@@ -1,0 +1,34 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: checkba-backend
+  # 默认使用 H2 内存数据库，方便直接启动。
+  # 如需连接本地 MySQL，请注释掉 H2 配置，取消 MySQL 配置的注释。
+  datasource:
+    # H2 配置
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:checkba;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password:
+
+    # MySQL 配置 (取消注释以使用)
+    # driver-class-name: com.mysql.cj.jdbc.Driver
+    # url: jdbc:mysql://localhost:3306/checkba?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    # username: root
+    # password: your_password
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    database-platform: org.hibernate.dialect.H2Dialect
+    # MySQL 请使用: org.hibernate.dialect.MySQL8Dialect
+
+# 外部服务配置
+external:
+  qichacha:
+    base-url: https://api.qichacha.com
+    key: ***REMOVED***
+    secret: ***REMOVED***

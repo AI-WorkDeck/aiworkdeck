@@ -1,0 +1,54 @@
+# Java / Maven
+backend/target/
+backend/.classpath
+backend/.project
+backend/.settings/
+*.class
+*.log
+*.jar
+*.war
+
+# Node.js
+node_modules/
+frontend/node_modules/
+panel/node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+database.sqlite
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 日志文件
+*.log
+hs_err_pid*.log
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+
+# WPS / 其他第三方配置（如果包含敏感信息）
+# 注意：WPS AppSecret 等应该通过环境变量配置，不要提交到仓库
+
