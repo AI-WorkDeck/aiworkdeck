@@ -31,8 +31,17 @@ echo -e "${GREEN}[1/8] 检查环境...${NC}"
 # 检查 Java
 if ! command -v java &> /dev/null; then
     echo -e "${YELLOW}Java 未安装，开始安装 Java 17...${NC}"
-    apt-get update
+    # 先更新 apt，忽略仓库 Label 变更的警告
+    apt-get update -o Acquire::Check-Valid-Until=false 2>/dev/null || apt-get update
+    # 安装 Java 17
     apt-get install -y openjdk-17-jdk
+    # 验证安装
+    if command -v java &> /dev/null; then
+        echo -e "${GREEN}Java 安装成功: $(java -version 2>&1 | head -n 1)${NC}"
+    else
+        echo -e "${RED}Java 安装失败，请手动检查${NC}"
+        exit 1
+    fi
 else
     echo -e "${GREEN}Java 已安装: $(java -version 2>&1 | head -n 1)${NC}"
 fi
@@ -41,6 +50,13 @@ fi
 if ! command -v mvn &> /dev/null; then
     echo -e "${YELLOW}Maven 未安装，开始安装 Maven...${NC}"
     apt-get install -y maven
+    # 验证安装
+    if command -v mvn &> /dev/null; then
+        echo -e "${GREEN}Maven 安装成功: $(mvn -version | head -n 1)${NC}"
+    else
+        echo -e "${RED}Maven 安装失败，请手动检查${NC}"
+        exit 1
+    fi
 else
     echo -e "${GREEN}Maven 已安装: $(mvn -version | head -n 1)${NC}"
 fi
