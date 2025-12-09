@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: checkba-backend
+  # 生产环境建议使用 MySQL
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/checkba?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: 你的MySQL密码  # 请修改
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false  # 生产环境关闭 SQL 日志
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+
+# 外部服务配置
+external:
+  qichacha:
+    base-url: https://api.qichacha.com
+    key: ***REMOVED***
+    secret: ***REMOVED***
+  wps:
+    app-id: 你的WPS_AppID  # 从 WPS 控制台获取
+    app-secret: 你的WPS_AppSecret  # 从 WPS 控制台获取
+    callback-base-url: https://api.checkba.yourdomain.com  # 你的 API 域名
+
