@@ -23,7 +23,7 @@ ssh root@你的ECS_IP
 cd /www/wwwroot
 
 # 克隆代码
-git clone https://github.com/zeweihan/checkba.git
+git clone https://gitee.com/hanzeweiasa/checkba.git
 
 cd checkba
 ```
@@ -97,15 +97,9 @@ sudo systemctl enable checkba-backend
 sudo systemctl status checkba-backend
 ```
 
-### 第 6 步：在宝塔创建网站（前端）
+### 第 6 步：配置 Nginx 反向代理（API）
 
-1. 登录宝塔面板
-2. 网站 → 添加站点
-3. 域名：`checkba.yourdomain.com`
-4. 根目录：`/www/wwwroot/checkba/frontend/dist`（需要先构建前端）
-5. PHP 版本：纯静态（不需要 PHP）
-
-### 第 7 步：配置 Nginx 反向代理（API）
+**注意：前端在本地开发，不需要在服务器上部署前端**
 
 在宝塔面板：
 1. 网站 → 找到 `api.checkba.yourdomain.com`（如果没有就创建一个）
@@ -121,29 +115,26 @@ sudo systemctl status checkba-backend
 2. 设置 → SSL → Let's Encrypt
 3. 申请证书并开启强制 HTTPS
 
-### 第 9 步：构建前端
+### 第 7 步：配置前端本地开发环境
+
+**前端在本地开发，不需要在服务器上构建**
+
+在本地 `frontend/.env.local` 文件中配置：
 
 ```bash
-cd /www/wwwroot/checkba/frontend
-
-# 安装依赖
-npm install
-
-# 构建生产版本
-npm run build:h5
-
-# 构建产物在 dist 目录
-```
-
-### 第 10 步：配置前端环境变量
-
-编辑 `frontend/.env.production`（需要创建）：
-
-```bash
+# 后端 API 地址（指向服务器的 API 域名）
 VITE_API_BASE_URL=https://api.checkba.yourdomain.com
 ```
 
-然后重新构建前端。
+然后在本地运行：
+
+```bash
+cd frontend
+npm install  # 首次需要
+npm run dev:h5
+```
+
+浏览器访问 `http://localhost:5173` 即可，前端会自动请求服务器的 API。
 
 ## 验证部署
 
@@ -152,11 +143,14 @@ VITE_API_BASE_URL=https://api.checkba.yourdomain.com
    curl http://localhost:8080/api/projects
    ```
 
-2. **检查前端是否可访问：**
-   浏览器打开 `https://checkba.yourdomain.com`
-
-3. **检查 API 是否可访问：**
+2. **检查 API 是否可访问（从外网）：**
    浏览器打开 `https://api.checkba.yourdomain.com/api/projects`
+   应该返回 JSON 数据（可能是空数组，说明后端正常）
+
+3. **本地前端测试：**
+   - 在本地运行 `npm run dev:h5`
+   - 浏览器打开 `http://localhost:5173`
+   - 前端应该能正常调用服务器的 API
 
 ## 常见问题
 

@@ -49,7 +49,7 @@ fi
 if [ ! -d "$PROJECT_DIR" ]; then
     echo -e "${YELLOW}项目目录不存在，开始克隆代码...${NC}"
     cd /www/wwwroot
-    git clone https://github.com/zeweihan/checkba.git
+    git clone https://gitee.com/hanzeweiasa/checkba.git
 else
     echo -e "${GREEN}项目目录已存在，更新代码...${NC}"
     cd "$PROJECT_DIR"
@@ -114,25 +114,8 @@ else
     echo -e "${YELLOW}后端 API 可能还未完全启动，请稍后手动检查${NC}"
 fi
 
-echo -e "${GREEN}[6/8] 构建前端...${NC}"
-
-cd "$FRONTEND_DIR"
-
-# 检查 node_modules
-if [ ! -d "node_modules" ]; then
-    echo -e "${YELLOW}安装前端依赖...${NC}"
-    npm install
-fi
-
-# 构建前端
-npm run build:h5
-
-if [ ! -d "$FRONTEND_DIR/dist" ]; then
-    echo -e "${RED}前端构建失败！${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}前端构建成功${NC}"
+echo -e "${GREEN}[6/8] 跳过前端构建（前端在本地开发）...${NC}"
+echo -e "${YELLOW}前端在本地开发，通过 VITE_API_BASE_URL 指向服务器 API${NC}"
 
 echo -e "${GREEN}[7/8] 配置 Nginx（需要在宝塔面板手动完成）...${NC}"
 echo -e "${YELLOW}请按照以下步骤在宝塔面板配置：${NC}"
@@ -146,8 +129,10 @@ echo -e "${GREEN}[8/8] 部署完成！${NC}"
 echo ""
 echo -e "${GREEN}后续操作：${NC}"
 echo "1. 在宝塔面板配置 Nginx 反向代理（参考上面的步骤）"
-echo "2. 申请 SSL 证书"
-echo "3. 配置前端网站（域名: checkba.yourdomain.com，目录: $FRONTEND_DIR/dist）"
+echo "2. 申请 SSL 证书（API 域名: api.checkba.yourdomain.com）"
+echo "3. 前端本地开发配置："
+echo "   - 在 frontend/.env.local 中设置: VITE_API_BASE_URL=https://api.checkba.yourdomain.com"
+echo "   - 运行: npm run dev:h5"
 echo "4. 查看后端日志: journalctl -u checkba-backend -f"
 echo "5. 查看后端状态: systemctl status checkba-backend"
 
