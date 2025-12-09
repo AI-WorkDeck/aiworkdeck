@@ -140,7 +140,7 @@ npm run dev:h5
 
 1. **检查后端是否运行：**
    ```bash
-   curl http://localhost:8080/api/projects
+   curl http://localhost:9696/api/projects
    ```
 
 2. **检查 API 是否可访问（从外网）：**

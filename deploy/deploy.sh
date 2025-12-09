@@ -108,7 +108,7 @@ echo -e "${GREEN}[5/8] 检查后端健康状态...${NC}"
 # 等待后端完全启动
 sleep 5
 
-if curl -f http://localhost:8080/api/projects > /dev/null 2>&1; then
+if curl -f http://localhost:9696/api/projects > /dev/null 2>&1; then
     echo -e "${GREEN}后端 API 响应正常${NC}"
 else
     echo -e "${YELLOW}后端 API 可能还未完全启动，请稍后手动检查${NC}"

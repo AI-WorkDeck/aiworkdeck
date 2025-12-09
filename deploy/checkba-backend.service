@@ -8,7 +8,7 @@ User=root
 WorkingDirectory=/www/wwwroot/checkba/backend
 Environment="JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64"
 Environment="SPRING_PROFILES_ACTIVE=prod"
-ExecStart=/usr/bin/java -jar -Xms512m -Xmx1024m /www/wwwroot/checkba/backend/target/backend-0.0.1-SNAPSHOT.jar
+ExecStart=/usr/bin/java -jar -Xms512m -Xmx1024m -Dserver.port=9696 /www/wwwroot/checkba/backend/target/backend-0.0.1-SNAPSHOT.jar
 Restart=always
 RestartSec=10
 StandardOutput=journal
