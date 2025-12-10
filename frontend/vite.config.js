@@ -15,4 +15,6 @@ export default defineConfig({
       overlay: true, // 显示错误覆盖层
     },
   },
+  // 配置静态资源
+  publicDir: 'static',
 })

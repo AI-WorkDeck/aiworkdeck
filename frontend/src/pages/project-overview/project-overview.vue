@@ -73,18 +73,40 @@
               <view class="section-header">
                 <text class="section-title">在线编辑</text>
               </view>
-              <view v-if="wpsUrl" class="wps-container">
-                <!--
-                  这里通过 iframe 承载 WPS WebOffice 在线编辑页面：
-                  - wpsUrl 由后端生成并通过环境变量注入（或后续按项目与文档 ID 拼接）；
-                  - 后续接入 JS SDK 后，可以改为在容器 div 上初始化 WPS 对象并绑定 JSAPI。
-                -->
-                <iframe class="wps-frame" :src="wpsUrl" frameborder="0"></iframe>
+
+              <!-- 初始状态：提示用户点击按钮再加载编辑器，避免一进入页面就全屏加载 -->
+              <view v-if="!wpsEverTried" class="editor-placeholder">
+                <view>
+                  <text class="placeholder-text">
+                    尚未加载在线编辑器，请点击下方“开始编辑”按钮。
+                  </text>
+                </view>
+                <view style="margin-top: 16rpx;">
+                  <button type="primary" size="mini" @tap="startWpsEdit">
+                    开始编辑
+                  </button>
+                </view>
               </view>
-              <view v-else class="editor-placeholder">
-                <text class="placeholder-text">
-                  未配置 WPS 在线编辑地址，请在环境变量 VITE_WPS_WEB_OFFICE_DEMO_URL 中填入后端生成的编辑链接。
-                </text>
+
+              <!-- 编辑器容器：只有在 wpsEverTried 后才渲染，避免首屏被 WPS 占满 -->
+              <view v-else class="wps-container">
+                <!--
+                  WPS JS SDK 容器：
+                  - 使用 JS SDK 初始化编辑器，而不是 iframe
+                  - SDK 会自动创建 iframe 并注入到这个容器中
+                  - 注意：uni-app 中使用 view 标签，但 SDK 需要真实的 DOM 元素
+                -->
+                <view :id="wpsContainerId" class="wps-editor-container" style="width: 100%; height: 100%;"></view>
+
+                <!-- 状态提示覆盖层 -->
+                <view v-if="wpsLoading" class="editor-placeholder wps-status-layer">
+                  <text class="placeholder-text">正在加载编辑器...</text>
+                </view>
+                <view v-else-if="wpsEverTried && !wpsInstanceReady" class="editor-placeholder wps-status-layer">
+                  <text class="placeholder-text">
+                    编辑器加载失败，请检查后端配置或刷新页面重试。
+                  </text>
+                </view>
               </view>
             </view>
           </view>
@@ -132,7 +154,8 @@
 </template>
 
 <script>
-import { WPS_WEB_OFFICE_DEMO_URL } from '@/config/wps.js'
+import { createWpsSession } from '@/services/api.js'
+import { initWpsEditor } from '@/utils/wps-sdk.js'
 
 export default {
   data() {
@@ -157,7 +180,13 @@ export default {
         { key: 'assets', label: '主要资产', subtitle: '核心资产与权属情况' },
         { key: 'related', label: '关联方与同业竞争', subtitle: '关联交易与竞业' },
       ],
-      wpsUrl: WPS_WEB_OFFICE_DEMO_URL,
+      wpsUrl: '',
+      wpsLoading: false,
+      wpsEverTried: false,
+      wpsInstanceReady: false,
+      wpsInstance: null,
+      wpsContainerId: 'wps-editor-container-' + Date.now(),
+      wpsAppId: 'SX20251208BJWRFK', // WPS AppID
     }
   },
   onLoad(query) {
@@ -183,7 +212,84 @@ export default {
     },
     switchTab(key) {
       this.activeTab = key
+      // 用户主动点击“开始编辑”后再加载 WPS，不在切换 Tab 时自动加载
     },
+    // 用户点击“开始编辑”按钮时调用
+    startWpsEdit() {
+      if (!this.wpsInstanceReady && !this.wpsLoading) {
+        this.loadWpsEditUrl()
+      }
+    },
+    async loadWpsEditUrl() {
+      if (!this.projectId) {
+        // 如果没有项目ID，使用默认文件ID
+        this.projectId = 'default'
+      }
+      // 标记已尝试加载，用于控制错误提示展示时机
+      this.wpsEverTried = true
+      
+      this.wpsLoading = true
+      try {
+        // 生成文件ID：project_{projectId}_doc_1，附带时间戳避免历史状态干扰
+        const fileId = `project_${this.projectId}_doc_1_v${Date.now()}`
+        const fileName = this.project.name ? `${this.project.name}.docx` : '项目文档.docx'
+        let token = ''
+
+        // 先向后端申请一个业务 token，用于 SDK 初始化和回调鉴权
+        try {
+          const session = await createWpsSession({
+            fileId,
+            // 预留：后续接入登录体系后，可以传当前登录用户 ID
+            // userId: this.currentUserId,
+          })
+          if (session && session.token) {
+            token = session.token
+          }
+        } catch (e) {
+          console.error('创建 WPS 会话失败:', e)
+          // 不阻断后续流程，允许在无 token 情况下继续尝试加载编辑器
+        }
+
+        // 等待容器元素渲染完成
+        await this.$nextTick()
+        
+        // 再次确认容器元素存在
+        const containerElement = document.getElementById(this.wpsContainerId)
+        if (!containerElement) {
+          throw new Error(`容器元素 ${this.wpsContainerId} 未找到，请检查页面渲染`)
+        }
+        
+        // 使用 JS SDK 初始化编辑器
+        // 注意：JS SDK 需要直接使用 fileId 和 appId，不需要生成 URL
+        this.wpsInstance = await initWpsEditor({
+          containerId: this.wpsContainerId,
+          appId: this.wpsAppId,
+          fileId: fileId,
+          fileName: fileName,
+          mode: 'edit',
+          token,
+        })
+        
+        this.wpsInstanceReady = true
+        console.log('WPS 编辑器初始化成功')
+      } catch (error) {
+        console.error('Error loading WPS editor:', error)
+        uni.showToast({
+          title: '加载编辑器失败: ' + (error.message || '未知错误'),
+          icon: 'none',
+          duration: 3000,
+        })
+        this.wpsInstanceReady = false
+      } finally {
+        this.wpsLoading = false
+      }
+    },
+  },
+  beforeUnmount() {
+    // 组件销毁时，销毁 WPS 实例
+    if (this.wpsInstance && this.wpsInstance.destroy) {
+      this.wpsInstance.destroy()
+    }
   },
 }
 </script>
@@ -381,6 +487,9 @@ export default {
 .workspace-right {
   flex: 1;
   min-width: 0;
+  /* 让右侧工作区内部可以滚动，避免 WPS 编辑器撑满整屏 */
+  max-height: calc(100vh - 260rpx);
+  overflow: hidden;
 }
 
 .section-header {
@@ -406,11 +515,25 @@ export default {
   box-sizing: border-box;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
 }
 
 .wps-container {
+  position: relative;
   padding: 0;
   border-style: solid;
+  /* 限制编辑区域高度，防止占满整屏；保留上方项目信息和 Tab */
+  height: calc(100vh - 360rpx);
+  max-height: 800px;
+  overflow: hidden;
+}
+
+/* WPS 编辑器状态覆盖层：保持容器节点存在，仅用半透明层做状态提示 */
+.wps-status-layer {
+  position: absolute;
+  inset: 0;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.8);
 }
 
 .wps-frame {

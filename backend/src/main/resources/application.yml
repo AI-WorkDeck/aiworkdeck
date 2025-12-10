@@ -32,3 +32,7 @@ external:
     base-url: https://api.qichacha.com
     key: ***REMOVED***
     secret: ***REMOVED***
+  wps:
+    app-id: your-wps-app-id  # 请从 WPS 控制台获取
+    app-secret: your-wps-app-secret  # 请从 WPS 控制台获取
+    callback-base-url: https://checkbahttps.vip.cpolar.cn  # 使用 cpolar 内网穿透地址，供 WPS 回调使用

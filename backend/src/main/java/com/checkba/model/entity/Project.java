@@ -55,14 +55,14 @@ public class Project {
      * 上市公司从外部服务补全的基础信息 JSON
      */
     @Lob
-    @Column(columnDefinition = "CLOB")
+    @Column(columnDefinition = "TEXT")
     private String listedCompanyInfoJson;
 
     /**
      * 标的公司从外部服务补全的基础信息 JSON
      */
     @Lob
-    @Column(columnDefinition = "CLOB")
+    @Column(columnDefinition = "TEXT")
     private String targetCompanyInfoJson;
 
     /**

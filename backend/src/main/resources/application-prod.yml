@@ -1,0 +1,26 @@
+server:
+  port: 9696
+
+spring:
+  application:
+    name: checkba-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/checkba?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: checkba
+    password: checkba123
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+
+external:
+  qichacha:
+    base-url: https://api.qichacha.com
+    key: ***REMOVED***
+    secret: ***REMOVED***
+  wps:
+    app-id: SX20251208BJWRFK
+    app-secret: ***REMOVED***
+    callback-base-url: https://api.checkba.hanzewei.com

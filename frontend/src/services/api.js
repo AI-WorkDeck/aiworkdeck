@@ -3,7 +3,9 @@
 // - 所有网络请求都应通过这里发起，组件内禁止直接写 URL。
 // - 后端基础地址通过环境变量配置，便于本地 / Sealos / 阿里云等环境切换。
 
-const DEFAULT_API_BASE_URL = 'http://localhost:8080';
+// 本地开发环境默认使用 cpolar 内网穿透地址
+// 生产环境可通过 VITE_API_BASE_URL 环境变量覆盖
+const DEFAULT_API_BASE_URL = 'https://checkbahttps.vip.cpolar.cn';
 
 function getApiBaseUrl() {
   // uni-app + vite 环境下可使用 import.meta.env
@@ -73,6 +75,40 @@ export function fetchCompanyBasicInfo(payload) {
 export function createProject(payload) {
   return request({
     url: '/api/projects',
+    method: 'POST',
+    data: payload,
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 生成 WPS 在线编辑链接
+// payload: { fileId: string, fileName?: string, mode?: 'edit' | 'view' }
+export function generateWpsEditUrl(payload) {
+  return request({
+    url: '/api/wps/generate-url',
+    method: 'POST',
+    data: payload,
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 获取 WPS 回调网关地址
+export function getWpsCallbackBaseUrl() {
+  return request({
+    url: '/api/wps/callback-base-url',
+    method: 'GET',
+  });
+}
+
+// 创建 WPS 会话，获取用于前端 SDK 初始化的业务 token
+// payload: { fileId: string, userId?: string }
+export function createWpsSession(payload) {
+  return request({
+    url: '/api/wps/session',
     method: 'POST',
     data: payload,
     header: {

@@ -98,21 +98,21 @@ public class CompanyMirror {
      * 前十大股东列表 JSON
      */
     @Lob
-    @Column(columnDefinition = "CLOB")
+    @Column(columnDefinition = "TEXT")
     private String top10ShareholdersJson;
 
     /**
      * 董监高列表 JSON
      */
     @Lob
-    @Column(columnDefinition = "CLOB")
+    @Column(columnDefinition = "TEXT")
     private String executivesJson;
 
     /**
      * 股东列表 JSON（标的公司）
      */
     @Lob
-    @Column(columnDefinition = "CLOB")
+    @Column(columnDefinition = "TEXT")
     private String shareholdersJson;
 
     /**

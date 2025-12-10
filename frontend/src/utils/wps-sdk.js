@@ -1,0 +1,180 @@
+/**
+ * WPS WebOffice SDK 工具类
+ * 封装 WPS JS SDK 的初始化和使用
+ */
+
+// 动态加载 WPS SDK
+let WebOfficeSDK = null
+
+/**
+ * 加载 WPS SDK
+ */
+export function loadWpsSDK() {
+  return new Promise((resolve, reject) => {
+    if (WebOfficeSDK) {
+      resolve(WebOfficeSDK)
+      return
+    }
+
+    // 在浏览器环境中动态加载 SDK
+    if (typeof window !== 'undefined') {
+      const script = document.createElement('script')
+      // uni-app + vite 环境下，静态资源路径
+      // 开发环境：直接从 static 目录读取
+      // 生产环境：需要配置正确的静态资源路径
+      const sdkPath = '/static/web-office-sdk-solution-v2.0.7.umd.js'
+      script.src = sdkPath
+      script.onload = () => {
+        // UMD 格式的 SDK 会挂载到 window 上
+        // 等待一小段时间确保 SDK 完全加载
+        setTimeout(() => {
+          if (window.WebOfficeSDK) {
+            WebOfficeSDK = window.WebOfficeSDK
+            resolve(WebOfficeSDK)
+          } else {
+            // 尝试其他可能的全局变量名
+            if (window.WPS || window.wps) {
+              WebOfficeSDK = window.WPS || window.wps
+              resolve(WebOfficeSDK)
+            } else {
+              reject(new Error('WPS SDK 加载失败：未找到 WebOfficeSDK 对象，请检查 SDK 文件是否正确加载'))
+            }
+          }
+        }, 100)
+      }
+      script.onerror = (error) => {
+        console.error('SDK 脚本加载错误:', error, '路径:', sdkPath)
+        reject(new Error(`WPS SDK 加载失败：脚本加载错误，请检查文件路径 ${sdkPath} 是否正确`))
+      }
+      document.head.appendChild(script)
+    } else {
+      reject(new Error('WPS SDK 只能在浏览器环境中使用'))
+    }
+  })
+}
+
+/**
+ * 初始化 WPS 编辑器
+ * @param {Object} options 配置选项
+ * @param {string} options.containerId 容器元素 ID
+ * @param {string} options.appId WPS AppID
+ * @param {string} options.fileId 文件ID
+ * @param {string} options.fileName 文件名
+ * @param {string} options.mode 模式：'edit' 或 'view'
+ * @param {string} [options.token] 业务 token（可选，用于后端鉴权）
+ * @returns {Promise<Object>} WPS 实例对象
+ */
+export async function initWpsEditor(options) {
+  const { containerId, appId, fileId, fileName, mode = 'edit', token } = options
+
+  // 加载 SDK
+  const SDK = await loadWpsSDK()
+
+  // 根据文件类型确定 officeType
+  // WPS SDK 使用 SDK.OfficeType 枚举
+  const officeType = getOfficeType(fileName, SDK)
+
+  // 初始化 WPS 编辑器
+  // 注意：uni-app 中使用 view 标签，需要等待 DOM 渲染完成
+  // 使用 nextTick 确保容器元素已渲染
+  await new Promise((resolve) => {
+    // 优先使用 uni-app 的 nextTick（如果存在且为函数）
+    if (typeof window !== 'undefined' && window.uni && typeof window.uni.nextTick === 'function') {
+      window.uni.nextTick(() => {
+        resolve()
+      })
+      return
+    }
+
+    // 兜底：普通浏览器环境下，使用短延时等待 DOM
+    setTimeout(resolve, 50)
+  })
+
+  const containerElement = document.getElementById(containerId)
+  if (!containerElement) {
+    throw new Error(`找不到容器元素: ${containerId}，请确保容器已渲染`)
+  }
+
+  // 初始化 WPS 编辑器
+  // 对照官方文档：
+  // https://solution.wps.cn/docs/web/quick-start.html
+  // WebOfficeSDK.init 的挂载点参数名称为 mount，而不是 container，
+  // mount 可以是 DOM 元素或选择器字符串。
+  const instance = SDK.init({
+    officeType: officeType,
+    appId: appId,
+    fileId: fileId,
+    // 按官方文档使用 mount 作为挂载容器，确保不走全屏默认容器逻辑
+    mount: containerElement,
+    // 业务 token：由后端生成并回传，用于在回调中做鉴权（X-Weboffice-Token）
+    // 按 WPS 文档，该字段完全由业务方自定义，可为空。
+    token: token,
+    // endpoint 默认为 https://o.wpsgo.com，这里使用默认即可；
+    // 如果后续需要切换到其他网关，可在此显式传入 endpoint。
+    // readOnly: false, // 如需强制预览模式，可按官方文档传入 readOnly，当前保持编辑默认值
+  })
+
+  // 等待编辑器就绪
+  await instance.ready()
+
+  // 监听文件打开事件
+  instance.ApiEvent.AddApiEventListener('fileOpen', (data) => {
+    console.log('WPS 文件打开:', data)
+    if (data.success) {
+      console.log('文件打开成功:', data.fileInfo)
+    } else {
+      console.error('文件打开失败:', data.msg)
+    }
+  })
+
+  // 监听错误事件
+  instance.ApiEvent.AddApiEventListener('error', (data) => {
+    console.error('WPS 错误:', data)
+  })
+
+  return instance
+}
+
+/**
+ * 根据文件名获取 Office 类型
+ * @param {string} fileName 文件名
+ * @param {Object} SDK WPS SDK 对象
+ * @returns {string|number} Office 类型（使用 SDK.OfficeType 枚举）
+ */
+function getOfficeType(fileName, SDK) {
+  // 使用 SDK 的 OfficeType 枚举
+  if (SDK && SDK.OfficeType) {
+    if (!fileName) {
+      return SDK.OfficeType.Writer // 默认 Word
+    }
+
+    const lower = fileName.toLowerCase()
+    if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
+      return SDK.OfficeType.Writer // Word
+    } else if (lower.endsWith('.xls') || lower.endsWith('.xlsx')) {
+      return SDK.OfficeType.Spreadsheet // Excel
+    } else if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) {
+      return SDK.OfficeType.Presentation // PowerPoint
+    } else if (lower.endsWith('.pdf')) {
+      return SDK.OfficeType.PDF
+    }
+    return SDK.OfficeType.Writer // 默认 Word
+  } else {
+    // 如果 SDK.OfficeType 不存在，使用字符串（兼容旧版本）
+    if (!fileName) {
+      return 'Writer'
+    }
+    const lower = fileName.toLowerCase()
+    if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
+      return 'Writer'
+    } else if (lower.endsWith('.xls') || lower.endsWith('.xlsx')) {
+      return 'Spreadsheet'
+    } else if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) {
+      return 'Presentation'
+    } else if (lower.endsWith('.pdf')) {
+      return 'PDF'
+    }
+    return 'Writer'
+  }
+}
+
