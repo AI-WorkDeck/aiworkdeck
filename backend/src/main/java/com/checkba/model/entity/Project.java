@@ -66,6 +66,12 @@ public class Project {
     private String targetCompanyInfoJson;
 
     /**
+     * 项目创建者用户 ID
+     */
+    @Column(nullable = false)
+    private Long userId;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createdAt;

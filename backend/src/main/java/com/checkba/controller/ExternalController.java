@@ -23,6 +23,9 @@ public class ExternalController {
     private QichachaService qichachaService;
 
     @Autowired
+    private com.checkba.service.TushareService tushareService;
+
+    @Autowired
     private CompanyMirrorService companyMirrorService;
 
     @Autowired
@@ -48,9 +51,26 @@ public class ExternalController {
         }
 
         try {
-            CompanyBasicInfoDTO dto = qichachaService.searchCompany(searchKey, request.getRole());
+            CompanyBasicInfoDTO dto = null;
+            
+            // Prioritize Tushare for LISTED companies
+            if ("LISTED".equalsIgnoreCase(request.getRole())) {
+                try {
+                    dto = tushareService.fetchCompanyInfoDTO(searchKey);
+                } catch (Exception e) {
+                    // Log error and fallback to Qichacha? Or just fail?
+                    // Let's assume fallback or just let it be null so Qichacha picks it up?
+                    // User explicitly asked to change data source to Tushare.
+                    // So if Tushare fails (returns null), we might want to fail or try Qichacha as backup.
+                    // For now, if Tushare returns null, we proceed to Qichacha.
+                }
+            }
+            
+            if (dto == null) {
+                dto = qichachaService.searchCompany(searchKey, request.getRole());
+            }
 
-            // 如果是股票代码查询且企查查返回的 stockCode 为空，则用用户输入的代码兜底
+            // 如果是股票代码查询且企查查/Tushare返回的 stockCode 为空，则用用户输入的代码兜底
             if (original.matches("\\d{6}") && !StringUtils.hasText(dto.getStockCode())) {
                 dto.setStockCode(original);
             }

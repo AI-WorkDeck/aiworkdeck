@@ -1,121 +1,157 @@
 package com.checkba.controller;
 
+import com.checkba.model.entity.ProjectFile;
+import com.checkba.repository.ProjectFileRepository;
+import com.checkba.service.ai.ProjectRagService;
+import com.checkba.storage.StorageException;
+import com.checkba.storage.StorageService;
+import com.checkba.storage.StorageServiceFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URLEncoder;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * WPS 文档实际存储与下载/上传接口
- *
- * 路径与 WpsController 中的回调返回保持一致：
- * - 下载：GET  /api/files/{fileId}/download
- * - 上传：PUT  /api/files/{fileId}/upload
- *
- * 存储策略：
- * - 统一存放在项目根目录 ../data/wps-files/{fileId}.docx
- * - 如果文件不存在，则从 ../docs/template.docx 复制一份作为初始文档
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/files")
 public class FileController {
 
-    // 项目根目录（backend 的上一级目录）
-    private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir")).getParent();
-    // 模板文件：用于新建文档的初始内容
-    private static final Path TEMPLATE_DOC = PROJECT_ROOT.resolve("docs/template.docx");
-    // 实际存储目录
-    private static final Path STORAGE_DIR = PROJECT_ROOT.resolve("data/wps-files");
+    @Autowired
+    private StorageServiceFactory storageServiceFactory;
 
-    private Path resolveFilePath(String fileId) {
-        return STORAGE_DIR.resolve(fileId + ".docx");
+    @Autowired
+    private ProjectFileRepository projectFileRepository;
+    
+    @Autowired
+    private ProjectRagService projectRagService;
+
+    private StorageService getStorageService() {
+        return storageServiceFactory.getStorageService();
     }
 
     /**
-     * 实际下载接口：供 WPS 回调中的 download_url 使用
+     * 实际下载接口
      */
     @GetMapping("/{fileId}/download")
-    public ResponseEntity<Resource> downloadFile(@PathVariable("fileId") String fileId) throws IOException {
-        Path filePath = resolveFilePath(fileId);
+    public ResponseEntity<Resource> downloadFile(@PathVariable("fileId") String fileId) {
+        try {
+            // 1. 获取文件路径
+            String path = fileId; // 默认回退到 fileId (兼容旧逻辑)
+            
+            Optional<ProjectFile> projectFileOpt = projectFileRepository.findByWpsFileId(fileId);
+            String downloadFilename = fileId + ".docx";
 
-        // 如果文件不存在，则以模板为基础创建
-        if (!Files.exists(filePath)) {
-            Files.createDirectories(STORAGE_DIR);
-            if (Files.exists(TEMPLATE_DOC)) {
-                Files.copy(TEMPLATE_DOC, filePath, StandardCopyOption.REPLACE_EXISTING);
-                log.info("Created new file from template: {}", filePath);
-            } else {
-                log.warn("Template file not found: {}", TEMPLATE_DOC);
-                // 如果没有模板，就创建一个空文件，避免 404
-                Files.createFile(filePath);
+            if (projectFileOpt.isPresent()) {
+                ProjectFile pf = projectFileOpt.get();
+                // 如果数据库中有 filePath，优先使用
+                if (StringUtils.hasText(pf.getFilePath())) {
+                    path = pf.getFilePath();
+                }
+                // 使用真实文件名（防中文乱码）
+                if (StringUtils.hasText(pf.getName())) {
+                    downloadFilename = pf.getName();
+                    if (!downloadFilename.toLowerCase().endsWith(".docx")) {
+                        downloadFilename += ".docx";
+                    }
+                }
             }
-        }
 
-        FileSystemResource resource = new FileSystemResource(filePath);
-        if (!resource.exists()) {
-            log.error("File not found for download: {}", filePath);
+            Resource resource = getStorageService().load(path);
+
+            MediaType mediaType = MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+
+            String filename = URLEncoder.encode(downloadFilename, StandardCharsets.UTF_8).replace("+", "%20");
+
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .body(resource);
+        } catch (StorageException e) {
+            log.error("文件下载失败: fileId={}", fileId, e);
             return ResponseEntity.notFound().build();
         }
-
-        // 统一使用 docx MIME 类型
-        MediaType mediaType = MediaType.parseMediaType(
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-
-        // 下载文件名：使用 fileId.docx，避免中文编码问题
-        String filename = URLEncoder.encode(fileId + ".docx", "UTF-8").replace("+", "%20");
-
-        return ResponseEntity.ok()
-                .contentType(mediaType)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .body(resource);
     }
 
     /**
-     * 上传接口：供 WPS 三段式保存中的 upload_url 使用
-     * WPS 会以 PUT application/octet-stream 的方式上传文件流
+     * 上传接口
      */
     @PutMapping("/{fileId}/upload")
     public ResponseEntity<Map<String, Object>> uploadFile(
             @PathVariable("fileId") String fileId,
-            HttpServletRequest request) throws IOException {
+            HttpServletRequest request) {
 
-        Path filePath = resolveFilePath(fileId);
-        Files.createDirectories(STORAGE_DIR);
+        try (InputStream inputStream = request.getInputStream()) {
+            // 1. 确定存储路径
+            String storagePath = fileId; // 默认旧路径
+            Long projectId = null;
+            
+            Optional<ProjectFile> projectFileOpt = projectFileRepository.findByWpsFileId(fileId);
+            if (projectFileOpt.isPresent()) {
+                ProjectFile pf = projectFileOpt.get();
+                projectId = pf.getProjectId();
+                
+                // 如果已有路径，沿用
+                if (StringUtils.hasText(pf.getFilePath())) {
+                    storagePath = pf.getFilePath();
+                } else {
+                    // 如果没有路径，构建新结构路径: projects/{pid}/edit/{name}
+                    // 默认上传的文件归类为 edit，后续可手动移动到 evidence
+                    // 使用真实文件名作为物理文件名
+                    String safeName = StringUtils.hasText(pf.getName()) ? pf.getName() : fileId;
+                    if (!safeName.endsWith(".docx")) safeName += ".docx";
+                    
+                    // 构造路径: projects/1/edit/合同.docx
+                    storagePath = String.format("projects/%d/edit/%s", pf.getProjectId(), safeName);
+                    
+                    // 更新数据库
+                    pf.setFilePath(storagePath);
+                    projectFileRepository.save(pf);
+                    log.info("迁移文件存储路径: fileId={} -> {}", fileId, storagePath);
+                }
+            }
 
-        try (InputStream in = request.getInputStream();
-             OutputStream out = Files.newOutputStream(filePath,
-                     StandardOpenOption.CREATE,
-                     StandardOpenOption.TRUNCATE_EXISTING,
-                     StandardOpenOption.WRITE)) {
-            in.transferTo(out);
+            String savedPath = getStorageService().save(storagePath, inputStream);
+            log.info("文件上传成功: fileId={}, path={}", fileId, savedPath);
+            
+            // 2. 触发 RAG 知识库刷新
+            if (projectId != null) {
+                // 转为 String
+                projectRagService.refreshProjectKnowledge(String.valueOf(projectId));
+                log.info("触发项目知识库刷新: projectId={}", projectId);
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", 0);
+            result.put("message", "");
+            result.put("data", new HashMap<>());
+
+            return ResponseEntity.ok(result);
+        } catch (IOException | StorageException e) {
+            log.error("文件上传失败: fileId={}", fileId, e);
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", -1);
+            result.put("message", "文件上传失败: " + e.getMessage());
+            result.put("data", new HashMap<>());
+
+            return ResponseEntity.status(500).body(result);
         }
-
-        log.info("Uploaded file for fileId={}, path={}", fileId, filePath);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("code", 0);
-        result.put("message", "");
-        result.put("data", new HashMap<>());
-
-        return ResponseEntity.ok(result);
     }
 }
-
-

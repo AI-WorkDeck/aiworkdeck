@@ -6,7 +6,7 @@ spring:
     name: checkba-backend
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/checkba?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3306/checkba?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: checkba
     password: checkba123
   jpa:
@@ -23,4 +23,22 @@ external:
   wps:
     app-id: SX20251208BJWRFK
     app-secret: ***REMOVED***
-    callback-base-url: https://api.checkba.hanzewei.com
+    callback-base-url: https://checkbahttps.vip.cpolar.cn  # 使用 cpolar 内网穿透地址，供 WPS 回调使用
+
+# 文件存储配置
+storage:
+  # 生产环境建议使用对象存储
+  type: local  # 或 oss
+  local:
+    root-path: /data/checkba/wps-files  # 生产环境建议使用绝对路径
+    template-path: /data/checkba/docs/template.docx
+  oss:
+    provider: aliyun  # 或 aws、minio
+    access-key-id: ${OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+    bucket-name: ${OSS_BUCKET_NAME:}
+    region: ${OSS_REGION:oss-cn-hangzhou}
+    endpoint: ${OSS_ENDPOINT:}
+    path-prefix: wps-files/
+    use-https: true
+    cdn-domain: ${OSS_CDN_DOMAIN:}

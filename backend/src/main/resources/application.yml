@@ -4,27 +4,16 @@ server:
 spring:
   application:
     name: checkba-backend
-  # 默认使用 H2 内存数据库，方便直接启动。
-  # 如需连接本地 MySQL，请注释掉 H2 配置，取消 MySQL 配置的注释。
   datasource:
-    # H2 配置
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:checkba;DB_CLOSE_DELAY=-1;MODE=MySQL
-    username: sa
-    password:
-
-    # MySQL 配置 (取消注释以使用)
-    # driver-class-name: com.mysql.cj.jdbc.Driver
-    # url: jdbc:mysql://localhost:3306/checkba?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
-    # username: root
-    # password: your_password
-  
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/checkba?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: checkba
+    password: checkba123
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
-    database-platform: org.hibernate.dialect.H2Dialect
-    # MySQL 请使用: org.hibernate.dialect.MySQL8Dialect
+    database-platform: org.hibernate.dialect.MySQL8Dialect
 
 # 外部服务配置
 external:
@@ -33,6 +22,50 @@ external:
     key: ***REMOVED***
     secret: ***REMOVED***
   wps:
-    app-id: your-wps-app-id  # 请从 WPS 控制台获取
-    app-secret: your-wps-app-secret  # 请从 WPS 控制台获取
+    app-id: SX20251208BJWRFK
+    app-secret: ***REMOVED***
     callback-base-url: https://checkbahttps.vip.cpolar.cn  # 使用 cpolar 内网穿透地址，供 WPS 回调使用
+
+# 文件存储配置
+storage:
+  # 存储类型：local（本地文件系统）或 oss（对象存储）
+  type: local
+  # 本地存储配置
+  local:
+    # 存储根目录（相对于项目根目录或绝对路径）
+    root-path: data/wps-files
+    # 模板文件路径（用于新建文档的初始内容）
+    template-path: docs/template.docx
+  # 对象存储配置（当 type=oss 时生效）
+  oss:
+    # 对象存储提供商：aliyun（阿里云OSS）、aws（AWS S3）、minio（MinIO）
+    provider: aliyun
+    # 访问密钥ID
+    access-key-id: YOUR_ACCESS_KEY_ID
+    # 访问密钥Secret
+    access-key-secret: YOUR_ACCESS_KEY_SECRET
+    # 存储桶名称
+    bucket-name: your-bucket-name
+    # 存储桶所在区域（例如：oss-cn-hangzhou、us-east-1）
+    region: oss-cn-hangzhou
+    # 自定义端点（可选，用于MinIO或私有部署）
+    endpoint: 
+    # 文件存储路径前缀（可选，例如：wps-files/）
+    path-prefix: wps-files/
+    # 是否使用HTTPS
+    use-https: true
+    # CDN域名（可选，用于加速访问）
+    cdn-domain:
+
+# LangChain4j Ollama Configuration
+langchain4j:
+  ollama:
+    chat-model:
+      base-url: http://localhost:11434
+      model-name: qwen2.5:14b-instruct
+      temperature: 0.7
+      timeout: 300s
+    embedding-model:
+      base-url: http://localhost:11434
+      model-name: nomic-embed-text
+      timeout: 300s
