@@ -68,6 +68,17 @@
             <artifactId>langchain4j-document-parser-apache-tika</artifactId>
             <version>0.36.0</version>
         </dependency>
+        <!-- flexmark-java: Markdown 解析 + Docx 渲染 -->
+        <dependency>
+            <groupId>com.vladsch.flexmark</groupId>
+            <artifactId>flexmark-all</artifactId>
+            <version>0.64.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.vladsch.flexmark</groupId>
+            <artifactId>flexmark-docx-converter</artifactId>
+            <version>0.64.0</version>
+        </dependency>
         
         <!-- 对象存储依赖（可选，根据实际使用的服务提供商选择） -->
         <!-- 阿里云OSS -->

@@ -1,9 +1,12 @@
 package com.checkba.service.ai;
 
 import dev.langchain4j.service.SystemMessage;
-import dev.langchain4j.service.spring.AiService;
 
-@AiService
+/**
+ * 项目智能助手接口：
+ * - 通过 LangChain4j 的 AiServices 在配置类中手动构建实现
+ * - SystemMessage 仍由 LangChain4j 读取并注入到对话上下文中
+ */
 public interface ProjectAssistant {
 
     @SystemMessage("You are an intelligent assistant for the Checkba project. " +

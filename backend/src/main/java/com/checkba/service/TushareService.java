@@ -8,6 +8,7 @@ import cn.hutool.json.JSONUtil;
 import com.checkba.model.dto.CompanyBasicInfoDTO;
 import com.checkba.model.entity.ProjectVariable;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -16,8 +17,11 @@ import java.util.*;
 @Slf4j
 public class TushareService {
 
-    private static final String TUSHARE_API_URL = "http://api.tushare.pro";
-    private static final String TOKEN = "***REMOVED***";
+    @Value("${external.tushare.base-url:http://api.tushare.pro}")
+    private String tushareApiUrl;
+
+    @Value("${external.tushare.token:}")
+    private String tushareToken;
 
     /**
      * Fetch listed company data and return a DTO for frontend display.
@@ -242,12 +246,12 @@ public class TushareService {
     private JSONObject callTushare(String apiName, JSONObject params, String fields) {
         JSONObject body = new JSONObject();
         body.put("api_name", apiName);
-        body.put("token", TOKEN);
+        body.put("token", tushareToken);
         body.put("params", params);
         body.put("fields", fields);
 
         try {
-            String result = HttpRequest.post(TUSHARE_API_URL)
+            String result = HttpRequest.post(tushareApiUrl)
                     .body(body.toString())
                     .timeout(10000)
                     .execute()

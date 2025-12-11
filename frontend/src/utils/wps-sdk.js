@@ -70,9 +70,23 @@ export async function initWpsEditor(options) {
   // 加载 SDK
   const SDK = await loadWpsSDK()
 
+  // 验证必需参数
+  if (!appId) {
+    throw new Error('[WebOfficeSDK.init] appId为必选项！')
+  }
+  if (!fileId) {
+    throw new Error('[WebOfficeSDK.init] fileId为必选项！')
+  }
+
   // 根据文件类型确定 officeType
   // WPS SDK 使用 SDK.OfficeType 枚举
   const officeType = getOfficeType(fileName, SDK)
+  
+  if (!officeType) {
+    throw new Error('[WebOfficeSDK.init] officeType为必选项！无法从文件名推断文件类型')
+  }
+  
+  console.log('初始化WPS编辑器:', { appId, fileId, fileName, officeType, mode })
 
   // 初始化 WPS 编辑器
   // 注意：uni-app 中使用 view 标签，需要等待 DOM 渲染完成
@@ -100,7 +114,11 @@ export async function initWpsEditor(options) {
   // https://solution.wps.cn/docs/web/quick-start.html
   // WebOfficeSDK.init 的挂载点参数名称为 mount，而不是 container，
   // mount 可以是 DOM 元素或选择器字符串。
-  const instance = SDK.init({
+  // 根据 WPS 官方文档，预览模式需要设置 readOnly: true
+  const isViewMode = mode === 'view'
+  
+  // 构建初始化配置对象
+  const initConfig = {
     officeType: officeType,
     appId: appId,
     fileId: fileId,
@@ -108,11 +126,18 @@ export async function initWpsEditor(options) {
     mount: containerElement,
     // 业务 token：由后端生成并回传，用于在回调中做鉴权（X-Weboffice-Token）
     // 按 WPS 文档，该字段完全由业务方自定义，可为空。
-    token: token,
+    // 在token中编码mode信息，供后端权限接口使用
+    token: token ? `${token}|mode=${mode}` : `mode=${mode}`,
+    // 预览模式：设置 readOnly: true 强制只读
+    // 编辑模式：readOnly: false 或不设置（默认可编辑）
+    readOnly: isViewMode,
     // endpoint 默认为 https://o.wpsgo.com，这里使用默认即可；
     // 如果后续需要切换到其他网关，可在此显式传入 endpoint。
-    // readOnly: false, // 如需强制预览模式，可按官方文档传入 readOnly，当前保持编辑默认值
-  })
+  }
+  
+  console.log('WPS初始化配置:', initConfig)
+  
+  const instance = SDK.init(initConfig)
 
   // 等待编辑器就绪
   await instance.ready()
@@ -142,39 +167,56 @@ export async function initWpsEditor(options) {
  * @returns {string|number} Office 类型（使用 SDK.OfficeType 枚举）
  */
 function getOfficeType(fileName, SDK) {
-  // 使用 SDK 的 OfficeType 枚举
-  if (SDK && SDK.OfficeType) {
-    if (!fileName) {
-      return SDK.OfficeType.Writer // 默认 Word
-    }
+  if (!fileName) {
+    // 默认 Word
+    return SDK && SDK.OfficeType ? SDK.OfficeType.Writer : 'Writer'
+  }
 
-    const lower = fileName.toLowerCase()
+  const lower = fileName.toLowerCase()
+  let officeType = null
+  
+  // 优先使用 SDK.OfficeType 枚举
+  if (SDK && SDK.OfficeType) {
     if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
-      return SDK.OfficeType.Writer // Word
+      officeType = SDK.OfficeType.Writer
     } else if (lower.endsWith('.xls') || lower.endsWith('.xlsx')) {
-      return SDK.OfficeType.Spreadsheet // Excel
+      officeType = SDK.OfficeType.Spreadsheet
     } else if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) {
-      return SDK.OfficeType.Presentation // PowerPoint
+      officeType = SDK.OfficeType.Presentation
     } else if (lower.endsWith('.pdf')) {
-      return SDK.OfficeType.PDF
+      // 尝试获取 PDF 类型，不同版本 SDK 可能使用 PDF 或 Pdf
+      officeType = SDK.OfficeType.PDF || SDK.OfficeType.Pdf || 'f'
+    } else {
+      officeType = SDK.OfficeType.Writer // 默认 Word
     }
-    return SDK.OfficeType.Writer // 默认 Word
+    
+    // 验证officeType是否有效
+    if (officeType === undefined || officeType === null) {
+      console.warn('SDK.OfficeType 枚举值无效，使用字符串类型', { fileName, officeType })
+      // 降级到字符串类型
+      return getOfficeTypeString(lower)
+    }
+    
+    return officeType
   } else {
     // 如果 SDK.OfficeType 不存在，使用字符串（兼容旧版本）
-    if (!fileName) {
-      return 'Writer'
-    }
-    const lower = fileName.toLowerCase()
-    if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
-      return 'Writer'
-    } else if (lower.endsWith('.xls') || lower.endsWith('.xlsx')) {
-      return 'Spreadsheet'
-    } else if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) {
-      return 'Presentation'
-    } else if (lower.endsWith('.pdf')) {
-      return 'PDF'
-    }
-    return 'Writer'
+    return getOfficeTypeString(lower)
   }
+}
+
+/**
+ * 获取字符串类型的Office类型（降级方案）
+ */
+function getOfficeTypeString(lowerFileName) {
+  if (lowerFileName.endsWith('.doc') || lowerFileName.endsWith('.docx')) {
+    return 'w'
+  } else if (lowerFileName.endsWith('.xls') || lowerFileName.endsWith('.xlsx')) {
+    return 's'
+  } else if (lowerFileName.endsWith('.ppt') || lowerFileName.endsWith('.pptx')) {
+    return 'p'
+  } else if (lowerFileName.endsWith('.pdf')) {
+    return 'f'
+  }
+  return 'w' // 默认 Word
 }
 

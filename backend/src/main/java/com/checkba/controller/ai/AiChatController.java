@@ -1,10 +1,15 @@
 package com.checkba.controller.ai;
 
+import com.checkba.controller.AuthController;
+import com.checkba.service.ProjectAiMessageService;
+import com.checkba.service.UserService;
+import com.checkba.service.ai.AiDocxExportService;
 import com.checkba.service.ai.ProjectAssistant;
 import com.checkba.service.ai.context.ProjectContextHolder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -14,6 +19,9 @@ import org.springframework.web.bind.annotation.*;
 public class AiChatController {
 
     private final ProjectAssistant projectAssistant;
+    private final ProjectAiMessageService projectAiMessageService;
+    private final AiDocxExportService aiDocxExportService;
+    private final UserService userService;
 
     @PostMapping("/chat")
     public AiChatResponse chat(@RequestBody AiChatRequest request) {
@@ -21,12 +29,64 @@ public class AiChatController {
         try {
             ProjectContextHolder.setProjectId(request.getProjectId());
             String response = projectAssistant.chat(request.getMessage());
+            // 记录对话历史（预留会话管理能力）
+            try {
+                projectAiMessageService.saveUserAndAssistantMessage(
+                        request.getProjectId(),
+                        request.getMessage(),
+                        response
+                );
+            } catch (Exception logEx) {
+                log.warn("Failed to save AI chat history for project {}", request.getProjectId(), logEx);
+            }
             return new AiChatResponse(response);
         } catch (Exception e) {
             log.error("Error during AI chat", e);
             return new AiChatResponse("Sorry, I encountered an error: " + e.getMessage());
         } finally {
             ProjectContextHolder.clear();
+        }
+    }
+
+    /**
+     * AI 导出 Word：后端根据 markdown 文本生成 docx 并注册为项目文件。
+     */
+    @PostMapping("/export-docx")
+    public ResponseEntity<?> exportDocx(@RequestBody AiExportDocxRequest request,
+                                        @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        try {
+            Long userId = AuthController.getUserIdFromSession(sessionId);
+            if (userId == null) {
+                return ResponseEntity.status(401).body("请先登录");
+            }
+            Long projectId = request.getProjectId();
+            if (projectId == null) {
+                return ResponseEntity.badRequest().body("项目 ID 不能为空");
+            }
+            String fileName = request.getFileName();
+            if (fileName == null || fileName.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("文件名不能为空");
+            }
+
+            // 如果没有 .docx 后缀，自动补上
+            if (!fileName.toLowerCase().endsWith(".docx")) {
+                fileName = fileName + ".docx";
+            }
+
+            String markdown = request.getMarkdown() != null ? request.getMarkdown() : request.getContent();
+
+            var file = aiDocxExportService.exportMarkdownToDocx(
+                    projectId,
+                    request.getParentId(),
+                    userId,
+                    fileName,
+                    markdown
+            );
+
+            return ResponseEntity.ok(file);
+        } catch (Exception e) {
+            log.error("AI 导出 Word 失败", e);
+            return ResponseEntity.status(500).body("导出 Word 失败: " + e.getMessage());
         }
     }
     
@@ -40,6 +100,21 @@ public class AiChatController {
     public static class AiChatResponse {
         private String response;
         public AiChatResponse(String response) { this.response = response; }
+    }
+
+    @Data
+    public static class AiExportDocxRequest {
+        private Long projectId;
+        private Long parentId;
+        private String fileName;
+        /**
+         * 文本内容（优先 markdown）
+         */
+        private String markdown;
+        /**
+         * 兼容字段：如果前端还没改成 markdown，可以传 content
+         */
+        private String content;
     }
 }
 

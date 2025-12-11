@@ -3,13 +3,20 @@ package com.checkba.controller;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.WpsService;
+import com.checkba.storage.StorageService;
+import com.checkba.storage.StorageServiceFactory;
+import cn.hutool.crypto.digest.DigestUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * WPS WebOffice 回调接口控制器
@@ -31,6 +38,13 @@ public class WpsController {
 
     @Autowired
     private ProjectFileRepository projectFileRepository;
+
+    @Autowired
+    private StorageServiceFactory storageServiceFactory;
+
+    private StorageService getStorageService() {
+        return storageServiceFactory.getStorageService();
+    }
 
     /**
      * 获取文件信息
@@ -141,6 +155,36 @@ public class WpsController {
         Map<String, Object> data = new java.util.LinkedHashMap<>();
         data.put("url", wpsService.getCallbackBaseUrl() + "/api/files/" + fileId + "/download");
         data.put("expires_in", 3600); // 有效期，秒
+
+        // 计算文件 SHA1 以启用 WPS 加速
+        try {
+            // 确定文件存储路径（逻辑同 FileController）
+            String path = fileId;
+            Optional<ProjectFile> projectFileOpt = projectFileRepository.findByWpsFileId(fileId);
+            if (projectFileOpt.isPresent()) {
+                ProjectFile pf = projectFileOpt.get();
+                if (StringUtils.hasText(pf.getFilePath())) {
+                    path = pf.getFilePath();
+                }
+            }
+
+            // 读取文件流计算 SHA1
+            Resource resource = getStorageService().load(path);
+            if (resource.exists() && resource.isReadable()) {
+                try (InputStream is = resource.getInputStream()) {
+                    String sha1 = DigestUtil.sha1Hex(is);
+                    data.put("digest", sha1);
+                    data.put("digest_type", "sha1");
+                    log.info("Calculated SHA1 for fileId {}: {}", fileId, sha1);
+                }
+            } else {
+                log.warn("File resource not found or unreadable for SHA1 calculation: {}", path);
+            }
+        } catch (Exception e) {
+            log.error("Failed to calculate SHA1 for fileId: " + fileId, e);
+            // 不阻断流程，仅记录错误，不返回 digest
+        }
+
         // 预留 headers 字段，若后续需要自定义下载请求头，可在此填充
         data.put("headers", new HashMap<String, String>());
 
@@ -355,7 +399,7 @@ public class WpsController {
         Map<String, Object> data = new HashMap<>();
         String uploadUrl = wpsService.getCallbackBaseUrl() + "/api/files/" + fileId + "/upload";
         data.put("url", uploadUrl);  // 关键：字段名必须是 url
-        data.put("method", "PUT");   // 关键：必须指定上传方法，与 FileController 中的 @PutMapping 保持一致
+        data.put("method", "POST");   // 关键：必须指定上传方法，与 FileController 中的 @PostMapping 保持一致
         data.put("expires_in", 3600);
         
         Map<String, Object> result = new HashMap<>();
@@ -363,7 +407,7 @@ public class WpsController {
         result.put("message", "");
         result.put("data", data);
         
-        log.info("WPS prepare upload response: fileId={}, url={}, method=PUT", fileId, uploadUrl);
+        log.info("WPS prepare upload response: fileId={}, url={}, method=POST", fileId, uploadUrl);
         
         return ResponseEntity.ok(result);
     }
@@ -387,7 +431,7 @@ public class WpsController {
         Map<String, Object> data = new HashMap<>();
         String uploadUrl = wpsService.getCallbackBaseUrl() + "/api/files/" + fileId + "/upload";
         data.put("url", uploadUrl);  // 关键：字段名必须是 url，不是 upload_url
-        data.put("method", "PUT");   // 关键：必须指定上传方法，与 FileController 中的 @PutMapping 保持一致
+        data.put("method", "POST");   // 关键：必须指定上传方法，与 FileController 中的 @PostMapping 保持一致
         data.put("expires_in", 3600);
         
         Map<String, Object> result = new HashMap<>();
@@ -395,7 +439,7 @@ public class WpsController {
         result.put("message", "");
         result.put("data", data);
         
-        log.info("WPS upload address response: fileId={}, url={}, method=PUT", fileId, uploadUrl);
+        log.info("WPS upload address response: fileId={}, url={}, method=POST", fileId, uploadUrl);
         
         return ResponseEntity.ok(result);
     }

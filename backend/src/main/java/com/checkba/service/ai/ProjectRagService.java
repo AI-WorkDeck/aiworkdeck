@@ -46,7 +46,24 @@ public class ProjectRagService {
         return retrieverCache.computeIfAbsent(projectId, this::buildRetriever);
     }
 
+    /**
+     * 刷新项目知识库（全量刷新）
+     */
     public void refreshProjectKnowledge(String projectId) {
+        retrieverCache.remove(projectId);
+        log.info("项目知识库缓存已清除，下次访问时将重新构建: projectId={}", projectId);
+    }
+
+    /**
+     * 增量刷新项目知识库（仅刷新指定文件）
+     * 注意：由于使用InMemoryEmbeddingStore，增量刷新需要重新构建整个知识库
+     * 但可以通过只扫描变化的文件来优化性能
+     */
+    public void refreshProjectKnowledgeIncremental(String projectId, String filePath) {
+        // 简化实现：清除缓存，让下次访问时重新构建
+        // 由于InMemoryEmbeddingStore的限制，真正的增量更新需要更复杂的实现
+        // 这里先使用全量刷新，但记录日志以便后续优化
+        log.info("增量刷新项目知识库: projectId={}, filePath={}", projectId, filePath);
         retrieverCache.remove(projectId);
     }
 

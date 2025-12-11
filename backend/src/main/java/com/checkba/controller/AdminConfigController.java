@@ -1,0 +1,388 @@
+package com.checkba.controller;
+
+import com.checkba.config.AiModelProperties;
+import com.checkba.model.entity.User;
+import com.checkba.repository.UserRepository;
+import com.checkba.service.SystemSettingService;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * 后台管理配置接口：
+ * - 外部服务供应商配置（key / secret / baseUrl 等）
+ * - AI 服务系统提示词
+ * - AI 服务激活的供应商
+ * - 用户管理（只读列表）
+ *
+ * 说明：
+ * - 仅允许 admin 用户调用（基于现有 session 机制）
+ * - 将可变配置写入 system_setting 表，默认值来自 application.yml
+ */
+@RestController
+@RequestMapping("/api/admin")
+@CrossOrigin(origins = "*")
+@RequiredArgsConstructor
+public class AdminConfigController {
+
+    private final SystemSettingService systemSettingService;
+    private final UserRepository userRepository;
+    private final AiModelProperties aiModelProperties;
+
+    // ==== 默认值：来自 application.yml ====
+
+    @Value("${external.qichacha.base-url:}")
+    private String defaultQichachaBaseUrl;
+
+    @Value("${external.qichacha.key:}")
+    private String defaultQichachaKey;
+
+    @Value("${external.qichacha.secret:}")
+    private String defaultQichachaSecret;
+
+    @Value("${external.wps.app-id:}")
+    private String defaultWpsAppId;
+
+    @Value("${external.wps.app-secret:}")
+    private String defaultWpsAppSecret;
+
+    @Value("${external.wps.callback-base-url:}")
+    private String defaultWpsCallbackBaseUrl;
+
+    @Value("${external.tushare.base-url:http://api.tushare.pro}")
+    private String defaultTushareBaseUrl;
+
+    @Value("${external.tushare.token:}")
+    private String defaultTushareToken;
+
+    // Google / Gemini 默认值来自 AiModelProperties
+
+    // === 配置 key 常量 ===
+    private static final String KEY_AI_SYSTEM_PROMPT = "ai.systemPrompt";
+    private static final String KEY_AI_ACTIVE_PROVIDER = "ai.activeProvider";
+
+    // Qichacha
+    private static final String KEY_QICHACHA_BASE_URL = "external.qichacha.baseUrl";
+    private static final String KEY_QICHACHA_KEY = "external.qichacha.key";
+    private static final String KEY_QICHACHA_SECRET = "external.qichacha.secret";
+
+    // Tushare
+    private static final String KEY_TUSHARE_BASE_URL = "external.tushare.baseUrl";
+    private static final String KEY_TUSHARE_TOKEN = "external.tushare.token";
+
+    // WPS
+    private static final String KEY_WPS_APP_ID = "external.wps.appId";
+    private static final String KEY_WPS_APP_SECRET = "external.wps.appSecret";
+    private static final String KEY_WPS_CALLBACK_BASE_URL = "external.wps.callbackBaseUrl";
+
+    // Google / Gemini
+    private static final String KEY_GOOGLE_API_KEY = "external.google.apiKey";
+    private static final String KEY_GOOGLE_MODEL_NAME = "external.google.modelName";
+    private static final String KEY_GOOGLE_API_BASE_URL = "external.google.apiBaseUrl";
+
+    // ============ 配置读取 =============
+
+    @GetMapping("/config")
+    public ResponseEntity<?> getAdminConfig(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+
+        User admin = requireAdmin(sessionId);
+        if (admin == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(error("仅管理员可访问此接口"));
+        }
+
+        // 外部服务默认值
+        Map<String, String> defaults = new HashMap<>();
+        defaults.put(KEY_QICHACHA_BASE_URL, defaultQichachaBaseUrl);
+        defaults.put(KEY_QICHACHA_KEY, defaultQichachaKey);
+        defaults.put(KEY_QICHACHA_SECRET, defaultQichachaSecret);
+        defaults.put(KEY_TUSHARE_BASE_URL, defaultTushareBaseUrl);
+        defaults.put(KEY_TUSHARE_TOKEN, defaultTushareToken);
+        defaults.put(KEY_WPS_APP_ID, defaultWpsAppId);
+        defaults.put(KEY_WPS_APP_SECRET, defaultWpsAppSecret);
+        defaults.put(KEY_WPS_CALLBACK_BASE_URL, defaultWpsCallbackBaseUrl);
+
+        // Google / Gemini 默认值来自配置类
+        defaults.put(KEY_GOOGLE_API_KEY, aiModelProperties.getGemini().getApiKey());
+        defaults.put(KEY_GOOGLE_MODEL_NAME, aiModelProperties.getGemini().getModelName());
+        defaults.put(KEY_GOOGLE_API_BASE_URL, aiModelProperties.getGemini().getApiBaseUrl());
+
+        // AI 默认值
+        defaults.put(KEY_AI_ACTIVE_PROVIDER,
+                aiModelProperties.getProvider() != null
+                        ? aiModelProperties.getProvider().name()
+                        : AiModelProperties.Provider.OLLAMA.name());
+
+        // 当前存储值（DB > 默认值）
+        Map<String, String> all = systemSettingService.getMany(defaults);
+
+        AdminConfigResponse resp = new AdminConfigResponse();
+
+        // 外部服务
+        ExternalServicesConfig external = new ExternalServicesConfig();
+        external.setGoogle(new GoogleConfig(
+                all.get(KEY_GOOGLE_API_KEY),
+                all.get(KEY_GOOGLE_MODEL_NAME),
+                all.get(KEY_GOOGLE_API_BASE_URL)
+        ));
+        external.setQichacha(new QichachaConfig(
+                all.get(KEY_QICHACHA_BASE_URL),
+                all.get(KEY_QICHACHA_KEY),
+                all.get(KEY_QICHACHA_SECRET)
+        ));
+        external.setTushare(new TushareConfig(
+                all.get(KEY_TUSHARE_BASE_URL),
+                all.get(KEY_TUSHARE_TOKEN)
+        ));
+        external.setWps(new WpsConfig(
+                all.get(KEY_WPS_APP_ID),
+                all.get(KEY_WPS_APP_SECRET),
+                all.get(KEY_WPS_CALLBACK_BASE_URL)
+        ));
+        resp.setExternal(external);
+
+        // AI 配置
+        AiConfig ai = new AiConfig();
+        String activeProvider = all.get(KEY_AI_ACTIVE_PROVIDER);
+        ai.setActiveProvider(activeProvider);
+        ai.setSystemPrompt(systemSettingService.get(
+                KEY_AI_SYSTEM_PROMPT,
+                // 默认系统提示词等同于 ProjectAssistant 上的注解内容
+                "You are an intelligent assistant for the Checkba project. " +
+                        "You have access to the project's files as a knowledge base. " +
+                        "If the user asks you to create or save files, you may use the available tools. " +
+                        "Do not create or save files unless the user explicitly asks you to."
+        ));
+        resp.setAi(ai);
+
+        return ResponseEntity.ok(resp);
+    }
+
+    /**
+     * 更新系统配置（外部服务 + AI）
+     */
+    @PostMapping("/config")
+    public ResponseEntity<?> updateAdminConfig(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @RequestBody AdminConfigUpdateRequest request) {
+
+        User admin = requireAdmin(sessionId);
+        if (admin == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(error("仅管理员可访问此接口"));
+        }
+
+        Map<String, String> updates = new HashMap<>();
+
+        if (request.getExternal() != null) {
+            ExternalServicesConfig ext = request.getExternal();
+            if (ext.getGoogle() != null) {
+                updates.put(KEY_GOOGLE_API_KEY, safe(ext.getGoogle().getApiKey()));
+                updates.put(KEY_GOOGLE_MODEL_NAME, safe(ext.getGoogle().getModelName()));
+                updates.put(KEY_GOOGLE_API_BASE_URL, safe(ext.getGoogle().getApiBaseUrl()));
+            }
+            if (ext.getQichacha() != null) {
+                updates.put(KEY_QICHACHA_BASE_URL, safe(ext.getQichacha().getBaseUrl()));
+                updates.put(KEY_QICHACHA_KEY, safe(ext.getQichacha().getKey()));
+                updates.put(KEY_QICHACHA_SECRET, safe(ext.getQichacha().getSecret()));
+            }
+            if (ext.getTushare() != null) {
+                updates.put(KEY_TUSHARE_BASE_URL, safe(ext.getTushare().getBaseUrl()));
+                updates.put(KEY_TUSHARE_TOKEN, safe(ext.getTushare().getToken()));
+            }
+            if (ext.getWps() != null) {
+                updates.put(KEY_WPS_APP_ID, safe(ext.getWps().getAppId()));
+                updates.put(KEY_WPS_APP_SECRET, safe(ext.getWps().getAppSecret()));
+                updates.put(KEY_WPS_CALLBACK_BASE_URL, safe(ext.getWps().getCallbackBaseUrl()));
+            }
+        }
+
+        if (request.getAi() != null) {
+            AiConfig ai = request.getAi();
+            if (ai.getSystemPrompt() != null) {
+                updates.put(KEY_AI_SYSTEM_PROMPT, ai.getSystemPrompt());
+            }
+            if (ai.getActiveProvider() != null) {
+                updates.put(KEY_AI_ACTIVE_PROVIDER, ai.getActiveProvider());
+            }
+        }
+
+        systemSettingService.setMany(updates);
+
+        Map<String, Object> ok = new HashMap<>();
+        ok.put("code", 0);
+        ok.put("message", "保存成功");
+        ok.put("timestamp", LocalDateTime.now().toString());
+        return ResponseEntity.ok(ok);
+    }
+
+    /**
+     * 用户管理：简单返回用户列表（只读）
+     */
+    @GetMapping("/users")
+    public ResponseEntity<?> listUsers(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+
+        User admin = requireAdmin(sessionId);
+        if (admin == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(error("仅管理员可访问此接口"));
+        }
+
+        List<UserSummary> users = userRepository.findAll()
+                .stream()
+                .map(u -> {
+                    UserSummary dto = new UserSummary();
+                    dto.setId(u.getId());
+                    dto.setUsername(u.getUsername());
+                    dto.setDisplayName(u.getDisplayName());
+                    dto.setAvatarUrl(u.getAvatarUrl());
+                    dto.setEmail(u.getEmail());
+                    dto.setCreatedAt(u.getCreatedAt());
+                    dto.setUpdatedAt(u.getUpdatedAt());
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(users);
+    }
+
+    // ============ 辅助方法 & DTO =============
+
+    private User requireAdmin(String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) {
+            return null;
+        }
+        return userRepository.findById(userId)
+                .filter(u -> "admin".equalsIgnoreCase(u.getUsername()))
+                .orElse(null);
+    }
+
+    private Map<String, Object> error(String message) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("message", message);
+        return result;
+    }
+
+    private String safe(String v) {
+        return v == null ? "" : v;
+    }
+
+    // -------- DTO 定义 --------
+
+    @Data
+    public static class AdminConfigResponse {
+        private ExternalServicesConfig external;
+        private AiConfig ai;
+    }
+
+    @Data
+    public static class AdminConfigUpdateRequest {
+        private ExternalServicesConfig external;
+        private AiConfig ai;
+    }
+
+    @Data
+    public static class ExternalServicesConfig {
+        private GoogleConfig google;
+        private QichachaConfig qichacha;
+        private TushareConfig tushare;
+        private WpsConfig wps;
+    }
+
+    @Data
+    public static class GoogleConfig {
+        private String apiKey;
+        private String modelName;
+        private String apiBaseUrl;
+
+        public GoogleConfig() {}
+
+        public GoogleConfig(String apiKey, String modelName, String apiBaseUrl) {
+            this.apiKey = apiKey;
+            this.modelName = modelName;
+            this.apiBaseUrl = apiBaseUrl;
+        }
+    }
+
+    @Data
+    public static class QichachaConfig {
+        private String baseUrl;
+        private String key;
+        private String secret;
+
+        public QichachaConfig() {}
+
+        public QichachaConfig(String baseUrl, String key, String secret) {
+            this.baseUrl = baseUrl;
+            this.key = key;
+            this.secret = secret;
+        }
+    }
+
+    @Data
+    public static class TushareConfig {
+        private String baseUrl;
+        private String token;
+
+        public TushareConfig() {}
+
+        public TushareConfig(String baseUrl, String token) {
+            this.baseUrl = baseUrl;
+            this.token = token;
+        }
+    }
+
+    @Data
+    public static class WpsConfig {
+        private String appId;
+        private String appSecret;
+        private String callbackBaseUrl;
+
+        public WpsConfig() {}
+
+        public WpsConfig(String appId, String appSecret, String callbackBaseUrl) {
+            this.appId = appId;
+            this.appSecret = appSecret;
+            this.callbackBaseUrl = callbackBaseUrl;
+        }
+    }
+
+    @Data
+    public static class AiConfig {
+        /**
+         * 额外的系统提示词（可为空），会在基础提示词上追加使用。
+         */
+        private String systemPrompt;
+
+        /**
+         * 激活的大模型提供商：OLLAMA / GEMINI
+         */
+        private String activeProvider;
+    }
+
+    @Data
+    public static class UserSummary {
+        private Long id;
+        private String username;
+        private String displayName;
+        private String avatarUrl;
+        private String email;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+    }
+}
+
+

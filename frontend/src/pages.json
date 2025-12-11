@@ -1,7 +1,14 @@
 {
 	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
 		{
-			"path": "pages/index/index",
+			"path": "pages/login/login",
+			"style": {
+				"navigationBarTitleText": "登录",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/newproject/index",
 			"style": {
 				"navigationBarTitleText": "新建项目",
 				"navigationStyle": "custom"
@@ -11,6 +18,27 @@
 			"path": "pages/project-overview/project-overview",
 			"style": {
 				"navigationBarTitleText": "项目概览",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/variable-library/variable-library",
+			"style": {
+				"navigationBarTitleText": "变量库管理",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/userprofile/userprofile",
+			"style": {
+				"navigationBarTitleText": "个人中心",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/admin/admin",
+			"style": {
+				"navigationBarTitleText": "系统管理",
 				"navigationStyle": "custom"
 			}
 		}

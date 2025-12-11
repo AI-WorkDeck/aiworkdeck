@@ -2,22 +2,29 @@ package com.checkba.service;
 
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.repository.ProjectFileRepository;
+import com.checkba.service.ai.ProjectRagService;
+import com.checkba.storage.StorageServiceFactory;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 项目文件服务
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProjectFileService {
 
     private final ProjectFileRepository projectFileRepository;
+    private final ProjectRagService projectRagService;
+    private final StorageServiceFactory storageServiceFactory;
 
     /**
      * 获取项目的文件树（指定父文件夹下的文件列表）
@@ -80,6 +87,45 @@ public class ProjectFileService {
     }
 
     /**
+     * 构建文件的物理存储路径
+     * 格式: projects/{projectId}/{logical_path}/{fileName}
+     */
+    private String buildPhysicalPath(Long projectId, Long parentId, String fileName) {
+        StringBuilder pathBuilder = new StringBuilder();
+        
+        // 构建逻辑路径
+        Long currentParentId = parentId;
+        int depth = 0;
+        // 防止无限循环
+        while (currentParentId != null && depth < 20) {
+            Optional<ProjectFile> parentOpt = projectFileRepository.findById(currentParentId);
+            if (parentOpt.isPresent()) {
+                ProjectFile parent = parentOpt.get();
+                if (pathBuilder.length() > 0) {
+                    pathBuilder.insert(0, "/");
+                }
+                pathBuilder.insert(0, parent.getName());
+                currentParentId = parent.getParentId();
+            } else {
+                break;
+            }
+            depth++;
+        }
+        
+        // 构建完整路径
+        // 格式: {projectId}/{logicalPath}/{fileName}
+        // 物理根目录配置为 data，所以最终路径为 data/{projectId}/{logicalPath}/{fileName}
+        String logicalPath = pathBuilder.toString();
+        String safeName = fileName;
+        
+        if (StringUtils.hasText(logicalPath)) {
+            return String.format("%d/%s/%s", projectId, logicalPath, safeName);
+        } else {
+            return String.format("%d/%s", projectId, safeName);
+        }
+    }
+
+    /**
      * 创建文件
      */
     @Transactional
@@ -107,6 +153,11 @@ public class ProjectFileService {
                 .max()
                 .orElse(-1);
 
+        // 如果未提供 filePath，则自动构建
+        if (!StringUtils.hasText(filePath)) {
+            filePath = buildPhysicalPath(projectId, parentId, name);
+        }
+
         ProjectFile file = new ProjectFile();
         file.setProjectId(projectId);
         file.setParentId(parentId);
@@ -121,7 +172,17 @@ public class ProjectFileService {
         file.setCreatedAt(LocalDateTime.now());
         file.setUpdatedAt(LocalDateTime.now());
 
-        return projectFileRepository.save(file);
+        ProjectFile savedFile = projectFileRepository.save(file);
+        
+        // 尝试创建物理文件（从模板复制）
+        try {
+            storageServiceFactory.getStorageService().load(filePath);
+            log.info("物理文件创建成功: {}", filePath);
+        } catch (Exception e) {
+            log.warn("物理文件创建可能失败 (如果是第一次访问会自动创建): {}", filePath, e);
+        }
+        
+        return savedFile;
     }
 
     /**
@@ -182,7 +243,16 @@ public class ProjectFileService {
             }
         }
 
+        // 记录文件路径用于向量库刷新
+        String filePath = file.getFilePath();
+        
         projectFileRepository.deleteById(fileId);
+        
+        // 触发向量库增量刷新（文件删除）
+        if (file.getProjectId() != null && filePath != null) {
+            projectRagService.refreshProjectKnowledgeIncremental(
+                    String.valueOf(file.getProjectId()), filePath);
+        }
     }
 
     /**

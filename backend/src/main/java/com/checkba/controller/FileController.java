@@ -90,9 +90,42 @@ public class FileController {
     }
 
     /**
-     * 上传接口
+     * 递归构建文件的逻辑路径（相对于项目根目录）
      */
-    @PutMapping("/{fileId}/upload")
+    private String buildLogicalPath(ProjectFile file) {
+        if (file.getParentId() == null) {
+            return "";
+        }
+        
+        StringBuilder pathBuilder = new StringBuilder();
+        ProjectFile current = file;
+        
+        // 向上查找父文件夹，直到根目录
+        // 为防止死循环，设置最大深度
+        int depth = 0;
+        while (current.getParentId() != null && depth < 20) {
+            Optional<ProjectFile> parentOpt = projectFileRepository.findById(current.getParentId());
+            if (parentOpt.isPresent()) {
+                current = parentOpt.get();
+                // 在路径前插入父文件夹名
+                if (pathBuilder.length() > 0) {
+                    pathBuilder.insert(0, "/");
+                }
+                pathBuilder.insert(0, current.getName());
+            } else {
+                break;
+            }
+            depth++;
+        }
+        
+        return pathBuilder.toString();
+    }
+
+    /**
+     * 上传接口
+     * 注意：使用POST方法，因为uni.uploadFile不支持PUT方法
+     */
+    @PostMapping("/{fileId}/upload")
     public ResponseEntity<Map<String, Object>> uploadFile(
             @PathVariable("fileId") String fileId,
             HttpServletRequest request) {
@@ -111,30 +144,42 @@ public class FileController {
                 if (StringUtils.hasText(pf.getFilePath())) {
                     storagePath = pf.getFilePath();
                 } else {
-                    // 如果没有路径，构建新结构路径: projects/{pid}/edit/{name}
-                    // 默认上传的文件归类为 edit，后续可手动移动到 evidence
-                    // 使用真实文件名作为物理文件名
-                    String safeName = StringUtils.hasText(pf.getName()) ? pf.getName() : fileId;
-                    if (!safeName.endsWith(".docx")) safeName += ".docx";
+                    // 构建物理存储路径，使其与逻辑树结构一致
+                    // 格式: projects/{pid}/{logical_path}/{filename}
+                    // 例如: projects/1/尽调底稿/财务/报表.docx
                     
-                    // 构造路径: projects/1/edit/合同.docx
-                    storagePath = String.format("projects/%d/edit/%s", pf.getProjectId(), safeName);
+                    String safeName = StringUtils.hasText(pf.getName()) ? pf.getName() : fileId;
+                    // 确保文件名有后缀（简单判断，根据实际情况可能需要更严谨的后缀处理）
+                    if (pf.getFileType() != null && !safeName.toLowerCase().endsWith("." + pf.getFileType().toLowerCase())) {
+                         safeName += "." + pf.getFileType();
+                    } else if (!safeName.contains(".")) {
+                         safeName += ".docx"; // 默认后缀
+                    }
+                    
+                    String logicalPath = buildLogicalPath(pf);
+                    String basePath = String.format("projects/%d", pf.getProjectId());
+                    
+                    if (StringUtils.hasText(logicalPath)) {
+                        storagePath = String.format("%s/%s/%s", basePath, logicalPath, safeName);
+                    } else {
+                        storagePath = String.format("%s/%s", basePath, safeName);
+                    }
                     
                     // 更新数据库
                     pf.setFilePath(storagePath);
                     projectFileRepository.save(pf);
-                    log.info("迁移文件存储路径: fileId={} -> {}", fileId, storagePath);
+                    log.info("构建文件存储路径: fileId={} -> {}", fileId, storagePath);
                 }
             }
 
             String savedPath = getStorageService().save(storagePath, inputStream);
             log.info("文件上传成功: fileId={}, path={}", fileId, savedPath);
             
-            // 2. 触发 RAG 知识库刷新
+            // 2. 触发 RAG 知识库增量刷新
             if (projectId != null) {
-                // 转为 String
-                projectRagService.refreshProjectKnowledge(String.valueOf(projectId));
-                log.info("触发项目知识库刷新: projectId={}", projectId);
+                // 转为 String，使用增量刷新
+                projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(projectId), savedPath);
+                log.info("触发项目知识库增量刷新: projectId={}, filePath={}", projectId, savedPath);
             }
 
             Map<String, Object> result = new HashMap<>();

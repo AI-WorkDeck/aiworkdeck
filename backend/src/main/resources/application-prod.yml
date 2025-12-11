@@ -24,6 +24,24 @@ external:
     app-id: SX20251208BJWRFK
     app-secret: ***REMOVED***
     callback-base-url: https://checkbahttps.vip.cpolar.cn  # 使用 cpolar 内网穿透地址，供 WPS 回调使用
+  tushare:
+    base-url: http://api.tushare.pro
+    token: ${TUSHARE_TOKEN:}
+
+# AI 大模型配置（生产环境建议全部走环境变量）
+ai:
+  model:
+    provider: ollama
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model-name: ${GEMINI_MODEL_NAME:gemini-1.5-pro}
+      api-base-url: ${GEMINI_API_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+      timeout: ${GEMINI_TIMEOUT:60s}
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model-name: ${OLLAMA_MODEL_NAME:qwen2.5:14b-instruct}
+      temperature: ${OLLAMA_TEMPERATURE:0.7}
+      timeout: ${OLLAMA_TIMEOUT:300s}
 
 # 文件存储配置
 storage:
