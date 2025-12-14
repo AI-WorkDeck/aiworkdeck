@@ -11,8 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * 项目文件服务
@@ -113,15 +116,15 @@ public class ProjectFileService {
         }
         
         // 构建完整路径
-        // 格式: {projectId}/{logicalPath}/{fileName}
-        // 物理根目录配置为 data，所以最终路径为 data/{projectId}/{logicalPath}/{fileName}
+        // 格式: projects/{projectId}/{logicalPath}/{fileName}
+        // 物理根目录配置为 data，所以最终路径为 data/projects/{projectId}/{logicalPath}/{fileName}
         String logicalPath = pathBuilder.toString();
         String safeName = fileName;
         
         if (StringUtils.hasText(logicalPath)) {
-            return String.format("%d/%s/%s", projectId, logicalPath, safeName);
+            return String.format("projects/%d/%s/%s", projectId, logicalPath, safeName);
         } else {
-            return String.format("%d/%s", projectId, safeName);
+            return String.format("projects/%d/%s", projectId, safeName);
         }
     }
 
@@ -211,8 +214,51 @@ public class ProjectFileService {
             throw new IllegalArgumentException("该文件夹下已存在同名文件/文件夹: " + newName);
         }
 
-        file.setName(newName.trim());
+        String oldName = file.getName();
+        String oldFilePath = file.getFilePath();
+        
+        // 处理文件名：如果是文件，确保保留文件后缀
+        String finalNewName = newName.trim();
+        if (!file.getIsFolder()) {
+            // 检查原文件名是否有后缀
+            String oldExtension = "";
+            int lastDotIndex = oldName.lastIndexOf('.');
+            if (lastDotIndex > 0 && lastDotIndex < oldName.length() - 1) {
+                oldExtension = oldName.substring(lastDotIndex);
+            }
+            
+            // 如果新名称不包含后缀，但原名称有后缀，则保留原后缀
+            if (!finalNewName.contains(".") && StringUtils.hasText(oldExtension)) {
+                finalNewName = finalNewName + oldExtension;
+            }
+            // 如果新名称不包含后缀，且原名称也没有后缀，但 fileType 存在，则添加 fileType 后缀
+            else if (!finalNewName.contains(".") && !StringUtils.hasText(oldExtension) 
+                    && StringUtils.hasText(file.getFileType())) {
+                finalNewName = finalNewName + "." + file.getFileType();
+            }
+        }
+        
+        // 更新文件名
+        file.setName(finalNewName);
         file.setUpdatedAt(LocalDateTime.now());
+
+        // 如果是文件（非文件夹），需要更新 filePath 并重命名物理文件
+        if (!file.getIsFolder() && StringUtils.hasText(oldFilePath)) {
+            // 构建新的文件路径
+            String newFilePath = buildPhysicalPath(file.getProjectId(), file.getParentId(), finalNewName);
+            file.setFilePath(newFilePath);
+            
+            // 重命名物理文件
+            try {
+                movePhysicalFile(oldFilePath, newFilePath);
+                log.info("物理文件重命名成功: fileId={}, oldPath={}, newPath={}", fileId, oldFilePath, newFilePath);
+            } catch (Exception e) {
+                log.warn("物理文件重命名失败，继续更新数据库记录: fileId={}, oldPath={}, newPath={}", 
+                    fileId, oldFilePath, newFilePath, e);
+                // 如果物理文件重命名失败，回滚 filePath
+                file.setFilePath(oldFilePath);
+            }
+        }
 
         return projectFileRepository.save(file);
     }
@@ -243,9 +289,21 @@ public class ProjectFileService {
             }
         }
 
-        // 记录文件路径用于向量库刷新
+        // 记录文件路径用于向量库刷新和物理文件删除
         String filePath = file.getFilePath();
         
+        // 删除物理文件（仅对文件，文件夹不需要删除物理文件）
+        if (!file.getIsFolder() && StringUtils.hasText(filePath)) {
+            try {
+                storageServiceFactory.getStorageService().delete(filePath);
+                log.info("物理文件删除成功: fileId={}, path={}", fileId, filePath);
+            } catch (Exception e) {
+                // 物理文件删除失败不影响数据库删除，只记录警告
+                log.warn("物理文件删除失败，继续删除数据库记录: fileId={}, path={}", fileId, filePath, e);
+            }
+        }
+        
+        // 删除数据库记录
         projectFileRepository.deleteById(fileId);
         
         // 触发向量库增量刷新（文件删除）
@@ -286,6 +344,9 @@ public class ProjectFileService {
             throw new IllegalArgumentException("目标文件夹下已存在同名文件/文件夹: " + file.getName());
         }
 
+        String oldFilePath = file.getFilePath();
+        Long oldParentId = file.getParentId();
+        
         // 更新父文件夹和排序序号
         file.setParentId(newParentId);
         if (newSortOrder != null) {
@@ -293,7 +354,229 @@ public class ProjectFileService {
         }
         file.setUpdatedAt(LocalDateTime.now());
 
+        // 如果是文件（非文件夹），需要更新 filePath 并移动物理文件
+        if (!file.getIsFolder()) {
+            return moveSingleFileWithPhysical(file, oldFilePath, oldParentId);
+        }
+
+        // 文件夹移动：需要同步更新子文件的 filePath，并移动所有子文件的物理文件
+        ProjectFile savedFolder = projectFileRepository.save(file);
+        try {
+            moveFolderDescendantPhysicalFiles(savedFolder);
+        } catch (Exception e) {
+            log.warn("文件夹移动：同步移动子文件物理文件失败（数据库已更新 parentId）: folderId={}", savedFolder.getId(), e);
+        }
+        return savedFolder;
+    }
+
+    /**
+     * 批量删除（支持文件夹递归删除）
+     */
+    @Transactional
+    public void batchDelete(Long projectId, com.checkba.model.dto.ProjectFileBatchRequest request, Long userId) {
+        if (request == null || request.getFileIds() == null || request.getFileIds().isEmpty()) {
+            throw new IllegalArgumentException("fileIds 不能为空");
+        }
+        for (Long id : request.getFileIds()) {
+            if (id == null) continue;
+            delete(id, userId);
+        }
+    }
+
+    /**
+     * 批量移动（支持文件夹递归移动）
+     */
+    @Transactional
+    public List<ProjectFile> batchMove(Long projectId, com.checkba.model.dto.ProjectFileBatchRequest request, Long userId) {
+        if (request == null || request.getFileIds() == null || request.getFileIds().isEmpty()) {
+            throw new IllegalArgumentException("fileIds 不能为空");
+        }
+        List<ProjectFile> result = new ArrayList<>();
+        for (Long id : request.getFileIds()) {
+            if (id == null) continue;
+            result.add(move(id, request.getTargetParentId(), null, userId));
+        }
+        return result;
+    }
+
+    /**
+     * 批量复制（支持文件夹递归复制）
+     */
+    @Transactional
+    public List<ProjectFile> batchCopy(Long projectId, com.checkba.model.dto.ProjectFileBatchRequest request, Long userId) {
+        if (request == null || request.getFileIds() == null || request.getFileIds().isEmpty()) {
+            throw new IllegalArgumentException("fileIds 不能为空");
+        }
+        if (request.getTargetParentId() == null && projectId == null) {
+            // 防御性校验
+            throw new IllegalArgumentException("projectId 不能为空");
+        }
+        List<ProjectFile> createdRoots = new ArrayList<>();
+        for (Long id : request.getFileIds()) {
+            if (id == null) continue;
+            ProjectFile source = projectFileRepository.findById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("文件不存在: " + id));
+            if (!Objects.equals(source.getProjectId(), projectId)) {
+                throw new IllegalArgumentException("跨项目复制不支持");
+            }
+            createdRoots.add(copyRecursive(projectId, source, request.getTargetParentId(), userId));
+        }
+        return createdRoots;
+    }
+
+    private ProjectFile moveSingleFileWithPhysical(ProjectFile file, String oldFilePath, Long oldParentId) {
+        if (StringUtils.hasText(oldFilePath)) {
+            String newFilePath = buildPhysicalPath(file.getProjectId(), file.getParentId(), file.getName());
+            file.setFilePath(newFilePath);
+            try {
+                movePhysicalFile(oldFilePath, newFilePath);
+                log.info("物理文件移动成功: fileId={}, oldPath={}, newPath={}", file.getId(), oldFilePath, newFilePath);
+            } catch (Exception e) {
+                log.warn("物理文件移动失败，继续更新数据库记录: fileId={}, oldPath={}, newPath={}",
+                        file.getId(), oldFilePath, newFilePath, e);
+                file.setFilePath(oldFilePath);
+                file.setParentId(oldParentId);
+            }
+        }
         return projectFileRepository.save(file);
+    }
+
+    /**
+     * 文件夹移动后：递归更新其子孙文件的 filePath，并移动物理文件
+     */
+    private void moveFolderDescendantPhysicalFiles(ProjectFile folder) throws Exception {
+        if (folder == null || !Boolean.TRUE.equals(folder.getIsFolder())) return;
+        List<ProjectFile> children = projectFileRepository.findByProjectIdAndParentIdOrderBySortOrderAsc(folder.getProjectId(), folder.getId());
+        for (ProjectFile child : children) {
+            if (Boolean.TRUE.equals(child.getIsFolder())) {
+                moveFolderDescendantPhysicalFiles(child);
+                continue;
+            }
+            String oldPath = child.getFilePath();
+            if (!StringUtils.hasText(oldPath)) continue;
+            String newPath = buildPhysicalPath(child.getProjectId(), child.getParentId(), child.getName());
+            if (oldPath.equals(newPath)) continue;
+            try {
+                movePhysicalFile(oldPath, newPath);
+                child.setFilePath(newPath);
+                child.setUpdatedAt(LocalDateTime.now());
+                projectFileRepository.save(child);
+            } catch (Exception e) {
+                log.warn("移动子文件物理文件失败: fileId={}, oldPath={}, newPath={}", child.getId(), oldPath, newPath, e);
+            }
+        }
+    }
+
+    /**
+     * 递归复制文件/文件夹
+     */
+    private ProjectFile copyRecursive(Long projectId, ProjectFile source, Long targetParentId, Long userId) {
+        if (Boolean.TRUE.equals(source.getIsFolder())) {
+            String newFolderName = resolveUniqueName(projectId, targetParentId, source.getName());
+            ProjectFile newFolder = new ProjectFile();
+            newFolder.setProjectId(projectId);
+            newFolder.setParentId(targetParentId);
+            newFolder.setIsFolder(true);
+            newFolder.setName(newFolderName);
+            newFolder.setSortOrder(0);
+            newFolder.setUserId(userId);
+            newFolder.setCreatedAt(LocalDateTime.now());
+            newFolder.setUpdatedAt(LocalDateTime.now());
+            ProjectFile savedFolder = projectFileRepository.save(newFolder);
+
+            List<ProjectFile> children = projectFileRepository.findByProjectIdAndParentIdOrderBySortOrderAsc(projectId, source.getId());
+            for (ProjectFile child : children) {
+                copyRecursive(projectId, child, savedFolder.getId(), userId);
+            }
+            return savedFolder;
+        }
+
+        // file
+        String newName = resolveUniqueName(projectId, targetParentId, source.getName());
+        ProjectFile newFile = new ProjectFile();
+        newFile.setProjectId(projectId);
+        newFile.setParentId(targetParentId);
+        newFile.setIsFolder(false);
+        newFile.setName(newName);
+        newFile.setFileType(source.getFileType());
+        newFile.setFileSize(source.getFileSize());
+        String newPath = buildPhysicalPath(projectId, targetParentId, newName);
+        newFile.setFilePath(newPath);
+        newFile.setWpsFileId(generateWpsFileId(projectId));
+        newFile.setSortOrder(0);
+        newFile.setUserId(userId);
+        newFile.setCreatedAt(LocalDateTime.now());
+        newFile.setUpdatedAt(LocalDateTime.now());
+        ProjectFile saved = projectFileRepository.save(newFile);
+
+        // copy physical
+        if (StringUtils.hasText(source.getFilePath())) {
+            try {
+                copyPhysicalFile(source.getFilePath(), newPath);
+            } catch (Exception e) {
+                log.warn("复制物理文件失败: sourcePath={}, targetPath={}", source.getFilePath(), newPath, e);
+            }
+        }
+        return saved;
+    }
+
+    private String resolveUniqueName(Long projectId, Long parentId, String desiredName) {
+        if (!StringUtils.hasText(desiredName)) return desiredName;
+        String base = desiredName.trim();
+        String ext = "";
+        int dot = base.lastIndexOf('.');
+        if (dot > 0 && dot < base.length() - 1) {
+            ext = base.substring(dot);
+            base = base.substring(0, dot);
+        }
+        String candidate = base + ext;
+        int i = 1;
+        while (projectFileRepository.existsByProjectIdAndParentIdAndNameAndIdNot(projectId, parentId, candidate, -1L)) {
+            candidate = base + " (" + i + ")" + ext;
+            i++;
+            if (i > 1000) {
+                candidate = base + "-" + UUID.randomUUID() + ext;
+                break;
+            }
+        }
+        return candidate;
+    }
+
+    private String generateWpsFileId(Long projectId) {
+        // 与前端生成规则保持一致的风格（无需完全一致，但确保全局唯一）
+        String rand = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return String.format("project_%d_doc_%d_%s", projectId, System.currentTimeMillis(), rand);
+    }
+
+    private void copyPhysicalFile(String sourcePath, String targetPath) throws Exception {
+        var resource = storageServiceFactory.getStorageService().load(sourcePath);
+        try (var inputStream = resource.getInputStream()) {
+            storageServiceFactory.getStorageService().save(targetPath, inputStream);
+        }
+    }
+    
+    /**
+     * 移动/重命名物理文件
+     * 通过读取旧文件、写入新位置、删除旧文件来实现
+     */
+    private void movePhysicalFile(String oldPath, String newPath) throws Exception {
+        try {
+            // 读取旧文件
+            var resource = storageServiceFactory.getStorageService().load(oldPath);
+            
+            // 写入新位置
+            try (var inputStream = resource.getInputStream()) {
+                storageServiceFactory.getStorageService().save(newPath, inputStream);
+            }
+            
+            // 删除旧文件
+            storageServiceFactory.getStorageService().delete(oldPath);
+            
+            log.info("物理文件移动/重命名成功: {} -> {}", oldPath, newPath);
+        } catch (Exception e) {
+            log.error("物理文件移动/重命名失败: {} -> {}", oldPath, newPath, e);
+            throw e;
+        }
     }
 
     /**

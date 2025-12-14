@@ -1,0 +1,140 @@
+package com.checkba.service;
+
+import com.checkba.model.entity.DocFileLink;
+import com.checkba.model.entity.ProjectFile;
+import com.checkba.repository.DocFileLinkRepository;
+import com.checkba.repository.ProjectFileRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.util.*;
+
+@Service
+@RequiredArgsConstructor
+public class DocFileLinkService {
+
+    private final DocFileLinkRepository docFileLinkRepository;
+    private final ProjectFileRepository projectFileRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Data
+    public static class DocFileLinkResult {
+        private String linkKey;
+        private String docWpsFileId;
+        private String anchorText;
+        private List<Long> fileIds;
+        private List<ProjectFile> files;
+    }
+
+    @Transactional
+    public DocFileLinkResult createOrAppend(Long userId,
+                                           Long projectId,
+                                           String docWpsFileId,
+                                           String linkKey,
+                                           String anchorText,
+                                           Integer rangeStart,
+                                           Integer rangeEnd,
+                                           List<Long> fileIds) {
+        if (userId == null) throw new IllegalArgumentException("请先登录");
+        if (projectId == null) throw new IllegalArgumentException("项目ID不能为空");
+        if (!StringUtils.hasText(docWpsFileId)) throw new IllegalArgumentException("docWpsFileId 不能为空");
+        if (fileIds == null || fileIds.isEmpty()) throw new IllegalArgumentException("fileIds 不能为空");
+
+        String key = StringUtils.hasText(linkKey) ? linkKey.trim() : ("lk_" + UUID.randomUUID());
+        DocFileLink link = docFileLinkRepository.findByProjectIdAndLinkKey(projectId, key).orElse(null);
+        if (link == null) {
+            link = new DocFileLink();
+            link.setProjectId(projectId);
+            link.setUserId(userId);
+            link.setDocWpsFileId(docWpsFileId.trim());
+            link.setLinkKey(key);
+            link.setAnchorText(StringUtils.hasText(anchorText) ? anchorText.trim() : null);
+            link.setRangeStart(rangeStart);
+            link.setRangeEnd(rangeEnd);
+            link.setCreatedAt(LocalDateTime.now());
+        } else {
+            // 只允许创建者修改（避免跨用户污染）
+            if (!Objects.equals(link.getUserId(), userId)) {
+                throw new IllegalArgumentException("无权限修改该链接");
+            }
+            // 文档 ID 变更（理论不应发生），保留原值，避免把同 key 混到另一文档
+        }
+
+        // 合并 fileIds（不去重逻辑？此处业务上应去重避免列表膨胀）
+        List<Long> merged = new ArrayList<>();
+        try {
+            if (StringUtils.hasText(link.getFileIdsJson())) {
+                merged.addAll(objectMapper.readValue(link.getFileIdsJson(), new TypeReference<List<Long>>() {}));
+            }
+        } catch (Exception ignore) {
+            // ignore
+        }
+        for (Long fid : fileIds) {
+            if (fid == null) continue;
+            if (!merged.contains(fid)) merged.add(fid);
+        }
+        link.setFileIdsJson(writeJson(merged));
+        link.setUpdatedAt(LocalDateTime.now());
+
+        DocFileLink saved = docFileLinkRepository.save(link);
+        return buildResult(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public DocFileLinkResult getByKey(Long userId, Long projectId, String linkKey) {
+        if (userId == null) throw new IllegalArgumentException("请先登录");
+        if (projectId == null) throw new IllegalArgumentException("项目ID不能为空");
+        if (!StringUtils.hasText(linkKey)) throw new IllegalArgumentException("linkKey 不能为空");
+
+        DocFileLink link = docFileLinkRepository.findByProjectIdAndLinkKey(projectId, linkKey.trim())
+                .orElseThrow(() -> new IllegalArgumentException("链接不存在"));
+
+        // 只允许创建者读取（后续可扩展为项目内共享）
+        if (!Objects.equals(link.getUserId(), userId)) {
+            throw new IllegalArgumentException("无权限访问该链接");
+        }
+        return buildResult(link);
+    }
+
+    private DocFileLinkResult buildResult(DocFileLink link) {
+        DocFileLinkResult r = new DocFileLinkResult();
+        r.setLinkKey(link.getLinkKey());
+        r.setDocWpsFileId(link.getDocWpsFileId());
+        r.setAnchorText(link.getAnchorText());
+
+        List<Long> fileIds = new ArrayList<>();
+        try {
+            if (StringUtils.hasText(link.getFileIdsJson())) {
+                fileIds = objectMapper.readValue(link.getFileIdsJson(), new TypeReference<List<Long>>() {});
+            }
+        } catch (Exception ignore) {
+            // ignore
+        }
+        r.setFileIds(fileIds);
+
+        // 返回文件元信息，便于前端弹窗展示
+        List<ProjectFile> files = new ArrayList<>();
+        for (Long fid : fileIds) {
+            if (fid == null) continue;
+            projectFileRepository.findById(fid).ifPresent(files::add);
+        }
+        r.setFiles(files);
+        return r;
+    }
+
+    private String writeJson(Object v) {
+        try {
+            return objectMapper.writeValueAsString(v);
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+}
+
+

@@ -41,6 +41,10 @@
             <text class="action-text">后台管理</text>
             <text class="action-arrow">›</text>
           </view>
+          <view class="action-item" @tap="handleLogout">
+            <text class="action-text">注销登录</text>
+            <text class="action-arrow">›</text>
+          </view>
           </view>
         </view>
       </view>
@@ -146,14 +150,37 @@
             </view>
           </view>
 
-          <!-- 我的收藏 (UI 占位) -->
-          <view v-else-if="activeTab === 'favorites'" class="panel-placeholder">
-            <view class="empty-state">
+          <!-- 我的收藏 -->
+          <view v-else-if="activeTab === 'favorites'" class="panel-favorites">
+            <view v-if="favoritesLoading" class="loading">
+              <text class="loading-text">加载中...</text>
+            </view>
+            <view v-else-if="favorites.length === 0" class="empty-state">
               <view class="empty-icon-circle">
                 <text class="empty-icon">⭐</text>
               </view>
               <text class="empty-title">我的收藏</text>
               <text class="empty-desc">暂无收藏内容</text>
+            </view>
+            <view v-else class="favorites-list">
+              <view v-for="fav in favorites" :key="fav.id" class="favorite-card">
+                <view class="favorite-header">
+                  <text class="favorite-title">{{ fav.title || (fav.sourceUrl ? fav.sourceUrl : '未命名摘录') }}</text>
+                  <button class="btn-danger-outline small" @tap.stop="handleDeleteFavorite(fav.id)">删除</button>
+                </view>
+                <view v-if="fav.sourceUrl" class="favorite-url">
+                  <text class="url-text">{{ fav.sourceUrl }}</text>
+                </view>
+                <view v-if="fav.imagePath" class="favorite-image">
+                  <image class="fav-img" mode="widthFix" :src="getFavoriteImageUrl(fav.id)" />
+                </view>
+                <view class="favorite-content">
+                  <text class="content-text">{{ fav.content }}</text>
+                </view>
+                <view class="favorite-footer">
+                  <text class="time-text">{{ formatTime(fav.createdAt) }}</text>
+                </view>
+              </view>
             </view>
           </view>
 
@@ -202,9 +229,9 @@
 </template>
 
 <script>
-import { getMyProjects, deleteProject, getCurrentUser as getCurrentUserApi } from '@/services/api.js'
+import { getMyProjects, deleteProject, getCurrentUser as getCurrentUserApi, getMyFavorites, deleteFavorite, getFavoriteImageUrl } from '@/services/api.js'
 import { getProjectTypeLabel } from '@/config/projectTypes.js'
-import { getCurrentUser, isLoggedIn, getSessionId } from '@/utils/auth.js'
+ import { getCurrentUser, isLoggedIn, getSessionId, clearSession } from '@/utils/auth.js'
 
 export default {
   name: 'UserProfile',
@@ -226,9 +253,19 @@ export default {
       projects: [],
       projectsLoading: false,
       deletingProjectId: null,
+      favoritesLoading: false,
+      favorites: [],
     }
   },
   onLoad() {
+    // Desktop：个人中心页必须隐藏 BrowserView（避免工作区网页残留覆盖）
+    try {
+      if (typeof window !== 'undefined' && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
+        window.checkbaDesktop.browser.setViewsVisible({ visible: false }).catch(() => {})
+      }
+    } catch (e) {
+      // ignore
+    }
     // 检查登录状态
     const sessionId = getSessionId()
     const user = getCurrentUser()
@@ -250,8 +287,58 @@ export default {
     })
   },
   methods: {
+    handleLogout() {
+      uni.showModal({
+        title: '确认注销',
+        content: '确定要退出登录吗？',
+        success: (res) => {
+          if (!res.confirm) return
+          try {
+            clearSession()
+          } catch (e) {
+            // ignore
+          }
+          uni.reLaunch({ url: '/pages/login/login' })
+        }
+      })
+    },
     switchTab(key) {
       this.activeTab = key
+      if (key === 'favorites') {
+        this.loadFavorites()
+      }
+    },
+    async loadFavorites() {
+      this.favoritesLoading = true
+      try {
+        const list = await getMyFavorites()
+        this.favorites = Array.isArray(list) ? list : (list?.data || [])
+      } catch (e) {
+        console.error('加载收藏失败:', e)
+        uni.showToast({ title: '加载收藏失败', icon: 'none' })
+      } finally {
+        this.favoritesLoading = false
+      }
+    },
+    getFavoriteImageUrl(id) {
+      return getFavoriteImageUrl(id)
+    },
+    async handleDeleteFavorite(id) {
+      uni.showModal({
+        title: '确认删除',
+        content: '确定要删除该收藏吗？',
+        success: async (res) => {
+          if (!res.confirm) return
+          try {
+            await deleteFavorite(id)
+            await this.loadFavorites()
+            uni.showToast({ title: '删除成功', icon: 'success' })
+          } catch (e) {
+            console.error('删除收藏失败:', e)
+            uni.showToast({ title: '删除失败', icon: 'none' })
+          }
+        }
+      })
     },
     async loadUserInfo() {
       const user = getCurrentUser()
@@ -712,6 +799,90 @@ $danger-color: #E02020;
   &:hover {
     background: #fff5f5;
   }
+}
+
+.btn-danger-outline.small {
+  height: 28px;
+  line-height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.panel-favorites {
+  width: 100%;
+}
+
+.favorites-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.favorite-card {
+  background: $brand-white;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(18, 52, 77, 0.05);
+  border: 1px solid rgba(224, 224, 224, 0.7);
+  padding: 16px;
+}
+
+.favorite-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.favorite-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text-main;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.favorite-url {
+  margin-top: 6px;
+}
+
+.url-text {
+  font-size: 12px;
+  color: $text-light;
+  word-break: break-all;
+}
+
+.favorite-image {
+  margin-top: 10px;
+}
+
+.fav-img {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(224, 224, 224, 0.7);
+}
+
+.favorite-content {
+  margin-top: 10px;
+}
+
+.content-text {
+  font-size: 13px;
+  color: $text-secondary;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.favorite-footer {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.time-text {
+  font-size: 12px;
+  color: $text-light;
 }
 
 .btn-enter {

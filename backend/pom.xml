@@ -105,7 +105,27 @@
             <version>8.5.7</version>
         </dependency>
         -->
+
+        <!-- 阿里云 OCR（新 SDK：ocr-api 2021-07-07，按官方文档接入） -->
+        <!-- 参考：
+             - https://next.api.aliyun.com/api-tools/sdk/ocr-api?version=2021-07-07&language=java-tea&tab=primer-doc
+             - https://help.aliyun.com/document_detail/295359.html
+        -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>ocr_api20210707</artifactId>
+            <version>1.1.1</version>
+        </dependency>
     </dependencies>
+
+    <repositories>
+        <!-- 阿里云 Maven 公共仓库（部分云产品 SDK 不在 Maven Central） -->
+        <repository>
+            <id>aliyun-public</id>
+            <name>Aliyun Public</name>
+            <url>https://maven.aliyun.com/repository/public</url>
+        </repository>
+    </repositories>
 
     <build>
         <plugins>

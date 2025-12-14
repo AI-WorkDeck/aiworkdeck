@@ -1,7 +1,18 @@
 <template>
   <view class="page-new-project new-project-page">
+    <view class="topbar">
+      <view class="topbar-left" @tap="goBack">
+        <text class="topbar-back">←</text>
+        <text class="topbar-title">新建项目</text>
+      </view>
+      <view class="topbar-right" @tap="goToUserProfile">
+        <view class="topbar-avatar">
+          <text class="avatar-text">{{ userDisplayName?.charAt(0) || 'U' }}</text>
+        </view>
+      </view>
+    </view>
     <view class="page-header">
-      <text class="page-title">新建项目</text>
+      <text class="page-title">项目创建向导</text>
       <text class="page-subtitle">请选择项目类型并录入上市公司 / 标的公司信息，系统将自动补全基础信息。</text>
     </view>
 
@@ -71,10 +82,12 @@
 import { PROJECT_TYPES } from '@/config/projectTypes.js'
 import { COMPANY_ROLES } from '@/config/projectTypes.js'
 import { fetchCompanyBasicInfo, createProject } from '@/services/api.js'
+import { getCurrentUser } from '@/utils/auth.js'
 
 export default {
   data() {
     return {
+      userDisplayName: '用户',
       projectTypes: PROJECT_TYPES,
       projectTypeIndex: 0,
       formModel: {
@@ -83,6 +96,12 @@ export default {
         targetCompanyName: '',
       },
       creating: false
+    }
+  },
+  onLoad() {
+    const user = getCurrentUser()
+    if (user) {
+      this.userDisplayName = user.displayName || user.username || '用户'
     }
   },
   computed: {
@@ -96,6 +115,16 @@ export default {
     },
   },
   methods: {
+    goBack() {
+      try {
+        uni.navigateBack()
+      } catch (e) {
+        uni.navigateTo({ url: '/pages/userprofile/userprofile' })
+      }
+    },
+    goToUserProfile() {
+      uni.navigateTo({ url: '/pages/userprofile/userprofile' })
+    },
     onProjectTypeChange(e) {
       const index = Number(e.detail.value || 0)
       this.projectTypeIndex = index
@@ -193,6 +222,56 @@ export default {
   },
 }
 </script>
+
+<style lang="scss" scoped>
+.topbar {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.topbar-back {
+  font-size: 16px;
+  color: #12344D;
+}
+
+.topbar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #12344D;
+}
+
+.topbar-right {
+  cursor: pointer;
+}
+
+.topbar-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #12344D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-text {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+</style>
 
 <style lang="scss">
 /* 全局变量映射 */

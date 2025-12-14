@@ -1,6 +1,6 @@
 <template>
-  <view class="file-tree">
-    <view class="tree-content">
+  <view class="file-tree" tabindex="0" @keydown="handleKeyDown" @mousedown="focusTree">
+    <view class="tree-content" @mousedown="onMarqueeStart" @mousemove="onMarqueeMove" @mouseup="onMarqueeEnd">
       <view v-if="loading" class="tree-loading">
         <text>加载中...</text>
       </view>
@@ -8,6 +8,8 @@
         <text>暂无文件</text>
       </view>
       <view v-else class="tree-list">
+        <!-- 框选区域（H5） -->
+        <view v-if="marquee.active" class="marquee" :style="marqueeStyle"></view>
         <!-- H5端使用HTML5拖拽API -->
         <!-- #ifdef H5 -->
         <view
@@ -18,14 +20,25 @@
             'tree-item-selected': selectedFileId === item.id,
             'tree-item-drop-target': dragOverIndex === index
           }"
+          :data-file-id="item.id"
           :draggable="true"
           @tap="handleItemClick(item)"
-          @dragstart="handleDragStart($event, index)"
+          @contextmenu.prevent="handleContextMenu(item)"
+          @dragstart="handleDragStart($event, item, index)"
           @dragover.prevent="handleDragOver($event, index)"
           @drop="handleDrop($event, index)"
           @dragend="handleDragEnd"
         >
           <view class="tree-item-content" :style="{ paddingLeft: getItemPadding(item) }">
+            <view v-if="selectionMode" class="tree-checkbox" @tap.stop="toggleChecked(item)">
+              <view
+                class="checkbox-box"
+                :class="{
+                  checked: getCheckState(item) === 'checked',
+                  indeterminate: getCheckState(item) === 'indeterminate'
+                }"
+              ></view>
+            </view>
             <text v-if="item.isFolder && showTree" class="tree-expand-icon" @tap.stop="toggleFolder(item.id)">
               {{ expandedFolders.has(item.id) ? '▼' : '▶' }}
             </text>
@@ -66,12 +79,23 @@
             'tree-item-selected': selectedFileId === item.id, 
             'tree-item-dragging': draggingIndex === index 
           }"
+          :data-file-id="item.id"
           @tap="handleItemClick(item)"
+          @contextmenu.prevent="handleContextMenu(item)"
           @touchstart="handleTouchStart($event, index)"
           @touchmove="handleTouchMove($event, index)"
           @touchend="handleTouchEnd($event, index)"
         >
           <view class="tree-item-content" :style="{ paddingLeft: getItemPadding(item) }">
+            <view v-if="selectionMode" class="tree-checkbox" @tap.stop="toggleChecked(item)">
+              <view
+                class="checkbox-box"
+                :class="{
+                  checked: getCheckState(item) === 'checked',
+                  indeterminate: getCheckState(item) === 'indeterminate'
+                }"
+              ></view>
+            </view>
             <text v-if="item.isFolder && showTree" class="tree-expand-icon" @tap.stop="toggleFolder(item.id)">
               {{ expandedFolders.has(item.id) ? '▼' : '▶' }}
             </text>
@@ -104,7 +128,7 @@
     </view>
 
     <!-- 底部工具栏 -->
-    <view class="tree-footer">
+    <view v-if="showFooterActions" class="tree-footer">
       <!-- 第一行：新建文件夹和新建Word -->
       <view class="footer-row">
         <button class="btn-new-folder" @tap="showCreateFolderDialog">
@@ -265,7 +289,7 @@
 </template>
 
 <script>
-import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, moveFile, getApiBaseUrl } from '@/services/api.js'
+import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getApiBaseUrl } from '@/services/api.js'
 import { getAuthHeaders } from '@/utils/auth.js'
 
 export default {
@@ -278,6 +302,16 @@ export default {
     parentId: {
       type: Number,
       default: null
+    },
+    // 批量选择模式：由父组件控制（默认关闭）
+    selectionMode: {
+      type: Boolean,
+      default: false
+    },
+    // 是否展示底部“新建/上传”操作区（默认展示；在 IDE 风格页面由父组件放到头部工具栏）
+    showFooterActions: {
+      type: Boolean,
+      default: true
     }
   },
   data() {
@@ -301,6 +335,21 @@ export default {
       allFiles: [], // 完整文件树
       expandedFolders: new Set(), // 展开的文件夹ID集合
       showTree: true, // 是否显示完整树形结构（默认false，只显示当前文件夹）
+      // 批量选择（勾选/框选）
+      checkedMap: {}, // { [id]: true }
+      pendingBatchAction: null, // 'move'|'cut'|'copy'
+      batchTargetParentId: null,
+      folderSelectorMode: 'upload', // 'upload' | 'batch'
+      // 框选状态（H5）
+      marquee: {
+        active: false,
+        startX: 0,
+        startY: 0,
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0
+      },
       // 上传文件相关
       showUploadDialog: false,
       showFolderSelector: false,
@@ -314,6 +363,24 @@ export default {
     }
   },
   computed: {
+    checkedIds() {
+      return Object.keys(this.checkedMap)
+        .filter(k => this.checkedMap[k])
+        .map(k => Number(k))
+        .filter(v => !isNaN(v))
+    },
+    checkedCount() {
+      return this.checkedIds.length
+    },
+    marqueeStyle() {
+      const m = this.marquee
+      return {
+        left: `${m.x}px`,
+        top: `${m.y}px`,
+        width: `${m.w}px`,
+        height: `${m.h}px`
+      }
+    },
     folders() {
       return this.allFiles.filter(f => f.isFolder)
     },
@@ -403,6 +470,11 @@ export default {
         this.loadFiles()
       }
     },
+    selectionMode(val) {
+      if (!val) {
+        this.clearChecked()
+      }
+    },
     // 打开文件夹选择器时，初始化展开状态并同步当前选择
     showFolderSelector(val) {
       if (val) {
@@ -411,11 +483,26 @@ export default {
           expanded[f.id] = true
         })
         this.folderSelectorExpanded = expanded
-        this.tempSelectedParent = this.selectedUploadParent
+        this.tempSelectedParent = this.folderSelectorMode === 'batch' ? this.batchTargetParentId : this.selectedUploadParent
       }
     }
   },
+  mounted() {
+    // selectionMode 关闭时，确保不残留选中态
+    if (!this.selectionMode) {
+      this.clearChecked()
+    }
+  },
   methods: {
+    // 让文件树容器可聚焦，接收键盘事件（H5）
+    focusTree() {
+      try {
+        const el = typeof document !== 'undefined' ? document.querySelector('.file-tree') : null
+        if (el && el.focus) el.focus()
+      } catch (e) {
+        // ignore
+      }
+    },
     async loadFiles() {
       if (!this.projectId) {
         console.warn('FileTree: projectId 未设置，无法加载文件列表')
@@ -462,9 +549,13 @@ export default {
     },
     handleItemClick(item) {
       if (item.isFolder) {
-        // 如果是文件夹，切换展开/收起
+        // 文件夹交互：按需求“左键收起、右键展开”
         if (this.showTree) {
-          this.toggleFolder(item.id)
+          this.selectedFileId = item.id
+          // 左键仅在已展开时收起；未展开时不展开（由右键/→键展开）
+          if (this.expandedFolders.has(item.id)) {
+            this.toggleFolder(item.id)
+          }
         } else {
           // 如果不显示树形结构，点击文件夹时触发选择事件（由父组件处理导航）
           this.selectedFileId = item.id
@@ -705,7 +796,239 @@ export default {
     // 切换选择器中某个文件夹的展开/收起
     toggleFolderSelectorExpand(folderId) {
       const current = this.folderSelectorExpanded[folderId]
-      this.$set(this.folderSelectorExpanded, folderId, current === false ? true : false)
+      this.folderSelectorExpanded = {
+        ...this.folderSelectorExpanded,
+        [folderId]: current === false ? true : false
+      }
+    },
+    isChecked(id) {
+      return !!this.checkedMap[String(id)]
+    },
+    getCheckState(item) {
+      if (!this.selectionMode || !item) return 'unchecked'
+      if (!item.isFolder) {
+        return this.isChecked(item.id) ? 'checked' : 'unchecked'
+      }
+
+      const ids = this.getDescendantIds(item.id, true) // 包含自身
+      let checked = 0
+      ids.forEach(id => {
+        if (this.isChecked(id)) checked++
+      })
+      if (checked === 0) return 'unchecked'
+      if (checked === ids.length) return 'checked'
+      return 'indeterminate'
+    },
+    getDescendantIds(folderId, includeSelf = false) {
+      const all = Array.isArray(this.allFiles) && this.allFiles.length ? this.allFiles : (Array.isArray(this.files) ? this.files : [])
+      const childrenMap = new Map()
+      all.forEach(f => {
+        const pid = f.parentId == null ? null : f.parentId
+        if (!childrenMap.has(pid)) childrenMap.set(pid, [])
+        childrenMap.get(pid).push(f)
+      })
+      const result = []
+      if (includeSelf) result.push(folderId)
+      const stack = [folderId]
+      while (stack.length) {
+        const cur = stack.pop()
+        const kids = childrenMap.get(cur) || []
+        kids.forEach(k => {
+          result.push(k.id)
+          if (k.isFolder) stack.push(k.id)
+        })
+      }
+      return result
+    },
+    toggleChecked(item) {
+      if (!this.selectionMode) return
+      if (!item || item.id == null) return
+
+      // 文件夹：联动勾选/取消其全部子孙
+      if (item.isFolder) {
+        const state = this.getCheckState(item)
+        const ids = this.getDescendantIds(item.id, true)
+        const next = { ...this.checkedMap }
+        if (state === 'checked') {
+          ids.forEach(id => delete next[String(id)])
+        } else {
+          ids.forEach(id => { next[String(id)] = true })
+        }
+        this.checkedMap = next
+        this.$emit('checked-change', this.checkedIds)
+        return
+      }
+
+      const key = String(item.id)
+      const next = { ...this.checkedMap }
+      if (next[key]) {
+        delete next[key]
+      } else {
+        next[key] = true
+      }
+      this.checkedMap = next
+      this.$emit('checked-change', this.checkedIds)
+    },
+    clearChecked() {
+      this.checkedMap = {}
+      this.pendingBatchAction = null
+      this.batchTargetParentId = null
+      this.folderSelectorMode = 'upload'
+      this.$emit('checked-change', [])
+    },
+    openBatchAction(action) {
+      const ids = this.checkedIds
+      if (!ids.length) return
+
+      if (action === 'delete') {
+        uni.showModal({
+          title: '批量删除',
+          content: `确定要删除选中的 ${ids.length} 项吗？（包含文件夹将递归删除）`,
+          success: async (res) => {
+            if (!res.confirm) return
+            try {
+              const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+              await batchDeleteFiles(projectId, ids)
+              this.clearChecked()
+              await this.loadFiles()
+              uni.showToast({ title: '删除成功', icon: 'success' })
+            } catch (e) {
+              console.error('批量删除失败:', e)
+              uni.showToast({ title: e.message || '批量删除失败', icon: 'none' })
+            }
+          }
+        })
+        return
+      }
+
+      this.pendingBatchAction = action
+      this.folderSelectorMode = 'batch'
+      this.batchTargetParentId = null
+      this.showFolderSelector = true
+    },
+    async executeBatchAction() {
+      const action = this.pendingBatchAction
+      const ids = this.checkedIds
+      if (!action || !ids.length) return
+      try {
+        const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+        const targetParentId = this.batchTargetParentId
+        if (action === 'move' || action === 'cut') {
+          await batchMoveFiles(projectId, ids, targetParentId)
+          uni.showToast({ title: '移动成功', icon: 'success' })
+        } else if (action === 'copy') {
+          await batchCopyFiles(projectId, ids, targetParentId)
+          uni.showToast({ title: '复制成功', icon: 'success' })
+        }
+        this.clearChecked()
+        await this.loadFiles()
+      } catch (e) {
+        console.error('批量操作失败:', e)
+        uni.showToast({ title: e.message || '批量操作失败', icon: 'none' })
+      }
+    },
+    handleContextMenu(item) {
+      // 右键：展开文件夹
+      if (item && item.isFolder && this.showTree && !this.expandedFolders.has(item.id)) {
+        this.toggleFolder(item.id)
+      }
+    },
+    handleKeyDown(e) {
+      if (!e) return
+      const key = e.key
+      const idx = this.files.findIndex(f => f.id === this.selectedFileId)
+      const curIndex = idx >= 0 ? idx : 0
+
+      if (key === 'ArrowDown') {
+        e.preventDefault()
+        const next = this.files[Math.min(this.files.length - 1, curIndex + 1)]
+        if (next) this.handleItemClick(next)
+      } else if (key === 'ArrowUp') {
+        e.preventDefault()
+        const prev = this.files[Math.max(0, curIndex - 1)]
+        if (prev) this.handleItemClick(prev)
+      } else if (key === 'ArrowLeft') {
+        e.preventDefault()
+        const cur = this.files[curIndex]
+        if (cur && cur.isFolder && this.expandedFolders.has(cur.id)) {
+          this.toggleFolder(cur.id)
+        }
+      } else if (key === 'ArrowRight') {
+        e.preventDefault()
+        const cur = this.files[curIndex]
+        if (cur && cur.isFolder && !this.expandedFolders.has(cur.id)) {
+          this.toggleFolder(cur.id)
+        }
+      }
+    },
+    // 框选（H5）：在空白区域按下拖动
+    onMarqueeStart(e) {
+      if (!this.selectionMode) return
+      if (!e || e.button !== 0) return
+      const target = e.target
+      if (target && (target.closest?.('.tree-item') || target.closest?.('.tree-footer'))) return
+
+      this.marquee.active = true
+      this.marquee.startX = e.clientX
+      this.marquee.startY = e.clientY
+      this.marquee.x = e.clientX
+      this.marquee.y = e.clientY
+      this.marquee.w = 0
+      this.marquee.h = 0
+      this.clearChecked()
+    },
+    onMarqueeMove(e) {
+      if (!this.selectionMode) return
+      if (!this.marquee.active || !e) return
+      const x1 = this.marquee.startX
+      const y1 = this.marquee.startY
+      const x2 = e.clientX
+      const y2 = e.clientY
+      const left = Math.min(x1, x2)
+      const top = Math.min(y1, y2)
+      const w = Math.abs(x2 - x1)
+      const h = Math.abs(y2 - y1)
+      this.marquee.x = left
+      this.marquee.y = top
+      this.marquee.w = w
+      this.marquee.h = h
+
+      try {
+        const items = typeof document !== 'undefined' ? document.querySelectorAll('.file-tree .tree-item') : []
+        const next = {}
+        items.forEach(el => {
+          const rect = el.getBoundingClientRect()
+          const hit = !(rect.right < left || rect.left > left + w || rect.bottom < top || rect.top > top + h)
+          if (hit) {
+            const id = el.getAttribute('data-file-id')
+            if (id) next[String(id)] = true
+          }
+        })
+        this.checkedMap = next
+        this.$emit('checked-change', this.checkedIds)
+      } catch (err) {
+        // ignore
+      }
+    },
+    onMarqueeEnd() {
+      if (!this.marquee.active) return
+      this.marquee.active = false
+    },
+
+    // 供父组件快速同步文件名（例如 WPS 内重命名）
+    updateFileName(fileId, newName) {
+      if (!fileId || !newName) return
+      if (Array.isArray(this.files)) {
+        this.files.forEach(f => {
+          if (f.id === fileId) f.name = newName
+        })
+      }
+      if (Array.isArray(this.allFiles)) {
+        this.allFiles.forEach(f => {
+          if (f.id === fileId) f.name = newName
+        })
+      }
+      this.$forceUpdate()
     },
     // 根据文件类型返回图标样式类
     getFileIconClass(item) {
@@ -748,15 +1071,43 @@ export default {
       return `${m}min ${rest}s`
     },
     // H5端拖拽方法（HTML5 Drag and Drop API）
-    handleDragStart(e, index) {
+    handleDragStart(e, item, index) {
       console.log('拖拽开始:', index)
       this.draggedIndex = index
+      // 向外部暴露“拖拽文件开始”（用于 WPS 文档建立关联）
+      try {
+        if (item && item.id && !item.isFolder) {
+          this.$emit('file-drag-start', { id: item.id, name: item.name, fileType: item.fileType, wpsFileId: item.wpsFileId })
+        }
+      } catch (e) {
+        // ignore
+      }
       // 检查 dataTransfer 是否存在（在某些环境中可能不存在）
       if (e.dataTransfer) {
-        e.dataTransfer.effectAllowed = 'move'
+        // 允许 copy/link/move
+        e.dataTransfer.effectAllowed = 'all'
+        
         // 设置拖拽数据
         try {
+          // 1. 基础索引，用于列表内排序
           e.dataTransfer.setData('text/plain', index.toString())
+          
+          // 2. 完整文件信息，用于跨组件拖拽（如拖到 WPS）
+          if (item && item.id && !item.isFolder) {
+            const fileData = JSON.stringify({
+              fileId: item.id,
+              name: item.name,
+              fileType: item.fileType,
+              wpsFileId: item.wpsFileId
+            })
+            // 标准自定义类型
+            e.dataTransfer.setData('application/x-checkba-file', fileData)
+            // 兜底：也放到 text/plain 里（虽然会覆盖上面的索引，但跨组件拖拽时我们优先读自定义类型，或者通过 fileLinkDrag 状态传递）
+            // 注意：如果这里覆盖了 text/plain，可能会影响同组件内的排序逻辑（handleDrop 里用 parseInt 解析）。
+            // 权衡：同组件排序 handleDrop 里主要用 this.draggedIndex，不太依赖 dataTransfer.getData('text/plain')。
+            // 但为了安全，我们可以用一个特殊前缀
+            e.dataTransfer.setData('text/checkba-file-json', fileData)
+          }
         } catch (err) {
           // 某些环境可能不支持 setData，静默失败
           console.warn('设置拖拽数据失败:', err)
@@ -821,6 +1172,11 @@ export default {
       this.draggedIndex = -1
     },
     handleDragEnd() {
+      try {
+        this.$emit('file-drag-end')
+      } catch (e) {
+        // ignore
+      }
       this.dragOverIndex = -1
       this.draggedIndex = -1
     },
@@ -917,6 +1273,12 @@ export default {
       this.tempSelectedParent = parentId
     },
     confirmFolderSelection() {
+      if (this.folderSelectorMode === 'batch') {
+        this.batchTargetParentId = this.tempSelectedParent
+        this.showFolderSelector = false
+        this.executeBatchAction()
+        return
+      }
       this.selectedUploadParent = this.tempSelectedParent
       this.showFolderSelector = false
     },
@@ -1056,11 +1418,15 @@ export default {
           ? `${baseUrl}api/files/${wpsFileId}/upload`
           : `${baseUrl}/api/files/${wpsFileId}/upload`
 
+        // 获取认证头，但移除 Content-Type，让 uni.uploadFile 自动设置 multipart/form-data
+        const authHeaders = this.getAuthHeaders()
+        delete authHeaders['Content-Type'] // 移除 Content-Type，让 uni.uploadFile 自动处理
+        
         const uploadTask = uni.uploadFile({
           url: url,
           filePath: file.path,
           name: 'file',
-          header: this.getAuthHeaders(),
+          header: authHeaders,
           success: (res) => {
             try {
               const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
@@ -1074,7 +1440,7 @@ export default {
                 }
                 // 短暂展示100%后移除
                 setTimeout(async () => {
-                  this.$delete(this.uploadStatusMap, createdFile.id)
+                  delete this.uploadStatusMap[createdFile.id]
                   await this.loadFiles()
                 }, 800)
                 resolve(createdFile)
@@ -1139,10 +1505,23 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+$brand-primary: $brand-color-primary;
+$brand-border: $brand-border-light;
+$bg: $uni-bg-color;
+$bg-grey: $uni-bg-color-grey;
+
 .file-tree {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.file-tree,
+.tree-content,
+.tree-list,
+.tree-item,
+.tree-item-name {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
 .tree-toolbar {
@@ -1155,33 +1534,46 @@ export default {
 
 .btn-new-folder,
 .btn-new-word {
-  flex: 1;
-  height: 64rpx;
-  font-size: 26rpx;
+  flex: 1 1 0;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  height: 56rpx;
+  font-size: 24rpx;
   padding: 0;
-  line-height: 64rpx;
-  border-radius: 8rpx;
+  line-height: 56rpx;
+  border-radius: 10rpx;
   border: 1px solid transparent;
   transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+/* uni-app button 默认会带 ::after 边框，这里统一去掉，避免窄屏/不同端显示“发虚/变丑” */
+.btn-new-folder::after,
+.btn-new-word::after,
+.btn-upload::after,
+.batch-btn::after,
+.dialog-btn::after {
+  border: none;
 }
 
 .btn-new-folder {
-  background-color: #ffffff;
-  border-color: #12344D;
-  color: #12344D;
+  background-color: $bg;
+  border-color: $brand-primary;
+  color: $brand-primary;
 }
 
 .btn-new-folder:active {
-  background-color: #f0f4f8;
+  background-color: rgba($brand-primary, 0.06);
 }
 
 .btn-new-word {
-  background-color: #12344D;
-  color: #ffffff;
+  background-color: $brand-primary;
+  color: $uni-text-color-inverse;
 }
 
 .btn-new-word:active {
-  background-color: #0e2a3f;
+  background-color: rgba($brand-primary, 0.92);
 }
 
 .tree-content {
@@ -1189,10 +1581,128 @@ export default {
   overflow-y: auto;
 }
 
-.tree-footer {
-  padding: 12rpx 16rpx;
+.file-tree {
+  outline: none;
+}
+
+.tree-list {
+  position: relative;
+}
+
+.marquee {
+  position: fixed;
+  z-index: 999;
+  border: 1px solid rgba(37, 99, 235, 0.55);
+  background: rgba(37, 99, 235, 0.10);
+  pointer-events: none;
+  border-radius: 6px;
+}
+
+.tree-checkbox {
+  width: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-box {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.9);
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.checkbox-box.checked {
+  border-color: $brand-primary;
+  background: $brand-primary;
+  position: relative;
+}
+
+.checkbox-box.checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-box.indeterminate {
+  border-color: $brand-primary;
+  background: rgba($brand-primary, 0.10);
+  position: relative;
+}
+
+.checkbox-box.indeterminate::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 8px;
+  height: 2px;
+  background: $brand-primary;
+  border-radius: 2px;
+}
+
+.batch-bar {
+  padding: 10rpx 12rpx;
   border-top: 1rpx solid #e5e7eb;
   background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.batch-info {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 8rpx;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.batch-btn {
+  height: 52rpx;
+  line-height: 52rpx;
+  padding: 0 14rpx;
+  font-size: 24rpx;
+  border-radius: 10rpx;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #12344D;
+}
+
+.batch-btn:active {
+  background: #f8fafc;
+}
+
+.batch-btn-danger {
+  border-color: rgba(220, 38, 38, 0.25);
+  color: #dc2626;
+}
+
+.batch-btn-danger:active {
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.batch-btn-ghost {
+  border-color: transparent;
+  color: #64748b;
+}
+
+.tree-footer {
+  padding: 10rpx 12rpx;
+  border-top: 1rpx solid rgba($brand-border, 0.9);
+  background-color: $bg;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
@@ -1201,23 +1711,78 @@ export default {
 .footer-row {
   display: flex;
   gap: 8rpx;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .btn-upload {
-  flex: 1;
-  height: 64rpx;
-  font-size: 26rpx;
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 320px;
+  height: 56rpx;
+  font-size: 24rpx;
   padding: 0;
-  line-height: 64rpx;
-  border-radius: 8rpx;
+  line-height: 56rpx;
+  border-radius: 10rpx;
   border: 1px solid transparent;
   transition: all 0.2s;
-  background-color: #12344D;
-  color: #ffffff;
+  background-color: $brand-primary;
+  color: $uni-text-color-inverse;
 }
 
 .btn-upload:active {
-  background-color: #0e2a3f;
+  background-color: rgba($brand-primary, 0.92);
+}
+
+@media (max-width: 420px) {
+  .btn-new-folder,
+  .btn-new-word {
+    min-width: 46%;
+  }
+}
+
+/* 桌面端窄屏：避免 rpx 随视口缩放导致按钮“忽大忽小/比例失衡” */
+@media (max-width: 900px) {
+  .btn-new-folder,
+  .btn-new-word,
+  .btn-upload {
+    height: 28px;
+    line-height: 28px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+  .tree-footer {
+    padding: 8px 10px;
+  }
+  .tree-item-name {
+    font-size: 12px;
+  }
+  .tree-item-icon.icon-word,
+  .tree-item-icon.icon-excel,
+  .tree-item-icon.icon-ppt,
+  .tree-item-icon.icon-pdf,
+  .tree-item-icon.icon-file {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    font-size: 11px;
+  }
+  .tree-expand-icon,
+  .tree-expand-placeholder {
+    width: 20px;
+  }
+  .tree-item-content {
+    height: 32px;
+    gap: 6px;
+    padding-right: 68px;
+  }
+}
+
+/* < 960px：直接压平缩进，避免层级 padding 把内容挤到“啥都看不见” */
+@media (max-width: 960px) {
+  .tree-item-content {
+    padding-left: 10px !important;
+  }
 }
 
 .upload-dialog {
@@ -1368,26 +1933,47 @@ export default {
 }
 
 .tree-list {
-  padding: 8rpx;
+  padding: 6rpx;
 }
 
 .tree-item {
-  padding: 12rpx 8rpx;
+  position: relative;
+  padding: 4rpx 6rpx;
   border-radius: 8rpx;
-  margin-bottom: 4rpx;
-  transition: background-color 0.2s;
+  margin-bottom: 0;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+/* Finder 风格：奇偶行浅色差（尽量克制） */
+.tree-list .tree-item:nth-child(odd) {
+  background-color: rgba(18, 52, 77, 0.02);
+}
+
+.tree-list .tree-item:nth-child(even) {
+  background-color: transparent;
 }
 
 .tree-item:hover {
-  background-color: #f3f4f6;
+  background-color: rgba(18, 52, 77, 0.05);
 }
 
 .tree-item:active {
-  background-color: #f3f4f6;
+  background-color: rgba(18, 52, 77, 0.06);
 }
 
 .tree-item-selected {
-  background-color: #e0f2fe;
+  background-color: rgba(18, 52, 77, 0.08);
+}
+
+.tree-item-selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8rpx;
+  bottom: 8rpx;
+  width: 6rpx;
+  border-radius: 999px;
+  background-color: #12344D;
 }
 
 .tree-item-dragging {
@@ -1415,8 +2001,9 @@ export default {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  height: 64rpx; /* 增加点击区域 */
+  gap: 10rpx;
+  height: 52rpx; /* 紧凑行高，接近 Finder */
+  padding-right: 84rpx; /* 预留右侧操作按钮空间，避免把文件名挤没 */
 }
 
 /* 树引导线 - 竖线 */
@@ -1442,7 +2029,7 @@ export default {
 }
 
 .tree-expand-icon {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: #6b7280;
   width: 32rpx;
   display: inline-block;
@@ -1466,7 +2053,8 @@ export default {
   width: 32rpx;
   height: 24rpx;
   border-radius: 4rpx;
-  border: 2rpx solid #6b7280;
+  border: 2rpx solid rgba(148, 163, 184, 0.9);
+  background: rgba(148, 163, 184, 0.10);
   position: relative;
 }
 
@@ -1478,7 +2066,7 @@ export default {
   width: 14rpx;
   height: 6rpx;
   border-radius: 3rpx 3rpx 0 0;
-  background-color: #e5e7eb;
+  background-color: rgba(148, 163, 184, 0.25);
 }
 
 .tree-item-icon.icon-word,
@@ -1489,47 +2077,59 @@ export default {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 6rpx;
-  font-size: 18rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 8rpx;
+  font-size: 16rpx;
   font-weight: 600;
-  color: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.35);
 }
 
 .tree-item-icon.icon-word {
-  background: linear-gradient(135deg, #185abd, #2b579a);
+  background: rgba(37, 99, 235, 0.10);
+  color: #2563eb;
 }
 
 .tree-item-icon.icon-excel {
-  background: linear-gradient(135deg, #107c41, #185c37);
+  background: rgba(22, 163, 74, 0.10);
+  color: #16a34a;
 }
 
 .tree-item-icon.icon-ppt {
-  background: linear-gradient(135deg, #c43e1c, #b7472a);
+  background: rgba(234, 88, 12, 0.10);
+  color: #ea580c;
 }
 
 .tree-item-icon.icon-pdf {
-  background: linear-gradient(135deg, #d32f2f, #b71c1c);
-  font-size: 14rpx;
+  background: rgba(220, 38, 38, 0.10);
+  color: #dc2626;
+  font-size: 13rpx;
 }
 
 .tree-item-icon.icon-file {
-  background: linear-gradient(135deg, #4b5563, #374151);
+  background: rgba(100, 116, 139, 0.10);
+  color: #64748b;
 }
 
 .tree-item-name {
   flex: 1;
-  font-size: 28rpx;
-  color: #1f2430;
+  font-size: 26rpx;
+  color: $uni-text-color;
+  letter-spacing: 0.2px;
+  display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tree-item-actions {
+  position: absolute;
+  right: 10rpx;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
-  gap: 16rpx;
+  gap: 12rpx;
   opacity: 0;
   transition: opacity 0.2s;
 }

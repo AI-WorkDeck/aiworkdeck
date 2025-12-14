@@ -98,7 +98,16 @@ export default {
       error: null,
       instance: null,
       // 自动生成容器 ID，避免多个组件实例冲突
-      generatedContainerId: null
+      generatedContainerId: null,
+      // 选区缓存（用于解决拖拽时焦点丢失问题）
+      selectionCache: {
+        start: 0,
+        end: 0,
+        text: '',
+        ts: 0
+      },
+      // 选区轮询定时器
+      selectionTimer: null
     }
   },
   computed: {
@@ -145,6 +154,24 @@ export default {
     this.destroy()
   },
   methods: {
+    /**
+     * [API] 尝试把焦点切到编辑器（用于拖拽落点插入前）
+     * 说明：WPS WebOffice 多数情况是 iframe，且可能跨域，无法操作其内部 DOM；
+     * 但 iframe.focus() 能保证后续 JSAPI 插入更稳定。
+     */
+    focusEditor() {
+      try {
+        const refContainer = this.$refs.wpsContainer
+        let el = refContainer
+        if (Array.isArray(el) && el.length) el = el[0]
+        if (el && el.$el) el = el.$el
+        if (!el || typeof el.querySelector !== 'function') return
+        const iframe = el.querySelector('iframe')
+        if (iframe && typeof iframe.focus === 'function') iframe.focus()
+      } catch (e) {
+        // ignore
+      }
+    },
     /**
      * 加载编辑器
      */
@@ -311,6 +338,9 @@ export default {
       if (!this.instance || !this.instance.ApiEvent) {
         return
       }
+      
+      // 启动选区轮询（每 800ms 记录一次，用于拖拽时的 Fallback）
+      this.startSelectionPolling()
 
       // 文件打开事件
       this.instance.ApiEvent.AddApiEventListener('fileOpen', (data) => {
@@ -324,13 +354,8 @@ export default {
         }
       })
 
-      try {
-        this.instance.ApiEvent.AddApiEventListener('fileSave', (data) => {
-          this.$emit('fileSave', data)
-        })
-      } catch (e) {
-        console.warn('WPS SDK 不支持 fileSave 事件监听', e)
-      }
+      // 说明：部分 WPS 版本会对未知事件名直接抛出 "Invalid event name"
+      // fileSave/fileRename/HyperLinkOpen 在当前环境下不稳定，先不绑定，避免刷屏影响排查其它问题
 
       // 错误事件
       this.instance.ApiEvent.AddApiEventListener('error', (data) => {
@@ -356,15 +381,25 @@ export default {
         this.$emit('error', new Error(errorMsg))
       })
 
-      // 监听重命名事件（尝试捕获 WPS 内部重命名操作）
+      // 同上：不绑定 fileRename，避免 Invalid event name 刷屏
+
+      // 监听复制事件：用于“剪贴板历史”入库（按 WPS 官方 WebOffice 事件：ClipboardCopy）
+      // 参考：https://solution.wps.cn/docs/client/api/summary.html/web/events
       try {
-        this.instance.ApiEvent.AddApiEventListener('fileRename', (data) => {
-          console.log('WPS 文件重命名:', data)
-          this.$emit('fileRename', data)
+        this.instance.ApiEvent.AddApiEventListener('ClipboardCopy', (data) => {
+          const text = (data && (data.text || data.Text)) || ''
+          const payload = { ...(data || {}), text }
+          // uni-app / Vue 模板里推荐用 kebab-case
+          this.$emit('clipboard-copy', payload)
+          // 兼容可能存在的 camelCase 绑定
+          this.$emit('clipboardCopy', payload)
         })
       } catch (e) {
-        console.warn('WPS SDK 不支持 fileRename 事件监听', e)
+        console.warn('WPS SDK 不支持 ClipboardCopy 事件监听', e)
       }
+
+      // 超链接拦截：桌面端统一交给 Electron 的 setWindowOpenHandler/will-navigate 拦截 checkba: 协议
+      // 这样不依赖 WPS 的 ApiEvent（避免 Invalid event name）
 
       // 注意：WPS 的保存和关闭事件是通过后端回调接口 /v3/3rd/notify 接收的
       // 而不是通过前端事件监听器。这些事件会在后端 WpsController.notify() 方法中处理
@@ -375,6 +410,12 @@ export default {
      * 销毁编辑器实例
      */
     destroy() {
+      // 清理轮询定时器
+      if (this.selectionTimer) {
+        clearInterval(this.selectionTimer)
+        this.selectionTimer = null
+      }
+
       if (this.instance) {
         try {
           if (typeof this.instance.destroy === 'function') {
@@ -410,6 +451,77 @@ export default {
     reload() {
       this.destroy()
       this.load()
+    },
+
+    /**
+     * [Internal] 启动选区轮询
+     * 说明：WPS WebOffice SDK 的 SelectionChange 事件不可靠，且拖拽时焦点会丢失。
+     * 必须通过轮询来持续记录“最后一次有效选区”，以便在 Drop 时使用。
+     */
+    startSelectionPolling() {
+      if (this.selectionTimer) clearInterval(this.selectionTimer)
+      this.selectionTimer = setInterval(async () => {
+        if (!this.instance) return
+        try {
+          // 只在页面可见时轮询，节省性能
+          if (typeof document !== 'undefined' && document.hidden) return
+
+          const app = this.instance.Application
+          const selection = await app.ActiveDocument.Selection
+          const range = await selection.Range
+          const start = await range.Start
+          const end = await range.End
+          
+          // 仅缓存有效且非空的选区
+          if (typeof start === 'number' && typeof end === 'number' && end > start) {
+            const text = await range.Text
+            if (text) {
+              this.selectionCache = {
+                start,
+                end,
+                text: String(text),
+                ts: Date.now()
+              }
+              // console.log('WpsEditor Cached Selection:', this.selectionCache)
+            }
+          }
+        } catch (e) {
+          // ignore polling errors
+        }
+      }, 800)
+    },
+
+    /**
+     * [API] 获取最后一次已知的有效选区（Fallback 机制）
+     * 如果当前能获取到实时选区，优先返回实时；否则返回缓存。
+     */
+    async getLastKnownSelection() {
+      // 1. 尝试获取实时选区
+      const current = await this.getSelectionRange()
+      const currentText = await this.getSelectionText()
+      
+      if (current && current.end > current.start && currentText) {
+        return {
+          start: current.start,
+          end: current.end,
+          text: currentText,
+          isRealtime: true
+        }
+      }
+      
+      // 2. 检查缓存是否有效（例如 2 分钟内）
+      const cache = this.selectionCache
+      if (cache && cache.ts && (Date.now() - cache.ts < 120 * 1000)) {
+        console.log('Using cached selection fallback:', cache)
+        return {
+          start: cache.start,
+          end: cache.end,
+          text: cache.text,
+          isRealtime: false
+        }
+      }
+      
+      return null
     },
 
     /**
@@ -463,6 +575,165 @@ export default {
       } catch (e) {
         console.error('获取选区 Range 失败', e)
         return null
+      }
+    },
+
+    /**
+     * [API] 获取选区所在的超链接地址（若选区不在超链接内，则返回空）
+     * 说明：不同版本 JSAPI 对 Range.Hyperlinks 的支持不一致，这里 best-effort。
+     */
+    async getSelectionHyperlinkUrl() {
+      if (!this.instance) return ''
+      try {
+        const app = this.instance.Application
+        const selection = await app.ActiveDocument.Selection
+        const range = await selection.Range
+        // 方案 1：range.Hyperlinks
+        try {
+          const hyperlinks = await range.Hyperlinks
+          const c = hyperlinks && hyperlinks.Count ? await hyperlinks.Count : 0
+          if (c > 0) {
+            const item = await hyperlinks.Item(1)
+            const addr = item && (await item.Address)
+            return addr ? String(addr) : ''
+          }
+        } catch (e) {
+          // ignore
+        }
+        // 兜底：返回空
+        return ''
+      } catch (e) {
+        return ''
+      }
+    },
+
+    /**
+     * [API] 在指定 Range 上设置超链接（保持原文本，尽量不改变内容）
+     * 遵循官方文档：先 Select 选区，再调用 Hyperlinks.Add({ Address, TextToDisplay })
+     */
+    async setHyperlinkAtRange(start, end, url, displayText = '') {
+      if (!this.instance) return false
+      const u = String(url || '')
+      if (!u) return false
+      
+      console.log('setHyperlinkAtRange:', { start, end, url, displayText })
+
+      try {
+        const app = this.instance.Application
+        const doc = app.ActiveDocument
+        const hyperlinks = await doc.Hyperlinks
+
+        // 策略 1：尝试 Select() 恢复选区后，使用官方标准 Hyperlinks.Add({ Address })
+        // 这是最标准做法，但如果焦点被浏览器强制锁定在外部，Select() 可能无效
+        try {
+          const rangeObj = await doc.Range(start, end)
+          if (rangeObj) {
+            await rangeObj.Select()
+            // 稍作延迟，给 Select 生效一点时间
+            // await new Promise(r => setTimeout(r, 10)) 
+            
+            await hyperlinks.Add({
+              Address: u,
+              TextToDisplay: displayText ? String(displayText) : undefined
+            })
+            console.log('setHyperlinkAtRange: 策略1(Standard)成功')
+            return true
+          }
+        } catch (e0) {
+           console.warn('setHyperlinkAtRange: 策略1失败', e0)
+        }
+
+        // 策略 2：如果 Select 失败，尝试利用 Range 对象本身作为 Anchor 上下文
+        // 某些 WebOffice 版本可能允许 range.Hyperlinks.Add 或传入 Anchor 参数
+        try {
+          const rangeObj = await doc.Range(start, end)
+          if (rangeObj) {
+            // 尝试 2.1: 传递 Anchor 参数 (VBA 风格)
+            try {
+              await hyperlinks.Add({
+                Address: u,
+                TextToDisplay: displayText ? String(displayText) : undefined,
+                Anchor: rangeObj
+              })
+              console.log('setHyperlinkAtRange: 策略2.1(Anchor Param)成功')
+              return true
+            } catch (errAnchor) {
+               // ignore
+            }
+            
+            // 尝试 2.2: 直接在 Range 对象上调用 (如果 SDK 支持)
+             try {
+               const rangeLinks = await rangeObj.Hyperlinks
+               if (rangeLinks && rangeLinks.Add) {
+                 await rangeLinks.Add({
+                    Address: u,
+                    TextToDisplay: displayText ? String(displayText) : undefined
+                 })
+                 console.log('setHyperlinkAtRange: 策略2.2(Range.Hyperlinks)成功')
+                 return true
+               }
+             } catch (errRange) {
+               // ignore
+             }
+          }
+        } catch (e1) {
+          console.warn('setHyperlinkAtRange: 策略2失败', e1)
+        }
+        
+        // 策略 3: 如果以上都失败，尝试仅替换文本（作为最后的无奈之举，但这样无法生成超链接）
+        // 既然用户一定要关联，我们可以尝试仅保留文本，然后抛错让上层提示
+        console.error('setHyperlinkAtRange: 所有策略均失败，无法创建超链接')
+        return false
+
+      } catch (e) {
+        console.error('setHyperlinkAtRange 失败:', e)
+        return false
+      }
+    },
+    /**
+     * [API] 获取文档纯文本（用于 AI 上下文）
+     * 参考 docs/wpsmanual.md 的“前端集成”部分，使用 ActiveDocument.Content.Text 读取
+     */
+    async getDocumentPlainText(maxLength = 8000) {
+      if (!this.instance) return ''
+      try {
+        const app = this.instance.Application
+        if (!app || !app.ActiveDocument) return ''
+        const content = await app.ActiveDocument.Content
+        if (!content) return ''
+        let text = await content.Text
+        if (!text) return ''
+        const normalized = String(text)
+          .replace(/\u00A0/g, ' ')
+          .replace(/\r\n/g, '\n')
+          .replace(/[ \t]{2,}/g, ' ')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim()
+        if (!maxLength || normalized.length <= maxLength) {
+          return normalized
+        }
+        return `${normalized.slice(0, maxLength)}\n...[上下文截断 ${normalized.length - maxLength} 字]`
+      } catch (e) {
+        console.error('获取文档全文失败', e)
+        return ''
+      }
+    },
+
+    /**
+     * [API] 替换当前选区文本（用于 AI “替换选区”能力）
+     * 说明：按官方 JSAPI 思路，直接对 Selection.Range.Text 赋值即可完成替换
+     */
+    async replaceSelectionText(text) {
+      if (!this.instance) return false
+      try {
+        const app = this.instance.Application
+        const selection = await app.ActiveDocument.Selection
+        const range = await selection.Range
+        range.Text = String(text || '')
+        return true
+      } catch (e) {
+        console.error('替换选区文本失败', e)
+        throw e
       }
     },
 
@@ -587,6 +858,75 @@ export default {
     },
 
     /**
+     * [API] 插入“网核证据链接”（带书签名，且尽量以超链接样式呈现）
+     * 说明：WPS WebOffice 的不同版本对 Hyperlinks.Add 的参数形态支持不完全一致；
+     * 这里做“尽力而为”，失败则退化为普通书签文本。
+     */
+    async insertEvidenceLink(text, bookmarkName, url) {
+      if (!this.instance) return false
+      const t = String(text || '')
+      const u = String(url || '')
+      if (!t) return false
+      try {
+        const app = this.instance.Application
+        const selection = await app.ActiveDocument.Selection
+        const range = await selection.Range
+
+        // 先插入文本
+        range.Text = t
+        const start = await range.Start
+        const end = await range.End
+
+        // 创建书签（用于后续定位）
+        try {
+          const bookmarks = await app.ActiveDocument.Bookmarks
+          const exists = await bookmarks.Exists(bookmarkName)
+          if (!exists) {
+            await bookmarks.Add({
+              Name: bookmarkName,
+              Range: { Start: start, End: end }
+            })
+          }
+        } catch (e) {
+          // ignore bookmark failure
+        }
+
+        // 尝试创建超链接（失败则保持普通文本）
+        if (u) {
+          try {
+            const hyperlinks = await app.ActiveDocument.Hyperlinks
+            // 形态 1：对象参数（更像 WebOffice 的 async 风格）
+            try {
+              await hyperlinks.Add({
+                Address: u,
+                TextToDisplay: t,
+                Range: { Start: start, End: end }
+              })
+            } catch (e1) {
+              // 形态 2：可能要求 Anchor
+              try {
+                await hyperlinks.Add({
+                  Address: u,
+                  TextToDisplay: t,
+                  Anchor: range
+                })
+              } catch (e2) {
+                // ignore hyperlink failures
+              }
+            }
+          } catch (e) {
+            // ignore hyperlink failures
+          }
+        }
+        return true
+      } catch (e) {
+        console.error('insertEvidenceLink 失败:', e)
+        // 兜底：至少插入书签文本
+        return await this.insertTextWithBookmark(t, bookmarkName)
+      }
+    },
+
+    /**
      * [API] 更新书签内容
      * @param {string} name 书签名称
      * @param {string} text 新文本
@@ -654,6 +994,168 @@ export default {
         console.error('同步书签失败', e)
         throw e
       }
+    },
+
+    // =========================
+    // 文本变量（域/公文域）实现
+    // 说明：
+    // - 书签在协同/编辑中容易被误删或 Range 漂移
+    // - 改用“公文域/域”思想：每次插入都创建一个带唯一ID的字段实例，字段名中包含 scope+变量名，便于枚举与批量回填
+    // - 由于不同版本 SDK 的 API 命名可能存在差异，这里做了能力探测与容错；若不支持，会抛出明确错误给上层提示
+    // =========================
+
+    _getDocumentFieldsApi(app) {
+      // 兼容：ActiveDocument.DocumentFields / ActiveDocument.DocumentField(s)
+      return (
+        (app && app.ActiveDocument && app.ActiveDocument.DocumentFields) ||
+        (app && app.ActiveDocument && app.ActiveDocument.DocumentField) ||
+        null
+      )
+    },
+
+    _normalizeFieldName(scope, varName, uid) {
+      const safeScope = String(scope || 'D').toUpperCase()
+      const safeName = String(varName || '').trim().replace(/\s+/g, '_').replace(/[^\w\u4e00-\u9fa5\-]/g, '_')
+      const safeUid = String(uid || Date.now())
+      return `${safeScope}__${safeName}__${safeUid}`
+    },
+
+    _parseFieldName(fieldName) {
+      const raw = String(fieldName || '')
+      const m = raw.match(/^([A-Z])__([^_].*?)__(\d+.*)$/)
+      if (!m) return { scope: 'D', varName: raw, uid: '' }
+      return { scope: m[1], varName: m[2].replace(/_/g, ' '), uid: m[3] }
+    },
+
+    async listVariableFields() {
+      if (!this.instance) return []
+      try {
+        const app = this.instance.Application
+        const documentFields = this._getDocumentFieldsApi(app)
+        if (!documentFields) return []
+
+        // 兼容 collection：Count + Item(i)
+        const count = await documentFields.Count
+        const total = typeof count === 'number' ? count : 0
+        const result = []
+        for (let i = 1; i <= total; i++) {
+          try {
+            const item = await documentFields.Item(i)
+            const name = await item.Name
+            const range = await item.Range
+            const text = await range.Text
+            result.push({
+              id: name,
+              ...this._parseFieldName(name),
+              text: text || ''
+            })
+          } catch (e) {
+            // 单条失败不影响整体
+            console.warn('读取公文域条目失败:', e)
+          }
+        }
+        return result
+      } catch (e) {
+        console.error('listVariableFields 失败:', e)
+        return []
+      }
+    },
+
+    async insertTextWithDocumentField(text, scope, varName) {
+      if (!this.instance) return false
+      const t = String(text || '')
+      const fieldName = this._normalizeFieldName(scope, varName, Date.now())
+      try {
+        const app = this.instance.Application
+        const selection = await app.ActiveDocument.Selection
+        const range = await selection.Range
+
+        // 用选中文本/变量值替换当前选区
+        range.Text = t
+        const start = await range.Start
+        const end = await range.End
+
+        const documentFields = this._getDocumentFieldsApi(app)
+        if (!documentFields) {
+          throw new Error('当前 WPS SDK 不支持公文域(DocumentFields)能力')
+        }
+
+        // 尝试按书签类似的 Add({Name, Range}) 方式创建
+        await documentFields.Add({
+          Name: fieldName,
+          Range: { Start: start, End: end }
+        })
+
+        return { ok: true, fieldName }
+      } catch (e) {
+        console.error('insertTextWithDocumentField 失败:', e)
+        throw e
+      }
+    },
+
+    async updateDocumentField(fieldName, text) {
+      if (!this.instance) return false
+      try {
+        const app = this.instance.Application
+        const documentFields = this._getDocumentFieldsApi(app)
+        if (!documentFields) throw new Error('当前 WPS SDK 不支持公文域(DocumentFields)能力')
+
+        // 兼容：不同版本可能命名为 ReplaceDocumentField / ReplaceDocumentFields
+        if (documentFields.ReplaceDocumentField) {
+          await documentFields.ReplaceDocumentField([
+            { name: fieldName, type: 'text', value: String(text || '') }
+          ])
+          return true
+        }
+        if (documentFields.ReplaceDocumentFields) {
+          await documentFields.ReplaceDocumentFields([
+            { name: fieldName, type: 'text', value: String(text || '') }
+          ])
+          return true
+        }
+
+        // fallback：若无 Replace API，尝试直接取条目 Range 写入
+        if (documentFields.Count && documentFields.Item) {
+          const count = await documentFields.Count
+          for (let i = 1; i <= count; i++) {
+            const item = await documentFields.Item(i)
+            const name = await item.Name
+            if (name === fieldName) {
+              const range = await item.Range
+              range.Text = String(text || '')
+              return true
+            }
+          }
+        }
+
+        throw new Error('当前 WPS SDK 未暴露公文域替换接口')
+      } catch (e) {
+        console.error('updateDocumentField 失败:', e)
+        throw e
+      }
+    },
+
+    async syncAllDocumentFields(getValueByScopeAndName) {
+      // getValueByScopeAndName: (scope, varName, currentText) => string
+      if (!this.instance) return { updated: 0, total: 0 }
+      const fields = await this.listVariableFields()
+      if (!fields.length) return { updated: 0, total: 0 }
+
+      let updated = 0
+      for (const f of fields) {
+        try {
+          const next = typeof getValueByScopeAndName === 'function'
+            ? getValueByScopeAndName(f.scope, f.varName, f.text)
+            : f.text
+          if (typeof next === 'string' && next !== f.text) {
+            await this.updateDocumentField(f.id, next)
+            updated++
+          }
+        } catch (e) {
+          console.warn('同步单个公文域失败:', f, e)
+        }
+      }
+      return { updated, total: fields.length }
     },
   }
 }

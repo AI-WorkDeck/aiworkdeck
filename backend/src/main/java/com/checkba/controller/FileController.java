@@ -15,6 +15,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -124,13 +126,52 @@ public class FileController {
     /**
      * 上传接口
      * 注意：使用POST方法，因为uni.uploadFile不支持PUT方法
+     * 支持两种上传方式：
+     * 1. multipart/form-data格式（前端uni.uploadFile使用）- 通过@RequestParam接收
+     * 2. 原始二进制流（WPS保存时可能使用）- 通过HttpServletRequest接收
      */
     @PostMapping("/{fileId}/upload")
     public ResponseEntity<Map<String, Object>> uploadFile(
             @PathVariable("fileId") String fileId,
+            @RequestPart(value = "file", required = false) MultipartFile multipartFile,
             HttpServletRequest request) {
 
-        try (InputStream inputStream = request.getInputStream()) {
+        InputStream inputStream = null;
+        try {
+            String contentType = request.getContentType();
+            log.info("文件上传请求: fileId={}, contentType={}, multipartFile={}", 
+                fileId, contentType, multipartFile != null ? multipartFile.getOriginalFilename() : "null");
+            
+            // 检查是否为 multipart/form-data 请求
+            if (contentType != null && contentType.toLowerCase().startsWith("multipart/form-data")) {
+                // 尝试从 MultipartHttpServletRequest 获取文件（备用方案）
+                if (multipartFile == null || multipartFile.isEmpty()) {
+                    if (request instanceof MultipartHttpServletRequest) {
+                        MultipartHttpServletRequest multipartRequest = (MultipartHttpServletRequest) request;
+                        multipartFile = multipartRequest.getFile("file");
+                        log.info("从 MultipartHttpServletRequest 获取文件: {}", multipartFile != null ? multipartFile.getOriginalFilename() : "null");
+                    }
+                }
+                
+                // 必须是 multipart 请求，且 multipartFile 不能为空
+                if (multipartFile == null || multipartFile.isEmpty()) {
+                    log.error("multipart/form-data 请求但未找到文件: fileId={}, contentType={}", fileId, contentType);
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("code", -1);
+                    result.put("message", "文件上传失败: multipart 请求中未找到文件，请确保字段名为 'file'");
+                    result.put("data", new HashMap<>());
+                    return ResponseEntity.status(400).body(result);
+                }
+                
+                inputStream = multipartFile.getInputStream();
+                log.info("使用multipart方式上传: fileId={}, filename={}, size={}", 
+                    fileId, multipartFile.getOriginalFilename(), multipartFile.getSize());
+            } else {
+                // 非 multipart 请求，使用原始流方式（WPS保存时可能使用）
+                inputStream = request.getInputStream();
+                log.info("使用原始流方式上传: fileId={}, contentType={}", fileId, contentType);
+            }
+
             // 1. 确定存储路径
             String storagePath = fileId; // 默认旧路径
             Long projectId = null;
@@ -197,6 +238,10 @@ public class FileController {
             result.put("data", new HashMap<>());
 
             return ResponseEntity.status(500).body(result);
+        } finally {
+            // 注意：multipartFile.getInputStream()返回的流会在multipartFile对象被清理时自动关闭
+            // 但为了安全，如果是从request.getInputStream()获取的流，需要手动关闭
+            // 不过Spring会自动处理multipart请求的清理，所以这里不需要手动关闭
         }
     }
 }

@@ -3,6 +3,8 @@
  * 封装 WPS JS SDK 的初始化和使用
  */
 
+import { WPS_INTERNAL_HTTP_LINK_BASE } from '@/config/workbenchActions.js'
+
 // 动态加载 WPS SDK
 let WebOfficeSDK = null
 
@@ -131,11 +133,92 @@ export async function initWpsEditor(options) {
     // 预览模式：设置 readOnly: true 强制只读
     // 编辑模式：readOnly: false 或不设置（默认可编辑）
     readOnly: isViewMode,
+    // 尝试关闭 AI 功能以避免 403 错误导致内部 crash
+    commonOptions: {
+      isShowAi: false,
+      isShowTopAi: false,
+      isBrowserViewFullscreen: false, // 避免全屏接管
+    },
+    // Word 组件特定配置
+    wordOptions: {
+      isShowAi: false,
+      isShowSmartMenu: false, // 尝试关闭智能菜单（可能包含 AI）
+    },
+    // 通过 commandBars 隐藏 AI 相关按钮（如果有）
+    commandBars: [
+      {
+        cmbId: 'WPSAI', // 猜测的 ID，实际可能不同，尝试隐藏
+        attributes: { visible: false }
+      },
+      {
+        cmbId: 'SmartMenu', 
+        attributes: { visible: false }
+      }
+    ],
+    // 超链接跳转拦截（按官方 demo：intercept-link）
+    // https://solution.wps.cn/docs/demo/public/intercept-link.html#%E8%B6%85%E9%93%BE%E6%8E%A5%E8%B7%B3%E8%BD%AC%E6%8B%A6%E6%88%AA
+    onHyperLinkOpen: (payload) => {
+      try {
+        // 官方示例字段：linkUrl
+        // https://solution.wps.cn/docs/demo/public/intercept-link.html#%E8%B6%85%E9%93%BE%E6%8E%A5%E8%B7%B3%E8%BD%AC%E6%8B%A6%E6%88%AA
+        const linkUrl =
+          (payload && (payload.linkUrl || payload.LinkUrl || payload.url || payload.URL || payload.href || payload.Href)) || ''
+        const u = String(linkUrl || '').trim()
+        if (!u) return
+        // 只对 onHyperLinkOpen 打点：确认回调是否触发（日志会在宿主控制台）
+        // eslint-disable-next-line no-console
+        console.log('[WPS onHyperLinkOpen] linkUrl:', u)
+
+        // 方案：使用 https “包装链接”，确保 onHyperLinkOpen 必定触发，然后完全接管跳转
+        if (WPS_INTERNAL_HTTP_LINK_BASE && u.startsWith(WPS_INTERNAL_HTTP_LINK_BASE)) {
+          try {
+            const q = u.includes('?') ? u.split('?')[1] : ''
+            const params = new URLSearchParams(q)
+            const inner = params.get('u') ? decodeURIComponent(String(params.get('u'))) : ''
+            if (inner) {
+              if (typeof window !== 'undefined' && typeof window.__checkbaHandleInternalLink === 'function') {
+                window.__checkbaHandleInternalLink(inner)
+              } else {
+                const msg = { __checkbaInternalLink: true, url: inner }
+                try { window.parent && window.parent.postMessage(msg, '*') } catch (e1) {}
+                try { window.top && window.top.postMessage(msg, '*') } catch (e2) {}
+              }
+              // eslint-disable-next-line no-console
+              console.log('[WPS onHyperLinkOpen] intercepted internal:', inner)
+              return false
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+
+        // 旧格式兜底：如果仍有 checkba:，也尝试接管
+        if (u.startsWith('checkba:')) {
+          try {
+            if (typeof window !== 'undefined' && typeof window.__checkbaHandleInternalLink === 'function') {
+              window.__checkbaHandleInternalLink(u)
+            } else {
+              const msg = { __checkbaInternalLink: true, url: u }
+              try { window.parent && window.parent.postMessage(msg, '*') } catch (e1) {}
+              try { window.top && window.top.postMessage(msg, '*') } catch (e2) {}
+            }
+          } catch (e) {}
+          return false
+        }
+      } catch (e) {
+        // ignore
+      }
+      // 其他链接保持默认
+      return true
+    },
     // endpoint 默认为 https://o.wpsgo.com，这里使用默认即可；
     // 如果后续需要切换到其他网关，可在此显式传入 endpoint。
   }
   
   console.log('WPS初始化配置:', initConfig)
+  // 额外确认：确保 onHyperLinkOpen 已按官方示例挂进去
+  // eslint-disable-next-line no-console
+  console.log('WPS初始化配置 keys:', Object.keys(initConfig || {}))
   
   const instance = SDK.init(initConfig)
 

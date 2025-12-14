@@ -64,6 +64,22 @@ public class AdminConfigController {
     @Value("${external.tushare.token:}")
     private String defaultTushareToken;
 
+    // Aliyun OCR 默认值
+    @Value("${external.aliyun-ocr.access-key-id:}")
+    private String defaultAliyunOcrAccessKeyId;
+
+    @Value("${external.aliyun-ocr.access-key-secret:}")
+    private String defaultAliyunOcrAccessKeySecret;
+
+    @Value("${external.aliyun-ocr.endpoint:}")
+    private String defaultAliyunOcrEndpoint;
+
+    @Value("${external.aliyun-ocr.region-id:}")
+    private String defaultAliyunOcrRegionId;
+
+    @Value("${external.aliyun-ocr.public-base-url:}")
+    private String defaultAliyunOcrPublicBaseUrl;
+
     // Google / Gemini 默认值来自 AiModelProperties
 
     // === 配置 key 常量 ===
@@ -83,6 +99,13 @@ public class AdminConfigController {
     private static final String KEY_WPS_APP_ID = "external.wps.appId";
     private static final String KEY_WPS_APP_SECRET = "external.wps.appSecret";
     private static final String KEY_WPS_CALLBACK_BASE_URL = "external.wps.callbackBaseUrl";
+
+    // Aliyun OCR
+    private static final String KEY_ALIYUN_OCR_ACCESS_KEY_ID = "external.aliyunOcr.accessKeyId";
+    private static final String KEY_ALIYUN_OCR_ACCESS_KEY_SECRET = "external.aliyunOcr.accessKeySecret";
+    private static final String KEY_ALIYUN_OCR_ENDPOINT = "external.aliyunOcr.endpoint";
+    private static final String KEY_ALIYUN_OCR_REGION_ID = "external.aliyunOcr.regionId";
+    private static final String KEY_ALIYUN_OCR_PUBLIC_BASE_URL = "external.aliyunOcr.publicBaseUrl";
 
     // Google / Gemini
     private static final String KEY_GOOGLE_API_KEY = "external.google.apiKey";
@@ -111,6 +134,22 @@ public class AdminConfigController {
         defaults.put(KEY_WPS_APP_ID, defaultWpsAppId);
         defaults.put(KEY_WPS_APP_SECRET, defaultWpsAppSecret);
         defaults.put(KEY_WPS_CALLBACK_BASE_URL, defaultWpsCallbackBaseUrl);
+        defaults.put(KEY_ALIYUN_OCR_ACCESS_KEY_ID, defaultAliyunOcrAccessKeyId);
+        defaults.put(KEY_ALIYUN_OCR_ACCESS_KEY_SECRET, defaultAliyunOcrAccessKeySecret);
+        // 给出开箱即用的默认值：cn-hangzhou 通用 OCR Endpoint
+        defaults.put(KEY_ALIYUN_OCR_ENDPOINT,
+                (defaultAliyunOcrEndpoint == null || defaultAliyunOcrEndpoint.isBlank())
+                        ? "ocr-api.cn-hangzhou.aliyuncs.com"
+                        : defaultAliyunOcrEndpoint);
+        defaults.put(KEY_ALIYUN_OCR_REGION_ID,
+                (defaultAliyunOcrRegionId == null || defaultAliyunOcrRegionId.isBlank())
+                        ? "cn-hangzhou"
+                        : defaultAliyunOcrRegionId);
+        // 公网 baseUrl：优先用专门配置，否则复用 WPS callbackBaseUrl（通常已是公网域名）
+        String defaultPublicBase = (defaultAliyunOcrPublicBaseUrl == null || defaultAliyunOcrPublicBaseUrl.isBlank())
+                ? defaultWpsCallbackBaseUrl
+                : defaultAliyunOcrPublicBaseUrl;
+        defaults.put(KEY_ALIYUN_OCR_PUBLIC_BASE_URL, defaultPublicBase == null ? "" : defaultPublicBase);
 
         // Google / Gemini 默认值来自配置类
         defaults.put(KEY_GOOGLE_API_KEY, aiModelProperties.getGemini().getApiKey());
@@ -148,6 +187,13 @@ public class AdminConfigController {
                 all.get(KEY_WPS_APP_ID),
                 all.get(KEY_WPS_APP_SECRET),
                 all.get(KEY_WPS_CALLBACK_BASE_URL)
+        ));
+        external.setAliyunOcr(new AliyunOcrConfig(
+                all.get(KEY_ALIYUN_OCR_ACCESS_KEY_ID),
+                all.get(KEY_ALIYUN_OCR_ACCESS_KEY_SECRET),
+                all.get(KEY_ALIYUN_OCR_ENDPOINT),
+                all.get(KEY_ALIYUN_OCR_REGION_ID),
+                all.get(KEY_ALIYUN_OCR_PUBLIC_BASE_URL)
         ));
         resp.setExternal(external);
 
@@ -204,6 +250,13 @@ public class AdminConfigController {
                 updates.put(KEY_WPS_APP_ID, safe(ext.getWps().getAppId()));
                 updates.put(KEY_WPS_APP_SECRET, safe(ext.getWps().getAppSecret()));
                 updates.put(KEY_WPS_CALLBACK_BASE_URL, safe(ext.getWps().getCallbackBaseUrl()));
+            }
+            if (ext.getAliyunOcr() != null) {
+                updates.put(KEY_ALIYUN_OCR_ACCESS_KEY_ID, safe(ext.getAliyunOcr().getAccessKeyId()));
+                updates.put(KEY_ALIYUN_OCR_ACCESS_KEY_SECRET, safe(ext.getAliyunOcr().getAccessKeySecret()));
+                updates.put(KEY_ALIYUN_OCR_ENDPOINT, safe(ext.getAliyunOcr().getEndpoint()));
+                updates.put(KEY_ALIYUN_OCR_REGION_ID, safe(ext.getAliyunOcr().getRegionId()));
+                updates.put(KEY_ALIYUN_OCR_PUBLIC_BASE_URL, safe(ext.getAliyunOcr().getPublicBaseUrl()));
             }
         }
 
@@ -277,7 +330,8 @@ public class AdminConfigController {
     }
 
     private String safe(String v) {
-        return v == null ? "" : v;
+        // 统一 trim，避免用户粘贴 key/secret 时带入换行/空格导致签名不匹配
+        return v == null ? "" : v.trim();
     }
 
     // -------- DTO 定义 --------
@@ -300,6 +354,7 @@ public class AdminConfigController {
         private QichachaConfig qichacha;
         private TushareConfig tushare;
         private WpsConfig wps;
+        private AliyunOcrConfig aliyunOcr;
     }
 
     @Data
@@ -357,6 +412,25 @@ public class AdminConfigController {
             this.appId = appId;
             this.appSecret = appSecret;
             this.callbackBaseUrl = callbackBaseUrl;
+        }
+    }
+
+    @Data
+    public static class AliyunOcrConfig {
+        private String accessKeyId;
+        private String accessKeySecret;
+        private String endpoint;
+        private String regionId;
+        private String publicBaseUrl;
+
+        public AliyunOcrConfig() {}
+
+        public AliyunOcrConfig(String accessKeyId, String accessKeySecret, String endpoint, String regionId, String publicBaseUrl) {
+            this.accessKeyId = accessKeyId;
+            this.accessKeySecret = accessKeySecret;
+            this.endpoint = endpoint;
+            this.regionId = regionId;
+            this.publicBaseUrl = publicBaseUrl;
         }
     }
 

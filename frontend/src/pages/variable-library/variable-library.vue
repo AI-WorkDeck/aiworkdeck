@@ -22,6 +22,17 @@
       </button>
     </view>
 
+    <!-- 搜索 -->
+    <view class="search-bar">
+      <input
+        class="search-input"
+        v-model="searchKeyword"
+        :placeholder="VARIABLE_LIBRARY_SEARCH_PLACEHOLDER"
+        confirm-type="search"
+      />
+      <view v-if="searchKeyword" class="search-clear" @tap="searchKeyword = ''">×</view>
+    </view>
+
     <!-- 变量列表 -->
     <scroll-view class="variable-list" scroll-y="true">
       <view v-if="loading" class="empty">
@@ -95,6 +106,7 @@
 
 <script>
 import { getProject, getProjectVariables, saveProjectVariable, deleteProjectVariable } from '@/services/api.js'
+import { VARIABLE_LIBRARY_SEARCH_PLACEHOLDER } from '@/config/variables.js'
 
 export default {
   data() {
@@ -104,12 +116,24 @@ export default {
       variables: [],
       loading: false,
       saving: false,
+      searchKeyword: '',
+      VARIABLE_LIBRARY_SEARCH_PLACEHOLDER,
     }
   },
   computed: {
+    filteredVariables() {
+      const kw = (this.searchKeyword || '').trim().toLowerCase()
+      if (!kw) return this.variables
+      return (this.variables || []).filter(v => {
+        const name = String(v?.name || '').toLowerCase()
+        const value = String(v?.value || '').toLowerCase()
+        const group = String(v?.variableGroup || '').toLowerCase()
+        return name.includes(kw) || value.includes(kw) || group.includes(kw)
+      })
+    },
     groupedVariables() {
       const groups = {};
-      this.variables.forEach(v => {
+      this.filteredVariables.forEach(v => {
         const group = v.variableGroup || '其他变量';
         if (!groups[group]) {
           groups[group] = [];
@@ -376,6 +400,37 @@ export default {
   display: flex;
   flex-direction: row;
   column-gap: 12rpx;
+}
+
+.search-bar {
+  position: relative;
+  margin-bottom: 12rpx;
+}
+
+.search-input {
+  width: 100%;
+  height: 64rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid rgba($uni-border-color, 0.85);
+  padding: 0 70rpx 0 24rpx;
+  font-size: 26rpx;
+  background-color: $uni-bg-color;
+  box-sizing: border-box;
+}
+
+.search-clear {
+  position: absolute;
+  right: 18rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44rpx;
+  height: 44rpx;
+  line-height: 44rpx;
+  text-align: center;
+  border-radius: 999rpx;
+  background-color: rgba($uni-color-primary, 0.08);
+  color: $uni-color-primary;
+  font-size: 28rpx;
 }
 
 .btn {

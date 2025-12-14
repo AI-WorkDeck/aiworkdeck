@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.util.StringUtils;
 
 @Slf4j
 @RestController
@@ -28,7 +29,8 @@ public class AiChatController {
         log.info("Received AI chat request for project {}: {}", request.getProjectId(), request.getMessage());
         try {
             ProjectContextHolder.setProjectId(request.getProjectId());
-            String response = projectAssistant.chat(request.getMessage());
+            String payload = buildPromptWithContext(request);
+            String response = projectAssistant.chat(payload);
             // 记录对话历史（预留会话管理能力）
             try {
                 projectAiMessageService.saveUserAndAssistantMessage(
@@ -46,6 +48,49 @@ public class AiChatController {
         } finally {
             ProjectContextHolder.clear();
         }
+    }
+    private static final int MAX_CONTEXT_CHARS = 6000;
+
+    private String buildPromptWithContext(AiChatRequest request) {
+        AiChatContext ctx = request.getContext();
+        if (ctx == null) {
+            return request.getMessage();
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append("当前激活文件：")
+                .append(StringUtils.hasText(ctx.getFileName()) ? ctx.getFileName() : "未命名文件");
+        if (StringUtils.hasText(ctx.getFileType())) {
+            builder.append(" (").append(ctx.getFileType()).append(")");
+        }
+        builder.append("。\n");
+
+        String selection = safeContextBlock(ctx.getSelectionText(), 1500);
+        if (StringUtils.hasText(selection)) {
+            builder.append("选区内容:\n```\n")
+                    .append(selection)
+                    .append("\n```\n");
+        }
+        String document = safeContextBlock(ctx.getDocumentText(), MAX_CONTEXT_CHARS);
+        if (StringUtils.hasText(document)) {
+            builder.append("正文摘要:\n```\n")
+                    .append(document)
+                    .append("\n```\n");
+        }
+        builder.append("请基于以上内容回答或修改，并保持原项目语气。")
+                .append("\n用户请求:\n")
+                .append(request.getMessage());
+        return builder.toString();
+    }
+
+    private String safeContextBlock(String raw, int maxLen) {
+        if (!StringUtils.hasText(raw)) {
+            return "";
+        }
+        String cleaned = raw.trim();
+        if (cleaned.length() <= maxLen) {
+            return cleaned;
+        }
+        return cleaned.substring(0, maxLen) + "\n...[上下文截断 " + (cleaned.length() - maxLen) + " 字]";
     }
 
     /**
@@ -94,12 +139,23 @@ public class AiChatController {
     public static class AiChatRequest {
         private String projectId;
         private String message;
+        private AiChatContext context;
     }
     
     @Data
     public static class AiChatResponse {
         private String response;
         public AiChatResponse(String response) { this.response = response; }
+    }
+
+    @Data
+    public static class AiChatContext {
+        private String fileId;
+        private String fileName;
+        private String fileType;
+        private String wpsFileId;
+        private String selectionText;
+        private String documentText;
     }
 
     @Data
@@ -117,4 +173,3 @@ public class AiChatController {
         private String content;
     }
 }
-

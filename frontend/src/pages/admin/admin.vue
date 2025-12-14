@@ -1,5 +1,16 @@
 <template>
   <view class="page-admin">
+    <view class="topbar">
+      <view class="topbar-left" @tap="goBack">
+        <text class="topbar-back">←</text>
+        <text class="topbar-title">系统设置</text>
+      </view>
+      <view class="topbar-right" @tap="goToUserProfile">
+        <view class="topbar-avatar">
+          <text class="avatar-text">{{ userDisplayName?.charAt(0) || 'U' }}</text>
+        </view>
+      </view>
+    </view>
     <view class="admin-layout">
       <!-- 左侧导航 -->
       <view class="admin-sider">
@@ -147,6 +158,54 @@
                   />
                 </view>
               </view>
+
+              <!-- 阿里云 OCR -->
+              <view class="provider-card">
+                <view class="provider-header">
+                  <text class="provider-name">阿里云 OCR</text>
+                </view>
+                <view class="form-row">
+                  <text class="form-label">AccessKey ID</text>
+                  <input
+                    v-model="form.external.aliyunOcr.accessKeyId"
+                    class="form-input"
+                    placeholder="请输入 AccessKey ID"
+                  />
+                </view>
+                <view class="form-row">
+                  <text class="form-label">AccessKey Secret</text>
+                  <input
+                    v-model="form.external.aliyunOcr.accessKeySecret"
+                    class="form-input"
+                    placeholder="请输入 AccessKey Secret（将保存到系统配置）"
+                    password
+                  />
+                </view>
+                <view class="form-row">
+                  <text class="form-label">Endpoint</text>
+                  <input
+                    v-model="form.external.aliyunOcr.endpoint"
+                    class="form-input"
+                    placeholder="例如：ocr-api.cn-hangzhou.aliyuncs.com"
+                  />
+                </view>
+                <view class="form-row">
+                  <text class="form-label">RegionId</text>
+                  <input
+                    v-model="form.external.aliyunOcr.regionId"
+                    class="form-input"
+                    placeholder="例如：cn-hangzhou"
+                  />
+                </view>
+                <view class="form-row">
+                  <text class="form-label">公网 Base URL</text>
+                  <input
+                    v-model="form.external.aliyunOcr.publicBaseUrl"
+                    class="form-input"
+                    placeholder="例如：https://你的域名（用于 /api/ocr/temp 供阿里云拉图）"
+                  />
+                </view>
+              </view>
             </view>
           </view>
 
@@ -262,11 +321,13 @@
 
 <script>
 import { getAdminConfig, saveAdminConfig, getAdminUsers } from '@/services/api.js'
+import { getCurrentUser } from '@/utils/auth.js'
 
 export default {
   name: 'AdminPage',
   data() {
     return {
+      userDisplayName: '用户',
       activeNav: 'config',
       navItems: [
         { key: 'config', label: '系统配置' },
@@ -278,6 +339,7 @@ export default {
           qichacha: { baseUrl: '', key: '', secret: '' },
           tushare: { baseUrl: '', token: '' },
           wps: { appId: '', appSecret: '', callbackBaseUrl: '' },
+          aliyunOcr: { accessKeyId: '', accessKeySecret: '', endpoint: '', regionId: '', publicBaseUrl: '' },
         },
         ai: {
           systemPrompt: '',
@@ -294,10 +356,25 @@ export default {
     }
   },
   onLoad() {
+    const user = getCurrentUser()
+    if (user) {
+      this.userDisplayName = user.displayName || user.username || '用户'
+    }
     this.loadConfig()
     this.loadUsers()
   },
   methods: {
+    goBack() {
+      // 有历史就返回，否则回到个人中心
+      try {
+        uni.navigateBack()
+      } catch (e) {
+        uni.navigateTo({ url: '/pages/userprofile/userprofile' })
+      }
+    },
+    goToUserProfile() {
+      uni.navigateTo({ url: '/pages/userprofile/userprofile' })
+    },
     async loadConfig() {
       try {
         const data = await getAdminConfig()
@@ -321,6 +398,13 @@ export default {
               appId: data.external.wps?.appId || '',
               appSecret: data.external.wps?.appSecret || '',
               callbackBaseUrl: data.external.wps?.callbackBaseUrl || '',
+            },
+            aliyunOcr: {
+              accessKeyId: data.external.aliyunOcr?.accessKeyId || '',
+              accessKeySecret: data.external.aliyunOcr?.accessKeySecret || '',
+              endpoint: data.external.aliyunOcr?.endpoint || 'ocr-api.cn-hangzhou.aliyuncs.com',
+              regionId: data.external.aliyunOcr?.regionId || 'cn-hangzhou',
+              publicBaseUrl: data.external.aliyunOcr?.publicBaseUrl || data.external.wps?.callbackBaseUrl || '',
             },
           }
         }
@@ -364,6 +448,54 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.topbar {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.topbar-back {
+  font-size: 16px;
+  color: #12344D;
+}
+
+.topbar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #12344D;
+}
+
+.topbar-right {
+  cursor: pointer;
+}
+
+.topbar-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #12344D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-text {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 $brand-gold: #C8A45D;
 $brand-dark: #12344D;
 $brand-bg: #F7F5F0;

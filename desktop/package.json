@@ -1,0 +1,23 @@
+{
+  "name": "checkba-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "main": "main/main.js",
+  "scripts": {
+    "dev": "cross-env CHECKBA_DESKTOP_DEV=1 electron .",
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "electron": "^30.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron-builder": "^24.13.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
+
+

@@ -36,22 +36,36 @@ NEW_PID=$!
 
 echo "新进程已启动，PID=$NEW_PID"
 
-# 等待一下，确保进程启动
-sleep 3
-
-# 检查进程是否还在运行
-if kill -0 $NEW_PID 2>/dev/null; then
-  echo "✓ 进程 $NEW_PID 正在运行"
+# 等待进程启动，最多等待15秒
+echo "等待服务启动..."
+for i in {1..15}; do
+  if ! kill -0 $NEW_PID 2>/dev/null; then
+    echo "✗ 错误：进程 $NEW_PID 启动失败，请查看 app.log 获取错误信息"
+    echo "最后 20 行日志："
+    tail -20 app.log
+    exit 1
+  fi
+  
   # 检查端口是否被监听
   if lsof -ti:9696 >/dev/null 2>&1; then
+    echo "✓ 进程 $NEW_PID 正在运行"
     echo "✓ 端口 9696 已被监听"
     echo "启动成功！"
-  else
-    echo "⚠ 警告：进程在运行，但端口 9696 未被监听，请检查日志 app.log"
+    exit 0
   fi
+  
+  sleep 1
+done
+
+# 如果15秒后端口仍未监听，检查进程状态
+if kill -0 $NEW_PID 2>/dev/null; then
+  echo "✓ 进程 $NEW_PID 正在运行"
+  echo "⚠ 警告：进程在运行，但端口 9696 在15秒内未被监听，请检查日志 app.log"
+  echo "最后 30 行日志："
+  tail -30 app.log
 else
   echo "✗ 错误：进程 $NEW_PID 启动失败，请查看 app.log 获取错误信息"
-  echo "最后 20 行日志："
-  tail -20 app.log
+  echo "最后 30 行日志："
+  tail -30 app.log
   exit 1
 fi

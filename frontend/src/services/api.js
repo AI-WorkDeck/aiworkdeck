@@ -6,8 +6,10 @@
 // 导入认证工具
 import { getAuthHeaders } from '@/utils/auth.js'
 
-// 本地开发环境默认使用 cpolar 内网穿透地址
-// 生产环境可通过 VITE_API_BASE_URL 环境变量覆盖
+// 默认后端地址：
+// - 本地 H5 开发（localhost/127.0.0.1）：自动指向后端 9696
+// - 其他环境：可通过 VITE_API_BASE_URL 覆盖；否则使用默认网关地址
+// 注意：用户当前环境后端就挂在 checkbahttps 域名下
 const DEFAULT_API_BASE_URL = 'https://checkbahttps.vip.cpolar.cn';
 
 export function getApiBaseUrl() {
@@ -24,6 +26,19 @@ export function getApiBaseUrl() {
     }
   } catch (e) {
     // 如果 import.meta 不可用，忽略错误
+  }
+
+  // H5 本地开发：优先走本机后端（避免默认 cpolar 指向错误环境导致 404）
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+      const host = window.location.hostname
+      if (host === 'localhost' || host === '127.0.0.1') {
+        return 'http://localhost:9696'
+      }
+
+    }
+  } catch (e) {
+    // ignore
   }
   return DEFAULT_API_BASE_URL;
 }
@@ -164,7 +179,8 @@ export function aiChat(payload) {
     method: 'POST',
     data: {
       projectId: String(payload.projectId),
-      message: payload.message
+      message: payload.message,
+      context: payload.context || null
     },
     header: {
       'Content-Type': 'application/json',
@@ -431,6 +447,50 @@ export function moveFile(projectId, fileId, parentId, sortOrder) {
   });
 }
 
+// 批量删除文件/文件夹
+export function batchDeleteFiles(projectId, fileIds) {
+  return request({
+    url: `/api/projects/${projectId}/files/batch/delete`,
+    method: 'POST',
+    data: {
+      fileIds
+    },
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 批量移动文件/文件夹
+export function batchMoveFiles(projectId, fileIds, targetParentId) {
+  return request({
+    url: `/api/projects/${projectId}/files/batch/move`,
+    method: 'POST',
+    data: {
+      fileIds,
+      targetParentId
+    },
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 批量复制文件/文件夹
+export function batchCopyFiles(projectId, fileIds, targetParentId) {
+  return request({
+    url: `/api/projects/${projectId}/files/batch/copy`,
+    method: 'POST',
+    data: {
+      fileIds,
+      targetParentId
+    },
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 // 获取文件详情
 export function getFileDetail(projectId, fileId) {
   return request({
@@ -443,6 +503,105 @@ export function getFileDetail(projectId, fileId) {
 export function getFileDownloadUrl(fileId) {
   const baseUrl = getApiBaseUrl()
   return `${baseUrl}/api/files/${fileId}/download`
+}
+
+// OCR：截图识别（后端调用阿里云）
+export function ocrRecognize(imageBase64) {
+  return request({
+    url: '/api/ocr/recognize',
+    method: 'POST',
+    data: { imageBase64 },
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 收藏：我的收藏
+export function getMyFavorites() {
+  return request({
+    url: '/api/favorites/my',
+    method: 'GET',
+  })
+}
+
+// 收藏：项目内收藏（支持搜索/限量，避免返回超大 meta/html 导致卡顿）
+export function getProjectFavorites(projectId, q = '', limit = 80) {
+  const qs = []
+  if (q) qs.push(`q=${encodeURIComponent(q)}`)
+  if (limit != null) qs.push(`limit=${encodeURIComponent(String(limit))}`)
+  const queryString = qs.length ? `?${qs.join('&')}` : ''
+  return request({
+    url: `/api/projects/${projectId}/favorites${queryString}`,
+    method: 'GET',
+  })
+}
+
+export function createProjectFavorite(projectId, payload) {
+  return request({
+    url: `/api/projects/${projectId}/favorites`,
+    method: 'POST',
+    data: payload,
+    header: {
+      'Content-Type': 'application/json',
+    },
+  })
+}
+
+// 文档-文件关联（WPS 选区超链接）
+export function createDocFileLink(projectId, payload) {
+  return request({
+    url: `/api/projects/${projectId}/doc-links`,
+    method: 'POST',
+    data: payload,
+    header: {
+      'Content-Type': 'application/json',
+    },
+  })
+}
+
+export function getDocFileLink(projectId, linkKey) {
+  return request({
+    url: `/api/projects/${projectId}/doc-links/${encodeURIComponent(linkKey)}`,
+    method: 'GET',
+  })
+}
+
+export function deleteFavorite(favoriteId) {
+  return request({
+    url: `/api/favorites/${favoriteId}`,
+    method: 'DELETE',
+  })
+}
+
+export function getFavoriteImageUrl(favoriteId) {
+  const baseUrl = getApiBaseUrl()
+  return `${baseUrl}/api/favorites/${favoriteId}/image`
+}
+
+// 剪贴板（Paste-like）
+export function listClipboard(q, limit = 50) {
+  const queryString = q ? `?q=${encodeURIComponent(q)}&limit=${limit}` : `?limit=${limit}`
+  return request({
+    url: `/api/clipboard${queryString}`,
+    method: 'GET',
+  })
+}
+
+export function saveClipboardText(text) {
+  return request({
+    url: '/api/clipboard/text',
+    method: 'POST',
+    data: { text },
+    header: { 'Content-Type': 'application/json' },
+  })
+}
+
+export function deleteClipboardItem(id) {
+  return request({
+    url: `/api/clipboard/${id}`,
+    method: 'DELETE',
+  })
 }
 
 export const getProjectVariables = (projectId) => {
@@ -465,6 +624,29 @@ export const deleteProjectVariable = (id) => {
         url: `/api/variables/${id}`,
         method: 'DELETE'
     })
+}
+
+// 用户变量（用户收藏/自维护）
+export const getUserVariables = () => {
+  return request({
+    url: `/api/variables/user`,
+    method: 'GET'
+  })
+}
+
+export const saveUserVariable = (data) => {
+  return request({
+    url: '/api/variables/user',
+    method: 'POST',
+    data
+  })
+}
+
+export const deleteUserVariable = (id) => {
+  return request({
+    url: `/api/variables/user/${id}`,
+    method: 'DELETE'
+  })
 }
 
 export default {
@@ -492,12 +674,23 @@ export default {
     moveFile,
     getFileDetail,
     getFileDownloadUrl,
+    ocrRecognize,
+    getMyFavorites,
+    getProjectFavorites,
+    createProjectFavorite,
+    deleteFavorite,
+    getFavoriteImageUrl,
+    listClipboard,
+    saveClipboardText,
+    deleteClipboardItem,
     getProjectVariables,
     saveProjectVariable,
     deleteProjectVariable,
+    getUserVariables,
+    saveUserVariable,
+    deleteUserVariable,
     getAdminConfig,
     saveAdminConfig,
     getAdminUsers
 }
-
 

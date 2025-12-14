@@ -1,6 +1,7 @@
 package com.checkba.controller;
 
 import com.checkba.model.entity.ProjectFile;
+import com.checkba.model.dto.ProjectFileBatchRequest;
 import com.checkba.service.ProjectFileService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -119,6 +120,73 @@ public class ProjectFileController {
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
         result.put("message", "删除成功");
+        return result;
+    }
+
+    /**
+     * 批量删除文件或文件夹（支持文件夹递归删除）
+     * POST /api/projects/{projectId}/files/batch/delete
+     */
+    @PostMapping("/batch/delete")
+    public Map<String, Object> batchDelete(
+            @PathVariable Long projectId,
+            @RequestBody ProjectFileBatchRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        projectFileService.batchDelete(projectId, request, userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", "删除成功");
+        result.put("data", new HashMap<>());
+        return result;
+    }
+
+    /**
+     * 批量移动文件或文件夹（支持文件夹递归移动：同步更新子文件 filePath 并移动物理文件）
+     * POST /api/projects/{projectId}/files/batch/move
+     */
+    @PostMapping("/batch/move")
+    public Map<String, Object> batchMove(
+            @PathVariable Long projectId,
+            @RequestBody ProjectFileBatchRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        List<ProjectFile> moved = projectFileService.batchMove(projectId, request, userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", "移动成功");
+        Map<String, Object> data = new HashMap<>();
+        data.put("files", moved);
+        result.put("data", data);
+        return result;
+    }
+
+    /**
+     * 批量复制文件或文件夹（支持文件夹递归复制：同步复制物理文件）
+     * POST /api/projects/{projectId}/files/batch/copy
+     */
+    @PostMapping("/batch/copy")
+    public Map<String, Object> batchCopy(
+            @PathVariable Long projectId,
+            @RequestBody ProjectFileBatchRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        List<ProjectFile> created = projectFileService.batchCopy(projectId, request, userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", "复制成功");
+        Map<String, Object> data = new HashMap<>();
+        data.put("files", created);
+        result.put("data", data);
         return result;
     }
 

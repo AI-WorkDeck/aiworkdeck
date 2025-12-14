@@ -1,5 +1,5 @@
 <template>
-  <view class="page-project-overview">
+  <view class="page-project-overview" :class="{ 'compact-mode': isCompactLayout, 'is-resizing': resizing && resizing.active }">
     <!-- 顶部固定项目信息 -->
     <view class="project-header">
       <view class="header-left">
@@ -23,6 +23,37 @@
         </view>
       </view>
       <view class="header-right">
+        <!-- 顶部工具区（IDE 风格）：分屏 / 浏览器 / 摘录 / AI / 工具 -->
+        <view class="header-tools">
+          <view
+            class="icon-btn"
+            :class="{ active: !sidebarCollapsed }"
+            @tap="toggleSidebar"
+            :title="sidebarCollapsed ? '展开左侧栏' : '收起左侧栏'"
+          >
+            <text class="tool-icon">{{ sidebarCollapsed ? '»' : '«' }}</text>
+          </view>
+          <view
+            class="icon-btn split-btn"
+            :class="{ active: splitMode }"
+            @tap="toggleSplitMode"
+            :title="splitMode ? '关闭分屏' : '开启分屏'"
+          >
+            <text class="tool-icon">◫</text>
+          </view>
+          <view class="icon-btn" @tap="openBrowserTab()" title="浏览器">
+            <text class="tool-icon">⌕</text>
+          </view>
+          <view class="icon-btn" @tap="startOcrCapture" title="截图摘录（OCR）">
+            <text class="tool-icon">✂</text>
+          </view>
+          <view class="icon-btn" :class="{ active: showAiPanel }" @tap="toggleAiPanel" title="AI 助手">
+            <text class="tool-icon">AI</text>
+          </view>
+          <view class="icon-btn" :class="{ active: showToolsPanel }" @tap="toggleToolsPanel" title="常用工具">
+            <text class="tool-icon">⌥</text>
+          </view>
+        </view>
         <!-- 用户头像 -->
         <view class="user-avatar" @tap="goToUserProfile">
            <text class="avatar-text">{{ userDisplayName?.charAt(0) || 'U' }}</text>
@@ -31,273 +62,423 @@
     </view>
 
     <!-- 主体布局 -->
-    <view class="main-layout">
+    <view class="main-layout" :class="{ 'is-compact': isCompactLayout }">
+      <!-- Cursor 风格：最左常驻栏（Activity Bar） -->
+      <view class="left-rail">
+        <view
+          v-for="p in LEFT_SIDEBAR_PLUGINS"
+          :key="p.key"
+          class="rail-btn"
+          :class="{ active: leftPaneKey === p.key && !sidebarCollapsed }"
+          :title="p.label"
+          @tap="toggleLeftPane(p.key)"
+        >
+          <text class="rail-icon">{{ p.icon }}</text>
+        </view>
+      </view>
+
       <!-- 左侧文件树（可收起） -->
-      <view class="sidebar-left" :class="{ collapsed: sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '48px' : sidebarWidth + 'px' }">
-        <view class="sidebar-header">
-          <text class="sidebar-title" v-if="!sidebarCollapsed">文件资源</text>
-          <view class="sidebar-toggle" @tap="toggleSidebar">
-            <text class="toggle-icon">{{ sidebarCollapsed ? '»' : '«' }}</text>
+      <view class="sidebar-left" :class="{ collapsed: sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '0px' : sidebarWidth + 'px' }">
+        <!-- 批量菜单遮罩：用于点击空白关闭下拉（不弹中间） -->
+        <view v-if="showBatchMenu" class="batch-menu-mask" @tap="closeBatchMenu"></view>
+        <view v-if="!sidebarCollapsed" class="sidebar-header">
+          <view class="sidebar-title-row">
+            <text class="sidebar-title">{{ leftPaneTitle }}</text>
+            <view v-if="leftPaneKey === 'files'" class="sidebar-actions">
+              <view class="icon-btn mini" :class="{ active: fileBatchMode }" @tap="toggleFileBatchMode" title="批量选择">
+                <text class="tool-icon">☑</text>
+              </view>
+              <view v-if="fileBatchMode" class="batch-menu-wrapper">
+                <view
+                  class="icon-btn mini"
+                  :class="{ active: showBatchMenu, disabled: checkedFileCount <= 0 }"
+                  @tap="toggleBatchMenu"
+                  title="批量操作"
+                >
+                  <text class="tool-icon">⋮</text>
+                </view>
+                <view v-if="showBatchMenu" class="batch-menu" @tap.stop>
+                  <view
+                    v-for="action in FILE_BATCH_ACTIONS"
+                    :key="action.key"
+                    class="batch-menu-item"
+                    :class="{ danger: action.key === 'delete', disabled: checkedFileCount <= 0 }"
+                    @tap="onBatchMenuSelect(action.key)"
+                  >
+                    <text class="batch-menu-label">{{ action.label }}</text>
+                  </view>
+                </view>
+              </view>
+              <view class="sidebar-actions-divider"></view>
+              <view
+                v-for="a in FILE_TREE_QUICK_ACTIONS"
+                :key="a.key"
+                class="icon-btn mini"
+                :title="a.title"
+                @tap="onFileTreeQuickAction(a.key)"
+              >
+                <text class="tool-icon">{{ a.icon }}</text>
+              </view>
+            </view>
           </view>
         </view>
-        <view class="sidebar-content" v-show="!sidebarCollapsed">
+
+        <view v-if="!sidebarCollapsed" class="sidebar-content">
           <FileTree
+            v-if="leftPaneKey === 'files'"
             ref="fileTree"
             :project-id="projectId"
+            :selection-mode="fileBatchMode"
+            :show-footer-actions="false"
+            @checked-change="onFileTreeCheckedChange"
             @file-select="handleFileTreeSelect"
+            @file-drag-start="onFileLinkDragStart"
+            @file-drag-end="onFileLinkDragEnd"
           />
+          <view v-else class="sidebar-plugin-placeholder">
+            <text class="placeholder-title">{{ leftPaneTitle }}</text>
+            <text class="placeholder-desc">插件位预留：后续这里会展示对应插件的工具与流程。</text>
+          </view>
         </view>
         <!-- 拖拽手柄 -->
-        <view class="resize-handle" @touchstart="startResize" @mousedown="startResize"></view>
+        <view class="resize-handle" @touchstart="startResize('left', $event)" @mousedown="startResize('left', $event)"></view>
       </view>
 
-      <!-- 中间内容区 -->
-      <view class="content-area">
-        <!-- 顶部 Tab 栏 -->
-        <view class="tabs-bar">
-          <!-- 左侧窗格的 Tabs -->
-          <view class="tabs-pane tabs-pane-left" :class="{ 'half-width': splitMode }">
-            <scroll-view class="tabs-scroll" scroll-x show-scrollbar="false">
-              <view class="tabs-list">
-                <view
-                  v-for="file in leftFiles"
-                  :key="file.id"
-                  class="tab-item"
-                  :class="{ active: activeFileIdLeft === file.id }"
-                  @tap="activateTab(file, 'left')"
-                >
-                  <text class="tab-icon">{{ getFileIcon(file.fileType) }}</text>
-                  <text class="tab-name">{{ file.name }}</text>
-                  <text class="tab-close" @tap.stop="closeFile(file.id, 'left')">×</text>
-                </view>
-              </view>
-            </scroll-view>
-          </view>
-
-          <!-- 右侧窗格的 Tabs (仅在分屏时显示) -->
-          <view v-if="splitMode" class="tabs-pane tabs-pane-right">
-            <scroll-view class="tabs-scroll" scroll-x show-scrollbar="false">
-              <view class="tabs-list">
-                <view
-                  v-for="file in rightFiles"
-                  :key="file.id"
-                  class="tab-item"
-                  :class="{ active: activeFileIdRight === file.id }"
-                  @tap="activateTab(file, 'right')"
-                >
-                  <text class="tab-icon">{{ getFileIcon(file.fileType) }}</text>
-                  <text class="tab-name">{{ file.name }}</text>
-                  <text class="tab-close" @tap.stop="closeFile(file.id, 'right')">×</text>
-                </view>
-              </view>
-            </scroll-view>
-          </view>
-
-          <!-- 分屏按钮放在标签栏最右侧 -->
-          <view class="tabs-tools">
-            <view 
-              class="icon-btn split-btn" 
-              :class="{ active: splitMode }" 
-              @tap="toggleSplitMode" 
-              :title="splitMode ? '关闭分屏' : '开启分屏'"
-            >
-              <text class="tool-icon">◫</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- 编辑器区域 -->
-        <view class="editors-container">
-          <!-- 初始空状态 (仅当左侧也没有文件时) -->
-          <view v-if="leftFiles.length === 0 && !splitMode" class="empty-workspace">
-            <view class="empty-content">
-              <text class="empty-icon">📂</text>
-              <text class="empty-text">在左侧选择文件开始工作</text>
-            </view>
-          </view>
-
-          <!-- 编辑器视图 -->
-          <view v-else class="editors-grid">
-            
-            <!-- 左/主 窗格 -->
-            <view 
-              class="editor-pane pane-left" 
-              :class="{ 
-                'pane-full': !splitMode, 
-                'pane-half': splitMode, 
-                focused: focusedPane === 'left' 
-              }"
-              @tap="focusPane('left')"
-            >
-              <view v-if="activeFileLeft" class="pane-content">
-                <WpsEditor
-                  v-if="isWpsFile(activeFileLeft)"
-                  ref="wpsLeft"
-                  :file-id="activeFileLeft.wpsFileId"
-                  :file-name="activeFileLeft.name"
-                  :app-id="wpsAppId"
-                  mode="edit"
-                  container-id="wps-container-left"
-                  :auto-load="true"
-                  @ready="onWpsReady($event, 'left')"
-                />
-                <FilePreview 
-                  v-else 
-                  :file="activeFileLeft" 
-                  :show-edit-btn="false" 
-                />
-              </view>
-              <view v-else class="pane-empty">
-                <text>左侧空闲</text>
-              </view>
-            </view>
-
-            <!-- 右/副 窗格 (分屏时显示) -->
-            <view 
-              v-if="splitMode" 
-              class="editor-pane pane-right pane-half"
-              :class="{ focused: focusedPane === 'right' }"
-              @tap="focusPane('right')"
-            >
-              <view v-if="activeFileRight" class="pane-content">
-                <WpsEditor
-                  v-if="isWpsFile(activeFileRight)"
-                  ref="wpsRight"
-                  :file-id="activeFileRight.wpsFileId"
-                  :file-name="activeFileRight.name"
-                  :app-id="wpsAppId"
-                  mode="edit"
-                  container-id="wps-container-right"
-                  :auto-load="true"
-                  @ready="onWpsReady($event, 'right')"
-                />
-                <FilePreview 
-                  v-else 
-                  :file="activeFileRight" 
-                  :show-edit-btn="false" 
-                />
-              </view>
-              <view v-else class="pane-empty">
-                <text>点击此处后选择文件以对比</text>
-              </view>
-            </view>
-
-          </view>
-        </view>
-      </view>
-
-      <!-- 右侧吸附抽屉（AI 对话 + 常用工具） -->
-      <view class="drawer-container" :class="{ expanded: showRightDrawer }">
-        <!-- 抽屉把手 -->
-        <view class="drawer-handle" @tap="toggleDrawer">
-          <text class="handle-icon">{{ showRightDrawer ? '›' : '‹' }}</text>
-          <!-- 收起时显示的小标签 -->
-          <view class="handle-label-container" v-if="!showRightDrawer">
-             <text class="handle-vertical-text">工具箱</text>
-          </view>
-        </view>
-        
-        <!-- 抽屉内容 -->
-        <view class="drawer-content">
-          <!-- 顶部 Tab 区：AI 助手 / 常用工具 -->
-          <view class="drawer-tabs-bar">
-            <view
-              v-for="tab in drawerTabs"
-              :key="tab.key"
-              class="drawer-tab-item"
-              :class="{ active: drawerActiveTab === tab.key }"
-              @tap="switchDrawerTab(tab.key)"
-            >
-              <text class="drawer-tab-text">{{ tab.label }}</text>
-            </view>
-          </view>
-
-          <!-- Tab：AI 助手，仅显示对话与输入框 -->
-          <view v-if="drawerActiveTab === 'ai'" class="drawer-ai-layout">
-            <view class="ai-chat-pane">
-              <view class="ai-chat-header">
-                <text class="ai-chat-title">项目 AI 助手</text>
-                <text class="ai-chat-subtitle">结合项目文档进行问答与起草</text>
-              </view>
-              <scroll-view class="ai-chat-body" scroll-y :scroll-with-animation="true">
-                <view
-                  v-for="msg in aiMessages"
-                  :key="msg.id"
-                  class="ai-message"
-                  :class="msg.role === 'user' ? 'ai-message-user' : 'ai-message-assistant'"
-                >
-                  <view class="ai-message-bubble">
-                    <text class="ai-message-role">
-                      {{ msg.role === 'user' ? '我' : '助手' }}
-                    </text>
-                    <text class="ai-message-content">
-                      {{ msg.content }}
-                    </text>
+      <!-- IDE 工作台：中(编辑) + 右(AI) + 底(工具) -->
+      <view class="workbench">
+        <view class="workbench-main">
+          <!-- 中间内容区 -->
+          <view class="content-area">
+            <!-- 顶部 Tab 栏 -->
+            <view class="tabs-bar">
+              <!-- 左侧窗格的 Tabs -->
+              <view class="tabs-pane tabs-pane-left" :class="{ 'half-width': splitMode }">
+                <scroll-view class="tabs-scroll" scroll-x show-scrollbar="false">
+                  <view
+                    class="tabs-list"
+                    @dragover.prevent="onTabDropZoneDragOver('left')"
+                    @drop.prevent="onTabDropOnZone($event, 'left')"
+                  >
                     <view
-                      v-if="msg.role === 'assistant' && msg.content"
-                      class="ai-message-actions"
+                      v-for="file in leftFiles"
+                      :key="file.id"
+                      class="tab-item"
+                      :class="{
+                        active: activeFileIdLeft === file.id,
+                        'tab-drag-over': tabDragOver && tabDragOver.pane === 'left' && tabDragOver.fileId === file.id,
+                        'tab-dual-open': isOpenInOtherPane(file.id, 'left')
+                      }"
+                      :draggable="true"
+                      @tap="activateTab(file, 'left')"
+                      @dragstart="onTabDragStart($event, file, 'left')"
+                      @dragover.prevent="onTabDragOver($event, file, 'left')"
+                      @drop.prevent="onTabDropOnItem($event, file, 'left')"
+                      @dragend="onTabDragEnd"
                     >
-                      <text class="ai-export-btn" @tap="openExportDialog(msg)">
-                        导出为Word
-                      </text>
+                      <text class="tab-icon">{{ file.tabType === 'web' ? '🌐' : getFileIcon(file.fileType) }}</text>
+                      <text class="tab-name">{{ file.name }}</text>
+                      <text class="tab-close" @tap.stop="closeFile(file.id, 'left')">×</text>
                     </view>
                   </view>
+                </scroll-view>
+                <view class="tabs-plus" @tap="onTabsPlusClick('left')" title="新建/复制">
+                  <text class="tabs-plus-icon">＋</text>
                 </view>
-                <view v-if="aiLoading" class="ai-message ai-message-assistant">
-                  <view class="ai-message-bubble">
-                    <text class="ai-message-role">助手</text>
-                    <text class="ai-message-content">正在思考...</text>
+              </view>
+
+              <!-- 右侧窗格的 Tabs (仅在分屏时显示) -->
+              <view v-if="splitMode" class="tabs-pane tabs-pane-right">
+                <scroll-view class="tabs-scroll" scroll-x show-scrollbar="false">
+                  <view
+                    class="tabs-list"
+                    @dragover.prevent="onTabDropZoneDragOver('right')"
+                    @drop.prevent="onTabDropOnZone($event, 'right')"
+                  >
+                    <view
+                      v-for="file in rightFiles"
+                      :key="file.id"
+                      class="tab-item"
+                      :class="{
+                        active: activeFileIdRight === file.id,
+                        'tab-drag-over': tabDragOver && tabDragOver.pane === 'right' && tabDragOver.fileId === file.id,
+                        'tab-dual-open': isOpenInOtherPane(file.id, 'right')
+                      }"
+                      :draggable="true"
+                      @tap="activateTab(file, 'right')"
+                      @dragstart="onTabDragStart($event, file, 'right')"
+                      @dragover.prevent="onTabDragOver($event, file, 'right')"
+                      @drop.prevent="onTabDropOnItem($event, file, 'right')"
+                      @dragend="onTabDragEnd"
+                    >
+                      <text class="tab-icon">{{ file.tabType === 'web' ? '🌐' : getFileIcon(file.fileType) }}</text>
+                      <text class="tab-name">{{ file.name }}</text>
+                      <text class="tab-close" @tap.stop="closeFile(file.id, 'right')">×</text>
+                    </view>
+                  </view>
+                </scroll-view>
+                <view class="tabs-plus" @tap="onTabsPlusClick('right')" title="新建/复制">
+                  <text class="tabs-plus-icon">＋</text>
+                </view>
+              </view>
+
+            </view>
+
+            <!-- 编辑器区域（会被底部工具面板压缩） -->
+            <view class="editors-container">
+              <!-- 初始空状态 (仅当左侧也没有文件时) -->
+              <view v-if="leftFiles.length === 0 && !splitMode" class="empty-workspace">
+                <view class="empty-content">
+                  <text class="empty-icon">📂</text>
+                  <text class="empty-text">在左侧选择文件开始工作</text>
+                </view>
+              </view>
+
+              <!-- 编辑器视图 -->
+              <view v-else class="editors-grid">
+                <!-- 左/主 窗格 -->
+                <view 
+                  class="editor-pane pane-left" 
+                  :class="{ 
+                    'pane-full': !splitMode, 
+                    'pane-half': splitMode, 
+                    focused: focusedPane === 'left' 
+                  }"
+                  @tap="focusPane('left')"
+                >
+                  <view v-if="activeFileLeft" class="pane-content">
+                    <BrowserPane
+                      v-if="isBrowserTab(activeFileLeft)"
+                      :key="activeFileLeft.id"
+                      :tab-id="activeFileLeft.id"
+                      :url="activeFileLeft.url"
+                      @url-change="onBrowserUrlChange('left', $event)"
+                      @title-change="onBrowserTitleChange('left', $event)"
+                      @open-new-tab="openBrowserTab($event)"
+                    />
+                    <WpsEditor
+                      v-else-if="isWpsFile(activeFileLeft)"
+                      ref="wpsLeft"
+                      :file-id="activeFileLeft.wpsFileId"
+                      :file-name="activeFileLeft.name"
+                      :app-id="wpsAppId"
+                      mode="edit"
+                      container-id="wps-container-left"
+                      :auto-load="true"
+                      @ready="onWpsReady($event, 'left')"
+                      @clipboard-copy="onWpsClipboardCopy($event)"
+                    />
+                    <FilePreview 
+                      v-else 
+                      :file="activeFileLeft" 
+                      :show-edit-btn="false" 
+                    />
+                  </view>
+                  <view v-else class="pane-empty">
+                    <text>左侧空闲</text>
                   </view>
                 </view>
-                <view v-if="!aiMessages.length && !aiLoading" class="ai-empty-tip">
-                  <text>可以直接提问“帮我起草公告草案”等问题</text>
-                </view>
-              </scroll-view>
-              <view class="ai-input-area">
-                <textarea
-                  class="ai-input"
-                  v-model="aiInput"
-                  placeholder="请输入要咨询的问题..."
-                  :disabled="aiLoading"
-                  confirm-type="send"
-                  @confirm="handleAiSend"
-                />
-                <button
-                  class="ai-send-btn"
-                  type="primary"
-                  size="mini"
-                  :disabled="aiLoading || !aiInput.trim()"
-                  @tap="handleAiSend"
+
+                <!-- 右/副 窗格 (分屏时显示) -->
+                <view 
+                  v-if="splitMode" 
+                  class="editor-pane pane-right pane-half"
+                  :class="{ focused: focusedPane === 'right' }"
+                  @tap="focusPane('right')"
                 >
-                  发送
-                </button>
+                  <view v-if="activeFileRight" class="pane-content">
+                    <BrowserPane
+                      v-if="isBrowserTab(activeFileRight)"
+                      :key="activeFileRight.id"
+                      :tab-id="activeFileRight.id"
+                      :url="activeFileRight.url"
+                      @url-change="onBrowserUrlChange('right', $event)"
+                      @title-change="onBrowserTitleChange('right', $event)"
+                      @open-new-tab="openBrowserTab($event)"
+                    />
+                    <WpsEditor
+                      v-else-if="isWpsFile(activeFileRight)"
+                      ref="wpsRight"
+                      :file-id="activeFileRight.wpsFileId"
+                      :file-name="activeFileRight.name"
+                      :app-id="wpsAppId"
+                      mode="edit"
+                      container-id="wps-container-right"
+                      :auto-load="true"
+                      @ready="onWpsReady($event, 'right')"
+                      @clipboard-copy="onWpsClipboardCopy($event)"
+                    />
+                    <FilePreview 
+                      v-else 
+                      :file="activeFileRight" 
+                      :show-edit-btn="false" 
+                    />
+                  </view>
+                  <view v-else class="pane-empty">
+                    <text>点击此处后选择文件以对比</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+
+            <!-- 底部常用工具面板（仅占中间工作区宽度；右侧 AI 面板优先完整显示） -->
+            <view v-if="showToolsPanel" class="bottom-panel" :style="{ height: toolsPanelHeight + 'px' }">
+              <view class="bottom-resize-handle" @touchstart="startResize('bottom', $event)" @mousedown="startResize('bottom', $event)"></view>
+              <view class="panel-header panel-header-tools">
+                <view class="panel-tabs">
+                  <view
+                    v-for="t in toolsList"
+                    :key="t.key"
+                    class="panel-tab"
+                    :class="{ active: activeToolKey === t.key }"
+                    @tap="switchToolTab(t.key)"
+                  >
+                    <text class="panel-tab-icon">{{ t.icon }}</text>
+                    <text class="panel-tab-label">{{ t.label }}</text>
+                  </view>
+                </view>
+                <view class="tools-search" v-if="activeToolKey === 'variables' || activeToolKey === 'favorites' || activeToolKey === 'clipboard'">
+                  <view class="tools-search-wrap">
+                    <input
+                      class="tools-search-input"
+                      v-model="toolsSearchKeyword"
+                      :placeholder="toolsSearchPlaceholder"
+                      confirm-type="search"
+                    />
+                    <view v-if="toolsSearchKeyword" class="tools-search-clear" @tap="toolsSearchKeyword = ''">×</view>
+                  </view>
+                </view>
+                <view class="panel-actions">
+                  <view class="icon-btn" title="收起" @tap="toggleToolsPanel">
+                    <text class="tool-icon">×</text>
+                  </view>
+                </view>
+              </view>
+              <view class="panel-body">
+                <view class="tools-content">
+                  <VariablePanel
+                    v-if="activeToolKey === 'variables'"
+                    ref="variablePanel"
+                    :project-id="projectId"
+                    :get-wps="() => getCurrentWpsInstance()"
+                    :search-keyword="toolsSearchKeyword"
+                    @insert="handleInsertVariable"
+                    @update-from-selection="handleUpdateVariable"
+                    @sync-document="handleSyncDocument"
+                  />
+                  <ProjectFavoritesPanel
+                    v-else-if="activeToolKey === 'favorites'"
+                    ref="favoritesPanel"
+                    :project-id="projectId"
+                    :query="toolsSearchKeyword"
+                    @insert="insertPlainTextToWps"
+                    @open-url="openBrowserTab($event)"
+                  />
+                  <ClipboardPanel
+                    v-else-if="activeToolKey === 'clipboard'"
+                    ref="clipboardPanel"
+                    :query="toolsSearchKeyword"
+                    @insert="insertPlainTextToWps"
+                  />
+                </view>
               </view>
             </view>
           </view>
 
-          <!-- Tab：常用工具，展示变量库等工具 -->
-          <view v-else-if="drawerActiveTab === 'tools'" class="tool-detail-view">
-            <view class="drawer-header">
-              <text class="drawer-title">常用工具</text>
+          <!-- 右侧 AI 面板（可拖拽宽度） -->
+          <view v-if="showAiPanel" class="side-panel side-panel-ai" :style="{ width: aiPanelWidth + 'px' }">
+            <view class="side-resize-handle" @touchstart="startResize('right', $event)" @mousedown="startResize('right', $event)"></view>
+            <view class="panel-header">
+              <text class="panel-title">AI 助手</text>
+              <view class="panel-actions">
+                <view class="icon-btn" title="收起" @tap="toggleAiPanel">
+                  <text class="tool-icon">×</text>
+                </view>
+              </view>
             </view>
-            <view class="drawer-body">
-              <VariablePanel
-                ref="variablePanel"
-                :project-id="projectId"
-                @insert="handleInsertVariable"
-                @update-from-selection="handleUpdateVariable"
-                @sync-document="handleSyncDocument"
-              />
-            </view>
-          </view>
-
-          <!-- 其他 Tab 占位 -->
-          <view v-else class="tool-detail-view">
-            <view class="drawer-header">
-              <text class="drawer-title">功能开发中</text>
-            </view>
-            <view class="drawer-body empty-body">
-              <text>此功能即将上线</text>
+            <view class="panel-body panel-body-ai">
+              <view class="ai-chat-pane">
+                <view class="ai-context-card">
+                  <view class="context-header">
+                    <view class="context-file">
+                      <text class="context-label">当前文件</text>
+                      <text class="context-value">
+                        {{ activeAiFileName || '未选择 WPS 文件' }}
+                      </text>
+                    </view>
+                    <view class="context-actions">
+                      <text class="context-status" :class="{ synced: aiContextPreview }">
+                        {{ aiContextLoading ? '同步中...' : (aiContextPreview ? '已同步' : '待同步') }}
+                      </text>
+                      <view
+                        class="context-action-btn"
+                        :class="{ disabled: aiContextLoading }"
+                        @tap="!aiContextLoading && refreshAiContextPreview(true)"
+                      >
+                        <text>{{ aiContextLoading ? '同步中' : '同步当前文件' }}</text>
+                      </view>
+                    </view>
+                  </view>
+                  <view v-if="aiContextPreview && (aiContextPreview.selection || aiContextPreview.snippet)" class="context-snippet">
+                    <view v-if="aiContextPreview.selection" class="context-snippet-row">
+                      <text class="context-snippet-label">选区</text>
+                      <text class="context-snippet-text">{{ aiContextPreview.selection }}</text>
+                    </view>
+                    <view v-if="aiContextPreview.snippet" class="context-snippet-row">
+                      <text class="context-snippet-label">摘要</text>
+                      <text class="context-snippet-text">{{ aiContextPreview.snippet }}</text>
+                    </view>
+                  </view>
+                  <view v-else class="context-snippet placeholder">
+                    <text>同步后，助手会带着当前 WPS 文档上下文进行回答与改写。</text>
+                  </view>
+                </view>
+                <scroll-view class="ai-chat-body" scroll-y :scroll-with-animation="true">
+                  <view
+                    v-for="msg in aiMessages"
+                    :key="msg.id"
+                    class="ai-message"
+                    :class="msg.role === 'user' ? 'ai-message-user' : 'ai-message-assistant'"
+                  >
+                    <view class="ai-message-bubble">
+                      <text class="ai-message-role">
+                        {{ msg.role === 'user' ? '我' : '助手' }}
+                      </text>
+                      <text class="ai-message-content">
+                        {{ msg.content }}
+                      </text>
+                      <view v-if="msg.role === 'assistant' && msg.content" class="ai-message-actions">
+                        <text class="ai-export-btn primary" @tap="insertAiMessageToDoc(msg)">插入当前文档</text>
+                        <text class="ai-export-btn" @tap="applyAiMessageToSelection(msg)">替换选区</text>
+                        <text class="ai-export-btn" @tap="openExportDialog(msg)">导出为Word</text>
+                      </view>
+                    </view>
+                  </view>
+                  <view v-if="aiLoading" class="ai-message ai-message-assistant">
+                    <view class="ai-message-bubble">
+                      <text class="ai-message-role">助手</text>
+                      <text class="ai-message-content">正在思考...</text>
+                    </view>
+                  </view>
+                  <view v-if="!aiMessages.length && !aiLoading" class="ai-empty-tip">
+                    <text>向助手描述你想在当前文件中补充、重写或审阅的内容</text>
+                  </view>
+                </scroll-view>
+                <view class="ai-input-area">
+                  <textarea
+                    class="ai-input"
+                    v-model="aiInput"
+                    placeholder="描述你想在当前文档里完成的修改..."
+                    :disabled="aiLoading"
+                    confirm-type="send"
+                    @confirm="handleAiSend"
+                  />
+                  <view
+                    class="ai-send-btn"
+                    :class="{ disabled: aiLoading || !aiInput.trim() }"
+                    @tap="!(aiLoading || !aiInput.trim()) && handleAiSend()"
+                  >发送</view>
+                </view>
+              </view>
             </view>
           </view>
         </view>
@@ -365,33 +546,162 @@
         </view>
       </view>
 
+      <!-- OCR 截图：全屏浮层（单击或 ESC 退出；框选后出快捷命令条） -->
+      <view
+        v-if="showOcrOverlay"
+        class="ocr-overlay"
+      >
+        <!-- #ifdef H5 -->
+        <image
+          v-if="ocrFrameUrl"
+          class="ocr-frame-img"
+          :src="ocrFrameUrl"
+          mode="aspectFit"
+          :style="ocrFrameImgStyle"
+        />
+        <view v-else class="ocr-frame-loading">
+          <text>正在获取画面…</text>
+        </view>
+        <!-- #endif -->
+        <view class="ocr-overlay-hintline">
+          <text>拖动框选 · 单击/ESC 退出</text>
+        </view>
+        <view class="ocr-frame-shade"></view>
+        <view v-if="ocrOverlaySelecting || ocrHasSelection" class="ocr-selection" :style="ocrSelectionStyle"></view>
+
+        <!-- 框选后的快捷命令 -->
+        <view
+          v-if="ocrActionBar.visible"
+          class="ocr-actionbar"
+          :style="{ left: ocrActionBar.x + 'px', top: ocrActionBar.y + 'px' }"
+          @mousedown.stop
+          @mouseup.stop
+          @click.stop
+          @touchstart.stop
+          @touchend.stop
+        >
+          <view class="ocr-actionbar-row">
+            <view class="ocr-action" @tap="ocrDoRefreshSelection">{{ OCR_ACTION_LABELS.refresh }}</view>
+            <view class="ocr-action" @tap="ocrDoRecognize" :class="{ disabled: ocrLoading }">{{ OCR_ACTION_LABELS.recognize }}</view>
+            <view class="ocr-action" @tap="ocrDoDownload">{{ OCR_ACTION_LABELS.download }}</view>
+            <view class="ocr-action" @tap="ocrDoCopy" :class="{ disabled: !ocrText }">{{ OCR_ACTION_LABELS.copy }}</view>
+            <view class="ocr-action" @tap="ocrDoInsert" :class="{ disabled: !ocrText }">{{ OCR_ACTION_LABELS.insertDoc }}</view>
+            <view class="ocr-action" @tap="ocrDoWebLink" :class="{ disabled: ocrLoading }">{{ OCR_ACTION_LABELS.webLink }}</view>
+            <view class="ocr-action primary" @tap="ocrDoFavorite" :class="{ disabled: !ocrImageDataUrl || ocrLoading }">{{ OCR_ACTION_LABELS.favorite }}</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 文件拖拽关联：浮窗落点区域（避开 WPS iframe 吞 drop，按你建议降低前端成本） -->
+      <view v-if="fileLinkDrag.active" class="filelink-float">
+        <view class="filelink-float-title">拖到这里松手：关联到当前高亮文本</view>
+        <view class="filelink-float-sub">当前文件：{{ fileLinkDrag.file ? fileLinkDrag.file.name : '' }}</view>
+        
+        <!-- 临时调试按钮 -->
+        <!-- <button size="mini" type="warn" @tap.stop.prevent="debugAddHyperlink" style="margin: 4px 0;">调试：插入测试链接</button> -->
+
+        <view class="filelink-float-zones">
+          <view
+            ref="dropZoneLeft"
+            class="filelink-float-zone"
+            :class="{ active: fileLinkDrag.hoverSide === 'left' }"
+          >
+            关联到左侧文档
+          </view>
+          <view
+            v-if="splitMode"
+            ref="dropZoneRight"
+            class="filelink-float-zone"
+            :class="{ active: fileLinkDrag.hoverSide === 'right' }"
+          >
+            关联到右侧文档
+          </view>
+        </view>
+      </view>
+
+      <!-- 文件关联选择弹窗：一个文本关联多个文件时，点击超链接弹出选择 -->
+      <view v-if="fileLinkPicker.visible" class="upload-mask" @tap="closeFileLinkPicker">
+        <view class="folder-modal" @tap.stop>
+          <view class="upload-header">
+            <text class="upload-title">选择要打开的文件</text>
+          </view>
+          <view class="folder-body">
+            <view
+              v-for="f in fileLinkPicker.files"
+              :key="f.id"
+              class="folder-item"
+              @tap="openFileLinkTarget(f.id)"
+            >
+              <text class="folder-icon">{{ f.isFolder ? '📁' : '📄' }}</text>
+              <text class="folder-name">{{ f.name }}</text>
+            </view>
+            <view v-if="!fileLinkPicker.files || fileLinkPicker.files.length === 0" class="empty-tip">
+              <text>无可用关联文件</text>
+            </view>
+          </view>
+          <view class="upload-footer">
+            <view class="upload-btn upload-btn-secondary" @tap="closeFileLinkPicker">关闭</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 网核关联拖拽：全屏透明蒙层接管鼠标事件（避免进入 WPS iframe 后 mousemove 丢失导致“卡住”） -->
+      <view v-if="webLinkDrag.active" class="webmark-drag-overlay" @mousedown.stop @mouseup.stop @mousemove.stop>
+        <view
+          class="webmark-drag-ghost"
+          :style="{ left: webLinkDrag.x + 'px', top: webLinkDrag.y + 'px' }"
+        >
+          <image class="webmark-ghost-img" :src="webLinkDrag.imageDataUrl" mode="aspectFill" />
+          <view class="webmark-ghost-badge">网核</view>
+        </view>
+      </view>
+
+      <!-- OCR 结果不再使用弹窗：改为框选后的快捷命令条 -->
+
     </view>
   </view>
 </template>
 
 <script>
 import WpsEditor from '@/components/WpsEditor.vue'
+import BrowserPane from '@/components/BrowserPane.vue'
 import FileTree from '@/components/FileTree.vue'
 import FilePreview from '@/components/FilePreview.vue'
 import VariablePanel from '@/components/VariablePanel.vue'
+import ProjectFavoritesPanel from '@/components/ProjectFavoritesPanel.vue'
+import ClipboardPanel from '@/components/ClipboardPanel.vue'
 import {
   getProject,
   getFileDetail,
+  renameFile,
+  ocrRecognize,
+  createProjectFavorite,
+  createDocFileLink,
+  getDocFileLink,
+  saveClipboardText,
   saveProjectVariable,
   getProjectVariables,
   getProjectFiles,
+  batchCopyFiles,
   aiChat,
   exportAiDocx
 } from '@/services/api.js'
 import { getCurrentUser } from '@/utils/auth.js'
+import { FILE_BATCH_ACTIONS, FILE_TREE_QUICK_ACTIONS } from '@/config/fileActions.js'
+import { WORKBENCH_TOOLS } from '@/config/tools.js'
+import { OCR_ACTION_LABELS, INTERNAL_LINK_SCHEMES, WPS_INTERNAL_HTTP_LINK_BASE } from '@/config/workbenchActions.js'
+import { LEFT_SIDEBAR_PLUGINS, getLeftSidebarPlugin } from '@/config/leftSidebarPlugins.js'
 
 export default {
   name: 'ProjectOverview',
   components: {
     WpsEditor,
+    BrowserPane,
     FileTree,
     FilePreview,
-    VariablePanel
+    VariablePanel,
+    ProjectFavoritesPanel,
+    ClipboardPanel
   },
   data() {
     return {
@@ -401,20 +711,44 @@ export default {
       
       // 布局状态
       sidebarWidth: 260, // 侧边栏宽度
-      isResizing: false,
-      startX: 0,
-      startWidth: 0,
-      
       sidebarCollapsed: false,
-      showRightDrawer: false, // 抽屉默认收起
-      drawerMode: 'menu', // menu | variable | compare | template
-      // 右侧抽屉 Tab 与 AI 状态
-      drawerTabs: [
-        { key: 'ai', label: 'AI 助手' },
-        { key: 'tools', label: '常用工具' }
-      ],
-      drawerActiveTab: 'ai',
-      aiCurrentTool: 'variable', // 右侧默认工具
+      isCompactLayout: false,
+      leftPaneKey: 'files',
+      LEFT_SIDEBAR_PLUGINS,
+      // 文件树批量选择模式（由页面控制开关）
+      fileBatchMode: false,
+      checkedFileIds: [],
+      showBatchMenu: false,
+      FILE_TREE_QUICK_ACTIONS,
+
+      // 右侧 AI 面板（IDE 右侧窗格）
+      showAiPanel: false,
+      aiPanelWidth: 360,
+      aiContextPreview: null,
+      aiContextLoading: false,
+
+      // 底部常用工具面板（IDE 底部抽屉）
+      showToolsPanel: false,
+      toolsPanelHeight: 260,
+      activeToolKey: 'variables',
+      toolsSearchKeyword: '',
+
+      // 拖拽调整尺寸状态（left/right/bottom）
+      resizing: {
+        active: false,
+        target: null, // 'left' | 'right' | 'bottom'
+        startX: 0,
+        startY: 0,
+        startSidebarWidth: 0,
+        startAiWidth: 0,
+        startToolsHeight: 0
+      },
+      _resizeRaf: null,
+      _resizePendingX: 0,
+      _resizePendingY: 0,
+      boundResizeMove: null,
+      boundStopResize: null,
+
       aiMessages: [], // { id, role: 'user'|'assistant', content }
       aiInput: '',
       aiLoading: false,
@@ -425,6 +759,53 @@ export default {
       exportFileName: '',
       exportSourceMessage: null,
       exportLoading: false,
+
+      // OCR 摘录
+      ocrLoading: false,
+      ocrImageDataUrl: '',
+      ocrText: '',
+      ocrSourceUrl: '',
+      // 全屏截图浮层
+      showOcrOverlay: false,
+      ocrStream: null,
+      ocrVideo: null, // offscreen video
+      ocrFrameCanvas: null, // offscreen frame canvas（vw x vh）
+      ocrFrameView: null, // { vw, vh, cw, ch, dx, dy, scale }
+      ocrFrameLoading: false,
+      ocrFrameUrl: '',
+      ocrHostRect: null, // Desktop: BrowserView bounds（用于把截图铺到网页区域，确保坐标准确）
+      ocrOverlaySelecting: false,
+      ocrSel: { x1: 0, y1: 0, x2: 0, y2: 0 },
+      ocrActionBar: { visible: false, x: 0, y: 0 },
+      ocrDebug: true,
+      ocrLastPointer: { x: 0, y: 0 },
+
+      // 网核关联拖拽（将截图证据块拖到 WPS 文档中插入标记）
+      webLinkDrag: {
+        active: false,
+        x: 0,
+        y: 0,
+        favoriteId: null,
+        imageDataUrl: '',
+        sourceUrl: '',
+        title: ''
+      },
+      _webLinkMoveHandler: null,
+      _webLinkUpHandler: null,
+      _webLinkKeydownHandler: null,
+
+      // 文件拖拽到 WPS 高亮文本：建立超链接关联
+      fileLinkDrag: {
+        active: false,
+        file: null, // { id, name, fileType, wpsFileId }
+        hoverSide: null // 'left' | 'right' | null
+      },
+      fileLinkPicker: {
+        visible: false,
+        side: 'left',
+        files: [],
+        linkKey: ''
+      },
       splitMode: false,
       focusedPane: 'left', // 'left' | 'right'
 
@@ -433,6 +814,10 @@ export default {
       rightFiles: [], // 右侧文件列表
       activeFileIdLeft: null, // 左侧当前激活ID
       activeFileIdRight: null, // 右侧当前激活ID
+
+      // Tabs 拖拽状态
+      draggingTab: null, // { fileId, fromPane }
+      tabDragOver: null, // { fileId, pane }
       
       // WPS Config
       wpsAppId: 'SX20251208BJWRFK',
@@ -442,22 +827,194 @@ export default {
       },
       // 文件信息轮询定时器
       fileInfoPollingIntervals: {}
+      ,
+      // WPS 选区轮询：记录最近一次非空高亮选区（用于拖拽建立超链接）
+      selectionPollingIntervals: {},
+      lastWpsSelection: {
+        left: null,  // { start, end, text, ts }
+        right: null  // { start, end, text, ts }
+      },
+      _desktopWebMarkUnsub: null
+      ,
+      _desktopOcrSelectionUnsub: null
+      ,
+      _desktopOcrSelectionErrUnsub: null
+    }
+  },
+  computed: {
+    toolsSearchPlaceholder() {
+      if (this.activeToolKey === 'variables') return '搜索变量…'
+      if (this.activeToolKey === 'favorites') return '搜索收藏…'
+      if (this.activeToolKey === 'clipboard') return '搜索剪贴板…'
+      return '搜索…'
+    },
+    OCR_ACTION_LABELS() {
+      return OCR_ACTION_LABELS
+    },
+    INTERNAL_LINK_SCHEMES() {
+      return INTERNAL_LINK_SCHEMES
+    },
+    WPS_INTERNAL_HTTP_LINK_BASE() {
+      return WPS_INTERNAL_HTTP_LINK_BASE
+    },
+    FILE_BATCH_ACTIONS() {
+      return FILE_BATCH_ACTIONS
+    },
+    leftPaneTitle() {
+      try {
+        return getLeftSidebarPlugin(this.leftPaneKey)?.label || '文件树'
+      } catch (e) {
+        return '文件树'
+      }
+    },
+    checkedFileCount() {
+      return Array.isArray(this.checkedFileIds) ? this.checkedFileIds.length : 0
+    },
+    activeFileLeft() {
+      return this.leftFiles.find(f => f.id === this.activeFileIdLeft)
+    },
+    activeFileRight() {
+      return this.rightFiles.find(f => f.id === this.activeFileIdRight)
+    },
+    activeAiFileName() {
+      const target = this.getActiveAiTargetFile()
+      return target && target.name ? target.name : ''
+    }
+    ,
+    ocrHasSelection() {
+      const s = this.ocrSel
+      return Math.abs(s.x2 - s.x1) >= 6 && Math.abs(s.y2 - s.y1) >= 6
+    },
+    ocrSelectionStyle() {
+      const s = this.ocrSel
+      const left = Math.min(s.x1, s.x2)
+      const top = Math.min(s.y1, s.y2)
+      const w = Math.abs(s.x2 - s.x1)
+      const h = Math.abs(s.y2 - s.y1)
+      return {
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${w}px`,
+        height: `${h}px`
+      }
+    }
+    ,
+    ocrFrameImgStyle() {
+      const v = this.ocrFrameView
+      if (!v) return {}
+      const dx = Number(v.dx)
+      const dy = Number(v.dy)
+      const vw = Number(v.vw)
+      const vh = Number(v.vh)
+      const scale = Number(v.scale)
+      if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(vw) || !Number.isFinite(vh) || !Number.isFinite(scale) || scale <= 0) {
+        // 兜底：不提供 style，让图片按 inset:0 全屏显示，避免“网页消失但看不到截图底图”
+        return {}
+      }
+      const dw = vw * scale
+      const dh = vh * scale
+      return {
+        left: `${dx}px`,
+        top: `${dy}px`,
+        width: `${dw}px`,
+        height: `${dh}px`
+      }
+    }
+    ,
+    toolsList() {
+      return WORKBENCH_TOOLS
+    }
+    ,
+    isDesktopApp() {
+      try {
+        return typeof window !== 'undefined' && window.checkbaDesktop && window.checkbaDesktop.ocr
+      } catch (e) {
+        return false
+      }
     }
   },
   beforeUnmount() {
+    this.teardownResponsiveListener()
     // 清理轮询定时器
     if (this.fileInfoPollingIntervals) {
       Object.values(this.fileInfoPollingIntervals).forEach(intervalId => {
         if (intervalId) clearInterval(intervalId)
       })
     }
-  },
-  computed: {
-    activeFileLeft() {
-      return this.leftFiles.find(f => f.id === this.activeFileIdLeft)
-    },
-    activeFileRight() {
-      return this.rightFiles.find(f => f.id === this.activeFileIdRight)
+    if (this.selectionPollingIntervals) {
+      Object.values(this.selectionPollingIntervals).forEach(intervalId => {
+        if (intervalId) clearInterval(intervalId)
+      })
+    }
+
+    // 清理拖拽监听
+    try {
+      this.stopResize()
+    } catch (e) {
+      // ignore
+    }
+
+    // 清理剪贴板监听
+    this.unbindClipboardListener()
+
+    // OCR 全局监听清理（防止残留导致无法点击/拖拽）
+    try {
+      this.unbindOcrGlobalListeners()
+    } catch (e) {
+      // ignore
+    }
+    // Desktop：解绑网核标记监听
+    try {
+      if (this._desktopWebMarkUnsub) this._desktopWebMarkUnsub()
+    } catch (e) {
+      // ignore
+    }
+    this._desktopWebMarkUnsub = null
+
+    // Desktop：解绑内部链接打开监听
+    try {
+      if (this._desktopOpenInternalUnsub) this._desktopOpenInternalUnsub()
+    } catch (e) {
+      // ignore
+    }
+    this._desktopOpenInternalUnsub = null
+
+    // WPS iframe：内部链接 postMessage 监听清理
+    try {
+      if (this._wpsInternalMsgHandler && typeof window !== 'undefined') {
+        window.removeEventListener('message', this._wpsInternalMsgHandler)
+      }
+    } catch (e) {
+      // ignore
+    }
+    this._wpsInternalMsgHandler = null
+    try {
+      if (typeof window !== 'undefined' && window.__checkbaHandleInternalLink) {
+        delete window.__checkbaHandleInternalLink
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // Desktop：解绑 OCR 选区结果监听
+    try {
+      if (this._desktopOcrSelectionUnsub) this._desktopOcrSelectionUnsub()
+    } catch (e) {
+      // ignore
+    }
+    this._desktopOcrSelectionUnsub = null
+    try {
+      if (this._desktopOcrSelectionErrUnsub) this._desktopOcrSelectionErrUnsub()
+    } catch (e) {
+      // ignore
+    }
+    this._desktopOcrSelectionErrUnsub = null
+
+    // 网核拖拽清理
+    try {
+      this.stopWebLinkDrag()
+    } catch (e) {
+      // ignore
     }
   },
   onLoad(query) {
@@ -470,8 +1027,1812 @@ export default {
     if (user) {
       this.userDisplayName = user.displayName || user.username
     }
+    // 登录态下启用剪贴板记录（仅记录本应用能感知到的 paste / 复制按钮）
+    this.bindClipboardListener()
+  },
+  onShow() {
+    // Desktop：仅在工作区页面展示 BrowserView（否则会“飘”到其它页面）
+    try {
+      if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
+        window.checkbaDesktop.browser.setViewsVisible({ visible: true }).catch(() => {})
+      }
+    } catch (e) {
+      // ignore
+    }
+  },
+  onHide() {
+    // Desktop：离开工作区页面（如去个人中心）必须隐藏 BrowserView
+    try {
+      if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
+        window.checkbaDesktop.browser.setViewsVisible({ visible: false }).catch(() => {})
+      }
+    } catch (e) {
+      // ignore
+    }
+  },
+  onUnload() {
+    // 兜底：页面销毁也隐藏
+    try {
+      if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
+        window.checkbaDesktop.browser.setViewsVisible({ visible: false }).catch(() => {})
+      }
+    } catch (e) {
+      // ignore
+    }
+  },
+  mounted() {
+    this.setupResponsiveListener()
+    // Desktop：网页选中“加入网核收藏”（右键菜单触发）
+    try {
+      if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.onWebMark) {
+        if (!this._desktopWebMarkUnsub) {
+          this._desktopWebMarkUnsub = window.checkbaDesktop.browser.onWebMark(async (payload) => {
+            try {
+              const text = payload && payload.text ? String(payload.text).trim() : ''
+              const url = payload && payload.url ? String(payload.url).trim() : ''
+              const title = payload && payload.title ? String(payload.title).trim() : ''
+              const imageBase64 = payload && payload.imageDataUrl ? String(payload.imageDataUrl) : ''
+              if (!text || !this.projectId) return
+              const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+              await createProjectFavorite(pid, {
+                title: title || (url ? (() => { try { return new URL(url).host } catch (e) { return '网核' } })() : '网核'),
+                sourceUrl: url,
+                content: text,
+                imageBase64: imageBase64 || ''
+              })
+              // 立即刷新网核中心面板（如果可见）
+              if (this.$refs.favoritesPanel && typeof this.$refs.favoritesPanel.refresh === 'function') {
+                this.$refs.favoritesPanel.refresh()
+              }
+              uni.showToast({ title: '已加入网核收藏', icon: 'success' })
+            } catch (e) {
+              console.error('保存网核收藏失败:', e)
+              uni.showToast({ title: e.message || '保存失败', icon: 'none' })
+            }
+          })
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // Desktop：拦截 WPS 中点击 “checkba://...” 的内部链接
+    try {
+      if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.app && window.checkbaDesktop.app.onOpenInternal) {
+        if (!this._desktopOpenInternalUnsub) {
+          this._desktopOpenInternalUnsub = window.checkbaDesktop.app.onOpenInternal((payload) => {
+            try {
+              const raw0 = payload && payload.url ? String(payload.url) : ''
+              if (!raw0 || !raw0.startsWith('checkba:')) return
+              const raw = raw0.replace(/^checkba:\/*/i, 'checkba://')
+              const q = raw.includes('?') ? raw.split('?')[1] : ''
+              const params = new URLSearchParams(q)
+
+              // 1) webfav：定位收藏卡片
+              if (raw.startsWith('checkba://webfav')) {
+                const favId = params.get('id')
+                if (!favId) return
+                this.showToolsPanel = true
+                this.activeToolKey = 'favorites'
+                this.$nextTick(() => {
+                  try {
+                    const panel = this.$refs.favoritesPanel
+                    if (panel && typeof panel.focusFavorite === 'function') {
+                      panel.focusFavorite(Number(favId))
+                    }
+                  } catch (e) {
+                    // ignore
+                  }
+                })
+                return
+              }
+
+              // 2) filelink：打开关联文件（多文件先弹窗）
+              if (raw.startsWith(this.INTERNAL_LINK_SCHEMES.fileLink)) {
+                const linkKey = params.get('k') || ''
+                if (!linkKey || !this.projectId) return
+                const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+                getDocFileLink(pid, linkKey)
+                  .then((resp) => {
+                    const files = resp && resp.files ? resp.files : (resp && resp.data && resp.data.files ? resp.data.files : [])
+                    const list = Array.isArray(files) ? files : []
+                    if (list.length <= 0) {
+                      uni.showToast({ title: '关联文件不存在', icon: 'none' })
+                      return
+                    }
+                    if (list.length === 1) {
+                      this.openFileLinkTarget(list[0].id, this.focusedPane || 'left')
+                      return
+                    }
+                    this.fileLinkPicker = { visible: true, side: this.focusedPane === 'right' && this.splitMode ? 'right' : 'left', files: list, linkKey }
+                  })
+                  .catch((e) => {
+                    uni.showToast({ title: (e && e.message) ? e.message : '打开失败', icon: 'none' })
+                  })
+                return
+              }
+            } catch (e) {
+              // ignore
+            }
+          })
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // WPS 官方 onHyperLinkOpen：在 iframe 内无法直接打开 checkba:，
+    // 通过 postMessage 把内部链接交给宿主页面处理
+    try {
+      // 给 WPS SDK onHyperLinkOpen 直接调用：避免 window.open/postMessage 的不确定性
+      if (typeof window !== 'undefined') {
+        window.__checkbaHandleInternalLink = (url) => {
+          try {
+            const raw0 = url ? String(url) : ''
+            if (!raw0) return
+            let raw = raw0
+            // 兼容：WPS 内部包装链接（https://checkba-internal... ?u=checkba://xxx）
+            try {
+              if (this.WPS_INTERNAL_HTTP_LINK_BASE && raw.startsWith(this.WPS_INTERNAL_HTTP_LINK_BASE)) {
+                const q0 = raw.includes('?') ? raw.split('?')[1] : ''
+                const p0 = new URLSearchParams(q0)
+                const inner = p0.get('u') ? decodeURIComponent(String(p0.get('u'))) : ''
+                if (inner) raw = inner
+              }
+            } catch (e) {}
+            if (!raw || !raw.startsWith('checkba:')) return
+            // 统一 normalize：兼容 checkba:/xxx 与 checkba://xxx
+            raw = raw.replace(/^checkba:\/*/i, 'checkba://')
+            const q = raw.includes('?') ? raw.split('?')[1] : ''
+            const params = new URLSearchParams(q)
+
+            // eslint-disable-next-line no-console
+            console.log('[Host internalLink] received:', raw)
+
+            if (raw.startsWith('checkba://webfav')) {
+              const favId = params.get('id')
+              if (!favId) return
+              this.showToolsPanel = true
+              this.activeToolKey = 'favorites'
+              this.$nextTick(() => {
+                try {
+                  const panel = this.$refs.favoritesPanel
+                  if (panel && typeof panel.focusFavorite === 'function') panel.focusFavorite(Number(favId))
+                } catch (e) {}
+              })
+              return
+            }
+
+            if (raw.startsWith(this.INTERNAL_LINK_SCHEMES.fileLink)) {
+              const linkKey = params.get('k') || ''
+              if (!linkKey || !this.projectId) return
+              const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+              getDocFileLink(pid, linkKey)
+                .then((resp) => {
+                  const files = resp && resp.files ? resp.files : (resp && resp.data && resp.data.files ? resp.data.files : [])
+                  const list = Array.isArray(files) ? files : []
+                  if (list.length <= 0) {
+                    uni.showToast({ title: '关联文件不存在', icon: 'none' })
+                    return
+                  }
+                  if (list.length === 1) {
+                    this.openFileLinkTarget(list[0].id, this.focusedPane || 'left')
+                    return
+                  }
+                  this.fileLinkPicker = { visible: true, side: this.focusedPane === 'right' && this.splitMode ? 'right' : 'left', files: list, linkKey }
+                })
+                .catch((e) => {
+                  uni.showToast({ title: (e && e.message) ? e.message : '打开失败', icon: 'none' })
+                })
+              return
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
+      if (!this._wpsInternalMsgHandler && typeof window !== 'undefined') {
+        this._wpsInternalMsgHandler = (evt) => {
+          try {
+            const d = evt && evt.data
+            if (!d || d.__checkbaInternalLink !== true) return
+            const raw0 = d.url ? String(d.url) : ''
+            if (typeof window !== 'undefined' && typeof window.__checkbaHandleInternalLink === 'function') {
+              window.__checkbaHandleInternalLink(raw0)
+              return
+            }
+            const raw = raw0.replace(/^checkba:\/*/i, 'checkba://')
+            const q = raw.includes('?') ? raw.split('?')[1] : ''
+            const params = new URLSearchParams(q)
+
+            // webfav：定位收藏卡片
+            if (raw.startsWith('checkba://webfav')) {
+              const favId = params.get('id')
+              if (!favId) return
+              this.showToolsPanel = true
+              this.activeToolKey = 'favorites'
+              this.$nextTick(() => {
+                try {
+                  const panel = this.$refs.favoritesPanel
+                  if (panel && typeof panel.focusFavorite === 'function') panel.focusFavorite(Number(favId))
+                } catch (e) {}
+              })
+              return
+            }
+
+            // filelink：打开关联文件（多文件先弹窗）
+            if (raw.startsWith(this.INTERNAL_LINK_SCHEMES.fileLink)) {
+              const linkKey = params.get('k') || ''
+              if (!linkKey || !this.projectId) return
+              const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+              getDocFileLink(pid, linkKey)
+                .then((resp) => {
+                  const files = resp && resp.files ? resp.files : (resp && resp.data && resp.data.files ? resp.data.files : [])
+                  const list = Array.isArray(files) ? files : []
+                  if (list.length <= 0) {
+                    uni.showToast({ title: '关联文件不存在', icon: 'none' })
+                    return
+                  }
+                  if (list.length === 1) {
+                    this.openFileLinkTarget(list[0].id, this.focusedPane || 'left')
+                    return
+                  }
+                  this.fileLinkPicker = { visible: true, side: this.focusedPane === 'right' && this.splitMode ? 'right' : 'left', files: list, linkKey }
+                })
+                .catch((e) => {
+                  uni.showToast({ title: (e && e.message) ? e.message : '打开失败', icon: 'none' })
+                })
+              return
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+        window.addEventListener('message', this._wpsInternalMsgHandler)
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // Desktop：截图框选失败时给用户提示（避免“松手啥也没有”）
+    try {
+      if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.ocr && window.checkbaDesktop.ocr.onSelectionError) {
+        if (!this._desktopOcrSelectionErrUnsub) {
+          this._desktopOcrSelectionErrUnsub = window.checkbaDesktop.ocr.onSelectionError((data) => {
+            const msg = data && data.message ? String(data.message) : '截图失败'
+            uni.showToast({ title: msg, icon: 'none' })
+          })
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
   },
   methods: {
+    onFileTreeQuickAction(actionKey) {
+      const tree = this.$refs.fileTree
+      if (!tree) return
+      if (actionKey === 'newFolder' && typeof tree.showCreateFolderDialog === 'function') {
+        tree.showCreateFolderDialog()
+        return
+      }
+      if (actionKey === 'newFile' && typeof tree.handleCreateWord === 'function') {
+        tree.handleCreateWord()
+        return
+      }
+      if (actionKey === 'upload' && typeof tree.handleUploadFile === 'function') {
+        tree.handleUploadFile()
+      }
+    },
+    wrapWpsInternalLink(innerUrl) {
+      const inner = String(innerUrl || '').trim()
+      if (!inner) return ''
+      const base = this.WPS_INTERNAL_HTTP_LINK_BASE || ''
+      if (!base) return inner
+      // 写入到文档里的超链接必须是 http/https，才能稳定触发 onHyperLinkOpen（对照官方 demo）
+      return `${base}?u=${encodeURIComponent(inner)}`
+    },
+    startSelectionPolling(pane) {
+      const p = pane === 'right' ? 'right' : 'left'
+      try {
+        const old = this.selectionPollingIntervals && this.selectionPollingIntervals[p]
+        if (old) clearInterval(old)
+      } catch (e) {
+        // ignore
+      }
+      const timer = setInterval(async () => {
+        try {
+          const wpsComp = this.$refs[p === 'right' ? 'wpsRight' : 'wpsLeft']
+          if (!wpsComp) return
+          const r = await wpsComp.getSelectionRange()
+          if (!r || typeof r.start !== 'number' || typeof r.end !== 'number' || r.end <= r.start) return
+          const text = await wpsComp.getSelectionText()
+          const t = String(text || '').trim()
+          if (!t) return
+          this.lastWpsSelection[p] = { start: r.start, end: r.end, text: t, ts: Date.now() }
+        } catch (e) {
+          // ignore
+        }
+      }, 650)
+      this.selectionPollingIntervals[p] = timer
+    },
+
+    stopSelectionPolling(pane) {
+      const p = pane === 'right' ? 'right' : 'left'
+      try {
+        const old = this.selectionPollingIntervals && this.selectionPollingIntervals[p]
+        if (old) clearInterval(old)
+      } catch (e) {
+        // ignore
+      }
+      if (this.selectionPollingIntervals) this.selectionPollingIntervals[p] = null
+    },
+    // === 文件拖拽到 WPS 选区建立关联（超链接） ===
+    onFileLinkDragStart(file) {
+      if (!file || !file.id) return
+      this.fileLinkDrag.active = true
+      this.fileLinkDrag.file = file
+      this.fileLinkDrag.hoverSide = null
+      console.log('onFileLinkDragStart:', file)
+      
+      // 延迟绑定原生事件（确保 v-if 渲染完成）
+      this.$nextTick(() => {
+        this.bindNativeDropEvents('left')
+        if (this.splitMode) {
+          this.bindNativeDropEvents('right')
+        }
+      })
+    },
+    
+    bindNativeDropEvents(side) {
+      const refName = side === 'left' ? 'dropZoneLeft' : 'dropZoneRight'
+      const refComp = this.$refs[refName]
+      if (!refComp) return
+
+      // uni-app H5 中，$el 才是真实 DOM
+      const el = refComp.$el || refComp
+      if (!el || typeof el.addEventListener !== 'function') return
+
+      console.log(`Binding native drop events for ${side}`, el)
+
+      // 清理旧事件（防止重复绑定）
+      if (el._checkbaDropHandlers) {
+        el.removeEventListener('dragenter', el._checkbaDropHandlers.enter)
+        el.removeEventListener('dragover', el._checkbaDropHandlers.over)
+        el.removeEventListener('dragleave', el._checkbaDropHandlers.leave)
+        el.removeEventListener('drop', el._checkbaDropHandlers.drop)
+      }
+
+      const handlers = {
+        enter: (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          this.fileLinkDrag.hoverSide = side
+        },
+        over: (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'link'
+          if (this.fileLinkDrag.hoverSide !== side) {
+             this.fileLinkDrag.hoverSide = side
+          }
+        },
+        leave: (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          // 防止子元素触发 leave
+          if (e.relatedTarget && el.contains(e.relatedTarget)) return
+          if (this.fileLinkDrag.hoverSide === side) {
+            this.fileLinkDrag.hoverSide = null
+          }
+        },
+        drop: (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          console.log(`Native drop detected on ${side}`)
+          this.onFileLinkDrop(side, e)
+        }
+      }
+
+      el.addEventListener('dragenter', handlers.enter)
+      el.addEventListener('dragover', handlers.over)
+      el.addEventListener('dragleave', handlers.leave)
+      el.addEventListener('drop', handlers.drop)
+      
+      // 挂载引用以便清理
+      el._checkbaDropHandlers = handlers
+    },
+
+    onFileLinkDragEnd() {
+      console.log('onFileLinkDragEnd')
+      this.fileLinkDrag.active = false
+      this.fileLinkDrag.file = null
+      this.fileLinkDrag.hoverSide = null
+    },
+    // 移除未使用的模板绑定方法，以防混淆
+    // onFileLinkDragOver/Enter/Leave 现已通过 bindNativeDropEvents 接管
+    
+    async onFileLinkDrop(side, e) {
+      console.log('onFileLinkDrop triggered:', side)
+      this.fileLinkDrag.hoverSide = side
+      
+      let file = this.fileLinkDrag.file
+      
+      // 兜底：如果组件状态中没有文件（可能跨组件丢失），尝试从 dataTransfer 读取
+      if ((!file || !file.id) && e && e.dataTransfer) {
+        try {
+          const raw = e.dataTransfer.getData('application/x-checkba-file') || e.dataTransfer.getData('text/checkba-file-json')
+          if (raw) {
+            file = JSON.parse(raw)
+            console.log('onFileLinkDrop: recovered file from dataTransfer', file)
+          }
+        } catch (err) {
+          console.warn('onFileLinkDrop: failed to parse dataTransfer', err)
+        }
+      }
+
+      this.onFileLinkDragEnd()
+      if (!file || !file.id) {
+        console.warn('onFileLinkDrop: no file data found')
+        return
+      }
+      await this.createWpsSelectionFileLink(side, file)
+    },
+    closeFileLinkPicker() {
+      this.fileLinkPicker.visible = false
+      this.fileLinkPicker.files = []
+      this.fileLinkPicker.linkKey = ''
+    },
+    // 调试：手动添加超链接（绕过拖拽）
+    async debugAddHyperlink() {
+      const target = this.$refs.wpsLeft
+      if (!target) return
+      try {
+        const sel = await target.getSelectionText()
+        if (!sel) {
+          uni.showToast({ title: '无选区', icon: 'none' })
+          return
+        }
+        const range = await target.getSelectionRange()
+        console.log('Debug Link: Selection', range, sel)
+        
+        const success = await target.setHyperlinkAtRange(
+          range.start, 
+          range.end, 
+          'https://www.wps.cn', 
+          sel
+        )
+        uni.showToast({ title: success ? '调试链接成功' : '调试链接失败', icon: 'none' })
+      } catch (e) {
+        console.error('Debug Link Error:', e)
+        uni.showToast({ title: '调试出错', icon: 'none' })
+      }
+    },
+
+    async createWpsSelectionFileLink(side, file) {
+      console.log('createWpsSelectionFileLink start:', { side, fileId: file.id })
+      // 1) 取目标 WPS 编辑器实例
+      const target = side === 'right' ? this.$refs.wpsRight : this.$refs.wpsLeft
+      if (!target) {
+        uni.showToast({ title: '请先打开一个 WPS 文档', icon: 'none' })
+        return
+      }
+      
+      // 2) 获取选区（优先使用 getLastKnownSelection，因为它包含了实时失败时的 Fallback）
+      let selectionData = null
+      if (typeof target.getLastKnownSelection === 'function') {
+        selectionData = await target.getLastKnownSelection()
+      } else {
+        // 兼容旧版逻辑（虽然现在 WpsEditor 已经更新了）
+        const range = await target.getSelectionRange()
+        const text = await target.getSelectionText()
+        if (range && range.end > range.start && text) {
+          selectionData = { ...range, text }
+        }
+      }
+
+      console.log('createWpsSelectionFileLink got selection data:', selectionData)
+
+      if (!selectionData || !selectionData.text) {
+        console.warn('createWpsSelectionFileLink no valid selection')
+        uni.showToast({ title: '请先在文档中高亮一段文本（蓝色选区）', icon: 'none' })
+        return
+      }
+      
+      const selText = String(selectionData.text).trim()
+      const rangeStart = selectionData.start
+      const rangeEnd = selectionData.end
+
+      // 3) 生成/复用 linkKey：优先从选区现有超链接读取（如果能读到）
+      let linkKey = ''
+      try {
+        if (typeof target.getSelectionHyperlinkUrl === 'function') {
+          const u = await target.getSelectionHyperlinkUrl()
+          const raw = u ? String(u) : ''
+          // 兼容：新包装链接（https://checkba-internal... ?u=checkba://filelink?...）
+          if (raw && this.WPS_INTERNAL_HTTP_LINK_BASE && raw.startsWith(this.WPS_INTERNAL_HTTP_LINK_BASE)) {
+            const q0 = raw.includes('?') ? raw.split('?')[1] : ''
+            const p0 = new URLSearchParams(q0)
+            const inner = p0.get('u') ? decodeURIComponent(String(p0.get('u'))) : ''
+            if (inner && inner.startsWith(this.INTERNAL_LINK_SCHEMES.fileLink)) {
+              const q = inner.includes('?') ? inner.split('?')[1] : ''
+              const p = new URLSearchParams(q)
+              linkKey = p.get('k') || ''
+            }
+          } else if (raw && raw.startsWith(this.INTERNAL_LINK_SCHEMES.fileLink)) {
+            const q = raw.includes('?') ? raw.split('?')[1] : ''
+            const p = new URLSearchParams(q)
+            linkKey = p.get('k') || ''
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+      if (!linkKey) {
+        linkKey = `lk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        // 文档内写入“包装后的 https 链接”，点击时由 onHyperLinkOpen 接管并打开内部链接（新 tab）
+        const inner = `${this.INTERNAL_LINK_SCHEMES.fileLink}?k=${encodeURIComponent(linkKey)}&projectId=${encodeURIComponent(String(this.projectId || ''))}`
+        const url = this.wrapWpsInternalLink(inner)
+        try {
+          if (typeof target.setHyperlinkAtRange === 'function') {
+            await target.setHyperlinkAtRange(rangeStart, rangeEnd, url, selText)
+          } else {
+            // 兜底：替换为链接文本（与原文一致）
+            await target.insertEvidenceLink(selText || '关联文件', `FILE_LINK_${linkKey}`, url)
+          }
+        } catch (e) {
+          console.error('设置超链接失败:', e)
+          uni.showToast({ title: '设置超链接失败', icon: 'none' })
+          return
+        }
+      }
+      // 4) 入库：按 fileId 关联（文件移动/重命名不影响打开）
+      try {
+        const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+        const doc = side === 'right' ? this.activeFileRight : this.activeFileLeft
+        const docWpsFileId = doc && this.isWpsFile && this.isWpsFile(doc) ? (doc.wpsFileId || '') : ''
+        if (!docWpsFileId) throw new Error('文档未就绪')
+        const payload = await createDocFileLink(pid, {
+          linkKey,
+          docWpsFileId,
+          anchorText: selText || '',
+          rangeStart: rangeStart,
+          rangeEnd: rangeEnd,
+          fileIds: [Number(file.id)]
+        })
+        if (payload && payload.linkKey) linkKey = payload.linkKey
+        uni.showToast({ title: '已建立关联', icon: 'success' })
+      } catch (e) {
+        uni.showToast({ title: e.message || '关联失败', icon: 'none' })
+      }
+    },
+
+    async openFileLinkTarget(fileId, sideOverride = null) {
+      const fid = Number(fileId)
+      if (!fid || !this.projectId) return
+      const side = sideOverride || this.fileLinkPicker.side || 'left'
+      this.closeFileLinkPicker()
+      try {
+        const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+        const file = await getFileDetail(pid, fid)
+        if (!file) throw new Error('文件不存在')
+        const old = this.focusedPane
+        this.focusedPane = side === 'right' && this.splitMode ? 'right' : 'left'
+        this.openFile(file)
+        this.focusedPane = old
+      } catch (e) {
+        uni.showToast({ title: e.message || '打开失败', icon: 'none' })
+      }
+    },
+    async applyDesktopOcrSelection(payload) {
+      if (!payload || !payload.dataUrl || !payload.selection) return
+      // 选区完成后再隐藏 BrowserView：此时用户不需要看真实网页了
+      try {
+        if (window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
+          await window.checkbaDesktop.browser.setViewsVisible({ visible: false })
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      this.ocrText = ''
+      this.ocrImageDataUrl = ''
+      this.ocrOverlaySelecting = false
+      this.ocrActionBar = { visible: false, x: 0, y: 0 }
+      this.showOcrOverlay = true
+      this.bindOcrHotkeys()
+      this.bindOcrGlobalListeners()
+
+      this.ocrSourceUrl = payload.url ? String(payload.url) : (this.ocrSourceUrl || '')
+      const b = payload.bounds || null
+      const hostRect = b ? { x: Number(b.x) || 0, y: Number(b.y) || 0, width: Number(b.width) || 0, height: Number(b.height) || 0 } : null
+      this.ocrHostRect = hostRect
+      await this.ocrSetFrameFromDataUrl(String(payload.dataUrl), hostRect)
+
+      const s = payload.selection
+      this.ocrSel = { x1: Number(s.x1) || 0, y1: Number(s.y1) || 0, x2: Number(s.x2) || 0, y2: Number(s.y2) || 0 }
+
+      try {
+        this.ocrImageDataUrl = this.cropOcrSelection()
+        const left = Math.min(this.ocrSel.x1, this.ocrSel.x2)
+        const top = Math.min(this.ocrSel.y1, this.ocrSel.y2)
+        this.ocrActionBar = { visible: true, x: Math.max(12, Math.min(window.innerWidth - 320, left)), y: Math.max(12, top - 44) }
+      } catch (e) {
+        console.error('截图裁剪失败:', e)
+      }
+    },
+    getActiveWebTab() {
+      // 优先取当前聚焦窗格的激活 tab
+      const focused = this.focusedPane === 'right' ? this.activeFileRight : this.activeFileLeft
+      if (focused && focused.tabType === 'web') return focused
+      // 再取另一个窗格的激活 tab
+      const other = this.focusedPane === 'right' ? this.activeFileLeft : this.activeFileRight
+      if (other && other.tabType === 'web') return other
+      // 兜底：找任意一个 web tab（优先右侧）
+      const anyRight = Array.isArray(this.rightFiles) ? this.rightFiles.find(t => t && t.tabType === 'web') : null
+      if (anyRight) return anyRight
+      const anyLeft = Array.isArray(this.leftFiles) ? this.leftFiles.find(t => t && t.tabType === 'web') : null
+      return anyLeft || null
+    },
+    async onTabsPlusClick(pane) {
+      // 规则：
+      // - 如果当前激活的是网页 Tab：新建网页 Tab
+      // - 否则：复制当前文件（后端 batchCopy），并打开新文件
+      const active = pane === 'right' ? this.activeFileRight : this.activeFileLeft
+      if (active && this.isBrowserTab(active)) {
+        this.openBrowserTab('https://www.baidu.com', pane)
+        return
+      }
+      if (!active || !active.id || !this.projectId) {
+        this.openBrowserTab('https://www.baidu.com', pane)
+        return
+      }
+      try {
+        const targetParentId = active.parentId != null ? active.parentId : null
+        const res = await batchCopyFiles(this.projectId, [active.id], targetParentId)
+        const created = (res && res.data && Array.isArray(res.data.files)) ? res.data.files : (res && res.files) || []
+        const createdFile = Array.isArray(created) ? created[0] : null
+        if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
+          this.$refs.fileTree.loadFiles()
+        }
+        if (createdFile) {
+          // 强制在当前 pane 打开：临时聚焦 pane
+          const oldFocus = this.focusedPane
+          this.focusedPane = pane === 'right' && this.splitMode ? 'right' : 'left'
+          this.openFile(createdFile)
+          this.focusedPane = oldFocus
+        } else {
+          uni.showToast({ title: '复制失败：未返回新文件', icon: 'none' })
+        }
+      } catch (e) {
+        console.error('复制文件失败', e)
+        uni.showToast({ title: e.message || '复制失败', icon: 'none' })
+      }
+    },
+    switchToolTab(key) {
+      this.activeToolKey = key
+      // 如果用户切到剪贴板，且之前有 pending，则立刻刷新
+      this.$nextTick(() => {
+        if (key === 'clipboard') {
+          this.triggerClipboardRefresh()
+        }
+      })
+    },
+    setupResponsiveListener() {
+      if (typeof window === 'undefined') return
+      if (this._windowResizeHandler) return
+      this._windowResizeHandler = () => this.handleResponsiveResize()
+      window.addEventListener('resize', this._windowResizeHandler, { passive: true })
+      this.$nextTick(() => this.handleResponsiveResize())
+    },
+    teardownResponsiveListener() {
+      if (typeof window === 'undefined') return
+      if (this._windowResizeHandler) {
+        window.removeEventListener('resize', this._windowResizeHandler)
+        this._windowResizeHandler = null
+      }
+    },
+    handleResponsiveResize() {
+      if (typeof window === 'undefined') return
+      const viewportWidth = window.innerWidth || 1920
+      const compact = viewportWidth <= 1360
+      this.isCompactLayout = compact
+      // 按 Cursor 体验：不在窄屏时强行限制面板宽度（遮挡就遮挡），只切换样式密度
+    },
+    toggleLeftPane(key) {
+      // Cursor 体验：点击同一图标可收起/展开
+      if (this.leftPaneKey === key) {
+        this.sidebarCollapsed = !this.sidebarCollapsed
+      } else {
+        this.leftPaneKey = key
+        this.sidebarCollapsed = false
+      }
+    },
+    onLeftPluginClick(key) {
+      // 兼容旧调用（若仍有地方使用）
+      this.toggleLeftPane(key)
+    },
+    getOcrPoint(e) {
+      const te = e && (e.touches && e.touches[0])
+      const ce = e && (e.changedTouches && e.changedTouches[0])
+      const p = te || ce || e || {}
+      return { x: Number(p.clientX || p.pageX || 0), y: Number(p.clientY || p.pageY || 0) }
+    },
+    getOcrCanvasEl() {
+      // uniapp H5 下 ref 可能不是原生 canvas；兜底用 id 取真实 DOM
+      let c = this.$refs.ocrCanvas
+      if (c && c.$el) c = c.$el
+      if (c && typeof c.getContext === 'function') return c
+      // #ifdef H5
+      const dom = document.getElementById('ocr-overlay-canvas')
+      if (dom && typeof dom.getContext === 'function') return dom
+      // #endif
+      return null
+    },
+    ocrLog(...args) {
+      if (!this.ocrDebug) return
+      // eslint-disable-next-line no-console
+      console.log('[OCR]', ...args)
+    },
+    // uniapp H5：用 document capture 事件接管拖拽，避免 view 合成事件不触发
+    bindOcrGlobalListeners() {
+      // #ifdef H5
+      if (this._ocrGlobalBound) return
+      this._ocrGlobalBound = true
+      this._ocrMoveLogTs = 0
+
+      this._ocrDocDown = (ev) => {
+        if (!this.showOcrOverlay) return
+        const p0 = this.getOcrPoint(ev)
+        this.ocrLastPointer = p0
+        // 右键不处理
+        if (ev && ev.button !== undefined && ev.button !== 0) return
+        // actionbar 内点击不触发框选
+        if (ev && ev.target && ev.target.closest && ev.target.closest('.ocr-actionbar')) return
+        this.onOcrOverlayDown(ev)
+        if (ev && ev.cancelable) ev.preventDefault()
+      }
+      this._ocrDocMove = (ev) => {
+        if (!this.showOcrOverlay) return
+        const p0 = this.getOcrPoint(ev)
+        this.ocrLastPointer = p0
+        this.onOcrOverlayMove(ev)
+        const now = Date.now()
+        if (this.ocrDebug && now - this._ocrMoveLogTs > 250) {
+          const p = this.getOcrPoint(ev)
+          this.ocrLog('move', p.x, p.y, 'selecting=', this.ocrOverlaySelecting)
+          this._ocrMoveLogTs = now
+        }
+        if (ev && ev.cancelable) ev.preventDefault()
+      }
+      this._ocrDocUp = (ev) => {
+        if (!this.showOcrOverlay) return
+        const p0 = this.getOcrPoint(ev)
+        this.ocrLastPointer = p0
+        this.onOcrOverlayUp(ev)
+        if (ev && ev.cancelable) ev.preventDefault()
+      }
+
+      document.addEventListener('mousedown', this._ocrDocDown, true)
+      document.addEventListener('mousemove', this._ocrDocMove, true)
+      document.addEventListener('mouseup', this._ocrDocUp, true)
+      document.addEventListener('touchstart', this._ocrDocDown, { capture: true, passive: false })
+      document.addEventListener('touchmove', this._ocrDocMove, { capture: true, passive: false })
+      document.addEventListener('touchend', this._ocrDocUp, { capture: true, passive: false })
+      // #endif
+    },
+    unbindOcrGlobalListeners() {
+      // #ifdef H5
+      if (!this._ocrGlobalBound) return
+      document.removeEventListener('mousedown', this._ocrDocDown, true)
+      document.removeEventListener('mousemove', this._ocrDocMove, true)
+      document.removeEventListener('mouseup', this._ocrDocUp, true)
+      document.removeEventListener('touchstart', this._ocrDocDown, true)
+      document.removeEventListener('touchmove', this._ocrDocMove, true)
+      document.removeEventListener('touchend', this._ocrDocUp, true)
+      this._ocrDocDown = null
+      this._ocrDocMove = null
+      this._ocrDocUp = null
+      this._ocrGlobalBound = false
+      // #endif
+    },
+    bindClipboardListener() {
+      // #ifdef H5
+      if (this._clipboardBound) return
+      const user = getCurrentUser()
+      if (!user) return
+      this._clipboardBound = true
+      // 统一的“写库 + 立即更新 UI”入口：避免 copy 事件多次触发导致重复入库
+      this._clipboardLast = this._clipboardLast || { ts: 0, text: '' }
+      const recordClipboardOnce = async (rawText, source = 'doc') => {
+        let t = (rawText || '').trim()
+        if (
+          !t &&
+          typeof navigator !== 'undefined' &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.readText === 'function'
+        ) {
+          try {
+            const latest = await navigator.clipboard.readText()
+            t = (latest || '').trim()
+          } catch (clipErr) {
+            // ignore permission errors
+          }
+        }
+        if (!t) return null
+
+        const now = Date.now()
+        // 仅用于防止同一次用户动作被多路监听重复触发（不是业务去重）
+        if (this._clipboardLast.text === t && now - (this._clipboardLast.ts || 0) < 600) {
+          return null
+        }
+        this._clipboardLast = { ts: now, text: t, source }
+
+        try {
+          const res = await saveClipboardText(t)
+          const saved = (res && res.data) ? res.data : res
+          this.onClipboardSaved(saved)
+          return saved
+        } catch (saveErr) {
+          console.error('记录剪贴板失败:', saveErr)
+          return null
+        }
+      }
+      this._recordClipboardOnce = recordClipboardOnce
+
+      // Desktop：由 Electron 主进程捕获 copy/cut，并直接推送剪贴板文本（更稳定，不依赖浏览器权限）
+      if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.clipboard) {
+        try {
+          if (!this._desktopClipboardUnsub) {
+            this._desktopClipboardUnsub = window.checkbaDesktop.clipboard.onCopied(async (payload) => {
+              try {
+                const t = payload && payload.text ? String(payload.text) : ''
+                await recordClipboardOnce(t, 'desktop')
+              } catch (e) {
+                // ignore
+              }
+            })
+          }
+        } catch (e) {
+          // ignore
+        }
+        return
+      }
+
+      this._pasteHandler = async (e) => {
+        try {
+          const cd = e && e.clipboardData
+          const text = cd && typeof cd.getData === 'function' ? (cd.getData('text/plain') || '') : ''
+          await recordClipboardOnce(text, 'paste')
+        } catch (err) {
+          // ignore
+        }
+      }
+
+      this._copyHandler = async (e) => {
+        try {
+          let text = ''
+          const cd = e && e.clipboardData
+          if (cd && typeof cd.getData === 'function') {
+            text = cd.getData('text/plain') || ''
+          }
+          if (!text && typeof window !== 'undefined' && window.getSelection) {
+            const selection = window.getSelection()
+            text = selection ? selection.toString() : ''
+          }
+          await recordClipboardOnce(text, 'copy')
+        } catch (err) {
+          // ignore
+        }
+      }
+
+      // 键盘兜底：覆盖部分“网页内复制/iframe 内复制”导致外层收不到 copy 事件的场景（best-effort）
+      this._clipboardKeydownHandler = async (e) => {
+        try {
+          const key = e && (e.key || '')
+          const isCopy = (key === 'c' || key === 'C') && (e.metaKey || e.ctrlKey)
+          if (!isCopy) return
+          // 不从事件里取文本，直接尝试读剪贴板（权限失败则忽略）
+          await recordClipboardOnce('', 'keydown')
+        } catch (err) {
+          // ignore
+        }
+      }
+
+      document.addEventListener('paste', this._pasteHandler)
+      document.addEventListener('copy', this._copyHandler, true)
+      window.addEventListener('keydown', this._clipboardKeydownHandler, true)
+      // #endif
+    },
+    // WPS 内部复制事件（ClipboardCopy）：解决 iframe 内复制无法冒泡到外层 document 的问题
+    // 这里保持逻辑极简：拿到 text 就入库并触发刷新，不做去重、不做复杂判断
+    async onWpsClipboardCopy(payload) {
+      try {
+        const raw = payload && (payload.text || payload.Text || payload.content)
+        const t = String(raw || '').trim()
+        if (!t) return
+        if (this._recordClipboardOnce) {
+          await this._recordClipboardOnce(t, 'wps')
+          return
+        }
+        const res = await saveClipboardText(t)
+        const saved = (res && res.data) ? res.data : res
+        this.onClipboardSaved(saved)
+      } catch (e) {
+        // best-effort：不阻断用户复制体验
+        console.warn('WPS 复制入库失败:', e)
+      }
+    },
+    onClipboardSaved(item) {
+      // 1) 面板打开时：立即新增一张卡片（不等刷新）
+      if (this.$refs.clipboardPanel && typeof this.$refs.clipboardPanel.prependItem === 'function') {
+        this.$refs.clipboardPanel.prependItem(item, 80)
+      } else {
+        this.pendingClipboardRefresh = true
+      }
+      // 2) 兜底：如果面板当前可见，做一次 refresh 对齐服务端（避免时间/格式差异）
+      this.triggerClipboardRefresh()
+    },
+    triggerClipboardRefresh() {
+      if (!this.pendingClipboardRefresh) return
+      // 仅在剪贴板面板已渲染时刷新；否则保持 pending，等用户切到剪贴板再刷新
+      const panel = this.$refs.clipboardPanel
+      if (panel && typeof panel.refresh === 'function') {
+        this.pendingClipboardRefresh = false
+        try {
+          panel.refresh()
+        } catch (e) {
+          // ignore
+        }
+      }
+    },
+    unbindClipboardListener() {
+      // #ifdef H5
+      try {
+        if (this._desktopClipboardUnsub) this._desktopClipboardUnsub()
+      } catch (e) {
+        // ignore
+      }
+      this._desktopClipboardUnsub = null
+      if (this._pasteHandler) {
+        document.removeEventListener('paste', this._pasteHandler)
+      }
+      if (this._copyHandler) {
+        document.removeEventListener('copy', this._copyHandler, true)
+      }
+      if (this._clipboardKeydownHandler) {
+        window.removeEventListener('keydown', this._clipboardKeydownHandler, true)
+      }
+      this._pasteHandler = null
+      this._copyHandler = null
+      this._clipboardKeydownHandler = null
+      this._recordClipboardOnce = null
+      this._clipboardBound = false
+      // #endif
+    },
+    bindOcrHotkeys() {
+      if (this._ocrKeydownBound) return
+      this._ocrKeydownBound = true
+      this._ocrKeydownHandler = (e) => {
+        if (!this.showOcrOverlay) return
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          this.closeOcrOverlay()
+        }
+      }
+      window.addEventListener('keydown', this._ocrKeydownHandler)
+    },
+    unbindOcrHotkeys() {
+      if (this._ocrKeydownHandler) {
+        window.removeEventListener('keydown', this._ocrKeydownHandler)
+      }
+      this._ocrKeydownHandler = null
+      this._ocrKeydownBound = false
+    },
+    closeOcrOverlay() {
+      // 关闭蒙层：H5 使用屏幕共享时可能涉及授权；Desktop 不需要授权
+      this.showOcrOverlay = false
+      // Desktop：恢复 BrowserView（否则会遮挡主页面）
+      try {
+        if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
+          window.checkbaDesktop.browser.setViewsVisible({ visible: true })
+        }
+      } catch (e) {
+        // ignore
+      }
+      // #ifdef H5
+      this.unbindOcrGlobalListeners()
+      // #endif
+      this.ocrOverlaySelecting = false
+      this.ocrSel = { x1: 0, y1: 0, x2: 0, y2: 0 }
+      this.ocrActionBar = { visible: false, x: 0, y: 0 }
+      this.ocrText = ''
+      this.ocrImageDataUrl = ''
+      this.ocrFrameCanvas = null
+      this.ocrFrameView = null
+      if (this.ocrFrameUrl) {
+        try { URL.revokeObjectURL(this.ocrFrameUrl) } catch (e) { /* ignore */ }
+      }
+      this.ocrFrameUrl = ''
+      this.unbindOcrHotkeys()
+    },
+    isBrowserTab(tab) {
+      return !!tab && tab.tabType === 'web'
+    },
+    onBrowserUrlChange(pane, url) {
+      const active = pane === 'left' ? this.activeFileLeft : this.activeFileRight
+      if (active && this.isBrowserTab(active)) {
+        active.url = url
+        // 标签名称：尽量短（host）
+        try {
+          const u = new URL(url)
+          active.name = u.host || url
+        } catch (e) {
+          active.name = url
+        }
+        this.$forceUpdate()
+      }
+    },
+    onBrowserTitleChange(pane, title) {
+      const active = pane === 'left' ? this.activeFileLeft : this.activeFileRight
+      if (!active || !this.isBrowserTab(active)) return
+      const t = String(title || '').trim()
+      if (!t) return
+      // 避免过长：保留前 18 字符
+      active.name = t.length > 18 ? (t.slice(0, 18) + '…') : t
+      this.$forceUpdate()
+    },
+    openBrowserTab(url = 'https://www.baidu.com', pane = null) {
+      // 默认在当前聚焦窗格打开；未分屏则左侧
+      const targetPane = pane ? (pane === 'right' && this.splitMode ? 'right' : 'left') : (this.splitMode ? this.focusedPane : 'left')
+      const list = targetPane === 'left' ? this.leftFiles : this.rightFiles
+      const idProp = targetPane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'
+
+      const id = `web_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      let name = '浏览器'
+      try {
+        const u = new URL(url)
+        name = u.host || '浏览器'
+      } catch (e) {
+        // ignore
+      }
+      list.push({
+        id,
+        tabType: 'web',
+        name,
+        url
+      })
+      this[idProp] = id
+      this.focusedPane = targetPane
+      this.$nextTick(() => this.triggerWorkbenchResize())
+    },
+
+    // ===== OCR 摘录：屏幕共享抓帧 -> 框选 -> 后端 OCR（阿里云） =====
+    async startOcrCapture() {
+      // #ifdef H5
+      try {
+        this.ocrLoading = false
+        this.ocrText = ''
+        this.ocrImageDataUrl = ''
+        this.ocrHostRect = null
+        this.ocrOverlaySelecting = false
+        this.ocrSel = { x1: 0, y1: 0, x2: 0, y2: 0 }
+        this.ocrFrameCanvas = null
+        this.ocrFrameView = null
+        this.ocrFrameLoading = false
+
+        // 尽量绑定当前浏览器 tab 的 URL（用于收藏）
+        const active = this.focusedPane === 'right' ? this.activeFileRight : this.activeFileLeft
+        this.ocrSourceUrl = active && active.tabType === 'web' ? (active.url || '') : ''
+
+        // Desktop：直接抓屏做底图，不需要浏览器授权
+        if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.ocr) {
+          // 桌面端（方案 B）：使用主进程 OverlayWindow 进行框选（选区期间不隐藏 BrowserView）
+          const activeWebTab = this.getActiveWebTab()
+          const viewId = activeWebTab && activeWebTab.id ? String(activeWebTab.id) : ''
+          if (!window.checkbaDesktop.ocr.startSelection) {
+            uni.showToast({ title: '桌面端截图能力不可用', icon: 'none' })
+            return
+          }
+          // 全局截图：无网页 tab 时走 window 模式（两边都是文档也能截图）
+          const resp = viewId
+            ? await window.checkbaDesktop.ocr.startSelection({ viewId })
+            : await window.checkbaDesktop.ocr.startSelection({ mode: 'window' })
+          if (!resp || resp.ok !== true) {
+            if (resp && resp.cancelled) return
+            uni.showToast({ title: (resp && resp.message) ? String(resp.message) : '截图失败', icon: 'none' })
+            return
+          }
+          if (resp && resp.payload) {
+            await this.applyDesktopOcrSelection(resp.payload)
+          } else {
+            // 兼容旧事件回调（但不再依赖）
+            uni.showToast({ title: '截图完成，但未收到结果', icon: 'none' })
+          }
+          return
+        }
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+          uni.showToast({ title: '当前浏览器不支持屏幕共享', icon: 'none' })
+          return
+        }
+
+        // 关键：授权一次后保持 stream，用户在全屏浮层上随时框选
+        if (!this.ocrStream) {
+          this.ocrStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+        }
+
+        this.showOcrOverlay = true
+        this.ocrActionBar = { visible: false, x: 0, y: 0 }
+        this.bindOcrHotkeys()
+        this.bindOcrGlobalListeners()
+        // 用 offscreen video + canvas 实时渲染（避免出现“播放器三角/黑屏”）
+        if (!this.ocrVideo) {
+          this.ocrVideo = document.createElement('video')
+          this.ocrVideo.muted = true
+          this.ocrVideo.playsInline = true
+          this.ocrVideo.autoplay = true
+        }
+        this.ocrVideo.srcObject = this.ocrStream
+        await this.ocrVideo.play()
+
+        // 改为“冻结帧”模式：抓一帧作为底图，用户在底图上框选，裁剪/下载/识别都基于同一帧
+        await this.$nextTick()
+        await this.ocrRefreshFrame()
+      } catch (e) {
+        console.error('启动 OCR 截图失败:', e)
+        // 桌面端不需要浏览器授权：避免误导
+        const title = this.isDesktopApp ? (e.message || '截图失败') : '截图失败（请允许共享标签页/窗口）'
+        uni.showToast({ title, icon: 'none' })
+        // 失败时确保恢复 BrowserView
+        try {
+          if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
+            window.checkbaDesktop.browser.setViewsVisible({ visible: true })
+          }
+        } catch (err) {
+          // ignore
+        }
+      }
+      // #endif
+      // #ifndef H5
+      uni.showToast({ title: '仅 H5 支持截图摘录', icon: 'none' })
+      // #endif
+    },
+
+    // OCR 不再使用弹窗
+
+    hideOcrOverlay() {
+      this.closeOcrOverlay()
+    },
+
+    stopOcrCapture() {
+      this.closeOcrOverlay()
+      try {
+        if (this.ocrStream) {
+          this.ocrStream.getTracks().forEach(t => t.stop())
+        }
+      } catch (e) {
+        // ignore
+      }
+      this.ocrStream = null
+      this.ocrVideo = null
+    },
+
+    async ensureOcrFrozenFrame() {
+      // 若底图未就绪：等待 DOM 挂载并重试抓帧，避免松开时报“画面未就绪”
+      if (this.ocrFrameCanvas && this.ocrFrameView) return
+      if (this.ocrFrameLoading) {
+        const start = Date.now()
+        while (Date.now() - start < 1200) {
+          if (this.ocrFrameCanvas && this.ocrFrameView) return
+          await new Promise(r => setTimeout(r, 30))
+        }
+        throw new Error('截图画面未就绪')
+      }
+      this.ocrFrameLoading = true
+      try {
+        // 等 canvas 挂载
+        await this.$nextTick()
+        await new Promise(r => requestAnimationFrame(r))
+        // 最多重试 2 次
+        for (let i = 0; i < 2; i++) {
+          try {
+            await this.ocrRefreshFrame()
+            if (this.ocrFrameCanvas && this.ocrFrameView) return
+          } catch (e) {
+            if (i === 1) throw e
+            await new Promise(r => setTimeout(r, 80))
+          }
+        }
+      } finally {
+        this.ocrFrameLoading = false
+      }
+    },
+
+    async ocrRefreshFrame() {
+      // 抓一帧作为底图，并绘制到 overlay canvas（用户框选基于该底图）
+      // #ifdef H5
+      if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.ocr) {
+        // 桌面端：抓“当前激活网页 Tab 的 BrowserView”（包含网页内容；不需要屏幕录制权限）
+        const activeWebTab = this.getActiveWebTab()
+        const viewId = activeWebTab && activeWebTab.id ? String(activeWebTab.id) : ''
+
+        // 获取 BrowserView 的 bounds，用于把截图图像铺到网页区域，确保框选坐标正确
+        try {
+          const api = window.checkbaDesktop && window.checkbaDesktop.browser
+          const b = api && viewId ? await api.getBounds({ id: viewId }) : null
+          if (b && b.ok && b.bounds) {
+            this.ocrHostRect = {
+              x: Number(b.bounds.x) || 0,
+              y: Number(b.bounds.y) || 0,
+              width: Number(b.bounds.width) || 0,
+              height: Number(b.bounds.height) || 0
+            }
+          } else {
+            this.ocrHostRect = null
+          }
+        } catch (e) {
+          this.ocrHostRect = null
+        }
+
+        // 若当前没有网页 tab，则回退抓当前窗口（此时 hostRect 为空，图片会铺满全屏）
+        const resp = viewId
+          ? await window.checkbaDesktop.ocr.captureScreen({ viewId })
+          : await window.checkbaDesktop.ocr.captureScreen({ mode: 'window' })
+        if (!resp || resp.ok !== true || !resp.dataUrl) {
+          const m = resp && resp.message ? String(resp.message) : ''
+          throw new Error(m || '截图失败')
+        }
+        await this.ocrSetFrameFromDataUrl(resp.dataUrl, this.ocrHostRect)
+        return
+      }
+      const video = this.ocrVideo
+      if (!video) throw new Error('截图视频未就绪')
+      await this.ensureOcrFrameReady()
+
+      const vw = video.videoWidth || 0
+      const vh = video.videoHeight || 0
+      if (!vw || !vh) throw new Error('截图视频尺寸异常')
+
+      const frame = document.createElement('canvas')
+      frame.width = vw
+      frame.height = vh
+      const fctx = frame.getContext('2d')
+      fctx.drawImage(video, 0, 0, vw, vh)
+      this.ocrFrameCanvas = frame
+
+      // viewport 内展示：aspectFit（contain）
+      const cw = window.innerWidth
+      const ch = window.innerHeight
+      const scale = Math.min(cw / vw, ch / vh)
+      const dw = vw * scale
+      const dh = vh * scale
+      const dx = (cw - dw) / 2
+      const dy = (ch - dh) / 2
+      this.ocrFrameView = { vw, vh, cw, ch, dx, dy, scale }
+
+      // 生成可展示的 URL（避免依赖 canvas DOM）
+      if (this.ocrFrameUrl) {
+        try { URL.revokeObjectURL(this.ocrFrameUrl) } catch (e) { /* ignore */ }
+      }
+      const blob = await new Promise((resolve) => {
+        try {
+          frame.toBlob((b) => resolve(b), 'image/png')
+        } catch (e) {
+          resolve(null)
+        }
+      })
+      if (blob) {
+        this.ocrFrameUrl = URL.createObjectURL(blob)
+      } else {
+        // fallback
+        this.ocrFrameUrl = frame.toDataURL('image/png')
+      }
+      // #endif
+    },
+
+    async ocrSetFrameFromDataUrl(dataUrl, hostRect = null) {
+      const url = String(dataUrl || '')
+      if (!url) throw new Error('截图失败')
+      const img = await new Promise((resolve, reject) => {
+        const im = new Image()
+        im.onload = () => resolve(im)
+        im.onerror = () => reject(new Error('截图图片加载失败'))
+        im.src = url
+      })
+      const vw = img.naturalWidth || img.width || 0
+      const vh = img.naturalHeight || img.height || 0
+      if (!vw || !vh) throw new Error('截图图片尺寸异常')
+
+      const frame = document.createElement('canvas')
+      frame.width = vw
+      frame.height = vh
+      const fctx = frame.getContext('2d')
+      fctx.drawImage(img, 0, 0, vw, vh)
+      this.ocrFrameCanvas = frame
+
+      // Desktop：如果传入 hostRect（BrowserView bounds），就把画面铺到该区域内；否则回退到全屏
+      const cw = hostRect && hostRect.width ? Number(hostRect.width) : window.innerWidth
+      const ch = hostRect && hostRect.height ? Number(hostRect.height) : window.innerHeight
+      const ox = hostRect && typeof hostRect.x === 'number' ? Number(hostRect.x) : 0
+      const oy = hostRect && typeof hostRect.y === 'number' ? Number(hostRect.y) : 0
+      const scale = Math.min(cw / vw, ch / vh)
+      const dw = vw * scale
+      const dh = vh * scale
+      const dx = ox + (cw - dw) / 2
+      const dy = oy + (ch - dh) / 2
+      this.ocrFrameView = { vw, vh, cw, ch, dx, dy, scale }
+
+      // 展示用：直接使用 dataUrl（桌面端无需 objectURL）
+      this.ocrFrameUrl = url
+    },
+
+    onOcrOverlayDown(e) {
+      if (!this.showOcrOverlay) return
+      // 只处理左键
+      if (e && e.button !== 0) return
+      // 如果已经有 actionbar，重新开始框选
+      this.ocrActionBar.visible = false
+      this.ocrOverlaySelecting = true
+      const p = this.getOcrPoint(e)
+      this.ocrSel = { x1: p.x, y1: p.y, x2: p.x, y2: p.y }
+      this.ocrLog('down', p.x, p.y, 'type=', e && e.type)
+    },
+    onOcrOverlayMove(e) {
+      if (!this.ocrOverlaySelecting) return
+      const p = this.getOcrPoint(e)
+      this.ocrSel = { ...this.ocrSel, x2: p.x, y2: p.y }
+    },
+    async onOcrOverlayUp(e) {
+      if (!this.ocrOverlaySelecting) return
+      this.ocrOverlaySelecting = false
+      const p = this.getOcrPoint(e)
+      this.ocrLog('up', p.x, p.y, 'hasSelection=', this.ocrHasSelection)
+      // 单击（无明显拖动）直接退出蒙层
+      if (!this.ocrHasSelection) {
+        this.closeOcrOverlay()
+        return
+      }
+
+      // 框选结束：先裁剪生成图片，再显示快捷命令条（不自动识别）
+      // #ifdef H5
+      try {
+        this.ocrText = ''
+        await this.ensureOcrFrozenFrame()
+        this.ocrImageDataUrl = this.cropOcrSelection()
+        const left = Math.min(this.ocrSel.x1, this.ocrSel.x2)
+        const top = Math.min(this.ocrSel.y1, this.ocrSel.y2)
+        // 命令条位置：尽量贴近框的上方左侧
+        this.ocrActionBar = {
+          visible: true,
+          x: Math.max(12, Math.min(window.innerWidth - 320, left)),
+          y: Math.max(12, top - 44)
+        }
+      } catch (e) {
+        console.error('截图裁剪失败:', e)
+        uni.showToast({ title: e.message || '截图失败', icon: 'none' })
+      }
+      // #endif
+    },
+
+    async ensureOcrFrameReady() {
+      // 确保 videoWidth/videoHeight 与 cover 已就绪（防止第一下松开太快）
+      const videoEl = this.ocrVideo
+      if (!videoEl) throw new Error('截图视频未就绪')
+      const start = Date.now()
+      const timeoutMs = 900
+      while (Date.now() - start < timeoutMs) {
+        const vw = videoEl.videoWidth || 0
+        const vh = videoEl.videoHeight || 0
+        if (vw && vh) return
+        await new Promise(r => setTimeout(r, 30))
+      }
+      // 即使超时，也让 crop 自己兜底一次（会检查 vw/vh）
+    },
+
+    cropOcrSelection() {
+      const left = Math.min(this.ocrSel.x1, this.ocrSel.x2)
+      const top = Math.min(this.ocrSel.y1, this.ocrSel.y2)
+      const w = Math.abs(this.ocrSel.x2 - this.ocrSel.x1)
+      const h = Math.abs(this.ocrSel.y2 - this.ocrSel.y1)
+
+      const frame = this.ocrFrameCanvas
+      const view = this.ocrFrameView
+      if (!frame || !view) throw new Error('截图画面未就绪')
+
+      // 将用户在 viewport 的框选，映射到“冻结帧”像素坐标
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v))
+      const sx = (left - view.dx) / view.scale
+      const sy = (top - view.dy) / view.scale
+      const sw = w / view.scale
+      const sh = h / view.scale
+
+      const csx = clamp(sx, 0, view.vw - 1)
+      const csy = clamp(sy, 0, view.vh - 1)
+      const csw = clamp(sw, 1, view.vw - csx)
+      const csh = clamp(sh, 1, view.vh - csy)
+
+      const out = document.createElement('canvas')
+      out.width = Math.max(1, Math.floor(csw))
+      out.height = Math.max(1, Math.floor(csh))
+      const ctx = out.getContext('2d')
+      ctx.drawImage(
+        frame,
+        Math.floor(csx),
+        Math.floor(csy),
+        Math.floor(csw),
+        Math.floor(csh),
+        0,
+        0,
+        out.width,
+        out.height
+      )
+      return out.toDataURL('image/png')
+    },
+
+    // H5：用 window 级事件保证拖拽框选必然可用
+    async ocrDoRecognize() {
+      if (!this.ocrImageDataUrl || this.ocrLoading) return
+      this.ocrLoading = true
+      try {
+        const res = await ocrRecognize(this.ocrImageDataUrl)
+        this.ocrText = (res?.data?.text || '').trim()
+        if (!this.ocrText) {
+          uni.showToast({ title: '未识别到文字', icon: 'none' })
+        }
+      } catch (e) {
+        console.error('OCR 识别失败:', e)
+        uni.showToast({ title: e.message || '识别失败', icon: 'none' })
+      } finally {
+        this.ocrLoading = false
+      }
+    },
+
+    ocrDoDownload() {
+      if (!this.ocrImageDataUrl) return
+      try {
+        // dataURL 直接 download 在部分浏览器会异常/被重编码；转成 blob 更稳
+        const dataUrl = this.ocrImageDataUrl
+        const arr = dataUrl.split(',')
+        const mime = (arr[0].match(/:(.*?);/) || [])[1] || 'image/png'
+        const bstr = atob(arr[1] || '')
+        let n = bstr.length
+        const u8arr = new Uint8Array(n)
+        while (n--) u8arr[n] = bstr.charCodeAt(n)
+        const blob = new Blob([u8arr], { type: mime })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `clip_${Date.now()}.png`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } catch (e) {
+        // ignore
+      }
+    },
+
+    async ocrDoCopy() {
+      if (!this.ocrText) return
+      await this.insertClipboardAndCopy(this.ocrText, { saveToHistory: true })
+      uni.showToast({ title: '已复制', icon: 'success' })
+    },
+
+    async ocrDoInsert() {
+      if (!this.ocrText) return
+      await this.insertPlainTextToWps(this.ocrText)
+    },
+
+    async ocrDoRefreshSelection() {
+      // 统一为：重新发起一次截图框选（比“刷新底图”更符合用户预期）
+      try {
+        this.closeOcrOverlay()
+      } catch (e) {
+        // ignore
+      }
+      await this.startOcrCapture()
+    },
+
+    async ocrDoFavorite() {
+      if (!this.ocrImageDataUrl) return
+      await this.saveOcrFavorite()
+    },
+
+    async insertClipboardAndCopy(text, options = {}) {
+      const t = (text || '').trim()
+      if (!t) return
+      // 记录到剪贴板历史（best-effort）
+      if (options.saveToHistory) {
+        try {
+          await saveClipboardText(t)
+          if (this.$refs.clipboardPanel && typeof this.$refs.clipboardPanel.refresh === 'function') {
+            this.$refs.clipboardPanel.refresh()
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+      // #ifdef H5
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(t)
+        } else {
+          uni.setClipboardData({ data: t })
+        }
+      } catch (e) {
+        uni.setClipboardData({ data: t })
+      }
+      // #endif
+      // #ifndef H5
+      uni.setClipboardData({ data: t })
+      // #endif
+    },
+
+    // copyOcrText / insertOcrToWps 已被快捷命令条替代
+
+    async insertPlainTextToWps(text) {
+      const t = (text || '').trim()
+      if (!t) return
+      const wpsComp = this.getCurrentWpsInstance()
+      if (!wpsComp) {
+        uni.showToast({ title: '请先激活一个 WPS 文档窗口', icon: 'none' })
+        return
+      }
+      try {
+        await wpsComp.insertTextWithBookmark(t, `WEB_CLIP_${Date.now()}`)
+        uni.showToast({ title: '已插入文档', icon: 'success' })
+      } catch (e) {
+        console.error(e)
+        uni.showToast({ title: '插入失败', icon: 'none' })
+      }
+    },
+
+    async saveOcrFavorite() {
+      const t = (this.ocrText || '').trim()
+      if (!this.ocrImageDataUrl) {
+        uni.showToast({ title: '请先框选区域', icon: 'none' })
+        return
+      }
+      try {
+        uni.showToast({ title: '正在加入收藏…', icon: 'loading', duration: 1200 })
+        const created = await createProjectFavorite(this.projectId, {
+          title: this.ocrSourceUrl ? this.ocrSourceUrl : '网页摘录',
+          sourceUrl: this.ocrSourceUrl,
+          content: t || '',
+          imageBase64: this.ocrImageDataUrl
+        })
+        const favId = created && created.id ? created.id : null
+        // 立即给用户可见反馈：打开收藏夹并高亮新卡片
+        this.showToolsPanel = true
+        this.activeToolKey = 'favorites'
+        this.$nextTick(() => {
+          try {
+            const panel = this.$refs.favoritesPanel
+            if (panel && typeof panel.refresh === 'function') panel.refresh()
+            if (favId && panel && typeof panel.focusFavorite === 'function') panel.focusFavorite(Number(favId))
+          } catch (e) {
+            // ignore
+          }
+        })
+        uni.showToast({ title: '收藏成功', icon: 'success' })
+      } catch (e) {
+        console.error('收藏失败:', e)
+        uni.showToast({ title: e.message || '收藏失败', icon: 'none' })
+      }
+    },
+
+    async ocrDoWebLink() {
+      // 目标：将框选截图作为“网核证据”入库，并进入“拖拽关联到文档”模式
+      if (this.ocrLoading) return
+      if (!this.ocrImageDataUrl) {
+        uni.showToast({ title: '请先框选区域', icon: 'none' })
+        return
+      }
+      this.ocrLoading = true
+      try {
+        // 1) 采集网页上下文（桌面端可抓 HTML 快照；H5 尽量仅保存 URL/标题）
+        const metaObj = {
+          kind: 'webmark',
+          capturedAt: new Date().toISOString(),
+          sourceUrl: this.ocrSourceUrl || '',
+          title: '',
+          selection: {
+            x1: this.ocrSel.x1,
+            y1: this.ocrSel.y1,
+            x2: this.ocrSel.x2,
+            y2: this.ocrSel.y2
+          }
+        }
+        // 补齐卡片展示需要的关键元信息（站点 / 关联文档）
+        try {
+          if (metaObj.sourceUrl) {
+            metaObj.sourceHost = (() => { try { return new URL(metaObj.sourceUrl).host } catch (e) { return '' } })()
+          }
+          const activeDoc = this.focusedPane === 'right' ? this.activeFileRight : this.activeFileLeft
+          metaObj.docFileName = activeDoc && this.isWpsFile && this.isWpsFile(activeDoc) ? (activeDoc.name || '') : ''
+          metaObj.docSide = this.focusedPane || 'left'
+        } catch (e) {
+          // ignore
+        }
+        try {
+          const active = this.focusedPane === 'right' ? this.activeFileRight : this.activeFileLeft
+          const viewId = active && active.tabType === 'web' ? active.id : ''
+          if (this.isDesktopApp && viewId && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.getSnapshot) {
+            const snap = await window.checkbaDesktop.browser.getSnapshot({ id: viewId })
+            if (snap && snap.ok) {
+              metaObj.sourceUrl = snap.url || metaObj.sourceUrl
+              metaObj.title = snap.title || ''
+              // 完整页面 HTML 快照（用于“截至某日是否更新”对比）
+              metaObj.html = snap.html || ''
+              if (!metaObj.sourceHost && metaObj.sourceUrl) {
+                metaObj.sourceHost = (() => { try { return new URL(metaObj.sourceUrl).host } catch (e) { return '' } })()
+              }
+            }
+          }
+        } catch (e) {
+          // ignore snapshot failure
+        }
+
+        const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+        const title = metaObj.title || (metaObj.sourceUrl ? (() => { try { return new URL(metaObj.sourceUrl).host } catch (e) { return '网核' } })() : '网核')
+
+        // 2) 入库：content 可为空（用截图也算证据）；imageBase64 必填
+        const res = await createProjectFavorite(pid, {
+          title,
+          sourceUrl: metaObj.sourceUrl,
+          content: (this.ocrText || '').trim(),
+          imageBase64: this.ocrImageDataUrl,
+          meta: JSON.stringify(metaObj)
+        })
+        const saved = res && res.id ? res : (res && res.data ? res.data : null)
+        const favId = saved && saved.id ? saved.id : null
+
+        if (this.$refs.favoritesPanel && typeof this.$refs.favoritesPanel.refresh === 'function') {
+          this.$refs.favoritesPanel.refresh()
+        }
+
+        // 3) 关闭浮层，进入拖拽模式（把证据块拖到 WPS 插入标记）
+        this.closeOcrOverlay()
+        this.startWebLinkDrag({
+          favoriteId: favId,
+          imageDataUrl: this.ocrImageDataUrl,
+          sourceUrl: metaObj.sourceUrl,
+          title,
+          docFileName: metaObj.docFileName || ''
+        })
+      } catch (e) {
+        console.error('网核关联失败:', e)
+        uni.showToast({ title: e.message || '网核关联失败', icon: 'none' })
+      } finally {
+        this.ocrLoading = false
+      }
+    },
+
+    startWebLinkDrag(payload) {
+      const p = payload || {}
+      this.webLinkDrag = {
+        active: true,
+        x: this.ocrLastPointer?.x || 0,
+        y: this.ocrLastPointer?.y || 0,
+        favoriteId: p.favoriteId || null,
+        imageDataUrl: p.imageDataUrl || '',
+        sourceUrl: p.sourceUrl || '',
+        title: p.title || ''
+      }
+      // 鼠标移动跟随
+      this._webLinkMoveHandler = (ev) => {
+        const p2 = this.getOcrPoint(ev)
+        this.webLinkDrag.x = p2.x + 10
+        this.webLinkDrag.y = p2.y + 10
+      }
+      this._webLinkUpHandler = (ev) => {
+        const p2 = this.getOcrPoint(ev)
+        this.handleWebLinkDrop(p2.x, p2.y)
+      }
+      this._webLinkKeydownHandler = (ev) => {
+        if (ev && ev.key === 'Escape') {
+          ev.preventDefault()
+          this.stopWebLinkDrag()
+        }
+      }
+      // #ifdef H5
+      document.addEventListener('mousemove', this._webLinkMoveHandler, true)
+      document.addEventListener('mouseup', this._webLinkUpHandler, true)
+      window.addEventListener('keydown', this._webLinkKeydownHandler, true)
+      // #endif
+    },
+
+    stopWebLinkDrag() {
+      if (this._webLinkMoveHandler) document.removeEventListener('mousemove', this._webLinkMoveHandler, true)
+      if (this._webLinkUpHandler) document.removeEventListener('mouseup', this._webLinkUpHandler, true)
+      if (this._webLinkKeydownHandler) window.removeEventListener('keydown', this._webLinkKeydownHandler, true)
+      this._webLinkMoveHandler = null
+      this._webLinkUpHandler = null
+      this._webLinkKeydownHandler = null
+      this.webLinkDrag.active = false
+    },
+
+    async handleWebLinkDrop(x, y) {
+      // 检测是否落在 WPS 容器上（左/右）
+      const hit = (el) => {
+        if (!el) return false
+        const r = el.getBoundingClientRect()
+        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
+      }
+      const leftEl = typeof document !== 'undefined' ? document.getElementById('wps-container-left') : null
+      const rightEl = typeof document !== 'undefined' ? document.getElementById('wps-container-right') : null
+      let target = null
+      let side = 'left'
+      if (hit(leftEl)) {
+        target = this.$refs.wpsLeft
+        side = 'left'
+      } else if (hit(rightEl)) {
+        target = this.$refs.wpsRight
+        side = 'right'
+      }
+      if (!target) {
+        this.stopWebLinkDrag()
+        uni.showToast({ title: '请拖拽到文档区域进行关联', icon: 'none' })
+        return
+      }
+      try {
+        // 尽量把焦点给到编辑器（否则某些情况下插入会失败/不生效）
+        try {
+          if (target && typeof target.focusEditor === 'function') {
+            target.focusEditor()
+          }
+        } catch (e) {
+          // ignore
+        }
+        const favId = this.webLinkDrag.favoriteId
+        const host = this.webLinkDrag.sourceUrl ? (() => { try { return new URL(this.webLinkDrag.sourceUrl).host } catch (e) { return '网核' } })() : '网核'
+        const ts = new Date().toLocaleString()
+        const text = `【网核证据：${host}｜${ts}】`
+        const bookmarkName = `WEB_EVID_${favId || Date.now()}`
+        const internalUrl = this.wrapWpsInternalLink(`checkba://webfav?id=${encodeURIComponent(String(favId || ''))}&projectId=${encodeURIComponent(String(this.projectId || ''))}`)
+        if (target && typeof target.insertEvidenceLink === 'function') {
+          await target.insertEvidenceLink(text, bookmarkName, internalUrl)
+        } else {
+          await target.insertTextWithBookmark(text, bookmarkName)
+        }
+        uni.showToast({ title: '已插入网核标记', icon: 'success' })
+      } catch (e) {
+        console.error('插入网核标记失败:', e)
+        uni.showToast({ title: '插入失败', icon: 'none' })
+      } finally {
+        this.stopWebLinkDrag()
+      }
+    },
+    onFileTreeCheckedChange(ids) {
+      this.checkedFileIds = Array.isArray(ids) ? ids : []
+    },
+    toggleFileBatchMode() {
+      this.fileBatchMode = !this.fileBatchMode
+      if (!this.fileBatchMode) {
+        this.checkedFileIds = []
+        this.showBatchMenu = false
+        if (this.$refs.fileTree && typeof this.$refs.fileTree.clearChecked === 'function') {
+          this.$refs.fileTree.clearChecked()
+        }
+      }
+    },
+    toggleBatchMenu() {
+      if (!this.fileBatchMode) return
+      if (this.checkedFileCount <= 0) return
+      this.showBatchMenu = !this.showBatchMenu
+    },
+    closeBatchMenu() {
+      this.showBatchMenu = false
+    },
+    onBatchMenuSelect(actionKey) {
+      if (this.checkedFileCount <= 0) return
+      this.showBatchMenu = false
+      if (this.$refs.fileTree && typeof this.$refs.fileTree.openBatchAction === 'function') {
+        this.$refs.fileTree.openBatchAction(actionKey)
+      }
+    },
     // --- 导航与初始化 ---
     async loadProjectInfo() {
       try {
@@ -498,22 +2859,239 @@ export default {
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
     },
-    
-    // 右侧抽屉控制
-    toggleDrawer() {
-      this.showRightDrawer = !this.showRightDrawer
-      // 每次打开都重置为菜单，或者保持状态？用户可能希望保持。
-      // 这里暂不重置。
+
+    toggleAiPanel() {
+      this.showAiPanel = !this.showAiPanel
+      this.$nextTick(() => {
+        this.triggerWorkbenchResize()
+        if (this.showAiPanel) {
+          this.refreshAiContextPreview()
+        }
+      })
     },
-    switchDrawerTab(key) {
-      this.drawerActiveTab = key
-      // 在 AI Tab 打开时自动展开抽屉
-      if (!this.showRightDrawer) {
-        this.showRightDrawer = true
+
+    toggleToolsPanel() {
+      this.showToolsPanel = !this.showToolsPanel
+      this.$nextTick(() => this.triggerWorkbenchResize())
+    },
+
+    triggerWorkbenchResize() {
+      // WPS SDK 通常监听 window resize 来调整内部 iframe 大小
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('resize'))
+        // 给过渡动画留时间，保证最终尺寸正确
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 250)
       }
     },
-    switchDrawerMode(mode) {
-      this.drawerMode = mode
+
+    // ================= Tabs 拖拽：同窗格换序 + 分屏跨窗格移动 =================
+    onTabDragStart(evt, file, fromPane) {
+      this.draggingTab = { fileId: file.id, fromPane }
+      this.tabDragOver = null
+      try {
+        if (evt && evt.dataTransfer) {
+          evt.dataTransfer.effectAllowed = 'move'
+          evt.dataTransfer.setData('application/json', JSON.stringify({ fileId: file.id, fromPane }))
+        }
+      } catch (e) {
+        // ignore
+      }
+    },
+
+    onTabDragOver(_evt, file, pane) {
+      this.tabDragOver = { fileId: file.id, pane }
+    },
+
+    onTabDropZoneDragOver(pane) {
+      // 空白区域的 hover 提示（只记录 pane，避免 tab-drag-over 误高亮）
+      if (!this.draggingTab) return
+      this.tabDragOver = null
+      // 预激活：拖到右侧区域时，先聚焦右侧，避免“未激活窗格无法接收拖拽”的体验
+      if (pane === 'right' && this.splitMode) {
+        this.focusedPane = 'right'
+      }
+    },
+
+    onTabDropOnZone(evt, targetPane) {
+      const payload = this.getTabDragPayload(evt) || this.draggingTab
+      if (!payload || !payload.fileId) return
+      // drop 到空白区域：插入到末尾
+      this.moveTabTo(payload.fileId, payload.fromPane, targetPane, null)
+      this.onTabDragEnd()
+    },
+
+    onTabDropOnItem(evt, targetFile, targetPane) {
+      const payload = this.getTabDragPayload(evt) || this.draggingTab
+      if (!payload || !payload.fileId) return
+
+      this.moveTabTo(payload.fileId, payload.fromPane, targetPane, targetFile.id)
+      this.onTabDragEnd()
+    },
+
+    getTabDragPayload(evt) {
+      try {
+        const raw = evt?.dataTransfer?.getData('application/json')
+        if (!raw) return null
+        return JSON.parse(raw)
+      } catch (e) {
+        return null
+      }
+    },
+
+    moveTabTo(fileId, fromPane, toPane, beforeFileId) {
+      if (!fileId || !fromPane || !toPane) return
+      if (!this.splitMode && toPane === 'right') return
+
+      const fromList = fromPane === 'left' ? this.leftFiles : this.rightFiles
+      const toList = toPane === 'left' ? this.leftFiles : this.rightFiles
+
+      const fromIdx = fromList.findIndex(f => f.id === fileId)
+      if (fromIdx < 0) return
+
+      const source = fromList[fromIdx]
+      // 关键修复：跨窗格拖拽不“移动”，而是“在另一侧打开同一文件”（允许左右双开）
+      const isCrossPane = fromPane !== toPane
+      const moved = isCrossPane ? { ...source } : fromList.splice(fromIdx, 1)[0]
+
+      // 目标索引：插入到 beforeFileId 前面（如果没有则追加末尾）
+      let toIdx = -1
+      if (beforeFileId) {
+        toIdx = toList.findIndex(f => f.id === beforeFileId)
+      }
+      // 若目标窗格已存在同文件，则仅激活，不重复插入
+      const existedIdx = toList.findIndex(f => f.id === moved.id)
+      if (existedIdx >= 0) {
+        // 如果目标还指定了 beforeFileId 且是同窗格换序，可以做排序调整
+        if (!isCrossPane && beforeFileId && existedIdx !== toIdx && toIdx >= 0) {
+          const [existing] = toList.splice(existedIdx, 1)
+          toList.splice(toIdx, 0, existing)
+        }
+      } else {
+        if (toIdx < 0) {
+          toList.push(moved)
+        } else {
+          toList.splice(toIdx, 0, moved)
+        }
+      }
+
+      // 激活态跟随：如果是跨窗格移动，更新 activeFileId
+      if (toPane === 'left') {
+        this.activeFileIdLeft = moved.id
+        this.focusedPane = 'left'
+      } else {
+        this.activeFileIdRight = moved.id
+        this.focusedPane = 'right'
+      }
+
+      // 拖拽换序/跨窗格会改变容器尺寸分配，给 WPS 一个 resize
+      this.$nextTick(() => this.triggerWorkbenchResize())
+    },
+
+    onTabDragEnd() {
+      this.draggingTab = null
+      this.tabDragOver = null
+    },
+
+    isOpenInOtherPane(fileId, pane) {
+      if (!fileId) return false
+      if (pane === 'left') return this.rightFiles.some(f => f.id === fileId)
+      return this.leftFiles.some(f => f.id === fileId)
+    },
+
+    startResize(target, evt) {
+      // target: 'left' | 'right' | 'bottom'
+      this.resizing.active = true
+      this.resizing.target = target
+      const e = evt && evt.touches && evt.touches[0] ? evt.touches[0] : evt
+      this.resizing.startX = e?.clientX || 0
+      this.resizing.startY = e?.clientY || 0
+      this.resizing.startSidebarWidth = this.sidebarWidth
+      this.resizing.startAiWidth = this.aiPanelWidth
+      this.resizing.startToolsHeight = this.toolsPanelHeight
+
+      if (evt && typeof evt.preventDefault === 'function') {
+        evt.preventDefault()
+      }
+
+      if (typeof window !== 'undefined') {
+        if (!this.boundResizeMove) this.boundResizeMove = (e2) => this.onResizeMove(e2)
+        if (!this.boundStopResize) this.boundStopResize = () => this.stopResize()
+
+        window.addEventListener('mousemove', this.boundResizeMove, { passive: false })
+        window.addEventListener('mouseup', this.boundStopResize, { passive: true })
+        window.addEventListener('touchmove', this.boundResizeMove, { passive: false })
+        window.addEventListener('touchend', this.boundStopResize, { passive: true })
+      }
+    },
+
+    onResizeMove(evt) {
+      if (!this.resizing.active) return
+      const e = evt && evt.touches && evt.touches[0] ? evt.touches[0] : evt
+      const clientX = e?.clientX || 0
+      const clientY = e?.clientY || 0
+
+      // 防止页面滚动
+      if (evt && typeof evt.preventDefault === 'function') {
+        evt.preventDefault()
+      }
+
+      // rAF 节流：让拖拽跟手更稳（避免 move 事件过密导致抖动/延迟）
+      this._resizePendingX = clientX
+      this._resizePendingY = clientY
+      if (this._resizeRaf) return
+      this._resizeRaf = requestAnimationFrame(() => {
+        this._resizeRaf = null
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+
+        // Cursor 体验：拖动范围尽量大，不强行保证中间工作区可用（遮挡就遮挡）
+        const leftMin = 160
+        const leftMax = Math.max(leftMin, Math.floor(vw * 0.75))
+        const rightMin = 240
+        const rightMax = Math.max(rightMin, Math.floor(vw * 0.75))
+        const headerH = 56
+        const tabsH = 40
+        const bottomMin = 140
+        const bottomMax = Math.max(bottomMin, Math.floor((vh - headerH - tabsH) * 0.85))
+
+        const dx = (this._resizePendingX || 0) - this.resizing.startX
+        const dy = (this._resizePendingY || 0) - this.resizing.startY
+
+        if (this.resizing.target === 'left') {
+          const next = this.resizing.startSidebarWidth + dx
+          this.sidebarWidth = Math.max(leftMin, Math.min(leftMax, next))
+        } else if (this.resizing.target === 'right') {
+          const next = this.resizing.startAiWidth - dx
+          this.aiPanelWidth = Math.max(rightMin, Math.min(rightMax, next))
+        } else if (this.resizing.target === 'bottom') {
+          const next = this.resizing.startToolsHeight - dy
+          this.toolsPanelHeight = Math.max(bottomMin, Math.min(bottomMax, next))
+        }
+      })
+    },
+
+    stopResize() {
+      if (!this.resizing.active) return
+      this.resizing.active = false
+      this.resizing.target = null
+
+      if (this._resizeRaf) {
+        cancelAnimationFrame(this._resizeRaf)
+        this._resizeRaf = null
+      }
+
+      if (typeof window !== 'undefined') {
+        if (this.boundResizeMove) {
+          window.removeEventListener('mousemove', this.boundResizeMove)
+          window.removeEventListener('touchmove', this.boundResizeMove)
+        }
+        if (this.boundStopResize) {
+          window.removeEventListener('mouseup', this.boundStopResize)
+          window.removeEventListener('touchend', this.boundStopResize)
+        }
+      }
+
+      this.$nextTick(() => this.triggerWorkbenchResize())
     },
     
     toggleSplitMode() {
@@ -521,19 +3099,7 @@ export default {
 
       // 关键修复：触发 resize 事件通知 WPS SDK 调整布局
       // WPS SDK 监听 window resize 来调整内部 iframe 大小
-      this.$nextTick(() => {
-        // 立即触发一次
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('resize'))
-        }
-        
-        // 配合 transition 动画（0.2s），在动画结束时再次触发，确保最终尺寸正确
-        setTimeout(() => {
-           if (typeof window !== 'undefined') {
-             window.dispatchEvent(new Event('resize'))
-           }
-        }, 250)
-      })
+      this.$nextTick(() => this.triggerWorkbenchResize())
 
       if (!this.splitMode) {
         // 关闭分屏时，重置 focus 到左侧
@@ -556,74 +3122,25 @@ export default {
     },
     
     openFile(file) {
-      // 1. 检查文件是否已经在某个窗口打开
-      const isInLeft = this.leftFiles.some(f => f.id === file.id)
-      const isInRight = this.rightFiles.some(f => f.id === file.id)
-
-      if (isInLeft) {
-        // 如果在左侧，激活左侧并聚焦
-        this.focusedPane = 'left'
-        // 关键修复：确保文件对象是最新的（从文件树获取的最新数据）
-        const existingFile = this.leftFiles.find(f => f.id === file.id)
-        if (existingFile) {
-          // 更新文件对象，确保WPS组件能正确响应变化
-          Object.assign(existingFile, file)
-        }
-        this.activeFileIdLeft = file.id
-        // 强制触发WPS组件重新加载（如果fileId或fileName变化）
-        this.$nextTick(() => {
-          const wpsComp = this.$refs.wpsLeft
-          if (wpsComp && wpsComp.fileId === file.wpsFileId) {
-            // 如果fileId相同但可能是其他属性变化，强制重新加载
-            wpsComp.reload()
-          }
-        })
-        return
-      }
-
-      if (isInRight) {
-        // 如果在右侧，激活右侧并聚焦 (前提是分屏模式)
-        if (this.splitMode) {
-          this.focusedPane = 'right'
-          // 关键修复：确保文件对象是最新的
-          const existingFile = this.rightFiles.find(f => f.id === file.id)
-          if (existingFile) {
-            Object.assign(existingFile, file)
-          }
-          this.activeFileIdRight = file.id
-          // 强制触发WPS组件重新加载
-          this.$nextTick(() => {
-            const wpsComp = this.$refs.wpsRight
-            if (wpsComp && wpsComp.fileId === file.wpsFileId) {
-              wpsComp.reload()
-            }
-          })
-        } else {
-          // 如果不在分屏模式但在右侧列表（可能被隐藏了），这时候应该怎么办？
-          // 用户期望"聚焦到已经打开的标签"。如果是隐藏的右侧，可能需要自动开启分屏？
-          // 或者把文件移动到左侧？
-          // 这里简单处理：如果未分屏，就在左侧打开（因为右侧不可见）
-          // 但为了防止重复，先把右侧的删掉？
-          // 根据用户描述 "点击文件树里的已打开文件，聚焦到已经打开的标签"，隐喻是可见的。
-          // 如果不可见，就在当前窗口打开。
-          
-          // 修正逻辑：如果未分屏，所有操作都在左侧。
-          // 检查左侧是否有，没有就加。
-          this.focusedPane = 'left'
-          this.leftFiles.push(file)
-          this.activeFileIdLeft = file.id
-        }
-        return
-      }
-
-      // 2. 如果都没打开，加入当前聚焦的窗格
-      // 如果未分屏，强制左侧
+      // 允许“同一文件左右双开”：
+      // - 如果当前聚焦窗格未打开该文件，则在当前窗格打开
+      // - 若当前窗格已打开，则仅激活
       const targetPane = this.splitMode ? this.focusedPane : 'left'
       const targetList = targetPane === 'left' ? this.leftFiles : this.rightFiles
       const targetIdProp = targetPane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'
-      
-      targetList.push(file)
-      this[targetIdProp] = file.id
+
+      const existing = targetList.find(f => f.id === file.id)
+      if (existing) {
+        Object.assign(existing, file)
+        this[targetIdProp] = file.id
+        this.focusedPane = targetPane
+      } else {
+        targetList.push({ ...file })
+        this[targetIdProp] = file.id
+      }
+
+      // 打开/激活后，给 WPS 一个机会刷新（避免容器尺寸/激活状态不对）
+      this.$nextTick(() => this.triggerWorkbenchResize())
     },
 
     activateTab(file, pane) {
@@ -663,6 +3180,7 @@ export default {
     },
     isWpsFile(file) {
       // 根据是否有 wpsFileId 判断是否用 WPS 打开
+      if (!file || file.tabType === 'web') return false
       return file && (file.wpsFileId || ['doc','docx','xls','xlsx','ppt','pptx'].includes(file.fileType))
     },
 
@@ -671,32 +3189,12 @@ export default {
       console.log(`WPS Ready [${pane}]`, instance)
       this.wpsInstances[pane] = instance
       
-      // 监听WPS重命名事件，同步更新文件树和标签
-      // 注意：WPS的重命名是通过后端回调处理的，前端需要通过轮询或监听文件信息变化来同步
-      if (instance && instance.ApiEvent) {
-        try {
-          // 监听文件保存事件，保存后可能触发重命名同步
-          instance.ApiEvent.AddApiEventListener('fileSave', async (data) => {
-            console.log('WPS 文件保存事件:', data)
-            // 保存后刷新文件信息，获取最新文件名
-            await this.syncFileInfo(pane)
-          })
-          
-          // 尝试监听重命名事件（如果SDK支持）
-          try {
-            instance.ApiEvent.AddApiEventListener('fileRename', async (data) => {
-              console.log('WPS 文件重命名事件:', data)
-              await this.handleFileRename(pane, data)
-            })
-          } catch (e) {
-            console.warn('WPS SDK 不支持 fileRename 事件监听，将使用轮询方式', e)
-            // 如果不支持事件监听，使用轮询方式检查文件信息变化
-            this.startFileInfoPolling(pane)
-          }
-        } catch (e) {
-          console.warn('WPS 事件监听设置失败:', e)
-        }
-      }
+      // 注意：当前 WPS 环境会对未知事件名抛出 "Invalid event name"
+      // fileSave/fileRename 在你的控制台里已验证会刷屏，因此这里不再监听，统一改为轮询同步文件信息。
+      this.startFileInfoPolling(pane)
+
+      // 关联功能：轮询记录“最近一次非空选区”（用于拖拽时选区丢失的问题）
+      this.startSelectionPolling(pane)
 
       // 如果有待写入的 AI 导出内容，尝试在文档就绪后写入
       this.$nextTick(async () => {
@@ -737,18 +3235,48 @@ export default {
       const newName = data.name || data.fileName
       if (!newName) return
       
-      console.log(`文件重命名: ${activeFile.name} -> ${newName}`)
-      
-      // 更新文件对象
-      activeFile.name = newName
-      
-      // 刷新文件树
-      if (this.$refs.fileTree) {
-        await this.$refs.fileTree.loadFiles()
+      const oldName = activeFile.name
+      if (oldName === newName) return
+
+      console.log(`文件重命名(WPS): ${oldName} -> ${newName}`)
+
+      try {
+        // 1) 先落库：调用后端重命名（同步物理文件）
+        const updated = await renameFile(this.projectId, activeFile.id, newName)
+        const finalName = updated?.name || newName
+
+        // 2) 同步更新 Tabs（左右可能同时打开同一文件）
+        this.leftFiles.forEach(f => {
+          if (f.id === activeFile.id) f.name = finalName
+        })
+        this.rightFiles.forEach(f => {
+          if (f.id === activeFile.id) f.name = finalName
+        })
+
+        // 3) 同步文件树（不要求整页刷新）
+        if (this.$refs.fileTree) {
+          // 优先局部更新（如果提供了方法），否则 fallback 重新拉取
+          if (typeof this.$refs.fileTree.updateFileName === 'function') {
+            this.$refs.fileTree.updateFileName(activeFile.id, finalName)
+          } else {
+            await this.$refs.fileTree.loadFiles()
+          }
+        }
+
+        // 4) 触发响应式更新，确保 Tab 与 WpsEditor 的 fileName prop 立即刷新
+        this.$forceUpdate()
+      } catch (e) {
+        console.error('WPS 重命名同步到后端失败:', e)
+        // 回滚前端显示，避免出现“看起来改了但后端没改”
+        this.leftFiles.forEach(f => {
+          if (f.id === activeFile.id) f.name = oldName
+        })
+        this.rightFiles.forEach(f => {
+          if (f.id === activeFile.id) f.name = oldName
+        })
+        this.$forceUpdate()
+        uni.showToast({ title: '重命名同步失败', icon: 'none' })
       }
-      
-      // 触发响应式更新
-      this.$forceUpdate()
     },
     
     // 同步文件信息（从后端获取最新信息）
@@ -805,6 +3333,20 @@ export default {
       // Fallback
       if (this.wpsInstances.left) return this.$refs.wpsLeft
       return null
+    },
+    getActiveAiTargetFile() {
+      // AI 仅对“当前激活的 WPS 文档”生效，避免出现“浏览器Tab名 + 文档上下文”错配
+      let candidate = null
+      if (this.focusedPane === 'right' && this.splitMode) {
+        candidate = this.activeFileRight || this.activeFileLeft || null
+      } else {
+        candidate = this.activeFileLeft || this.activeFileRight || null
+      }
+      if (!candidate) return null
+      if (typeof this.isWpsFile === 'function' && !this.isWpsFile(candidate)) {
+        return null
+      }
+      return candidate
     },
 
     // --- 变量库交互 (复用原有逻辑) ---
@@ -873,6 +3415,117 @@ export default {
       }
     },
 
+    normalizeContextText(text, maxLen = 8000) {
+      const raw = (text || '')
+        .replace(/\u00A0/g, ' ')
+        .replace(/\r\n/g, '\n')
+      const cleaned = raw
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+      if (!cleaned) return ''
+      if (!maxLen || cleaned.length <= maxLen) return cleaned
+      return `${cleaned.slice(0, maxLen)}\n...[上下文已截断 ${cleaned.length - maxLen} 字]`
+    },
+    buildAiContextPreview(context) {
+      if (!context) return null
+      return {
+        fileName: context.fileName || this.activeAiFileName || '未命名文件',
+        selection: this.normalizeContextText(context.selectionText || '', 160),
+        snippet: this.normalizeContextText(context.documentText || '', 200),
+        updatedAt: Date.now()
+      }
+    },
+    async collectAiContextForChat(options = {}) {
+      const { updatePreview = false } = options
+      const file = this.getActiveAiTargetFile()
+      if (!file) {
+        if (updatePreview) this.aiContextPreview = null
+        return null
+      }
+      const context = {
+        fileId: file.id || null,
+        fileName: file.name || '',
+        fileType: file.fileType || file.tabType || '',
+        wpsFileId: file.wpsFileId || null,
+        selectionText: '',
+        documentText: ''
+      }
+      const wpsComp = this.getCurrentWpsInstance()
+      if (wpsComp && typeof wpsComp.getSelectionText === 'function') {
+        try {
+          const selection = await wpsComp.getSelectionText()
+          context.selectionText = this.normalizeContextText(selection, 1500)
+        } catch (e) {
+          console.warn('获取选区文本失败', e)
+        }
+      }
+      if (wpsComp && typeof wpsComp.getDocumentPlainText === 'function') {
+        try {
+          const docText = await wpsComp.getDocumentPlainText(8000)
+          context.documentText = this.normalizeContextText(docText, 8000)
+        } catch (e) {
+          console.warn('获取文档全文失败', e)
+        }
+      }
+      if (!context.selectionText && !context.documentText && file.summary) {
+        context.documentText = this.normalizeContextText(file.summary, 2000)
+      }
+      if (updatePreview) {
+        this.aiContextPreview = this.buildAiContextPreview(context)
+      }
+      return context
+    },
+    async refreshAiContextPreview(manualTrigger = false) {
+      if (!this.showAiPanel) return null
+      try {
+        this.aiContextLoading = true
+        const context = await this.collectAiContextForChat({ updatePreview: true })
+        if (manualTrigger && !context) {
+          uni.showToast({ title: '请先激活一个 WPS 文档', icon: 'none' })
+        } else if (manualTrigger) {
+          uni.showToast({ title: '上下文已同步', icon: 'none' })
+        }
+        return context
+      } catch (e) {
+        console.error('刷新 AI 上下文失败', e)
+        if (manualTrigger) {
+          uni.showToast({ title: '同步失败，请重试', icon: 'none' })
+        }
+        return null
+      } finally {
+        this.aiContextLoading = false
+      }
+    },
+    insertAiMessageToDoc(message) {
+      if (!message || !message.content) return
+      this.insertPlainTextToWps(message.content)
+    },
+    async applyAiMessageToSelection(message) {
+      if (!message || !message.content) return
+      const wpsComp = this.getCurrentWpsInstance()
+      if (!wpsComp || typeof wpsComp.getSelectionText !== 'function') {
+        uni.showToast({ title: '请先激活一个 WPS 文档窗口', icon: 'none' })
+        return
+      }
+      try {
+        const selected = await wpsComp.getSelectionText()
+        if (!String(selected || '').trim()) {
+          uni.showToast({ title: '请先在文档中选择要替换的内容', icon: 'none' })
+          return
+        }
+        if (typeof wpsComp.replaceSelectionText === 'function') {
+          await wpsComp.replaceSelectionText(message.content)
+          uni.showToast({ title: '已替换选区', icon: 'success' })
+          return
+        }
+        // 兜底：如果当前 SDK 未暴露替换能力，则退化为插入
+        await this.insertPlainTextToWps(message.content)
+      } catch (e) {
+        console.error('替换选区失败', e)
+        uni.showToast({ title: e.message || '替换失败', icon: 'none' })
+      }
+    },
     // --- AI 对话 ---
     async handleAiSend() {
       const text = (this.aiInput || '').trim()
@@ -899,10 +3552,13 @@ export default {
       })
 
       this.aiLoading = true
+      let contextPayload = null
       try {
+        contextPayload = await this.collectAiContextForChat({ updatePreview: true })
         const res = await aiChat({
           projectId,
-          message: text
+          message: text,
+          context: contextPayload
         })
         const reply =
           (res && res.response) ||
@@ -1061,41 +3717,52 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* 颜色变量 */
-$brand-gold: #C8A45D;
-$brand-dark: #12344D;
-$brand-bg: #F7F5F0;
-$brand-white: #FFFFFF;
-$text-main: #1A1A1A;
-$text-secondary: #666666;
-$border-color: #E0E0E0;
+/* 兼容旧变量命名：统一映射到 uni.scss 的 token（避免在各处硬编码） */
+$brand-gold: $brand-color-gold;
+$brand-dark: $brand-color-primary;
+$brand-bg: $brand-bg-warm;
+$brand-white: $uni-bg-color;
+$text-main: $uni-text-color;
+$text-secondary: $uni-text-color-secondary;
+$border-color: $brand-border-light;
 
 .page-project-overview {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: $brand-bg;
+  background: linear-gradient(180deg, #fbf7f0 0%, #f3f7fb 100%);
   overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  box-sizing: border-box;
+
+  &.compact-mode {
+    background: linear-gradient(180deg, #fbfbfd 0%, #f6f8fb 100%);
+  }
 }
 
 /* 顶部 Header */
 .project-header {
-  height: 64px;
-  background: $brand-white;
-  border-bottom: 1px solid $border-color;
+  min-height: 56px;
+  height: auto;
+  background: $uni-bg-color;
+  border-bottom: 1px solid $brand-border-light;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 24px;
+  padding: 0 12px;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  box-shadow: none;
   z-index: 10;
+  gap: 0;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .back-btn {
@@ -1106,11 +3773,11 @@ $border-color: #E0E0E0;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: $text-secondary;
+  color: $uni-text-color-secondary;
   font-size: 18px;
   
   &:hover {
-    background-color: #f5f5f5;
+    background-color: $uni-bg-color-hover;
   }
 }
 
@@ -1123,34 +3790,35 @@ $border-color: #E0E0E0;
 .project-title-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .project-name {
   font-size: 18px;
   font-weight: 600;
-  color: $text-main;
+  color: $uni-text-color;
 }
 
 .project-status-badge {
-  background: rgba(200, 164, 93, 0.1);
+  background: rgba(200, 164, 93, 0.12);
   padding: 2px 8px;
   border-radius: 4px;
   
   .status-text {
     font-size: 12px;
-    color: $brand-gold;
+    color: $brand-color-gold;
   }
 }
 
 .project-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
   
   .meta-item {
     font-size: 12px;
-    color: $text-secondary;
+    color: $uni-text-color-secondary;
   }
   
   .meta-divider {
@@ -1162,13 +3830,41 @@ $border-color: #E0E0E0;
 .header-right {
   display: flex;
   align-items: center;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.page-project-overview.compact-mode .project-header {
+  padding: 12px 16px;
+  gap: 8px 12px;
+}
+
+.page-project-overview.compact-mode .header-tools {
+  border-right: none;
+  padding-right: 0;
+  margin-right: 0;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.page-project-overview.compact-mode .header-right {
+  justify-content: flex-end;
+}
+
+.header-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-right: 8px;
+  margin-right: 4px;
+  border-right: 1px solid rgba(18, 52, 77, 0.08);
 }
 
 .user-avatar {
   width: 32px;
   height: 32px;
-  background: $brand-dark;
+  background: $brand-color-primary;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1185,56 +3881,447 @@ $border-color: #E0E0E0;
   flex-direction: row;
   overflow: hidden;
   position: relative;
+  gap: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background: $uni-bg-color;
+
+  &.is-compact {
+    padding: 0;
+    gap: 0;
+  }
+}
+
+/* Cursor 风格：最左常驻栏（Activity Bar） */
+.left-rail {
+  width: 48px;
+  flex-shrink: 0;
+  background: #f8fafc;
+  border: none;
+  border-right: 1px solid rgba(18, 52, 77, 0.08);
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 8px;
+}
+
+.rail-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.rail-btn:hover {
+  background: rgba(18, 52, 77, 0.06);
+}
+
+.rail-btn.active {
+  background: rgba(18, 52, 77, 0.08);
+  border-color: rgba(18, 52, 77, 0.12);
+  box-shadow: inset 0 -2px 0 $brand-color-gold;
+}
+
+.rail-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* IDE 工作台（中/右 + 底部面板） */
+.workbench {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.workbench-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.page-project-overview.compact-mode .workbench-main {
+  padding: 0;
+  gap: 0;
+}
+
+.side-panel {
+  position: relative;
+  flex-shrink: 0;
+  min-height: 0;
+  background: #ffffff;
+  border: none;
+  border-left: 1px solid rgba(18, 52, 77, 0.08);
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.side-resize-handle {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 20;
+}
+
+.bottom-panel {
+  position: relative;
+  flex-shrink: 0;
+  min-height: 0;
+  background: #ffffff;
+  border-top: 1px solid rgba(18, 52, 77, 0.08);
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.bottom-resize-handle {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: row-resize;
+  z-index: 20;
+}
+
+.panel-header {
+  height: 32px; /* 更紧凑，接近 IDE */
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid $border-color;
+  background: $uni-bg-color;
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: $text-main;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-header-tools {
+  height: 30px;
+}
+
+.panel-tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.panel-tab {
+  height: 24px;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: $text-main;
+}
+
+.panel-tab.active {
+  font-weight: 700;
+  color: $brand-color-primary;
+  box-shadow: inset 0 -2px 0 rgba($brand-color-primary, 0.9);
+}
+
+.panel-tab-icon {
+  font-size: 12px;
+  font-weight: 700;
+  color: #12344D;
+}
+
+.panel-tab-label {
+  font-size: 12px;
+  color: $text-main;
+}
+
+.panel-tab.active .panel-tab-icon,
+.panel-tab.active .panel-tab-label {
+  color: $brand-color-primary;
+}
+
+.tools-search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.tools-search-wrap {
+  width: 100%;
+  max-width: 520px;
+  position: relative;
+}
+
+.tools-search-input {
+  width: 100%;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba($border-color, 0.85);
+  padding: 0 26px 0 10px;
+  font-size: 12px;
+  background: rgba(15, 23, 42, 0.02);
+  color: $text-main;
+  box-sizing: border-box;
+}
+
+.tools-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 4px;
+  color: $uni-text-color-muted;
+}
+
+.tools-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-body-ai {
+  display: flex;
+  flex-direction: column;
 }
 
 /* 左侧 Sidebar */
 .sidebar-left {
   width: 260px;
-  background: #FAFAFA;
-  border-right: 1px solid $border-color;
+  background: #fbfcfe;
+  border: none;
+  border-right: 1px solid rgba(18, 52, 77, 0.08);
+  border-radius: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease;
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
   
   &.collapsed {
-    width: 40px;
-    
-    .sidebar-header {
-      padding: 0;
-      justify-content: center;
-    }
+    width: 0;
+    border-right: none;
+    box-shadow: none;
   }
 }
 
+/* 拖拽期间禁用过渡：提升跟手性，避免“抖动/滞后” */
+.page-project-overview.is-resizing .sidebar-left,
+.page-project-overview.is-resizing .side-panel,
+.page-project-overview.is-resizing .bottom-panel {
+  transition: none !important;
+}
+
 .sidebar-header {
-  height: 48px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid $brand-border-light;
+  background: $uni-bg-color;
   flex-shrink: 0;
 }
 
-.sidebar-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: $text-secondary;
+.sidebar-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.sidebar-toggle {
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-actions-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(18, 52, 77, 0.12);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+.batch-menu-wrapper {
+  position: relative;
+}
+
+.batch-menu-mask {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 90;
+}
+
+.batch-menu {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  width: 140px;
+  background: #fff;
+  border: 1px solid $border-color;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+  padding: 6px;
+  z-index: 100;
+}
+
+.batch-menu-item {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
   cursor: pointer;
-  color: #999;
-  width: 24px;
-  height: 24px;
+  color: $text-main;
+}
+
+.batch-menu-item:hover {
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.batch-menu-item.danger {
+  color: #dc2626;
+}
+
+.batch-menu-item.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.batch-menu-label {
+  font-size: 13px;
+}
+
+.icon-btn.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.icon-btn.mini {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.icon-btn.mini .tool-icon {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: $uni-text-color-secondary;
+}
+
+/* 左侧收起态：Cursor 风格插件栏 */
+.sidebar-collapsed-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  gap: 10px;
+  background: $uni-bg-color;
+}
+
+.sidebar-plugin-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  
-  &:hover {
-    color: $text-main;
-  }
+  cursor: pointer;
+  border: 1px solid transparent;
+  color: $uni-text-color-secondary;
+  background: transparent;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.sidebar-plugin-btn:hover {
+  background: rgba(18, 52, 77, 0.06);
+}
+
+.sidebar-plugin-btn.active {
+  background: rgba(18, 52, 77, 0.08);
+  border-color: rgba(18, 52, 77, 0.12);
+  box-shadow: inset 0 -2px 0 $brand-color-gold;
+}
+
+.plugin-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.sidebar-plugin-placeholder {
+  padding: 16px 12px;
+}
+
+.placeholder-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: $uni-text-color;
+}
+
+.placeholder-desc {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: $uni-text-color-muted;
 }
 
 .sidebar-content {
@@ -1243,24 +4330,44 @@ $border-color: #E0E0E0;
   overflow-x: hidden;
 }
 
+.resize-handle {
+  position: absolute;
+  right: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 20;
+}
+
+.resize-handle:hover,
+.side-resize-handle:hover,
+.bottom-resize-handle:hover {
+  background-color: rgba(18, 52, 77, 0.06);
+}
+
 /* 中间内容区 */
 .content-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: $brand-white;
+  background: #ffffff;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
 }
 
 /* 标签栏 Tabs */
 .tabs-bar {
-  height: 40px;
-  background: #f0f0f0;
-  border-bottom: 1px solid $border-color;
+  height: 36px;
+  background: #f8fafc;
+  border-bottom: 1px solid rgba(18, 52, 77, 0.08);
+  backdrop-filter: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-right: 8px; /* 给右侧工具留位置 */
+  justify-content: flex-start;
 }
 
 .tabs-pane {
@@ -1277,6 +4384,33 @@ $border-color: #E0E0E0;
   }
 }
 
+.tabs-plus {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin: 0 8px 0 0;
+  align-self: center;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tabs-plus:hover {
+  background-color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(200, 164, 93, 0.4);
+}
+
+.tabs-plus-icon {
+  font-size: 16px;
+  font-weight: 800;
+  color: $brand-dark;
+  line-height: 1;
+}
+
 .tabs-scroll {
   width: 100%;
   height: 100%;
@@ -1286,28 +4420,59 @@ $border-color: #E0E0E0;
   display: flex;
   flex-direction: row;
   height: 100%;
-  padding-top: 4px;
-  padding-left: 4px;
+  padding: 0;
+  align-items: center;
+}
+
+/* tabs-tools 仍可能存在旧样式：隐藏（按钮已上移至 header-tools） */
+.tabs-tools {
+  display: none;
+}
+
+/* 底部工具面板：按钮不随宽度拉伸（覆盖 VariablePanel 的 width:100%） */
+.bottom-panel :deep(.panel-actions) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.bottom-panel :deep(.action-btn) {
+  width: auto !important;
+  max-width: 360px;
+  min-width: 240px;
+}
+
+.bottom-panel :deep(.var-tools button) {
+  flex: 0 0 auto;
+  min-width: 72px;
 }
 
 .tab-item {
-  height: 36px;
-  padding: 0 16px;
+  position: relative;
+  height: 28px;
+  padding: 0 10px;
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #e0e0e0;
-  border-radius: 8px 8px 0 0;
-  margin-right: 2px;
+  background: rgba(15, 23, 42, 0.02);
+  border-radius: 10px;
+  margin-right: 6px;
   cursor: pointer;
   min-width: 100px;
   max-width: 180px;
   user-select: none;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+  
+  &:hover {
+    border-color: rgba(200, 164, 93, 0.55);
+    background: rgba(200, 164, 93, 0.06);
+  }
   
   .tab-name {
     flex: 1;
     font-size: 13px;
-    color: $text-secondary;
+    color: $uni-text-color-secondary;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1330,9 +4495,37 @@ $border-color: #E0E0E0;
   }
   
   &.active {
-    background: $brand-white;
-    .tab-name { color: $brand-dark; font-weight: 500; }
+    background: rgba(18, 52, 77, 0.06);
+    border-color: rgba(18, 52, 77, 0.18);
+    box-shadow: inset 0 -2px 0 rgba($brand-gold, 0.8);
+
+    .tab-name { color: $text-main; font-weight: 600; }
   }
+}
+
+.tab-item.tab-drag-over {
+  border-color: rgba(200, 164, 93, 0.55);
+  background: rgba(200, 164, 93, 0.08);
+}
+
+.tab-item.tab-dual-open {
+  position: relative;
+}
+
+.tab-item.tab-dual-open::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.75);
+}
+
+.page-project-overview.compact-mode .tab-item {
+  min-width: 88px;
+  padding: 0 10px;
 }
 
 .tabs-tools {
@@ -1347,17 +4540,24 @@ $border-color: #E0E0E0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
   cursor: pointer;
   color: $text-secondary;
-  
+  background: rgba(15, 23, 42, 0.02);
+  transition: all 0.18s ease;
+
   &:hover {
-    background-color: rgba(0,0,0,0.05);
+    background-color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(200, 164, 93, 0.4);
+    color: $brand-dark;
   }
   
   &.active {
-    background-color: rgba(18, 52, 77, 0.1);
+    background: linear-gradient(120deg, rgba(255,255,255,0.95), rgba(248, 241, 228, 0.9));
     color: $brand-dark;
+    border-color: rgba(200, 164, 93, 0.6);
+    box-shadow: 0 4px 10px rgba(200, 164, 93, 0.16);
   }
   
   .tool-icon {
@@ -1370,6 +4570,7 @@ $border-color: #E0E0E0;
   flex: 1;
   overflow: hidden;
   position: relative;
+  min-height: 0;
 }
 
 .editors-grid {
@@ -1388,6 +4589,10 @@ $border-color: #E0E0E0;
   min-width: 0; /* 防止内容撑大 */
   transition: all 0.2s ease-in-out; /* 更好的过渡 */
   overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  background: rgba(249, 250, 255, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
   
   &.focused {
     /* 聚焦时的高亮提示 */
@@ -1418,6 +4623,9 @@ $border-color: #E0E0E0;
   width: 100%;
   height: 100%;
   overflow: hidden; /* 确保内部组件不溢出 */
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.03);
 }
 
 .pane-empty, .empty-workspace {
@@ -1593,7 +4801,7 @@ $border-color: #E0E0E0;
   flex: 3;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #f0f0f0;
+  border-right: 1px solid rgba($border-color, 0.7);
   min-width: 0;
 }
 
@@ -1604,27 +4812,117 @@ $border-color: #E0E0E0;
   min-width: 0;
 }
 
-.ai-chat-header {
-  padding: 12px 14px 8px;
-  border-bottom: 1px solid #f3f3f3;
+.ai-context-card {
+  padding: 10px 10px;
+  border: 1px solid rgba($border-color, 0.85);
+  background: #fbfcfe;
+  border-radius: 12px;
+  margin: 0 10px 8px;
+  box-shadow: none;
 }
 
-.ai-chat-title {
-  font-size: 14px;
+.context-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.context-file {
+  display: flex;
+  flex-direction: column;
+}
+
+.context-label {
+  font-size: 12px;
+  color: $uni-text-color-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.context-value {
+  font-size: 13px;
   font-weight: 600;
   color: $text-main;
+  margin-top: 2px;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.ai-chat-subtitle {
-  margin-top: 4px;
+.context-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.context-status {
   font-size: 12px;
-  color: $text-secondary;
+  color: $uni-text-color-muted;
+  white-space: nowrap;
+}
+
+.context-status.synced {
+  color: $uni-color-success;
+}
+
+.context-action-btn {
+  padding: 0 10px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba($border-color, 0.75);
+  background: rgba(15, 23, 42, 0.02);
+  font-size: 12px;
+  color: $brand-dark;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.context-action-btn.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.context-snippet {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.context-snippet-row {
+  display: flex;
+  gap: 8px;
+}
+
+.context-snippet-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: $uni-text-color-muted;
+  text-transform: uppercase;
+}
+
+.context-snippet-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: $text-main;
+  white-space: pre-wrap;
+}
+
+.context-snippet.placeholder {
+  font-size: 12px;
+  color: $uni-text-color-muted;
 }
 
 .ai-chat-body {
   flex: 1;
-  padding: 10px 12px;
-  background: #fafafa;
+  padding: 8px 10px;
+  background: $uni-bg-color-grey;
 }
 
 .ai-message {
@@ -1643,19 +4941,21 @@ $border-color: #E0E0E0;
 .ai-message-bubble {
   max-width: 90%;
   padding: 8px 10px;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-radius: 12px;
+  background: $uni-bg-color;
+  border: 1px solid rgba($border-color, 0.75);
+  box-shadow: 0 1px 0 rgba(18, 52, 77, 0.03);
 }
 
 .ai-message-user .ai-message-bubble {
-  background: #12344D;
-  color: #ffffff;
+  background: rgba($brand-dark, 0.96);
+  color: $uni-text-color-inverse;
+  border-color: rgba($brand-dark, 0.18);
 }
 
 .ai-message-role {
   font-size: 11px;
-  color: #999;
+  color: $uni-text-color-muted;
 }
 
 .ai-message-user .ai-message-role {
@@ -1674,24 +4974,35 @@ $border-color: #E0E0E0;
   margin-top: 6px;
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
 }
 
 .ai-export-btn {
   font-size: 12px;
   color: $brand-gold;
+  cursor: pointer;
+}
+
+.ai-export-btn.primary {
+  color: $brand-dark;
+  font-weight: 600;
 }
 
 .ai-empty-tip {
-  margin-top: 16px;
+  margin: 12px 10px 0;
+  padding: 10px 10px;
   font-size: 12px;
-  color: #999;
+  color: $uni-text-color-muted;
   text-align: center;
+  border: 1px dashed rgba($border-color, 0.9);
+  border-radius: 12px;
+  background: rgba($brand-dark, 0.02);
 }
 
 .ai-input-area {
-  padding: 8px 10px;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  padding: 6px 10px;
+  border-top: 1px solid rgba($border-color, 0.9);
+  background: $uni-bg-color;
   display: flex;
   flex-direction: row;
   align-items: flex-end;
@@ -1700,17 +5011,32 @@ $border-color: #E0E0E0;
 
 .ai-input {
   flex: 1;
-  min-height: 64rpx;
-  max-height: 140rpx;
-  padding: 8rpx 10rpx;
-  border-radius: 8rpx;
-  border: 1rpx solid #e5e7eb;
-  font-size: 26rpx;
-  background-color: #fafafa;
+  min-height: 28px;
+  max-height: 96px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba($border-color, 0.9);
+  font-size: 12px;
+  background-color: rgba($brand-dark, 0.02);
 }
 
 .ai-send-btn {
   flex-shrink: 0;
+  height: 32px;
+  line-height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgba($brand-dark, 0.96);
+  color: $uni-text-color-inverse;
+  font-size: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ai-send-btn.disabled {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .drawer-header {
@@ -1761,6 +5087,19 @@ $border-color: #E0E0E0;
     justify-content: center;
     color: #999;
     font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .project-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header-right {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 8px;
   }
 }
 
@@ -1833,6 +5172,262 @@ $border-color: #E0E0E0;
   justify-content: center;
   z-index: 1000;
 }
+
+.ocr-modal {
+  width: 880px;
+  max-width: 92vw;
+}
+
+.ocr-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.ocr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.35);
+  cursor: crosshair !important;
+}
+
+.ocr-frame-img {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* 让“网页截图区域”也有明确的截图态视觉（避免看起来像仍在操作真实网页） */
+  filter: brightness(0.88) contrast(0.98);
+}
+
+.ocr-frame-loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.9);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.ocr-frame-shade {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.18);
+  pointer-events: none;
+}
+
+.ocr-overlay-topbar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(224, 224, 224, 0.8);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 92vw;
+}
+
+.ocr-overlay-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #12344D;
+}
+
+.ocr-overlay-hint {
+  font-size: 12px;
+  color: #64748b;
+  max-width: 520px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ocr-overlay-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ocr-overlay-btn {
+  height: 28px;
+  line-height: 28px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: #fff;
+  font-size: 12px;
+  color: #12344D;
+}
+
+.ocr-selection {
+  position: fixed;
+  border: 2px solid rgba(37, 99, 235, 0.75);
+  background: rgba(37, 99, 235, 0.12);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.ocr-overlay-hintline {
+  position: fixed;
+  left: 14px;
+  top: 14px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(224, 224, 224, 0.7);
+  border-radius: 10px;
+  font-size: 12px;
+  color: #12344D;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.ocr-actionbar {
+  position: fixed;
+  z-index: 10001;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(224, 224, 224, 0.9);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+}
+
+.ocr-actionbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ocr-action {
+  height: 28px;
+  line-height: 28px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: #fff;
+  font-size: 12px;
+  color: #12344D;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ocr-action.primary {
+  background: #12344D;
+  border-color: transparent;
+  color: #fff;
+}
+
+.ocr-action.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.webmark-drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10003; /* 高于 ghost（10002），确保拖拽时事件不落到 WPS iframe */
+  background: transparent;
+  pointer-events: auto;
+  cursor: grabbing;
+}
+
+.filelink-float {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 10004;
+  width: 520px;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba($brand-border-light, 0.9);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: $brand-card-shadow-soft;
+}
+
+.filelink-float-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: $uni-text-color;
+}
+
+.filelink-float-sub {
+  margin-top: 6px;
+  font-size: 12px;
+  color: $uni-text-color-secondary;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filelink-float-zones {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.filelink-float-zone {
+  flex: 1;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 2px dashed rgba(37, 99, 235, 0.25);
+  background: rgba(37, 99, 235, 0.06);
+  color: #12344D;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: auto; /* 关键：确保能接收拖拽事件 */
+  transition: all 0.2s;
+  z-index: 10005 !important; /* 强制最高层级 */
+}
+
+.filelink-float-zone.active {
+  border-color: rgba(37, 99, 235, 0.8);
+  background: rgba(37, 99, 235, 0.25);
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+
+.webmark-drag-ghost {
+  position: fixed;
+  z-index: 10002; /* 高于 OCR hintline */
+  width: 180px;
+  height: 120px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.18);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  pointer-events: none; /* 不挡鼠标 hit-test */
+  opacity: 0.82;
+}
+
+.webmark-ghost-img {
+  width: 100%;
+  height: 100%;
+}
+
+.webmark-ghost-badge {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 
 .folder-modal {
   width: 580rpx;
