@@ -66,7 +66,7 @@ export default {
       editorReady: false,
       fileId: 'example_doc_1',
       fileName: '示例文档.docx',
-      appId: 'SX20251208BJWRFK', // 替换为你的 AppID
+      appId: 'AK20251215TTJNYB', // 替换为你的 AppID
       mode: 'edit', // 'edit' 或 'view'
       userId: '1780305141' // 可选，用户 ID
     }

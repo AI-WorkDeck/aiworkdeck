@@ -1,28 +1,34 @@
 <template>
   <view class="page-admin">
-    <view class="topbar">
-      <view class="topbar-left" @tap="goBack">
-        <text class="topbar-back">←</text>
-        <text class="topbar-title">系统设置</text>
-      </view>
-      <view class="topbar-right" @tap="goToUserProfile">
-        <view class="topbar-avatar">
-          <text class="avatar-text">{{ userDisplayName?.charAt(0) || 'U' }}</text>
+    <view class="admin-container">
+      <!-- Sidebar -->
+      <view class="admin-sidebar">
+        <view class="sidebar-logo-area">
+            <image src="/static/logo_full.png" class="sidebar-logo" mode="heightFix" />
         </view>
-      </view>
-    </view>
-    <view class="admin-layout">
-      <!-- 左侧导航 -->
-      <view class="admin-sider">
-        <view class="admin-title">系统管理</view>
-        <view
-          v-for="nav in navItems"
-          :key="nav.key"
-          class="nav-item"
-          :class="{ active: activeNav === nav.key }"
-          @tap="activeNav = nav.key"
-        >
-          <text class="nav-text">{{ nav.label }}</text>
+
+        <view class="nav-card">
+            <view class="nav-card-header">
+                <text class="nav-card-title">系统管理</text>
+            </view>
+            <view class="nav-list">
+                <view
+                  v-for="nav in navItems"
+                  :key="nav.key"
+                  class="nav-item"
+                  :class="{ active: activeNav === nav.key }"
+                  @tap="activeNav = nav.key"
+                >
+                  <text class="nav-text">{{ nav.label }}</text>
+                </view>
+            </view>
+            
+            <view class="nav-footer">
+                <view class="action-item" @tap="goToUserProfile">
+                  <text class="action-text">返回个人中心</text>
+                  <text class="action-arrow">›</text>
+                </view>
+            </view>
         </view>
       </view>
 
@@ -209,7 +215,27 @@
             </view>
           </view>
 
-          <!-- AI 配置 -->
+
+
+          <!-- 保存按钮 -->
+          <view class="fixed-footer">
+            <button
+              class="btn-save"
+              type="primary"
+              :loading="saving"
+              @tap="handleSave"
+            >
+              保存配置
+            </button>
+          </view>
+        </scroll-view>
+
+        <!-- AI 配置 -->
+        <scroll-view
+          v-else-if="activeNav === 'ai'"
+          scroll-y
+          class="config-scroll"
+        >
           <view class="section-card">
             <view class="section-header">
               <text class="section-title">AI 服务配置</text>
@@ -219,7 +245,7 @@
             </view>
             <view class="section-body">
               <view class="form-row">
-                <text class="form-label">激活供应商</text>
+                <text class="form-label">默认AI供应商</text>
                 <view class="provider-radio-group">
                   <view
                     v-for="opt in aiProviderOptions"
@@ -233,16 +259,63 @@
                   </view>
                 </view>
               </view>
-              <view class="form-row vertical">
-                <text class="form-label">系统提示词</text>
+              
+              <!-- Tab for Prompt Config -->
+              <view class="prompt-tabs">
+                  <view 
+                    class="prompt-tab" 
+                    :class="{ active: activePromptTab === 'OLLAMA' }"
+                    @tap="activePromptTab = 'OLLAMA'"
+                  >本地 Ollama</view>
+                  <view 
+                    class="prompt-tab" 
+                    :class="{ active: activePromptTab === 'GEMINI' }"
+                    @tap="activePromptTab = 'GEMINI'"
+                  >Google Gemini</view>
+              </view>
+              
+              <view class="form-row vertical" v-if="activePromptTab === 'OLLAMA'">
+                <text class="form-label">Ollama 系统提示词</text>
                 <textarea
                   class="prompt-textarea"
-                  v-model="form.ai.systemPrompt"
-                  placeholder="用于约束 AI 行为的系统提示词，例如：只有在用户明确要求时才创建或保存文件..."
+                  v-model="form.ai.systemPromptOllama"
+                  placeholder="针对 Ollama 模型的系统提示词 (留空则无系统指令)"
                   :maxlength="-1"
                   auto-height
                 />
               </view>
+
+              <view class="form-row vertical" v-if="activePromptTab === 'GEMINI'">
+                <text class="form-label">Gemini 系统提示词</text>
+                <textarea
+                  class="prompt-textarea"
+                  v-model="form.ai.systemPromptGemini"
+                  placeholder="针对 Gemini 模型的系统提示词 (留空则无系统指令)"
+                  :maxlength="-1"
+                  auto-height
+                />
+              </view>
+              
+              <!-- Assistant Management Section -->
+              <view class="section-divider"></view>
+              <view class="section-header-inline">
+                  <text class="section-title-sm">AI 助手管理</text>
+                  <view class="admin-ai-add-btn" @tap="handleAddAssistant">+ 新增助手</view>
+              </view>
+              
+              <view class="assistant-list">
+                  <view v-for="(ast, index) in form.ai.assistants" :key="ast.id" class="assistant-card">
+                      <view class="ast-header">
+                          <text class="ast-name">{{ ast.name }} <text class="ast-id">({{ ast.id }})</text></text>
+                          <view class="ast-actions">
+                              <text class="action-btn" @tap="handleEditAssistant(index)">编辑</text>
+                              <text class="action-btn delete" @tap="handleDeleteAssistant(index)">删除</text>
+                          </view>
+                      </view>
+                      <text class="ast-desc">{{ ast.description || '暂无描述' }}</text>
+                  </view>
+              </view>
+
             </view>
           </view>
 
@@ -316,6 +389,40 @@
         </scroll-view>
       </view>
     </view>
+    
+    <!-- Assistant Edit Modal (Custom Overlay) -->
+    <view v-if="showAssistantModal" class="modal-overlay" @tap.stop>
+        <view class="modal-content">
+            <view class="modal-header">
+                <text class="modal-title">{{ isEditing ? '编辑助手' : '新增助手' }}</text>
+                <text class="modal-close" @tap="closeAssistantModal">×</text>
+            </view>
+            <scroll-view scroll-y class="modal-body">
+                <view class="modal-body-inner">
+                    <view class="modal-field">
+                        <text class="form-label">ID (唯一标识)</text>
+                        <input class="modal-input" v-model="editingAssistant.id" :disabled="isEditing" placeholder="例如: code-reviewer"/>
+                    </view>
+                     <view class="modal-field">
+                        <text class="form-label">助手名称</text>
+                        <input class="modal-input" v-model="editingAssistant.name" placeholder="例如: 代码评审专家"/>
+                    </view>
+                     <view class="modal-field">
+                        <text class="form-label">描述</text>
+                        <input class="modal-input" v-model="editingAssistant.description" placeholder="简短描述功能"/>
+                    </view>
+                     <view class="modal-field">
+                        <text class="form-label">系统提示词</text>
+                        <textarea class="modal-textarea" v-model="editingAssistant.systemPrompt" placeholder="设定助手的角色和行为..." maxlength="-1" auto-height/>
+                    </view>
+                </view>
+            </scroll-view>
+            <view class="modal-footer">
+                <button class="btn-cancel" @tap="closeAssistantModal">取消</button>
+                <button class="btn-primary" @tap="saveAssistantModal">确定</button>
+            </view>
+        </view>
+    </view>
   </view>
 </template>
 
@@ -329,8 +436,10 @@ export default {
     return {
       userDisplayName: '用户',
       activeNav: 'config',
+      activePromptTab: 'OLLAMA', // 'OLLAMA' | 'GEMINI'
       navItems: [
         { key: 'config', label: '系统配置' },
+        { key: 'ai', label: 'AI 功能设置' },
         { key: 'users', label: '用户管理' },
       ],
       form: {
@@ -342,14 +451,33 @@ export default {
           aliyunOcr: { accessKeyId: '', accessKeySecret: '', endpoint: '', regionId: '', publicBaseUrl: '' },
         },
         ai: {
-          systemPrompt: '',
+          systemPromptOllama: '',
+          systemPromptGemini: '',
           activeProvider: 'OLLAMA',
+          assistants: [],
         },
       },
       aiProviderOptions: [
         { value: 'OLLAMA', label: '本地 Ollama' },
         { value: 'GEMINI', label: 'Google Gemini' },
       ],
+      // Helpers
+      defaultAssistants: [
+        { id: 'default', name: '默认助手', tools: [], systemPrompt: '你是一个专业的助手。', description: 'Generic Assistant' },
+        { id: 'rename', name: '重命名助手', tools: ['renameFile', 'listFiles'], systemPrompt: '你是一个由Google Deepmind开发的文件管理专家。用户会提供文件目录信息或重命名请求，你需要使用工具对文件进行批量重命名。注意：在执行重命名前，最好列出计划，但如果用户非常明确，可以直接调用工具。', description: 'Rename Assistant' },
+        { id: 'info-extract', name: '信息抽取助手', tools: [], systemPrompt: '你负责从文档中提取关键信息。请以JSON格式输出提取结果。', description: 'Info Extractor' },
+        { id: 'desensitization', name: '脱敏助手', tools: [], systemPrompt: '你负责识别并脱敏文档中的敏感信息。将敏感信息替换为[脱敏]。', description: 'De-identification' },
+      ],
+      // Modal State
+      showAssistantModal: false,
+      editingAssistant: {
+          id: '',
+          name: '',
+          systemPrompt: '',
+          description: '',
+          tools: []
+      },
+      isEditing: false, // true if editing existing, false if adding new
       saving: false,
       usersLoading: false,
       users: [],
@@ -409,8 +537,16 @@ export default {
           }
         }
         if (data && data.ai) {
-          this.form.ai.systemPrompt = data.ai.systemPrompt || ''
+          this.form.ai.systemPromptOllama = data.ai.systemPromptOllama || ''
+          this.form.ai.systemPromptGemini = data.ai.systemPromptGemini || ''
           this.form.ai.activeProvider = data.ai.activeProvider || 'OLLAMA'
+          
+          if (data.ai.assistants && data.ai.assistants.length > 0) {
+              this.form.ai.assistants = data.ai.assistants;
+          } else {
+              // Initialize with defaults if empty (first time migration)
+              this.form.ai.assistants = JSON.parse(JSON.stringify(this.defaultAssistants));
+          }
         }
       } catch (e) {
         console.error('加载后台配置失败', e)
@@ -443,139 +579,255 @@ export default {
         this.saving = false
       }
     },
+    // Assistant Methods
+    handleAddAssistant() {
+        this.isEditing = false;
+        this.editingAssistant = {
+            id: '',
+            name: '',
+            systemPrompt: '',
+            description: '',
+            tools: [] // Future: select tools
+        };
+        this.showAssistantModal = true;
+    },
+    handleEditAssistant(index) {
+        this.isEditing = true;
+        // Deep copy to disconnect reference
+        this.editingAssistant = JSON.parse(JSON.stringify(this.form.ai.assistants[index]));
+        this.editingIndex = index;
+        this.showAssistantModal = true;
+    },
+    handleDeleteAssistant(index) {
+        uni.showModal({
+            title: '确认删除',
+            content: '确定要删除这个助手吗？',
+            confirmText: '删除',
+            confirmColor: '#ff4d4f',
+            success: (res) => {
+                if (res.confirm) {
+                    this.form.ai.assistants.splice(index, 1);
+                }
+            }
+        });
+    },
+    closeAssistantModal() {
+        this.showAssistantModal = false;
+    },
+    saveAssistantModal() {
+        if (!this.editingAssistant.id || !this.editingAssistant.name) {
+            uni.showToast({ title: 'ID和名称不能为空', icon: 'none' });
+            return;
+        }
+        
+        // Check ID uniqueness if adding
+        if (!this.isEditing) {
+            const exists = this.form.ai.assistants.find(a => a.id === this.editingAssistant.id);
+            if (exists) {
+                uni.showToast({ title: 'ID 已存在', icon: 'none' });
+                return;
+            }
+            this.form.ai.assistants.push(this.editingAssistant);
+        } else {
+            // Update existing
+            // If ID changed, check unique? Usually ID shouldn't change, but let's allow it for now if needed, or check validity.
+            // Simplified: direct overwrite
+            this.form.ai.assistants.splice(this.editingIndex, 1, this.editingAssistant);
+        }
+        
+        this.showAssistantModal = false;
+    }
   },
 }
 </script>
 
 <style lang="scss" scoped>
-.topbar {
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #ffffff;
-}
+/* King IDE Color System */
+$king-forest: #1A5336;
+$king-mint: #5BD197;
+$king-mint-light: #E6F9F0;
+$king-forest-dark: #123A26;
 
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-}
-
-.topbar-back {
-  font-size: 16px;
-  color: #12344D;
-}
-
-.topbar-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #12344D;
-}
-
-.topbar-right {
-  cursor: pointer;
-}
-
-.topbar-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  background: #12344D;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.avatar-text {
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-$brand-gold: #C8A45D;
-$brand-dark: #12344D;
-$brand-bg: #F7F5F0;
+$brand-primary: $king-forest;
+$brand-accent: $king-mint;
+$brand-bg: #F8F9FA; // Gray-Pale
 $brand-white: #FFFFFF;
-$text-main: #1A1A1A;
-$text-secondary: #666666;
-$border-color: #E0E0E0;
+$text-main: #2C3338; // Gray-Dark
+$text-secondary: #6C757D; // Gray-Medium
+$border-color: #E9ECEF; // Gray-Light
 
+.prompt-tabs {
+    display: flex;
+    border-bottom: 1px solid $border-color;
+    margin-bottom: 16px;
+    gap: 24px;
+}
+.prompt-tab {
+    padding: 8px 0;
+    font-size: 13px;
+    color: $text-secondary;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+.prompt-tab.active {
+    color: $brand-primary;
+    border-bottom-color: $brand-primary;
+}
 .page-admin {
   min-height: 100vh;
-  background-color: $brand-bg;
-  padding: 32px 24px;
+  /* King IDE Palette Background */
+  background: linear-gradient(135deg, #F8F9FA 0%, #E8F3ED 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 40px 24px;
   box-sizing: border-box;
 }
 
-.admin-layout {
+.admin-container {
   max-width: 1200px;
   margin: 0 auto;
+  width: 100%;
   display: flex;
   flex-direction: row;
+  align-items: flex-start;
   gap: 24px;
 }
 
-.admin-sider {
-  width: 220px;
+.admin-sidebar {
+  width: 260px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-logo-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-left: 8px;
+}
+
+.sidebar-logo {
+    height: 32px;
+    width: auto;
+}
+
+.nav-card {
   background: $brand-white;
   border-radius: 16px;
   box-shadow: 0 4px 16px rgba(18, 52, 77, 0.05);
-  padding: 20px 16px;
+  border: 1px solid rgba(0,0,0,0.02);
+  overflow: hidden;
+  padding: 24px 0 16px;
+  display: flex;
+  flex-direction: column;
 }
 
-.admin-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: $text-main;
-  margin-bottom: 16px;
+.nav-card-header {
+    padding: 0 24px 16px;
+    border-bottom: 1px solid $border-color;
+    margin-bottom: 12px;
+}
+
+.nav-card-title {
+   font-size: 13px;
+   font-weight: 600;
+   color: $text-secondary;
+   text-transform: uppercase;
+   letter-spacing: 0.5px;
+}
+
+.nav-list {
+    padding: 0 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .nav-item {
-  padding: 10px 12px;
+  padding: 12px 16px;
   border-radius: 8px;
-  margin-bottom: 4px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-item:hover {
+    background-color: rgba(0,0,0, 0.02);
 }
 
 .nav-item.active {
-  background: rgba(18, 52, 77, 0.06);
+  background: $king-mint-light;
 }
 
 .nav-text {
   font-size: 14px;
   color: $text-secondary;
+  font-weight: 500;
 }
 
 .nav-item.active .nav-text {
-  color: $brand-dark;
+  color: $brand-primary;
   font-weight: 600;
+}
+
+.nav-footer {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #f9f9f9;
+}
+
+.action-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: background 0.2s;
+  
+  &:hover {
+    background-color: #F8F9FA;
+  }
+}
+
+.action-text {
+  font-size: 14px;
+  color: $text-secondary;
+}
+
+.action-arrow {
+  font-size: 18px;
+  color: #ADB5BD;
+  font-family: monospace;
 }
 
 .admin-main {
   flex: 1;
   min-width: 0;
-  background: transparent;
+  display: flex;
+  flex-direction: column;
 }
 
 .config-scroll {
-  height: calc(100vh - 80px);
+  height: calc(100vh - 140px);
 }
 
 .section-card {
   background: $brand-white;
-  border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(18, 52, 77, 0.04);
-  margin-bottom: 20px;
+  border-radius: 12px;
+  border: 1px solid $border-color;
+  margin-bottom: 24px;
   overflow: hidden;
 }
 
 .section-header {
-  padding: 20px 24px 12px;
-  border-bottom: 1px solid #f1f1f1;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid $border-color;
 }
 
 .section-title {
@@ -586,24 +838,25 @@ $border-color: #E0E0E0;
 
 .section-subtitle {
   display: block;
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 4px;
+  font-size: 13px;
   color: $text-secondary;
 }
 
 .section-body {
-  padding: 16px 24px 24px;
+  padding: 24px;
 }
 
 .provider-card {
-  border: 1px solid #f1f1f1;
-  border-radius: 12px;
-  padding: 12px 16px 8px;
-  margin-bottom: 12px;
+  border: 1px solid $border-color;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  background-color: #FAFAFA;
 }
 
 .provider-header {
-  margin-bottom: 8px;
+  margin-bottom: 16px;
 }
 
 .provider-name {
@@ -615,95 +868,354 @@ $border-color: #E0E0E0;
 .form-row {
   display: flex;
   align-items: center;
-  margin: 8px 0;
+  margin-bottom: 16px;
+  &:last-child {
+      margin-bottom: 0;
+  }
 }
 
 .form-row.vertical {
   flex-direction: column;
   align-items: flex-start;
+  gap: 8px;
+  width: 100%; /* Fix modal input width */
 }
 
 .form-label {
-  width: 90px;
+  width: 100px;
   font-size: 13px;
-  color: $text-secondary;
+  color: $text-main;
+  font-weight: 500;
 }
 
 .form-input {
   flex: 1;
-  height: 34px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid $border-color;
   font-size: 13px;
-  background-color: #fafafa;
+  background-color: #fff;
+  transition: border-color 0.2s;
+  
+  &:focus {
+      border-color: $brand-primary;
+      outline: none;
+  }
 }
 
 .prompt-textarea {
   width: 100%;
-  min-height: 80px;
-  margin-top: 6px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  min-height: 120px;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid $border-color;
   font-size: 13px;
-  background-color: #fafafa;
+  background-color: #fff;
   box-sizing: border-box;
+  line-height: 1.5;
+  
+  &:focus {
+      border-color: $brand-primary;
+      outline: none;
+  }
 }
 
 .provider-radio-group {
   flex: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
 }
 
 .radio-item {
   display: flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: 16px;
-  border: 1px solid #e5e7eb;
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid $border-color;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.radio-item:hover {
+    border-color: $text-secondary;
 }
 
 .radio-item.checked {
-  border-color: $brand-dark;
-  background: rgba(18, 52, 77, 0.06);
+  border-color: $brand-primary;
+  background: $king-mint-light;
 }
 
 .radio-dot {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  border: 1px solid #9ca3af;
-  margin-right: 6px;
+  border: 4px solid #fff;
+  box-shadow: 0 0 0 1px $text-secondary;
+  margin-right: 8px;
+}
+
+// Assistant & Modal Styles
+.section-header-inline {
+    display: flex;
+    flex-direction: row; /* Ensure row layout */
+    justify-content: flex-start;
+    align-items: center;
+    gap: 16px; /* Explicit gap */
+    margin-bottom: 16px;
+}
+.section-title-sm {
+    font-size: 14px;
+    font-weight: 600;
+    color: $text-main;
+}
+
+/* Explicit new class for the button to avoid native button styles */
+.admin-ai-add-btn {
+    font-size: 12px;
+    background-color: #fff;
+    color: $text-secondary;
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: 1px solid $border-color;
+    line-height: 1.5;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex; /* Use inline-flex */
+    align-items: center;
+    justify-content: center;
+    
+    &:hover {
+        color: $brand-primary;
+        border-color: $brand-primary;
+        background: $king-mint-light;
+    }
+}
+
+/* Clean Modal Styles - No reuse of .form-row */
+.modal-field {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    margin-bottom: 16px;
+    box-sizing: border-box;
+}
+
+.modal-input {
+    width: 100%;
+    flex: none; /* Disable flex scaling */
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 6px;
+    border: 1px solid $border-color;
+    font-size: 13px;
+    background-color: #fff;
+    box-sizing: border-box; /* Strict box model */
+    transition: border-color 0.2s;
+}
+
+.modal-input:focus {
+    border-color: $brand-primary;
+    outline: none;
+}
+
+.modal-textarea {
+    width: 100%;
+    flex: none;
+    min-height: 120px;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid $border-color;
+    font-size: 13px;
+    background-color: #fff;
+    box-sizing: border-box;
+    line-height: 1.5;
+}
+
+.modal-textarea:focus {
+    border-color: $brand-primary;
+    outline: none;
+}
+
+.section-divider {
+    height: 1px;
+    background: $border-color;
+    margin: 24px 0;
+}
+.assistant-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.assistant-card {
+    background: #FAFAFA;
+    border: 1px solid $border-color;
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.2s;
+    &:hover {
+        border-color: $brand-primary;
+    }
+}
+.ast-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.ast-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: $text-main;
+}
+.ast-id {
+    font-size: 12px;
+    color: $text-secondary;
+    font-weight: 400;
+    margin-left: 6px;
+}
+.ast-actions {
+    display: flex;
+    gap: 12px;
+}
+.action-btn {
+    font-size: 12px;
+    color: $brand-primary;
+    cursor: pointer;
+    &:hover { opacity: 0.8; }
+}
+.action-btn.delete {
+    color: #ff4d4f;
+}
+.ast-desc {
+    font-size: 12px;
+    color: $text-secondary;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+
+// Modal
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-content {
+    width: 500px;
+    max-width: 90vw;
+    background: #fff;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.modal-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid $border-color;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: $text-main;
+}
+.modal-close {
+    font-size: 24px;
+    color: $text-secondary;
+    cursor: pointer;
+    line-height: 1;
+    &:hover { color: $text-main; }
+}
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0; /* Important for flex child scroll */
+}
+.modal-body-inner {
+    padding: 24px;
+    box-sizing: border-box;
+    width: 100%;
+}
+.modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid $border-color;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+.btn-cancel {
+    font-size: 14px;
+    background: #fff;
+    border: 1px solid $border-color;
+    color: $text-main;
+    padding: 6px 16px;
+    border-radius: 6px;
+    line-height: 1.5;
+    &:after { border: none; }
+}
+.btn-primary {
+    font-size: 14px;
+    background: $brand-primary;
+    color: #fff;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 6px;
+    line-height: 1.5;
+     &:after { border: none; }
 }
 
 .radio-item.checked .radio-dot {
-  border-color: $brand-dark;
-  background: $brand-dark;
+  background: $brand-primary;
+  box-shadow: 0 0 0 1px $brand-primary;
 }
 
 .radio-label {
-  font-size: 12px;
-  color: $text-secondary;
+  font-size: 13px;
+  color: $text-main;
 }
 
 .fixed-footer {
-  padding: 12px 24px 24px;
+  padding: 24px 0;
   display: flex;
   justify-content: flex-end;
 }
 
 .btn-save {
-  min-width: 120px;
-  height: 36px;
-  line-height: 36px;
-  background: $brand-dark;
+  min-width: 140px;
+  height: 40px;
+  line-height: 40px;
+  background: $brand-primary;
   color: #fff;
-  border-radius: 999px;
+  border-radius: 6px; // Slightly rounded
   font-size: 14px;
+  font-weight: 500;
   border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(26, 83, 54, 0.2);
+  transition: background 0.2s;
+  
+  &:active {
+      background: $king-forest-dark;
+  }
+  
+  &[loading] {
+      opacity: 0.8;
+  }
 }
 
 .user-list {
@@ -715,21 +1227,25 @@ $border-color: #E0E0E0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #f1f1f1;
+  padding: 16px 0;
+  border-bottom: 1px solid $border-color;
+  &:last-child {
+      border-bottom: none;
+  }
 }
 
 .user-main {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .avatar-mini {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: $brand-dark;
+  background: $border-color;
+  color: $text-secondary;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -737,16 +1253,18 @@ $border-color: #E0E0E0;
 
 .avatar-char {
   font-size: 16px;
-  color: #fff;
+  font-weight: 600;
 }
 
 .user-meta {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
 .user-name {
   font-size: 14px;
+  font-weight: 600;
   color: $text-main;
 }
 
@@ -756,30 +1274,31 @@ $border-color: #E0E0E0;
 }
 
 .admin-tag {
-  margin-left: 6px;
+  display: inline-block;
+  margin-left: 8px;
   font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(200, 164, 93, 0.12);
-  color: $brand-gold;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: $king-mint-light;
+  color: $brand-primary;
+  font-weight: 500;
+  vertical-align: middle;
 }
 
 .user-extra {
-  font-size: 12px;
+  font-size: 13px;
   color: $text-secondary;
 }
 
 .loading,
 .empty {
-  padding: 20px 0;
+  padding: 40px 0;
   text-align: center;
 }
 
 .loading-text,
 .empty-text {
-  font-size: 13px;
+  font-size: 14px;
   color: $text-secondary;
 }
 </style>
-
-

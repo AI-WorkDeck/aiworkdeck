@@ -90,7 +90,7 @@ backend/
 ```yaml
 external:
   wps:
-    app-id: SX20251208BJWRFK          # 从 WPS 控制台获取
+    app-id: AK20251215TTJNYB          # 从 WPS 控制台获取
     app-secret: ***REMOVED***  # 从 WPS 控制台获取
     callback-base-url: https://checkbahttps.vip.cpolar.cn  # 回调网关地址（需公网可访问）
 ```
@@ -124,7 +124,7 @@ export default {
       showEditor: false,
       fileId: 'project_123_doc_1',
       fileName: '项目文档.docx',
-      appId: 'SX20251208BJWRFK'
+      appId: 'AK20251215TTJNYB'
     }
   },
   methods: {
@@ -154,7 +154,7 @@ const session = await createWpsSession({
 // 2. 初始化编辑器
 const instance = await initWpsEditor({
   containerId: 'wps-container',
-  appId: 'SX20251208BJWRFK',
+  appId: 'AK20251215TTJNYB',
   fileId: 'project_123_doc_1',
   fileName: '项目文档.docx',
   mode: 'edit',
@@ -246,7 +246,7 @@ export default {
       ready: false,
       fileId: 'project_123_doc_1',
       fileName: '项目文档.docx',
-      appId: 'SX20251208BJWRFK',
+      appId: 'AK20251215TTJNYB',
       mode: 'edit',
       currentUserId: '1780305141'
     }
@@ -286,7 +286,7 @@ export default {
    ```javascript
    const instance = await initWpsEditor({
      containerId: 'wps-container',
-     appId: 'SX20251208BJWRFK',
+     appId: 'AK20251215TTJNYB',
      fileId: 'project_123_doc_1',
      fileName: '项目文档.docx',
      mode: 'edit',

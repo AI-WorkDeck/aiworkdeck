@@ -77,7 +77,7 @@ public class AiModelProperties {
         /**
          * 用于对话的模型名称。
          */
-        private String modelName = "qwen2.5:14b-instruct";
+        private String modelName = "qwen3-vl:8b";
 
         /**
          * 采样温度。

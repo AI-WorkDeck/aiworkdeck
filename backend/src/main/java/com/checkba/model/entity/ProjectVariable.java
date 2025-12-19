@@ -36,6 +36,12 @@ public class ProjectVariable {
     @Column(nullable = false)
     private String type; // "TEXT" or "TEMPLATE"
 
+    @Column(name = "creator_id")
+    private Long creatorId;
+
+    @Column(name = "creator_name")
+    private String creatorName;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -2,12 +2,7 @@
   <div class="variable-panel">
     <div class="variable-layout">
       <div class="variable-main">
-        <div class="panel-topbar">
-          <div class="top-actions">
-            <button class="top-btn" @click="openCreateModal" title="将选中文字设为变量">＋ 设为变量</button>
-            <button class="top-btn ghost" @click="syncDocument" title="同步当前文档">↻ 同步</button>
-          </div>
-        </div>
+
 
         <div class="variable-list">
           <div v-if="loading" class="loading">加载中...</div>
@@ -15,27 +10,37 @@
           <div v-else-if="!filteredItems.length" class="empty">未找到匹配的变量</div>
 
           <div v-else class="list-scroll">
-            <div class="list">
-              <div v-for="it in filteredItems" :key="it.key" class="card">
-                <div class="card-head">
-                  <div class="head-left">
-                    <div class="type-badge" :class="'tone-' + it.tone" :title="it.meta">
-                      <span class="type-badge-text">{{ it.badgeText }}</span>
-                    </div>
-                    <div class="title-wrap">
-                      <div class="card-title" :title="it.name">{{ it.name }}</div>
-                      <div class="card-sub">{{ formatUpdateTime(it.updatedAt) }}</div>
+            <div class="list-grid">
+              <div v-for="it in filteredItems" :key="it.key" class="var-card">
+                <div class="var-card-header">
+                  <div class="var-info">
+                    <div class="var-name" :title="it.name">{{ it.name }}</div>
+                    <div class="var-creator">{{ it.creatorName || (it.scope === 'U' ? 'User' : 'Project') }}</div>
+                    <span class="var-time-top">{{ formatUpdateTime(it.updatedAt) }}</span>
+                  </div>
+                  <div class="var-actions-top">
+                    <!-- Vertical Stack -->
+                    <button class="var-act-btn" @click.stop="insertVariable(it)" title="插入">⚡</button>
+                    <button class="var-act-btn" @click.stop="updateValueFromSelection(it)" title="更新值">↻</button>
+                    <div class="del-wrapper" style="position: relative;">
+                      <button v-if="it.canDelete" class="var-act-btn danger" @click.stop="requestDelete(it)" title="删除">×</button>
+                      <!-- Inline Confirm Popup -->
+                      <div v-if="confirmDeleteKey === it.key" class="delete-popover" @click.stop>
+                        <div class="pop-arrow"></div>
+                        <div class="pop-text">确认删除?</div>
+                        <div class="pop-row">
+                          <span class="pop-btn" @click.stop="cancelDelete">取消</span>
+                          <span class="pop-btn danger" @click.stop="confirmDelete(it)">确定</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div class="card-actions">
-                    <button class="mini-btn" @click="insertVariable(it)">插入</button>
-                    <button class="mini-btn ghost" @click="updateValueFromSelection(it)">更新</button>
-                    <button v-if="it.canDelete" class="mini-btn danger" @click="removeVariable(it)">删</button>
-                  </div>
                 </div>
-                <div class="card-body">
-                  <div class="card-value" :title="it.value">{{ it.value || '（空）' }}</div>
-                </div>
+                
+                
+                <div class="var-value" :title="it.value">{{ it.value || '（空）' }}</div>
+                
+                <!-- Footer removed to maximize content space -->
               </div>
             </div>
           </div>
@@ -49,6 +54,13 @@
         <div class="scope-item" :class="{ active: activeScope === 'user' }" @click="switchScope('user')">用户变量</div>
       </div>
     </div>
+
+
+
+
+
+
+
 
     <div v-if="showCreateModal" class="modal-mask" @click="closeCreateModal">
       <div class="modal" @click.stop>
@@ -98,7 +110,8 @@ export default {
       userVars: [],
       docFields: [],
       showCreateModal: false,
-      createForm: { name: '' }
+      createForm: { name: '' },
+      confirmDeleteKey: null
     }
   },
   computed: {
@@ -117,13 +130,26 @@ export default {
           const varName = first.varName || key
           const count = list.length
           const value = this._resolveValue(scope, varName, first.text || '')
+          
+          let backendId = null
+          let canDelete = false
+          if (scope === 'P') {
+             const found = (this.projectVars || []).find(v => v.name === varName)
+             if (found) { backendId = found.id; canDelete = true; }
+          } else if (scope === 'U') {
+             const found = (this.userVars || []).find(v => v.name === varName)
+             if (found) { backendId = found.id; canDelete = true; }
+          }
+
           items.push(this._toCardItem({
             key,
             scope,
             name: varName,
             value,
             occurrences: count,
-            fieldIds: list.map(x => x.id).filter(Boolean)
+            fieldIds: list.map(x => x.id).filter(Boolean),
+            backendId,
+            canDelete
           }))
         })
         return items.sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-Hans-CN'))
@@ -262,7 +288,12 @@ export default {
       try {
         const d = new Date(v)
         if (Number.isNaN(d.getTime())) return '—'
-        return d.toLocaleString()
+        const Y = d.getFullYear()
+        const M = String(d.getMonth() + 1).padStart(2, '0')
+        const D = String(d.getDate()).padStart(2, '0')
+        const h = String(d.getHours()).padStart(2, '0')
+        const m = String(d.getMinutes()).padStart(2, '0')
+        return `${Y}-${M}-${D} ${h}:${m}`
       } catch (e) {
         return '—'
       }
@@ -404,38 +435,61 @@ export default {
       }
     },
 
-    async removeVariable(it) {
-      if (!it.canDelete) return
-      uni.showModal({
-        title: '确认删除',
-        content: `确定删除变量 \"${it.name}\"？`,
-        success: async (res) => {
-          if (!res.confirm) return
-          try {
-            if (it.scope === 'P') {
-              if (it.backendId) await deleteProjectVariable(it.backendId)
-              await this.fetchProjectVars()
-            } else if (it.scope === 'U') {
-              if (it.backendId) await deleteUserVariable(it.backendId)
-              await this.fetchUserVars()
-            }
-            uni.showToast({ title: '已删除', icon: 'success' })
-          } catch (e) {
-            uni.showToast({ title: e.message || '删除失败', icon: 'none' })
-          }
+    requestDelete(it) {
+      if (this.confirmDeleteKey === it.key) {
+        this.confirmDeleteKey = null // toggle off
+        return
+      }
+      this.confirmDeleteKey = it.key
+      // Auto-hide after 3 seconds if not confirmed
+      if (this._deleteTimer) clearTimeout(this._deleteTimer)
+      this._deleteTimer = setTimeout(() => {
+        if (this.confirmDeleteKey === it.key) {
+          this.confirmDeleteKey = null
         }
-      })
+      }, 5000)
+    },
+
+    cancelDelete() {
+      this.confirmDeleteKey = null
+      if (this._deleteTimer) clearTimeout(this._deleteTimer)
+    },
+
+    async confirmDelete(it) {
+      this.cancelDelete()
+      try {
+        if (it.scope === 'P') {
+          if (it.backendId) await deleteProjectVariable(it.backendId)
+          await this.fetchProjectVars()
+        } else if (it.scope === 'U') {
+          if (it.backendId) await deleteUserVariable(it.backendId)
+          await this.fetchUserVars()
+        }
+        uni.showToast({ title: '已删除', icon: 'success' })
+      } catch (e) {
+        uni.showToast({ title: e.message || '删除失败', icon: 'none' })
+      }
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
+/* Color Config - King IDE Palette */
+$color-primary: #1A5336; // King Forest
+$color-accent: #5BD197; // King Mint
+$color-accent-pale: #E6F9F0;
+$color-text-main: #2C3338;
+$color-text-light: #6C757D;
+$color-border: #E9ECEF;
+$bg-pale: #F8F9FA;
+$bg-white: #FFFFFF;
+
 .variable-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: $uni-bg-color;
+  background: $bg-pale;
 }
 
 .variable-layout {
@@ -452,274 +506,254 @@ export default {
   flex-direction: column;
 }
 
+/* Sidebar / Scope Rail */
 .scope-rail {
-  width: 96px;
+  width: 100px;
   flex-shrink: 0;
-  border-left: 1px solid rgba($brand-border-light, 0.9);
-  background: $uni-bg-color;
+  border-left: 1px solid $color-border;
+  background: $bg-white;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  padding: 8px 6px;
-  gap: 6px;
+  padding: 12px 8px;
+  gap: 4px;
 }
 
 .scope-item {
-  height: 26px;
-  line-height: 26px;
-  padding: 0 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
   font-size: 12px;
-  color: $uni-text-color-secondary;
+  color: $color-text-light;
   cursor: pointer;
-  user-select: none;
-  border-radius: 0;
-  background: transparent;
-  border-left: 2px solid transparent;
-}
-
-.scope-item:hover {
-  color: $uni-text-color;
-}
-
-.scope-item.active {
-  color: $brand-color-primary;
-  font-weight: 700;
-  border-left-color: $brand-color-primary;
+  text-align: left;
+  transition: all 0.2s;
+  font-weight: 500;
+  
+  &:hover {
+    background: $bg-pale;
+    color: $color-text-main;
+  }
+  
+  &.active {
+    background: $color-accent-pale; // Mint Lightest
+    color: $color-primary; // Forest Green
+    font-weight: 600;
+  }
 }
 
 .panel-topbar {
-  height: 32px;
+  height: 48px; /* Slightly taller for better spacing */
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-  border-bottom: 1px solid rgba($brand-border-light, 0.9);
-  background: $uni-bg-color;
+  justify-content: flex-start;
+  padding: 0 16px;
+  border-bottom: 1px solid $color-border;
+  background: $bg-white;
   flex-shrink: 0;
-  gap: 8px;
+  gap: 12px;
 }
 
 .top-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex: 0 0 auto;
 }
 
 .top-btn {
-  height: 26px;
-  line-height: 26px;
-  padding: 0 10px;
-  border-radius: 10px;
-  border: 1px solid rgba($uni-border-color, 0.6);
-  background: $uni-bg-color;
-  font-size: 12px;
-  color: $brand-color-primary;
+  height: 32px;
+  line-height: 30px; /* Center vertical alignment */
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid $color-border;
+  background: $bg-white;
+  font-size: 13px;
+  color: $color-text-main;
   cursor: pointer;
-}
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  font-weight: 500;
 
-.top-btn:hover {
-  border-color: rgba($brand-color-gold, 0.75);
-}
-
-.top-btn.ghost {
-  background: rgba($brand-color-primary, 0.04);
-  border-color: rgba($brand-color-primary, 0.14);
+  &:hover {
+    border-color: $color-accent;
+    color: $color-primary;
+    background: $color-accent-pale;
+  }
+  
+  &.ghost {
+    border-color: transparent;
+    background: transparent;
+    color: $color-text-light;
+    
+    &:hover {
+      background: $bg-pale;
+      color: $color-text-main;
+    }
+  }
 }
 
 .variable-list {
   flex: 1;
   overflow: hidden;
   padding: 0;
-  background: $uni-bg-color-grey;
+  background: $bg-pale; 
 }
 
 .loading, .empty {
   text-align: center;
-  color: $uni-text-color-muted;
-  padding: 20px;
+  color: $color-text-light;
+  padding: 48px 20px;
   font-size: 13px;
 }
 
+/* Horizontal Scroll Layout */
 .list-scroll {
   flex: 1;
-  min-height: 0;
+  width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 2px;
+  padding: 16px;
+  /* Use flex row for horizontal scrolling container */
+  white-space: nowrap;
 }
 
-.list {
-  display: flex;
-  flex-direction: row;
+.list-grid {
+  display: inline-flex;
+  gap: 16px;
+  height: 100%;
   align-items: stretch;
-  gap: 12px;
-  min-height: 0;
 }
 
-.card {
-  width: 220px;
-  height: 220px;
-  box-sizing: border-box;
-  background: $uni-bg-color;
-  border: 1px solid rgba($brand-border-light, 0.9);
-  border-radius: $brand-card-radius-md;
-  padding: 10px 10px 12px;
-  box-shadow: 0 1px 0 rgba(18, 52, 77, 0.03);
-  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
-  flex: 0 0 auto; /* 关键：横向滚动时不允许被压缩成“竖条” */
-  min-width: 220px;
+.var-card {
+  background: $bg-white;
+  border: 1px solid $color-border;
+  border-radius: 8px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  overflow: hidden; /* 强兜底：任何内容不允许溢出遮挡其他卡片 */
+  gap: 12px;
+  width: 260px; /* Fixed width for horizontal items */
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  /* Fixed Height independent of content */
+  height: 140px; 
+  overflow: hidden;
 }
 
-@media (max-width: 900px) {
-  .panel-search {
-    max-width: 260px;
-  }
-  .card {
-    width: 180px;
-    height: 180px;
-    min-width: 180px;
-  }
-  .list {
-    gap: 10px;
-  }
-  .card-value {
-    max-height: 110px;
-  }
+.var-card:hover {
+  border-color: $color-accent;
+  box-shadow: 0 8px 24px rgba(91, 209, 151, 0.15); /* Mint shadow */
+  transform: translateY(-2px);
 }
 
-.card-head {
+.var-card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 8px;
+  flex-shrink: 0;
 }
 
-.head-left {
-  display: flex;
-  gap: 10px;
-  min-width: 0;
-  align-items: flex-start;
-}
-
-.title-wrap {
-  min-width: 0;
+.var-info {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.card-title {
+.var-name {
+  font-size: 14px;
   font-weight: 600;
-  font-size: 13px;
-  color: $uni-text-color;
-  white-space: nowrap;
+  color: $color-text-main;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.card-sub {
-  margin-top: 4px;
-  font-size: 11px;
-  color: $uni-text-color-muted;
   white-space: nowrap;
 }
 
-.card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.mini-btn {
-  height: 20px;
-  line-height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  border: 1px solid rgba($uni-border-color, 0.55);
-  background: $uni-bg-color;
-  font-size: 11px;
-  color: $brand-color-primary;
-  cursor: pointer;
-}
-
-.mini-btn.ghost {
-  background: rgba($brand-color-primary, 0.04);
-  border-color: rgba($brand-color-primary, 0.14);
-}
-
-.mini-btn.danger {
-  border-color: rgba($uni-color-error, 0.35);
-  color: $uni-color-error;
-  background: rgba($uni-color-error, 0.05);
-}
-
-.card-body {
-  margin-top: 10px;
-  flex: 1;
-  min-height: 0;
-}
-
-.card-value {
+.var-creator {
   font-size: 12px;
-  color: $uni-text-color;
-  white-space: pre-wrap;
-  line-height: 1.55;
+  color: $color-text-light;
   overflow: hidden;
-  max-height: 148px;
-  background: rgba($brand-color-primary, 0.03);
-  border: 1px solid rgba($brand-border-light, 0.7);
-  padding: 8px 8px;
-  border-radius: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.type-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  border: 1px solid rgba($brand-border-light, 0.9);
-  background: rgba($brand-color-primary, 0.04);
+.var-time-top {
+  font-size: 11px;
+  color: #9aa5b1; 
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Vertical Actions Stack -> Horizontal */
+.var-actions-top {
+  display: flex;
+  flex-direction: row; 
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: flex-start; /* Align top */
+}
+
+.var-act-btn {
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.type-badge-text {
-  font-size: 11px;
-  color: $brand-color-primary;
-  font-weight: 600;
-  white-space: pre-line;
-  line-height: 1.05;
-  text-align: center;
-}
-
-.type-badge.tone-info {
-  background: rgba($uni-color-primary, 0.06);
-  border-color: rgba($uni-color-primary, 0.16);
-}
-
-.type-badge.tone-info .type-badge-text {
-  color: $uni-color-primary;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .card:hover {
-    border-color: rgba($brand-color-gold, 0.5);
-    box-shadow: $brand-card-shadow-soft;
-    transform: translateY(-1px);
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent; 
+  color: $color-text-light;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: $color-accent-pale;
+    color: $color-primary;
+  }
+  
+  &.danger:hover {
+    background: #FEF2F2;
+    color: #DC2626;
   }
 }
 
+.var-value {
+  font-size: 13px;
+  color: $color-text-main;
+  background: #f1f5f9;
+  padding: 10px;
+  border-radius: 6px;
+  flex: 1;
+  overflow: hidden;
+  word-break: break-all;
+  line-height: 1.6;
+  margin-bottom: 0; /* Remove bottom margin if any */
+}
+
+/* Footer removed as requested to maximize content area */
+.var-card-footer {
+  display: none;
+}
+
+
+/* Removed old var-actions styles */
+
+/* Modal Styles */
 .modal-mask {
   position: fixed;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.35);
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5); /* Darker mask */
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -727,66 +761,153 @@ export default {
 }
 
 .modal {
-  width: 320px;
-  background: $uni-bg-color;
-  border-radius: 12px;
-  padding: 14px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba($brand-border-light, 0.9);
+  width: 360px;
+  background: #fff;
+  border-radius: 12px; /* More rounded */
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
-.modal-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: $uni-text-color;
+.modal-title { 
+  font-weight: 600; 
+  font-size: 16px; 
+  color: $color-text-main;
+  margin-bottom: 8px; 
 }
 
-.modal-subtitle {
-  margin-top: 6px;
-  font-size: 12px;
-  color: $uni-text-color-muted;
-  line-height: 1.5;
+.modal-subtitle { 
+  font-size: 13px; 
+  color: $color-text-light; 
+  margin-bottom: 16px; 
 }
 
 .modal-input {
-  margin-top: 10px;
-  width: 100%;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba($uni-border-color, 0.7);
-  padding: 0 10px;
-  font-size: 13px;
-  outline: none;
+  width: 100%; 
+  height: 40px;
+  border: 1px solid $color-border;
+  border-radius: 6px;
+  padding: 0 12px; 
+  font-size: 14px;
   box-sizing: border-box;
+  transition: border-color 0.2s;
+  
+  &:focus {
+    border-color: $color-accent;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(91, 209, 151, 0.2);
+  }
 }
 
-.modal-actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
+.modal-actions { 
+  display: flex; 
+  justify-content: flex-end; 
+  gap: 12px; 
+  margin-top: 24px; 
 }
 
 .modal-btn {
-  height: 30px;
-  line-height: 30px;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid rgba($uni-border-color, 0.7);
-  background: $uni-bg-color;
-  font-size: 12px;
-  color: $uni-text-color;
+  padding: 8px 16px; 
+  border-radius: 6px; 
+  font-size: 13px; 
   cursor: pointer;
+  border: 1px solid $color-border; 
+  background: #fff;
+  color: $color-text-main;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: $bg-pale;
+  }
 }
 
-.modal-btn.primary {
-  border-color: transparent;
-  background: $brand-color-primary;
-  color: #fff;
+/* Inline Delete Popover */
+.delete-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: #fff;
+  border: 1px solid $color-border;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 8px;
+  z-index: 100;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: fadeIn 0.1s ease-out;
 }
 
-.modal-btn:disabled {
-  opacity: $uni-opacity-disabled;
-  cursor: not-allowed;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pop-arrow {
+  position: absolute;
+  top: -4px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border-top: 1px solid $color-border;
+  border-left: 1px solid $color-border;
+  transform: rotate(45deg);
+}
+
+.pop-text {
+  font-size: 12px;
+  color: $color-text-main;
+  text-align: center;
+  font-weight: 500;
+}
+
+.pop-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pop-btn {
+  flex: 1;
+  font-size: 11px;
+  padding: 4px 0;
+  text-align: center;
+  border-radius: 4px;
+  cursor: pointer;
+  background: $bg-pale;
+  color: $color-text-light;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #e2e8f0;
+    color: $color-text-main;
+  }
+}
+
+.pop-btn.danger {
+  background: #FEF2F2;
+  color: #DC2626;
+  
+  &:hover {
+    background: #FEE2E2;
+  }
+}
+
+.modal-btn.primary { 
+  background: $color-primary; 
+  color: #fff; 
+  border-color: transparent; 
+  
+  &:hover {
+    background: mix($color-primary, #000, 90%);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 </style>
+

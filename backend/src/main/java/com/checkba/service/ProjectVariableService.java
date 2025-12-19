@@ -25,6 +25,12 @@ public class ProjectVariableService {
             existing.setValue(variable.getValue());
             existing.setType(variable.getType());
             existing.setVariableGroup(variable.getVariableGroup());
+            // Preserve creator info if not present in update
+            if (variable.getCreatorId() != null) {
+                existing.setCreatorId(variable.getCreatorId());
+                existing.setCreatorName(variable.getCreatorName());
+            }
+            
             // TODO: Implement template parsing logic for nested variables
             if ("TEXT".equals(variable.getType())) {
                 existing.setResolvedValue(variable.getValue());

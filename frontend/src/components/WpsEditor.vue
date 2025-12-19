@@ -32,7 +32,7 @@ import { createWpsSession } from '@/services/api.js'
  * <WpsEditor
  *   :file-id="'project_123_doc_1'"
  *   :file-name="'项目文档.docx'"
- *   :app-id="'SX20251208BJWRFK'"
+ *   :app-id="'AK20251215TTJNYB'"
  *   :mode="'edit'"
  *   :user-id="'user_123'"
  *   @ready="onEditorReady"
@@ -618,61 +618,52 @@ export default {
       
       console.log('setHyperlinkAtRange:', { start, end, url, displayText })
 
+      // 关键修复：确保编辑器获得焦点，否则 Select 可能无效
+      this.focusEditor()
+
       try {
         const app = this.instance.Application
         const doc = app.ActiveDocument
         const hyperlinks = await doc.Hyperlinks
 
-        // 策略 1：尝试 Select() 恢复选区后，使用官方标准 Hyperlinks.Add({ Address })
-        // 这是最标准做法，但如果焦点被浏览器强制锁定在外部，Select() 可能无效
+        // 策略 1：强制恢复选区，然后添加超链接
+        // 这是官方推荐做法：Selection.Hyperlinks.Add
         try {
           const rangeObj = await doc.Range(start, end)
           if (rangeObj) {
             await rangeObj.Select()
-            // 稍作延迟，给 Select 生效一点时间
-            // await new Promise(r => setTimeout(r, 10)) 
+            // 给予少量缓冲时间让 Select 生效
+            await new Promise(r => setTimeout(r, 50))
             
-            await hyperlinks.Add({
+            // 使用 Application.Selection 添加，最为稳妥
+            const selection = await app.Selection
+            const selHyperlinks = await selection.Hyperlinks
+            await selHyperlinks.Add({
               Address: u,
               TextToDisplay: displayText ? String(displayText) : undefined
             })
-            console.log('setHyperlinkAtRange: 策略1(Standard)成功')
+            
+            console.log('setHyperlinkAtRange: 策略1(Selection.Hyperlinks)成功')
             return true
           }
         } catch (e0) {
            console.warn('setHyperlinkAtRange: 策略1失败', e0)
         }
 
-        // 策略 2：如果 Select 失败，尝试利用 Range 对象本身作为 Anchor 上下文
-        // 某些 WebOffice 版本可能允许 range.Hyperlinks.Add 或传入 Anchor 参数
+        // 策略 2：直接在 Range 对象上操作 (如果 selection 失败)
         try {
           const rangeObj = await doc.Range(start, end)
           if (rangeObj) {
-            // 尝试 2.1: 传递 Anchor 参数 (VBA 风格)
-            try {
-              await hyperlinks.Add({
-                Address: u,
-                TextToDisplay: displayText ? String(displayText) : undefined,
-                Anchor: rangeObj
-              })
-              console.log('setHyperlinkAtRange: 策略2.1(Anchor Param)成功')
-              return true
-            } catch (errAnchor) {
-               // ignore
-            }
-            
-            // 尝试 2.2: 直接在 Range 对象上调用 (如果 SDK 支持)
+             // 尝试 Doc.Hyperlinks.Add(Anchor=Range)
              try {
-               const rangeLinks = await rangeObj.Hyperlinks
-               if (rangeLinks && rangeLinks.Add) {
-                 await rangeLinks.Add({
-                    Address: u,
-                    TextToDisplay: displayText ? String(displayText) : undefined
-                 })
-                 console.log('setHyperlinkAtRange: 策略2.2(Range.Hyperlinks)成功')
-                 return true
-               }
-             } catch (errRange) {
+               await hyperlinks.Add({
+                 Address: u,
+                 TextToDisplay: displayText ? String(displayText) : undefined,
+                 Anchor: rangeObj
+               })
+               console.log('setHyperlinkAtRange: 策略2(Anchor Param)成功')
+               return true
+             } catch (errAnchor) {
                // ignore
              }
           }
@@ -680,9 +671,7 @@ export default {
           console.warn('setHyperlinkAtRange: 策略2失败', e1)
         }
         
-        // 策略 3: 如果以上都失败，尝试仅替换文本（作为最后的无奈之举，但这样无法生成超链接）
-        // 既然用户一定要关联，我们可以尝试仅保留文本，然后抛错让上层提示
-        console.error('setHyperlinkAtRange: 所有策略均失败，无法创建超链接')
+        console.error('setHyperlinkAtRange: 所有策略均失败')
         return false
 
       } catch (e) {

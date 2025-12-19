@@ -83,11 +83,11 @@ export async function initWpsEditor(options) {
   // 根据文件类型确定 officeType
   // WPS SDK 使用 SDK.OfficeType 枚举
   const officeType = getOfficeType(fileName, SDK)
-  
+
   if (!officeType) {
     throw new Error('[WebOfficeSDK.init] officeType为必选项！无法从文件名推断文件类型')
   }
-  
+
   console.log('初始化WPS编辑器:', { appId, fileId, fileName, officeType, mode })
 
   // 初始化 WPS 编辑器
@@ -118,7 +118,7 @@ export async function initWpsEditor(options) {
   // mount 可以是 DOM 元素或选择器字符串。
   // 根据 WPS 官方文档，预览模式需要设置 readOnly: true
   const isViewMode = mode === 'view'
-  
+
   // 构建初始化配置对象
   const initConfig = {
     officeType: officeType,
@@ -151,7 +151,7 @@ export async function initWpsEditor(options) {
         attributes: { visible: false }
       },
       {
-        cmbId: 'SmartMenu', 
+        cmbId: 'SmartMenu',
         attributes: { visible: false }
       }
     ],
@@ -180,8 +180,8 @@ export async function initWpsEditor(options) {
                 window.__checkbaHandleInternalLink(inner)
               } else {
                 const msg = { __checkbaInternalLink: true, url: inner }
-                try { window.parent && window.parent.postMessage(msg, '*') } catch (e1) {}
-                try { window.top && window.top.postMessage(msg, '*') } catch (e2) {}
+                try { window.parent && window.parent.postMessage(msg, '*') } catch (e1) { }
+                try { window.top && window.top.postMessage(msg, '*') } catch (e2) { }
               }
               // eslint-disable-next-line no-console
               console.log('[WPS onHyperLinkOpen] intercepted internal:', inner)
@@ -199,10 +199,10 @@ export async function initWpsEditor(options) {
               window.__checkbaHandleInternalLink(u)
             } else {
               const msg = { __checkbaInternalLink: true, url: u }
-              try { window.parent && window.parent.postMessage(msg, '*') } catch (e1) {}
-              try { window.top && window.top.postMessage(msg, '*') } catch (e2) {}
+              try { window.parent && window.parent.postMessage(msg, '*') } catch (e1) { }
+              try { window.top && window.top.postMessage(msg, '*') } catch (e2) { }
             }
-          } catch (e) {}
+          } catch (e) { }
           return false
         }
       } catch (e) {
@@ -214,12 +214,12 @@ export async function initWpsEditor(options) {
     // endpoint 默认为 https://o.wpsgo.com，这里使用默认即可；
     // 如果后续需要切换到其他网关，可在此显式传入 endpoint。
   }
-  
+
   console.log('WPS初始化配置:', initConfig)
   // 额外确认：确保 onHyperLinkOpen 已按官方示例挂进去
   // eslint-disable-next-line no-console
   console.log('WPS初始化配置 keys:', Object.keys(initConfig || {}))
-  
+
   const instance = SDK.init(initConfig)
 
   // 等待编辑器就绪
@@ -257,7 +257,7 @@ function getOfficeType(fileName, SDK) {
 
   const lower = fileName.toLowerCase()
   let officeType = null
-  
+
   // 优先使用 SDK.OfficeType 枚举
   if (SDK && SDK.OfficeType) {
     if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
@@ -272,14 +272,14 @@ function getOfficeType(fileName, SDK) {
     } else {
       officeType = SDK.OfficeType.Writer // 默认 Word
     }
-    
+
     // 验证officeType是否有效
     if (officeType === undefined || officeType === null) {
       console.warn('SDK.OfficeType 枚举值无效，使用字符串类型', { fileName, officeType })
       // 降级到字符串类型
       return getOfficeTypeString(lower)
     }
-    
+
     return officeType
   } else {
     // 如果 SDK.OfficeType 不存在，使用字符串（兼容旧版本）

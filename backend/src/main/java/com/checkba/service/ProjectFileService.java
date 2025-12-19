@@ -264,7 +264,7 @@ public class ProjectFileService {
     }
 
     /**
-     * 删除文件或文件夹（如果是文件夹，会递归删除所有子文件）
+     * 软删除文件或文件夹（移入回收站）
      */
     @Transactional
     public void delete(Long fileId, Long userId) {
@@ -275,31 +275,75 @@ public class ProjectFileService {
         ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("文件不存在: " + fileId));
 
-        // 检查权限（只有创建者可以删除）
+        // 检查权限
         if (!file.getUserId().equals(userId)) {
             throw new IllegalArgumentException("无权删除此文件");
         }
 
-        // 如果是文件夹，递归删除所有子文件
-        if (file.getIsFolder()) {
-            List<ProjectFile> children = projectFileRepository.findByProjectIdAndParentIdOrderBySortOrderAsc(
-                    file.getProjectId(), fileId);
+        // 递归软删除
+        softDeleteRecursive(file);
+    }
+
+    private void softDeleteRecursive(ProjectFile file) {
+        // 如果是文件夹，递归软删除子文件
+        if (Boolean.TRUE.equals(file.getIsFolder())) {
+            List<ProjectFile> children = projectFileRepository.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(
+                    file.getProjectId(), file.getId());
             for (ProjectFile child : children) {
-                delete(child.getId(), userId);
+                softDeleteRecursive(child);
+            }
+        }
+        
+        // 标记为已删除
+        file.setIsDeleted(true);
+        file.setDeletedAt(LocalDateTime.now());
+        projectFileRepository.save(file);
+    }
+
+    /**
+     * 彻底删除文件或文件夹（物理删除 + 数据库删除）
+     */
+    @Transactional
+    public void permDelete(Long fileId, Long userId) {
+        if (fileId == null) {
+            throw new IllegalArgumentException("文件 ID 不能为空");
+        }
+
+        ProjectFile file = projectFileRepository.findById(fileId)
+                // 如果文件找不到，可能已经被删除了，这是幂等操作，可以直接返回，但为了明确反馈，这里还是查一下
+                // 注意：findById 默认查所有（包括 isDeleted=true）
+                .orElseThrow(() -> new IllegalArgumentException("文件不存在: " + fileId));
+
+        // 检查权限
+        if (!file.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("无权删除此文件");
+        }
+
+        // 如果是文件夹，递归彻底删除所有子文件
+        if (Boolean.TRUE.equals(file.getIsFolder())) {
+            // 这里要查出所有子文件（包括已软删除的，否则删不干净）
+            // 使用自定义查询查所有 parentId = id 的
+             List<ProjectFile> children = getAllChildrenIncludingDeleted(file.getProjectId(), fileId);
+            for (ProjectFile child : children) {
+                permDelete(child.getId(), userId);
             }
         }
 
         // 记录文件路径用于向量库刷新和物理文件删除
         String filePath = file.getFilePath();
         
-        // 删除物理文件（仅对文件，文件夹不需要删除物理文件）
-        if (!file.getIsFolder() && StringUtils.hasText(filePath)) {
+        // 删除物理文件
+        // 1. 如果是文件夹，构建物理路径并尝试删除
+        if (Boolean.TRUE.equals(file.getIsFolder())) {
+             filePath = buildPhysicalPath(file.getProjectId(), file.getParentId(), file.getName());
+        }
+
+        if (StringUtils.hasText(filePath)) {
             try {
                 storageServiceFactory.getStorageService().delete(filePath);
-                log.info("物理文件删除成功: fileId={}, path={}", fileId, filePath);
+                log.info("物理文件/文件夹彻底删除成功: fileId={}, path={}", fileId, filePath);
             } catch (Exception e) {
-                // 物理文件删除失败不影响数据库删除，只记录警告
-                log.warn("物理文件删除失败，继续删除数据库记录: fileId={}, path={}", fileId, filePath, e);
+                log.warn("物理文件/文件夹彻底删除失败，继续删除数据库记录: fileId={}, path={}", fileId, filePath, e);
             }
         }
         
@@ -311,6 +355,53 @@ public class ProjectFileService {
             projectRagService.refreshProjectKnowledgeIncremental(
                     String.valueOf(file.getProjectId()), filePath);
         }
+    }
+    
+    private List<ProjectFile> getAllChildrenIncludingDeleted(Long projectId, Long parentId) {
+        return projectFileRepository.findByProjectIdAndParentId(projectId, parentId);
+    }
+    
+    /**
+     * 还原文件
+     */
+    @Transactional
+    public void restore(Long fileId, Long userId) {
+         ProjectFile file = projectFileRepository.findById(fileId)
+                .orElseThrow(() -> new IllegalArgumentException("文件不存在: " + fileId));
+         
+         if (!file.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("无权还原此文件");
+         }
+         
+         restoreRecursive(file);
+    }
+    
+    private void restoreRecursive(ProjectFile file) {
+        file.setIsDeleted(false);
+        file.setDeletedAt(null);
+        projectFileRepository.save(file);
+        
+        // 递归还原所有子文件
+        if (Boolean.TRUE.equals(file.getIsFolder())) {
+            List<ProjectFile> children = getAllChildrenIncludingDeleted(file.getProjectId(), file.getId());
+            for (ProjectFile child : children) {
+                // 注意：如果只还原文件夹，但不想还原之前的子文件？
+                // 现在的逻辑是：软删除时，递归删除了所有子文件。
+                // 还原时，如果递归还原，那就全都回来了。
+                // 这是一个简单的策略。
+                // 为了避免还原出"本来就是已删除"的文件（比如在文件夹删除之前就删除了的文件），
+                // 我们可能需要更复杂的逻辑（比如 deleteTransactionId）。
+                // 但当前 MVP，递归还原即可。
+                restoreRecursive(child);
+            }
+        }
+    }
+    
+    /**
+     * 获取回收站文件列表
+     */
+    public List<ProjectFile> getRecycleBinFiles(Long projectId) {
+         return projectFileRepository.findByProjectIdAndIsDeletedTrueOrderByDeletedAtDesc(projectId);
     }
 
     /**
@@ -379,7 +470,19 @@ public class ProjectFileService {
         }
         for (Long id : request.getFileIds()) {
             if (id == null) continue;
-            delete(id, userId);
+            try {
+                delete(id, userId);
+            } catch (IllegalArgumentException e) {
+                // 忽略文件不存在的错误，实现幂等删除
+                if (e.getMessage() != null && e.getMessage().contains("文件不存在")) {
+                    log.warn("批量删除时忽略不存在的文件: {}", id);
+                    continue;
+                }
+                throw e;
+            } catch (Exception e) {
+                log.error("删除文件失败: " + id, e);
+                throw e;
+            }
         }
     }
 
@@ -472,7 +575,11 @@ public class ProjectFileService {
      */
     private ProjectFile copyRecursive(Long projectId, ProjectFile source, Long targetParentId, Long userId) {
         if (Boolean.TRUE.equals(source.getIsFolder())) {
-            String newFolderName = resolveUniqueName(projectId, targetParentId, source.getName());
+            String desiredName = source.getName();
+            if (Objects.equals(source.getParentId(), targetParentId)) {
+                desiredName = "【副本】" + desiredName;
+            }
+            String newFolderName = resolveUniqueName(projectId, targetParentId, desiredName);
             ProjectFile newFolder = new ProjectFile();
             newFolder.setProjectId(projectId);
             newFolder.setParentId(targetParentId);
@@ -492,7 +599,11 @@ public class ProjectFileService {
         }
 
         // file
-        String newName = resolveUniqueName(projectId, targetParentId, source.getName());
+        String desiredName = source.getName();
+        if (Objects.equals(source.getParentId(), targetParentId)) {
+            desiredName = "【副本】" + desiredName;
+        }
+        String newName = resolveUniqueName(projectId, targetParentId, desiredName);
         ProjectFile newFile = new ProjectFile();
         newFile.setProjectId(projectId);
         newFile.setParentId(targetParentId);
@@ -605,6 +716,20 @@ public class ProjectFileService {
     public ProjectFile getFile(Long fileId) {
         return projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("文件不存在: " + fileId));
+    }
+
+    /**
+     * 读取文件字节内容 (支持 Local/OSS)
+     */
+    public byte[] getFileBytes(Long fileId) throws java.io.IOException {
+        ProjectFile file = getFile(fileId);
+        if (file == null || !StringUtils.hasText(file.getFilePath())) {
+            return null;
+        }
+        var resource = storageServiceFactory.getStorageService().load(file.getFilePath());
+        try (var inputStream = resource.getInputStream()) {
+            return inputStream.readAllBytes();
+        }
     }
 }
 

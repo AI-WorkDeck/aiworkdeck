@@ -101,8 +101,10 @@ public class WebFavoriteController {
     @GetMapping("/api/favorites/{favoriteId}/image")
     public ResponseEntity<?> image(
             @PathVariable Long favoriteId,
-            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        Long userId = AuthController.getUserIdFromSession(sessionId);
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @RequestParam(value = "token", required = false) String token) {
+        String finalSessionId = sessionId != null ? sessionId : token;
+        Long userId = AuthController.getUserIdFromSession(finalSessionId);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("请先登录"));
         }

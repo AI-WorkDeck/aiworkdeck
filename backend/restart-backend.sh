@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# 确保脚本在 backend 目录下执行，解决从根目录即使 invoked 找不到 pom.xml 的问题
+cd "$(dirname "$0")"
+
 echo "== 1. 打包 =="
 mvn clean package -DskipTests
 

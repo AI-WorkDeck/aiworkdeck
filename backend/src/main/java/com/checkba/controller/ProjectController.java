@@ -1,5 +1,6 @@
 package com.checkba.controller;
 
+import com.checkba.model.dto.ProjectCardDTO;
 import com.checkba.model.dto.ProjectCreateRequest;
 import com.checkba.model.entity.Project;
 import com.checkba.service.ProjectService;
@@ -37,15 +38,37 @@ public class ProjectController {
     }
 
     /**
-     * 获取当前用户的项目列表
+     * 重命名项目
      */
-    @GetMapping("/my")
-    public List<Project> getMyProjects(@RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+    @PutMapping("/{id}")
+    public Project updateProject(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
-        return projectService.getUserProjects(userId);
+        
+        Project project = projectService.getProject(id);
+        if (!project.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("无权修改此项目");
+        }
+
+        String newName = body.get("name");
+        return projectService.updateProjectName(id, newName);
+    }
+
+    /**
+     * 获取当前用户的项目列表
+     */
+    @GetMapping("/my")
+    public List<ProjectCardDTO> getMyProjects(@RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        return projectService.getUserProjectCardDTOs(userId);
     }
 
     /**

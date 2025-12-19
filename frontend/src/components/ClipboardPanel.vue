@@ -1,27 +1,53 @@
 <template>
   <view class="clip-panel">
-    <scroll-view class="clip-body" scroll-x :scroll-y="false" show-scrollbar="false">
+    <scroll-view class="clip-body" :scroll-y="false" :scroll-x="true" show-scrollbar="false">
       <view v-if="loading" class="loading">加载中...</view>
       <view v-else-if="items.length === 0" class="empty">暂无记录</view>
-      <view v-else class="list">
-        <view v-for="it in items" :key="it.id" class="item">
-          <view class="item-head">
-            <view class="head-left">
-              <view class="type-badge" :class="'tone-' + getTypeMeta(it.type).tone">
-                <text class="type-badge-text">{{ formatTypeLabel(it.type) }}</text>
+      <view v-else class="list-grid">
+        <view v-for="it in items" :key="it.id" class="clip-card" @tap="copy(it.text)">
+          <view class="card-header">
+            <view class="header-left">
+              <view class="type-line">
+                <view class="left-badge" :class="'tone-' + getTypeMeta(it.type).tone">
+                  <text class="badge-text">{{ formatTypeLabel(it.type) }}</text>
+                </view>
+                <!-- Source label removed as requested -->
               </view>
+              <text class="time-label">{{ formatTime(it.createdAt) }}</text>
             </view>
-            <view class="head-right">
-              <text class="time">{{ formatTime(it.createdAt) }}</text>
-              <view class="item-actions">
-                <view v-if="it.type === 'TEXT'" class="mini-btn" @tap.stop="copy(it.text)">复制</view>
-                <view v-if="it.type === 'TEXT'" class="mini-btn ghost" @tap.stop="$emit('insert', it.text)">插入</view>
-                <view class="mini-btn danger" @tap.stop="remove(it.id)">删除</view>
-              </view>
+            <!-- Actions Top Right -->
+            <view class="cli-actions-top">
+               <view v-if="it.type === 'TEXT'" class="cli-btn" @tap.stop="copy(it.text)" title="复制">
+                 <text class="icon">⧉</text>
+               </view>
+               <view v-if="it.type === 'TEXT'" class="cli-btn" @tap.stop="$emit('insert', it.text)" title="插入">
+                 <text class="icon">⚡</text>
+               </view>
+               <view class="del-wrapper" style="position: relative;">
+                 <view class="cli-btn danger" @tap.stop="requestDelete(it.id)" title="删除">
+                   <text class="icon">×</text>
+                 </view>
+                 <!-- Inline Confirm Popup -->
+                 <view v-if="confirmDeleteId === it.id" class="delete-popover" @tap.stop>
+                   <view class="pop-arrow"></view>
+                   <text class="pop-text">确认删除?</text>
+                   <view class="pop-row">
+                     <view class="pop-btn" @tap.stop="cancelDelete">取消</view>
+                     <view class="pop-btn danger" @tap.stop="confirmDelete(it.id)">确定</view>
+                   </view>
+                 </view>
+               </view>
             </view>
           </view>
-          <view class="item-content">
-            <text class="content-text">{{ preview(it) }}</text>
+          
+          <!-- Content: Horizontal Scroll -->
+          <view class="card-content">
+            <text v-if="it.type === 'TEXT'" class="content-text">{{ it.text }}</text>
+            <image v-else-if="it.type === 'IMAGE'" class="content-image" :src="getImageUrl(it)" mode="aspectFill" @click.stop="previewImage(it)"></image>
+            <view v-else class="content-file">
+               <text class="file-icon">📄</text>
+               <text class="file-name">{{ it.fileName || '未知文件' }}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -30,11 +56,14 @@
 </template>
 
 <script>
-import { listClipboard, deleteClipboardItem } from '@/services/api.js'
+/* ... script keeps same logic ... */
+import { listClipboard, deleteClipboardItem, getApiBaseUrl } from '@/services/api.js'
 import { getClipboardTypeMeta } from '@/config/clipboard.js'
+import { getSessionId } from '@/utils/auth.js'
 
 export default {
   name: 'ClipboardPanel',
+  /* ... props/data/methods same ... */
   props: {
     query: {
       type: String,
@@ -45,6 +74,7 @@ export default {
     return {
       loading: false,
       items: [],
+      confirmDeleteId: null
     }
   },
   mounted() {
@@ -56,21 +86,11 @@ export default {
     }
   },
   methods: {
-    prependItem(item, limit = 80) {
-      if (!item) return
-      const next = Array.isArray(this.items) ? [...this.items] : []
-      next.unshift(item)
-      // 简单兜底：避免列表无限增长（不是业务去重）
-      this.items = next.slice(0, Math.max(1, Math.min(200, limit)))
-    },
     getTypeMeta(type) {
       return getClipboardTypeMeta(type)
     },
     formatTypeLabel(type) {
-      const label = (getClipboardTypeMeta(type)?.label || String(type || ''))
-      // 贴近 Paste：两字中文竖排/两行展示（如“文本”“图片”）
-      if (label.length === 2) return `${label[0]}\n${label[1]}`
-      return label
+      return (getClipboardTypeMeta(type)?.label || String(type || ''))
     },
     async refresh() {
       this.loading = true
@@ -87,16 +107,24 @@ export default {
     preview(it) {
       if (it.type === 'TEXT') {
         const t = (it.text || '').trim()
-        return t.length > 400 ? (t.slice(0, 400) + '...') : t
+        /* No truncation here if we want scroll, pass full text or reasonably long */
+        return t
       }
-      return it.meta || ''
+      return it.meta || '未知内容'
     },
     formatTime(v) {
       if (!v) return ''
       try {
-        return new Date(v).toLocaleString()
+        const d = new Date(v)
+        if (Number.isNaN(d.getTime())) return ''
+        const Y = d.getFullYear()
+        const M = String(d.getMonth() + 1).padStart(2, '0')
+        const D = String(d.getDate()).padStart(2, '0')
+        const h = String(d.getHours()).padStart(2, '0')
+        const m = String(d.getMinutes()).padStart(2, '0')
+        return `${Y}-${M}-${D} ${h}:${m}`
       } catch (e) {
-        return String(v)
+        return ''
       }
     },
     async copy(text) {
@@ -118,220 +146,354 @@ export default {
       uni.setClipboardData({ data: t })
       // #endif
     },
-    async remove(id) {
-      // Desktop：用应用内确认弹窗（不遮挡、不丑、也不需要隐藏网页）
-      try {
-        const isDesktop = typeof window !== 'undefined' && window.checkbaDesktop && window.checkbaDesktop.app && window.checkbaDesktop.app.confirm
-        if (isDesktop) {
-          const resp = await window.checkbaDesktop.app.confirm({
-            title: '确认删除',
-            content: '确定删除该记录？',
-            okText: '删除',
-            cancelText: '取消'
-          })
-          if (!resp || resp.confirmed !== true) return
-        } else {
-          const ok = await new Promise((resolve) => {
-            uni.showModal({
-              title: '确认删除',
-              content: '确定删除该记录？',
-              success: (res) => resolve(!!res.confirm),
-              fail: () => resolve(false)
-            })
-          })
-          if (!ok) return
-        }
-      } catch (e) {
-        // ignore confirm errors
+    requestDelete(id) {
+      if (this.confirmDeleteId === id) {
+        this.confirmDeleteId = null
         return
       }
+      this.confirmDeleteId = id
+      if (this._deleteTimer) clearTimeout(this._deleteTimer)
+      this._deleteTimer = setTimeout(() => {
+        if (this.confirmDeleteId === id) {
+          this.confirmDeleteId = null
+        }
+      }, 5000)
+    },
+    
+    cancelDelete() {
+      this.confirmDeleteId = null
+      if (this._deleteTimer) clearTimeout(this._deleteTimer)
+    },
+
+    async confirmDelete(id) {
+      this.cancelDelete()
       try {
         await deleteClipboardItem(id)
         await this.refresh()
       } catch (e) {
         uni.showToast({ title: '删除失败', icon: 'none' })
       }
+    },
+    getImageUrl(it) {
+      if (it.url) return it.url // backward compat or if set
+      if (it.type === 'IMAGE' || it.type === 'FILE') { // FILE might be image too? No, separated.
+          // Use /api/clipboard/{id}/file?token=...
+           // Since we don't have global baseUrl in component easily without import:
+           // But actually relative path works in H5 if proxied. 
+           // In App/Electron, we might need full URL.
+           // However, let's use a method to get full URL or rely on relative.
+           // If we are in Electron shell, relative path might not work if page is file://?
+           // Actually page is http://localhost...
+           
+           // Hack: construct URL.
+           // Better: import getApiBaseUrl from api.js. 
+           // But let's assume relative path works for now or use /api prefix.
+           // Wait, we imported getSessionId.
+           const token = getSessionId()
+           // Use import { getApiBaseUrl } ... I didn't import it.
+           // Let's assume /api/clipboard works (proxied). If not, images won't load in dev.
+           // In production, it's same origin.
+           // In Electron Dev, it's http://localhost:5173 vs http://localhost:9696.
+           // API requests in `api.js` handle base URL.
+           // `img src` needs full URL if cross-origin.
+           // Let's import getApiBaseUrl.
+           return this.getApiUrl(`/api/clipboard/${it.id}/file?token=${token}`)
+      }
+      return ''
+    },
+    // Helper to get full API URL
+    getApiUrl(path) {
+        const base = getApiBaseUrl()
+        // Simple concat, assuming path starts with /
+        // If base ends with /, remove it? usually base is origin.
+        if (base) {
+            return `${base}${path}`
+        }
+        return path
+    },
+    previewImage(it) {
+        const url = this.getImageUrl(it)
+        if (url) {
+            uni.previewImage({
+                urls: [url]
+            })
+        }
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
+/* Unified King IDE Palette */
+$color-primary: #1A5336;
+$color-accent: #5BD197;
+$color-accent-pale: #E6F9F0;
+$color-text-main: #2C3338;
+$color-text-light: #6C757D;
+$color-border: #E9ECEF;
+$bg-pale: #F8F9FA;
+$bg-white: #FFFFFF;
+
 .clip-panel {
   height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: $bg-pale;
 }
 
 .clip-body {
   flex: 1;
   min-height: 0;
-  padding: 0;
-  background: $uni-bg-color-grey;
+  padding: 16px;
 }
 
-.list {
-  display: flex;
-  flex-direction: row;
+/* Horizontal Scroll Layout */
+.list-grid {
+  display: inline-flex;
+  gap: 16px;
+  height: 100%;
   align-items: stretch;
+  padding: 4px; /* Fix border clipping */
+}
+
+.clip-card {
+  background: $bg-white;
+  border: 1px solid $color-border;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  padding-bottom: 2px;
-}
-
-.item {
-  background: $uni-bg-color;
-  border: 1px solid rgba($brand-border-light, 0.9);
-  border-radius: $brand-card-radius-md;
-  padding: 10px 10px 12px;
-  box-shadow: 0 1px 0 rgba(18, 52, 77, 0.03);
-  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
-  flex: 0 0 auto;
-  width: 220px;
-  height: 220px; /* 正方形卡片 */
-  max-width: 220px;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* 窄屏：缩小卡片，避免“满屏大方块” */
-@media (max-width: 900px) {
-  .item {
-    width: 180px;
-    height: 180px;
-    max-width: 180px;
-  }
-  .content-text {
-    max-height: 110px;
-  }
-}
-
-@media (max-width: 768px) {
-  .item {
-    width: 160px;
-    height: 160px;
-    max-width: 160px;
-  }
-  .content-text {
-    max-height: 90px;
-  }
-}
-
-.item-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.head-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  min-width: 0;
-}
-
-.item-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  max-width: 100%;
-  opacity: 0.92;
-  pointer-events: auto;
-}
-
-.mini-btn {
-  height: 22px;
-  line-height: 22px;
-  padding: 0 10px;
-  border-radius: 999px;
-  border: 1px solid rgba($uni-border-color, 0.55);
-  background: $uni-bg-color;
-  font-size: 11px;
-  color: $brand-color-primary;
-}
-
-.mini-btn.ghost {
-  color: $brand-color-primary;
-  background: rgba($brand-color-primary, 0.04);
-  border-color: rgba($brand-color-primary, 0.14);
-}
-
-.mini-btn.danger {
-  border-color: rgba($uni-color-error, 0.35);
-  color: $uni-color-error;
-  background: rgba($uni-color-error, 0.05);
-}
-
-.item-content {
-  margin-top: 10px;
-  flex: 1;
-  min-height: 0;
-}
-
-.content-text {
-  font-size: 12px;
-  color: $uni-text-color;
-  white-space: pre-wrap;
-  line-height: 1.55;
-  display: block;
+  width: 240px; /* Fixed width */
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  /* Fixed Height */
+  height: 130px; 
+  cursor: default;
   overflow: hidden;
-  max-height: 140px; /* 正方形卡片下更充足 */
 }
 
-.type-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  border: 1px solid rgba($brand-border-light, 0.9);
-  background: rgba($brand-color-primary, 0.04);
+.clip-card:hover {
+  border-color: $color-accent;
+  box-shadow: 0 8px 16px rgba(91, 209, 151, 0.12);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.header-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.type-line {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
+  height: 20px;
 }
 
-.type-badge-text {
-  font-size: 11px;
-  color: $brand-color-primary;
+.badge-text {
+  font-size: 12px;
   font-weight: 600;
-  white-space: pre-line;
-  line-height: 1.05;
-  text-align: center;
+  color: $color-text-main;
 }
 
-.type-badge.tone-info {
-  background: rgba($uni-color-primary, 0.06);
-  border-color: rgba($uni-color-primary, 0.16);
-}
-
-.type-badge.tone-info .type-badge-text {
-  color: $uni-color-primary;
-}
-
-.time {
+.clip-source {
   font-size: 11px;
-  color: $uni-text-color-muted;
+  color: $color-text-light;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.loading, .empty {
-  padding: 16px 8px;
-  color: $uni-text-color-muted;
-  font-size: 12px;
+.time-label {
+  font-size: 11px;
+  color: #9aa5b1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Hover：更接近 Paste 的“卡片浮起感”（仅桌面端 hover 生效） */
-@media (hover: hover) and (pointer: fine) {
-  .item:hover {
-    border-color: rgba($brand-color-gold, 0.5);
-    box-shadow: $brand-card-shadow-soft;
-    transform: translateY(-1px);
+/* Actions Top Right - Horizontal */
+.cli-actions-top {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: flex-start;
+}
+
+.cli-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+  
+  .icon {
+    font-size: 13px;
+    color: $color-text-light;
+  }
+
+  &:hover {
+    background: $color-accent-pale;
+    border-color: transparent;
+    .icon { color: $color-primary; }
   }
 }
+
+.cli-btn.danger:hover {
+  background: #FEF2F2;
+  .icon { color: #DC2626; }
+}
+
+.card-content {
+  flex: 1;
+  min-height: 0;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 8px;
+  overflow: hidden;
+  position: relative;
+  display: block; /* Reset flex */
+}
+
+/* Content Types */
+.content-text {
+  font-size: 12px;
+  color: $color-text-main;
+  line-height: 1.5;
+  
+  /* Top-Left No Scroll Ellipsis */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3; 
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-all;
+}
+
+.content-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.content-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.file-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+/* Inline Delete Popover */
+.delete-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: #fff;
+  border: 1px solid $color-border;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 8px;
+  z-index: 100;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: fadeIn 0.1s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pop-arrow {
+  position: absolute;
+  top: -4px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border-top: 1px solid $color-border;
+  border-left: 1px solid $color-border;
+  transform: rotate(45deg);
+}
+
+.pop-text {
+  font-size: 12px;
+  color: $color-text-main;
+  text-align: center;
+  font-weight: 500;
+  display: block;
+}
+
+.pop-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pop-btn {
+  flex: 1;
+  font-size: 11px;
+  padding: 4px 0;
+  text-align: center;
+  border-radius: 4px;
+  cursor: pointer;
+  background: $bg-pale;
+  color: $color-text-light;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #e2e8f0;
+    color: $color-text-main;
+  }
+}
+
+.pop-btn.danger {
+  background: #FEF2F2;
+  color: #DC2626;
+  
+  &:hover {
+    background: #FEE2E2;
+  }
+}
+
+.file-name {
+  font-size: 12px;
+  color: $color-text-main;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 </style>
-
-

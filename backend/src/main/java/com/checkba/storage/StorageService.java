@@ -58,5 +58,23 @@ public interface StorageService {
      * @return 访问URL，如果不需要URL则返回null
      */
     String getUrl(String fileId);
+
+    /**
+     * 追加内容到文件末尾 (用于断点续传)
+     *
+     * @param fileId      文件ID
+     * @param inputStream 输入流
+     * @return 存储路径
+     * @throws StorageException 存储异常
+     */
+    String append(String fileId, InputStream inputStream) throws StorageException;
+
+    /**
+     * 获取文件当前大小
+     *
+     * @param fileId 文件ID
+     * @return 文件大小 (字节)
+     */
+    long getSize(String fileId);
 }
 

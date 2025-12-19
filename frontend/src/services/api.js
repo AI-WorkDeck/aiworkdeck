@@ -4,7 +4,7 @@
 // - 后端基础地址通过环境变量配置，便于本地 / Sealos / 阿里云等环境切换。
 
 // 导入认证工具
-import { getAuthHeaders } from '@/utils/auth.js'
+import { getAuthHeaders, getSessionId } from '@/utils/auth.js'
 
 // 默认后端地址：
 // - 本地 H5 开发（localhost/127.0.0.1）：自动指向后端 9696
@@ -78,6 +78,8 @@ function request(options) {
     uni.request({
       ...options,
       url,
+      // uni.request expects query params in 'data' for GET requests
+      data: (options.method === 'GET' && options.params) ? { ...options.data, ...options.params } : options.data,
       header: headers,
       success(res) {
         const status = res.statusCode || 0;
@@ -87,17 +89,17 @@ function request(options) {
             // 对于有 code 字段的响应，返回整个响应对象（保持向后兼容）
             // 这样登录页面可以访问 res.code 和 res.data
             resolve(res.data);
-        } else {
-          // 完整打印业务错误信息
-          const errorMessage = res.data.message || '服务异常，请稍后重试'
-          console.error('业务错误:', {
-            code: res.data.code,
-            message: errorMessage,
-            data: res.data.data,
-            fullResponse: res.data
-          })
-          reject(new Error(errorMessage));
-        }
+          } else {
+            // 完整打印业务错误信息
+            const errorMessage = res.data.message || '服务异常，请稍后重试'
+            console.error('业务错误:', {
+              code: res.data.code,
+              message: errorMessage,
+              data: res.data.data,
+              fullResponse: res.data
+            })
+            reject(new Error(errorMessage));
+          }
         } else if (status >= 200 && status < 300) {
           // 如果没有 code 字段，直接返回数据（兼容旧接口）
           resolve(res.data);
@@ -171,7 +173,7 @@ export function fetchCompanyBasicInfo(payload) {
 
 /**
  * 项目内 AI 对话
- * payload: { projectId: string|number, message: string }
+ * payload: { projectId: string|number, message: string, model?: string }
  */
 export function aiChat(payload) {
   return request({
@@ -180,11 +182,46 @@ export function aiChat(payload) {
     data: {
       projectId: String(payload.projectId),
       message: payload.message,
-      context: payload.context || null
+      context: payload.context || null,
+      model: payload.model || null,
+      conversationId: payload.conversationId || null
     },
     header: {
       'Content-Type': 'application/json',
     },
+    timeout: 300000, // Increase timeout to 300s for local LLM
+  });
+}
+
+export function getAiHistory(params) {
+  return request({
+    url: '/api/ai/history',
+    method: 'GET',
+    params: params
+  });
+}
+
+export function getAiConversations(projectId) {
+  return request({
+    url: '/api/ai/conversations',
+    method: 'GET',
+    params: { projectId }
+  });
+}
+
+// 获取 AI 公共配置（如默认供应商）
+export function getAiConfig() {
+  return request({
+    url: '/api/ai/config',
+    method: 'GET'
+  });
+}
+
+// 获取可用 AI 助手列表
+export function getAssistants() {
+  return request({
+    url: '/api/ai/assistants',
+    method: 'GET'
   });
 }
 
@@ -318,12 +355,67 @@ export function login(username, password) {
   });
 }
 
+export function clientLogin(accessCode, displayName) {
+  return request({
+    url: '/api/auth/client-login',
+    method: 'POST',
+    data: { accessCode, displayName },
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function inviteClient(projectId, clientName) {
+  return request({
+    url: `/api/projects/${projectId}/invite/client`,
+    method: 'POST',
+    data: { clientName },
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
 // 获取当前登录用户信息
 export function getCurrentUser() {
   return request({
     url: '/api/auth/me',
     method: 'GET',
   });
+}
+
+// 上传用户头像
+export function uploadAvatar(filePath) {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/api/users/avatar`
+  const sessionId = getSessionId()
+
+  return new Promise((resolve, reject) => {
+    uni.uploadFile({
+      url: url,
+      filePath: filePath,
+      name: 'file',
+      header: {
+        'X-Session-Id': sessionId
+      },
+      success: (uploadFileRes) => {
+        if (uploadFileRes.statusCode === 200) {
+          try {
+            const data = JSON.parse(uploadFileRes.data)
+            if (data.code === 0) {
+              resolve(data)
+            } else {
+              reject(new Error(data.message || '上传失败'))
+            }
+          } catch (e) {
+            reject(new Error('解析响应失败'))
+          }
+        } else {
+          reject(new Error('HTTP Error ' + uploadFileRes.statusCode))
+        }
+      },
+      fail: (err) => {
+        reject(err)
+      }
+    })
+  })
 }
 
 // 用户登出
@@ -355,6 +447,18 @@ export function getProject(projectId) {
   return request({
     url: `/api/projects/${projectId}`,
     method: 'GET',
+  });
+}
+
+// 重命名项目
+export function renameProject(projectId, name) {
+  return request({
+    url: `/api/projects/${projectId}`,
+    method: 'PUT',
+    data: { name },
+    header: {
+      'Content-Type': 'application/json',
+    },
   });
 }
 
@@ -429,6 +533,32 @@ export function deleteFile(projectId, fileId) {
   return request({
     url: `/api/projects/${projectId}/files/${fileId}`,
     method: 'DELETE',
+  });
+}
+
+
+
+// 永久删除文件
+export function deleteFilePerm(projectId, fileId) {
+  return request({
+    url: `/api/projects/${projectId}/files/${fileId}/permanent`,
+    method: 'DELETE',
+  });
+}
+
+// 还原文件
+export function restoreFile(projectId, fileId) {
+  return request({
+    url: `/api/projects/${projectId}/files/${fileId}/restore`,
+    method: 'POST',
+  });
+}
+
+// 获取回收站文件
+export function getRecycleBinFiles(projectId) {
+  return request({
+    url: `/api/projects/${projectId}/files/recycle-bin`,
+    method: 'GET',
   });
 }
 
@@ -576,7 +706,8 @@ export function deleteFavorite(favoriteId) {
 
 export function getFavoriteImageUrl(favoriteId) {
   const baseUrl = getApiBaseUrl()
-  return `${baseUrl}/api/favorites/${favoriteId}/image`
+  const token = getSessionId()
+  return `${baseUrl}/api/favorites/${favoriteId}/image?token=${token || ''}`
 }
 
 // 剪贴板（Paste-like）
@@ -597,6 +728,52 @@ export function saveClipboardText(text) {
   })
 }
 
+export function saveClipboardFile(fileObj, type = 'FILE') {
+  const baseUrl = getApiBaseUrl()
+  const url = `${baseUrl}/api/clipboard/file`
+  const sessionId = getSessionId()
+
+  return new Promise((resolve, reject) => {
+    // Use native XMLHttpRequest or fetch to ensure Blob/File upload works reliably in H5/Electron
+    const formData = new FormData()
+    // fileObj.file is the DOM File from project-overview.vue
+    if (fileObj.file) {
+      formData.append('file', fileObj.file)
+    } else {
+      reject(new Error('No file object'))
+      return
+    }
+    if (type) formData.append('type', type)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', url)
+    if (sessionId) {
+      xhr.setRequestHeader('X-Session-Id', sessionId)
+    }
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        try {
+          const data = JSON.parse(xhr.responseText)
+          if (data.code === 0) {
+            resolve(data)
+          } else {
+            reject(new Error(data.message || '上传失败'))
+          }
+        } catch (e) {
+          reject(new Error('解析响应失败'))
+        }
+      } else {
+        reject(new Error('HTTP Error ' + xhr.status))
+      }
+    }
+
+    xhr.onerror = () => reject(new Error('Network Error'))
+
+    xhr.send(formData)
+  })
+}
+
 export function deleteClipboardItem(id) {
   return request({
     url: `/api/clipboard/${id}`,
@@ -605,25 +782,25 @@ export function deleteClipboardItem(id) {
 }
 
 export const getProjectVariables = (projectId) => {
-    return request({
-        url: `/api/variables/project/${projectId}`,
-        method: 'GET'
-    })
+  return request({
+    url: `/api/variables/project/${projectId}`,
+    method: 'GET'
+  })
 }
 
 export const saveProjectVariable = (data) => {
-    return request({
-        url: '/api/variables',
-        method: 'POST',
-        data
-    })
+  return request({
+    url: '/api/variables',
+    method: 'POST',
+    data
+  })
 }
 
 export const deleteProjectVariable = (id) => {
-    return request({
-        url: `/api/variables/${id}`,
-        method: 'DELETE'
-    })
+  return request({
+    url: `/api/variables/${id}`,
+    method: 'DELETE'
+  })
 }
 
 // 用户变量（用户收藏/自维护）
@@ -649,48 +826,243 @@ export const deleteUserVariable = (id) => {
   })
 }
 
+// ===================== 项目成员管理 =====================
+export function getProjectMembers(projectId) {
+  return request({
+    url: `/api/projects/${projectId}/members`,
+    method: 'GET'
+  })
+}
+
+export function addProjectMember(projectId, username, role) {
+  return request({
+    url: `/api/projects/${projectId}/members`,
+    method: 'POST',
+    data: { username, role },
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function removeProjectMember(projectId, userId) {
+  return request({
+    url: `/api/projects/${projectId}/members/${userId}`,
+    method: 'DELETE'
+  })
+}
+
+// ===================== 文件变量管理 =====================
+export function getFileVariables(fileId) {
+  return request({
+    url: `/api/file-variables?fileId=${fileId}`,
+    method: 'GET'
+  })
+}
+
+export function saveFileVariable(data) {
+  return request({
+    url: '/api/file-variables',
+    method: 'POST',
+    data,
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function deleteFileVariable(id) {
+  return request({
+    url: `/api/file-variables/${id}`,
+    method: 'DELETE'
+  })
+}
+
+// ===================== 用户活动日志 =====================
+export function logActivity(actionType, targetId, targetName, duration, metaInfo) {
+  return request({
+    url: '/api/activity/log',
+    method: 'POST',
+    data: {
+      actionType,
+      targetId,
+      targetName,
+      duration,
+      metaInfo
+    },
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function getUserActivityHistory() {
+  return request({
+    url: '/api/activity/history',
+    method: 'GET'
+  })
+}
+
+// ===================== 尽调清单管理 (Due Diligence) =====================
+export function getDdRequests(projectId) {
+  return request({
+    url: `/api/dd/projects/${projectId}`,
+    method: 'GET'
+  })
+}
+
+export function createDdRequest(projectId, payload) {
+  return request({
+    url: `/api/dd/projects/${projectId}`,
+    method: 'POST',
+    data: payload,
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function getDdRequestDetails(requestId) {
+  return request({
+    url: `/api/dd/requests/${requestId}`,
+    method: 'GET'
+  })
+}
+
+export function updateDdItemStatus(itemId, status) {
+  return request({
+    url: `/api/dd/items/${itemId}/status`,
+    method: 'PUT',
+    data: { status },
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function updateDdItemInfo(itemId, title, description) {
+  return request({
+    url: `/api/dd/items/${itemId}/info`,
+    method: 'PUT',
+    data: { title, description },
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function addDdItemComment(itemId, content) {
+  return request({
+    url: `/api/dd/items/${itemId}/comments`,
+    method: 'POST',
+    data: { content },
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function getDdItemComments(itemId) {
+  return request({
+    url: `/api/dd/items/${itemId}/comments`,
+    method: 'GET'
+  })
+}
+
+export function deleteDdItem(itemId) {
+  return request({
+    url: `/api/dd/items/${itemId}`,
+    method: 'DELETE'
+  })
+}
+
+export function deleteDdRequest(requestId) {
+  return request({
+    url: `/api/dd/requests/${requestId}`,
+    method: 'DELETE'
+  })
+}
+
 export default {
-    getApiBaseUrl,
-    request,
-    aiChat,
-    exportAiDocx,
-    fetchCompanyBasicInfo,
-    createProject,
-    generateWpsEditUrl,
-    getWpsCallbackBaseUrl,
-    createWpsSession,
-    register,
-    login,
-    getCurrentUser,
-    logout,
-    getMyProjects,
-    deleteProject,
-    getProject,
-    getProjectFiles,
-    createFolder,
-    createFile,
-    renameFile,
-    deleteFile,
-    moveFile,
-    getFileDetail,
-    getFileDownloadUrl,
-    ocrRecognize,
-    getMyFavorites,
-    getProjectFavorites,
-    createProjectFavorite,
-    deleteFavorite,
-    getFavoriteImageUrl,
-    listClipboard,
-    saveClipboardText,
-    deleteClipboardItem,
-    getProjectVariables,
-    saveProjectVariable,
-    deleteProjectVariable,
-    getUserVariables,
-    saveUserVariable,
-    deleteUserVariable,
-    getAdminConfig,
-    saveAdminConfig,
-    getAdminUsers
+  getApiBaseUrl,
+  request,
+  aiChat,
+  exportAiDocx,
+  fetchCompanyBasicInfo,
+  createProject,
+  generateWpsEditUrl,
+  getWpsCallbackBaseUrl,
+  createWpsSession,
+  register,
+  login,
+  clientLogin,
+  inviteClient,
+  getCurrentUser,
+  logout,
+  getMyProjects,
+  deleteProject,
+  getProject,
+  getProjectFiles,
+  createFolder,
+  createFile,
+  renameFile,
+  deleteFile,
+  moveFile,
+  getFileDetail,
+  getFileDownloadUrl,
+  ocrRecognize,
+  getMyFavorites,
+  getProjectFavorites,
+  createProjectFavorite,
+  deleteFavorite,
+  getFavoriteImageUrl,
+  listClipboard,
+  saveClipboardText,
+  deleteClipboardItem,
+  getProjectVariables,
+  saveProjectVariable,
+  deleteProjectVariable,
+  getUserVariables,
+  saveUserVariable,
+  deleteUserVariable,
+  getProjectMembers,
+  addProjectMember,
+  removeProjectMember,
+  getFileVariables,
+  saveFileVariable,
+  deleteFileVariable,
+  logActivity,
+  getUserActivityHistory,
+  getAdminConfig,
+  saveAdminConfig,
+  getAdminUsers,
+  // DD Files
+  getDdRequests,
+  createDdRequest,
+  getDdRequestDetails,
+  updateDdItemStatus,
+  updateDdItemInfo,
+  addDdItemComment,
+  getDdItemComments,
+  deleteDdItem,
+  deleteDdRequest,
+  addDdRequestItems(requestId, content) {
+    return request({
+      url: `/api/dd/requests/${requestId}/items`,
+      method: 'POST',
+      data: { content },
+      header: { 'Content-Type': 'application/json' }
+    })
+  },
+  addDdItem(requestId, parentId) {
+    return request({
+      url: `/api/dd/requests/${requestId}/item`,
+      method: 'POST',
+      data: { parentId },
+      header: { 'Content-Type': 'application/json' }
+    })
+  },
+  moveDdItem(itemId, parentId) {
+    return request({
+      url: `/api/dd/items/${itemId}/parent`,
+      method: 'PUT',
+      data: { parentId },
+      header: { 'Content-Type': 'application/json' }
+    })
+  },
+  updateDdRequest(requestId, name) {
+    return request({
+      url: `/api/dd/requests/${requestId}`,
+      method: 'PUT',
+      data: { name },
+      header: { 'Content-Type': 'application/json' }
+    })
+  }
 }
 

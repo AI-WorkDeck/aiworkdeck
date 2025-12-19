@@ -160,4 +160,50 @@ public class LocalFileStorageService implements StorageService {
         }
         return storageDir.resolve(fileId + ".docx");
     }
+
+    @Override
+    public String append(String fileId, InputStream inputStream) throws StorageException {
+        Path filePath = resolveFilePath(fileId);
+
+        try {
+            // 确保父目录存在
+            if (!Files.exists(filePath.getParent())) {
+                Files.createDirectories(filePath.getParent());
+            }
+
+            // 如果文件不存在，先创建
+            if (!Files.exists(filePath)) {
+                Files.createFile(filePath);
+            }
+
+            // 追加内容
+            try (var outputStream = Files.newOutputStream(filePath, StandardOpenOption.APPEND)) {
+                inputStream.transferTo(outputStream);
+            }
+
+            log.debug("文件追加成功: fileId={}, path={}", fileId, filePath);
+
+            try {
+                return storageDir.relativize(filePath).toString();
+            } catch (IllegalArgumentException e) {
+                return filePath.toString();
+            }
+        } catch (IOException e) {
+            log.error("文件追加失败: fileId={}, path={}", fileId, filePath, e);
+            throw new StorageException("文件追加失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public long getSize(String fileId) {
+        Path filePath = resolveFilePath(fileId);
+        try {
+            if (Files.exists(filePath)) {
+                return Files.size(filePath);
+            }
+        } catch (IOException e) {
+            log.warn("获取文件大小失败: {}", fileId, e);
+        }
+        return 0;
+    }
 }

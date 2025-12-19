@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "main": "main/main.js",
   "scripts": {
+    "clean": "node scripts/clean.js",
     "dev": "cross-env CHECKBA_DESKTOP_DEV=1 electron .",
     "start": "electron .",
     "build": "electron-builder"
@@ -19,5 +20,3 @@
     "node": ">=18"
   }
 }
-
-

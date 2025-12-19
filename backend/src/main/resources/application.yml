@@ -17,9 +17,9 @@ spring:
   servlet:
     multipart:
       enabled: true
-      max-file-size: 100MB
-      max-request-size: 100MB
-      file-size-threshold: 1MB
+      max-file-size: 20GB
+      max-request-size: 20GB
+      file-size-threshold: 1GB
 
 # 外部服务配置
 external:
@@ -28,7 +28,7 @@ external:
     key: ***REMOVED***
     secret: ***REMOVED***
   wps:
-    app-id: SX20251208BJWRFK
+    app-id: AK20251215TTJNYB
     app-secret: ***REMOVED***
     callback-base-url: https://checkbahttps.vip.cpolar.cn  # 使用 cpolar 内网穿透地址，供 WPS 回调使用
   tushare:
@@ -44,13 +44,13 @@ ai:
       # 建议通过环境变量 GEMINI_API_KEY 注入，避免写死在配置文件
       api-key: ***REMOVED***
       # 默认使用官方当前推荐的通用文本模型，可按需调整为 gemini-2.5-flash 等
-      model-name: gemini-2.5-pro
+      model-name: gemini-2.5-flash
       api-base-url: https://generativelanguage.googleapis.com/v1beta
       timeout: 60s
     ollama:
       # 与当前本地 Ollama 配置保持一致，方便一键切换回本地模型
       base-url: http://localhost:11434
-      model-name: qwen2.5:14b-instruct
+      model-name: qwen3-vl:8b
       temperature: 0.7
       timeout: 300s
 
@@ -90,7 +90,7 @@ langchain4j:
   ollama:
     chat-model:
       base-url: http://localhost:11434
-      model-name: qwen2.5:14b-instruct
+      model-name: qwen3-vl:8b
       temperature: 0.7
       timeout: 300s
     embedding-model:

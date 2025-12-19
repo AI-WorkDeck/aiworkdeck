@@ -1,6 +1,8 @@
 package com.checkba.controller;
 
+import com.checkba.model.entity.ProjectInvitation;
 import com.checkba.model.entity.User;
+import com.checkba.service.ClientInvitationService;
 import com.checkba.service.UserService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -15,12 +17,17 @@ import java.util.Map;
 public class AuthController {
 
     private final UserService userService;
+    private final ClientInvitationService clientInvitationService;
 
     // 简单的 session 存储（内存中，实际生产环境应使用 Redis 或 JWT）
     private static final Map<String, Long> SESSION_STORE = new HashMap<>();
 
-    public AuthController(UserService userService) {
+    private static UserService staticUserService;
+
+    public AuthController(UserService userService, ClientInvitationService clientInvitationService) {
         this.userService = userService;
+        this.clientInvitationService = clientInvitationService;
+        staticUserService = userService; 
     }
 
     /**
@@ -48,7 +55,9 @@ public class AuthController {
                             "id", user.getId(),
                             "username", user.getUsername(),
                             "displayName", user.getDisplayName(),
-                            "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : ""
+                            "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : "",
+                            "role", user.getRole(),
+                            "subscriptionType", user.getSubscriptionType()
                     )
             ));
             return result;
@@ -80,7 +89,58 @@ public class AuthController {
                             "id", user.getId(),
                             "username", user.getUsername(),
                             "displayName", user.getDisplayName(),
-                            "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : ""
+                            "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : "",
+                            "role", user.getRole(),
+                            "subscriptionType", user.getSubscriptionType()
+                    )
+            ));
+            return result;
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", 1);
+            result.put("message", e.getMessage());
+            return result;
+        }
+    }
+
+    /**
+     * 客户登录（使用访问码）
+     */
+    @PostMapping("/client-login")
+    public Map<String, Object> clientLogin(@RequestBody ClientLoginRequest request) {
+        try {
+            ProjectInvitation invitation = clientInvitationService.validateCode(request.getAccessCode());
+            
+            // Create a new user for this client login if displayName is provided
+            // This allows tracking "Who uploaded what"
+            User user;
+            if (request.getDisplayName() != null && !request.getDisplayName().trim().isEmpty()) {
+                user = clientInvitationService.createClientUser(
+                    invitation.getProjectId(), 
+                    request.getDisplayName(), 
+                    request.getAccessCode()
+                );
+            } else {
+                 // Fallback to the generic user linked to the invitation (legacy)
+                 user = userService.getUserById(invitation.getRelatedUserId());
+            }
+
+            String sessionId = generateSessionId();
+            SESSION_STORE.put(sessionId, user.getId());
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", 0);
+            result.put("message", "登录成功");
+            result.put("data", Map.of(
+                    "sessionId", sessionId,
+                    "projectId", invitation.getProjectId(), // Return projectId so frontend knows where to go
+                    "user", Map.of(
+                            "id", user.getId(),
+                            "username", user.getUsername(),
+                            "displayName", user.getDisplayName(),
+                            "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : "",
+                            "role", user.getRole(),
+                            "subscriptionType", user.getSubscriptionType()
                     )
             ));
             return result;
@@ -113,7 +173,9 @@ public class AuthController {
                 "id", user.getId(),
                 "username", user.getUsername(),
                 "displayName", user.getDisplayName(),
-                "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : ""
+                "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : "",
+                "role", user.getRole(),
+                "subscriptionType", user.getSubscriptionType()
         ));
         return result;
     }
@@ -143,6 +205,20 @@ public class AuthController {
         return "session_" + System.currentTimeMillis() + "_" + String.valueOf(Math.random()).substring(2, 15);
     }
 
+    public static String getUsernameFromSession(String sessionId) {
+        Long userId = SESSION_STORE.get(sessionId);
+        if (userId == null) return null;
+        if (staticUserService != null) {
+            try {
+                User user = staticUserService.getUserById(userId);
+                return user != null ? user.getDisplayName() : null; // Use DisplayName as creator name
+            } catch (Exception e) {
+                 return null;
+            }
+        }
+        return null;
+    }
+
     @Data
     static class RegisterRequest {
         private String username;
@@ -154,6 +230,12 @@ public class AuthController {
     static class LoginRequest {
         private String username;
         private String password;
+    }
+
+    @Data
+    static class ClientLoginRequest {
+        private String accessCode;
+        private String displayName;
     }
 }
 

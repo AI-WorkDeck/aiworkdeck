@@ -3,61 +3,167 @@
     <!-- 顶部固定项目信息 -->
     <view class="project-header">
       <view class="header-left">
-        <view class="back-btn" @tap="goBack">
-          <text class="back-icon">←</text>
-        </view>
+
         <view class="project-info">
+          <!-- Logo moved to center -->
           <view class="project-title-row">
-            <text class="project-name">{{ project.name || '未命名项目' }}</text>
+            <view v-if="isRenamingProject" class="rename-container">
+              <input
+                class="rename-input"
+                v-model="renameProjectName"
+                :focus="true"
+                @confirm="confirmRenameProject"
+                @blur="cancelRenameProject"
+              />
+            </view>
+            <text v-else class="project-name" @tap="startRenameProject" title="点击重命名">{{ project.name || '未命名项目' }}</text>
             <view class="project-status-badge">
               <text class="status-text">进行中</text>
             </view>
           </view>
           <view class="project-meta">
             <text class="meta-item">负责人：{{ project.manager || userDisplayName || '我' }}</text>
-            <text class="meta-divider">|</text>
-            <text class="meta-item">上市公司：{{ project.listedCompanyName || '-' }}</text>
-            <text class="meta-divider">|</text>
-            <text class="meta-item">创建时间：{{ formatTime(project.createdAt) }}</text>
+            
+            <block v-if="project.listedCompanyName && project.listedCompanyName !== '-'">
+                <text class="meta-divider">|</text>
+                <text class="meta-item">上市公司：{{ project.listedCompanyName }}</text>
+            </block>
+            
+            <block v-if="project.createdAt">
+                <text class="meta-divider">|</text>
+                <text class="meta-item">创建时间：{{ formatTime(project.createdAt) }}</text>
+            </block>
           </view>
         </view>
       </view>
+      
+      <!-- Center Logo -->
+      <view class="header-center">
+         <image src="/static/logo_full.png" mode="heightFix" class="project-logo" />
+      </view>
+
       <view class="header-right">
         <!-- 顶部工具区（IDE 风格）：分屏 / 浏览器 / 摘录 / AI / 工具 -->
-        <view class="header-tools">
+        <view class="header-tools" v-if="!isClientView">
+          <!-- 1. Left Sidebar -->
           <view
-            class="icon-btn"
+            class="top-bar-btn"
             :class="{ active: !sidebarCollapsed }"
             @tap="toggleSidebar"
             :title="sidebarCollapsed ? '展开左侧栏' : '收起左侧栏'"
+            @mouseenter="hoverLeft = true"
+            @mouseleave="hoverLeft = false"
           >
-            <text class="tool-icon">{{ sidebarCollapsed ? '»' : '«' }}</text>
+            <image 
+              :src="(!sidebarCollapsed || hoverLeft) ? '/static/left-bar_selected.png' : '/static/left-bar.png'" 
+              class="tool-icon-img" 
+              mode="aspectFit"
+            />
           </view>
+
+          <!-- 2. Bottom Sidebar (Tools Panel) -->
           <view
-            class="icon-btn split-btn"
+            class="top-bar-btn" 
+            :class="{ active: showToolsPanel }" 
+            @tap="toggleToolsPanel" 
+            title="常用工具"
+            @mouseenter="hoverBottom = true"
+            @mouseleave="hoverBottom = false"
+          >
+            <image 
+              :src="(showToolsPanel || hoverBottom) ? '/static/bottom-bar_selected.png' : '/static/bottom-bar.png'" 
+              class="tool-icon-img" 
+              mode="aspectFit"
+            />
+          </view>
+
+          <!-- 3. Right Sidebar (AI Panel) -->
+          <view
+            class="top-bar-btn" 
+            :class="{ active: showAiPanel }" 
+            @tap="toggleAiPanel" 
+            title="AI 助手"
+            @mouseenter="hoverRight = true"
+            @mouseleave="hoverRight = false"
+          >
+            <image 
+              :src="(showAiPanel || hoverRight) ? '/static/right-bar_selected.png' : '/static/right-bar.png'" 
+              class="tool-icon-img" 
+              mode="aspectFit"
+            />
+          </view>
+
+          <!-- 4. Split View -->
+          <view
+            class="top-bar-btn split-btn"
             :class="{ active: splitMode }"
             @tap="toggleSplitMode"
             :title="splitMode ? '关闭分屏' : '开启分屏'"
+            @mouseenter="hoverSplit = true"
+            @mouseleave="hoverSplit = false"
           >
-            <text class="tool-icon">◫</text>
+             <image 
+              :src="(splitMode || hoverSplit) ? '/static/square_selected.png' : '/static/square_split_2x1.png'" 
+              class="tool-icon-img" 
+              mode="aspectFit"
+            />
           </view>
-          <view class="icon-btn" @tap="openBrowserTab()" title="浏览器">
-            <text class="tool-icon">⌕</text>
+
+          <!-- 5. Screenshot (OCR) -->
+          <view 
+            class="top-bar-btn" 
+            @tap="startOcrCapture" 
+            title="截图摘录（OCR）"
+            @mouseenter="hoverCapture = true"
+            @mouseleave="hoverCapture = false"
+          >
+             <image 
+              :src="hoverCapture ? '/static/screenshop_selected.png' : '/static/screenshop.png'" 
+              class="tool-icon-img" 
+              mode="aspectFit"
+            />
           </view>
-          <view class="icon-btn" @tap="startOcrCapture" title="截图摘录（OCR）">
-            <text class="tool-icon">✂</text>
+
+          <!-- 6. Browser (New Web) -->
+          <view 
+            class="top-bar-btn" 
+            @tap="openBrowserTab()" 
+            title="浏览器"
+            @mouseenter="hoverWeb = true"
+            @mouseleave="hoverWeb = false"
+          >
+             <image 
+              :src="hoverWeb ? '/static/new-web_selected.png' : '/static/new-web.png'" 
+              class="tool-icon-img" 
+              mode="aspectFit"
+            />
           </view>
-          <view class="icon-btn" :class="{ active: showAiPanel }" @tap="toggleAiPanel" title="AI 助手">
-            <text class="tool-icon">AI</text>
-          </view>
-          <view class="icon-btn" :class="{ active: showToolsPanel }" @tap="toggleToolsPanel" title="常用工具">
-            <text class="tool-icon">⌥</text>
+          
+          <!-- Activity Record Toggle -->
+          <view 
+            class="top-bar-btn" 
+            :class="{ active: isRecording }" 
+            @tap="toggleRecording" 
+            title="录制活动"
+            @mouseenter="hoverRecord = true"
+            @mouseleave="hoverRecord = false"
+          >
+            <image 
+              :src="(isRecording || hoverRecord) ? '/static/record-rec_selected.png' : '/static/record-rec.png'" 
+              class="tool-icon-img" 
+              mode="aspectFit"
+            />
           </view>
         </view>
-        <!-- 用户头像 -->
-        <view class="user-avatar" @tap="goToUserProfile">
-           <text class="avatar-text">{{ userDisplayName?.charAt(0) || 'U' }}</text>
+        <view v-else>
+            <!-- Client View Only Tools -->
+            <view class="header-tools">
+               <view class="icon-btn" @tap="handleLogout" title="退出登录">
+                   <text class="tool-icon">×</text>
+               </view>
+            </view>
         </view>
+        <!-- User Avatar moved to Left Rail -->
       </view>
     </view>
 
@@ -73,52 +179,274 @@
           :title="p.label"
           @tap="toggleLeftPane(p.key)"
         >
-          <text class="rail-icon">{{ p.icon }}</text>
+          <image 
+            v-if="p.activeIcon"
+            :src="(leftPaneKey === p.key && !sidebarCollapsed) ? p.activeIcon : p.icon"
+            class="rail-icon-img"
+            mode="aspectFit"
+          />
+          <text v-else class="rail-icon">{{ p.icon }}</text>
         </view>
+
+        <!-- Spacer -->
+        <view style="flex: 1"></view>
+
+        <!-- Project Members Stack -->
+        <view class="rail-members-container" v-if="projectMembers && projectMembers.length > 0">
+           <view class="members-stack-icon">
+              <!-- Stacked avatars -->
+              <view class="stack-preview">
+                   <view 
+                      v-for="(member, index) in projectMembers.slice(0, 3)" 
+                      :key="member.id" 
+                      class="stack-avatar-mini"
+                      :style="{ zIndex: 3 - index, top: (index * -4) + 'px', left: (index * 2) + 'px' }" 
+                   >
+                      <image v-if="member.avatarUrl" :src="member.avatarUrl" class="avatar-img" />
+                      <view v-else class="avatar-placeholder">{{ member.displayName?.charAt(0) || 'U' }}</view>
+                   </view>
+              </view>
+              
+              <!-- Expanded Panel (Hover) -->
+              <view class="members-expand-panel-left">
+                  <scroll-view scroll-y class="expand-list">
+                      <view v-for="group in groupedMembers" :key="group.label" class="member-group">
+                          <view class="group-label">{{ group.label }}</view>
+                          <view class="members-grid">
+                              <view v-for="member in group.list" :key="member.id" class="member-grid-item" :title="member.displayName">
+                                   <!-- Avatar -->
+                                   <view class="member-avatar-wrapper">
+                                     <image v-if="member.avatarUrl" :src="member.avatarUrl" class="member-avatar-grid" />
+                                     <view v-else class="member-avatar-placeholder-grid" :class="{ 'is-client': member.role === 'CLIENT' }">
+                                       {{ member.role === 'CLIENT' ? '客' : (member.displayName?.charAt(0) || 'U') }}
+                                     </view>
+                                   </view>
+                              </view>
+                              
+                              <!-- Add Member Button (Only in 'Client' group or at the end if you want) -->
+                              <!-- User requested: "成员头像最右侧... 应该有一个空圆圈，里边显示加号" -->
+                              <!-- We'll put it at the end of the last group OR as a separate item if we want -->
+                              <!-- Let's put it in the last available spot of the last group to allow flow, or just append it to the grid of the last group -->
+                          </view>
+                      </view>
+                      
+                      <!-- Add Member Trigger (Appended to the list visually) -->
+                      <view class="add-member-row" style="padding: 0 12px 12px;">
+                          <view class="add-member-btn" @tap.stop="showInviteModal = true" title="添加成员">
+                              <text class="add-icon">＋</text>
+                          </view>
+                      </view>
+                  </scroll-view>
+              </view>
+           </view>
+        </view>
+        
+        <!-- User Avatar (Bottom) -->
+        <view class="rail-user-avatar" @tap="goToUserProfile" title="个人中心">
+           <image v-if="currentUser && currentUser.avatarUrl" :src="currentUser.avatarUrl" class="avatar-img" style="border-radius: 50%;" />
+           <text v-else class="avatar-text">{{ (userDisplayName || currentUser?.displayName)?.charAt(0) || 'U' }}</text>
+        </view>
+      </view>
+
+      <!-- Invite Modal (Refactored to King IDE) -->
+      <!-- Invite Member Dialog -->
+      <InviteMemberDialog 
+        v-model:visible="showInviteModal" 
+        :project-id="projectId" 
+        @success="loadProjectMembers" 
+      />
+
+    <!-- Custom Recording Toast -->
+    <view class="recording-toast" :class="{ visible: showRecordingToast }">
+      <text>{{ recordingToastMessage }}</text>
+    </view>
+
+      <!-- Assistant Config Dialog Overlay (Moved to Root) -->
+      <view v-if="showAssistantConfigDialog" class="dialog-overlay" style="z-index: 9999;" @tap="closeAssistantConfigDialog">
+         <view class="config-dialog" @tap.stop>
+            <view class="dialog-header">
+               <text class="dialog-title">配置助手</text>
+               <text class="dialog-close" @tap="closeAssistantConfigDialog">×</text>
+            </view>
+            <view class="dialog-content">
+               <view class="form-item">
+                  <text class="label">助手名称 (System)</text>
+                  <input class="input readonly" :value="editingAssistant.name" disabled />
+               </view>
+               <view class="form-item">
+                  <text class="label">预设 Prompt (System)</text>
+                  <textarea class="textarea readonly" :value="editingAssistant.systemPrompt" disabled></textarea>
+               </view>
+               <view class="form-item">
+                  <text class="label">用户自定义 Prompt</text>
+                  <textarea class="textarea" v-model="editingAssistant.userPrompt" placeholder="输入自定义指令..."></textarea>
+                  <text class="hint">⚠️ 注意：如果设置了自定义 Prompt，预设 Prompt 将被忽略（User Prompt Prevails）。</text>
+               </view>
+            </view>
+            <view class="dialog-footer">
+               <button class="btn-cancel" @tap="closeAssistantConfigDialog">取消</button>
+               <button class="btn-save" @tap="saveAssistantConfig">保存</button>
+            </view>
+         </view>
       </view>
 
       <!-- 左侧文件树（可收起） -->
       <view class="sidebar-left" :class="{ collapsed: sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '0px' : sidebarWidth + 'px' }">
         <!-- 批量菜单遮罩：用于点击空白关闭下拉（不弹中间） -->
         <view v-if="showBatchMenu" class="batch-menu-mask" @tap="closeBatchMenu"></view>
-        <view v-if="!sidebarCollapsed" class="sidebar-header">
+        <view v-if="!sidebarCollapsed && leftPaneKey !== 'dd-files'" class="sidebar-header">
           <view class="sidebar-title-row">
-            <text class="sidebar-title">{{ leftPaneTitle }}</text>
-            <view v-if="leftPaneKey === 'files'" class="sidebar-actions">
-              <view class="icon-btn mini" :class="{ active: fileBatchMode }" @tap="toggleFileBatchMode" title="批量选择">
-                <text class="tool-icon">☑</text>
-              </view>
-              <view v-if="fileBatchMode" class="batch-menu-wrapper">
-                <view
-                  class="icon-btn mini"
-                  :class="{ active: showBatchMenu, disabled: checkedFileCount <= 0 }"
-                  @tap="toggleBatchMenu"
-                  title="批量操作"
-                >
-                  <text class="tool-icon">⋮</text>
-                </view>
-                <view v-if="showBatchMenu" class="batch-menu" @tap.stop>
-                  <view
-                    v-for="action in FILE_BATCH_ACTIONS"
-                    :key="action.key"
-                    class="batch-menu-item"
-                    :class="{ danger: action.key === 'delete', disabled: checkedFileCount <= 0 }"
-                    @tap="onBatchMenuSelect(action.key)"
-                  >
-                    <text class="batch-menu-label">{{ action.label }}</text>
-                  </view>
-                </view>
-              </view>
-              <view class="sidebar-actions-divider"></view>
-              <view
-                v-for="a in FILE_TREE_QUICK_ACTIONS"
-                :key="a.key"
-                class="icon-btn mini"
-                :title="a.title"
-                @tap="onFileTreeQuickAction(a.key)"
-              >
-                <text class="tool-icon">{{ a.icon }}</text>
-              </view>
+            <text v-if="!fileBatchMode" class="sidebar-title">{{ leftPaneTitle }}</text>
+            <view 
+              v-else 
+              class="btn-select-all" 
+              @tap="selectAllFiles"
+            >
+              <text>选择全部</text>
+            </view>
+          </view>
+          
+          <view v-if="leftPaneKey === 'files'" class="sidebar-actions-row">
+            <view class="sidebar-actions">
+              <!-- 1. 新建文件 (普通模式) -->
+      <view
+        v-if="!fileBatchMode"
+        class="icon-btn mini"
+        @tap="onFileTreeQuickAction('newFile')"
+        title="新建文档"
+        @mouseenter="hoverNewFile = true"
+        @mouseleave="hoverNewFile = false"
+      >
+        <image
+          :src="hoverNewFile ? '/static/new-document.png' : '/static/new-document_unselected.png'"
+          class="tool-icon-img"
+          mode="contain"
+          style="width: 16px; height: 16px;"
+        />
+      </view>
+
+      <!-- 2. 新建文件夹 (普通模式) -->
+      <view
+        v-if="!fileBatchMode"
+        class="icon-btn mini"
+        @tap="onFileTreeQuickAction('newFolder')"
+        title="新建文件夹"
+        @mouseenter="hoverNewFolder = true"
+        @mouseleave="hoverNewFolder = false"
+      >
+        <image
+          :src="hoverNewFolder ? '/static/icon_new_folder.png' : '/static/icon_new_folder_unselected.png'"
+          class="tool-icon-img"
+          mode="contain"
+          style="width: 16px; height: 16px;"
+        />
+      </view>
+
+      <!-- 3. 批量选择开关 (始终显示) -->
+      <view
+        class="icon-btn mini"
+        :class="{ active: fileBatchMode }"
+        @tap="toggleFileBatchMode"
+        title="批量选择"
+        @mouseenter="hoverBatchSelect = true"
+        @mouseleave="hoverBatchSelect = false"
+      >
+        <image
+          :src="fileBatchMode || hoverBatchSelect ? '/static/batch_select.png' : '/static/batch_select_unselected.png'"
+          class="tool-icon-img"
+          mode="contain"
+          style="width: 16px; height: 16px;"
+        />
+      </view>
+
+      <!-- 4. 上传 (普通模式) -->
+      <view
+        v-if="!fileBatchMode"
+        class="icon-btn mini"
+        @tap="onFileTreeQuickAction('upload')"
+        title="上传文件"
+        @mouseenter="hoverUpload = true"
+        @mouseleave="hoverUpload = false"
+      >
+        <image
+          :src="hoverUpload ? '/static/upload.png' : '/static/upload_unselected.png'"
+          class="tool-icon-img"
+          mode="contain"
+          style="width: 16px; height: 16px;"
+        />
+      </view>
+
+      <!-- 5. 下载 (批量模式) -->
+      <view
+        v-if="fileBatchMode"
+        class="icon-btn mini"
+        @tap="onFileTreeQuickAction('download')"
+        title="批量下载"
+        :class="{ disabled: checkedFileCount <= 0 }"
+        @mouseenter="hoverDownload = true"
+        @mouseleave="hoverDownload = false"
+      >
+        <image
+          :src="hoverDownload ? '/static/download_selected.png' : '/static/download.png'"
+          class="tool-icon-img"
+          mode="contain"
+          style="width: 16px; height: 16px;"
+        />
+      </view>
+
+      <!-- 6. 排序 (普通模式) -->
+      <view
+        v-if="!fileBatchMode"
+        class="icon-btn mini"
+        @tap="onFileTreeQuickAction('sort')"
+        title="排序"
+        @mouseenter="hoverSort = true"
+        @mouseleave="hoverSort = false"
+      >
+        <image
+          :src="hoverSort ? '/static/sort.png' : '/static/sort_unselected.png'"
+          class="tool-icon-img"
+          mode="contain"
+          style="width: 16px; height: 16px;"
+        />
+      </view>
+
+      <!-- 7. 复制 (批量模式) -->
+      <view
+        v-if="fileBatchMode"
+        class="icon-btn mini"
+        @tap="onFileTreeQuickAction('copy')"
+        title="批量复制"
+        :class="{ disabled: checkedFileCount <= 0 }"
+        @mouseenter="hoverCopy = true"
+        @mouseleave="hoverCopy = false"
+      >
+        <image
+          :src="hoverCopy ? '/static/copy_selected.png' : '/static/copy.png'"
+          class="tool-icon-img"
+          mode="contain"
+          style="width: 16px; height: 16px;"
+        />
+      </view>
+
+      <!-- 8. 回收站 / 删除 (始终显示，功能不同) -->
+      <view
+        class="icon-btn mini"
+        @tap="onFileTreeQuickAction('recycleBin')"
+        :title="fileBatchMode ? '删除选中' : '回收站'"
+        @mouseenter="hoverRecycleBin = true"
+        @mouseleave="hoverRecycleBin = false"
+      >
+        <image
+          :src="hoverRecycleBin ? '/static/recycle-bin.png' : '/static/recycle-bin_unselected.png'"
+          class="tool-icon-img"
+          mode="contain"
+          style="width: 16px; height: 16px;"
+        />
+      </view>
+
+
+
             </view>
           </view>
         </view>
@@ -135,11 +463,28 @@
             @file-drag-start="onFileLinkDragStart"
             @file-drag-end="onFileLinkDragEnd"
           />
+          <DdFilesPanel
+            v-else-if="leftPaneKey === 'dd-files'"
+            :project-id="projectId"
+            :current-user="currentUser"
+            @open-request="handleOpenDdRequest"
+          />
           <view v-else class="sidebar-plugin-placeholder">
             <text class="placeholder-title">{{ leftPaneTitle }}</text>
-            <text class="placeholder-desc">插件位预留：后续这里会展示对应插件的工具与流程。</text>
+            <text class="placeholder-desc">加载中...</text>
           </view>
+          
+          <!-- 文件拖拽关联：浮窗落点区域 (移至侧边栏底部) -->
+          <FileLinkDropZone
+            :visible="fileLinkDrag.active"
+            :file-name="fileLinkDrag.file ? fileLinkDrag.file.name : ''"
+            :split-mode="splitMode"
+            @drop="onFileLinkZoneDrop"
+          />
         </view>
+        
+        <!-- Sidebar Footer moved to Left Rail -->
+
         <!-- 拖拽手柄 -->
         <view class="resize-handle" @touchstart="startResize('left', $event)" @mousedown="startResize('left', $event)"></view>
       </view>
@@ -228,7 +573,7 @@
               <!-- 初始空状态 (仅当左侧也没有文件时) -->
               <view v-if="leftFiles.length === 0 && !splitMode" class="empty-workspace">
                 <view class="empty-content">
-                  <text class="empty-icon">📂</text>
+                  <image src="/static/iconmark.png" class="empty-state-img" mode="aspectFit" />
                   <text class="empty-text">在左侧选择文件开始工作</text>
                 </view>
               </view>
@@ -267,6 +612,10 @@
                       @ready="onWpsReady($event, 'left')"
                       @clipboard-copy="onWpsClipboardCopy($event)"
                     />
+                    <DdRequestEditor
+                      v-else-if="isDdRequest(activeFileLeft)"
+                      :request-id="activeFileLeft.requestId"
+                    />
                     <FilePreview 
                       v-else 
                       :file="activeFileLeft" 
@@ -274,7 +623,8 @@
                     />
                   </view>
                   <view v-else class="pane-empty">
-                    <text>左侧空闲</text>
+                    <image src="/static/iconmark.png" class="empty-state-img" mode="aspectFit" />
+                    <text class="empty-text">左侧空闲</text>
                   </view>
                 </view>
 
@@ -307,6 +657,10 @@
                       @ready="onWpsReady($event, 'right')"
                       @clipboard-copy="onWpsClipboardCopy($event)"
                     />
+                    <DdRequestEditor
+                      v-else-if="isDdRequest(activeFileRight)"
+                      :request-id="activeFileRight.requestId"
+                    />
                     <FilePreview 
                       v-else 
                       :file="activeFileRight" 
@@ -314,7 +668,8 @@
                     />
                   </view>
                   <view v-else class="pane-empty">
-                    <text>点击此处后选择文件以对比</text>
+                    <image src="/static/iconmark.png" class="empty-state-img" mode="aspectFit" />
+                    <text class="empty-text">右侧空闲</text>
                   </view>
                 </view>
               </view>
@@ -324,19 +679,36 @@
             <view v-if="showToolsPanel" class="bottom-panel" :style="{ height: toolsPanelHeight + 'px' }">
               <view class="bottom-resize-handle" @touchstart="startResize('bottom', $event)" @mousedown="startResize('bottom', $event)"></view>
               <view class="panel-header panel-header-tools">
-                <view class="panel-tabs">
-                  <view
-                    v-for="t in toolsList"
-                    :key="t.key"
-                    class="panel-tab"
-                    :class="{ active: activeToolKey === t.key }"
-                    @tap="switchToolTab(t.key)"
-                  >
-                    <text class="panel-tab-icon">{{ t.icon }}</text>
-                    <text class="panel-tab-label">{{ t.label }}</text>
+                <!-- Group: Tabs + Specific Actions -->
+                <view class="header-content-left">
+                  <view class="panel-tabs king-style">
+                    <view
+                      v-for="t in toolsList"
+                      :key="t.key"
+                      class="panel-tab"
+                      :class="{ active: activeToolKey === t.key }"
+                      @tap="switchToolTab(t.key)"
+                    >
+                      <text class="panel-tab-label">{{ t.label }}</text>
+                      <view class="tab-indicator" v-if="activeToolKey === t.key"></view>
+                    </view>
+                  </view>
+                  
+                  <!-- Variable Specific Actions (Moved from VariablePanel) -->
+                  <view v-if="activeToolKey === 'variables'" class="tool-actions-group">
+                    <view class="tool-action-btn" @tap="handleOpenCreateVariable" title="设为变量">
+                      <text class="btn-icon">＋</text>
+                      <text class="btn-text">设为变量</text>
+                    </view>
+                    <view class="tool-action-btn" @tap="handleSyncVariable" title="同步">
+                      <text class="btn-icon">↻</text>
+                      <text class="btn-text">同步</text>
+                    </view>
                   </view>
                 </view>
-                <view class="tools-search" v-if="activeToolKey === 'variables' || activeToolKey === 'favorites' || activeToolKey === 'clipboard'">
+
+                <!-- Centered Search -->
+                <view class="tools-search-centered" v-if="activeToolKey === 'variables' || activeToolKey === 'favorites' || activeToolKey === 'clipboard'">
                   <view class="tools-search-wrap">
                     <input
                       class="tools-search-input"
@@ -347,6 +719,7 @@
                     <view v-if="toolsSearchKeyword" class="tools-search-clear" @tap="toolsSearchKeyword = ''">×</view>
                   </view>
                 </view>
+
                 <view class="panel-actions">
                   <view class="icon-btn" title="收起" @tap="toggleToolsPanel">
                     <text class="tool-icon">×</text>
@@ -385,54 +758,89 @@
           </view>
 
           <!-- 右侧 AI 面板（可拖拽宽度） -->
-          <view v-if="showAiPanel" class="side-panel side-panel-ai" :style="{ width: aiPanelWidth + 'px' }">
+          <view 
+            v-if="showAiPanel" 
+            class="side-panel side-panel-ai" 
+            :class="{ 'drag-over': dragOverAiPanel }"
+            :style="{ width: aiPanelWidth + 'px' }"
+            @dragover.prevent="handleAiDragOver"
+            @dragleave="handleAiDragLeave"
+            @drop="handleAiDrop"
+          >
             <view class="side-resize-handle" @touchstart="startResize('right', $event)" @mousedown="startResize('right', $event)"></view>
-            <view class="panel-header">
-              <text class="panel-title">AI 助手</text>
-              <view class="panel-actions">
-                <view class="icon-btn" title="收起" @tap="toggleAiPanel">
-                  <text class="tool-icon">×</text>
-                </view>
-              </view>
+            <view class="panel-header panel-header-ai">
+              <view class="sidebar-title-row">
+                  <text class="sidebar-title" style="font-size: 12px; color: #1f2937;">对话</text>
+               </view>
+
+               <view class="panel-actions" style="gap: 4px;">
+                 <!-- 1. New Chat -->
+                 <view class="icon-btn mini" style="width: 24px; height: 24px;" title="新建对话" @tap="startNewChat">
+                    <text class="tool-icon" style="font-size: 14px;">＋</text>
+                 </view>
+
+                 <!-- 3. Assistant (Robot) -->
+                 <view class="icon-btn mini" style="width: 24px; height: 24px;" :class="{ active: showAssistantMenu }" title="助手设置" @tap="toggleAssistantMenu">
+                    <text class="tool-icon" style="font-size: 14px;">🤖</text>
+                 </view>
+                 
+                 <!-- 4. History (Clock) -->
+                 <view class="icon-btn mini" style="width: 24px; height: 24px;" title="历史对话" @tap="toggleHistoryDrawer">
+                    <text class="tool-icon" style="font-size: 14px;">🕒</text>
+                 </view>
+
+                 <!-- 5. Close -->
+                 <view class="icon-btn mini" style="width: 24px; height: 24px;" title="收起" @tap="toggleAiPanel">
+                   <text class="tool-icon" style="font-size: 14px;">×</text>
+                 </view>
+               </view>
             </view>
+            
+            <!-- Dropdowns (Positioned relative to side-panel-ai) -->
+            
+
+            <!-- 2. Assistant Dropdown -->
+            <view v-if="showAssistantMenu" class="ai-dropdown-panel" @tap.stop>
+               <view class="menu-item header">选择助手</view>
+               <view 
+                 v-for="ast in assistants" 
+                 :key="ast.id" 
+                 class="menu-item"
+                 :class="{ active: currentAssistantId === ast.id }"
+                 @tap="switchAssistant(ast.id)"
+               >
+                  <!-- No emoji icon as requested -->
+                  <text style="flex: 1;">{{ ast.name }}</text>
+                  <!-- Gear icon for configuration -->
+                  <view class="icon-btn mini" style="width: 20px; height: 20px; display:flex; align-items:center; justify-content:center;" @tap.stop="openAssistantConfig(ast)">
+                    <text style="font-size: 12px; line-height:1;">⚙️</text>
+                  </view>
+               </view>
+            </view>
+            <view v-if="showAssistantMenu" class="dropdown-fixed-mask" @tap.stop="toggleAssistantMenu"></view>
+
+            <!-- 3. History Dropdown (Unified style) -->
+            <view v-if="showHistoryDrawer" class="ai-dropdown-panel" @tap.stop>
+                <view class="menu-item header">历史对话</view>
+                <scroll-view scroll-y class="drawer-list" style="max-height: 350px;">
+                    <view v-if="loadingHistory" class="menu-item" style="color:#999;">加载中...</view>
+                    <view v-else-if="chatHistoryList.length === 0" class="menu-item" style="color:#999;">暂无历史记录</view>
+                    <view v-else v-for="chat in chatHistoryList" :key="chat.id" class="menu-item" @tap="loadHistoryChat(chat)">
+                        <view style="flex:1; overflow:hidden;">
+                            <text class="item-title" style="display:block; font-size:13px; color:#333; margin-bottom:2px;">{{ chat.title || '未命名对话' }}</text>
+                            <text class="item-preview" style="display:block; font-size:11px; color:#999; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ chat.lastMessage }}</text>
+                        </view>
+                        <text class="item-time" style="font-size:10px; color:#ccc; margin-left:8px;">{{ formatTime(chat.updatedAt) }}</text>
+                    </view>
+                </scroll-view>
+            </view>
+            <view v-if="showHistoryDrawer" class="dropdown-fixed-mask" @tap.stop="toggleHistoryDrawer"></view>
+            
+            <!-- Removed separate context drawer row -->
+
             <view class="panel-body panel-body-ai">
-              <view class="ai-chat-pane">
-                <view class="ai-context-card">
-                  <view class="context-header">
-                    <view class="context-file">
-                      <text class="context-label">当前文件</text>
-                      <text class="context-value">
-                        {{ activeAiFileName || '未选择 WPS 文件' }}
-                      </text>
-                    </view>
-                    <view class="context-actions">
-                      <text class="context-status" :class="{ synced: aiContextPreview }">
-                        {{ aiContextLoading ? '同步中...' : (aiContextPreview ? '已同步' : '待同步') }}
-                      </text>
-                      <view
-                        class="context-action-btn"
-                        :class="{ disabled: aiContextLoading }"
-                        @tap="!aiContextLoading && refreshAiContextPreview(true)"
-                      >
-                        <text>{{ aiContextLoading ? '同步中' : '同步当前文件' }}</text>
-                      </view>
-                    </view>
-                  </view>
-                  <view v-if="aiContextPreview && (aiContextPreview.selection || aiContextPreview.snippet)" class="context-snippet">
-                    <view v-if="aiContextPreview.selection" class="context-snippet-row">
-                      <text class="context-snippet-label">选区</text>
-                      <text class="context-snippet-text">{{ aiContextPreview.selection }}</text>
-                    </view>
-                    <view v-if="aiContextPreview.snippet" class="context-snippet-row">
-                      <text class="context-snippet-label">摘要</text>
-                      <text class="context-snippet-text">{{ aiContextPreview.snippet }}</text>
-                    </view>
-                  </view>
-                  <view v-else class="context-snippet placeholder">
-                    <text>同步后，助手会带着当前 WPS 文档上下文进行回答与改写。</text>
-                  </view>
-                </view>
-                <scroll-view class="ai-chat-body" scroll-y :scroll-with-animation="true">
+              <scroll-view class="ai-chat-body" scroll-y :scroll-with-animation="true" :scroll-top="scrollTop">
+                <view class="ai-chat-padding"> <!-- Container for padding -->
                   <view
                     v-for="msg in aiMessages"
                     :key="msg.id"
@@ -440,43 +848,73 @@
                     :class="msg.role === 'user' ? 'ai-message-user' : 'ai-message-assistant'"
                   >
                     <view class="ai-message-bubble">
-                      <text class="ai-message-role">
-                        {{ msg.role === 'user' ? '我' : '助手' }}
-                      </text>
-                      <text class="ai-message-content">
-                        {{ msg.content }}
-                      </text>
+                      <text class="ai-message-content">{{ msg.content }}</text>
                       <view v-if="msg.role === 'assistant' && msg.content" class="ai-message-actions">
-                        <text class="ai-export-btn primary" @tap="insertAiMessageToDoc(msg)">插入当前文档</text>
-                        <text class="ai-export-btn" @tap="applyAiMessageToSelection(msg)">替换选区</text>
-                        <text class="ai-export-btn" @tap="openExportDialog(msg)">导出为Word</text>
+                        <text class="ai-export-btn primary" @tap="insertAiMessageToDoc(msg)">插入</text>
+                        <text class="ai-export-btn" @tap="applyAiMessageToSelection(msg)">替换</text>
+                        <text class="ai-export-btn" @tap="openExportDialog(msg)">导出</text>
                       </view>
                     </view>
                   </view>
                   <view v-if="aiLoading" class="ai-message ai-message-assistant">
                     <view class="ai-message-bubble">
-                      <text class="ai-message-role">助手</text>
                       <text class="ai-message-content">正在思考...</text>
                     </view>
                   </view>
                   <view v-if="!aiMessages.length && !aiLoading" class="ai-empty-tip">
-                    <text>向助手描述你想在当前文件中补充、重写或审阅的内容</text>
+                    <text>开始对话...</text>
                   </view>
-                </scroll-view>
-                <view class="ai-input-area">
-                  <textarea
-                    class="ai-input"
-                    v-model="aiInput"
-                    placeholder="描述你想在当前文档里完成的修改..."
-                    :disabled="aiLoading"
-                    confirm-type="send"
-                    @confirm="handleAiSend"
-                  />
+                </view>
+              </scroll-view>
+
+              <!-- 仿 Cursor 输入区 -->
+              <view class="ai-input-wrapper" @keydown.native.capture="handleWrapperKeydown">
+                <view class="ai-input-scroller" @tap="focusRichInput">
+                  <!-- Pasted/Uploaded Images Preview -->
+                  <view v-if="pastedImages.length > 0" class="ai-attachments-preview">
+                     <view v-for="(img, idx) in pastedImages" :key="idx" class="attachment-thumb-wrap">
+                        <image :src="img.path" class="attachment-thumb" mode="aspectFill" />
+                        <view class="attachment-remove" @tap.stop="removeAttachment(idx)">×</view>
+                     </view>
+                  </view>
+                  <div 
+                    ref="aiRichInput"
+                    class="ai-rich-input"
+                    :class="{ empty: !aiInput && (!manualContextFiles || manualContextFiles.length === 0) }"
+                    contenteditable="true"
+                    @input="onRichInput"
+                    @keydown="onRichKeydown"
+                    @paste="handleRichPaste"
+                  ></div>
+                </view>
+                <view class="ai-input-footer">
+                  <view class="ai-model-select" @tap="toggleModelDropdown">
+                    <text class="model-name">{{ currentModelName }}</text>
+                    <text class="model-arrow">▼</text>
+                    
+                    <!-- Dropdown Mask & Menu -->
+                    <view v-if="showModelDropdown" class="dropdown-fixed-mask" @tap.stop="toggleModelDropdown"></view>
+                    <!-- 模型选择下拉 -->
+                    <view v-if="showModelDropdown" class="model-dropdown-menu" @tap.stop>
+                      <view 
+                        v-for="m in availableModels" 
+                        :key="m.id" 
+                        class="model-option" 
+                        :class="{ active: currentModelId === m.id }"
+                        @tap="switchModel(m.id)"
+                      >
+                        {{ m.name }}
+                      </view>
+                    </view>
+                  </view>
+                  
                   <view
-                    class="ai-send-btn"
+                    class="ai-send-round-btn"
                     :class="{ disabled: aiLoading || !aiInput.trim() }"
                     @tap="!(aiLoading || !aiInput.trim()) && handleAiSend()"
-                  >发送</view>
+                  >
+                    <text class="send-icon">→</text>
+                  </view>
                 </view>
               </view>
             </view>
@@ -546,6 +984,79 @@
         </view>
       </view>
 
+      <!-- Screenshot Save Dialog -->
+      <view v-if="showScreenshotSaveDialog" class="upload-mask" @tap="closeScreenshotSaveDialog">
+        <view class="folder-modal" @tap.stop>
+          <view class="upload-header">
+            <text class="upload-title">保存截图</text>
+          </view>
+          <view class="folder-content">
+            <view class="upload-row">
+              <text class="upload-label">文件名</text>
+              <input
+                v-model="screenshotSaveName"
+                class="dialog-input"
+                placeholder="例如：screenshot.png"
+              />
+            </view>
+            <view class="upload-row export-folder-label-row">
+              <text class="upload-label">存放位置</text>
+            </view>
+            <scroll-view scroll-y class="folder-tree-list">
+              <view
+                class="folder-item root-folder"
+                :class="{ active: screenshotSaveParentId === null }"
+                @tap="selectScreenshotFolder(null)"
+              >
+                <text class="folder-icon">📂</text>
+                <text class="folder-name">根目录</text>
+                <view v-if="!screenshotSaveParentId" class="check-icon">✓</view>
+              </view>
+              <template v-for="folder in screenshotFolderTree">
+                  <view
+                    v-if="isFolderVisible(folder)"
+                    :key="folder.id"
+                    class="folder-item"
+                    :class="{ active: screenshotSaveParentId === folder.id }"
+                    @tap="selectScreenshotFolder(folder.id)"
+                  >
+                    <!-- Indent -->
+                    <view class="folder-indent" :style="{ width: (folder.level * 20) + 'px' }"></view>
+                    
+                    <!-- Toggle Arrow -->
+                    <view 
+                        class="folder-toggle"
+                        @tap.stop="toggleExportFolder(folder)"
+                        :style="{ visibility: (folder.children && folder.children.length) ? 'visible' : 'hidden' }"
+                    >
+                        <text :class="folder.expanded ? 'arrow-down' : 'arrow-right'">▶</text>
+                    </view>
+
+                    <text class="folder-icon">📁</text>
+                    <text class="folder-name">{{ folder.name }}</text>
+                    <view v-if="screenshotSaveParentId === folder.id" class="check-icon">✓</view>
+                  </view>
+              </template>
+              <view v-if="!screenshotFolderTree.length" class="empty-tip">
+                <text>暂无子文件夹</text>
+              </view>
+            </scroll-view>
+          </view>
+          <view class="upload-footer">
+            <view class="upload-btn upload-btn-secondary" @tap="closeScreenshotSaveDialog">
+              取消
+            </view>
+            <view
+              class="upload-btn upload-btn-primary"
+              :class="{ 'upload-btn-disabled': screenshotSaveLoading || !screenshotSaveName.trim() }"
+              @tap="!screenshotSaveLoading && screenshotSaveName.trim() && confirmSaveScreenshot()"
+            >
+              {{ screenshotSaveLoading ? '保存中...' : '确定保存' }}
+            </view>
+          </view>
+        </view>
+      </view>
+
       <!-- OCR 截图：全屏浮层（单击或 ESC 退出；框选后出快捷命令条） -->
       <view
         v-if="showOcrOverlay"
@@ -581,43 +1092,17 @@
           @touchend.stop
         >
           <view class="ocr-actionbar-row">
-            <view class="ocr-action" @tap="ocrDoRefreshSelection">{{ OCR_ACTION_LABELS.refresh }}</view>
-            <view class="ocr-action" @tap="ocrDoRecognize" :class="{ disabled: ocrLoading }">{{ OCR_ACTION_LABELS.recognize }}</view>
-            <view class="ocr-action" @tap="ocrDoDownload">{{ OCR_ACTION_LABELS.download }}</view>
-            <view class="ocr-action" @tap="ocrDoCopy" :class="{ disabled: !ocrText }">{{ OCR_ACTION_LABELS.copy }}</view>
-            <view class="ocr-action" @tap="ocrDoInsert" :class="{ disabled: !ocrText }">{{ OCR_ACTION_LABELS.insertDoc }}</view>
+            <!-- 移除刷新画面 -->
+            <view class="ocr-action" @tap="ocrDoCopy" :class="{ disabled: !ocrText && !ocrImageDataUrl }">{{ OCR_ACTION_LABELS.copy }}</view>
+            <view class="ocr-action" @tap="ocrDoOpenSaveDialog">{{ OCR_ACTION_LABELS.download }}</view>
+            <view class="ocr-action" @tap="ocrDoFavorite" :class="{ disabled: !ocrImageDataUrl || ocrLoading }">{{ OCR_ACTION_LABELS.favorite }}</view>
             <view class="ocr-action" @tap="ocrDoWebLink" :class="{ disabled: ocrLoading }">{{ OCR_ACTION_LABELS.webLink }}</view>
-            <view class="ocr-action primary" @tap="ocrDoFavorite" :class="{ disabled: !ocrImageDataUrl || ocrLoading }">{{ OCR_ACTION_LABELS.favorite }}</view>
+            <view class="ocr-action primary" @tap="ocrDoRecognize" :class="{ disabled: ocrLoading }">{{ OCR_ACTION_LABELS.recognize }}</view>
           </view>
         </view>
       </view>
 
-      <!-- 文件拖拽关联：浮窗落点区域（避开 WPS iframe 吞 drop，按你建议降低前端成本） -->
-      <view v-if="fileLinkDrag.active" class="filelink-float">
-        <view class="filelink-float-title">拖到这里松手：关联到当前高亮文本</view>
-        <view class="filelink-float-sub">当前文件：{{ fileLinkDrag.file ? fileLinkDrag.file.name : '' }}</view>
-        
-        <!-- 临时调试按钮 -->
-        <!-- <button size="mini" type="warn" @tap.stop.prevent="debugAddHyperlink" style="margin: 4px 0;">调试：插入测试链接</button> -->
 
-        <view class="filelink-float-zones">
-          <view
-            ref="dropZoneLeft"
-            class="filelink-float-zone"
-            :class="{ active: fileLinkDrag.hoverSide === 'left' }"
-          >
-            关联到左侧文档
-          </view>
-          <view
-            v-if="splitMode"
-            ref="dropZoneRight"
-            class="filelink-float-zone"
-            :class="{ active: fileLinkDrag.hoverSide === 'right' }"
-          >
-            关联到右侧文档
-          </view>
-        </view>
-      </view>
 
       <!-- 文件关联选择弹窗：一个文本关联多个文件时，点击超链接弹出选择 -->
       <view v-if="fileLinkPicker.visible" class="upload-mask" @tap="closeFileLinkPicker">
@@ -658,6 +1143,7 @@
 
       <!-- OCR 结果不再使用弹窗：改为框选后的快捷命令条 -->
 
+
     </view>
   </view>
 </template>
@@ -669,9 +1155,12 @@ import FileTree from '@/components/FileTree.vue'
 import FilePreview from '@/components/FilePreview.vue'
 import VariablePanel from '@/components/VariablePanel.vue'
 import ProjectFavoritesPanel from '@/components/ProjectFavoritesPanel.vue'
+import FileLinkDropZone from '@/components/FileLinkDropZone.vue'
 import ClipboardPanel from '@/components/ClipboardPanel.vue'
+import InviteMemberDialog from '@/components/InviteMemberDialog.vue'
 import {
   getProject,
+  renameProject,
   getFileDetail,
   renameFile,
   ocrRecognize,
@@ -679,21 +1168,40 @@ import {
   createDocFileLink,
   getDocFileLink,
   saveClipboardText,
+  saveClipboardFile,
   saveProjectVariable,
   getProjectVariables,
   getProjectFiles,
   batchCopyFiles,
   aiChat,
-  exportAiDocx
+  exportAiDocx,
+  getProjectMembers,
+  logActivity,
+  inviteClient,
+  removeProjectMember,
+  getAiHistory,
+
+  getAiConversations,
+  createFile,
+  getApiBaseUrl,
+  getAiConfig,
+  getAssistants // Added
 } from '@/services/api.js'
 import { getCurrentUser } from '@/utils/auth.js'
 import { FILE_BATCH_ACTIONS, FILE_TREE_QUICK_ACTIONS } from '@/config/fileActions.js'
 import { WORKBENCH_TOOLS } from '@/config/tools.js'
 import { OCR_ACTION_LABELS, INTERNAL_LINK_SCHEMES, WPS_INTERNAL_HTTP_LINK_BASE } from '@/config/workbenchActions.js'
-import { LEFT_SIDEBAR_PLUGINS, getLeftSidebarPlugin } from '@/config/leftSidebarPlugins.js'
+import {
+  LEFT_SIDEBAR_PLUGINS,
+  getLeftSidebarPlugin,
+  getPluginsForUser
+} from '@/config/leftSidebarPlugins.js'
+
+import { activityTracker } from '@/utils/activityTracker.js'
+import DdFilesPanel from '@/components/DdFilesPanel.vue'
+import DdRequestEditor from '@/components/DdRequestEditor.vue'
 
 export default {
-  name: 'ProjectOverview',
   components: {
     WpsEditor,
     BrowserPane,
@@ -701,24 +1209,39 @@ export default {
     FilePreview,
     VariablePanel,
     ProjectFavoritesPanel,
-    ClipboardPanel
+    FileLinkDropZone,
+    ClipboardPanel,
+    DdFilesPanel,
+    DdRequestEditor,
+    InviteMemberDialog
   },
   data() {
     return {
       projectId: null,
       project: {},
+      // Screenshot Save Dialog
+      showScreenshotSaveDialog: false,
+      screenshotSaveName: '',
+      screenshotSaveParentId: null,
+      screenshotFolderTree: [],
+      screenshotSaveLoading: false,
+      screenshotSaveDataUrl: '', // Cached for save dialog
+      projectMembers: [], // Added
+      isRenamingProject: false,
+      renameProjectName: '',
       userDisplayName: '用户',
       
       // 布局状态
       sidebarWidth: 260, // 侧边栏宽度
       sidebarCollapsed: false,
       isCompactLayout: false,
-      leftPaneKey: 'files',
+      leftPaneKey: null, // Initialize to null to prevent premature loading
       LEFT_SIDEBAR_PLUGINS,
       // 文件树批量选择模式（由页面控制开关）
       fileBatchMode: false,
       checkedFileIds: [],
       showBatchMenu: false,
+      showFileMoreMenu: false,
       FILE_TREE_QUICK_ACTIONS,
 
       // 右侧 AI 面板（IDE 右侧窗格）
@@ -750,8 +1273,37 @@ export default {
       boundStopResize: null,
 
       aiMessages: [], // { id, role: 'user'|'assistant', content }
-      aiInput: '',
       aiLoading: false,
+      scrollTop: 0, // Added for scroll control
+      aiInput: '',
+      pastedImages: [], 
+      currentModelId: 'gemini-1.5-pro',
+      currentModelName: 'Gemini Pro',
+      showModelDropdown: false,
+      availableModels: [
+        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+        { id: 'ollama', name: 'Local (Ollama)' }
+      ],
+      // Context
+      activeAiFileName: '',
+      manualContextFiles: [], // Multi Context Support
+      dragOverAiPanel: false,
+      aiContextPreview: null,
+      aiContextLoading: false,
+      
+      // AI New Features
+      showHistoryDrawer: false,
+      loadingHistory: false,
+      chatHistoryList: [],
+      currentConversationId: null, // Added for tracking current session
+      showAssistantMenu: false,
+      currentAssistantId: 'default',
+      showAssistantConfigDialog: false,
+      editingAssistant: null,
+      showAssistantConfigDialog: false,
+      editingAssistant: null,
+      assistants: [], // Dynamic now
+      selectedContextNode: null, // Picker 中临时选中的节点
       // AI 导出 Word 相关（后端生成 docx）
       showExportDialog: false,
       exportTargetParentId: null,
@@ -779,6 +1331,9 @@ export default {
       ocrActionBar: { visible: false, x: 0, y: 0 },
       ocrDebug: true,
       ocrLastPointer: { x: 0, y: 0 },
+
+      // Invite Modal (Refactored)
+      showInviteModal: false,
 
       // 网核关联拖拽（将截图证据块拖到 WPS 文档中插入标记）
       webLinkDrag: {
@@ -814,13 +1369,18 @@ export default {
       rightFiles: [], // 右侧文件列表
       activeFileIdLeft: null, // 左侧当前激活ID
       activeFileIdRight: null, // 右侧当前激活ID
+      
+      // Members
+      projectMembers: [],
+      currentUser: {},
+      pageEnterTime: 0,
 
       // Tabs 拖拽状态
       draggingTab: null, // { fileId, fromPane }
       tabDragOver: null, // { fileId, pane }
       
       // WPS Config
-      wpsAppId: 'SX20251208BJWRFK',
+      wpsAppId: 'AK20251215TTJNYB',
       wpsInstances: {
         left: null,
         right: null
@@ -838,10 +1398,50 @@ export default {
       ,
       _desktopOcrSelectionUnsub: null
       ,
-      _desktopOcrSelectionErrUnsub: null
+      _desktopOcrSelectionErrUnsub: null,
+      
+      // Hover States for File Tree Icons
+      hoverActionKey: null,
+      hoverBatchSelect: false,
+      hoverRecycleBin: false,
+
+      // Activity Recording State
+      isRecording: false,
+      
+      // Toolbar Hover States
+      hoverLeft: false,
+      hoverBottom: false,
+      hoverRight: false,
+      hoverSplit: false,
+      hoverCapture: false,
+      hoverWeb: false,
+      hoverWeb: false,
+      hoverRecord: false,
+      
+      // Sidebar Action Hovers
+      hoverNewFile: false,
+      hoverNewFolder: false,
+      hoverUpload: false,
+      hoverSort: false,
+      hoverDownload: false,
+      hoverCopy: false,
+      hoverBatchSelect: false, // existing
+      hoverRecycleBin: false,  // existing
+      
+      // Recording Toast
+      showRecordingToast: false,
+      recordingToastMessage: '',
+      recordingToastTimer: null
     }
   },
   computed: {
+    LEFT_SIDEBAR_PLUGINS() {
+      const user = getCurrentUser()
+      if (user && user.role === 'CLIENT') {
+        return getPluginsForUser('CLIENT')
+      }
+      return LEFT_SIDEBAR_PLUGINS
+    },
     toolsSearchPlaceholder() {
       if (this.activeToolKey === 'variables') return '搜索变量…'
       if (this.activeToolKey === 'favorites') return '搜索收藏…'
@@ -860,12 +1460,42 @@ export default {
     FILE_BATCH_ACTIONS() {
       return FILE_BATCH_ACTIONS
     },
+    // 是否为“仅尽调”视图（客户）
+    isClientView() {
+      const user = getCurrentUser()
+      return user && user.role === 'CLIENT'
+    },
+    // 是否有权管理成员
+    canManageMembers() {
+      const user = getCurrentUser()
+      // Simplified: Admin or owner (backend checks too)
+      return user && user.role !== 'CLIENT'
+    },
     leftPaneTitle() {
       try {
         return getLeftSidebarPlugin(this.leftPaneKey)?.label || '文件树'
       } catch (e) {
         return '文件树'
       }
+    },
+    groupedMembers() {
+      const groups = {
+        admin: { label: '项目管理员', list: [] },
+        member: { label: '项目成员', list: [] },
+        client: { label: '客户', list: [] }
+      }
+      
+      this.projectMembers.forEach(m => {
+        if (m.role === 'ADMIN' || m.role === 'MANAGER' || m.id === this.project.managerId) {
+          groups.admin.list.push(m)
+        } else if (m.role === 'CLIENT') {
+          groups.client.list.push(m)
+        } else {
+          groups.member.list.push(m)
+        }
+      })
+      
+      return [groups.admin, groups.member, groups.client].filter(g => g.list.length > 0)
     },
     checkedFileCount() {
       return Array.isArray(this.checkedFileIds) ? this.checkedFileIds.length : 0
@@ -876,7 +1506,11 @@ export default {
     activeFileRight() {
       return this.rightFiles.find(f => f.id === this.activeFileIdRight)
     },
-    activeAiFileName() {
+    currentModelName() {
+      const m = this.availableModels.find(item => item.id === this.currentModelId)
+      return m ? m.name : '选择模型'
+    },
+    computedActiveToolName() {
       const target = this.getActiveAiTargetFile()
       return target && target.name ? target.name : ''
     }
@@ -931,6 +1565,13 @@ export default {
       } catch (e) {
         return false
       }
+    },
+    visibleFileActions() {
+      // 显示更多操作，因为现在有单独一行了
+      return this.FILE_TREE_QUICK_ACTIONS
+    },
+    moreFileActions() {
+      return []
     }
   },
   beforeUnmount() {
@@ -1016,21 +1657,60 @@ export default {
     } catch (e) {
       // ignore
     }
+    
+    // Stop Activity Tracking
+    this.stopActivityTracking()
+    
+    // Cleanup manual event listener removed
   },
   onLoad(query) {
+    this.pageEnterTime = Date.now()
     if (query && query.id) {
       this.projectId = Number(query.id)
       this.loadProjectInfo()
+      this.loadProjectMembers()
     }
     
     const user = getCurrentUser()
     if (user) {
       this.userDisplayName = user.displayName || user.username
+      this.currentUser = user
+      
+      // Try to restore previous state from localStorage
+      const savedKey = uni.getStorageSync(`project_${this.projectId}_leftPaneKey`)
+      
+      if (savedKey) {
+          this.leftPaneKey = savedKey
+      } else {
+          // Set default plugin based on user role
+          if (user.role === 'CLIENT') {
+            this.leftPaneKey = 'dd-files'
+          } else {
+            this.leftPaneKey = 'files'
+          }
+      }
     }
     // 登录态下启用剪贴板记录（仅记录本应用能感知到的 paste / 复制按钮）
     this.bindClipboardListener()
+    
+    // Initialize AI Model (Persistence > System Default)
+    this.initAiModel()
+    this.loadAssistants() // Fetch assistants
   },
   onShow() {
+    // Sync UI state
+    this.isRecording = activityTracker.getRecordingState()
+    
+    // Reload members to ensure up-to-date list
+    if (this.projectId) {
+        this.loadProjectMembers()
+    }
+
+    // Start/Resume Activity Tracking
+    if (this.projectId && this.project.name) {
+         this.startActivityTracking()
+    }
+    
     // Desktop：仅在工作区页面展示 BrowserView（否则会“飘”到其它页面）
     try {
       if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
@@ -1041,6 +1721,8 @@ export default {
     }
   },
   onHide() {
+    this.stopActivityTracking()
+
     // Desktop：离开工作区页面（如去个人中心）必须隐藏 BrowserView
     try {
       if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
@@ -1051,6 +1733,9 @@ export default {
     }
   },
   onUnload() {
+    // Replace simple page view log with ActivityTracker stop
+    this.stopActivityTracking()
+
     // 兜底：页面销毁也隐藏
     try {
       if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
@@ -1095,6 +1780,8 @@ export default {
     } catch (e) {
       // ignore
     }
+
+    // Manual binding removed (reverted to native modifier)
 
     // Desktop：拦截 WPS 中点击 “checkba://...” 的内部链接
     try {
@@ -1310,6 +1997,93 @@ export default {
     }
   },
   methods: {
+
+    async removeMember(member) {
+      if (!this.projectId) return
+      if (!this.canRemoveMember(member)) {
+         uni.showToast({ title: '无权移除该成员', icon: 'none' })
+         return
+      }
+      uni.showModal({
+        title: '确认移除',
+        content: `确定要将 ${member.displayName} 移出项目吗？`,
+        success: async (res) => {
+          if (res.confirm) {
+            try {
+              await removeProjectMember(this.projectId, member.userId)
+              uni.showToast({ title: '已移除', icon: 'success' })
+              this.loadProjectMembers()
+            } catch (e) {
+              console.error(e)
+              uni.showToast({ title: e.message || '移除失败', icon: 'none' })
+            }
+          }
+        }
+      })
+    },
+    canRemoveMember(targetMember) {
+       if (!this.currentUser || !targetMember) return false
+       if (this.currentUser.id === targetMember.userId) return false // Cannot remove self
+       
+       // Find my role in the project
+       const myMember = this.projectMembers.find(m => m.userId === this.currentUser.id)
+       if (!myMember) return false // Not a member?
+       
+       const myRole = myMember.role
+       const targetRole = targetMember.role
+       
+       if (myRole === 'ADMIN') return true
+       if (myRole === 'PARTICIPANT') {
+           return targetRole === 'READ_ONLY' || targetRole === 'CLIENT'
+       }
+       return false
+    },
+    isDdRequest(file) {
+      return file && file.type === 'dd-request'
+    },
+    handleOpenDdRequest(req) {
+      const file = {
+        id: 'dd-' + req.id,
+        requestId: req.id,
+        name: req.name,
+        type: 'dd-request',
+        fileType: 'dd',
+        isFolder: false
+      }
+      this.openFile(file)
+    },
+    startRenameProject() {
+      this.renameProjectName = this.project.name || ''
+      this.isRenamingProject = true
+    },
+    async confirmRenameProject() {
+      if (!this.renameProjectName || !this.renameProjectName.trim()) {
+        uni.showToast({ title: '项目名称不能为空', icon: 'none' })
+        return
+      }
+      try {
+        await renameProject(this.projectId, this.renameProjectName.trim())
+        this.project.name = this.renameProjectName.trim()
+        this.isRenamingProject = false
+        uni.showToast({ title: '重命名成功', icon: 'success' })
+      } catch (e) {
+        console.error('重命名失败', e)
+        uni.showToast({ title: '重命名失败', icon: 'none' })
+      }
+    },
+    cancelRenameProject() {
+      this.isRenamingProject = false
+      this.renameProjectName = ''
+    },
+    toggleFileMoreMenu() {
+      this.showFileMoreMenu = !this.showFileMoreMenu
+    },
+    handleLogout() {
+      try {
+         clearSession()
+      } catch (e) {}
+      uni.reLaunch({ url: '/pages/login/login' })
+    },
     onFileTreeQuickAction(actionKey) {
       const tree = this.$refs.fileTree
       if (!tree) return
@@ -1323,6 +2097,33 @@ export default {
       }
       if (actionKey === 'upload' && typeof tree.handleUploadFile === 'function') {
         tree.handleUploadFile()
+        return
+      }
+      if (actionKey === 'recycleBin') {
+        if (this.fileBatchMode) {
+           if (typeof tree.openBatchAction === 'function') {
+             tree.openBatchAction('delete')
+           }
+        } else {
+           if (typeof tree.openRecycleBin === 'function') {
+             tree.openRecycleBin()
+           }
+        }
+        return
+      }
+      
+      if (actionKey === 'download') {
+         if (typeof tree.openBatchAction === 'function') {
+             tree.openBatchAction('download')
+         }
+         return
+      }
+      
+      if (actionKey === 'copy') {
+         if (typeof tree.openBatchAction === 'function') {
+             tree.openBatchAction('copy')
+         }
+         return
       }
     },
     wrapWpsInternalLink(innerUrl) {
@@ -1375,74 +2176,9 @@ export default {
       this.fileLinkDrag.file = file
       this.fileLinkDrag.hoverSide = null
       console.log('onFileLinkDragStart:', file)
-      
-      // 延迟绑定原生事件（确保 v-if 渲染完成）
-      this.$nextTick(() => {
-        this.bindNativeDropEvents('left')
-        if (this.splitMode) {
-          this.bindNativeDropEvents('right')
-        }
-      })
     },
     
-    bindNativeDropEvents(side) {
-      const refName = side === 'left' ? 'dropZoneLeft' : 'dropZoneRight'
-      const refComp = this.$refs[refName]
-      if (!refComp) return
-
-      // uni-app H5 中，$el 才是真实 DOM
-      const el = refComp.$el || refComp
-      if (!el || typeof el.addEventListener !== 'function') return
-
-      console.log(`Binding native drop events for ${side}`, el)
-
-      // 清理旧事件（防止重复绑定）
-      if (el._checkbaDropHandlers) {
-        el.removeEventListener('dragenter', el._checkbaDropHandlers.enter)
-        el.removeEventListener('dragover', el._checkbaDropHandlers.over)
-        el.removeEventListener('dragleave', el._checkbaDropHandlers.leave)
-        el.removeEventListener('drop', el._checkbaDropHandlers.drop)
-      }
-
-      const handlers = {
-        enter: (e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          this.fileLinkDrag.hoverSide = side
-        },
-        over: (e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          if (e.dataTransfer) e.dataTransfer.dropEffect = 'link'
-          if (this.fileLinkDrag.hoverSide !== side) {
-             this.fileLinkDrag.hoverSide = side
-          }
-        },
-        leave: (e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          // 防止子元素触发 leave
-          if (e.relatedTarget && el.contains(e.relatedTarget)) return
-          if (this.fileLinkDrag.hoverSide === side) {
-            this.fileLinkDrag.hoverSide = null
-          }
-        },
-        drop: (e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          console.log(`Native drop detected on ${side}`)
-          this.onFileLinkDrop(side, e)
-        }
-      }
-
-      el.addEventListener('dragenter', handlers.enter)
-      el.addEventListener('dragover', handlers.over)
-      el.addEventListener('dragleave', handlers.leave)
-      el.addEventListener('drop', handlers.drop)
-      
-      // 挂载引用以便清理
-      el._checkbaDropHandlers = handlers
-    },
+    // bindNativeDropEvents 已移除，逻辑迁移至 FileLinkDropZone 组件
 
     onFileLinkDragEnd() {
       console.log('onFileLinkDragEnd')
@@ -1450,33 +2186,25 @@ export default {
       this.fileLinkDrag.file = null
       this.fileLinkDrag.hoverSide = null
     },
-    // 移除未使用的模板绑定方法，以防混淆
-    // onFileLinkDragOver/Enter/Leave 现已通过 bindNativeDropEvents 接管
     
-    async onFileLinkDrop(side, e) {
-      console.log('onFileLinkDrop triggered:', side)
-      this.fileLinkDrag.hoverSide = side
-      
+    async onFileLinkZoneDrop({ side }) {
+      console.log('onFileLinkZoneDrop triggered:', side)
       let file = this.fileLinkDrag.file
       
-      // 兜底：如果组件状态中没有文件（可能跨组件丢失），尝试从 dataTransfer 读取
-      if ((!file || !file.id) && e && e.dataTransfer) {
-        try {
-          const raw = e.dataTransfer.getData('application/x-checkba-file') || e.dataTransfer.getData('text/checkba-file-json')
-          if (raw) {
-            file = JSON.parse(raw)
-            console.log('onFileLinkDrop: recovered file from dataTransfer', file)
-          }
-        } catch (err) {
-          console.warn('onFileLinkDrop: failed to parse dataTransfer', err)
-        }
+      // 这里的 file 应该是从 state 中获取的，因为 drop 主要是为了触发 action，
+      // 如果需要从 DataTransfer 恢复 (跨组件丢失 state)，组件内部其实拿不到 DataTransfer 数据 (dropzone 一般只暴露 event)，
+      // 但因为我们是同页面拖拽，state 应该是保持的。
+      
+      if (!file || !file.id) {
+        console.warn('onFileLinkZoneDrop: no file in state')
+        // 尝试兜底？组件可以传回更多信息吗？
+        // 暂时先这样，因为 FileTree 就在同一个页面，state 不会丢
       }
 
+      // 先关闭浮窗
       this.onFileLinkDragEnd()
-      if (!file || !file.id) {
-        console.warn('onFileLinkDrop: no file data found')
-        return
-      }
+
+      if (!file || !file.id) return
       await this.createWpsSelectionFileLink(side, file)
     },
     closeFileLinkPicker() {
@@ -1656,8 +2384,10 @@ export default {
       try {
         this.ocrImageDataUrl = this.cropOcrSelection()
         const left = Math.min(this.ocrSel.x1, this.ocrSel.x2)
-        const top = Math.min(this.ocrSel.y1, this.ocrSel.y2)
-        this.ocrActionBar = { visible: true, x: Math.max(12, Math.min(window.innerWidth - 320, left)), y: Math.max(12, top - 44) }
+    const right = Math.max(this.ocrSel.x1, this.ocrSel.x2)
+    const bottom = Math.max(this.ocrSel.y1, this.ocrSel.y2)
+    const centerX = (left + right) / 2
+    this.ocrActionBar = { visible: true, x: centerX, y: bottom + 12 }
       } catch (e) {
         console.error('截图裁剪失败:', e)
       }
@@ -1775,7 +2505,7 @@ export default {
       // eslint-disable-next-line no-console
       console.log('[OCR]', ...args)
     },
-    // uniapp H5：用 document capture 事件接管拖拽，避免 view 合成事件不触发
+    // uniapp H5 下：用 document capture 事件接管拖拽，避免 view 合成事件不触发
     bindOcrGlobalListeners() {
       // #ifdef H5
       if (this._ocrGlobalBound) return
@@ -1846,6 +2576,67 @@ export default {
       // 统一的“写库 + 立即更新 UI”入口：避免 copy 事件多次触发导致重复入库
       this._clipboardLast = this._clipboardLast || { ts: 0, text: '' }
       const recordClipboardOnce = async (rawText, source = 'doc') => {
+        // 1. Electron Payload Object (IMAGE / FILE)
+        if (rawText && typeof rawText === 'object') {
+           const payload = rawText
+           if (payload.type === 'TEXT') {
+             return await recordClipboardOnce(payload.text, source) 
+           } else if (payload.type === 'IMAGE' && payload.data) {
+             try {
+               const arr = payload.data.split(',')
+               const match = arr[0].match(/:(.*?);/)
+               const mime = match ? match[1] : 'image/png'
+               // Decode base64
+               const bstr = atob(arr[1])
+               let n = bstr.length
+               const u8arr = new Uint8Array(n)
+               while (n--) { u8arr[n] = bstr.charCodeAt(n) }
+               const blob = new Blob([u8arr], { type: mime })
+               
+               // Create File object
+               const f = new File([blob], `image_${Date.now()}.png`, { type: mime })
+               
+               const res = await saveClipboardFile({ file: f }, 'IMAGE')
+               const saved = (res && res.data) ? res.data : res
+               this.onClipboardSaved(saved)
+               uni.showToast({ title: '已捕获图片', icon: 'success' })
+               return saved
+             } catch (e) {
+               console.error('Image upload failed', e)
+               return null
+             }
+           } else if (payload.type === 'FILE' && payload.filePath) {
+             try {
+               // Must verify API exists (Electron only)
+                // eslint-disable-next-line
+               if (window.checkbaDesktop && window.checkbaDesktop.utils && window.checkbaDesktop.utils.readFile) {
+                  // eslint-disable-next-line
+                  const resp = await window.checkbaDesktop.utils.readFile(payload.filePath)
+                  if (resp && resp.ok && resp.data) {
+                     // resp.data is usually Uint8Array or serialized Buffer
+                     const u8arr = new Uint8Array(resp.data) 
+                     
+                     const name = payload.filePath.split(/[/\\]/).pop() || 'file'
+                     const blob = new Blob([u8arr])
+                     const f = new File([blob], name)
+                     
+                     
+                     const res = await saveClipboardFile({ file: f }, 'FILE')
+                     const saved = (res && res.data) ? res.data : res
+                     this.onClipboardSaved(saved)
+                     uni.showToast({ title: '已捕获文件', icon: 'success' })
+                     return saved
+                  }
+               }
+             } catch (e) {
+               console.error('File upload failed', e)
+             }
+             return null
+           }
+           return null
+        }
+
+        // 2. Normal Text Logic
         let t = (rawText || '').trim()
         if (
           !t &&
@@ -1887,8 +2678,8 @@ export default {
           if (!this._desktopClipboardUnsub) {
             this._desktopClipboardUnsub = window.checkbaDesktop.clipboard.onCopied(async (payload) => {
               try {
-                const t = payload && payload.text ? String(payload.text) : ''
-                await recordClipboardOnce(t, 'desktop')
+                // Pass full payload object to support IMAGE/FILE
+                await recordClipboardOnce(payload, 'desktop')
               } catch (e) {
                 // ignore
               }
@@ -2072,6 +2863,10 @@ export default {
           active.name = url
         }
         this.$forceUpdate()
+        
+        // Track URL Session (flush previous, start new)
+        const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
+        activityTracker.trackActivePage('OPEN_URL', 0, url, meta)
       }
     },
     onBrowserTitleChange(pane, title) {
@@ -2079,6 +2874,20 @@ export default {
       if (!active || !this.isBrowserTab(active)) return
       const t = String(title || '').trim()
       if (!t) return
+      
+      // Update session meta with title?
+      // trackActivePage will flush and restart. This might be noisy if title changes often.
+      // But user requested "record url and web title".
+      // If we don't restart, we can't update the log meta.
+      // Let's check if title is significantly different or just loaded.
+      
+      const url = active.url || ''
+      const meta = (this.project && this.project.name ? `Project: ${this.project.name}. ` : '') + `Title: ${t}`
+      if (url) {
+          // Restart session to capture title in the new segment
+          activityTracker.trackActivePage('OPEN_URL', 0, url, meta)
+      }
+
       // 避免过长：保留前 18 字符
       active.name = t.length > 18 ? (t.slice(0, 18) + '…') : t
       this.$forceUpdate()
@@ -2368,6 +3177,52 @@ export default {
       this.ocrFrameUrl = url
     },
 
+    startActivityTracking() {
+        if (activityTracker.getRecordingState()) {
+             activityTracker.start()
+             this.isRecording = true
+        }
+    },
+
+    stopActivityTracking() {
+        activityTracker.stop()
+        activityTracker.setRecording(false) // Force stop recording state
+        this.isRecording = false
+    },
+    
+    toggleRecording() {
+        const newState = activityTracker.toggleRecording()
+        this.isRecording = newState
+        
+        // Custom Toast
+        this.recordingToastMessage = newState ? '开始录制工作' : '已停止录制工作'
+        this.showRecordingToast = true
+        if (this.recordingToastTimer) clearTimeout(this.recordingToastTimer)
+        this.recordingToastTimer = setTimeout(() => {
+            this.showRecordingToast = false
+        }, 2000)
+
+        if (newState) {
+             // uni.showToast({ title: '开始录制工作', icon: 'none' }) // Replaced
+             // If we have an active file/tab, start tracking it immediately
+             const pane = this.focusedPane
+             const file = pane === 'left' ? this.activeFileLeft : this.activeFileRight
+             if (file) {
+                 const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
+                 if (this.isBrowserTab(file)) {
+                     const url = file.url || ''
+                     const title = file.name || ''
+                     const fullMeta = meta + (title ? `. Title: ${title}` : '')
+                     activityTracker.trackActivePage('OPEN_URL', 0, url, fullMeta)
+                 } else {
+                     activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, meta)
+                 }
+             }
+        } else {
+             // uni.showToast({ title: '已停止录制', icon: 'none' }) // Replaced
+        }
+    },
+
     onOcrOverlayDown(e) {
       if (!this.showOcrOverlay) return
       // 只处理左键
@@ -2402,13 +3257,21 @@ export default {
         await this.ensureOcrFrozenFrame()
         this.ocrImageDataUrl = this.cropOcrSelection()
         const left = Math.min(this.ocrSel.x1, this.ocrSel.x2)
-        const top = Math.min(this.ocrSel.y1, this.ocrSel.y2)
-        // 命令条位置：尽量贴近框的上方左侧
-        this.ocrActionBar = {
-          visible: true,
-          x: Math.max(12, Math.min(window.innerWidth - 320, left)),
-          y: Math.max(12, top - 44)
-        }
+    const right = Math.max(this.ocrSel.x1, this.ocrSel.x2)
+    const bottom = Math.max(this.ocrSel.y1, this.ocrSel.y2)
+
+    // Center X: Use the midpoint
+    const centerX = (left + right) / 2
+    
+    // Y: Below the selection
+    const topY = bottom + 12
+
+    // 命令条位置：居中显示在框选区域下方
+    this.ocrActionBar = {
+      visible: true,
+      x: centerX,
+      y: topY
+    }
       } catch (e) {
         console.error('截图裁剪失败:', e)
         uni.showToast({ title: e.message || '截图失败', icon: 'none' })
@@ -2474,50 +3337,194 @@ export default {
     // H5：用 window 级事件保证拖拽框选必然可用
     async ocrDoRecognize() {
       if (!this.ocrImageDataUrl || this.ocrLoading) return
-      this.ocrLoading = true
+      
+      const imageData = this.ocrImageDataUrl // Cache data
+      // Close overlay immediately
+      this.closeOcrOverlay()
+      
+      this.ocrLoading = true // Should I use global loading? closeOcrOverlay resets ocrLoading.
+      // Resetting ocrLoading via closeOcrOverlay is correct?
+      // closeOcrOverlay resets `this.ocrLoading = false`? No, it resets `this.ocrLoading = false` in my previous logic?
+      // Wait, `closeOcrOverlay` resets `ocrText`, `ocrImageDataUrl`.
+      
+      // Since UI is gone, I should use `uni.showLoading`
+      uni.showLoading({ title: '识别中…' })
+
       try {
-        const res = await ocrRecognize(this.ocrImageDataUrl)
-        this.ocrText = (res?.data?.text || '').trim()
-        if (!this.ocrText) {
+        const res = await ocrRecognize(imageData)
+        const text = (res?.data?.text || '').trim()
+        if (text) {
+          // Auto copy
+          await this.insertClipboardAndCopy(text, { saveToHistory: true })
+          uni.showToast({ title: '识别并复制成功', icon: 'success' })
+        } else {
           uni.showToast({ title: '未识别到文字', icon: 'none' })
         }
       } catch (e) {
         console.error('OCR 识别失败:', e)
         uni.showToast({ title: e.message || '识别失败', icon: 'none' })
       } finally {
-        this.ocrLoading = false
+        uni.hideLoading()
       }
     },
 
-    ocrDoDownload() {
-      if (!this.ocrImageDataUrl) return
-      try {
-        // dataURL 直接 download 在部分浏览器会异常/被重编码；转成 blob 更稳
-        const dataUrl = this.ocrImageDataUrl
-        const arr = dataUrl.split(',')
-        const mime = (arr[0].match(/:(.*?);/) || [])[1] || 'image/png'
-        const bstr = atob(arr[1] || '')
-        let n = bstr.length
-        const u8arr = new Uint8Array(n)
-        while (n--) u8arr[n] = bstr.charCodeAt(n)
-        const blob = new Blob([u8arr], { type: mime })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `clip_${Date.now()}.png`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      } catch (e) {
-        // ignore
-      }
-    },
+    // Old ocrDoDownload (Removed/Replaced)
+    // ocrDoDownload() { ... }
 
     async ocrDoCopy() {
-      if (!this.ocrText) return
-      await this.insertClipboardAndCopy(this.ocrText, { saveToHistory: true })
-      uni.showToast({ title: '已复制', icon: 'success' })
+      if (!this.ocrImageDataUrl) return
+      
+      const dataUrl = this.ocrImageDataUrl
+      
+      // Close immediately
+      this.closeOcrOverlay()
+      
+      // 1. Copy Image to Clipboard
+      try {
+          const blob = await (await fetch(dataUrl)).blob()
+          
+          // Use Clipboard API
+          if (navigator.clipboard && navigator.clipboard.write) {
+              const item = new ClipboardItem({ [blob.type]: blob })
+              await navigator.clipboard.write([item])
+              uni.showToast({ title: '已复制图片', icon: 'success' })
+          } else {
+              throw new Error('Clipboard API unavailable')
+          }
+      } catch (e) {
+          console.error('Copy Image Failed', e)
+          uni.showToast({ title: '复制失败', icon: 'none' })
+      }
+    },
+    
+    ocrDoOpenSaveDialog() {
+       if (!this.ocrImageDataUrl) return
+       
+       // Cache data for dialog
+       this.screenshotSaveDataUrl = this.ocrImageDataUrl
+       
+       // Close overlay immediately
+       this.closeOcrOverlay()
+       
+       this.showScreenshotSaveDialog = true
+       this.screenshotSaveName = `screenshot_${Date.now()}.png`
+       this.screenshotSaveParentId = null // Root
+       // Load folders
+       this.loadScreenshotFolders()
+    },
+
+    async loadScreenshotFolders() {
+        this.screenshotFolderTree = []
+        try {
+            const allFiles = await getProjectFiles(this.projectId, null, true)
+            if (this.buildExportFolderTree) {
+                 this.screenshotFolderTree = this.buildExportFolderTree(allFiles || [])
+            }
+        } catch (e) {
+            console.error('加载文件夹失败', e)
+        }
+    },
+    
+    selectScreenshotFolder(id) {
+        this.screenshotSaveParentId = id
+    },
+    
+    closeScreenshotSaveDialog() {
+        this.showScreenshotSaveDialog = false
+        this.screenshotSaveDataUrl = ''
+    },
+    
+    async confirmSaveScreenshot() {
+        if (!this.screenshotSaveDataUrl) return
+        let name = (this.screenshotSaveName || '').trim()
+        if (!name) {
+            uni.showToast({ title: '请输入文件名', icon: 'none' })
+            return
+        }
+        if (!/\.(png|jpg|jpeg)$/i.test(name)) {
+            name = `${name}.png`
+        }
+        
+        this.screenshotSaveLoading = true
+        try {
+        const dataUrl = this.screenshotSaveDataUrl
+        const res = await fetch(dataUrl)
+        const blob = await res.blob()
+        const fileSize = blob.size
+        
+        // 1. Create File Metadata
+        // Auto-generate wpsFileId and proper fileType
+        const timestamp = Date.now()
+        const randomStr = Math.random().toString(36).substring(2, 9)
+        const wpsFileId = `project_${this.projectId}_doc_${timestamp}_${randomStr}`
+        const fileType = 'png' // Simplify to png for screenshots
+        // Ensure name ends with .png
+        if (!name.toLowerCase().endsWith('.png')) {
+            name += '.png'
+        }
+        
+        // Call backend to create metadata
+        const metadata = await createFile(
+            this.projectId,
+            this.screenshotSaveParentId || null,
+            name,
+            fileType,
+            fileSize,
+            null, // filePath (backend handles)
+            wpsFileId
+        )
+        
+        if (!metadata || !metadata.id) {
+            throw new Error('Failed to create file record')
+        }
+
+        // 2. Upload File Content
+        const fileToUpload = new File([blob], name, { type: 'image/png' })
+        const token = uni.getStorageSync('token')
+        const baseUrl = getApiBaseUrl()
+        
+        await new Promise((resolve, reject) => {
+             uni.uploadFile({
+                 url: `${baseUrl}/api/files/${wpsFileId}/upload`,
+                 name: 'file', // Param name expected by backend
+                 file: fileToUpload,
+                 header: {
+                     'Authorization': token ? `Bearer ${token}` : ''
+                 },
+                 success: (res) => {
+                     if (res.statusCode >= 200 && res.statusCode < 300) {
+                         resolve(res.data)
+                     } else {
+                         reject(new Error(`Upload failed: ${res.statusCode}`))
+                     }
+                 },
+                 fail: (err) => reject(err)
+             })
+        })
+        
+        uni.showToast({ title: '保存成功', icon: 'success' })
+        this.showScreenshotSaveDialog = false
+        this.screenshotSaveDataUrl = ''
+        // Refresh items: Switch to files pane and reload
+        this.leftPaneKey = 'files'
+        this.sidebarCollapsed = false
+        this.$nextTick(() => {
+             const ft = this.$refs.fileTree
+             if (ft) {
+                 if (this.screenshotSaveParentId) {
+                     ft.expandedFolders.add(this.screenshotSaveParentId)
+                 }
+                 if (ft.loadFiles) {
+                     ft.loadFiles()
+                 }
+             }
+        })
+    } catch (e) {
+        console.error('保存失败', e)
+        uni.showToast({ title: '保存失败: ' + (e.message || '未知错误'), icon: 'none' })
+    } finally {
+        this.screenshotSaveLoading = false
+    }
     },
 
     async ocrDoInsert() {
@@ -2589,19 +3596,21 @@ export default {
       }
     },
 
-    async saveOcrFavorite() {
-      const t = (this.ocrText || '').trim()
-      if (!this.ocrImageDataUrl) {
-        uni.showToast({ title: '请先框选区域', icon: 'none' })
-        return
-      }
+    async ocrDoFavorite() {
+      if (!this.ocrImageDataUrl) return
+      
+      const imgData = this.ocrImageDataUrl
+      const srcUrl = this.ocrSourceUrl
+      // Close overlay immediately
+      this.closeOcrOverlay()
+      
       try {
         uni.showToast({ title: '正在加入收藏…', icon: 'loading', duration: 1200 })
         const created = await createProjectFavorite(this.projectId, {
-          title: this.ocrSourceUrl ? this.ocrSourceUrl : '网页摘录',
-          sourceUrl: this.ocrSourceUrl,
-          content: t || '',
-          imageBase64: this.ocrImageDataUrl
+          title: srcUrl ? srcUrl : '网页摘录',
+          sourceUrl: srcUrl,
+          content: '',
+          imageBase64: imgData
         })
         const favId = created && created.id ? created.id : null
         // 立即给用户可见反馈：打开收藏夹并高亮新卡片
@@ -2630,19 +3639,29 @@ export default {
         uni.showToast({ title: '请先框选区域', icon: 'none' })
         return
       }
-      this.ocrLoading = true
+      // 1) Cache State
+      const sel = { ...this.ocrSel }
+      const imgData = this.ocrImageDataUrl
+      const srcUrl = this.ocrSourceUrl
+      const lastPtr = this.ocrLastPointer ? { ...this.ocrLastPointer } : { x: 0, y: 0 }
+
+      // 2) Close UI immediately
+      this.closeOcrOverlay()
+      
+      uni.showLoading({ title: '处理中…' })
+
       try {
-        // 1) 采集网页上下文（桌面端可抓 HTML 快照；H5 尽量仅保存 URL/标题）
+        // 1) 采集网页上下文
         const metaObj = {
           kind: 'webmark',
           capturedAt: new Date().toISOString(),
-          sourceUrl: this.ocrSourceUrl || '',
+          sourceUrl: srcUrl || '',
           title: '',
           selection: {
-            x1: this.ocrSel.x1,
-            y1: this.ocrSel.y1,
-            x2: this.ocrSel.x2,
-            y2: this.ocrSel.y2
+            x1: sel.x1,
+            y1: sel.y1,
+            x2: sel.x2,
+            y2: sel.y2
           }
         }
         // 补齐卡片展示需要的关键元信息（站点 / 关联文档）
@@ -2664,7 +3683,7 @@ export default {
             if (snap && snap.ok) {
               metaObj.sourceUrl = snap.url || metaObj.sourceUrl
               metaObj.title = snap.title || ''
-              // 完整页面 HTML 快照（用于“截至某日是否更新”对比）
+              // 完整页面 HTML 快照
               metaObj.html = snap.html || ''
               if (!metaObj.sourceHost && metaObj.sourceUrl) {
                 metaObj.sourceHost = (() => { try { return new URL(metaObj.sourceUrl).host } catch (e) { return '' } })()
@@ -2678,12 +3697,12 @@ export default {
         const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
         const title = metaObj.title || (metaObj.sourceUrl ? (() => { try { return new URL(metaObj.sourceUrl).host } catch (e) { return '网核' } })() : '网核')
 
-        // 2) 入库：content 可为空（用截图也算证据）；imageBase64 必填
+        // 2) 入库
         const res = await createProjectFavorite(pid, {
           title,
           sourceUrl: metaObj.sourceUrl,
-          content: (this.ocrText || '').trim(),
-          imageBase64: this.ocrImageDataUrl,
+          content: '',
+          imageBase64: imgData,
           meta: JSON.stringify(metaObj)
         })
         const saved = res && res.id ? res : (res && res.data ? res.data : null)
@@ -2693,20 +3712,21 @@ export default {
           this.$refs.favoritesPanel.refresh()
         }
 
-        // 3) 关闭浮层，进入拖拽模式（把证据块拖到 WPS 插入标记）
-        this.closeOcrOverlay()
+        // 3) 进入拖拽模式（把证据块拖到 WPS 插入标记）
         this.startWebLinkDrag({
           favoriteId: favId,
-          imageDataUrl: this.ocrImageDataUrl,
+          imageDataUrl: imgData,
           sourceUrl: metaObj.sourceUrl,
           title,
-          docFileName: metaObj.docFileName || ''
+          docFileName: metaObj.docFileName || '',
+          x: lastPtr.x,
+          y: lastPtr.y
         })
       } catch (e) {
         console.error('网核关联失败:', e)
         uni.showToast({ title: e.message || '网核关联失败', icon: 'none' })
       } finally {
-        this.ocrLoading = false
+        uni.hideLoading()
       }
     },
 
@@ -2714,8 +3734,8 @@ export default {
       const p = payload || {}
       this.webLinkDrag = {
         active: true,
-        x: this.ocrLastPointer?.x || 0,
-        y: this.ocrLastPointer?.y || 0,
+        x: p.x ?? (this.ocrLastPointer?.x || 0),
+        y: p.y ?? (this.ocrLastPointer?.y || 0),
         favoriteId: p.favoriteId || null,
         imageDataUrl: p.imageDataUrl || '',
         sourceUrl: p.sourceUrl || '',
@@ -2818,6 +3838,11 @@ export default {
         }
       }
     },
+    selectAllFiles() {
+       if (this.$refs.fileTree && typeof this.$refs.fileTree.selectAll === 'function') {
+         this.$refs.fileTree.selectAll()
+       }
+    },
     toggleBatchMenu() {
       if (!this.fileBatchMode) return
       if (this.checkedFileCount <= 0) return
@@ -2840,9 +3865,19 @@ export default {
         if (data) {
           this.project = data
         }
+        this.loadProjectMembers() // Load members
       } catch (e) {
         console.error('加载项目详情失败', e)
       }
+    },
+    async loadProjectMembers() {
+        if (!this.projectId) return
+        try {
+            const res = await getProjectMembers(this.projectId)
+            this.projectMembers = res.data || []
+        } catch (e) {
+            console.error('Failed to load project members', e)
+        }
     },
     goBack() {
       uni.navigateBack()
@@ -3112,7 +4147,25 @@ export default {
     focusPane(pane) {
       // 只有在分屏模式下才允许聚焦右侧
       if (!this.splitMode && pane === 'right') return
+      
+      const oldPane = this.focusedPane
       this.focusedPane = pane
+      
+      if (oldPane !== pane) {
+          // Switch active tracking to the file in the new pane
+          const file = pane === 'left' ? this.activeFileLeft : this.activeFileRight
+          if (file) {
+              const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
+              if (this.isBrowserTab(file)) {
+                   const url = file.url || ''
+                   const title = file.name || ''
+                   const fullMeta = meta + (title ? `. Title: ${title}` : '')
+                   activityTracker.trackActivePage('OPEN_URL', 0, url, fullMeta)
+              } else {
+                   activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, meta)
+              }
+          }
+      }
     },
 
     // --- 文件管理逻辑 ---
@@ -3122,7 +4175,12 @@ export default {
     },
     
     openFile(file) {
-      // 允许“同一文件左右双开”：
+      const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
+      // Start session tracking for this file
+      activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, meta)
+
+      // 1. 如果已经在某个 pane 打开，则聚焦该 pane
+      const existingLeft = this.leftFiles.find(f => f.id === file.id)
       // - 如果当前聚焦窗格未打开该文件，则在当前窗格打开
       // - 若当前窗格已打开，则仅激活
       const targetPane = this.splitMode ? this.focusedPane : 'left'
@@ -3151,6 +4209,19 @@ export default {
       } else {
         this.activeFileIdRight = file.id
       }
+      
+      // Track switch
+      const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
+      if (this.isBrowserTab(file)) {
+          // If browser tab, we need to track URL session
+          const url = file.url || ''
+          const title = file.name || ''
+          const fullMeta = meta + (title ? `. Title: ${title}` : '')
+          activityTracker.trackActivePage('OPEN_URL', 0, url, fullMeta)
+      } else {
+          // File
+          activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, meta)
+      }
     },
 
     closeFile(fileId, pane) {
@@ -3160,6 +4231,16 @@ export default {
       
       const idx = list.findIndex(f => f.id === fileId)
       if (idx === -1) return
+      
+      const file = list[idx]
+      
+      // If closing the active file/tab, the activityTracker.trackActivePage in activateTab or openFile will handle the switch.
+      // But if we close the *currently active* file and no other file becomes active (e.g. empty list), we should stop session?
+      // Actually, if we close active file, we usually switch to another one (logic below).
+      // So we don't need to manually stop session here, UNLESS the list becomes empty.
+      
+      // const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
+      // activityTracker.logAction('CLOSE_FILE', file.id, file.name, 0, meta)
       
       list.splice(idx, 1)
       
@@ -3180,8 +4261,35 @@ export default {
     },
     isWpsFile(file) {
       // 根据是否有 wpsFileId 判断是否用 WPS 打开
-      if (!file || file.tabType === 'web') return false
-      return file && (file.wpsFileId || ['doc','docx','xls','xlsx','ppt','pptx'].includes(file.fileType))
+      if (!file || file.tabType === 'web' || !file.fileType) return false
+      
+      const type = file.fileType.toLowerCase()
+      
+      // 1. Force native preview for media types (Images, Video, Audio)
+      const mediaTypes = [
+          // Images
+          'jpg','jpeg','png','gif','bmp','svg','webp',
+          // Video
+          'mp4','webm','ogg','mov','mkv','avi',
+          // Audio
+          'mp3','wav','m4a','flac','aac'
+      ]
+      if (mediaTypes.includes(type)) return false
+
+      // 2. WPS Supported Office Formats
+      const wpsFormats = [
+          // Writer
+          'wps', 'wpt', 'doc', 'dot', 'docx', 'dotx', 'docm', 'dotm', 'rtf', 'odt',
+          // Spreadsheet
+          'et', 'ett', 'ets', 'xls', 'xlsx', 'xlt', 'xltx', 'xlsm', 'xltm', 'xlsb', 'csv',
+          // Presentation
+          'dps', 'dpt', 'dpss', 'ppt', 'pot', 'pps', 'pptx', 'potx', 'ppsx', 'pptm', 'potm', 'ppsm',
+          // PDF
+          'pdf'
+      ]
+      
+      // Default to WPS if it has ID or is office type (but not media)
+      return wpsFormats.includes(type) || (file.wpsFileId && !mediaTypes.includes(type))
     },
 
     // --- WPS 交互逻辑 ---
@@ -3438,59 +4546,112 @@ export default {
     },
     async collectAiContextForChat(options = {}) {
       const { updatePreview = false } = options
-      const file = this.getActiveAiTargetFile()
-      if (!file) {
+      
+      let contexts = []
+
+      // 1. Manual Contexts (Multiple)
+      if (this.manualContextFiles && this.manualContextFiles.length > 0) {
+        for (const file of this.manualContextFiles) {
+             const ctx = await this.buildSingleFileContext(file, true)
+             if (ctx) contexts.push(ctx)
+        }
+      } 
+      // 2. Automatic Context (Active File)
+      else {
+        const active = this.getActiveAiTargetFile()
+        if (active) {
+            const ctx = await this.buildSingleFileContext(active, false)
+            if (ctx) contexts.push(ctx)
+        }
+      }
+
+      if (contexts.length === 0) {
         if (updatePreview) this.aiContextPreview = null
-        return null
+        return null 
       }
-      const context = {
-        fileId: file.id || null,
-        fileName: file.name || '',
-        fileType: file.fileType || file.tabType || '',
-        wpsFileId: file.wpsFileId || null,
-        selectionText: '',
-        documentText: ''
-      }
-      const wpsComp = this.getCurrentWpsInstance()
-      if (wpsComp && typeof wpsComp.getSelectionText === 'function') {
-        try {
-          const selection = await wpsComp.getSelectionText()
-          context.selectionText = this.normalizeContextText(selection, 1500)
-        } catch (e) {
-          console.warn('获取选区文本失败', e)
-        }
-      }
-      if (wpsComp && typeof wpsComp.getDocumentPlainText === 'function') {
-        try {
-          const docText = await wpsComp.getDocumentPlainText(8000)
-          context.documentText = this.normalizeContextText(docText, 8000)
-        } catch (e) {
-          console.warn('获取文档全文失败', e)
-        }
-      }
-      if (!context.selectionText && !context.documentText && file.summary) {
-        context.documentText = this.normalizeContextText(file.summary, 2000)
-      }
+      
+      // Update Preview (Simple count or first file)
       if (updatePreview) {
-        this.aiContextPreview = this.buildAiContextPreview(context)
+        if (contexts.length > 0) {
+            this.aiContextPreview = this.buildAiContextPreview(contexts[0])
+            if (contexts.length > 1) {
+                // Determine logic for multi-file preview if needed, or just let UI show tags
+            }
+        } else {
+            this.aiContextPreview = null
+        }
       }
-      return context
+      
+      return contexts
+    },
+
+    // Helper to build context for a single file
+    async buildSingleFileContext(file, isManual) {
+        if (!file) return null
+        const context = {
+            fileId: file.id || file.fileId || null,
+            fileName: file.fileName || file.name || '',
+            fileType: file.fileType || file.tabType || '',
+            wpsFileId: file.wpsFileId || null,
+            selectionText: '',
+            documentText: ''
+        }
+        
+        // Try getting content from WPS if active
+        let wpsComp = null
+        if (!isManual) {
+            wpsComp = this.getCurrentWpsInstance()
+        } else {
+             const active = this.getActiveAiTargetFile()
+             // Verify ID match 
+             const fid = file.id || file.fileId
+             if (active && active.id === fid) {
+                 wpsComp = this.getCurrentWpsInstance()
+             }
+        }
+        
+        if (wpsComp) {
+            if (typeof wpsComp.getSelectionText === 'function') {
+                try {
+                     const selection = await wpsComp.getSelectionText()
+                     context.selectionText = this.normalizeContextText(selection, 1500)
+                } catch(e) {}
+            }
+            if (typeof wpsComp.getDocumentPlainText === 'function') {
+                try {
+                     const docText = await wpsComp.getDocumentPlainText(8000)
+                     context.documentText = this.normalizeContextText(docText, 8000)
+                } catch(e) {}
+            }
+        }
+        
+        // Fallback or Summary
+        if (!context.selectionText && !context.documentText && file.summary) {
+             context.documentText = this.normalizeContextText(file.summary, 2000)
+        }
+        
+        return context
     },
     async refreshAiContextPreview(manualTrigger = false) {
       if (!this.showAiPanel) return null
       try {
         this.aiContextLoading = true
-        const context = await this.collectAiContextForChat({ updatePreview: true })
-        if (manualTrigger && !context) {
-          uni.showToast({ title: '请先激活一个 WPS 文档', icon: 'none' })
-        } else if (manualTrigger) {
-          uni.showToast({ title: '上下文已同步', icon: 'none' })
+        const contexts = await this.collectAiContextForChat({ updatePreview: true })
+        
+        if (manualTrigger) {
+           if (!contexts || contexts.length === 0) {
+              if (this.manualContextFiles.length === 0) {
+                 uni.showToast({ title: '没有激活的上下文', icon: 'none' })
+              }
+           } else {
+              uni.showToast({ title: '上下文已更新', icon: 'none' })
+           }
         }
-        return context
+        return contexts
       } catch (e) {
         console.error('刷新 AI 上下文失败', e)
         if (manualTrigger) {
-          uni.showToast({ title: '同步失败，请重试', icon: 'none' })
+          uni.showToast({ title: '同步失败', icon: 'none' })
         }
         return null
       } finally {
@@ -3526,57 +4687,310 @@ export default {
         uni.showToast({ title: e.message || '替换失败', icon: 'none' })
       }
     },
-    // --- AI 对话 ---
-    async handleAiSend() {
-      const text = (this.aiInput || '').trim()
-      if (!text || !this.projectId) {
+    // --- AI Context Drag & Drop ---
+    handleAiDragOver(e) {
+        if (e && e.preventDefault) e.preventDefault()
+        this.dragOverAiPanel = true
+    },
+    handleAiDragLeave(e) {
+        if (e && e.preventDefault) e.preventDefault()
+        this.dragOverAiPanel = false
+    },
+    handleAiDrop(e) {
+        if (e && e.preventDefault) e.preventDefault()
+        this.dragOverAiPanel = false
+        
+        let fileData = null
+        try {
+             // 1. Try standard json format
+             const raw = e.dataTransfer.getData('application/x-checkba-file')
+             if (raw) fileData = JSON.parse(raw)
+        } catch(e) {}
+        
+        if (!fileData) {
+             try {
+                  // 2. Try fallback text format
+                  const raw2 = e.dataTransfer.getData('text/checkba-file-json')
+                  if (raw2) fileData = JSON.parse(raw2)
+             } catch(e) {}
+        }
+        
+        // 3. Try global fallback (WebView/Browser safe)
+        if (!fileData && typeof document !== 'undefined' && document.__checkbaDraggedFile) {
+             fileData = { ...document.__checkbaDraggedFile }
+        }
+        
+        if (fileData) {
+             // Logic: Add to list if not exists, THEN insert tag visually
+             if (!this.manualContextFiles) this.manualContextFiles = []
+             const exists = this.manualContextFiles.find(f => f.fileId === fileData.fileId)
+             
+             if (!exists) {
+                 this.manualContextFiles.push({
+                     fileId: fileData.fileId,
+                     fileName: fileData.name,
+                     fileType: fileData.fileType,
+                     wpsFileId: fileData.wpsFileId
+                 })
+             }
+             
+             // Insert Visual Tag
+             this.insertContextTag(fileData)
+             uni.showToast({ title: '已添加: ' + fileData.name, icon: 'none' })
+
+        } else {
+             uni.showToast({ title: '未获取到拖拽数据', icon: 'none' })
+        }
+    },
+    removeContextFile(index) {
+        this.manualContextFiles.splice(index, 1)
+    },
+    removeAttachment(index) {
+        this.pastedImages.splice(index, 1)
+    },
+    // --- Rich Input Support ---
+    focusRichInput(e) {
+      if (e && e.target && (e.target.classList.contains('attachment-remove') || e.target.tagName === 'IMAGE')) return
+      if(this.$refs.aiRichInput) this.$refs.aiRichInput.focus()
+    },
+    onRichInput(e) {
+       // Sync text
+       const el = e.target
+       this.aiInput = el.innerText
+    },
+    onRichKeydown(e) {
+       // Handle Enter
+       if (e.key === 'Enter') {
+          if (!e.shiftKey) {
+             e.preventDefault()
+             this.handleAiSend()
+          }
+       }
+    },
+    // Paste Handler
+    handleRichPaste(e) {
+       // Check for clipboard items (images)
+       const items = (e.clipboardData || e.originalEvent.clipboardData).items
+       let hasImage = false
+       for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+              const file = items[i].getAsFile()
+              if (file) {
+                 hasImage = true
+                 e.preventDefault() // Stop default paste (img tag)
+                 
+                 // Read file to create preview
+                 const reader = new FileReader()
+                 reader.onload = (evt) => {
+                     // Add to pastedImages
+                     this.pastedImages.push({
+                         file: file, // Keep blob for sending
+                         path: evt.target.result // Base64 for preview
+                     })
+                 }
+                 reader.readAsDataURL(file)
+              }
+          }
+       }
+       // If mixed content (text + image), usually only one "paste" event fires for the primary data.
+       // If no image found, let default text paste handle it.
+    },
+    getContextColor(type) {
+       const t = (type || '').toLowerCase()
+       // Colors from FileTree
+       const colors = {
+          word: '#7E94B3',
+          doc: '#7E94B3',
+          docx: '#7E94B3',
+          
+          ppt: '#B38F7E',
+          pptx: '#B38F7E',
+          
+          pdf: '#B37E7E',
+          
+          excel: '#5CA67D',
+          xls: '#5CA67D',
+          xlsx: '#5CA67D',
+          
+          image: '#7EABB3',
+          png: '#7EABB3',
+          jpg: '#7EABB3',
+          jpeg: '#7EABB3',
+          
+          video: '#947EB3',
+          mp4: '#947EB3',
+          
+          audio: '#B3B37E',
+          mp3: '#B3B37E',
+          
+          default: '#6C757D'
+       }
+       return colors[t] || colors.default
+    },
+    insertContextTag(file) {
+       if (!this.$refs.aiRichInput) return
+       
+       const color = this.getContextColor(file.fileType)
+       // Style: Italic, Serif-ish, small font, custom background (light version of color)
+       // Using style string directly for contenteditable safety
+       // Converting hex to rgba for background (simple approx or just use heavy opacity)
+       // Actually simpler: Use the color as text color, and a very light background.
+       // Let's use opacity 0.1 for bg
+       
+       // Hex to RGB helper (inline simplification)
+       let r=0,g=0,b=0
+       if(color.length === 7) {
+           r = parseInt(color.slice(1,3), 16)
+           g = parseInt(color.slice(3,5), 16)
+           b = parseInt(color.slice(5,7), 16)
+       }
+       const bg = `rgba(${r},${g},${b},0.1)`
+       
+       const tagHtml = `<span class="ai-tag" contenteditable="false" data-file-id="${file.id || file.fileId}" style="background:${bg}; color:${color}; font-family: 'Georgia', serif; font-style: italic; font-size: 11px;">@${file.name}</span>&nbsp;`
+       
+       const sel = window.getSelection()
+       if (sel.rangeCount > 0) {
+           const range = sel.getRangeAt(0)
+           // Check if range is inside our input
+           if (this.$refs.aiRichInput.contains(range.commonAncestorContainer)) {
+               range.deleteContents()
+               const fragment = range.createContextualFragment(tagHtml)
+               range.insertNode(fragment)
+               range.collapse(false) // Move cursor after
+           } else {
+               // Append to end
+               this.$refs.aiRichInput.innerHTML += tagHtml
+           }
+       } else {
+           this.$refs.aiRichInput.innerHTML += tagHtml
+       }
+       // Update text model
+       this.aiInput = this.$refs.aiRichInput.innerText
+    },
+    clearRichInput() {
+       if (this.$refs.aiRichInput) {
+           this.$refs.aiRichInput.innerHTML = ''
+           this.aiInput = ''
+       }
+       this.pastedImages = [] // Clear images too
+    },
+    async loadAssistants() {
+      try {
+          const list = await getAssistants()
+          if (Array.isArray(list) && list.length > 0) {
+              this.assistants = list
+          } else {
+              // Fallback default if needed, or keep empty
+              this.assistants = [
+                  { id: 'default', name: '默认助手', systemPrompt: '你是一个专业的助手。' }
+              ]
+          }
+      } catch (e) {
+          console.error('Failed to load assistants', e)
+          this.assistants = [
+              { id: 'default', name: '默认助手', systemPrompt: '你是一个专业的助手。' }
+          ]
+      }
+  },
+
+  // --- AI 相关 ---
+  async initAiModel() {
+      // 1. Try to recover from local storage (User Preference)
+      const savedProvider = uni.getStorageSync('activeAiProvider')
+      if (savedProvider) {
+        this.currentModelId = savedProvider
         return
       }
-      const projectId = this.projectId
-      // 先清空输入框，提升响应感
-      this.aiInput = ''
+      
+      // 2. Fallback to System Default (Public Config)
+      try {
+        const res = await getAiConfig()
+        if (res && res.activeProvider) {
+          // Map backend enum to frontend model ID
+          const provider = res.activeProvider.toUpperCase()
+          if (provider === 'OLLAMA') {
+            this.currentModelId = 'ollama'
+          } else if (provider === 'GEMINI') {
+            this.currentModelId = 'gemini-1.5-pro'
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load AI config, using default.', e)
+      }
+    },
+    
+    toggleModelDropdown() {
+      this.showModelDropdown = !this.showModelDropdown
+      if (this.showModelDropdown) this.showContextDropdown = false
+    },
+    switchModel(modelId) {
+      this.currentModelId = modelId
+      this.showModelDropdown = false
+      // Persistence: Remember user's choice
+      uni.setStorageSync('activeAiProvider', modelId)
+    },
+    // --- AI 对话 ---
+    scrollToBottom() {
+      this.scrollTop = this.scrollTop + 1 // trigger value change for watcher if needed? 
+      // Actually uni-app scroll-top works better when set to a large value
+      this.$nextTick(() => {
+        this.scrollTop = 99999
+      })
+    },
 
-      const userMsgId = `u_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-      const assistantMsgId = `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-
+    async handleAiSend() {
+      if (this.aiLoading || !this.aiInput.trim()) return
+      
+      // Logic: Send message to backend
+      this.aiLoading = true
+      // Push user message immediately for responsiveness
+      const tempId = Date.now()
+      const text = this.aiInput.trim() 
       this.aiMessages.push({
-        id: userMsgId,
+        id: tempId,
         role: 'user',
         content: text
       })
-      this.aiMessages.push({
-        id: assistantMsgId,
-        role: 'assistant',
-        content: '',
-        loading: true
+      this.aiInput = '' // Clear input
+      this.clearRichInput() // Clear rich div
+      
+      // Scroll to bottom
+      this.$nextTick(() => {
+        this.scrollToBottom()
       })
 
-      this.aiLoading = true
-      let contextPayload = null
       try {
-        contextPayload = await this.collectAiContextForChat({ updatePreview: true })
+        // Collect fresh context (List of contexts)
+        const activeContexts = await this.collectAiContextForChat()
+        
         const res = await aiChat({
-          projectId,
+          projectId: this.projectId,
           message: text,
-          context: contextPayload
+          contexts: activeContexts, // Updated to List
+          model: this.currentModelId,
+          assistantId: this.currentAssistantId,
+          conversationId: this.currentConversationId 
         })
-        const reply =
-          (res && res.response) ||
-          (res && res.data && res.data.response) ||
-          ''
-        const target = this.aiMessages.find(m => m.id === assistantMsgId)
-        if (target) {
-          target.content = reply || '（AI 未返回内容）'
-          target.loading = false
+        
+        // Update current conversation ID if it was new
+        if (res && res.conversationId) {
+             this.currentConversationId = res.conversationId
         }
+        
+        const responseText = res.response || ''
+        
+        this.aiMessages.push({
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: responseText
+        })
       } catch (e) {
-        console.error('AI 对话失败', e)
-        const target = this.aiMessages.find(m => m.id === assistantMsgId)
-        if (target) {
-          target.content = e.message || 'AI 调用失败'
-          target.loading = false
-        }
-        uni.showToast({ title: 'AI 调用失败', icon: 'none' })
+        console.error('AI Chat Error:', e)
+        this.aiMessages.push({
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: `出错啦：${e.message || '网络异常'}`
+        })
       } finally {
         this.aiLoading = false
       }
@@ -3618,17 +5032,21 @@ export default {
       if (!Array.isArray(allFiles) || !allFiles.length) return []
       const folders = allFiles.filter(f => f && f.isFolder)
       if (!folders.length) return []
-
+    
       const map = new Map()
+      // Init map
       folders.forEach(f => {
+        const isRoot = !f.parentId
         map.set(f.id, {
           ...f,
-          children: [],
-          level: 0
+          children: [], 
+          level: 0,
+          expanded: isRoot // Default: Root expanded, others collapsed
         })
       })
-
+    
       const roots = []
+      // Build hierarchy
       folders.forEach(f => {
         const node = map.get(f.id)
         if (node.parentId != null && map.has(node.parentId)) {
@@ -3637,13 +5055,14 @@ export default {
           roots.push(node)
         }
       })
-
+    
+      // Flatten for v-for
       const result = []
       const traverse = (nodes, level) => {
         if (!Array.isArray(nodes)) return
         nodes
           .slice()
-          .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+          .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-CN', { numeric: true }))
           .forEach(node => {
             node.level = level
             result.push(node)
@@ -3652,9 +5071,29 @@ export default {
             }
           })
       }
-
+    
       traverse(roots, 0)
       return result
+    },
+
+    toggleExportFolder(folder) {
+        if (!folder) return
+        folder.expanded = !folder.expanded
+        this.$forceUpdate() 
+    },
+    
+    isFolderVisible(folder) {
+        if (!folder) return false
+        if (!this.screenshotFolderTree || !this.screenshotFolderTree.length) return true
+        
+        let parentId = folder.parentId
+        while (parentId) {
+            const parent = this.screenshotFolderTree.find(f => f.id === parentId)
+            if (!parent) return true 
+            if (!parent.expanded) return false
+            parentId = parent.parentId
+        }
+        return true
     },
 
     selectExportFolder(folderId) {
@@ -3711,80 +5150,271 @@ export default {
       } finally {
         this.exportLoading = false
       }
-    }
+    },
+    // --- AI Header Actions ---
+    toggleHistoryDrawer() {
+        this.showHistoryDrawer = !this.showHistoryDrawer
+        if (this.showHistoryDrawer) {
+            this.fetchChatHistory()
+        }
+    },
+    startNewChat() {
+      this.aiMessages = []
+      this.currentConversationId = null
+      this.scrollToBottom()
+      this.aiContextPreview = null
+      // Retain current assistant/model settings? Yes.
+      this.showHistoryDrawer = false // Close drawer if open
+    },
+    
+    handleInsertVariable(text) {
+      this.insertPlainTextToWps(text)
+    },
+    handleUpdateVariable() {
+      // Logic handled inside VariablePanel, no extra parent action needed unless event is emitted
+    },
+    handleSyncDocument(e) {
+      // Pass through or log
+    },
+    handleOpenCreateVariable() {
+      if (this.$refs.variablePanel) this.$refs.variablePanel.openCreateModal()
+    },
+    handleSyncVariable() {
+      if (this.$refs.variablePanel) this.$refs.variablePanel.syncDocument()
+    },
+    handleInputKeydown(e) {
+      // Enter to send, Shift + Enter to newline
+      this.checkKeySend(e)
+    },
+    
+    handleWrapperKeydown(e) {
+      // Capture phase backup
+      this.checkKeySend(e)
+    },
+
+    checkKeySend(e) {
+      // Enter to send, Shift + Enter to newline
+      const isEnter = e.key === 'Enter' || e.keyCode === 13
+      
+      if (isEnter) {
+        if (!e.shiftKey) {
+          // Enter only: Send
+          e.preventDefault() 
+          e.stopPropagation()
+          if (!this.aiLoading && this.aiInput.trim()) {
+            this.handleAiSend()
+          }
+        }
+        // Shift + Enter: Default behavior (newline), do nothing
+      }
+    },
+    
+    async fetchChatHistory() {
+      if (!this.projectId) return
+      this.loadingHistory = true
+      this.showHistoryDrawer = true
+      try {
+          const res = await getAiConversations(this.projectId)
+          // Map to display format
+          // Backend returns: [{conversationId, updatedAt, lastMessage}, ...]
+          // We map to: { id, title, date }
+          this.chatHistoryList = (res || []).map(item => ({
+              id: item.conversationId,
+              title: item.lastMessage ? (item.lastMessage.substring(0, 20) + (item.lastMessage.length > 20 ? '...' : '')) : '新对话',
+              date: item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : '',
+              conversationId: item.conversationId
+          }))
+      } catch (e) {
+        console.error('Fetch history failed', e)
+        uni.showToast({ title: '加载历史失败', icon: 'none' })
+      } finally {
+        this.loadingHistory = false
+      }
+    },
+    
+    async loadHistoryChat(chat) {
+        if (!chat || !chat.conversationId) return
+        this.currentConversationId = chat.conversationId
+        this.loadingHistory = true // Reuse loading state or local
+        try {
+            const msgs = await getAiHistory({ 
+                projectId: this.projectId, 
+                conversationId: chat.conversationId 
+            })
+            // Populate aiMessages
+            this.aiMessages = (msgs || []).map(m => ({
+                id: m.id,
+                role: m.role ? m.role.toLowerCase() : 'user',
+                content: m.content
+            }))
+            this.showHistoryDrawer = false
+            this.$nextTick(() => {
+                this.scrollToBottom()
+            })
+        } catch (e) {
+            console.error('Load chat failed', e)
+            uni.showToast({ title: '加载对话失败', icon: 'none' })
+        } finally {
+            this.loadingHistory = false
+        }
+    },
+    toggleAssistantMenu() {
+        this.showAssistantMenu = !this.showAssistantMenu
+    },
+    switchAssistant(id) {
+        this.currentAssistantId = id
+        this.showAssistantMenu = false
+        const ast = this.assistants.find(a => a.id === id)
+        if (ast) {
+             uni.showToast({ title: `已切换为：${ast.name}`, icon: 'none' })
+             // Inject system prompt notification (hidden or visible)
+             this.aiMessages.push({
+                 id: Date.now(),
+                 role: 'system', // Display as special notice
+                 content: `助手切换为：${ast.name}`
+             })
+        }
+    },
+    // Helper for icons
+    getAssistantIcon(id) {
+        // User requested to remove emoji icons
+        return '' 
+    },
+    openAssistantConfig(assistant) {
+        if (!assistant) return
+        this.editingAssistant = JSON.parse(JSON.stringify(assistant)) // Deep copy
+        this.showAssistantMenu = false // Close menu when opening dialog
+        this.showAssistantConfigDialog = true
+    },
+    closeAssistantConfigDialog() {
+        this.showAssistantConfigDialog = false
+        this.editingAssistant = null
+    },
+    saveAssistantConfig() {
+        if (!this.editingAssistant) return
+        
+        // Update local list
+        const idx = this.assistants.findIndex(a => a.id === this.editingAssistant.id)
+        if (idx !== -1) {
+             this.assistants.splice(idx, 1, this.editingAssistant)
+             // Sync to backend would happen here
+             uni.showToast({ title: '配置已保存', icon: 'success' })
+        }
+        this.closeAssistantConfigDialog()
+    },
   }
 }
 </script>
 
 <style lang="scss" scoped>
-/* 兼容旧变量命名：统一映射到 uni.scss 的 token（避免在各处硬编码） */
-$brand-gold: $brand-color-gold;
-$brand-dark: $brand-color-primary;
-$brand-bg: $brand-bg-warm;
-$brand-white: $uni-bg-color;
-$text-main: $uni-text-color;
-$text-secondary: $uni-text-color-secondary;
-$border-color: $brand-border-light;
+/* Color Config - King IDE Palette */
+$color-primary: #1A5336; // King Forest
+$color-primary-light: #2D7A52; // Hover
+$color-primary-dark: #123A26; // Active
+$color-accent: #5BD197; // King Mint
+$color-accent-light: #84E0B3; // Hover
+$color-accent-pale: #E6F9F0; // Lightest (Selection)
+$color-text-main: #2C3338; // Gray-Dark
+$color-text-light: #6C757D; // Gray-Medium
+$color-border: #E9ECEF; // Gray-Light
+$bg-dark: #212629; // Dark BG
+$bg-pale: #F8F9FA; // Pale BG
+$bg-white: #FFFFFF;
+
+/* Mixins */
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .page-project-overview {
-  height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #fbf7f0 0%, #f3f7fb 100%);
+  height: 100vh;
+  background-color: $bg-pale;
+  color: $color-text-main;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  box-sizing: border-box;
-
+  
   &.compact-mode {
-    background: linear-gradient(180deg, #fbfbfd 0%, #f6f8fb 100%);
+    .project-header {
+      height: 48px;
+      padding: 0 16px;
+    }
   }
 }
 
-/* 顶部 Header */
+/* ================= Header ================= */
 .project-header {
-  min-height: 56px;
-  height: auto;
-  background: $uni-bg-color;
-  border-bottom: 1px solid $brand-border-light;
+  height: 42px;
+  background-color: $bg-white;
+  border-bottom: 1px solid $color-border;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0 12px;
+  justify-content: space-between;
+  padding: 0 18px;
+  position: relative; // For absolute centering
   flex-shrink: 0;
-  box-shadow: none;
-  z-index: 10;
-  gap: 0;
+  z-index: 200;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02); // Subtle shadow
+  transition: all 0.3s ease;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 16px;
+}
+
+.header-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; // Let clicks pass through if needed, though logo usually isn't interactive here
 }
 
 .back-btn {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  @include flex-center;
+  border-radius: 6px;
   cursor: pointer;
-  color: $uni-text-color-secondary;
-  font-size: 18px;
+  color: $color-text-light;
+  transition: all 0.2s;
   
   &:hover {
-    background-color: $uni-bg-color-hover;
+    background-color: $bg-pale;
+    color: $color-primary;
   }
+}
+
+.back-icon {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.project-logo {
+  height: 20px;
+  width: 100px; /* approximiate aspect ratio for heightFix */
+  margin-right: 0;
+  display: block;
 }
 
 .project-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  justify-content: center;
 }
 
 .project-title-row {
@@ -3794,77 +5424,136 @@ $border-color: $brand-border-light;
 }
 
 .project-name {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  color: $uni-text-color;
+  color: $color-primary; // King Forest for title
+  letter-spacing: -0.2px;
+  cursor: pointer;
+  
+  &:hover {
+    color: $color-primary-light;
+  }
+}
+
+.rename-input {
+  font-size: 16px;
+  font-weight: 600;
+  color: $color-text-main;
+  border: 1px solid $color-accent;
+  border-radius: 4px;
+  padding: 0 4px;
+  width: 200px;
+  background: $bg-white;
 }
 
 .project-status-badge {
-  background: rgba(200, 164, 93, 0.12);
-  padding: 2px 8px;
+  background-color: $color-accent-pale;
+  border: 1px solid transparent; // Cleaner look
   border-radius: 4px;
+  padding: 1px 6px;
   
   .status-text {
-    font-size: 12px;
-    color: $brand-color-gold;
+    font-size: 10px;
+    font-weight: 500;
+    color: $color-primary; // Dark green text on light green bg
   }
 }
 
 .project-meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  font-size: 11px;
+  color: $color-text-light;
+  margin-top: 2px;
   gap: 6px;
-  
-  .meta-item {
-    font-size: 12px;
-    color: $uni-text-color-secondary;
-  }
-  
-  .meta-divider {
-    color: #ddd;
-    font-size: 10px;
-  }
+}
+
+.meta-divider {
+  color: #dee2e6;
+  font-size: 10px;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.page-project-overview.compact-mode .project-header {
-  padding: 12px 16px;
-  gap: 8px 12px;
-}
-
-.page-project-overview.compact-mode .header-tools {
-  border-right: none;
-  padding-right: 0;
-  margin-right: 0;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.page-project-overview.compact-mode .header-right {
-  justify-content: flex-end;
+  gap: 12px;
 }
 
 .header-tools {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding-right: 8px;
-  margin-right: 4px;
-  border-right: 1px solid rgba(18, 52, 77, 0.08);
+  gap: 4px;
+  margin-right: 0;
+  padding-right: 0;
+  border-right: none; 
 }
+
+.top-bar-btn {
+  width: 24px; /* Resized to 3/4 of 32px */
+  height: 24px;
+  display: flex; /* mixin replacement */
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px; /* Adjusted radius */
+  cursor: pointer;
+  color: #374151; /* Cool Gray 700 - explicitly dark gray */
+  background-color: transparent;
+  border: 1px solid transparent; /* Explicitly transparent to kill default borders */
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background-color: #f3f4f6; /* Cool Gray 100 - very neutral */
+    color: #111827; /* Gray 900 */
+  }
+  
+  &.active {
+    background-color: #e5e7eb; /* Cool Gray 200 */
+    color: #111827;
+  }
+
+  .tool-icon {
+    font-size: 16px;
+  }
+}
+
+.tool-icon-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  @include flex-center;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #4b5563; /* Cool Gray 600 - explicit cool tone */
+  border: 1px solid transparent; /* Enforce no default border */
+  transition: all 0.2s;
+  position: relative; // For red dot or badge
+  
+  &:hover {
+    background-color: $color-accent-pale;
+    color: $color-primary;
+  }
+  
+  &.active {
+    background-color: $color-accent-pale;
+    color: $color-primary;
+  }
+  
+  .tool-icon {
+    font-size: 16px;
+    // Specific adjustment for font icons if needed
+  }
+}
+
 
 .user-avatar {
   width: 32px;
   height: 32px;
-  background: $brand-color-primary;
+  background: $color-primary;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -3878,63 +5567,438 @@ $border-color: $brand-border-light;
 .main-layout {
   flex: 1;
   display: flex;
-  flex-direction: row;
   overflow: hidden;
   position: relative;
-  gap: 0;
-  padding: 0;
-  box-sizing: border-box;
-  background: $uni-bg-color;
-
-  &.is-compact {
-    padding: 0;
-    gap: 0;
-  }
 }
 
-/* Cursor 风格：最左常驻栏（Activity Bar） */
+/* Left Rail (Activity Bar) - Match Doc Dark BG */
 .left-rail {
-  width: 48px;
-  flex-shrink: 0;
-  background: #f8fafc;
-  border: none;
-  border-right: 1px solid rgba(18, 52, 77, 0.08);
-  border-radius: 0;
-  box-shadow: none;
+  width: 50px;
+  background-color: #F8F9FA; // King IDE Gray-Pale (Light Mode)
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 0;
-  gap: 8px;
+  padding: 12px 0;
+  z-index: 150;
+  flex-shrink: 0;
+  border-right: 1px solid #E9ECEF; // Gray-Light
 }
 
 .rail-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 40px;
+  height: 40px;
+  @include flex-center;
+  margin-bottom: 8px;
+  border-radius: 8px;
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: background 0.18s ease, border-color 0.18s ease;
+  color: #64748b; // Slate-500 (Gray-Medium equivalent)
+  transition: all 0.2s;
+  
+  &:hover {
+    color: #1A5336; // King Forest
+    background-color: #f1f5f9; // Slate-100
+  }
+  
+  &.active {
+    background-color: rgba(91, 209, 151, 0.1); // Mint with opacity
+    border-left: 3px solid $color-accent; // Indicator
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
 }
 
-.rail-btn:hover {
-  background: rgba(18, 52, 77, 0.06);
-}
-
-.rail-btn.active {
-  background: rgba(18, 52, 77, 0.08);
-  border-color: rgba(18, 52, 77, 0.12);
-  box-shadow: inset 0 -2px 0 $brand-color-gold;
+.rail-icon-img {
+    width: 24px;
+    height: 24px;
 }
 
 .rail-icon {
-  font-size: 16px;
-  line-height: 1;
+  font-size: 20px;
 }
 
+/* ================= Tabs Bar ================= */
+.tabs-bar {
+  height: 36px;
+  background: $bg-pale; // Match sidebar/bg
+  border-bottom: 1px solid $color-border;
+  display: flex;
+  flex-shrink: 0;
+  
+  /* Remove old shadow/z-index if present */
+  box-shadow: none;
+}
+
+.tabs-pane {
+  flex: 1;
+  display: flex;
+  align-items: flex-end; // Align tabs with bottom border
+  min-width: 0;
+  border-right: 1px solid transparent;
+  
+  &.half-width {
+    width: 50%;
+    border-right: 1px solid $color-border;
+  }
+}
+
+.tabs-scroll {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  height: 100%;
+}
+
+.tabs-list {
+  display: flex;
+  height: 100%;
+  align-items: flex-end; // Tabs sit on the bottom line
+  padding-left: 8px; // Slight offset
+}
+
+.tab-item {
+  height: 32px; // slightly shorter than bar
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  max-width: 180px;
+  background: transparent;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  cursor: pointer;
+  color: $color-text-light;
+  font-size: 12px;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+  border-bottom: none;
+  margin-right: 2px;
+  position: relative;
+  
+  &:hover {
+    background: darken($bg-pale, 3%);
+    color: $color-text-main;
+  }
+  
+  &.active {
+    background: $bg-white;
+    color: $color-primary; // King Forest for active text
+    font-weight: 500;
+    border-color: $color-border;
+    border-bottom: 1px solid $bg-white; // Merge with content below
+    margin-bottom: -1px; // Push down to cover border
+    z-index: 10;
+    
+    // Top highlight line for active tab
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 2px;
+      right: 2px;
+      height: 2px;
+      background: $color-accent; // King Mint highlight
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+    }
+  }
+  
+  &.tab-drag-over {
+    background: $color-accent-pale;
+  }
+}
+
+.tab-icon {
+  margin-right: 6px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.tab-name {
+  @include text-ellipsis;
+  flex: 1;
+}
+
+.tab-close {
+  margin-left: 8px;
+  font-size: 14px;
+  width: 16px;
+  height: 16px;
+  @include flex-center;
+  border-radius: 50%;
+  color: transparent; // Hidden by default
+  
+  &:hover {
+    background: rgba(0,0,0,0.1);
+    color: $color-text-main;
+  }
+}
+
+.tab-item:hover .tab-close,
+.tab-item.active .tab-close {
+  color: $color-text-light; // Show on hover/active
+}
+
+.tabs-plus {
+  width: 32px;
+  height: 100%;
+  @include flex-center;
+  cursor: pointer;
+  color: $color-text-light;
+  transition: color 0.2s;
+  
+  &:hover {
+    color: $color-primary;
+  }
+}
+
+.tabs-plus-icon {
+  font-size: 16px;
+}
+
+/* ================= Editors Grid ================= */
+.editors-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background: $bg-white; // Content bg
+}
+
+.empty-workspace {
+  flex: 1;
+  @include flex-center;
+  flex-direction: column;
+  color: $color-text-light;
+  background: $bg-pale;
+}
+
+.empty-state-img {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  opacity: 0.8;
+}
+
+.empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; } // Keep for fallback/refs if any
+.empty-text { font-size: 14px; }
+
+.editors-grid {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.editor-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  background: $bg-white;
+  
+  &.pane-full {
+    flex: 1;
+    width: 100%;
+  }
+  
+  &.pane-half {
+    flex: 1;
+    width: 50%;
+    &:first-child { border-right: 1px solid $color-border; }
+  }
+  
+  &.focused {
+    // Optional focus indication
+  }
+}
+
+.pane-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.pane-empty {
+  flex: 1;
+  @include flex-center;
+  flex-direction: column; /* Ensure stacked layout for icon + text */
+  color: $color-text-light;
+  font-size: 13px;
+  background: $bg-pale;
+}
+
+/* ================= Bottom Panel ================= */
+.bottom-panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: $bg-white;
+  border-top: 1px solid $color-border;
+  position: relative;
+  z-index: 100;
+}
+
+.bottom-resize-handle {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: row-resize;
+  z-index: 101;
+  
+  &:hover {
+    background: rgba($color-accent, 0.2); // Visual feedback
+  }
+}
+
+.panel-header-tools {
+  height: 32px; // Compact header
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: $bg-pale;
+  border-bottom: 1px solid $color-border;
+}
+
+.panel-tabs {
+  display: flex;
+  gap: 16px;
+}
+
+.panel-tab {
+  font-size: 12px;
+  color: $color-text-light;
+  cursor: pointer;
+  padding: 4px 0;
+  position: relative;
+  
+  &.active {
+    color: $color-primary;
+    font-weight: 600;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; // On the line
+      left: 0; right: 0;
+      height: 2px;
+      background: $color-accent;
+    }
+  }
+  
+  &:hover {
+    color: $color-text-main;
+  }
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+}
+
+.panel-body {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.tools-content {
+  width: 100%;
+  height: 100%;
+}
+
+
+.rail-members-container {
+  margin-bottom: 16px;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  @include flex-center;
+  
+  &:hover {
+     .members-expand-panel-left {
+        display: flex;
+     }
+  }
+}
+
+.rail-user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  @include flex-center;
+  cursor: pointer;
+  margin-top: 8px;
+  border: 2px solid transparent;
+  transition: border-color 0.2s;
+  
+  &:hover {
+    border-color: $color-accent;
+  }
+}
+
+.avatar-img {
+  width: 100%; height: 100%; border-radius: 50%;
+}
+.avatar-text {
+  color: #fff; font-size: 14px; font-weight: 600;
+}
+
+/* Sidebar Left (File Tree) */
+.sidebar-left {
+  background-color: $bg-pale; // Light gray for sidebar
+  border-right: 1px solid $color-border;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: width 0.1s ease-out; // Faster transition
+  
+  &.collapsed {
+    border-right: none;
+  }
+}
+
+.sidebar-header {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background-color: $bg-pale;
+  border-bottom: 1px solid darken($bg-pale, 5%);
+}
+
+.sidebar-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: $color-text-light;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-actions-row {
+  display: flex;
+}
+
+.sidebar-actions {
+  display: flex;
+  gap: 4px;
+  
+  .icon-btn.mini {
+    width: 24px;
+    height: 24px;
+    
+    .tool-icon { font-size: 14px; }
+    
+    &.active {
+       color: $color-primary;
+    }
+  }
+}
 /* IDE 工作台（中/右 + 底部面板） */
 .workbench {
   flex: 1;
@@ -3975,6 +6039,7 @@ $border-color: $brand-border-light;
   box-shadow: none;
   display: flex;
   flex-direction: column;
+  overflow: visible; /* Ensure dropdowns can pop out if needed */
 }
 
 .side-resize-handle {
@@ -4016,14 +6081,14 @@ $border-color: $brand-border-light;
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  border-bottom: 1px solid $border-color;
-  background: $uni-bg-color;
+  border-bottom: 1px solid $color-border;
+  background: $bg-white;
 }
 
 .panel-title {
   font-size: 13px;
   font-weight: 600;
-  color: $text-main;
+  color: $color-text-main;
 }
 
 .panel-actions {
@@ -4044,70 +6109,70 @@ $border-color: $brand-border-light;
 
 .panel-tabs {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  height: 100%;
+  gap: 24px; /* 增加间距 */
 }
 
 .panel-tab {
-  height: 24px;
-  padding: 0;
-  border-radius: 0;
-  border: none;
-  background: transparent;
-  display: inline-flex;
+  height: 100%;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
   cursor: pointer;
-  color: $text-main;
+  position: relative;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.panel-tab:hover {
+  color: #1e293b;
 }
 
 .panel-tab.active {
-  font-weight: 700;
-  color: $brand-color-primary;
-  box-shadow: inset 0 -2px 0 rgba($brand-color-primary, 0.9);
+  color: #0f172a;
+  font-weight: 600;
 }
 
-.panel-tab-icon {
-  font-size: 12px;
-  font-weight: 700;
-  color: #12344D;
-}
-
-.panel-tab-label {
-  font-size: 12px;
-  color: $text-main;
-}
-
-.panel-tab.active .panel-tab-icon,
-.panel-tab.active .panel-tab-label {
-  color: $brand-color-primary;
+.panel-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #0f172a; /* 黑色下划线，更专业 */
 }
 
 .tools-search {
   flex: 1;
-  min-width: 0;
+  max-width: 400px; /* 限制最大宽度 */
   display: flex;
-  justify-content: center;
+  align-items: center;
 }
 
 .tools-search-wrap {
   width: 100%;
-  max-width: 520px;
   position: relative;
 }
 
 .tools-search-input {
   width: 100%;
-  height: 24px;
+  height: 32px;
+  background: #f1f5f9; /* 浅灰背景 */
+  border: 1px solid transparent; /* 默认无边框 */
   border-radius: 6px;
-  border: 1px solid rgba($border-color, 0.85);
-  padding: 0 26px 0 10px;
-  font-size: 12px;
-  background: rgba(15, 23, 42, 0.02);
-  color: $text-main;
-  box-sizing: border-box;
+  padding: 0 12px;
+  font-size: 13px;
+  color: #334155;
+  transition: all 0.2s;
 }
 
+.tools-search-input:focus {
+  background: #fff;
+  border-color: #3b82f6; /* 聚焦蓝框 */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
 .tools-search-clear {
   position: absolute;
   right: 6px;
@@ -4118,7 +6183,7 @@ $border-color: $brand-border-light;
   line-height: 18px;
   text-align: center;
   border-radius: 4px;
-  color: $uni-text-color-muted;
+  color: $color-text-light;
 }
 
 .tools-content {
@@ -4128,8 +6193,234 @@ $border-color: $brand-border-light;
 }
 
 .panel-body-ai {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* AI Dropdown Panels (Full width below header) */
+.ai-dropdown-panel {
+    position: absolute;
+    top: 36px; /* Exactly below header (Reverted to 36px) */
+    left: 0;
+    right: 0; 
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    z-index: 1001; /* Higher than mask (999) to ensure clicks work */
+    display: flex;
+    flex-direction: column;
+    max-height: 400px;
+    overflow-y: auto;
+    animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #334155;
+    cursor: pointer;
+    border-bottom: 1px solid #f8fafc;
+}
+.menu-item:hover { background: #f1f5f9; }
+.menu-item.header {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 6px 12px;
+    cursor: default;
+}
+.menu-item.active {
+    background: #eff6ff;
+    color: #2563eb;
+    font-weight: 500;
+}
+.menu-divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 4px 0;
+}
+
+.panel-header-ai {
+  /* Inherit shared panel-header styles, plus specifics */
+  position: relative;
+  height: 36px; /* Reverted to 36px per user request */
+  padding: 0 12px;
+  background: $bg-white;
+  border-bottom: 1px solid $color-border;
+  flex-shrink: 0; /* Ensure it doesn't shrink */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Ensure Side Panel AI handles absolute children correctly */
+.side-panel-ai {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    /* No overflow: hidden here, or dropdowns might be cut off if we wanted them to pop out. 
+       But here we want them INSIDE the panel width, so it's fine. */
+}
+
+.ai-history-drawer {
+    position: absolute;
+    top: 32px; /* Below header */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid $color-border;
+}
+
+/* Dialog Styles */
+.dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.config-dialog {
+    width: 500px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+}
+.dialog-header {
+    padding: 16px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.dialog-title { font-size: 16px; font-weight: 600; color: #333; }
+.dialog-close { font-size: 20px; color: #999; cursor: pointer; }
+.dialog-content { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.form-item { display: flex; flex-direction: column; gap: 6px; }
+.label { font-size: 13px; color: #666; font-weight: 500; }
+.input, .textarea {
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 13px;
+    width: 100%;
+    height: 36px; /* Explicit height fixed */
+    box-sizing: border-box;
+}
+.input.readonly, .textarea.readonly {
+    background: #f8fafc;
+    color: #64748b;
+    cursor: not-allowed;
+}
+.textarea { height: 80px; }
+.hint { font-size: 12px; color: #f59e0b; margin-top: 4px; }
+.dialog-footer {
+    padding: 16px;
+    border-top: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+.btn-cancel {
+    padding: 6px 16px;
+    background: #f1f5f9;
+    color: #475569;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn-save {
+    padding: 6px 16px;
+    background: $color-primary;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.drawer-header {
+    padding: 12px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.drawer-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+.drawer-close {
+    font-size: 18px;
+    color: #999;
+    cursor: pointer;
+}
+.drawer-list {
+    flex: 1;
+    overflow-y: auto;
+}
+.drawer-item {
+    padding: 12px;
+    border-bottom: 1px solid #f5f5f5;
+    cursor: pointer;
+}
+.drawer-item:hover {
+    background: #f9fafb;
+}
+.item-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+    display: block;
+    margin-bottom: 4px;
+}
+.item-time {
+    font-size: 11px;
+    color: #999;
+}
+.item-preview {
+    font-size: 12px;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    margin-top: 4px;
+}
+.drawer-empty, .drawer-loading {
+    padding: 24px;
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+}
+
+.panel-body-ai {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* 左侧 Sidebar */
@@ -4162,33 +6453,46 @@ $border-color: $brand-border-light;
 }
 
 .sidebar-header {
-  height: 40px;
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid $brand-border-light;
-  background: $uni-bg-color;
+  padding: 0 12px;
+  height: 36px; /* Align with tabs-bar height */
+  border-bottom: 1px solid $color-border;
+  background: $bg-white;
   flex-shrink: 0;
+  gap: 8px;
 }
 
 .sidebar-title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  line-height: 1;
+  margin-bottom: 0;
+}
+
+.sidebar-actions-row {
+  display: flex;
+  align-items: center;
+  width: auto;
+  line-height: 1;
 }
 
 .sidebar-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
+  width: auto;
 }
 
 .sidebar-actions-divider {
   width: 1px;
-  height: 18px;
+  height: 14px;
   background: rgba(18, 52, 77, 0.12);
-  margin: 0 2px;
+  margin: 0 4px;
   flex-shrink: 0;
 }
 
@@ -4205,25 +6509,25 @@ $border-color: $brand-border-light;
 
 .batch-menu {
   position: absolute;
-  top: 36px;
+  top: 24px;
   right: 0;
   width: 140px;
   background: #fff;
-  border: 1px solid $border-color;
-  border-radius: 10px;
-  box-shadow: 0 10px 24px rgba(0,0,0,0.08);
-  padding: 6px;
+  border: 1px solid $color-border;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  padding: 4px;
   z-index: 100;
 }
 
 .batch-menu-item {
-  height: 34px;
-  padding: 0 10px;
-  border-radius: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   cursor: pointer;
-  color: $text-main;
+  color: $color-text-main;
 }
 
 .batch-menu-item:hover {
@@ -4240,7 +6544,7 @@ $border-color: $brand-border-light;
 }
 
 .batch-menu-label {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .icon-btn.disabled {
@@ -4249,22 +6553,56 @@ $border-color: $brand-border-light;
 }
 
 .icon-btn.mini {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 22px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+  background: transparent;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.icon-btn.mini:hover {
+  background-color: #E8F3ED; /* King Mint Lightest */
+  border: none !important;
+  outline: none !important;
+}
+
+.icon-btn.mini.active {
+  background-color: #E8F3ED;
+  border: none !important;
+  outline: none !important;
+}
+
+.icon-btn.mini:focus {
+    outline: none !important;
+    border: none !important;
 }
 
 .icon-btn.mini .tool-icon {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 400;
+  color: #666;
 }
 
 .sidebar-title {
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 600;
-  color: $uni-text-color-secondary;
+  color: $color-text-light; /* Lighter color */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+  transform: scale(0.95);
+  transform-origin: left center;
 }
 
+/* 左侧收起态：Cursor 风格插件栏 */
 /* 左侧收起态：Cursor 风格插件栏 */
 .sidebar-collapsed-bar {
   flex: 1;
@@ -4273,7 +6611,35 @@ $border-color: $brand-border-light;
   align-items: center;
   padding: 10px 0;
   gap: 10px;
-  background: $uni-bg-color;
+  background: $bg-white;
+}
+
+.sidebar-title-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.btn-select-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background-color: #E8F3ED; /* King Mint Lightest */
+  color: #1A5336; /* King Forest */
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.2s;
+  white-space: nowrap; /* Prevent vertical text */
+  flex-shrink: 0;
+}
+
+.btn-select-all:hover {
+    opacity: 0.8;
 }
 
 .sidebar-plugin-btn {
@@ -4285,7 +6651,7 @@ $border-color: $brand-border-light;
   justify-content: center;
   cursor: pointer;
   border: 1px solid transparent;
-  color: $uni-text-color-secondary;
+  color: $color-text-light;
   background: transparent;
   transition: background 0.18s ease, border-color 0.18s ease;
 }
@@ -4297,7 +6663,7 @@ $border-color: $brand-border-light;
 .sidebar-plugin-btn.active {
   background: rgba(18, 52, 77, 0.08);
   border-color: rgba(18, 52, 77, 0.12);
-  box-shadow: inset 0 -2px 0 $brand-color-gold;
+  box-shadow: inset 0 -2px 0 $color-accent;
 }
 
 .plugin-icon {
@@ -4313,7 +6679,7 @@ $border-color: $brand-border-light;
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: $uni-text-color;
+  color: $color-text-main;
 }
 
 .placeholder-desc {
@@ -4321,7 +6687,7 @@ $border-color: $brand-border-light;
   margin-top: 6px;
   font-size: 12px;
   line-height: 1.5;
-  color: $uni-text-color-muted;
+  color: $color-text-light;
 }
 
 .sidebar-content {
@@ -4380,7 +6746,7 @@ $border-color: $brand-border-light;
   &.half-width {
     flex: 0 0 50%; /* 强制占50% */
     max-width: 50%;
-    border-right-color: $border-color;
+    border-right-color: $color-border;
   }
 }
 
@@ -4407,7 +6773,7 @@ $border-color: $brand-border-light;
 .tabs-plus-icon {
   font-size: 16px;
   font-weight: 800;
-  color: $brand-dark;
+  color: $color-primary;
   line-height: 1;
 }
 
@@ -4472,7 +6838,7 @@ $border-color: $brand-border-light;
   .tab-name {
     flex: 1;
     font-size: 13px;
-    color: $uni-text-color-secondary;
+    color: $color-text-light;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4497,9 +6863,9 @@ $border-color: $brand-border-light;
   &.active {
     background: rgba(18, 52, 77, 0.06);
     border-color: rgba(18, 52, 77, 0.18);
-    box-shadow: inset 0 -2px 0 rgba($brand-gold, 0.8);
+    box-shadow: inset 0 -2px 0 rgba($color-accent, 0.8);
 
-    .tab-name { color: $text-main; font-weight: 600; }
+    .tab-name { color: $color-text-main; font-weight: 600; }
   }
 }
 
@@ -4543,19 +6909,19 @@ $border-color: $brand-border-light;
   border-radius: 8px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   cursor: pointer;
-  color: $text-secondary;
+  color: $color-text-light;
   background: rgba(15, 23, 42, 0.02);
   transition: all 0.18s ease;
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.8);
     border-color: rgba(200, 164, 93, 0.4);
-    color: $brand-dark;
+    color: $color-primary;
   }
   
   &.active {
     background: linear-gradient(120deg, rgba(255,255,255,0.95), rgba(248, 241, 228, 0.9));
-    color: $brand-dark;
+    color: $color-primary;
     border-color: rgba(200, 164, 93, 0.6);
     box-shadow: 0 4px 10px rgba(200, 164, 93, 0.16);
   }
@@ -4611,7 +6977,7 @@ $border-color: $brand-border-light;
     width: 50%;
     flex: 0 0 50%;
     max-width: 50%;
-    border-right: 1px solid $border-color;
+    border-right: 1px solid $color-border;
     
     &:last-child {
       border-right: none;
@@ -4674,7 +7040,7 @@ $border-color: $brand-border-light;
 .drawer-handle {
   width: 24px;
   height: 64px; /* 加高一点 */
-  background: $brand-dark; /* 使用主色调 */
+  background: $color-primary; /* 使用主色调 */
   border-radius: 8px 0 0 8px;
   display: flex;
   align-items: center;
@@ -4737,8 +7103,8 @@ $border-color: $brand-border-light;
 
 .drawer-content {
   width: 300px;
-  background: $brand-white; /* 确保不透明 */
-  border-left: 1px solid $border-color;
+  background: $bg-white; /* 确保不透明 */
+  border-left: 1px solid $color-border;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -4764,12 +7130,12 @@ $border-color: $brand-border-light;
   margin-right: 16px;
   padding: 8px 4px;
   font-size: 13px;
-  color: $text-secondary;
+  color: $color-text-light;
   position: relative;
   cursor: pointer;
 
   &.active {
-    color: $brand-dark;
+    color: $color-primary;
     font-weight: 600;
   }
 
@@ -4780,7 +7146,7 @@ $border-color: $brand-border-light;
     right: 0;
     bottom: 0;
     height: 2px;
-    background: linear-gradient(90deg, $brand-gold, $brand-dark);
+    background: linear-gradient(90deg, $color-accent, $color-primary);
     border-radius: 999px;
   }
 }
@@ -4801,7 +7167,7 @@ $border-color: $brand-border-light;
   flex: 3;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid rgba($border-color, 0.7);
+  border-right: 1px solid rgba($color-border, 0.7);
   min-width: 0;
 }
 
@@ -4814,7 +7180,7 @@ $border-color: $brand-border-light;
 
 .ai-context-card {
   padding: 10px 10px;
-  border: 1px solid rgba($border-color, 0.85);
+  border: 1px solid rgba($color-border, 0.85);
   background: #fbfcfe;
   border-radius: 12px;
   margin: 0 10px 8px;
@@ -4835,7 +7201,7 @@ $border-color: $brand-border-light;
 
 .context-label {
   font-size: 12px;
-  color: $uni-text-color-muted;
+  color: $color-text-light;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -4843,7 +7209,7 @@ $border-color: $brand-border-light;
 .context-value {
   font-size: 13px;
   font-weight: 600;
-  color: $text-main;
+  color: $color-text-main;
   margin-top: 2px;
   max-width: 220px;
   white-space: nowrap;
@@ -4861,22 +7227,22 @@ $border-color: $brand-border-light;
 
 .context-status {
   font-size: 12px;
-  color: $uni-text-color-muted;
+  color: $color-text-light;
   white-space: nowrap;
 }
 
 .context-status.synced {
-  color: $uni-color-success;
+  color: $color-accent;
 }
 
 .context-action-btn {
   padding: 0 10px;
   height: 24px;
   border-radius: 999px;
-  border: 1px solid rgba($border-color, 0.75);
+  border: 1px solid rgba($color-border, 0.75);
   background: rgba(15, 23, 42, 0.02);
   font-size: 12px;
-  color: $brand-dark;
+  color: $color-primary;
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -4903,32 +7269,195 @@ $border-color: $brand-border-light;
 .context-snippet-label {
   flex-shrink: 0;
   font-size: 12px;
-  color: $uni-text-color-muted;
+  color: $color-text-light;
   text-transform: uppercase;
 }
 
 .context-snippet-text {
   font-size: 13px;
   line-height: 1.5;
-  color: $text-main;
+  color: $color-text-main;
   white-space: pre-wrap;
+}
+
+/* refined close button */
+.panel-actions .icon-btn {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  color: #94a3b8;
+  cursor: pointer;
+  background: transparent; /* Remove background */
+  transition: all 0.2s;
+  border: none;
+}
+.panel-actions .icon-btn:hover {
+  background: #f1f5f9;
+  color: #ef4444; /* Red on hover for close */
+}
+
+/* refined search bar */
+/* refined search bar */
+.tools-search {
+  flex: 1;
+  max-width: 240px; /* Even smaller */
+  display: flex; /* Make it a flex container */
+  align-items: center;
+  position: relative; /* For absolute clear btn */
+}
+
+/* Parent container (panel-header-tools) needs alignment update via previous steps or verify current flex.
+ * Assuming panel-header-tools is flex with justify-space-between or explicit gaps.
+ * We want the search bar to sit near the tabs.
+ */
+.panel-header-tools .panel-tabs {
+  margin-right: 20px; /* gap between tabs and search */
+}
+.panel-header-tools .tools-search {
+  margin: 0; /* Remove auto margins */
+}
+
+.tools-search-input {
+  width: 100%;
+  height: 30px; /* Slightly smaller */
+  background: #fff; /* White background */
+  border: 1px solid #e2e8f0; /* Subtle border */
+  border-radius: 999px; /* Pill shape for modern look */
+  padding: 0 16px;
+  font-size: 13px;
+  color: #334155;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03); /* Subtle shadow */
+}
+
+.tools-search-input:focus {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.1);
 }
 
 .context-snippet.placeholder {
   font-size: 12px;
-  color: $uni-text-color-muted;
+  color: $color-text-light;
 }
 
+/* Removed duplicate .panel-header-ai and .ai-tabs styles to avoid conflict */
+/* Removed duplicate .panel-header-ai and .ai-tabs styles to avoid conflict */
+
+.ai-context-drawer:hover {
+  background: #f1f5f9;
+}
+
+.context-label { font-size: 12px; color: #94a3b8; margin-right: 4px; }
+.context-current-name { font-size: 12px; color: #334155; font-weight: 500; flex: 1; }
+.context-arrow { font-size: 10px; color: #94a3b8; margin-left: 8px; }
+
+/* Dropdown Menu shared styles */
+.context-dropdown-menu, .model-dropdown-menu {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  z-index: 9999; /* Max z-index */
+  padding: 4px 0;
+  animation: fadeIn 0.1s ease-out;
+}
+
+.context-dropdown-menu {
+  top: 100%; left: 16px; width: 320px; /* Widened for file tree */
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.context-file-tree-wrapper {
+  flex: 1;
+  min-height: 150px;
+  overflow: hidden;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+}
+
+.model-dropdown-menu {
+  bottom: 100%; left: 0; width: 200px; margin-bottom: 6px;
+}
+
+.menu-item, .model-option {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+}
+
+.menu-item:hover, .model-option:hover { background: #f1f5f9; }
+.menu-item.header { font-size: 11px; color: #94a3b8; pointer-events: none; padding-bottom: 4px; }
+.menu-item.active, .model-option.active { color: #3b82f6; background: #eff6ff; font-weight: 500; }
+.menu-divider { height: 1px; background: #f1f5f9; margin: 4px 0; }
+
+.dropdown-fixed-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 999; /* Higher than page content, lower than dropdown */
+  background: transparent;
+  cursor: default;
+}
+
+/* Chat Body Refinements */
 .ai-chat-body {
   flex: 1;
-  padding: 8px 10px;
-  background: $uni-bg-color-grey;
+  background: #fff;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ai-chat-padding {
+  padding: 20px 20px 40px; /* Add breathing room around chat bubbles */
 }
 
 .ai-message {
-  margin-bottom: 8px;
+  margin-bottom: 20px; /* More space between messages */
   display: flex;
 }
+
+/* Model Dropdown */
+.ai-model-select {
+  position: relative; 
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #f8fafc;
+  transition: background 0.1s;
+}
+
+.model-dropdown-menu {
+  position: absolute;
+  bottom: 100%; /* Show ABOVE the input */
+  left: 0;
+  margin-bottom: 8px;
+  width: 180px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  z-index: 1000;
+  padding: 4px 0;
+}
+
+.model-option {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #334155;
+  cursor: pointer;
+}
+
+.model-option:hover { background: #f1f5f9; }
+.model-option.active { color: #3b82f6; background: #eff6ff; }
+
+/* ... existing styles ... */
 
 .ai-message-user {
   justify-content: flex-end;
@@ -4939,105 +7468,212 @@ $border-color: $brand-border-light;
 }
 
 .ai-message-bubble {
-  max-width: 90%;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: $uni-bg-color;
-  border: 1px solid rgba($border-color, 0.75);
-  box-shadow: 0 1px 0 rgba(18, 52, 77, 0.03);
+  max-width: 92%;
+  padding: 10px 14px;
+  border-radius: 10px; /* Slightly squarer */
+  background: #f8fafc;
+  border: 1px solid #f1f5f9; /* Subtle border */
+  box-shadow: none; /* Flat design */
 }
 
 .ai-message-user .ai-message-bubble {
-  background: rgba($brand-dark, 0.96);
-  color: $uni-text-color-inverse;
-  border-color: rgba($brand-dark, 0.18);
+  background: #eff6ff; /* Very light blue */
+  color: #1e293b;
+  border-color: #dbeafe;
 }
 
 .ai-message-role {
-  font-size: 11px;
-  color: $uni-text-color-muted;
-}
-
-.ai-message-user .ai-message-role {
-  color: #e5e7eb;
+  display: none; /* Hide role for cleaner look, bubbles imply it */
 }
 
 .ai-message-content {
   display: block;
-  margin-top: 4px;
   font-size: 13px;
   line-height: 1.6;
+  color: #334155;
   white-space: pre-wrap;
+  text-align: justify; /* Two-ended alignment */
+}
+
+.ai-message-user .ai-message-content {
+  color: #1e293b;
 }
 
 .ai-message-actions {
-  margin-top: 6px;
+  margin-top: 8px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start; /* Organize actions */
   gap: 12px;
+  border-top: 1px solid rgba(0,0,0,0.03);
+  padding-top: 6px;
 }
 
 .ai-export-btn {
-  font-size: 12px;
-  color: $brand-gold;
+  font-size: 11px;
+  color: #64748b;
   cursor: pointer;
+  transition: color 0.1s;
+}
+
+.ai-export-btn:hover {
+  color: #0f172a;
 }
 
 .ai-export-btn.primary {
-  color: $brand-dark;
-  font-weight: 600;
+  color: #3b82f6;
+  font-weight: 500;
 }
 
 .ai-empty-tip {
-  margin: 12px 10px 0;
-  padding: 10px 10px;
-  font-size: 12px;
-  color: $uni-text-color-muted;
+  margin-top: 40px;
+  font-size: 13px;
+  color: #94a3b8;
   text-align: center;
-  border: 1px dashed rgba($border-color, 0.9);
-  border-radius: 12px;
-  background: rgba($brand-dark, 0.02);
 }
 
-.ai-input-area {
-  padding: 6px 10px;
-  border-top: 1px solid rgba($border-color, 0.9);
-  background: $uni-bg-color;
+/* Input Area (Cursor Style) */
+.ai-input-wrapper {
+  margin: 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
   display: flex;
-  flex-direction: row;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  position: relative; /* Anchor for dropdown */
+  /* max-height: 400px;  Previous value */
+  max-height: 200px; /* User requested 200px */
 }
 
-.ai-input {
+.ai-input-wrapper:focus-within {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.ai-input-scroller {
   flex: 1;
-  min-height: 28px;
-  max-height: 96px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  border: 1px solid rgba($border-color, 0.9);
-  font-size: 12px;
-  background-color: rgba($brand-dark, 0.02);
+  overflow-y: auto;
+  overflow-x: hidden; /* Disable horizontal scroll */
+  display: flex;
+  flex-direction: column;
+  min-height: 40px; 
+  width: 100%; /* Ensure width constraint */
 }
 
-.ai-send-btn {
-  flex-shrink: 0;
-  height: 32px;
-  line-height: 32px;
-  padding: 0 12px;
-  border-radius: 10px;
-  background: rgba($brand-dark, 0.96);
-  color: $uni-text-color-inverse;
+/* Pasted Images */
+.ai-attachments-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px 0;
+}
+.attachment-thumb-wrap {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+.attachment-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.attachment-remove {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    width: 14px;
+    height: 14px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-bottom-left-radius: 4px;
+}
+
+/* Replaces old textarea style */
+.ai-rich-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1e293b;
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-all; /* Force break to prevent horizontal scroll */
+  text-align: justify;
+  overflow-x: hidden;
+}
+
+.ai-rich-input.empty::before {
+  content: '输入指令 (Enter 发送，Shift + Enter 换行)...';
+  color: #94a3b8;
+  pointer-events: none;
+  display: block; 
+}
+
+/* Inline Tag Style */
+.ai-tag {
+  display: inline-flex;
+  align-items: center;
+  background: #E6F9F0;
+  color: #1A5336;
+  padding: 0px 6px;
+  border-radius: 4px;
+  margin: 0 4px;
   font-size: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  cursor: pointer;
+  vertical-align: middle;
+  border: 1px solid rgba(26, 83, 54, 0.1);
   user-select: none;
 }
 
-.ai-send-btn.disabled {
-  opacity: 0.45;
-  pointer-events: none;
+.ai-input-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid #f8fafc;
 }
+
+.ai-model-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #f8fafc;
+  transition: background 0.1s;
+}
+
+.ai-model-select:hover {
+  background: #f1f5f9;
+}
+
+.model-name { font-size: 11px; color: #64748b; font-weight: 500; }
+.model-arrow { font-size: 10px; color: #94a3b8; }
+
+.ai-send-round-btn {
+  width: 26px; height: 26px;
+  border-radius: 999px;
+  background: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ai-send-round-btn:hover { background: #334155; }
+.ai-send-round-btn.disabled { opacity: 0.5; cursor: not-allowed; }
+.send-icon { color: #fff; font-size: 14px; line-height: 1; }
 
 .drawer-header {
   height: 48px;
@@ -5058,7 +7694,7 @@ $border-color: $brand-border-light;
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  color: $brand-gold;
+  color: $color-accent;
   font-size: 13px;
   
   &:hover {
@@ -5072,7 +7708,7 @@ $border-color: $brand-border-light;
 
 .drawer-title {
   font-weight: 600;
-  color: $text-main;
+  color: $color-text-main;
   font-size: 14px;
 }
 
@@ -5129,8 +7765,8 @@ $border-color: $brand-border-light;
   position: relative;
   
   &:hover {
-    border-color: $brand-gold;
-    box-shadow: 0 2px 8px rgba(200, 164, 93, 0.1);
+    border-color: $color-accent;
+    box-shadow: 0 2px 8px rgba(91, 209, 151, 0.2);
     background: #fff;
   }
 }
@@ -5143,13 +7779,13 @@ $border-color: $brand-border-light;
 .tool-name {
   font-size: 14px;
   font-weight: 600;
-  color: $text-main;
+  color: $color-text-main;
   margin-bottom: 4px;
 }
 
 .tool-desc {
   font-size: 12px;
-  color: $text-secondary;
+  color: $color-text-light;
 }
 
 /* 详情视图容器 */
@@ -5291,37 +7927,49 @@ $border-color: $brand-border-light;
 .ocr-actionbar {
   position: fixed;
   z-index: 10001;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(224, 224, 224, 0.9);
-  border-radius: 12px;
-  padding: 8px;
-  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+  background: #FFFFFF;
+  border: 1px solid #E9ECEF;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Soft shadow */
+  transform: translateX(-50%); /* Center horizontally based on center point */
 }
 
 .ocr-actionbar-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px; /* Tighter gap */
   flex-wrap: wrap;
 }
 
 .ocr-action {
-  height: 28px;
-  line-height: 28px;
-  padding: 0 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: #fff;
-  font-size: 12px;
-  color: #12344D;
+  height: 32px;
+  line-height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: #1A5336; /* King Forest */
   cursor: pointer;
   user-select: none;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.ocr-action:hover {
+  background: #E6F9F0; /* Mint Lightest */
+  color: #1A5336;
 }
 
 .ocr-action.primary {
-  background: #12344D;
+  background: #1A5336;
   border-color: transparent;
   color: #fff;
+}
+
+.ocr-action.primary:hover {
+  background: #2D7A52; /* Lighter Forest */
 }
 
 .ocr-action.disabled {
@@ -5338,65 +7986,7 @@ $border-color: $brand-border-light;
   cursor: grabbing;
 }
 
-.filelink-float {
-  position: fixed;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  z-index: 10004;
-  width: 520px;
-  max-width: calc(100vw - 24px);
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid rgba($brand-border-light, 0.9);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: $brand-card-shadow-soft;
-}
 
-.filelink-float-title {
-  font-size: 13px;
-  font-weight: 800;
-  color: $uni-text-color;
-}
-
-.filelink-float-sub {
-  margin-top: 6px;
-  font-size: 12px;
-  color: $uni-text-color-secondary;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.filelink-float-zones {
-  margin-top: 10px;
-  display: flex;
-  gap: 10px;
-}
-
-.filelink-float-zone {
-  flex: 1;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  border: 2px dashed rgba(37, 99, 235, 0.25);
-  background: rgba(37, 99, 235, 0.06);
-  color: #12344D;
-  font-size: 12px;
-  font-weight: 700;
-  pointer-events: auto; /* 关键：确保能接收拖拽事件 */
-  transition: all 0.2s;
-  z-index: 10005 !important; /* 强制最高层级 */
-}
-
-.filelink-float-zone.active {
-  border-color: rgba(37, 99, 235, 0.8);
-  background: rgba(37, 99, 235, 0.25);
-  transform: scale(1.02);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
-}
 
 .webmark-drag-ghost {
   position: fixed;
@@ -5430,8 +8020,8 @@ $border-color: $brand-border-light;
 
 
 .folder-modal {
-  width: 580rpx;
-  max-width: 88vw;
+  width: 800rpx; /* Increased to 800rpx */
+  max-width: 95vw;
   background-color: #ffffff;
   border-radius: 16rpx;
   box-shadow: 0 12rpx 32rpx rgba(0, 0, 0, 0.08);
@@ -5456,11 +8046,18 @@ $border-color: $brand-border-light;
   color: #666666;
 }
 
-.folder-body {
-  padding: 24rpx 40rpx 8rpx;
-  max-height: 520rpx;
-  overflow-y: auto;
+.folder-content {
+  padding: 8rpx 32rpx 24rpx;
   background-color: #ffffff;
+}
+
+.folder-tree-list {
+  max-height: 480rpx; /* Fixed height for the list */
+  overflow-y: auto;
+  margin-top: 8rpx;
+  border: 1px solid #F1F5F9;
+  border-radius: 8rpx;
+  padding: 4rpx;
 }
 
 .export-folder-label-row {
@@ -5487,8 +8084,8 @@ $border-color: $brand-border-light;
 }
 
 .folder-item.active {
-  background-color: #e3f2fd;
-  color: #0d6efd;
+  background-color: #E6F9F0; /* King Mint Lightest */
+  color: #1A5336; /* King Forest */
   font-weight: 500;
 }
 
@@ -5510,12 +8107,54 @@ $border-color: $brand-border-light;
 .folder-name {
   flex: 1;
   font-size: 28rpx;
-  color: #1f2430;
+  color: #334155; /* Slate 700 */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.folder-toggle {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #94A3B8;
+  font-size: 10px;
+}
+
+.arrow-right {
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform 0.2s;
+}
+
+.arrow-down {
+  display: inline-block;
+  transform: rotate(90deg);
+  transition: transform 0.2s;
+}
+
+.check-icon {
+  color: #1A5336; /* King Forest */
+  font-weight: bold;
+  font-size: 14px;
+  margin-left: 8px;
+}
+
+/* Custom Scrollbar for Folder List */
+.folder-tree-list::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.folder-tree-list::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+.folder-tree-list::-webkit-scrollbar-track {
+  background: transparent;
+}
 .empty-tip {
   text-align: center;
   color: #adb5bd;
@@ -5525,44 +8164,880 @@ $border-color: $brand-border-light;
 
 .upload-footer {
   padding: 16rpx 40rpx 24rpx;
-  border-top: 1rpx solid #E0E0E0;
-  background-color: #FAFAFA;
+  border-top: 1rpx solid #F1F5F9; /* Neutral Lightest */
+  background-color: #FFFFFF;
   display: flex;
   justify-content: flex-end;
   gap: 16rpx;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
 }
 
 .upload-btn {
-  min-width: 160rpx;
-  padding: 16rpx 32rpx;
+  min-width: 140rpx;
+  padding: 14rpx 32rpx;
   text-align: center;
-  border-radius: 999rpx;
+  border-radius: 6px; /* Rounded corners */
   font-size: 26rpx;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
 }
 
 .upload-btn-secondary {
-  background-color: #ffffff;
-  color: #12344D;
-  border: 1rpx solid #12344D;
+  background-color: #FFFFFF;
+  color: #64748B; /* Slate 500 */
+  border: 1rpx solid #CBD5E1;
+}
+
+.upload-btn-secondary:hover {
+  background-color: #F8FAFC;
+  color: #1A5336;
+  border-color: #1A5336;
 }
 
 .upload-btn-primary {
-  background-color: #12344D;
+  background-color: #1A5336; /* King Forest */
   color: #ffffff;
+  border: 1px solid transparent;
+}
+
+.upload-btn-primary:hover {
+  background-color: #123A26; /* Darker Forest */
 }
 
 .upload-btn-primary.upload-btn-disabled {
-  background-color: #CBD5E1;
-  color: #ffffff;
+  background-color: #E2E8F0;
+  color: #94A3B8;
+  cursor: not-allowed;
 }
 
 .dialog-input {
   width: 100%;
   height: 80rpx;
   padding: 0 16rpx;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid #E2E8F0;
   border-radius: 8rpx;
   font-size: 28rpx;
   box-sizing: border-box;
+  color: #1E293B;
+  transition: border-color 0.2s;
+}
+
+.dialog-input:focus {
+  border-color: #5BD197; /* King Mint */
+  outline: none;
+}
+
+.record-btn {
+  margin-left: 8px;
+  position: relative;
+  
+  .record-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #e11d48; // Red for stop/record
+    transition: all 0.3s ease;
+  }
+  
+  &.recording {
+    .record-dot {
+      background: #e11d48;
+      box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.2);
+      animation: breathe 1.5s infinite ease-in-out;
+      border: 2px solid transparent; // for outer ring
+      width: 12px;
+      height: 12px;
+      position: relative;
+      
+      &::after {
+         content: '';
+         position: absolute;
+         top: -4px;
+         left: -4px;
+         right: -4px;
+         bottom: -4px;
+         border-radius: 50%;
+         border: 1px solid #e11d48;
+         opacity: 0.6;
+         animation: ripple 1.5s infinite ease-out;
+      }
+    }
+  }
+}
+
+@keyframes breathe {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.9); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes ripple {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Sidebar Footer */
+.sidebar-footer {
+    padding: 12px;
+    border-top: 1px solid #e1e4e8;
+    background: #f7f9fc;
+}
+.current-user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+.user-avatar-small {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+}
+.user-avatar-placeholder-small {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #eef2f5;
+    color: #666;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.user-name {
+    font-size: 13px;
+    color: #333;
+    font-weight: 500;
+}
+.project-members-stack {
+    position: relative;
+    height: 30px;
+    cursor: pointer;
+}
+.members-avatars {
+    position: relative;
+    height: 100%;
+}
+.member-avatar-stack-item {
+    position: absolute;
+    top: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    transition: transform 0.2s;
+    background: #fff;
+}
+.member-avatar-mini, .member-avatar-placeholder-mini {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+}
+.member-avatar-placeholder-mini {
+    background: #ccc;
+    color: #fff;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.members-expand-panel {
+    display: none;
+    position: absolute;
+    left: 100%;
+    bottom: 0;
+    width: 200px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-radius: 8px;
+    padding: 12px;
+    z-index: 1000;
+    margin-left: 12px;
+}
+.project-members-stack:hover .members-expand-panel {
+    display: block;
+}
+.upload-label {
+  font-size: 26rpx;
+  color: #12344D; /* King Dark Blue/Gray */
+  font-weight: 600;
+  margin-bottom: 12rpx;
+  display: block;
+}
+.expand-header {
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 8px;
+}
+.expand-list {
+    max-height: 200px;
+}
+.member-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.member-avatar-row, .member-avatar-placeholder-row {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+}
+.member-avatar-placeholder-row {
+    background: #eef2f5;
+    color: #666;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.member-info {
+    display: flex;
+    flex-direction: column;
+}
+.member-name {
+    font-size: 13px;
+    color: #333;
+}
+.member-role {
+    font-size: 11px;
+    color: #999;
+}
+/* Sidebar Member Stack & User Avatar (Left Rail) */
+.rail-members-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.members-stack-icon {
+  width: 32px;
+  height: 32px;
+  position: relative;
+  cursor: pointer;
+}
+
+/* Stacked avatars */
+.stack-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.stack-avatar-mini {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #fff;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Member Floating Panel */
+.members-expand-panel-left {
+  display: none;
+  position: absolute;
+  left: 100%; /* Position right next to the icon */
+  bottom: 0px;
+  width: 280px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 1000;
+  cursor: default;
+  border: 1px solid #f1f5f9;
+  margin-left: 10px; /* Visual gap */
+}
+
+/* Invisible bridge to prevent hover loss */
+.members-expand-panel-left::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -20px; /* Cover the gap and overlap with icon */
+  width: 20px; 
+  background: transparent;
+}
+
+.members-stack-icon:hover .members-expand-panel-left,
+.members-expand-panel-left:hover {
+  display: block;
+}
+
+.member-group {
+  margin-bottom: 16px;
+}
+
+.group-label {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.members-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.member-grid-item {
+  width: 32px;
+  height: 32px;
+  position: relative;
+}
+
+.member-avatar-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.member-avatar-grid {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+}
+
+.member-avatar-placeholder-grid {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #f1f5f9; /* Slate 100 */
+  color: #64748b; /* Slate 500 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
+}
+
+.member-avatar-placeholder-grid.is-client {
+  background: #F0FDF4; /* Mint 50 */
+  color: #1A5336; /* Forest */
+  border-color: #DCFCE7;
+}
+
+/* Add Member Round Button */
+.add-member-row {
+  display: flex;
+  justify-content: flex-end; /* Align right or flow with grid if in grid */
+  margin-top: 8px;
+}
+
+/* If we want it in the grid flow, we place it in the grid. 
+   But user asked for "most right" (超出最大列宽后可以换行).
+   If we put it as a separate block after lists, it's easier. 
+   Or we can append it to the last group's grid. 
+   Currently implemented as a separate row at bottom right or flow.
+*/
+.add-member-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px dashed #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fff;
+}
+
+.add-member-btn:hover {
+  border-color: #1A5336;
+  color: #1A5336;
+  background: #F0FDF4;
+}
+
+.add-icon {
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 300;
+}
+
+/* Stacked avatars */
+.stack-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.stack-avatar-mini {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #fff;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #cbd5e1;
+  color: #fff;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* King IDE Dialog System (Copied for project-overview.vue usage) */
+.king-dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(2px);
+}
+
+.king-dialog {
+  width: 618px; /* Golden Ratio approx */
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.king-dialog * {
+  box-sizing: border-box;
+}
+
+.king-dialog-large {
+  width: 750px;
+}
+
+.king-dialog-header {
+  padding: 24px 32px 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.king-dialog-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #0f172a;
+  display: block;
+}
+
+.king-dialog-subtitle {
+  font-size: 14px;
+  color: #64748b;
+  margin-top: 6px;
+  display: block;
+}
+
+.king-dialog-body {
+  padding: 24px 32px;
+  color: #334155;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.king-dialog-text {
+  font-size: 15px;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.king-dialog-footer {
+  padding: 20px 32px 24px;
+  background: #f8fafc;
+  display: flex;
+  justify-content: center; /* Centered buttons */
+  gap: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.king-btn {
+  height: 44px;
+  padding: 0 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.king-btn-primary {
+  background: #1A5336; /* King Forest */
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+
+.king-btn-primary:hover {
+  background: #14422b;
+  box-shadow: 0 4px 6px -1px rgba(26, 83, 54, 0.2);
+}
+
+.king-btn-secondary {
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.king-btn-secondary:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+.king-btn-danger {
+  background: #dc2626; /* Red */
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+
+.king-btn-danger:hover {
+  background: #b91c1c;
+}
+
+.king-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 15px;
+  color: #0f172a;
+  transition: all 0.2s;
+}
+
+.king-input:focus {
+  border-color: #1A5336;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(26, 83, 54, 0.1);
+}
+
+.king-field {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  min-height: 48px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+/* Hover Expand Panel */
+.members-expand-panel-left {
+  position: absolute;
+  left: 100%; /* To the right of the rail */
+  bottom: 0;
+  width: 180px; /* Slightly wider for grid */
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  padding: 12px;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(10px);
+  transition: all 0.2s ease;
+  margin-left: 12px;
+}
+
+/* Show on hover of parent container */
+.rail-members-container:hover .members-expand-panel-left {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+
+.expand-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.expand-list {
+  max-height: 200px;
+}
+
+.members-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.member-grid-item {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.member-grid-item:hover {
+  transform: scale(1.1);
+}
+
+.member-avatar-grid {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+}
+
+.member-avatar-placeholder-grid {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  color: #fff;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+}
+
+
+/* Rail User Avatar (Bottom) */
+.rail-user-avatar {
+  width: 32px;
+  height: 32px;
+  background: #0f172a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 12px;
+  transition: transform 0.2s;
+}
+
+.rail-user-avatar:hover {
+  transform: scale(1.05);
+}
+/* --- Refined Resource Manager Header Styles --- */
+.panel-header-tools {
+  position: relative; /* For absolute search centering */
+  justify-content: space-between; /* Override */
+}
+
+.header-content-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1; /* Allow taking space left of search */
+}
+
+/* King Style Tabs */
+.panel-tabs.king-style {
+  background: transparent;
+  padding: 0;
+  gap: 24px;
+}
+
+.panel-tabs.king-style .panel-tab {
+  background: transparent;
+  padding: 0 4px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  position: relative;
+  font-weight: 500;
+  color: #6C757D;
+  transition: all 0.2s;
+}
+
+.panel-tabs.king-style .panel-tab.active {
+  background: transparent;
+  color: #2C3338;
+  font-weight: 600;
+}
+
+.tab-indicator {
+  position: absolute;
+  bottom: 0px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #5BD197; /* King Mint */
+  border-radius: 2px 2px 0 0;
+}
+
+/* Tool Actions Group (Variable Buttons) */
+.tool-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+  padding-left: 16px;
+  border-left: 1px solid #E9ECEF;
+  height: 24px; /* Divider height */
+}
+
+.tool-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #6C757D;
+  
+  &:hover {
+    background: #E6F9F0;
+    color: #1A5336;
+  }
+}
+
+.btn-icon {
+  font-size: 14px;
+}
+
+.btn-text {
+  font-size: 12px;
+}
+
+/* Centered Search */
+.tools-search-centered {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  display: flex;
+  justify-content: center;
+}
+
+.tools-search-centered .tools-search-wrap {
+  width: 100%;
+  background: #F8F9FA;
+  border: 1px solid #E9ECEF;
+}
+
+.tools-search-centered .tools-search-input {
+  text-align: left;
+}
+.icon-btn.active {
+    background-color: $color-accent-pale;
+    color: $color-primary;
+}
+
+/* Custom Recording Toast */
+.recording-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(44, 51, 56, 0.9); /* King IDE Gray-Dark with opacity */
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &.visible {
+    opacity: 1;
+  }
+}
+/* AI Context Drag & Drop */
+.side-panel-ai.drag-over {
+  border: 2px dashed #1A5336;
+  background-color: rgba(91, 209, 151, 0.1);
+}
+
+.ai-context-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px 12px 0; /* Top/Side padding, 0 bottom (close to text) */
+  background: #fff; /* Ensure bg */
+}
+
+.context-tag-pill {
+  display: flex;
+  align-items: center;
+  background: #E6F9F0; /* Pale Mint */
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #1A5336;
+  cursor: default;
+}
+
+.tag-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-close {
+  margin-left: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #1A5336;
+  opacity: 0.6;
+}
+
+.tag-close:hover {
+  opacity: 1;
 }
 </style>

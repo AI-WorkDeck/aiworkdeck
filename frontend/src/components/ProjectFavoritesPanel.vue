@@ -1,31 +1,60 @@
 <template>
   <view class="favorites-panel">
-    <scroll-view class="favorites-body" scroll-x :scroll-y="false" :show-scrollbar="false" :scroll-into-view="scrollIntoView" scroll-with-animation>
+    <scroll-view class="favorites-body" scroll-x :show-scrollbar="true" :scroll-into-view="scrollIntoView" scroll-with-animation>
       <view v-if="loading" class="loading">
         <text class="loading-text">加载中...</text>
       </view>
       <view v-else-if="items.length === 0" class="empty">
         <text class="empty-text">暂无收藏</text>
       </view>
-      <view v-else class="list">
-        <view v-for="fav in items" :key="fav.id" class="card" :id="getCardDomId(fav.id)" :class="{ 'card--highlight': highlightId === fav.id }">
-          <view class="card-head">
-            <text class="card-title">{{ fav.title || fav.sourceUrl || '未命名摘录' }}</text>
-            <view class="card-btns">
-              <view v-if="fav.sourceUrl" class="mini-btn" @tap.stop="$emit('open-url', fav.sourceUrl)">打开</view>
-              <view class="mini-btn ghost" @tap.stop="$emit('insert', fav.content)">插入</view>
-              <view class="mini-btn danger" @tap.stop="remove(fav.id)">删除</view>
-            </view>
+      <view v-else class="list-grid">
+        <view v-for="fav in items" :key="fav.id" class="fav-card" :id="getCardDomId(fav.id)" :class="{ 'card--highlight': highlightId === fav.id }">
+          
+          <!-- New Header Structure -->
+          <view class="card-header">
+             <view class="header-left">
+               <view class="type-badge" :class="getTypeClass(fav)">{{ getTypeLabel(fav) }}</view>
+               <text class="card-time">{{ formatTime(fav.createdAt) }}</text>
+             </view>
+             <view class="header-right">
+                <view v-if="fav.sourceUrl" class="favo-btn" @tap.stop="openUrl(fav.sourceUrl)" title="新标签页打开">
+                  <text class="icon">🔗</text>
+                </view>
+                <!-- Insert Button -->
+                <view class="favo-btn" @tap.stop="$emit('insert', fav.content)" title="插入">
+                  <text class="icon">⚡</text>
+                </view>
+                <!-- Delete -->
+                <view class="del-wrapper" style="position: relative;">
+                  <view class="favo-btn danger" @tap.stop="requestDelete(fav.id)" title="删除">
+                    <text class="icon">×</text>
+                  </view>
+                  <view v-if="confirmDeleteId === fav.id" class="delete-popover" @tap.stop>
+                    <view class="pop-arrow"></view>
+                    <text class="pop-text">确认删除?</text>
+                    <view class="pop-row">
+                      <view class="pop-btn" @tap.stop="cancelDelete">取消</view>
+                      <view class="pop-btn danger" @tap.stop="confirmDelete(fav.id)">确定</view>
+                    </view>
+                  </view>
+                </view>
+             </view>
           </view>
-          <view class="card-meta">
-            <text class="meta-text">{{ formatMetaLine(fav) }}</text>
+
+          <!-- Content Body -->
+          <view class="card-body">
+             <!-- Prominent Image -->
+             <view v-if="fav.imagePath" class="card-cover">
+               <image class="cover-img" :src="getFavoriteImageUrl(fav.id)" mode="aspectFill" :lazy-load="true" />
+             </view>
+             <!-- Or Text Preview -->
+             <view v-else class="text-preview">
+                <text class="content-text">{{ fav.content || fav.title || '无内容' }}</text>
+             </view>
+             <!-- Source Host (if web) -->
+             <view v-if="fav.sourceHost" class="source-host">{{ fav.sourceHost }}</view>
           </view>
-          <view v-if="fav.imagePath" class="card-image">
-            <image class="image-thumb" :src="getFavoriteImageUrl(fav.id)" mode="aspectFill" :lazy-load="true" />
-          </view>
-          <view class="card-content">
-            <text class="content-text">{{ fav.content }}</text>
-          </view>
+
         </view>
       </view>
     </scroll-view>
@@ -53,7 +82,8 @@ export default {
       items: [],
       scrollIntoView: '',
       highlightId: null,
-      _lastRefreshAt: 0
+      _lastRefreshAt: 0,
+      confirmDeleteId: null
     }
   },
   watch: {
@@ -68,6 +98,25 @@ export default {
     }
   },
   methods: {
+    getTypeLabel(fav) {
+      if (fav.sourceUrl) return '网页'
+      if (fav.imagePath) return '图片'
+      return '文本'
+    },
+    getTypeClass(fav) {
+      if (fav.sourceUrl) return 'type-web'
+      if (fav.imagePath) return 'type-image'
+      return 'type-text'
+    },
+    openUrl(url) {
+      if (!url) return
+      // #ifdef H5
+      window.open(url, '_blank')
+      // #endif
+      // #ifndef H5
+      this.$emit('open-url', url)
+      // #endif
+    },
     getCardDomId(id) {
       return `fav-${id}`
     },
@@ -86,38 +135,19 @@ export default {
       if (!v) return ''
       try {
         const d = new Date(v)
-        if (Number.isNaN(d.getTime())) return String(v)
-        return d.toLocaleString()
+        if (Number.isNaN(d.getTime())) return ''
+        const Y = d.getFullYear()
+        const M = String(d.getMonth() + 1).padStart(2, '0')
+        const D = String(d.getDate()).padStart(2, '0')
+        const h = String(d.getHours()).padStart(2, '0')
+        const m = String(d.getMinutes()).padStart(2, '0')
+        return `${Y}-${M}-${D} ${h}:${m}`
       } catch (e) {
         return String(v)
       }
     },
-    formatMetaLine(fav) {
-      const pieces = []
-      const t = this.formatTime(fav && fav.createdAt)
-      if (t) pieces.push(t)
-      // 优先使用后端轻量字段（更快），否则回退解析 meta
-      const host2 = fav && fav.sourceHost ? String(fav.sourceHost) : ''
-      const doc2 = fav && fav.docFileName ? String(fav.docFileName) : ''
-      if (host2) pieces.unshift(host2)
-      if (doc2) pieces.push(doc2)
-      if (!host2 && !doc2) {
-      try {
-        const meta = fav && fav.meta ? JSON.parse(String(fav.meta)) : null
-        const doc = meta && meta.docFileName ? String(meta.docFileName) : ''
-        const host = meta && meta.sourceHost ? String(meta.sourceHost) : ''
-        if (host) pieces.unshift(host)
-        if (doc) pieces.push(doc)
-      } catch (e) {
-        // ignore
-        }
-      }
-      if (pieces.length) return pieces.join(' · ')
-      return ''
-    },
     async refresh() {
       const now = Date.now()
-      // 打开收藏夹/插入新收藏时会触发多次 refresh；这里做轻量节流，保证“感觉更快”
       if (this._lastRefreshAt && now - this._lastRefreshAt < 1200) return
       this._lastRefreshAt = now
       this.loading = true
@@ -132,31 +162,27 @@ export default {
         this.loading = false
       }
     },
-    async remove(id) {
-      try {
-        const isDesktop = typeof window !== 'undefined' && window.checkbaDesktop && window.checkbaDesktop.app && window.checkbaDesktop.app.confirm
-        if (isDesktop) {
-          const resp = await window.checkbaDesktop.app.confirm({
-            title: '确认删除',
-            content: '确定要删除该收藏吗？',
-            okText: '删除',
-            cancelText: '取消'
-          })
-          if (!resp || resp.confirmed !== true) return
-        } else {
-          const ok = await new Promise((resolve) => {
-            uni.showModal({
-              title: '确认删除',
-              content: '确定要删除该收藏吗？',
-              success: (res) => resolve(!!res.confirm),
-              fail: () => resolve(false)
-            })
-          })
-          if (!ok) return
-        }
-      } catch (e) {
+    requestDelete(id) {
+      if (this.confirmDeleteId === id) {
+        this.confirmDeleteId = null
         return
       }
+      this.confirmDeleteId = id
+      if (this._deleteTimer) clearTimeout(this._deleteTimer)
+      this._deleteTimer = setTimeout(() => {
+        if (this.confirmDeleteId === id) {
+          this.confirmDeleteId = null
+        }
+      }, 5000)
+    },
+
+    cancelDelete() {
+      this.confirmDeleteId = null
+      if (this._deleteTimer) clearTimeout(this._deleteTimer)
+    },
+
+    async confirmDelete(id) {
+      this.cancelDelete()
       try {
         await deleteFavorite(id)
         await this.refresh()
@@ -171,134 +197,263 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+/* Unified King IDE Palette */
+$color-primary: #1A5336;
+$color-accent: #5BD197;
+$color-accent-pale: #E6F9F0;
+$color-text-main: #2C3338;
+$color-text-light: #6C757D;
+$color-border: #E9ECEF;
+$bg-pale: #F8F9FA;
+$bg-white: #FFFFFF;
+
 .favorites-panel {
   height: 100%;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  background: $bg-pale;
 }
 
 .favorites-body {
   flex: 1;
-  min-height: 0;
-  padding: 0;
-  background: $uni-bg-color-grey;
+  height: 100%;
+  padding: 16px;
 }
 
-.list {
+.list-grid {
   display: flex;
   flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 16px;
   align-items: stretch;
-  gap: 12px;
-  padding-bottom: 2px;
+  padding: 4px 4px 24px 4px; 
 }
 
-.card {
-  background: $uni-bg-color;
-  border: 1px solid rgba($brand-border-light, 0.9);
-  border-radius: $brand-card-radius-md;
-  padding: 10px 10px 12px;
-  box-shadow: none;
-  flex: 0 0 auto;
-  width: 220px;
-  height: 220px;
-  max-width: 220px;
+.fav-card {
+  background: $bg-white;
+  border: 1px solid $color-border;
+  border-radius: 8px;
+  padding: 0; 
   display: flex;
   flex-direction: column;
-  min-width: 0;
-}
-
-.card--highlight {
-  border-color: rgba(37, 99, 235, 0.45);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-}
-
-.card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.card-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #1a1a1a;
-  flex: 1;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  width: 260px; /* Fixed width for horizontal scrolling */
+  flex-shrink: 0;
+  height: 180px; 
 }
 
-.card-btns {
+.fav-card:hover {
+  border-color: $color-accent;
+  box-shadow: 0 8px 24px rgba(91, 209, 151, 0.15);
+  transform: translateY(-2px);
+}
+
+.fav-card.card--highlight {
+  border-color: $color-accent;
+  box-shadow: 0 0 0 2px rgba(91, 209, 151, 0.3);
+}
+
+.card-header {
+  padding: 10px 12px;
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mini-btn {
-  height: 26px;
-  line-height: 26px;
-  padding: 0 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid #F1F5F9; 
   background: #fff;
+  z-index: 2; /* Ensure header stays above content if needed */
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.type-badge {
   font-size: 12px;
-  color: #12344D;
+  font-weight: 600;
+  display: inline-block;
 }
 
-.mini-btn.ghost {
-  border-color: rgba(148, 163, 184, 0.35);
-  color: #12344D;
+.type-web { color: #10B981; } /* Emerald */
+.type-image { color: #F59E0B; } /* Amber */
+.type-text { color: #64748B; } /* Slate */
+
+.card-time {
+  font-size: 11px;
+  color: #94A3B8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.mini-btn.danger {
-  border-color: rgba(220, 38, 38, 0.25);
-  color: #dc2626;
+.header-right {
+  display: flex;
+  gap: 4px;
 }
 
-.card-meta {
-  margin-top: 6px;
+.card-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.meta-text {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.card-image {
-  margin-top: 8px;
-}
-
-.image-thumb {
+.card-cover {
   width: 100%;
-  height: 92px;
-  border-radius: 10px;
+  height: 100%;
   background: #f1f5f9;
 }
 
-.card-content {
-  margin-top: 8px;
+.cover-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.text-preview {
+  padding: 12px;
   flex: 1;
-  min-height: 0;
+  overflow: hidden;
 }
 
 .content-text {
-  font-size: 12px;
-  color: #374151;
-  white-space: pre-wrap;
-  line-height: 1.6;
+  font-size: 13px;
+  color: $color-text-main;
+  line-height: 1.5;
   display: -webkit-box;
-  -webkit-line-clamp: 6;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
+.source-host {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(255,255,255,0.9);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: $color-text-light;
+  max-width: 80%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.favo-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: $color-text-light;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  .icon {
+    font-size: 13px;
+  }
+
+  &:hover {
+    background: $color-accent-pale;
+    color: $color-primary;
+  }
+}
+
+.favo-btn.danger:hover {
+  background: #FEF2F2;
+  color: #DC2626;
+}
+
 .loading, .empty {
-  padding: 18px 10px;
-  color: #64748b;
+  padding: 20px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* Inline Delete Popover */
+.delete-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: #fff;
+  border: 1px solid $color-border;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 8px;
+  z-index: 100;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: fadeIn 0.1s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pop-arrow {
+  position: absolute;
+  top: -4px;
+  right: 8px; /* Slightly adjusted to align with small button */
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border-top: 1px solid $color-border;
+  border-left: 1px solid $color-border;
+  transform: rotate(45deg);
+}
+
+.pop-text {
   font-size: 12px;
+  color: $color-text-main;
+  text-align: center;
+  font-weight: 500;
+  display: block;
+}
+
+.pop-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pop-btn {
+  flex: 1;
+  font-size: 11px;
+  padding: 4px 0;
+  text-align: center;
+  border-radius: 4px;
+  cursor: pointer;
+  background: $bg-pale;
+  color: $color-text-light;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #e2e8f0;
+    color: $color-text-main;
+  }
+}
+
+.pop-btn.danger {
+  background: #FEF2F2;
+  color: #DC2626;
+  
+  &:hover {
+    background: #FEE2E2;
+  }
 }
 </style>
-
-

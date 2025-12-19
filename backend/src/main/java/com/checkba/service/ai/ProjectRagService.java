@@ -88,9 +88,9 @@ public class ProjectRagService {
         }
 
         // Strategy 2: Scan legacy directory (root) for files starting with project_{id}_
-        // Only if we didn't find enough documents or just to be safe (mixed mode)
-        log.info("Scanning root directory for legacy files: {}", storageRoot);
-        allDocuments.addAll(scanDirectory(storageRoot, parser, "project_" + projectId + "_"));
+        // Disabled for performance and safety (prevent scanning entire root)
+        // log.info("Scanning root directory for legacy files: {}", storageRoot);
+        // allDocuments.addAll(scanDirectory(storageRoot, parser, "project_" + projectId + "_"));
 
         if (!allDocuments.isEmpty()) {
             // 使用更“温和”的方式逐段向量化，避免一次性向 Ollama 发送过大的 embedding 请求

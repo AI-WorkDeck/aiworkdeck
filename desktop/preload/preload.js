@@ -33,7 +33,8 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
       ipcRenderer.on('checkba:browser-title-updated', listener)
       return () => ipcRenderer.removeListener('checkba:browser-title-updated', listener)
     },
-    getSnapshot: (payload) => ipcRenderer.invoke('checkba:browser-get-snapshot', payload)
+    getSnapshot: (payload) => ipcRenderer.invoke('checkba:browser-get-snapshot', payload),
+    setUA: (payload) => ipcRenderer.invoke('checkba:browser-set-ua', payload)
   }
   ,
   ocr: {
@@ -102,6 +103,9 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
       ipcRenderer.on('checkba:backend-status', listener)
       return () => ipcRenderer.removeListener('checkba:backend-status', listener)
     }
+  },
+  utils: {
+    readFile: (path) => ipcRenderer.invoke('checkba:fs-read-file', { path })
   }
 })
 

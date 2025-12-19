@@ -49,6 +49,10 @@ hs_err_pid*.log
 *.temp
 *.bak
 
+# 大文件
+*.mov
+King IDE汇报/
+
 # WPS / 其他第三方配置（如果包含敏感信息）
 # 注意：WPS AppSecret 等应该通过环境变量配置，不要提交到仓库
 

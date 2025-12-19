@@ -17,5 +17,8 @@ public interface ProjectAssistant {
                    "If the user asks to summarize or extract info, use the knowledge base. " +
                    "If you cannot find information in the files, say so politely.")
     String chat(String userMessage);
+
+    // Support for Multi-Modal (Text + Image)
+    String chat(@dev.langchain4j.service.UserMessage dev.langchain4j.data.message.UserMessage userMessage);
 }
 

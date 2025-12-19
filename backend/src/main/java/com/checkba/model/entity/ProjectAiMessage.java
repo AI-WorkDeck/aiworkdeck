@@ -24,6 +24,12 @@ public class ProjectAiMessage {
     private Long projectId;
 
     /**
+     * 用户 ID
+     */
+    @Column
+    private Long userId;
+
+    /**
      * 消息角色：USER / ASSISTANT
      */
     @Column(length = 16, nullable = false)

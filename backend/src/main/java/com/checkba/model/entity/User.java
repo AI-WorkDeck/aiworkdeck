@@ -58,6 +58,22 @@ public class User {
     private String password;
 
     /**
+     * 用户角色
+     * - USER: 普通用户
+     * - ADMIN: 系统管理员
+     */
+    @Column(length = 32, nullable = false)
+    private String role = "USER";
+
+    /**
+     * 订阅类型
+     * - FREE: 免费用户
+     * - PAID: 付费用户
+     */
+    @Column(length = 32, nullable = false)
+    private String subscriptionType = "FREE";
+
+    /**
      * 创建时间
      */
     private LocalDateTime createdAt;

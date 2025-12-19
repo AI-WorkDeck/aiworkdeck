@@ -201,6 +201,18 @@ public class OssStorageService implements StorageService {
         }
     }
 
+    @Override
+    public String append(String fileId, InputStream inputStream) throws StorageException {
+        throw new UnsupportedOperationException("对象存储暂不支持追加写入");
+    }
+
+    @Override
+    public long getSize(String fileId) throws StorageException {
+        // TODO: 实现获取文件大小 (Head Object)
+        // return 0;
+        throw new UnsupportedOperationException("对象存储暂不支持获取文件大小");
+    }
+
     /**
      * 构建对象存储的键（Object Key）
      */

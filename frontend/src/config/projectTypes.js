@@ -79,6 +79,19 @@ export const PROJECT_TYPES = [
       LISTED: { label: '上市公司基础信息', fields: [], lists: [] },
       TARGET: { label: '标的公司基础信息', fields: [], lists: [] }
     }
+  },
+  {
+    value: 'BLANK',
+    label: '空白项目',
+    formFields: [
+        {
+            field: 'name',
+            label: '项目名称',
+            required: true,
+            placeholder: '请输入项目名称',
+        }
+    ],
+    companyDisplay: null
   }
 ];
 

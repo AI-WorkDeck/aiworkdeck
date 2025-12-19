@@ -1,6 +1,7 @@
 package com.checkba.service;
 
 import cn.hutool.crypto.SecureUtil;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -11,16 +12,35 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class WpsService {
 
+    private final SystemSettingService systemSettingService;
+
     @Value("${external.wps.app-id}")
-    private String appId;
+    private String defaultAppId;
 
     @Value("${external.wps.app-secret}")
-    private String appSecret;
+    private String defaultAppSecret;
 
     @Value("${external.wps.callback-base-url}")
-    private String callbackBaseUrl;
+    private String defaultCallbackBaseUrl;
+
+    private static final String KEY_WPS_APP_ID = "external.wps.appId";
+    private static final String KEY_WPS_APP_SECRET = "external.wps.appSecret";
+    private static final String KEY_WPS_CALLBACK_BASE_URL = "external.wps.callbackBaseUrl";
+
+    private String getAppId() {
+        return systemSettingService.get(KEY_WPS_APP_ID, defaultAppId);
+    }
+
+    private String getAppSecret() {
+        return systemSettingService.get(KEY_WPS_APP_SECRET, defaultAppSecret);
+    }
+
+    public String getCallbackBaseUrl() {
+        return systemSettingService.get(KEY_WPS_CALLBACK_BASE_URL, defaultCallbackBaseUrl);
+    }
 
     /**
      * 生成 WPS 在线编辑链接（URL 直连方案预留）
@@ -28,6 +48,7 @@ public class WpsService {
     public String generateEditUrl(String fileId, String fileName, String mode) {
         long timestamp = System.currentTimeMillis() / 1000;
         String signature = generateSignature(fileId, timestamp, mode);
+        String appId = getAppId();
 
         try {
             String encodedFileName = fileName != null
@@ -89,7 +110,7 @@ public class WpsService {
      * 签名算法：MD5(app_id + file_id + timestamp + app_secret)
      */
     private String generateSignature(String fileId, long timestamp, String mode) {
-        String signStr = appId + fileId + timestamp + appSecret;
+        String signStr = getAppId() + fileId + timestamp + getAppSecret();
         return SecureUtil.md5(signStr).toUpperCase();
     }
 
@@ -99,7 +120,7 @@ public class WpsService {
      */
     public String generateSessionToken(String fileId, String userId, long timestamp) {
         String uid = (userId != null && !userId.trim().isEmpty()) ? userId.trim() : "1780305141";
-        String raw = appId + "|" + fileId + "|" + uid + "|" + timestamp + "|" + appSecret;
+        String raw = getAppId() + "|" + fileId + "|" + uid + "|" + timestamp + "|" + getAppSecret();
         return SecureUtil.md5(raw).toUpperCase();
     }
 
@@ -109,12 +130,5 @@ public class WpsService {
     public boolean verifyCallbackSignature(String fileId, long timestamp, String signature) {
         String expectedSignature = generateSignature(fileId, timestamp, "callback");
         return expectedSignature.equalsIgnoreCase(signature);
-    }
-
-    /**
-     * 获取回调网关地址
-     */
-    public String getCallbackBaseUrl() {
-        return callbackBaseUrl;
     }
 }

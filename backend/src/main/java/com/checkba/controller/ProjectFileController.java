@@ -3,6 +3,7 @@ package com.checkba.controller;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.model.dto.ProjectFileBatchRequest;
 import com.checkba.service.ProjectFileService;
+import com.checkba.service.ProjectMemberService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class ProjectFileController {
 
     private final ProjectFileService projectFileService;
+    private final ProjectMemberService projectMemberService;
 
     /**
      * 获取文件列表（指定父文件夹）
@@ -37,12 +39,24 @@ public class ProjectFileController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        
+        checkFileTreeAccess(projectId, userId);
+
         // 如果请求完整文件树
         if (Boolean.TRUE.equals(tree)) {
             return projectFileService.getFileTree(projectId);
         }
         // 否则返回指定父文件夹下的文件
         return projectFileService.getFilesByParent(projectId, parentId);
+    }
+    
+    private void checkFileTreeAccess(Long projectId, Long userId) {
+         if (!projectMemberService.hasReadPermission(projectId, userId)) {
+              throw new IllegalArgumentException("无权访问该项目");
+         }
+         if (projectMemberService.isClient(projectId, userId)) {
+             throw new IllegalArgumentException("客户无权访问资源管理器");
+         }
     }
 
     /**
@@ -58,6 +72,7 @@ public class ProjectFileController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        checkFileTreeAccess(projectId, userId);
         return projectFileService.createFolder(projectId, request.getParentId(), request.getName(), userId);
     }
 
@@ -74,6 +89,7 @@ public class ProjectFileController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        checkFileTreeAccess(projectId, userId);
         return projectFileService.createFile(
                 projectId,
                 request.getParentId(),
@@ -100,6 +116,7 @@ public class ProjectFileController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        checkFileTreeAccess(projectId, userId);
         return projectFileService.rename(fileId, request.getName(), userId);
     }
 
@@ -116,6 +133,7 @@ public class ProjectFileController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        checkFileTreeAccess(projectId, userId);
         projectFileService.delete(fileId, userId);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
@@ -136,6 +154,7 @@ public class ProjectFileController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        checkFileTreeAccess(projectId, userId);
         projectFileService.batchDelete(projectId, request, userId);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
@@ -157,6 +176,7 @@ public class ProjectFileController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        checkFileTreeAccess(projectId, userId);
         List<ProjectFile> moved = projectFileService.batchMove(projectId, request, userId);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
@@ -180,6 +200,7 @@ public class ProjectFileController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        checkFileTreeAccess(projectId, userId);
         List<ProjectFile> created = projectFileService.batchCopy(projectId, request, userId);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
@@ -204,6 +225,7 @@ public class ProjectFileController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        checkFileTreeAccess(projectId, userId);
         return projectFileService.move(fileId, request.getParentId(), request.getSortOrder(), userId);
     }
 
@@ -220,7 +242,66 @@ public class ProjectFileController {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        checkFileTreeAccess(projectId, userId);
         return projectFileService.getFile(fileId);
+    }
+
+    /**
+     * 获取回收站文件列表
+     * GET /api/projects/{projectId}/files/recycle-bin
+     */
+    @GetMapping("/recycle-bin")
+    public List<ProjectFile> getRecycleBinFiles(
+            @PathVariable Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        checkFileTreeAccess(projectId, userId);
+        return projectFileService.getRecycleBinFiles(projectId);
+    }
+    
+    /**
+     * 还原文件或文件夹
+     * POST /api/projects/{projectId}/files/{fileId}/restore
+     */
+    @PostMapping("/{fileId}/restore")
+    public Map<String, Object> restoreFile(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        checkFileTreeAccess(projectId, userId);
+        projectFileService.restore(fileId, userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", "还原成功");
+        return result;
+    }
+    
+    /**
+     * 彻底删除文件或文件夹
+     * DELETE /api/projects/{projectId}/files/{fileId}/permanent
+     */
+    @DeleteMapping("/{fileId}/permanent")
+    public Map<String, Object> permDelete(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        checkFileTreeAccess(projectId, userId);
+        projectFileService.permDelete(fileId, userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", "彻底删除成功");
+        return result;
     }
 
     private Long getUserIdFromSession(String sessionId) {

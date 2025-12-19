@@ -1,51 +1,85 @@
 <template>
-  <view class="page-new-project new-project-page">
-    <view class="topbar">
-      <view class="topbar-left" @tap="goBack">
-        <text class="topbar-back">←</text>
-        <text class="topbar-title">新建项目</text>
-      </view>
-      <view class="topbar-right" @tap="goToUserProfile">
-        <view class="topbar-avatar">
-          <text class="avatar-text">{{ userDisplayName?.charAt(0) || 'U' }}</text>
+  <view class="page-new-project">
+    <view class="workbench-container">
+      <!-- 左侧个人信息卡片 (复用样式) -->
+      <view class="user-sidebar">
+        <!-- Logo Area -->
+        <view class="sidebar-logo-area">
+            <image src="/static/logo_full.png" class="sidebar-logo" mode="heightFix" />
         </view>
-      </view>
-    </view>
-    <view class="page-header">
-      <text class="page-title">项目创建向导</text>
-      <text class="page-subtitle">请选择项目类型并录入上市公司 / 标的公司信息，系统将自动补全基础信息。</text>
-    </view>
 
-    <view class="page-content new-project-container">
-      <!-- 基础信息卡片 -->
-      <view class="card project-form-card new-project-card">
-        <view class="card-header">
-          <text class="card-title">项目基础信息</text>
-          <text class="card-subtitle">请选择项目类型并录入相关公司信息。</text>
+        <view class="user-card">
+          <view class="card-gold-accent"></view>
+          <view class="user-profile-main">
+            <view class="user-avatar-wrapper">
+              <image
+                v-if="userAvatarUrl"
+                class="user-avatar"
+                :src="userAvatarUrl"
+                mode="aspectFill"
+              />
+              <view v-else class="user-avatar-placeholder">
+                <text class="avatar-text">{{ userDisplayName?.charAt(0) || 'U' }}</text>
+              </view>
+            </view>
+            <text class="user-name">{{ userDisplayName }}</text>
+            <text class="user-handle">@{{ username || 'user' }}</text>
+            <view class="user-role-tag">
+              <text class="role-text">标准用户</text>
+            </view>
+          </view>
+          
+          <view class="user-actions">
+            <view class="action-item" @tap="goToUserProfile">
+              <text class="action-text">返回个人中心</text>
+              <text class="action-arrow">›</text>
+            </view>
+          </view>
         </view>
-        <view class="card-body">
-          <view class="form-grid">
+      </view>
+
+      <!-- 右侧主内容区 -->
+      <view class="main-content">
+        <view class="content-header">
+           <text class="content-title">项目创建向导</text>
+           <text class="content-subtitle">请选择项目类型并录入相关信息，系统将为您初始化项目环境。</text>
+        </view>
+
+        <view class="card project-form-card">
+            <view class="form-grid">
             <view class="form-row">
               <view class="form-label">
                 <text>项目类型</text>
                 <text class="required-mark">*</text>
               </view>
-              <view class="form-field">
-                <picker
-                  mode="selector"
-                  :range="projectTypes"
-                  range-key="label"
-                  :value="projectTypeIndex"
-                  @change="onProjectTypeChange"
+              <view class="form-field relative-field">
+                <!-- Custom Dropdown Trigger -->
+                <view 
+                  class="selector-display" 
+                  :class="{ 'is-open': projectTypeDropdownOpen }"
+                  @tap.stop="toggleProjectTypeDropdown"
                 >
-                  <view class="selector-display">
-                    <text class="selector-text">{{ currentProjectType.label }}</text>
-                    <text class="selector-arrow">▼</text>
-                  </view>
-                </picker>
+                  <text class="selector-text">{{ currentProjectType.label }}</text>
+                  <text class="selector-arrow">▼</text>
+                </view>
+
+                <!-- Custom Dropdown Menu -->
+                <view v-if="projectTypeDropdownOpen" class="custom-dropdown-menu">
+                   <view 
+                     v-for="(type, index) in projectTypes" 
+                     :key="type.value" 
+                     class="dropdown-item"
+                     :class="{ 'item-selected': index === projectTypeIndex }"
+                     @tap.stop="selectProjectType(index)"
+                   >
+                     <text>{{ type.label }}</text>
+                     <text v-if="index === projectTypeIndex" class="check-mark">✓</text>
+                   </view>
+                </view>
               </view>
             </view>
 
+            <!-- 动态表单字段 -->
             <view
               v-for="field in currentProjectType.formFields"
               :key="field.field"
@@ -66,12 +100,13 @@
               </view>
             </view>
           </view>
-        </view>
-        
-        <view class="card-footer form-actions">
-          <button class="btn btn-create" :loading="creating" :disabled="!canCreate" @tap="onCreateProject">
-            {{ creating ? '创建中...' : '创建项目' }}
-          </button>
+
+          <view class="form-actions">
+             <button class="btn btn-cancel" @tap="goToUserProfile">取消</button>
+             <button class="btn btn-create" :loading="creating" :disabled="!canCreate" @tap="onCreateProject">
+                {{ creating ? '创建中...' : '立即创建' }}
+             </button>
+          </view>
         </view>
       </view>
     </view>
@@ -88,20 +123,26 @@ export default {
   data() {
     return {
       userDisplayName: '用户',
+      username: '',
+      userAvatarUrl: '', // Added to support avatar display
       projectTypes: PROJECT_TYPES,
       projectTypeIndex: 0,
       formModel: {
         projectType: PROJECT_TYPES[0]?.value || '',
         listedCompanyName: '',
         targetCompanyName: '',
+        name: '', // For blank project
       },
-      creating: false
+      creating: false,
+      projectTypeDropdownOpen: false
     }
   },
   onLoad() {
     const user = getCurrentUser()
     if (user) {
       this.userDisplayName = user.displayName || user.username || '用户'
+      this.username = user.username
+      this.userAvatarUrl = user.avatarUrl
     }
   },
   computed: {
@@ -113,26 +154,26 @@ export default {
       const requiredFields = this.currentProjectType.formFields.filter(f => f.required)
       return requiredFields.every(f => !!this.formModel[f.field])
     },
+    isBlankProject() {
+        return this.currentProjectType.value === 'BLANK'
+    }
   },
   methods: {
-    goBack() {
-      try {
-        uni.navigateBack()
-      } catch (e) {
-        uni.navigateTo({ url: '/pages/userprofile/userprofile' })
-      }
-    },
     goToUserProfile() {
       uni.navigateTo({ url: '/pages/userprofile/userprofile' })
     },
-    onProjectTypeChange(e) {
-      const index = Number(e.detail.value || 0)
+    toggleProjectTypeDropdown() {
+      this.projectTypeDropdownOpen = !this.projectTypeDropdownOpen
+    },
+    selectProjectType(index) {
       this.projectTypeIndex = index
       const type = this.projectTypes[index]
       this.formModel.projectType = type ? type.value : ''
       // 清空字段值
       this.formModel.listedCompanyName = ''
       this.formModel.targetCompanyName = ''
+      this.formModel.name = ''
+      this.projectTypeDropdownOpen = false
     },
     onInput(field, event) {
       const value = event.detail && event.detail.value
@@ -152,30 +193,33 @@ export default {
       let targetInfo = null
 
       try {
-        // 1. 尝试拉取上市公司信息（如果有）
-        if (this.formModel.listedCompanyName) {
-          try {
-            listedInfo = await fetchCompanyBasicInfo({
-              projectType: this.formModel.projectType,
-              role: COMPANY_ROLES.LISTED,
-              name: this.formModel.listedCompanyName
-            })
-          } catch (e) {
-            console.warn('拉取上市公司信息失败，将使用空信息创建', e)
-          }
-        }
+        // 非空白项目才尝试拉取公司信息
+        if (!this.isBlankProject) {
+            // 1. 尝试拉取上市公司信息（如果有）
+            if (this.formModel.listedCompanyName) {
+            try {
+                listedInfo = await fetchCompanyBasicInfo({
+                projectType: this.formModel.projectType,
+                role: COMPANY_ROLES.LISTED,
+                name: this.formModel.listedCompanyName
+                })
+            } catch (e) {
+                console.warn('拉取上市公司信息失败，将使用空信息创建', e)
+            }
+            }
 
-        // 2. 尝试拉取标的公司信息（如果有）
-        if (this.formModel.targetCompanyName) {
-          try {
-            targetInfo = await fetchCompanyBasicInfo({
-              projectType: this.formModel.projectType,
-              role: COMPANY_ROLES.TARGET,
-              name: this.formModel.targetCompanyName
-            })
-          } catch (e) {
-            console.warn('拉取标的公司信息失败，将使用空信息创建', e)
-          }
+            // 2. 尝试拉取标的公司信息（如果有）
+            if (this.formModel.targetCompanyName) {
+            try {
+                targetInfo = await fetchCompanyBasicInfo({
+                projectType: this.formModel.projectType,
+                role: COMPANY_ROLES.TARGET,
+                name: this.formModel.targetCompanyName
+                })
+            } catch (e) {
+                console.warn('拉取标的公司信息失败，将使用空信息创建', e)
+            }
+            }
         }
 
         // 3. 创建项目
@@ -183,9 +227,11 @@ export default {
           projectType: this.formModel.projectType,
           listedCompanyName: this.formModel.listedCompanyName,
           targetCompanyName: this.formModel.targetCompanyName,
+          name: this.formModel.name, // 只有空白项目会有这个值，或者如果后端支持自定义名称也可以传
           listedCompanyInfo: listedInfo,
           targetCompanyInfo: targetInfo,
         }
+        
         const res = await createProject(payload)
         
         uni.showToast({
@@ -195,18 +241,10 @@ export default {
 
         // 4. 跳转到项目概览页
         const projectId = res && res.id
-        const query = {
-          id: projectId,
-          name: res && res.name ? res.name : `${this.formModel.listedCompanyName} 项目`,
-        }
-        const queryStr = Object.keys(query)
-          .filter((k) => query[k])
-          .map((k) => `${k}=${encodeURIComponent(query[k])}`)
-          .join('&')
         
         setTimeout(() => {
            uni.navigateTo({
-             url: `/pages/project-overview/project-overview?${queryStr}`,
+             url: `/pages/project-overview/project-overview?id=${projectId}`,
            })
         }, 500)
 
@@ -224,138 +262,202 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.topbar {
-  height: 52px;
+/* 品牌配色变量 - King IDE Palette */
+$brand-primary: #1A5336; /* King Forest */
+$brand-accent: #5BD197;  /* King Mint */
+$brand-dark: #212629;    /* Dark BG */
+$brand-bg: #F8F9FA;      /* Gray-Pale */
+$brand-white: #FFFFFF;
+$text-main: #2C3338;     /* Gray-Dark */
+$text-secondary: #6C757D;/* Gray-Medium */
+$text-light: #ADB5BD;
+$border-color: #E9ECEF;  /* Gray-Light */
+$danger-color: #E74C3C;
+
+.page-new-project {
+  min-height: 100vh;
+  /* Subtle Gradient Background */
+  background: linear-gradient(135deg, #F8F9FA 0%, #E8F3ED 100%);
+  padding: 40px 24px;
+  box-sizing: border-box;
+}
+
+.workbench-container {
+  max-width: 1200px;
+  margin: 0 auto;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #ffffff;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 24px;
 }
 
-.topbar-left {
+/* 左侧边栏 - 复用 UserProfile 样式 */
+.user-sidebar {
+  width: 280px;
+  flex-shrink: 0;
   display: flex;
+  flex-direction: column;
+}
+
+.sidebar-logo-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-left: 8px;
+}
+
+.sidebar-logo {
+    height: 36px;
+    width: auto;
+}
+
+.user-card {
+  background: $brand-white;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(18, 52, 77, 0.05);
+  overflow: hidden;
+  position: relative;
+  padding-bottom: 24px;
+  /* Add border to match userprofile */
+  border: 1px solid rgba(0,0,0,0.02);
+}
+
+.card-gold-accent {
+  height: 4px;
+  width: 100%;
+  background: $brand-primary;
+}
+
+.user-profile-main {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  cursor: pointer;
+  padding: 32px 24px;
+  border-bottom: 1px solid $border-color;
 }
 
-.topbar-back {
-  font-size: 16px;
-  color: #12344D;
+.user-avatar-wrapper {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 16px;
+  background-color: #eef2f5;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-.topbar-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #12344D;
+.user-avatar {
+  width: 100%;
+  height: 100%;
 }
 
-.topbar-right {
-  cursor: pointer;
-}
-
-.topbar-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  background: #12344D;
+.user-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  background: $brand-dark;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .avatar-text {
+  font-size: 32px;
   color: #fff;
-  font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
-</style>
 
-<style lang="scss">
-/* 全局变量映射 */
-$bg-page: #F7F5F0;
-$bg-card: #FFFFFF;
-$bg-input: #FFFFFF; /* 调整为白色背景，与输入框一致 */
-$brand-gold: #C8A45D;
-$brand-dark: #12344D;
-$text-main: #1A1A1A;
-$text-sub: #666666;
-$text-placeholder: #999999;
-$border-light: #E0E0E0;
-$success: #059669;
-$danger: #DC2626;
+.user-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: $text-main;
+  margin-bottom: 4px;
+}
 
-.page-new-project {
-  min-height: 100vh;
-  background-color: $bg-page;
-  padding: 40px 24px;
-  box-sizing: border-box;
+.user-handle {
+  font-size: 14px;
+  color: $text-secondary;
+  margin-bottom: 12px;
+}
+
+.user-role-tag {
+  background: rgba(26, 83, 54, 0.08); /* Forest Light */
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(26, 83, 54, 0.1);
+}
+
+.role-text {
+  font-size: 12px;
+  color: $brand-primary;
+  font-weight: 500;
+}
+
+.user-actions {
+  padding: 16px 0 0;
+}
+
+.action-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: background 0.2s;
+  
+  &:hover {
+    background-color: #F8F9FA;
+  }
+}
+
+.action-text {
+  font-size: 14px;
+  color: $text-secondary;
+}
+
+.action-arrow {
+  font-size: 18px;
+  color: $text-light;
+  font-family: monospace;
+}
+
+/* 右侧主内容区 */
+.main-content {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro SC", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
-.page-header {
-  text-align: center;
-  margin-bottom: 40px;
-  max-width: 800px;
+.content-header {
+    margin-bottom: 24px;
 }
 
-.page-title {
-  display: block;
-  font-size: 28px;
-  font-weight: 700;
-  color: $text-main;
-  margin-bottom: 12px;
-  letter-spacing: -0.5px;
+.content-title {
+    display: block;
+    font-size: 24px;
+    font-weight: 600;
+    color: $text-main;
+    margin-bottom: 8px;
 }
 
-.page-subtitle {
-  font-size: 15px;
-  color: $text-sub;
-  line-height: 1.6;
+.content-subtitle {
+    font-size: 14px;
+    color: $text-secondary;
 }
 
-.page-content {
-  width: 100%;
-  max-width: 840px;
-}
-
-.card {
-  background-color: $bg-card;
+.project-form-card {
+  background: $brand-white;
   border-radius: 16px;
-  padding: 32px 40px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-  margin-bottom: 24px;
-  border: 1px solid rgba(0,0,0,0.02);
-}
-
-.card-header {
-  margin-bottom: 32px;
-  border-bottom: 1px solid $bg-page;
-  padding-bottom: 20px;
-}
-
-.card-title {
-  display: block;
-  font-size: 18px;
-  font-weight: 600;
-  color: $brand-dark;
-  margin-bottom: 8px;
-}
-
-.card-subtitle {
-  font-size: 13px;
-  color: $text-sub;
+  padding: 40px;
+  box-shadow: 0 4px 20px rgba(18, 52, 77, 0.04);
 }
 
 .form-grid {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  max-width: 600px;
 }
 
 .form-row {
@@ -373,7 +475,7 @@ $danger: #DC2626;
 }
 
 .required-mark {
-  color: $danger;
+  color: $danger-color;
   margin-left: 4px;
   font-size: 16px;
 }
@@ -383,14 +485,19 @@ $danger: #DC2626;
   flex-direction: column;
 }
 
+.relative-field {
+    position: relative;
+    z-index: 100; /* Ensure dropdown is on top */
+}
+
 /* 统一输入框与下拉框样式 */
 .selector-display, .input {
-  height: 48px; /* 增加高度 */
-  background-color: $bg-input !important; 
-  border: 1px solid $border-light;
+  height: 48px;
+  background-color: #fff; 
+  border: 1px solid $border-color;
   border-radius: 8px;
   padding: 0 16px;
-  font-size: 15px; /* 字体稍大 */
+  font-size: 15px;
   color: $text-main;
   transition: all 0.2s;
   box-sizing: border-box;
@@ -412,9 +519,8 @@ $danger: #DC2626;
 }
 
 .selector-display:active, .input:focus {
-  background-color: #fff !important;
-  border-color: $brand-gold;
-  box-shadow: 0 0 0 3px rgba(200, 164, 93, 0.1);
+  border-color: $brand-primary;
+  box-shadow: 0 0 0 3px rgba(26, 83, 54, 0.1);
   outline: none;
 }
 
@@ -427,37 +533,104 @@ $danger: #DC2626;
 
 .selector-arrow {
   font-size: 10px;
-  color: $text-sub;
+  color: $text-secondary;
   margin-left: 8px;
+  transition: transform 0.2s;
 }
 
-/* 按钮样式 */
-.btn-create {
-  width: 100%;
-  height: 52px;
+.selector-display.is-open .selector-arrow {
+    transform: rotate(180deg);
+}
+
+.custom-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    margin-top: 8px;
+    background: #fff;
+    border: 1px solid $border-color;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08); /* Premium Shadow */
+    z-index: 1000;
+    overflow: hidden;
+    padding: 8px 0;
+}
+
+.dropdown-item {
+    padding: 12px 16px;
+    font-size: 14px;
+    color: $text-main;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    
+    &:hover {
+        background-color: rgba(91, 209, 151, 0.08); /* Mint Light */
+        color: $brand-primary;
+    }
+}
+
+.item-selected {
+    color: $brand-primary;
+    font-weight: 500;
+    background-color: rgba(91, 209, 151, 0.08);
+}
+
+.check-mark {
+    font-size: 12px;
+    color: $brand-primary;
+}
+
+.form-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid #f5f5f5;
+  max-width: 600px;
+}
+
+.btn {
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: $brand-gold; /* 金色主操作按钮 */
-  color: #fff;
-  font-size: 16px;
-  font-weight: 600;
   border-radius: 8px;
-  border: none;
-  box-shadow: 0 4px 16px rgba(200, 164, 93, 0.25);
-  transition: all 0.2s;
+  font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
+  border: none;
+  transition: all 0.2s;
 }
 
-.btn-create:hover {
-  background-color: #d4ae66;
-  box-shadow: 0 6px 20px rgba(200, 164, 93, 0.35);
-  transform: translateY(-1px);
+.btn-cancel {
+    background: #f5f5f5;
+    color: $text-secondary;
+    flex: 1;
+    
+    &:hover {
+        background: #e0e0e0;
+    }
 }
 
-.btn-create:active {
-  transform: translateY(1px);
-  box-shadow: 0 2px 8px rgba(200, 164, 93, 0.2);
+.btn-create {
+  background-color: $brand-primary;
+  color: #fff;
+  flex: 2;
+  box-shadow: 0 4px 12px rgba(26, 83, 54, 0.2);
+  
+  &:hover {
+    background-color: lighten($brand-primary, 5%);
+    box-shadow: 0 6px 16px rgba(26, 83, 54, 0.3);
+    transform: translateY(-1px);
+  }
+  
+  &:active {
+    transform: translateY(1px);
+  }
 }
 
 .btn-create[disabled] {
@@ -468,22 +641,21 @@ $danger: #DC2626;
   transform: none;
 }
 
-.form-actions {
-  display: flex;
-  justify-content: center; /* 按钮居中 */
-  margin-top: 32px;
-  padding-top: 0;
-  border-top: none;
-}
-
-/* 响应式调整 */
-@media screen and (max-width: 600px) {
-  .page-new-project {
-    padding: 24px 16px;
+@media screen and (max-width: 768px) {
+  .workbench-container {
+    flex-direction: column;
   }
   
-  .card {
-    padding: 24px 16px;
+  .user-sidebar {
+    width: 100%;
+  }
+  
+  .form-actions {
+      max-width: 100%;
+  }
+  
+  .form-grid {
+      max-width: 100%;
   }
 }
 </style>

@@ -24,6 +24,10 @@
       <view class="browser-btn" @tap="openInAppNewTab" title="新标签页">
         <text class="btn-icon">⧉</text>
       </view>
+
+      <view class="browser-btn" :class="{ primary: isMobileMode }" @tap="toggleMobileMode" :title="isMobileMode ? '切换回桌面版' : '切换移动版 (解决网页过宽)'">
+        <text class="btn-icon" style="font-size: 16px;">{{ isMobileMode ? '📱' : '💻' }}</text>
+      </view>
     </view>
 
     <view class="browser-body">
@@ -77,7 +81,8 @@ export default {
       _messageHandler: null,
       _desktopUnsub: null,
       _desktopResizeObs: null,
-      _desktopViewId: ''
+      _desktopViewId: '',
+      isMobileMode: false
     }
   },
   computed: {
@@ -329,6 +334,24 @@ export default {
     },
     onIframeLoad(e) {
       // 由后端 proxy 注入脚本统一处理 _blank / window.open；这里无需再做同源注入
+    },
+    async toggleMobileMode() {
+      if (!this.isDesktopBrowser) return
+      this.isMobileMode = !this.isMobileMode
+      const api = window.checkbaDesktop && window.checkbaDesktop.browser
+      if (!api || !this._desktopViewId) return
+      
+      const mobileUA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+      const desktopUA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      
+      try {
+        await api.setUA({
+          id: this._desktopViewId,
+          ua: this.isMobileMode ? mobileUA : desktopUA
+        })
+      } catch (e) {
+        // ignore
+      }
     }
   }
 }

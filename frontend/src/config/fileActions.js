@@ -12,9 +12,10 @@ export const FILE_BATCH_CANCEL_LABEL = '取消'
 // 左侧文件树：快捷操作（集中维护，避免组件内硬编码）
 // 说明：icon 采用简洁符号，尽量避免 emoji
 export const FILE_TREE_QUICK_ACTIONS = [
-  { key: 'newFile', label: '新建文件', title: '新建文件', icon: '＋' },
-  { key: 'newFolder', label: '新建文件夹', title: '新建文件夹', icon: '▦' },
-  { key: 'upload', label: '上传文件', title: '上传文件', icon: '↑' },
+  { key: 'newFile', label: '新建文件', title: '新建文件', iconPath: '/static/new-document_unselected.png', activeIconPath: '/static/new-document.png' },
+  { key: 'newFolder', label: '新建文件夹', title: '新建文件夹', iconPath: '/static/icon_new_folder_unselected.png', activeIconPath: '/static/icon_new_folder.png' },
+  { key: 'upload', label: '上传文件', title: '上传文件', iconPath: '/static/upload_unselected.png', activeIconPath: '/static/upload.png' },
+  { key: 'sort', label: '排序', title: '排序', iconPath: '/static/sort_unselected.png', activeIconPath: '/static/sort.png' },
 ]
 
 

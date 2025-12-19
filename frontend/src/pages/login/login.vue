@@ -1,163 +1,166 @@
 <template>
-  <view class="page-login">
-    <!-- 顶部导航条 -->
-    <view class="top-navbar">
+  <view class="login-page" @mousemove="handleMouseMove">
+    <!-- Background Elements -->
+    <view class="bg-gradient"></view>
+    <view class="bg-mesh"></view>
+
+    <!-- Top Navigation -->
+    <view class="top-nav">
       <view class="nav-left">
-        <image class="nav-logo" src="/static/logo.png" mode="heightFix" />
-        <text class="nav-brand">资易</text>
+        <image class="nav-logo" src="/static/logo_full.png" mode="heightFix" />
       </view>
       <view class="nav-right">
-        <text class="nav-link">使用指引</text>
-        <text class="nav-link">帮助中心</text>
-        <text class="nav-link">官网</text>
+        <text class="nav-item">使用指引</text>
+        <text class="nav-item">帮助中心</text>
+        <text class="nav-item">官网</text>
       </view>
     </view>
 
-    <view class="login-layout">
-      <!-- 品牌展示区 -->
-      <view class="brand-panel">
-        <view class="brand-content">
-          <image
-            class="brand-logo-left"
-            src="/static/logo.png"
-            mode="heightFix"
-          />
-          <view class="brand-text-block">
-            <view class="brand-title-row">
-              <text class="brand-title">资易</text>
-              <text class="brand-separator">·</text>
-              <text class="brand-subtitle">让资本市场更加容易</text>
+    <view class="main-layout">
+      <!-- Left Column: 3D Device Showcase -->
+      <view class="showcase-section">
+        <view 
+          class="device-wrapper"
+          :style="{ transform: deviceTransform }"
+        >
+          <view class="device-frame">
+            <!-- Simulated IDE Interface -->
+            <view class="ide-window">
+              <view class="ide-titlebar">
+                <view class="window-controls">
+                  <view class="control red"></view>
+                  <view class="control yellow"></view>
+                  <view class="control green"></view>
+                </view>
+                <text class="window-title">King · IDE - Professional Workspace</text>
+              </view>
+              <view class="ide-body">
+                <view class="ide-sidebar">
+                  <view class="sidebar-icon active"></view>
+                  <view class="sidebar-icon"></view>
+                  <view class="sidebar-icon"></view>
+                </view>
+                <view class="ide-explorer">
+                  <view class="explorer-item">Project Alpha</view>
+                  <view class="explorer-item indent">立案文件</view>
+                  <view class="explorer-item indent active">尽职调查</view>
+                  <view class="explorer-item indent">法律意见书</view>
+                </view>
+                <view class="ide-editor">
+                  <view class="editor-tabs">
+                    <view class="tab active">尽职调查报告.doc</view>
+                    <view class="tab">证据清单.xlsx</view>
+                  </view>
+                  <view class="doc-area">
+                    <view class="doc-title">关于 Project Alpha 的法律尽职调查报告</view>
+                    <view class="doc-meta">
+                      <text>致：客户委员会</text>
+                      <text style="margin-left: 20px;">日期：2025-12-17</text>
+                    </view>
+                    <view class="doc-content">
+                      <view class="doc-paragraph">
+                        <text>第一章 法律尽职调查概述</text>
+                      </view>
+                      <view class="doc-paragraph text-body">
+                        <text>本次尽职调查旨在全面评估目标公司的法律合规性，包括但不限于公司设立与存续、主要资产、重大债权债务、税务合规等方面。</text>
+                      </view>
+                      <view class="doc-paragraph text-body">
+                        <text>我们查阅了目标公司提供的工商档案、合同文件及相关的政府批文，并对关键管理人员进行了访谈...</text>
+                      </view>
+                      <!-- Skeleton lines for "blank" look -->
+                      <view class="skeleton-line" style="width: 90%"></view>
+                      <view class="skeleton-line" style="width: 95%"></view>
+                      <view class="skeleton-line" style="width: 80%"></view>
+                      <view class="skeleton-line" style="width: 85%"></view>
+                    </view>
+                  </view>
+                  
+                  <!-- Subtle Monogram Watermark inside IDE -->
+                  <image class="ide-watermark" src="/static/monochrome.png" mode="aspectFit" />
+                </view>
+              </view>
             </view>
-            <view class="brand-description">
-              <text class="desc-line">帮法律人聚焦专业判断</text>
-            </view>
+            <!-- Screen Reflection/Gloss -->
+            <view class="screen-gloss"></view>
           </view>
-        </view>
-        <view class="brand-decoration">
-          <view class="decoration-layer decoration-large" />
-          <view class="decoration-layer decoration-small" />
+          <!-- Device Edge Highlight -->
+          <view class="device-edge"></view>
+          <!-- Shadow -->
+          <view class="device-shadow"></view>
         </view>
       </view>
 
-      <!-- 登录卡片区 -->
-      <view class="auth-panel">
-        <view class="login-card">
-          <view class="login-card-header">
-            <view class="card-logo-row">
-              <image class="card-logo" src="/static/logo.png" mode="heightFix" />
-              <text class="card-title">资易</text>
-            </view>
-
-            <!-- Tab 切换：登录/注册 -->
-            <view class="tab-bar">
-              <view
-                class="tab-item"
-                :class="{ 'tab-item-active': activeTab === 'login' }"
-                @tap="switchTab('login')"
-              >
-                <text class="tab-text">登录</text>
-              </view>
-              <view
-                class="tab-item"
-                :class="{ 'tab-item-active': activeTab === 'register' }"
-                @tap="switchTab('register')"
-              >
-                <text class="tab-text">注册</text>
-              </view>
+      <!-- Right Column: Glassmorphism Login Card -->
+      <view class="login-section">
+        <view class="glass-card">
+          <view class="card-header">
+            <image class="card-logo" src="/static/iconmark.png" mode="heightFix" />
+            <view class="card-texts">
+              <text class="product-name">King · IDE</text>
+              <text class="product-subtitle">律师一站式工作平台</text>
             </view>
           </view>
 
-          <!-- 登录表单 -->
-          <view v-if="activeTab === 'login'" class="form-container">
-            <view class="form-item">
-              <text class="form-label">用户名</text>
-              <input
-                class="form-input"
-                type="text"
-                placeholder="请输入用户名"
-                v-model="loginForm.username"
-              />
-            </view>
-            <view class="form-item">
-              <text class="form-label">密码</text>
-              <input
-                class="form-input"
-                type="password"
-                placeholder="请输入密码"
-                v-model="loginForm.password"
-                @confirm="handleLogin"
-              />
-            </view>
-            <view class="form-extra-row">
-              <view class="extra-left">
-                <view class="checkbox-visual" />
-                <text class="extra-text">记住我</text>
-              </view>
-              <text class="extra-link">忘记密码</text>
-            </view>
-            <button
-              class="btn btn-primary"
-              type="primary"
-              :loading="loginLoading"
-              @tap="handleLogin"
-            >
-              登录
-            </button>
+          <!-- Tabs -->
+          <view class="auth-tabs">
+            <view class="tab-btn" :class="{ active: activeTab === 'login' }" @tap="switchTab('login')">登录</view>
+            <view class="tab-btn" :class="{ active: activeTab === 'register' }" @tap="switchTab('register')">注册</view>
+            <view class="tab-btn" :class="{ active: activeTab === 'client' }" @tap="switchTab('client')">客户</view>
+            <view class="tab-indicator" :style="indicatorStyle"></view>
           </view>
 
-          <!-- 注册表单 -->
-          <view v-else class="form-container">
-            <view class="form-item">
-              <text class="form-label">用户名</text>
-              <input
-                class="form-input"
-                type="text"
-                placeholder="请输入用户名（6-20个字符）"
-                v-model="registerForm.username"
-              />
+          <!-- Login Form -->
+          <view v-if="activeTab === 'login'" class="form-body swing-in">
+            <view class="input-group">
+              <text class="label">用户名</text>
+              <input class="glass-input" type="text" v-model="loginForm.username" placeholder="请输入用户名" placeholder-class="placeholder-style" />
             </view>
-            <view class="form-item">
-              <text class="form-label">显示名称</text>
-              <input
-                class="form-input"
-                type="text"
-                placeholder="请输入显示名称（可选）"
-                v-model="registerForm.displayName"
-              />
+            <view class="input-group">
+              <text class="label">密码</text>
+              <input class="glass-input" type="password" v-model="loginForm.password" @confirm="handleLogin" placeholder="请输入密码" placeholder-class="placeholder-style" />
             </view>
-            <view class="form-item">
-              <text class="form-label">密码</text>
-              <input
-                class="form-input"
-                type="password"
-                placeholder="请输入密码（至少6位）"
-                v-model="registerForm.password"
-              />
+            <view class="form-options">
+               <view class="remember-me">
+                 <checkbox style="transform:scale(0.7)" color="#5BD197" checked />
+                 <text>记住我</text>
+               </view>
+               <text class="link-text">忘记密码?</text>
             </view>
-            <view class="form-item">
-              <text class="form-label">确认密码</text>
-              <input
-                class="form-input"
-                type="password"
-                placeholder="请再次输入密码"
-                v-model="registerForm.passwordConfirm"
-                @confirm="handleRegister"
-              />
-            </view>
-            <button
-              class="btn btn-primary"
-              type="primary"
-              :loading="registerLoading"
-              @tap="handleRegister"
-            >
-              注册
-            </button>
+            <button class="action-btn" :loading="loginLoading" @tap="handleLogin">登 录</button>
           </view>
 
-          <view class="login-footer">
-            <text class="footer-text">
-              © 2025 资易 让资本市场更加容易
-            </text>
+          <!-- Register Form -->
+          <view v-else-if="activeTab === 'register'" class="form-body swing-in">
+            <view class="input-group">
+              <text class="label">用户名</text>
+              <input class="glass-input" type="text" v-model="registerForm.username" placeholder="6-20个字符" placeholder-class="placeholder-style" />
+            </view>
+            <view class="input-group">
+              <text class="label">显示名称</text>
+              <input class="glass-input" type="text" v-model="registerForm.displayName" placeholder="可选" placeholder-class="placeholder-style" />
+            </view>
+            <view class="input-group">
+              <text class="label">密码</text>
+              <input class="glass-input" type="password" v-model="registerForm.password" placeholder="至少6位" placeholder-class="placeholder-style" />
+            </view>
+            <view class="input-group">
+              <text class="label">确认密码</text>
+              <input class="glass-input" type="password" v-model="registerForm.passwordConfirm" @confirm="handleRegister" placeholder="再次输入密码" placeholder-class="placeholder-style" />
+            </view>
+            <button class="action-btn" :loading="registerLoading" @tap="handleRegister">注 册</button>
+          </view>
+
+          <!-- Client Form -->
+          <view v-else class="form-body swing-in">
+            <view class="input-group">
+              <text class="label">项目访问码</text>
+              <input class="glass-input" type="text" v-model="clientForm.accessCode" @confirm="handleClientLogin" placeholder="请输入律师提供的访问码" placeholder-class="placeholder-style" />
+            </view>
+            <button class="action-btn" :loading="clientLoginLoading" @tap="handleClientLogin">进入项目</button>
+          </view>
+          
+          <view class="card-footer">
+            <text>让法律人聚焦专业判断</text>
           </view>
         </view>
       </view>
@@ -166,7 +169,7 @@
 </template>
 
 <script>
-import { login, register } from '@/services/api.js'
+import { login, register, clientLogin } from '@/services/api.js'
 import { saveSession, getSessionId } from '@/utils/auth.js'
 
 export default {
@@ -174,6 +177,7 @@ export default {
   data() {
     return {
       activeTab: 'login',
+      mouseXPercent: 0, // 0 to 1
       loginForm: {
         username: '',
         password: '',
@@ -184,793 +188,577 @@ export default {
         password: '',
         passwordConfirm: '',
       },
+      clientForm: {
+        accessCode: '',
+        displayName: ''
+      },
       loginLoading: false,
       registerLoading: false,
+      clientLoginLoading: false
+    }
+  },
+  computed: {
+    deviceTransform() {
+      // Logic:
+      // When mouse is at left (low %), device is tilted: rotateY(25deg) rotateX(5deg) scale(0.9)
+      // When mouse is at right (high %), device is facing front: rotateY(0deg) rotateX(0deg) scale(1)
+      // User Request: Reach "straight" state when mouse reaches the login card (approx 60% width)
+      
+      // Define a threshold (e.g., 0.6 means 60% of screen width)
+      const threshold = 0.6;
+      let rawP = this.mouseXPercent / threshold;
+      
+      // Clamp between 0 and 1
+      const p = Math.min(Math.max(rawP, 0), 1);
+      
+      const rotY = 25 * (1 - p); // 25deg -> 0deg
+      const rotX = 10 * (1 - p);  // 10deg -> 0deg
+      const scale = 0.95 + (0.05 * p); // 0.95 -> 1.0
+      const translateX = -50 * (1 - p); // Slide in slightly from left
+      
+      return `perspective(2000px) rotateY(${rotY}deg) rotateX(${rotX}deg) scale(${scale}) translateX(${translateX}px)`;
+    },
+    indicatorStyle() {
+      // Simple logic to move the tab indicator
+      const index = ['login', 'register', 'client'].indexOf(this.activeTab);
+      return {
+        left: `${index * 33.33}%`
+      }
     }
   },
   methods: {
+    handleMouseMove(e) {
+      // #ifdef H5
+      // On H5 we can track mouse. On App/Mobile touch might be different, but request is Desktop-like
+      const width = window.innerWidth;
+      const x = e.pageX; // or clientX
+      this.mouseXPercent = x / width;
+      // #endif
+    },
     switchTab(tab) {
-      this.activeTab = tab
-      // 清空表单
-      this.loginForm = { username: '', password: '' }
-      this.registerForm = {
-        username: '',
-        displayName: '',
-        password: '',
-        passwordConfirm: '',
+      this.activeTab = tab;
+      this.loginForm = { username: '', password: '' };
+      this.registerForm = { username: '', displayName: '', password: '', passwordConfirm: '' };
+      this.clientForm = { accessCode: '' };
+    },
+    async handleClientLogin() {
+      if (!this.clientForm.accessCode) {
+        uni.showToast({ title: '请输入访问码', icon: 'none' });
+        return;
+      }
+      this.clientLoginLoading = true;
+      try {
+        const res = await clientLogin(this.clientForm.accessCode, null);
+        if (res.code === 0 && res.data) {
+          saveSession(res.data.sessionId, res.data.user);
+          uni.showToast({ title: '登录成功', icon: 'success' });
+          const projectId = res.data.projectId;
+          setTimeout(() => {
+            uni.reLaunch({ url: `/pages/project-overview/project-overview?id=${projectId}` });
+          }, 300);
+        } else {
+          uni.showToast({ title: res.message || '登录失败', icon: 'none' });
+        }
+      } catch (e) {
+        uni.showToast({ title: e.message || '登录失败', icon: 'none' });
+      } finally {
+        this.clientLoginLoading = false;
       }
     },
     async handleLogin() {
       if (!this.loginForm.username || !this.loginForm.password) {
-        uni.showToast({
-          title: '请输入用户名和密码',
-          icon: 'none',
-          duration: 2000,
-        })
-        return
+        uni.showToast({ title: '请输入用户名和密码', icon: 'none' });
+        return;
       }
-
-      this.loginLoading = true
+      this.loginLoading = true;
       try {
-        const res = await login(this.loginForm.username, this.loginForm.password)
+        const res = await login(this.loginForm.username, this.loginForm.password);
         if (res.code === 0 && res.data) {
-          // 保存 session
-          saveSession(res.data.sessionId, res.data.user)
+          saveSession(res.data.sessionId, res.data.user);
+           // Verify session
+          if (!getSessionId()) throw new Error('Session Save Failed');
           
-          // 验证 session 是否保存成功
-          const savedSessionId = getSessionId()
-          if (!savedSessionId) {
-            throw new Error('Session 保存失败')
-          }
-
-          uni.showToast({
-            title: '登录成功',
-            icon: 'success',
-            duration: 1500,
-          })
-
-          // 跳转到项目列表页面（延迟确保 session 已保存）
+          uni.showToast({ title: '登录成功', icon: 'success' });
           setTimeout(() => {
-            uni.reLaunch({
-              url: '/pages/userprofile/userprofile',
-            })
-          }, 300)
+            uni.reLaunch({ url: '/pages/userprofile/userprofile' });
+          }, 300);
         } else {
-          uni.showToast({
-            title: res.message || '登录失败',
-            icon: 'none',
-            duration: 2000,
-          })
+          uni.showToast({ title: res.message || '登录失败', icon: 'none' });
         }
       } catch (error) {
-        console.error('登录失败:', error)
-        uni.showToast({
-          title: error.message || '登录失败，请稍后重试',
-          icon: 'none',
-          duration: 2000,
-        })
+        console.error('Login Failed', error);
+        uni.showToast({ title: error.message || '登录失败', icon: 'none' });
       } finally {
-        this.loginLoading = false
+        this.loginLoading = false;
       }
     },
     async handleRegister() {
       if (!this.registerForm.username || !this.registerForm.password) {
-        uni.showToast({
-          title: '请输入用户名和密码',
-          icon: 'none',
-          duration: 2000,
-        })
-        return
+        uni.showToast({ title: '请输入用户名和密码', icon: 'none' });
+        return;
       }
-
       if (this.registerForm.password.length < 6) {
-        uni.showToast({
-          title: '密码长度不能少于6位',
-          icon: 'none',
-          duration: 2000,
-        })
-        return
+        uni.showToast({ title: '密码长度不能少于6位', icon: 'none' });
+        return;
       }
-
       if (this.registerForm.password !== this.registerForm.passwordConfirm) {
-        uni.showToast({
-          title: '两次输入的密码不一致',
-          icon: 'none',
-          duration: 2000,
-        })
-        return
+        uni.showToast({ title: '两次输入的密码不一致', icon: 'none' });
+        return;
       }
-
-      this.registerLoading = true
+      this.registerLoading = true;
       try {
         const res = await register(
           this.registerForm.username,
           this.registerForm.password,
           this.registerForm.displayName || this.registerForm.username
-        )
+        );
         if (res.code === 0 && res.data) {
-          // 保存 session
-          saveSession(res.data.sessionId, res.data.user)
-
-          uni.showToast({
-            title: '注册成功',
-            icon: 'success',
-            duration: 2000,
-          })
-
-          // 跳转到项目列表页面
+          saveSession(res.data.sessionId, res.data.user);
+          uni.showToast({ title: '注册成功', icon: 'success' });
           setTimeout(() => {
-            uni.reLaunch({
-              url: '/pages/userprofile/userprofile',
-            })
-          }, 500)
+            uni.reLaunch({ url: '/pages/userprofile/userprofile' });
+          }, 500);
         } else {
-          uni.showToast({
-            title: res.message || '注册失败',
-            icon: 'none',
-            duration: 2000,
-          })
+          uni.showToast({ title: res.message || '注册失败', icon: 'none' });
         }
       } catch (error) {
-        console.error('注册失败:', error)
-        uni.showToast({
-          title: error.message || '注册失败，请稍后重试',
-          icon: 'none',
-          duration: 2000,
-        })
+        console.error('Register Failed', error);
+        uni.showToast({ title: error.message || '注册失败', icon: 'none' });
       } finally {
-        this.registerLoading = false
+        this.registerLoading = false;
       }
-    },
-  },
+    }
+  }
 }
 </script>
 
 <style lang="scss" scoped>
-/* 品牌配色变量（本地定义，确保可访问） */
-$brand-color-gold: #C8A45D;
-$brand-color-primary: #12344D;
-$brand-bg-warm: #F7F5F0;
-$brand-border-light: #E0E0E0;
-$uni-text-color-secondary: #666666;
-$uni-text-color-muted: #888888;
+/* Color Config */
+$color-primary: #1A5336; // King Forest
+$color-accent: #5BD197; // King Mint
+$color-text-main: #2C3338;
+$color-text-light: #6C757D;
+$bg-dark: #212629;
+$glass-white: rgba(255, 255, 255, 0.75);
+$glass-border: rgba(255, 255, 255, 0.5);
 
-.page-login {
-  width: 100%;
-  min-height: 100vh;
-  background: $brand-bg-warm;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  box-sizing: border-box;
+.login-page {
+  width: 100vw;
+  height: 100vh;
   position: relative;
   overflow: hidden;
-}
-
-/* 页面背景斜线与层次感 */
-.page-login::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  /* 大面积暖色斜向切面，保持非常轻的对比度 */
-  background:
-    linear-gradient(
-      135deg,
-      rgba(252, 249, 243, 0.95) 0%,
-      rgba(247, 245, 240, 0.9) 32%,
-      transparent 70%
-    );
-}
-
-.page-login::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  /* 细线性斜纹，模拟参考页面的“斜线感”，不喧宾夺主 */
-  background-image:
-    repeating-linear-gradient(
-      135deg,
-      rgba(200, 164, 93, 0.06) 0,
-      rgba(200, 164, 93, 0.06) 1px,
-      transparent 1px,
-      transparent 26px
-    );
-  opacity: 0.55;
-}
-
-/* 顶部导航条 */
-.top-navbar {
-  width: 100%;
-  padding: 16px 40px;
+  background-color: #F8F9FA;
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  background: transparent;
-  box-sizing: border-box;
+  flex-direction: column;
+}
+
+.bg-gradient {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at 10% 20%, rgba(91, 209, 151, 0.15) 0%, transparent 40%),
+              radial-gradient(circle at 90% 80%, rgba(26, 83, 54, 0.1) 0%, transparent 40%);
+  z-index: 0;
+}
+
+.bg-mesh {
+  position: absolute;
+  inset: 0;
+  // Subtle mesh pattern
+  background-image: linear-gradient(rgba(26, 83, 54, 0.03) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(26, 83, 54, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  z-index: 0;
+}
+
+.top-nav {
+  position: relative;
   z-index: 10;
-}
-
-.nav-left {
   display: flex;
-  flex-direction: row;
+  justify-content: space-between;
   align-items: center;
-  column-gap: 8px;
+  padding: 24px 48px;
 }
 
 .nav-logo {
-  height: 40px;
+  height: 32px;
   width: auto;
-}
-
-.nav-brand {
-  font-size: 16px;
-  font-weight: 500;
-  color: $uni-text-color;
 }
 
 .nav-right {
   display: flex;
+  gap: 32px;
+}
+.nav-item {
+  font-size: 14px;
+  color: $color-text-light;
+  cursor: pointer;
+  transition: color 0.3s;
+  &:hover { color: $color-primary; }
+}
+
+.main-layout {
+  position: relative;
+  z-index: 5;
+  flex: 1;
+  display: flex;
   flex-direction: row;
   align-items: center;
-  column-gap: 24px;
+  justify-content: center;
+  padding: 0 4vw;
 }
 
-.nav-link {
-  font-size: 14px;
-  color: #333333;
-  cursor: pointer;
-  transition: all 0.2s ease-out;
-  position: relative;
-  font-weight: 400;
-  letter-spacing: 0.1px;
-}
-
-.nav-link:hover {
-  color: $brand-color-gold;
-}
-
-.nav-link:hover::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: -3px;
-  width: 100%;
-  height: 1.5px;
-  background-color: $brand-color-gold;
-  border-radius: 1px;
-}
-
-.login-layout {
-  flex: 1;
-  width: 100%;
-  max-width: 1520px;
-  margin: 0 auto;
+/* 3D Showcase Section */
+.showcase-section {
+  flex: 1.2;
+  height: 100%;
   display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  justify-content: space-between;
-  column-gap: 100px;
-  padding: 72px 80px 48px;
-  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  perspective: 2000px; // Deep perspective
 }
 
-.brand-panel {
-  flex: 1;
-  min-width: 0;
+.device-wrapper {
+  position: relative;
+  width: 680px;
+  height: 460px;
+  transition: transform 0.1s linear; // Smooth follow
+  transform-style: preserve-3d;
+}
+
+.device-frame {
+  width: 100%;
+  height: 100%;
+  background: #2a2f34;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 
+    inset 0 0 0 2px #444,
+    0 20px 50px rgba(0,0,0,0.3);
+  position: relative;
+  overflow: hidden;
+  transform: translateZ(20px); // Pop out
+  background-clip: padding-box;
+}
+
+.ide-window {
+  width: 100%;
+  height: 100%;
+  background: #1e1e1e;
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding-top: 32px;
-  box-sizing: border-box;
-  position: relative;
+  overflow: hidden;
+  font-family: 'Fira Code', 'Monaco', monospace;
 }
 
-.brand-content {
+.ide-titlebar {
+  height: 32px;
+  background: #252526;
   display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  column-gap: 10px;
-  flex-shrink: 0;
-  z-index: 2;
-  width: 100%;
-  margin-left: -120px;
+  align-items: center;
+  padding: 0 10px;
+  border-bottom: 1px solid #333;
 }
 
-/* Logo 高度设置：与文本块高度一致
- * 当前计算值：标题行(56px * 1.2) + 间距(20px) + 描述文字(18px * 1.6) ≈ 120px
- * 用户已手动调整为 160px
- * 如需调整，请修改下方 height 值
- */
-.brand-logo-left {
-  height: 160px;
-  width: auto;
-  flex-shrink: 0;
-  margin-top: -20px;
-  align-self: flex-start;
-}
-
-.brand-text-block {
+.window-controls {
   display: flex;
-  flex-direction: column;
-  row-gap: 20px;
-  position: relative;
+  gap: 6px;
+  margin-right: 16px;
+  .control { width: 10px; height: 10px; border-radius: 50%; }
+  .red { background: #ff5f56; }
+  .yellow { background: #ffbd2e; }
+  .green { background: #27c93f; }
+}
+
+.window-title {
+  color: #999;
+  font-size: 12px;
+}
+
+.ide-body {
   flex: 1;
-}
-
-.brand-title-row {
   display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  column-gap: 12px;
-  flex-wrap: wrap;
 }
 
-.brand-title {
-  font-size: 60px;
-  font-weight: 700;
-  color: #1A1A1A;
-  line-height: 1.15;
-  letter-spacing: -0.8px;
-}
-
-.brand-separator {
-  font-size: 28px;
-  color: $uni-text-color-secondary;
-  font-weight: 300;
-  line-height: 1.2;
-  opacity: 0.5;
-  margin: 0 4px;
-}
-
-.brand-subtitle {
-  font-size: 22px;
-  color: $uni-text-color-secondary;
-  font-weight: 400;
-  line-height: 1.3;
-  letter-spacing: 0.2px;
-}
-
-.brand-description {
+.ide-sidebar {
+  width: 48px;
+  background: #333333;
   display: flex;
   flex-direction: column;
-  row-gap: 0;
-  margin-top: 0;
+  align-items: center;
+  padding-top: 10px;
+  gap: 15px;
+  .sidebar-icon {
+    width: 24px; height: 24px; background: #666; border-radius: 4px;
+    &.active { background: $color-accent; }
+  }
 }
 
-.desc-line {
-  font-size: 17px;
-  color: $uni-text-color-secondary;
-  line-height: 1.65;
-  font-weight: 400;
-  letter-spacing: 0.1px;
+.ide-explorer {
+  width: 160px;
+  background: #252526;
+  border-right: 1px solid #333;
+  padding: 10px;
+  .explorer-item {
+    color: #ccc; font-size: 12px; line-height: 24px;
+    &.indent { padding-left: 15px; }
+    &.active { background: #37373d; color: #fff; }
+  }
 }
 
-.brand-decoration {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  z-index: 1;
+.ide-editor {
+  flex: 1;
+  background: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
-.decoration-layer {
-  position: absolute;
-  border-radius: 32px;
-  opacity: 0.3;
+.editor-tabs {
+  height: 30px;
+  background: #252526;
+  display: flex;
+  .tab {
+    padding: 0 15px;
+    font-size: 12px; color: #999;
+    display: flex; align-items: center;
+    background: #2d2d2d;
+    &.active { background: #1e1e1e; color: #fff; border-top: 2px solid $color-accent; }
+  }
 }
 
-.decoration-large {
-  width: 500px;
-  height: 500px;
-  top: -100px;
-  left: 200px;
-  background: radial-gradient(
-    circle at 30% 30%,
-    rgba(200, 164, 93, 0.08),
-    transparent 60%
-  );
-  transform: rotate(-8deg);
+.doc-area {
+  padding: 30px 40px;
+  background: #fff; /* White paper background for doc view */
+  flex: 1;
+  color: #333;
+  font-family: 'Times New Roman', serif; /* Serif for legal docs */
+  overflow: hidden;
+  position: relative;
 }
 
-.decoration-small {
-  width: 300px;
-  height: 300px;
-  top: 150px;
-  left: 400px;
-  background: radial-gradient(
-    circle at 50% 50%,
-    rgba(200, 164, 93, 0.05),
-    transparent 70%
-  );
-  transform: rotate(12deg);
+.doc-title {
+  font-size: 16px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 20px;
+  color: #000;
 }
 
-.auth-panel {
-  flex: 0 0 auto;
+.doc-meta {
+  font-size: 10px;
+  color: #666;
+  margin-bottom: 24px;
   display: flex;
   justify-content: flex-end;
-  align-items: flex-start;
-  width: auto;
-  min-width: 420px;
-  max-width: 520px;
-  box-sizing: border-box;
-  padding-top: 32px;
 }
 
-.login-card {
-  width: 100%;
-  background-color: #ffffff;
-  border-radius: 14px;
-  padding: 0;
-  border-top: 2px solid $brand-color-gold;
-  box-shadow: 0 8px 32px rgba(18, 52, 77, 0.08), 0 2px 8px rgba(200, 164, 93, 0.12);
-  box-sizing: border-box;
-  transition: box-shadow 0.3s ease-out;
+.doc-paragraph {
+  font-size: 11px;
+  line-height: 1.8;
+  margin-bottom: 12px;
+  font-weight: bold;
+  
+  &.text-body {
+    font-weight: normal;
+    text-indent: 2em;
+    color: #444;
+  }
 }
 
-.login-card:hover {
-  box-shadow: 0 12px 40px rgba(18, 52, 77, 0.12), 0 4px 12px rgba(200, 164, 93, 0.15);
-}
-
-.login-card-header {
-  padding: 36px 36px 28px;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.card-logo-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  column-gap: 10px;
-  margin-bottom: 24px;
-}
-
-.card-logo {
-  height: 28px;
-  width: auto;
-  flex-shrink: 0;
-}
-
-.card-title {
-  font-size: 21px;
-  font-weight: 600;
-  color: #1A1A1A;
-  line-height: 1.4;
-  letter-spacing: -0.2px;
-}
-
-.tab-bar {
-  display: flex;
-  flex-direction: row;
-  border-bottom: none;
-}
-
-.tab-item {
-  flex: 1;
-  padding: 14px 0;
-  text-align: center;
-  position: relative;
-  cursor: pointer;
-  transition: all 0.2s ease-out;
-}
-
-.tab-item-active {
-  color: $brand-color-primary;
-}
-
-.tab-text {
-  font-size: 16px;
-  color: $uni-text-color-muted;
-  line-height: 1.5;
-  transition: color 0.2s ease-out;
-}
-
-.tab-item:hover:not(.tab-item-active) .tab-text {
-  color: #666666;
-  font-weight: 400;
-}
-
-.tab-item-active .tab-text {
-  color: $brand-color-primary;
-  font-weight: 500;
-}
-
-.tab-item-active::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -1px;
-  transform: translateX(-50%);
-  width: 44px;
-  height: 2.5px;
-  border-radius: 999px;
-  background-color: $brand-color-gold;
-  transition: width 0.2s ease-out;
-}
-
-.form-container {
-  display: flex;
-  flex-direction: column;
-  padding: 28px 36px 36px;
-  row-gap: 22px;
-}
-
-.form-item {
-  display: flex;
-  flex-direction: column;
-  row-gap: 8px;
-  position: relative;
-}
-
-.form-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 29px;
-  width: 0;
-  height: 46px;
-  background-color: $brand-color-gold;
-  border-radius: 8px 0 0 8px;
-  transition: width 0.25s ease-out;
-  z-index: 1;
-  pointer-events: none;
-}
-
-.form-item:focus-within::before {
-  width: 3px;
-}
-
-.form-label {
-  font-size: 14px;
-  color: #1f2430;
-  font-weight: 500;
-  line-height: 1.5;
-  letter-spacing: 0.1px;
-}
-
-.form-input {
-  height: 46px;
-  padding: 0 18px;
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-  border: 1.5px solid $brand-border-light;
-  border-radius: 8px;
-  font-size: 15px;
-  color: #1f2430;
-  box-sizing: border-box;
-  width: 100%;
-  position: relative;
-  z-index: 2;
-  transition: all 0.2s ease-out;
-}
-
-/* 确保输入框 focus 时左侧金色标记可见 */
-.form-item:focus-within .form-input {
-  padding-left: 21px;
-}
-
-.form-input:hover {
-  border-color: #d0d0d0;
-}
-
-.form-input:focus {
-  border-color: $brand-color-primary;
-  border-width: 1.5px;
-  box-shadow: 0 0 0 3px rgba(18, 52, 77, 0.08);
-  outline: none;
-}
-
-/* 深度覆盖可能来自 uni-app 默认样式的淡色背景 */
-::v-deep .form-input {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-}
-
-::v-deep .form-input input {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-}
-
-/* 直接命中 uni-app H5 下内部 input 元素的类，彻底去掉淡蓝色背景 */
-::v-deep .uni-input-input {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-}
-
-.form-item-error .form-input {
-  border-color: $uni-color-error;
-}
-
-.form-error-text {
-  margin-top: 4px;
-  font-size: 12px;
-  color: $uni-color-error;
-  line-height: 1.5;
-}
-
-.form-extra-row {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.extra-left {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  column-gap: 8px;
-}
-
-.checkbox-visual {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  border: 1px solid $brand-border-light;
-  background-color: #ffffff;
-  flex-shrink: 0;
-  position: relative;
-  transition: border-color 0.2s ease-out, background-color 0.2s ease-out;
-}
-
-.checkbox-visual::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) scale(0);
-  width: 10px;
-  height: 10px;
-  background-color: $brand-color-gold;
+.skeleton-line {
+  height: 8px;
+  background: #f0f0f0;
+  margin-bottom: 12px;
   border-radius: 2px;
-  transition: transform 0.2s ease-out;
 }
 
-/* 选中态（需要通过 JS 控制，这里先预留样式） */
-.checkbox-visual.checked {
-  border-color: $brand-color-gold;
-  background-color: $brand-color-gold;
+// Ensure watermark blends with white background
+.ide-watermark {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 100px;
+  height: 100px;
+  opacity: 0.05;
+  pointer-events: none;
+  mix-blend-mode: multiply;
 }
 
-.checkbox-visual.checked::after {
-  transform: translate(-50%, -50%) scale(1);
-  background-color: #ffffff;
-  width: 6px;
-  height: 6px;
-  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+.device-edge {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  border-radius: 12px;
+  box-shadow: 
+    inset 2px 2px 4px rgba(255,255,255,0.1),
+    inset -2px -2px 4px rgba(0,0,0,0.5);
+  pointer-events: none;
+  z-index: 10;
 }
 
-.extra-text {
-  font-size: 14px;
-  color: #6b7280;
-  line-height: 1.5;
+.screen-gloss {
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 60%;
+  background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 5;
 }
 
-.extra-link {
-  font-size: 14px;
-  color: $brand-color-primary;
-  cursor: pointer;
-  line-height: 1.5;
-  transition: color 0.2s ease-out;
+/* Glass Login Card */
+.login-section {
+  flex: 0.8;
+  display: flex;
+  justify-content: center;
+  perspective: 1000px;
 }
 
-.extra-link:hover {
-  color: $brand-color-gold;
+.glass-card {
+  width: 440px;
+  background: $glass-white;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid $glass-border;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 
+    0 16px 48px rgba(26, 83, 54, 0.1),
+    0 4px 12px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
 }
 
-.login-footer {
-  padding: 24px 32px 32px;
-  border-top: 1px solid #f3f4f6;
+.card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 32px;
+  gap: 12px;
+}
+.card-logo {
+  height: 48px;
+  width: auto;
+}
+.card-texts {
+  display: flex;
+  flex-direction: column;
+}
+.product-name {
+  font-size: 24px;
+  font-weight: 700;
+  color: $color-primary;
+  letter-spacing: -0.5px;
+}
+.product-subtitle {
+  font-size: 13px;
+  color: $color-text-light;
+  letter-spacing: 0.5px;
 }
 
-.footer-text {
-  font-size: 12px;
-  color: #9ca3af;
-  line-height: 1.6;
+.auth-tabs {
+  display: flex;
+  position: relative;
+  border-bottom: 2px solid rgba(0,0,0,0.05);
+  margin-bottom: 28px;
+}
+.tab-btn {
+  flex: 1;
   text-align: center;
+  padding: 12px 0;
+  font-size: 15px;
+  color: $color-text-light;
+  cursor: pointer;
+  &.active {
+    color: $color-primary;
+    font-weight: 600;
+  }
+}
+.tab-indicator {
+  position: absolute;
+  bottom: -2px;
+  width: 33.33%;
+  height: 2px;
+  background: $color-accent;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.btn {
-  height: 44px;
+.input-group {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.label {
+  font-size: 13px;
+  color: $color-text-main;
+  font-weight: 500;
+}
+.glass-input {
+  height: 48px;
+  background: rgba(255,255,255,0.6);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 8px;
+  padding: 0 16px;
+  font-size: 15px;
+  transition: all 0.2s;
+  &:focus {
+    background: #fff;
+    border-color: $color-accent;
+    box-shadow: 0 0 0 3px rgba(91, 209, 151, 0.2);
+  }
+}
+.placeholder-style {
+  color: #aaa;
+}
+
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  font-size: 13px;
+  color: $color-text-light;
+}
+.remember-me {
+  display: flex;
+  align-items: center;
+}
+.link-text {
+  color: $color-primary;
+  cursor: pointer;
+}
+
+.action-btn {
+  width: 100%;
+  height: 50px;
+  background: $color-primary;
+  color: #fff;
   border-radius: 8px;
   font-size: 16px;
   font-weight: 500;
-  margin-top: 4px;
-  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   cursor: pointer;
-  box-sizing: border-box;
+  transition: background 0.2s;
+  &:active {
+    background: darken($color-primary, 5%);
+  }
+  &::after { border: none; } // uni-app button reset
 }
 
-.btn-primary {
-  background-color: $brand-color-primary;
-  color: #ffffff;
-  box-shadow: 0 4px 14px rgba(18, 52, 77, 0.2), 0 2px 6px rgba(18, 52, 77, 0.1);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  font-weight: 500;
-  letter-spacing: 0.3px;
+.card-footer {
+  margin-top: 32px;
+  text-align: center;
+  font-size: 12px;
+  color: #aaa;
 }
 
-.btn-primary:hover:not([disabled]) {
-  background: linear-gradient(135deg, #1a4a6b 0%, $brand-color-primary 100%);
-  box-shadow: 0 8px 20px rgba(18, 52, 77, 0.25), 0 4px 10px rgba(18, 52, 77, 0.15);
-  transform: translateY(-2px);
+/* Animations */
+.swing-in {
+  animation: swing-in-top-fwd 0.4s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
 }
-
-.btn-primary[disabled] {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary:not([disabled]):active {
-  box-shadow: 0 3px 10px rgba(18, 52, 77, 0.2);
-  transform: translateY(0);
-}
-
-@media screen and (max-width: 1024px) {
-  .top-navbar {
-    padding: 12px 24px;
-  }
-
-  .nav-right {
-    column-gap: 16px;
-  }
-
-  .nav-link {
-    font-size: 13px;
-  }
-
-  .login-layout {
-    flex-direction: column;
-    align-items: center;
-    column-gap: 0;
-    padding: 40px 24px 24px;
-  }
-
-  .brand-panel {
-    display: none;
-  }
-
-  .auth-panel {
-    width: 100%;
-    max-width: 500px;
-    min-width: 0;
-    justify-content: center;
-    padding-top: 0;
-  }
-
-  .login-card {
-    max-width: 100%;
-  }
-}
-
-@media screen and (min-width: 1920px) {
-  .login-layout {
-    max-width: 1600px;
-    column-gap: 120px;
-    padding: 80px 60px 60px;
-  }
-
-  .brand-panel {
-    padding-top: 60px;
-  }
-
-  .brand-title {
-    font-size: 64px;
-  }
-
-  .brand-subtitle {
-    font-size: 28px;
-  }
+@keyframes swing-in-top-fwd {
+  0% { transform: translateY(-10px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 </style>
-

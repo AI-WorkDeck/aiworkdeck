@@ -41,6 +41,18 @@ export function getCurrentUser() {
 }
 
 /**
+ * 更新当前用户信息
+ */
+export function setSessionUser(user) {
+  try {
+    uni.setStorageSync(USER_KEY, user)
+  } catch (e) {
+    console.error('更新用户信息失败:', e)
+  }
+}
+
+
+/**
  * 清除 session
  */
 export function clearSession() {

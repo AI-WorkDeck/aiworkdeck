@@ -50,9 +50,40 @@
           <!-- #endif -->
         </view>
 
-        <!-- 图片预览 -->
+        <!-- 图片/SVG 预览 -->
         <view v-else-if="isImage" class="preview-image">
-          <image :src="fileUrl" mode="aspectFit" class="preview-img" @error="handleImageError" />
+          <image :src="blobUrl" mode="aspectFit" class="preview-img" @error="handleImageError" />
+        </view>
+
+        <!-- 视频预览 -->
+        <view v-else-if="isVideo" class="preview-video">
+          <!-- #ifdef H5 -->
+          <video 
+            :src="fileUrl" 
+            controls 
+            autoplay 
+            class="preview-video-player"
+            @error="handleVideoError"
+          ></video>
+          <!-- #endif -->
+          <!-- #ifndef H5 -->
+          <video 
+            :src="fileUrl" 
+            controls 
+            autoplay 
+            class="preview-video-player"
+            @error="handleVideoError"
+          ></video>
+          <!-- #endif -->
+        </view>
+
+        <!-- 音频预览 -->
+        <view v-else-if="isAudio" class="preview-audio">
+           <view class="audio-wrapper">
+            <view class="audio-icon">🎵</view>
+            <text class="audio-name">{{ file.name }}</text>
+            <view class="preview-audio-player" v-html="audioPlayerHtml"></view>
+           </view>
         </view>
 
         <!-- 文本预览 -->
@@ -76,6 +107,7 @@
 
 <script>
 import { getFileDownloadUrl } from '@/services/api.js'
+import { getAuthHeaders } from '@/utils/auth.js'
 import WpsEditor from '@/components/WpsEditor.vue'
 
 export default {
@@ -94,13 +126,14 @@ export default {
     },
     wpsAppId: {
       type: String,
-      default: 'SX20251208BJWRFK'
+      default: 'AK20251215TTJNYB'
     }
   },
   data() {
     return {
       textContent: '',
       loading: false,
+      blobUrl: '',
       wpsContainerStyle: {
         width: '100%',
         height: '100%'
@@ -113,46 +146,45 @@ export default {
         console.log('FilePreview: file 为空')
         return ''
       }
-      // 构建文件访问URL
-      let base = this.baseUrl
-      if (!base) {
-        // 尝试从环境变量获取
-        try {
-          if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL) {
-            base = import.meta.env.VITE_API_BASE_URL
-          }
-        } catch (e) {
-          console.warn('获取环境变量失败:', e)
-        }
-        if (!base && typeof window !== 'undefined') {
-          base = window.location.origin
-        }
-        if (!base) {
-          base = 'https://checkbahttps.vip.cpolar.cn'
-        }
-      }
       const fileId = this.file.wpsFileId || this.file.id
-      const url = `${base}/api/files/${fileId}/download`
-      console.log('FilePreview fileUrl:', { file: this.file, fileId, base, url })
+      const url = getFileDownloadUrl(fileId)
+      console.log('FilePreview fileUrl:', { file: this.file, fileId, url })
       return url
     },
     isPdf() {
-      return this.file && this.file.fileType && this.file.fileType.toLowerCase() === 'pdf'
+      // PDF is now handled by isOffice (WpsEditor)
+      return false
     },
     isOffice() {
       if (!this.file || !this.file.fileType) return false
       const type = this.file.fileType.toLowerCase()
-      return ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(type)
+      // Create 'pdf' as an office type to be handled by WpsEditor
+      return ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf'].includes(type)
     },
     isImage() {
       if (!this.file || !this.file.fileType) return false
       const type = this.file.fileType.toLowerCase()
-      return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(type)
+      return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(type)
+    },
+    isVideo() {
+      if (!this.file || !this.file.fileType) return false
+      const type = this.file.fileType.toLowerCase()
+      return ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi'].includes(type)
+    },
+    isAudio() {
+       if (!this.file || !this.file.fileType) return false
+       const type = this.file.fileType.toLowerCase()
+       return ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'].includes(type)
+    },
+    audioPlayerHtml() {
+      if (!this.isAudio || !this.fileUrl) return ''
+      // Use standard HTML audio tag, bypassing UniApp component resolution
+      return `<audio src="${this.blobUrl}" controls style="width: 100%; height: 50px; outline: none;"></audio>`
     },
     isText() {
       if (!this.file || !this.file.fileType) return false
       const type = this.file.fileType.toLowerCase()
-      return ['txt', 'md', 'json', 'xml', 'html', 'css', 'js'].includes(type)
+      return ['txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'java', 'py', 'sh', 'sql', 'log'].includes(type)
     },
     canEdit() {
       // Office 文件且有 wpsFileId 可以编辑
@@ -176,10 +208,25 @@ export default {
       immediate: true,
       handler(newFile) {
         console.log('FilePreview file 变化:', newFile)
-        if (newFile && this.isText) {
+        // 清理旧的 blobUrl
+        if (this.blobUrl) {
+          URL.revokeObjectURL(this.blobUrl)
+          this.blobUrl = ''
+        }
+        
+        if (!newFile) return
+
+        if (this.isText) {
           this.loadTextContent()
+        } else if (this.isImage || this.isVideo || this.isAudio) {
+           this.loadMediaResource()
         }
       }
+    }
+  },
+  beforeUnmount() {
+    if (this.blobUrl) {
+      URL.revokeObjectURL(this.blobUrl)
     }
   },
   mounted() {
@@ -203,6 +250,54 @@ export default {
         this.loading = false
       }
     },
+    async loadMediaResource() {
+        if (!this.file || !this.fileUrl) return
+        
+        this.loading = true
+        try {
+           const header = getAuthHeaders() || {}
+           const response = await uni.request({
+             url: this.fileUrl,
+             method: 'GET',
+             responseType: 'arraybuffer',
+             header: header
+           })
+           
+           if (response.statusCode === 200 && response.data) {
+               const blob = new Blob([response.data], { type: this.getMimeType(this.file.fileType) })
+               this.blobUrl = URL.createObjectURL(blob)
+           } else {
+               throw new Error('Load failed with status: ' + response.statusCode)
+           }
+        } catch (e) {
+            console.error('加载媒体资源失败:', e)
+            uni.showToast({
+                title: '资源加载失败',
+                icon: 'none'
+            })
+        } finally {
+            this.loading = false
+        }
+    },
+    getMimeType(fileType) {
+        if (!fileType) return ''
+        const type = fileType.toLowerCase()
+        const map = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'webp': 'image/webp',
+            'svg': 'image/svg+xml',
+            'bmp': 'image/bmp',
+            'mp4': 'video/mp4',
+            'webm': 'video/webm',
+            'ogg': 'video/ogg',
+            'mp3': 'audio/mpeg',
+            'wav': 'audio/wav'
+        }
+        return map[type] || ''
+    },
     handleEdit() {
       if (this.canEdit) {
         this.$emit('edit', this.file)
@@ -212,6 +307,20 @@ export default {
       console.error('图片加载失败:', e)
       uni.showToast({
         title: '图片加载失败',
+        icon: 'none'
+      })
+    },
+    handleVideoError(e) {
+      console.error('视频加载失败:', e)
+      uni.showToast({
+        title: '视频播放失败',
+        icon: 'none'
+      })
+    },
+    handleAudioError(e) {
+      console.error('音频加载失败:', e)
+      uni.showToast({
+        title: '音频播放失败',
         icon: 'none'
       })
     },
@@ -399,6 +508,52 @@ export default {
   gap: 24rpx;
   color: #9ca3af;
   font-size: 28rpx;
+}
+
+.preview-video {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #000;
+}
+
+.preview-video-player {
+  width: 100%;
+  height: 100%;
+}
+
+.preview-audio {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8fafc;
+}
+
+.audio-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+  width: 80%;
+}
+
+.audio-icon {
+  font-size: 80rpx;
+}
+
+.audio-name {
+  font-size: 32rpx;
+  color: #334155;
+  font-weight: 500;
+  text-align: center;
+}
+
+.preview-audio-player {
+  width: 100%;
 }
 
 .btn-download {

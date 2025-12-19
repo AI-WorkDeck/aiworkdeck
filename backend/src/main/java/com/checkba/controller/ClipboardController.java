@@ -43,6 +43,58 @@ public class ClipboardController {
         return ResponseEntity.ok(success(clipboardService.saveText(userId, request.getText())));
     }
 
+    @PostMapping("/file")
+    public ResponseEntity<?> saveFile(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "type", required = false) String type
+    ) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("请先登录"));
+        }
+        try {
+            return ResponseEntity.ok(success(clipboardService.saveFile(userId, file, type)));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error("保存失败: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/file")
+    public ResponseEntity<org.springframework.core.io.Resource> getFile(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @RequestParam(value = "token", required = false) String token,
+            @PathVariable Long id
+    ) {
+        String effectiveToken = sessionId;
+        if (effectiveToken == null || effectiveToken.isEmpty()) {
+            effectiveToken = token;
+        }
+        Long userId = AuthController.getUserIdFromSession(effectiveToken);
+        if (userId == null) {
+             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        try {
+            org.springframework.core.io.Resource resource = clipboardService.getFile(id, userId);
+            String filename = resource.getFilename();
+            if (filename == null) filename = "file";
+            
+            org.springframework.http.MediaType mediaType = org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
+            String lower = filename.toLowerCase();
+            if (lower.endsWith(".png")) mediaType = org.springframework.http.MediaType.IMAGE_PNG;
+            else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) mediaType = org.springframework.http.MediaType.IMAGE_JPEG;
+            else if (lower.endsWith(".gif")) mediaType = org.springframework.http.MediaType.IMAGE_GIF;
+            
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,

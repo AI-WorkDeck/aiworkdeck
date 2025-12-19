@@ -5,9 +5,7 @@ import cn.hutool.http.HttpResponse;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.ChatMessageType;
+import dev.langchain4j.data.message.*;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
 import lombok.extern.slf4j.Slf4j;
@@ -52,64 +50,101 @@ public class GeminiChatLanguageModel implements ChatLanguageModel {
 
             // 将 SYSTEM 消息合并为前缀，附加到下一条 USER 消息上，尽量保留指示信息
             StringBuilder systemPrefix = new StringBuilder();
+            String cachedContentName = null;
 
             for (ChatMessage message : messages) {
                 ChatMessageType type = message.type();
-                String text = message.text();
-                if (text == null || text.isEmpty()) {
-                    continue;
-                }
-
+                
                 if (type == ChatMessageType.SYSTEM) {
-                    if (systemPrefix.length() > 0) {
-                        systemPrefix.append("\n");
+                    String text = message.text();
+                    if (text != null) {
+                        if (text.startsWith("GEMINI_CACHE_ID:")) {
+                            cachedContentName = text.substring("GEMINI_CACHE_ID:".length()).trim();
+                            continue; // Do not add to contents
+                        }
+                        
+                        if (systemPrefix.length() > 0) {
+                            systemPrefix.append("\n");
+                        }
+                        systemPrefix.append(text);
                     }
-                    systemPrefix.append(text);
                     continue;
                 }
 
-                // LangChain4j 中：
-                // - USER → user
-                // - AI   → model
-                // 其余类型（如 TOOL_EXECUTION_RESULT）这里先忽略或按 user 处理
-                String role;
-                if (type == ChatMessageType.AI) {
-                    role = "model";
-                } else {
-                    role = "user";
-                }
-
-                JSONObject content = new JSONObject();
-                content.set("role", role);
-
+                String role = (type == ChatMessageType.AI) ? "model" : "user";
+                JSONObject contentObj = new JSONObject();
+                contentObj.set("role", role);
                 JSONArray parts = new JSONArray();
-                JSONObject part = new JSONObject();
 
-                if (systemPrefix.length() > 0 && type == ChatMessageType.USER) {
-                    part.set("text", systemPrefix + "\n\n" + text);
-                    systemPrefix.setLength(0);
+                if (message instanceof UserMessage) {
+                    UserMessage userMsg = (UserMessage) message;
+                     // Handle Multi-modal content
+                    for (Content content : userMsg.contents()) {
+                        if (content instanceof TextContent) {
+                            JSONObject part = new JSONObject();
+                            String text = ((TextContent) content).text();
+                            
+                            // Prepend system prompt to the FIRST text part of the FIRST user message (or effectively this logic)
+                            // Here logic: if systemPrefix exists, prepend it to this text block
+                            if (systemPrefix.length() > 0) {
+                                text = systemPrefix + "\n\n" + text;
+                                systemPrefix.setLength(0);
+                            }
+                            part.set("text", text);
+                            parts.add(part);
+                        } else if (content instanceof ImageContent) {
+                            ImageContent img = (ImageContent) content;
+                            JSONObject part = new JSONObject();
+                            JSONObject inlineData = new JSONObject();
+                            // ImageContent -> Image -> mimeType() / base64Data()
+                            // Note: validation of image existence
+                            if (img.image() != null) {
+                                inlineData.set("mime_type", img.image().mimeType());
+                                inlineData.set("data", img.image().base64Data());
+                            }
+                            part.set("inline_data", inlineData);
+                            parts.add(part);
+                        }
+                    }
                 } else {
-                    part.set("text", text);
+                    // Fallback for AiMessage or simple text messages
+                    String text = message.text();
+                    if (text != null && !text.isEmpty()) {
+                        JSONObject part = new JSONObject();
+                         // Logic for system prefix fallback if it wasn't consumed by a UserMessage yet (rare but possible)
+                         // Usually System is followed by User. If System -> AI, it's weird but let's just append.
+                        if (systemPrefix.length() > 0 && type == ChatMessageType.USER) { 
+                             // Should be caught by instanceof UserMessage usually, but safe fallback
+                             text = systemPrefix + "\n\n" + text;
+                             systemPrefix.setLength(0);
+                        }
+                        part.set("text", text);
+                        parts.add(part);
+                    }
                 }
 
-                parts.add(part);
-                content.set("parts", parts);
-                contents.add(content);
+                if (!parts.isEmpty()) {
+                    contentObj.set("parts", parts);
+                    contents.add(contentObj);
+                }
             }
 
-            // 如果只有 SystemMessage，被上面逻辑吃掉了，这里做一次兜底
-            if (contents.isEmpty()) {
+            // 如果只有 SystemMessage (excluding cache id)，被上面逻辑吃掉了，这里做一次兜底
+            if (contents.isEmpty() && systemPrefix.length() > 0) {
                 JSONObject content = new JSONObject();
                 content.set("role", "user");
                 JSONArray parts = new JSONArray();
                 JSONObject part = new JSONObject();
-                part.set("text", systemPrefix.length() > 0 ? systemPrefix.toString() : "");
+                part.set("text", systemPrefix.toString());
                 parts.add(part);
                 content.set("parts", parts);
                 contents.add(content);
             }
 
             body.set("contents", contents);
+            if (cachedContentName != null) {
+                body.set("cachedContent", cachedContentName);
+            }
 
             log.debug("Calling Gemini API: url={} body={}", url, body.toString());
 

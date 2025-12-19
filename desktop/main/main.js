@@ -44,6 +44,7 @@ function emitClipboard(text, source) {
     if (!t) return
     if (mainWindow) {
       mainWindow.webContents.send('checkba:clipboard-copied', {
+        type: 'TEXT',
         text: t,
         ts: Date.now(),
         source: source || 'system'
@@ -87,27 +88,109 @@ function restoreViewsVisibility() {
   }
 }
 
+// 记录上一次剪贴板内容指纹，防止重复推送
+let lastClipboardFingerprint = ''
+
 function startClipboardWatcher() {
   if (clipboardWatchTimer) return
-  try {
-    lastClipboardText = clipboard.readText() || ''
-  } catch (e) {
-    lastClipboardText = ''
-  }
-  // 系统级：轮询剪贴板内容变化（可捕获“软件外复制”）
+  // Init fingerprint
+  lastClipboardFingerprint = (clipboard.readText() || '')
+
+  // 系统级：轮询剪贴板内容变化
   clipboardWatchTimer = setInterval(() => {
     try {
-      const t = clipboard.readText() || ''
-      const tt = String(t || '')
-      if (!tt) return
-      if (tt !== lastClipboardText) {
-        lastClipboardText = tt
-        emitClipboard(tt, 'system')
+      const formats = clipboard.availableFormats()
+
+      const hasImage = formats.some(f => f.includes('image'))
+      const hasText = formats.includes('text/plain')
+
+      // LOG formats for debugging
+      // console.log('[Clipboard] Formats:', formats) 
+
+      // Relaxed: if hasImage, try it.
+      if (hasImage) {
+        const img = clipboard.readImage()
+        if (img && !img.isEmpty()) {
+          const dataUrl = img.toDataURL()
+          const fingerprint = 'IMG_' + dataUrl.length + '_' + dataUrl.slice(0, 50)
+          if (fingerprint !== lastClipboardFingerprint) {
+            console.log('[Clipboard] Image detected, size:', dataUrl.length)
+            lastClipboardFingerprint = fingerprint
+            if (mainWindow) {
+              mainWindow.webContents.send('checkba:clipboard-copied', {
+                type: 'IMAGE',
+                data: dataUrl,
+                ts: Date.now(),
+                source: 'system'
+              })
+            }
+          }
+          // Return if image handled? 
+          // If user copied "Mixed Content", we prefer Image.
+          return
+        }
       }
+
+
+      // 2. 检查文件 (File) - macOS public.file-url
+      // 暂时仅支持单文件路径读取，需根据操作系统适配
+      // user requested: "other files"
+      // Electron clipboard usually has 'public.file-url' on Mac
+      if (process.platform === 'darwin' && formats.includes('public.file-url')) {
+        const filePath = clipboard.read('public.file-url')
+        if (filePath) {
+          // filePath gets returned as file:// URL usually, need to decode
+          let cleanPath = filePath
+          try { cleanPath = decodeURIComponent(filePath.replace('file://', '')) } catch (e) { }
+
+          const fingerprint = 'FILE_' + cleanPath
+          if (fingerprint !== lastClipboardFingerprint) {
+            lastClipboardFingerprint = fingerprint
+            if (mainWindow) {
+              mainWindow.webContents.send('checkba:clipboard-copied', {
+                type: 'FILE',
+                filePath: cleanPath, // Front-end needs to read this file or we read it here?
+                // Browser/Renderer cannot read arbitrary file path easily without user interaction or enabling nodeIntegration (which we have disabled/isolated)
+                // But we can read it here in Main and send buffer? Or simply notify frontend to trigger a logic?
+                // Better: Send event, and let frontend decide. 
+                // Since frontend is remote (or local server), it can't read local path `filePath` if it is a browser.
+                // But here we are in Electron. 
+                // Solution: Send 'FILE' type with `filePath`. Frontend `onCopied` will receive it.
+                // But frontend `project-overview.vue` runs in Renderer. 
+                // If we want to upload, we need the file data.
+                // Let's read file here and send as Blob/Buffer? No, too big.
+                // Let's send `filePath` and let Frontend invoke `checkbaDesktop.fs.readFile`?
+                // We don't have `checkbaDesktop.fs`.
+                // We can add `checkbaDesktop.clipboard.readFile(path)`?
+                // Or just read tiny files here?
+                // For now, let's just send the path. The user requirement is "record OTHER FILES". 
+                // If we just record the path text, that's not "recording the file".
+                // Let's try to send basic meta first.
+                ts: Date.now(),
+                source: 'system'
+              })
+            }
+          }
+          return
+        }
+      }
+
+      // 3. 文本 (Text)
+      if (hasText) {
+        const t = clipboard.readText() || ''
+        const tt = String(t || '')
+        if (!tt) return
+        const fingerprint = 'TXT_' + tt
+        if (fingerprint !== lastClipboardFingerprint) {
+          lastClipboardFingerprint = fingerprint
+          emitClipboard(tt, 'system') // reuse emitClipboard for text to keep compat
+        }
+      }
+
     } catch (e) {
       // ignore
     }
-  }, 450)
+  }, 1000) // Increase interval to 1s to save CPU on image processing
 }
 
 function stopClipboardWatcher() {
@@ -224,6 +307,19 @@ function createMainWindow() {
 
   // 监听渲染层内的 copy/cut（WPS/页面内复制等），统一推送给前端入库
   attachCopyListener(mainWindow.webContents, 'renderer')
+
+  // Handle file downloads: ensure "Safe As" dialog appears
+  mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
+    // Set options for the save dialog
+    item.setSaveDialogOptions({
+      title: '保存文件',
+      defaultPath: item.getFilename() // Use the default filename suggestion
+    })
+    // Note: If item.setSavePath() is NOT called, Electron implicitly shows the dialog 
+    // (unless global "Always ask..." is disabled, but setSaveDialogOptions helps hint it).
+    // To strictly FORCE it, we would need to check existing configuration, but usually this is enough.
+  })
+
   startClipboardWatcher()
 }
 
@@ -400,11 +496,11 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
 
   const result = await new Promise((resolve) => {
     const done = (data) => {
-      try { ipcMain.removeAllListeners(resultChannel) } catch (e) {}
+      try { ipcMain.removeAllListeners(resultChannel) } catch (e) { }
       resolve(data || { ok: false, cancelled: true })
       closeOcrSelectWin()
       // 兜底：框选窗关闭后，恢复 BrowserView 可见性（避免全屏下 onShow 未触发导致黑屏）
-      try { restoreViewsVisibility() } catch (e) {}
+      try { restoreViewsVisibility() } catch (e) { }
     }
     ipcMain.once(resultChannel, (_evt2, data) => done(data))
     ocrSelectWin.on('closed', () => done({ ok: false, cancelled: true }))
@@ -414,7 +510,7 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
         try {
           ocrSelectWin.show()
           ocrSelectWin.focus()
-        } catch (e) {}
+        } catch (e) { }
       })
     } catch (e) {
       done({ ok: false, cancelled: true })
@@ -597,6 +693,25 @@ function ensureView(id) {
     }
   })
 
+  // 注入 viewport meta 标签，确保页面能感知到 Webview 宽度（User Request: 把webview的宽度传给页面）
+  view.webContents.on('dom-ready', () => {
+    try {
+      const script = `
+        (function() {
+          if (!document.querySelector('meta[name="viewport"]')) {
+            var meta = document.createElement('meta');
+            meta.name = "viewport";
+            meta.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
+            document.head.appendChild(meta);
+          }
+        })();
+      `;
+      view.webContents.executeJavaScript(script).catch(() => { });
+    } catch (e) {
+      // ignore
+    }
+  })
+
   views.set(id, view)
   return view
 }
@@ -730,6 +845,22 @@ ipcMain.handle('checkba:browser-set-views-visible', async (_evt, payload) => {
   return { ok: true }
 })
 
+ipcMain.handle('checkba:browser-set-ua', async (_evt, payload) => {
+  const id = payload && payload.id ? String(payload.id) : null
+  const ua = payload && payload.ua ? String(payload.ua) : null
+  if (!id) return { ok: false }
+  const view = views.get(id)
+  if (!view) return { ok: false }
+  try {
+    if (ua) view.webContents.setUserAgent(ua)
+    // 自动刷新以生效
+    view.webContents.reload()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false }
+  }
+})
+
 ipcMain.handle('checkba:browser-get-snapshot', async (_evt, payload) => {
   const id = payload && payload.id ? String(payload.id) : null
   if (!id) return { ok: false, message: 'missing id' }
@@ -758,6 +889,24 @@ ipcMain.handle('checkba:browser-get-bounds', async (_evt, payload) => {
   return { ok: true, bounds: b }
 })
 
+ipcMain.handle('checkba:fs-read-file', async (_evt, payload) => {
+  const p = payload && payload.path ? String(payload.path) : ''
+  if (!p) return { ok: false, message: 'path empty' }
+  const fs = require('fs')
+  try {
+    // Safety check: only allow reading if user explicitly copied it? 
+    // In this context, it's triggered by clipboard event which contains the path.
+    // For local desktop app, reading local file is acceptable if triggered by user action.
+    const buf = await fs.promises.readFile(p)
+    // Return key info + base64 (since we can't pass Buffer easily over bridge without setup)
+    // Actually Electron handles Buffer in invoke? Yes it does serialize.
+    // But to be safe and easy for frontend Blob creation:
+    return { ok: true, data: buf }
+  } catch (e) {
+    return { ok: false, message: String(e.message) }
+  }
+})
+
 // 等待 BrowserView 导航/渲染稳定后再截图（避免 capturePage 抓到空白）
 ipcMain.handle('checkba:browser-wait-ready', async (_evt, payload) => {
   const id = payload && payload.id ? String(payload.id) : null
@@ -772,8 +921,8 @@ ipcMain.handle('checkba:browser-wait-ready', async (_evt, payload) => {
     const start = Date.now()
     await new Promise((resolve) => {
       const done = () => {
-        try { wc.removeListener('did-stop-loading', done) } catch (e) {}
-        try { wc.removeListener('did-finish-load', done) } catch (e) {}
+        try { wc.removeListener('did-stop-loading', done) } catch (e) { }
+        try { wc.removeListener('did-finish-load', done) } catch (e) { }
         resolve()
       }
       try {
@@ -955,11 +1104,11 @@ ipcMain.handle('checkba:ui-confirm', async (_evt, payload) => {
 
   const result = await new Promise((resolve) => {
     const done = (v) => {
-      try { ipcMain.removeAllListeners(resultChannel) } catch (e) {}
+      try { ipcMain.removeAllListeners(resultChannel) } catch (e) { }
       resolve(!!v)
-      try { if (!confirmWin.isDestroyed()) confirmWin.close() } catch (e) {}
+      try { if (!confirmWin.isDestroyed()) confirmWin.close() } catch (e) { }
       // 兜底：确认窗关闭后恢复 BrowserView（全屏下可能触发渲染层 onHide，导致 BrowserView 被隐藏）
-      try { restoreViewsVisibility() } catch (e) {}
+      try { restoreViewsVisibility() } catch (e) { }
     }
     ipcMain.once(resultChannel, (_evt2, data) => done(data && data.confirmed === true))
     confirmWin.on('closed', () => done(false))

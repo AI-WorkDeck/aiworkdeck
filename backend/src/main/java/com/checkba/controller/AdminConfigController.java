@@ -37,6 +37,7 @@ public class AdminConfigController {
     private final SystemSettingService systemSettingService;
     private final UserRepository userRepository;
     private final AiModelProperties aiModelProperties;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     // ==== 默认值：来自 application.yml ====
 
@@ -83,8 +84,11 @@ public class AdminConfigController {
     // Google / Gemini 默认值来自 AiModelProperties
 
     // === 配置 key 常量 ===
-    private static final String KEY_AI_SYSTEM_PROMPT = "ai.systemPrompt";
+    // AI - System Prompts
     private static final String KEY_AI_ACTIVE_PROVIDER = "ai.activeProvider";
+    private static final String KEY_AI_SYSTEM_PROMPT_OLLAMA = "ai.systemPrompt.OLLAMA";
+    private static final String KEY_AI_SYSTEM_PROMPT_GEMINI = "ai.systemPrompt.GEMINI";
+    private static final String KEY_AI_ASSISTANTS = "ai.assistants";
 
     // Qichacha
     private static final String KEY_QICHACHA_BASE_URL = "external.qichacha.baseUrl";
@@ -201,14 +205,23 @@ public class AdminConfigController {
         AiConfig ai = new AiConfig();
         String activeProvider = all.get(KEY_AI_ACTIVE_PROVIDER);
         ai.setActiveProvider(activeProvider);
-        ai.setSystemPrompt(systemSettingService.get(
-                KEY_AI_SYSTEM_PROMPT,
-                // 默认系统提示词等同于 ProjectAssistant 上的注解内容
-                "You are an intelligent assistant for the Checkba project. " +
-                        "You have access to the project's files as a knowledge base. " +
-                        "If the user asks you to create or save files, you may use the available tools. " +
-                        "Do not create or save files unless the user explicitly asks you to."
-        ));
+        
+        // No fallback as requested
+        ai.setSystemPromptOllama(systemSettingService.get(KEY_AI_SYSTEM_PROMPT_OLLAMA, ""));
+        ai.setSystemPromptGemini(systemSettingService.get(KEY_AI_SYSTEM_PROMPT_GEMINI, ""));
+        
+        // Assistants logic: DB only, no fallback
+        String assistantsJson = systemSettingService.get(KEY_AI_ASSISTANTS, null);
+        if (assistantsJson != null && !assistantsJson.isBlank()) {
+            try {
+                List<com.checkba.model.ai.AiAssistantConfig> list = objectMapper.readValue(assistantsJson, new com.fasterxml.jackson.core.type.TypeReference<List<com.checkba.model.ai.AiAssistantConfig>>() {});
+                ai.setAssistants(list);
+            } catch (Exception e) {
+                // Log error but return empty list (or handle appropriately)
+                e.printStackTrace();
+            }
+        }
+
         resp.setAi(ai);
 
         return ResponseEntity.ok(resp);
@@ -262,11 +275,23 @@ public class AdminConfigController {
 
         if (request.getAi() != null) {
             AiConfig ai = request.getAi();
-            if (ai.getSystemPrompt() != null) {
-                updates.put(KEY_AI_SYSTEM_PROMPT, ai.getSystemPrompt());
+            if (ai.getSystemPromptOllama() != null) {
+                updates.put(KEY_AI_SYSTEM_PROMPT_OLLAMA, ai.getSystemPromptOllama());
+            }
+            if (ai.getSystemPromptGemini() != null) {
+                updates.put(KEY_AI_SYSTEM_PROMPT_GEMINI, ai.getSystemPromptGemini());
             }
             if (ai.getActiveProvider() != null) {
                 updates.put(KEY_AI_ACTIVE_PROVIDER, ai.getActiveProvider());
+            }
+            if (ai.getAssistants() != null) {
+                try {
+                    String json = objectMapper.writeValueAsString(ai.getAssistants());
+                    updates.put(KEY_AI_ASSISTANTS, json);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return ResponseEntity.badRequest().body(error("Asssistants JSON serialization failed"));
+                }
             }
         }
 
@@ -437,14 +462,14 @@ public class AdminConfigController {
     @Data
     public static class AiConfig {
         /**
-         * 额外的系统提示词（可为空），会在基础提示词上追加使用。
-         */
-        private String systemPrompt;
-
-        /**
          * 激活的大模型提供商：OLLAMA / GEMINI
          */
         private String activeProvider;
+        
+        private String systemPromptOllama;
+        private String systemPromptGemini;
+        
+        private List<com.checkba.model.ai.AiAssistantConfig> assistants;
     }
 
     @Data

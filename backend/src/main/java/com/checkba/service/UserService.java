@@ -86,5 +86,15 @@ public class UserService {
     public Optional<User> getUserByUsername(String username) {
         return userRepository.findByUsername(username);
     }
+
+    /**
+     * 更新用户头像
+     */
+    public User updateAvatar(Long userId, String avatarUrl) {
+        User user = getUserById(userId);
+        user.setAvatarUrl(avatarUrl);
+        user.setUpdatedAt(LocalDateTime.now());
+        return userRepository.save(user);
+    }
 }
 

@@ -98,5 +98,15 @@ public class ProjectFile {
      * 最近更新时间
      */
     private LocalDateTime updatedAt;
+    /**
+     * 是否已删除（软删除标记）
+     */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private Boolean isDeleted = false;
+
+    /**
+     * 删除时间
+     */
+    private LocalDateTime deletedAt;
 }
 
