@@ -13,11 +13,12 @@ import java.util.Map;
  * WPS API 控制器
  * 提供生成编辑链接、会话 token 等接口给前端调用
  */
-@Slf4j
 @RestController
 @RequestMapping("/api/wps")
 @CrossOrigin(origins = "*")
 public class WpsApiController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WpsApiController.class);
 
     /**
      * 默认用户 ID（需与 WPS 控制台“人员配置”中的账号 ID 保持一致）

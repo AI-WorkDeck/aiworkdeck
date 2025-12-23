@@ -160,7 +160,7 @@ export default {
   justify-content: center;
   border-radius: 6px;
   border: 2px dashed #cbd5e1;
-  background: #f8fafc;
+  background: #f8f9fa;
   color: #475569;
   font-size: 12px;
   font-weight: 600;

@@ -23,13 +23,23 @@ public class DocFileLinkService {
     private final ProjectFileRepository projectFileRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Data
     public static class DocFileLinkResult {
         private String linkKey;
         private String docWpsFileId;
         private String anchorText;
         private List<Long> fileIds;
         private List<ProjectFile> files;
+
+        public String getLinkKey() { return linkKey; }
+        public void setLinkKey(String linkKey) { this.linkKey = linkKey; }
+        public String getDocWpsFileId() { return docWpsFileId; }
+        public void setDocWpsFileId(String docWpsFileId) { this.docWpsFileId = docWpsFileId; }
+        public String getAnchorText() { return anchorText; }
+        public void setAnchorText(String anchorText) { this.anchorText = anchorText; }
+        public List<Long> getFileIds() { return fileIds; }
+        public void setFileIds(List<Long> fileIds) { this.fileIds = fileIds; }
+        public List<ProjectFile> getFiles() { return files; }
+        public void setFiles(List<ProjectFile> files) { this.files = files; }
     }
 
     @Transactional

@@ -19,10 +19,11 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.UUID;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DdService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DdService.class);
 
     private final DdRequestRepository ddRequestRepository;
     private final DdItemRepository ddItemRepository;
@@ -401,6 +402,52 @@ public class DdService {
         verifyAndSafeDeleteRequestFolder(request, userId);
         
         ddRequestRepository.delete(request);
+    }
+
+    /**
+     * 复制整个清单
+     */
+    @Transactional
+    public DdRequest copyRequest(Long requestId, Long userId) {
+        DdRequest original = getRequest(requestId);
+        
+        // 1. Create new request record
+        DdRequest copy = new DdRequest();
+        copy.setProjectId(original.getProjectId());
+        copy.setName("【副本】" + original.getName());
+        copy.setCreatedBy(userId);
+        copy.setStatus("DRAFT");
+        copy = ddRequestRepository.save(copy);
+        
+        // 2. Copy Items (preserving hierarchy)
+        List<DdItem> items = ddItemRepository.findByDdRequestIdOrderBySortOrderAsc(requestId);
+        copyItemsRecursively(items, null, copy.getId(), null);
+        
+        return copy;
+    }
+
+    private void copyItemsRecursively(List<DdItem> allItems, Long originalParentId, Long newRequestId, Long newParentId) {
+        List<DdItem> children = allItems.stream()
+                .filter(i -> (originalParentId == null && i.getParentId() == null) || 
+                            (originalParentId != null && originalParentId.equals(i.getParentId())))
+                .collect(Collectors.toList());
+        
+        for (DdItem item : children) {
+            DdItem itemCopy = new DdItem();
+            itemCopy.setDdRequestId(newRequestId);
+            itemCopy.setTitle(item.getTitle());
+            itemCopy.setDescription(item.getDescription());
+            itemCopy.setStatus("PENDING");
+            itemCopy.setSortOrder(item.getSortOrder());
+            itemCopy.setParentId(newParentId);
+            itemCopy.setLevel(item.getLevel());
+            itemCopy.setExampleFileId(item.getExampleFileId()); // Copy example reference if exists
+            
+            itemCopy = ddItemRepository.save(itemCopy);
+            
+            // Recurse for its children
+            copyItemsRecursively(allItems, item.getId(), newRequestId, itemCopy.getId());
+        }
     }
     
     // --- Helper Methods for Safe Delete ---

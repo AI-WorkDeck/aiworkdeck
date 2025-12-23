@@ -58,12 +58,22 @@ public class ActivityLogController {
         return result;
     }
 
-    @Data
     static class LogRequest {
         private String actionType;
         private Long targetId;
         private String targetName;
         private Long duration;
         private String metaInfo;
+
+        public String getActionType() { return actionType; }
+        public void setActionType(String actionType) { this.actionType = actionType; }
+        public Long getTargetId() { return targetId; }
+        public void setTargetId(Long targetId) { this.targetId = targetId; }
+        public String getTargetName() { return targetName; }
+        public void setTargetName(String targetName) { this.targetName = targetName; }
+        public Long getDuration() { return duration; }
+        public void setDuration(Long duration) { this.duration = duration; }
+        public String getMetaInfo() { return metaInfo; }
+        public void setMetaInfo(String metaInfo) { this.metaInfo = metaInfo; }
     }
 }

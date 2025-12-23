@@ -29,10 +29,11 @@ import java.util.Optional;
 /**
  * WPS 文档实际存储与下载/上传接口
  */
-@Slf4j
 @RestController
 @RequestMapping("/api/files")
 public class FileController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FileController.class);
 
     @Autowired
     private StorageServiceFactory storageServiceFactory;

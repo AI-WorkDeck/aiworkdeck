@@ -1738,7 +1738,7 @@ $danger-color: #E74C3C;
 
 .log-table-header {
   display: flex;
-  background: #f8fafc;
+  background: #f8f9fa;
   border-bottom: 1px solid #e2e8f0;
   padding: 12px 16px;
 }
@@ -1773,7 +1773,7 @@ $danger-color: #E74C3C;
   }
   
   &:hover {
-    background: #f8fafc;
+    background: #f8f9fa;
   }
 }
 

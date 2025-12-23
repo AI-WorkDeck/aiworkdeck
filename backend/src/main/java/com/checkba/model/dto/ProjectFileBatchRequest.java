@@ -11,7 +11,6 @@ import java.util.List;
  * - move/copy：需要 targetParentId
  * - delete：仅使用 fileIds
  */
-@Data
 public class ProjectFileBatchRequest {
     /**
      * 需要操作的文件/文件夹 ID 列表
@@ -22,6 +21,11 @@ public class ProjectFileBatchRequest {
      * 目标父文件夹 ID（move/copy 使用；null 表示根目录）
      */
     private Long targetParentId;
+
+    public List<Long> getFileIds() { return fileIds; }
+    public void setFileIds(List<Long> fileIds) { this.fileIds = fileIds; }
+    public Long getTargetParentId() { return targetParentId; }
+    public void setTargetParentId(Long targetParentId) { this.targetParentId = targetParentId; }
 }
 
 

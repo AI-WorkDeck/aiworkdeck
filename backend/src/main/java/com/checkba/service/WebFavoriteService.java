@@ -18,10 +18,11 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WebFavoriteService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WebFavoriteService.class);
 
     private final WebFavoriteRepository repository;
     private final StorageServiceFactory storageServiceFactory;

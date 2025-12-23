@@ -20,14 +20,23 @@ import java.util.UUID;
 /**
  * 项目文件服务
  */
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class ProjectFileService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProjectFileService.class);
 
     private final ProjectFileRepository projectFileRepository;
     private final ProjectRagService projectRagService;
     private final StorageServiceFactory storageServiceFactory;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ProjectFileService(ProjectFileRepository projectFileRepository,
+                              ProjectRagService projectRagService,
+                              StorageServiceFactory storageServiceFactory) {
+        this.projectFileRepository = projectFileRepository;
+        this.projectRagService = projectRagService;
+        this.storageServiceFactory = storageServiceFactory;
+    }
 
     /**
      * 获取项目的文件树（指定父文件夹下的文件列表）
@@ -129,6 +138,33 @@ public class ProjectFileService {
     }
 
     /**
+     * 创建或更新文件 (如果存在则更新元数据)
+     */
+    @Transactional
+    public ProjectFile createOrUpdateFile(Long projectId, Long parentId, String name, String fileType, 
+                                  Long fileSize, String filePath, String wpsFileId, Long userId) {
+        
+        Optional<ProjectFile> existing = projectFileRepository.findByProjectIdAndParentIdAndNameAndIsDeletedFalse(projectId, parentId, name);
+        if (existing.isPresent()) {
+            ProjectFile f = existing.get();
+            f.setFileSize(fileSize);
+            f.setUpdatedAt(LocalDateTime.now());
+            // If wpsFileId is provided, update it (or keep existing if new is null?? usually overwrite)
+            if (StringUtils.hasText(wpsFileId)) {
+                f.setWpsFileId(wpsFileId);
+            }
+            // Ensure path is consistent if changed?
+            if (StringUtils.hasText(filePath)) {
+                f.setFilePath(filePath);
+            }
+            log.info("Updating existing file in DB: {}", name);
+            return projectFileRepository.save(f);
+        } else {
+            return createFile(projectId, parentId, name, fileType, fileSize, filePath, wpsFileId, userId);
+        }
+    }
+
+    /**
      * 创建文件
      */
     @Transactional
@@ -203,10 +239,7 @@ public class ProjectFileService {
         ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("文件不存在: " + fileId));
 
-        // 检查权限（只有创建者可以重命名）
-        if (!file.getUserId().equals(userId)) {
-            throw new IllegalArgumentException("无权重命名此文件");
-        }
+        // 权限检查已移至 Controller 层，这里不再检查创建者身份
 
         // 检查同名文件是否存在
         if (projectFileRepository.existsByProjectIdAndParentIdAndNameAndIdNot(
@@ -275,10 +308,7 @@ public class ProjectFileService {
         ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("文件不存在: " + fileId));
 
-        // 检查权限
-        if (!file.getUserId().equals(userId)) {
-            throw new IllegalArgumentException("无权删除此文件");
-        }
+        // 权限检查已移至 Controller 层，这里不再检查创建者身份
 
         // 递归软删除
         softDeleteRecursive(file);
@@ -314,10 +344,7 @@ public class ProjectFileService {
                 // 注意：findById 默认查所有（包括 isDeleted=true）
                 .orElseThrow(() -> new IllegalArgumentException("文件不存在: " + fileId));
 
-        // 检查权限
-        if (!file.getUserId().equals(userId)) {
-            throw new IllegalArgumentException("无权删除此文件");
-        }
+        // 权限检查已移至 Controller 层，这里不再检查创建者身份
 
         // 如果是文件夹，递归彻底删除所有子文件
         if (Boolean.TRUE.equals(file.getIsFolder())) {
@@ -369,9 +396,7 @@ public class ProjectFileService {
          ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("文件不存在: " + fileId));
          
-         if (!file.getUserId().equals(userId)) {
-            throw new IllegalArgumentException("无权还原此文件");
-         }
+         // 权限检查已移至 Controller 层，这里不再检查创建者身份
          
          restoreRecursive(file);
     }
@@ -416,10 +441,7 @@ public class ProjectFileService {
         ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("文件不存在: " + fileId));
 
-        // 检查权限
-        if (!file.getUserId().equals(userId)) {
-            throw new IllegalArgumentException("无权移动此文件");
-        }
+        // 权限检查已移至 Controller 层，这里不再检查创建者身份
 
         // 检查不能移动到自己的子文件夹中
         if (file.getIsFolder() && newParentId != null) {
@@ -729,6 +751,143 @@ public class ProjectFileService {
         var resource = storageServiceFactory.getStorageService().load(file.getFilePath());
         try (var inputStream = resource.getInputStream()) {
             return inputStream.readAllBytes();
+        }
+    }
+    /**
+     * 保存 Artifact 文件 (AI 助手工作计划/任务清单)
+     * 路径: /AI Assistant Files/{conversationId}/{filename}.md
+     * 若 conversationId 对应的文件夹不存在，则创建（并将 wpsFileId 设为 conversationId 以便后续查找）
+     */
+    @Transactional
+    public ProjectFile saveArtifactFile(Long projectId, String conversationId, String filename, String content, Long userId) {
+        if (projectId == null || !StringUtils.hasText(filename)) {
+            return null;
+        }
+
+        // 1. 确保 "AI Assistant Files" 根目录存在
+        ProjectFile rootFolder = ensureFolder(projectId, null, "AI Assistant Files", userId);
+
+        // 2. 确保 conversationId 子目录存在
+        // 查找逻辑: 先按 wpsFileId = conversationId 查 (支持已重命名的情况)
+        // 如果没找到，再按 Name = conversationId 查 (旧数据兼容)
+        // 如果都没找到，创建新的，name=conversationId, wpsFileId=conversationId
+        ProjectFile convFolder = ensureConversationFolder(projectId, rootFolder.getId(), conversationId, userId);
+
+        // 3. 保存文件
+        String finalName = filename.endsWith(".md") ? filename : filename + ".md";
+        
+        // 检查是否存在
+        Optional<ProjectFile> existing = projectFileRepository.findByProjectIdAndParentIdAndNameAndIsDeletedFalse(
+            projectId, convFolder.getId(), finalName
+        );
+        
+        if (existing.isPresent()) {
+            // 更新内容
+            ProjectFile file = existing.get();
+            try {
+                // 更新物理文件
+                storageServiceFactory.getStorageService().save(file.getFilePath(), new java.io.ByteArrayInputStream(content.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                file.setFileSize((long) content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length);
+                file.setUpdatedAt(LocalDateTime.now());
+                return projectFileRepository.save(file);
+            } catch (Exception e) {
+                log.error("更新 Artifact 文件失败: " + file.getFilePath(), e);
+                throw new RuntimeException("Save artifact failed", e);
+            }
+        } else {
+            // 创建新文件
+            String logicalPath = "AI Assistant Files/" + convFolder.getName() + "/" + finalName;
+            String physicalPath = buildPhysicalPath(projectId, convFolder.getId(), finalName);
+            
+            ProjectFile file = new ProjectFile();
+            file.setProjectId(projectId);
+            file.setParentId(convFolder.getId());
+            file.setIsFolder(false);
+            file.setName(finalName);
+            file.setFileType("md");
+            file.setFileSize((long) content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length);
+            file.setFilePath(physicalPath);
+            file.setWpsFileId(generateWpsFileId(projectId));
+            file.setSortOrder(0);
+            file.setUserId(userId);
+            file.setCreatedAt(LocalDateTime.now());
+            file.setUpdatedAt(LocalDateTime.now());
+            
+            ProjectFile saved = projectFileRepository.save(file);
+            
+            try {
+                storageServiceFactory.getStorageService().save(physicalPath, new java.io.ByteArrayInputStream(content.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            } catch (Exception e) {
+                log.error("创建 Artifact 物理文件失败: " + physicalPath, e);
+                 // 稍微清理一下
+                 projectFileRepository.delete(saved);
+                 throw new RuntimeException("Create artifact file failed", e);
+            }
+            return saved;
+        }
+    }
+
+    private ProjectFile ensureFolder(Long projectId, Long parentId, String name, Long userId) {
+        Optional<ProjectFile> folderOpt = projectFileRepository.findByProjectIdAndParentIdAndNameAndIsDeletedFalse(projectId, parentId, name);
+        if (folderOpt.isPresent()) {
+            return folderOpt.get();
+        }
+        return createFolder(projectId, parentId, name, userId);
+    }
+
+    private ProjectFile ensureConversationFolder(Long projectId, Long parentId, String conversationId, Long userId) {
+        // 1. Try by wpsFileId (Robust lookup)
+        Optional<ProjectFile> byWpsId = projectFileRepository.findByWpsFileId(conversationId);
+        if (byWpsId.isPresent() && !Boolean.TRUE.equals(byWpsId.get().getIsDeleted())) {
+            return byWpsId.get();
+        }
+        
+        // 2. Try by Name (Fallback / Initial creation if wpsId wasn't set)
+        Optional<ProjectFile> byName = projectFileRepository.findByProjectIdAndParentIdAndNameAndIsDeletedFalse(projectId, parentId, conversationId);
+        if (byName.isPresent()) {
+            // Found by name. Let's update wpsFileId for future robustness if empty
+            ProjectFile f = byName.get();
+            if (!StringUtils.hasText(f.getWpsFileId())) {
+                f.setWpsFileId(conversationId);
+                projectFileRepository.save(f);
+            }
+            return f;
+        }
+        
+        // 3. Create New
+        // Reuse createFolder logic but set wpsFileId manually
+        ProjectFile folder = new ProjectFile();
+        folder.setProjectId(projectId);
+        folder.setParentId(parentId);
+        folder.setIsFolder(true);
+        folder.setName(conversationId); // Default name is ID
+        folder.setSortOrder(0);
+        folder.setUserId(userId);
+        folder.setCreatedAt(LocalDateTime.now());
+        folder.setUpdatedAt(LocalDateTime.now());
+        folder.setWpsFileId(conversationId); // CRITICAL: Link ID to Folder
+        
+        return projectFileRepository.save(folder);
+    }
+    
+    @Transactional
+    public void renameConversationFolder(String conversationId, String newTitle, Long userId) {
+        if (!StringUtils.hasText(newTitle)) return;
+        
+        // Find folder by wpsFileId = conversationId
+        Optional<ProjectFile> folderOpt = projectFileRepository.findByWpsFileId(conversationId);
+        if (folderOpt.isPresent()) {
+            ProjectFile folder = folderOpt.get();
+            // Only rename if different
+            if (!folder.getName().equals(newTitle)) {
+                try {
+                    rename(folder.getId(), newTitle, userId); // Re-use standard rename logic
+                } catch (Exception e) {
+                    log.error("Failed to rename conversation folder {} to {}", conversationId, newTitle, e);
+                    // Fallback: force update DB Name if physical rename fails? 
+                    // rename() already handles DB update even if physical fails (partially)
+                }
+            }
         }
     }
 }

@@ -17,9 +17,10 @@ import java.nio.file.StandardOpenOption;
 /**
  * 本地文件系统存储服务实现
  */
-@Slf4j
 @Service
 public class LocalFileStorageService implements StorageService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LocalFileStorageService.class);
 
     private final StorageProperties storageProperties;
     private final Path storageDir;

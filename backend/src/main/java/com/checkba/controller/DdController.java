@@ -156,7 +156,6 @@ public class DdController {
         return ResponseEntity.ok().build();
     }
     
-    // 删除整个清单
     @DeleteMapping("/requests/{requestId}")
     public ResponseEntity<Void> deleteRequest(
             @PathVariable Long requestId,
@@ -167,40 +166,62 @@ public class DdController {
         return ResponseEntity.ok().build();
     }
 
-    @Data
+    // 复制整个清单
+    @PostMapping("/requests/{requestId}/copy")
+    public DdRequest copyRequest(
+            @PathVariable Long requestId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) throw new IllegalArgumentException("未登录");
+        return ddService.copyRequest(requestId, userId);
+    }
+
     static class CreateRequestDto {
         private String name;
         private String content;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getContent() { return content; }
+        public void setContent(String content) { this.content = content; }
     }
 
-    @Data
     static class UpdateRequestDto {
         private String name;
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
     }
 
-    @Data
     static class UpdateStatusDto {
         private String status;
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
     }
 
-    @Data
     static class UpdateInfoDto {
         private String title;
         private String description;
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
     }
 
-    @Data
     static class AddItemDto {
         private Long parentId;
+        public Long getParentId() { return parentId; }
+        public void setParentId(Long parentId) { this.parentId = parentId; }
     }
 
-    @Data
     static class MoveItemDto {
         private Long parentId;
+        public Long getParentId() { return parentId; }
+        public void setParentId(Long parentId) { this.parentId = parentId; }
     }
 
-    @Data
     static class CommentDto {
         private String content;
+        public String getContent() { return content; }
+        public void setContent(String content) { this.content = content; }
     }
 }

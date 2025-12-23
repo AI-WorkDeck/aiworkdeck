@@ -1,9 +1,7 @@
 package com.checkba.model.dto;
 
-import lombok.Data;
 import java.time.LocalDateTime;
 
-@Data
 public class ProjectCardDTO {
     private Long id;
     private String name;
@@ -22,4 +20,100 @@ public class ProjectCardDTO {
     private Long managerId;
     private String managerName;
     private String managerAvatarUrl;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getProjectType() {
+        return projectType;
+    }
+
+    public void setProjectType(String projectType) {
+        this.projectType = projectType;
+    }
+
+    public String getListedCompanyName() {
+        return listedCompanyName;
+    }
+
+    public void setListedCompanyName(String listedCompanyName) {
+        this.listedCompanyName = listedCompanyName;
+    }
+
+    public String getTargetCompanyName() {
+        return targetCompanyName;
+    }
+
+    public void setTargetCompanyName(String targetCompanyName) {
+        this.targetCompanyName = targetCompanyName;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public String getMyRole() {
+        return myRole;
+    }
+
+    public void setMyRole(String myRole) {
+        this.myRole = myRole;
+    }
+
+    public Long getManagerId() {
+        return managerId;
+    }
+
+    public void setManagerId(Long managerId) {
+        this.managerId = managerId;
+    }
+
+    public String getManagerName() {
+        return managerName;
+    }
+
+    public void setManagerName(String managerName) {
+        this.managerName = managerName;
+    }
+
+    public String getManagerAvatarUrl() {
+        return managerAvatarUrl;
+    }
+
+    public void setManagerAvatarUrl(String managerAvatarUrl) {
+        this.managerAvatarUrl = managerAvatarUrl;
+    }
 }

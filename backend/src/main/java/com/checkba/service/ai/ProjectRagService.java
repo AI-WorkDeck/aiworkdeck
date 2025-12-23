@@ -32,10 +32,11 @@ import java.util.stream.Stream;
  * RAG Service responsible for building knowledge base from project files.
  * Supports universal file formats via Apache Tika.
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProjectRagService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProjectRagService.class);
 
     private final StorageProperties storageProperties;
     private final EmbeddingModel embeddingModel;

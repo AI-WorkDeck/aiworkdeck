@@ -10,20 +10,25 @@ import org.springframework.stereotype.Service;
  * WPS WebOffice 服务
  * 负责生成编辑链接、会话 token 等
  */
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class WpsService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WpsService.class);
 
     private final SystemSettingService systemSettingService;
 
-    @Value("${external.wps.app-id}")
+    @org.springframework.beans.factory.annotation.Autowired
+    public WpsService(SystemSettingService systemSettingService) {
+        this.systemSettingService = systemSettingService;
+    }
+
+    @Value("${external.wps.app-id:}")
     private String defaultAppId;
 
-    @Value("${external.wps.app-secret}")
+    @Value("${external.wps.app-secret:}")
     private String defaultAppSecret;
 
-    @Value("${external.wps.callback-base-url}")
+    @Value("${external.wps.callback-base-url:}")
     private String defaultCallbackBaseUrl;
 
     private static final String KEY_WPS_APP_ID = "external.wps.appId";

@@ -9,10 +9,11 @@ import org.springframework.stereotype.Component;
  * 存储服务工厂
  * 根据配置自动选择使用本地存储或对象存储
  */
-@Slf4j
 @Component
 @Primary
 public class StorageServiceFactory {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StorageServiceFactory.class);
 
     @Autowired
     private StorageProperties storageProperties;

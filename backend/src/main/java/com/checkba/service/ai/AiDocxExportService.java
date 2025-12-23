@@ -29,8 +29,9 @@ import java.time.LocalDateTime;
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class AiDocxExportService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AiDocxExportService.class);
 
     private final ProjectFileService projectFileService;
     private final StorageServiceFactory storageServiceFactory;

@@ -11,7 +11,6 @@ import java.time.Duration;
  *
  * 配置前缀：ai.model
  */
-@Data
 @Component
 @ConfigurationProperties(prefix = "ai.model")
 public class AiModelProperties {
@@ -20,10 +19,12 @@ public class AiModelProperties {
      * 模型提供商：
      * - OLLAMA：本地 Ollama 服务
      * - GEMINI：Google Gemini 云端模型
+     * - OPENROUTER: OpenRouter (OpenAI 兼容)
      */
     public enum Provider {
         OLLAMA,
-        GEMINI
+        GEMINI,
+        OPENROUTER
     }
 
     /**
@@ -37,11 +38,75 @@ public class AiModelProperties {
     private Gemini gemini = new Gemini();
 
     /**
+     * OpenRouter 配置 (兼容 OpenAI 接口)。
+     */
+    private OpenRouter openRouter = new OpenRouter();
+
+    /**
      * 本地 Ollama 配置（用于兼容当前的本地大模型设置）。
      */
     private Ollama ollama = new Ollama();
 
-    @Data
+    public Provider getProvider() {
+        return provider;
+    }
+
+    public void setProvider(Provider provider) {
+        this.provider = provider;
+    }
+
+    public Gemini getGemini() {
+        return gemini;
+    }
+
+    public void setGemini(Gemini gemini) {
+        this.gemini = gemini;
+    }
+
+    public OpenRouter getOpenRouter() {
+        return openRouter;
+    }
+
+    public void setOpenRouter(OpenRouter openRouter) {
+        this.openRouter = openRouter;
+    }
+
+    public Ollama getOllama() {
+        return ollama;
+    }
+
+    public void setOllama(Ollama ollama) {
+        this.ollama = ollama;
+    }
+
+    public static class OpenRouter {
+        /**
+         * OpenRouter API Key.
+         */
+        private String apiKey;
+        /**
+         * OpenRouter Base URL.
+         */
+        private String baseUrl = "https://openrouter.ai/api/v1";
+        /**
+         * Default model to use if not specified.
+         */
+        private String defaultModel = "anthropic/claude-3.5-sonnet";
+        /**
+         * Timeout.
+         */
+        private Duration timeout = Duration.ofSeconds(120);
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+        public String getDefaultModel() { return defaultModel; }
+        public void setDefaultModel(String defaultModel) { this.defaultModel = defaultModel; }
+        public Duration getTimeout() { return timeout; }
+        public void setTimeout(Duration timeout) { this.timeout = timeout; }
+    }
+
     public static class Gemini {
 
         /**
@@ -64,9 +129,17 @@ public class AiModelProperties {
          * 请求超时时间。
          */
         private Duration timeout = Duration.ofSeconds(60);
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+        public String getModelName() { return modelName; }
+        public void setModelName(String modelName) { this.modelName = modelName; }
+        public String getApiBaseUrl() { return apiBaseUrl; }
+        public void setApiBaseUrl(String apiBaseUrl) { this.apiBaseUrl = apiBaseUrl; }
+        public Duration getTimeout() { return timeout; }
+        public void setTimeout(Duration timeout) { this.timeout = timeout; }
     }
 
-    @Data
     public static class Ollama {
 
         /**
@@ -88,6 +161,15 @@ public class AiModelProperties {
          * 请求超时时间。
          */
         private Duration timeout = Duration.ofSeconds(300);
+
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+        public String getModelName() { return modelName; }
+        public void setModelName(String modelName) { this.modelName = modelName; }
+        public Double getTemperature() { return temperature; }
+        public void setTemperature(Double temperature) { this.temperature = temperature; }
+        public Duration getTimeout() { return timeout; }
+        public void setTimeout(Duration timeout) { this.timeout = timeout; }
     }
 }
 

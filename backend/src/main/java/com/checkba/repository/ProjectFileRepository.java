@@ -67,6 +67,11 @@ public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> 
     Long sumSizeByProjectId(Long projectId);
 
     /**
+     * 根据物理文件路径查询
+     */
+    Optional<ProjectFile> findByFilePath(String filePath);
+
+    /**
      * 查询回收站文件（已删除）
      */
     List<ProjectFile> findByProjectIdAndIsDeletedTrueOrderByDeletedAtDesc(Long projectId);

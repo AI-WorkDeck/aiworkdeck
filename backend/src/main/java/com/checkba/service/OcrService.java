@@ -13,10 +13,11 @@ import java.util.Base64;
 /**
  * OCR 服务（目前实现：阿里云 OCR）
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OcrService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OcrService.class);
 
     private final SystemSettingService systemSettingService;
 

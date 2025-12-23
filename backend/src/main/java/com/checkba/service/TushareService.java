@@ -14,8 +14,9 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 @Service
-@Slf4j
 public class TushareService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TushareService.class);
 
     @Value("${external.tushare.base-url:http://api.tushare.pro}")
     private String tushareApiUrl;

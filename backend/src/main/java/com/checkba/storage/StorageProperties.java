@@ -1,13 +1,11 @@
 package com.checkba.storage;
 
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
  * 存储服务配置属性
  */
-@Data
 @Component
 @ConfigurationProperties(prefix = "storage")
 public class StorageProperties {
@@ -27,7 +25,30 @@ public class StorageProperties {
      */
     private Oss oss = new Oss();
 
-    @Data
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public Local getLocal() {
+        return local;
+    }
+
+    public void setLocal(Local local) {
+        this.local = local;
+    }
+
+    public Oss getOss() {
+        return oss;
+    }
+
+    public void setOss(Oss oss) {
+        this.oss = oss;
+    }
+
     public static class Local {
         /**
          * 本地存储根目录（相对于项目根目录或绝对路径）
@@ -40,9 +61,24 @@ public class StorageProperties {
          * 默认：docs/template.docx
          */
         private String templatePath = "docs/template.docx";
+
+        public String getRootPath() {
+            return rootPath;
+        }
+
+        public void setRootPath(String rootPath) {
+            this.rootPath = rootPath;
+        }
+
+        public String getTemplatePath() {
+            return templatePath;
+        }
+
+        public void setTemplatePath(String templatePath) {
+            this.templatePath = templatePath;
+        }
     }
 
-    @Data
     public static class Oss {
         /**
          * 对象存储类型：aliyun（阿里云OSS）、aws（AWS S3）、minio（MinIO）
@@ -92,6 +128,77 @@ public class StorageProperties {
          * 如果配置了CDN，文件访问URL将使用CDN域名
          */
         private String cdnDomain;
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public void setProvider(String provider) {
+            this.provider = provider;
+        }
+
+        public String getAccessKeyId() {
+            return accessKeyId;
+        }
+
+        public void setAccessKeyId(String accessKeyId) {
+            this.accessKeyId = accessKeyId;
+        }
+
+        public String getAccessKeySecret() {
+            return accessKeySecret;
+        }
+
+        public void setAccessKeySecret(String accessKeySecret) {
+            this.accessKeySecret = accessKeySecret;
+        }
+
+        public String getBucketName() {
+            return bucketName;
+        }
+
+        public void setBucketName(String bucketName) {
+            this.bucketName = bucketName;
+        }
+
+        public String getRegion() {
+            return region;
+        }
+
+        public void setRegion(String region) {
+            this.region = region;
+        }
+
+        public String getEndpoint() {
+            return endpoint;
+        }
+
+        public void setEndpoint(String endpoint) {
+            this.endpoint = endpoint;
+        }
+
+        public String getPathPrefix() {
+            return pathPrefix;
+        }
+
+        public void setPathPrefix(String pathPrefix) {
+            this.pathPrefix = pathPrefix;
+        }
+
+        public boolean isUseHttps() {
+            return useHttps;
+        }
+
+        public void setUseHttps(boolean useHttps) {
+            this.useHttps = useHttps;
+        }
+
+        public String getCdnDomain() {
+            return cdnDomain;
+        }
+
+        public void setCdnDomain(String cdnDomain) {
+            this.cdnDomain = cdnDomain;
+        }
     }
 }
-

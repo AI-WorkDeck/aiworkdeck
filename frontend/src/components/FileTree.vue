@@ -7,7 +7,7 @@
     <view v-if="showDeleteDialog" class="king-dialog-mask" @tap="showDeleteDialog = false">
       <view class="king-dialog" @tap.stop>
         <view class="king-dialog-header">
-          <text class="king-dialog-title">移入回收站</text>
+          <text class="king-dialog-title">{{ deleteMode === 'hard' ? '彻底删除' : '移入回收站' }}</text>
         </view>
         <view class="king-dialog-body">
           <text class="king-dialog-text">
@@ -65,7 +65,7 @@
           <view class="form-group">
             <text class="form-label">上传位置</text>
             <view class="king-field clickable" @tap="showFolderSelector = true">
-              <text class="field-icon">📂</text>
+              <image src="/static/folder-closed.png" class="field-icon-img" mode="aspectFit" />
               <text class="field-value">
                 {{ selectedUploadParent ? getFolderPath(selectedUploadParent) : '根目录' }}
               </text>
@@ -116,10 +116,16 @@
     </view>
 
     <!-- 4. Folder Selector Popup (Nested) -->
-    <view v-if="showFolderSelector" class="king-dialog-mask" style="z-index: 1001;" @tap="showFolderSelector = false">
+    <view v-if="showFolderSelector" class="king-dialog-mask" style="z-index: 3000;" @tap="showFolderSelector = false">
       <view class="king-dialog" @tap.stop>
         <view class="king-dialog-header">
-          <text class="king-dialog-title">选择文件夹</text>
+          <view class="header-row">
+            <text class="king-dialog-title">选择文件夹</text>
+            <view class="new-folder-btn" @tap="handleSelectorCreateFolder">
+              <text class="btn-plus">+</text>
+              <text>新建文件夹</text>
+            </view>
+          </view>
         </view>
         <view class="king-dialog-body scrollable-body">
           <view
@@ -127,7 +133,20 @@
             :class="{ active: tempSelectedParent === null }"
             @tap="selectUploadParent(null)"
           >
-            <text class="folder-icon">📂</text>
+            <view class="tree-expand-icon-wrapper" @tap.stop="toggleFolderSelectorExpand('root')">
+              <image
+                class="tree-expand-icon-img"
+                :src="folderSelectorExpanded['root'] !== false ? '/static/down.png' : '/static/right.png'"
+                mode="aspectFit"
+              />
+            </view>
+            <image 
+              :src="folderSelectorExpanded['root'] !== false ? '/static/folder-opened.png' : '/static/folder-closed.png'" 
+              class="folder-icon-img" 
+              :class="{ 'is-opened': folderSelectorExpanded['root'] !== false }"
+              style="margin-right: 8px;" 
+              mode="aspectFit" 
+            />
             <text class="folder-name">根目录</text>
           </view>
 
@@ -139,16 +158,30 @@
             @tap="selectUploadParent(folder.id)"
           >
             <view class="indent" :style="{ width: (folder.level * 20) + 'px' }"></view>
-            <text
-              v-if="folder.children && folder.children.length"
-              class="expand-arrow"
-              @tap.stop="toggleFolderSelectorExpand(folder.id)"
-            >
-              {{ folderSelectorExpanded[folder.id] === false ? '▶' : '▼' }}
-            </text>
-            <text v-else class="expand-arrow-placeholder"></text>
-            <text class="folder-icon">📁</text>
-            <text class="folder-name">{{ folder.name }}</text>
+            <view class="tree-expand-icon-wrapper" @tap.stop="toggleFolderSelectorExpand(folder.id)">
+              <image
+                class="tree-expand-icon-img"
+                :src="folderSelectorExpanded[String(folder.id)] === true ? '/static/down.png' : '/static/right.png'"
+                mode="aspectFit"
+              />
+            </view>
+            <image 
+              :src="folderSelectorExpanded[String(folder.id)] === true ? '/static/folder-opened.png' : '/static/folder-closed.png'" 
+              class="folder-icon-img" 
+              :class="{ 'is-opened': folderSelectorExpanded[String(folder.id)] === true }"
+              mode="aspectFit" 
+            />
+            <view v-if="renamingId === folder.id" class="rename-input-wrapper dialog-rename" @tap.stop>
+              <input 
+                class="rename-input" 
+                v-model="tempRenameValue" 
+                :focus="true"
+                @confirm="commitRename"
+                @blur="commitRename"
+                @keydown.esc="renamingId = null"
+              />
+            </view>
+            <text v-else class="folder-name">{{ folder.name }}</text>
           </view>
           <view v-if="folderTree.length === 0" class="empty-tip">暂无其他文件夹</view>
         </view>
@@ -161,9 +194,9 @@
 
     <view class="tree-content" @mousedown="onMarqueeStart" @mousemove="onMarqueeMove" @mouseup="onMarqueeEnd">
       <!-- Recycle Bin Header -->
-      <view v-if="viewMode === 'recycle'" class="tree-toolbar" style="background: #fff3cd; border-bottom: 1px solid #ffeeba; justify-content: space-between;">
-         <text style="font-size: 12px; color: #856404; display: flex; align-items: center;">🗑️ 回收站 ({{ recycleBin.length }})</text>
-         <text class="action-btn" @tap="exitRecycleBin" style="font-size: 12px; cursor: pointer;">返回</text>
+      <view v-if="viewMode === 'recycle'" class="tree-toolbar" style="background: #E8F3ED; border-bottom: 1px solid #E9ECEF; justify-content: space-between;">
+         <text style="font-size: 12px; color: #1A5336; display: flex; align-items: center; font-weight: 500;">🗑️ 回收站 ({{ recycleBin.length }})</text>
+         <text class="action-btn recycle-back-btn" @tap="exitRecycleBin">返回</text>
       </view>
 
       <!-- Sort Menu (Dropdown) -->
@@ -229,17 +262,23 @@
                 }"
               ></view>
             </view>
-            <text v-if="item.isFolder && showTree" class="tree-expand-icon" @tap.stop="toggleFolder(item.id)">
-              {{ expandedFolders.has(item.id) ? '▼' : '▶' }}
-            </text>
-            <text v-else class="tree-expand-placeholder"></text>
+            <view v-if="item.isFolder && showTree" class="tree-expand-icon-wrapper" @tap.stop="toggleFolder(item.id)">
+              <image 
+                :src="expandedFolders.has(item.id) ? '/static/down.png' : '/static/right.png'" 
+                class="tree-expand-icon-img" 
+                mode="aspectFit" 
+              />
+            </view>
+            <view v-else class="tree-expand-placeholder"></view>
             
             <!-- Icon Logic: Folder uses CSS, Files use SVG Component -->
-            <text 
+            <image 
               v-if="item.isFolder"
-              class="tree-item-icon" 
-              :class="getFileIconClass(item)"
-            ></text>
+              class="tree-item-icon-img" 
+              :class="{ 'is-opened': expandedFolders.has(item.id) }"
+              :src="expandedFolders.has(item.id) ? '/static/folder-opened.png' : '/static/folder-closed.png'"
+              mode="aspectFit"
+            />
             <view v-else class="tree-item-icon-wrapper">
                <FileTypeIcon :type="item.fileType" :active="selectedFileId === item.id" />
             </view>
@@ -275,9 +314,34 @@
                 </view>
               </template>
               <template v-else-if="viewMode === 'recycle'">
-                <text class="action-btn icon-btn" title="还原" @tap="restoreFile(item)">♻️</text>
-                <text class="action-btn icon-btn" title="彻底删除" @tap="permDeleteFile(item)">✖️</text>
+                <view 
+                  class="action-btn icon-btn" 
+                  title="还原" 
+                  @tap="restoreFile(item)"
+                  @mouseenter="hoverRestore = { ...hoverRestore, [item.id]: true }"
+                  @mouseleave="hoverRestore = { ...hoverRestore, [item.id]: false }"
+                >
+                  <image 
+                    :src="hoverRestore[item.id] ? '/static/restore.png' : '/static/restore_unselected.png'" 
+                    class="action-icon" 
+                    mode="aspectFit" 
+                  />
+                </view>
+                <view 
+                  class="action-btn icon-btn" 
+                  title="彻底删除" 
+                  @tap="permDeleteFile(item)"
+                  @mouseenter="hoverPermDelete = { ...hoverPermDelete, [item.id]: true }"
+                  @mouseleave="hoverPermDelete = { ...hoverPermDelete, [item.id]: false }"
+                >
+                  <image 
+                    :src="hoverPermDelete[item.id] ? '/static/permnently_delete.png' : '/static/permnently_delete_unselected.png'" 
+                    class="action-icon" 
+                    mode="aspectFit" 
+                  />
+                </view>
               </template>
+
             </view>
           </view>
           <!-- 行内上传进度条 (Removed old one to avoid duplicate) -->
@@ -328,17 +392,23 @@
                 }"
               ></view>
             </view>
-            <text v-if="item.isFolder && showTree" class="tree-expand-icon" @tap.stop="toggleFolder(item.id)">
-              {{ expandedFolders.has(item.id) ? '▼' : '▶' }}
-            </text>
-            <text v-else class="tree-expand-placeholder"></text>
+            <view v-if="item.isFolder && showTree" class="tree-expand-icon-wrapper" @tap.stop="toggleFolder(item.id)">
+              <image 
+                :src="expandedFolders.has(item.id) ? '/static/down.png' : '/static/right.png'" 
+                class="tree-expand-icon-img" 
+                mode="aspectFit" 
+              />
+            </view>
+            <view v-else class="tree-expand-placeholder"></view>
             
              <!-- Icon Logic: Folder uses CSS, Files use SVG Component -->
-            <text 
+            <image 
               v-if="item.isFolder"
-              class="tree-item-icon" 
-              :class="getFileIconClass(item)"
-            ></text>
+              class="tree-item-icon-img" 
+              :class="{ 'is-opened': expandedFolders.has(item.id) }"
+              :src="expandedFolders.has(item.id) ? '/static/folder-opened.png' : '/static/folder-closed.png'"
+              mode="aspectFit"
+            />
             <view v-else class="tree-item-icon-wrapper">
                <FileTypeIcon :type="item.fileType" :active="selectedFileId === item.id" />
             </view>
@@ -374,9 +444,34 @@
                 </view>
               </template>
               <template v-else-if="viewMode === 'recycle'">
-                <text class="action-btn icon-btn" title="还原" @tap="restoreFile(item)">♻️</text>
-                <text class="action-btn icon-btn" title="彻底删除" @tap="permDeleteFile(item)">✖️</text>
+                <view 
+                  class="action-btn icon-btn" 
+                  title="还原" 
+                  @tap="restoreFile(item)"
+                  @mouseenter="hoverRestore = { ...hoverRestore, [item.id]: true }"
+                  @mouseleave="hoverRestore = { ...hoverRestore, [item.id]: false }"
+                >
+                  <image 
+                    :src="hoverRestore[item.id] ? '/static/restore.png' : '/static/restore_unselected.png'" 
+                    class="action-icon" 
+                    mode="aspectFit" 
+                  />
+                </view>
+                <view 
+                  class="action-btn icon-btn" 
+                  title="彻底删除" 
+                  @tap="permDeleteFile(item)"
+                  @mouseenter="hoverPermDelete = { ...hoverPermDelete, [item.id]: true }"
+                  @mouseleave="hoverPermDelete = { ...hoverPermDelete, [item.id]: false }"
+                >
+                  <image 
+                    :src="hoverPermDelete[item.id] ? '/static/permnently_delete.png' : '/static/permnently_delete_unselected.png'" 
+                    class="action-icon" 
+                    mode="aspectFit" 
+                  />
+                </view>
               </template>
+
             </view>
           </view>
         </view>
@@ -603,6 +698,7 @@ export default {
       
       // Sort
       sortMode: 'name', // 'name' | 'date' | 'type'
+      sortOrder: 'asc', // 'asc' | 'desc'
       showSortMenu: false,
       
       // Batch Upload Global Progress
@@ -617,8 +713,12 @@ export default {
       deleteTargetItem: null, // The item being deleted
       deleteMode: 'soft', // 'soft' | 'hard'
       deleteIsBatch: false,
-      deleteBatchIds: []
+      deleteBatchIds: [],
+      // Hover states for Recycle Bin icons
+      hoverRestore: {}, // { [fileId]: boolean }
+      hoverPermDelete: {}
     }
+
   },
   computed: {
     sortLabel() {
@@ -671,50 +771,52 @@ export default {
       const folders = this.allFiles.filter(f => f && f.isFolder)
       if (folders.length === 0) return []
 
-      // 构建 id -> 节点 映射
-      const nodeMap = new Map()
-      folders.forEach(f => {
-        // 避免引用同一个对象，复制一份
-        nodeMap.set(f.id, {
-          ...f,
-          children: [],
-          level: 0
-        })
-      })
+       // 构建 id -> 节点 映射
+       const nodeMap = new Map()
+       folders.forEach(f => {
+         nodeMap.set(String(f.id), {
+           ...f,
+           children: [],
+           level: 0
+         })
+       })
+ 
+       // 构建树结构
+       const roots = []
+       folders.forEach(f => {
+         const node = nodeMap.get(String(f.id))
+         const pId = node.parentId ? String(node.parentId) : null
+         if (pId && nodeMap.has(pId)) {
+           const parent = nodeMap.get(pId)
+           parent.children.push(node)
+         } else {
+           roots.push(node)
+         }
+       })
+ 
+       const result = []
+       // 默认只展开根目录（即显示第一层级）
+       const isRootExpanded = this.folderSelectorExpanded['root'] !== false
 
-      // 构建树结构
-      const roots = []
-      folders.forEach(f => {
-        const node = nodeMap.get(f.id)
-        if (node.parentId != null && nodeMap.has(node.parentId)) {
-          const parent = nodeMap.get(node.parentId)
-          parent.children.push(node)
-        } else {
-          // parentId 为 null 或找不到父节点，都视为根
-          roots.push(node)
-        }
-      })
-
-      // 递归扁平化，并计算 level（根据 folderSelectorExpanded 控制展开/收起）
-      const result = []
-      const traverse = (nodes, level) => {
-        if (!Array.isArray(nodes)) return
-        // 按 sortOrder 排序，确保顺序与左侧树一致
-        nodes
-          .slice()
-          .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-          .forEach(node => {
-            node.level = level
-            result.push(node)
-            const hasChildren = node.children && node.children.length > 0
-            const expanded = this.folderSelectorExpanded[node.id] !== false // 默认展开
-            if (hasChildren && expanded) {
-              traverse(node.children, level + 1)
-            }
-          })
-      }
-
-      traverse(roots, 0)
+       if (isRootExpanded) {
+         const traverse = (nodes, level) => {
+           if (!Array.isArray(nodes)) return
+           nodes
+             .slice()
+             .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-CN', { numeric: true }))
+             .forEach(node => {
+               node.level = level
+               result.push(node)
+               const hasChildren = node.children && node.children.length > 0
+               // 一级及以下文件夹默认收起，必须显式在 folderSelectorExpanded 标记为 true 才展示下级
+               const expanded = this.folderSelectorExpanded[String(node.id)] === true
+               if (hasChildren && expanded) {
+                 traverse(node.children, level + 1)
+               }
+             })
+         }
+         traverse(roots, 1)
+       }
       return result
     },
     // 全局上传进度（0-100），如果没有上传任务则返回 null
@@ -772,11 +874,8 @@ export default {
     // 打开文件夹选择器时，初始化展开状态并同步当前选择
     showFolderSelector(val) {
       if (val) {
-        const expanded = {}
-        this.folders.forEach(f => {
-          expanded[f.id] = true
-        })
-        this.folderSelectorExpanded = expanded
+        // 重置为默认状态：根目录展开(undefined !== false)，其他收起(undefined !== true)
+        this.folderSelectorExpanded = {}
         this.tempSelectedParent = this.folderSelectorMode === 'batch' ? this.batchTargetParentId : this.selectedUploadParent
       }
     }
@@ -1205,7 +1304,7 @@ export default {
       const result = []
       let children = allFiles.filter(f => {
         if (parentId === null) {
-          return f.parentId === null
+          return f.parentId === null || f.parentId === 0
         }
         return f.parentId === parentId
       })
@@ -1216,21 +1315,33 @@ export default {
          if (a.isFolder && !b.isFolder) return -1
          if (!a.isFolder && b.isFolder) return 1
          
+         let result = 0
          if (this.sortMode === 'date') {
-            // 按修改时间倒序
+            // Newest first by default in 'date' mode? 
+            // Existing was timeB - timeA. We now make it controllable.
             const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime()
             const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime()
-            return timeB - timeA
+            result = timeA - timeB
          } else if (this.sortMode === 'type') {
             // 按类型 A-Z
             const typeA = (a.fileType || '').toLowerCase()
             const typeB = (b.fileType || '').toLowerCase()
-            if (typeA !== typeB) return typeA.localeCompare(typeB)
-            return (a.name || '').localeCompare(b.name || '', 'zh-CN', { numeric: true })
+            if (typeA !== typeB) {
+              result = typeA.localeCompare(typeB)
+            } else {
+              result = (a.name || '').localeCompare(b.name || '', 'zh-CN', { numeric: true })
+            }
          } else {
             // 默认：按名称 A-Z (中文拼音)
-            return (a.name || '').localeCompare(b.name || '', 'zh-CN', { numeric: true })
+            result = (a.name || '').localeCompare(b.name || '', 'zh-CN', { numeric: true })
          }
+
+         // Date mode default desc (newest first)
+         if (this.sortMode === 'date') {
+            return this.sortOrder === 'asc' ? result : -result
+         }
+         
+         return this.sortOrder === 'desc' ? -result : result
       })
       
       for (const item of children) {
@@ -1248,11 +1359,20 @@ export default {
       this.sortMode = mode
       this.showSortMenu = false
       // 触发重绘
-      if (this.showTree && this.allFiles.length > 0) {
+      this.refreshTreeView()
+    },
+    toggleSortOrder() {
+      this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'
+      uni.showToast({ 
+        title: this.sortOrder === 'asc' ? '正序排列' : '倒序排列', 
+        icon: 'none' 
+      })
+      this.refreshTreeView()
+    },
+    refreshTreeView() {
+      if (this.showTree && Array.isArray(this.allFiles) && this.allFiles.length > 0) {
         this.files = this.buildTreeView(this.allFiles, this.parentId)
       } else {
-        // 如果不是树模式，直接对 files 排序 (虽然 files 也是 loadFiles 来的，但也需要重新排序)
-        // 简单起见，重新加载或手动排序 files
         this.loadFiles()
       }
     },
@@ -1281,12 +1401,63 @@ export default {
       }
       return `${depth * 24}rpx`
     },
+    // 为选择器设计的新建文件夹逻辑
+    async handleSelectorCreateFolder() {
+      if (!this.projectId) return
+      
+      try {
+        const pId = this.tempSelectedParent // 这个是当前的高亮选中项
+        const folderName = '新建文件夹'
+        // 1. 创建文件夹
+        const res = await createFolder(this.projectId, pId, folderName)
+        const newFolderId = res.id || res.data?.id
+        
+        // 2. 刷新列表
+        await this.loadFiles()
+        
+        // 3. 展开父节点
+        if (pId) {
+          this.folderSelectorExpanded = {
+            ...this.folderSelectorExpanded,
+            [String(pId)]: true
+          }
+        } else {
+          // 如果是根目录创建，确保根也是展开的
+          this.folderSelectorExpanded = {
+            ...this.folderSelectorExpanded,
+            ['root']: true
+          }
+        }
+        
+        // 4. 进入重命名模式
+        this.$nextTick(() => {
+          this.renamingId = newFolderId
+          this.tempRenameValue = folderName
+        })
+        
+      } catch (error) {
+        console.error('新建文件夹失败:', error)
+        uni.showToast({ title: '新建文件夹失败', icon: 'none' })
+      }
+    },
     // 切换选择器中某个文件夹的展开/收起
     toggleFolderSelectorExpand(folderId) {
-      const current = this.folderSelectorExpanded[folderId]
+      const sId = String(folderId)
+      const isRoot = sId === 'root'
+      const current = this.folderSelectorExpanded[sId]
+      
+      // 根目录默认是展开的 (undefined 或 true)
+      // 其他目录默认是收起的 (undefined 或 false)
+      let nextState
+      if (isRoot) {
+        nextState = current === false ? true : false
+      } else {
+        nextState = current === true ? false : true
+      }
+      
       this.folderSelectorExpanded = {
         ...this.folderSelectorExpanded,
-        [folderId]: current === false ? true : false
+        [sId]: nextState
       }
     },
     isChecked(id) {
@@ -2814,7 +2985,7 @@ $bg-grey: $uni-bg-color-grey;
 }
 
 .batch-btn:active {
-  background: #f8fafc;
+  background: #f8f9fa;
 }
 
 .batch-btn-danger {
@@ -3208,48 +3379,37 @@ $bg-grey: $uni-bg-color-grey;
   opacity: 0.8;
 }
 
-.tree-expand-icon {
-  font-size: 22rpx;
-  color: #6b7280;
+.tree-expand-icon-wrapper {
   width: 32rpx;
-  display: inline-block;
-  text-align: center;
+  height: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+}
+
+.tree-expand-icon-img {
+  width: 16rpx;
+  height: 16rpx;
 }
 
 .tree-expand-placeholder {
   width: 32rpx;
-  display: inline-block;
+  height: 32rpx;
 }
 
-.tree-item-icon {
-  margin-right: 8rpx;
-  font-size: 24rpx;
-  color: #6b7280;
-}
-
-/* 经典 Office 风格图标 - 移除背景色 */
-.tree-item-icon.icon-folder {
+.tree-item-icon-img {
   width: 32rpx;
-  height: 24rpx;
-  border-radius: 4rpx;
-  border: 2rpx solid rgba(148, 163, 184, 0.9);
-  background: transparent;
-  position: relative;
+  height: 32rpx;
+  margin-right: 8rpx;
+  transition: transform 0.2s;
 }
 
-.tree-item-icon.icon-folder::before {
-  content: '';
-  position: absolute;
-  top: -6rpx;
-  left: 2rpx;
-  width: 14rpx;
-  height: 6rpx;
-  border-radius: 3rpx 3rpx 0 0;
-  background-color: transparent;
-  border: 2rpx solid rgba(148, 163, 184, 0.9);
-  border-bottom: none;
+.tree-item-icon-img.is-opened {
+  transform: scale(1.2);
 }
+
+
 
 
 
@@ -3314,6 +3474,20 @@ $bg-grey: $uni-bg-color-grey;
   font-size: 22rpx;
   color: #64748b;
   padding: 0 4rpx;
+}
+
+.recycle-back-btn {
+  color: #3498DB !important;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 12rpx;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.recycle-back-btn:hover {
+  color: #2980B9 !important;
+  text-decoration: underline;
 }
 
 .action-btn:active {
@@ -3639,6 +3813,37 @@ $bg-grey: $uni-bg-color-grey;
   color: #2563eb;
   font-weight: 500;
 }
+
+.header-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.new-folder-btn {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px;
+  background-color: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+.new-folder-btn:hover {
+  background-color: #E5E7EB;
+  color: #111827;
+}
+.new-folder-btn .btn-plus {
+  font-size: 18px;
+  margin-right: 4px;
+  font-weight: 300;
+  line-height: 1;
+}
+
 /* KING IDE Dialog Styles */
 .king-dialog-mask {
   position: fixed;
@@ -3847,6 +4052,11 @@ $bg-grey: $uni-bg-color-grey;
   margin-right: 12px;
   font-size: 18px;
 }
+.field-icon-img {
+  width: 20px;
+  height: 20px;
+  margin-right: 12px;
+}
 .field-value {
   font-size: 14px;
   color: #111827;
@@ -3896,20 +4106,46 @@ $bg-grey: $uni-bg-color-grey;
   background-color: #E6F9F0;
   color: #1A5336;
 }
-.expand-arrow {
+.king-dialog .tree-expand-icon-wrapper {
   width: 24px;
   height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  color: #9CA3AF;
+  cursor: pointer;
 }
-.expand-arrow-placeholder {
+.king-dialog .tree-expand-icon-img {
+  width: 10px;
+  height: 10px;
+}
+.king-dialog .tree-expand-placeholder {
   width: 24px;
+}
+.folder-icon-img {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.2s;
+}
+.folder-icon-img.is-opened {
+  transform: scale(1.2);
 }
 .folder-name {
   margin-left: 8px;
+  font-size: 14px;
+}
+
+.rename-input-wrapper.dialog-rename {
+  margin-left: 8px;
+  flex: 1;
+}
+
+.rename-input-wrapper.dialog-rename .rename-input {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #5BD197;
+  border-radius: 4px;
+  background-color: #ffffff;
   font-size: 14px;
 }
 .empty-tip {

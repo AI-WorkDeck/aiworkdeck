@@ -22,11 +22,12 @@ import java.util.Optional;
  * WPS WebOffice 回调接口控制器
  * 实现 WPS 要求的回调接口
  */
-@Slf4j
 @RestController
 @RequestMapping("/v3/3rd")
 @CrossOrigin(origins = "*")
 public class WpsController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WpsController.class);
 
     /**
      * 默认用户ID（需与 WPS 控制台"人员配置"中的账号ID保持一致）

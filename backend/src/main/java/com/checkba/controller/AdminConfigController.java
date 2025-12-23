@@ -31,13 +31,31 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/admin")
 @CrossOrigin(origins = "*")
-@RequiredArgsConstructor
 public class AdminConfigController {
 
     private final SystemSettingService systemSettingService;
     private final UserRepository userRepository;
     private final AiModelProperties aiModelProperties;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AdminConfigController(SystemSettingService systemSettingService, 
+                                 UserRepository userRepository, 
+                                 AiModelProperties aiModelProperties, 
+                                 com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+        this.systemSettingService = systemSettingService;
+        this.userRepository = userRepository;
+        this.aiModelProperties = aiModelProperties;
+        this.objectMapper = objectMapper;
+    }
+
+    // ... (rest of the file remains same until DTOs)
+
+    // ... (lines 43-475 skipped, need to pinpoint where DTOs start or if I can replace just the DTOs and Constructor)
+    // Using multiple chunks to be safer.
+
+    // ...
+
 
     // ==== 默认值：来自 application.yml ====
 
@@ -361,28 +379,45 @@ public class AdminConfigController {
 
     // -------- DTO 定义 --------
 
-    @Data
     public static class AdminConfigResponse {
         private ExternalServicesConfig external;
         private AiConfig ai;
+
+        public ExternalServicesConfig getExternal() { return external; }
+        public void setExternal(ExternalServicesConfig external) { this.external = external; }
+        public AiConfig getAi() { return ai; }
+        public void setAi(AiConfig ai) { this.ai = ai; }
     }
 
-    @Data
     public static class AdminConfigUpdateRequest {
         private ExternalServicesConfig external;
         private AiConfig ai;
+
+        public ExternalServicesConfig getExternal() { return external; }
+        public void setExternal(ExternalServicesConfig external) { this.external = external; }
+        public AiConfig getAi() { return ai; }
+        public void setAi(AiConfig ai) { this.ai = ai; }
     }
 
-    @Data
     public static class ExternalServicesConfig {
         private GoogleConfig google;
         private QichachaConfig qichacha;
         private TushareConfig tushare;
         private WpsConfig wps;
         private AliyunOcrConfig aliyunOcr;
+
+        public GoogleConfig getGoogle() { return google; }
+        public void setGoogle(GoogleConfig google) { this.google = google; }
+        public QichachaConfig getQichacha() { return qichacha; }
+        public void setQichacha(QichachaConfig qichacha) { this.qichacha = qichacha; }
+        public TushareConfig getTushare() { return tushare; }
+        public void setTushare(TushareConfig tushare) { this.tushare = tushare; }
+        public WpsConfig getWps() { return wps; }
+        public void setWps(WpsConfig wps) { this.wps = wps; }
+        public AliyunOcrConfig getAliyunOcr() { return aliyunOcr; }
+        public void setAliyunOcr(AliyunOcrConfig aliyunOcr) { this.aliyunOcr = aliyunOcr; }
     }
 
-    @Data
     public static class GoogleConfig {
         private String apiKey;
         private String modelName;
@@ -395,9 +430,15 @@ public class AdminConfigController {
             this.modelName = modelName;
             this.apiBaseUrl = apiBaseUrl;
         }
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+        public String getModelName() { return modelName; }
+        public void setModelName(String modelName) { this.modelName = modelName; }
+        public String getApiBaseUrl() { return apiBaseUrl; }
+        public void setApiBaseUrl(String apiBaseUrl) { this.apiBaseUrl = apiBaseUrl; }
     }
 
-    @Data
     public static class QichachaConfig {
         private String baseUrl;
         private String key;
@@ -410,9 +451,15 @@ public class AdminConfigController {
             this.key = key;
             this.secret = secret;
         }
+
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+        public String getKey() { return key; }
+        public void setKey(String key) { this.key = key; }
+        public String getSecret() { return secret; }
+        public void setSecret(String secret) { this.secret = secret; }
     }
 
-    @Data
     public static class TushareConfig {
         private String baseUrl;
         private String token;
@@ -423,9 +470,13 @@ public class AdminConfigController {
             this.baseUrl = baseUrl;
             this.token = token;
         }
+
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+        public String getToken() { return token; }
+        public void setToken(String token) { this.token = token; }
     }
 
-    @Data
     public static class WpsConfig {
         private String appId;
         private String appSecret;
@@ -438,9 +489,15 @@ public class AdminConfigController {
             this.appSecret = appSecret;
             this.callbackBaseUrl = callbackBaseUrl;
         }
+
+        public String getAppId() { return appId; }
+        public void setAppId(String appId) { this.appId = appId; }
+        public String getAppSecret() { return appSecret; }
+        public void setAppSecret(String appSecret) { this.appSecret = appSecret; }
+        public String getCallbackBaseUrl() { return callbackBaseUrl; }
+        public void setCallbackBaseUrl(String callbackBaseUrl) { this.callbackBaseUrl = callbackBaseUrl; }
     }
 
-    @Data
     public static class AliyunOcrConfig {
         private String accessKeyId;
         private String accessKeySecret;
@@ -457,22 +514,35 @@ public class AdminConfigController {
             this.regionId = regionId;
             this.publicBaseUrl = publicBaseUrl;
         }
+
+        public String getAccessKeyId() { return accessKeyId; }
+        public void setAccessKeyId(String accessKeyId) { this.accessKeyId = accessKeyId; }
+        public String getAccessKeySecret() { return accessKeySecret; }
+        public void setAccessKeySecret(String accessKeySecret) { this.accessKeySecret = accessKeySecret; }
+        public String getEndpoint() { return endpoint; }
+        public void setEndpoint(String endpoint) { this.endpoint = endpoint; }
+        public String getRegionId() { return regionId; }
+        public void setRegionId(String regionId) { this.regionId = regionId; }
+        public String getPublicBaseUrl() { return publicBaseUrl; }
+        public void setPublicBaseUrl(String publicBaseUrl) { this.publicBaseUrl = publicBaseUrl; }
     }
 
-    @Data
     public static class AiConfig {
-        /**
-         * 激活的大模型提供商：OLLAMA / GEMINI
-         */
         private String activeProvider;
-        
         private String systemPromptOllama;
         private String systemPromptGemini;
-        
         private List<com.checkba.model.ai.AiAssistantConfig> assistants;
+
+        public String getActiveProvider() { return activeProvider; }
+        public void setActiveProvider(String activeProvider) { this.activeProvider = activeProvider; }
+        public String getSystemPromptOllama() { return systemPromptOllama; }
+        public void setSystemPromptOllama(String systemPromptOllama) { this.systemPromptOllama = systemPromptOllama; }
+        public String getSystemPromptGemini() { return systemPromptGemini; }
+        public void setSystemPromptGemini(String systemPromptGemini) { this.systemPromptGemini = systemPromptGemini; }
+        public List<com.checkba.model.ai.AiAssistantConfig> getAssistants() { return assistants; }
+        public void setAssistants(List<com.checkba.model.ai.AiAssistantConfig> assistants) { this.assistants = assistants; }
     }
 
-    @Data
     public static class UserSummary {
         private Long id;
         private String username;
@@ -481,6 +551,21 @@ public class AdminConfigController {
         private String email;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getUsername() { return username; }
+        public void setUsername(String username) { this.username = username; }
+        public String getDisplayName() { return displayName; }
+        public void setDisplayName(String displayName) { this.displayName = displayName; }
+        public String getAvatarUrl() { return avatarUrl; }
+        public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+        public LocalDateTime getCreatedAt() { return createdAt; }
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+        public LocalDateTime getUpdatedAt() { return updatedAt; }
+        public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     }
 }
 

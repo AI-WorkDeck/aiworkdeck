@@ -16,9 +16,9 @@ public interface ProjectAssistant {
                    "When creating a file, use the 'Save content to a file' tool. " +
                    "If the user asks to summarize or extract info, use the knowledge base. " +
                    "If you cannot find information in the files, say so politely.")
-    String chat(String userMessage);
+    dev.langchain4j.service.Result<String> chat(String userMessage);
 
     // Support for Multi-Modal (Text + Image)
-    String chat(@dev.langchain4j.service.UserMessage dev.langchain4j.data.message.UserMessage userMessage);
+    dev.langchain4j.service.Result<String> chat(@dev.langchain4j.service.UserMessage dev.langchain4j.data.message.UserMessage userMessage);
 }
 

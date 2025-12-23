@@ -275,7 +275,7 @@ export default {
 
 .dialog-tab:hover {
   color: #1A5336;
-  background: #f8fafc;
+  background: #f8f9fa;
 }
 
 .dialog-tab.active {
@@ -348,7 +348,7 @@ export default {
 
 .role-option:hover {
   border-color: #cbd5e1;
-  background: #f8fafc;
+  background: #f8f9fa;
 }
 
 .role-option.active {
@@ -381,7 +381,7 @@ export default {
 
 /* Client Invite */
 .invite-desc-box {
-  background: #f8fafc;
+  background: #f8f9fa;
   padding: 12px;
   border-radius: 8px;
   margin-bottom: 20px;
@@ -431,7 +431,7 @@ export default {
 
 .king-dialog-footer {
   padding: 20px 32px 24px;
-  background: #f8fafc;
+  background: #f8f9fa;
   display: flex;
   justify-content: flex-end;
   gap: 12px;

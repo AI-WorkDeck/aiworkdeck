@@ -120,7 +120,6 @@ public class WebFavoriteController {
         return result;
     }
 
-    @Data
     public static class WebFavoriteListItem {
         private Long id;
         private String title;
@@ -156,15 +155,42 @@ public class WebFavoriteController {
             }
             return it;
         }
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
+        public String getSourceUrl() { return sourceUrl; }
+        public void setSourceUrl(String sourceUrl) { this.sourceUrl = sourceUrl; }
+        public String getContent() { return content; }
+        public void setContent(String content) { this.content = content; }
+        public String getImagePath() { return imagePath; }
+        public void setImagePath(String imagePath) { this.imagePath = imagePath; }
+        public Object getCreatedAt() { return createdAt; }
+        public void setCreatedAt(Object createdAt) { this.createdAt = createdAt; }
+        public String getSourceHost() { return sourceHost; }
+        public void setSourceHost(String sourceHost) { this.sourceHost = sourceHost; }
+        public String getDocFileName() { return docFileName; }
+        public void setDocFileName(String docFileName) { this.docFileName = docFileName; }
     }
 
-    @Data
     public static class CreateFavoriteRequest {
         private String title;
         private String sourceUrl;
         private String content;
         private String imageBase64;
         private String meta;
+
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
+        public String getSourceUrl() { return sourceUrl; }
+        public void setSourceUrl(String sourceUrl) { this.sourceUrl = sourceUrl; }
+        public String getContent() { return content; }
+        public void setContent(String content) { this.content = content; }
+        public String getImageBase64() { return imageBase64; }
+        public void setImageBase64(String imageBase64) { this.imageBase64 = imageBase64; }
+        public String getMeta() { return meta; }
+        public void setMeta(String meta) { this.meta = meta; }
     }
 }
 

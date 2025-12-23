@@ -230,6 +230,14 @@ export default {
   mounted() {
     this.fetchData()
   },
+  watch: {
+    requestId: {
+      handler() {
+        this.fetchData()
+      },
+      immediate: false
+    }
+  },
   methods: {
     async fetchData() {
       try {

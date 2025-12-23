@@ -308,13 +308,16 @@ public class ProjectFileController {
         return AuthController.getUserIdFromSession(sessionId);
     }
 
-    @Data
     static class CreateFolderRequest {
         private Long parentId;
         private String name;
+
+        public Long getParentId() { return parentId; }
+        public void setParentId(Long parentId) { this.parentId = parentId; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
     }
 
-    @Data
     static class CreateFileRequest {
         private Long parentId;
         private String name;
@@ -322,17 +325,36 @@ public class ProjectFileController {
         private Long fileSize;
         private String filePath;
         private String wpsFileId;
+
+        public Long getParentId() { return parentId; }
+        public void setParentId(Long parentId) { this.parentId = parentId; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getFileType() { return fileType; }
+        public void setFileType(String fileType) { this.fileType = fileType; }
+        public Long getFileSize() { return fileSize; }
+        public void setFileSize(Long fileSize) { this.fileSize = fileSize; }
+        public String getFilePath() { return filePath; }
+        public void setFilePath(String filePath) { this.filePath = filePath; }
+        public String getWpsFileId() { return wpsFileId; }
+        public void setWpsFileId(String wpsFileId) { this.wpsFileId = wpsFileId; }
     }
 
-    @Data
     static class RenameRequest {
         private String name;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
     }
 
-    @Data
     static class MoveRequest {
         private Long parentId;
         private Integer sortOrder;
+
+        public Long getParentId() { return parentId; }
+        public void setParentId(Long parentId) { this.parentId = parentId; }
+        public Integer getSortOrder() { return sortOrder; }
+        public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
     }
 }
 

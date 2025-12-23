@@ -20,8 +20,8 @@ import java.util.List;
  * - 通过官方 REST 接口 /models/{model}:generateContent 调用
  * - 将 LangChain4j 的 ChatMessage 序列化为 Gemini 的 contents 结构
  */
-@Slf4j
 public class GeminiChatLanguageModel implements ChatLanguageModel {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GeminiChatLanguageModel.class);
 
     private final String apiBaseUrl;
     private final String modelName;

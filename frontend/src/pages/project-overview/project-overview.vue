@@ -321,7 +321,8 @@
           :src="hoverNewFile ? '/static/new-document.png' : '/static/new-document_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 16px; height: 16px;"
+          style="width: 12px; height: 12px;"
+
         />
       </view>
 
@@ -338,7 +339,8 @@
           :src="hoverNewFolder ? '/static/icon_new_folder.png' : '/static/icon_new_folder_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 16px; height: 16px;"
+          style="width: 12px; height: 12px;"
+
         />
       </view>
 
@@ -355,7 +357,8 @@
           :src="fileBatchMode || hoverBatchSelect ? '/static/batch_select.png' : '/static/batch_select_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 16px; height: 16px;"
+          style="width: 12px; height: 12px;"
+
         />
       </view>
 
@@ -372,7 +375,8 @@
           :src="hoverUpload ? '/static/upload.png' : '/static/upload_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 16px; height: 16px;"
+          style="width: 12px; height: 12px;"
+
         />
       </view>
 
@@ -390,7 +394,8 @@
           :src="hoverDownload ? '/static/download_selected.png' : '/static/download.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 16px; height: 16px;"
+          style="width: 12px; height: 12px;"
+
         />
       </view>
 
@@ -407,7 +412,8 @@
           :src="hoverSort ? '/static/sort.png' : '/static/sort_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 16px; height: 16px;"
+          style="width: 12px; height: 12px;"
+
         />
       </view>
 
@@ -425,7 +431,8 @@
           :src="hoverCopy ? '/static/copy_selected.png' : '/static/copy.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 16px; height: 16px;"
+          style="width: 12px; height: 12px;"
+
         />
       </view>
 
@@ -441,7 +448,8 @@
           :src="hoverRecycleBin ? '/static/recycle-bin.png' : '/static/recycle-bin_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 16px; height: 16px;"
+          style="width: 12px; height: 12px;"
+
         />
       </view>
 
@@ -468,6 +476,11 @@
             :project-id="projectId"
             :current-user="currentUser"
             @open-request="handleOpenDdRequest"
+          />
+          <PluginPane
+            v-else-if="leftPaneKey && dynamicPlugins.some(p => p.key === leftPaneKey)"
+            :url="dynamicPlugins.find(p => p.key === leftPaneKey)?.frontendEntry"
+            :plugin-id="leftPaneKey"
           />
           <view v-else class="sidebar-plugin-placeholder">
             <text class="placeholder-title">{{ leftPaneTitle }}</text>
@@ -507,6 +520,7 @@
                     <view
                       v-for="file in leftFiles"
                       :key="file.id"
+                      v-show="isTabVisible(file)"
                       class="tab-item"
                       :class="{
                         active: activeFileIdLeft === file.id,
@@ -542,6 +556,7 @@
                     <view
                       v-for="file in rightFiles"
                       :key="file.id"
+                      v-show="isTabVisible(file)"
                       class="tab-item"
                       :class="{
                         active: activeFileIdRight === file.id,
@@ -612,9 +627,18 @@
                       @ready="onWpsReady($event, 'left')"
                       @clipboard-copy="onWpsClipboardCopy($event)"
                     />
+                    <MarkdownPreview
+                      v-else-if="isMarkdownTab(activeFileLeft)"
+                      :content="activeFileLeft.content"
+                    />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileLeft)"
                       :request-id="activeFileLeft.requestId"
+                    />
+                    <PluginPane
+                      v-else-if="activeFileLeft.fileType === 'plugin'"
+                      :url="activeFileLeft.frontendEntry"
+                      :plugin-id="activeFileLeft.id"
                     />
                     <FilePreview 
                       v-else 
@@ -657,9 +681,18 @@
                       @ready="onWpsReady($event, 'right')"
                       @clipboard-copy="onWpsClipboardCopy($event)"
                     />
+                    <MarkdownPreview
+                      v-else-if="isMarkdownTab(activeFileRight)"
+                      :content="activeFileRight.content"
+                    />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileRight)"
                       :request-id="activeFileRight.requestId"
+                    />
+                    <PluginPane
+                      v-else-if="activeFileRight.fileType === 'plugin'"
+                      :url="activeFileRight.frontendEntry"
+                      :plugin-id="activeFileRight.id"
                     />
                     <FilePreview 
                       v-else 
@@ -767,60 +800,41 @@
             @dragleave="handleAiDragLeave"
             @drop="handleAiDrop"
           >
+            <!-- ChatInterface Integration -->
+            <!-- Note: We leverage ChatInterface for the entire panel content. -->
+            <!-- Resize handle is still here in the outer container scope -->
+            
+            <ChatInterface
+              ref="chatInterface"
+              :project-id="String(projectId)"
+              :project-name="project.name"
+              :recent-history="chatHistoryList.slice(0, 3)"
+              :assistants="assistants"
+              v-model:current-assistant-id="currentAssistantId"
+              @close="toggleAiPanel"
+              @toggle-history="toggleHistoryDrawer"
+              @new-chat="startNewChat"
+              @load-history="loadHistoryChat"
+              @message-action="handleChatInterfaceAction"
+              @config-assistant="openAssistantConfig"
+              @client-action="handleClientAction"
+              @refresh-history="fetchChatHistory"
+              @artifact-open-tab="handleArtifactOpenTab"
+            />
+            
             <view class="side-resize-handle" @touchstart="startResize('right', $event)" @mousedown="startResize('right', $event)"></view>
-            <view class="panel-header panel-header-ai">
-              <view class="sidebar-title-row">
-                  <text class="sidebar-title" style="font-size: 12px; color: #1f2937;">对话</text>
-               </view>
-
-               <view class="panel-actions" style="gap: 4px;">
-                 <!-- 1. New Chat -->
-                 <view class="icon-btn mini" style="width: 24px; height: 24px;" title="新建对话" @tap="startNewChat">
-                    <text class="tool-icon" style="font-size: 14px;">＋</text>
-                 </view>
-
-                 <!-- 3. Assistant (Robot) -->
-                 <view class="icon-btn mini" style="width: 24px; height: 24px;" :class="{ active: showAssistantMenu }" title="助手设置" @tap="toggleAssistantMenu">
-                    <text class="tool-icon" style="font-size: 14px;">🤖</text>
-                 </view>
-                 
-                 <!-- 4. History (Clock) -->
-                 <view class="icon-btn mini" style="width: 24px; height: 24px;" title="历史对话" @tap="toggleHistoryDrawer">
-                    <text class="tool-icon" style="font-size: 14px;">🕒</text>
-                 </view>
-
-                 <!-- 5. Close -->
-                 <view class="icon-btn mini" style="width: 24px; height: 24px;" title="收起" @tap="toggleAiPanel">
-                   <text class="tool-icon" style="font-size: 14px;">×</text>
-                 </view>
-               </view>
-            </view>
             
-            <!-- Dropdowns (Positioned relative to side-panel-ai) -->
+            <!-- History Drawer (Outside ChatInterface so it can overlay? Or ChatInterface handles it? ChatInterface has header but no drawer content? -->
+            <!-- Update: The ChatInterface component I wrote DOES NOT contain the drawer content, it just emits toggle-history. -->
+            <!-- The original logic had a dropdown-panel. I should perhaps keep the drawer logic here OR move it to ChatInterface. -->
+            <!-- The user requirement was to 'upgrade UI'. -->
+            <!-- ChatInterface.vue implementation: -->
+            <!-- It has @tap="$emit('toggle-history')". -->
+            <!-- It doesn't have the drawer markup. -->
+            <!-- So I need to keep the History Drawer (dropdown) here, assuming they are positioned ok. -->
             
-
-            <!-- 2. Assistant Dropdown -->
-            <view v-if="showAssistantMenu" class="ai-dropdown-panel" @tap.stop>
-               <view class="menu-item header">选择助手</view>
-               <view 
-                 v-for="ast in assistants" 
-                 :key="ast.id" 
-                 class="menu-item"
-                 :class="{ active: currentAssistantId === ast.id }"
-                 @tap="switchAssistant(ast.id)"
-               >
-                  <!-- No emoji icon as requested -->
-                  <text style="flex: 1;">{{ ast.name }}</text>
-                  <!-- Gear icon for configuration -->
-                  <view class="icon-btn mini" style="width: 20px; height: 20px; display:flex; align-items:center; justify-content:center;" @tap.stop="openAssistantConfig(ast)">
-                    <text style="font-size: 12px; line-height:1;">⚙️</text>
-                  </view>
-               </view>
-            </view>
-            <view v-if="showAssistantMenu" class="dropdown-fixed-mask" @tap.stop="toggleAssistantMenu"></view>
-
             <!-- 3. History Dropdown (Unified style) -->
-            <view v-if="showHistoryDrawer" class="ai-dropdown-panel" @tap.stop>
+            <view v-if="showHistoryDrawer" class="ai-dropdown-panel" @tap.stop style="top: 36px; border-radius: 0 0 8px 8px;">
                 <view class="menu-item header">历史对话</view>
                 <scroll-view scroll-y class="drawer-list" style="max-height: 350px;">
                     <view v-if="loadingHistory" class="menu-item" style="color:#999;">加载中...</view>
@@ -835,89 +849,6 @@
                 </scroll-view>
             </view>
             <view v-if="showHistoryDrawer" class="dropdown-fixed-mask" @tap.stop="toggleHistoryDrawer"></view>
-            
-            <!-- Removed separate context drawer row -->
-
-            <view class="panel-body panel-body-ai">
-              <scroll-view class="ai-chat-body" scroll-y :scroll-with-animation="true" :scroll-top="scrollTop">
-                <view class="ai-chat-padding"> <!-- Container for padding -->
-                  <view
-                    v-for="msg in aiMessages"
-                    :key="msg.id"
-                    class="ai-message"
-                    :class="msg.role === 'user' ? 'ai-message-user' : 'ai-message-assistant'"
-                  >
-                    <view class="ai-message-bubble">
-                      <text class="ai-message-content">{{ msg.content }}</text>
-                      <view v-if="msg.role === 'assistant' && msg.content" class="ai-message-actions">
-                        <text class="ai-export-btn primary" @tap="insertAiMessageToDoc(msg)">插入</text>
-                        <text class="ai-export-btn" @tap="applyAiMessageToSelection(msg)">替换</text>
-                        <text class="ai-export-btn" @tap="openExportDialog(msg)">导出</text>
-                      </view>
-                    </view>
-                  </view>
-                  <view v-if="aiLoading" class="ai-message ai-message-assistant">
-                    <view class="ai-message-bubble">
-                      <text class="ai-message-content">正在思考...</text>
-                    </view>
-                  </view>
-                  <view v-if="!aiMessages.length && !aiLoading" class="ai-empty-tip">
-                    <text>开始对话...</text>
-                  </view>
-                </view>
-              </scroll-view>
-
-              <!-- 仿 Cursor 输入区 -->
-              <view class="ai-input-wrapper" @keydown.native.capture="handleWrapperKeydown">
-                <view class="ai-input-scroller" @tap="focusRichInput">
-                  <!-- Pasted/Uploaded Images Preview -->
-                  <view v-if="pastedImages.length > 0" class="ai-attachments-preview">
-                     <view v-for="(img, idx) in pastedImages" :key="idx" class="attachment-thumb-wrap">
-                        <image :src="img.path" class="attachment-thumb" mode="aspectFill" />
-                        <view class="attachment-remove" @tap.stop="removeAttachment(idx)">×</view>
-                     </view>
-                  </view>
-                  <div 
-                    ref="aiRichInput"
-                    class="ai-rich-input"
-                    :class="{ empty: !aiInput && (!manualContextFiles || manualContextFiles.length === 0) }"
-                    contenteditable="true"
-                    @input="onRichInput"
-                    @keydown="onRichKeydown"
-                    @paste="handleRichPaste"
-                  ></div>
-                </view>
-                <view class="ai-input-footer">
-                  <view class="ai-model-select" @tap="toggleModelDropdown">
-                    <text class="model-name">{{ currentModelName }}</text>
-                    <text class="model-arrow">▼</text>
-                    
-                    <!-- Dropdown Mask & Menu -->
-                    <view v-if="showModelDropdown" class="dropdown-fixed-mask" @tap.stop="toggleModelDropdown"></view>
-                    <!-- 模型选择下拉 -->
-                    <view v-if="showModelDropdown" class="model-dropdown-menu" @tap.stop>
-                      <view 
-                        v-for="m in availableModels" 
-                        :key="m.id" 
-                        class="model-option" 
-                        :class="{ active: currentModelId === m.id }"
-                        @tap="switchModel(m.id)"
-                      >
-                        {{ m.name }}
-                      </view>
-                    </view>
-                  </view>
-                  
-                  <view
-                    class="ai-send-round-btn"
-                    :class="{ disabled: aiLoading || !aiInput.trim() }"
-                    @tap="!(aiLoading || !aiInput.trim()) && handleAiSend()"
-                  >
-                    <text class="send-icon">→</text>
-                  </view>
-                </view>
-              </view>
-            </view>
           </view>
         </view>
       </view>
@@ -1156,6 +1087,7 @@ import FilePreview from '@/components/FilePreview.vue'
 import VariablePanel from '@/components/VariablePanel.vue'
 import ProjectFavoritesPanel from '@/components/ProjectFavoritesPanel.vue'
 import FileLinkDropZone from '@/components/FileLinkDropZone.vue'
+import PluginPane from '@/components/PluginPane.vue' // Added
 import ClipboardPanel from '@/components/ClipboardPanel.vue'
 import InviteMemberDialog from '@/components/InviteMemberDialog.vue'
 import {
@@ -1185,7 +1117,8 @@ import {
   createFile,
   getApiBaseUrl,
   getAiConfig,
-  getAssistants // Added
+  getAssistants, // Added
+  getPlugins // Added
 } from '@/services/api.js'
 import { getCurrentUser } from '@/utils/auth.js'
 import { FILE_BATCH_ACTIONS, FILE_TREE_QUICK_ACTIONS } from '@/config/fileActions.js'
@@ -1200,6 +1133,8 @@ import {
 import { activityTracker } from '@/utils/activityTracker.js'
 import DdFilesPanel from '@/components/DdFilesPanel.vue'
 import DdRequestEditor from '@/components/DdRequestEditor.vue'
+import ChatInterface from '@/components/ChatInterface.vue'
+import MarkdownPreview from '@/components/MarkdownPreview.vue'
 
 export default {
   components: {
@@ -1213,7 +1148,10 @@ export default {
     ClipboardPanel,
     DdFilesPanel,
     DdRequestEditor,
-    InviteMemberDialog
+    InviteMemberDialog,
+    ChatInterface,
+    MarkdownPreview,
+    PluginPane // Added
   },
   data() {
     return {
@@ -1236,7 +1174,6 @@ export default {
       sidebarCollapsed: false,
       isCompactLayout: false,
       leftPaneKey: null, // Initialize to null to prevent premature loading
-      LEFT_SIDEBAR_PLUGINS,
       // 文件树批量选择模式（由页面控制开关）
       fileBatchMode: false,
       checkedFileIds: [],
@@ -1278,7 +1215,6 @@ export default {
       aiInput: '',
       pastedImages: [], 
       currentModelId: 'gemini-1.5-pro',
-      currentModelName: 'Gemini Pro',
       showModelDropdown: false,
       availableModels: [
         { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
@@ -1431,16 +1367,25 @@ export default {
       // Recording Toast
       showRecordingToast: false,
       recordingToastMessage: '',
-      recordingToastTimer: null
+      recordingToastTimer: null,
+      
+      // Mode-based active tab persistence
+      lastActiveIdsByMode: {
+        left: { 'files': null, 'dd-files': null },
+        right: { 'files': null, 'dd-files': null }
+      },
+      dynamicPlugins: [] // Added for dynamic sidebar icons
     }
   },
   computed: {
     LEFT_SIDEBAR_PLUGINS() {
       const user = getCurrentUser()
       if (user && user.role === 'CLIENT') {
-        return getPluginsForUser('CLIENT')
+        const clientPlugins = getPluginsForUser('CLIENT')
+        // Append client-visible dynamic plugins if any (optional)
+        return clientPlugins
       }
-      return LEFT_SIDEBAR_PLUGINS
+      return [...LEFT_SIDEBAR_PLUGINS, ...this.dynamicPlugins]
     },
     toolsSearchPlaceholder() {
       if (this.activeToolKey === 'variables') return '搜索变量…'
@@ -1501,10 +1446,14 @@ export default {
       return Array.isArray(this.checkedFileIds) ? this.checkedFileIds.length : 0
     },
     activeFileLeft() {
-      return this.leftFiles.find(f => f.id === this.activeFileIdLeft)
+      const file = this.leftFiles.find(f => f.id === this.activeFileIdLeft)
+      if (file && !this.isTabVisible(file)) return null
+      return file
     },
     activeFileRight() {
-      return this.rightFiles.find(f => f.id === this.activeFileIdRight)
+      const file = this.rightFiles.find(f => f.id === this.activeFileIdRight)
+      if (file && !this.isTabVisible(file)) return null
+      return file
     },
     currentModelName() {
       const m = this.availableModels.find(item => item.id === this.currentModelId)
@@ -1689,6 +1638,15 @@ export default {
             this.leftPaneKey = 'files'
           }
       }
+
+      // Restore active tabs for this project/mode
+      const savedActiveTabs = uni.getStorageSync(`project_${this.projectId}_activeTabsByMode`)
+      if (savedActiveTabs) {
+        this.lastActiveIdsByMode = savedActiveTabs
+        const mode = this.leftPaneKey || 'files'
+        if (savedActiveTabs.left[mode]) this.activeFileIdLeft = savedActiveTabs.left[mode]
+        if (savedActiveTabs.right[mode]) this.activeFileIdRight = savedActiveTabs.right[mode]
+      }
     }
     // 登录态下启用剪贴板记录（仅记录本应用能感知到的 paste / 复制按钮）
     this.bindClipboardListener()
@@ -1696,6 +1654,7 @@ export default {
     // Initialize AI Model (Persistence > System Default)
     this.initAiModel()
     this.loadAssistants() // Fetch assistants
+    this.loadDynamicPlugins() // Fetch dynamic plugins
   },
   onShow() {
     // Sync UI state
@@ -1917,65 +1876,6 @@ export default {
             // ignore
           }
         }
-      }
-
-      if (!this._wpsInternalMsgHandler && typeof window !== 'undefined') {
-        this._wpsInternalMsgHandler = (evt) => {
-          try {
-            const d = evt && evt.data
-            if (!d || d.__checkbaInternalLink !== true) return
-            const raw0 = d.url ? String(d.url) : ''
-            if (typeof window !== 'undefined' && typeof window.__checkbaHandleInternalLink === 'function') {
-              window.__checkbaHandleInternalLink(raw0)
-              return
-            }
-            const raw = raw0.replace(/^checkba:\/*/i, 'checkba://')
-            const q = raw.includes('?') ? raw.split('?')[1] : ''
-            const params = new URLSearchParams(q)
-
-            // webfav：定位收藏卡片
-            if (raw.startsWith('checkba://webfav')) {
-              const favId = params.get('id')
-              if (!favId) return
-              this.showToolsPanel = true
-              this.activeToolKey = 'favorites'
-              this.$nextTick(() => {
-                try {
-                  const panel = this.$refs.favoritesPanel
-                  if (panel && typeof panel.focusFavorite === 'function') panel.focusFavorite(Number(favId))
-                } catch (e) {}
-              })
-              return
-            }
-
-            // filelink：打开关联文件（多文件先弹窗）
-            if (raw.startsWith(this.INTERNAL_LINK_SCHEMES.fileLink)) {
-              const linkKey = params.get('k') || ''
-              if (!linkKey || !this.projectId) return
-              const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
-              getDocFileLink(pid, linkKey)
-                .then((resp) => {
-                  const files = resp && resp.files ? resp.files : (resp && resp.data && resp.data.files ? resp.data.files : [])
-                  const list = Array.isArray(files) ? files : []
-                  if (list.length <= 0) {
-                    uni.showToast({ title: '关联文件不存在', icon: 'none' })
-                    return
-                  }
-                  if (list.length === 1) {
-                    this.openFileLinkTarget(list[0].id, this.focusedPane || 'left')
-                    return
-                  }
-                  this.fileLinkPicker = { visible: true, side: this.focusedPane === 'right' && this.splitMode ? 'right' : 'left', files: list, linkKey }
-                })
-                .catch((e) => {
-                  uni.showToast({ title: (e && e.message) ? e.message : '打开失败', icon: 'none' })
-                })
-              return
-            }
-          } catch (e) {
-            // ignore
-          }
-        }
         window.addEventListener('message', this._wpsInternalMsgHandler)
       }
     } catch (e) {
@@ -2042,6 +1942,10 @@ export default {
       return file && file.type === 'dd-request'
     },
     handleOpenDdRequest(req) {
+      // 切换到尽调清单模式以便查看
+      if (this.leftPaneKey !== 'dd-files') {
+        this.toggleLeftPane('dd-files')
+      }
       const file = {
         id: 'dd-' + req.id,
         requestId: req.id,
@@ -2051,6 +1955,21 @@ export default {
         isFolder: false
       }
       this.openFile(file)
+    },
+    isTabVisible(file) {
+      if (!file) return false
+      // dd-request 或者 fileType 为 dd 的属于尽调清单类标签
+      const isDd = file.type === 'dd-request' || file.fileType === 'dd'
+      if (isDd) {
+        return this.leftPaneKey === 'dd-files'
+      }
+      // 其他文件标签（资源管理器打开的文件、浏览器标签等）仅在资源管理器模式下显示
+      // 插件标签也只在插件模式下显示
+      const isPlugin = file.fileType === 'plugin'
+      if (isPlugin) {
+        return this.leftPaneKey === file.id // Assuming plugin ID is its key
+      }
+      return this.leftPaneKey === 'files'
     },
     startRenameProject() {
       this.renameProjectName = this.project.name || ''
@@ -2124,6 +2043,11 @@ export default {
              tree.openBatchAction('copy')
          }
          return
+      }
+      
+      if (actionKey === 'sort' && typeof tree.toggleSortOrder === 'function') {
+        tree.toggleSortOrder()
+        return
       }
     },
     wrapWpsInternalLink(innerUrl) {
@@ -2471,12 +2395,66 @@ export default {
       // 按 Cursor 体验：不在窄屏时强行限制面板宽度（遮挡就遮挡），只切换样式密度
     },
     toggleLeftPane(key) {
-      // Cursor 体验：点击同一图标可收起/展开
+      // 记录当前活跃 tab 到当前模式
+      const oldKey = this.leftPaneKey
+      if (oldKey) {
+        this.lastActiveIdsByMode.left[oldKey] = this.activeFileIdLeft
+        this.lastActiveIdsByMode.right[oldKey] = this.activeFileIdRight
+      }
+
       if (this.leftPaneKey === key) {
         this.sidebarCollapsed = !this.sidebarCollapsed
       } else {
         this.leftPaneKey = key
         this.sidebarCollapsed = false
+        
+        // Check if it's a dynamic plugin and open its tab
+        const plugin = this.dynamicPlugins.find(p => p.key === key)
+        if (plugin) {
+          this.openFile({
+            id: plugin.key,
+            name: plugin.label,
+            fileType: 'plugin',
+            frontendEntry: plugin.frontendEntry
+          })
+        }
+
+        // 恢复新模式下的活跃 tab
+        const savedLeft = this.lastActiveIdsByMode.left[key]
+        const savedRight = this.lastActiveIdsByMode.right[key]
+        
+        if (savedLeft) {
+          this.activeFileIdLeft = savedLeft
+        } else {
+          // 如果新模式没有记录，且当前 active 的 tab 在新模式下不可见，则设为 null
+          const curLeft = this.leftFiles.find(f => f.id === this.activeFileIdLeft)
+          if (curLeft && !this.isTabVisible(curLeft)) {
+            // 尝试找一个在新模式下可见的 tab
+            const firstVisible = this.leftFiles.find(f => this.isTabVisible(f))
+            this.activeFileIdLeft = firstVisible ? firstVisible.id : null
+          }
+        }
+
+        if (savedRight) {
+          this.activeFileIdRight = savedRight
+        } else {
+          const curRight = this.rightFiles.find(f => f.id === this.activeFileIdRight)
+          if (curRight && !this.isTabVisible(curRight)) {
+            const firstVisible = this.rightFiles.find(f => this.isTabVisible(f))
+            this.activeFileIdRight = firstVisible ? firstVisible.id : null
+          }
+        }
+      }
+
+      // Persistence
+      if (this.projectId) {
+        uni.setStorageSync(`project_${this.projectId}_leftPaneKey`, key)
+        this.saveActiveIdsByMode()
+      }
+    },
+    saveActiveIdsByMode() {
+      if (this.projectId) {
+        uni.setStorageSync(`project_${this.projectId}_activeTabsByMode`, this.lastActiveIdsByMode)
       }
     },
     onLeftPluginClick(key) {
@@ -3886,8 +3864,29 @@ export default {
       uni.navigateTo({ url: '/pages/userprofile/userprofile' })
     },
     formatTime(timeStr) {
-      if (!timeStr) return '-'
-      return new Date(timeStr).toLocaleDateString()
+  if (!timeStr) return '-'
+  
+  // Parse the timestamp
+  const date = new Date(timeStr)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+  const diffHrs = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  
+  // Return relative time format
+  if (diffMins < 1) {
+    return '刚刚'
+  } else if (diffMins < 60) {
+    return `${diffMins}分钟前`
+  } else if (diffHrs < 24) {
+    return `${diffHrs}小时前`
+  } else if (diffDays < 7) {
+    return `${diffDays}天前`
+  } else {
+    // Fallback to MM/DD format for older dates
+    return `${date.getMonth() + 1}/${date.getDate()}`
+    }
     },
 
     // --- 布局控制 ---
@@ -3901,6 +3900,8 @@ export default {
         this.triggerWorkbenchResize()
         if (this.showAiPanel) {
           this.refreshAiContextPreview()
+          // Auto-load recent chat history when panel opens
+          this.fetchChatHistory()
         }
       })
     },
@@ -4197,6 +4198,11 @@ export default {
         this[targetIdProp] = file.id
       }
 
+      // Persist active ID for current mode
+      const mode = this.leftPaneKey || 'files'
+      this.lastActiveIdsByMode[targetPane][mode] = file.id
+      this.saveActiveIdsByMode()
+
       // 打开/激活后，给 WPS 一个机会刷新（避免容器尺寸/激活状态不对）
       this.$nextTick(() => this.triggerWorkbenchResize())
     },
@@ -4209,6 +4215,11 @@ export default {
       } else {
         this.activeFileIdRight = file.id
       }
+
+      // Persist active ID for current mode
+      const mode = this.leftPaneKey || 'files'
+      this.lastActiveIdsByMode[pane][mode] = file.id
+      this.saveActiveIdsByMode()
       
       // Track switch
       const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
@@ -4246,9 +4257,15 @@ export default {
       
       // 如果关闭的是当前激活的文件，尝试切换到临近的文件
       if (activeId === fileId) {
-        this[idProp] = list.length > 0 
+        const newActiveId = list.length > 0 
           ? list[Math.min(idx, list.length - 1)].id 
           : null
+        this[idProp] = newActiveId
+
+        // Update persisted record
+        const mode = this.leftPaneKey || 'files'
+        this.lastActiveIdsByMode[pane][mode] = newActiveId
+        this.saveActiveIdsByMode()
       }
     },
 
@@ -4261,7 +4278,7 @@ export default {
     },
     isWpsFile(file) {
       // 根据是否有 wpsFileId 判断是否用 WPS 打开
-      if (!file || file.tabType === 'web' || !file.fileType) return false
+      if (!file || file.tabType === 'web' || file.tabType === 'markdown' || !file.fileType) return false
       
       const type = file.fileType.toLowerCase()
       
@@ -4290,6 +4307,11 @@ export default {
       
       // Default to WPS if it has ID or is office type (but not media)
       return wpsFormats.includes(type) || (file.wpsFileId && !mediaTypes.includes(type))
+    },
+
+    // Check if file is a markdown tab (for AI artifacts)
+    isMarkdownTab(file) {
+      return file && file.tabType === 'markdown'
     },
 
     // --- WPS 交互逻辑 ---
@@ -4391,6 +4413,11 @@ export default {
     async syncFileInfo(pane) {
       const activeFile = pane === 'left' ? this.activeFileLeft : this.activeFileRight
       if (!activeFile || !activeFile.id) return
+      
+      // Skip sync for virtual artifact tabs (they have string IDs like 'artifact-hist-xxx')
+      if (typeof activeFile.id === 'string' && activeFile.id.startsWith('artifact-')) {
+        return
+      }
       
       try {
         const fileDetail = await getFileDetail(this.projectId, activeFile.id)
@@ -4658,6 +4685,63 @@ export default {
         this.aiContextLoading = false
       }
     },
+    handleChatInterfaceAction({ type, msg }) {
+      if (type === 'insert') {
+        this.insertAiMessageToDoc(msg)
+      } else if (type === 'replace') {
+        this.applyAiMessageToSelection(msg)
+      } else if (type === 'export') {
+        this.openExportDialog(msg)
+      }
+    },
+    
+    // Handle artifact open-tab event from ChatInterface
+    // Creates a virtual .md tab in the left pane with typewriter effect
+    handleArtifactOpenTab(artifactInfo) {
+      console.log('[ProjectOverview] 📄 Opening artifact in tab:', artifactInfo)
+      
+      // Check if tab already exists
+      const existingTab = this.leftFiles.find(f => f.artifactId === artifactInfo.id)
+      if (existingTab) {
+        // Activate existing tab
+        this.activateTab(existingTab, 'left')
+        return
+      }
+      
+      // Create virtual markdown file object
+      const virtualFile = {
+        id: `artifact-${artifactInfo.id}`,
+        artifactId: artifactInfo.id,
+        name: artifactInfo.fileName || 'AI工作计划.md',
+        tabType: 'markdown',
+        fileType: 'md',
+        content: artifactInfo.content || artifactInfo.data?.content || '',
+
+        createdAt: Date.now()
+      }
+      
+      // Add to leftFiles and activate
+      this.leftFiles.push(virtualFile)
+      this.activeFileIdLeft = virtualFile.id
+      
+      // TODO: Persist to backend /项目根目录/AI助手工作计划/ if needed
+      console.log('[ProjectOverview] ✓ Created markdown tab:', virtualFile.name)
+    },
+
+    handleClientAction(action) {
+        console.log('[ProjectOverview] Client Action:', action)
+        if (action.action === 'refresh_files') {
+            if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
+                console.log('[ProjectOverview] Refreshing File Tree...')
+                this.$refs.fileTree.loadFiles()
+                // optionally show toast
+                uni.showToast({ title: '文件已更新', icon: 'none' })
+            }
+        }
+    },
+
+    // --- 文件选择/上传 ---
+    
     insertAiMessageToDoc(message) {
       if (!message || !message.content) return
       this.insertPlainTextToWps(message.content)
@@ -4721,21 +4805,43 @@ export default {
         }
         
         if (fileData) {
-             // Logic: Add to list if not exists, THEN insert tag visually
-             if (!this.manualContextFiles) this.manualContextFiles = []
-             const exists = this.manualContextFiles.find(f => f.fileId === fileData.fileId)
-             
-             if (!exists) {
-                 this.manualContextFiles.push({
-                     fileId: fileData.fileId,
-                     fileName: fileData.name,
-                     fileType: fileData.fileType,
-                     wpsFileId: fileData.wpsFileId
-                 })
+             const file = {
+                 id: fileData.fileId || fileData.id,
+                 name: fileData.name || fileData.fileName,
+                 fileType: fileData.fileType,
+                 wpsFileId: fileData.wpsFileId,
+                 isDir: fileData.fileType === 'folder' || fileData.isDir
              }
              
-             // Insert Visual Tag
-             this.insertContextTag(fileData)
+             // Check for folder file count limit (>10)
+             if (file.isDir && this.$refs.fileTree && Array.isArray(this.$refs.fileTree.allFiles)) {
+                 const allFiles = this.$refs.fileTree.allFiles
+                 // Helper to count non-folder files recursively
+                 const countDescendants = (pid) => {
+                     let count = 0
+                     const children = allFiles.filter(f => f.parentId == pid) // use fuzzy match for potential string/int diff
+                     for (const child of children) {
+                         if (!child.isFolder) {
+                             count++
+                         } else {
+                             count += countDescendants(child.id)
+                         }
+                     }
+                     return count
+                 }
+                 
+                 const totalFiles = countDescendants(file.id)
+                 if (totalFiles > 10) {
+                     uni.showToast({ title: `文件夹含${totalFiles}个文件(超出10个限制)，请减少数量`, icon: 'none' })
+                     return
+                 }
+             }
+
+             if (this.$refs.chatInterface) {
+                 this.$refs.chatInterface.addFile(file)
+             }
+             
+             // Note: Visual tag display is now handled within ChatInterface
              uni.showToast({ title: '已添加: ' + fileData.name, icon: 'none' })
 
         } else {
@@ -4759,12 +4865,14 @@ export default {
        this.aiInput = el.innerText
     },
     onRichKeydown(e) {
-       // Handle Enter
+       // Handle Enter: Enter = newline, Cmd/Ctrl+Enter = send
        if (e.key === 'Enter') {
-          if (!e.shiftKey) {
+          if (e.metaKey || e.ctrlKey) {
+             // Cmd/Ctrl+Enter: Send message
              e.preventDefault()
              this.handleAiSend()
           }
+          // Otherwise: let default behavior (newline) happen
        }
     },
     // Paste Handler
@@ -4846,7 +4954,15 @@ export default {
        }
        const bg = `rgba(${r},${g},${b},0.1)`
        
-       const tagHtml = `<span class="ai-tag" contenteditable="false" data-file-id="${file.id || file.fileId}" style="background:${bg}; color:${color}; font-family: 'Georgia', serif; font-style: italic; font-size: 11px;">@${file.name}</span>&nbsp;`
+       // Truncate filename to max 10 characters
+       const maxLen = 10
+       const displayName = file.name.length > maxLen 
+           ? file.name.substring(0, maxLen) + '...' 
+           : file.name
+       
+       // Use King IDE brand colors for the tag
+       const tagHtml = `<span class="ai-tag" contenteditable="false" data-file-id="${file.id || file.fileId}" data-full-name="${file.name}" title="${file.name}" style="background: linear-gradient(135deg, #1A5336 0%, #2D7A52 100%); color: #FFFFFF; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; box-shadow: 0 1px 3px rgba(26,83,54,0.2);">@${displayName}</span>&nbsp;`
+
        
        const sel = window.getSelection()
        if (sel.rangeCount > 0) {
@@ -4892,6 +5008,25 @@ export default {
           ]
       }
   },
+    async loadDynamicPlugins() {
+      try {
+        const res = await getPlugins()
+        if (res && res.data) {
+          // Map backend PluginMetadata to frontend plugin structure
+          this.dynamicPlugins = res.data.map(p => ({
+            key: `plugin-${p.id}`,
+            label: p.name,
+            icon: p.icon || '/static/plugin_default.png',
+            activeIcon: p.icon || '/static/plugin_default.png',
+            isDynamic: true,
+            frontendEntry: p.frontendEntry
+          }))
+          console.log('Dynamic plugins loaded:', this.dynamicPlugins)
+        }
+      } catch (e) {
+        console.error('Failed to load dynamic plugins:', e)
+      }
+    },
 
   // --- AI 相关 ---
   async initAiModel() {
@@ -5212,7 +5347,8 @@ export default {
     async fetchChatHistory() {
       if (!this.projectId) return
       this.loadingHistory = true
-      this.showHistoryDrawer = true
+      // Note: Do NOT set showHistoryDrawer = true here
+      // The drawer should only open when user clicks the toggle button (toggleHistoryDrawer)
       try {
           const res = await getAiConversations(this.projectId)
           // Map to display format
@@ -5220,8 +5356,9 @@ export default {
           // We map to: { id, title, date }
           this.chatHistoryList = (res || []).map(item => ({
               id: item.conversationId,
-              title: item.lastMessage ? (item.lastMessage.substring(0, 20) + (item.lastMessage.length > 20 ? '...' : '')) : '新对话',
-              date: item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : '',
+              title: item.title ? item.title.replace(/<[^>]+>/g, '').trim() : (item.lastMessage ? (item.lastMessage.substring(0, 20) + (item.lastMessage.length > 20 ? '...' : '')) : '新对话'),
+              updatedAt: item.updatedAt, 
+              lastMessage: item.lastMessage ? item.lastMessage.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').substring(0, 60) + (item.lastMessage.length > 60 ? '...' : '') : '',
               conversationId: item.conversationId
           }))
       } catch (e) {
@@ -5241,16 +5378,18 @@ export default {
                 projectId: this.projectId, 
                 conversationId: chat.conversationId 
             })
-            // Populate aiMessages
-            this.aiMessages = (msgs || []).map(m => ({
-                id: m.id,
-                role: m.role ? m.role.toLowerCase() : 'user',
-                content: m.content
-            }))
+            // Pass conversationId and messages to ChatInterface via $refs
+            if (this.$refs.chatInterface && typeof this.$refs.chatInterface.loadMessages === 'function') {
+                this.$refs.chatInterface.loadMessages(chat.conversationId, msgs)
+            } else {
+                // Fallback for legacy - populate aiMessages directly
+                this.aiMessages = (msgs || []).map(m => ({
+                    id: m.id,
+                    role: m.role ? m.role.toLowerCase() : 'user',
+                    content: m.content
+                }))
+            }
             this.showHistoryDrawer = false
-            this.$nextTick(() => {
-                this.scrollToBottom()
-            })
         } catch (e) {
             console.error('Load chat failed', e)
             uni.showToast({ title: '加载对话失败', icon: 'none' })
@@ -5489,8 +5628,8 @@ $bg-white: #FFFFFF;
 }
 
 .top-bar-btn {
-  width: 24px; /* Resized to 3/4 of 32px */
-  height: 24px;
+  width: 19.2px; /* Resized to 4/5 of 24px */
+  height: 19.2px;
   display: flex; /* mixin replacement */
   align-items: center;
   justify-content: center;
@@ -5608,8 +5747,8 @@ $bg-white: #FFFFFF;
 }
 
 .rail-icon-img {
-    width: 24px;
-    height: 24px;
+    width: 18px; /* Resized to 3/4 of 24px */
+    height: 18px;
 }
 
 .rail-icon {
@@ -5807,7 +5946,7 @@ $bg-white: #FFFFFF;
   }
   
   &.focused {
-    // Optional focus indication
+    background-color: rgba(91, 209, 151, 0.05);
   }
 }
 
@@ -5986,11 +6125,12 @@ $bg-white: #FFFFFF;
 
 .sidebar-actions {
   display: flex;
-  gap: 4px;
+  gap: 1px;
   
   .icon-btn.mini {
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 16px;
+
     
     .tool-icon { font-size: 14px; }
     
@@ -6032,6 +6172,7 @@ $bg-white: #FFFFFF;
   position: relative;
   flex-shrink: 0;
   min-height: 0;
+  min-width: 0; /* Allow flex shrinking */
   background: #ffffff;
   border: none;
   border-left: 1px solid rgba(18, 52, 77, 0.08);
@@ -6039,7 +6180,9 @@ $bg-white: #FFFFFF;
   box-shadow: none;
   display: flex;
   flex-direction: column;
-  overflow: visible; /* Ensure dropdowns can pop out if needed */
+  overflow-x: hidden; /* Prevent horizontal overflow */
+  overflow-y: visible; /* Allow vertical overflow for dropdowns */
+  box-sizing: border-box;
 }
 
 .side-resize-handle {
@@ -6056,7 +6199,7 @@ $bg-white: #FFFFFF;
   position: relative;
   flex-shrink: 0;
   min-height: 0;
-  background: #ffffff;
+  background: #f8f9fa;
   border-top: 1px solid rgba(18, 52, 77, 0.08);
   border-radius: 0;
   box-shadow: none;
@@ -6082,7 +6225,7 @@ $bg-white: #FFFFFF;
   justify-content: space-between;
   padding: 0 12px;
   border-bottom: 1px solid $color-border;
-  background: $bg-white;
+  background: #f8f9fa;
 }
 
 .panel-title {
@@ -6227,11 +6370,11 @@ $bg-white: #FFFFFF;
     font-size: 13px;
     color: #334155;
     cursor: pointer;
-    border-bottom: 1px solid #f8fafc;
+    border-bottom: 1px solid #f8f9fa;
 }
 .menu-item:hover { background: #f1f5f9; }
 .menu-item.header {
-    background: #f8fafc;
+    background: #f8f9fa;
     color: #64748b;
     font-size: 11px;
     font-weight: 600;
@@ -6268,13 +6411,15 @@ $bg-white: #FFFFFF;
     display: flex;
     flex-direction: column;
     height: 100%;
-    /* No overflow: hidden here, or dropdowns might be cut off if we wanted them to pop out. 
-       But here we want them INSIDE the panel width, so it's fine. */
+    min-width: 0; /* Allow flex shrinking */
+    overflow: hidden; /* Contain children within bounds */
+    box-sizing: border-box;
+    /* Child ChatInterface now handles its own overflow */
 }
 
 .ai-history-drawer {
     position: absolute;
-    top: 32px; /* Below header */
+    top: 36px; /* Match panel-header-ai height */
     left: 0;
     right: 0;
     bottom: 0;
@@ -6282,7 +6427,7 @@ $bg-white: #FFFFFF;
     z-index: 50;
     display: flex;
     flex-direction: column;
-    border-top: 1px solid $color-border;
+    border-top: none; /* Remove border since it's directly under header */
 }
 
 /* Dialog Styles */
@@ -6328,7 +6473,7 @@ $bg-white: #FFFFFF;
     box-sizing: border-box;
 }
 .input.readonly, .textarea.readonly {
-    background: #f8fafc;
+    background: #f8f9fa;
     color: #64748b;
     cursor: not-allowed;
 }
@@ -6484,7 +6629,8 @@ $bg-white: #FFFFFF;
 .sidebar-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
+
   width: auto;
 }
 
@@ -6553,8 +6699,9 @@ $bg-white: #FFFFFF;
 }
 
 .icon-btn.mini {
-  width: 22px;
-  height: 20px;
+  width: 18px;
+  height: 16px;
+
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -6573,10 +6720,12 @@ $bg-white: #FFFFFF;
 }
 
 .icon-btn.mini.active {
-  background-color: #E8F3ED;
-  border: none !important;
+  background: rgba(91, 209, 151, 0.2) !important;
+  border: 1px solid rgba(26, 83, 54, 0.2) !important;
+  box-shadow: none !important;
   outline: none !important;
 }
+
 
 .icon-btn.mini:focus {
     outline: none !important;
@@ -6728,7 +6877,7 @@ $bg-white: #FFFFFF;
 /* 标签栏 Tabs */
 .tabs-bar {
   height: 36px;
-  background: #f8fafc;
+  background: #f8f9fa;
   border-bottom: 1px solid rgba(18, 52, 77, 0.08);
   backdrop-filter: none;
   display: flex;
@@ -7169,6 +7318,8 @@ $bg-white: #FFFFFF;
   flex-direction: column;
   border-right: 1px solid rgba($color-border, 0.7);
   min-width: 0;
+  overflow: hidden; /* Prevent children from overflowing */
+  box-sizing: border-box;
 }
 
 .ai-tool-pane {
@@ -7429,7 +7580,7 @@ $bg-white: #FFFFFF;
   padding: 4px 8px;
   border-radius: 4px;
   cursor: pointer;
-  background: #f8fafc;
+  background: #f8f9fa;
   transition: background 0.1s;
 }
 
@@ -7471,7 +7622,7 @@ $bg-white: #FFFFFF;
   max-width: 92%;
   padding: 10px 14px;
   border-radius: 10px; /* Slightly squarer */
-  background: #f8fafc;
+  background: #f8f9fa;
   border: 1px solid #f1f5f9; /* Subtle border */
   box-shadow: none; /* Flat design */
 }
@@ -7569,8 +7720,8 @@ $bg-white: #FFFFFF;
 }
 .attachment-thumb-wrap {
     position: relative;
-    width: 48px;
-    height: 48px;
+    width: 38px; /* 4/5 of 48px */
+    height: 38px;
     border-radius: 4px;
     overflow: hidden;
     border: 1px solid #e2e8f0;
@@ -7613,25 +7764,39 @@ $bg-white: #FFFFFF;
 }
 
 .ai-rich-input.empty::before {
-  content: '输入指令 (Enter 发送，Shift + Enter 换行)...';
+  content: '输入指令 (Enter 换行，⌘/Ctrl + Enter 发送)...';
   color: #94a3b8;
   pointer-events: none;
   display: block; 
 }
 
-/* Inline Tag Style */
+/* Inline Tag Style - King IDE Brand Colors */
 .ai-tag {
   display: inline-flex;
   align-items: center;
-  background: #E6F9F0;
-  color: #1A5336;
-  padding: 0px 6px;
+  background: linear-gradient(135deg, #1A5336 0%, #2D7A52 100%); /* King Forest gradient */
+  color: #FFFFFF;
+  padding: 2px 8px;
   border-radius: 4px;
-  margin: 0 4px;
+  margin: 0 4px 2px 0;
   font-size: 12px;
+  font-weight: 500;
   vertical-align: middle;
-  border: 1px solid rgba(26, 83, 54, 0.1);
+  border: none;
   user-select: none;
+  max-width: 10em; /* Max ~10 characters */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 2.5em;
+  box-shadow: 0 1px 3px rgba(26, 83, 54, 0.2);
+  transition: all 0.15s ease;
+}
+
+.ai-tag:hover {
+  background: linear-gradient(135deg, #2D7A52 0%, #1A5336 100%);
+  box-shadow: 0 2px 6px rgba(26, 83, 54, 0.3);
 }
 
 .ai-input-footer {
@@ -7639,7 +7804,7 @@ $bg-white: #FFFFFF;
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  border-top: 1px solid #f8fafc;
+  border-top: 1px solid #f8f9fa;
 }
 
 .ai-model-select {
@@ -7649,7 +7814,7 @@ $bg-white: #FFFFFF;
   padding: 4px 8px;
   border-radius: 4px;
   cursor: pointer;
-  background: #f8fafc;
+  background: #f8f9fa;
   transition: background 0.1s;
 }
 
@@ -8191,7 +8356,7 @@ $bg-white: #FFFFFF;
 }
 
 .upload-btn-secondary:hover {
-  background-color: #F8FAFC;
+  background-color: #f8f9fa;
   color: #1A5336;
   border-color: #1A5336;
 }
@@ -8677,7 +8842,7 @@ $bg-white: #FFFFFF;
 
 .king-dialog-footer {
   padding: 20px 32px 24px;
-  background: #f8fafc;
+  background: #f8f9fa;
   display: flex;
   justify-content: center; /* Centered buttons */
   gap: 16px;

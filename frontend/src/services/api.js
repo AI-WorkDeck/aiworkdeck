@@ -225,6 +225,14 @@ export function getAssistants() {
   });
 }
 
+// 获取插件列表
+export function getPlugins() {
+  return request({
+    url: '/api/plugins/list',
+    method: 'GET'
+  });
+}
+
 /**
  * 将一段 AI 文本（markdown）导出为 Word 文档并落地到项目文件树中（后端生成 docx）
  * payload: { projectId, parentId, fileName, markdown | content }
@@ -969,6 +977,13 @@ export function deleteDdRequest(requestId) {
   })
 }
 
+export function copyDdRequest(requestId) {
+  return request({
+    url: `/api/dd/requests/${requestId}/copy`,
+    method: 'POST'
+  })
+}
+
 export default {
   getApiBaseUrl,
   request,
@@ -1032,6 +1047,7 @@ export default {
   getDdItemComments,
   deleteDdItem,
   deleteDdRequest,
+  copyDdRequest,
   addDdRequestItems(requestId, content) {
     return request({
       url: `/api/dd/requests/${requestId}/items`,

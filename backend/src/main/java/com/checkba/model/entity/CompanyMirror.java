@@ -7,9 +7,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
-import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 /**
  * 公司镜像实体
@@ -19,7 +19,6 @@ import java.time.LocalDateTime;
  * - 既可承载上市公司，也可承载标的公司（通过 role 区分）；
  * - 列表类字段（股东、董监高等）暂以 JSON 字符串存储，后续有需要可以拆分子表。
  */
-@Data
 @Entity
 @Table(name = "company_mirror")
 public class CompanyMirror {
@@ -130,6 +129,172 @@ public class CompanyMirror {
      * 最近更新时间
      */
     private LocalDateTime updatedAt;
+    
+    // Getters and Setters
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getStockCode() {
+        return stockCode;
+    }
+
+    public void setStockCode(String stockCode) {
+        this.stockCode = stockCode;
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public String getShortName() {
+        return shortName;
+    }
+
+    public void setShortName(String shortName) {
+        this.shortName = shortName;
+    }
+
+    public String getBoard() {
+        return board;
+    }
+
+    public void setBoard(String board) {
+        this.board = board;
+    }
+
+    public String getTotalShares() {
+        return totalShares;
+    }
+
+    public void setTotalShares(String totalShares) {
+        this.totalShares = totalShares;
+    }
+
+    public String getLatestClosePrice() {
+        return latestClosePrice;
+    }
+
+    public void setLatestClosePrice(String latestClosePrice) {
+        this.latestClosePrice = latestClosePrice;
+    }
+
+    public String getRegisteredAddress() {
+        return registeredAddress;
+    }
+
+    public void setRegisteredAddress(String registeredAddress) {
+        this.registeredAddress = registeredAddress;
+    }
+
+    public String getRegisteredCapital() {
+        return registeredCapital;
+    }
+
+    public void setRegisteredCapital(String registeredCapital) {
+        this.registeredCapital = registeredCapital;
+    }
+
+    public String getEquityStructureRemark() {
+        return equityStructureRemark;
+    }
+
+    public void setEquityStructureRemark(String equityStructureRemark) {
+        this.equityStructureRemark = equityStructureRemark;
+    }
+
+    public String getTop10ShareholdersJson() {
+        return top10ShareholdersJson;
+    }
+
+    public void setTop10ShareholdersJson(String top10ShareholdersJson) {
+        this.top10ShareholdersJson = top10ShareholdersJson;
+    }
+
+    public String getExecutivesJson() {
+        return executivesJson;
+    }
+
+    public void setExecutivesJson(String executivesJson) {
+        this.executivesJson = executivesJson;
+    }
+
+    public String getShareholdersJson() {
+        return shareholdersJson;
+    }
+
+    public void setShareholdersJson(String shareholdersJson) {
+        this.shareholdersJson = shareholdersJson;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        CompanyMirror that = (CompanyMirror) o;
+        return Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+    
+    @Override
+    public String toString() {
+        return "CompanyMirror{" +
+                "id=" + id +
+                ", role='" + role + '\'' +
+                ", name='" + name + '\'' +
+                '}';
+    }
 }
-
-

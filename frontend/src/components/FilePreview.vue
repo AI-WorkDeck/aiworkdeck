@@ -530,7 +530,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f8fafc;
+  background-color: #f8f9fa;
 }
 
 .audio-wrapper {

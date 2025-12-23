@@ -22,9 +22,10 @@ import java.net.URL;
  * 
  * 使用前需要在pom.xml中添加相应的依赖，并在配置文件中配置访问凭证。
  */
-@Slf4j
 @Service
 public class OssStorageService implements StorageService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OssStorageService.class);
 
     private final StorageProperties storageProperties;
 

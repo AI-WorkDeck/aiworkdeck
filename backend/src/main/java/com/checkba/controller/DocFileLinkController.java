@@ -51,7 +51,6 @@ public class DocFileLinkController {
         return AuthController.getUserIdFromSession(sessionId);
     }
 
-    @Data
     public static class CreateOrAppendRequest {
         private String docWpsFileId;
         private String linkKey;
@@ -59,6 +58,19 @@ public class DocFileLinkController {
         private Integer rangeStart;
         private Integer rangeEnd;
         private List<Long> fileIds;
+
+        public String getDocWpsFileId() { return docWpsFileId; }
+        public void setDocWpsFileId(String docWpsFileId) { this.docWpsFileId = docWpsFileId; }
+        public String getLinkKey() { return linkKey; }
+        public void setLinkKey(String linkKey) { this.linkKey = linkKey; }
+        public String getAnchorText() { return anchorText; }
+        public void setAnchorText(String anchorText) { this.anchorText = anchorText; }
+        public Integer getRangeStart() { return rangeStart; }
+        public void setRangeStart(Integer rangeStart) { this.rangeStart = rangeStart; }
+        public Integer getRangeEnd() { return rangeEnd; }
+        public void setRangeEnd(Integer rangeEnd) { this.rangeEnd = rangeEnd; }
+        public List<Long> getFileIds() { return fileIds; }
+        public void setFileIds(List<Long> fileIds) { this.fileIds = fileIds; }
     }
 }
 

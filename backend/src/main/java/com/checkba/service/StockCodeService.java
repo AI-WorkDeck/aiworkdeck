@@ -14,9 +14,10 @@ import org.springframework.util.StringUtils;
  * - 当前实现基于新浪行情公开接口，不依赖额外密钥；
  * - 后续如需切换到更稳定的数据源，可以在不影响调用方的前提下替换实现。
  */
-@Slf4j
 @Service
 public class StockCodeService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StockCodeService.class);
 
     /**
      * 根据 6 位股票代码解析公司名称（简称）

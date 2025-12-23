@@ -15,9 +15,10 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 
-@Slf4j
 @Service
 public class MediaProcessingService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MediaProcessingService.class);
 
     /**
      * 从视频文件中提取关键帧

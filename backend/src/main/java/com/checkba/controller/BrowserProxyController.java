@@ -26,11 +26,12 @@ import java.time.Duration;
  *
  * 注意：这是“最小可用”实现，不保证兼容所有站点（复杂 CSP/分片加载/反爬会失败）。
  */
-@Slf4j
 @RestController
 @RequestMapping("/api/browser")
 @CrossOrigin(origins = "*")
 public class BrowserProxyController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BrowserProxyController.class);
 
     private static final HttpClient CLIENT = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)

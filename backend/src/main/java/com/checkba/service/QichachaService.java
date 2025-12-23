@@ -18,9 +18,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Slf4j
 @Service
 public class QichachaService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(QichachaService.class);
 
     @Value("${external.qichacha.key}")
     private String appKey;

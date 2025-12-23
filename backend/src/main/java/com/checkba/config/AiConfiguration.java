@@ -16,10 +16,11 @@ import org.springframework.context.annotation.Configuration;
  * - 根据配置选择不同的大模型供应商（Ollama / Google Gemini）
  * - 创建 ProjectAssistant，实现对话 + RAG + 文件工具
  */
-@Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class AiConfiguration {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AiConfiguration.class);
 
     private final AiModelProperties aiModelProperties;
     private final DynamicContentRetriever dynamicContentRetriever;

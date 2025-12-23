@@ -4,7 +4,6 @@ backend/.classpath
 backend/.project
 backend/.settings/
 *.class
-*.log
 *.jar
 *.war
 

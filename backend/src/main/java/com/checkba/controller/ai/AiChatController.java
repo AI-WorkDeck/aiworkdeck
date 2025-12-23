@@ -26,11 +26,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONArray;
 
-@Slf4j
 @RestController
 @RequestMapping("/api/ai")
-
 public class AiChatController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AiChatController.class);
 
     private final ProjectAssistant defaultProjectAssistant;
     private final ProjectAiMessageService projectAiMessageService;
@@ -42,6 +42,9 @@ public class AiChatController {
     private final SystemSettingService systemSettingService;
     private final com.checkba.service.ai.MediaProcessingService mediaProcessingService;
     private final com.checkba.service.ProjectFileService projectFileService;
+    private final com.checkba.service.ai.ChatModelFactory chatModelFactory;
+    private final com.checkba.service.ai.TokenUsageService tokenUsageService;
+    private final com.checkba.service.ai.context.FileContentExtractorService fileContentExtractorService;
 
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private static final String KEY_AI_ASSISTANTS = "ai.assistants";
@@ -65,6 +68,9 @@ public class AiChatController {
             SystemSettingService systemSettingService,
             com.checkba.service.ai.MediaProcessingService mediaProcessingService,
             com.checkba.service.ProjectFileService projectFileService,
+            com.checkba.service.ai.ChatModelFactory chatModelFactory,
+            com.checkba.service.ai.TokenUsageService tokenUsageService,
+            com.checkba.service.ai.context.FileContentExtractorService fileContentExtractorService,
             com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.defaultProjectAssistant = defaultProjectAssistant;
         this.projectAiMessageService = projectAiMessageService;
@@ -76,6 +82,9 @@ public class AiChatController {
         this.systemSettingService = systemSettingService;
         this.mediaProcessingService = mediaProcessingService;
         this.projectFileService = projectFileService;
+        this.chatModelFactory = chatModelFactory;
+        this.tokenUsageService = tokenUsageService;
+        this.fileContentExtractorService = fileContentExtractorService;
         this.objectMapper = objectMapper;
     }
 
@@ -139,6 +148,7 @@ public class AiChatController {
             // 3. Get LLM Service
             ProjectAssistant assistant = getAssistant(request.getModel(), assistantConfig);
             String response = "";
+            dev.langchain4j.service.Result<String> result = null;
 
             // Handle Multi-Modal Context (Image/Video) or Native PDF for Gemini
             // For now, only handle FIRST valid multi-modal context if multiple are present? 
@@ -217,16 +227,29 @@ public class AiChatController {
             
             if (hasMedia) {
                  dev.langchain4j.data.message.UserMessage userMessage = dev.langchain4j.data.message.UserMessage.from(multiModalContents);
-                 response = assistant.chat(userMessage);
+                 result = assistant.chat(userMessage);
                  handledAsMultiModal = true;
             } else {
                  // Text Only
-                 response = assistant.chat(finalPrompt);
+                 result = assistant.chat(finalPrompt);
             }
-             
+            
+            // Extract content and usage
+            response = result.content();
+            if (result.tokenUsage() != null) {
+                tokenUsageService.recordUsage(
+                    Long.parseLong(request.getProjectId()), 
+                    userId, 
+                    request.getModel(), 
+                    result.tokenUsage(),
+                    conversationId
+                );
+            }
+
             // Skip the old logic blocks below since we handled it above
             boolean legacySkip = true; 
             if (!legacySkip) {
+
 
             }
             
@@ -278,49 +301,52 @@ public class AiChatController {
     
     // --- Helper Methods for Folder Context & Caching ---
     
+    // Use a counter class to pass by reference
+    private static class FileCountWrapper {
+        int count = 0;
+    }
+
     private String collectFolderContent(Long projectId, Long folderId) {
         StringBuilder sb = new StringBuilder();
-        // Uses ProjectFileService to recursion.
-        // Since ProjectFileService.getFilesByParent only returns direct children, we need recursion helper here.
-        collectFilesRecursive(projectId, folderId, sb, 0);
+        FileCountWrapper counter = new FileCountWrapper();
+        collectFilesRecursive(projectId, folderId, sb, 0, counter);
         return sb.toString();
     }
     
-    private void collectFilesRecursive(Long projectId, Long parentId, StringBuilder sb, int depth) {
-        if (depth > 20) return; // safety
+    private void collectFilesRecursive(Long projectId, Long parentId, StringBuilder sb, int depth, FileCountWrapper counter) {
+        if (depth > 20) return; // depth safety
+        if (counter.count >= 10) return; // max file limit enforcement
+
         List<com.checkba.model.entity.ProjectFile> children = projectFileService.getFilesByParent(projectId, parentId);
+        
+        // Sort children: files first, then folders? Or mixed. 
+        // Let's prioritize text files if we want to be smart, but simple interaction is fine.
+        
         for (com.checkba.model.entity.ProjectFile file : children) {
+            if (counter.count >= 10) break;
+
             if (Boolean.TRUE.equals(file.getIsFolder())) {
-                collectFilesRecursive(projectId, file.getId(), sb, depth + 1);
+                collectFilesRecursive(projectId, file.getId(), sb, depth + 1, counter);
             } else {
-                // Filter text files
-                if (isTextFile(file.getName())) {
-                     // Read content. Assuming local file system for now as per `ProjectFileService` impl.
-                     // Warning: Performance hit for many files.
-                     try {
-                         if (StringUtils.hasText(file.getFilePath())) {
-                             java.io.File physical = new java.io.File(file.getFilePath());
-                             if (physical.exists() && physical.length() < 1024 * 1024) { // Skip > 1MB files individually
-                                 String content = java.nio.file.Files.readString(physical.toPath());
-                                 sb.append("\n--- File: ").append(file.getName()).append(" ---\n");
-                                 sb.append(content).append("\n");
-                             }
-                         }
-                     } catch (Exception e) {
-                         // ignore
-                     }
+                // Try to extract text only if it's a supported file (text or binary)
+                // The service handles size check and type check.
+                if (Boolean.TRUE.equals(file.getIsFolder())) continue; // Just in case
+                
+                if (StringUtils.hasText(file.getFilePath())) {
+                    java.io.File physical = new java.io.File(file.getFilePath());
+                    String extracted = fileContentExtractorService.extractText(physical);
+                    
+                    if (StringUtils.hasText(extracted)) {
+                        sb.append("\n--- File: ").append(file.getName()).append(" ---\n");
+                        sb.append(extracted).append("\n");
+                        counter.count++;
+                    }
                 }
             }
         }
     }
     
-    private boolean isTextFile(String name) {
-        if (name == null) return false;
-        String lower = name.toLowerCase();
-        return lower.endsWith(".java") || lower.endsWith(".js") || lower.endsWith(".vue") || lower.endsWith(".ts") 
-            || lower.endsWith(".html") || lower.endsWith(".css") || lower.endsWith(".xml") || lower.endsWith(".yml") 
-            || lower.endsWith(".json") || lower.endsWith(".md") || lower.endsWith(".txt") || lower.endsWith(".sql");
-    }
+
 
     private String getOrCreateGeminiCache(String content) {
         // Simple hash content to key
@@ -412,62 +438,33 @@ public class AiChatController {
 
     private ProjectAssistant getAssistant(String modelId, com.checkba.model.ai.AiAssistantConfig assistantConfig) {
         String key = (StringUtils.hasText(modelId) ? modelId : "default").toLowerCase();
-        boolean needsTools = assistantConfig.getTools() != null && !assistantConfig.getTools().isEmpty();
+        boolean needsTools = assistantConfig != null && assistantConfig.getTools() != null && !assistantConfig.getTools().isEmpty();
         
-        // Use a composite key for cache: model + assistantId (because different assistants might need different tool bindings)
-        String cacheKey = key + "_" + assistantConfig.getId();
+        // Use a composite key for cache: model + assistantId
+        String assistantId = assistantConfig != null ? assistantConfig.getId() : "default";
+        String cacheKey = key + "_" + assistantId;
 
         return assistantCache.computeIfAbsent(cacheKey, k -> {
-            if (key.contains("local") || key.contains("ollama")) {
-                return createOllamaAssistant(needsTools);
-            } else if (key.contains("gemini") || key.contains("google")) {
-                return createGeminiAssistant(needsTools); // Try to enable tools for Gemini too
+            ChatLanguageModel chatModel = chatModelFactory.getChatModel(modelId);
+            
+            var builder = AiServices.builder(ProjectAssistant.class)
+                    .chatLanguageModel(chatModel);
+
+            // Tools support (only for Ollama or if Model supports it)
+            // For now, only Ollama and OpenRouter (via OpenAI) support tools well in LangChain4j.
+            // Gemini manual impl does NOT support tools yet.
+            AiModelProperties.Provider provider = aiModelProperties.getProvider();
+            boolean isGemini = key.contains("gemini") || provider == AiModelProperties.Provider.GEMINI;
+            
+            if (needsTools && !isGemini) {
+                // builder.tools(fileTools); // Temporarily simplified: we need ContentRetriever to handle context
             }
-            return defaultProjectAssistant;
+            
+            // Inject Retriever if needed (usually RAG)
+            // builder.contentRetriever(dynamicContentRetriever); 
+            
+            return builder.build();
         });
-    }
-
-    private ProjectAssistant createOllamaAssistant(boolean withTools) {
-        AiModelProperties.Ollama cfg = aiModelProperties.getOllama();
-        ChatLanguageModel model = dev.langchain4j.model.ollama.OllamaChatModel.builder()
-                .baseUrl(cfg.getBaseUrl())
-                .modelName(cfg.getModelName())
-                .temperature(cfg.getTemperature())
-                .timeout(cfg.getTimeout())
-                .build();
-        
-        var builder = AiServices.builder(ProjectAssistant.class)
-                .chatLanguageModel(model)
-                .contentRetriever(dynamicContentRetriever);
-                
-        if (withTools) {
-            builder.tools(fileTools);
-        }
-        
-        return builder.build();
-    }
-
-    private ProjectAssistant createGeminiAssistant(boolean withTools) {
-        AiModelProperties.Gemini cfg = aiModelProperties.getGemini();
-        ChatLanguageModel model = new GeminiChatLanguageModel(
-                cfg.getApiBaseUrl(),
-                cfg.getModelName(),
-                cfg.getApiKey(),
-                cfg.getTimeout()
-        );
-        
-        var builder = AiServices.builder(ProjectAssistant.class)
-                .chatLanguageModel(model);
-                // .contentRetriever(dynamicContentRetriever); // Disable RAG for Gemini as per requirement and to avoid timeout
-        
-        // Try enabling tools for Gemini if supported by custom impl or future SDK
-        // For now, if withTools is true, we might just inject tools and see if GeminiChatLanguageModel handles it
-        // Or we rely on user manually using Ollama as per instruction "ask the user use local ollama"
-        if (withTools) {
-             // builder.tools(fileTools); // Uncomment if GeminiChatLanguageModel supports function calling
-        }
-        
-        return builder.build();
     }
 
     private static final int MAX_CONTEXT_CHARS = 6000;
@@ -540,16 +537,7 @@ public class AiChatController {
                     if (fileEntity != null && StringUtils.hasText(fileEntity.getFilePath())) {
                         java.io.File file = new java.io.File(fileEntity.getFilePath());
                         if (file.exists()) {
-                            String lowerName = file.getName().toLowerCase();
-                            if (isTextFile(lowerName)) {
-                                 // Plain Text Read
-                                 documentText = java.nio.file.Files.readString(file.toPath());
-                            } else if (lowerName.endsWith(".pdf") || lowerName.endsWith(".doc") || lowerName.endsWith(".docx") || lowerName.endsWith(".ppt") || lowerName.endsWith(".pptx")) {
-                                 // Tika Parse
-                                 dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser parser = new dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser();
-                                 dev.langchain4j.data.document.Document doc = parser.parse(java.nio.file.Files.newInputStream(file.toPath()));
-                                 documentText = doc.text();
-                            }
+                            documentText = fileContentExtractorService.extractText(file);
                         }
                     }
                 } catch (Exception e) {
@@ -641,7 +629,6 @@ public class AiChatController {
         }
     }
     
-    @Data
     public static class AiChatRequest {
         private String projectId;
         private String message;
@@ -650,9 +637,23 @@ public class AiChatController {
         private String model;
         private String assistantId;
         private String conversationId;
+
+        public String getProjectId() { return projectId; }
+        public void setProjectId(String projectId) { this.projectId = projectId; }
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
+        public AiChatContext getContext() { return context; }
+        public void setContext(AiChatContext context) { this.context = context; }
+        public java.util.List<AiChatContext> getContexts() { return contexts; }
+        public void setContexts(java.util.List<AiChatContext> contexts) { this.contexts = contexts; }
+        public String getModel() { return model; }
+        public void setModel(String model) { this.model = model; }
+        public String getAssistantId() { return assistantId; }
+        public void setAssistantId(String assistantId) { this.assistantId = assistantId; }
+        public String getConversationId() { return conversationId; }
+        public void setConversationId(String conversationId) { this.conversationId = conversationId; }
     }
     
-    @Data
     public static class AiChatResponse {
         private String response;
         private String conversationId;
@@ -661,9 +662,12 @@ public class AiChatController {
             this.response = response; 
             this.conversationId = conversationId;
         }
+        public String getResponse() { return response; }
+        public void setResponse(String response) { this.response = response; }
+        public String getConversationId() { return conversationId; }
+        public void setConversationId(String conversationId) { this.conversationId = conversationId; }
     }
 
-    @Data
     public static class AiChatContext {
         private String fileId;
         private String fileName;
@@ -671,9 +675,21 @@ public class AiChatController {
         private String wpsFileId;
         private String selectionText;
         private String documentText;
+
+        public String getFileId() { return fileId; }
+        public void setFileId(String fileId) { this.fileId = fileId; }
+        public String getFileName() { return fileName; }
+        public void setFileName(String fileName) { this.fileName = fileName; }
+        public String getFileType() { return fileType; }
+        public void setFileType(String fileType) { this.fileType = fileType; }
+        public String getWpsFileId() { return wpsFileId; }
+        public void setWpsFileId(String wpsFileId) { this.wpsFileId = wpsFileId; }
+        public String getSelectionText() { return selectionText; }
+        public void setSelectionText(String selectionText) { this.selectionText = selectionText; }
+        public String getDocumentText() { return documentText; }
+        public void setDocumentText(String documentText) { this.documentText = documentText; }
     }
 
-    @Data
     public static class AiExportDocxRequest {
         private Long projectId;
         private Long parentId;
@@ -686,5 +702,16 @@ public class AiChatController {
          * 兼容字段：如果前端还没改成 markdown，可以传 content
          */
         private String content;
+
+        public Long getProjectId() { return projectId; }
+        public void setProjectId(Long projectId) { this.projectId = projectId; }
+        public Long getParentId() { return parentId; }
+        public void setParentId(Long parentId) { this.parentId = parentId; }
+        public String getFileName() { return fileName; }
+        public void setFileName(String fileName) { this.fileName = fileName; }
+        public String getMarkdown() { return markdown; }
+        public void setMarkdown(String markdown) { this.markdown = markdown; }
+        public String getContent() { return content; }
+        public void setContent(String content) { this.content = content; }
     }
 }

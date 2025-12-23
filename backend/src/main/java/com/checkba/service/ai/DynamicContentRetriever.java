@@ -11,10 +11,11 @@ import org.springframework.stereotype.Component;
 import java.util.Collections;
 import java.util.List;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DynamicContentRetriever implements ContentRetriever {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DynamicContentRetriever.class);
 
     private final ProjectRagService projectRagService;
 
