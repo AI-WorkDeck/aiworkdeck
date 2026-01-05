@@ -175,13 +175,14 @@
           v-for="p in LEFT_SIDEBAR_PLUGINS"
           :key="p.key"
           class="rail-btn"
-          :class="{ active: leftPaneKey === p.key && !sidebarCollapsed }"
+          :class="{ active: (leftPaneKey === p.key && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned) }"
           :title="p.label"
           @tap="toggleLeftPane(p.key)"
         >
+          <text v-if="p.textIcon" class="rail-icon">{{ p.textIcon }}</text>
           <image 
-            v-if="p.activeIcon"
-            :src="(leftPaneKey === p.key && !sidebarCollapsed) ? p.activeIcon : p.icon"
+            v-else-if="p.activeIcon && p.icon"
+            :src="((leftPaneKey === p.key && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned)) ? p.activeIcon : p.icon"
             class="rail-icon-img"
             mode="aspectFit"
           />
@@ -190,6 +191,20 @@
 
         <!-- Spacer -->
         <view style="flex: 1"></view>
+
+        <!-- Staging Area (Moved to bottom) -->
+        <view
+          class="rail-btn"
+          :class="{ active: (leftPaneKey === 'staging' && !sidebarCollapsed) || stagingPinned }"
+          title="文件暂存区"
+          @tap="toggleLeftPane('staging')"
+        >
+          <image 
+            :src="((leftPaneKey === 'staging' && !sidebarCollapsed) || stagingPinned) ? '/static/temporary_selected.png' : '/static/temporary.png'"
+            class="rail-icon-img"
+            mode="aspectFit"
+          />
+        </view>
 
         <!-- Project Members Stack -->
         <view class="rail-members-container" v-if="projectMembers && projectMembers.length > 0">
@@ -242,11 +257,21 @@
         </view>
         
         <!-- User Avatar (Bottom) -->
+        <!-- User Avatar (Bottom) -->
         <view class="rail-user-avatar" @tap="goToUserProfile" title="个人中心">
-           <image v-if="currentUser && currentUser.avatarUrl" :src="currentUser.avatarUrl" class="avatar-img" style="border-radius: 50%;" />
-           <text v-else class="avatar-text">{{ (userDisplayName || currentUser?.displayName)?.charAt(0) || 'U' }}</text>
+           <view class="rail-user-avatar-inner">
+               <image v-if="currentUser && currentUser.avatarUrl" :src="currentUser.avatarUrl" class="avatar-img" />
+               <text v-else class="avatar-text">{{ (userDisplayName || currentUser?.displayName)?.charAt(0) || 'U' }}</text>
+           </view>
         </view>
       </view>
+
+      <!-- File Picker Dialog (for EasyVoice Import) -->
+      <FilePickerDialog
+        v-model:visible="showFilePicker"
+        :project-id="projectId"
+        @confirm="handleFilePickerConfirm"
+      />
 
       <!-- Invite Modal (Refactored to King IDE) -->
       <!-- Invite Member Dialog -->
@@ -254,6 +279,14 @@
         v-model:visible="showInviteModal" 
         :project-id="projectId" 
         @success="loadProjectMembers" 
+      />
+      
+      <!-- 文档比较选择对话框 -->
+      <CompareDocDialog
+        :visible="showCompareDialog"
+        :documents="compareDocuments"
+        @cancel="showCompareDialog = false"
+        @confirm="onCompareDialogConfirm"
       />
 
     <!-- Custom Recording Toast -->
@@ -291,7 +324,7 @@
       </view>
 
       <!-- 左侧文件树（可收起） -->
-      <view class="sidebar-left" :class="{ collapsed: sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '0px' : sidebarWidth + 'px' }">
+      <view class="sidebar-left" ref="sidebarLeft" :class="{ collapsed: sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '0px' : sidebarWidth + 'px' }">
         <!-- 批量菜单遮罩：用于点击空白关闭下拉（不弹中间） -->
         <view v-if="showBatchMenu" class="batch-menu-mask" @tap="closeBatchMenu"></view>
         <view v-if="!sidebarCollapsed && leftPaneKey !== 'dd-files'" class="sidebar-header">
@@ -466,16 +499,23 @@
             :project-id="projectId"
             :selection-mode="fileBatchMode"
             :show-footer-actions="false"
+            :hidden-file-ids="stagedFileIds"
             @checked-change="onFileTreeCheckedChange"
             @file-select="handleFileTreeSelect"
             @file-drag-start="onFileLinkDragStart"
             @file-drag-end="onFileLinkDragEnd"
+            @compare-documents="onCompareDocumentsRequest"
+            @files-changed="loadStagingFiles"
           />
           <DdFilesPanel
             v-else-if="leftPaneKey === 'dd-files'"
             :project-id="projectId"
             :current-user="currentUser"
             @open-request="handleOpenDdRequest"
+          />
+          <EasyVoicePane
+             v-else-if="leftPaneKey === 'easyvoice'"
+             @request-doc-text="handleEasyVoiceDocRequest"
           />
           <PluginPane
             v-else-if="leftPaneKey && dynamicPlugins.some(p => p.key === leftPaneKey)"
@@ -487,14 +527,29 @@
             <text class="placeholder-desc">加载中...</text>
           </view>
           
+
+        </view>
+          
           <!-- 文件拖拽关联：浮窗落点区域 (移至侧边栏底部) -->
+          <!-- 1. 关联区域 (Priority: Dragging + WPS Word Open) -->
           <FileLinkDropZone
-            :visible="fileLinkDrag.active"
+            :visible="showAssociationDropZone"
             :file-name="fileLinkDrag.file ? fileLinkDrag.file.name : ''"
             :split-mode="splitMode"
             @drop="onFileLinkZoneDrop"
           />
-        </view>
+
+          <!-- 2. 文件暂存区 (Visible if Staging has files OR Dragging without WPS Open) -->
+          <FileStagingArea
+            :visible="showStagingArea"
+            :files="stagingFiles"
+            @drop="onStagingDrop"
+            @clear="handleStagingClear"
+            @remove="handleStagingRemove"
+            @open="handleStagingOpen"
+            @compare="handleStagingCompare"
+            @collapse="handleStagingCollapse"
+          />
         
         <!-- Sidebar Footer moved to Left Rail -->
 
@@ -630,6 +685,14 @@
                     <MarkdownPreview
                       v-else-if="isMarkdownTab(activeFileLeft)"
                       :content="activeFileLeft.content"
+                      :file="activeFileLeft"
+                    />
+                    <DocDiffViewer
+                      v-else-if="isDiffTab(activeFileLeft)"
+                      :source-id="activeFileLeft.diffSource.id"
+                      :target-id="activeFileLeft.diffTarget.id"
+                      :source-name="activeFileLeft.diffSource.name"
+                      :target-name="activeFileLeft.diffTarget.name"
                     />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileLeft)"
@@ -684,6 +747,14 @@
                     <MarkdownPreview
                       v-else-if="isMarkdownTab(activeFileRight)"
                       :content="activeFileRight.content"
+                      :file="activeFileRight"
+                    />
+                    <DocDiffViewer
+                      v-else-if="isDiffTab(activeFileRight)"
+                      :source-id="activeFileRight.diffSource.id"
+                      :target-id="activeFileRight.diffTarget.id"
+                      :source-name="activeFileRight.diffSource.name"
+                      :target-name="activeFileRight.diffTarget.name"
                     />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileRight)"
@@ -709,7 +780,7 @@
             </view>
 
             <!-- 底部常用工具面板（仅占中间工作区宽度；右侧 AI 面板优先完整显示） -->
-            <view v-if="showToolsPanel" class="bottom-panel" :style="{ height: toolsPanelHeight + 'px' }">
+            <view v-if="showToolsPanel" class="bottom-panel" ref="bottomPanel" :style="{ height: toolsPanelHeight + 'px' }">
               <view class="bottom-resize-handle" @touchstart="startResize('bottom', $event)" @mousedown="startResize('bottom', $event)"></view>
               <view class="panel-header panel-header-tools">
                 <!-- Group: Tabs + Specific Actions -->
@@ -793,6 +864,7 @@
           <!-- 右侧 AI 面板（可拖拽宽度） -->
           <view 
             v-if="showAiPanel" 
+            ref="aiPanel"
             class="side-panel side-panel-ai" 
             :class="{ 'drag-over': dragOverAiPanel }"
             :style="{ width: aiPanelWidth + 'px' }"
@@ -811,6 +883,8 @@
               :recent-history="chatHistoryList.slice(0, 3)"
               :assistants="assistants"
               v-model:current-assistant-id="currentAssistantId"
+              :active-tab="currentActiveTab"
+              :active-tab-pane="focusedPane"
               @close="toggleAiPanel"
               @toggle-history="toggleHistoryDrawer"
               @new-chat="startNewChat"
@@ -820,6 +894,7 @@
               @client-action="handleClientAction"
               @refresh-history="fetchChatHistory"
               @artifact-open-tab="handleArtifactOpenTab"
+              @open-file="handleOpenFileFromChat"
             />
             
             <view class="side-resize-handle" @touchstart="startResize('right', $event)" @mousedown="startResize('right', $event)"></view>
@@ -1087,9 +1162,16 @@ import FilePreview from '@/components/FilePreview.vue'
 import VariablePanel from '@/components/VariablePanel.vue'
 import ProjectFavoritesPanel from '@/components/ProjectFavoritesPanel.vue'
 import FileLinkDropZone from '@/components/FileLinkDropZone.vue'
+import FileStagingArea from '@/components/FileStagingArea.vue'
 import PluginPane from '@/components/PluginPane.vue' // Added
+import EasyVoicePane from '@/components/EasyVoicePane.vue'
 import ClipboardPanel from '@/components/ClipboardPanel.vue'
 import InviteMemberDialog from '@/components/InviteMemberDialog.vue'
+import CompareDocDialog from '@/components/CompareDocDialog.vue'
+import DocDiffViewer from '@/components/DocDiffViewer.vue'
+import MarkdownPreview from '@/components/MarkdownPreview.vue'
+import FilePickerDialog from '@/components/FilePickerDialog.vue'
+
 import {
   getProject,
   renameProject,
@@ -1105,6 +1187,8 @@ import {
   getProjectVariables,
   getProjectFiles,
   batchCopyFiles,
+  createFolder,
+  batchMoveFiles,
   aiChat,
   exportAiDocx,
   getProjectMembers,
@@ -1118,7 +1202,10 @@ import {
   getApiBaseUrl,
   getAiConfig,
   getAssistants, // Added
-  getPlugins // Added
+  getPlugins, // Added
+  sendWpsResult, // WPS 操作结果回调
+  getWpsConfig, // WPS 配置获取
+  getFileText
 } from '@/services/api.js'
 import { getCurrentUser } from '@/utils/auth.js'
 import { FILE_BATCH_ACTIONS, FILE_TREE_QUICK_ACTIONS } from '@/config/fileActions.js'
@@ -1131,10 +1218,11 @@ import {
 } from '@/config/leftSidebarPlugins.js'
 
 import { activityTracker } from '@/utils/activityTracker.js'
+import { useWpsBridge } from '@/composables/useWpsBridge.js'
 import DdFilesPanel from '@/components/DdFilesPanel.vue'
 import DdRequestEditor from '@/components/DdRequestEditor.vue'
 import ChatInterface from '@/components/ChatInterface.vue'
-import MarkdownPreview from '@/components/MarkdownPreview.vue'
+
 
 export default {
   components: {
@@ -1145,13 +1233,18 @@ export default {
     VariablePanel,
     ProjectFavoritesPanel,
     FileLinkDropZone,
+    FileStagingArea,
     ClipboardPanel,
     DdFilesPanel,
     DdRequestEditor,
     InviteMemberDialog,
     ChatInterface,
     MarkdownPreview,
-    PluginPane // Added
+    PluginPane, // Added
+    CompareDocDialog,
+    DocDiffViewer,
+    EasyVoicePane,
+    FilePickerDialog
   },
   data() {
     return {
@@ -1166,6 +1259,9 @@ export default {
       screenshotSaveDataUrl: '', // Cached for save dialog
       projectMembers: [], // Added
       isRenamingProject: false,
+      // File Picker
+      showFilePicker: false,
+      easyVoiceImportCallback: null,
       renameProjectName: '',
       userDisplayName: '用户',
       
@@ -1180,6 +1276,10 @@ export default {
       showBatchMenu: false,
       showFileMoreMenu: false,
       FILE_TREE_QUICK_ACTIONS,
+      
+      // 文档对比
+      showCompareDialog: false,
+      compareDocuments: [], // 待比较的文档列表
 
       // 右侧 AI 面板（IDE 右侧窗格）
       showAiPanel: false,
@@ -1295,8 +1395,11 @@ export default {
         visible: false,
         side: 'left',
         files: [],
+        files: [],
         linkKey: ''
       },
+      stagingFiles: [], // 文件暂存区列表
+      stagingOriginalParents: {}, // 记录文件进入暂存区前的原始 parentId: { fileId: originalParentId }
       splitMode: false,
       focusedPane: 'left', // 'left' | 'right'
 
@@ -1316,7 +1419,7 @@ export default {
       tabDragOver: null, // { fileId, pane }
       
       // WPS Config
-      wpsAppId: 'AK20251215TTJNYB',
+      wpsAppId: '', // 从后端动态获取
       wpsInstances: {
         left: null,
         right: null
@@ -1374,7 +1477,10 @@ export default {
         left: { 'files': null, 'dd-files': null },
         right: { 'files': null, 'dd-files': null }
       },
-      dynamicPlugins: [] // Added for dynamic sidebar icons
+      dynamicPlugins: [], // Added for dynamic sidebar icons
+      stagingPinned: false, // Added: keeps staging area open via sidebar button
+      stagingManuallyCollapsed: false, // Track if user explicitly collapsed staging area
+      stagingFolderId: null // ID of the .stagezone folder
     }
   },
   computed: {
@@ -1455,6 +1561,13 @@ export default {
       if (file && !this.isTabVisible(file)) return null
       return file
     },
+    // NEW: Current active tab for AI context (prioritizes focused pane)
+    currentActiveTab() {
+      if (this.focusedPane === 'right' && this.activeFileRight) {
+        return this.activeFileRight
+      }
+      return this.activeFileLeft || this.activeFileRight
+    },
     currentModelName() {
       const m = this.availableModels.find(item => item.id === this.currentModelId)
       return m ? m.name : '选择模型'
@@ -1462,6 +1575,43 @@ export default {
     computedActiveToolName() {
       const target = this.getActiveAiTargetFile()
       return target && target.name ? target.name : ''
+    },
+    // New Computed for Staging Area Logic
+    hasOpenWpsWord() {
+       // Helper to check if a file is a Word doc (not PPT/Excel)
+       const isWord = (f) => {
+          if (!f || !f.name) return false;
+          const n = f.name.toLowerCase();
+          return n.endsWith('.doc') || n.endsWith('.docx') || n.endsWith('.wps');
+       };
+       return isWord(this.activeFileLeft) || (this.splitMode && isWord(this.activeFileRight));
+    },
+    showAssociationDropZone() {
+       // "When and only when right (active loop) has open WPS... show association"
+       // We use hasOpenWpsWord (Left or Right) as proxy for "Open WPS Document"
+       return this.fileLinkDrag.active && this.hasOpenWpsWord;
+    },
+    // Staging Area Visibility:
+    // 1. If files exist in staging -> Resident.
+    // 2. If Dragging AND Association Zone is NOT shown -> Show Staging Drop.
+    // 3. User Requirement: "In absence of open WPS... position should be a staging area".
+    showStagingArea() {
+       // 1. User explicitly collapsed - respect their choice
+       if (this.stagingManuallyCollapsed) return false;
+       
+       // 2. Explicitly pinned by user via sidebar button
+       if (this.stagingPinned) return true;
+
+       // 3. If staging area has files, show it (resident behavior)
+       if (this.stagingFiles && this.stagingFiles.length > 0) return true;
+
+       // 4. If dragging AND Association not overriding (Auto-expand)
+       if (this.showAssociationDropZone) return false;
+       
+       return this.fileLinkDrag.active;
+    },
+    stagedFileIds() {
+       return (this.stagingFiles || []).map(f => f.id);
     }
     ,
     ocrHasSelection() {
@@ -1618,6 +1768,12 @@ export default {
       this.projectId = Number(query.id)
       this.loadProjectInfo()
       this.loadProjectMembers()
+
+      // Initialize Staging Area (Persistent)
+      // We don't await here to avoid blocking page load, but ensuring folder exists is critical
+      this.ensureStagingFolder().then(() => {
+          this.loadStagingFiles()
+      })
     }
     
     const user = getCurrentUser()
@@ -1655,6 +1811,7 @@ export default {
     this.initAiModel()
     this.loadAssistants() // Fetch assistants
     this.loadDynamicPlugins() // Fetch dynamic plugins
+    this.loadWpsConfig() // 加载 WPS 配置
   },
   onShow() {
     // Sync UI state
@@ -1897,6 +2054,42 @@ export default {
     }
   },
   methods: {
+    // EasyVoice Integration
+    async handleEasyVoiceDocRequest(callback) {
+      console.log('[EasyVoice] Requesting doc text...')
+      this.easyVoiceImportCallback = callback
+      this.showFilePicker = true
+    },
+    
+    async handleFilePickerConfirm(file) {
+        if (!file || !file.id) return
+        
+        try {
+            uni.showLoading({ title: '正在导入...' })
+            
+            // Check if it is a text file -> use content directly if available/loaded? 
+            // Better to call backend always for consistency, or check file extension.
+            // Backend endpoint handles doc/docx decoding which is the main point.
+            
+            const res = await getFileText(file.id)
+            if (res && res.code === 0) {
+                const text = res.data
+                if (this.easyVoiceImportCallback) {
+                    this.easyVoiceImportCallback(text)
+                }
+                uni.showToast({ title: '导入成功', icon: 'success' })
+            } else {
+                throw new Error(res.message || '导入失败')
+            }
+        } catch (e) {
+            console.error('Failed to import doc text', e)
+            uni.showToast({ title: '导入失败: ' + e.message, icon: 'none' })
+        } finally {
+            uni.hideLoading()
+            this.easyVoiceImportCallback = null
+        }
+    },
+
 
     async removeMember(member) {
       if (!this.projectId) return
@@ -2058,14 +2251,35 @@ export default {
       // 写入到文档里的超链接必须是 http/https，才能稳定触发 onHyperLinkOpen（对照官方 demo）
       return `${base}?u=${encodeURIComponent(inner)}`
     },
+    /**
+     * 启动选区轮询（仅对 Word 文档有效）
+     * 只有 doc/docx 文件才支持 Selection 选区操作，其他文件类型无需轮询
+     */
     startSelectionPolling(pane) {
       const p = pane === 'right' ? 'right' : 'left'
+      
+      // 先清理旧的定时器
       try {
         const old = this.selectionPollingIntervals && this.selectionPollingIntervals[p]
         if (old) clearInterval(old)
       } catch (e) {
         // ignore
       }
+      
+      // 检查当前打开的文件是否是 Word 文档
+      const activeFile = p === 'right' ? this.activeFileRight : this.activeFileLeft
+      if (!activeFile || !activeFile.name) {
+        // 没有打开文件，不启动轮询
+        return
+      }
+      
+      const fileName = activeFile.name.toLowerCase()
+      const isWordDocument = fileName.endsWith('.doc') || fileName.endsWith('.docx')
+      if (!isWordDocument) {
+        // 不是 Word 文档，不启动选区轮询（pptx/xlsx/pdf 等不支持 Selection API）
+        return
+      }
+      
       const timer = setInterval(async () => {
         try {
           const wpsComp = this.$refs[p === 'right' ? 'wpsRight' : 'wpsLeft']
@@ -2259,6 +2473,186 @@ export default {
         uni.showToast({ title: e.message || '关联失败', icon: 'none' })
       }
     },
+    
+    // === Staging Area Methods ===
+    async ensureStagingFolder() {
+      if (this.stagingFolderId) return
+      try {
+        // Changed from .stagezone to __staging_area__ to avoid dotfile filtering
+        const folderName = '__staging_area__' 
+        console.log('EnsureStaging: Fetching root files...')
+        const response = await getProjectFiles(this.projectId, null)
+        
+        // Normalize response: API returns { code: 0, data: [...] } or possibly just array
+        const files = Array.isArray(response) ? response : (response?.data || [])
+        console.log('EnsureStaging: Got files count:', files.length, 'Looking for:', folderName)
+        
+        let folder = files.find ? files.find(f => f.name === folderName) : null
+        console.log('EnsureStaging: Found folder?', folder ? folder.id : null)
+        
+        if (!folder) {
+          console.log('EnsureStaging: Creating folder...')
+          try {
+             const createResp = await createFolder(this.projectId, null, folderName)
+             // createFolder may also return wrapped response
+             folder = createResp?.data || createResp
+          } catch(err) {
+             console.error('EnsureStaging: Create failed:', err)
+             
+             // Retry: Maybe it exists now (concurrency) or previous fetch missed it?
+             // Or maybe create failed because it already exists.
+             console.log('EnsureStaging: Retrying fetch...')
+             const retryResponse = await getProjectFiles(this.projectId, null)
+             const retryFiles = Array.isArray(retryResponse) ? retryResponse : (retryResponse?.data || [])
+             folder = retryFiles.find ? retryFiles.find(f => f.name === folderName) : null
+          }
+        }
+        
+        if (folder) {
+           this.stagingFolderId = folder.id
+           console.log('EnsureStaging: stagingFolderId set to:', folder.id)
+        }
+      } catch (e) {
+        console.error('Failed to ensure staging folder:', e)
+      }
+    },
+    async loadStagingFiles() {
+      console.log('LoadStaging: Starting...')
+      if (!this.stagingFolderId) await this.ensureStagingFolder()
+      if (!this.stagingFolderId) {
+          console.warn('LoadStaging: No folder ID, aborting.')
+          return
+      }
+      try {
+        console.log('LoadStaging: Fetching files for ID:', this.stagingFolderId)
+        const response = await getProjectFiles(this.projectId, this.stagingFolderId)
+        // Normalize response: API returns { code: 0, data: [...] } or possibly just array
+        const files = Array.isArray(response) ? response : (response?.data || [])
+        console.log('LoadStaging: Got files count:', files.length)
+        this.stagingFiles = files
+        // Debug: log file names
+        if (files.length > 0) {
+          console.log('LoadStaging: Files:', files.map(f => f.name).join(', '))
+        }
+      } catch (e) {
+        console.error('Failed to load staging files:', e)
+        uni.showToast({ title: '加载暂存区文件失败', icon: 'none' })
+      }
+    },
+    async onStagingDrop(files) {
+      console.log('onStagingDrop received:', files)
+      
+      // Critical Fix: Ensure files is an array. 
+      // If event object passed accidentally, return.
+      if (!files) return
+      
+      // Check if this is a native DOM Event object (not a Vue emitted payload)
+      // This can happen if the native @drop event bubbles up
+      if (files instanceof Event || (files.type && files.target && files.currentTarget)) {
+        // Silently ignore - the actual files should be processed by FileStagingArea's onDrop
+        return
+      }
+      
+      if (!Array.isArray(files)) {
+         // Try to recover if it's a single file object
+         if (files.id && files.name) {
+             files = [files]
+         } else {
+             console.warn('onStagingDrop: Unexpected argument format, ignoring:', typeof files)
+             return
+         }
+      }
+      
+      if (files.length === 0) return
+      if (!this.stagingFolderId) await this.ensureStagingFolder()
+      
+      const fileIds = files.map(f => f.id)
+      
+      // 记录每个文件进入暂存区前的原始 parentId
+      for (const file of files) {
+        if (file.id && file.parentId !== undefined) {
+          this.stagingOriginalParents[file.id] = file.parentId
+        }
+      }
+      
+      try {
+        // Move to staging folder
+        await batchMoveFiles(this.projectId, fileIds, this.stagingFolderId)
+        
+        // Reload staging files
+        await this.loadStagingFiles()
+        // Reload file tree (to remove from original location)
+        if (this.$refs.fileTree) {
+            this.$refs.fileTree.loadFiles()
+        }
+        
+        // Auto-pin
+        this.stagingPinned = true
+        uni.showToast({ title: '已加入暂存区', icon: 'success' })
+      } catch (e) {
+        console.error('Failed to move files to staging:', e)
+        uni.showToast({ title: '加入暂存区失败', icon: 'none' })
+      }
+    },
+    handleStagingClear() {
+       // Optional: Move all back to root? Or just clear list (which creates orphans in .stagezone)?
+       // User didn't specify, but "Clear" usually means empty the list. 
+       // Logic: Move all files in staging back to root.
+       if (this.stagingFiles.length === 0) return
+       const ids = this.stagingFiles.map(f => f.id)
+       
+       batchMoveFiles(this.projectId, ids, null).then(() => {
+          this.loadStagingFiles()
+          this.$refs.fileTree.loadFiles()
+       })
+    },
+    async handleStagingRemove(id) {
+       // 恢复到文件原来的目录，如果找不到则移动到根目录
+       if (!this.stagingFolderId) return
+       
+       // 获取原始 parentId（如果有记录的话）
+       const originalParentId = this.stagingOriginalParents[id]
+       // 注意：originalParentId 可能是 null（原本就在根目录）或 undefined（未记录）
+       // 两者都应该移动到根目录
+       const targetParentId = originalParentId !== undefined ? originalParentId : null
+       
+       try {
+         await batchMoveFiles(this.projectId, [id], targetParentId)
+         // 清理该文件的原始目录记录
+         delete this.stagingOriginalParents[id]
+         await this.loadStagingFiles()
+         this.$refs.fileTree.loadFiles()
+       } catch (e) {
+         console.error('Failed to remove from staging:', e)
+         // 如果恢复失败（可能原目录已删除），尝试移动到根目录
+         if (targetParentId !== null) {
+           try {
+             await batchMoveFiles(this.projectId, [id], null)
+             delete this.stagingOriginalParents[id]
+             await this.loadStagingFiles()
+             this.$refs.fileTree.loadFiles()
+             uni.showToast({ title: '原目录已不存在，已移至根目录', icon: 'none' })
+             return
+           } catch (e2) {
+             console.error('Fallback to root also failed:', e2)
+           }
+         }
+         uni.showToast({ title: '移出暂存区失败', icon: 'none' })
+       }
+    },
+    handleStagingCompare(files) {
+        if (!files || files.length !== 2) return;
+        this.onCompareDocumentsRequest(files);
+    },
+    handleStagingOpen(file) {
+      if (!file) return
+      this.openFile(file)
+    },
+    handleStagingCollapse() {
+      // User explicitly collapsed staging area
+      this.stagingPinned = false
+      this.stagingManuallyCollapsed = true
+    },
 
     async openFileLinkTarget(fileId, sideOverride = null) {
       const fid = Number(fileId)
@@ -2395,6 +2789,21 @@ export default {
       // 按 Cursor 体验：不在窄屏时强行限制面板宽度（遮挡就遮挡），只切换样式密度
     },
     toggleLeftPane(key) {
+      if (key === 'staging') {
+        // Toggle staging visibility
+        if (this.showStagingArea) {
+          // Currently showing, collapse it
+          this.stagingPinned = false
+          this.stagingManuallyCollapsed = true
+        } else {
+          // Currently hidden, expand it
+          this.stagingPinned = true
+          this.stagingManuallyCollapsed = false
+          this.sidebarCollapsed = false
+        }
+        return
+      }
+
       // 记录当前活跃 tab 到当前模式
       const oldKey = this.leftPaneKey
       if (oldKey) {
@@ -3322,7 +3731,6 @@ export default {
       
       this.ocrLoading = true // Should I use global loading? closeOcrOverlay resets ocrLoading.
       // Resetting ocrLoading via closeOcrOverlay is correct?
-      // closeOcrOverlay resets `this.ocrLoading = false`? No, it resets `this.ocrLoading = false` in my previous logic?
       // Wait, `closeOcrOverlay` resets `ocrText`, `ocrImageDataUrl`.
       
       // Since UI is gone, I should use `uni.showLoading`
@@ -4045,6 +4453,16 @@ export default {
       this.resizing.startAiWidth = this.aiPanelWidth
       this.resizing.startToolsHeight = this.toolsPanelHeight
 
+      // Cache DOM element for direct manipulation
+      this.resizing.element = null
+      if (target === 'left') {
+        this.resizing.element = this.$refs.sidebarLeft ? (this.$refs.sidebarLeft.$el || this.$refs.sidebarLeft) : null
+      } else if (target === 'right') {
+        this.resizing.element = this.$refs.aiPanel ? (this.$refs.aiPanel.$el || this.$refs.aiPanel) : null
+      } else if (target === 'bottom') {
+         this.resizing.element = this.$refs.bottomPanel ? (this.$refs.bottomPanel.$el || this.$refs.bottomPanel) : null
+      }
+
       if (evt && typeof evt.preventDefault === 'function') {
         evt.preventDefault()
       }
@@ -4093,23 +4511,48 @@ export default {
         const dx = (this._resizePendingX || 0) - this.resizing.startX
         const dy = (this._resizePendingY || 0) - this.resizing.startY
 
+        let finalValue = 0
+
         if (this.resizing.target === 'left') {
           const next = this.resizing.startSidebarWidth + dx
-          this.sidebarWidth = Math.max(leftMin, Math.min(leftMax, next))
+          finalValue = Math.max(leftMin, Math.min(leftMax, next))
+          // Direct DOM update
+          if (this.resizing.element) {
+              this.resizing.element.style.width = finalValue + 'px'
+          }
+          // Store for sync on stop
+          this.resizing.currentValue = finalValue
         } else if (this.resizing.target === 'right') {
           const next = this.resizing.startAiWidth - dx
-          this.aiPanelWidth = Math.max(rightMin, Math.min(rightMax, next))
+          finalValue = Math.max(rightMin, Math.min(rightMax, next))
+           // Direct DOM update
+           if (this.resizing.element) {
+              this.resizing.element.style.width = finalValue + 'px'
+          }
+          this.resizing.currentValue = finalValue
         } else if (this.resizing.target === 'bottom') {
           const next = this.resizing.startToolsHeight - dy
-          this.toolsPanelHeight = Math.max(bottomMin, Math.min(bottomMax, next))
+          finalValue = Math.max(bottomMin, Math.min(bottomMax, next))
+           // Direct DOM update
+           if (this.resizing.element) {
+              this.resizing.element.style.height = finalValue + 'px'
+          }
+           this.resizing.currentValue = finalValue
         }
       })
     },
 
     stopResize() {
       if (!this.resizing.active) return
+      
+      // Save target and currentValue BEFORE nullifying
+      const target = this.resizing.target
+      const finalValue = this.resizing.currentValue
+      
       this.resizing.active = false
       this.resizing.target = null
+      this.resizing.element = null
+      this.resizing.currentValue = null
 
       if (this._resizeRaf) {
         cancelAnimationFrame(this._resizeRaf)
@@ -4125,6 +4568,17 @@ export default {
           window.removeEventListener('mouseup', this.boundStopResize)
           window.removeEventListener('touchend', this.boundStopResize)
         }
+      }
+
+      // Sync final value to Vue state using saved target
+      if (finalValue) {
+          if (target === 'left') {
+              this.sidebarWidth = finalValue
+          } else if (target === 'right') {
+              this.aiPanelWidth = finalValue
+          } else if (target === 'bottom') {
+              this.toolsPanelHeight = finalValue
+          }
       }
 
       this.$nextTick(() => this.triggerWorkbenchResize())
@@ -4174,6 +4628,38 @@ export default {
       if (!file || file.isFolder) return
       this.openFile(file)
     },
+
+    // Handle file open request from ChatInterface (file changes popup)
+    async handleOpenFileFromChat({ name }) {
+      if (!name) return
+      console.log('[project-overview] Open file from chat:', name)
+
+      // Refresh project files first to ensure we have latest
+      try {
+        const resp = await getProjectFiles(this.projectId)
+        // Normalize response: API returns { code: 0, data: [...] } or possibly just array
+        const files = Array.isArray(resp) ? resp : (resp?.data || [])
+        console.log('[project-overview] Got files for search:', files.length)
+        
+        // Find file by name (case-insensitive, match basename)
+        const targetFile = files.find(f => {
+          if (f.isFolder) return false
+          // Match exact name or name without extension
+          return f.name === name || f.name.toLowerCase() === name.toLowerCase()
+        })
+
+        if (targetFile) {
+          console.log('[project-overview] Found file:', targetFile.id, targetFile.name)
+          this.openFile(targetFile)
+        } else {
+          console.warn('File not found:', name, 'in', files.map(f => f.name))
+          uni.showToast({ title: '未找到文件: ' + name, icon: 'none' })
+        }
+      } catch (e) {
+        console.error('Failed to fetch files for open:', e)
+        uni.showToast({ title: '获取文件列表失败', icon: 'none' })
+      }
+    },
     
     openFile(file) {
       const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
@@ -4220,6 +4706,23 @@ export default {
       const mode = this.leftPaneKey || 'files'
       this.lastActiveIdsByMode[pane][mode] = file.id
       this.saveActiveIdsByMode()
+      
+      // 如果是文件类型（非浏览器标签），展开侧边栏并定位到文件树
+      if (!this.isBrowserTab(file) && file.id && !file.tabType) {
+        // 展开侧边栏并切换到文件模式
+        if (this.sidebarCollapsed) {
+          this.sidebarCollapsed = false
+        }
+        if (this.leftPaneKey !== 'files') {
+          this.leftPaneKey = 'files'
+        }
+        // 定位到文件树中的对应文件
+        this.$nextTick(() => {
+          if (this.$refs.fileTree && this.$refs.fileTree.revealFile) {
+            this.$refs.fileTree.revealFile(file.id)
+          }
+        })
+      }
       
       // Track switch
       const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
@@ -4292,8 +4795,11 @@ export default {
           'mp3','wav','m4a','flac','aac'
       ]
       if (mediaTypes.includes(type)) return false
+      
+      // 2. 排除 Markdown 文件，使用专门的 Markdown 预览组件
+      if (type === 'md' || type === 'markdown') return false
 
-      // 2. WPS Supported Office Formats
+      // 3. WPS Supported Office Formats
       const wpsFormats = [
           // Writer
           'wps', 'wpt', 'doc', 'dot', 'docx', 'dotx', 'docm', 'dotm', 'rtf', 'odt',
@@ -4305,13 +4811,69 @@ export default {
           'pdf'
       ]
       
-      // Default to WPS if it has ID or is office type (but not media)
-      return wpsFormats.includes(type) || (file.wpsFileId && !mediaTypes.includes(type))
+      // Default to WPS if it has ID or is office type (but not media/markdown)
+      return wpsFormats.includes(type) || (file.wpsFileId && !mediaTypes.includes(type) && type !== 'md' && type !== 'markdown')
     },
 
-    // Check if file is a markdown tab (for AI artifacts)
+    // Check if file is a markdown tab (for AI artifacts or real .md files)
     isMarkdownTab(file) {
-      return file && file.tabType === 'markdown'
+      if (!file) return false
+      // 1. AI 创建的虚拟 markdown 标签
+      if (file.tabType === 'markdown') return true
+      // 2. 真正的 .md 文件（从文件树打开）
+      if (file.fileType && (file.fileType.toLowerCase() === 'md' || file.fileType.toLowerCase() === 'markdown')) return true
+      return false
+    },
+    
+    isDiffTab(file) {
+      return file && file.tabType === 'diff'
+    },
+    
+    // --- 文档对比逻辑 ---
+    onCompareDocumentsRequest(docs) {
+      // FileTree 发起的文档对比请求
+      if (!docs || docs.length !== 2) {
+        uni.showToast({ title: '请选择两个文档进行对比', icon: 'none' })
+        return
+      }
+      this.compareDocuments = docs
+      this.showCompareDialog = true
+    },
+    
+    onCompareDialogConfirm({ source, target }) {
+      // 用户确认了源文档和目标文档，打开 diff 标签页
+      this.showCompareDialog = false
+      this.openDiffTab(source, target)
+    },
+    
+    openDiffTab(source, target) {
+      // 创建 diff 类型的虚拟标签页
+      const diffId = `diff-${source.id}-${target.id}-${Date.now()}`
+      const diffFile = {
+        id: diffId,
+        name: `${source.name} ↔ ${target.name}`,
+        tabType: 'diff',
+        fileType: 'diff',
+        diffSource: {
+          id: source.id,
+          name: source.name
+        },
+        diffTarget: {
+          id: target.id,
+          name: target.name
+        },
+        createdAt: Date.now()
+      }
+      
+      // 添加到当前窗格
+      const targetPane = this.splitMode ? this.focusedPane : 'left'
+      const targetList = targetPane === 'left' ? this.leftFiles : this.rightFiles
+      const targetIdProp = targetPane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'
+      
+      targetList.push(diffFile)
+      this[targetIdProp] = diffFile.id
+      
+      console.log('[ProjectOverview] 打开文档对比标签:', diffFile.name)
     },
 
     // --- WPS 交互逻辑 ---
@@ -4414,8 +4976,8 @@ export default {
       const activeFile = pane === 'left' ? this.activeFileLeft : this.activeFileRight
       if (!activeFile || !activeFile.id) return
       
-      // Skip sync for virtual artifact tabs (they have string IDs like 'artifact-hist-xxx')
-      if (typeof activeFile.id === 'string' && activeFile.id.startsWith('artifact-')) {
+      // Skip sync for virtual tabs (they have string IDs like 'artifact-xxx' or 'web_xxx')
+      if (typeof activeFile.id === 'string' && (activeFile.id.startsWith('artifact-') || activeFile.id.startsWith('web_'))) {
         return
       }
       
@@ -4730,13 +5292,205 @@ export default {
 
     handleClientAction(action) {
         console.log('[ProjectOverview] Client Action:', action)
+        
         if (action.action === 'refresh_files') {
             if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
                 console.log('[ProjectOverview] Refreshing File Tree...')
                 this.$refs.fileTree.loadFiles()
-                // optionally show toast
                 uni.showToast({ title: '文件已更新', icon: 'none' })
             }
+        } 
+        // AI Agent 请求打开文件
+        else if (action.action === 'wps_open_file') {
+            this.handleWpsOpenFile(action)
+        }
+        // AI Agent 请求重新加载文件（用于后端修改文件后刷新 WPS）
+        else if (action.action === 'wps_reload_file') {
+            this.handleWpsReloadFile(action)
+        }
+        // AI Agent 请求执行 WPS 命令
+        else if (action.tool === 'wps_command') {
+            this.handleWpsCommand(action)
+        }
+    },
+    
+    /**
+     * 处理 AI Agent 的打开文件请求
+     */
+    async handleWpsOpenFile(action) {
+        console.log('[ProjectOverview] WPS Open File:', action)
+        try {
+            const fileId = action.fileId
+            if (!fileId) {
+                console.warn('[ProjectOverview] No fileId in wps_open_file action')
+                return
+            }
+            
+            // 获取文件详情
+            const file = await getFileDetail(this.projectId, fileId)
+            if (!file) {
+                console.error('[ProjectOverview] File not found:', fileId)
+                uni.showToast({ title: '文件不存在', icon: 'none' })
+                return
+            }
+            
+            // 打开文件
+            this.openFile(file)
+            
+            // 提示用户
+            uni.showToast({ title: `已打开: ${file.name}`, icon: 'none' })
+            
+        } catch (e) {
+            console.error('[ProjectOverview] handleWpsOpenFile error:', e)
+            uni.showToast({ title: '打开文件失败', icon: 'none' })
+        }
+    },
+
+    /**
+     * 处理 AI Agent 的重新加载文件请求
+     * 当后端修改了 PPTX 文件后，需要通知前端刷新 WPS 以显示最新内容
+     * 
+     * 工作原理：
+     * 1. 后端修改文件后会更新 wpsFileId（添加版本时间戳）
+     * 2. 前端获取最新文件信息，更新 leftFiles/rightFiles 中的 wpsFileId
+     * 3. WpsEditor 组件的 watch 检测到 fileId 变化后会自动调用 reload()
+     * 4. reload() 会销毁并重新创建 WPS 实例，触发新的文件下载
+     */
+    async handleWpsReloadFile(action) {
+        console.log('[ProjectOverview] WPS Reload File:', action)
+        try {
+            const fileId = action.fileId
+            if (!fileId) {
+                console.warn('[ProjectOverview] No fileId in wps_reload_file action')
+                return
+            }
+            
+            // 获取文件详情（确保获取最新信息，包括新的 wpsFileId）
+            const file = await getFileDetail(this.projectId, fileId)
+            if (!file) {
+                console.error('[ProjectOverview] File not found:', fileId)
+                uni.showToast({ title: '文件不存在', icon: 'none' })
+                return
+            }
+            
+            console.log('[ProjectOverview] Got updated file info:', {
+                id: file.id,
+                name: file.name,
+                wpsFileId: file.wpsFileId
+            })
+            
+            // 同时更新 leftFiles 和 rightFiles 中的文件信息
+            // 这样可以确保所有打开的相同文件都能获得新的 wpsFileId
+            let updated = false
+            
+            // 更新左侧窗格
+            const existingLeft = this.leftFiles.find(f => f.id === file.id)
+            if (existingLeft) {
+                const oldWpsFileId = existingLeft.wpsFileId
+                Object.assign(existingLeft, file)
+                console.log('[ProjectOverview] Updated leftFiles:', {
+                    oldWpsFileId,
+                    newWpsFileId: file.wpsFileId
+                })
+                updated = true
+            }
+            
+            // 更新右侧窗格
+            const existingRight = this.rightFiles.find(f => f.id === file.id)
+            if (existingRight) {
+                const oldWpsFileId = existingRight.wpsFileId
+                Object.assign(existingRight, file)
+                console.log('[ProjectOverview] Updated rightFiles:', {
+                    oldWpsFileId,
+                    newWpsFileId: file.wpsFileId
+                })
+                updated = true
+            }
+            
+            // 如果文件不在任何窗格中打开，则打开它
+            if (!updated) {
+                console.log('[ProjectOverview] File not open, opening:', file.name)
+                this.openFile(file)
+            }
+            
+            uni.showToast({ title: `文件已更新: ${file.name}`, icon: 'success' })
+            
+            // 刷新文件树以更新文件信息
+            if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
+                this.$refs.fileTree.loadFiles()
+            }
+            
+        } catch (e) {
+            console.error('[ProjectOverview] handleWpsReloadFile error:', e)
+            uni.showToast({ title: '刷新文件失败', icon: 'none' })
+        }
+    },
+    
+    /**
+     * 处理 AI Agent 的 WPS 命令请求
+     */
+    async handleWpsCommand(action) {
+        console.log('[ProjectOverview] ========== WPS Command Start ==========')
+        console.log('[ProjectOverview] WPS Command:', JSON.stringify(action))
+        
+        const { action: commandAction, params, requestId, conversationId } = action
+        console.log('[ProjectOverview] commandAction:', commandAction, 'requestId:', requestId)
+        
+        try {
+            // 获取当前活跃的 WPS 实例
+            // FIX: 优先使用当前聚焦窗格的 WPS 实例，避免多窗口时操作错误的文档
+            let wpsInstance = null
+            console.log('[ProjectOverview] focusedPane:', this.focusedPane)
+            console.log('[ProjectOverview] wpsInstances:', {
+                left: !!this.wpsInstances.left,
+                right: !!this.wpsInstances.right
+            })
+            
+            if (this.focusedPane && this.wpsInstances[this.focusedPane]) {
+                wpsInstance = this.wpsInstances[this.focusedPane]
+                console.log('[ProjectOverview] Using focused pane instance:', this.focusedPane)
+            } else {
+                // 降级策略：使用任一可用的实例
+                wpsInstance = this.wpsInstances.left || this.wpsInstances.right
+                console.log('[ProjectOverview] Using fallback instance:', wpsInstance ? 'found' : 'null')
+            }
+            
+            if (!wpsInstance) {
+                console.error('[ProjectOverview] No WPS instance available')
+                await sendWpsResult(conversationId, requestId, false, null, 'WPS 编辑器未就绪，请先打开一个文档')
+                return
+            }
+            
+            console.log('[ProjectOverview] WPS instance found, calling wpsBridge.executeCommand...')
+            console.log('[ProjectOverview] wpsInstance type:', typeof wpsInstance)
+            console.log('[ProjectOverview] wpsInstance.Application:', !!wpsInstance?.Application)
+            
+            // 使用 WpsBridge 执行命令
+            const wpsBridge = useWpsBridge()
+            console.log('[ProjectOverview] wpsBridge created, calling executeCommand with:', commandAction, params)
+            
+            const result = await wpsBridge.executeCommand(commandAction, params, wpsInstance)
+            
+            console.log('[ProjectOverview] WPS Command Result:', JSON.stringify(result))
+            
+            // 发送结果回后端
+            const successFlag = result.success !== false
+            console.log('[ProjectOverview] Sending result to backend: success=', successFlag)
+            
+            await sendWpsResult(
+                conversationId, 
+                requestId, 
+                successFlag, 
+                result, 
+                result.error || null
+            )
+            
+            console.log('[ProjectOverview] ========== WPS Command End ==========')
+            
+        } catch (e) {
+            console.error('[ProjectOverview] handleWpsCommand error:', e)
+            console.error('[ProjectOverview] Error stack:', e.stack)
+            await sendWpsResult(conversationId, requestId, false, null, e.message)
         }
     },
 
@@ -5025,6 +5779,23 @@ export default {
         }
       } catch (e) {
         console.error('Failed to load dynamic plugins:', e)
+      }
+    },
+
+    /**
+     * 加载 WPS 配置（从后端动态获取 appId）
+     */
+    async loadWpsConfig() {
+      try {
+        const res = await getWpsConfig()
+        if (res && res.data && res.data.appId) {
+          this.wpsAppId = res.data.appId
+          console.log('[WPS] 配置加载成功, appId:', this.wpsAppId)
+        } else {
+          console.warn('[WPS] 后端未返回有效的 appId，将无法初始化 WPS 编辑器')
+        }
+      } catch (e) {
+        console.error('[WPS] 加载配置失败:', e)
       }
     },
 
@@ -5381,6 +6152,10 @@ export default {
             // Pass conversationId and messages to ChatInterface via $refs
             if (this.$refs.chatInterface && typeof this.$refs.chatInterface.loadMessages === 'function') {
                 this.$refs.chatInterface.loadMessages(chat.conversationId, msgs)
+                // Load metadata (file changes + token usage) for historical display
+                if (typeof this.$refs.chatInterface.loadConversationMetadata === 'function') {
+                    this.$refs.chatInterface.loadConversationMetadata(chat.conversationId)
+                }
             } else {
                 // Fallback for legacy - populate aiMessages directly
                 this.aiMessages = (msgs || []).map(m => ({
@@ -5740,9 +6515,22 @@ $bg-white: #FFFFFF;
   
   &.active {
     background-color: rgba(91, 209, 151, 0.1); // Mint with opacity
-    border-left: 3px solid $color-accent; // Indicator
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
+    // Use pseudo-element for border to avoid layout shift
+    position: relative;
+    border-radius: 0; // Remove radius for active state to match square-ish look or keep? Original had left radius removed.
+    // Actually, original had: border-top-left-radius: 0; border-bottom-left-radius: 0;
+    
+    &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background-color: #1A5336; // King Forest (Accent)
+        border-top-right-radius: 2px;
+        border-bottom-right-radius: 2px;
+    }
   }
 }
 
@@ -8572,10 +9360,20 @@ $bg-white: #FFFFFF;
 }
 /* Sidebar Member Stack & User Avatar (Left Rail) */
 .rail-members-container {
+  width: 40px;
+  height: 40px;
   position: relative;
   display: flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: 12px;
+  margin-bottom: 8px; /* Consistent margin */
+  border-radius: 8px; /* Match rail-btn */
+  transition: all 0.2s;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #f1f5f9; /* Match rail-btn hover */
+  }
 }
 
 .members-stack-icon {
@@ -9011,19 +9809,34 @@ $bg-white: #FFFFFF;
 
 
 /* Rail User Avatar (Bottom) */
+/* Rail User Avatar (Bottom) */
 .rail-user-avatar {
-  width: 32px;
-  height: 32px;
-  background: #0f172a;
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px; /* Match rail-btn container */
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  margin-bottom: 8px; /* Consistent margin */
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: #f1f5f9; /* Match rail-btn hover */
+  }
+}
+
+.rail-user-avatar-inner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0f172a;
   color: white;
   font-size: 14px;
-  cursor: pointer;
-  margin-bottom: 12px;
-  transition: transform 0.2s;
 }
 
 .rail-user-avatar:hover {
@@ -9164,8 +9977,20 @@ $bg-white: #FFFFFF;
 }
 /* AI Context Drag & Drop */
 .side-panel-ai.drag-over {
-  border: 2px dashed #1A5336;
   background-color: rgba(91, 209, 151, 0.1);
+  
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 2px dashed #1A5336;
+    pointer-events: none;
+    z-index: 100;
+    box-sizing: border-box;
+  }
 }
 
 .ai-context-tags-row {

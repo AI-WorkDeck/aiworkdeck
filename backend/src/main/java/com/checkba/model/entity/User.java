@@ -18,7 +18,7 @@ import java.util.Objects;
  * - 支持用户对项目的管理和权限控制
  */
 @Entity
-@Table(name = "user")
+@Table(name = "app_users")
 public class User {
 
     @Id

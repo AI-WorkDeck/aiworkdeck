@@ -53,6 +53,9 @@ public class ProjectAiMessageService {
     /**
      * Save a single message (user OR assistant) to the database.
      * Used for streaming scenarios where assistant response comes after user message.
+     * 
+     * 对于 ASSISTANT 消息，如果最后一条同角色消息是最近 30 秒内创建的（即同一个对话轮次），
+     * 则更新它而不是创建新的。这样可以避免增量保存和最终保存产生重复消息。
      */
     public void saveMessage(String projectIdStr, Long userId, String conversationId, String role, String content) {
         if (projectIdStr == null || role == null) {
@@ -65,6 +68,24 @@ public class ProjectAiMessageService {
             return;
         }
         
+        // 对于 ASSISTANT 消息，检查是否需要更新而不是新建
+        if ("ASSISTANT".equalsIgnoreCase(role) && conversationId != null) {
+            java.util.Optional<ProjectAiMessage> lastMsgOpt = repository.findLastByConversationIdAndRole(conversationId, "ASSISTANT");
+            if (lastMsgOpt.isPresent()) {
+                ProjectAiMessage lastMsg = lastMsgOpt.get();
+                // 如果最后一条 ASSISTANT 消息是 30 秒内创建的，认为是同一个对话轮次，更新它
+                java.time.LocalDateTime threshold = java.time.LocalDateTime.now().minusSeconds(30);
+                if (lastMsg.getCreatedAt() != null && lastMsg.getCreatedAt().isAfter(threshold)) {
+                    // 更新已有消息而不是创建新的
+                    lastMsg.setContent(content);
+                    lastMsg.setCreatedAt(java.time.LocalDateTime.now()); // 更新时间戳
+                    repository.save(lastMsg);
+                    return;
+                }
+            }
+        }
+        
+        // 否则创建新消息
         ProjectAiMessage msg = new ProjectAiMessage();
         msg.setProjectId(projectId);
         msg.setUserId(userId);

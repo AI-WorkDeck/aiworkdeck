@@ -1,105 +1,362 @@
 package com.checkba.service.ai.tools;
 
-import com.checkba.service.ai.ProjectRagService;
+import com.checkba.model.entity.ConversationSummary;
+import com.checkba.model.entity.MemoryEntry;
+import com.checkba.model.entity.ProjectMemory;
+import com.checkba.service.ai.context.ProjectContextHolder;
+import com.checkba.service.ai.memory.AgenticRetriever;
+import com.checkba.service.ai.memory.MemoryManager;
+import com.checkba.service.ai.memory.ProjectMemoryExtractor;
+import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
-import dev.langchain4j.rag.content.retriever.ContentRetriever;
-import dev.langchain4j.rag.query.Query;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
- * Memory Tools for the Agent.
- * Includes:
- * 1. Add Memory (Save Key Preferences/Facts)
- * 2. Query Knowledge Base (RAG)
+ * 增强版记忆工具
+ * 提供结构化的长期记忆存储和检索能力
+ * 
+ * 工具列表：
+ * 1. save_memory - 保存重要信息到项目记忆
+ * 2. query_memory - 查询项目相关记忆
+ * 3. get_project_context - 获取项目核心信息
+ * 4. update_project_info - 更新项目信息
+ * 5. search_knowledge_base - 智能混合搜索知识库（RRF 融合）
+ * 6. get_conversation_summary - 获取对话摘要
+ * 7. deep_search - Agentic 深度搜索（多轮召回）
  */
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class MemoryTools {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MemoryTools.class);
+    private final MemoryManager memoryManager;
+    private final ProjectMemoryExtractor projectMemoryExtractor;
+    private final AgenticRetriever agenticRetriever;
 
-    private final ProjectRagService projectRagService;
-
-    // Simple file-based KV store for "Long Term Memory" (MVP)
-    // Saved in ~/.gemini/checkba_memory.json or similar
-    private final Path memoryFile = Paths.get(System.getProperty("user.home"), ".gemini", "checkba_memory.txt");
-
-    @Tool("Add a piece of information to long-term memory. Use this for user preferences or important facts.")
-    public String add_memory(String key, String value) {
-        log.info("Tool: add_memory called key={}, value={}", key, value);
+    /**
+     * 保存结构化记忆
+     */
+    @Tool("保存重要信息到项目记忆中。用于存储关键决策、结论、事实、法律引用等需要长期保留的信息。")
+    public String save_memory(
+            @P("记忆类型: decision(决策)/conclusion(结论)/fact(事实)/reference(法律引用)/preference(偏好)") String type,
+            @P("记忆标题或关键词，用于后续检索") String key,
+            @P("记忆内容，详细描述需要保存的信息") String value,
+            @P("是否为法律关键信息需要特别保护（如法条引用、金额、日期等），受保护信息在压缩时不会丢失") boolean isProtected
+    ) {
+        log.info("Tool: save_memory called type={}, key={}, protected={}", type, key, isProtected);
+        
+        Long projectId = ProjectContextHolder.getProjectIdAsLong();
+        String conversationId = ProjectContextHolder.getConversationId();
+        
+        if (projectId == null) {
+            return "错误：无法获取当前项目ID，请确保在项目上下文中使用此工具。";
+        }
+        
+        // 验证类型
+        if (!isValidMemoryType(type)) {
+            return "错误：无效的记忆类型。请使用: decision, conclusion, fact, reference, preference";
+        }
+        
         try {
-            if (!Files.exists(memoryFile.getParent())) {
-                Files.createDirectories(memoryFile.getParent());
+            MemoryEntry entry = MemoryEntry.builder()
+                    .projectId(projectId)
+                    .conversationId(conversationId)
+                    .memoryType(type.toLowerCase())
+                    .memoryKey(key)
+                    .memoryValue(value)
+                    .isProtected(isProtected)
+                    .importanceScore(isProtected ? 1.0 : 0.7)
+                    .build();
+            
+            memoryManager.saveMemory(entry);
+            
+            return String.format("✓ 记忆已保存\n- 类型: %s\n- 关键词: %s\n- 受保护: %s", 
+                    type, key, isProtected ? "是" : "否");
+        } catch (Exception e) {
+            log.error("Failed to save memory: {}", e.getMessage(), e);
+            return "保存记忆时出错: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 查询项目记忆
+     */
+    @Tool("查询项目相关的记忆信息，支持按关键词和类型检索。用于回顾之前的决策、结论或重要事实。")
+    public String query_memory(
+            @P("查询关键词，用于搜索相关记忆") String query,
+            @P("记忆类型过滤(可选): decision/conclusion/fact/reference/preference/all，默认为all") String type
+    ) {
+        log.info("Tool: query_memory called query='{}', type='{}'", query, type);
+        
+        Long projectId = ProjectContextHolder.getProjectIdAsLong();
+        
+        if (projectId == null) {
+            return "错误：无法获取当前项目ID。";
+        }
+        
+        try {
+            String memoryType = "all".equalsIgnoreCase(type) || type == null ? null : type.toLowerCase();
+            List<MemoryEntry> memories = memoryManager.retrieveMemories(projectId, query, memoryType, 10);
+            
+            if (memories.isEmpty()) {
+                return "未找到相关记忆。可以使用 save_memory 工具保存重要信息。";
             }
-            String line = LocalDateTime.now() + " | " + key + ": " + value + "\n";
-            Files.writeString(memoryFile, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            return "Memory added successfully.";
+            
+            StringBuilder sb = new StringBuilder("找到 ").append(memories.size()).append(" 条相关记忆:\n\n");
+            int index = 1;
+            for (MemoryEntry mem : memories) {
+                sb.append(index++).append(". ");
+                sb.append("[").append(mem.getMemoryType().toUpperCase()).append("] ");
+                if (mem.getMemoryKey() != null) {
+                    sb.append("**").append(mem.getMemoryKey()).append("**\n");
+                }
+                sb.append("   ").append(mem.getMemoryValue()).append("\n");
+                if (Boolean.TRUE.equals(mem.getIsProtected())) {
+                    sb.append("   🔒 受保护\n");
+                }
+                sb.append("\n");
+            }
+            
+            return sb.toString();
         } catch (Exception e) {
-            return "Error adding memory: " + e.getMessage();
+            log.error("Failed to query memory: {}", e.getMessage(), e);
+            return "查询记忆时出错: " + e.getMessage();
         }
     }
 
-    @Tool("Query the project's knowledge base (documents). Returns relevant snippets.")
-    public String query_knowledge_base(String query) {
-        log.info("Tool: query_knowledge_base called for query='{}'", query);
+    /**
+     * 获取项目核心信息
+     */
+    @Tool("获取当前项目的核心信息，包括项目类型、交易结构、当事人、关键日期等。")
+    public String get_project_context() {
+        log.info("Tool: get_project_context called");
+        
+        Long projectId = ProjectContextHolder.getProjectIdAsLong();
+        
+        if (projectId == null) {
+            return "错误：无法获取当前项目ID。";
+        }
+        
         try {
-            // How do we know the ProjectId?
-            // Usually context is needed. If we don't have projectId, we might scan all?
-            // For this tool to work, the Agent usually operates within a "Project Context".
-            // Since we can't easily injection Request Scope here without ThreadLocal, 
-            // we'll assume a default or pass it?
+            Optional<ProjectMemory> pmOpt = memoryManager.getProjectMemory(projectId);
             
-            // HACK: For now, we search the 'default' project or we need to ask User to provide projectId?
-            // Better: update tool signature to `query_knowledge_base(query, projectId)` 
-            // OR the Agent knows the current projectId from the System Prompt and passes it?
-            // The System Prompt says "- Current Task List ID", but not Project ID explicitly?
-            // Actually, we can try to guess or use a placeholder.
-            // Let's rely on the Agent passing projectId if it knows it, or we defaulting to the active one.
+            if (pmOpt.isEmpty()) {
+                return "项目记忆尚未建立。系统会在对话过程中自动提取并保存项目信息，您也可以使用 update_project_info 手动更新。";
+            }
             
-            // Let's search ALL known projects in cache? No.
-            // We'll return a hint: "Please provide Project ID to search specific documents."
-            // But wait, the user wants "search project files" (FileTools) vs "query_knowledge_base" (RAG).
-            // RAG is usually better for semantic search. 
-            // Let's implement this but note the limitation.
+            ProjectMemory pm = pmOpt.get();
+            StringBuilder sb = new StringBuilder("# 项目核心信息\n\n");
+            sb.append(pm.toCoreContext());
             
-            return "Knowledge Base Query requires ProjectContext. (To be implemented fully: ensure ProjectId is passed)";
+            // 添加统计信息
+            Map<String, Object> stats = memoryManager.getMemoryStats(projectId);
+            sb.append("\n## 记忆统计\n");
+            sb.append("- 总记忆条目: ").append(stats.get("totalMemories")).append("\n");
             
+            return sb.toString();
         } catch (Exception e) {
-            return "Error querying knowledge base: " + e.getMessage();
+            log.error("Failed to get project context: {}", e.getMessage(), e);
+            return "获取项目信息时出错: " + e.getMessage();
         }
     }
-    
-    // Overloaded to accept projectId if the Agent decides to pass it
-    @Tool("Query the knowledge base for a specific project.")
-    public String query_knowledge_base_with_id(String query, String projectId) {
-         log.info("Tool: query_knowledge_base_with_id called query='{}', projectId='{}'", query, projectId);
-         try {
-             ContentRetriever retriever = projectRagService.getRetrieverForProject(projectId);
-             // Retrieve
-             // Note: ContentRetriever API usually takes a Query object.
-             // We need to fetch contents. 
-             // LangChain4j usage: retriever.retrieve(Query.from(query))
-             
-             var contents = retriever.retrieve(Query.from(query));
-             if (contents.isEmpty()) return "No relevant information found.";
-             
-             StringBuilder sb = new StringBuilder("Found matches:\n");
-             contents.forEach(content -> {
-                 sb.append("- ").append(content.textSegment().text()).append("\n");
-             });
-             return sb.toString();
-         } catch (Exception e) {
-             return "Error: " + e.getMessage();
-         }
+
+    /**
+     * 更新项目信息
+     */
+    @Tool("更新项目的核心信息，如项目名称、交易金额、关键日期等。")
+    public String update_project_info(
+            @P("要更新的字段: projectName/projectType/listedCompany/targetCompany/transactionStructure/transactionAmount") String field,
+            @P("新的值") String value
+    ) {
+        log.info("Tool: update_project_info called field={}, value={}", field, value);
+        
+        Long projectId = ProjectContextHolder.getProjectIdAsLong();
+        
+        if (projectId == null) {
+            return "错误：无法获取当前项目ID。";
+        }
+        
+        try {
+            memoryManager.updateProjectField(projectId, field, value);
+            return String.format("✓ 项目信息已更新\n- 字段: %s\n- 新值: %s", field, value);
+        } catch (Exception e) {
+            log.error("Failed to update project info: {}", e.getMessage(), e);
+            return "更新项目信息时出错: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 智能混合搜索知识库（RRF 融合）
+     * 结合关键词检索和语义检索，使用 RRF 算法融合结果，获得更准确的搜索结果
+     */
+    @Tool("在项目知识库中进行智能混合搜索，结合关键词和语义理解，查找与查询相关的记忆和信息。")
+    public String search_knowledge_base(
+            @P("搜索查询，描述你想查找的信息") String query,
+            @P("返回结果数量，默认5") int limit
+    ) {
+        log.info("Tool: search_knowledge_base (hybrid RRF) called query='{}', limit={}", query, limit);
+        
+        Long projectId = ProjectContextHolder.getProjectIdAsLong();
+        
+        if (projectId == null) {
+            return "错误：无法获取当前项目ID。";
+        }
+        
+        if (limit <= 0 || limit > 20) {
+            limit = 5;
+        }
+        
+        try {
+            // 使用 RRF 混合检索替代单纯的语义检索
+            List<MemoryEntry> results = memoryManager.hybridSearch(projectId, query, limit);
+            
+            if (results.isEmpty()) {
+                return "未在知识库中找到相关信息。";
+            }
+            
+            StringBuilder sb = new StringBuilder("混合搜索结果 (RRF 融合，").append(results.size()).append(" 条):\n\n");
+            int index = 1;
+            for (MemoryEntry mem : results) {
+                sb.append(index++).append(". ");
+                sb.append("[").append(mem.getMemoryType().toUpperCase()).append("] ");
+                if (mem.getMemoryKey() != null) {
+                    sb.append(mem.getMemoryKey()).append(": ");
+                }
+                sb.append(mem.getMemoryValue());
+                if (mem.getMemoryValue().length() > 200) {
+                    sb.append("...");
+                }
+                sb.append("\n\n");
+            }
+            
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("Failed to search knowledge base: {}", e.getMessage(), e);
+            return "搜索知识库时出错: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Agentic 深度搜索（多轮召回）
+     * 当普通搜索结果不足时，自动生成补充查询并融合结果
+     */
+    @Tool("在项目知识库中进行深度智能搜索。当您需要更全面的信息时使用，会自动扩展查询范围。")
+    public String deep_search(
+            @P("搜索查询，描述你想查找的信息") String query,
+            @P("返回结果数量，默认10") int limit
+    ) {
+        log.info("Tool: deep_search (agentic) called query='{}', limit={}", query, limit);
+        
+        Long projectId = ProjectContextHolder.getProjectIdAsLong();
+        
+        if (projectId == null) {
+            return "错误：无法获取当前项目ID。";
+        }
+        
+        if (limit <= 0 || limit > 20) {
+            limit = 10;
+        }
+        
+        try {
+            // 使用 Agentic 多轮召回检索
+            List<MemoryEntry> results = agenticRetriever.agenticRetrieve(projectId, query, limit);
+            
+            if (results.isEmpty()) {
+                return "深度搜索未找到相关信息。建议尝试不同的查询词或使用 save_memory 保存新信息。";
+            }
+            
+            StringBuilder sb = new StringBuilder("深度搜索结果 (Agentic 多轮召回，")
+                    .append(results.size()).append(" 条):\n\n");
+            int index = 1;
+            for (MemoryEntry mem : results) {
+                sb.append(index++).append(". ");
+                sb.append("[").append(mem.getMemoryType().toUpperCase()).append("] ");
+                if (mem.getMemoryKey() != null) {
+                    sb.append("**").append(mem.getMemoryKey()).append("**: ");
+                }
+                String value = mem.getMemoryValue();
+                if (value.length() > 300) {
+                    value = value.substring(0, 300) + "...";
+                }
+                sb.append(value);
+                if (Boolean.TRUE.equals(mem.getIsProtected())) {
+                    sb.append(" 🔒");
+                }
+                sb.append("\n\n");
+            }
+            
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("Failed to deep search: {}", e.getMessage(), e);
+            return "深度搜索时出错: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 获取对话摘要
+     */
+    @Tool("获取当前对话的历史摘要，了解之前讨论的要点和结论。")
+    public String get_conversation_summary() {
+        log.info("Tool: get_conversation_summary called");
+        
+        String conversationId = ProjectContextHolder.getConversationId();
+        
+        if (conversationId == null || conversationId.isEmpty()) {
+            return "错误：无法获取当前对话ID。";
+        }
+        
+        try {
+            Optional<ConversationSummary> summaryOpt = memoryManager.getConversationSummary(conversationId);
+            
+            if (summaryOpt.isEmpty()) {
+                return "当前对话暂无摘要。系统会在对话累积足够消息后自动生成摘要。";
+            }
+            
+            ConversationSummary summary = summaryOpt.get();
+            StringBuilder sb = new StringBuilder("# 对话摘要\n\n");
+            sb.append(summary.getSummaryText()).append("\n");
+            
+            if (summary.getKeyPoints() != null && !summary.getKeyPoints().isEmpty()) {
+                sb.append("\n## 关键要点\n");
+                for (String point : summary.getKeyPoints()) {
+                    sb.append("- ").append(point).append("\n");
+                }
+            }
+            
+            if (summary.getLegalReferences() != null && !summary.getLegalReferences().isEmpty()) {
+                sb.append("\n## 法律引用\n");
+                for (String ref : summary.getLegalReferences()) {
+                    sb.append("- ").append(ref).append("\n");
+                }
+            }
+            
+            if (summary.getPendingTasks() != null && !summary.getPendingTasks().isEmpty()) {
+                sb.append("\n## 待办事项\n");
+                for (String task : summary.getPendingTasks()) {
+                    sb.append("- [ ] ").append(task).append("\n");
+                }
+            }
+            
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("Failed to get conversation summary: {}", e.getMessage(), e);
+            return "获取对话摘要时出错: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 验证记忆类型是否有效
+     */
+    private boolean isValidMemoryType(String type) {
+        if (type == null) return false;
+        String t = type.toLowerCase();
+        return t.equals("decision") || t.equals("conclusion") || 
+               t.equals("fact") || t.equals("reference") || t.equals("preference");
     }
 }

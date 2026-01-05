@@ -2,13 +2,12 @@ package com.checkba.service.ocr;
 
 import lombok.RequiredArgsConstructor;
 import com.aliyun.ocr_api20210707.Client;
-import com.aliyun.ocr_api20210707.models.RecognizeGeneralRequest;
-import com.aliyun.ocr_api20210707.models.RecognizeGeneralResponse;
+import com.aliyun.ocr_api20210707.models.RecognizeAllTextRequest;
+import com.aliyun.ocr_api20210707.models.RecognizeAllTextResponse;
 import com.aliyun.teaopenapi.models.Config;
 import com.aliyun.teautil.models.RuntimeOptions;
 
 import java.io.InputStream;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -31,47 +30,37 @@ public class AliyunOcrClient {
     }
 
     /**
-     * 通用文字识别（ocr-api 2021-07-07 / RecognizeGeneral）
-     * 直接上传图片流（避免对公网 URL 的依赖，也避免旧版 SDK Version 报错）
+     * 通用文字识别（ocr-api 2021-07-07 / RecognizeAllText）
+     * 直接上传图片流（避免对公网 URL 的依赖）
+     * 使用 RecognizeAllText + Type="Advanced" 替代原 RecognizeGeneral
      */
     public OcrResult recognizeGeneral(InputStream imageStream) throws Exception {
-        RecognizeGeneralRequest req = new RecognizeGeneralRequest()
-                .setBody(imageStream);
-        RuntimeOptions runtime = new RuntimeOptions();
-        RecognizeGeneralResponse resp = client.recognizeGeneralWithOptions(req, runtime);
+        // 使用 OCR 统一识别接口
+        RecognizeAllTextRequest req = new RecognizeAllTextRequest()
+                .setBody(imageStream)
+                .setType("Advanced"); // 通用文字识别高精版
 
-        if (resp == null || resp.getBody() == null) {
+        RuntimeOptions runtime = new RuntimeOptions();
+        RecognizeAllTextResponse resp = client.recognizeAllTextWithOptions(req, runtime);
+
+        if (resp == null || resp.getBody() == null || resp.getBody().getData() == null) {
             return new OcrResult("", "");
         }
 
-        // 返回结构里 data 是 JSON 字符串（TeaModel 里是 String）
-        String raw = resp.getBody().getData() == null ? "" : resp.getBody().getData();
-        String text = "";
-        if (!raw.isBlank()) {
-            try {
-                JsonNode root = MAPPER.readTree(raw);
-                // 尽量兼容不同返回：content / data.content / data.data.content
-                JsonNode content = root.get("content");
-                if (content == null) {
-                    JsonNode data = root.get("data");
-                    if (data != null) {
-                        content = data.get("content");
-                        if (content == null && data.get("data") != null) {
-                            content = data.get("data").get("content");
-                        }
-                    }
-                }
-                if (content != null && !content.isNull()) {
-                    text = content.asText("");
-                } else {
-                    // 兜底：直接返回 raw（至少可见）
-                    text = raw;
-                }
-            } catch (Exception ignore) {
-                // raw 不是合法 JSON 时，直接作为文本返回
-                text = raw;
-            }
+        // 提取全文本
+        String text = resp.getBody().getData().getContent();
+        if (text == null) {
+            text = "";
         }
+
+        // 将整个 Data 对象转为 JSON 字符串作为 raw 返回，方便后续如果有需要提取详细坐标等信息
+        String raw = "";
+        try {
+            raw = MAPPER.writeValueAsString(resp.getBody().getData());
+        } catch (Exception e) {
+            raw = resp.getBody().getData().toString();
+        }
+
         return new OcrResult(text, raw);
     }
 }

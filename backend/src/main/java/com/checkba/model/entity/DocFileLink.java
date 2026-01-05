@@ -58,7 +58,7 @@ public class DocFileLink {
     /**
      * 关联文件 ID 列表（JSON 数组），例如：[1,2,3]
      */
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String fileIdsJson;
 
     private LocalDateTime createdAt;

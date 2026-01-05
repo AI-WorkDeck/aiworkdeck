@@ -1,18 +1,29 @@
 <template>
   <view class="markdown-preview">
-    <view class="markdown-body" v-html="displayedHtml"></view>
+    <view v-if="loading" class="markdown-loading">
+      <text>正在加载...</text>
+    </view>
+    <view v-else class="markdown-body" v-html="displayedHtml"></view>
   </view>
 </template>
 
 <script>
 import MarkdownIt from 'markdown-it'
+import { getFileDownloadUrl } from '@/services/api.js'
+import { getAuthHeaders } from '@/utils/auth.js'
 
 export default {
   name: 'MarkdownPreview',
   props: {
+    // AI artifact 的内容（直接传入）
     content: {
       type: String,
       default: ''
+    },
+    // 真正的 .md 文件对象（从服务器加载）
+    file: {
+      type: Object,
+      default: null
     }
   },
   data() {
@@ -21,12 +32,52 @@ export default {
         html: true,
         linkify: true,
         typographer: true
-      })
+      }),
+      loadedContent: '',
+      loading: false
     }
   },
   computed: {
     displayedHtml() {
-      return this.md.render(this.content || '')
+      // 优先使用直接传入的 content，其次使用从服务器加载的内容
+      const text = this.content || this.loadedContent || ''
+      return this.md.render(text)
+    }
+  },
+  watch: {
+    file: {
+      immediate: true,
+      handler(newFile) {
+        if (newFile && !this.content) {
+          this.loadFileContent()
+        }
+      }
+    }
+  },
+  methods: {
+    async loadFileContent() {
+      if (!this.file) return
+      
+      const fileId = this.file.wpsFileId || this.file.id
+      if (!fileId) return
+      
+      this.loading = true
+      try {
+        const url = getFileDownloadUrl(fileId)
+        const headers = getAuthHeaders()
+        const response = await fetch(url, { headers })
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+        
+        this.loadedContent = await response.text()
+      } catch (e) {
+        console.error('加载 Markdown 文件失败:', e)
+        this.loadedContent = `加载失败: ${e.message}`
+      } finally {
+        this.loading = false
+      }
     }
   }
 }
@@ -41,6 +92,15 @@ export default {
   overflow-x: hidden; /* Prevent horizontal overflow */
   box-sizing: border-box;
   min-width: 0; /* Allow flex shrinking */
+}
+
+.markdown-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+  font-size: 14px;
 }
 
 .markdown-body {

@@ -82,6 +82,8 @@ public class AiDocxExportService {
 
             // 渲染为 docx 到内存中的 WordprocessingMLPackage
             WordprocessingMLPackage wordMLPackage = WordprocessingMLPackage.createPackage();
+            // 添加缺失的样式（BodyText, Quotations），避免 docx4j PropertyResolver 报错
+            com.checkba.util.DocxStyleHelper.addMissingStyles(wordMLPackage);
             renderer.render(mdDocument, wordMLPackage);
 
             ByteArrayOutputStream bos = new ByteArrayOutputStream();

@@ -40,6 +40,7 @@ public class FileTools {
 
     private final ProjectFileService projectFileService;
     private final ProjectFileRepository projectFileRepository;
+    private final com.checkba.service.ai.WpsActionService wpsActionService;
     private static final Long AGENT_USER_ID = 10001L;
 
     // We need to resolve the project root physically.
@@ -121,19 +122,34 @@ public class FileTools {
         }
     }
 
-    @Tool("List files and directories in a specific folder. Returns names and types (DIR/FILE).")
+    @Tool("List files and directories in a project's data folder. Note: This lists physical files, not database records. For database files, use wps_list_project_files or pptx_list_files.")
     public String list_files(
-            @P("Directory path relative to project root (e.g. 'backend/src'). Use '.' for root.") String dirPath
+            @P("Project ID - files will be listed from data/projects/{projectId}/") Long projectId,
+            @P("Optional: Subdirectory path within the project folder. Use '.' or empty for project root.") String subPath
     ) {
-        log.info("Tool: list_files called for {}", dirPath);
+        log.info("Tool: list_files called for projectId={}, subPath={}", projectId, subPath);
         try {
-            Path root = getProjectRoot();
-            Path dir = root.resolve(dirPath.equals(".") ? "" : dirPath);
+            // 限制在项目数据目录内
+            Path projectDataDir = getProjectRoot().resolve("data/projects/" + projectId);
+            if (!Files.exists(projectDataDir)) {
+                return "Error: Project data directory not found: " + projectDataDir;
+            }
             
-            if (!Files.exists(dir)) return "Error: Directory not found: " + dirPath;
-            if (!Files.isDirectory(dir)) return "Error: Path is not a directory: " + dirPath;
+            Path dir = projectDataDir;
+            if (StringUtils.hasText(subPath) && !".".equals(subPath)) {
+                dir = projectDataDir.resolve(subPath);
+                // 安全检查：确保解析后的路径仍在项目目录内
+                if (!dir.normalize().startsWith(projectDataDir.normalize())) {
+                    return "Error: Access denied. Path escapes project directory.";
+                }
+            }
+            
+            if (!Files.exists(dir)) return "Error: Directory not found: " + subPath;
+            if (!Files.isDirectory(dir)) return "Error: Path is not a directory: " + subPath;
 
-            StringBuilder sb = new StringBuilder("Contents of " + dirPath + ":\n");
+            String displayPath = subPath == null || subPath.isEmpty() || ".".equals(subPath) ? 
+                    "project " + projectId + " root" : subPath;
+            StringBuilder sb = new StringBuilder("Contents of " + displayPath + ":\n");
             
             // Stream and sort: Directories first, then files
             try (var stream = Files.list(dir)) {
@@ -149,6 +165,7 @@ public class FileTools {
                 });
             }
             
+            sb.append("\nNote: These are physical files. Database file records may differ. Use wps_list_project_files for database files.");
             return sb.toString();
 
         } catch (IOException e) {
@@ -181,19 +198,28 @@ public class FileTools {
         }
     }
 
-    @Tool("Create a .docx file from Markdown. Registers in DB so it can be opened in WPS.")
+    @Tool("【STRICTLY NEW FILES ONLY】Create a NEW .docx from Markdown. FORBIDDEN for 'revise', 'update', or 'modify' tasks. If a similar file exists, you MUST use wps_open_file to edit it. DO NOT create 'Revised_Version.docx'.")
     public String write_docx(
-            @P("Target filename (e.g. 'report.docx')") String fileName, 
-            @P("Markdown content") String markdownContent,
-            @P("Project ID") Long projectId
+            @P("新文件名 (如 '报告.docx')") String fileName, 
+            @P("Markdown 内容") String markdownContent,
+            @P("项目ID") Long projectId
     ) {
         log.info("Tool: write_docx called for {}", fileName);
         if (!fileName.endsWith(".docx")) fileName += ".docx";
+        
+        // Block suspicious filenames that suggest revision
+        if (fileName.matches(".*(revise|revision|update|modify|change|修改|修订|更新|变动).*")) {
+            return "Error: Creation of files with 'revise/update/modify' in the name is FORBIDDEN. You MUST use 'wps_open_file' to open the original file and use editing tools (wps_find_replace, wps_modify_paragraph, etc.) to apply changes. DO NOT create a new file.";
+        }
         
         try {
             Path projectDataDir = getProjectRoot().resolve("data/projects/" + projectId);
             if (!Files.exists(projectDataDir)) Files.createDirectories(projectDataDir);
             Path targetPath = projectDataDir.resolve(fileName);
+            
+            if (Files.exists(targetPath)) {
+                return "Error: File '" + fileName + "' already exists. Please use 'wps_open_file' and editing tools to modify the existing document instead of overwriting it.";
+            }
             
             Parser parser = Parser.builder().build();
             com.vladsch.flexmark.util.ast.Node document = parser.parse(markdownContent);
@@ -202,8 +228,9 @@ public class FileTools {
             File file = targetPath.toFile();
             DocxRenderer renderer = DocxRenderer.builder().build();
             
-            // Create Package -> Render -> Save
+            // Create Package -> Add missing styles -> Render -> Save
             org.docx4j.openpackaging.packages.WordprocessingMLPackage wordDoc = org.docx4j.openpackaging.packages.WordprocessingMLPackage.createPackage();
+            com.checkba.util.DocxStyleHelper.addMissingStyles(wordDoc);
             renderer.render(document, wordDoc);
             wordDoc.save(file);
             
@@ -216,6 +243,10 @@ public class FileTools {
                         projectId, null, fileName, "docx", file.length(), 
                         storageRelativePath, wpsId, AGENT_USER_ID
                 );
+                
+                // 通知前端刷新文件列表
+                wpsActionService.sendRefreshFilesAction();
+                
                 return String.format("{\"status\":\"success\", \"db_id\":%d, \"wps_file_id\":\"%s\", \"file_path\":\"%s\"}", pf.getId(), wpsId, targetPath.toAbsolutePath().toString().replace("\\", "\\\\"));
             } catch (Exception e) {
                 return "File created at " + targetPath + " but DB register failed (Ownership lost): " + e.getMessage();
@@ -262,6 +293,9 @@ public class FileTools {
                     }
                 });
             }
+            
+            // 通知前端刷新文件列表
+            wpsActionService.sendRefreshFilesAction();
             
             return report.toString();
         } catch (Exception e) {

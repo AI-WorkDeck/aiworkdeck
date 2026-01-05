@@ -12,35 +12,104 @@ import { getAuthHeaders, getSessionId } from '@/utils/auth.js'
 // 注意：用户当前环境后端就挂在 checkbahttps 域名下
 const DEFAULT_API_BASE_URL = 'https://checkbahttps.vip.cpolar.cn';
 
+// 本地开发环境后端地址
+const LOCAL_API_BASE_URL = 'http://localhost:9696';
+
+/**
+ * 检测是否为本地开发环境
+ * - 检查 window.location.hostname（H5 开发）
+ * - 检查 Electron 环境
+ * - 检查 Vite 开发模式
+ */
+function isLocalDevelopment() {
+  // 检查浏览器 URL（最可靠的方式）
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+      const host = window.location.hostname;
+      // localhost 或 127.0.0.1 或局域网 IP
+      if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) {
+        console.log('[API] 检测到本地开发环境 (hostname: ' + host + ')');
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn('[API] 检测 hostname 失败:', e);
+  }
+
+  // 检查 Vite 开发模式
+  try {
+    // eslint-disable-next-line no-undef
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // DEV 可能是布尔值或字符串
+      const isDev = import.meta.env.DEV === true || import.meta.env.DEV === 'true' || import.meta.env.MODE === 'development';
+      if (isDev) {
+        console.log('[API] 检测到 Vite 开发模式');
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn('[API] 检测 Vite DEV 环境失败:', e);
+  }
+
+  // 检查 Electron 环境（file:// 协议通常表示本地开发）
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
+      console.log('[API] 检测到 file:// 协议（Electron 本地开发）');
+      return true;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  console.log('[API] 非本地开发环境，使用远程 API');
+  return false;
+}
+
+// 缓存 API 基础 URL，避免每次请求都重新计算
+let cachedApiBaseUrl = null;
+
 export function getApiBaseUrl() {
-  // uni-app + vite 环境下可使用 import.meta.env
-  // 建议在不同部署环境中通过 VITE_API_BASE_URL 配置后端网关地址
-  // 例如：
-  // 本地开发：VITE_API_BASE_URL=http://localhost:8080
-  // 云环境：VITE_API_BASE_URL=https://api.your-domain.com
+  // 如果已经缓存了，直接返回
+  if (cachedApiBaseUrl) {
+    return cachedApiBaseUrl;
+  }
+
+  // 优先使用环境变量配置
   try {
     // eslint-disable-next-line no-undef
     if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL) {
       // eslint-disable-next-line no-undef
-      return import.meta.env.VITE_API_BASE_URL;
+      cachedApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+      console.log('[API] 使用环境变量配置的 API 地址:', cachedApiBaseUrl);
+      return cachedApiBaseUrl;
     }
   } catch (e) {
     // 如果 import.meta 不可用，忽略错误
   }
 
-  // H5 本地开发：优先走本机后端（避免默认 cpolar 指向错误环境导致 404）
+  // 直接检查 window.location.hostname（不通过 isLocalDevelopment 函数，确保能正确执行）
   try {
-    if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-      const host = window.location.hostname
-      if (host === 'localhost' || host === '127.0.0.1') {
-        return 'http://localhost:9696'
-      }
-
+    const hostname = window?.location?.hostname;
+    console.log('[API] 当前 hostname:', hostname);
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      cachedApiBaseUrl = LOCAL_API_BASE_URL;
+      console.log('[API] 检测到本地环境，使用本地后端:', cachedApiBaseUrl);
+      return cachedApiBaseUrl;
     }
   } catch (e) {
-    // ignore
+    console.warn('[API] 检测 hostname 失败:', e);
   }
-  return DEFAULT_API_BASE_URL;
+
+  // 本地开发环境：使用本地后端（避免跨域问题）
+  if (isLocalDevelopment()) {
+    cachedApiBaseUrl = LOCAL_API_BASE_URL;
+    console.log('[API] 检测到本地开发环境，使用本地后端:', cachedApiBaseUrl);
+    return cachedApiBaseUrl;
+  }
+
+  cachedApiBaseUrl = DEFAULT_API_BASE_URL;
+  console.log('[API] 使用默认远程 API 地址:', cachedApiBaseUrl);
+  return cachedApiBaseUrl;
 }
 
 function request(options) {
@@ -209,6 +278,32 @@ export function getAiConversations(projectId) {
   });
 }
 
+/**
+ * 获取对话元数据：文件变动和Token使用量
+ * @param {string} conversationId 对话ID
+ */
+export function getConversationMetadata(conversationId) {
+  return request({
+    url: `/api/ai/conversation/${conversationId}/metadata`,
+    method: 'GET'
+  });
+}
+
+/**
+ * 执行 PPT 生成
+ * payload: { topic, projectId, parentId, fileName, style, language, modelId, conversationId, exportEditable }
+ */
+export function performPptGeneration(payload) {
+  return request({
+    url: '/api/agent/ppt/generate',
+    method: 'POST',
+    data: payload,
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 // 获取 AI 公共配置（如默认供应商）
 export function getAiConfig() {
   return request({
@@ -246,6 +341,26 @@ export function exportAiDocx(payload) {
       parentId: payload.parentId,
       fileName: payload.fileName,
       markdown: payload.markdown || payload.content
+    },
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+/**
+ * 回退对话历史到指定消息
+ * 删除该消息之后的所有对话记录
+ * @param conversationId 对话ID
+ * @param messageId 消息ID（回退到此消息之前，此消息也会被删除）
+ */
+export function rollbackConversation(conversationId, messageId) {
+  return request({
+    url: '/api/agent/history/rollback',
+    method: 'POST',
+    data: {
+      conversationId,
+      messageId
     },
     header: {
       'Content-Type': 'application/json',
@@ -327,6 +442,17 @@ export function createWpsSession(payload) {
     header: {
       'Content-Type': 'application/json',
     },
+  });
+}
+
+/**
+ * 获取 WPS 公开配置（appId 等，供前端 SDK 初始化使用）
+ * 注意：此接口不返回 appSecret，secret 仅在后端使用
+ */
+export function getWpsConfig() {
+  return request({
+    url: '/api/wps/config',
+    method: 'GET',
   });
 }
 
@@ -643,6 +769,14 @@ export function getFileDownloadUrl(fileId) {
   return `${baseUrl}/api/files/${fileId}/download`
 }
 
+// 获取文件文本内容
+export function getFileText(fileId) {
+  return request({
+    url: `/api/files/${fileId}/text`,
+    method: 'GET',
+  });
+}
+
 // OCR：截图识别（后端调用阿里云）
 export function ocrRecognize(imageBase64) {
   return request({
@@ -673,6 +807,24 @@ export function getProjectFavorites(projectId, q = '', limit = 80) {
     url: `/api/projects/${projectId}/favorites${queryString}`,
     method: 'GET',
   })
+}
+
+// ===================== EasyVoice (TTS) =====================
+
+export function getTtsVoices() {
+  return request({
+    url: '/api/tts/voices',
+    method: 'GET'
+  });
+}
+
+export function generateTtsAudio(payload) {
+  return request({
+    url: '/api/tts/generate',
+    method: 'POST',
+    data: payload,
+    responseType: 'arraybuffer'
+  });
 }
 
 export function createProjectFavorite(projectId, payload) {
@@ -984,6 +1136,31 @@ export function copyDdRequest(requestId) {
   })
 }
 
+// ==================== WPS 操作结果回调 ====================
+
+/**
+ * 发送 WPS 操作结果到后端
+ * @param {string} conversationId - 会话 ID
+ * @param {string} requestId - 请求 ID
+ * @param {boolean} success - 是否成功
+ * @param {Object} data - 结果数据
+ * @param {string} error - 错误信息
+ */
+export function sendWpsResult(conversationId, requestId, success, data, error = null) {
+  return request({
+    url: '/api/ai/agent/wps-result',
+    method: 'POST',
+    data: {
+      conversationId,
+      requestId,
+      success,
+      data,
+      error
+    },
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
 export default {
   getApiBaseUrl,
   request,
@@ -1048,6 +1225,8 @@ export default {
   deleteDdItem,
   deleteDdRequest,
   copyDdRequest,
+  // WPS 操作
+  sendWpsResult,
   addDdRequestItems(requestId, content) {
     return request({
       url: `/api/dd/requests/${requestId}/items`,
@@ -1078,6 +1257,19 @@ export default {
       method: 'PUT',
       data: { name },
       header: { 'Content-Type': 'application/json' }
+    })
+  },
+
+  /**
+   * 文档比较 - 提取两个文档的文本内容
+   * @param {number} sourceId 源文档 ID（基准文档）
+   * @param {number} targetId 目标文档 ID（比较对象）
+   * @returns {Promise<{code: number, data: {source: {id, name, text}, target: {id, name, text}}}>}
+   */
+  compareDocuments(sourceId, targetId) {
+    return request({
+      url: `/api/files/compare?sourceId=${sourceId}&targetId=${targetId}`,
+      method: 'GET'
     })
   }
 }

@@ -91,20 +91,17 @@ export default {
 
 <style scoped>
 .drop-zone-container {
-  /* 修改为绝对定位，由父容器决定位置（父容器为侧边栏底部） */
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  /* Changed from absolute to relative to stack with other components in sidebar */
+  position: relative;
   z-index: 100;
   
   width: auto;
-  min-height: 120px;
-  padding: 12px;
+  min-height: 100px;
+  padding: 8px 12px;
   
   /* 样式调整：适应侧边栏 */
-  border-top: 1px solid rgba(226, 232, 240, 0.9);
-  background: rgba(255, 255, 255, 0.98);
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
   /* 只有顶部阴影 */
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
   
@@ -112,7 +109,7 @@ export default {
   flex-direction: column;
   align-items: center;
   
-  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
 }
 
 @keyframes slideUp {

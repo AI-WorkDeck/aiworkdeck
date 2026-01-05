@@ -18,11 +18,15 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import org.apache.tika.Tika;
+import org.apache.tika.exception.TikaException;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -53,6 +57,9 @@ public class FileController {
      */
     @GetMapping("/{fileId}/download")
     public ResponseEntity<Resource> downloadFile(@PathVariable("fileId") String fileId) {
+        log.info("[FileDownload] ===== 开始处理下载请求 =====");
+        log.info("[FileDownload] 收到下载请求: fileId={}", fileId);
+        
         try {
             // 1. 获取文件路径
             String path = fileId; // 默认回退到 fileId (兼容旧逻辑)
@@ -63,22 +70,30 @@ public class FileController {
             try {
                 Long dbId = Long.parseLong(fileId);
                 projectFileOpt = projectFileRepository.findById(dbId);
+                log.info("[FileDownload] 按数据库ID查找: dbId={}, found={}", dbId, projectFileOpt.isPresent());
             } catch (NumberFormatException e) {
-                // Not a number, treat as WPS File ID
+                log.info("[FileDownload] fileId不是数字，将按wpsFileId查找: {}", fileId);
             }
             
             // 如果没找到，尝试按 WPS File ID 查找 (Fallback)
             if (projectFileOpt.isEmpty()) {
                 projectFileOpt = projectFileRepository.findByWpsFileId(fileId);
+                log.info("[FileDownload] 按wpsFileId查找: wpsFileId={}, found={}", fileId, projectFileOpt.isPresent());
             }
             
             String downloadFilename = fileId + ".docx";
 
             if (projectFileOpt.isPresent()) {
                 ProjectFile pf = projectFileOpt.get();
+                log.info("[FileDownload] 找到文件记录: id={}, name={}, filePath={}, wpsFileId={}", 
+                    pf.getId(), pf.getName(), pf.getFilePath(), pf.getWpsFileId());
+                
                 // 如果数据库中有 filePath，优先使用
                 if (StringUtils.hasText(pf.getFilePath())) {
                     path = pf.getFilePath();
+                    log.info("[FileDownload] 使用数据库filePath: {}", path);
+                } else {
+                    log.warn("[FileDownload] 数据库filePath为空，使用fileId作为路径: {}", path);
                 }
                 // 使用真实文件名（防中文乱码）
                 if (StringUtils.hasText(pf.getName())) {
@@ -89,9 +104,13 @@ public class FileController {
                         downloadFilename += "." + pf.getFileType();
                     }
                 }
+            } else {
+                log.warn("[FileDownload] 数据库中未找到文件记录，使用fileId作为路径: {}", path);
             }
 
+            log.info("[FileDownload] 准备从存储加载文件: path={}", path);
             Resource resource = getStorageService().load(path);
+            log.info("[FileDownload] 存储加载结果: exists={}, readable={}", resource.exists(), resource.isReadable());
 
             // Determine Media Type dynamically
             MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
@@ -121,8 +140,13 @@ public class FileController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                     .body(resource);
         } catch (StorageException e) {
-            log.error("文件下载失败: fileId={}", fileId, e);
+            log.error("[FileDownload] 存储异常: fileId={}, message={}", fileId, e.getMessage());
+            log.error("[FileDownload] 存储异常堆栈:", e);
             return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("[FileDownload] 未知异常: fileId={}, message={}", fileId, e.getMessage());
+            log.error("[FileDownload] 未知异常堆栈:", e);
+            return ResponseEntity.status(500).build();
         }
     }
 
@@ -304,6 +328,140 @@ public class FileController {
         } catch (Exception e) {
             log.error("上传失败", e);
             return ResponseEntity.status(500).body(Map.of("code", -1, "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * 获取文件文本内容
+     * GET /api/files/{fileId}/text
+     */
+    @GetMapping("/{fileId}/text")
+    public ResponseEntity<Map<String, Object>> getFileText(@PathVariable("fileId") Long fileId) {
+        try {
+            Optional<ProjectFile> fileOpt = projectFileRepository.findById(fileId);
+            if (fileOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("code", -1, "message", "文件不存在"));
+            }
+            
+            String text = extractDocumentText(fileOpt.get());
+            
+            return ResponseEntity.ok(Map.of("code", 0, "data", text));
+        } catch (Exception e) {
+            log.error("获取文件文本失败: fileId={}", fileId, e);
+            return ResponseEntity.status(500).body(Map.of("code", -1, "message", "获取文本失败: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 文档比较接口 - 提取两个文档的文本内容供前端进行差异对比
+     * @param sourceId 源文档 ID（基准文档）
+     * @param targetId 目标文档 ID（比较对象）
+     * @return 包含两个文档文本内容的响应
+     */
+    @GetMapping("/compare")
+    public ResponseEntity<Map<String, Object>> compareDocuments(
+            @RequestParam("sourceId") Long sourceId,
+            @RequestParam("targetId") Long targetId) {
+        
+        try {
+            log.info("文档比较请求: sourceId={}, targetId={}", sourceId, targetId);
+            
+            // 1. 查找源文档
+            Optional<ProjectFile> sourceOpt = projectFileRepository.findById(sourceId);
+            if (sourceOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "code", -1,
+                    "message", "源文档不存在: " + sourceId
+                ));
+            }
+            
+            // 2. 查找目标文档
+            Optional<ProjectFile> targetOpt = projectFileRepository.findById(targetId);
+            if (targetOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "code", -1,
+                    "message", "目标文档不存在: " + targetId
+                ));
+            }
+            
+            ProjectFile sourceFile = sourceOpt.get();
+            ProjectFile targetFile = targetOpt.get();
+            
+            // 3. 检查文件类型（只支持 doc/docx）
+            List<String> supportedTypes = List.of("doc", "docx");
+            String sourceType = sourceFile.getFileType() != null ? sourceFile.getFileType().toLowerCase() : "";
+            String targetType = targetFile.getFileType() != null ? targetFile.getFileType().toLowerCase() : "";
+            
+            if (!supportedTypes.contains(sourceType)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "code", -1,
+                    "message", "源文档类型不支持比较: " + sourceType
+                ));
+            }
+            if (!supportedTypes.contains(targetType)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "code", -1,
+                    "message", "目标文档类型不支持比较: " + targetType
+                ));
+            }
+            
+            // 4. 提取文本内容
+            String sourceText = extractDocumentText(sourceFile);
+            String targetText = extractDocumentText(targetFile);
+            
+            // 5. 构建响应
+            Map<String, Object> data = new HashMap<>();
+            data.put("source", Map.of(
+                "id", sourceFile.getId(),
+                "name", sourceFile.getName(),
+                "text", sourceText
+            ));
+            data.put("target", Map.of(
+                "id", targetFile.getId(),
+                "name", targetFile.getName(),
+                "text", targetText
+            ));
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", 0);
+            result.put("data", data);
+            
+            log.info("文档比较完成: sourceId={}, targetId={}, sourceLen={}, targetLen={}", 
+                sourceId, targetId, sourceText.length(), targetText.length());
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            log.error("文档比较失败: sourceId={}, targetId={}", sourceId, targetId, e);
+            return ResponseEntity.status(500).body(Map.of(
+                "code", -1,
+                "message", "文档比较失败: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * 使用 Apache Tika 提取文档文本内容
+     */
+    private String extractDocumentText(ProjectFile file) throws IOException, TikaException {
+        String filePath = file.getFilePath();
+        if (!StringUtils.hasText(filePath)) {
+            // 尝试使用 wpsFileId 作为路径
+            filePath = file.getWpsFileId();
+        }
+        
+        if (!StringUtils.hasText(filePath)) {
+            throw new IOException("文件路径为空: " + file.getId());
+        }
+        
+        try {
+            Resource resource = getStorageService().load(filePath);
+            try (InputStream is = resource.getInputStream()) {
+                Tika tika = new Tika();
+                return tika.parseToString(is);
+            }
+        } catch (StorageException e) {
+            throw new IOException("加载文件失败: " + filePath, e);
         }
     }
 }

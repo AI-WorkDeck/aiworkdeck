@@ -19,6 +19,12 @@ export const LEFT_SIDEBAR_PLUGINS = [
     icon: '/static/meeting_unselected.png',
     activeIcon: '/static/meeting_selected.png'
   },
+  {
+    key: 'easyvoice',
+    label: 'EasyVoice',
+    icon: '/static/MPIS-TTS.png',
+    activeIcon: '/static/MPIS-TTS_selected.png'
+  }
 ]
 
 export function getLeftSidebarPlugin(key) {

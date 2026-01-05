@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* 主色 - 黄色系 */
+  --banana-yellow: #FFD700;
+  --banana-yellow-light: #FFE44D;
+  --banana-yellow-dark: #FFC700;
+  --banana-yellow-pale: #FFF9E6;
+
+  /* 中性色 - 黑白灰 */
+  --black: #1A1A1A;
+  --black-80: #4A4A4A;
+  --black-60: #757575;
+  --black-10: #F5F5F5;
+  --white: #FFFFFF;
+
+  /* 功能色 */
+  --success: #52C41A;
+  --warning: #FAAD14;
+  --error: #FF4D4F;
+  --info: #1890FF;
+
+  /* 过渡 */
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 250ms ease-in-out;
+  --transition-slow: 350ms ease-in-out;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 移动端优化 */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--black-10);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--banana-yellow);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--banana-yellow-dark);
+}
+
+/* 移动端触摸优化 */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 移动端按钮优化 - 仅针对主要交互按钮 */
+@media (max-width: 640px) {
+  .btn-touch-target,
+  button:not(.no-min-touch-target):not([class*="w-"]):not([class*="h-"]),
+  a:not(.no-min-touch-target):not([class*="w-"]):not([class*="h-"]) {
+    min-height: 44px; /* iOS推荐的最小触摸目标 */
+    min-width: 44px;
+  }
+}
+
+/* 渐变文本动画 */
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Markdown 内容样式 - 仅保留基础容器样式，具体样式由 Markdown.tsx 组件内的 Tailwind 类处理 */
+.markdown-content {
+  line-height: 1.6;
+}
+

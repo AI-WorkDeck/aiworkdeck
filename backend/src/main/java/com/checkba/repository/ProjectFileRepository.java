@@ -13,14 +13,15 @@ public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> 
     List<ProjectFile> findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(Long projectId, Long parentId);
     
     // Legacy support: alias to above (implicit filter)
-    @org.springframework.data.jpa.repository.Query("SELECT pf FROM ProjectFile pf WHERE pf.projectId = :projectId AND pf.parentId = :parentId AND pf.isDeleted = false ORDER BY pf.sortOrder ASC")
+    // FIX: Use IS NULL check for null parentId, otherwise = comparison
+    @org.springframework.data.jpa.repository.Query("SELECT pf FROM ProjectFile pf WHERE pf.projectId = :projectId AND (:parentId IS NULL AND pf.parentId IS NULL OR pf.parentId = :parentId) AND pf.isDeleted = false ORDER BY pf.sortOrder ASC")
     List<ProjectFile> findByProjectIdAndParentIdOrderBySortOrderAsc(Long projectId, Long parentId);
 
     /**
      * 根据项目 ID 和父文件夹 ID 查询文件列表（按排序序号排序，包含已删除）
      * 用于彻底删除和还原时查找所有子文件
      */
-    @org.springframework.data.jpa.repository.Query("SELECT pf FROM ProjectFile pf WHERE pf.projectId = :projectId AND pf.parentId = :parentId ORDER BY pf.sortOrder ASC")
+    @org.springframework.data.jpa.repository.Query("SELECT pf FROM ProjectFile pf WHERE pf.projectId = :projectId AND (:parentId IS NULL AND pf.parentId IS NULL OR pf.parentId = :parentId) ORDER BY pf.sortOrder ASC")
     List<ProjectFile> findByProjectIdAndParentId(Long projectId, Long parentId);
 
     /**
@@ -44,7 +45,7 @@ public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> 
      */
     boolean existsByProjectIdAndParentIdAndNameAndIdNotAndIsDeletedFalse(Long projectId, Long parentId, String name, Long excludeId);
     
-    @org.springframework.data.jpa.repository.Query("SELECT COUNT(pf) > 0 FROM ProjectFile pf WHERE pf.projectId = :projectId AND pf.parentId = :parentId AND pf.name = :name AND pf.id <> :excludeId AND pf.isDeleted = false")
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(pf) > 0 FROM ProjectFile pf WHERE pf.projectId = :projectId AND (:parentId IS NULL AND pf.parentId IS NULL OR pf.parentId = :parentId) AND pf.name = :name AND pf.id <> :excludeId AND pf.isDeleted = false")
     boolean existsByProjectIdAndParentIdAndNameAndIdNot(Long projectId, Long parentId, String name, Long excludeId);
 
     /**
@@ -57,7 +58,7 @@ public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> 
      */
     Optional<ProjectFile> findByProjectIdAndParentIdAndNameAndIsDeletedFalse(Long projectId, Long parentId, String name);
     
-    @org.springframework.data.jpa.repository.Query("SELECT pf FROM ProjectFile pf WHERE pf.projectId = :projectId AND pf.parentId = :parentId AND pf.name = :name AND pf.isDeleted = false")
+    @org.springframework.data.jpa.repository.Query("SELECT pf FROM ProjectFile pf WHERE pf.projectId = :projectId AND (:parentId IS NULL AND pf.parentId IS NULL OR pf.parentId = :parentId) AND pf.name = :name AND pf.isDeleted = false")
     Optional<ProjectFile> findByProjectIdAndParentIdAndName(Long projectId, Long parentId, String name);
 
     /**

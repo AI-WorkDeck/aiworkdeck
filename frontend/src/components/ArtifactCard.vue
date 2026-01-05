@@ -118,13 +118,13 @@ export default {
 
 <style scoped>
 .artifact-card {
-  background: #fafbfc;
-  padding: 10px 14px;
+  background: #ffffff;
+  padding: 12px 16px;
   transition: background 0.15s;
 }
 
 .artifact-card:hover {
-  background: #f3f4f6;
+  background: #F8F9FA; /* Gray-Pale */
 }
 
 /* Row 1 */
@@ -132,13 +132,13 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .card-title-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 /* Styled box icon */
@@ -146,7 +146,7 @@ export default {
   width: 6px;
   height: 6px;
   background: #d97706;
-  border-radius: 1px;
+  border-radius: 50%; /* Circle looks more modern for status-like dots */
   flex-shrink: 0;
 }
 .implementation_plan .card-icon-box { background: #ea580c; }
@@ -154,46 +154,47 @@ export default {
 .walkthrough .card-icon-box { background: #6b7280; }
 
 .card-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #1f2937;
+  color: #1A5336; /* King Forest */
 }
 
 .status-badge.resolved {
   font-size: 9px;
-  background: #dcfce7;
-  color: #16a34a;
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-weight: 500;
+  background: #E6F9F0; /* Mint Lightest */
+  color: #1A5336; /* King Forest */
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
 }
 
 .card-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .btn-approve {
-  background: #1f2937;
+  background: #1A5336; /* King Forest */
   color: #fff;
   font-size: 11px;
-  padding: 3px 10px;
-  border-radius: 3px;
+  padding: 4px 12px;
+  border-radius: 6px;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
   transition: background 0.15s;
 }
-.btn-approve:hover { background: #111827; }
+.btn-approve:hover { background: #123A26; } /* King Forest Darker */
 
 .btn-view {
   background: transparent;
-  color: #6b7280;
+  color: #6C757D; /* Gray-Medium */
   font-size: 11px;
-  padding: 3px 6px;
+  padding: 4px 6px;
   cursor: pointer;
-  text-decoration: underline;
+  text-decoration: none;
+  font-weight: 500;
 }
-.btn-view:hover { color: #1f2937; }
+.btn-view:hover { color: #1A5336; text-decoration: underline; }
 
 /* Row 2 */
 .card-row-bottom {
@@ -201,24 +202,25 @@ export default {
 }
 
 .file-info-block {
-  background: #f3f4f6;
-  border-radius: 3px;
-  padding: 6px 10px;
+  background: #F8F9FA; /* Gray-Pale */
+  border: 1px solid #E9ECEF; /* Gray-Light */
+  border-radius: 6px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .file-label {
   font-size: 9px;
-  font-weight: 600;
-  color: #9ca3af;
-  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: #ADB5BD;
+  letter-spacing: 0.8px;
 }
 
 .file-name-text {
   font-size: 12px;
-  color: #374151;
+  color: #2C3338; /* Gray-Dark */
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 </style>

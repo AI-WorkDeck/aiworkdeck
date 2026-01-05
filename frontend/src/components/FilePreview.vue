@@ -126,7 +126,7 @@ export default {
     },
     wpsAppId: {
       type: String,
-      default: 'AK20251215TTJNYB'
+      default: '' // 由父组件从后端动态获取并传入
     }
   },
   data() {

@@ -1,57 +1,34 @@
-# Java / Maven
-backend/target/
-backend/.classpath
-backend/.project
-backend/.settings/
-*.class
-*.jar
-*.war
+# Build artifacts
+**/target/
+**/node_modules/
+**/dist/
+**/bin/
+**/*.class
+**/*.jar
 
-# Node.js
-node_modules/
-frontend/node_modules/
-panel/node_modules/
+# Logs and help files
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+hs_err_pid*
+desktop/desktop.log
 
-# IDE
-.idea/
-.vscode/
-*.iml
-*.swp
-*.swo
-*~
-
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
-# 数据库
-*.db
-*.sqlite
-*.sqlite3
-database.sqlite
+# Project-specific data
+data/
+database/
+easyvoice/temp/
+pptx-service/uploads/
+mineru-service/temp/
 
-# 环境变量
-.env
-.env.local
-.env.*.local
-
-# 日志文件
-*.log
-hs_err_pid*.log
-
-# 临时文件
+# Backup and temp files
+*_backup.*
 *.tmp
-*.temp
 *.bak
 
-# 大文件
-*.mov
-King IDE汇报/
-
-# WPS / 其他第三方配置（如果包含敏感信息）
-# 注意：WPS AppSecret 等应该通过环境变量配置，不要提交到仓库
-
+# IDE files
+.idea/
+.vscode/
+.trae/
+*.iml
