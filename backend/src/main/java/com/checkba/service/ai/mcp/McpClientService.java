@@ -14,14 +14,17 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * MCP Client Service for managing connections to MCP servers.
  * Implements "streamableHttp" (JSON-RPC over HTTP POST) manually
  * as the SDK's SSE transport is not compatible with PKULaw's current endpoint.
  */
 @Service
-@Slf4j
 public class McpClientService {
+    private static final Logger log = LoggerFactory.getLogger(McpClientService.class);
 
     // PKULaw Token
     // Note: Should conceptually be in application.properties

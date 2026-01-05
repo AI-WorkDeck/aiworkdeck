@@ -1,0 +1,425 @@
+package com.checkba.service.ai.context;
+
+import com.checkba.model.entity.ConversationSummary;
+import com.checkba.model.entity.ProjectMemory;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * 上下文压缩器
+ * 实现智能上下文压缩，在保留关键信息的前提下减少 token 使用
+ */
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class ContextCompressor {
+
+    private final LegalInfoProtector legalInfoProtector;
+    private final ConversationSummarizer conversationSummarizer;
+
+    // Token 预算配置（基于 GPT-4 128K 或 Gemini 1M）
+    private static final int MAX_CONTEXT_TOKENS = 100000;
+    private static final int SYSTEM_PROMPT_RESERVE = 8000;
+    private static final int MEMORY_RESERVE = 5000;
+    private static final int RESPONSE_RESERVE = 8000;
+    private static final int AVAILABLE_FOR_HISTORY = MAX_CONTEXT_TOKENS - SYSTEM_PROMPT_RESERVE - MEMORY_RESERVE - RESPONSE_RESERVE;
+
+    // 估算每个字符约 0.5 个 token（中文约 1-2 token/字，英文约 0.25-0.5 token/字）
+    private static final double CHARS_PER_TOKEN = 2.0;
+
+    /**
+     * 压缩消息历史
+     * @param messages 原始消息列表
+     * @param projectMemory 项目记忆
+     * @param conversationSummary 已有的对话摘要
+     * @param targetTokens 目标 token 数量
+     * @return 压缩后的消息列表
+     */
+    public List<ChatMessage> compress(List<ChatMessage> messages,
+                                       ProjectMemory projectMemory,
+                                       ConversationSummary conversationSummary,
+                                       int targetTokens) {
+        int currentTokens = estimateTokens(messages);
+        
+        log.info("Context compression: currentTokens={}, targetTokens={}, messageCount={}",
+                currentTokens, targetTokens, messages.size());
+
+        if (currentTokens <= targetTokens) {
+            // 无需压缩
+            return messages;
+        }
+
+        List<ChatMessage> result = new ArrayList<>();
+        
+        // 第一层：如果有已存在的摘要，使用它代替旧消息
+        if (conversationSummary != null && conversationSummary.getSummaryText() != null) {
+            result.add(SystemMessage.from("[对话历史摘要]\n" + conversationSummary.getSummaryText()));
+            
+            // 只保留摘要之后的新消息
+            Long lastMessageId = conversationSummary.getLastMessageId();
+            if (lastMessageId != null) {
+                // 假设消息按时间顺序排列，找到摘要覆盖的最后一条消息
+                // 这里简化处理，保留最近的 N 条消息
+                int keepRecent = Math.min(10, messages.size());
+                for (int i = messages.size() - keepRecent; i < messages.size(); i++) {
+                    result.add(messages.get(i));
+                }
+            } else {
+                // 保留最近 10 条消息
+                int keepRecent = Math.min(10, messages.size());
+                for (int i = messages.size() - keepRecent; i < messages.size(); i++) {
+                    result.add(messages.get(i));
+                }
+            }
+            
+            int newTokens = estimateTokens(result);
+            if (newTokens <= targetTokens) {
+                log.info("Compression using existing summary: {} -> {} tokens", currentTokens, newTokens);
+                return result;
+            }
+        }
+
+        // 第二层：移除冗余信息并压缩单条消息
+        result = removeRedundancy(messages);
+        int afterRedundancy = estimateTokens(result);
+        log.debug("After removing redundancy: {} tokens", afterRedundancy);
+        
+        if (afterRedundancy <= targetTokens) {
+            return result;
+        }
+
+        // 第三层：压缩工具调用结果
+        result = compressToolResults(result);
+        int afterToolCompress = estimateTokens(result);
+        log.debug("After compressing tool results: {} tokens", afterToolCompress);
+        
+        if (afterToolCompress <= targetTokens) {
+            return result;
+        }
+
+        // 第四层：生成摘要替换旧消息
+        result = summarizeOldMessages(result, targetTokens);
+        int afterSummarize = estimateTokens(result);
+        log.debug("After summarizing old messages: {} tokens", afterSummarize);
+        
+        if (afterSummarize <= targetTokens) {
+            return result;
+        }
+
+        // 第五层：激进压缩 - 只保留最关键的信息
+        result = aggressiveCompress(result, projectMemory, targetTokens);
+        
+        int finalTokens = estimateTokens(result);
+        log.info("Final compression result: {} -> {} tokens ({}% reduction)", 
+                currentTokens, finalTokens, 
+                String.format("%.1f", (1 - (double)finalTokens / currentTokens) * 100));
+
+        return result;
+    }
+
+    /**
+     * 估算 token 数量
+     */
+    public int estimateTokens(List<ChatMessage> messages) {
+        int totalChars = 0;
+        for (ChatMessage msg : messages) {
+            String text = extractText(msg);
+            if (text != null) {
+                totalChars += text.length();
+            }
+        }
+        return (int) (totalChars / CHARS_PER_TOKEN);
+    }
+
+    /**
+     * 估算单条消息的 token 数量
+     */
+    public int estimateTokens(String text) {
+        if (text == null) return 0;
+        return (int) (text.length() / CHARS_PER_TOKEN);
+    }
+
+    /**
+     * 提取消息文本
+     */
+    private String extractText(ChatMessage msg) {
+        if (msg instanceof UserMessage um) {
+            return um.singleText();
+        } else if (msg instanceof AiMessage am) {
+            return am.text();
+        } else if (msg instanceof SystemMessage sm) {
+            return sm.text();
+        }
+        return null;
+    }
+
+    /**
+     * 第一层：移除冗余信息
+     */
+    private List<ChatMessage> removeRedundancy(List<ChatMessage> messages) {
+        List<ChatMessage> result = new ArrayList<>();
+        Set<String> seenContent = new HashSet<>();
+        
+        for (ChatMessage msg : messages) {
+            String text = extractText(msg);
+            if (text == null) {
+                result.add(msg);
+                continue;
+            }
+            
+            // 移除 XML 标签中的冗余内容（如重复的 thinking 标签）
+            text = removeRedundantTags(text);
+            
+            // 检查是否与之前的消息高度相似
+            String normalized = normalizeForComparison(text);
+            if (normalized.length() > 50 && seenContent.contains(normalized)) {
+                log.debug("Skipping duplicate message");
+                continue;
+            }
+            seenContent.add(normalized);
+            
+            // 重建消息
+            if (msg instanceof UserMessage) {
+                result.add(UserMessage.from(text));
+            } else if (msg instanceof AiMessage) {
+                result.add(AiMessage.from(text));
+            } else {
+                result.add(msg);
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * 移除冗余的 XML 标签内容
+     */
+    private String removeRedundantTags(String text) {
+        // 移除多余的 thinking 标签内容（保留第一个）
+        text = text.replaceAll("(?s)(<thinking>.*?</thinking>).*?(<thinking>.*?</thinking>)", "$1");
+        
+        // 移除空的标签
+        text = text.replaceAll("<[^/>]+></[^>]+>", "");
+        
+        // 压缩多余空白
+        text = text.replaceAll("\\n{3,}", "\n\n");
+        
+        return text.trim();
+    }
+
+    /**
+     * 标准化文本用于比较
+     */
+    private String normalizeForComparison(String text) {
+        return text.replaceAll("\\s+", " ")
+                .replaceAll("<[^>]+>", "")
+                .toLowerCase()
+                .substring(0, Math.min(200, text.length()));
+    }
+
+    /**
+     * 第二层：压缩工具调用结果
+     */
+    private List<ChatMessage> compressToolResults(List<ChatMessage> messages) {
+        List<ChatMessage> result = new ArrayList<>();
+        
+        for (ChatMessage msg : messages) {
+            String text = extractText(msg);
+            if (text == null) {
+                result.add(msg);
+                continue;
+            }
+            
+            // 压缩 tool_output 内容
+            if (text.contains("<tool_output>")) {
+                text = compressToolOutput(text);
+            }
+            
+            // 重建消息
+            if (msg instanceof UserMessage) {
+                result.add(UserMessage.from(text));
+            } else if (msg instanceof AiMessage) {
+                result.add(AiMessage.from(text));
+            } else {
+                result.add(msg);
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * 压缩工具输出
+     */
+    private String compressToolOutput(String text) {
+        // 提取并压缩 tool_output 内容
+        StringBuilder result = new StringBuilder();
+        int lastEnd = 0;
+        
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                "(<tool_output[^>]*>)(.*?)(</tool_output>)", 
+                java.util.regex.Pattern.DOTALL);
+        java.util.regex.Matcher matcher = pattern.matcher(text);
+        
+        while (matcher.find()) {
+            result.append(text, lastEnd, matcher.start());
+            
+            String openTag = matcher.group(1);
+            String content = matcher.group(2);
+            String closeTag = matcher.group(3);
+            
+            // 如果输出超过 2000 字符，截断
+            if (content.length() > 2000) {
+                // 保留法律关键信息
+                LegalInfoProtector.CompressedResult compressed = 
+                        legalInfoProtector.safeCompress(content, 1500);
+                content = compressed.getContent();
+                if (compressed.isWasCompressed()) {
+                    content += "\n[输出已压缩，保留关键信息]";
+                }
+            }
+            
+            result.append(openTag).append(content).append(closeTag);
+            lastEnd = matcher.end();
+        }
+        
+        result.append(text.substring(lastEnd));
+        return result.toString();
+    }
+
+    /**
+     * 第三层：摘要旧消息
+     */
+    private List<ChatMessage> summarizeOldMessages(List<ChatMessage> messages, int targetTokens) {
+        if (messages.size() <= 6) {
+            // 消息太少，不需要摘要
+            return messages;
+        }
+        
+        List<ChatMessage> result = new ArrayList<>();
+        
+        // 保留最近 4 条消息
+        int keepRecent = 4;
+        List<ChatMessage> oldMessages = messages.subList(0, messages.size() - keepRecent);
+        List<ChatMessage> recentMessages = messages.subList(messages.size() - keepRecent, messages.size());
+        
+        // 为旧消息生成摘要
+        String summary = conversationSummarizer.generateQuickSummary(oldMessages);
+        
+        // 添加摘要作为系统消息
+        result.add(SystemMessage.from("[对话历史摘要]\n" + summary));
+        
+        // 添加最近的消息
+        result.addAll(recentMessages);
+        
+        return result;
+    }
+
+    /**
+     * 第四层：激进压缩
+     */
+    private List<ChatMessage> aggressiveCompress(List<ChatMessage> messages, 
+                                                   ProjectMemory projectMemory,
+                                                   int targetTokens) {
+        List<ChatMessage> result = new ArrayList<>();
+        
+        // 构建核心上下文
+        StringBuilder coreContext = new StringBuilder();
+        coreContext.append("[压缩上下文 - 仅保留核心信息]\n\n");
+        
+        // 添加项目核心信息
+        if (projectMemory != null) {
+            coreContext.append("## 项目信息\n");
+            coreContext.append(projectMemory.toCoreContext());
+            coreContext.append("\n");
+        }
+        
+        // 提取所有消息中的法律关键信息
+        Set<String> legalRefs = new LinkedHashSet<>();
+        Set<String> amounts = new LinkedHashSet<>();
+        Set<String> dates = new LinkedHashSet<>();
+        
+        for (ChatMessage msg : messages) {
+            String text = extractText(msg);
+            if (text != null) {
+                legalRefs.addAll(legalInfoProtector.extractLegalReferences(text));
+                amounts.addAll(legalInfoProtector.extractAmounts(text));
+                dates.addAll(legalInfoProtector.extractDates(text));
+            }
+        }
+        
+        if (!legalRefs.isEmpty()) {
+            coreContext.append("## 法律引用\n");
+            legalRefs.forEach(ref -> coreContext.append("- ").append(ref).append("\n"));
+            coreContext.append("\n");
+        }
+        
+        if (!amounts.isEmpty()) {
+            coreContext.append("## 关键金额\n");
+            amounts.forEach(amt -> coreContext.append("- ").append(amt).append("\n"));
+            coreContext.append("\n");
+        }
+        
+        if (!dates.isEmpty()) {
+            coreContext.append("## 关键日期\n");
+            dates.forEach(date -> coreContext.append("- ").append(date).append("\n"));
+            coreContext.append("\n");
+        }
+        
+        result.add(SystemMessage.from(coreContext.toString()));
+        
+        // 只保留最近 2 条消息
+        int keepRecent = Math.min(2, messages.size());
+        for (int i = messages.size() - keepRecent; i < messages.size(); i++) {
+            result.add(messages.get(i));
+        }
+        
+        return result;
+    }
+
+    /**
+     * 检查是否需要压缩
+     */
+    public boolean needsCompression(List<ChatMessage> messages) {
+        int tokens = estimateTokens(messages);
+        return tokens > AVAILABLE_FOR_HISTORY;
+    }
+
+    /**
+     * 获取可用于历史的 token 预算
+     */
+    public int getAvailableTokensForHistory() {
+        return AVAILABLE_FOR_HISTORY;
+    }
+
+    /**
+     * 压缩统计结果
+     */
+    @Data
+    @AllArgsConstructor
+    public static class CompressionStats {
+        private int originalTokens;
+        private int compressedTokens;
+        private int originalMessageCount;
+        private int compressedMessageCount;
+        private double compressionRatio;
+        
+        public static CompressionStats of(int originalTokens, int compressedTokens,
+                                          int originalMessageCount, int compressedMessageCount) {
+            double ratio = originalTokens > 0 ? (double) compressedTokens / originalTokens : 1.0;
+            return new CompressionStats(originalTokens, compressedTokens, 
+                    originalMessageCount, compressedMessageCount, ratio);
+        }
+    }
+}
+

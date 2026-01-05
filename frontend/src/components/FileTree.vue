@@ -192,7 +192,38 @@
       </view>
     </view>
 
-    <view class="tree-content" @mousedown="onMarqueeStart" @mousemove="onMarqueeMove" @mouseup="onMarqueeEnd">
+    <!-- 右键上下文菜单 -->
+    <view 
+      v-if="contextMenu.visible" 
+      class="context-menu-mask" 
+      @tap="closeContextMenu"
+      @contextmenu.prevent="closeContextMenu"
+    >
+      <view 
+        class="context-menu" 
+        :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+        @tap.stop
+      >
+        <view v-if="canCompareDocuments()" class="context-menu-item" @tap="startDocumentCompare">
+          <text class="context-menu-icon">📊</text>
+          <text class="context-menu-text">比较文档</text>
+        </view>
+        <view v-if="contextMenu.targetItem && !contextMenu.targetItem.isFolder" class="context-menu-item" @tap="handleDownload(contextMenu.targetItem); closeContextMenu()">
+          <text class="context-menu-icon">⬇️</text>
+          <text class="context-menu-text">下载</text>
+        </view>
+        <view v-if="contextMenu.targetItem" class="context-menu-item" @tap="handleRename(contextMenu.targetItem); closeContextMenu()">
+          <text class="context-menu-icon">✏️</text>
+          <text class="context-menu-text">重命名</text>
+        </view>
+        <view v-if="contextMenu.targetItem" class="context-menu-item context-menu-item-danger" @tap="handleDelete(contextMenu.targetItem); closeContextMenu()">
+          <text class="context-menu-icon">🗑️</text>
+          <text class="context-menu-text">删除</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="tree-content" @mousedown="onMarqueeStart" @mousemove="onMarqueeMove" @mouseup="onMarqueeEnd" @tap="closeContextMenu">
       <!-- Recycle Bin Header -->
       <view v-if="viewMode === 'recycle'" class="tree-toolbar" style="background: #E8F3ED; border-bottom: 1px solid #E9ECEF; justify-content: space-between;">
          <text style="font-size: 12px; color: #1A5336; display: flex; align-items: center; font-weight: 500;">🗑️ 回收站 ({{ recycleBin.length }})</text>
@@ -221,25 +252,43 @@
         <text>加载中...</text>
       </view>
       <view v-else-if="displayFiles.length === 0" class="tree-empty">
-        <text>暂无文件</text>
-      </view>
-      <view v-else class="tree-list">
-        <!-- 框选区域（H5） -->
-        <view v-if="marquee.active" class="marquee" :style="marqueeStyle"></view>
-        <!-- H5端使用HTML5拖拽API -->
+        <view class="empty-content">
+          <text>暂无文件</text>
+        </view>
+        <!-- Root Drop Zone for empty folders -->
         <!-- #ifdef H5 -->
-        <view
-          v-for="(item, index) in displayFiles"
-          :key="item.id"
-          class="tree-item"
-          :class="{
-            'tree-item-selected': selectedFileId === item.id,
-            'tree-item-drop-target': dragOverIndex === index
-          }"
+        <view 
+          v-if="isAnyDragging"
+          class="root-drop-zone-empty"
+          :class="{ 'drop-active': rootDropActive }"
+          @dragover.prevent="onRootDragOver"
+          @dragleave="onRootDragLeave"
+          @drop.prevent="onRootDrop"
+        >
+          <text>拖拽到此处移至根目录</text>
+        </view>
+        <!-- #endif -->
+      </view>
+      <view v-else class="tree-list-container">
+        <view class="tree-list">
+          <!-- 框选区域（H5） -->
+          <view v-if="marquee.active" class="marquee" :style="marqueeStyle"></view>
+          
+          <!-- H5端使用HTML5拖拽API -->
+          <!-- #ifdef H5 -->
+          <view
+            v-for="(item, index) in displayFiles"
+            :key="item.id"
+            class="tree-item"
+            :class="{
+              'tree-item-selected': selectedFileId === item.id,
+              'tree-item-multi-selected': multiSelectedIds.includes(item.id),
+              'tree-item-drop-target': dragOverIndex === index
+            }"
           :data-file-id="item.id"
           :draggable="true"
-          @tap="handleItemClick(item)"
-          @contextmenu.prevent="handleContextMenu(item)"
+          @tap="handleItemClick(item, $event)"
+          @contextmenu.prevent="handleContextMenu(item, $event)"
           @dragstart="handleDragStart($event, item, index)"
           @dragover.prevent="handleDragOver($event, index)"
           @drop="handleDrop($event, index)"
@@ -365,12 +414,13 @@
           :key="item.id"
           class="tree-item"
           :class="{ 
-            'tree-item-selected': selectedFileId === item.id, 
+            'tree-item-selected': selectedFileId === item.id,
+            'tree-item-multi-selected': multiSelectedIds.includes(item.id),
             'tree-item-dragging': draggingIndex === index 
           }"
           :data-file-id="item.id"
-          @tap="handleItemClick(item)"
-          @contextmenu.prevent="handleContextMenu(item)"
+          @tap="handleItemClick(item, $event)"
+          @contextmenu.prevent="handleContextMenu(item, $event)"
           @touchstart="handleTouchStart($event, index)"
           @touchmove="handleTouchMove($event, index)"
           @touchend="handleTouchEnd($event, index)"
@@ -476,6 +526,20 @@
           </view>
         </view>
         <!-- #endif -->
+        
+        <!-- Root Drop Zone: 拖拽到此区域可移动到根目录 -->
+        <!-- #ifdef H5 -->
+        <view 
+          v-if="isAnyDragging"
+          class="root-drop-zone"
+          :class="{ 'drop-active': rootDropActive }"
+          @dragover.prevent="onRootDragOver"
+          @dragleave="onRootDragLeave"
+          @drop.prevent="onRootDrop"
+        >
+          <text>拖拽到此处移至根目录</text>
+        </view>
+        <!-- #endif -->
       </view>
     </view>
 
@@ -540,6 +604,19 @@
              <text class="status-detail" v-if="globalUploadProgress !== null" style="font-size: 10px; color: #666;">{{ Math.floor(globalUploadProgress) }}%</text>
           </view>
         </view>
+    </view>
+
+    </view> <!-- Close tree-content -->
+
+    <!-- 文档对比按钮（选中 2 个文档时显示） -->
+    <view v-if="canCompareDocuments()" class="compare-bar">
+      <view class="compare-bar-content">
+        <text class="compare-bar-text">已选择 2 个文档</text>
+        <button class="btn-compare" @tap="startDocumentCompare">
+          <text class="compare-icon">📊</text>
+          <text>对比文档</text>
+        </button>
+      </view>
     </view>
 
     <!-- 底部工具栏 -->
@@ -636,6 +713,10 @@ export default {
     showFooterActions: {
       type: Boolean,
       default: true
+    },
+    hiddenFileIds: {
+      type: Array,
+      default: () => []
     }
   },
   data() {
@@ -687,6 +768,7 @@ export default {
       folderSelectorExpanded: {},
       
       // New Features State
+      rootDropActive: false,
       activeFolderId: null,
       lastClickTime: 0,
       lastClickItemId: null,
@@ -716,7 +798,20 @@ export default {
       deleteBatchIds: [],
       // Hover states for Recycle Bin icons
       hoverRestore: {}, // { [fileId]: boolean }
-      hoverPermDelete: {}
+      hoverPermDelete: {},
+      
+      // Cmd/Ctrl 多选支持
+      multiSelectedIds: [], // 多选的文件 ID 数组
+      
+      // 右键菜单状态
+      contextMenu: {
+        visible: false,
+        x: 0,
+        y: 0,
+        targetItem: null
+      },
+      // Global Drag Support
+      isAnyDragging: false
     }
 
   },
@@ -726,12 +821,25 @@ export default {
       return map[this.sortMode] || '排序'
     },
     displayFiles() {
+       let result = []
        if (this.viewMode === 'recycle') {
-         return this.recycleBin
+         result = this.recycleBin
+       } else {
+         // Filter out soft-deleted items
+         const binIds = new Set(this.recycleBin.map(f => f.id))
+         result = this.files.filter(f => !binIds.has(f.id))
        }
-       // Filter out soft-deleted items
-       const binIds = new Set(this.recycleBin.map(f => f.id))
-       return this.files.filter(f => !binIds.has(f.id))
+
+       // Filter out staged files AND the staging folder itself
+       const hiddenNames = new Set(['.stagezone', '__staging_area__'])
+       
+       if (this.hiddenFileIds && this.hiddenFileIds.length > 0) {
+         const hiddenIds = new Set(this.hiddenFileIds.map(id => Number(id)))
+         result = result.filter(f => !hiddenIds.has(Number(f.id)) && !hiddenNames.has(f.name))
+       } else {
+         result = result.filter(f => !hiddenNames.has(f.name))
+       }
+       return result
     },
     checkedIds() {
       return Object.keys(this.checkedMap)
@@ -886,6 +994,14 @@ export default {
       this.clearChecked()
     }
     this.restoreUploadState()
+    
+    // Listen for global drag events to show/hide root drop zone
+    uni.$on('file-drag-start', () => { this.isAnyDragging = true })
+    uni.$on('file-drag-end', () => { this.isAnyDragging = false })
+  },
+  beforeDestroy() {
+    uni.$off('file-drag-start')
+    uni.$off('file-drag-end')
   },
   methods: {
     // 让文件树容器可聚焦，接收键盘事件（H5）
@@ -1528,7 +1644,7 @@ export default {
       this.checkedMap = next
       this.$emit('checked-change', this.checkedIds)
     },
-    handleItemClick(item) {
+    handleItemClick(item, event) {
       if (!item) return
       
       const now = Date.now()
@@ -1550,6 +1666,43 @@ export default {
         this.toggleChecked(item)
         return
       }
+      
+      // Cmd/Ctrl 多选逻辑
+      // 使用 try-catch 包裹事件属性访问，避免 WPS iframe 的跨域错误
+      let isMultiSelect = false
+      try {
+        isMultiSelect = event && (event.metaKey || event.ctrlKey)
+      } catch (e) {
+        // 忽略跨域访问错误（WPS iframe 可能会拦截事件）
+        console.warn('检测多选键时出错:', e)
+      }
+      
+      if (isMultiSelect) {
+        // 阻止事件继续传播，避免触发 WPS iframe 的处理逻辑
+        if (event && typeof event.stopPropagation === 'function') {
+          event.stopPropagation()
+        }
+        if (event && typeof event.preventDefault === 'function') {
+          event.preventDefault()
+        }
+        
+        // 多选模式：切换当前项的选中状态
+        const idx = this.multiSelectedIds.indexOf(item.id)
+        if (idx >= 0) {
+          this.multiSelectedIds.splice(idx, 1)
+        } else {
+          this.multiSelectedIds.push(item.id)
+        }
+        // 多选时也更新 selectedFileId 为最后选中的
+        if (this.multiSelectedIds.length > 0) {
+          this.selectedFileId = this.multiSelectedIds[this.multiSelectedIds.length - 1]
+        }
+        this.$emit('multi-select-change', this.multiSelectedIds)
+        return
+      }
+      
+      // 单选模式：清空多选，只选中当前
+      this.multiSelectedIds = [item.id]
       this.selectedFileId = item.id
       this.$emit('file-select', item)
       
@@ -1699,12 +1852,130 @@ export default {
         link.click()
         document.body.removeChild(link)
     },
-    handleContextMenu(item) {
-      // 右键：展开文件夹
+    handleContextMenu(item, event) {
+      // 右键：展开文件夹（保持原有功能）
       if (item && item.isFolder && this.showTree && !this.expandedFolders.has(item.id)) {
         this.toggleFolder(item.id)
       }
+      
+      // 显示右键菜单
+      if (event && item) {
+        event.preventDefault()
+        event.stopPropagation()
+        
+        // 如果右键点击的项不在多选列表中，则将其加入
+        if (!this.multiSelectedIds.includes(item.id)) {
+          this.multiSelectedIds = [item.id]
+          this.selectedFileId = item.id
+        }
+        
+        this.contextMenu = {
+          visible: true,
+          x: event.clientX || event.pageX || 0,
+          y: event.clientY || event.pageY || 0,
+          targetItem: item
+        }
+      }
     },
+    
+    /**
+     * 关闭右键菜单
+     */
+    closeContextMenu() {
+      this.contextMenu.visible = false
+      this.contextMenu.targetItem = null
+    },
+    
+    /**
+     * 检查是否可以进行文档对比（选中恰好 2 个文档文件）
+     */
+    canCompareDocuments() {
+      if (this.multiSelectedIds.length !== 2) return false
+      const docTypes = ['doc', 'docx']
+      const selectedFiles = this.multiSelectedIds.map(id => 
+        this.allFiles.find(f => f.id === id)
+      ).filter(Boolean)
+      return selectedFiles.every(f => !f.isFolder && docTypes.includes((f.fileType || '').toLowerCase()))
+    },
+    
+    /**
+     * 获取选中的两个文档文件
+     */
+    getSelectedDocumentFiles() {
+      return this.multiSelectedIds.map(id => 
+        this.allFiles.find(f => f.id === id)
+      ).filter(Boolean)
+    },
+    
+    /**
+     * 发起文档对比
+     */
+    startDocumentCompare() {
+      if (!this.canCompareDocuments()) return
+      const docs = this.getSelectedDocumentFiles()
+      this.$emit('compare-documents', docs)
+      this.closeContextMenu()
+    },
+    
+    /**
+     * 定位并展开到指定文件
+     * @param {number|string} fileId - 要定位的文件 ID
+     * @returns {boolean} 是否成功定位
+     */
+    revealFile(fileId) {
+      if (!fileId) return false
+      
+      // 确保文件数据已加载
+      if (!this.allFiles || this.allFiles.length === 0) {
+        console.warn('[FileTree] revealFile: allFiles 为空，无法定位')
+        return false
+      }
+      
+      // 查找目标文件
+      const targetFile = this.allFiles.find(f => f.id === fileId || String(f.id) === String(fileId))
+      if (!targetFile) {
+        console.warn('[FileTree] revealFile: 未找到文件', fileId)
+        return false
+      }
+      
+      // 获取所有父目录 ID 链
+      const parentIds = []
+      let current = targetFile
+      while (current && current.parentId != null) {
+        parentIds.push(current.parentId)
+        current = this.allFiles.find(f => f.id === current.parentId)
+      }
+      
+      // 展开所有父目录
+      parentIds.forEach(pid => {
+        if (!this.expandedFolders.has(pid)) {
+          this.expandedFolders.add(pid)
+        }
+      })
+      
+      // 重新构建树形视图
+      if (this.showTree && this.allFiles.length > 0) {
+        this.files = this.buildTreeView(this.allFiles, this.parentId)
+      }
+      
+      // 设置选中状态
+      this.selectedFileId = targetFile.id
+      
+      // 延迟滚动到目标元素
+      this.$nextTick(() => {
+        try {
+          const el = document.querySelector(`.tree-item[data-file-id="${targetFile.id}"]`)
+          if (el && el.scrollIntoView) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        } catch (e) {
+          // ignore scroll errors
+        }
+      })
+      
+      return true
+    },
+    
     handleKeyDown(e) {
       if (!e) return
       const key = e.key
@@ -1846,6 +2117,7 @@ export default {
     handleDragStart(e, item, index) {
       console.log('拖拽开始:', index)
       this.draggedIndex = index
+      uni.$emit('file-drag-start')
       // 向外部暴露“拖拽文件开始”（用于 WPS 文档建立关联）
       try {
         if (item && item.id && !item.isFolder) {
@@ -1918,57 +2190,165 @@ export default {
       e.preventDefault()
       console.log('拖拽放下:', { draggedIndex: this.draggedIndex, targetIndex: index })
       
-      if (this.draggedIndex === -1 || this.draggedIndex === index) {
-        this.dragOverIndex = -1
-        this.draggedIndex = -1
-        return
+      const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+      // BUGFIX: Use displayFiles instead of files since template v-for uses displayFiles
+      const targetItem = this.displayFiles[index]
+      
+      // Determine Target Parent ID
+      let targetParentId
+      let newSortOrder = targetItem.sortOrder
+      
+      // If dropping onto a folder, move INTO it
+      // If dropping onto a file, move to same parent (sibling)
+      if (targetItem.isFolder) {
+         targetParentId = targetItem.id
+         newSortOrder = 0 // Or keep default
+      } else {
+         targetParentId = this.showTree ? targetItem.parentId : this.parentId
       }
 
-      try {
-        const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
-        const draggedItem = this.files[this.draggedIndex]
-        const targetItem = this.files[index]
-        
-        let targetParentId
-        let newSortOrder = targetItem.sortOrder
+      // Case 1: Internal FileTree Drag (Reordering)
+      if (this.draggedIndex !== -1) {
+          if (this.draggedIndex === index) {
+            this.dragOverIndex = -1
+            this.draggedIndex = -1
+            return
+          }
+          
+          try {
+            // BUGFIX: Use displayFiles instead of files
+            const draggedItem = this.displayFiles[this.draggedIndex]
+            
+            // Prevent self-parenting or no-op moves if needed check
+            if (draggedItem.id === targetParentId) return
 
-        // 如果目标是文件夹，且不是拖拽同级排序（即不是仅仅改变顺序），则移动到文件夹内
-        // 注意：这里简单判定，如果拖拽到文件夹上，就是移动到文件夹内
-        // 用户反馈：希望能跨层级移动到文件夹里
-        if (targetItem.isFolder && draggedItem.parentId !== targetItem.id) {
-           targetParentId = targetItem.id
-           // 移动到文件夹内时，暂定置顶或由后端处理排序
-           newSortOrder = 0 
-        } else {
-           // 否则认为是同级排序或移动到同一目录下
-           targetParentId = this.showTree ? targetItem.parentId : this.parentId
-        }
-        
-        await moveFile(projectId, draggedItem.id, targetParentId, newSortOrder)
-        await this.loadFiles()
-        uni.showToast({
-          title: '移动成功',
-          icon: 'success'
-        })
-      } catch (error) {
-        console.error('移动文件失败:', error)
-        uni.showToast({
-          title: error.message || '移动失败',
-          icon: 'none'
-        })
+            await moveFile(projectId, draggedItem.id, targetParentId, newSortOrder)
+            await this.loadFiles()
+            uni.showToast({ title: '移动成功', icon: 'success' })
+          } catch (error) {
+            console.error('移动文件失败:', error)
+            uni.showToast({ title: error.message || '移动失败', icon: 'none' })
+          }
+      } 
+      // Case 2: External Drag (e.g. from Staging Area)
+      else {
+          // Parse dropped data
+          let droppedFileId = null
+          let droppedFileName = ''
+          
+          if (e.dataTransfer) {
+              try {
+                  let rawData = e.dataTransfer.getData('application/x-checkba-file')
+                  if (!rawData) rawData = e.dataTransfer.getData('text/checkba-file-json')
+                  
+                  if (rawData) {
+                      const data = JSON.parse(rawData)
+                      if (data.fileId) {
+                          droppedFileId = data.fileId
+                          droppedFileName = data.name
+                      }
+                  }
+              } catch (err) {}
+          }
+          
+          // Fallback global check
+          if (!droppedFileId && typeof document !== 'undefined' && document.__checkbaDraggedFile) {
+              droppedFileId = document.__checkbaDraggedFile.fileId
+              droppedFileName = document.__checkbaDraggedFile.name
+              document.__checkbaDraggedFile = null // Consume
+          }
+          
+          if (droppedFileId) {
+             try {
+                 await moveFile(projectId, droppedFileId, targetParentId, newSortOrder)
+                 await this.loadFiles()
+                 uni.showToast({ title: '移动成功', icon: 'success' })
+                 
+                 // If Staging Area listens to file changes (it does via project-overview reloading), 
+                 // it will update automatically. 
+                 // However, project-overview needs to know to reload staging?
+                 // Actually moveFile changes the parent, so it disappears from .stagezone
+                 // Staging Area should refresh? project-overview usually listens to changes?
+                 // We might need to emit an event to notify parent to refresh staging area
+                 this.$emit('files-changed') // Standardize this event?
+                 
+                 // Verify if project-overview handles this.
+             } catch (error) {
+                console.error('从暂存区移动失败:', error)
+                uni.showToast({ title: error.message || '移动失败', icon: 'none' })
+             }
+          }
       }
 
       this.dragOverIndex = -1
       this.draggedIndex = -1
     },
     handleDragEnd() {
-      try {
-        this.$emit('file-drag-end')
-      } catch (e) {
-        // ignore
-      }
-      this.dragOverIndex = -1
       this.draggedIndex = -1
+      this.dragOverIndex = -1
+      uni.$emit('file-drag-end')
+    },
+    onRootDragOver(e) {
+      e.preventDefault()
+      this.rootDropActive = true
+    },
+    onRootDragLeave() {
+      this.rootDropActive = false
+    },
+    async onRootDrop(e) {
+      e.preventDefault()
+      this.rootDropActive = false
+      console.log('拖拽到根目录')
+
+      const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+      const targetParentId = null // Move to root
+      const newSortOrder = 0
+
+      // Case 1: Internal FileTree Drag
+      if (this.draggedIndex !== -1) {
+          try {
+            const draggedItem = this.displayFiles[this.draggedIndex]
+            
+            // If already in root (parentId is null or matches), we might still want to allow movement if subfolder -> root
+            await moveFile(projectId, draggedItem.id, targetParentId, newSortOrder)
+            await this.loadFiles()
+            uni.showToast({ title: '移动到根目录成功', icon: 'success' })
+            this.draggedIndex = -1
+          } catch (error) {
+            console.error('移动到根目录失败:', error)
+            uni.showToast({ title: error.message || '移动失败', icon: 'none' })
+          }
+      } 
+      // Case 2: External Drag (e.g. from Staging Area)
+      else {
+          let droppedFileId = null
+          if (e.dataTransfer) {
+              try {
+                  let rawData = e.dataTransfer.getData('application/x-checkba-file')
+                  if (!rawData) rawData = e.dataTransfer.getData('text/checkba-file-json')
+                  if (rawData) {
+                      const data = JSON.parse(rawData)
+                      if (data.fileId) droppedFileId = data.fileId
+                  }
+              } catch (err) {}
+          }
+          if (!droppedFileId && typeof document !== 'undefined' && document.__checkbaDraggedFile) {
+              droppedFileId = document.__checkbaDraggedFile.fileId
+              document.__checkbaDraggedFile = null
+          }
+          
+          if (droppedFileId) {
+             try {
+                 await moveFile(projectId, droppedFileId, targetParentId, newSortOrder)
+                 await this.loadFiles()
+                 uni.showToast({ title: '移动到根目录成功', icon: 'success' })
+                 this.$emit('files-changed') 
+             } catch (error) {
+                console.error('从外部移动到根目录失败:', error)
+                uni.showToast({ title: error.message || '移动失败', icon: 'none' })
+             }
+          }
+      }
     },
     // 非H5端触摸拖拽方法
     handleTouchStart(e, index) {
@@ -1995,11 +2375,12 @@ export default {
       const itemHeight = 60 // 估算每个项目高度（rpx转px约30px）
       const targetIndex = Math.round(deltaY / itemHeight) + index
 
-      if (targetIndex !== index && targetIndex >= 0 && targetIndex < this.files.length) {
+      // BUGFIX: Use displayFiles instead of files since template v-for uses displayFiles
+      if (targetIndex !== index && targetIndex >= 0 && targetIndex < this.displayFiles.length) {
         try {
           const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
-          const draggedItem = this.files[index]
-          const targetItem = this.files[targetIndex]
+          const draggedItem = this.displayFiles[index]
+          const targetItem = this.displayFiles[targetIndex]
           
           let targetParentId
           let newSortOrder = targetItem.sortOrder
@@ -2888,8 +3269,78 @@ $bg-grey: $uni-bg-color-grey;
   outline: none;
 }
 
+.tree-list-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .tree-list {
   position: relative;
+  min-height: 100rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.root-drop-zone,
+.root-drop-zone-empty {
+  margin: 12rpx 16rpx;
+  padding: 24rpx;
+  border: 1rpx dashed #e2e8f0;
+  border-radius: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 22rpx;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: #f8fafc;
+  opacity: 0.8;
+  animation: fadeIn 0.3s ease-out;
+  
+  text {
+    pointer-events: none;
+  }
+  
+  &.drop-active {
+    background-color: #eff6ff;
+    border-color: #3b82f6;
+    color: #3b82f6;
+    border-style: solid;
+    transform: scale(1.005);
+    opacity: 1;
+    box-shadow: 0 2rpx 8rpx rgba(59, 130, 246, 0.08);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4rpx); }
+  to { opacity: 0.8; transform: translateY(0); }
+}
+
+.root-drop-zone {
+  min-height: 60rpx;
+}
+
+.root-drop-zone-empty {
+  min-height: 160rpx;
+  margin-top: 40rpx;
+}
+
+.tree-empty {
+  display: flex;
+  flex-direction: column;
+  padding: 40rpx 0;
+  flex: 1;
+  
+  .empty-content {
+     display: flex;
+     justify-content: center;
+     padding: 40rpx 0;
+     color: #94a3b8;
+     font-size: 28rpx;
+  }
 }
 
 .marquee {
@@ -2899,6 +3350,110 @@ $bg-grey: $uni-bg-color-grey;
   background: rgba(37, 99, 235, 0.10);
   pointer-events: none;
   border-radius: 6px;
+}
+
+/* 右键上下文菜单样式 */
+.context-menu-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: transparent;
+}
+
+.context-menu {
+  position: fixed;
+  min-width: 160px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  z-index: 10000;
+  border: 1px solid #e5e7eb;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.context-menu-item:hover {
+  background: #f3f4f6;
+}
+
+.context-menu-item-danger:hover {
+  background: #fef2f2;
+}
+
+.context-menu-item-danger .context-menu-text {
+  color: #dc2626;
+}
+
+.context-menu-icon {
+  font-size: 14px;
+  margin-right: 10px;
+  width: 20px;
+  text-align: center;
+}
+
+.context-menu-text {
+  font-size: 13px;
+  color: #374151;
+}
+
+/* 文档对比按钮栏 */
+.compare-bar {
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+  border-top: 1px solid #bae6fd;
+  border-bottom: 1px solid #bae6fd;
+}
+
+.compare-bar-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.compare-bar-text {
+  font-size: 12px;
+  color: #0369a1;
+  font-weight: 500;
+}
+
+.btn-compare {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.btn-compare:hover {
+  background: linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.3);
+}
+
+.btn-compare:active {
+  transform: translateY(0);
+}
+
+.compare-icon {
+  font-size: 14px;
 }
 
 .tree-checkbox {
@@ -3298,6 +3853,27 @@ $bg-grey: $uni-bg-color-grey;
 
 .tree-item-selected {
   background-color: rgba(18, 52, 77, 0.08);
+}
+
+/* Cmd/Ctrl 多选样式 */
+.tree-item-multi-selected {
+  background-color: rgba(37, 99, 235, 0.08);
+}
+
+.tree-item-multi-selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8rpx;
+  bottom: 8rpx;
+  width: 6rpx;
+  border-radius: 999px;
+  background-color: #2563eb;
+}
+
+.tree-item-multi-selected .tree-item-actions {
+  opacity: 1;
+  background: linear-gradient(to right, transparent 0%, rgba(37, 99, 235, 0.08) 30%, rgba(37, 99, 235, 0.08) 100%);
 }
 
 .tree-item-selected::before {

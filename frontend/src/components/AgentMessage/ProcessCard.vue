@@ -1,13 +1,31 @@
 <template>
-  <div class="process-card" :class="{ 'is-expanded': (isExpanded || isHeadless), 'is-system-actions': isSystemActions, 'headless-process': isHeadless }">
+  <div 
+    class="process-card" 
+    :class="{ 
+      'is-expanded': (isExpanded || isHeadless), 
+      'is-system-actions': isSystemActions, 
+      'headless-process': isHeadless 
+    }"
+  >
+    <!-- Header Area -->
     <div class="process-header" @click="toggle" v-if="!isHeadless">
       <div class="left">
-        <!-- Status Dot or Icon -->
-        <span class="status-indicator" :class="{ 'thinking': !isFinished }"></span>
+        <div class="header-icon-wrapper">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-action-icon">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+        </div>
         <span class="title">{{ processTitle }}</span>
       </div>
       <div class="right">
-        <span class="chevron-icon"></span>
+        <div v-if="isFinished" class="status-badge success">成功</div>
+        <div v-else class="status-badge processing">执行中</div>
+        <div class="chevron-wrapper" :class="{ 'is-rotated': isExpanded }">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
       </div>
     </div>
 
@@ -16,10 +34,32 @@
       <div class="items-list" v-if="process.items && process.items.length > 0">
         <div v-for="(item, idx) in process.items" :key="idx" class="process-item">
             
-            <!-- CASE 1: Normal Step -->
-            <div v-if="item.type === 'step'" class="step-row">
-                <span class="step-check" :class="{ 'done': item.status !== 'doing' }"></span>
-                <span class="step-text">{{ item.text || 'Working...' }}</span>
+            <!-- CASE 1: Normal Step or File Attachment -->
+            <div v-if="item.type === 'step'" class="step-container">
+                <template v-if="detectFile(item.text)">
+                    <div class="file-attachment-card">
+                        <div class="file-icon-area">
+                            <FileTypeIcon :type="getFileExtension(detectFile(item.text))" />
+                        </div>
+                        <div class="file-details">
+                            <div class="file-name">{{ detectFile(item.text) }}</div>
+                            <div class="file-meta">{{ item.text.replace(`《${detectFile(item.text)}》`, '').trim() }}</div>
+                        </div>
+                        <div class="file-actions">
+                            <div class="action-btn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <div v-else class="step-row">
+                    <span class="step-dot" :class="{ 'done': item.status !== 'doing' }"></span>
+                    <span class="step-text" :class="{ 'is-meta': isSecondaryContent(item.text) }">{{ item.text || 'Working...' }}</span>
+                </div>
             </div>
 
             <!-- CASE 2: Nested Thinking -->
@@ -35,25 +75,24 @@
 
             <!-- CASE 3: Tool Execution -->
             <div v-else-if="item.type === 'tool'" class="tool-row">
-                <div class="tool-header">
-                     <!-- Removed tool-icon -->
+                <div class="tool-content">
+                     <span class="tool-label">执行工具</span>
                      <span class="tool-name">{{ formatToolName(item.code) }}</span>
                 </div>
-                <!-- Status aligned to right already -->
                 <div class="tool-status">
-                     <span v-if="item.status === 'loading'" class="status-loading">执行中...</span>
-                     <span v-else-if="item.status === 'success'" class="status-success">成功</span>
-                     <span v-else class="status-error">失败</span>
+                     <span v-if="item.status === 'loading'" class="status-loading">正在调用...</span>
+                     <span v-else-if="item.status === 'success'" class="status-success">已完成</span>
+                     <span v-else class="status-error">出错</span>
                 </div>
             </div>
 
         </div>
       </div>
       
-      <!-- Fallback for legacy 'steps' array if 'items' is empty -->
+      <!-- Fallback for legacy 'steps' array -->
       <div class="steps-list" v-else-if="process.steps && process.steps.length > 0">
          <div class="step-item" v-for="(step, idx) in process.steps" :key="idx">
-            <span class="step-check"></span>
+            <span class="step-dot done"></span>
             <span class="step-text">{{ step.text }}</span>
          </div>
       </div>
@@ -65,6 +104,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import ThinkingCard from './ThinkingCard.vue'
+import FileTypeIcon from '../FileTypeIcon.vue'
 
 const props = defineProps({
   process: { type: Object, required: true }
@@ -76,7 +116,6 @@ const isSystemActions = computed(() => {
   return props.process.title === 'System Actions'
 })
 
-// Headless if title is exactly "Processing..." (the default generic title)
 const isHeadless = computed(() => {
     return !props.process.title || props.process.title === 'Processing...'
 })
@@ -86,10 +125,12 @@ const processTitle = computed(() => {
 })
 
 const isFinished = computed(() => {
-    return true
+    // Check if any item is still doing or if the process itself marks completion
+    // Given the request, we'll assume it's finished if there are items and none are 'doing'
+    if (!props.process.items || props.process.items.length === 0) return false
+    return !props.process.items.some(item => item.status === 'doing')
 })
 
-// Track if user has manually toggled (to prevent auto-expand from overriding)
 const userHasToggled = ref(false)
 
 const toggle = () => {
@@ -97,12 +138,7 @@ const toggle = () => {
   isExpanded.value = !isExpanded.value
 }
 
-// Auto-expand when first items arrive, but respect user manual toggle
-
 watch(() => props.process.items?.length, (newLen, oldLen) => {
-    // Only auto-expand if:
-    // 1. Items were just added (went from 0 or undefined to > 0)
-    // 2. User hasn't manually toggled this card
     if (newLen > 0 && (!oldLen || oldLen === 0) && !userHasToggled.value) {
         isExpanded.value = true
     }
@@ -110,38 +146,55 @@ watch(() => props.process.items?.length, (newLen, oldLen) => {
 
 const formatToolName = (code) => {
     if (!code) return 'Tool Call'
-    if (code.includes('read_document')) {
-        return 'Reading Document'
-    }
+    if (code.includes('read_document')) return '读取文档'
+    if (code.includes('write_docx')) return '撰写文档'
+    if (code.includes('pptx_generate')) return '生成幻灯片'
+    
     const match = code.match(/^([\w_.]+)\(/)
     return match ? match[1] : (code.length > 40 ? code.substring(0, 37) + '...' : code)
+}
+
+const detectFile = (text) => {
+    if (!text) return null
+    const match = text.match(/《([^》]+)》/)
+    return match ? match[1] : null
+}
+
+const getFileExtension = (filename) => {
+    if (!filename) return 'file'
+    const parts = filename.split('.')
+    return parts.length > 1 ? parts.pop().toLowerCase() : 'file'
+}
+
+const isSecondaryContent = (text) => {
+    if (!text) return false
+    return text.includes('主要内容') || text.includes('摘要')
 }
 </script>
 
 <style scoped>
 .process-card {
-  border-bottom: 1px solid #E9ECEF; /* Gray-Light */
-  background: #fff;
-  transition: background 0.15s;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
 }
 
-/* Headless: Merge visually with previous content */
 .process-card.headless-process {
     background: transparent;
-    border-bottom: none; /* Remove separator */
-    margin-top: -8px; /* Pull up to join previous card visually */
-}
-
-.process-card.is-system-actions {
-  background: #FAFbfc; /* Very subtle gray */
+    box-shadow: none;
+    margin-top: -8px;
 }
 
 .process-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 16px; /* 恢复适度内边距 */
+  padding: 12px 16px;
   cursor: pointer;
+  background: #ffffff;
   transition: background 0.15s;
 }
 
@@ -149,159 +202,201 @@ const formatToolName = (code) => {
   background: #F8F9FA; /* Gray-Pale */
 }
 
-.process-card.is-expanded .process-header {
-  background: transparent; /* No background when expanded */
-}
-
-/* System Actions Header - More Subtle */
-.process-card.is-system-actions .process-header {
-  padding: 8px 16px;
-}
-.process-card.is-system-actions .title {
-  color: #6C757D; /* Gray-Medium */
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  font-weight: 600;
-}
-.process-card.is-system-actions .status-indicator {
-  background: #CED4DA; /* Gray-Light/Medium */
-}
-
 .left {
   display: flex;
   align-items: center;
-  gap: 10px; /* 增加间距 */
+  gap: 12px;
 }
 
-.status-indicator {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #1A5336; /* King Forest - Default/Processing */
-  flex-shrink: 0;
-}
-.status-indicator.thinking {
-  background: #5BD197; /* King Mint - Active */
-  box-shadow: 0 0 0 2px rgba(91, 209, 151, 0.2);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-@keyframes pulse { 
-  0% { box-shadow: 0 0 0 0px rgba(91, 209, 151, 0.4); } 
-  70% { box-shadow: 0 0 0 4px rgba(91, 209, 151, 0); } 
-  100% { box-shadow: 0 0 0 0px rgba(91, 209, 151, 0); } 
+.header-icon-wrapper {
+  color: #1A5336; /* King Forest */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .title {
-  font-size: 13px;
-  font-weight: 500;
-  color: #2C3338; /* Gray-Dark */
+  font-size: 14px;
+  font-weight: 600;
+  color: #1A5336; /* King Forest */
 }
 
-/* V-Shape Chevron */
-.chevron-icon {
-  width: 6px;
-  height: 6px;
-  border-right: 1.5px solid #ADB5BD; /* Gray-Medium */
-  border-bottom: 1.5px solid #ADB5BD;
-  transform: rotate(45deg);
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  display: block;
-  margin-right: 4px;
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.process-card.is-expanded .chevron-icon {
-  transform: rotate(-135deg);
-  margin-top: 4px;
+
+.status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.status-badge.success {
+  background: #E6F9F0; /* Mint Lightest */
+  color: #1A5336; /* King Forest */
+}
+
+.status-badge.processing {
+  background: #E9ECEF; /* Gray-Light */
+  color: #6C757D; /* Gray-Medium */
+}
+
+.chevron-wrapper {
+  color: #ADB5BD;
+  transition: transform 0.2s ease;
+}
+
+.chevron-wrapper.is-rotated {
+  transform: rotate(180deg);
 }
 
 .process-body {
-  padding: 4px 16px 12px 32px; /* 左侧留出对齐 header title 的空间 (16padding + 10gap + 6indicator) */
+  padding: 8px 16px 16px 16px;
 }
 
-/* Adjust padding for headless to align with flattened structure */
-.process-card.headless-process .process-body {
-    padding-top: 0;
-    padding-bottom: 8px;
-}
-
-/* Process Items */
 .process-item {
-    margin-bottom: 6px;
-}
-
-/* 1. Step Row */
-.step-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 13px;
-  color: #495057; /* Gray-Dark/Medium */
-  line-height: 1.5;
-}
-
-.step-check {
-  width: 6px;
-  height: 10px;
-  border-right: 1.5px solid #CED4DA;
-  border-bottom: 1.5px solid #CED4DA;
-  transform: rotate(45deg);
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-.step-check.done {
-    border-color: #5BD197; /* King Mint */
-}
-
-/* 2. Nested Thinking - NO INDENT, NO BORDER */
-.thinking-row {
-    margin-left: 0; 
-    border-left: none;
-    padding-left: 0;
     margin-bottom: 8px;
 }
 
-/* 3. Tool Row */
+/* Step Styling */
+.step-container {
+    width: 100%;
+}
+
+.step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-left: 4px;
+}
+
+.step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #E9ECEF;
+  margin-top: 7px;
+  flex-shrink: 0;
+}
+
+.step-dot.done {
+    background: #5BD197; /* King Mint */
+}
+
+.step-text {
+  font-size: 13px;
+  color: #2C3338; /* Gray-Dark */
+  line-height: 1.5;
+}
+
+.step-text.is-meta {
+    color: #6C757D; /* Gray-Medium */
+    font-size: 12px;
+}
+
+/* File Attachment Card */
+.file-attachment-card {
+    display: flex;
+    align-items: center;
+    background: #F8F9FA; /* Gray-Pale */
+    border: 1px solid #E9ECEF; /* Gray-Light */
+    border-radius: 8px;
+    padding: 10px 14px;
+    gap: 12px;
+    margin: 4px 0 8px 0;
+}
+
+.file-icon-area {
+    flex-shrink: 0;
+}
+
+.file-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #2C3338;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-meta {
+    font-size: 11px;
+    color: #6C757D;
+    margin-top: 1px;
+}
+
+.file-actions {
+    display: flex;
+    align-items: center;
+}
+
+.action-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: #6C757D;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.action-btn:hover {
+    background: #E9ECEF;
+    color: #1A5336;
+}
+
+/* Tool Row */
 .tool-row {
-  margin-left: 0; /* Reset margin, handle alignment internally if needed */
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 4px 0;
-  font-size: 12px;
-  color: #6C757D; /* Gray-Medium */
-  
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  padding: 6px 12px;
+  background: #F8F9FA;
+  border-radius: 6px;
+  margin-left: 0;
 }
-.tool-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.tool-name {
-    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-    background: rgba(0,0,0,0.03);
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-.tool-status {
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap; 
-}
-.status-loading { color: #1A5336; } /* Forest */
-.status-success { color: #5BD197; } /* Mint */
-.status-error { color: #E74C3C; } /* Error Red */
 
-/* Legacy Steps Support */
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-  font-size: 12px;
-  color: #495057;
+.tool-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tool-label {
+    font-size: 11px;
+    color: #6C757D;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tool-name {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 12px;
+    color: #1A5336;
+    font-weight: 500;
+}
+
+.tool-status {
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.status-loading { color: #6C757D; }
+.status-success { color: #5BD197; }
+.status-error { color: #E74C3C; }
+
+/* Thinking Row */
+.thinking-row {
+    margin-bottom: 8px;
 }
 </style>

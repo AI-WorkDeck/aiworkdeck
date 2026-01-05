@@ -40,7 +40,7 @@ public class WebFavorite {
     /**
      * 摘录文本（OCR 或复制的文本）
      */
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     /**
@@ -53,7 +53,7 @@ public class WebFavorite {
      * 扩展元信息（JSON 字符串）：
      * - 用于网核证据：抓取时间、页面 HTML 快照摘要、selector 等
      */
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String meta;
 
     @Column

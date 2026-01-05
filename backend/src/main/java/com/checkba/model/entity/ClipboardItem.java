@@ -28,7 +28,7 @@ public class ClipboardItem {
     /**
      * 文本内容（TEXT）
      */
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String text;
 
     /**

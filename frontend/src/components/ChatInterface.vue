@@ -130,6 +130,83 @@
       </view>
     </view>
 
+    <!-- Rollback Confirmation Dialog -->
+    <view v-if="showRollbackDialog" class="king-dialog-mask" style="z-index: 3100;" @tap="cancelRollback">
+      <view class="king-dialog" @tap.stop>
+        <view class="king-dialog-header warning-header">
+          <text class="king-dialog-title warning-title">⚠️ 确认回退</text>
+        </view>
+        <view class="king-dialog-body">
+          <view class="rollback-warning-content">
+            <text class="warning-text">此操作将删除该消息以及之后的所有对话记录，且无法恢复。</text>
+            <view class="wps-tip-box">
+              <text class="wps-tip-icon">💡</text>
+              <view class="wps-tip-text">
+                <text>如果助手在后续对话中修改了文档（Word/PPT），文件内容不会自动回退。</text>
+                <text class="wps-link-text">请使用 WPS 的“历史版本”功能恢复文件。</text>
+              </view>
+            </view>
+            <view class="rollback-preview">
+              <text class="preview-label">将回退到并编辑：</text>
+              <text class="preview-content">"{{ truncateName(rollbackTargetContent, 50) }}"</text>
+            </view>
+          </view>
+        </view>
+        <view class="king-dialog-footer">
+          <view class="king-btn king-btn-secondary" @tap="cancelRollback">取消</view>
+          <view class="king-btn king-btn-danger" @tap="confirmRollback">确认回退</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- PPT Config Dialog -->
+    <view v-if="showPptConfigDialog" class="king-dialog-mask" style="z-index: 3200;" @tap="cancelPptConfig">
+      <view class="king-dialog" @tap.stop>
+        <view class="king-dialog-header">
+           <text class="king-dialog-title">PPT 生成选项</text>
+        </view>
+        <view class="king-dialog-body">
+           <view class="ppt-config-section">
+              <text class="section-title">请选择导出格式</text>
+              
+              <!-- Option 1: Editable (Beta) -->
+              <view class="ppt-option-card" 
+                   :class="{ active: pptExportEditable === true }"
+                   @tap="pptExportEditable = true">
+                 <view class="option-header">
+                    <text class="option-icon">✏️</text>
+                    <text class="option-name">可编辑版 (Beta)</text>
+                    <text v-if="pptExportEditable === true" class="check-mark">✔</text>
+                 </view>
+                 <view class="option-desc">
+                    生成原生 PPTX 文本和表格。
+                    <text class="warning-text">⚠️ 实验性功能，复杂排版可能不稳定。</text>
+                 </view>
+              </view>
+
+              <!-- Option 2: Image (Stable) -->
+              <view class="ppt-option-card"
+                   :class="{ active: pptExportEditable === false }"
+                   @tap="pptExportEditable = false">
+                 <view class="option-header">
+                    <text class="option-icon">🖼️</text>
+                    <text class="option-name">高清图片版 (推荐)</text>
+                    <text v-if="pptExportEditable === false" class="check-mark">✔</text>
+                 </view>
+                 <view class="option-desc">
+                    将每页渲染为高清图片。
+                    <text class="highlight-text">排版完美，渲染稳定，但文字不可编辑。</text>
+                 </view>
+              </view>
+           </view>
+        </view>
+        <view class="king-dialog-footer">
+           <view class="king-btn king-btn-secondary" @tap="cancelPptConfig">取消</view>
+           <view class="king-btn king-btn-primary" @tap="confirmPptGeneration">开始生成</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 1. Header Actions -->
     <view class="chat-header">
        <view class="header-left">
@@ -195,17 +272,24 @@
             <view v-if="msg.images && msg.images.length > 0" class="user-bubble-images">
                <image v-for="(img, idx) in msg.images" :key="idx" :src="img.path" mode="aspectFill" class="bubble-image-thumb" />
             </view>
-            <!-- Context File Tags (inline before content) -->
-            <div class="user-bubble-content">
-              <span v-for="f in (msg.contextFiles || [])" :key="f.id" class="context-tag-inline">
-                <image :src="f.isDir ? '/static/folder-closed.png' : '/static/document.png'" class="tag-icon" />
-                <span class="tag-at">@</span>
-                <span class="tag-name" :title="f.name">{{ truncateName(f.name) }}</span>
-              </span>
-              <span v-if="msg.contextFiles && msg.contextFiles.length > 0">&nbsp;</span>
-              {{ msg.content }}
+            <!-- Content with inline file tags preserved at their original positions -->
+            <div 
+              class="user-bubble-content"
+              v-html="msg.contentHtml || escapeHtml(msg.content)"
+            ></div>
+            <div class="bubble-footer">
+              <span v-if="msg.timestamp" class="bubble-timestamp user">{{ msg.timestamp }}</span>
+              <!-- Rollback Button -->
+              <view v-if="!isStreaming" class="rollback-btn" @tap.stop="openRollbackDialog(msg, index)" title="回退到此消息（修改重发）">
+                 <div class="rollback-icon-svg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 14 4 9l5-5"></path>
+                        <path d="M4 9h12a5 5 0 0 1 5 5v3"></path>
+                    </svg>
+                 </div>
+                 <text class="rollback-text">回退</text>
+              </view>
             </div>
-            <span v-if="msg.timestamp" class="bubble-timestamp user">{{ msg.timestamp }}</span>
           </div>
 
           <!-- Assistant Message (Root Bubble) -->
@@ -249,6 +333,7 @@
                 @input="handleRichInput"
                 @paste="handlePaste"
                 @keydown.enter="handleEnterKey"
+                @click="handleInputClick"
                 data-placeholder="请输入法律问题、拖拽文件/文件夹至此、粘贴合同文本或描述案情..."
               ></div>
               <!-- Note: Context files are now shown as inline tags inside the rich input -->
@@ -258,6 +343,25 @@
                    <image class="btn-icon default" src="/static/plus.png" />
                    <image class="btn-icon hover" src="/static/plus_hover.png" />
                  </view>
+                    <!-- Agent Mode Selector -->
+                    <view class="mode-selector" @tap="toggleModeDropdown">
+                       <text class="mode-icon" v-if="currentModeIcon">{{ currentModeIcon }}</text>
+                       <text class="mode-name">{{ currentModeName }}</text>
+                       <text class="dropdown-arrow">▼</text>
+                       <view v-if="showModeDropdown" class="mode-dropdown down">
+                          <view v-for="mode in availableModes" :key="mode.id" 
+                                class="mode-option" 
+                                :class="{ active: currentModeId === mode.id }"
+                                @tap.stop="selectMode(mode)">
+                            <text class="mode-option-icon" v-if="mode.icon">{{ mode.icon }}</text>
+                             <view class="mode-option-text">
+                                <text class="mode-option-name">{{ mode.name }}</text>
+                                <text class="mode-option-desc">{{ mode.desc }}</text>
+                             </view>
+                          </view>
+                       </view>
+                    </view>
+                    <!-- Model Selector -->
                     <view class="model-selector" @tap="toggleModelDropdown">
                        <text class="model-name">{{ currentModelName }}</text>
                        <text class="dropdown-arrow">▼</text>
@@ -271,18 +375,22 @@
                        </view>
                     </view>
                  </view>
-                 <view class="send-btn" :class="{ disabled: !inputPrompt.trim() && !isStreaming }" @tap="handleSubmit">
-                    <text>→</text>
+                 <view 
+                    class="send-btn" 
+                    :class="{ disabled: !inputPrompt.trim() && !isStreaming, stopping: isStreaming }" 
+                    @tap="isStreaming ? abort() : handleSubmit()"
+                 >
+                    <text>{{ isStreaming ? '■' : '→' }}</text>
                  </view>
               </view>
           </view>
-          <view v-if="showModelDropdown" class="dropdown-mask model-mask" @tap="showModelDropdown = false"></view>
+          <view v-if="showModelDropdown || showModeDropdown" class="dropdown-mask model-mask" @tap="showModelDropdown = false; showModeDropdown = false"></view>
        </view>
 
        <!-- Bottom: History (pushed to bottom with flexbox) -->
        <view class="empty-bottom-section">
           <view class="recent-history-header">近期对话</view>
-          <view class="recent-history" v-if="recentHistory.length > 0">
+          <view class="recent-history" v-if="recentHistory && recentHistory.length > 0">
              <view v-for="h in recentHistory" :key="h.id" class="history-item" @tap="$emit('load-history', h)">
                 <text class="history-title">{{ cleanTitle(h.title) }}</text>
                 <text class="history-time">{{ formatRelativeTime(h.updatedAt) }}</text>
@@ -297,6 +405,48 @@
 
     <!-- 4. Regular Bottom Input -->
     <view v-else class="input-area-wrapper">
+       <!-- NEW: File Changes & Token Usage Bar (Always visible) -->
+       <view class="status-bar-row">
+           <!-- Left: File Changes -->
+           <view class="status-bar-left">
+               <!-- Modified Files -->
+                <view class="status-btn-wrapper">
+                    <view class="status-btn modified" :class="{ empty: modifiedFiles.length === 0 }" @tap.stop="modifiedFiles.length > 0 ? toggleModifiedPopup() : null">
+                        <svg class="status-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        <text>改动 ({{ modifiedFiles.length }})</text>
+                    </view>
+                   <view v-if="showModifiedPopup && modifiedFiles.length > 0" class="status-popup up">
+                       <view v-for="(f, i) in modifiedFiles" :key="i" class="status-popup-item" @tap.stop="handleOpenFile(f)">
+                           <image src="/static/file.png" class="file-icon-mini"/>
+                           <text class="file-name-text">{{ f.fileName }}</text>
+                       </view>
+                   </view>
+                   <view v-if="showModifiedPopup && modifiedFiles.length > 0" class="popup-mask-transparent" @tap.stop="showModifiedPopup = false"></view>
+               </view>
+
+               <!-- New Files -->
+               <view class="status-btn-wrapper">
+                   <view class="status-btn created" :class="{ empty: createdFiles.length === 0 }" @tap.stop="createdFiles.length > 0 ? toggleNewPopup() : null">
+                       <svg class="status-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                       <text>新增 ({{ createdFiles.length }})</text>
+                   </view>
+                   <view v-if="showNewPopup && createdFiles.length > 0" class="status-popup up">
+                       <view v-for="(f, i) in createdFiles" :key="i" class="status-popup-item" @tap.stop="handleOpenFile(f)">
+                           <image src="/static/file.png" class="file-icon-mini"/>
+                           <text class="file-name-text">{{ f.fileName }}</text>
+                       </view>
+                   </view>
+                   <view v-if="showNewPopup && createdFiles.length > 0" class="popup-mask-transparent" @tap.stop="showNewPopup = false"></view>
+               </view>
+           </view>
+
+           <!-- Right: Token Usage -->
+           <view v-if="tokenUsage && tokenUsage.totalTokens > 0" class="status-bar-right">
+               <text class="token-label">Tokens</text>
+               <text class="token-value">{{ tokenUsage.totalTokens.toLocaleString() }}</text>
+               <text class="token-detail">({{ tokenUsage.promptTokens.toLocaleString() }} / {{ tokenUsage.completionTokens.toLocaleString() }})</text>
+           </view>
+       </view>
        <view class="input-card">
           <view v-if="isDragging" class="drop-overlay">
              <text>Drop files here</text>
@@ -315,6 +465,7 @@
             @input="handleRichInput"
             @paste="handlePaste"
             @keydown.enter="handleEnterKey"
+            @click="handleInputClick"
             data-placeholder="Ask anything..."
           ></div>
           <!-- Note: Context files are now shown as inline tags inside the rich input -->
@@ -324,6 +475,25 @@
                    <image class="btn-icon default" src="/static/plus.png" />
                    <image class="btn-icon hover" src="/static/plus_hover.png" />
                 </view>
+                <!-- Agent Mode Selector -->
+                <view class="mode-selector" @tap="toggleModeDropdown">
+                   <text class="mode-icon" v-if="currentModeIcon">{{ currentModeIcon }}</text>
+                   <text class="mode-name">{{ currentModeName }}</text>
+                   <text class="dropdown-arrow">▲</text>
+                   <view v-if="showModeDropdown" class="mode-dropdown up">
+                      <view v-for="mode in availableModes" :key="mode.id" 
+                            class="mode-option" 
+                            :class="{ active: currentModeId === mode.id }"
+                            @tap.stop="selectMode(mode)">
+                         <text class="mode-option-icon" v-if="mode.icon">{{ mode.icon }}</text>
+                         <view class="mode-option-text">
+                            <text class="mode-option-name">{{ mode.name }}</text>
+                            <text class="mode-option-desc">{{ mode.desc }}</text>
+                         </view>
+                      </view>
+                   </view>
+                </view>
+                <!-- Model Selector -->
                 <view class="model-selector" @tap="toggleModelDropdown">
                    <text class="model-name">{{ currentModelName }}</text>
                    <text class="dropdown-arrow">▲</text>
@@ -337,33 +507,59 @@
                    </view>
                 </view>
              </view>
-             <view class="send-btn" :class="{ disabled: !inputPrompt.trim() && !isStreaming }" @tap="handleSubmit">
-                <text>→</text>
+             <view 
+                class="send-btn" 
+                :class="{ disabled: !inputPrompt.trim() && !isStreaming, stopping: isStreaming }" 
+                @tap="isStreaming ? abort() : handleSubmit()"
+             >
+                <text>{{ isStreaming ? '■' : '→' }}</text>
              </view>
           </view>
-          <view v-if="showModelDropdown" class="dropdown-mask" @tap="showModelDropdown = false"></view>
+          <view v-if="showModelDropdown || showModeDropdown" class="dropdown-mask" @tap="showModelDropdown = false; showModeDropdown = false"></view>
        </view>
     </view>
+    
+    <!-- Background Task Progress Indicator -->
+    <BackgroundTaskIndicator 
+      :backgroundTasks="backgroundTasks"
+      :lastHeartbeat="lastHeartbeat"
+    />
 
   </view>
 </template>
 
 <script>
 import RootBubble from './AgentMessage/RootBubble.vue'
+import BackgroundTaskIndicator from './BackgroundTaskIndicator.vue'
 import { useAgentStream } from '@/composables/useAgentStream.js'
 import { ref, watch, onMounted, nextTick, getCurrentInstance, computed } from 'vue'
-import { createFile, getProjectFiles, getApiBaseUrl } from '@/services/api.js'
+import { createFile, getProjectFiles, getApiBaseUrl, rollbackConversation, performPptGeneration } from '@/services/api.js'
 import { getAuthHeaders } from '@/utils/auth.js'
 
 export default {
   name: 'ChatInterface',
-  components: { RootBubble },
+  components: { RootBubble, BackgroundTaskIndicator },
   props: {
     projectId: String,
     projectName: String,
-    recentHistory: Array,
-    assistants: Array,
-    currentAssistantId: String
+    recentHistory: {
+      type: Array,
+      default: () => []
+    },
+    assistants: {
+        type: Array,
+        default: () => []
+    },
+    currentAssistantId: String,
+    // NEW: Current active tab for auto-context injection
+    activeTab: {
+      type: Object,
+      default: null
+    },
+    activeTabPane: {
+      type: String,
+      default: null // 'left' | 'right' | null
+    }
   },
   setup(props, { emit, expose }) {
     const { 
@@ -374,12 +570,26 @@ export default {
       setConversationId,
       clearBubbles,
       onClientAction,
-      onTitleUpdate
+      onTitleUpdate,
+      backgroundTasks,
+      lastHeartbeat,
+      tokenUsage,
+      fileChanges,
+      rollbackToMessage,
+      currentConversationId,
+      loadConversationMetadata
     } = useAgentStream()
 
     // Bridge Stream Events to Component Events
     onClientAction((action) => {
-        emit('client-action', action)
+        if (action.action === 'ppt_config_required') {
+           // Show PPT config dialog
+           pptConfigData.value = action
+           pptExportEditable.value = false // Default to safe option
+           showPptConfigDialog.value = true
+        } else {
+           emit('client-action', action)
+        }
     })
     
     // Bridge Title Update Event to Parent
@@ -387,7 +597,6 @@ export default {
         emit('title-update', title)
         emit('refresh-history') // Trigger history refresh to show new title
     })
-
     const inputPrompt = ref('')
     const richInput = ref(null)
     const scrollTop = ref(0)
@@ -409,7 +618,6 @@ export default {
     const currentModelId = ref(availableModels[0].id)
     const currentModelName = ref(availableModels[0].name)
     
-    
     // Fix: Define selectModel explicitly
     const selectModel = (m) => {
       console.log('Switching model to:', m.name)
@@ -417,6 +625,39 @@ export default {
       currentModelName.value = m.name
       showModelDropdown.value = false
     }
+    
+    // Agent Mode Selection (Ask, Plan, Agent)
+    const showModeDropdown = ref(false)
+    const availableModes = [
+      { id: 'AGENT', name: 'Agent', icon: '', desc: '自动执行' },
+      { id: 'ASK', name: 'Ask', icon: '', desc: '纯对话' },
+      { id: 'PLAN', name: 'Plan', icon: '', desc: '规划确认' }
+    ]
+    const currentModeId = ref(availableModes[0].id)
+    const currentModeName = ref(availableModes[0].name)
+    const currentModeIcon = ref(availableModes[0].icon)
+    
+    const selectMode = (mode) => {
+      console.log('Switching agent mode to:', mode.name)
+      currentModeId.value = mode.id
+      currentModeName.value = mode.name
+      currentModeIcon.value = mode.icon
+      showModeDropdown.value = false
+    }
+    
+    const toggleModeDropdown = () => {
+      showModeDropdown.value = !showModeDropdown.value
+      // 关闭其他下拉菜单
+      if (showModeDropdown.value) {
+        showModelDropdown.value = false
+      }
+    }
+    
+    // Rollback Dialog State
+    const showRollbackDialog = ref(false)
+    const rollbackTargetIndex = ref(-1)
+    const rollbackTargetContent = ref('')
+    const rollbackTargetId = ref(null)
     
     const showAssistantMenu = ref(false)
     
@@ -497,6 +738,40 @@ export default {
       return folder ? folder.name : '根目录'
     })
 
+    // --- File Changes Logic ---
+    const showModifiedPopup = ref(false)
+    const showNewPopup = ref(false)
+    
+    const createdFiles = computed(() => {
+        return (fileChanges.value || []).filter(f => f.changeType === 'ADDED')
+    })
+    
+    const modifiedFiles = computed(() => {
+        return (fileChanges.value || []).filter(f => f.changeType === 'MODIFIED')
+    })
+    
+    const toggleModifiedPopup = () => {
+        showModifiedPopup.value = !showModifiedPopup.value
+        if (showModifiedPopup.value) showNewPopup.value = false
+    }
+    
+    const toggleNewPopup = () => {
+        showNewPopup.value = !showNewPopup.value
+        if (showNewPopup.value) showModifiedPopup.value = false
+    }
+    
+    const handleOpenFile = (f) => {
+        // Emit open-file event to parent
+        // f.fileName is the name. Backend might need full path if it's nested.
+        // But for now we just emit what we have.
+        // Assuming parent can handle opening by name or request details if needed.
+        // Or send { name: f.fileName, path: f.fileName }
+        console.log('Opening file:', f.fileName)
+        emit('open-file', { name: f.fileName })
+        showModifiedPopup.value = false
+        showNewPopup.value = false
+    }
+
     // Scroll to bottom when bubbles change
     watch(() => bubbles.value.length, () => {
        scrollToBottom()
@@ -513,6 +788,110 @@ export default {
        })
     }
 
+
+    // --- PPT Config Logic ---
+    const showPptConfigDialog = ref(false)
+    const pptConfigData = ref(null)
+    const pptExportEditable = ref(false)
+
+    const cancelPptConfig = () => {
+       showPptConfigDialog.value = false
+       pptConfigData.value = null
+       // Optionally notify backend of cancellation? Not strictly needed as AI task handles timeout or just hangs.
+       // Ideally we should tell user "Cancelled". 
+       bubbles.value.push({
+          role: 'ASSISTANT',
+          content: 'PPT 生成已取消。',
+          timestamp: new Date().toLocaleTimeString() 
+       })
+    }
+
+    const confirmPptGeneration = async () => {
+       if (!pptConfigData.value) return
+       
+       const params = {
+          ...pptConfigData.value, // contains topic, projectId etc.
+          exportEditable: pptExportEditable.value,
+          conversationId: currentConversationId.value
+       }
+       
+       // Close dialog immediately
+       showPptConfigDialog.value = false
+       
+       try {
+          // Call backend API
+          await performPptGeneration(params)
+          
+          // Add a system bubble saying "Starting generation..."
+          bubbles.value.push({
+             role: 'ASSISTANT',
+             content: `开始生成 PPT (${pptExportEditable.value ? '可编辑版' : '高清图片版'})...\n请留意上方进度条。`,
+             timestamp: new Date().toLocaleTimeString()
+          })
+          
+       } catch (err) {
+          console.error("Failed to start PPT generation:", err)
+          uni.showToast({ title: '启动生成失败', icon: 'none' })
+       }
+    }
+
+    // --- Rollback Functions ---
+    const openRollbackDialog = (msg, index) => {
+      if (isStreaming.value) {
+        uni.showToast({ title: '请等待当前对话完成', icon: 'none' })
+        return
+      }
+      rollbackTargetIndex.value = index
+      rollbackTargetContent.value = msg.content || ''
+      rollbackTargetId.value = msg.id
+      showRollbackDialog.value = true
+    }
+
+    const cancelRollback = () => {
+      showRollbackDialog.value = false
+      rollbackTargetIndex.value = -1
+      rollbackTargetContent.value = ''
+      rollbackTargetId.value = null
+    }
+
+    const confirmRollback = async () => {
+      const targetIndex = rollbackTargetIndex.value
+      const targetId = rollbackTargetId.value
+      const content = rollbackTargetContent.value
+      
+      // 关闭对话框
+      showRollbackDialog.value = false
+
+      try {
+        // 1. 调用后端API删除数据库中的消息
+        if (targetId && currentConversationId.value) {
+          await rollbackConversation(currentConversationId.value, targetId)
+        }
+        
+        // 2. 在前端删除bubbles
+        const rolledBackContent = rollbackToMessage(targetIndex)
+        
+        // 3. 将回退的消息内容放入输入框
+        if (richInput.value && content) {
+          richInput.value.innerHTML = escapeHtml(content)
+          inputPrompt.value = content
+        }
+        
+        // 4. 通知父组件刷新历史
+        emit('refresh-history')
+        
+        uni.showToast({ title: '已回退', icon: 'success' })
+      } catch (err) {
+        console.error('[ChatInterface] Rollback failed:', err)
+        uni.showToast({ title: '回退失败: ' + (err.message || '未知错误'), icon: 'none' })
+      }
+      
+      // 重置状态
+      rollbackTargetIndex.value = -1
+      rollbackTargetContent.value = ''
+      rollbackTargetId.value = null
+    }
+
     const startNewChat = () => {
       setConversationId(null)  // This now triggers resetSSE internally
       clearBubbles()           // Use composable method
@@ -522,15 +901,30 @@ export default {
     const handleSubmit = async () => {
       // Create a clone to safely manipulate and extract text without tags
       let text = ''
+      let contentHtml = ''
       if (richInput.value) {
-        const clone = richInput.value.cloneNode(true)
+        // 1. First, capture the HTML with inline tags for display in bubble
+        // Clone and sanitize for display, keeping file tags
+        const displayClone = richInput.value.cloneNode(true)
+        // Clean up contenteditable artifacts but keep file tags
+        let rawHtml = displayClone.innerHTML
+        // Replace <br> with <br/> for consistency
+        rawHtml = rawHtml.replace(/<br\s*>/gi, '<br/>')
+        // Replace <div> blocks with <br/> + content (preserve line breaks)
+        rawHtml = rawHtml.replace(/<div[^>]*>/gi, '<br/>')
+        rawHtml = rawHtml.replace(/<\/div>/gi, '')
+        // Clean leading <br/> if starts with one
+        rawHtml = rawHtml.replace(/^<br\/?>/, '')
+        contentHtml = rawHtml.trim()
+        
+        // 2. Extract plain text (without tags) for sending to backend
+        const textClone = richInput.value.cloneNode(true)
         // Remove file tags to avoid duplicating their name in the text
-        const tags = clone.querySelectorAll('[data-file-id]')
+        const tags = textClone.querySelectorAll('[data-file-id]')
         tags.forEach(t => t.remove())
         
         // Manual Text Extraction to preserve newlines
-        // 1. Replace block elements/breaks with newlines
-        let html = clone.innerHTML
+        let html = textClone.innerHTML
         // Replace <br> with newline
         html = html.replace(/<br\s*\/?>/gi, '\n')
         // Replace <div> and <p> with newline (start of block)
@@ -538,7 +932,7 @@ export default {
         // Remove closing tags (implicit newline separation handled by start tags)
         html = html.replace(/<\/(?:div|p)>/gi, '')
         
-        // 2. Decode entities and strip remaining tags
+        // Decode entities and strip remaining tags
         const temp = document.createElement('div')
         temp.innerHTML = html
         text = temp.textContent.trim()
@@ -586,12 +980,29 @@ export default {
       contextFiles.value = []
       pastedImages.value = []
       
+      // Build activeContext from props.activeTab (only if no manual context provided)
+      // Priority: manual contextFiles > activeContext
+      const activeContext = (fileListToSend.length === 0 && props.activeTab) ? {
+        id: String(props.activeTab.id || props.activeTab.wpsFileId),
+        name: props.activeTab.name,
+        fileType: props.activeTab.fileType,
+        wpsFileId: props.activeTab.wpsFileId,
+        pane: props.activeTabPane
+      } : null
+      
+      if (activeContext) {
+        console.log('[ChatInterface] Auto-attaching active context:', activeContext.name)
+      }
+      
       await sendMessage({
         prompt,
+        contentHtml, // Pass HTML with inline tags for bubble display
         fileList: fileListToSend,
         projectId: props.projectId,
         modelId: currentModelId.value,
+        mode: currentModeId.value, // Agent 模式: ASK, PLAN, AGENT
         assistantId: props.currentAssistantId,
+        activeContext, // NEW: Auto-detected active tab context
         // Pass for user bubble display
         _userImages: imagesToShow,
         _userContextFiles: contextFilesToShow
@@ -811,6 +1222,21 @@ export default {
         // When user deletes a tag from the input, also remove it from contextFiles
         syncContextFilesWithInlineTags()
     }
+
+    const handleInputClick = (e) => {
+      // Check if clicked the close button of a tag
+      if (e.target.classList.contains('tag-close')) {
+        const tag = e.target.closest('.context-tag-inline')
+        if (tag) {
+          tag.remove()
+          syncContextFilesWithInlineTags()
+          // Update text model
+          if (richInput.value) {
+            inputPrompt.value = richInput.value.innerText
+          }
+        }
+      }
+    }
     
     // --- Sync contextFiles with actual inline tags in the input ---
     const syncContextFilesWithInlineTags = () => {
@@ -889,6 +1315,18 @@ export default {
       return name.length > maxLen ? name.slice(0, maxLen) + '...' : name
     }
     
+    // --- Escape HTML for safe rendering (fallback for plain text content) ---
+    const escapeHtml = (text) => {
+      if (!text) return ''
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br/>')
+    }
+    
     // --- File Context Methods ---
     const addFile = (file) => {
       // Check if file already exists by ID
@@ -915,29 +1353,14 @@ export default {
       
       const icon = file.isDir ? '/static/folder-closed.png' : '/static/document.png'
       const displayName = truncateName(file.name)
-      // Use inline styles since scoped CSS doesn't apply to dynamically created DOM elements
-      // Transparent background + border style
-      const tagStyles = `
-        display: inline-flex;
-        align-items: center;
-        gap: 3px;
-        background: transparent;
-        color: #1A5336;
-        padding: 3px 8px;
-        border-radius: 4px;
-        margin: 0 4px 2px 0;
-        font-size: 12px;
-        font-weight: 500;
-        vertical-align: middle;
-        user-select: none;
-        max-width: 160px;
-        border: 1px solid rgba(26, 83, 54, 0.4);
-      `.replace(/\s+/g, ' ').trim()
-      const iconStyles = `width: 14px; height: 14px; flex-shrink: 0; border-radius: 2px; filter: brightness(0.3);`
-      const atStyles = `color: #1A5336; font-weight: 600;`
-      const nameStyles = `white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; color: #1A5336;`
       
-      const tagHtml = `<span style="${tagStyles}" contenteditable="false" data-file-id="${file.id}" data-is-dir="${file.isDir ? 'true' : 'false'}" title="${file.name}"><img src="${icon}" style="${iconStyles}"/><span style="${atStyles}">@</span><span style="${nameStyles}">${displayName}</span></span>&nbsp;`
+      const tagHtml = `
+        <span class="context-tag-inline" contenteditable="false" data-file-id="${file.id}" data-is-dir="${file.isDir ? 'true' : 'false'}" title="${file.name}">
+          <img src="${icon}" class="tag-icon"/>
+          <span class="tag-at">@</span>
+          <span class="tag-name">${displayName}</span>
+          <span class="tag-close">×</span>
+        </span>&nbsp;`.replace(/\s+/g, ' ').trim()
       
       // Insert at cursor or append to end
       const sel = window.getSelection()
@@ -1275,19 +1698,22 @@ export default {
     }
     
     // Expose methods for parent ref access
-    expose({ addFile, loadMessages })
+    expose({ addFile, loadMessages, loadConversationMetadata })
 
     return {
        bubbles,
        isStreaming,
        inputPrompt,
        richInput,
+       tokenUsage,
        scrollTop,
        isDragging,
        contextFiles,
        pastedImages,
        handleSubmit,
+       abort,
        handleRichInput,
+       handleInputClick,
        handlePaste,
        handleEnterKey,
        startNewChat,
@@ -1299,6 +1725,13 @@ export default {
        removeContextFile,
        removePastedImage,
        truncateName,
+       escapeHtml,
+       // Rollback
+       showRollbackDialog,
+       rollbackTargetContent,
+       openRollbackDialog,
+       cancelRollback,
+       confirmRollback,
        // Menu
        showAssistantMenu,
        toggleAssistantMenu: () => showAssistantMenu.value = !showAssistantMenu.value,
@@ -1306,19 +1739,32 @@ export default {
        // Model
        currentModelId,
        currentModelName,
-       toggleModelDropdown: () => showModelDropdown.value = !showModelDropdown.value,
+       toggleModelDropdown: () => {
+         showModelDropdown.value = !showModelDropdown.value
+         if (showModelDropdown.value) showModeDropdown.value = false
+       },
        selectModel,
        showModelDropdown,
        availableModels,
+       // Agent Mode
+       currentModeId,
+       currentModeName,
+       currentModeIcon,
+       toggleModeDropdown,
+       selectMode,
+       showModeDropdown,
+       availableModes,
        // Artifact
        handleArtifactOpenTab: (art) => emit('artifact-open-tab', art),
        handleArtifactApprove: async (art) => {
           console.log('[ChatInterface] Artifact Approved:', art.id)
+          // 审批后使用 AGENT 模式执行计划
           await sendMessage({
              prompt: `已批准实施计划: ${art.fileName}`,
              fileList: [],
              projectId: props.projectId,
              modelId: currentModelId.value,
+             mode: 'AGENT', // 审批后使用 Agent 模式执行
              assistantId: props.currentAssistantId
           })
           scrollToBottom()
@@ -1345,7 +1791,25 @@ export default {
        openFolderSelector,
        toggleFolderSelectorExpand,
        getFolderPath,
-       handleSelectorCreateFolder
+       handleSelectorCreateFolder,
+       // Background Task Indicator
+       backgroundTasks,
+       lastHeartbeat,
+       // PPT Config
+       showPptConfigDialog,
+       pptExportEditable, 
+       pptConfigData,
+       cancelPptConfig,
+       confirmPptGeneration,
+       // File Changes Status
+       fileChanges,
+       modifiedFiles,
+       createdFiles,
+       showModifiedPopup,
+       showNewPopup,
+       toggleModifiedPopup,
+       toggleNewPopup,
+       handleOpenFile
     }
   }
 }
@@ -1571,7 +2035,7 @@ export default {
 .input-card {
   background: #fff;
   border: 1px solid #e0e0e0;
-  border-radius: 12px;
+  border-radius: 0px;
   padding: 16px;
   width: 100%;
   box-sizing: border-box;
@@ -1694,9 +2158,10 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 2px 6px;
+  border-radius: 2px;
   transition: background 0.15s ease;
+  white-space: nowrap;
 }
 .model-selector:hover {
   background: rgba(0, 0, 0, 0.05);
@@ -1718,7 +2183,7 @@ export default {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  z-index: 200;
+  z-index: 1001;
   min-width: 180px;
   max-height: 200px;
   overflow-y: auto;
@@ -1733,6 +2198,95 @@ export default {
 /* 向上展开 (对话中) */
 .model-dropdown.up {
   bottom: calc(100% + 4px);
+}
+
+/* ============= Mode Selector (Agent/Ask/Plan) ============= */
+.mode-selector {
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  transition: all 0.15s ease;
+}
+.mode-selector:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.mode-icon {
+  font-size: 14px;
+}
+
+.mode-name {
+  font-weight: 500;
+  color: #3b82f6;
+}
+
+.mode-dropdown {
+  position: absolute;
+  left: 0;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+  min-width: 160px;
+  padding: 6px 0;
+}
+
+.mode-dropdown.down {
+  top: calc(100% + 6px);
+}
+
+.mode-dropdown.up {
+  bottom: calc(100% + 6px);
+}
+
+.mode-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.mode-option:hover {
+  background: #f5f5f5;
+}
+.mode-option.active {
+  background: rgba(59, 130, 246, 0.1);
+}
+.mode-option.active .mode-option-name {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.mode-option-icon {
+  font-size: 18px;
+}
+
+.mode-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mode-option-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+}
+
+.mode-option-desc {
+  font-size: 11px;
+  color: #888;
 }
 
 .dropdown-menu {
@@ -1942,13 +2496,20 @@ export default {
 .send-btn.disabled:hover {
   background: #eee;
 }
+.send-btn.stopping {
+  background: #C53030;
+}
+.send-btn.stopping:hover {
+  background: #9B2C2C;
+}
 
 .input-area-wrapper {
   padding: 16px 24px;
   background: #fff;
   border-top: 1px solid #eee;
   display: flex;
-  justify-content: center;
+  flex-direction: column;  /* Fix: Stack children vertically */
+  align-items: stretch;    /* Fix: Make children full width */
   flex-shrink: 0;
   min-width: 0;
   box-sizing: border-box;
@@ -2047,58 +2608,87 @@ export default {
   transform: scale(1.1);
 }
 
-/* =============================================
-   King IDE Style - Inline Context Tags (Input Box)
-   Transparent background + border style
-   ============================================= */
-.chat-input-rich .context-tag-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  background: transparent;
-  color: #1A5336;
-  padding: 3px 8px;
-  border-radius: 4px;
-  margin: 0 4px 2px 0;
-  font-size: 12px;
-  font-weight: 500;
-  vertical-align: middle;
-  user-select: none;
-  max-width: 160px;
-  border: 1px solid rgba(26, 83, 54, 0.4);
-  transition: all 0.15s ease;
-}
-
-.chat-input-rich .context-tag-inline:hover {
-  background: rgba(26, 83, 54, 0.08);
-  border-color: rgba(26, 83, 54, 0.6);
-}
-
-.chat-input-rich .tag-icon {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  border-radius: 2px;
-  filter: brightness(0.3);
-}
-
-.chat-input-rich .tag-at {
-  color: #1A5336;
-  font-weight: 600;
-}
-
-.chat-input-rich .tag-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100px;
-  color: #1A5336;
-}
-
-/* =============================================
-   King IDE Style - Inline Context Tags (User Bubble)
-   Lighter/transparent background for visibility
-   ============================================= */
+ /* =============================================
+    King IDE Style - Inline Context Tags (Input Box)
+    Transparent background + border style
+    ============================================= */
+ :deep(.context-tag-inline) {
+   display: inline-flex;
+   align-items: center;
+   gap: 3px;
+   background: transparent;
+   color: #1A5336;
+   padding: 3px 8px;
+   border-radius: 4px;
+   margin: 0 4px 2px 0;
+   font-size: 12px;
+   font-weight: 500;
+   vertical-align: middle;
+   user-select: none;
+   max-width: 160px;
+   border: 1px solid rgba(26, 83, 54, 0.4);
+   transition: all 0.15s ease;
+   position: relative;
+ }
+ 
+ :deep(.context-tag-inline:hover) {
+   background: rgba(26, 83, 54, 0.08);
+   border-color: rgba(26, 83, 54, 0.6);
+   padding-right: 22px; /* Make room for close button */
+ }
+ 
+ :deep(.tag-icon) {
+   width: 14px;
+   height: 14px;
+   flex-shrink: 0;
+   border-radius: 2px;
+   filter: brightness(0.3);
+ }
+ 
+ :deep(.tag-at) {
+   color: #1A5336;
+   font-weight: 600;
+ }
+ 
+ :deep(.tag-name) {
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   max-width: 100px;
+   color: #1A5336;
+ }
+ 
+ :deep(.tag-close) {
+   display: none;
+   position: absolute;
+   right: 6px;
+   top: 50%;
+   transform: translateY(-50%);
+   width: 14px;
+   height: 14px;
+   background: rgba(26, 83, 54, 0.2);
+   color: #1A5336;
+   border-radius: 50%;
+   align-items: center;
+   justify-content: center;
+   font-size: 10px;
+   cursor: pointer;
+   transition: all 0.1s ease;
+ }
+ 
+ :deep(.context-tag-inline:hover .tag-close) {
+   display: flex;
+ }
+ 
+ :deep(.tag-close:hover) {
+   background: rgba(26, 83, 54, 0.4);
+   color: #fff;
+ }
+ 
+ /* =============================================
+    King IDE Style - Inline Context Tags (User Bubble)
+    Lighter/transparent background for visibility
+    ============================================= */
 .user-bubble .context-tag-inline {
   display: inline-flex;
   align-items: center;
@@ -2482,4 +3072,414 @@ export default {
   font-size: 13px;
   padding: 20px 0;
 }
+/* Token Usage Bar */
+.token-usage-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Spread content if needed, or keeping it left aligned but full width */
+  gap: 8px;
+  padding: 4px 12px;
+  margin-bottom: 8px; /* Maintain margin */
+  background: linear-gradient(135deg, rgba(26, 83, 54, 0.05) 0%, rgba(91, 209, 151, 0.08) 100%);
+  border-radius: 6px;
+  border: 1px solid rgba(91, 209, 151, 0.2);
+  width: 100%; /* Fix: Full width */
+  box-sizing: border-box; /* Fix: Include padding in width */
+  height: 28px; /* Fix: Fixed low height */
+}
+
+.token-usage-bar .token-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1A5336;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.token-usage-bar .token-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5BD197;
+  flex: 1; /* Allow value to take space if needed */
+  margin-left: 4px;
+}
+
+.token-usage-bar .token-detail {
+  font-size: 10px;
+  color: #6C757D;
+}
+
+
+/* Status Bar Row (File Changes + Tokens) */
+.status-bar-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 12px;
+  background-color: transparent;
+  font-size: 11px;
+  z-index: 10;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.status-bar-left {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.status-bar-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.6;
+  font-size: 11px;
+}
+
+/* Status Buttons */
+.status-btn-wrapper {
+  position: relative;
+}
+
+.status-btn {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background-color: #ffffff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6C757D; /* Gray-Medium */
+  border: 1px solid #E9ECEF; /* Gray-Light */
+  transition: all 0.2s ease;
+}
+
+.status-icon {
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.status-icon {
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.status-btn.modified {
+  border-color: rgba(26, 83, 54, 0.2);
+  color: #1A5336; /* King Forest */
+  background-color: #E6F9F0; /* Mint Lightest */
+}
+
+.status-btn.modified:hover {
+  background-color: #5BD197; /* King Mint */
+  color: #ffffff;
+  border-color: #1A5336;
+}
+
+.status-btn.created {
+  border-color: rgba(91, 209, 151, 0.3);
+  color: #1A5336;
+  background-color: #E6F9F0;
+}
+
+.status-btn.created:hover {
+  background-color: #5BD197;
+  color: #ffffff;
+  border-color: #1A5336;
+}
+
+/* Status Popup */
+.status-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px; /* Gap */
+  width: 200px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 4px 0;
+  z-index: 100;
+  border: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+}
+
+.status-popup-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.status-popup-item:hover {
+  background-color: #f5f5f5;
+}
+
+.file-icon-mini {
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  opacity: 0.7;
+}
+
+.file-name-text {
+  font-size: 13px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popup-mask-transparent {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99; /* Below popup but above others */
+  background: transparent;
+}
+
+/* Reuse existing token styles */
+.token-label {
+  font-weight: 500;
+  color: #666;
+}
+.token-value {
+  font-family: monospace;
+  font-weight: 600;
+}
+.token-detail {
+  font-size: 11px;
+  color: #999;
+}
+
+/* Empty state for file change buttons */
+.status-btn.empty {
+  opacity: 0.5;
+  cursor: default;
+}
+.status-btn.empty:hover {
+  transform: none;
+  background-color: inherit;
+}
+
+/* Rollback UI */
+.bubble-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.rollback-btn {
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+  opacity: 0;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background-color: #E6F9F0; /* Mint Lightest */
+  border: 1px solid rgba(26, 83, 54, 0.1);
+}
+
+.user-bubble:hover .rollback-btn {
+  opacity: 1;
+}
+
+.rollback-btn:hover {
+  background-color: #5BD197; /* King Mint */
+  border-color: #1A5336;
+}
+
+.rollback-icon-svg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  color: #1A5336; /* King Forest */
+}
+
+.rollback-btn:hover .rollback-icon-svg,
+.rollback-btn:hover .rollback-text {
+  color: white;
+}
+
+.rollback-text {
+  font-size: 11px;
+  color: #1A5336;
+  font-weight: 600;
+}
+
+/* Warning Dialog */
+.warning-header {
+  border-bottom: 2px solid #FFED4D;
+}
+
+.warning-title {
+  color: #B45309;
+}
+
+.rollback-warning-content {
+  padding: 10px;
+}
+
+.warning-text {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.wps-tip-box {
+  background-color: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 16px;
+}
+
+.wps-tip-icon {
+  font-size: 18px;
+  margin-right: 10px;
+}
+
+.wps-tip-text {
+  font-size: 13px;
+  color: #0369a1;
+  display: flex;
+  flex-direction: column;
+}
+
+.wps-link-text {
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.rollback-preview {
+  background-color: #f5f5f5;
+  padding: 8px;
+  border-radius: 4px;
+  border-left: 3px solid #ccc;
+}
+
+.preview-label {
+  font-size: 12px;
+  color: #666;
+  margin-right: 4px;
+}
+
+.preview-content {
+  font-size: 12px;
+  color: #333;
+  font-style: italic;
+}
+
+.king-btn-danger {
+  background-color: #dc2626;
+  color: white;
+  border: none;
+}
+
+.king-btn-danger:hover {
+  background-color: #b91c1c;
+}
+/* PPT Config Styles */
+.ppt-config-section {
+  padding: 10px 0;
+}
+
+.section-title {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.ppt-option-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: #fff;
+}
+
+.ppt-option-card:hover {
+  border-color: #2196f3;
+  background-color: #f5f9ff;
+}
+
+.ppt-option-card.active {
+  border-color: #2196f3;
+  background-color: #e3f2fd;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15);
+}
+
+.option-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.option-icon {
+  font-size: 20px;
+  margin-right: 12px;
+}
+
+.option-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.check-mark {
+  color: #2196f3;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.option-desc {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
+  padding-left: 32px; /* align with text start */
+}
+
+.warning-text {
+  color: #ff9800;
+  font-weight: 500;
+  display: block;
+  margin-top: 4px;
+}
+
+.highlight-text {
+  color: #4caf50;
+  font-weight: 500;
+  display: block;
+  margin-top: 4px;
+}
+
+.king-btn-secondary {
+    background-color: #f5f5f5;
+    color: #333;
+    border: 1px solid #ddd;
+}
+.king-btn-secondary:hover {
+    background-color: #e0e0e0;
+}
+
 </style>

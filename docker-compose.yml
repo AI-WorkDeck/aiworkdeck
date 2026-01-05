@@ -1,0 +1,85 @@
+# CheckBA Cloud Docker Compose 配置
+# 包含 PPTX 生成服务 (banana-slides) 和 MinerU 文档解析服务
+
+services:
+  # MinerU 文档解析服务 (官方 mineru-api)
+  # 基于 https://github.com/opendatalab/MinerU 官方文档
+  mineru-service:
+    build:
+      context: ./mineru-service
+      dockerfile: Dockerfile
+    container_name: checkba-mineru-service
+    ports:
+      - "8001:8000"
+    environment:
+      # CPU 模式配置
+      - MINERU_DEVICE_MODE=cpu
+      - MINERU_MODEL_SOURCE=modelscope
+    volumes:
+      # 持久化输出目录
+      - ./data/mineru/outputs:/app/output
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 300s  # 模型下载和加载需要较长时间
+    networks:
+      - checkba-network
+    deploy:
+      resources:
+        limits:
+          memory: 16G  # MinerU 模型需要较多内存
+        reservations:
+          memory: 8G
+
+  # PPTX 生成服务 (基于 banana-slides)
+  pptx-service:
+    build:
+      context: ./pptx-service
+      dockerfile: backend/Dockerfile
+    container_name: checkba-pptx-service
+    ports:
+      - "5001:5000"
+    env_file:
+      - ./pptx-service/.env
+    volumes:
+      # 持久化数据库
+      - ./pptx-service/backend/instance:/app/backend/instance
+      # 持久化上传的文件和生成的 PPTX
+      - ./pptx-service/uploads:/app/uploads
+      # 共享数据目录 - 让 Java 后端可以访问生成的 PPTX
+      - ./data/pptx:/app/shared
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - checkba-network
+
+  # EasyVoice TTS Service
+  easyvoice:
+    build:
+      context: ./easyvoice
+      dockerfile: Dockerfile
+    container_name: checkba-easyvoice
+    ports:
+      - "9549:3000"
+    environment:
+      - DEBUG=true
+      # Add OPENAI_BASE_URL if you want to support LLM based TTS, otherwise optional
+      # - OPENAI_BASE_URL=https://openrouter.ai/api/v1/
+    volumes:
+      - ./easyvoice/audio:/app/audio
+    restart: unless-stopped
+    networks:
+      - checkba-network
+
+networks:
+  checkba-network:
+    driver: bridge
+

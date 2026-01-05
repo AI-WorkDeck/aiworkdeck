@@ -1,6 +1,7 @@
 package com.checkba.service.ai;
 
 import com.checkba.controller.ai.AiAgentController;
+import com.checkba.model.ai.AgentMode;
 import com.checkba.model.entity.ProjectAiMessage;
 import com.checkba.service.ProjectAiMessageService;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -17,6 +18,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.lang.reflect.Method;
 import java.util.concurrent.CompletableFuture;
 
@@ -35,6 +38,11 @@ public class AgentOrchestrator {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AgentOrchestrator.class);
 
+    // 取消状态管理：存储被取消的会话ID
+    private final Set<String> cancelledConversations = ConcurrentHashMap.newKeySet();
+    // 存储当前活跃会话的已生成内容（用于取消时保存部分内容）
+    private final Map<String, StringBuilder> activeStreamContent = new ConcurrentHashMap<>();
+
     private final ChatModelFactory chatModelFactory;
     private final ProjectAiMessageService messageService;
     private final SseEmitterService sseEmitterService;
@@ -45,12 +53,66 @@ public class AgentOrchestrator {
     private final com.checkba.service.ai.tools.WebTools webTools;
     private final com.checkba.service.ai.tools.PythonTools pythonTools;
     private final com.checkba.service.ai.tools.MemoryTools memoryTools;
+    private final com.checkba.service.ai.tools.WpsTools wpsTools;
+    private final com.checkba.service.ai.tools.PptxTools pptxTools;
+    private final com.checkba.service.ai.tools.PptxEditTools pptxEditTools;
     private final com.checkba.service.ProjectFileService projectFileService;
     private final PluginService pluginService;
+    private final WpsActionService wpsActionService;
+    private final ConversationFileChangeService conversationFileChangeService;
 
+    // ==================== 取消功能相关方法 ====================
 
-    // Correct signature accepting projectId
-    private String executeNativeTool(dev.langchain4j.agent.tool.ToolExecutionRequest req, Long projectId, String conversationId) {
+    /**
+     * 标记会话为已取消
+     */
+    public void setCancelled(String conversationId) {
+        log.info("Cancelling conversation: {}", conversationId);
+        cancelledConversations.add(conversationId);
+    }
+
+    /**
+     * 检查会话是否被取消
+     */
+    public boolean isCancelled(String conversationId) {
+        return cancelledConversations.contains(conversationId);
+    }
+
+    /**
+     * 清理取消状态
+     */
+    private void clearCancelledState(String conversationId) {
+        cancelledConversations.remove(conversationId);
+        activeStreamContent.remove(conversationId);
+    }
+
+    /**
+     * 处理取消：保存已生成的部分内容
+     */
+    private void handleCancellation(String conversationId, String projectId, Long userId) {
+        log.info("Handling cancellation for conversation: {}", conversationId);
+        
+        // 获取已生成的部分内容
+        StringBuilder contentBuilder = activeStreamContent.get(conversationId);
+        String partialContent = contentBuilder != null ? contentBuilder.toString() : "";
+        
+        // 如果有部分内容，保存并标记为已中断
+        if (!partialContent.isEmpty()) {
+            String contentToSave = partialContent + "\n\n[已中断]";
+            messageService.saveMessage(projectId, userId, conversationId, "ASSISTANT", contentToSave);
+            log.info("Saved partial content ({} chars) for cancelled conversation: {}", partialContent.length(), conversationId);
+        }
+        
+        // 发送取消事件
+        sseEmitterService.send(conversationId, "cancelled", "{\"message\":\"用户已停止生成\"}");
+        sseEmitterService.close(conversationId);
+        
+        // 清理状态
+        clearCancelledState(conversationId);
+    }
+
+    // Correct signature accepting projectId, modelId, and userId for progress tracking
+    private String executeNativeTool(dev.langchain4j.agent.tool.ToolExecutionRequest req, Long projectId, String conversationId, String modelId, Long userId) {
         String toolName = req.name();
         String args = req.arguments();
         
@@ -99,8 +161,8 @@ public class AgentOrchestrator {
                  String content = extractArg(args, "content");
                  return fileTools.write_file(filename, content, projectId);
             } else if ("list_files".equals(toolName)) {
-                 String dir = extractArg(args, "dirPath");
-                 return fileTools.list_files(dir);
+                 String subPath = extractArg(args, "subPath");
+                 return fileTools.list_files(projectId, subPath);
             } else if ("search_project_files".equals(toolName)) {
                  String pattern = extractArg(args, "fileNamePattern");
                  String dir = extractArg(args, "dirPath");
@@ -115,16 +177,149 @@ public class AgentOrchestrator {
             } else if ("read_file".equals(toolName)) {
                  String path = extractArg(args, "filePath");
                  return fileTools.read_file(path);
-            } else if ("add_memory".equals(toolName)) {
+            // ==================== 记忆工具 ====================
+            } else if ("save_memory".equals(toolName)) {
+                 String type = extractArg(args, "type");
                  String key = extractArg(args, "key");
                  String value = extractArg(args, "value");
-                 return memoryTools.add_memory(key, value);
-            } else if ("query_knowledge_base".equals(toolName)) {
+                 boolean isProtected = "true".equalsIgnoreCase(extractArg(args, "isProtected"));
+                 return memoryTools.save_memory(type, key, value, isProtected);
+            } else if ("query_memory".equals(toolName)) {
                  String query = extractArg(args, "query");
-                 // Pass projectId if available in args or default? 
-                 // The tool definition is single arg `query`.
-                 // Overloaded version has generic query.
-                 return memoryTools.query_knowledge_base(query);
+                 String type = extractArg(args, "type");
+                 if (type == null || type.isEmpty()) type = "all";
+                 return memoryTools.query_memory(query, type);
+            } else if ("get_project_context".equals(toolName)) {
+                 return memoryTools.get_project_context();
+            } else if ("update_project_info".equals(toolName)) {
+                 String field = extractArg(args, "field");
+                 String value = extractArg(args, "value");
+                 return memoryTools.update_project_info(field, value);
+            } else if ("search_knowledge_base".equals(toolName)) {
+                 String query = extractArg(args, "query");
+                 int limit = 5;
+                 try {
+                     limit = Integer.parseInt(extractArg(args, "limit"));
+                 } catch (Exception e) { /* use default */ }
+                 return memoryTools.search_knowledge_base(query, limit);
+            } else if ("get_conversation_summary".equals(toolName)) {
+                 return memoryTools.get_conversation_summary();
+            } 
+            // ==================== WPS 工具 ====================
+            else if ("wps_list_project_files".equals(toolName)) {
+                 return wpsTools.wps_list_project_files(projectId);
+            } else if ("wps_open_file".equals(toolName)) {
+                 Long fileId = Long.parseLong(extractArg(args, "fileId"));
+                 return wpsTools.wps_open_file(fileId);
+            } else if ("wps_get_selection".equals(toolName)) {
+                 return wpsTools.wps_get_selection();
+            } else if ("wps_set_selection".equals(toolName)) {
+                 Integer start = Integer.parseInt(extractArg(args, "start"));
+                 Integer end = Integer.parseInt(extractArg(args, "end"));
+                 return wpsTools.wps_set_selection(start, end);
+            } else if ("wps_replace_selection".equals(toolName)) {
+                 String text = extractArg(args, "text");
+                 return wpsTools.wps_replace_selection(text);
+            } else if ("wps_goto".equals(toolName)) {
+                 String type = extractArg(args, "type");
+                 String target = extractArg(args, "target");
+                 return wpsTools.wps_goto(type, target);
+            } else if ("wps_find_text".equals(toolName)) {
+                 String keyword = extractArg(args, "keyword");
+                 Boolean matchCase = "true".equalsIgnoreCase(extractArg(args, "matchCase"));
+                 return wpsTools.wps_find_text(keyword, matchCase);
+            } else if ("wps_find_replace".equals(toolName)) {
+                 String findText = extractArg(args, "findText");
+                 String replaceText = extractArg(args, "replaceText");
+                 String replaceAllStr = extractArg(args, "replaceAll");
+                 Boolean replaceAll = replaceAllStr.isEmpty() || "true".equalsIgnoreCase(replaceAllStr);
+                 return wpsTools.wps_find_replace(findText, replaceText, replaceAll);
+            } else if ("wps_insert_at_cursor".equals(toolName)) {
+                 String text = extractArg(args, "text");
+                 return wpsTools.wps_insert_at_cursor(text);
+            } else if ("wps_get_paragraph".equals(toolName)) {
+                 Integer paragraphIndex = Integer.parseInt(extractArg(args, "paragraphIndex"));
+                 return wpsTools.wps_get_paragraph(paragraphIndex);
+            } else if ("wps_modify_paragraph".equals(toolName)) {
+                 Integer paragraphIndex = Integer.parseInt(extractArg(args, "paragraphIndex"));
+                 String newText = extractArg(args, "newText");
+                 return wpsTools.wps_modify_paragraph(paragraphIndex, newText);
+            } else if ("wps_get_outline".equals(toolName)) {
+                 return wpsTools.wps_get_outline();
+            } else if ("wps_insert_under_heading".equals(toolName)) {
+                 String headingText = extractArg(args, "headingText");
+                 String content = extractArg(args, "content");
+                 return wpsTools.wps_insert_under_heading(headingText, content);
+            } else if ("wps_search_related_docs".equals(toolName)) {
+                 String keyword = extractArg(args, "keyword");
+                 return wpsTools.wps_search_related_docs(keyword, projectId);
+            } else if ("wps_replace_nth_match".equals(toolName)) {
+                 String findText = extractArg(args, "findText");
+                 String replaceText = extractArg(args, "replaceText");
+                 Integer matchIndex = Integer.parseInt(extractArg(args, "matchIndex"));
+                 return wpsTools.wps_replace_nth_match(findText, replaceText, matchIndex);
+            } else if ("wps_delete_match".equals(toolName)) {
+                 String findText = extractArg(args, "findText");
+                 Integer matchIndex = Integer.parseInt(extractArg(args, "matchIndex"));
+                 return wpsTools.wps_delete_match(findText, matchIndex);
+            } else if ("wps_delete_text".equals(toolName)) {
+                 String text = extractArg(args, "text");
+                 Boolean deleteAll = "true".equalsIgnoreCase(extractArg(args, "deleteAll"));
+                 return wpsTools.wps_delete_text(text, deleteAll);
+            // ==================== PPTX 文件管理工具 ====================
+            } else if ("list_project_folders".equals(toolName)) {
+                 return pptxTools.list_project_folders(projectId);
+            } else if ("pptx_list_files".equals(toolName)) {
+                 return pptxTools.pptx_list_files(projectId);
+            } else if ("pptx_search_files".equals(toolName)) {
+                 String keyword = extractArg(args, "keyword");
+                 return pptxTools.pptx_search_files(projectId, keyword);
+            } else if ("pptx_open_file".equals(toolName)) {
+                 Long fileId = Long.parseLong(extractArg(args, "fileId"));
+                 return pptxTools.pptx_open_file(fileId);
+            } else if ("pptx_check_service".equals(toolName)) {
+                 return pptxTools.pptx_check_service();
+            } else if ("pptx_generate".equals(toolName)) {
+                 String topic = extractArg(args, "topic");
+                 String parentIdStr = extractArg(args, "parentId");
+                 // 处理 parentId=null/None 的情况（LLM 可能生成字符串 "null" 或 Python 的 "None"）
+                 Long parentId = (parentIdStr != null && !parentIdStr.isEmpty() 
+                     && !"null".equalsIgnoreCase(parentIdStr) && !"none".equalsIgnoreCase(parentIdStr)) 
+                     ? Long.parseLong(parentIdStr) : null;
+                 String fileName = extractArg(args, "fileName");
+                 String style = extractArg(args, "style");
+                 String language = extractArg(args, "language");
+                 return pptxTools.pptx_generate(topic, projectId, parentId, fileName, style, language, modelId);
+            } else if ("pptx_generate_outline".equals(toolName)) {
+                 String topic = extractArg(args, "topic");
+                 String language = extractArg(args, "language");
+                 return pptxTools.pptx_generate_outline(topic, language, modelId);
+            // ==================== PPTX 编辑工具 ====================
+            } else if ("pptx_get_presentation_info".equals(toolName)) {
+                 return pptxEditTools.pptx_get_presentation_info();
+            } else if ("pptx_get_slide_content".equals(toolName)) {
+                 Integer slideIndex = Integer.parseInt(extractArg(args, "slideIndex"));
+                 return pptxEditTools.pptx_get_slide_content(slideIndex);
+            } else if ("pptx_get_selection".equals(toolName)) {
+                 return pptxEditTools.pptx_get_selection();
+            } else if ("pptx_modify_slide_text".equals(toolName)) {
+                 Integer slideIndex = Integer.parseInt(extractArg(args, "slideIndex"));
+                 Integer shapeIndex = Integer.parseInt(extractArg(args, "shapeIndex"));
+                 String newText = extractArg(args, "newText");
+                 return pptxEditTools.pptx_modify_slide_text(slideIndex, shapeIndex, newText);
+            } else if ("pptx_insert_text".equals(toolName)) {
+                 Integer slideIndex = Integer.parseInt(extractArg(args, "slideIndex"));
+                 Integer shapeIndex = Integer.parseInt(extractArg(args, "shapeIndex"));
+                 String text = extractArg(args, "text");
+                 String position = extractArg(args, "position");
+                 return pptxEditTools.pptx_insert_text(slideIndex, shapeIndex, text, position);
+            } else if ("pptx_mark_delete_text".equals(toolName)) {
+                 Integer slideIndex = Integer.parseInt(extractArg(args, "slideIndex"));
+                 Integer shapeIndex = Integer.parseInt(extractArg(args, "shapeIndex"));
+                 String textToDelete = extractArg(args, "textToDelete");
+                 return pptxEditTools.pptx_mark_delete_text(slideIndex, shapeIndex, textToDelete);
+            } else if ("pptx_save".equals(toolName)) {
+                 return pptxEditTools.pptx_save();
             } else {
                 // Check if it's a dynamic plugin tool
                 Object toolObject = pluginService.getPluginTools().get(toolName);
@@ -182,9 +377,14 @@ public class AgentOrchestrator {
     public void handleUserMessage(AiAgentController.AgentChatRequest request, Long userId) {
         String conversationId = request.getConversationId();
         String projectId = String.valueOf(request.getProjectId());
+        AgentMode agentMode = request.getAgentMode(); // 获取 Agent 模式
+        
+        // 初始化取消状态和内容收集器
+        cancelledConversations.remove(conversationId);
+        activeStreamContent.put(conversationId, new StringBuilder());
         
         try {
-            log.info("Agent Loop Started: conv={}, model={}, msg={}", conversationId, request.getModel(), request.getMessage());
+            log.info("Agent Loop Started: conv={}, model={}, mode={}, msg={}", conversationId, request.getModel(), agentMode, request.getMessage());
             
             // 1. 保存用户消息 (Save only user message first; assistant saved after stream completes)
             messageService.saveMessage(
@@ -223,9 +423,11 @@ public class AgentOrchestrator {
                 request.getMessage(), 
                 request.getContextItems() != null ? request.getContextItems() : 
                     convertFileIdsToContextItems(request.getFileIds()),
+                request.getActiveContext(), // NEW: Pass active document context
                 taskListId,
                 planId,
-                projectId
+                projectId,
+                agentMode
             );
             
             log.info("Message assembly complete. Total messages: {}", messages.size());
@@ -243,10 +445,10 @@ public class AgentOrchestrator {
             }
 
             // 4. Start Loop
-            log.info("Starting runLoop for conversation: {}", conversationId);
+            log.info("Starting runLoop for conversation: {}, mode: {}", conversationId, agentMode);
             // Track tool executions for history persistence
             StringBuilder executionLog = new StringBuilder();
-            runLoop(model, messages, conversationId, projectId, userId, request.getModel(), 0, executionLog);
+            runLoop(model, messages, conversationId, projectId, userId, request.getModel(), 0, executionLog, agentMode);
             
         } catch (Exception e) {
             log.error("Agent Loop Error for conversation: " + conversationId, e);
@@ -258,13 +460,33 @@ public class AgentOrchestrator {
     private void runLoop(StreamingChatLanguageModel model, 
                          java.util.List<dev.langchain4j.data.message.ChatMessage> messages, 
                          String conversationId, String projectId, Long userId, String modelId, int depth,
-                         StringBuilder executionLog) {
+                         StringBuilder executionLog, AgentMode agentMode) {
+        
+        // 检查是否被取消
+        if (isCancelled(conversationId)) {
+            log.info("Conversation {} was cancelled, stopping loop at depth {}", conversationId, depth);
+            handleCancellation(conversationId, projectId, userId);
+            return;
+        }
         
         if (depth > 10) {
             sseEmitterService.send(conversationId, "error", "Max recursion depth reached");
             sseEmitterService.close(conversationId);
+            clearCancelledState(conversationId);
             return;
         }
+        
+        // Ask 模式限制递归深度为 1（不允许工具调用后的循环）
+        if (agentMode == AgentMode.ASK && depth > 0) {
+            log.info("Ask mode: stopping loop at depth {}", depth);
+            sseEmitterService.send(conversationId, "bubble_end", "{}");
+            sseEmitterService.close(conversationId);
+            clearCancelledState(conversationId);
+            return;
+        }
+        
+        // 设置当前会话 ID 到 WpsActionService，以便 WPS 工具可以发送 SSE 事件
+        wpsActionService.setCurrentConversationId(conversationId);
 
         AgentStreamHandler handler = new AgentStreamHandler(
             sseEmitterService, 
@@ -277,8 +499,28 @@ public class AgentOrchestrator {
         
         // Callback for Loop
         handler.setOnComplete(response -> {
+          try {
+            // 检查是否被取消
+            if (isCancelled(conversationId)) {
+                log.info("Conversation {} was cancelled during streaming", conversationId);
+                handleCancellation(conversationId, projectId, userId);
+                return;
+            }
+            
+            // 确保在回调线程中也能访问 conversationId（解决 ThreadLocal 线程隔离问题）
+            wpsActionService.setCurrentConversationId(conversationId);
+            
             dev.langchain4j.data.message.AiMessage aiMessage = response.content();
             messages.add(aiMessage);
+            
+            // 更新已生成内容（用于取消时保存）
+            String aiContent = aiMessage.text();
+            if (aiContent != null) {
+                StringBuilder contentBuilder = activeStreamContent.get(conversationId);
+                if (contentBuilder != null) {
+                    contentBuilder.append(aiContent);
+                }
+            }
             
             // 1. Check for Native Tool Requests (Priority 1)
             if (aiMessage.hasToolExecutionRequests()) {
@@ -287,7 +529,7 @@ public class AgentOrchestrator {
 
                 // Execute Native Tools
                 for (dev.langchain4j.agent.tool.ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
-                    String result = executeNativeTool(req, Long.parseLong(projectId), conversationId);
+                    String result = executeNativeTool(req, Long.parseLong(projectId), conversationId, modelId, userId);
                     messages.add(dev.langchain4j.data.message.ToolExecutionResultMessage.from(req, result));
                     
                     // Determine status for history and display
@@ -296,10 +538,36 @@ public class AgentOrchestrator {
                     // Log for history persistence (include status attribute)
                     executionLog.append(String.format("<process name=\"%s\"><tool_code>%s(%s)</tool_code><tool_output status=\"%s\">%s</tool_output></process>\n",
                         req.name(), req.name(), req.arguments(), nativeToolStatus, result));
+
+                    // --- Notify File Change (Native Tools) ---
+                    if ("SUCCESS".equals(nativeToolStatus)) {
+                         String toolName = req.name();
+                         if ("write_file".equals(toolName)) {
+                             notifyFileChange(conversationId, extractArg(req.arguments(), "filename"), "ADDED");
+                         } else if ("write_docx".equals(toolName)) {
+                             notifyFileChange(conversationId, extractArg(req.arguments(), "fileName"), "ADDED");
+                         } else if ("pptx_generate".equals(toolName)) {
+                             notifyFileChange(conversationId, extractArg(req.arguments(), "fileName"), "ADDED");
+                         } else if (toolName.startsWith("wps_modify") || toolName.startsWith("wps_replace") || toolName.startsWith("wps_insert")) {
+                            // Ideally we need to know WHICH file. 
+                            // But usually Agent works on the "active" file or opened file.
+                            // For now, we might not have the filename easily for modifications unless we track open state.
+                            // However, the requirement says "Modified Files".
+                            // If we don't have the filename, maybe we skip or use "Current File"?
+                            // Let's assume the frontend knows the active file, OR we just say "Current File"
+                            // Actually, better: if we can't get the name, maybe just don't list it or list "Current Document"?
+                         }
+                    }
                 }
                 
                 sseEmitterService.send(conversationId, "step_update", "{\"status\":\"done\", \"message\":\"Tools executed.\"}");
-                runLoop(model, messages, conversationId, projectId, userId, modelId, depth + 1, executionLog);
+                
+                // 增量保存：在工具执行后立即保存AI消息和工具输出，防止对话中断导致上下文丢失
+                String intermediateContent = (aiContent != null ? aiContent : "") + "\n" + executionLog.toString();
+                messageService.saveMessage(projectId, userId, conversationId, "ASSISTANT", intermediateContent);
+                log.info("Intermediate save after native tool execution for conversation: {}", conversationId);
+                
+                runLoop(model, messages, conversationId, projectId, userId, modelId, depth + 1, executionLog, agentMode);
                 return;
             } 
             
@@ -392,16 +660,18 @@ public class AgentOrchestrator {
                              // Trigger UI Refresh if success
                              if (result != null && !result.startsWith("Error")) {
                                  sseEmitterService.send(conversationId, "client_action", "{\"action\":\"refresh_files\"}");
+                                 notifyFileChange(conversationId, fileName, "ADDED");
                              }
                         } else if (code.contains("write_file")) {
                              String fileName = extractStringArg(code, "fileName");
                              if (fileName.isEmpty()) fileName = extractStringArg(code, "filename");
                              String fileContent = extractStringArg(code, "content");
                              result = fileTools.write_file(fileName, fileContent, Long.parseLong(projectId));
+                             if (!result.startsWith("Error")) notifyFileChange(conversationId, fileName, "ADDED");
                         } else if (code.contains("list_files")) {
-                             String dir = extractStringArg(code, "dirPath");
-                             if (dir.isEmpty()) dir = "."; 
-                             result = fileTools.list_files(dir);
+                             String subPath = extractStringArg(code, "subPath");
+                             if (subPath.isEmpty()) subPath = "."; 
+                             result = fileTools.list_files(Long.parseLong(projectId), subPath);
                         } else if (code.contains("search_project_files")) {
                              String pattern = extractStringArg(code, "fileNamePattern");
                              String dir = extractStringArg(code, "dirPath");
@@ -418,14 +688,223 @@ public class AgentOrchestrator {
                              String src = extractStringArg(code, "sourcePath");
                              String dst = extractStringArg(code, "destPath");
                              result = fileTools.move_file(src, dst);
-                        } else if (code.contains("add_memory")) {
+                        // ==================== 记忆工具 (Legacy XML) ====================
+                        } else if (code.contains("save_memory")) {
+                             String type = extractStringArg(code, "type");
                              String key = extractStringArg(code, "key");
                              String value = extractStringArg(code, "value");
-                             result = memoryTools.add_memory(key, value);
-                        } else if (code.contains("query_knowledge_base")) {
+                             boolean isProtected = "true".equalsIgnoreCase(extractStringArg(code, "isProtected"));
+                             result = memoryTools.save_memory(type, key, value, isProtected);
+                        } else if (code.contains("query_memory")) {
                              String query = extractStringArg(code, "query");
-                             result = memoryTools.query_knowledge_base(query);
+                             String type = extractStringArg(code, "type");
+                             if (type.isEmpty()) type = "all";
+                             result = memoryTools.query_memory(query, type);
+                        } else if (code.contains("get_project_context")) {
+                             result = memoryTools.get_project_context();
+                        } else if (code.contains("update_project_info")) {
+                             String field = extractStringArg(code, "field");
+                             String value = extractStringArg(code, "value");
+                             result = memoryTools.update_project_info(field, value);
+                        } else if (code.contains("search_knowledge_base")) {
+                             String query = extractStringArg(code, "query");
+                             int limit = 5;
+                             try {
+                                 String limitStr = extractStringArg(code, "limit");
+                                 if (!limitStr.isEmpty()) limit = Integer.parseInt(limitStr);
+                             } catch (Exception e) { /* use default */ }
+                             result = memoryTools.search_knowledge_base(query, limit);
+                        } else if (code.contains("get_conversation_summary")) {
+                             result = memoryTools.get_conversation_summary();
+                        // ==================== PPTX 工具 (Legacy XML) ====================
+                        } else if (code.contains("pptx_check_service")) {
+                             result = pptxTools.pptx_check_service();
+                        } else if (code.contains("pptx_generate_outline")) {
+                             String topic = extractStringArg(code, "topic");
+                             String language = extractStringArg(code, "language");
+                             result = pptxTools.pptx_generate_outline(topic, language, modelId);
+                        } else if (code.contains("pptx_generate")) {
+                             String topic = extractStringArg(code, "topic");
+                             String parentIdStr = extractStringArg(code, "parentId");
+                             // 处理 parentId=null/None 的情况（LLM 可能生成字符串 "null" 或 Python 的 "None"）
+                             Long parentId = (parentIdStr != null && !parentIdStr.isEmpty() 
+                                 && !"null".equalsIgnoreCase(parentIdStr) && !"none".equalsIgnoreCase(parentIdStr)) 
+                                 ? Long.parseLong(parentIdStr) : null;
+                             String fileName = extractStringArg(code, "fileName");
+                             String style = extractStringArg(code, "style");
+                             String language = extractStringArg(code, "language");
+                             result = pptxTools.pptx_generate(topic, Long.parseLong(projectId), parentId, fileName, style, language, modelId);
+                             if (!result.startsWith("Error")) notifyFileChange(conversationId, fileName, "ADDED");
+                        // ==================== PPTX 文件管理工具 ====================
+                        } else if (code.contains("list_project_folders")) {
+                             result = pptxTools.list_project_folders(Long.parseLong(projectId));
+                        } else if (code.contains("pptx_list_files")) {
+                             result = pptxTools.pptx_list_files(Long.parseLong(projectId));
+                        } else if (code.contains("pptx_search_files")) {
+                             String keyword = extractStringArg(code, "keyword");
+                             result = pptxTools.pptx_search_files(Long.parseLong(projectId), keyword);
+                        } else if (code.contains("pptx_open_file")) {
+                             String fileIdStr = extractStringArg(code, "fileId");
+                             Long fileId = safeParseLong(fileIdStr, "fileId");
+                             if (fileId == null) {
+                                 result = "Error: fileId 参数无效或为空";
+                             } else {
+                                 result = pptxTools.pptx_open_file(fileId);
+                             }
+                        // ==================== 智能 PPT 修改 ====================
+                        } else if (code.contains("pptx_smart_modify")) {
+                             String fileIdStr = extractStringArg(code, "fileId");
+                             String pageIndexStr = extractStringArg(code, "pageIndex");
+                             String modifyInstruction = extractStringArg(code, "modifyInstruction");
+                             Long fileId = safeParseLong(fileIdStr, "fileId");
+                             Integer pageIndex = safeParseInt(pageIndexStr, "pageIndex");
+                             if (fileId == null || pageIndex == null) {
+                                 result = "Error: 参数解析失败。fileId=" + fileIdStr + ", pageIndex=" + pageIndexStr + 
+                                        "。请确保使用正确的格式，如: pptx_smart_modify(fileId=10, pageIndex=1, modifyInstruction=\"...\")";
+                             } else if (modifyInstruction == null || modifyInstruction.isEmpty()) {
+                                 result = "Error: modifyInstruction 参数不能为空";
+                             } else {
+                                 // 传递 modelId 以便纯图片页面使用正确的图片生成模型
+                                 result = pptxTools.pptx_smart_modify(fileId, pageIndex, modifyInstruction, modelId);
+                             }
+                        // ==================== PPTX 编辑工具 ====================
+                        } else if (code.contains("pptx_edit_page")) {
+                             String serviceProjectId = extractStringArg(code, "serviceProjectId");
+                             String pageIdStr = extractStringArg(code, "pageId");
+                             String editInstruction = extractStringArg(code, "editInstruction");
+                             result = pptxTools.pptx_edit_page(serviceProjectId, pageIdStr, editInstruction);
+                        } else if (code.contains("pptx_get_project_pages")) {
+                             String serviceProjectId = extractStringArg(code, "serviceProjectId");
+                             result = pptxTools.pptx_get_project_pages(serviceProjectId);
+                        } else if (code.contains("pptx_get_page_screenshot")) {
+                             String fileIdStr = extractStringArg(code, "fileId");
+                             String pageIndexStr = extractStringArg(code, "pageIndex");
+                             Long fileId = safeParseLong(fileIdStr, "fileId");
+                             Integer pageIndex = safeParseInt(pageIndexStr, "pageIndex");
+                             if (fileId == null || pageIndex == null) {
+                                 result = "Error: 参数解析失败。fileId=" + fileIdStr + ", pageIndex=" + pageIndexStr;
+                             } else {
+                                 result = pptxTools.pptx_get_page_screenshot(fileId, pageIndex);
+                             }
+                        } else if (code.contains("pptx_refine_outline")) {
+                             String serviceProjectId = extractStringArg(code, "serviceProjectId");
+                             String userRequirement = extractStringArg(code, "userRequirement");
+                             String language = extractStringArg(code, "language");
+                             result = pptxTools.pptx_refine_outline(serviceProjectId, userRequirement, language);
+                        } else if (code.contains("pptx_export_editable")) {
+                             String serviceProjectId = extractStringArg(code, "serviceProjectId");
+                             String filename = extractStringArg(code, "filename");
+                             String exportModelId = extractStringArg(code, "modelId");
+                             result = pptxTools.pptx_export_editable(serviceProjectId, filename, exportModelId);
+                        // ==================== PPTX 编辑工具 (WPS WebOffice API) ====================
+                        } else if (code.contains("pptx_get_presentation_info")) {
+                             result = pptxEditTools.pptx_get_presentation_info();
+                        } else if (code.contains("pptx_get_slide_content")) {
+                             String slideIndexStr = extractStringArg(code, "slideIndex");
+                             Integer slideIndex = Integer.parseInt(slideIndexStr);
+                             result = pptxEditTools.pptx_get_slide_content(slideIndex);
+                        } else if (code.contains("pptx_get_selection")) {
+                             result = pptxEditTools.pptx_get_selection();
+                        } else if (code.contains("pptx_modify_slide_text")) {
+                             String slideIndexStr = extractStringArg(code, "slideIndex");
+                             String shapeIndexStr = extractStringArg(code, "shapeIndex");
+                             String newText = extractStringArg(code, "newText");
+                             Integer slideIndex = Integer.parseInt(slideIndexStr);
+                             Integer shapeIndex = Integer.parseInt(shapeIndexStr);
+                             result = pptxEditTools.pptx_modify_slide_text(slideIndex, shapeIndex, newText);
+                        } else if (code.contains("pptx_insert_text")) {
+                             String slideIndexStr = extractStringArg(code, "slideIndex");
+                             String shapeIndexStr = extractStringArg(code, "shapeIndex");
+                             String text = extractStringArg(code, "text");
+                             String position = extractStringArg(code, "position");
+                             Integer slideIndex = Integer.parseInt(slideIndexStr);
+                             Integer shapeIndex = Integer.parseInt(shapeIndexStr);
+                             result = pptxEditTools.pptx_insert_text(slideIndex, shapeIndex, text, position);
+                        } else if (code.contains("pptx_mark_delete_text")) {
+                             String slideIndexStr = extractStringArg(code, "slideIndex");
+                             String shapeIndexStr = extractStringArg(code, "shapeIndex");
+                             String textToDelete = extractStringArg(code, "textToDelete");
+                             Integer slideIndex = Integer.parseInt(slideIndexStr);
+                             Integer shapeIndex = Integer.parseInt(shapeIndexStr);
+                             result = pptxEditTools.pptx_mark_delete_text(slideIndex, shapeIndex, textToDelete);
+                        } else if (code.contains("pptx_save")) {
+                             result = pptxEditTools.pptx_save();
+                        // ==================== WPS 通用工具 ====================
+                        } else if (code.contains("wps_list_project_files")) {
+                             result = wpsTools.wps_list_project_files(Long.parseLong(projectId));
+                        } else if (code.contains("wps_open_file")) {
+                             String fileIdStr = extractStringArg(code, "fileId");
+                             Long fileId = Long.parseLong(fileIdStr);
+                             result = wpsTools.wps_open_file(fileId);
+                        } else if (code.contains("wps_get_selection")) {
+                             result = wpsTools.wps_get_selection();
+                        } else if (code.contains("wps_find_text")) {
+                             String keyword = extractStringArg(code, "keyword");
+                             result = wpsTools.wps_find_text(keyword, false);
+                        } else if (code.contains("wps_find_replace")) {
+                             String findText = extractStringArg(code, "findText");
+                             String replaceText = extractStringArg(code, "replaceText");
+                             result = wpsTools.wps_find_replace(findText, replaceText, true);
+                             if (!result.startsWith("Error")) notifyFileChange(conversationId, "Current Document", "MODIFIED");
+                        } else if (code.contains("wps_get_outline")) {
+                             result = wpsTools.wps_get_outline();
+                        } else if (code.contains("wps_set_selection")) {
+                             String startStr = extractStringArg(code, "start");
+                             String endStr = extractStringArg(code, "end");
+                             Integer start = safeParseInt(startStr, "start");
+                             Integer end = safeParseInt(endStr, "end");
+                             if (start == null || end == null) {
+                                  result = "Error: Invalid start/end parameters for set_selection";
+                             } else {
+                                  result = wpsTools.wps_set_selection(start, end);
+                             }
+                        } else if (code.contains("wps_replace_selection")) {
+                             String text = extractStringArg(code, "text");
+                             result = wpsTools.wps_replace_selection(text);
+                        } else if (code.contains("wps_goto")) {
+                             String type = extractStringArg(code, "type");
+                             String target = extractStringArg(code, "target");
+                             result = wpsTools.wps_goto(type, target);
+                        } else if (code.contains("wps_insert_at_cursor")) {
+                             String text = extractStringArg(code, "text");
+                             result = wpsTools.wps_insert_at_cursor(text);
+                        } else if (code.contains("wps_get_paragraph")) {
+                             String indexStr = extractStringArg(code, "paragraphIndex");
+                             Integer idx = 1;
+                             try { idx = Integer.parseInt(indexStr); } catch (Exception e) {}
+                             result = wpsTools.wps_get_paragraph(idx);
+                        } else if (code.contains("wps_modify_paragraph")) {
+                             String indexStr = extractStringArg(code, "paragraphIndex");
+                             String newText = extractStringArg(code, "newText");
+                             Integer idx = 1;
+                             try { idx = Integer.parseInt(indexStr); } catch (Exception e) {}
+                             result = wpsTools.wps_modify_paragraph(idx, newText);
+                             if (!result.startsWith("Error")) notifyFileChange(conversationId, "Current Document", "MODIFIED"); // Can't easily get filename
+                        } else if (code.contains("wps_insert_under_heading")) {
+                             String headingText = extractStringArg(code, "headingText");
+                             String insertContent = extractStringArg(code, "content");
+                             result = wpsTools.wps_insert_under_heading(headingText, insertContent);
+                        } else if (code.contains("wps_replace_nth_match")) {
+                             String findText = extractStringArg(code, "findText");
+                             String replaceText = extractStringArg(code, "replaceText");
+                             String matchIndexStr = extractStringArg(code, "matchIndex");
+                             Integer matchIndex = 1;
+                             try { matchIndex = Integer.parseInt(matchIndexStr); } catch (Exception e) {}
+                             result = wpsTools.wps_replace_nth_match(findText, replaceText, matchIndex);
+                        } else if (code.contains("wps_delete_match")) {
+                             String findText = extractStringArg(code, "findText");
+                             String matchIndexStr = extractStringArg(code, "matchIndex");
+                             Integer matchIndex = 1;
+                             try { matchIndex = Integer.parseInt(matchIndexStr); } catch (Exception e) {}
+                             result = wpsTools.wps_delete_match(findText, matchIndex);
+                        } else if (code.contains("wps_delete_text")) {
+                             String text = extractStringArg(code, "text");
+                             String deleteAllStr = extractStringArg(code, "deleteAll");
+                             Boolean deleteAll = deleteAllStr.isEmpty() || "true".equalsIgnoreCase(deleteAllStr);
+                             result = wpsTools.wps_delete_text(text, deleteAll);
+
                          } else {
+
                             // Try to check if it's a dynamic plugin tool (e.g., plugin_name.method_name or just method_name)
                             String dynamicToolName = parseToolName(code);
                             Object toolObject = pluginService.getPluginTools().get(dynamicToolName);
@@ -461,8 +940,8 @@ public class AgentOrchestrator {
                     
                     String toolOutputMsg = String.format("<process><tool_output>%s</tool_output></process>", result);
                     
-                    // Explicitly tell the model to EVALUATE
-                    String feedbackMsg = String.format("[System Tool Execution Log]\nTool: %s\nStatus: %s\nOutput: %s\n\n(INSTRUCTION: Evaluate the results above. If the user request is fulfilled, provide a final response to the user via `<final>` tag. If you need more information or further actions, continue.)", 
+                    // Explicitly tell the model to EVALUATE - with strict anti-over-execution instructions
+                    String feedbackMsg = String.format("[System Tool Execution Log]\nTool: %s\nStatus: %s\nOutput: %s\n\n(CRITICAL INSTRUCTION: The tool executed successfully. Now compare with the ORIGINAL user request. If the SPECIFIC task the user asked for is complete, output `<final>` IMMEDIATELY. DO NOT perform additional operations unless the user EXPLICITLY requested them. For example, if user asked to 'delete the 3rd z' and you deleted it, you are DONE - do not delete other z's.)", 
                         code, statusPrefix, result);
                         
                     messages.add(dev.langchain4j.data.message.UserMessage.from(feedbackMsg));
@@ -487,8 +966,13 @@ public class AgentOrchestrator {
                 }
                 
                 if (toolExecuted) {
+                     // 增量保存：在XML工具执行后立即保存AI消息和工具输出，防止对话中断导致上下文丢失
+                     String intermediateXmlContent = content + "\n" + executionLog.toString();
+                     messageService.saveMessage(projectId, userId, conversationId, "ASSISTANT", intermediateXmlContent);
+                     log.info("Intermediate save after XML tool execution for conversation: {}", conversationId);
+                     
                      // Recurse with executionLog
-                     runLoop(model, messages, conversationId, projectId, userId, modelId, depth + 1, executionLog);
+                     runLoop(model, messages, conversationId, projectId, userId, modelId, depth + 1, executionLog, agentMode);
                      return;
                 }
             }
@@ -560,6 +1044,10 @@ public class AgentOrchestrator {
                     // Save assistant message with execution log prepended
                     String fullContent = executionLog.length() > 0 ? executionLog.toString() + content : content;
                     messageService.saveMessage(projectId, userId, conversationId, "ASSISTANT", fullContent);
+                    // 发送 bubble_end 表示当前响应结束（等待用户审批）
+                    sseEmitterService.send(conversationId, "bubble_end", "{\"status\":\"awaiting_approval\"}");
+                    sseEmitterService.close(conversationId);
+                    clearCancelledState(conversationId);
                     return; // Stop and wait for user action
                 }
             }
@@ -593,23 +1081,69 @@ public class AgentOrchestrator {
                 String fullContent = executionLog.length() > 0 ? executionLog.toString() + content : content;
                 messageService.saveMessage(projectId, userId, conversationId, "ASSISTANT", fullContent);
             }
+            // 发送 bubble_end 表示整个循环真正结束
+            sseEmitterService.send(conversationId, "bubble_end", "{\"status\":\"finished\"}");
+            sseEmitterService.close(conversationId);
+            // 清理取消状态
+            clearCancelledState(conversationId);
+          } catch (Exception e) {
+            // 确保异常时也能正确结束 bubble，避免前端一直显示加载状态
+            log.error("Error in onComplete callback for conversation: " + conversationId, e);
+            sseEmitterService.send(conversationId, "error", "Callback Error: " + e.getMessage());
+            sseEmitterService.close(conversationId);
+            clearCancelledState(conversationId);
+          }
         });
         
         // Execute Generation with Tools
-        // Combine all tool specifications
-        List<ToolSpecification> allTools = new ArrayList<>();
-        allTools.addAll(ToolSpecifications.toolSpecificationsFrom(legalTools));
-        allTools.addAll(ToolSpecifications.toolSpecificationsFrom(webTools));
-        allTools.addAll(ToolSpecifications.toolSpecificationsFrom(pythonTools));
-        allTools.addAll(ToolSpecifications.toolSpecificationsFrom(memoryTools));
-        allTools.addAll(ToolSpecifications.toolSpecificationsFrom(fileTools));
-        
-        // Add Dynamic Plugin Tools
-        allTools.addAll(pluginService.getToolSpecifications());
-        
-        model.generate(messages, allTools, handler);
+        // Ask 模式：不传递工具，禁止工具调用
+        if (agentMode == AgentMode.ASK) {
+            log.info("Ask mode: generating without tools");
+            model.generate(messages, handler);
+        } else {
+            // Agent 和 Plan 模式：传递工具规格
+            // Combine all tool specifications
+            List<ToolSpecification> allTools = new ArrayList<>();
+            allTools.addAll(ToolSpecifications.toolSpecificationsFrom(legalTools));
+            allTools.addAll(ToolSpecifications.toolSpecificationsFrom(webTools));
+            allTools.addAll(ToolSpecifications.toolSpecificationsFrom(pythonTools));
+            allTools.addAll(ToolSpecifications.toolSpecificationsFrom(memoryTools));
+            allTools.addAll(ToolSpecifications.toolSpecificationsFrom(fileTools));
+            allTools.addAll(ToolSpecifications.toolSpecificationsFrom(wpsTools));
+            allTools.addAll(ToolSpecifications.toolSpecificationsFrom(pptxTools));
+            allTools.addAll(ToolSpecifications.toolSpecificationsFrom(pptxEditTools));
+            
+            // Add Dynamic Plugin Tools
+            allTools.addAll(pluginService.getToolSpecifications());
+            
+            model.generate(messages, allTools, handler);
+        }
     }
-    
+
+    // =================================================================================
+    // Helper to notify frontend of file changes (Added/Modified)
+    // =================================================================================
+    private void notifyFileChange(String conversationId, String fileName, String changeType) {
+        try {
+            // Determine pure filename if path is given
+            String name = fileName;
+            if (name.contains("/") || name.contains("\\")) {
+                java.nio.file.Path p = java.nio.file.Paths.get(name);
+                name = p.getFileName().toString();
+            }
+            
+            // Send SSE event to frontend
+            String json = String.format("{\"fileName\":\"%s\", \"changeType\":\"%s\"}", 
+                name.replace("\"", "\\\""), changeType);
+            sseEmitterService.send(conversationId, "file_change", json);
+            
+            // Persist to database for history retrieval
+            conversationFileChangeService.saveFileChange(conversationId, name, changeType);
+        } catch (Exception e) {
+            log.warn("Failed to notify file change", e);
+        }
+    }
+
     // Simple naive JSON extractor for single String arg tools
     private String extractArg(String jsonArgs, String key) {
         if (jsonArgs == null) return "";
@@ -625,10 +1159,112 @@ public class AgentOrchestrator {
     
     // Naive extraction from code string like: function(key="value")
 
+    /**
+     * 安全解析 Long 类型参数
+     */
+    private Long safeParseLong(String value, String argName) {
+        if (value == null || value.isEmpty()) {
+            log.warn("Empty value for argument: {}", argName);
+            return null;
+        }
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException e) {
+            log.warn("Failed to parse {} as Long: {}", argName, value);
+            return null;
+        }
+    }
+
+    /**
+     * 安全解析 Integer 类型参数
+     */
+    private Integer safeParseInt(String value, String argName) {
+        if (value == null || value.isEmpty()) {
+            log.warn("Empty value for argument: {}", argName);
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            log.warn("Failed to parse {} as Integer: {}", argName, value);
+            return null;
+        }
+    }
+
     private String extractStringArg(String code, String key) {
         // Extract string argument from code like: function(key="value") or function(key="multi\nline\nvalue")
         // Must handle multi-line content (e.g., markdown_content for write_docx)
+        // ALSO handles Python triple-quoted strings: key=""" or key='''
+        // NEW: Also handles JSON format: function({"key":"value"})
         try {
+            // PRIORITY 0: Check for JSON format (e.g., function({"key":"value"}))
+            // This handles cases where LLM generates: wps_find_replace({"findText":"...", "replaceText":"..."})
+            int jsonStart = code.indexOf("({");
+            int jsonEnd = code.lastIndexOf("})");
+            if (jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart) {
+                String jsonStr = code.substring(jsonStart + 1, jsonEnd + 1); // Extract {...}
+                cn.hutool.json.JSONObject json = cn.hutool.json.JSONUtil.parseObj(jsonStr);
+                if (json.containsKey(key)) {
+                    return json.getStr(key, "");
+                }
+            }
+            
+            // PRIORITY 0.5: Check for <ctrl46> delimiter format
+            // LLM sometimes uses <ctrl46> as string delimiter: key:<ctrl46>value<ctrl46>
+            // Common pattern: pptx_generate_outline{language:<ctrl46>zh<ctrl46>,topic:<ctrl46>...<ctrl46>}
+            String ctrlDelimiter = "<ctrl46>";
+            int ctrlKeyStart = code.indexOf(key + ":" + ctrlDelimiter);
+            if (ctrlKeyStart == -1) {
+                // Also try with equals sign: key=<ctrl46>value<ctrl46>
+                ctrlKeyStart = code.indexOf(key + "=" + ctrlDelimiter);
+            }
+            if (ctrlKeyStart != -1) {
+                // Found <ctrl46> delimiter
+                String prefix = ctrlKeyStart == code.indexOf(key + ":") ? key + ":" + ctrlDelimiter : key + "=" + ctrlDelimiter;
+                int valueStart = ctrlKeyStart + prefix.length();
+                int valueEnd = code.indexOf(ctrlDelimiter, valueStart);
+                if (valueEnd != -1) {
+                    String value = code.substring(valueStart, valueEnd);
+                    log.debug("Extracted {} from <ctrl46> format: {}", key, value.length() > 50 ? value.substring(0, 50) + "..." : value);
+                    return value;
+                }
+                // If no closing delimiter, take until next comma or closing brace
+                int commaEnd = code.indexOf(",", valueStart);
+                int braceEnd = code.indexOf("}", valueStart);
+                int end = Math.min(commaEnd != -1 ? commaEnd : Integer.MAX_VALUE, braceEnd != -1 ? braceEnd : Integer.MAX_VALUE);
+                if (end != Integer.MAX_VALUE) {
+                    return code.substring(valueStart, end).trim();
+                }
+                return code.substring(valueStart).trim();
+            }
+            
+            // PRIORITY 1: Check for triple-quoted string first (Python style)
+            // Pattern: key=""" or key='''
+            int tripleDoubleStart = code.indexOf(key + "=\"\"\"");
+            int tripleSingleStart = code.indexOf(key + "='''");
+            
+            if (tripleDoubleStart != -1) {
+                // Found triple double quotes
+                int valueStart = tripleDoubleStart + key.length() + 4; // skip key="""
+                int valueEnd = code.indexOf("\"\"\"", valueStart);
+                if (valueEnd != -1) {
+                    return code.substring(valueStart, valueEnd);
+                }
+                // If no closing """, take everything till the end (shouldn't happen)
+                return code.substring(valueStart);
+            }
+            
+            if (tripleSingleStart != -1) {
+                // Found triple single quotes
+                int valueStart = tripleSingleStart + key.length() + 4; // skip key='''
+                int valueEnd = code.indexOf("'''", valueStart);
+                if (valueEnd != -1) {
+                    return code.substring(valueStart, valueEnd);
+                }
+                return code.substring(valueStart);
+            }
+            
+            // PRIORITY 2: Single quoted string (original logic)
             // Find the start of key="
             int keyStart = code.indexOf(key + "=\"");
             char quoteChar = '"';
@@ -637,7 +1273,32 @@ public class AgentOrchestrator {
                 keyStart = code.indexOf(key + "='");
                 quoteChar = '\'';
             }
-            if (keyStart == -1) return "";
+            
+            // PRIORITY 3: Unquoted value (e.g., fileId=10, pageIndex=1)
+            // 如果没有找到带引号的参数，尝试解析不带引号的参数（如整数）
+            if (keyStart == -1) {
+                int unquotedStart = code.indexOf(key + "=");
+                if (unquotedStart != -1) {
+                    int valueStart = unquotedStart + key.length() + 1;
+                    // 检查值开头不是引号（避免误匹配带引号的情况）
+                    if (valueStart < code.length()) {
+                        char firstChar = code.charAt(valueStart);
+                        if (firstChar != '"' && firstChar != '\'') {
+                            int valueEnd = valueStart;
+                            // 查找结束位置：逗号、右括号、空格或换行
+                            while (valueEnd < code.length()) {
+                                char c = code.charAt(valueEnd);
+                                if (c == ',' || c == ')' || c == ' ' || c == '\n' || c == '\t') break;
+                                valueEnd++;
+                            }
+                            if (valueEnd > valueStart) {
+                                return code.substring(valueStart, valueEnd).trim();
+                            }
+                        }
+                    }
+                }
+                return "";
+            }
             
             // Move to the opening quote
             int valueStart = keyStart + key.length() + 2; // skip key="
@@ -829,6 +1490,11 @@ public class AgentOrchestrator {
         if (code.contains("add_memory")) return "添加记忆";
         if (code.contains("query_knowledge_base")) return "查询知识库";
         
+        // PPTX 工具
+        if (code.contains("pptx_generate(")) return "生成PPT演示文稿";
+        if (code.contains("pptx_generate_outline")) return "生成PPT大纲";
+        if (code.contains("pptx_check_service")) return "检查PPT服务";
+        
         return "工具执行";
     }
     private String parseToolName(String code) {
@@ -846,8 +1512,7 @@ public class AgentOrchestrator {
     }
 
     private String extractArgsAsJson(String code) {
-        // Very basic: convert method(k1="v1", k2="v2") to {"k1":"v1", "k2":"v2"}
-        // This is a naive implementation for the prototype.
+        // Convert method(k1="v1", k2=123, k3=true) to {"k1":"v1", "k2":123, "k3":true}
         try {
             int start = code.indexOf('(');
             int end = code.lastIndexOf(')');
@@ -857,15 +1522,50 @@ public class AgentOrchestrator {
             if (argsStr.isEmpty()) return "{}";
             
             cn.hutool.json.JSONObject json = new cn.hutool.json.JSONObject();
-            // Splitting by comma is tricky with values containing commas. 
-            // For now, assume simple args or use regex.
-            java.util.regex.Pattern p = java.util.regex.Pattern.compile("(\\w+)\\s*=\\s*\"([^\"]*)\"");
-            java.util.regex.Matcher m = p.matcher(argsStr);
-            while (m.find()) {
-                json.set(m.group(1), m.group(2));
+            
+            // 匹配带双引号的字符串值: key="value"
+            java.util.regex.Pattern stringPattern = java.util.regex.Pattern.compile("(\\w+)\\s*=\\s*\"([^\"]*)\"");
+            java.util.regex.Matcher stringMatcher = stringPattern.matcher(argsStr);
+            while (stringMatcher.find()) {
+                json.set(stringMatcher.group(1), stringMatcher.group(2));
             }
+            
+            // 匹配不带引号的数字或布尔值: key=123, key=true, key=false
+            java.util.regex.Pattern unquotedPattern = java.util.regex.Pattern.compile("(\\w+)\\s*=\\s*([^,\"\\)]+)");
+            java.util.regex.Matcher unquotedMatcher = unquotedPattern.matcher(argsStr);
+            while (unquotedMatcher.find()) {
+                String key = unquotedMatcher.group(1).trim();
+                String value = unquotedMatcher.group(2).trim();
+                
+                // 跳过已经通过字符串模式匹配的键
+                if (json.containsKey(key)) {
+                    continue;
+                }
+                
+                // 尝试解析为数字或布尔值
+                if ("true".equalsIgnoreCase(value) || "True".equals(value)) {
+                    json.set(key, true);
+                } else if ("false".equalsIgnoreCase(value) || "False".equals(value)) {
+                    json.set(key, false);
+                } else {
+                    try {
+                        // 尝试解析为整数
+                        json.set(key, Integer.parseInt(value));
+                    } catch (NumberFormatException e1) {
+                        try {
+                            // 尝试解析为浮点数
+                            json.set(key, Double.parseDouble(value));
+                        } catch (NumberFormatException e2) {
+                            // 保留为字符串
+                            json.set(key, value);
+                        }
+                    }
+                }
+            }
+            
             return json.toString();
         } catch (Exception e) {
+            log.warn("Failed to parse tool args from code: {}", code, e);
             return "{}";
         }
     }

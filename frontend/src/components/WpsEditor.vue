@@ -558,22 +558,37 @@ export default {
      * [API] 获取当前选区的 Range 起止位置（用于官方文档中的 Range: {Start, End}）
      * 注意：WebOffice JSAPI 的属性访问也是异步的，需要 await range.Start / await range.End
      * 返回 { start, end }，失败时返回 null
+     * 
+     * 注意：只有 Word 文档 (doc/docx) 才支持 Selection 选区操作，
+     * 对于 pptx/xlsx/pdf 等文件会静默返回 null，不报错。
      */
     async getSelectionRange() {
       if (!this.instance) return null
       try {
         const app = this.instance.Application
-        const selection = await app.ActiveDocument.Selection
+        if (!app) return null
+        
+        // 检查 ActiveDocument 是否存在
+        const activeDoc = await app.ActiveDocument
+        if (!activeDoc) return null
+        
+        // 检查 Selection 是否存在（只有 Word 文档支持）
+        const selection = await activeDoc.Selection
+        if (!selection) return null
+        
         const range = await selection.Range
+        if (!range) return null
+        
         const start = await range.Start
         const end = await range.End
         if (typeof start !== 'number' || typeof end !== 'number') {
-          console.error('Range Start/End 非数字:', { start, end })
+          // 静默返回 null，这是正常情况（如未选中任何内容）
           return null
         }
         return { start, end }
       } catch (e) {
-        console.error('获取选区 Range 失败', e)
+        // 静默返回 null，避免轮询时刷屏报错
+        // 常见场景：打开的不是 Word 文档，或者文档尚未完全加载
         return null
       }
     },

@@ -231,7 +231,9 @@ function createMainWindow() {
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // 允许跨域 Cookie（解决 WPS SameSite Cookie 被拦截导致 500 错误）
+      webSecurity: false
     }
   })
 
@@ -318,6 +320,22 @@ function createMainWindow() {
     // Note: If item.setSavePath() is NOT called, Electron implicitly shows the dialog 
     // (unless global "Always ask..." is disabled, but setSaveDialogOptions helps hint it).
     // To strictly FORCE it, we would need to check existing configuration, but usually this is enough.
+  })
+
+  // [Fix WPS 500 Error] Force Accept-Language to zh-CN for WPS domains
+  const wpsFilter = {
+    urls: [
+      '*://*.wps.cn/*',
+      '*://*.wps.com/*',
+      '*://*.wpsgo.com/*',
+      '*://*.wpscdn.cn/*',
+      '*://*.kingsoft.com/*'
+    ]
+  }
+  mainWindow.webContents.session.webRequest.onBeforeSendHeaders(wpsFilter, (details, callback) => {
+    // console.log('[WPS Fix] Modifying headers for:', details.url)
+    details.requestHeaders['Accept-Language'] = 'zh-CN,zh;q=0.9'
+    callback({ requestHeaders: details.requestHeaders })
   })
 
   startClipboardWatcher()

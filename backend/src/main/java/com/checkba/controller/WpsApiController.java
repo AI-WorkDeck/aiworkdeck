@@ -73,6 +73,9 @@ public class WpsApiController {
     public ResponseEntity<Map<String, Object>> createSession(@RequestBody Map<String, String> request) {
         String fileId = request.get("fileId");
         String userId = request.getOrDefault("userId", DEFAULT_USER_ID);
+        if (userId == null || "null".equals(userId)) {
+            userId = DEFAULT_USER_ID;
+        }
 
         if (fileId == null || fileId.trim().isEmpty()) {
             Map<String, Object> error = new HashMap<>();

@@ -451,7 +451,8 @@ public class ProjectFileService {
         }
 
         // 检查目标文件夹下是否存在同名文件
-        Long targetParentId = newParentId != null ? newParentId : file.getParentId();
+        // 注意：newParentId 为 null 表示移动到根目录
+        Long targetParentId = newParentId;
         if (projectFileRepository.existsByProjectIdAndParentIdAndNameAndIdNot(
                 file.getProjectId(), targetParentId, file.getName(), fileId)) {
             throw new IllegalArgumentException("目标文件夹下已存在同名文件/文件夹: " + file.getName());

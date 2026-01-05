@@ -5,15 +5,21 @@ spring:
   application:
     name: checkba-backend
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/checkba?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    # PostgreSQL with pgvector
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/checkba
     username: checkba
     password: checkba123
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
-    database-platform: org.hibernate.dialect.MySQL8Dialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        types:
+          print:
+            banner: false
   servlet:
     multipart:
       enabled: true
@@ -30,10 +36,16 @@ external:
   wps:
     app-id: AK20251215TTJNYB
     app-secret: ***REMOVED***
-    callback-base-url: https://checkbahttps.vip.cpolar.cn  # 使用 cpolar 内网穿透地址，供 WPS 回调使用
+    callback-base-url: https://kingide500.cpolar.top  # 使用 cpolar 内网穿透地址，供 WPS 回调使用
   tushare:
     base-url: http://api.tushare.pro
     token: ***REMOVED***
+  # PPTX 生成服务配置（banana-slides Docker 容器）
+  pptx-service:
+    # 服务地址（Docker 容器映射端口）
+    base-url: http://localhost:5001
+    # 请求超时时间（秒）- 生成 PPT 可能需要较长时间
+    timeout: 120
 
 # AI 大模型配置（供应商可切换）
 ai:

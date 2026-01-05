@@ -49,6 +49,10 @@ public class AiChatController {
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private static final String KEY_AI_ASSISTANTS = "ai.assistants";
     
+    // For conversation metadata API
+    private final com.checkba.service.ai.ConversationFileChangeService conversationFileChangeService;
+    private final com.checkba.repository.TokenUsageRepository tokenUsageRepository;
+    
     // Cache for Gemini Cache IDs: Map<ContentHash, CacheName>
     // Simple in-memory cache to avoid re-uploading same content in short term. Ttl is handled by Gemini.
     private final Map<String, String> activeGeminiCaches = new ConcurrentHashMap<>();
@@ -71,7 +75,9 @@ public class AiChatController {
             com.checkba.service.ai.ChatModelFactory chatModelFactory,
             com.checkba.service.ai.TokenUsageService tokenUsageService,
             com.checkba.service.ai.context.FileContentExtractorService fileContentExtractorService,
-            com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper,
+            com.checkba.service.ai.ConversationFileChangeService conversationFileChangeService,
+            com.checkba.repository.TokenUsageRepository tokenUsageRepository) {
         this.defaultProjectAssistant = defaultProjectAssistant;
         this.projectAiMessageService = projectAiMessageService;
         this.aiDocxExportService = aiDocxExportService;
@@ -86,6 +92,8 @@ public class AiChatController {
         this.tokenUsageService = tokenUsageService;
         this.fileContentExtractorService = fileContentExtractorService;
         this.objectMapper = objectMapper;
+        this.conversationFileChangeService = conversationFileChangeService;
+        this.tokenUsageRepository = tokenUsageRepository;
     }
 
     @PostMapping("/chat")
@@ -398,6 +406,43 @@ public class AiChatController {
             userId = AuthController.getUserIdFromSession(sessionId);
         }
         return projectAiMessageService.listConversations(projectId, userId);
+    }
+
+    /**
+     * Get conversation metadata: file changes and token usage for historical display.
+     */
+    @GetMapping("/conversation/{conversationId}/metadata")
+    public ResponseEntity<?> getConversationMetadata(@PathVariable String conversationId) {
+        try {
+            // Get file changes
+            var fileChanges = conversationFileChangeService.findByConversationId(conversationId);
+            var fileChangesDto = fileChanges.stream().map(fc -> {
+                Map<String, Object> m = new java.util.HashMap<>();
+                m.put("fileName", fc.getFileName());
+                m.put("changeType", fc.getChangeType());
+                return m;
+            }).collect(java.util.stream.Collectors.toList());
+
+            // Get token usage (sum all usages for this conversation)
+            var tokenUsages = tokenUsageRepository.findByConversationId(conversationId);
+            int promptTokens = tokenUsages.stream().mapToInt(t -> t.getPromptTokens() != null ? t.getPromptTokens() : 0).sum();
+            int completionTokens = tokenUsages.stream().mapToInt(t -> t.getCompletionTokens() != null ? t.getCompletionTokens() : 0).sum();
+            int totalTokens = tokenUsages.stream().mapToInt(t -> t.getTotalTokens() != null ? t.getTotalTokens() : 0).sum();
+
+            Map<String, Object> tokenUsage = new java.util.HashMap<>();
+            tokenUsage.put("promptTokens", promptTokens);
+            tokenUsage.put("completionTokens", completionTokens);
+            tokenUsage.put("totalTokens", totalTokens);
+
+            Map<String, Object> result = new java.util.HashMap<>();
+            result.put("fileChanges", fileChangesDto);
+            result.put("tokenUsage", tokenUsage);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Failed to get conversation metadata", e);
+            return ResponseEntity.status(500).body("Failed to get metadata: " + e.getMessage());
+        }
     }
 
     @GetMapping("/assistants")

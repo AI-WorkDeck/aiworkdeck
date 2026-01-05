@@ -1,5 +1,5 @@
 import { ref, reactive, nextTick } from 'vue'
-import { getApiBaseUrl } from '@/services/api.js'
+import { getApiBaseUrl, getConversationMetadata } from '@/services/api.js'
 import { getSessionId } from '@/utils/auth.js'
 
 export function useAgentStream() {
@@ -9,6 +9,16 @@ export function useAgentStream() {
     const isStreaming = ref(false)
     const error = ref(null)
     const currentConversationId = ref(null)
+    // STATE: Token Usage Tracking (Session Cumulative)
+    // STATE: Token Usage Tracking (Session Cumulative)
+    const tokenUsage = ref({ promptTokens: 0, completionTokens: 0, totalTokens: 0 })
+
+    // STATE: File Changes Tracking (Current Turn)
+    const fileChanges = ref([]) // Array of { fileName, changeType }
+
+    // STATE: Background task tracking for long-running operations
+    const backgroundTasks = ref({}) // taskId -> { type, progress, message, stage, startedAt, estimatedDuration }
+    const lastHeartbeat = ref(null) // { source, conversationId, timestamp }
 
     // POINTER: The current bubble we are writing to (Assistant)
     const currentAssistantBubble = ref(null)
@@ -39,10 +49,11 @@ export function useAgentStream() {
         isStreaming: false
     })
 
-    const createUserBubble = (content, images = [], contextFiles = []) => ({
+    const createUserBubble = (content, images = [], contextFiles = [], contentHtml = '') => ({
         id: `msg-${Date.now()}`,
         role: 'USER',
         content: content,
+        contentHtml: contentHtml, // HTML with inline file tags for display
         images: images,
         contextFiles: contextFiles
     })
@@ -73,8 +84,12 @@ export function useAgentStream() {
         // Reset parser state
         resetParser()
         // Reset event parser state
+        // Reset event parser state
         currentEventName = null
         currentEventData = ''
+        // Reset Token Usage (start fresh for new chat context? Or keep per session? Usually per chat.)
+        // Ideally we keep it during the chat session. resetSSE is called when switching conversations.
+        tokenUsage.value = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
         // Clear bubble pointer (will be set fresh on next send)
         currentAssistantBubble.value = null
     }
@@ -126,12 +141,18 @@ export function useAgentStream() {
                     if (done) break
 
                     const chunk = decoder.decode(value, { stream: true })
+                    // 调试日志：显示接收到的 chunk 时间戳
+                    console.log('[SSE] Chunk received at:', new Date().toISOString(), 'size:', chunk.length)
                     buffer += chunk
 
                     const lines = buffer.split(/\r?\n/)
                     buffer = lines.pop() // Keep incomplete line
 
                     for (const line of lines) {
+                        // 调试日志：显示解析的 SSE 行
+                        if (line.trim()) {
+                            console.log('[SSE] Processing line:', line.substring(0, 80) + (line.length > 80 ? '...' : ''))
+                        }
                         parseSSELineFull(line)
                     }
                 }
@@ -139,18 +160,34 @@ export function useAgentStream() {
                 if (err.name !== 'AbortError') {
                     console.error('[AgentStream] SSE Error:', err)
                     if (!isConnected.value && !isStreaming.value) reject(err)
+                    // SSE 连接出错时，确保结束当前 bubble 的加载状态
+                    if (currentAssistantBubble.value && currentAssistantBubble.value.isStreaming) {
+                        currentAssistantBubble.value.isStreaming = false
+                        currentAssistantBubble.value.content += '\n\n*[连接中断]*'
+                    }
                 }
                 isConnected.value = false
+                isStreaming.value = false
             } finally {
                 sseAbortController = null
                 isConnected.value = false
+                // SSE 连接结束时（包括正常结束），确保状态正确
+                if (isStreaming.value && currentAssistantBubble.value) {
+                    // 如果仍在流式状态但连接已结束，说明可能是意外断开
+                    console.warn('[AgentStream] SSE connection ended while still streaming')
+                    currentAssistantBubble.value.isStreaming = false
+                    isStreaming.value = false
+                }
             }
         })
     }
 
-    const sendMessage = async ({ prompt, fileList = [], projectId, modelId = 'default', assistantId, _userImages = [], _userContextFiles = [] }) => {
+    const sendMessage = async ({ prompt, contentHtml = '', fileList = [], projectId, modelId = 'default', assistantId, mode = 'AGENT', activeContext = null, _userImages = [], _userContextFiles = [] }) => {
+        // Clear file changes for new turn
+        fileChanges.value = []
+
         // 1. Add User Message with images and context files for display
-        bubbles.value.push(createUserBubble(prompt, _userImages, _userContextFiles))
+        bubbles.value.push(createUserBubble(prompt, _userImages, _userContextFiles, contentHtml))
 
         // 2. Prepare Assistant Bubble
         const newBubble = createAssistantBubble()
@@ -177,6 +214,7 @@ export function useAgentStream() {
                 conversationId,
                 message: prompt,
                 model: modelId,
+                mode: mode, // Agent 模式: ASK, PLAN, AGENT
                 // Send full context metadata for folder support
                 contextItems: fileList.map(f => ({
                     id: String(f.id),
@@ -184,7 +222,14 @@ export function useAgentStream() {
                     isDir: f.isDir === true,
                     fileType: f.fileType || ''
                 })),
-                fileIds: fileList.map(f => f.id) // Legacy compatibility
+                fileIds: fileList.map(f => f.id), // Legacy compatibility
+                // NEW: Active context (auto-detected current tab)
+                activeContext: activeContext ? {
+                    id: String(activeContext.id),
+                    name: activeContext.name || 'Unknown',
+                    fileType: activeContext.fileType || '',
+                    wpsFileId: activeContext.wpsFileId || null
+                } : null
             }
 
             await fetch(`${getApiBaseUrl()}/api/agent/chat`, {
@@ -206,12 +251,35 @@ export function useAgentStream() {
         }
     }
 
-    const abort = () => {
+    const abort = async () => {
+        // 1. 向后端发送取消请求
+        const conversationId = currentConversationId.value
+        if (conversationId) {
+            try {
+                await fetch(`${getApiBaseUrl()}/api/agent/cancel/${conversationId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Session-Id': getSessionId() || '' }
+                })
+                console.log('[AgentStream] Cancel request sent for:', conversationId)
+            } catch (e) {
+                console.warn('[AgentStream] Failed to send cancel request:', e)
+            }
+        }
+
+        // 2. 中断前端连接
         if (messageAbortController) messageAbortController.abort()
         if (sseAbortController) sseAbortController.abort()
+
+        // 3. 更新状态
         isStreaming.value = false
         if (currentAssistantBubble.value) {
             currentAssistantBubble.value.isStreaming = false
+            // 添加已停止标记
+            if (currentAssistantBubble.value.content) {
+                currentAssistantBubble.value.content += '\n\n*[已停止]*'
+            } else if (currentAssistantBubble.value.walkthrough) {
+                currentAssistantBubble.value.walkthrough += '\n\n*[已停止]*'
+            }
         }
     }
 
@@ -236,14 +304,30 @@ export function useAgentStream() {
     }
 
     const handleEvent = (evt, dataStr) => {
+        // 调试日志：显示事件处理
+        console.log('[SSE] handleEvent:', evt, 'dataLen:', dataStr?.length || 0, 'time:', new Date().toISOString())
+
         if (!currentAssistantBubble.value) return
 
         if (evt === 'text_delta') {
             try {
                 const d = JSON.parse(dataStr)
+                // 调试日志：显示 text_delta 内容
+                console.log('[SSE] text_delta content:', (d.content || '').substring(0, 50))
                 processTextStream(d.content || '')
             } catch (e) {
                 processTextStream(dataStr)
+            }
+        } else if (evt === 'token_usage') {
+            try {
+                const d = JSON.parse(dataStr)
+                // Accumulate usage for this session
+                tokenUsage.value.promptTokens += d.promptTokens || 0
+                tokenUsage.value.completionTokens += d.completionTokens || 0
+                tokenUsage.value.totalTokens += d.totalTokens || 0
+                console.log('[AgentStream] Token Usage Updated:', tokenUsage.value)
+            } catch (e) {
+                console.error('Failed to parse token_usage', e)
             }
         } else if (evt === 'step_update') {
             try {
@@ -275,6 +359,20 @@ export function useAgentStream() {
             } catch (e) {
                 console.error('Failed to parse title_update', e)
             }
+        } else if (evt === 'cancelled') {
+            // 处理取消事件
+            console.log('[SSE] Received cancelled event')
+            flushRemainingBuffer()
+            currentAssistantBubble.value.isStreaming = false
+            const thinking = currentAssistantBubble.value.thinking
+            if (thinking.status === 'thinking') {
+                thinking.status = 'done'
+                if (!thinking.duration || thinking.duration === 0) {
+                    thinking.duration = (Date.now() - thinking.startTime) / 1000
+                }
+            }
+            // 不需要在这里添加 [已停止] 标记，因为 abort 函数已经添加了
+            isStreaming.value = false
         } else if (evt === 'bubble_end' || evt === 'error') {
             // Flush any remaining content in parserBuffer before ending
             flushRemainingBuffer()
@@ -305,7 +403,103 @@ export function useAgentStream() {
                 }
             }
         }
-        if (evt === 'bubble_end') isStreaming.value = false
+        if (evt === 'bubble_end' || evt === 'cancelled') isStreaming.value = false
+
+        // ==================== BACKGROUND TASK EVENTS ====================
+
+        // Handle task progress updates
+        if (evt === 'task_progress') {
+            try {
+                const d = JSON.parse(dataStr)
+                console.log('[SSE] task_progress:', d.progress + '%', d.message)
+                if (d.taskId && backgroundTasks.value[d.taskId]) {
+                    Object.assign(backgroundTasks.value[d.taskId], {
+                        progress: d.progress || 0,
+                        message: d.message || '',
+                        stage: d.stage || '',
+                        estimatedRemainingSec: d.estimatedRemainingSec,
+                        lastUpdate: Date.now()
+                    })
+                }
+            } catch (e) {
+                console.error('Failed to parse task_progress', e)
+            }
+        }
+
+        // Handle background task start
+        if (evt === 'background_task_start') {
+            try {
+                const d = JSON.parse(dataStr)
+                console.log('[SSE] background_task_start:', d.taskId, d.taskType)
+                backgroundTasks.value[d.taskId] = {
+                    taskId: d.taskId,
+                    type: d.taskType,
+                    conversationId: d.conversationId,
+                    progress: 0,
+                    message: '任务开始...',
+                    stage: 'starting',
+                    startedAt: Date.now(),
+                    estimatedDurationSec: d.estimatedDurationSec,
+                    status: 'running'
+                }
+            } catch (e) {
+                console.error('Failed to parse background_task_start', e)
+            }
+        }
+
+        // Handle background task completion
+        if (evt === 'background_task_complete') {
+            try {
+                const d = JSON.parse(dataStr)
+                console.log('[SSE] background_task_complete:', d.taskId, d.eventType)
+                if (d.taskId && backgroundTasks.value[d.taskId]) {
+                    backgroundTasks.value[d.taskId].status = d.success ? 'completed' : 'failed'
+                    backgroundTasks.value[d.taskId].progress = d.success ? 100 : backgroundTasks.value[d.taskId].progress
+                    backgroundTasks.value[d.taskId].message = d.success ? '任务完成' : (d.error || '任务失败')
+                    backgroundTasks.value[d.taskId].result = d.result
+                    backgroundTasks.value[d.taskId].error = d.error
+
+                    // Auto-remove after 5 seconds
+                    setTimeout(() => {
+                        delete backgroundTasks.value[d.taskId]
+                    }, 5000)
+                }
+            } catch (e) {
+                console.error('Failed to parse background_task_complete', e)
+            }
+        }
+
+        // Handle heartbeat
+        if (evt === 'heartbeat') {
+            try {
+                const d = JSON.parse(dataStr)
+                lastHeartbeat.value = {
+                    source: d.source, // 'LLM_LOOP' or 'PPTX_SERVICE'
+                    conversationId: d.conversationId,
+                    taskId: d.taskId,
+                    currentOperation: d.currentOperation,
+                    timestamp: d.timestamp || Date.now()
+                }
+            } catch (e) {
+                console.error('Failed to parse heartbeat', e)
+            }
+        }
+
+        // Handle File Changes (Added/Modified)
+        if (evt === 'file_change') {
+            try {
+                const d = JSON.parse(dataStr)
+                // d: { fileName: "...", changeType: "ADDED" | "MODIFIED" }
+                // Avoid duplicates?
+                const exists = fileChanges.value.some(f => f.fileName === d.fileName && f.changeType === d.changeType)
+                if (!exists) {
+                    fileChanges.value.push(d)
+                }
+                console.log('[AgentStream] File Change:', d)
+            } catch (e) {
+                console.error('Failed to parse file_change', e)
+            }
+        }
     }
 
     const handleStepUpdate = (data) => {
@@ -731,6 +925,29 @@ export function useAgentStream() {
     const clientActionHandler = ref(null)
     const titleUpdateHandler = ref(null)
 
+    /**
+     * 回退到指定消息
+     * 删除该消息及其之后的所有bubbles，返回被回退消息的内容
+     * @param messageIndex 要回退到的消息在bubbles数组中的索引
+     * @returns 被回退消息的内容（用于放入输入框）
+     */
+    const rollbackToMessage = (messageIndex) => {
+        if (messageIndex < 0 || messageIndex >= bubbles.value.length) {
+            console.error('[AgentStream] Invalid rollback index:', messageIndex)
+            return ''
+        }
+
+        const targetMessage = bubbles.value[messageIndex]
+        const content = targetMessage.content || ''
+
+        // 删除目标消息及之后的所有消息
+        bubbles.value.splice(messageIndex)
+
+        console.log('[AgentStream] Rolled back to message index:', messageIndex, 'remaining:', bubbles.value.length)
+
+        return content
+    }
+
     return {
         bubbles,
         isStreaming,
@@ -740,7 +957,31 @@ export function useAgentStream() {
         resetSSE,
         clearBubbles,
         currentConversationId,
-        onClientAction: (fn) => clientActionHandler.value = fn,
-        onTitleUpdate: (fn) => titleUpdateHandler.value = fn
+        // Rollback support
+        rollbackToMessage,
+        // Background task tracking
+        onClientAction: (cb) => { clientActionHandler.value = cb },
+        onTitleUpdate: (cb) => { titleUpdateHandler.value = cb },
+        tokenUsage,
+        fileChanges,
+        backgroundTasks,
+        lastHeartbeat,
+        // Load metadata for historical conversations
+        loadConversationMetadata: async (conversationId) => {
+            if (!conversationId) return
+            try {
+                const resp = await getConversationMetadata(conversationId)
+                // resp: { fileChanges: [...], tokenUsage: { promptTokens, completionTokens, totalTokens } }
+                if (resp.fileChanges) {
+                    fileChanges.value = resp.fileChanges
+                }
+                if (resp.tokenUsage) {
+                    tokenUsage.value = resp.tokenUsage
+                }
+                console.log('[AgentStream] Loaded metadata for conversation:', conversationId, resp)
+            } catch (e) {
+                console.warn('[AgentStream] Failed to load conversation metadata:', e)
+            }
+        }
     }
 }

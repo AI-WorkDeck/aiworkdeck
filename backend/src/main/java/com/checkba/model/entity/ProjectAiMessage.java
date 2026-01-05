@@ -37,7 +37,7 @@ public class ProjectAiMessage {
     /**
      * 消息内容（支持 markdown）
      */
-    @Column(columnDefinition = "LONGTEXT", nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
     /**

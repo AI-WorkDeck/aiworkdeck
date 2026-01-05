@@ -79,7 +79,14 @@ public class WpsController {
         long currentTime = System.currentTimeMillis() / 1000;
         
         // 根据 wpsFileId 查询真实的文件信息
+        log.info("[WPS-getFileInfo] 开始查询文件: wpsFileId={}", idValue);
         ProjectFile projectFile = projectFileRepository.findByWpsFileId(idValue).orElse(null);
+        if (projectFile == null) {
+            log.warn("[WPS-getFileInfo] 未找到文件记录: wpsFileId={}", idValue);
+        } else {
+            log.info("[WPS-getFileInfo] 找到文件记录: id={}, name={}, filePath={}", 
+                projectFile.getId(), projectFile.getName(), projectFile.getFilePath());
+        }
         
         // 根据 WPS 官方文档《回调概述》：
         // 回调接口统一返回格式为 { code, message, data }，
@@ -99,7 +106,22 @@ public class WpsController {
         
         if (projectFile != null) {
             fileName = projectFile.getName();
-            fileSize = projectFile.getFileSize() != null ? projectFile.getFileSize() : 1024L;
+            // Try to get file size from database, if null or default, get actual size from storage
+            fileSize = projectFile.getFileSize();
+            if (fileSize == null || fileSize <= 1024L) {
+                try {
+                    String filePath = projectFile.getFilePath();
+                    if (filePath != null && !filePath.isEmpty()) {
+                        fileSize = getStorageService().getSize(filePath);
+                        log.info("WPS callback: got actual file size from storage: {}", fileSize);
+                    } else {
+                        fileSize = 1024L; // fallback
+                    }
+                } catch (Exception e) {
+                    log.warn("WPS callback: failed to get file size from storage, using default: {}", e.getMessage());
+                    fileSize = fileSize != null ? fileSize : 1024L;
+                }
+            }
             if (projectFile.getCreatedAt() != null) {
                 createTime = (int) (projectFile.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toEpochSecond());
             }
@@ -117,7 +139,8 @@ public class WpsController {
         
         data.put("name", fileName);              // 文件名（从数据库查询）
         data.put("size", fileSize.intValue());   // 文件大小（字节），使用 Integer
-        data.put("version", 1);                  // 版本号（Integer）
+        // 版本号使用 modifyTime 作为版本标识，确保文件更新后 WPS 能检测到版本变化
+        data.put("version", modifyTime);         // 版本号（使用修改时间戳作为版本号）
         data.put("create_time", createTime);     // 创建时间（秒级时间戳，Integer）
         data.put("modify_time", modifyTime);     // 修改时间（秒级时间戳，Integer）
         data.put("creator_id", creatorId);        // 创建者ID
@@ -147,26 +170,38 @@ public class WpsController {
      */
     @GetMapping("/files/{file_id}/download")
     public ResponseEntity<Map<String, Object>> getFileDownloadUrl(@PathVariable("file_id") String fileId) {
-        log.info("WPS callback: getFileDownloadUrl, fileId: {}", fileId);
+        log.info("[WPS-getDownloadUrl] ===== 开始处理下载URL请求 =====");
+        log.info("[WPS-getDownloadUrl] fileId: {}", fileId);
         
         // 根据 WPS 官方文档，下载地址接口同样使用统一返回格式 { code, message, data }
         // data 中的字段名为 url（不是 download_url），否则会出现“字段:url 不能为空”的错误。
 
         // 1. data：真正的下载信息
         Map<String, Object> data = new java.util.LinkedHashMap<>();
-        data.put("url", wpsService.getCallbackBaseUrl() + "/api/files/" + fileId + "/download");
+        String downloadUrl = wpsService.getCallbackBaseUrl() + "/api/files/" + fileId + "/download";
+        data.put("url", downloadUrl);
         data.put("expires_in", 3600); // 有效期，秒
+        log.info("[WPS-getDownloadUrl] 生成的下载URL: {}", downloadUrl);
 
         // 计算文件 SHA1 以启用 WPS 加速
         try {
             // 确定文件存储路径（逻辑同 FileController）
             String path = fileId;
             Optional<ProjectFile> projectFileOpt = projectFileRepository.findByWpsFileId(fileId);
+            log.info("[WPS-getDownloadUrl] 查找文件记录: wpsFileId={}, found={}", fileId, projectFileOpt.isPresent());
+            
             if (projectFileOpt.isPresent()) {
                 ProjectFile pf = projectFileOpt.get();
+                log.info("[WPS-getDownloadUrl] 文件详情: id={}, name={}, filePath={}", 
+                    pf.getId(), pf.getName(), pf.getFilePath());
                 if (StringUtils.hasText(pf.getFilePath())) {
                     path = pf.getFilePath();
+                    log.info("[WPS-getDownloadUrl] 使用filePath: {}", path);
+                } else {
+                    log.warn("[WPS-getDownloadUrl] filePath为空，使用fileId: {}", path);
                 }
+            } else {
+                log.warn("[WPS-getDownloadUrl] 未找到文件记录，使用fileId作为路径: {}", path);
             }
 
             // 读取文件流计算 SHA1
@@ -338,8 +373,8 @@ public class WpsController {
 
             Map<String, Object> user = new java.util.LinkedHashMap<>();
             user.put("id", uid);
-            // 这里只返回简单名称，实际可从数据库/人员表中查真实姓名
-            user.put("name", "用户" + uid);
+            // 根据用户ID返回不同的名称，以支持修订模式下区分 LLM 和真实用户
+            user.put("name", getUserDisplayName(uid));
             dataList.add(user);
         }
 
@@ -353,6 +388,26 @@ public class WpsController {
                 .header("X-Request-Id", xRequestId)
                 .header("Content-Type", "application/json; charset=utf-8")
                 .body(result);
+    }
+
+    /**
+     * 根据用户 ID 获取显示名称
+     * - 10001: AI Agent 专用用户（用于在修订模式下区分 LLM 的修改）
+     * - 其他: 返回通用名称（后续可扩展为从数据库查询）
+     */
+    private String getUserDisplayName(String userId) {
+        // AI Agent 专用 ID（在 WpsTools 中使用相同的 ID）
+        if ("10001".equals(userId)) {
+            return "🤖 AI 助手";
+        }
+        
+        // 默认用户 ID
+        if (DEFAULT_USER_ID.equals(userId)) {
+            return "King IDE";
+        }
+        
+        // 其他用户：返回通用名称（后续可从 UserRepository 查询真实用户名）
+        return "用户 " + userId;
     }
 
     /**
@@ -489,7 +544,20 @@ public class WpsController {
         
         if (projectFile != null) {
             fileName = projectFile.getName();
-            fileSize = projectFile.getFileSize() != null ? projectFile.getFileSize() : 1024L;
+            // Try to get file size from database, if null or default, get actual size from storage
+            fileSize = projectFile.getFileSize();
+            if (fileSize == null || fileSize <= 1024L) {
+                try {
+                    String filePath = projectFile.getFilePath();
+                    if (filePath != null && !filePath.isEmpty()) {
+                        fileSize = getStorageService().getSize(filePath);
+                    } else {
+                        fileSize = 1024L;
+                    }
+                } catch (Exception e) {
+                    fileSize = fileSize != null ? fileSize : 1024L;
+                }
+            }
             if (projectFile.getCreatedAt() != null) {
                 createTime = (int) (projectFile.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toEpochSecond());
             }
@@ -506,7 +574,8 @@ public class WpsController {
         data.put("id", idValue);                 // 文档ID，必须与 file_id 一致
         data.put("name", fileName);              // 文件名（从数据库查询）
         data.put("size", fileSize.intValue());   // 文件大小（字节）
-        data.put("version", 1);                   // 版本号
+        // 版本号使用 modifyTime 作为版本标识
+        data.put("version", modifyTime);         // 版本号（使用修改时间戳）
         data.put("create_time", createTime);     // 创建时间
         data.put("modify_time", modifyTime);     // 修改时间
         data.put("creator_id", creatorId);       // 创建者ID
@@ -592,7 +661,19 @@ public class WpsController {
         
         if (projectFile != null) {
             fileName = projectFile.getName();
-            fileSize = projectFile.getFileSize() != null ? projectFile.getFileSize() : 1024L;
+            fileSize = projectFile.getFileSize();
+            if (fileSize == null || fileSize <= 1024L) {
+                try {
+                    String filePath = projectFile.getFilePath();
+                    if (filePath != null && !filePath.isEmpty()) {
+                        fileSize = getStorageService().getSize(filePath);
+                    } else {
+                        fileSize = 1024L;
+                    }
+                } catch (Exception e) {
+                    fileSize = fileSize != null ? fileSize : 1024L;
+                }
+            }
             if (projectFile.getCreatedAt() != null) {
                 createTime = (int) (projectFile.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toEpochSecond());
             }
@@ -608,7 +689,8 @@ public class WpsController {
         Map<String, Object> version = new java.util.LinkedHashMap<>();
         version.put("id", fileId);
         version.put("name", fileName);           // 使用真实文件名
-        version.put("version", 1);
+        // 版本号使用 modifyTime 作为版本标识
+        version.put("version", modifyTime);      // 版本号（使用修改时间戳）
         version.put("size", fileSize.intValue());
         version.put("create_time", createTime);
         version.put("modify_time", modifyTime);

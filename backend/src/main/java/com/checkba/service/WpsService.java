@@ -48,6 +48,14 @@ public class WpsService {
     }
 
     /**
+     * 获取公开的 AppId（供前端 WPS SDK 初始化使用）
+     * 注意：这是公开方法，仅返回 appId，不返回 appSecret
+     */
+    public String getPublicAppId() {
+        return getAppId();
+    }
+
+    /**
      * 生成 WPS 在线编辑链接（URL 直连方案预留）
      */
     public String generateEditUrl(String fileId, String fileName, String mode) {

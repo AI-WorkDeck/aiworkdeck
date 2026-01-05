@@ -217,8 +217,19 @@ public class AgentStreamHandler implements StreamingResponseHandler<AiMessage> {
             emitText(buffer.toString());
         }
         
-        // End Bubble
-        sseEmitterService.send(conversationId, "bubble_end", "{\"status\":\"finished\"}");
+        // Emit Token Usage to Frontend
+        if (response.tokenUsage() != null) {
+            dev.langchain4j.model.output.TokenUsage usage = response.tokenUsage();
+            int promptTokens = usage.inputTokenCount() != null ? usage.inputTokenCount() : 0;
+            int completionTokens = usage.outputTokenCount() != null ? usage.outputTokenCount() : 0;
+            int totalTokens = usage.totalTokenCount() != null ? usage.totalTokenCount() : (promptTokens + completionTokens);
+            
+            String usageJson = String.format(
+                "{\"promptTokens\":%d,\"completionTokens\":%d,\"totalTokens\":%d}",
+                promptTokens, completionTokens, totalTokens
+            );
+            sseEmitterService.send(conversationId, "token_usage", usageJson);
+        }
         
         // Record Usage
         if (response.tokenUsage() != null) {
@@ -228,9 +239,14 @@ public class AgentStreamHandler implements StreamingResponseHandler<AiMessage> {
         }
         
         // Callback if supplied (for Loop)
+        // 注意：如果有回调，说明可能还有后续循环（工具调用），不要在这里发送 bubble_end
+        // bubble_end 应该在整个循环真正结束时由 AgentOrchestrator 发送
         if (onCompleteCallback != null) {
             log.info("Response completed for {}. Full content:\n{}", conversationId, fullContentBuilder.toString());
             onCompleteCallback.accept(response);
+        } else {
+            // 没有回调，说明是简单的单次响应，发送 bubble_end
+            sseEmitterService.send(conversationId, "bubble_end", "{\"status\":\"finished\"}");
         }
     }
     

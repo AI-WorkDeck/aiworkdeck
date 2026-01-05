@@ -1,16 +1,33 @@
 package com.checkba.service.ai;
 
+import com.checkba.model.ai.AgentMode;
+import com.checkba.model.entity.ConversationSummary;
+import com.checkba.model.entity.MemoryEntry;
+import com.checkba.model.entity.ProjectMemory;
+import com.checkba.service.ai.context.ContextCompressor;
+import com.checkba.service.ai.context.ConversationSummarizer;
+import com.checkba.service.ai.context.ProjectContextHolder;
+import com.checkba.service.ai.memory.MemCellExtractor;
+import com.checkba.service.ai.memory.MemoryManager;
+import com.checkba.service.ai.memory.ProjectMemoryExtractor;
 import com.checkba.service.ai.tools.LegalTools;
 import com.checkba.service.ProjectAiMessageService;
+import dev.langchain4j.data.message.ChatMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Service to assemble context from files and other sources.
  * Injects <file> tags into the System Message.
+ * 
+ * 增强功能：
+ * - 智能上下文压缩
+ * - 记忆系统集成
+ * - 法律信息保护
  */
 @Service
 @RequiredArgsConstructor
@@ -22,20 +39,32 @@ public class ContextAssemblerService {
     private final ProjectAiMessageService messageService;
     private final com.checkba.service.ProjectFileService projectFileService;
     private final com.checkba.service.ai.context.FileContentExtractorService fileContentExtractorService;
+    
+    // 记忆系统组件
+    private final MemoryManager memoryManager;
+    private final ContextCompressor contextCompressor;
+    private final ConversationSummarizer conversationSummarizer;
+    private final ProjectMemoryExtractor projectMemoryExtractor;
+    private final MemCellExtractor memCellExtractor;
 
     /**
      * Assembles the full message stack for the LLM.
-     * 1. System Message (Prompt + State + File Context)
+     * 1. System Message (Prompt + State + File Context + Mode Constraints)
      * 2. History Messages (Last 20)
      * 3. User Message (Current Prompt)
+     * 
+     * @param agentMode Agent 运行模式 (ASK, PLAN, AGENT)
+     * @param activeContext NEW: 当前激活标签页（自动上下文，可为null）
      */
     public java.util.List<dev.langchain4j.data.message.ChatMessage> assemble(
             String conversationId, 
             String userPrompt, 
             java.util.List<com.checkba.controller.ai.AiAgentController.ContextItem> contextItems,
+            com.checkba.controller.ai.AiAgentController.ContextItem activeContext,
             String taskListId,
             String planId,
-            String projectId) {
+            String projectId,
+            AgentMode agentMode) {
 
         java.util.List<dev.langchain4j.data.message.ChatMessage> messages = new java.util.ArrayList<>();
 
@@ -105,6 +134,9 @@ public class ContextAssemblerService {
 """;
         systemText.append(enforcement);
 
+        // [Injection] Mode-Specific Constraints (CRITICAL)
+        systemText.append(getModeConstraints(agentMode));
+
         // [Injection] State with Phase
         systemText.append("\n\n# Current Context\n[SYSTEM INJECTION]");
         
@@ -115,6 +147,7 @@ public class ContextAssemblerService {
         systemText.append("\n  - 这是当前真实时间，所有涉及\"最新\"、\"最近\"、\"当前\"的数据查询必须基于此时间判断。");
         systemText.append("\n  - 如果查询的数据日期早于此时间超过合理范围（如股票收盘价应为最近交易日），请明确告知用户数据的实际日期。");
         
+        systemText.append("\n- **Current Agent Mode**: ").append(agentMode != null ? agentMode.name() : "AGENT");
         systemText.append("\n- Current Phase: ").append(currentPhase);
         systemText.append("\n- Current Project ID: ").append(projectId != null ? projectId : "unknown");
         systemText.append("\n- Current Task List ID: ").append(taskListId != null ? taskListId : "null");
@@ -186,25 +219,190 @@ public class ContextAssemblerService {
             }
         }
 
-        messages.add(dev.langchain4j.data.message.SystemMessage.from(systemText.toString()));
-
-        // 2. Add History
-        List<com.checkba.model.entity.ProjectAiMessage> historyEntities = messageService.listByConversationId(conversationId);
-        // Take last 20
-        int start = Math.max(0, historyEntities.size() - 20);
-        for (int i = start; i < historyEntities.size(); i++) {
-            com.checkba.model.entity.ProjectAiMessage entity = historyEntities.get(i);
-            if ("USER".equalsIgnoreCase(entity.getRole())) {
-                messages.add(dev.langchain4j.data.message.UserMessage.from(entity.getContent()));
-            } else if ("ASSISTANT".equalsIgnoreCase(entity.getRole())) {
-                messages.add(dev.langchain4j.data.message.AiMessage.from(entity.getContent()));
+        // [Injection] Active Document Context (auto-detected current tab)
+        // This is injected when no explicit context is provided but user is viewing a document
+        // LLM decides whether to use this based on user's instruction
+        if (activeContext != null && activeContext.getId() != null && !activeContext.getId().isEmpty()) {
+            log.info("[Context] Injecting active document: id={}, name={}", 
+                     activeContext.getId(), activeContext.getName());
+            
+            String content = legalTools.read_document(activeContext.getId());
+            if (content != null && !content.isEmpty()) {
+                // Truncate if too long
+                if (content.length() > 50000) {
+                    content = content.substring(0, 50000) + "\n... [TRUNCATED - File too long]";
+                }
+                
+                systemText.append("\n\n# Active Document (当前活跃文档)\n");
+                systemText.append("The user is currently viewing/editing this document. ");
+                systemText.append("Use this context if the user's instruction refers to \"current document\", \"this file\", ");
+                systemText.append("\"line X\", \"paragraph X\", or similar positional references.\n\n");
+                systemText.append("<active_document id=\"").append(activeContext.getId())
+                          .append("\" name=\"").append(activeContext.getName()).append("\"><![CDATA[\n");
+                systemText.append(content);
+                systemText.append("\n]]></active_document>\n");
             }
         }
 
-        // 3. Add Current User Prompt
+        // 设置上下文（供 MemoryTools 使用）
+        ProjectContextHolder.setProjectId(projectId);
+        ProjectContextHolder.setConversationId(conversationId);
+
+        // 2. 注入项目记忆（如果存在）
+        Long projectIdLong = null;
+        try {
+            projectIdLong = projectId != null ? Long.parseLong(projectId) : null;
+        } catch (NumberFormatException e) {
+            // ignore
+        }
+        
+        if (projectIdLong != null) {
+            Optional<ProjectMemory> projectMemoryOpt = memoryManager.getProjectMemory(projectIdLong);
+            if (projectMemoryOpt.isPresent()) {
+                ProjectMemory pm = projectMemoryOpt.get();
+                systemText.append("\n\n# 项目记忆（长期记忆）\n");
+                systemText.append(pm.toCoreContext());
+            }
+            
+            // 注入相关的结构化记忆
+            List<MemoryEntry> relevantMemories = memoryManager.retrieveMemories(
+                    projectIdLong, userPrompt, null, 5);
+            if (!relevantMemories.isEmpty()) {
+                systemText.append("\n\n# 相关记忆\n");
+                for (MemoryEntry mem : relevantMemories) {
+                    systemText.append("- [").append(mem.getMemoryType()).append("] ");
+                    if (mem.getMemoryKey() != null) {
+                        systemText.append(mem.getMemoryKey()).append(": ");
+                    }
+                    systemText.append(mem.getMemoryValue()).append("\n");
+                }
+            }
+        }
+
+        messages.add(dev.langchain4j.data.message.SystemMessage.from(systemText.toString()));
+
+        // 3. 加载对话历史并进行智能压缩
+        List<com.checkba.model.entity.ProjectAiMessage> historyEntities = messageService.listByConversationId(conversationId);
+        
+        // 转换为 ChatMessage 列表
+        java.util.List<dev.langchain4j.data.message.ChatMessage> historyMessages = new java.util.ArrayList<>();
+        for (com.checkba.model.entity.ProjectAiMessage entity : historyEntities) {
+            if ("USER".equalsIgnoreCase(entity.getRole())) {
+                historyMessages.add(dev.langchain4j.data.message.UserMessage.from(entity.getContent()));
+            } else if ("ASSISTANT".equalsIgnoreCase(entity.getRole())) {
+                historyMessages.add(dev.langchain4j.data.message.AiMessage.from(entity.getContent()));
+            }
+        }
+        
+        // 检查是否需要压缩
+        if (contextCompressor.needsCompression(historyMessages)) {
+            log.info("Context compression triggered: {} messages, estimated {} tokens",
+                    historyMessages.size(), contextCompressor.estimateTokens(historyMessages));
+            
+            // 获取已有的对话摘要
+            ConversationSummary existingSummary = memoryManager.getConversationSummary(conversationId)
+                    .orElse(null);
+            
+            // 获取项目记忆
+            ProjectMemory pm = projectIdLong != null ? 
+                    memoryManager.getProjectMemory(projectIdLong).orElse(null) : null;
+            
+            // 执行压缩
+            historyMessages = contextCompressor.compress(
+                    historyMessages,
+                    pm,
+                    existingSummary,
+                    contextCompressor.getAvailableTokensForHistory()
+            );
+            
+            log.info("Context compressed: {} messages, estimated {} tokens",
+                    historyMessages.size(), contextCompressor.estimateTokens(historyMessages));
+        } else {
+            // 不需要压缩时，仍然限制为最近 30 条消息
+            int maxHistory = 30;
+            if (historyMessages.size() > maxHistory) {
+                historyMessages = historyMessages.subList(historyMessages.size() - maxHistory, historyMessages.size());
+            }
+        }
+        
+        messages.addAll(historyMessages);
+
+        // 4. Add Current User Prompt
         messages.add(dev.langchain4j.data.message.UserMessage.from(userPrompt));
 
         return messages;
+    }
+    
+    /**
+     * 对话结束后的记忆更新
+     * 在对话完成后调用，用于更新摘要和提取记忆
+     */
+    public void postConversationUpdate(String conversationId, String projectId, 
+                                        List<ChatMessage> messages) {
+        log.info("Post-conversation update: conversationId={}, messageCount={}", 
+                conversationId, messages.size());
+        
+        Long projectIdLong = null;
+        try {
+            projectIdLong = projectId != null ? Long.parseLong(projectId) : null;
+        } catch (NumberFormatException e) {
+            // ignore
+        }
+        
+        // 检查是否需要生成新摘要/Episode（超过 15 条消息）
+        if (messages.size() >= 15) {
+            try {
+                // 使用 Episode 生成器（借鉴 EverMemOS 的结构化情景记忆）
+                ConversationSummarizer.EpisodeResult episodeResult = 
+                        conversationSummarizer.generateEpisode(messages, conversationId, projectIdLong);
+                
+                ConversationSummarizer.SummaryResult summaryResult = episodeResult.getSummaryResult();
+                
+                // 更新完整的 Episode 信息
+                ConversationSummary summary = episodeResult.toEntity(conversationId, projectIdLong, null);
+                summary.setTokenCount(contextCompressor.estimateTokens(summaryResult.getSummaryText()));
+                summary.setMessageCount(messages.size());
+                
+                // 保存到数据库
+                memoryManager.updateConversationSummary(
+                        conversationId,
+                        summaryResult.getSummaryText(),
+                        summaryResult.getKeyPoints(),
+                        summaryResult.getLegalReferences(),
+                        summaryResult.getMentionedEntities(),
+                        summaryResult.getPendingTasks(),
+                        contextCompressor.estimateTokens(summaryResult.getSummaryText()),
+                        messages.size(),
+                        null  // lastMessageId - 可以从最后一条消息获取
+                );
+                
+                log.info("Episode generated: type={}, events={}, key points={}, legal refs={}",
+                        episodeResult.getEpisodeType(),
+                        episodeResult.getEvents() != null ? episodeResult.getEvents().size() : 0,
+                        summaryResult.getKeyPoints() != null ? summaryResult.getKeyPoints().size() : 0,
+                        summaryResult.getLegalReferences() != null ? summaryResult.getLegalReferences().size() : 0);
+            } catch (Exception e) {
+                log.error("Failed to generate Episode: {}", e.getMessage(), e);
+            }
+        }
+        
+        // 提取并更新项目记忆
+        if (projectIdLong != null) {
+            try {
+                // 1. 更新项目级记忆（法律引用、金额、日期等）
+                projectMemoryExtractor.extractAndUpdateProjectMemory(projectIdLong, messages);
+                
+                // 2. 使用 MemCellExtractor 自动提取原子记忆单元
+                // 这是借鉴 EverMemOS 的 MemCell 概念，使用 LLM 智能提取
+                int memCellCount = memCellExtractor.extractAndSave(projectIdLong, conversationId, messages);
+                
+                if (memCellCount > 0) {
+                    log.info("MemCell extraction completed: saved {} atomic memory units", memCellCount);
+                }
+            } catch (Exception e) {
+                log.error("Failed to extract project memory: {}", e.getMessage(), e);
+            }
+        }
     }
 
     /**
@@ -310,5 +508,105 @@ public class ContextAssemblerService {
                 collectFilesRecursive(projectId, child.getId(), collector, depth + 1);
             }
         }
+    }
+
+    /**
+     * 根据 Agent 模式生成对应的提示词约束。
+     * 
+     * - ASK: 纯对话模式，禁止工具调用
+     * - PLAN: 规划模式，必须先生成计划并等待确认
+     * - AGENT: 自动执行模式（默认行为）
+     */
+    private String getModeConstraints(AgentMode mode) {
+        if (mode == null) mode = AgentMode.AGENT;
+        
+        return switch (mode) {
+            case ASK -> """
+
+# MODE OVERRIDE: ASK MODE (纯对话模式)
+
+**CRITICAL CONSTRAINTS - YOU MUST FOLLOW THESE RULES:**
+
+1. **FORBIDDEN ACTIONS** - 以下操作在 Ask 模式下完全禁止：
+   - DO NOT output `<tool_code>` tags - 不允许调用任何工具
+   - DO NOT output `<artifact>` tags - 不生成任何计划或任务清单
+   - DO NOT output `<process>` tags - 不执行任何操作流程
+   - DO NOT use any tools (search_web, read_document, write_docx, etc.)
+
+2. **ALLOWED ACTIONS** - 在 Ask 模式下你只能：
+   - 直接回答用户问题（使用 `<thinking>` + 纯文本或 `<final>` 标签）
+   - 基于已有上下文（文件内容、历史记录）进行分析和解答
+   - 提供建议和意见，但不执行任何操作
+   - 如果用户请求需要工具才能完成，请告知用户切换到 Agent 模式
+
+3. **OUTPUT FORMAT**:
+   <thinking>分析用户意图...</thinking>
+   
+   <final>
+   直接回答用户问题的内容...
+   </final>
+
+4. **IMPORTANT**: 如果用户询问需要查询法规、搜索网络、读取文档或创建文件的问题，
+   你应该基于你的知识库回答，或者建议用户切换到 Agent 模式以获取实时信息。
+""";
+            case PLAN -> """
+
+# MODE OVERRIDE: PLAN MODE (规划模式)
+
+**CRITICAL CONSTRAINTS - YOU MUST FOLLOW THESE RULES:**
+
+1. **MANDATORY PLANNING** - 必须先生成计划：
+   - 对于任何非简单问答的请求，你必须先输出 `<artifact type="implementation_plan">`
+   - 计划必须详细列出将要执行的步骤、使用的工具、预期产出
+   - 输出计划后立即停止，等待用户确认
+
+2. **NO EXECUTION UNTIL APPROVED** - 未经确认不得执行：
+   - 在用户明确批准计划之前，禁止使用 `<tool_code>` 调用任何工具
+   - 如果用户说"确认"、"同意"、"执行"等确认词，则可以开始执行
+   - 执行时按照计划中的步骤逐一进行
+
+3. **PLAN OUTPUT FORMAT**:
+   <thinking>分析任务复杂度和所需步骤...</thinking>
+   
+   <title>任务标题</title>
+   
+   <artifact type="implementation_plan" name="计划名称">
+   ## 任务目标
+   [描述要完成什么]
+   
+   ## 执行步骤
+   1. [步骤1描述] - 使用工具: xxx
+   2. [步骤2描述] - 使用工具: xxx
+   3. ...
+   
+   ## 预期产出
+   - [产出1]
+   - [产出2]
+   
+   请确认是否按此计划执行？
+   </artifact>
+   
+   (STOP HERE - 等待用户确认)
+
+4. **SIMPLE QUESTIONS**: 对于简单问答（如打招呼、概念解释），可以直接回答，无需生成计划。
+""";
+            case AGENT -> """
+
+# MODE: AGENT MODE (自动执行模式)
+
+当前处于 Agent 模式，这是默认的完整功能模式：
+
+1. **自动执行**: 可以自动调用工具完成任务，无需等待用户确认
+2. **智能规划**: 对于复杂任务可以生成 `task_list`（但不会停止等待确认）
+3. **工具使用**: 可以使用所有可用工具（搜索、读写文件、法律研究等）
+4. **正常流程**: 按照标准的 [Thought -> Action -> Observation] 循环执行
+
+## 精确执行原则 (CRITICAL - 必须遵守)
+- **严格遵循用户请求的边界**：只执行用户明确要求的操作
+- 如果用户说"删除第三个z"，就**只删除第三个z**，不要删除第二个、第四个或任何其他z
+- 完成用户**明确请求的任务**后，立即输出 `<final>` 结束
+- **禁止**自作主张继续执行"相关"或"类似"的额外操作
+""";
+        };
     }
 }

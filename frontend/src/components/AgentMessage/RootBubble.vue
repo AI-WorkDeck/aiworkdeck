@@ -100,7 +100,6 @@ const isReady = computed(() => {
 }
 
 .ghost-thinking {
-    /* Floating style, minimal */
     max-width: 100%;
     margin-left: 0;
     padding: 0;
@@ -111,27 +110,25 @@ const isReady = computed(() => {
 }
 
 .ghost-thinking-wrapper {
-    /* 左对齐，无缩进 */
     margin-left: 0;
     padding: 0;
-    margin-bottom: 8px; /* 稍微增加与下方内容的间距 */
+    margin-bottom: 8px;
 }
 
 .root-bubble-container {
   display: flex;
   flex-direction: column;
   background: #ffffff;
-  /* 移除 heavy border, 使用更轻透的风格 */
-  border: 1px solid #E9ECEF; /* Gray-Light */
-  border-radius: 8px; /* 适中圆角 */
+  border: 1px solid rgba(233, 236, 239, 0.8); /* Very subtle border */
+  border-radius: 12px; /* rounded-xl */
   overflow: hidden;
-  /* box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03); 移除阴影，追求扁平化 */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.08); /* shadow-sm plus */
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  margin-bottom: 24px; /* 增加消息间距，显得更透气 */
+  margin-bottom: 32px; /* Breathable spacing between bubbles */
   user-select: text;
   -webkit-user-select: text;
 }
@@ -141,15 +138,19 @@ const isReady = computed(() => {
   border-bottom: 1px solid #f1f5f9;
 }
 
+.artifact-wrapper:last-child {
+    border-bottom: none;
+}
+
 .main-content {
-  padding: 12px 16px; /* 恢复适度内边距，太少会显得拥挤 */
-  font-size: 14px; /* 恢复标准字体大小，太小看不清 */
+  padding: 16px 20px; /* Increased padding */
+  font-size: 14px;
   line-height: 1.6;
   color: #2C3338; /* Gray-Dark */
 }
 
 .main-content:deep(p) {
-  margin: 0 0 10px 0;
+  margin: 0 0 12px 0;
 }
 
 .main-content:deep(p:last-child) {
@@ -157,13 +158,13 @@ const isReady = computed(() => {
 }
 
 .main-content:deep(ul), .main-content:deep(ol) {
-  margin: 6px 0;
+  margin: 8px 0;
   padding-left: 20px;
 }
 
 /* Inline Code Style - King Mint Tint */
 .main-content:deep(code) {
-  background: rgba(91, 209, 151, 0.12); /* King Mint Tint */
+  background: rgba(91, 209, 151, 0.1); /* Subtle King Mint Tint */
   padding: 2px 5px;
   border-radius: 4px;
   font-size: 85%;
@@ -174,12 +175,12 @@ const isReady = computed(() => {
 /* Block Code Style */
 .main-content:deep(pre) {
   background: #F8F9FA; /* Gray-Pale */
-  padding: 12px;
-  border-radius: 6px;
+  padding: 16px;
+  border-radius: 8px;
   overflow-x: auto;
   border: 1px solid #E9ECEF;
-  font-size: 12px;
-  margin: 10px 0;
+  font-size: 13px;
+  margin: 12px 0;
 }
 
 .main-content:deep(pre code) {
@@ -210,8 +211,8 @@ const isReady = computed(() => {
 .main-content :deep(.markdown-body h1),
 .main-content :deep(.markdown-body h2),
 .main-content :deep(.markdown-body h3) {
-  margin-top: 16px !important;
-  margin-bottom: 8px !important;
+  margin-top: 20px !important;
+  margin-bottom: 10px !important;
   font-weight: 600;
   color: #1A5336; /* King Forest for headings */
 }
