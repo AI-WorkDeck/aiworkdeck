@@ -266,6 +266,8 @@ public class AgentOrchestrator {
                  String text = extractArg(args, "text");
                  Boolean deleteAll = "true".equalsIgnoreCase(extractArg(args, "deleteAll"));
                  return wpsTools.wps_delete_text(text, deleteAll);
+            } else if ("wps_debug_revisions".equals(toolName)) {
+                 return wpsTools.wps_debug_revisions();
             // ==================== PPTX 文件管理工具 ====================
             } else if ("list_project_folders".equals(toolName)) {
                  return pptxTools.list_project_folders(projectId);
@@ -902,6 +904,8 @@ public class AgentOrchestrator {
                              String deleteAllStr = extractStringArg(code, "deleteAll");
                              Boolean deleteAll = deleteAllStr.isEmpty() || "true".equalsIgnoreCase(deleteAllStr);
                              result = wpsTools.wps_delete_text(text, deleteAll);
+                        } else if (code.contains("wps_debug_revisions")) {
+                             result = wpsTools.wps_debug_revisions();
 
                          } else {
 

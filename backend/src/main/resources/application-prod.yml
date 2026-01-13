@@ -21,9 +21,9 @@ external:
     key: ***REMOVED***
     secret: ***REMOVED***
   wps:
-    app-id: AK20251215TTJNYB
+    app-id: SX20260104RLPEYU
     app-secret: ***REMOVED***
-    callback-base-url: https://kingide500.cpolar.top  # 使用 cpolar 内网穿透地址，供 WPS 回调使用
+    callback-base-url: https://6e783f5e.r3.cpolar.cn  # 使用 cpolar 内网穿透地址（当前实际URL，每次重启会变化）
   tushare:
     base-url: http://api.tushare.pro
     token: ${TUSHARE_TOKEN:}

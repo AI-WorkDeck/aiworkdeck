@@ -382,6 +382,19 @@ public class WpsTools {
         }
     }
 
+    // ==================== 调试工具 ====================
+
+    @Tool("调试工具：获取 WPS 文档中所有修订记录的详细信息，包括修订类型、位置、内容等。用于分析和诊断修订模式下的文本操作问题。")
+    public String wps_debug_revisions() {
+        log.info("Tool: wps_debug_revisions called");
+        try {
+            return wpsActionService.executeWpsCommand("debug_revisions", null);
+        } catch (Exception e) {
+            log.error("Failed to debug revisions", e);
+            return "Error: " + e.getMessage();
+        }
+    }
+
     // ==================== 辅助方法 ====================
 
     /**
