@@ -226,6 +226,30 @@ export function useWpsBridge() {
     }
 
     /**
+     * 关闭修订模式（用于 AI 操作）
+     * AI 操作时不使用修订模式，直接替换文本
+     */
+    const disableTrackRevisions = async (wpsApp) => {
+        try {
+            await logWpsState('Pre-DisableTrackRevisions', wpsApp)
+
+            const doc = await wpsApp.ActiveDocument
+            if (doc) {
+                // 关闭修订模式
+                doc.TrackRevisions = false
+
+                const view = await doc.ActiveWindow.View
+                view.ShowRevisionsAndComments = false
+
+                await logWpsState('Post-DisableTrackRevisions', wpsApp)
+                console.log('[WpsBridge] TrackRevisions disabled for AI operation')
+            }
+        } catch (e) {
+            console.warn('[WpsBridge] disableTrackRevisions failed:', e)
+        }
+    }
+
+    /**
      * 获取 Selection 对象
      * 官方文档推荐路径：app.ActiveDocument.ActiveWindow.Selection
      * 参考：https://solution.wps.cn/docs/client/api/Word/Selection.html
@@ -523,51 +547,72 @@ export function useWpsBridge() {
 
     /**
      * Delete current selection using strict SDK method
+     * @param {Object} range - Range 对象（直接使用，不重新获取）
      * @param {Object} wpsApp
      */
-    const executeDelete = async (wpsApp) => {
+    const executeDelete = async (range, wpsApp) => {
         console.log(`[WpsBridge] executeDelete: Starting...`)
 
-        const sel = await wpsApp.ActiveDocument.ActiveWindow.Selection
-        const range = await sel.Range
-        const rangeToCheck = await sel.Range
-        const currentSelText = await rangeToCheck.Text
-
-        // 获取选区信息
-        const start = await range.Start
-        const end = await range.End
-        const count = end - start
-
-        console.log(`[WpsBridge] executeDelete: Selection: ${start}-${end}, Text: "${currentSelText}"`)
-
-        // 检查选区是否有效
-        if (count <= 0) {
-            console.warn(`[WpsBridge] executeDelete: Selection is empty or collapsed! count=${count}`)
-            // Don't throw, just return, trying to delete empty selection crashes some SDKs or does nothing.
-            // But if user insists on calling delete(1), we call it.
-        }
-
         try {
-            // 执行删除
-            // 官方文档：Selection.Delete(Unit, Count)
-            // WdUnits: wdCharacter = 1
-            console.log(`[WpsBridge] executeDelete: Calling Selection.Delete(1)`)
-            const deleteResult = await sel.Delete(1)
-            console.log(`[WpsBridge] executeDelete: Delete call returned:`, deleteResult)
+            const rangeToCheck = await range
+            const currentSelText = await rangeToCheck.Text
 
-            // 6. 验证删除结果
-            console.log(`[WpsBridge] Step 7: Verifying delete result`)
-            const postSel = await getSelection(wpsApp)
-            const postRange = await postSel.Range
-            const postStart = await postRange.Start
-            const postEnd = await postRange.End
-            console.log(`[WpsBridge] Post-delete selection: ${postStart}-${postEnd}`)
+            // 获取选区信息
+            const start = await range.Start
+            const end = await range.End
+            const count = end - start
 
-            if (postStart !== start || postEnd !== start) {
-                console.warn(`[WpsBridge] executeDelete: Selection did not collapse to start position after delete. Expected ${start}-${start}, got ${postStart}-${postEnd}`)
+            console.log(`[WpsBridge] executeDelete: Range: ${start}-${end}, Text: "${currentSelText}", Count: ${count}`)
+
+            // 检查选区是否有效
+            if (count <= 0) {
+                console.warn(`[WpsBridge] executeDelete: Range is empty or collapsed! count=${count}`)
+                return
             }
 
-            console.log('[WpsBridge] executeDelete: Delete call completed')
+            // 方法1：设置 range.Text = ""（最简单、最可靠）
+            console.log(`[WpsBridge] executeDelete: Using range.Text = ""`)
+            try {
+                range.Text = ""
+
+                // 验证删除结果
+                const postRangeText = await range.Text
+                const postRangeStart = await range.Start
+                const postRangeEnd = await range.End
+                console.log(`[WpsBridge] Post-delete range: ${postRangeStart}-${postRangeEnd}, Text: "${postRangeText}"`)
+
+                if (postRangeText === "" || postRangeStart === postRangeEnd) {
+                    console.log('[WpsBridge] executeDelete: Successfully deleted via range.Text')
+                    return
+                }
+            } catch (textErr) {
+                console.warn(`[WpsBridge] range.Text = "" failed:`, textErr)
+            }
+
+            // 方法2：使用 Selection.Delete()（备用方案）
+            console.log(`[WpsBridge] executeDelete: Trying Selection.Delete()`)
+            try {
+                // 设置 Selection 到这个 Range
+                const sel = await wpsApp.ActiveDocument.ActiveWindow.Selection
+
+                // ✅ 正确方式：通过 sel.Range.SetRange() 设置选区
+                const selRange = await sel.Range
+                await selRange.SetRange(start, end)
+
+                // 验证选区是否正确设置
+                const verifyStart = await selRange.Start
+                const verifyEnd = await selRange.End
+                console.log(`[WpsBridge] Selection set to: ${verifyStart}-${verifyEnd}`)
+
+                // 使用 Selection.Delete() 删除选区内容（不传参数 = 删除整个选区）
+                await sel.Delete()
+
+                console.log('[WpsBridge] executeDelete: Selection.Delete() completed')
+                return
+            } catch (selErr) {
+                console.warn(`[WpsBridge] Selection.Delete() also failed:`, selErr)
+                throw selErr
+            }
         } catch (e) {
             console.error('[WpsBridge] executeDelete failed:', e)
             throw e
@@ -576,28 +621,31 @@ export function useWpsBridge() {
 
     /**
      * 替换当前选区文本
-     * 
+     *
      * 官方文档：
      * - Selection.Delete(): https://solution.wps.cn/docs/client/api/Word/Selection.html#delete
      * - Range.Text: 通过 Range 选定区域获取和设置具体的文本内容信息
-     * 
+     *
      * @param {string} text - 新文本
-     * @param {Object} range - 由 setSelectionRange 返回的 Range 对象
      * @param {Object} wpsInstance - WPS 实例
      */
-    const replaceSelection = async (text, range, wpsInstance = null) => {
+    const replaceSelection = async (text, wpsInstance = null) => {
         try {
             const wpsApp = await getWpsInstance(wpsInstance)
             const doc = await wpsApp.ActiveDocument
 
-            // 获取传入 range 的坐标信息，确保是纯数字
+            // 获取当前选区
+            const sel = await doc.ActiveWindow.Selection
+            const range = await sel.Range
+
+            // 获取当前选区信息
             const startRaw = await range.Start
             const endRaw = await range.End
             const start = parseInt(startRaw)
             const end = parseInt(endRaw)
             const oldText = await range.Text
 
-            console.log(`[WpsBridge] Replacing range ${start}-${end} ("${oldText}") with "${text}"`)
+            console.log(`[WpsBridge] Replacing current selection ${start}-${end} ("${oldText}") with "${text}"`)
             console.log(`[WpsBridge] Parameter types: start=${typeof start}(${start}), end=${typeof end}(${end}), text=${typeof text}`)
 
             // 官方文档推荐模式：
@@ -627,28 +675,58 @@ export function useWpsBridge() {
             const textStr = String(text)
             console.log(`[WpsBridge] Step 3: Setting freshRange.Text = '${textStr}'`)
 
-            // 官方示例：range.Text = 'WebOffice' (无 await)
-            const freshRangeText = await freshRange.Text
-            freshRange.Text = textStr
+            // 方法1：直接赋值（最简单、最可靠）
+            try {
+                freshRange.Text = textStr
 
-            // 尝试捕获赋值操作的返回值（如果有）
-            // 延迟一点点，确保异步生效
-            // await new Promise(r => setTimeout(r, 50))
+                // 验证替换结果
+                const newText = await freshRange.Text
+                console.log(`[WpsBridge] After Text assignment, freshRange.Text = "${newText}"`)
 
-            // 验证替换结果
-            const newText = await freshRange.Text
-            console.log(`[WpsBridge] After assignment, freshRange.Text = "${newText}"`)
+                const replacementSuccess = (newText.trim() === textStr.trim())
+                console.log(`[WpsBridge] Replacement success: ${replacementSuccess}`)
 
-            // 检查是否真的替换成功
-            const replacementSuccess = (newText === textStr)
-            console.log(`[WpsBridge] Replacement success: ${replacementSuccess}`)
+                if (replacementSuccess) {
+                    return {
+                        success: true,
+                        replaced: true,
+                        message: `已将 "${oldText}" 替换为 "${textStr}"`
+                    }
+                }
+            } catch (e) {
+                console.error('[WpsBridge] Direct Text assignment failed:', e)
+            }
 
-            return {
-                success: replacementSuccess,
-                replaced: replacementSuccess,
-                message: replacementSuccess
-                    ? `已将 "${oldText}" 替换为 "${textStr}"`
-                    : `替换失败：期望 "${textStr}"，实际 "${newText}"`
+            // 方法2：使用 Selection.Delete() + InsertAfter()（回退方案）
+            try {
+                console.log(`[WpsBridge] Trying Selection.Delete() + InsertAfter()`)
+
+                // 设置选区（使用 sel.Range.SetRange，不是直接赋值 Start/End）
+                const sel = await wpsApp.ActiveDocument.ActiveWindow.Selection
+                const selRange = await sel.Range
+                await selRange.SetRange(start, end)
+
+                // 删除（不传参数，删除整个选区）
+                await sel.Delete()
+
+                // 插入新文本
+                await sel.InsertAfter(textStr)
+
+                // 验证
+                const verifyRange = await sel.Range
+                const newText = await verifyRange.Text
+                const replacementSuccess = (newText.trim() === textStr.trim())
+
+                return {
+                    success: replacementSuccess,
+                    replaced: replacementSuccess,
+                    message: replacementSuccess
+                        ? `已将 "${oldText}" 替换为 "${textStr}"`
+                        : `替换失败：期望 "${textStr}"，实际 "${newText}"`
+                }
+            } catch (e2) {
+                console.error('[WpsBridge] Selection.Delete+InsertAfter also failed:', e2)
+                return { success: false, error: e2.message }
             }
         } catch (e) {
             console.error('[WpsBridge] replaceSelection error:', e)
@@ -762,8 +840,8 @@ export function useWpsBridge() {
 
             const wpsApp = await getWpsInstance(wpsInstance)
 
-            // 0. Ensure revision state ONCE at the start
-            await ensureTrackRevisions(wpsApp)
+            // 0. 关闭修订模式（AI 操作直接替换）
+            await disableTrackRevisions(wpsApp)
 
             // 1. 查找所有位置
             const findResult = await findTextLocations(findTextStr, false, wpsApp)
@@ -784,13 +862,14 @@ export function useWpsBridge() {
             // 3. 执行替换
             let replacedCount = 0
             for (const pos of targets) {
-                const result = await setSelectionRange(pos.start, pos.end, wpsInstance)
-                if (result.success && result.range) {
-                    // 使用 setSelectionRange 返回的 range 对象进行替换
-                    const replaceRes = await replaceSelection(replaceTextStr, result.range, wpsInstance)
+                try {
+                    // 直接使用 replaceAtPosition，不受 Selection 状态影响
+                    const replaceRes = await replaceAtPosition(pos.start, pos.end, replaceTextStr, wpsInstance)
                     if (replaceRes.success) {
                         replacedCount++
                     }
+                } catch (e) {
+                    console.warn(`[WpsBridge] Failed to replace at ${pos.start}-${pos.end}:`, e)
                 }
             }
 
@@ -845,16 +924,16 @@ export function useWpsBridge() {
             let deletedCount = 0
 
             for (const pos of positions) {
-                // Strict sequence: Ensure Revision -> SetRange -> Delete
-                await ensureTrackRevisions(wpsApp)
-                const selRes = await setSelectionRange(pos.start, pos.end, wpsApp)
-                if (selRes.success) {
-                    try {
-                        await executeDelete(wpsApp)
-                        deletedCount++
-                    } catch (e) {
-                        console.warn(`[WpsBridge] Failed to delete match at ${pos.start}:`, e)
-                    }
+                // Strict sequence: Disable Revision -> Create Range -> Delete
+                await disableTrackRevisions(wpsApp)
+
+                try {
+                    // 直接创建 Range 对象
+                    const range = await wpsApp.ActiveDocument.Range(pos.start, pos.end)
+                    await executeDelete(range, wpsApp)
+                    deletedCount++
+                } catch (e) {
+                    console.warn(`[WpsBridge] Failed to delete match at ${pos.start}:`, e)
                 }
             }
 
@@ -874,7 +953,7 @@ export function useWpsBridge() {
      * 在指定位置替换文本
      * 官方文档：https://solution.wps.cn/docs/client/api/Word/Range.html#text
      * 需要 JSSDK v1.1.11+ 支持
-     * 
+     *
      * @param {number} start - 开始位置（字符索引）
      * @param {number} end - 结束位置（字符索引）
      * @param {string} newText - 替换后的文本
@@ -892,36 +971,85 @@ export function useWpsBridge() {
                 if (protectionType === 3) return { success: false, error: '文档处于只读保护模式' }
             } catch (e) { }
 
-            // 2. 确保视图可见
-            await ensureTrackRevisions(wpsApp)
+            // 2. 关闭修订模式
+            await disableTrackRevisions(wpsApp)
 
-            // 3. Select Range (Strict Mode)
-            const selRes = await setSelectionRange(start, end, wpsApp)
-            if (!selRes.success) throw new Error(selRes.error || 'Failed to set selection')
+            // 3. Create Range directly
+            console.log(`[WpsBridge] Creating range: ${start}-${end}`)
+            const range = await doc.Range(start, end)
 
-            // 4. Delete Old Text
-            await executeDelete(wpsApp)
+            // 验证 Range
+            const verifyStart = await range.Start
+            const verifyEnd = await range.End
+            const verifyText = await range.Text
+            console.log(`[WpsBridge] Range verification: ${verifyStart}-${verifyEnd}, Text: "${verifyText}"`)
 
-            // 5. Insert New Text
-            const sel = await doc.ActiveWindow.Selection
-            console.log(`[WpsBridge] Inserting "${newText}" via InsertAfter`)
-            await sel.InsertAfter(newText)
-
-            // 6. Update Selection (Collapse to end)
-            // InsertAfter expands selection
-            // 7. 更新选区
-            const newEnd = start + newText.length // Calculated from start
-            const finalRange = await sel.Range
-            await finalRange.SetRange(newEnd, newEnd);
-
-            return {
-                success: true,
-                replaced: true,
-                start,
-                end,
-                newText,
-                message: `已将位置 ${start}-${end} 的内容替换为 "${newText}"`
+            if (verifyStart !== start || verifyEnd !== end) {
+                throw new Error(`Range creation failed: expected ${start}-${end}, got ${verifyStart}-${verifyEnd}`)
             }
+
+            // 4. 直接替换文本（不分离删除和插入操作）
+            console.log(`[WpsBridge] Direct replacement: range.Text = "${newText}"`)
+            const newTextStr = String(newText)
+
+            // 方法1：直接赋值替换
+            try {
+                range.Text = newTextStr
+
+                // 验证替换结果
+                const resultText = await range.Text
+                const resultStart = await range.Start
+                const resultEnd = await range.End
+
+                console.log(`[WpsBridge] After replacement: range ${resultStart}-${resultEnd}, Text: "${resultText}"`)
+
+                // 检查是否替换成功
+                if (resultText.trim() === newTextStr.trim()) {
+                    console.log('[WpsBridge] ✅ Direct replacement successful')
+                    return {
+                        success: true,
+                        replaced: true,
+                        start,
+                        end,
+                        newText: newTextStr,
+                        message: `已将位置 ${start}-${end} 的内容替换为 "${newTextStr}"`
+                    }
+                } else {
+                    console.warn('[WpsBridge] ⚠️ Replacement verification failed, trying alternative method')
+                }
+            } catch (e) {
+                console.warn('[WpsBridge] Direct replacement failed:', e)
+            }
+
+            // 方法2：使用 Selection（备用方案）
+            try {
+                console.log(`[WpsBridge] Trying Selection-based replacement`)
+
+                // 设置选区
+                const sel = await doc.ActiveWindow.Selection
+                const selRange = await sel.Range
+                await selRange.SetRange(start, end)
+
+                // 先删除
+                await sel.Delete()
+
+                // 再插入
+                await sel.InsertAfter(newTextStr)
+
+                console.log('[WpsBridge] ✅ Selection-based replacement completed')
+                return {
+                    success: true,
+                    replaced: true,
+                    start,
+                    end,
+                    newText: newTextStr,
+                    message: `已将位置 ${start}-${end} 的内容替换为 "${newTextStr}"`
+                }
+            } catch (selErr) {
+                console.error('[WpsBridge] Selection-based replacement also failed:', selErr)
+                throw selErr
+            }
+
         } catch (e) {
             console.error('[WpsBridge] replaceAtPosition error:', e)
             return { success: false, error: e.message }
@@ -988,13 +1116,15 @@ export function useWpsBridge() {
             }
             const targetPos = visiblePositions[matchIndex - 1]
 
-            // 2. Set Selection
-            await ensureTrackRevisions(wpsApp)
-            const selRes = await setSelectionRange(targetPos.start, targetPos.end, wpsApp)
-            if (!selRes.success) return selRes
+            // 2. Create Range directly and delete
+            await disableTrackRevisions(wpsApp)
 
-            // 3. Delete
-            await executeDelete(wpsApp)
+            try {
+                const range = await wpsApp.ActiveDocument.Range(targetPos.start, targetPos.end)
+                await executeDelete(range, wpsApp)
+            } catch (e) {
+                return { success: false, error: e.message }
+            }
 
             return {
                 success: true,
@@ -1036,8 +1166,8 @@ export function useWpsBridge() {
                 console.warn('[WpsBridge] Check protection failed:', e)
             }
 
-            // 2. 确保开启修订模式，并设置视图可见性
-            await ensureTrackRevisions(wpsApp)
+            // 2. 关闭修订模式（AI 操作直接替换）
+            await disableTrackRevisions(wpsApp)
             try {
                 const doc = await wpsApp.ActiveDocument
                 const view = await doc.ActiveWindow.View
@@ -1170,8 +1300,8 @@ export function useWpsBridge() {
             const wpsApp = await getWpsInstance(wpsInstance)
             const doc = await wpsApp.ActiveDocument
 
-            // 确保开启修订模式
-            await ensureTrackRevisions(wpsApp)
+            // 关闭修订模式（AI 操作直接替换）
+            await disableTrackRevisions(wpsApp)
 
             // 通过 Content.Paragraphs 获取段落集合
             let paras = null
@@ -1328,8 +1458,8 @@ export function useWpsBridge() {
             const wpsApp = await getWpsInstance(wpsInstance)
             const doc = await wpsApp.ActiveDocument
 
-            // 确保开启修订模式
-            await ensureTrackRevisions(wpsApp)
+            // 关闭修订模式（AI 操作直接替换）
+            await disableTrackRevisions(wpsApp)
 
             // ========== 方式1：使用 Selection.Find ==========
             // 官方推荐路径：app.ActiveDocument.ActiveWindow.Selection

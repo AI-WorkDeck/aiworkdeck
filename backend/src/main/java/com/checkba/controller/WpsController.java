@@ -172,9 +172,9 @@ public class WpsController {
     public ResponseEntity<Map<String, Object>> getFileDownloadUrl(@PathVariable("file_id") String fileId) {
         log.info("[WPS-getDownloadUrl] ===== 开始处理下载URL请求 =====");
         log.info("[WPS-getDownloadUrl] fileId: {}", fileId);
-        
+
         // 根据 WPS 官方文档，下载地址接口同样使用统一返回格式 { code, message, data }
-        // data 中的字段名为 url（不是 download_url），否则会出现“字段:url 不能为空”的错误。
+        // data 中的字段名为 url（不是 download_url），否则会出现"字段:url 不能为空"的错误。
 
         // 1. data：真正的下载信息
         Map<String, Object> data = new java.util.LinkedHashMap<>();
@@ -232,7 +232,9 @@ public class WpsController {
 
         log.info("WPS download response: fileId={}, data={}", fileId, data);
 
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/json; charset=utf-8")
+                .body(result);
     }
 
     /**
@@ -252,6 +254,8 @@ public class WpsController {
             @RequestParam(value = "user_id", required = false) String userId,
             @RequestHeader(value = "X-Weboffice-Token", required = false) String token) {
         log.info("WPS callback: getFilePermission, fileId: {}, userId: {}, token: {}", fileId, userId, token);
+        log.info("WPS callback: getFilePermission - Request headers: X-Weboffice-Token={}, all headers debug",
+                token != null ? token : "null");
 
         // 根据 WPS 官方文档，回调统一返回格式为 { code, message, data }
         // data 中才是具体的权限字段
@@ -267,8 +271,12 @@ public class WpsController {
             if (modePart.contains("|")) {
                 modePart = modePart.substring(0, modePart.indexOf("|"));
             }
-            isViewMode = "view".equalsIgnoreCase(modePart.trim());
-            log.info("WPS permission: parsed mode from token: {}", modePart);
+            // 去除可能的尾部空格或其他字符
+            modePart = modePart.trim().split("[&\\s]")[0];
+            isViewMode = "view".equalsIgnoreCase(modePart);
+            log.info("WPS permission: parsed mode from token: modePart={}, isViewMode={}", modePart, isViewMode);
+        } else {
+            log.info("WPS permission: no mode found in token, defaulting to edit mode");
         }
 
         // 2. 具体权限数据
@@ -310,27 +318,38 @@ public class WpsController {
         result.put("data", data);
 
         log.info("WPS permission response: fileId={}, userId={}, isViewMode={}, data={}", fileId, userId, isViewMode, data);
+        log.info("WPS permission response: full response JSON={}", result);
 
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/json; charset=utf-8")
+                .body(result);
     }
 
     /**
      * 获取文档水印
      * GET /v3/3rd/files/{file_id}/watermark
-     * WPS 要求的响应格式：返回水印配置对象
+     *
+     * 根据 WPS 官方文档，水印接口也应遵循统一返回格式 { code, message, data }
      */
     @GetMapping("/files/{file_id}/watermark")
     public ResponseEntity<Map<String, Object>> getFileWatermark(@PathVariable("file_id") String fileId) {
         log.info("WPS callback: getFileWatermark, fileId: {}", fileId);
-        
-        // 返回空水印配置（不显示水印）
-        // WPS 可能要求返回 null 或空对象表示无水印
+
+        // 构建水印配置对象（无水印）
+        Map<String, Object> data = new HashMap<>();
+        data.put("type", "none");
+
+        // 按照 WPS 统一返回格式包装
         Map<String, Object> result = new HashMap<>();
-        result.put("type", "none");
-        // 或者返回 null 表示无水印
-        // return ResponseEntity.ok(null);
-        
-        return ResponseEntity.ok(result);
+        result.put("code", 0);
+        result.put("message", "");
+        result.put("data", data);
+
+        log.info("WPS watermark response: fileId={}, data={}", fileId, data);
+
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/json; charset=utf-8")
+                .body(result);
     }
 
     /**

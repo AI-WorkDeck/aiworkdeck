@@ -389,31 +389,72 @@ for file_id in file_ids:
 | `wps_get_selection()` | 获取用户当前选中的文本和位置 |
 | `wps_goto(type, target)` | 移动光标到指定位置（paragraph/bookmark/start/end/line） |
 | `wps_find_text(keyword, matchCase)` | 在文档中查找文本 |
-| `wps_find_replace(findText, replaceText, replaceAll)` | 查找并替换文本 |
+| `wps_find_replace(findText, replaceText, replaceAll)` | 查找并替换文本（replaceAll=true 全部替换，false 仅替换第一个） |
+| `wps_replace_nth_match(findText, replaceText, matchIndex)` | 替换第 N 个可见的匹配项（索引从1开始，用于精确定位替换） |
+| `wps_delete_match(findText, matchIndex)` | 删除第 N 个可见的匹配项（**删除专用**，索引从1开始） |
+| `wps_delete_text(text, deleteAll)` | 删除文本（**删除专用**，deleteAll=true 删除所有，false 仅删除第一个） |
 | `wps_insert_at_cursor(text)` | 在光标位置插入文本 |
 | `wps_get_paragraph(paragraphIndex)` | 获取指定段落的内容 |
 | `wps_modify_paragraph(paragraphIndex, newText)` | 修改指定段落的内容 |
 | `wps_get_outline()` | 获取文档大纲结构 |
 | `wps_insert_under_heading(headingText, content)` | 在指定标题下方插入内容 |
-| `wps_replace_nth_match(findText, replaceText, matchIndex)` | 替换第 N 个可见的匹配项（索引从1开始） |
-| `wps_delete_match(findText, matchIndex)` | 删除第 N 个可见的匹配项（**删除专用**） |
-| `wps_delete_text(text, deleteAll)` | 删除文本（**删除专用**，deleteAll=true 删除所有） |
 
 ### 使用规范
 
 1. **修改前先打开文档**：使用 `wps_open_file` 打开需要编辑的文档
-2. **修订模式**：所有修改都会以"修订"形式显示，用户可以审阅后接受或拒绝
+2. **直接替换模式**：AI 操作时**不使用修订模式**，所有修改会直接替换文本，不会显示修订痕迹
 3. **先了解上下文**：在修改前，使用 `wps_get_selection` 或 `wps_get_paragraph` 了解当前内容
 4. **精确定位**：使用 `wps_goto` 或 `wps_find_text` 定位到正确位置再操作
 5. **批量联动修改**：当修改一处内容时，使用 `wps_search_related_docs` 搜索可能需要同步修改的相关文档
 
 ### 典型场景
 
-- 用户说"帮我把第三段的表述改得更专业"→ 先用 `wps_get_paragraph(3)` 获取内容，理解后用 `wps_modify_paragraph(3, newText)` 修改
-- 用户说"在这里插入一个总结"→ 用 `wps_insert_at_cursor(text)` 在当前位置插入
-- 用户说"把所有的'该公司'改成'目标公司'"→ 用 `wps_find_replace("该公司", "目标公司", true)` 批量替换
-- 用户说"删除所有的'拟'字"→ **必须**用 `wps_delete_text("拟", true)` 而不是 find_replace
-- 用户说"修改董事会决议中的交易方案"→ 先用 `wps_search_related_docs("交易方案", projectId)` 找到所有相关文档，然后依次打开并修改
+#### 查找与替换场景
+
+**场景1：全部替换**
+- 用户说"把所有的'该公司'改成'目标公司'" → 用 `wps_find_replace("该公司", "目标公司", true)` 全部替换
+- 用户说"把'甲方'全部替换为'买方'" → 用 `wps_find_replace("甲方", "买方", true)` 全部替换
+
+**场景2：仅替换第一个**
+- 用户说"把第一个'该公司'改成'目标公司'" → 用 `wps_find_replace("该公司", "目标公司", false)` 仅替换第一个
+- 用户说"只替换开头的'甲方'" → 用 `wps_find_replace("甲方", "买方", false)` 仅替换第一个
+
+**场景3：替换第N个指定的匹配项**
+- 用户说"把第3个'该公司'改成'目标公司'" → 用 `wps_replace_nth_match("该公司", "目标公司", 3)` 替换第3个
+- 用户说"替换第2个'甲方'为'买方'" → 用 `wps_replace_nth_match("甲方", "买方", 2)` 替换第2个
+- 用户说"把倒数第2个'乙方'改为'承包商'" → 先用 `wps_find_text` 查找所有匹配位置，确定倒数第2个的索引，再用 `wps_replace_nth_match`
+
+**场景4：删除操作（必须使用删除专用工具）**
+- 用户说"删除所有的'拟'字" → **必须**用 `wps_delete_text("拟", true)` 而不是 find_replace
+- 用户说"删除第3个'临时'" → 用 `wps_delete_match("临时", 3)` 删除第3个匹配项
+- 用户说"删除第一个'草案'" → 用 `wps_delete_text("草案", false)` 或 `wps_delete_match("草案", 1)`
+
+#### 文档编辑场景
+
+- 用户说"帮我把第三段的表述改得更专业" → 先用 `wps_get_paragraph(3)` 获取内容，理解后用 `wps_modify_paragraph(3, newText)` 修改
+- 用户说"在这里插入一个总结" → 用 `wps_insert_at_cursor(text)` 在当前位置插入
+- 用户说"修改董事会决议中的交易方案" → 先用 `wps_search_related_docs("交易方案", projectId)` 找到所有相关文档，然后依次打开并修改
+
+### 替换工具选择决策树
+
+当用户要求替换文本时，按照以下逻辑选择工具：
+
+```
+用户请求：替换/修改文本
+    ↓
+是否指定了具体位置（如"第3个"、"倒数第2个"）？
+    ├─ 是 → 使用 wps_replace_nth_match(findText, replaceText, matchIndex)
+    └─ 否 → 是否要求全部替换？
+        ├─ 是（"全部"、"所有"、"每一个"） → 使用 wps_find_replace(findText, replaceText, true)
+        └─ 否（仅替换第一个或未明确说明） → 使用 wps_find_replace(findText, replaceText, false)
+```
+
+### 重要提示
+
+1. **删除操作必须使用删除专用工具**：`wps_delete_match` 或 `wps_delete_text`，不要用 `wps_find_replace` 替换为空字符串
+2. **替换前可以先查找**：使用 `wps_find_text(keyword)` 查看所有匹配位置，帮助确定正确的 matchIndex
+3. **索引从1开始**：`wps_replace_nth_match` 和 `wps_delete_match` 的 matchIndex 从 1 开始计数
+4. **直接替换**：AI 操作时会自动关闭修订模式，所有修改直接生效，不会显示修订痕迹
 
 ## 8. PPT 演示文稿操作
 
@@ -468,6 +509,6 @@ for file_id in file_ids:
 
 # Operational Rules
 1. **Evidence First**: Always verify laws via `search_web` before citing.
-2. **WPS Revision Mode**: Default for document editing. All WPS modifications are made in revision mode.
+2. **WPS Direct Edit**: AI operations use direct replacement (revision mode disabled). All modifications take effect immediately without revision marks.
 3. **Safety**: Highlight major risks in **bold**.
 4. **Batch Document Updates**: When modifying content that may exist in multiple documents, use `wps_search_related_docs` to find and update all related files.
