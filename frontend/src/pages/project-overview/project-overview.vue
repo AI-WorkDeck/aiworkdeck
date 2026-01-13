@@ -23,12 +23,12 @@
           </view>
           <view class="project-meta">
             <text class="meta-item">负责人：{{ project.manager || userDisplayName || '我' }}</text>
-            
+
             <block v-if="project.listedCompanyName && project.listedCompanyName !== '-'">
                 <text class="meta-divider">|</text>
                 <text class="meta-item">上市公司：{{ project.listedCompanyName }}</text>
             </block>
-            
+
             <block v-if="project.createdAt">
                 <text class="meta-divider">|</text>
                 <text class="meta-item">创建时间：{{ formatTime(project.createdAt) }}</text>
@@ -36,7 +36,7 @@
           </view>
         </view>
       </view>
-      
+
       <!-- Center Logo -->
       <view class="header-center">
          <image src="/static/logo_full.png" mode="heightFix" class="project-logo" />
@@ -54,41 +54,41 @@
             @mouseenter="hoverLeft = true"
             @mouseleave="hoverLeft = false"
           >
-            <image 
-              :src="(!sidebarCollapsed || hoverLeft) ? '/static/left-bar_selected.png' : '/static/left-bar.png'" 
-              class="tool-icon-img" 
+            <image
+              :src="(!sidebarCollapsed || hoverLeft) ? '/static/left-bar_selected.png' : '/static/left-bar.png'"
+              class="tool-icon-img"
               mode="aspectFit"
             />
           </view>
 
           <!-- 2. Bottom Sidebar (Tools Panel) -->
           <view
-            class="top-bar-btn" 
-            :class="{ active: showToolsPanel }" 
-            @tap="toggleToolsPanel" 
+            class="top-bar-btn"
+            :class="{ active: showToolsPanel }"
+            @tap="toggleToolsPanel"
             title="常用工具"
             @mouseenter="hoverBottom = true"
             @mouseleave="hoverBottom = false"
           >
-            <image 
-              :src="(showToolsPanel || hoverBottom) ? '/static/bottom-bar_selected.png' : '/static/bottom-bar.png'" 
-              class="tool-icon-img" 
+            <image
+              :src="(showToolsPanel || hoverBottom) ? '/static/bottom-bar_selected.png' : '/static/bottom-bar.png'"
+              class="tool-icon-img"
               mode="aspectFit"
             />
           </view>
 
           <!-- 3. Right Sidebar (AI Panel) -->
           <view
-            class="top-bar-btn" 
-            :class="{ active: showAiPanel }" 
-            @tap="toggleAiPanel" 
+            class="top-bar-btn"
+            :class="{ active: showAiPanel }"
+            @tap="toggleAiPanel"
             title="AI 助手"
             @mouseenter="hoverRight = true"
             @mouseleave="hoverRight = false"
           >
-            <image 
-              :src="(showAiPanel || hoverRight) ? '/static/right-bar_selected.png' : '/static/right-bar.png'" 
-              class="tool-icon-img" 
+            <image
+              :src="(showAiPanel || hoverRight) ? '/static/right-bar_selected.png' : '/static/right-bar.png'"
+              class="tool-icon-img"
               mode="aspectFit"
             />
           </view>
@@ -102,55 +102,55 @@
             @mouseenter="hoverSplit = true"
             @mouseleave="hoverSplit = false"
           >
-             <image 
-              :src="(splitMode || hoverSplit) ? '/static/square_selected.png' : '/static/square_split_2x1.png'" 
-              class="tool-icon-img" 
+             <image
+              :src="(splitMode || hoverSplit) ? '/static/square_selected.png' : '/static/square_split_2x1.png'"
+              class="tool-icon-img"
               mode="aspectFit"
             />
           </view>
 
           <!-- 5. Screenshot (OCR) -->
-          <view 
-            class="top-bar-btn" 
-            @tap="startOcrCapture" 
+          <view
+            class="top-bar-btn"
+            @tap="startOcrCapture"
             title="截图摘录（OCR）"
             @mouseenter="hoverCapture = true"
             @mouseleave="hoverCapture = false"
           >
-             <image 
-              :src="hoverCapture ? '/static/screenshop_selected.png' : '/static/screenshop.png'" 
-              class="tool-icon-img" 
+             <image
+              :src="hoverCapture ? '/static/screenshop_selected.png' : '/static/screenshop.png'"
+              class="tool-icon-img"
               mode="aspectFit"
             />
           </view>
 
           <!-- 6. Browser (New Web) -->
-          <view 
-            class="top-bar-btn" 
-            @tap="openBrowserTab()" 
+          <view
+            class="top-bar-btn"
+            @tap="openBrowserTab()"
             title="浏览器"
             @mouseenter="hoverWeb = true"
             @mouseleave="hoverWeb = false"
           >
-             <image 
-              :src="hoverWeb ? '/static/new-web_selected.png' : '/static/new-web.png'" 
-              class="tool-icon-img" 
+             <image
+              :src="hoverWeb ? '/static/new-web_selected.png' : '/static/new-web.png'"
+              class="tool-icon-img"
               mode="aspectFit"
             />
           </view>
-          
+
           <!-- Activity Record Toggle -->
-          <view 
-            class="top-bar-btn" 
-            :class="{ active: isRecording }" 
-            @tap="toggleRecording" 
+          <view
+            class="top-bar-btn"
+            :class="{ active: isRecording }"
+            @tap="toggleRecording"
             title="录制活动"
             @mouseenter="hoverRecord = true"
             @mouseleave="hoverRecord = false"
           >
-            <image 
-              :src="(isRecording || hoverRecord) ? '/static/record-rec_selected.png' : '/static/record-rec.png'" 
-              class="tool-icon-img" 
+            <image
+              :src="(isRecording || hoverRecord) ? '/static/record-rec_selected.png' : '/static/record-rec.png'"
+              class="tool-icon-img"
               mode="aspectFit"
             />
           </view>
@@ -180,7 +180,7 @@
           @tap="toggleLeftPane(p.key)"
         >
           <text v-if="p.textIcon" class="rail-icon">{{ p.textIcon }}</text>
-          <image 
+          <image
             v-else-if="p.activeIcon && p.icon"
             :src="((leftPaneKey === p.key && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned)) ? p.activeIcon : p.icon"
             class="rail-icon-img"
@@ -199,7 +199,7 @@
           title="文件暂存区"
           @tap="toggleLeftPane('staging')"
         >
-          <image 
+          <image
             :src="((leftPaneKey === 'staging' && !sidebarCollapsed) || stagingPinned) ? '/static/temporary_selected.png' : '/static/temporary.png'"
             class="rail-icon-img"
             mode="aspectFit"
@@ -211,17 +211,17 @@
            <view class="members-stack-icon">
               <!-- Stacked avatars -->
               <view class="stack-preview">
-                   <view 
-                      v-for="(member, index) in projectMembers.slice(0, 3)" 
-                      :key="member.id" 
+                   <view
+                      v-for="(member, index) in projectMembers.slice(0, 3)"
+                      :key="member.id"
                       class="stack-avatar-mini"
-                      :style="{ zIndex: 3 - index, top: (index * -4) + 'px', left: (index * 2) + 'px' }" 
+                      :style="{ zIndex: 3 - index, top: (index * -4) + 'px', left: (index * 2) + 'px' }"
                    >
                       <image v-if="member.avatarUrl" :src="member.avatarUrl" class="avatar-img" />
                       <view v-else class="avatar-placeholder">{{ member.displayName?.charAt(0) || 'U' }}</view>
                    </view>
               </view>
-              
+
               <!-- Expanded Panel (Hover) -->
               <view class="members-expand-panel-left">
                   <scroll-view scroll-y class="expand-list">
@@ -237,14 +237,14 @@
                                      </view>
                                    </view>
                               </view>
-                              
+
                               <!-- Add Member Button (Only in 'Client' group or at the end if you want) -->
                               <!-- User requested: "成员头像最右侧... 应该有一个空圆圈，里边显示加号" -->
                               <!-- We'll put it at the end of the last group OR as a separate item if we want -->
                               <!-- Let's put it in the last available spot of the last group to allow flow, or just append it to the grid of the last group -->
                           </view>
                       </view>
-                      
+
                       <!-- Add Member Trigger (Appended to the list visually) -->
                       <view class="add-member-row" style="padding: 0 12px 12px;">
                           <view class="add-member-btn" @tap.stop="showInviteModal = true" title="添加成员">
@@ -255,7 +255,7 @@
               </view>
            </view>
         </view>
-        
+
         <!-- User Avatar (Bottom) -->
         <!-- User Avatar (Bottom) -->
         <view class="rail-user-avatar" @tap="goToUserProfile" title="个人中心">
@@ -275,12 +275,12 @@
 
       <!-- Invite Modal (Refactored to King IDE) -->
       <!-- Invite Member Dialog -->
-      <InviteMemberDialog 
-        v-model:visible="showInviteModal" 
-        :project-id="projectId" 
-        @success="loadProjectMembers" 
+      <InviteMemberDialog
+        v-model:visible="showInviteModal"
+        :project-id="projectId"
+        @success="loadProjectMembers"
       />
-      
+
       <!-- 文档比较选择对话框 -->
       <CompareDocDialog
         :visible="showCompareDialog"
@@ -330,15 +330,15 @@
         <view v-if="!sidebarCollapsed && leftPaneKey !== 'dd-files'" class="sidebar-header">
           <view class="sidebar-title-row">
             <text v-if="!fileBatchMode" class="sidebar-title">{{ leftPaneTitle }}</text>
-            <view 
-              v-else 
-              class="btn-select-all" 
+            <view
+              v-else
+              class="btn-select-all"
               @tap="selectAllFiles"
             >
               <text>选择全部</text>
             </view>
           </view>
-          
+
           <view v-if="leftPaneKey === 'files'" class="sidebar-actions-row">
             <view class="sidebar-actions">
               <!-- 1. 新建文件 (普通模式) -->
@@ -354,7 +354,6 @@
           :src="hoverNewFile ? '/static/new-document.png' : '/static/new-document_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 12px; height: 12px;"
 
         />
       </view>
@@ -372,7 +371,6 @@
           :src="hoverNewFolder ? '/static/icon_new_folder.png' : '/static/icon_new_folder_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 12px; height: 12px;"
 
         />
       </view>
@@ -390,7 +388,6 @@
           :src="fileBatchMode || hoverBatchSelect ? '/static/batch_select.png' : '/static/batch_select_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 12px; height: 12px;"
 
         />
       </view>
@@ -408,7 +405,6 @@
           :src="hoverUpload ? '/static/upload.png' : '/static/upload_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 12px; height: 12px;"
 
         />
       </view>
@@ -427,7 +423,6 @@
           :src="hoverDownload ? '/static/download_selected.png' : '/static/download.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 12px; height: 12px;"
 
         />
       </view>
@@ -445,7 +440,6 @@
           :src="hoverSort ? '/static/sort.png' : '/static/sort_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 12px; height: 12px;"
 
         />
       </view>
@@ -464,7 +458,6 @@
           :src="hoverCopy ? '/static/copy_selected.png' : '/static/copy.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 12px; height: 12px;"
 
         />
       </view>
@@ -481,7 +474,6 @@
           :src="hoverRecycleBin ? '/static/recycle-bin.png' : '/static/recycle-bin_unselected.png'"
           class="tool-icon-img"
           mode="contain"
-          style="width: 12px; height: 12px;"
 
         />
       </view>
@@ -526,10 +518,10 @@
             <text class="placeholder-title">{{ leftPaneTitle }}</text>
             <text class="placeholder-desc">加载中...</text>
           </view>
-          
+
 
         </view>
-          
+
           <!-- 文件拖拽关联：浮窗落点区域 (移至侧边栏底部) -->
           <!-- 1. 关联区域 (Priority: Dragging + WPS Word Open) -->
           <FileLinkDropZone
@@ -550,7 +542,7 @@
             @compare="handleStagingCompare"
             @collapse="handleStagingCollapse"
           />
-        
+
         <!-- Sidebar Footer moved to Left Rail -->
 
         <!-- 拖拽手柄 -->
@@ -651,12 +643,12 @@
               <!-- 编辑器视图 -->
               <view v-else class="editors-grid">
                 <!-- 左/主 窗格 -->
-                <view 
-                  class="editor-pane pane-left" 
-                  :class="{ 
-                    'pane-full': !splitMode, 
-                    'pane-half': splitMode, 
-                    focused: focusedPane === 'left' 
+                <view
+                  class="editor-pane pane-left"
+                  :class="{
+                    'pane-full': !splitMode,
+                    'pane-half': splitMode,
+                    focused: focusedPane === 'left'
                   }"
                   @tap="focusPane('left')"
                 >
@@ -703,10 +695,10 @@
                       :url="activeFileLeft.frontendEntry"
                       :plugin-id="activeFileLeft.id"
                     />
-                    <FilePreview 
-                      v-else 
-                      :file="activeFileLeft" 
-                      :show-edit-btn="false" 
+                    <FilePreview
+                      v-else
+                      :file="activeFileLeft"
+                      :show-edit-btn="false"
                     />
                   </view>
                   <view v-else class="pane-empty">
@@ -716,8 +708,8 @@
                 </view>
 
                 <!-- 右/副 窗格 (分屏时显示) -->
-                <view 
-                  v-if="splitMode" 
+                <view
+                  v-if="splitMode"
                   class="editor-pane pane-right pane-half"
                   :class="{ focused: focusedPane === 'right' }"
                   @tap="focusPane('right')"
@@ -765,10 +757,10 @@
                       :url="activeFileRight.frontendEntry"
                       :plugin-id="activeFileRight.id"
                     />
-                    <FilePreview 
-                      v-else 
-                      :file="activeFileRight" 
-                      :show-edit-btn="false" 
+                    <FilePreview
+                      v-else
+                      :file="activeFileRight"
+                      :show-edit-btn="false"
                     />
                   </view>
                   <view v-else class="pane-empty">
@@ -797,7 +789,7 @@
                       <view class="tab-indicator" v-if="activeToolKey === t.key"></view>
                     </view>
                   </view>
-                  
+
                   <!-- Variable Specific Actions (Moved from VariablePanel) -->
                   <view v-if="activeToolKey === 'variables'" class="tool-actions-group">
                     <view class="tool-action-btn" @tap="handleOpenCreateVariable" title="设为变量">
@@ -862,10 +854,10 @@
           </view>
 
           <!-- 右侧 AI 面板（可拖拽宽度） -->
-          <view 
-            v-if="showAiPanel" 
+          <view
+            v-if="showAiPanel"
             ref="aiPanel"
-            class="side-panel side-panel-ai" 
+            class="side-panel side-panel-ai"
             :class="{ 'drag-over': dragOverAiPanel }"
             :style="{ width: aiPanelWidth + 'px' }"
             @dragover.prevent="handleAiDragOver"
@@ -875,7 +867,7 @@
             <!-- ChatInterface Integration -->
             <!-- Note: We leverage ChatInterface for the entire panel content. -->
             <!-- Resize handle is still here in the outer container scope -->
-            
+
             <ChatInterface
               ref="chatInterface"
               :project-id="String(projectId)"
@@ -896,9 +888,9 @@
               @artifact-open-tab="handleArtifactOpenTab"
               @open-file="handleOpenFileFromChat"
             />
-            
+
             <view class="side-resize-handle" @touchstart="startResize('right', $event)" @mousedown="startResize('right', $event)"></view>
-            
+
             <!-- History Drawer (Outside ChatInterface so it can overlay? Or ChatInterface handles it? ChatInterface has header but no drawer content? -->
             <!-- Update: The ChatInterface component I wrote DOES NOT contain the drawer content, it just emits toggle-history. -->
             <!-- The original logic had a dropdown-panel. I should perhaps keep the drawer logic here OR move it to ChatInterface. -->
@@ -907,7 +899,7 @@
             <!-- It has @tap="$emit('toggle-history')". -->
             <!-- It doesn't have the drawer markup. -->
             <!-- So I need to keep the History Drawer (dropdown) here, assuming they are positioned ok. -->
-            
+
             <!-- 3. History Dropdown (Unified style) -->
             <view v-if="showHistoryDrawer" class="ai-dropdown-panel" @tap.stop style="top: 36px; border-radius: 0 0 8px 8px;">
                 <view class="menu-item header">历史对话</view>
@@ -1028,9 +1020,9 @@
                   >
                     <!-- Indent -->
                     <view class="folder-indent" :style="{ width: (folder.level * 20) + 'px' }"></view>
-                    
+
                     <!-- Toggle Arrow -->
-                    <view 
+                    <view
                         class="folder-toggle"
                         @tap.stop="toggleExportFolder(folder)"
                         :style="{ visibility: (folder.children && folder.children.length) ? 'visible' : 'hidden' }"
@@ -1264,7 +1256,7 @@ export default {
       easyVoiceImportCallback: null,
       renameProjectName: '',
       userDisplayName: '用户',
-      
+
       // 布局状态
       sidebarWidth: 260, // 侧边栏宽度
       sidebarCollapsed: false,
@@ -1276,7 +1268,7 @@ export default {
       showBatchMenu: false,
       showFileMoreMenu: false,
       FILE_TREE_QUICK_ACTIONS,
-      
+
       // 文档对比
       showCompareDialog: false,
       compareDocuments: [], // 待比较的文档列表
@@ -1313,7 +1305,7 @@ export default {
       aiLoading: false,
       scrollTop: 0, // Added for scroll control
       aiInput: '',
-      pastedImages: [], 
+      pastedImages: [],
       currentModelId: 'gemini-1.5-pro',
       showModelDropdown: false,
       availableModels: [
@@ -1326,7 +1318,7 @@ export default {
       dragOverAiPanel: false,
       aiContextPreview: null,
       aiContextLoading: false,
-      
+
       // AI New Features
       showHistoryDrawer: false,
       loadingHistory: false,
@@ -1408,7 +1400,7 @@ export default {
       rightFiles: [], // 右侧文件列表
       activeFileIdLeft: null, // 左侧当前激活ID
       activeFileIdRight: null, // 右侧当前激活ID
-      
+
       // Members
       projectMembers: [],
       currentUser: {},
@@ -1417,7 +1409,7 @@ export default {
       // Tabs 拖拽状态
       draggingTab: null, // { fileId, fromPane }
       tabDragOver: null, // { fileId, pane }
-      
+
       // WPS Config
       wpsAppId: '', // 从后端动态获取
       wpsInstances: {
@@ -1438,7 +1430,7 @@ export default {
       _desktopOcrSelectionUnsub: null
       ,
       _desktopOcrSelectionErrUnsub: null,
-      
+
       // Hover States for File Tree Icons
       hoverActionKey: null,
       hoverBatchSelect: false,
@@ -1446,7 +1438,7 @@ export default {
 
       // Activity Recording State
       isRecording: false,
-      
+
       // Toolbar Hover States
       hoverLeft: false,
       hoverBottom: false,
@@ -1456,7 +1448,7 @@ export default {
       hoverWeb: false,
       hoverWeb: false,
       hoverRecord: false,
-      
+
       // Sidebar Action Hovers
       hoverNewFile: false,
       hoverNewFolder: false,
@@ -1466,12 +1458,12 @@ export default {
       hoverCopy: false,
       hoverBatchSelect: false, // existing
       hoverRecycleBin: false,  // existing
-      
+
       // Recording Toast
       showRecordingToast: false,
       recordingToastMessage: '',
       recordingToastTimer: null,
-      
+
       // Mode-based active tab persistence
       lastActiveIdsByMode: {
         left: { 'files': null, 'dd-files': null },
@@ -1535,7 +1527,7 @@ export default {
         member: { label: '项目成员', list: [] },
         client: { label: '客户', list: [] }
       }
-      
+
       this.projectMembers.forEach(m => {
         if (m.role === 'ADMIN' || m.role === 'MANAGER' || m.id === this.project.managerId) {
           groups.admin.list.push(m)
@@ -1545,7 +1537,7 @@ export default {
           groups.member.list.push(m)
         }
       })
-      
+
       return [groups.admin, groups.member, groups.client].filter(g => g.list.length > 0)
     },
     checkedFileCount() {
@@ -1598,7 +1590,7 @@ export default {
     showStagingArea() {
        // 1. User explicitly collapsed - respect their choice
        if (this.stagingManuallyCollapsed) return false;
-       
+
        // 2. Explicitly pinned by user via sidebar button
        if (this.stagingPinned) return true;
 
@@ -1607,7 +1599,7 @@ export default {
 
        // 4. If dragging AND Association not overriding (Auto-expand)
        if (this.showAssociationDropZone) return false;
-       
+
        return this.fileLinkDrag.active;
     },
     stagedFileIds() {
@@ -1756,10 +1748,10 @@ export default {
     } catch (e) {
       // ignore
     }
-    
+
     // Stop Activity Tracking
     this.stopActivityTracking()
-    
+
     // Cleanup manual event listener removed
   },
   onLoad(query) {
@@ -1775,15 +1767,15 @@ export default {
           this.loadStagingFiles()
       })
     }
-    
+
     const user = getCurrentUser()
     if (user) {
       this.userDisplayName = user.displayName || user.username
       this.currentUser = user
-      
+
       // Try to restore previous state from localStorage
       const savedKey = uni.getStorageSync(`project_${this.projectId}_leftPaneKey`)
-      
+
       if (savedKey) {
           this.leftPaneKey = savedKey
       } else {
@@ -1806,7 +1798,7 @@ export default {
     }
     // 登录态下启用剪贴板记录（仅记录本应用能感知到的 paste / 复制按钮）
     this.bindClipboardListener()
-    
+
     // Initialize AI Model (Persistence > System Default)
     this.initAiModel()
     this.loadAssistants() // Fetch assistants
@@ -1816,7 +1808,7 @@ export default {
   onShow() {
     // Sync UI state
     this.isRecording = activityTracker.getRecordingState()
-    
+
     // Reload members to ensure up-to-date list
     if (this.projectId) {
         this.loadProjectMembers()
@@ -1826,7 +1818,7 @@ export default {
     if (this.projectId && this.project.name) {
          this.startActivityTracking()
     }
-    
+
     // Desktop：仅在工作区页面展示 BrowserView（否则会“飘”到其它页面）
     try {
       if (this.isDesktopApp && window.checkbaDesktop && window.checkbaDesktop.browser && window.checkbaDesktop.browser.setViewsVisible) {
@@ -2060,17 +2052,17 @@ export default {
       this.easyVoiceImportCallback = callback
       this.showFilePicker = true
     },
-    
+
     async handleFilePickerConfirm(file) {
         if (!file || !file.id) return
-        
+
         try {
             uni.showLoading({ title: '正在导入...' })
-            
-            // Check if it is a text file -> use content directly if available/loaded? 
+
+            // Check if it is a text file -> use content directly if available/loaded?
             // Better to call backend always for consistency, or check file extension.
             // Backend endpoint handles doc/docx decoding which is the main point.
-            
+
             const res = await getFileText(file.id)
             if (res && res.code === 0) {
                 const text = res.data
@@ -2117,14 +2109,14 @@ export default {
     canRemoveMember(targetMember) {
        if (!this.currentUser || !targetMember) return false
        if (this.currentUser.id === targetMember.userId) return false // Cannot remove self
-       
+
        // Find my role in the project
        const myMember = this.projectMembers.find(m => m.userId === this.currentUser.id)
        if (!myMember) return false // Not a member?
-       
+
        const myRole = myMember.role
        const targetRole = targetMember.role
-       
+
        if (myRole === 'ADMIN') return true
        if (myRole === 'PARTICIPANT') {
            return targetRole === 'READ_ONLY' || targetRole === 'CLIENT'
@@ -2223,21 +2215,21 @@ export default {
         }
         return
       }
-      
+
       if (actionKey === 'download') {
          if (typeof tree.openBatchAction === 'function') {
              tree.openBatchAction('download')
          }
          return
       }
-      
+
       if (actionKey === 'copy') {
          if (typeof tree.openBatchAction === 'function') {
              tree.openBatchAction('copy')
          }
          return
       }
-      
+
       if (actionKey === 'sort' && typeof tree.toggleSortOrder === 'function') {
         tree.toggleSortOrder()
         return
@@ -2257,7 +2249,7 @@ export default {
      */
     startSelectionPolling(pane) {
       const p = pane === 'right' ? 'right' : 'left'
-      
+
       // 先清理旧的定时器
       try {
         const old = this.selectionPollingIntervals && this.selectionPollingIntervals[p]
@@ -2265,21 +2257,21 @@ export default {
       } catch (e) {
         // ignore
       }
-      
+
       // 检查当前打开的文件是否是 Word 文档
       const activeFile = p === 'right' ? this.activeFileRight : this.activeFileLeft
       if (!activeFile || !activeFile.name) {
         // 没有打开文件，不启动轮询
         return
       }
-      
+
       const fileName = activeFile.name.toLowerCase()
       const isWordDocument = fileName.endsWith('.doc') || fileName.endsWith('.docx')
       if (!isWordDocument) {
         // 不是 Word 文档，不启动选区轮询（pptx/xlsx/pdf 等不支持 Selection API）
         return
       }
-      
+
       const timer = setInterval(async () => {
         try {
           const wpsComp = this.$refs[p === 'right' ? 'wpsRight' : 'wpsLeft']
@@ -2315,7 +2307,7 @@ export default {
       this.fileLinkDrag.hoverSide = null
       console.log('onFileLinkDragStart:', file)
     },
-    
+
     // bindNativeDropEvents 已移除，逻辑迁移至 FileLinkDropZone 组件
 
     onFileLinkDragEnd() {
@@ -2324,15 +2316,15 @@ export default {
       this.fileLinkDrag.file = null
       this.fileLinkDrag.hoverSide = null
     },
-    
+
     async onFileLinkZoneDrop({ side }) {
       console.log('onFileLinkZoneDrop triggered:', side)
       let file = this.fileLinkDrag.file
-      
+
       // 这里的 file 应该是从 state 中获取的，因为 drop 主要是为了触发 action，
       // 如果需要从 DataTransfer 恢复 (跨组件丢失 state)，组件内部其实拿不到 DataTransfer 数据 (dropzone 一般只暴露 event)，
       // 但因为我们是同页面拖拽，state 应该是保持的。
-      
+
       if (!file || !file.id) {
         console.warn('onFileLinkZoneDrop: no file in state')
         // 尝试兜底？组件可以传回更多信息吗？
@@ -2362,11 +2354,11 @@ export default {
         }
         const range = await target.getSelectionRange()
         console.log('Debug Link: Selection', range, sel)
-        
+
         const success = await target.setHyperlinkAtRange(
-          range.start, 
-          range.end, 
-          'https://www.wps.cn', 
+          range.start,
+          range.end,
+          'https://www.wps.cn',
           sel
         )
         uni.showToast({ title: success ? '调试链接成功' : '调试链接失败', icon: 'none' })
@@ -2384,7 +2376,7 @@ export default {
         uni.showToast({ title: '请先打开一个 WPS 文档', icon: 'none' })
         return
       }
-      
+
       // 2) 获取选区（优先使用 getLastKnownSelection，因为它包含了实时失败时的 Fallback）
       let selectionData = null
       if (typeof target.getLastKnownSelection === 'function') {
@@ -2405,7 +2397,7 @@ export default {
         uni.showToast({ title: '请先在文档中高亮一段文本（蓝色选区）', icon: 'none' })
         return
       }
-      
+
       const selText = String(selectionData.text).trim()
       const rangeStart = selectionData.start
       const rangeEnd = selectionData.end
@@ -2473,23 +2465,23 @@ export default {
         uni.showToast({ title: e.message || '关联失败', icon: 'none' })
       }
     },
-    
+
     // === Staging Area Methods ===
     async ensureStagingFolder() {
       if (this.stagingFolderId) return
       try {
         // Changed from .stagezone to __staging_area__ to avoid dotfile filtering
-        const folderName = '__staging_area__' 
+        const folderName = '__staging_area__'
         console.log('EnsureStaging: Fetching root files...')
         const response = await getProjectFiles(this.projectId, null)
-        
+
         // Normalize response: API returns { code: 0, data: [...] } or possibly just array
         const files = Array.isArray(response) ? response : (response?.data || [])
         console.log('EnsureStaging: Got files count:', files.length, 'Looking for:', folderName)
-        
+
         let folder = files.find ? files.find(f => f.name === folderName) : null
         console.log('EnsureStaging: Found folder?', folder ? folder.id : null)
-        
+
         if (!folder) {
           console.log('EnsureStaging: Creating folder...')
           try {
@@ -2498,7 +2490,7 @@ export default {
              folder = createResp?.data || createResp
           } catch(err) {
              console.error('EnsureStaging: Create failed:', err)
-             
+
              // Retry: Maybe it exists now (concurrency) or previous fetch missed it?
              // Or maybe create failed because it already exists.
              console.log('EnsureStaging: Retrying fetch...')
@@ -2507,7 +2499,7 @@ export default {
              folder = retryFiles.find ? retryFiles.find(f => f.name === folderName) : null
           }
         }
-        
+
         if (folder) {
            this.stagingFolderId = folder.id
            console.log('EnsureStaging: stagingFolderId set to:', folder.id)
@@ -2541,18 +2533,18 @@ export default {
     },
     async onStagingDrop(files) {
       console.log('onStagingDrop received:', files)
-      
-      // Critical Fix: Ensure files is an array. 
+
+      // Critical Fix: Ensure files is an array.
       // If event object passed accidentally, return.
       if (!files) return
-      
+
       // Check if this is a native DOM Event object (not a Vue emitted payload)
       // This can happen if the native @drop event bubbles up
       if (files instanceof Event || (files.type && files.target && files.currentTarget)) {
         // Silently ignore - the actual files should be processed by FileStagingArea's onDrop
         return
       }
-      
+
       if (!Array.isArray(files)) {
          // Try to recover if it's a single file object
          if (files.id && files.name) {
@@ -2562,30 +2554,30 @@ export default {
              return
          }
       }
-      
+
       if (files.length === 0) return
       if (!this.stagingFolderId) await this.ensureStagingFolder()
-      
+
       const fileIds = files.map(f => f.id)
-      
+
       // 记录每个文件进入暂存区前的原始 parentId
       for (const file of files) {
         if (file.id && file.parentId !== undefined) {
           this.stagingOriginalParents[file.id] = file.parentId
         }
       }
-      
+
       try {
         // Move to staging folder
         await batchMoveFiles(this.projectId, fileIds, this.stagingFolderId)
-        
+
         // Reload staging files
         await this.loadStagingFiles()
         // Reload file tree (to remove from original location)
         if (this.$refs.fileTree) {
             this.$refs.fileTree.loadFiles()
         }
-        
+
         // Auto-pin
         this.stagingPinned = true
         uni.showToast({ title: '已加入暂存区', icon: 'success' })
@@ -2596,11 +2588,11 @@ export default {
     },
     handleStagingClear() {
        // Optional: Move all back to root? Or just clear list (which creates orphans in .stagezone)?
-       // User didn't specify, but "Clear" usually means empty the list. 
+       // User didn't specify, but "Clear" usually means empty the list.
        // Logic: Move all files in staging back to root.
        if (this.stagingFiles.length === 0) return
        const ids = this.stagingFiles.map(f => f.id)
-       
+
        batchMoveFiles(this.projectId, ids, null).then(() => {
           this.loadStagingFiles()
           this.$refs.fileTree.loadFiles()
@@ -2609,13 +2601,13 @@ export default {
     async handleStagingRemove(id) {
        // 恢复到文件原来的目录，如果找不到则移动到根目录
        if (!this.stagingFolderId) return
-       
+
        // 获取原始 parentId（如果有记录的话）
        const originalParentId = this.stagingOriginalParents[id]
        // 注意：originalParentId 可能是 null（原本就在根目录）或 undefined（未记录）
        // 两者都应该移动到根目录
        const targetParentId = originalParentId !== undefined ? originalParentId : null
-       
+
        try {
          await batchMoveFiles(this.projectId, [id], targetParentId)
          // 清理该文件的原始目录记录
@@ -2816,7 +2808,7 @@ export default {
       } else {
         this.leftPaneKey = key
         this.sidebarCollapsed = false
-        
+
         // Check if it's a dynamic plugin and open its tab
         const plugin = this.dynamicPlugins.find(p => p.key === key)
         if (plugin) {
@@ -2831,7 +2823,7 @@ export default {
         // 恢复新模式下的活跃 tab
         const savedLeft = this.lastActiveIdsByMode.left[key]
         const savedRight = this.lastActiveIdsByMode.right[key]
-        
+
         if (savedLeft) {
           this.activeFileIdLeft = savedLeft
         } else {
@@ -2967,7 +2959,7 @@ export default {
         if (rawText && typeof rawText === 'object') {
            const payload = rawText
            if (payload.type === 'TEXT') {
-             return await recordClipboardOnce(payload.text, source) 
+             return await recordClipboardOnce(payload.text, source)
            } else if (payload.type === 'IMAGE' && payload.data) {
              try {
                const arr = payload.data.split(',')
@@ -2979,10 +2971,10 @@ export default {
                const u8arr = new Uint8Array(n)
                while (n--) { u8arr[n] = bstr.charCodeAt(n) }
                const blob = new Blob([u8arr], { type: mime })
-               
+
                // Create File object
                const f = new File([blob], `image_${Date.now()}.png`, { type: mime })
-               
+
                const res = await saveClipboardFile({ file: f }, 'IMAGE')
                const saved = (res && res.data) ? res.data : res
                this.onClipboardSaved(saved)
@@ -3001,13 +2993,13 @@ export default {
                   const resp = await window.checkbaDesktop.utils.readFile(payload.filePath)
                   if (resp && resp.ok && resp.data) {
                      // resp.data is usually Uint8Array or serialized Buffer
-                     const u8arr = new Uint8Array(resp.data) 
-                     
+                     const u8arr = new Uint8Array(resp.data)
+
                      const name = payload.filePath.split(/[/\\]/).pop() || 'file'
                      const blob = new Blob([u8arr])
                      const f = new File([blob], name)
-                     
-                     
+
+
                      const res = await saveClipboardFile({ file: f }, 'FILE')
                      const saved = (res && res.data) ? res.data : res
                      this.onClipboardSaved(saved)
@@ -3250,7 +3242,7 @@ export default {
           active.name = url
         }
         this.$forceUpdate()
-        
+
         // Track URL Session (flush previous, start new)
         const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
         activityTracker.trackActivePage('OPEN_URL', 0, url, meta)
@@ -3261,13 +3253,13 @@ export default {
       if (!active || !this.isBrowserTab(active)) return
       const t = String(title || '').trim()
       if (!t) return
-      
+
       // Update session meta with title?
       // trackActivePage will flush and restart. This might be noisy if title changes often.
       // But user requested "record url and web title".
       // If we don't restart, we can't update the log meta.
       // Let's check if title is significantly different or just loaded.
-      
+
       const url = active.url || ''
       const meta = (this.project && this.project.name ? `Project: ${this.project.name}. ` : '') + `Title: ${t}`
       if (url) {
@@ -3576,11 +3568,11 @@ export default {
         activityTracker.setRecording(false) // Force stop recording state
         this.isRecording = false
     },
-    
+
     toggleRecording() {
         const newState = activityTracker.toggleRecording()
         this.isRecording = newState
-        
+
         // Custom Toast
         this.recordingToastMessage = newState ? '开始录制工作' : '已停止录制工作'
         this.showRecordingToast = true
@@ -3649,7 +3641,7 @@ export default {
 
     // Center X: Use the midpoint
     const centerX = (left + right) / 2
-    
+
     // Y: Below the selection
     const topY = bottom + 12
 
@@ -3724,15 +3716,15 @@ export default {
     // H5：用 window 级事件保证拖拽框选必然可用
     async ocrDoRecognize() {
       if (!this.ocrImageDataUrl || this.ocrLoading) return
-      
+
       const imageData = this.ocrImageDataUrl // Cache data
       // Close overlay immediately
       this.closeOcrOverlay()
-      
+
       this.ocrLoading = true // Should I use global loading? closeOcrOverlay resets ocrLoading.
       // Resetting ocrLoading via closeOcrOverlay is correct?
       // Wait, `closeOcrOverlay` resets `ocrText`, `ocrImageDataUrl`.
-      
+
       // Since UI is gone, I should use `uni.showLoading`
       uni.showLoading({ title: '识别中…' })
 
@@ -3759,16 +3751,16 @@ export default {
 
     async ocrDoCopy() {
       if (!this.ocrImageDataUrl) return
-      
+
       const dataUrl = this.ocrImageDataUrl
-      
+
       // Close immediately
       this.closeOcrOverlay()
-      
+
       // 1. Copy Image to Clipboard
       try {
           const blob = await (await fetch(dataUrl)).blob()
-          
+
           // Use Clipboard API
           if (navigator.clipboard && navigator.clipboard.write) {
               const item = new ClipboardItem({ [blob.type]: blob })
@@ -3782,16 +3774,16 @@ export default {
           uni.showToast({ title: '复制失败', icon: 'none' })
       }
     },
-    
+
     ocrDoOpenSaveDialog() {
        if (!this.ocrImageDataUrl) return
-       
+
        // Cache data for dialog
        this.screenshotSaveDataUrl = this.ocrImageDataUrl
-       
+
        // Close overlay immediately
        this.closeOcrOverlay()
-       
+
        this.showScreenshotSaveDialog = true
        this.screenshotSaveName = `screenshot_${Date.now()}.png`
        this.screenshotSaveParentId = null // Root
@@ -3810,16 +3802,16 @@ export default {
             console.error('加载文件夹失败', e)
         }
     },
-    
+
     selectScreenshotFolder(id) {
         this.screenshotSaveParentId = id
     },
-    
+
     closeScreenshotSaveDialog() {
         this.showScreenshotSaveDialog = false
         this.screenshotSaveDataUrl = ''
     },
-    
+
     async confirmSaveScreenshot() {
         if (!this.screenshotSaveDataUrl) return
         let name = (this.screenshotSaveName || '').trim()
@@ -3830,14 +3822,14 @@ export default {
         if (!/\.(png|jpg|jpeg)$/i.test(name)) {
             name = `${name}.png`
         }
-        
+
         this.screenshotSaveLoading = true
         try {
         const dataUrl = this.screenshotSaveDataUrl
         const res = await fetch(dataUrl)
         const blob = await res.blob()
         const fileSize = blob.size
-        
+
         // 1. Create File Metadata
         // Auto-generate wpsFileId and proper fileType
         const timestamp = Date.now()
@@ -3848,7 +3840,7 @@ export default {
         if (!name.toLowerCase().endsWith('.png')) {
             name += '.png'
         }
-        
+
         // Call backend to create metadata
         const metadata = await createFile(
             this.projectId,
@@ -3859,7 +3851,7 @@ export default {
             null, // filePath (backend handles)
             wpsFileId
         )
-        
+
         if (!metadata || !metadata.id) {
             throw new Error('Failed to create file record')
         }
@@ -3868,7 +3860,7 @@ export default {
         const fileToUpload = new File([blob], name, { type: 'image/png' })
         const token = uni.getStorageSync('token')
         const baseUrl = getApiBaseUrl()
-        
+
         await new Promise((resolve, reject) => {
              uni.uploadFile({
                  url: `${baseUrl}/api/files/${wpsFileId}/upload`,
@@ -3887,7 +3879,7 @@ export default {
                  fail: (err) => reject(err)
              })
         })
-        
+
         uni.showToast({ title: '保存成功', icon: 'success' })
         this.showScreenshotSaveDialog = false
         this.screenshotSaveDataUrl = ''
@@ -3984,12 +3976,12 @@ export default {
 
     async ocrDoFavorite() {
       if (!this.ocrImageDataUrl) return
-      
+
       const imgData = this.ocrImageDataUrl
       const srcUrl = this.ocrSourceUrl
       // Close overlay immediately
       this.closeOcrOverlay()
-      
+
       try {
         uni.showToast({ title: '正在加入收藏…', icon: 'loading', duration: 1200 })
         const created = await createProjectFavorite(this.projectId, {
@@ -4033,7 +4025,7 @@ export default {
 
       // 2) Close UI immediately
       this.closeOcrOverlay()
-      
+
       uni.showLoading({ title: '处理中…' })
 
       try {
@@ -4273,7 +4265,7 @@ export default {
     },
     formatTime(timeStr) {
   if (!timeStr) return '-'
-  
+
   // Parse the timestamp
   const date = new Date(timeStr)
   const now = new Date()
@@ -4281,7 +4273,7 @@ export default {
   const diffMins = Math.floor(diffMs / (1000 * 60))
   const diffHrs = Math.floor(diffMs / (1000 * 60 * 60))
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  
+
   // Return relative time format
   if (diffMins < 1) {
     return '刚刚'
@@ -4544,11 +4536,11 @@ export default {
 
     stopResize() {
       if (!this.resizing.active) return
-      
+
       // Save target and currentValue BEFORE nullifying
       const target = this.resizing.target
       const finalValue = this.resizing.currentValue
-      
+
       this.resizing.active = false
       this.resizing.target = null
       this.resizing.element = null
@@ -4583,7 +4575,7 @@ export default {
 
       this.$nextTick(() => this.triggerWorkbenchResize())
     },
-    
+
     toggleSplitMode() {
       this.splitMode = !this.splitMode
 
@@ -4602,10 +4594,10 @@ export default {
     focusPane(pane) {
       // 只有在分屏模式下才允许聚焦右侧
       if (!this.splitMode && pane === 'right') return
-      
+
       const oldPane = this.focusedPane
       this.focusedPane = pane
-      
+
       if (oldPane !== pane) {
           // Switch active tracking to the file in the new pane
           const file = pane === 'left' ? this.activeFileLeft : this.activeFileRight
@@ -4640,7 +4632,7 @@ export default {
         // Normalize response: API returns { code: 0, data: [...] } or possibly just array
         const files = Array.isArray(resp) ? resp : (resp?.data || [])
         console.log('[project-overview] Got files for search:', files.length)
-        
+
         // Find file by name (case-insensitive, match basename)
         const targetFile = files.find(f => {
           if (f.isFolder) return false
@@ -4660,7 +4652,7 @@ export default {
         uni.showToast({ title: '获取文件列表失败', icon: 'none' })
       }
     },
-    
+
     openFile(file) {
       const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
       // Start session tracking for this file
@@ -4706,7 +4698,7 @@ export default {
       const mode = this.leftPaneKey || 'files'
       this.lastActiveIdsByMode[pane][mode] = file.id
       this.saveActiveIdsByMode()
-      
+
       // 如果是文件类型（非浏览器标签），展开侧边栏并定位到文件树
       if (!this.isBrowserTab(file) && file.id && !file.tabType) {
         // 展开侧边栏并切换到文件模式
@@ -4723,7 +4715,7 @@ export default {
           }
         })
       }
-      
+
       // Track switch
       const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
       if (this.isBrowserTab(file)) {
@@ -4742,26 +4734,26 @@ export default {
       const list = pane === 'left' ? this.leftFiles : this.rightFiles
       const idProp = pane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'
       const activeId = this[idProp]
-      
+
       const idx = list.findIndex(f => f.id === fileId)
       if (idx === -1) return
-      
+
       const file = list[idx]
-      
+
       // If closing the active file/tab, the activityTracker.trackActivePage in activateTab or openFile will handle the switch.
       // But if we close the *currently active* file and no other file becomes active (e.g. empty list), we should stop session?
       // Actually, if we close active file, we usually switch to another one (logic below).
       // So we don't need to manually stop session here, UNLESS the list becomes empty.
-      
+
       // const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
       // activityTracker.logAction('CLOSE_FILE', file.id, file.name, 0, meta)
-      
+
       list.splice(idx, 1)
-      
+
       // 如果关闭的是当前激活的文件，尝试切换到临近的文件
       if (activeId === fileId) {
-        const newActiveId = list.length > 0 
-          ? list[Math.min(idx, list.length - 1)].id 
+        const newActiveId = list.length > 0
+          ? list[Math.min(idx, list.length - 1)].id
           : null
         this[idProp] = newActiveId
 
@@ -4782,9 +4774,9 @@ export default {
     isWpsFile(file) {
       // 根据是否有 wpsFileId 判断是否用 WPS 打开
       if (!file || file.tabType === 'web' || file.tabType === 'markdown' || !file.fileType) return false
-      
+
       const type = file.fileType.toLowerCase()
-      
+
       // 1. Force native preview for media types (Images, Video, Audio)
       const mediaTypes = [
           // Images
@@ -4795,7 +4787,7 @@ export default {
           'mp3','wav','m4a','flac','aac'
       ]
       if (mediaTypes.includes(type)) return false
-      
+
       // 2. 排除 Markdown 文件，使用专门的 Markdown 预览组件
       if (type === 'md' || type === 'markdown') return false
 
@@ -4810,7 +4802,7 @@ export default {
           // PDF
           'pdf'
       ]
-      
+
       // Default to WPS if it has ID or is office type (but not media/markdown)
       return wpsFormats.includes(type) || (file.wpsFileId && !mediaTypes.includes(type) && type !== 'md' && type !== 'markdown')
     },
@@ -4824,11 +4816,11 @@ export default {
       if (file.fileType && (file.fileType.toLowerCase() === 'md' || file.fileType.toLowerCase() === 'markdown')) return true
       return false
     },
-    
+
     isDiffTab(file) {
       return file && file.tabType === 'diff'
     },
-    
+
     // --- 文档对比逻辑 ---
     onCompareDocumentsRequest(docs) {
       // FileTree 发起的文档对比请求
@@ -4839,13 +4831,13 @@ export default {
       this.compareDocuments = docs
       this.showCompareDialog = true
     },
-    
+
     onCompareDialogConfirm({ source, target }) {
       // 用户确认了源文档和目标文档，打开 diff 标签页
       this.showCompareDialog = false
       this.openDiffTab(source, target)
     },
-    
+
     openDiffTab(source, target) {
       // 创建 diff 类型的虚拟标签页
       const diffId = `diff-${source.id}-${target.id}-${Date.now()}`
@@ -4864,15 +4856,15 @@ export default {
         },
         createdAt: Date.now()
       }
-      
+
       // 添加到当前窗格
       const targetPane = this.splitMode ? this.focusedPane : 'left'
       const targetList = targetPane === 'left' ? this.leftFiles : this.rightFiles
       const targetIdProp = targetPane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'
-      
+
       targetList.push(diffFile)
       this[targetIdProp] = diffFile.id
-      
+
       console.log('[ProjectOverview] 打开文档对比标签:', diffFile.name)
     },
 
@@ -4880,7 +4872,7 @@ export default {
     onWpsReady(instance, pane) {
       console.log(`WPS Ready [${pane}]`, instance)
       this.wpsInstances[pane] = instance
-      
+
       // 注意：当前 WPS 环境会对未知事件名抛出 "Invalid event name"
       // fileSave/fileRename 在你的控制台里已验证会刷屏，因此这里不再监听，统一改为轮询同步文件信息。
       this.startFileInfoPolling(pane)
@@ -4918,15 +4910,15 @@ export default {
         }
       })
     },
-    
+
     // 处理文件重命名
     async handleFileRename(pane, data) {
       const activeFile = pane === 'left' ? this.activeFileLeft : this.activeFileRight
       if (!activeFile) return
-      
+
       const newName = data.name || data.fileName
       if (!newName) return
-      
+
       const oldName = activeFile.name
       if (oldName === newName) return
 
@@ -4970,23 +4962,23 @@ export default {
         uni.showToast({ title: '重命名同步失败', icon: 'none' })
       }
     },
-    
+
     // 同步文件信息（从后端获取最新信息）
     async syncFileInfo(pane) {
       const activeFile = pane === 'left' ? this.activeFileLeft : this.activeFileRight
       if (!activeFile || !activeFile.id) return
-      
+
       // Skip sync for virtual tabs (they have string IDs like 'artifact-xxx' or 'web_xxx')
       if (typeof activeFile.id === 'string' && (activeFile.id.startsWith('artifact-') || activeFile.id.startsWith('web_'))) {
         return
       }
-      
+
       try {
         const fileDetail = await getFileDetail(this.projectId, activeFile.id)
         if (fileDetail && fileDetail.name) {
           const oldName = activeFile.name
           activeFile.name = fileDetail.name
-          
+
           // 如果文件名变化了，刷新文件树
           if (oldName !== fileDetail.name) {
             console.log(`检测到文件名变化: ${oldName} -> ${fileDetail.name}`)
@@ -5000,7 +4992,7 @@ export default {
         console.error('同步文件信息失败:', e)
       }
     },
-    
+
     // 启动文件信息轮询（用于检测重命名）
     startFileInfoPolling(pane) {
       // 每5秒轮询一次文件信息
@@ -5012,21 +5004,21 @@ export default {
         }
         this.syncFileInfo(pane)
       }, 5000)
-      
+
       // 存储intervalId以便清理
       if (!this.fileInfoPollingIntervals) {
         this.fileInfoPollingIntervals = {}
       }
       this.fileInfoPollingIntervals[pane] = intervalId
     },
-    
+
     // 获取当前聚焦的 WPS 实例
     getCurrentWpsInstance() {
       // 优先获取聚焦窗格的实例
       const instance = this.wpsInstances[this.focusedPane]
       // 如果聚焦窗格没有实例（比如是预览或者空的），尝试获取另一个
       if (instance) return this.$refs[this.focusedPane === 'left' ? 'wpsLeft' : 'wpsRight']
-      
+
       // Fallback
       if (this.wpsInstances.left) return this.$refs.wpsLeft
       return null
@@ -5053,7 +5045,7 @@ export default {
         uni.showToast({ title: '请先点击激活一个编辑窗口', icon: 'none' })
         return
       }
-      
+
       try {
         await wpsComp.insertTextWithBookmark(variable.value, variable.name)
         uni.showToast({ title: '插入成功', icon: 'success' })
@@ -5062,7 +5054,7 @@ export default {
         uni.showToast({ title: '插入失败', icon: 'none' })
       }
     },
-    
+
     async handleUpdateVariable(variable) {
       const wpsComp = this.getCurrentWpsInstance()
       if (!wpsComp) return
@@ -5073,7 +5065,7 @@ export default {
           uni.showToast({ title: '请先选择内容', icon: 'none' })
           return
         }
-        
+
         uni.showModal({
           title: '确认更新',
           content: `确认将变量 "${variable.name}" 更新为选中文本？`,
@@ -5091,14 +5083,14 @@ export default {
         uni.showToast({ title: '更新失败', icon: 'none' })
       }
     },
-    
+
     async handleSyncDocument() {
       const wpsComp = this.getCurrentWpsInstance()
       if (!wpsComp) {
         uni.showToast({ title: '请先点击激活一个编辑窗口', icon: 'none' })
         return
       }
-      
+
       uni.showLoading({ title: '同步中...' })
       try {
         const vars = await getProjectVariables(this.projectId)
@@ -5135,7 +5127,7 @@ export default {
     },
     async collectAiContextForChat(options = {}) {
       const { updatePreview = false } = options
-      
+
       let contexts = []
 
       // 1. Manual Contexts (Multiple)
@@ -5144,7 +5136,7 @@ export default {
              const ctx = await this.buildSingleFileContext(file, true)
              if (ctx) contexts.push(ctx)
         }
-      } 
+      }
       // 2. Automatic Context (Active File)
       else {
         const active = this.getActiveAiTargetFile()
@@ -5156,9 +5148,9 @@ export default {
 
       if (contexts.length === 0) {
         if (updatePreview) this.aiContextPreview = null
-        return null 
+        return null
       }
-      
+
       // Update Preview (Simple count or first file)
       if (updatePreview) {
         if (contexts.length > 0) {
@@ -5170,7 +5162,7 @@ export default {
             this.aiContextPreview = null
         }
       }
-      
+
       return contexts
     },
 
@@ -5185,20 +5177,20 @@ export default {
             selectionText: '',
             documentText: ''
         }
-        
+
         // Try getting content from WPS if active
         let wpsComp = null
         if (!isManual) {
             wpsComp = this.getCurrentWpsInstance()
         } else {
              const active = this.getActiveAiTargetFile()
-             // Verify ID match 
+             // Verify ID match
              const fid = file.id || file.fileId
              if (active && active.id === fid) {
                  wpsComp = this.getCurrentWpsInstance()
              }
         }
-        
+
         if (wpsComp) {
             if (typeof wpsComp.getSelectionText === 'function') {
                 try {
@@ -5213,12 +5205,12 @@ export default {
                 } catch(e) {}
             }
         }
-        
+
         // Fallback or Summary
         if (!context.selectionText && !context.documentText && file.summary) {
              context.documentText = this.normalizeContextText(file.summary, 2000)
         }
-        
+
         return context
     },
     async refreshAiContextPreview(manualTrigger = false) {
@@ -5226,7 +5218,7 @@ export default {
       try {
         this.aiContextLoading = true
         const contexts = await this.collectAiContextForChat({ updatePreview: true })
-        
+
         if (manualTrigger) {
            if (!contexts || contexts.length === 0) {
               if (this.manualContextFiles.length === 0) {
@@ -5256,12 +5248,12 @@ export default {
         this.openExportDialog(msg)
       }
     },
-    
+
     // Handle artifact open-tab event from ChatInterface
     // Creates a virtual .md tab in the left pane with typewriter effect
     handleArtifactOpenTab(artifactInfo) {
       console.log('[ProjectOverview] 📄 Opening artifact in tab:', artifactInfo)
-      
+
       // Check if tab already exists
       const existingTab = this.leftFiles.find(f => f.artifactId === artifactInfo.id)
       if (existingTab) {
@@ -5269,7 +5261,7 @@ export default {
         this.activateTab(existingTab, 'left')
         return
       }
-      
+
       // Create virtual markdown file object
       const virtualFile = {
         id: `artifact-${artifactInfo.id}`,
@@ -5281,25 +5273,25 @@ export default {
 
         createdAt: Date.now()
       }
-      
+
       // Add to leftFiles and activate
       this.leftFiles.push(virtualFile)
       this.activeFileIdLeft = virtualFile.id
-      
+
       // TODO: Persist to backend /项目根目录/AI助手工作计划/ if needed
       console.log('[ProjectOverview] ✓ Created markdown tab:', virtualFile.name)
     },
 
     handleClientAction(action) {
         console.log('[ProjectOverview] Client Action:', action)
-        
+
         if (action.action === 'refresh_files') {
             if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
                 console.log('[ProjectOverview] Refreshing File Tree...')
                 this.$refs.fileTree.loadFiles()
                 uni.showToast({ title: '文件已更新', icon: 'none' })
             }
-        } 
+        }
         // AI Agent 请求打开文件
         else if (action.action === 'wps_open_file') {
             this.handleWpsOpenFile(action)
@@ -5313,7 +5305,7 @@ export default {
             this.handleWpsCommand(action)
         }
     },
-    
+
     /**
      * 处理 AI Agent 的打开文件请求
      */
@@ -5325,7 +5317,7 @@ export default {
                 console.warn('[ProjectOverview] No fileId in wps_open_file action')
                 return
             }
-            
+
             // 获取文件详情
             const file = await getFileDetail(this.projectId, fileId)
             if (!file) {
@@ -5333,13 +5325,13 @@ export default {
                 uni.showToast({ title: '文件不存在', icon: 'none' })
                 return
             }
-            
+
             // 打开文件
             this.openFile(file)
-            
+
             // 提示用户
             uni.showToast({ title: `已打开: ${file.name}`, icon: 'none' })
-            
+
         } catch (e) {
             console.error('[ProjectOverview] handleWpsOpenFile error:', e)
             uni.showToast({ title: '打开文件失败', icon: 'none' })
@@ -5349,7 +5341,7 @@ export default {
     /**
      * 处理 AI Agent 的重新加载文件请求
      * 当后端修改了 PPTX 文件后，需要通知前端刷新 WPS 以显示最新内容
-     * 
+     *
      * 工作原理：
      * 1. 后端修改文件后会更新 wpsFileId（添加版本时间戳）
      * 2. 前端获取最新文件信息，更新 leftFiles/rightFiles 中的 wpsFileId
@@ -5364,7 +5356,7 @@ export default {
                 console.warn('[ProjectOverview] No fileId in wps_reload_file action')
                 return
             }
-            
+
             // 获取文件详情（确保获取最新信息，包括新的 wpsFileId）
             const file = await getFileDetail(this.projectId, fileId)
             if (!file) {
@@ -5372,17 +5364,17 @@ export default {
                 uni.showToast({ title: '文件不存在', icon: 'none' })
                 return
             }
-            
+
             console.log('[ProjectOverview] Got updated file info:', {
                 id: file.id,
                 name: file.name,
                 wpsFileId: file.wpsFileId
             })
-            
+
             // 同时更新 leftFiles 和 rightFiles 中的文件信息
             // 这样可以确保所有打开的相同文件都能获得新的 wpsFileId
             let updated = false
-            
+
             // 更新左侧窗格
             const existingLeft = this.leftFiles.find(f => f.id === file.id)
             if (existingLeft) {
@@ -5394,7 +5386,7 @@ export default {
                 })
                 updated = true
             }
-            
+
             // 更新右侧窗格
             const existingRight = this.rightFiles.find(f => f.id === file.id)
             if (existingRight) {
@@ -5406,36 +5398,36 @@ export default {
                 })
                 updated = true
             }
-            
+
             // 如果文件不在任何窗格中打开，则打开它
             if (!updated) {
                 console.log('[ProjectOverview] File not open, opening:', file.name)
                 this.openFile(file)
             }
-            
+
             uni.showToast({ title: `文件已更新: ${file.name}`, icon: 'success' })
-            
+
             // 刷新文件树以更新文件信息
             if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
                 this.$refs.fileTree.loadFiles()
             }
-            
+
         } catch (e) {
             console.error('[ProjectOverview] handleWpsReloadFile error:', e)
             uni.showToast({ title: '刷新文件失败', icon: 'none' })
         }
     },
-    
+
     /**
      * 处理 AI Agent 的 WPS 命令请求
      */
     async handleWpsCommand(action) {
         console.log('[ProjectOverview] ========== WPS Command Start ==========')
         console.log('[ProjectOverview] WPS Command:', JSON.stringify(action))
-        
+
         const { action: commandAction, params, requestId, conversationId } = action
         console.log('[ProjectOverview] commandAction:', commandAction, 'requestId:', requestId)
-        
+
         try {
             // 获取当前活跃的 WPS 实例
             // FIX: 优先使用当前聚焦窗格的 WPS 实例，避免多窗口时操作错误的文档
@@ -5445,7 +5437,7 @@ export default {
                 left: !!this.wpsInstances.left,
                 right: !!this.wpsInstances.right
             })
-            
+
             if (this.focusedPane && this.wpsInstances[this.focusedPane]) {
                 wpsInstance = this.wpsInstances[this.focusedPane]
                 console.log('[ProjectOverview] Using focused pane instance:', this.focusedPane)
@@ -5454,39 +5446,39 @@ export default {
                 wpsInstance = this.wpsInstances.left || this.wpsInstances.right
                 console.log('[ProjectOverview] Using fallback instance:', wpsInstance ? 'found' : 'null')
             }
-            
+
             if (!wpsInstance) {
                 console.error('[ProjectOverview] No WPS instance available')
                 await sendWpsResult(conversationId, requestId, false, null, 'WPS 编辑器未就绪，请先打开一个文档')
                 return
             }
-            
+
             console.log('[ProjectOverview] WPS instance found, calling wpsBridge.executeCommand...')
             console.log('[ProjectOverview] wpsInstance type:', typeof wpsInstance)
             console.log('[ProjectOverview] wpsInstance.Application:', !!wpsInstance?.Application)
-            
+
             // 使用 WpsBridge 执行命令
             const wpsBridge = useWpsBridge()
             console.log('[ProjectOverview] wpsBridge created, calling executeCommand with:', commandAction, params)
-            
+
             const result = await wpsBridge.executeCommand(commandAction, params, wpsInstance)
-            
+
             console.log('[ProjectOverview] WPS Command Result:', JSON.stringify(result))
-            
+
             // 发送结果回后端
             const successFlag = result.success !== false
             console.log('[ProjectOverview] Sending result to backend: success=', successFlag)
-            
+
             await sendWpsResult(
-                conversationId, 
-                requestId, 
-                successFlag, 
-                result, 
+                conversationId,
+                requestId,
+                successFlag,
+                result,
                 result.error || null
             )
-            
+
             console.log('[ProjectOverview] ========== WPS Command End ==========')
-            
+
         } catch (e) {
             console.error('[ProjectOverview] handleWpsCommand error:', e)
             console.error('[ProjectOverview] Error stack:', e.stack)
@@ -5495,7 +5487,7 @@ export default {
     },
 
     // --- 文件选择/上传 ---
-    
+
     insertAiMessageToDoc(message) {
       if (!message || !message.content) return
       this.insertPlainTextToWps(message.content)
@@ -5537,14 +5529,14 @@ export default {
     handleAiDrop(e) {
         if (e && e.preventDefault) e.preventDefault()
         this.dragOverAiPanel = false
-        
+
         let fileData = null
         try {
              // 1. Try standard json format
              const raw = e.dataTransfer.getData('application/x-checkba-file')
              if (raw) fileData = JSON.parse(raw)
         } catch(e) {}
-        
+
         if (!fileData) {
              try {
                   // 2. Try fallback text format
@@ -5552,12 +5544,12 @@ export default {
                   if (raw2) fileData = JSON.parse(raw2)
              } catch(e) {}
         }
-        
+
         // 3. Try global fallback (WebView/Browser safe)
         if (!fileData && typeof document !== 'undefined' && document.__checkbaDraggedFile) {
              fileData = { ...document.__checkbaDraggedFile }
         }
-        
+
         if (fileData) {
              const file = {
                  id: fileData.fileId || fileData.id,
@@ -5566,7 +5558,7 @@ export default {
                  wpsFileId: fileData.wpsFileId,
                  isDir: fileData.fileType === 'folder' || fileData.isDir
              }
-             
+
              // Check for folder file count limit (>10)
              if (file.isDir && this.$refs.fileTree && Array.isArray(this.$refs.fileTree.allFiles)) {
                  const allFiles = this.$refs.fileTree.allFiles
@@ -5583,7 +5575,7 @@ export default {
                      }
                      return count
                  }
-                 
+
                  const totalFiles = countDescendants(file.id)
                  if (totalFiles > 10) {
                      uni.showToast({ title: `文件夹含${totalFiles}个文件(超出10个限制)，请减少数量`, icon: 'none' })
@@ -5594,7 +5586,7 @@ export default {
              if (this.$refs.chatInterface) {
                  this.$refs.chatInterface.addFile(file)
              }
-             
+
              // Note: Visual tag display is now handled within ChatInterface
              uni.showToast({ title: '已添加: ' + fileData.name, icon: 'none' })
 
@@ -5640,7 +5632,7 @@ export default {
               if (file) {
                  hasImage = true
                  e.preventDefault() // Stop default paste (img tag)
-                 
+
                  // Read file to create preview
                  const reader = new FileReader()
                  reader.onload = (evt) => {
@@ -5664,41 +5656,41 @@ export default {
           word: '#7E94B3',
           doc: '#7E94B3',
           docx: '#7E94B3',
-          
+
           ppt: '#B38F7E',
           pptx: '#B38F7E',
-          
+
           pdf: '#B37E7E',
-          
+
           excel: '#5CA67D',
           xls: '#5CA67D',
           xlsx: '#5CA67D',
-          
+
           image: '#7EABB3',
           png: '#7EABB3',
           jpg: '#7EABB3',
           jpeg: '#7EABB3',
-          
+
           video: '#947EB3',
           mp4: '#947EB3',
-          
+
           audio: '#B3B37E',
           mp3: '#B3B37E',
-          
+
           default: '#6C757D'
        }
        return colors[t] || colors.default
     },
     insertContextTag(file) {
        if (!this.$refs.aiRichInput) return
-       
+
        const color = this.getContextColor(file.fileType)
        // Style: Italic, Serif-ish, small font, custom background (light version of color)
        // Using style string directly for contenteditable safety
        // Converting hex to rgba for background (simple approx or just use heavy opacity)
        // Actually simpler: Use the color as text color, and a very light background.
        // Let's use opacity 0.1 for bg
-       
+
        // Hex to RGB helper (inline simplification)
        let r=0,g=0,b=0
        if(color.length === 7) {
@@ -5707,17 +5699,17 @@ export default {
            b = parseInt(color.slice(5,7), 16)
        }
        const bg = `rgba(${r},${g},${b},0.1)`
-       
+
        // Truncate filename to max 10 characters
        const maxLen = 10
-       const displayName = file.name.length > maxLen 
-           ? file.name.substring(0, maxLen) + '...' 
+       const displayName = file.name.length > maxLen
+           ? file.name.substring(0, maxLen) + '...'
            : file.name
-       
+
        // Use King IDE brand colors for the tag
        const tagHtml = `<span class="ai-tag" contenteditable="false" data-file-id="${file.id || file.fileId}" data-full-name="${file.name}" title="${file.name}" style="background: linear-gradient(135deg, #1A5336 0%, #2D7A52 100%); color: #FFFFFF; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; box-shadow: 0 1px 3px rgba(26,83,54,0.2);">@${displayName}</span>&nbsp;`
 
-       
+
        const sel = window.getSelection()
        if (sel.rangeCount > 0) {
            const range = sel.getRangeAt(0)
@@ -5807,7 +5799,7 @@ export default {
         this.currentModelId = savedProvider
         return
       }
-      
+
       // 2. Fallback to System Default (Public Config)
       try {
         const res = await getAiConfig()
@@ -5824,7 +5816,7 @@ export default {
         console.warn('Failed to load AI config, using default.', e)
       }
     },
-    
+
     toggleModelDropdown() {
       this.showModelDropdown = !this.showModelDropdown
       if (this.showModelDropdown) this.showContextDropdown = false
@@ -5837,7 +5829,7 @@ export default {
     },
     // --- AI 对话 ---
     scrollToBottom() {
-      this.scrollTop = this.scrollTop + 1 // trigger value change for watcher if needed? 
+      this.scrollTop = this.scrollTop + 1 // trigger value change for watcher if needed?
       // Actually uni-app scroll-top works better when set to a large value
       this.$nextTick(() => {
         this.scrollTop = 99999
@@ -5846,12 +5838,12 @@ export default {
 
     async handleAiSend() {
       if (this.aiLoading || !this.aiInput.trim()) return
-      
+
       // Logic: Send message to backend
       this.aiLoading = true
       // Push user message immediately for responsiveness
       const tempId = Date.now()
-      const text = this.aiInput.trim() 
+      const text = this.aiInput.trim()
       this.aiMessages.push({
         id: tempId,
         role: 'user',
@@ -5859,7 +5851,7 @@ export default {
       })
       this.aiInput = '' // Clear input
       this.clearRichInput() // Clear rich div
-      
+
       // Scroll to bottom
       this.$nextTick(() => {
         this.scrollToBottom()
@@ -5868,23 +5860,23 @@ export default {
       try {
         // Collect fresh context (List of contexts)
         const activeContexts = await this.collectAiContextForChat()
-        
+
         const res = await aiChat({
           projectId: this.projectId,
           message: text,
           contexts: activeContexts, // Updated to List
           model: this.currentModelId,
           assistantId: this.currentAssistantId,
-          conversationId: this.currentConversationId 
+          conversationId: this.currentConversationId
         })
-        
+
         // Update current conversation ID if it was new
         if (res && res.conversationId) {
              this.currentConversationId = res.conversationId
         }
-        
+
         const responseText = res.response || ''
-        
+
         this.aiMessages.push({
           id: Date.now() + 1,
           role: 'assistant',
@@ -5938,19 +5930,19 @@ export default {
       if (!Array.isArray(allFiles) || !allFiles.length) return []
       const folders = allFiles.filter(f => f && f.isFolder)
       if (!folders.length) return []
-    
+
       const map = new Map()
       // Init map
       folders.forEach(f => {
         const isRoot = !f.parentId
         map.set(f.id, {
           ...f,
-          children: [], 
+          children: [],
           level: 0,
           expanded: isRoot // Default: Root expanded, others collapsed
         })
       })
-    
+
       const roots = []
       // Build hierarchy
       folders.forEach(f => {
@@ -5961,7 +5953,7 @@ export default {
           roots.push(node)
         }
       })
-    
+
       // Flatten for v-for
       const result = []
       const traverse = (nodes, level) => {
@@ -5977,7 +5969,7 @@ export default {
             }
           })
       }
-    
+
       traverse(roots, 0)
       return result
     },
@@ -5985,17 +5977,17 @@ export default {
     toggleExportFolder(folder) {
         if (!folder) return
         folder.expanded = !folder.expanded
-        this.$forceUpdate() 
+        this.$forceUpdate()
     },
-    
+
     isFolderVisible(folder) {
         if (!folder) return false
         if (!this.screenshotFolderTree || !this.screenshotFolderTree.length) return true
-        
+
         let parentId = folder.parentId
         while (parentId) {
             const parent = this.screenshotFolderTree.find(f => f.id === parentId)
-            if (!parent) return true 
+            if (!parent) return true
             if (!parent.expanded) return false
             parentId = parent.parentId
         }
@@ -6072,7 +6064,7 @@ export default {
       // Retain current assistant/model settings? Yes.
       this.showHistoryDrawer = false // Close drawer if open
     },
-    
+
     handleInsertVariable(text) {
       this.insertPlainTextToWps(text)
     },
@@ -6092,7 +6084,7 @@ export default {
       // Enter to send, Shift + Enter to newline
       this.checkKeySend(e)
     },
-    
+
     handleWrapperKeydown(e) {
       // Capture phase backup
       this.checkKeySend(e)
@@ -6101,11 +6093,11 @@ export default {
     checkKeySend(e) {
       // Enter to send, Shift + Enter to newline
       const isEnter = e.key === 'Enter' || e.keyCode === 13
-      
+
       if (isEnter) {
         if (!e.shiftKey) {
           // Enter only: Send
-          e.preventDefault() 
+          e.preventDefault()
           e.stopPropagation()
           if (!this.aiLoading && this.aiInput.trim()) {
             this.handleAiSend()
@@ -6114,7 +6106,7 @@ export default {
         // Shift + Enter: Default behavior (newline), do nothing
       }
     },
-    
+
     async fetchChatHistory() {
       if (!this.projectId) return
       this.loadingHistory = true
@@ -6128,7 +6120,7 @@ export default {
           this.chatHistoryList = (res || []).map(item => ({
               id: item.conversationId,
               title: item.title ? item.title.replace(/<[^>]+>/g, '').trim() : (item.lastMessage ? (item.lastMessage.substring(0, 20) + (item.lastMessage.length > 20 ? '...' : '')) : '新对话'),
-              updatedAt: item.updatedAt, 
+              updatedAt: item.updatedAt,
               lastMessage: item.lastMessage ? item.lastMessage.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').substring(0, 60) + (item.lastMessage.length > 60 ? '...' : '') : '',
               conversationId: item.conversationId
           }))
@@ -6139,15 +6131,15 @@ export default {
         this.loadingHistory = false
       }
     },
-    
+
     async loadHistoryChat(chat) {
         if (!chat || !chat.conversationId) return
         this.currentConversationId = chat.conversationId
         this.loadingHistory = true // Reuse loading state or local
         try {
-            const msgs = await getAiHistory({ 
-                projectId: this.projectId, 
-                conversationId: chat.conversationId 
+            const msgs = await getAiHistory({
+                projectId: this.projectId,
+                conversationId: chat.conversationId
             })
             // Pass conversationId and messages to ChatInterface via $refs
             if (this.$refs.chatInterface && typeof this.$refs.chatInterface.loadMessages === 'function') {
@@ -6192,7 +6184,7 @@ export default {
     // Helper for icons
     getAssistantIcon(id) {
         // User requested to remove emoji icons
-        return '' 
+        return ''
     },
     openAssistantConfig(assistant) {
         if (!assistant) return
@@ -6206,7 +6198,7 @@ export default {
     },
     saveAssistantConfig() {
         if (!this.editingAssistant) return
-        
+
         // Update local list
         const idx = this.assistants.findIndex(a => a.id === this.editingAssistant.id)
         if (idx !== -1) {
@@ -6256,7 +6248,7 @@ $bg-white: #FFFFFF;
   color: $color-text-main;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   overflow: hidden;
-  
+
   &.compact-mode {
     .project-header {
       height: 48px;
@@ -6306,7 +6298,7 @@ $bg-white: #FFFFFF;
   cursor: pointer;
   color: $color-text-light;
   transition: all 0.2s;
-  
+
   &:hover {
     background-color: $bg-pale;
     color: $color-primary;
@@ -6343,7 +6335,7 @@ $bg-white: #FFFFFF;
   color: $color-primary; // King Forest for title
   letter-spacing: -0.2px;
   cursor: pointer;
-  
+
   &:hover {
     color: $color-primary-light;
   }
@@ -6365,7 +6357,7 @@ $bg-white: #FFFFFF;
   border: 1px solid transparent; // Cleaner look
   border-radius: 4px;
   padding: 1px 6px;
-  
+
   .status-text {
     font-size: 10px;
     font-weight: 500;
@@ -6399,7 +6391,7 @@ $bg-white: #FFFFFF;
   gap: 4px;
   margin-right: 0;
   padding-right: 0;
-  border-right: none; 
+  border-right: none;
 }
 
 .top-bar-btn {
@@ -6414,12 +6406,12 @@ $bg-white: #FFFFFF;
   background-color: transparent;
   border: 1px solid transparent; /* Explicitly transparent to kill default borders */
   transition: all 0.2s ease;
-  
+
   &:hover {
     background-color: #f3f4f6; /* Cool Gray 100 - very neutral */
     color: #111827; /* Gray 900 */
   }
-  
+
   &.active {
     background-color: #e5e7eb; /* Cool Gray 200 */
     color: #111827;
@@ -6431,8 +6423,8 @@ $bg-white: #FFFFFF;
 }
 
 .tool-icon-img {
-  width: 100%;
-  height: 100%;
+  width: 16px;
+  height: 16px;
   display: block;
 }
 
@@ -6446,17 +6438,17 @@ $bg-white: #FFFFFF;
   border: 1px solid transparent; /* Enforce no default border */
   transition: all 0.2s;
   position: relative; // For red dot or badge
-  
+
   &:hover {
     background-color: $color-accent-pale;
     color: $color-primary;
   }
-  
+
   &.active {
     background-color: $color-accent-pale;
     color: $color-primary;
   }
-  
+
   .tool-icon {
     font-size: 16px;
     // Specific adjustment for font icons if needed
@@ -6507,19 +6499,19 @@ $bg-white: #FFFFFF;
   cursor: pointer;
   color: #64748b; // Slate-500 (Gray-Medium equivalent)
   transition: all 0.2s;
-  
+
   &:hover {
     color: #1A5336; // King Forest
     background-color: #f1f5f9; // Slate-100
   }
-  
+
   &.active {
     background-color: rgba(91, 209, 151, 0.1); // Mint with opacity
     // Use pseudo-element for border to avoid layout shift
     position: relative;
     border-radius: 0; // Remove radius for active state to match square-ish look or keep? Original had left radius removed.
     // Actually, original had: border-top-left-radius: 0; border-bottom-left-radius: 0;
-    
+
     &::before {
         content: '';
         position: absolute;
@@ -6550,7 +6542,7 @@ $bg-white: #FFFFFF;
   border-bottom: 1px solid $color-border;
   display: flex;
   flex-shrink: 0;
-  
+
   /* Remove old shadow/z-index if present */
   box-shadow: none;
 }
@@ -6561,7 +6553,7 @@ $bg-white: #FFFFFF;
   align-items: flex-end; // Align tabs with bottom border
   min-width: 0;
   border-right: 1px solid transparent;
-  
+
   &.half-width {
     width: 50%;
     border-right: 1px solid $color-border;
@@ -6599,12 +6591,12 @@ $bg-white: #FFFFFF;
   border-bottom: none;
   margin-right: 2px;
   position: relative;
-  
+
   &:hover {
     background: darken($bg-pale, 3%);
     color: $color-text-main;
   }
-  
+
   &.active {
     background: $bg-white;
     color: $color-primary; // King Forest for active text
@@ -6613,7 +6605,7 @@ $bg-white: #FFFFFF;
     border-bottom: 1px solid $bg-white; // Merge with content below
     margin-bottom: -1px; // Push down to cover border
     z-index: 10;
-    
+
     // Top highlight line for active tab
     &::after {
       content: '';
@@ -6627,7 +6619,7 @@ $bg-white: #FFFFFF;
       border-top-right-radius: 6px;
     }
   }
-  
+
   &.tab-drag-over {
     background: $color-accent-pale;
   }
@@ -6652,7 +6644,7 @@ $bg-white: #FFFFFF;
   @include flex-center;
   border-radius: 50%;
   color: transparent; // Hidden by default
-  
+
   &:hover {
     background: rgba(0,0,0,0.1);
     color: $color-text-main;
@@ -6671,7 +6663,7 @@ $bg-white: #FFFFFF;
   cursor: pointer;
   color: $color-text-light;
   transition: color 0.2s;
-  
+
   &:hover {
     color: $color-primary;
   }
@@ -6721,18 +6713,18 @@ $bg-white: #FFFFFF;
   overflow: hidden;
   position: relative;
   background: $bg-white;
-  
+
   &.pane-full {
     flex: 1;
     width: 100%;
   }
-  
+
   &.pane-half {
     flex: 1;
     width: 50%;
     &:first-child { border-right: 1px solid $color-border; }
   }
-  
+
   &.focused {
     background-color: rgba(91, 209, 151, 0.05);
   }
@@ -6774,7 +6766,7 @@ $bg-white: #FFFFFF;
   height: 8px;
   cursor: row-resize;
   z-index: 101;
-  
+
   &:hover {
     background: rgba($color-accent, 0.2); // Visual feedback
   }
@@ -6801,11 +6793,11 @@ $bg-white: #FFFFFF;
   cursor: pointer;
   padding: 4px 0;
   position: relative;
-  
+
   &.active {
     color: $color-primary;
     font-weight: 600;
-    
+
     &::after {
       content: '';
       position: absolute;
@@ -6815,7 +6807,7 @@ $bg-white: #FFFFFF;
       background: $color-accent;
     }
   }
-  
+
   &:hover {
     color: $color-text-main;
   }
@@ -6844,7 +6836,7 @@ $bg-white: #FFFFFF;
   width: 40px;
   height: 40px;
   @include flex-center;
-  
+
   &:hover {
      .members-expand-panel-left {
         display: flex;
@@ -6862,7 +6854,7 @@ $bg-white: #FFFFFF;
   margin-top: 8px;
   border: 2px solid transparent;
   transition: border-color 0.2s;
-  
+
   &:hover {
     border-color: $color-accent;
   }
@@ -6883,7 +6875,7 @@ $bg-white: #FFFFFF;
   flex-direction: column;
   position: relative;
   transition: width 0.1s ease-out; // Faster transition
-  
+
   &.collapsed {
     border-right: none;
   }
@@ -6913,15 +6905,15 @@ $bg-white: #FFFFFF;
 
 .sidebar-actions {
   display: flex;
-  gap: 1px;
-  
+  gap: 2px;
+
   .icon-btn.mini {
     width: 18px;
     height: 16px;
 
-    
+
     .tool-icon { font-size: 14px; }
-    
+
     &.active {
        color: $color-primary;
     }
@@ -7134,7 +7126,7 @@ $bg-white: #FFFFFF;
     position: absolute;
     top: 36px; /* Exactly below header (Reverted to 36px) */
     left: 0;
-    right: 0; 
+    right: 0;
     background: #fff;
     border-bottom: 1px solid #e2e8f0;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
@@ -7370,7 +7362,7 @@ $bg-white: #FFFFFF;
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
-  
+
   &.collapsed {
     width: 0;
     border-right: none;
@@ -7527,7 +7519,7 @@ $bg-white: #FFFFFF;
 }
 
 .sidebar-title {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
   color: $color-text-light; /* Lighter color */
   white-space: nowrap;
@@ -7679,7 +7671,7 @@ $bg-white: #FFFFFF;
   min-width: 0;
   display: flex;
   border-right: 1px solid transparent;
-  
+
   &.half-width {
     flex: 0 0 50%; /* 强制占50% */
     max-width: 50%;
@@ -7766,12 +7758,12 @@ $bg-white: #FFFFFF;
   user-select: none;
   border: 1px solid rgba(15, 23, 42, 0.06);
   transition: background-color 0.18s ease, border-color 0.18s ease;
-  
+
   &:hover {
     border-color: rgba(200, 164, 93, 0.55);
     background: rgba(200, 164, 93, 0.06);
   }
-  
+
   .tab-name {
     flex: 1;
     font-size: 13px;
@@ -7780,7 +7772,7 @@ $bg-white: #FFFFFF;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
+
   .tab-close {
     font-size: 16px;
     color: #999;
@@ -7790,13 +7782,13 @@ $bg-white: #FFFFFF;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    
+
     &:hover {
       background: rgba(0,0,0,0.1);
       color: #333;
     }
   }
-  
+
   &.active {
     background: rgba(18, 52, 77, 0.06);
     border-color: rgba(18, 52, 77, 0.18);
@@ -7855,14 +7847,14 @@ $bg-white: #FFFFFF;
     border-color: rgba(200, 164, 93, 0.4);
     color: $color-primary;
   }
-  
+
   &.active {
     background: linear-gradient(120deg, rgba(255,255,255,0.95), rgba(248, 241, 228, 0.9));
     color: $color-primary;
     border-color: rgba(200, 164, 93, 0.6);
     box-shadow: 0 4px 10px rgba(200, 164, 93, 0.16);
   }
-  
+
   .tool-icon {
     font-size: 16px;
   }
@@ -7896,26 +7888,26 @@ $bg-white: #FFFFFF;
   border: 1px solid rgba(15, 23, 42, 0.05);
   background: rgba(249, 250, 255, 0.82);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
-  
+
   &.focused {
     /* 聚焦时的高亮提示 */
     box-shadow: inset 0 0 0 2px rgba(18, 52, 77, 0.1);
     z-index: 1;
   }
-  
+
   /* 显式控制宽度 */
   &.pane-full {
     width: 100%;
     flex: 0 0 100%;
     max-width: 100%;
   }
-  
+
   &.pane-half {
     width: 50%;
     flex: 0 0 50%;
     max-width: 50%;
     border-right: 1px solid $color-border;
-    
+
     &:last-child {
       border-right: none;
     }
@@ -7966,7 +7958,7 @@ $bg-white: #FFFFFF;
   transform: translateX(300px); /* 默认收起内容，只留把手 */
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none; /* 收起时不遮挡底层点击，把手单独开启 pointer-events */
-  
+
   &.expanded {
     transform: translateX(0);
     pointer-events: auto;
@@ -7983,23 +7975,23 @@ $bg-white: #FFFFFF;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  
+
   /* 垂直居中定位 */
   position: absolute;
   left: -24px; /* 把它移到 content 左边 */
   top: 50%;
   transform: translateY(-50%);
-  
+
   box-shadow: -2px 2px 4px rgba(0,0,0,0.1);
   pointer-events: auto; /* 始终允许点击 */
   z-index: 51;
-  
+
   .handle-icon {
     font-size: 18px;
     color: #fff; /* 白色箭头 */
     line-height: 1;
   }
-  
+
   &:hover {
     background-color: #1a4a6b; /* hover 变亮一点 */
     width: 28px; /* hover 变宽一点点作为反馈 */
@@ -8020,7 +8012,7 @@ $bg-white: #FFFFFF;
   opacity: 0;
   transition: opacity 0.2s;
   pointer-events: none;
-  
+
   /* 小三角 */
   &::after {
     content: '';
@@ -8361,7 +8353,7 @@ $bg-white: #FFFFFF;
 
 /* Model Dropdown */
 .ai-model-select {
-  position: relative; 
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -8495,7 +8487,7 @@ $bg-white: #FFFFFF;
   overflow-x: hidden; /* Disable horizontal scroll */
   display: flex;
   flex-direction: column;
-  min-height: 40px; 
+  min-height: 40px;
   width: 100%; /* Ensure width constraint */
 }
 
@@ -8555,7 +8547,7 @@ $bg-white: #FFFFFF;
   content: '输入指令 (Enter 换行，⌘/Ctrl + Enter 发送)...';
   color: #94a3b8;
   pointer-events: none;
-  display: block; 
+  display: block;
 }
 
 /* Inline Tag Style - King IDE Brand Colors */
@@ -8636,7 +8628,7 @@ $bg-white: #FFFFFF;
   padding: 0 16px;
   background: #fff;
   flex-shrink: 0;
-  
+
   &.with-back {
     justify-content: space-between;
   }
@@ -8649,7 +8641,7 @@ $bg-white: #FFFFFF;
   cursor: pointer;
   color: $color-accent;
   font-size: 13px;
-  
+
   &:hover {
     opacity: 0.8;
   }
@@ -8669,7 +8661,7 @@ $bg-white: #FFFFFF;
   flex: 1;
   overflow-y: auto;
   background: #fff;
-  
+
   &.empty-body {
     display: flex;
     align-items: center;
@@ -8684,7 +8676,7 @@ $bg-white: #FFFFFF;
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .header-right {
     width: 100%;
     justify-content: flex-end;
@@ -8716,7 +8708,7 @@ $bg-white: #FFFFFF;
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
-  
+
   &:hover {
     border-color: $color-accent;
     box-shadow: 0 2px 8px rgba(91, 209, 151, 0.2);
@@ -9185,7 +9177,7 @@ $bg-white: #FFFFFF;
 .record-btn {
   margin-left: 8px;
   position: relative;
-  
+
   .record-dot {
     width: 10px;
     height: 10px;
@@ -9193,7 +9185,7 @@ $bg-white: #FFFFFF;
     background: #e11d48; // Red for stop/record
     transition: all 0.3s ease;
   }
-  
+
   &.recording {
     .record-dot {
       background: #e11d48;
@@ -9203,7 +9195,7 @@ $bg-white: #FFFFFF;
       width: 12px;
       height: 12px;
       position: relative;
-      
+
       &::after {
          content: '';
          position: absolute;
@@ -9370,7 +9362,7 @@ $bg-white: #FFFFFF;
   border-radius: 8px; /* Match rail-btn */
   transition: all 0.2s;
   cursor: pointer;
-  
+
   &:hover {
     background-color: #f1f5f9; /* Match rail-btn hover */
   }
@@ -9428,7 +9420,7 @@ $bg-white: #FFFFFF;
   top: 0;
   bottom: 0;
   left: -20px; /* Cover the gap and overlap with icon */
-  width: 20px; 
+  width: 20px;
   background: transparent;
 }
 
@@ -9503,10 +9495,10 @@ $bg-white: #FFFFFF;
   margin-top: 8px;
 }
 
-/* If we want it in the grid flow, we place it in the grid. 
+/* If we want it in the grid flow, we place it in the grid.
    But user asked for "most right" (超出最大列宽后可以换行).
-   If we put it as a separate block after lists, it's easier. 
-   Or we can append it to the last group's grid. 
+   If we put it as a separate block after lists, it's easier.
+   Or we can append it to the last group's grid.
    Currently implemented as a separate row at bottom right or flow.
 */
 .add-member-btn {
@@ -9820,7 +9812,7 @@ $bg-white: #FFFFFF;
   cursor: pointer;
   margin-bottom: 8px; /* Consistent margin */
   transition: all 0.2s;
-  
+
   &:hover {
     background-color: #f1f5f9; /* Match rail-btn hover */
   }
@@ -9910,7 +9902,7 @@ $bg-white: #FFFFFF;
   cursor: pointer;
   transition: all 0.2s;
   color: #6C757D;
-  
+
   &:hover {
     background: #E6F9F0;
     color: #1A5336;
@@ -9970,7 +9962,7 @@ $bg-white: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  
+
   &.visible {
     opacity: 1;
   }
@@ -9978,7 +9970,7 @@ $bg-white: #FFFFFF;
 /* AI Context Drag & Drop */
 .side-panel-ai.drag-over {
   background-color: rgba(91, 209, 151, 0.1);
-  
+
   &::after {
     content: "";
     position: absolute;
