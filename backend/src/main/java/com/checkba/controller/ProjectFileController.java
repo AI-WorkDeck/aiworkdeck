@@ -2,6 +2,7 @@ package com.checkba.controller;
 
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.model.dto.ProjectFileBatchRequest;
+import com.checkba.exception.UnauthorizedException;
 import com.checkba.service.ProjectFileService;
 import com.checkba.service.ProjectMemberService;
 import lombok.Data;
@@ -37,7 +38,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         
         checkFileTreeAccess(projectId, userId);
@@ -70,7 +71,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         return projectFileService.createFolder(projectId, request.getParentId(), request.getName(), userId);
@@ -87,7 +88,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         return projectFileService.createFile(
@@ -114,7 +115,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         return projectFileService.rename(fileId, request.getName(), userId);
@@ -131,7 +132,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         projectFileService.delete(fileId, userId);
@@ -152,7 +153,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         projectFileService.batchDelete(projectId, request, userId);
@@ -174,7 +175,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         List<ProjectFile> moved = projectFileService.batchMove(projectId, request, userId);
@@ -198,7 +199,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         List<ProjectFile> created = projectFileService.batchCopy(projectId, request, userId);
@@ -223,7 +224,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         return projectFileService.move(fileId, request.getParentId(), request.getSortOrder(), userId);
@@ -240,7 +241,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         return projectFileService.getFile(fileId);
@@ -256,7 +257,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         return projectFileService.getRecycleBinFiles(projectId);
@@ -273,7 +274,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         projectFileService.restore(fileId, userId);
@@ -294,7 +295,7 @@ public class ProjectFileController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
-            throw new IllegalArgumentException("请先登录");
+            throw new UnauthorizedException("请先登录");
         }
         checkFileTreeAccess(projectId, userId);
         projectFileService.permDelete(fileId, userId);
