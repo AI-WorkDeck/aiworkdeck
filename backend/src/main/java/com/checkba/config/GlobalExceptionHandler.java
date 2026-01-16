@@ -1,5 +1,6 @@
 package com.checkba.config;
 
+import com.checkba.exception.UnauthorizedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -15,6 +16,15 @@ import java.util.Map;
 @ControllerAdvice
 @lombok.extern.slf4j.Slf4j
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, Object>> handleUnauthorizedException(UnauthorizedException e) {
+        log.warn("GlobalExceptionHandler caught UnauthorizedException: {}", e.getMessage());
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 401);
+        result.put("message", e.getMessage() != null ? e.getMessage() : "请先登录");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
+    }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException e) {

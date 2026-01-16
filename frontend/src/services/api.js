@@ -152,6 +152,38 @@ function request(options) {
       header: headers,
       success(res) {
         const status = res.statusCode || 0;
+
+        // 处理401未授权错误（未登录或登录过期）
+        if (status === 401 || (res.data && res.data.code === 401)) {
+          console.warn('检测到未登录状态，准备跳转到登录页');
+          // 清除本地存储的session信息
+          try {
+            uni.removeStorageSync('sessionId');
+            uni.removeStorageSync('userId');
+          } catch (e) {
+            console.warn('清除登录信息失败:', e);
+          }
+
+          // 跳转到登录页
+          uni.reLaunch({
+            url: '/pages/login/login',
+            success: () => {
+              console.log('已跳转到登录页');
+              uni.showToast({
+                title: '登录已过期，请重新登录',
+                icon: 'none',
+                duration: 2000
+              });
+            },
+            fail: (err) => {
+              console.error('跳转到登录页失败:', err);
+            }
+          });
+
+          reject(new Error('登录已过期'));
+          return;
+        }
+
         // 统一处理后端返回的 { code: 0, data: ... } 或 { code: 1, message: ... } 格式
         if (res.data && typeof res.data.code !== 'undefined') {
           if (res.data.code === 0) {
