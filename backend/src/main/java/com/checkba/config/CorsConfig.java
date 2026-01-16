@@ -59,7 +59,7 @@ public class CorsConfig {
             }
             
             response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD");
-            response.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Session-Id, Cache-Control, Pragma");
+            response.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Session-Id, Cache-Control, Pragma, X-File-Offset, X-File-Total-Size");
             response.setHeader("Access-Control-Max-Age", "3600");
             response.setHeader("Access-Control-Expose-Headers", "Content-Disposition, X-Suggested-Filename");
             
