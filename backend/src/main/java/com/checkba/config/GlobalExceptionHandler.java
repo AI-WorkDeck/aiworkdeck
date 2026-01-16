@@ -12,6 +12,7 @@ import java.util.Map;
 /**
  * 全局异常处理器
  * 统一处理所有异常，返回统一的错误响应格式
+ * 所有接口统一返回 HTTP 200，通过响应体中的 code 字段区分成功（code=0）或失败（code=1）
  */
 @ControllerAdvice
 @lombok.extern.slf4j.Slf4j
@@ -21,9 +22,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleUnauthorizedException(UnauthorizedException e) {
         log.warn("GlobalExceptionHandler caught UnauthorizedException: {}", e.getMessage());
         Map<String, Object> result = new HashMap<>();
-        result.put("code", 401);
+        result.put("code", 1);
         result.put("message", e.getMessage() != null ? e.getMessage() : "请先登录");
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
+        // 统一返回 HTTP 200，通过 code 字段表示失败
+        return ResponseEntity.ok().body(result);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -32,7 +34,8 @@ public class GlobalExceptionHandler {
         Map<String, Object> result = new HashMap<>();
         result.put("code", 1);
         result.put("message", e.getMessage() != null ? e.getMessage() : "请求参数错误");
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+        // 统一返回 HTTP 200，通过 code 字段表示失败
+        return ResponseEntity.ok().body(result);
     }
 
     @ExceptionHandler(Exception.class)
@@ -41,7 +44,8 @@ public class GlobalExceptionHandler {
         Map<String, Object> result = new HashMap<>();
         result.put("code", 1);
         result.put("message", e.getMessage() != null ? e.getMessage() : "服务器内部错误");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        // 统一返回 HTTP 200，通过 code 字段表示失败
+        return ResponseEntity.ok().body(result);
     }
 }
 
