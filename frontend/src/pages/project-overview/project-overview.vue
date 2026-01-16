@@ -4654,6 +4654,22 @@ export default {
     },
 
     openFile(file) {
+      // 检查文件类型是否支持打开
+      if (!this.isFileTypeSupported(file)) {
+        uni.showModal({
+          title: '无法打开文件',
+          content: `暂不支持打开此类型文件：${file.name}\n\n文件类型：${file.fileType || '无后缀名'}\n\n支持的文件类型：\n• 文档：doc, docx, xls, xlsx, ppt, pptx, pdf\n• 图片：jpg, jpeg, png, gif, bmp, webp, svg\n• 视频：mp4, webm, ogg, mov, mkv, avi\n• 音频：mp3, wav, m4a, flac, aac\n• 文本：txt, md, json, xml, html等`,
+          showCancel: false,
+          confirmText: '我知道了',
+          success: (res) => {
+            if (res.confirm) {
+              console.log('用户确认无法打开文件')
+            }
+          }
+        })
+        return
+      }
+
       const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
       // Start session tracking for this file
       activityTracker.trackActivePage('OPEN_FILE', file.id, file.name, meta)
@@ -4699,7 +4715,8 @@ export default {
       this.lastActiveIdsByMode[pane][mode] = file.id
       this.saveActiveIdsByMode()
 
-      // 如果是文件类型（非浏览器标签），展开侧边栏并定位到文件树
+      // 同步更新 FileTree 的选中状态
+      // 如果是文件类型（非浏览器标签、非特殊标签类型），需要更新资源管理器的选中状态
       if (!this.isBrowserTab(file) && file.id && !file.tabType) {
         // 展开侧边栏并切换到文件模式
         if (this.sidebarCollapsed) {
@@ -4708,10 +4725,24 @@ export default {
         if (this.leftPaneKey !== 'files') {
           this.leftPaneKey = 'files'
         }
-        // 定位到文件树中的对应文件
+
+        // 确保在下一个 tick 中执行，此时 FileTree 组件已经更新
         this.$nextTick(() => {
-          if (this.$refs.fileTree && this.$refs.fileTree.revealFile) {
-            this.$refs.fileTree.revealFile(file.id)
+          if (this.$refs.fileTree) {
+            // 使用 revealFile 方法来定位并选中文件（会展开父目录并滚动到文件）
+            if (this.$refs.fileTree.revealFile) {
+              this.$refs.fileTree.revealFile(file.id)
+            } else {
+              // 如果没有 revealFile 方法，直接设置 selectedFileId
+              this.$refs.fileTree.selectedFileId = file.id
+            }
+          }
+        })
+      } else {
+        // 如果是浏览器标签或其他特殊类型，清空 FileTree 的选中状态
+        this.$nextTick(() => {
+          if (this.$refs.fileTree) {
+            this.$refs.fileTree.selectedFileId = null
           }
         })
       }
@@ -4770,6 +4801,28 @@ export default {
       if (['doc','docx'].includes(t)) return '📝'
       if (['pdf'].includes(t)) return '📕'
       return '📄'
+    },
+    isFileTypeSupported(file) {
+      if (!file || file.isFolder) return true
+      if (!file.fileType) return false
+
+      const type = file.fileType.toLowerCase()
+
+      // 支持的文件类型列表
+      const supportedTypes = [
+        // Office文档
+        'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf',
+        // 图片
+        'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp',
+        // 视频
+        'mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi',
+        // 音频
+        'mp3', 'wav', 'm4a', 'flac', 'aac',
+        // 文本文件
+        'txt', 'md', 'markdown', 'json', 'xml', 'html', 'css', 'js', 'java', 'py', 'sh', 'sql', 'log'
+      ]
+
+      return supportedTypes.includes(type)
     },
     isWpsFile(file) {
       // 根据是否有 wpsFileId 判断是否用 WPS 打开
