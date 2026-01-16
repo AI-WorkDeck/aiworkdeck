@@ -4743,6 +4743,7 @@ export default {
         this.$nextTick(() => {
           if (this.$refs.fileTree) {
             this.$refs.fileTree.selectedFileId = null
+            this.$refs.fileTree.multiSelectedIds = []
           }
         })
       }
