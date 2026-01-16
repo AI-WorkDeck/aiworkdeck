@@ -544,10 +544,10 @@
     </view>
 
     <!-- 独立于 Footer 的上传进度显示 -->
-    <view 
-        v-if="isBatchUploading || Object.keys(uploadStatusMap).length > 0" 
-        class="upload-status-footer-fixed" 
-        style="padding: 10px; border-top: 1px solid #eee; background: white; position: relative;"
+    <view
+        v-if="isBatchUploading || Object.keys(uploadStatusMap).length > 0"
+        class="upload-status-footer-fixed"
+        style="padding: 12px 16px; border-top: 2px solid #2563eb; background: linear-gradient(to bottom, #f8fafc, #ffffff); position: relative; box-shadow: 0 -2px 8px rgba(37, 99, 235, 0.1);"
         @mouseenter="showUploadDetails = true"
         @mouseleave="showUploadDetails = false"
     >
@@ -590,19 +590,32 @@
         
         <!-- Hidden input removed (using uni.chooseFile) -->
 
-        <view class="upload-status-content" style="display: flex; align-items: center; gap: 10px;">
-          <CircularProgress 
-            :percentage="globalUploadProgress || 0" 
-            :size="36" 
-            :strokeWidth="3"
+        <view class="upload-status-content" style="display: flex; align-items: center; gap: 12px;">
+          <!-- 线性进度条 -->
+          <view style="flex: 1; max-width: 200px;">
+            <view style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <text style="font-size: 13px; font-weight: 600; color: #1e40af;">正在上传文件...</text>
+              <text style="font-size: 13px; font-weight: 600; color: #2563eb;">{{ Math.floor(globalUploadProgress || 0) }}%</text>
+            </view>
+            <view style="width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; position: relative;">
+              <view
+                :style="{ width: (globalUploadProgress || 0) + '%', background: 'linear-gradient(90deg, #3b82f6, #2563eb)', height: '100%', transition: 'width 0.3s ease' }"
+              ></view>
+            </view>
+            <view style="display: flex; justify-content: space-between; margin-top: 4px;">
+              <text style="font-size: 11px; color: #6b7280;">{{ uploadedCount }} / {{ totalUploadCount }} 文件</text>
+              <text v-if="uploadSpeed" style="font-size: 11px; color: #6b7280;">{{ formatSpeed(uploadSpeed) }}</text>
+            </view>
+          </view>
+          <!-- 圆形进度条 -->
+          <CircularProgress
+            :percentage="globalUploadProgress || 0"
+            :size="48"
+            :strokeWidth="4"
             color="#2563eb"
           >
-            <text style="font-size: 10px; font-weight: bold;">{{ Math.floor(globalUploadProgress || 0) }}%</text>
+            <text style="font-size: 12px; font-weight: bold;">{{ Math.floor(globalUploadProgress || 0) }}%</text>
           </CircularProgress>
-          <view class="upload-status-text" style="display: flex; flex-direction: column;">
-             <text class="status-title" style="font-size: 12px; color: #333;">正在上传... ({{ uploadedCount }}/{{ totalUploadCount }})</text>
-             <text class="status-detail" v-if="globalUploadProgress !== null" style="font-size: 10px; color: #666;">{{ Math.floor(globalUploadProgress) }}%</text>
-          </view>
         </view>
     </view>
 
@@ -959,6 +972,16 @@ export default {
         uploaded += info.uploaded
       })
       return total > 0 ? (uploaded / total) * 100 : 0
+    },
+    // 全局上传速度（所有正在上传文件的速度总和）
+    uploadSpeed() {
+      let totalSpeed = 0
+      Object.values(this.uploadStatusMap).forEach(info => {
+        if (!info.error && info.status !== 'interrupted' && info.speed) {
+          totalSpeed += info.speed
+        }
+      })
+      return totalSpeed
     }
   },
   watch: {
@@ -1046,10 +1069,19 @@ export default {
         } else if (this.showTree) {
           // 加载完整文件树
           this.allFiles = await getProjectFiles(projectId, null, true)
+
+          // 过滤掉系统文件夹（在 allFiles 层面过滤，确保所有地方都不会显示）
+          const hiddenNames = new Set(['.stagezone', '__staging_area__'])
+          this.allFiles = this.allFiles.filter(f => !hiddenNames.has(f.name))
+
           this.files = this.buildTreeView(this.allFiles, this.parentId)
         } else {
           // 只加载当前文件夹下的文件
-          this.files = await getProjectFiles(projectId, this.parentId)
+          let files = await getProjectFiles(projectId, this.parentId)
+
+          // 过滤掉系统文件夹
+          const hiddenNames = new Set(['.stagezone', '__staging_area__'])
+          this.files = files.filter(f => !hiddenNames.has(f.name))
         }
         console.log('加载文件列表成功:', this.files)
       } catch (error) {
@@ -1088,6 +1120,16 @@ export default {
       if (!this.newFolderName.trim()) {
         uni.showToast({
           title: '请输入文件夹名称',
+          icon: 'none'
+        })
+        return
+      }
+
+      // 检查是否使用了系统保留名称
+      const reservedNames = ['.stagezone', '__staging_area__']
+      if (reservedNames.includes(this.newFolderName.trim())) {
+        uni.showToast({
+          title: '不能使用系统保留名称',
           icon: 'none'
         })
         return
@@ -1174,15 +1216,8 @@ export default {
         })
       } catch (error) {
         console.error('创建Word文件失败:', error)
-        // Check if error is due to duplicate name (in case backend has stricter check than displayFiles)
-        if (error.message && (error.message.includes('exists') || error.message.includes('duplicate'))) {
-             uni.showToast({ title: '文件名已存在，请重试', icon: 'none' })
-        } else {
-             uni.showToast({
-               title: error.message || '创建失败',
-               icon: 'none'
-             })
-        }
+        // 使用模态对话框显示错误
+        this.showErrorModal(error.message || '文件创建失败，请重试', '创建失败')
       }
     },
     handleRenameKeydown(e) {
@@ -1208,7 +1243,7 @@ export default {
          await this.loadFiles()
        } catch (error) {
          console.error('复制失败:', error)
-         uni.showToast({ title: error.message || '复制失败', icon: 'none' })
+         this.showErrorModal(error.message || '文件复制失败，请重试', '复制失败')
        }
     },
     handleRename(item) {
@@ -1218,10 +1253,10 @@ export default {
     },
     async commitRename() {
       if (!this.renamingId) return
-      
+
       const fileId = this.renamingId
       const newName = (this.tempRenameValue || '').trim()
-      
+
       // Reset state first to exit edit mode
       this.renamingId = null
       this.tempRenameValue = ''
@@ -1231,10 +1266,20 @@ export default {
         return
       }
 
+      // 检查是否使用了系统保留名称
+      const reservedNames = ['.stagezone', '__staging_area__']
+      if (reservedNames.includes(newName)) {
+        uni.showToast({
+          title: '不能使用系统保留名称',
+          icon: 'none'
+        })
+        return
+      }
+
       // Find file object
       const file = this.allFiles.find(f => f.id === fileId)
       if (!file) return
-      
+
       if (file.name === newName) return // No change
 
       if (!this.projectId) return
@@ -1246,7 +1291,7 @@ export default {
         uni.showToast({ title: '重命名成功', icon: 'success' })
       } catch (error) {
         console.error('重命名失败:', error)
-        uni.showToast({ title: error.message || '重命名失败', icon: 'none' })
+        this.showErrorModal(error.message || '重命名失败，请重试', '重命名失败')
       }
     },
     // Deprecated dialog method
@@ -1315,7 +1360,7 @@ export default {
         }
       } catch (error) {
         console.error('操作失败:', error)
-        uni.showToast({ title: error.message || '操作失败', icon: 'none' })
+        this.showErrorModal(error.message || '删除操作失败，请重试', '操作失败')
       } finally {
         this.deleteTargetItem = null
         this.deleteBatchIds = []
@@ -1418,13 +1463,22 @@ export default {
     // 构建树形视图
     buildTreeView(allFiles, parentId) {
       const result = []
+
+      // 定义需要隐藏的系统文件夹名称
+      const hiddenNames = new Set(['.stagezone', '__staging_area__'])
+
       let children = allFiles.filter(f => {
+        // 过滤掉系统文件夹
+        if (hiddenNames.has(f.name)) {
+          return false
+        }
+
         if (parentId === null) {
           return f.parentId === null || f.parentId === 0
         }
         return f.parentId === parentId
       })
-      
+
       // 排序逻辑：文件夹优先，然后按 sortMode 排序
       children.sort((a, b) => {
          // 文件夹始终置顶
@@ -1957,10 +2011,12 @@ export default {
       if (this.showTree && this.allFiles.length > 0) {
         this.files = this.buildTreeView(this.allFiles, this.parentId)
       }
-      
-      // 设置选中状态
+
+      // 设置选中状态（单选模式）
       this.selectedFileId = targetFile.id
-      
+      // 清空多选状态，避免旧文件保留多选样式
+      this.multiSelectedIds = [targetFile.id]
+
       // 延迟滚动到目标元素
       this.$nextTick(() => {
         try {
@@ -2690,7 +2746,15 @@ export default {
                      this.uploadFileObjects = {} // Clean up cache when batch done (or keep? better keep for failed items)
                      // Actually, we should only clean up successful ones.
                      // But for now, let's just trigger loadFiles
-                     this.loadFiles() 
+                     this.loadFiles()
+
+                     // 显示批量上传完成提示
+                     const totalCount = uploadQueue.length
+                     uni.showToast({
+                       title: `成功上传 ${totalCount} 个文件`,
+                       icon: 'success',
+                       duration: 2000
+                     })
                  }
                  return
              }
@@ -2703,12 +2767,14 @@ export default {
              const targetParentId = dirCache[dirPath] !== undefined ? dirCache[dirPath] : rootParentId
  
              try {
-                 // Update cache with real ID later? 
+                 // Update cache with real ID later?
                  // uploadSingleFile returns the new fileId, but we might need to map tempId -> realId in cache?
                  // Actually uploadSingleFile handles the transition.
                  await this.uploadSingleFile(projectId, file, targetParentId, tempId)
              } catch (error) {
                  console.error('上传文件失败:', error)
+                 // 显示错误提示（使用模态对话框）
+                 this.showErrorModal(error.message || '文件上传失败，请重试', '上传失败')
                  // Keep the error in status map so user can see it
                  if (this.uploadStatusMap[tempId]) {
                       this.uploadStatusMap[tempId].status = 'interrupted'
@@ -2730,15 +2796,34 @@ export default {
 
       } catch (error) {
         console.error('上传文件失败:', error)
-        uni.showToast({
-          title: error.message || '上传失败',
-          icon: 'none'
-        })
+        this.showErrorModal(error.message || '文件上传失败，请重试', '上传失败')
         this.isBatchUploading = false
       }
     },
     // 支持分片断点续传的上传逻辑
     async uploadSingleFile(projectId, file, parentId, pendingTempId = null) {
+      // 0. 检查是否存在同名且处于失败状态的文件记录，如果存在则先删除
+      try {
+        const failedFile = this.allFiles.find(f =>
+          f.name === file.name &&
+          f.parentId === parentId &&
+          f._isUploading === true &&
+          this.uploadStatusMap[f.id] &&
+          (this.uploadStatusMap[f.id].error || this.uploadStatusMap[f.id].status === 'interrupted')
+        )
+        if (failedFile) {
+          console.log('发现同名失败文件记录，先删除:', failedFile.name)
+          await deleteFile(projectId, failedFile.id)
+          // 从前端列表和状态中移除
+          this.files = this.files.filter(f => f.id !== failedFile.id)
+          this.allFiles = this.allFiles.filter(f => f.id !== failedFile.id)
+          delete this.uploadStatusMap[failedFile.id]
+          this.saveUploadState()
+        }
+      } catch (e) {
+        console.warn('检查失败文件记录时出错，继续上传:', e)
+      }
+
       // 1. 创建文件记录
       const fileType = this.getFileTypeFromName(file.name)
       const wpsFileId = `project_${projectId}_doc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
@@ -2841,10 +2926,10 @@ export default {
       // 保存到 localStorage 以便刷新后知道有哪些断点任务（虽然没 File 对象传不了，但可以提示）
       this.saveUploadState()
 
-      return this.processChunkedUpload(createdFile.id, file.fileObject || file)
+      return this.processChunkedUpload(createdFile.id, file.fileObject || file, createdFile)
     },
 
-    async processChunkedUpload(fileId, fileObject) {
+    async processChunkedUpload(fileId, fileObject, fileRecord) {
        const status = this.uploadStatusMap[fileId]
        if (!status) return
 
@@ -2974,9 +3059,14 @@ export default {
        
        } catch (error) {
            console.error('分片上传失败:', error)
-           uni.showToast({ title: '上传中断，请重试', icon: 'none' })
+           // 显示具体的错误信息（使用模态对话框）
+           const errorMessage = error.message || '上传中断，请重试'
+           this.showErrorModal(errorMessage, '上传失败')
            // 不要删除 status，保留进度条以允许重试
            status.error = true
+           status.errorMessage = errorMessage
+           // 保存失败状态
+           this.saveUploadState()
        }
     },
 
@@ -3003,14 +3093,21 @@ export default {
             status.progress = 100
             status.uploaded = status.size
             this.batchUploadFinishedSize += status.size
+
+            // 显示上传成功提示
+            uni.showToast({
+              title: `"${status.name}" 上传成功`,
+              icon: 'success',
+              duration: 2000
+            })
         }
-        
+
         // Remove from map after delay
         setTimeout(() => {
             if (this.uploadStatusMap[fileId]) {
                 delete this.uploadStatusMap[fileId]
                 this.saveUploadState()
-                
+
                 // 去掉 _isUploading 标记
                 const idx = this.files.findIndex(f => f.id === fileId)
                 if (idx !== -1) {
@@ -3164,6 +3261,20 @@ export default {
     // Placeholder for old method if called elsewhere
     async uploadSingleFileLegacy(projectId, file, parentId) {
        // ... kept for fallback if needed, or removed
+    },
+    // 统一的错误提示函数
+    showErrorModal(message, title = '操作失败') {
+      uni.showModal({
+        title: title,
+        content: message,
+        showCancel: false,
+        confirmText: '我知道了',
+        success: (res) => {
+          if (res.confirm) {
+            console.log('用户点击了确认')
+          }
+        }
+      })
     },
     getFileTypeFromName(fileName) {
       const ext = fileName.split('.').pop()?.toLowerCase()

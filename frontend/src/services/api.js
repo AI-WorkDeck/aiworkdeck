@@ -153,59 +153,8 @@ function request(options) {
       success(res) {
         const status = res.statusCode || 0;
 
-        // 处理401未授权错误（未登录或登录过期）
-        if (status === 401 || (res.data && res.data.code === 401)) {
-          console.warn('检测到未登录状态，准备跳转到登录页');
-          // 清除本地存储的session信息
-          try {
-            uni.removeStorageSync('sessionId');
-            uni.removeStorageSync('userId');
-          } catch (e) {
-            console.warn('清除登录信息失败:', e);
-          }
-
-          // 跳转到登录页
-          uni.reLaunch({
-            url: '/pages/login/login',
-            success: () => {
-              console.log('已跳转到登录页');
-              uni.showToast({
-                title: '登录已过期，请重新登录',
-                icon: 'none',
-                duration: 2000
-              });
-            },
-            fail: (err) => {
-              console.error('跳转到登录页失败:', err);
-            }
-          });
-
-          reject(new Error('登录已过期'));
-          return;
-        }
-
-        // 统一处理后端返回的 { code: 0, data: ... } 或 { code: 1, message: ... } 格式
-        if (res.data && typeof res.data.code !== 'undefined') {
-          if (res.data.code === 0) {
-            // 对于有 code 字段的响应，返回整个响应对象（保持向后兼容）
-            // 这样登录页面可以访问 res.code 和 res.data
-            resolve(res.data);
-          } else {
-            // 完整打印业务错误信息
-            const errorMessage = res.data.message || '服务异常，请稍后重试'
-            console.error('业务错误:', {
-              code: res.data.code,
-              message: errorMessage,
-              data: res.data.data,
-              fullResponse: res.data
-            })
-            reject(new Error(errorMessage));
-          }
-        } else if (status >= 200 && status < 300) {
-          // 如果没有 code 字段，直接返回数据（兼容旧接口）
-          resolve(res.data);
-        } else {
-          // HTTP 状态码错误
+        // 首先检查HTTP状态码，如果不是200则直接拒绝（网络级别错误）
+        if (status !== 200) {
           const message =
             (res.data && (res.data.message || res.data.error)) ||
             `请求失败 (${status})`;
@@ -216,6 +165,57 @@ function request(options) {
             header: res.header
           })
           reject(new Error(message));
+          return;
+        }
+
+        // 统一处理后端返回的 { code: 0, data: ... } 或 { code: 1, message: ... } 格式
+        if (res.data && typeof res.data.code !== 'undefined') {
+          if (res.data.code === 0) {
+            // 成功：code=0
+            resolve(res.data);
+          } else {
+            // 业务失败：code=1 或其他非0值
+            const errorMessage = res.data.message || '服务异常，请稍后重试'
+            console.error('业务错误:', {
+              code: res.data.code,
+              message: errorMessage,
+              data: res.data.data,
+              fullResponse: res.data
+            })
+
+            // 特殊处理：未登录错误（code=1且message包含"登录"关键字）
+            if (errorMessage.includes('登录') || errorMessage.includes('未授权') || errorMessage.includes('请先')) {
+              console.warn('检测到未登录状态，准备跳转到登录页');
+              // 清除本地存储的session信息
+              try {
+                uni.removeStorageSync('sessionId');
+                uni.removeStorageSync('userId');
+              } catch (e) {
+                console.warn('清除登录信息失败:', e);
+              }
+
+              // 跳转到登录页
+              uni.reLaunch({
+                url: '/pages/login/login',
+                success: () => {
+                  console.log('已跳转到登录页');
+                  uni.showToast({
+                    title: '登录已过期，请重新登录',
+                    icon: 'none',
+                    duration: 2000
+                  });
+                },
+                fail: (err) => {
+                  console.error('跳转到登录页失败:', err);
+                }
+              });
+            }
+
+            reject(new Error(errorMessage));
+          }
+        } else {
+          // 如果没有 code 字段，直接返回数据（兼容旧接口）
+          resolve(res.data);
         }
       },
       fail(err) {
