@@ -6423,8 +6423,8 @@ $bg-white: #FFFFFF;
 }
 
 .tool-icon-img {
-  width: 16px;
-  height: 16px;
+  width: 21px;
+  height: 21px;
   display: block;
 }
 
@@ -7516,6 +7516,12 @@ $bg-white: #FFFFFF;
   font-size: 14px;
   font-weight: 400;
   color: #666;
+}
+
+.icon-btn.mini .tool-icon-img {
+  width: 17px;
+  height: 17px;
+  display: block;
 }
 
 .sidebar-title {

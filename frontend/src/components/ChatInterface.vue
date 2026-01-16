@@ -1,6 +1,6 @@
 <template>
   <view class="chat-interface" :class="{ 'is-empty': bubbles.length === 0 && !isStreaming }">
-    
+
     <!-- Upload File Modal (reused from FileTree pattern) -->
     <view v-if="showUploadDialog" class="king-dialog-mask" @tap="cancelUpload">
       <view class="king-dialog king-dialog-large" @tap.stop>
@@ -20,7 +20,7 @@
               </text>
             </view>
           </view>
-          
+
           <!-- H5 Folder Upload -->
           <!-- #ifdef H5 -->
           <view class="form-group">
@@ -52,8 +52,8 @@
         </view>
         <view class="king-dialog-footer">
           <view class="king-btn king-btn-secondary" @tap="cancelUpload">取消</view>
-          <view 
-            class="king-btn king-btn-primary" 
+          <view
+            class="king-btn king-btn-primary"
             :class="{ disabled: !uploadSelectedFiles.length }"
             @tap="uploadSelectedFiles.length ? confirmUploadAndAddContext() : null"
           >
@@ -88,12 +88,12 @@
                 mode="aspectFit"
               />
             </view>
-            <image 
-              :src="folderSelectorExpanded['root'] !== false ? '/static/folder-opened.png' : '/static/folder-closed.png'" 
-              class="folder-icon-img" 
+            <image
+              :src="folderSelectorExpanded['root'] !== false ? '/static/folder-opened.png' : '/static/folder-closed.png'"
+              class="folder-icon-img"
               :class="{ 'is-opened': folderSelectorExpanded['root'] !== false }"
-              style="margin-right: 8px;" 
-              mode="aspectFit" 
+              style="margin-right: 8px;"
+              mode="aspectFit"
             />
             <text class="folder-name">根目录</text>
           </view>
@@ -113,11 +113,11 @@
                 mode="aspectFit"
               />
             </view>
-            <image 
-              :src="folderSelectorExpanded[String(folder.id)] === true ? '/static/folder-opened.png' : '/static/folder-closed.png'" 
-              class="folder-icon-img" 
+            <image
+              :src="folderSelectorExpanded[String(folder.id)] === true ? '/static/folder-opened.png' : '/static/folder-closed.png'"
+              class="folder-icon-img"
               :class="{ 'is-opened': folderSelectorExpanded[String(folder.id)] === true }"
-              mode="aspectFit" 
+              mode="aspectFit"
             />
             <text class="folder-name">{{ folder.name }}</text>
           </view>
@@ -168,9 +168,9 @@
         <view class="king-dialog-body">
            <view class="ppt-config-section">
               <text class="section-title">请选择导出格式</text>
-              
+
               <!-- Option 1: Editable (Beta) -->
-              <view class="ppt-option-card" 
+              <view class="ppt-option-card"
                    :class="{ active: pptExportEditable === true }"
                    @tap="pptExportEditable = true">
                  <view class="option-header">
@@ -235,9 +235,9 @@
     <!-- Assistant Dropdown Panel - positioned relative to chat-interface like history drawer -->
     <view v-if="showAssistantMenu" class="assistant-dropdown-panel" @tap.stop>
        <view class="assistant-menu-header">智慧助手</view>
-       <view 
-         v-for="ast in assistants" 
-         :key="ast.id" 
+       <view
+         v-for="ast in assistants"
+         :key="ast.id"
          class="assistant-menu-item"
          :class="{ active: currentAssistantId === ast.id }"
          @tap="selectAssistant(ast)"
@@ -252,17 +252,17 @@
     <view v-if="showAssistantMenu" class="dropdown-mask" @tap="showAssistantMenu = false"></view>
 
     <!-- 2. Message List (Single Source of Truth: bubbles) -->
-    <scroll-view 
+    <scroll-view
       v-if="bubbles.length > 0 || isStreaming"
-      class="message-list" 
-      scroll-y 
+      class="message-list"
+      scroll-y
       :scroll-top="scrollTop"
       :scroll-with-animation="true"
     >
       <view class="message-list-content">
-        <view 
-          v-for="(msg, index) in bubbles" 
-          :key="msg.id || index" 
+        <view
+          v-for="(msg, index) in bubbles"
+          :key="msg.id || index"
           class="message-row"
           :class="msg.role.toLowerCase()"
         >
@@ -273,7 +273,7 @@
                <image v-for="(img, idx) in msg.images" :key="idx" :src="img.path" mode="aspectFill" class="bubble-image-thumb" />
             </view>
             <!-- Content with inline file tags preserved at their original positions -->
-            <div 
+            <div
               class="user-bubble-content"
               v-html="msg.contentHtml || escapeHtml(msg.content)"
             ></div>
@@ -294,9 +294,9 @@
 
           <!-- Assistant Message (Root Bubble) -->
           <div v-else-if="msg.role === 'ASSISTANT'" class="assistant-root-wrapper">
-             <RootBubble 
+             <RootBubble
                :bubble="msg"
-               @open-artifact-tab="handleArtifactOpenTab" 
+               @open-artifact-tab="handleArtifactOpenTab"
                @approve="handleArtifactApprove"
              />
              <span v-if="msg.timestamp" class="bubble-timestamp assistant">{{ msg.timestamp }}</span>
@@ -326,7 +326,7 @@
                      <text class="preview-remove" @tap="removePastedImage(index)">×</text>
                   </view>
                </view>
-              <div 
+              <div
                 ref="richInput"
                 class="chat-input-rich"
                 contenteditable="true"
@@ -349,8 +349,8 @@
                        <text class="mode-name">{{ currentModeName }}</text>
                        <text class="dropdown-arrow">▼</text>
                        <view v-if="showModeDropdown" class="mode-dropdown down">
-                          <view v-for="mode in availableModes" :key="mode.id" 
-                                class="mode-option" 
+                          <view v-for="mode in availableModes" :key="mode.id"
+                                class="mode-option"
                                 :class="{ active: currentModeId === mode.id }"
                                 @tap.stop="selectMode(mode)">
                             <text class="mode-option-icon" v-if="mode.icon">{{ mode.icon }}</text>
@@ -366,8 +366,8 @@
                        <text class="model-name">{{ currentModelName }}</text>
                        <text class="dropdown-arrow">▼</text>
                        <view v-if="showModelDropdown" class="model-dropdown down">
-                          <view v-for="m in availableModels" :key="m.id" 
-                                class="model-option" 
+                          <view v-for="m in availableModels" :key="m.id"
+                                class="model-option"
                                 :class="{ active: currentModelId === m.id }"
                                 @tap.stop="selectModel(m)">
                              {{ m.name }}
@@ -375,12 +375,12 @@
                        </view>
                     </view>
                  </view>
-                 <view 
-                    class="send-btn" 
-                    :class="{ disabled: !inputPrompt.trim() && !isStreaming, stopping: isStreaming }" 
+                 <view
+                    class="send-btn"
+                    :class="{ disabled: !inputPrompt.trim() && !isStreaming, stopping: isStreaming }"
                     @tap="isStreaming ? abort() : handleSubmit()"
                  >
-                    <text>{{ isStreaming ? '■' : '→' }}</text>
+                    <text class="send-icon">{{ isStreaming ? '■' : '↑' }}</text>
                  </view>
               </view>
           </view>
@@ -458,7 +458,7 @@
                  <text class="preview-remove" @tap="removePastedImage(index)">×</text>
               </view>
            </view>
-          <div 
+          <div
             ref="richInput"
             class="chat-input-rich"
             contenteditable="true"
@@ -481,8 +481,8 @@
                    <text class="mode-name">{{ currentModeName }}</text>
                    <text class="dropdown-arrow">▲</text>
                    <view v-if="showModeDropdown" class="mode-dropdown up">
-                      <view v-for="mode in availableModes" :key="mode.id" 
-                            class="mode-option" 
+                      <view v-for="mode in availableModes" :key="mode.id"
+                            class="mode-option"
                             :class="{ active: currentModeId === mode.id }"
                             @tap.stop="selectMode(mode)">
                          <text class="mode-option-icon" v-if="mode.icon">{{ mode.icon }}</text>
@@ -498,8 +498,8 @@
                    <text class="model-name">{{ currentModelName }}</text>
                    <text class="dropdown-arrow">▲</text>
                    <view v-if="showModelDropdown" class="model-dropdown up">
-                      <view v-for="m in availableModels" :key="m.id" 
-                            class="model-option" 
+                      <view v-for="m in availableModels" :key="m.id"
+                            class="model-option"
                             :class="{ active: currentModelId === m.id }"
                             @tap.stop="selectModel(m)">
                          {{ m.name }}
@@ -507,20 +507,20 @@
                    </view>
                 </view>
              </view>
-             <view 
-                class="send-btn" 
-                :class="{ disabled: !inputPrompt.trim() && !isStreaming, stopping: isStreaming }" 
+             <view
+                class="send-btn"
+                :class="{ disabled: !inputPrompt.trim() && !isStreaming, stopping: isStreaming }"
                 @tap="isStreaming ? abort() : handleSubmit()"
              >
-                <text>{{ isStreaming ? '■' : '→' }}</text>
+                <text class="send-icon">{{ isStreaming ? '■' : '↑' }}</text>
              </view>
           </view>
           <view v-if="showModelDropdown || showModeDropdown" class="dropdown-mask" @tap="showModelDropdown = false; showModeDropdown = false"></view>
        </view>
     </view>
-    
+
     <!-- Background Task Progress Indicator -->
-    <BackgroundTaskIndicator 
+    <BackgroundTaskIndicator
       :backgroundTasks="backgroundTasks"
       :lastHeartbeat="lastHeartbeat"
     />
@@ -562,11 +562,11 @@ export default {
     }
   },
   setup(props, { emit, expose }) {
-    const { 
-      bubbles, 
-      isStreaming, 
-      sendMessage, 
-      abort, 
+    const {
+      bubbles,
+      isStreaming,
+      sendMessage,
+      abort,
       setConversationId,
       clearBubbles,
       onClientAction,
@@ -591,7 +591,7 @@ export default {
            emit('client-action', action)
         }
     })
-    
+
     // Bridge Title Update Event to Parent
     onTitleUpdate((title) => {
         emit('title-update', title)
@@ -601,13 +601,13 @@ export default {
     const richInput = ref(null)
     const scrollTop = ref(0)
     const isDragging = ref(false)
-    
+
     // Context Files (for drag-drop file context)
     const contextFiles = ref([])
-    
+
     // Pasted Images (for paste/drop images)
     const pastedImages = ref([])
-    
+
     // Model Selection
     const showModelDropdown = ref(false)
     const availableModels = [
@@ -617,7 +617,7 @@ export default {
     ]
     const currentModelId = ref(availableModels[0].id)
     const currentModelName = ref(availableModels[0].name)
-    
+
     // Fix: Define selectModel explicitly
     const selectModel = (m) => {
       console.log('Switching model to:', m.name)
@@ -625,7 +625,7 @@ export default {
       currentModelName.value = m.name
       showModelDropdown.value = false
     }
-    
+
     // Agent Mode Selection (Ask, Plan, Agent)
     const showModeDropdown = ref(false)
     const availableModes = [
@@ -636,7 +636,7 @@ export default {
     const currentModeId = ref(availableModes[0].id)
     const currentModeName = ref(availableModes[0].name)
     const currentModeIcon = ref(availableModes[0].icon)
-    
+
     const selectMode = (mode) => {
       console.log('Switching agent mode to:', mode.name)
       currentModeId.value = mode.id
@@ -644,7 +644,7 @@ export default {
       currentModeIcon.value = mode.icon
       showModeDropdown.value = false
     }
-    
+
     const toggleModeDropdown = () => {
       showModeDropdown.value = !showModeDropdown.value
       // 关闭其他下拉菜单
@@ -652,15 +652,15 @@ export default {
         showModelDropdown.value = false
       }
     }
-    
+
     // Rollback Dialog State
     const showRollbackDialog = ref(false)
     const rollbackTargetIndex = ref(-1)
     const rollbackTargetContent = ref('')
     const rollbackTargetId = ref(null)
-    
+
     const showAssistantMenu = ref(false)
-    
+
     // Upload Dialog State
     const showUploadDialog = ref(false)
     const uploadSelectedFiles = ref([])
@@ -671,7 +671,7 @@ export default {
     const allProjectFiles = ref([])
     const isUploading = ref(false)
     const folderSelectorExpanded = ref({}) // Folder expand state for selector
-    
+
     // Computed: Folder tree for selector (matching FileTree logic with expand/collapse)
     const folderTree = computed(() => {
       if (!Array.isArray(allProjectFiles.value) || allProjectFiles.value.length === 0) {
@@ -691,7 +691,7 @@ export default {
           level: 0
         })
       })
- 
+
       // 构建树结构
       const roots = []
       folders.forEach(f => {
@@ -704,7 +704,7 @@ export default {
           roots.push(node)
         }
       })
- 
+
       const result = []
       // 默认只展开根目录（即显示第一层级）
       const isRootExpanded = folderSelectorExpanded.value['root'] !== false
@@ -730,7 +730,7 @@ export default {
       }
       return result
     })
-    
+
     // Computed: Selected folder name (for backward compatibility)
     const selectedUploadParentName = computed(() => {
       if (selectedUploadParent.value === null) return '根目录'
@@ -741,25 +741,25 @@ export default {
     // --- File Changes Logic ---
     const showModifiedPopup = ref(false)
     const showNewPopup = ref(false)
-    
+
     const createdFiles = computed(() => {
         return (fileChanges.value || []).filter(f => f.changeType === 'ADDED')
     })
-    
+
     const modifiedFiles = computed(() => {
         return (fileChanges.value || []).filter(f => f.changeType === 'MODIFIED')
     })
-    
+
     const toggleModifiedPopup = () => {
         showModifiedPopup.value = !showModifiedPopup.value
         if (showModifiedPopup.value) showNewPopup.value = false
     }
-    
+
     const toggleNewPopup = () => {
         showNewPopup.value = !showNewPopup.value
         if (showNewPopup.value) showModifiedPopup.value = false
     }
-    
+
     const handleOpenFile = (f) => {
         // Emit open-file event to parent
         // f.fileName is the name. Backend might need full path if it's nested.
@@ -798,37 +798,37 @@ export default {
        showPptConfigDialog.value = false
        pptConfigData.value = null
        // Optionally notify backend of cancellation? Not strictly needed as AI task handles timeout or just hangs.
-       // Ideally we should tell user "Cancelled". 
+       // Ideally we should tell user "Cancelled".
        bubbles.value.push({
           role: 'ASSISTANT',
           content: 'PPT 生成已取消。',
-          timestamp: new Date().toLocaleTimeString() 
+          timestamp: new Date().toLocaleTimeString()
        })
     }
 
     const confirmPptGeneration = async () => {
        if (!pptConfigData.value) return
-       
+
        const params = {
           ...pptConfigData.value, // contains topic, projectId etc.
           exportEditable: pptExportEditable.value,
           conversationId: currentConversationId.value
        }
-       
+
        // Close dialog immediately
        showPptConfigDialog.value = false
-       
+
        try {
           // Call backend API
           await performPptGeneration(params)
-          
+
           // Add a system bubble saying "Starting generation..."
           bubbles.value.push({
              role: 'ASSISTANT',
              content: `开始生成 PPT (${pptExportEditable.value ? '可编辑版' : '高清图片版'})...\n请留意上方进度条。`,
              timestamp: new Date().toLocaleTimeString()
           })
-          
+
        } catch (err) {
           console.error("Failed to start PPT generation:", err)
           uni.showToast({ title: '启动生成失败', icon: 'none' })
@@ -858,7 +858,7 @@ export default {
       const targetIndex = rollbackTargetIndex.value
       const targetId = rollbackTargetId.value
       const content = rollbackTargetContent.value
-      
+
       // 关闭对话框
       showRollbackDialog.value = false
 
@@ -867,25 +867,25 @@ export default {
         if (targetId && currentConversationId.value) {
           await rollbackConversation(currentConversationId.value, targetId)
         }
-        
+
         // 2. 在前端删除bubbles
         const rolledBackContent = rollbackToMessage(targetIndex)
-        
+
         // 3. 将回退的消息内容放入输入框
         if (richInput.value && content) {
           richInput.value.innerHTML = escapeHtml(content)
           inputPrompt.value = content
         }
-        
+
         // 4. 通知父组件刷新历史
         emit('refresh-history')
-        
+
         uni.showToast({ title: '已回退', icon: 'success' })
       } catch (err) {
         console.error('[ChatInterface] Rollback failed:', err)
         uni.showToast({ title: '回退失败: ' + (err.message || '未知错误'), icon: 'none' })
       }
-      
+
       // 重置状态
       rollbackTargetIndex.value = -1
       rollbackTargetContent.value = ''
@@ -916,13 +916,13 @@ export default {
         // Clean leading <br/> if starts with one
         rawHtml = rawHtml.replace(/^<br\/?>/, '')
         contentHtml = rawHtml.trim()
-        
+
         // 2. Extract plain text (without tags) for sending to backend
         const textClone = richInput.value.cloneNode(true)
         // Remove file tags to avoid duplicating their name in the text
         const tags = textClone.querySelectorAll('[data-file-id]')
         tags.forEach(t => t.remove())
-        
+
         // Manual Text Extraction to preserve newlines
         let html = textClone.innerHTML
         // Replace <br> with newline
@@ -931,7 +931,7 @@ export default {
         html = html.replace(/<(?:div|p)[^>]*>/gi, '\n')
         // Remove closing tags (implicit newline separation handled by start tags)
         html = html.replace(/<\/(?:div|p)>/gi, '')
-        
+
         // Decode entities and strip remaining tags
         const temp = document.createElement('div')
         temp.innerHTML = html
@@ -940,7 +940,7 @@ export default {
 
       const hasImages = pastedImages.value.length > 0
       const hasFiles = contextFiles.value.length > 0
-      
+
       // 禁止发送纯空消息：必须有文本、图片或文件上下文至少其一
       if (!text && !hasImages && !hasFiles) {
         if (isStreaming.value) {
@@ -953,12 +953,12 @@ export default {
         }
         return
       }
-      
+
       const prompt = text
-      
+
       if (richInput.value) richInput.value.innerHTML = ''
       inputPrompt.value = ''
-      
+
       // Use context files as fileList
       const fileListToSend = contextFiles.value.map(f => ({
         id: f.id,  // useAgentStream.js uses f.id to extract fileIds
@@ -967,7 +967,7 @@ export default {
         wpsFileId: f.wpsFileId,
         isDir: f.isDir
       }))
-      
+
       // Save images and context files for user bubble display
       const imagesToShow = pastedImages.value.map(img => ({ path: img.path }))
       const contextFilesToShow = contextFiles.value.map(f => ({
@@ -975,11 +975,11 @@ export default {
         name: f.name,
         isDir: f.isDir
       }))
-      
+
       // Clear context files and images after sending
       contextFiles.value = []
       pastedImages.value = []
-      
+
       // Build activeContext from props.activeTab (only if no manual context provided)
       // Priority: manual contextFiles > activeContext
       const activeContext = (fileListToSend.length === 0 && props.activeTab) ? {
@@ -989,11 +989,11 @@ export default {
         wpsFileId: props.activeTab.wpsFileId,
         pane: props.activeTabPane
       } : null
-      
+
       if (activeContext) {
         console.log('[ChatInterface] Auto-attaching active context:', activeContext.name)
       }
-      
+
       await sendMessage({
         prompt,
         contentHtml, // Pass HTML with inline tags for bubble display
@@ -1007,7 +1007,7 @@ export default {
         _userImages: imagesToShow,
         _userContextFiles: contextFilesToShow
       })
-      
+
       scrollToBottom()
     }
 
@@ -1019,7 +1019,7 @@ export default {
 
        loadedMsgs.forEach(msg => {
           const role = msg.role?.toUpperCase() || 'USER'
-          
+
           if (role === 'USER') {
               bubbles.value.push({
                   id: msg.id,
@@ -1031,11 +1031,11 @@ export default {
               // Convert Assistant Message to Root Bubble Structure
               // 1. Check for XML tags
               const content = msg.content || ''
-              
+
               // Simple Heuristic: If content has <thinking> or <title>, try to parse?
               // Or just dump content into Walkthrough for legacy safety.
               // IF we want to support old artifacts in history, we parse them.
-              
+
               // Create default bubble
               const bubble = {
                   id: msg.id,
@@ -1048,7 +1048,7 @@ export default {
                   content: '', // Main Answer (from <final> tag)
                   timestamp: formatTime(msg.createdAt)
               }
-              
+
               // Extract Artifacts
               const artifactRegex = /<artifact\s+type="([^"]+)"(?:[^>]*)>([\s\S]*?)<\/artifact>/g
               let remaining = content
@@ -1065,14 +1065,14 @@ export default {
                  })
                  remaining = remaining.replace(match[0], '')
               }
-              
+
               // Extract thinking
               const thinkingMatch = remaining.match(/<thinking>([\s\S]*?)<\/thinking>/)
               if (thinkingMatch) {
                   bubble.thinking.content = thinkingMatch[1]
                   remaining = remaining.replace(thinkingMatch[0], '')
               }
-              
+
               // Extract title
               const titleMatch = remaining.match(/<title>([\s\S]*?)<\/title>/)
               if (titleMatch) {
@@ -1086,7 +1086,7 @@ export default {
                   bubble.content = finalMatch[1].trim()
                   remaining = remaining.replace(finalMatch[0], '')
               }
-              
+
               // Extract <walkthrough> tag content
               const walkthroughMatch = remaining.match(/<walkthrough>([\s\S]*?)<\/walkthrough>/)
               if (walkthroughMatch) {
@@ -1100,7 +1100,7 @@ export default {
               while ((processMatch = processRegex.exec(remaining)) !== null) {
                   const processName = processMatch[1] || 'Processing'
                   const processContent = processMatch[2]
-                  
+
                   const proc = {
                       id: `hist-proc-${Date.now()}-${Math.random()}`,
                       title: processName,
@@ -1109,7 +1109,7 @@ export default {
                       steps: [],  // Keep for backward compatibility
                       content: ''
                   }
-                  
+
                   // Extract <step> tags
                   const stepRegex = /<step>([\s\S]*?)<\/step>/g
                   let stepMatch
@@ -1120,17 +1120,17 @@ export default {
                           text: stepMatch[1].trim()
                       })
                   }
-                  
+
                   // Extract <tool_code> and <tool_output> - create tool items
                   const toolCodeMatch = processContent.match(/<tool_code>([\s\S]*?)<\/tool_code>/)
                   const toolOutputMatch = processContent.match(/<tool_output([^>]*)>([\s\S]*?)<\/tool_output>/)
-                  
+
                   if (toolCodeMatch) {
                       const code = toolCodeMatch[1].trim()
                       // toolOutputMatch[1] = attributes string, toolOutputMatch[2] = content
                       const outputAttrs = toolOutputMatch ? toolOutputMatch[1] : ''
                       const output = toolOutputMatch ? toolOutputMatch[2].trim() : ''
-                      
+
                       // First: Try to parse status from attribute (new format)
                       let status = 'success'
                       const statusAttrMatch = outputAttrs.match(/status="([^"]*)"/)
@@ -1147,7 +1147,7 @@ export default {
                               status = 'error'
                           }
                       }
-                      
+
                       proc.items.push({
                           type: 'tool',
                           code: code,
@@ -1155,10 +1155,10 @@ export default {
                           status: status
                       })
                   }
-                  
+
                   bubble.processes.push(proc)
               }
-              
+
               // Clean up process tags from remaining
               remaining = remaining.replace(/<process[^>]*>[\s\S]*?<\/process>/g, '')
 
@@ -1167,11 +1167,11 @@ export default {
               if (remaining && !bubble.content) {
                   bubble.content = remaining
               }
-              
+
               bubbles.value.push(bubble)
           }
        })
-       
+
        scrollToBottom()
     }
 
@@ -1190,7 +1190,7 @@ export default {
        const diffMins = Math.floor(diffMs / (1000 * 60))
        const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-       
+
        if (diffMins < 1) return '刚刚'
        if (diffMins < 60) return `${diffMins}分钟前`
        if (diffHours < 24) return `${diffHours}小时前`
@@ -1217,7 +1217,7 @@ export default {
 
     const handleRichInput = (e) => {
         inputPrompt.value = e.target.innerText
-        
+
         // Sync inline tags with contextFiles ref
         // When user deletes a tag from the input, also remove it from contextFiles
         syncContextFilesWithInlineTags()
@@ -1237,11 +1237,11 @@ export default {
         }
       }
     }
-    
+
     // --- Sync contextFiles with actual inline tags in the input ---
     const syncContextFilesWithInlineTags = () => {
       if (!richInput.value) return
-      
+
       // Get all file IDs from inline tags currently in the input
       const inlineTagElements = richInput.value.querySelectorAll('[data-file-id]')
       const inlineTagIds = new Set()
@@ -1251,22 +1251,22 @@ export default {
           inlineTagIds.add(fileId)
         }
       })
-      
+
       // Remove any contextFiles that no longer have a corresponding inline tag
       contextFiles.value = contextFiles.value.filter(f => inlineTagIds.has(String(f.id)))
     }
-    
+
     // --- Handle Paste (Images & Plain Text) ---
     const handlePaste = (e) => {
       // Always prevent default to stop rich text/HTML paste
       e.preventDefault()
-      
+
       const clipboardData = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData)
       if (!clipboardData) return
-      
+
       const items = clipboardData.items
       let hasProcessedImage = false
-      
+
       // 1. Try to handle images from clipboard
       if (items) {
         for (let i = 0; i < items.length; i++) {
@@ -1286,11 +1286,11 @@ export default {
           }
         }
       }
-      
+
       // 2. Handle Text (Insert as Plain Text)
       // Only insert text if we didn't just process an image, OR if there is text content
       // (sometimes image paste has no meaning text).
-      // But usually we want to allow pasting text AND images if mixed? 
+      // But usually we want to allow pasting text AND images if mixed?
       // Safe bet: if there is text data, insert it.
       const text = clipboardData.getData('text/plain')
       if (text) {
@@ -1298,23 +1298,23 @@ export default {
       }
     }
 
-    // --- Handle Enter Key (Enter=NewLine, Cmd/Ctrl+Enter=Send) ---
+    // --- Handle Enter Key ---
     const handleEnterKey = (e) => {
-      if (e.metaKey || e.ctrlKey) {
-        // Cmd+Enter or Ctrl+Enter -> Send
+      if (!e.shiftKey) {
+        // Plain Enter -> Send
         e.preventDefault()
         handleSubmit()
       } else {
-        // Plain Enter -> New Line (Default behavior, do not prevent)
+        // Shift+Enter -> New line (default behavior, do not prevent)
       }
     }
-    
+
     // --- Truncate filename for display ---
     const truncateName = (name, maxLen = 15) => {
       if (!name) return ''
       return name.length > maxLen ? name.slice(0, maxLen) + '...' : name
     }
-    
+
     // --- Escape HTML for safe rendering (fallback for plain text content) ---
     const escapeHtml = (text) => {
       if (!text) return ''
@@ -1326,7 +1326,7 @@ export default {
         .replace(/'/g, '&#039;')
         .replace(/\n/g, '<br/>')
     }
-    
+
     // --- File Context Methods ---
     const addFile = (file) => {
       // Check if file already exists by ID
@@ -1339,21 +1339,21 @@ export default {
           isDir: file.isDir || file.fileType === 'folder'
         }
         contextFiles.value.push(fileData)
-        
+
         // Insert inline tag into rich input
         insertContextTagToInput(fileData)
-        
+
         console.log('[ChatInterface] File added as context:', file.name)
       }
     }
-    
+
     // --- Insert inline tag into contenteditable ---
     const insertContextTagToInput = (file) => {
       if (!richInput.value) return
-      
+
       const icon = file.isDir ? '/static/folder-closed.png' : '/static/document.png'
       const displayName = truncateName(file.name)
-      
+
       const tagHtml = `
         <span class="context-tag-inline" contenteditable="false" data-file-id="${file.id}" data-is-dir="${file.isDir ? 'true' : 'false'}" title="${file.name}">
           <img src="${icon}" class="tag-icon"/>
@@ -1361,7 +1361,7 @@ export default {
           <span class="tag-name">${displayName}</span>
           <span class="tag-close">×</span>
         </span>&nbsp;`.replace(/\s+/g, ' ').trim()
-      
+
       // Insert at cursor or append to end
       const sel = window.getSelection()
       if (sel && sel.rangeCount > 0) {
@@ -1377,35 +1377,35 @@ export default {
       } else {
         richInput.value.innerHTML += tagHtml
       }
-      
+
       // Update text model
       inputPrompt.value = richInput.value.innerText
     }
-    
+
     const removeContextFile = (index) => {
       contextFiles.value.splice(index, 1)
     }
-    
+
     const removePastedImage = (index) => {
       pastedImages.value.splice(index, 1)
     }
-    
+
     // --- Upload Dialog Methods ---
     const triggerFileSelect = async () => {
       // Load project folders for folder selector
       await loadProjectFolders()
-      
+
       // Reset state
       uploadSelectedFiles.value = []
       selectedUploadParent.value = null
       isFolderUpload.value = false
       showFolderSelector.value = false
       tempSelectedParent.value = null
-      
+
       // Show upload dialog
       showUploadDialog.value = true
     }
-    
+
     const loadProjectFolders = async () => {
       if (!props.projectId) return
       try {
@@ -1417,7 +1417,7 @@ export default {
         allProjectFiles.value = []
       }
     }
-    
+
     const selectFilesForUpload = () => {
       // H5/uni-app file selection
       uni.chooseFile({
@@ -1438,7 +1438,7 @@ export default {
         }
       })
     }
-    
+
     // #ifdef H5
     const triggerFolderUploadInput = () => {
       const input = document.createElement('input')
@@ -1446,11 +1446,11 @@ export default {
       input.webkitdirectory = true
       input.directory = true
       input.multiple = true
-      
+
       input.onchange = (e) => {
         const files = Array.from(e.target.files || [])
         if (files.length === 0) return
-        
+
         isFolderUpload.value = true
         uploadSelectedFiles.value = files.map(f => ({
           name: f.name,
@@ -1460,27 +1460,27 @@ export default {
           relativePath: f.webkitRelativePath || f.name
         }))
       }
-      
+
       input.click()
     }
     // #endif
-    
+
     const selectUploadParent = (parentId) => {
       tempSelectedParent.value = parentId
     }
-    
+
     const confirmFolderSelection = () => {
       selectedUploadParent.value = tempSelectedParent.value
       showFolderSelector.value = false
     }
-    
+
     // Open folder selector and reset expand state
     const openFolderSelector = () => {
       folderSelectorExpanded.value = {} // Reset expand state
       tempSelectedParent.value = selectedUploadParent.value
       showFolderSelector.value = true
     }
-    
+
     // Toggle folder expand/collapse in selector
     const toggleFolderSelectorExpand = (folderId) => {
       const key = String(folderId)
@@ -1497,7 +1497,7 @@ export default {
         folderSelectorExpanded.value = { ...folderSelectorExpanded.value, [key]: !current }
       }
     }
-    
+
     // Get folder path for display
     const getFolderPath = (folderId) => {
       if (typeof folderId === 'number' || typeof folderId === 'string') {
@@ -1512,7 +1512,7 @@ export default {
       }
       return '根目录'
     }
-    
+
     // Build full folder path string
     const buildFolderPath = (folder) => {
       if (!folder) return ''
@@ -1529,7 +1529,7 @@ export default {
       }
       return path.join(' / ')
     }
-    
+
     // Handle create folder in selector
     const handleSelectorCreateFolder = async () => {
       const folderName = await new Promise((resolve) => {
@@ -1547,16 +1547,16 @@ export default {
           fail: () => resolve(null)
         })
       })
-      
+
       if (!folderName) return
-      
+
       try {
         const projectId = typeof props.projectId === 'string' ? Number(props.projectId) : props.projectId
         const parentId = tempSelectedParent.value
-        
+
         const { createFolder } = await import('@/services/api.js')
         const newFolder = await createFolder(projectId, parentId, folderName)
-        
+
         if (newFolder && newFolder.id) {
           // Add to local list
           allProjectFiles.value = [...allProjectFiles.value, { ...newFolder, isFolder: true }]
@@ -1573,19 +1573,19 @@ export default {
         uni.showToast({ title: error.message || '创建文件夹失败', icon: 'none' })
       }
     }
-    
+
     const cancelUpload = () => {
       showUploadDialog.value = false
       uploadSelectedFiles.value = []
       selectedUploadParent.value = null
       isFolderUpload.value = false
     }
-    
+
     const getFileTypeFromName = (fileName) => {
       if (!fileName) return 'other'
       const ext = fileName.split('.').pop()?.toLowerCase()
       const typeMap = {
-        doc: 'word', docx: 'word', 
+        doc: 'word', docx: 'word',
         xls: 'excel', xlsx: 'excel',
         pdf: 'pdf',
         txt: 'txt',
@@ -1595,33 +1595,33 @@ export default {
       }
       return typeMap[ext] || 'other'
     }
-    
+
     // Confirm upload and add to context (like drag-drop)
     const confirmUploadAndAddContext = async () => {
       if (uploadSelectedFiles.value.length === 0) {
         uni.showToast({ title: '请选择要上传的文件', icon: 'none' })
         return
       }
-      
+
       if (!props.projectId) {
         uni.showToast({ title: '项目ID未设置', icon: 'none' })
         return
       }
-      
+
       isUploading.value = true
       const projectId = typeof props.projectId === 'string' ? Number(props.projectId) : props.projectId
       const parentId = selectedUploadParent.value
       const filesToUpload = [...uploadSelectedFiles.value]
-      
+
       // Close dialog
       showUploadDialog.value = false
       uploadSelectedFiles.value = []
-      
+
       try {
         for (const file of filesToUpload) {
           const fileType = getFileTypeFromName(file.name)
           const wpsFileId = `project_${projectId}_doc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-          
+
           // Create file record in backend
           const createdFile = await createFile(
             projectId,
@@ -1632,10 +1632,10 @@ export default {
             null,
             wpsFileId
           )
-          
+
           if (createdFile && createdFile.id) {
             console.log('[ChatInterface] File created:', createdFile.name, createdFile.id)
-            
+
             // Upload file content if available (H5)
             if (file.fileObject) {
               try {
@@ -1644,7 +1644,7 @@ export default {
                 console.warn('[ChatInterface] File content upload failed, file record created:', uploadErr)
               }
             }
-            
+
             // Add to context (same as drag-drop)
             addFile({
               id: createdFile.id,
@@ -1655,7 +1655,7 @@ export default {
             })
           }
         }
-        
+
         uni.showToast({ title: `已添加 ${filesToUpload.length} 个文件`, icon: 'success' })
       } catch (error) {
         console.error('[ChatInterface] Upload failed:', error)
@@ -1664,14 +1664,14 @@ export default {
         isUploading.value = false
       }
     }
-    
+
     // Upload file content to storage
     const uploadFileContent = async (fileId, wpsFileId, fileObject, totalSize) => {
       return new Promise((resolve, reject) => {
         // #ifdef H5
         const xhr = new XMLHttpRequest()
         xhr.open('POST', `${getApiBaseUrl()}/api/files/${wpsFileId}/upload`)
-        
+
         const headers = getAuthHeaders()
         for (const key in headers) {
           xhr.setRequestHeader(key, headers[key])
@@ -1679,7 +1679,7 @@ export default {
         xhr.setRequestHeader('Content-Type', 'application/octet-stream')
         xhr.setRequestHeader('X-File-Offset', '0')
         xhr.setRequestHeader('X-File-Total-Size', String(totalSize))
-        
+
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve()
@@ -1690,13 +1690,13 @@ export default {
         xhr.onerror = () => reject(new Error('Network error'))
         xhr.send(fileObject)
         // #endif
-        
+
         // #ifndef H5
         resolve() // Non-H5 platforms skip direct upload
         // #endif
       })
     }
-    
+
     // Expose methods for parent ref access
     expose({ addFile, loadMessages, loadConversationMetadata })
 
@@ -1797,7 +1797,7 @@ export default {
        lastHeartbeat,
        // PPT Config
        showPptConfigDialog,
-       pptExportEditable, 
+       pptExportEditable,
        pptConfigData,
        cancelPptConfig,
        confirmPptGeneration,
@@ -2502,6 +2502,11 @@ export default {
 .send-btn.stopping:hover {
   background: #9B2C2C;
 }
+.send-icon {
+  font-size: 16px;
+  font-weight: bold;
+  display: inline-block;
+}
 
 .input-area-wrapper {
   padding: 16px 24px;
@@ -2561,7 +2566,7 @@ export default {
 }
 
 /* =============================================
-   King IDE Style - Input Image Preview 
+   King IDE Style - Input Image Preview
    ============================================= */
 .input-images-preview {
   display: flex;
@@ -2630,13 +2635,13 @@ export default {
    transition: all 0.15s ease;
    position: relative;
  }
- 
+
  :deep(.context-tag-inline:hover) {
    background: rgba(26, 83, 54, 0.08);
    border-color: rgba(26, 83, 54, 0.6);
    padding-right: 22px; /* Make room for close button */
  }
- 
+
  :deep(.tag-icon) {
    width: 14px;
    height: 14px;
@@ -2644,12 +2649,12 @@ export default {
    border-radius: 2px;
    filter: brightness(0.3);
  }
- 
+
  :deep(.tag-at) {
    color: #1A5336;
    font-weight: 600;
  }
- 
+
  :deep(.tag-name) {
    white-space: nowrap;
    overflow: hidden;
@@ -2657,7 +2662,7 @@ export default {
    max-width: 100px;
    color: #1A5336;
  }
- 
+
  :deep(.tag-close) {
    display: none;
    position: absolute;
@@ -2675,16 +2680,16 @@ export default {
    cursor: pointer;
    transition: all 0.1s ease;
  }
- 
+
  :deep(.context-tag-inline:hover .tag-close) {
    display: flex;
  }
- 
+
  :deep(.tag-close:hover) {
    background: rgba(26, 83, 54, 0.4);
    color: #fff;
  }
- 
+
  /* =============================================
     King IDE Style - Inline Context Tags (User Bubble)
     Lighter/transparent background for visibility
@@ -2730,7 +2735,7 @@ export default {
 }
 
 /* =============================================
-   User Bubble - Image Thumbnails 
+   User Bubble - Image Thumbnails
    ============================================= */
 .user-bubble-images {
   display: flex;
