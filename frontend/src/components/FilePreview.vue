@@ -58,19 +58,19 @@
         <!-- 视频预览 -->
         <view v-else-if="isVideo" class="preview-video">
           <!-- #ifdef H5 -->
-          <video 
-            :src="fileUrl" 
-            controls 
-            autoplay 
+          <video
+            :src="fileUrl"
+            controls
+            autoplay
             class="preview-video-player"
             @error="handleVideoError"
           ></video>
           <!-- #endif -->
           <!-- #ifndef H5 -->
-          <video 
-            :src="fileUrl" 
-            controls 
-            autoplay 
+          <video
+            :src="fileUrl"
+            controls
+            autoplay
             class="preview-video-player"
             @error="handleVideoError"
           ></video>
@@ -213,7 +213,7 @@ export default {
           URL.revokeObjectURL(this.blobUrl)
           this.blobUrl = ''
         }
-        
+
         if (!newFile) return
 
         if (this.isText) {
@@ -235,7 +235,7 @@ export default {
   methods: {
     async loadTextContent() {
       if (!this.file || !this.fileUrl) return
-      
+
       this.loading = true
       try {
         const response = await uni.request({
@@ -252,7 +252,7 @@ export default {
     },
     async loadMediaResource() {
         if (!this.file || !this.fileUrl) return
-        
+
         this.loading = true
         try {
            const header = getAuthHeaders() || {}
@@ -262,7 +262,7 @@ export default {
              responseType: 'arraybuffer',
              header: header
            })
-           
+
            if (response.statusCode === 200 && response.data) {
                const blob = new Blob([response.data], { type: this.getMimeType(this.file.fileType) })
                this.blobUrl = URL.createObjectURL(blob)
@@ -478,6 +478,7 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 24rpx;
+  background: #282828;
 }
 
 .preview-img {
