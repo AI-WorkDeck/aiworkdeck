@@ -57,20 +57,20 @@ export default {
   methods: {
     async loadFileContent() {
       if (!this.file) return
-      
+
       const fileId = this.file.wpsFileId || this.file.id
       if (!fileId) return
-      
+
       this.loading = true
       try {
         const url = getFileDownloadUrl(fileId)
         const headers = getAuthHeaders()
         const response = await fetch(url, { headers })
-        
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`)
         }
-        
+
         this.loadedContent = await response.text()
       } catch (e) {
         console.error('加载 Markdown 文件失败:', e)
@@ -143,7 +143,7 @@ export default {
 .markdown-body :deep(ul),
 .markdown-body :deep(ol) {
   padding-left: 20px;
-  margin: 8px 0;
+  /* margin: 8px 0; */
 }
 
 .markdown-body :deep(li) {

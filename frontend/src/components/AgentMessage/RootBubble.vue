@@ -25,7 +25,7 @@
             />
         </div>
 
-        <div class="root-bubble-container">
+        <div v-if="hasContent" class="root-bubble-container">
             <!-- 2. Title -->
             <TitleCard v-if="bubble.title" :title="bubble.title" />
 
@@ -92,6 +92,16 @@ const isReady = computed(() => {
     // If only "Thinking", remain in Ghost state (unless it's done thinking and has no other content? No, unlikely)
     return !!(props.bubble.title || props.bubble.processes.length > 0 || props.bubble.content)
 })
+
+const hasContent = computed(() => {
+    // Check if the bubble has any content to display
+    return !!(
+        props.bubble.title ||
+        props.bubble.processes.length > 0 ||
+        props.bubble.artifacts.length > 0 ||
+        props.bubble.content
+    )
+})
 </script>
 
 <style scoped>
@@ -143,7 +153,7 @@ const isReady = computed(() => {
 }
 
 .main-content {
-  padding: 0 16px 20px; /* Increased padding */
+  padding: 6px 16px; /* Increased padding */
   font-size: 14px;
   line-height: 1.6;
   color: #2C3338; /* Gray-Dark */
@@ -158,7 +168,7 @@ const isReady = computed(() => {
 }
 
 .main-content:deep(ul), .main-content:deep(ol) {
-  margin: 8px 0;
+  /* margin: 8px 0; */
   padding-left: 20px;
 }
 

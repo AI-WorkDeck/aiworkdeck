@@ -278,7 +278,6 @@
               v-html="msg.contentHtml || escapeHtml(msg.content)"
             ></div>
             <div class="bubble-footer">
-              <span v-if="msg.timestamp" class="bubble-timestamp user">{{ msg.timestamp }}</span>
               <!-- Rollback Button -->
               <view v-if="!isStreaming" class="rollback-btn" @tap.stop="openRollbackDialog(msg, index)" title="回退到此消息（修改重发）">
                  <div class="rollback-icon-svg">
@@ -289,6 +288,7 @@
                  </div>
                  <text class="rollback-text">回退</text>
               </view>
+              <span v-if="msg.timestamp" class="bubble-timestamp user">{{ msg.timestamp }}</span>
             </div>
           </div>
 
@@ -299,7 +299,7 @@
                @open-artifact-tab="handleArtifactOpenTab"
                @approve="handleArtifactApprove"
              />
-             <span v-if="msg.timestamp" class="bubble-timestamp assistant">{{ msg.timestamp }}</span>
+             <!-- <span v-if="msg.timestamp" class="bubble-timestamp assistant">{{ msg.timestamp }}</span> -->
           </div>
         </view>
       </view>
@@ -1934,13 +1934,13 @@ export default {
 }
 
 .message-row {
-  margin-bottom: 24px;
+  margin-bottom: 26px;
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  overflow: hidden; /* Prevent children from overflowing */
+  /* overflow: hidden; Prevent children from overflowing */
 }
 
 .message-row.user {
@@ -1962,6 +1962,7 @@ export default {
   box-sizing: border-box;
   user-select: text;
   -webkit-user-select: text;
+  position: relative;
 }
 
 .assistant-root-wrapper {
@@ -1977,7 +1978,7 @@ export default {
 .bubble-timestamp {
   font-size: 11px;
   color: #999;
-  margin-top: 4px;
+  /* margin-top: 4px; */
 }
 .user-bubble .bubble-timestamp { text-align: right; }
 
@@ -3181,9 +3182,10 @@ export default {
 }
 
 .status-btn.modified:hover {
-  background-color: #5BD197; /* King Mint */
-  color: #ffffff;
-  border-color: #1A5336;
+  /* background-color: #5BD197; King Mint */
+  background-color: #5BD197;
+  /* color: #ffffff; */
+  /* border-color: #1A5336; */
 }
 
 .status-btn.created {
@@ -3195,7 +3197,7 @@ export default {
 .status-btn.created:hover {
   background-color: #5BD197;
   color: #ffffff;
-  border-color: #1A5336;
+  /* border-color: #1A5336; */
 }
 
 /* Status Popup */
@@ -3268,7 +3270,7 @@ export default {
 
 /* Empty state for file change buttons */
 .status-btn.empty {
-  opacity: 0.5;
+  opacity: 0.7;
   cursor: default;
 }
 .status-btn.empty:hover {
@@ -3282,6 +3284,9 @@ export default {
   align-items: center;
   justify-content: flex-end;
   margin-top: 4px;
+  position: absolute;
+  bottom: -24px;
+  right: 0px;
 }
 
 .rollback-btn {
@@ -3293,8 +3298,8 @@ export default {
   cursor: pointer;
   padding: 4px 10px;
   border-radius: 99px;
-  background-color: #E6F9F0; /* Mint Lightest */
-  border: 1px solid rgba(26, 83, 54, 0.1);
+  /* background-color: #E6F9F0; Mint Lightest */
+  /* border: 1px solid rgba(26, 83, 54, 0.1); */
 }
 
 .user-bubble:hover .rollback-btn {
@@ -3302,8 +3307,8 @@ export default {
 }
 
 .rollback-btn:hover {
-  background-color: #5BD197; /* King Mint */
-  border-color: #1A5336;
+  /* background-color: #5BD197; King Mint */
+  /* border-color: #1A5336; */
 }
 
 .rollback-icon-svg {
@@ -3314,10 +3319,10 @@ export default {
   color: #1A5336; /* King Forest */
 }
 
-.rollback-btn:hover .rollback-icon-svg,
+/* .rollback-btn:hover .rollback-icon-svg,
 .rollback-btn:hover .rollback-text {
   color: white;
-}
+} */
 
 .rollback-text {
   font-size: 11px;
