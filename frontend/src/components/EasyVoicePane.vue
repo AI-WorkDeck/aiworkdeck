@@ -178,7 +178,12 @@ export default {
       generating: false,
       audioUrl: '',
       audioInstance: null,
-      isPlaying: false
+      isPlaying: false,
+      // Karaoke highlighting
+      sentences: [],
+      currentSentenceIndex: -1,
+      sentenceDurations: [],
+      audioDuration: 0
     }
   },
   computed: {
@@ -203,11 +208,77 @@ export default {
     this.stopAudio()
   },
   methods: {
+    // ==================== Karaoke Highlighting ====================
+    /**
+     * Split text into sentences by Chinese/English punctuation
+     */
+    splitTextToSentences(text) {
+      if (!text) return []
+      // Split by common sentence-ending punctuation
+      const raw = text.split(/[。！？；.!?;]+/)
+      // Filter empty and trim whitespace
+      return raw.map(s => s.trim()).filter(s => s.length > 0)
+    },
+
+    /**
+     * Estimate duration for each sentence based on character ratio
+     */
+    estimateSentenceDurations() {
+      if (!this.sentences.length || !this.audioDuration) return []
+      const totalChars = this.sentences.reduce((sum, s) => sum + s.length, 0)
+      if (totalChars === 0) return []
+      return this.sentences.map(s => (s.length / totalChars) * this.audioDuration * 1000) // ms
+    },
+
+    /**
+     * Determine current sentence index based on playback time
+     */
+    getCurrentSentenceIndex(currentTimeMs) {
+      let accumulated = 0
+      for (let i = 0; i < this.sentenceDurations.length; i++) {
+        accumulated += this.sentenceDurations[i]
+        if (currentTimeMs < accumulated) {
+          return i
+        }
+      }
+      return this.sentences.length - 1
+    },
+
+    /**
+     * Handle timeupdate event for karaoke sync
+     */
+    onAudioTimeUpdate() {
+      if (!this.audioInstance || !this.sentences.length) return
+      const currentTimeMs = this.audioInstance.currentTime * 1000
+      const newIndex = this.getCurrentSentenceIndex(currentTimeMs)
+      
+      if (newIndex !== this.currentSentenceIndex) {
+        this.currentSentenceIndex = newIndex
+        const sentence = this.sentences[newIndex]
+        if (sentence) {
+          console.log('[EasyVoice] Highlighting sentence:', newIndex, sentence.substring(0, 30) + '...')
+          this.$emit('highlight-sentence', sentence)
+        }
+      }
+    },
+
+    /**
+     * Handle audio ended event
+     */
+    onAudioEnded() {
+      this.isPlaying = false
+      this.currentSentenceIndex = -1
+      this.$emit('clear-highlight')
+    },
+
+    // ==================== Audio Control ====================
     stopAudio() {
         if (this.audioInstance) {
             this.audioInstance.pause()
             this.audioInstance = null
             this.isPlaying = false
+            this.currentSentenceIndex = -1
+            this.$emit('clear-highlight')
         }
     },
     togglePlay() {
@@ -215,8 +286,22 @@ export default {
         
         if (!this.audioInstance) {
             this.audioInstance = new Audio(this.audioUrl)
+            
+            // Get audio duration for sentence timing estimation
+            this.audioInstance.onloadedmetadata = () => {
+                this.audioDuration = this.audioInstance.duration
+                console.log('[EasyVoice] Audio duration:', this.audioDuration, 's')
+                this.sentenceDurations = this.estimateSentenceDurations()
+                console.log('[EasyVoice] Sentence durations:', this.sentenceDurations)
+            }
+            
+            // Karaoke sync via timeupdate
+            this.audioInstance.ontimeupdate = () => {
+                this.onAudioTimeUpdate()
+            }
+            
             this.audioInstance.onended = () => {
-                this.isPlaying = false
+                this.onAudioEnded()
             }
             this.audioInstance.onpause = () => {
                 this.isPlaying = false
@@ -284,6 +369,9 @@ export default {
         const callback = (content) => {
             if (content) {
                 this.text = content;
+                // Split into sentences for karaoke highlighting
+                this.sentences = this.splitTextToSentences(content)
+                console.log('[EasyVoice] Split into', this.sentences.length, 'sentences')
                 uni.showToast({ title: '已导入文档内容', icon: 'success' })
             } else {
                  uni.showToast({ title: '无法获取文档内容', icon: 'none' })
@@ -297,6 +385,10 @@ export default {
       if (!this.text) return
       this.generating = true
       this.stopAudio() 
+      
+      // Split text into sentences before generating
+      this.sentences = this.splitTextToSentences(this.text)
+      console.log('[EasyVoice] Prepared', this.sentences.length, 'sentences for karaoke')
       
       try {
         const payload = {

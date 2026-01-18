@@ -2186,6 +2186,125 @@ export function useWpsBridge() {
         }
     }
 
+    // ==================== TTS Karaoke Highlighting ====================
+
+    /**
+     * Use Find.Execute to select specified text (for karaoke highlighting)
+     * @param {string} text - The text to select/highlight
+     * @param {Object} wpsInstance - WPS instance
+     * @returns {Promise<{success: boolean, found: boolean}>}
+     */
+    const selectTextByFind = async (text, wpsInstance = null) => {
+        try {
+            if (!text || !text.trim()) {
+                return { success: false, error: 'Empty text' }
+            }
+
+            const wpsApp = await getWpsInstance(wpsInstance)
+            const sel = await getSelection(wpsApp)
+            let found = false
+
+            // Try 1: Use Selection.Find.Execute (Preferred for native UI behavior)
+            // Note: This relies on WPS internal Find implementation which is robust but sometimes unavailable in SDK
+            try {
+                // Move to document start first to ensure full search
+                try {
+                    const startRange = await sel.Range
+                    await startRange.SetRange(0, 0)
+                } catch (e) {
+                    // console.warn('[WpsBridge] selectTextByFind: Failed to move to start:', e)
+                }
+
+                const find = await sel.Find
+                if (find) {
+                    // API requires < 255 chars usually? No, Find.Execute usually supports longer but 
+                    // let's just try.
+                    find.Text = text
+                    // Find.Execute(Text, ShowHighlight)
+                    found = await find.Execute(text, true)
+                }
+            } catch (findErr) {
+                // console.warn('[WpsBridge] Selection.Find failed, falling back to JS search:', findErr)
+            }
+
+            // Try 2: Fallback to JS Search + SetRange (Robust but manual)
+            if (!found) {
+                console.log('[WpsBridge] Trying fallback JS search for highlight...')
+
+                // Strategy A: Exact match with newline normalization
+                let searchKeyword = text
+                let searchRes = await findTextLocations(searchKeyword, false, wpsApp)
+
+                // If fail, try converting \n to \r (WPS usually uses \r for breaks)
+                if (!searchRes.success || searchRes.count === 0) {
+                    const textR = text.replace(/\n/g, '\r')
+                    if (textR !== text) {
+                        // console.log('[WpsBridge] Retrying with \r normalization')
+                        searchKeyword = textR
+                        searchRes = await findTextLocations(searchKeyword, false, wpsApp)
+                    }
+                }
+
+                // Strategy B: Partial Match (Prefix) if sentence is long
+                // This helps when table markers or hidden chars cause mismatch in full sentence
+                if ((!searchRes.success || searchRes.count === 0) && text.length > 20) {
+                    const prefix = text.substring(0, 20)
+                    // console.log(`[WpsBridge] Retrying with prefix: "${prefix}..."`)
+                    searchRes = await findTextLocations(prefix, false, wpsApp)
+
+                    // If we found the prefix, we just highlight the prefix. 
+                    // Better than nothing for tracking.
+                }
+
+                if (searchRes.success && searchRes.count > 0) {
+                    // Highlight the first match
+                    const match = searchRes.positions[0]
+                    const setRes = await setSelectionRange(match.start, match.end, wpsApp)
+                    if (setRes.success) {
+                        found = true
+                        console.log(`[WpsBridge] Fallback highlight success: ${match.start}-${match.end}`)
+                    }
+                }
+            }
+
+            if (found) {
+                // Scroll to selection
+                try {
+                    const range = await sel.Range
+                    await wpsApp.ActiveDocument.ActiveWindow.ScrollIntoView(range)
+                } catch (e) {
+                    console.warn('[WpsBridge] ScrollIntoView failed:', e)
+                }
+            }
+
+            // console.log(`[WpsBridge] selectTextByFind found=${found}`)
+            return { success: true, found }
+        } catch (e) {
+            console.error('[WpsBridge] selectTextByFind error:', e)
+            return { success: false, error: e.message }
+        }
+    }
+
+    /**
+     * Clear current selection (unhighlight)
+     * @param {Object} wpsInstance - WPS instance
+     */
+    const clearSelection = async (wpsInstance = null) => {
+        try {
+            const wpsApp = await getWpsInstance(wpsInstance)
+            const sel = await getSelection(wpsApp)
+            const range = await sel.Range
+            const end = await range.End
+            // Collapse selection to end
+            await range.SetRange(end, end)
+            console.log('[WpsBridge] clearSelection: done')
+            return { success: true }
+        } catch (e) {
+            console.error('[WpsBridge] clearSelection error:', e)
+            return { success: false, error: e.message }
+        }
+    }
+
     return {
         // 状态
         isProcessing,
@@ -2219,6 +2338,10 @@ export function useWpsBridge() {
         getDocumentOutline,
         insertUnderHeading,
 
+        // TTS Karaoke Highlighting
+        selectTextByFind,
+        clearSelection,
+
         // PPT 操作方法
         isPptDocument,
         ppt_getPresentationInfo,
@@ -2234,3 +2357,4 @@ export function useWpsBridge() {
         executeWpsAction
     }
 }
+

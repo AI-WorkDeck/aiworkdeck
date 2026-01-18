@@ -64,7 +64,20 @@ public class TtsService {
         }
     }
 
+    private static final int MAX_SHORT_TEXT_LENGTH = 200;
+
     public File generateAudio(String text, String voice, String rate, String pitch, String volume) {
+        // Use streaming API for long text
+        if (text != null && text.length() > MAX_SHORT_TEXT_LENGTH) {
+            return generateAudioStream(text, voice, rate, pitch, volume);
+        }
+        return generateAudioShort(text, voice, rate, pitch, volume);
+    }
+
+    /**
+     * Generate audio for short text using the /generate endpoint
+     */
+    private File generateAudioShort(String text, String voice, String rate, String pitch, String volume) {
         try {
             Map<String, Object> payload = new HashMap<>();
             payload.put("text", text);
@@ -74,7 +87,7 @@ public class TtsService {
             payload.put("volume", volume);
             
             String generateUrl = TTS_API_BASE + "/generate";
-            logger.info("Sending TTS request to {}: {}", generateUrl, payload);
+            logger.info("Sending short text TTS request to {}: text length={}", generateUrl, text.length());
             
             ResponseEntity<GenerateResponse> response = restTemplate.postForEntity(generateUrl, payload, GenerateResponse.class);
             
@@ -100,8 +113,49 @@ public class TtsService {
             }
 
         } catch (Exception e) {
-            logger.error("Failed to generate audio via EasyVoice", e);
+            logger.error("Failed to generate short audio via EasyVoice", e);
             throw new RuntimeException("Failed to generate audio: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Generate audio for long text using streaming API (/createStream)
+     * Audio plays immediately; SRT subtitle is fetched asynchronously for karaoke feature
+     */
+    private File generateAudioStream(String text, String voice, String rate, String pitch, String volume) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("text", text);
+            payload.put("voice", voice);
+            payload.put("rate", rate);
+            payload.put("pitch", pitch);
+            payload.put("volume", volume);
+            
+            String streamUrl = TTS_API_BASE + "/createStream";
+            logger.info("Sending long text TTS stream request to {}: text length={}", streamUrl, text.length());
+            
+            // Get audio stream immediately for fast playback
+            ResponseEntity<byte[]> response = restTemplate.postForEntity(streamUrl, payload, byte[].class);
+            
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                throw new RuntimeException("TTS Stream generation failed: " + response.getStatusCode());
+            }
+            
+            byte[] audioData = response.getBody();
+            logger.info("Received streaming audio data: {} bytes", audioData.length);
+            
+            String outName = UUID.randomUUID().toString() + ".mp3";
+            File outputFile = new File(TEMP_AUDIO_DIR, outName);
+            try (FileOutputStream fos = new FileOutputStream(outputFile)) {
+                fos.write(audioData);
+            }
+            
+            logger.info("Saved streaming audio to: {}", outputFile.getAbsolutePath());
+            return outputFile;
+
+        } catch (Exception e) {
+            logger.error("Failed to generate streaming audio via EasyVoice", e);
+            throw new RuntimeException("Failed to generate streaming audio: " + e.getMessage(), e);
         }
     }
 
