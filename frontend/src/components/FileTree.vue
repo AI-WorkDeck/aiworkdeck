@@ -2657,6 +2657,10 @@ export default {
         // this.batchUploadFinishedSize already exists, don't reset it
         if (!this.batchUploadFinishedSize) this.batchUploadFinishedSize = 0
 
+        // 统计成功和失败的数量
+        let successCount = 0
+        let failCount = 0
+
         // 2. 排序：短路径在前（确保先创建父目录）
         const sortedDirs = Array.from(dirsToCreate).sort((a, b) => a.split('/').length - b.split('/').length)
 
@@ -2748,13 +2752,30 @@ export default {
                      // But for now, let's just trigger loadFiles
                      this.loadFiles()
 
-                     // 显示批量上传完成提示
+                     // 显示批量上传完成提示，包含成功和失败的统计
                      const totalCount = uploadQueue.length
-                     uni.showToast({
-                       title: `成功上传 ${totalCount} 个文件`,
-                       icon: 'success',
-                       duration: 2000
-                     })
+                     if (failCount === 0) {
+                       // 全部成功
+                       uni.showToast({
+                         title: `成功上传 ${successCount} 个文件`,
+                         icon: 'success',
+                         duration: 2000
+                       })
+                     } else if (successCount === 0) {
+                       // 全部失败
+                       uni.showToast({
+                         title: `上传失败 ${failCount} 个文件`,
+                         icon: 'error',
+                         duration: 2000
+                       })
+                     } else {
+                       // 部分成功
+                       uni.showToast({
+                         title: `成功 ${successCount} 个，失败 ${failCount} 个`,
+                         icon: successCount > failCount ? 'success' : 'none',
+                         duration: 2500
+                       })
+                     }
                  }
                  return
              }
@@ -2771,8 +2792,10 @@ export default {
                  // uploadSingleFile returns the new fileId, but we might need to map tempId -> realId in cache?
                  // Actually uploadSingleFile handles the transition.
                  await this.uploadSingleFile(projectId, file, targetParentId, tempId)
+                 successCount++ // 成功计数
              } catch (error) {
                  console.error('上传文件失败:', error)
+                 failCount++ // 失败计数
                  // 显示错误提示（使用模态对话框）
                  this.showErrorModal(error.message || '文件上传失败，请重试', '上传失败')
                  // Keep the error in status map so user can see it
@@ -3093,13 +3116,7 @@ export default {
             status.progress = 100
             status.uploaded = status.size
             this.batchUploadFinishedSize += status.size
-
-            // 显示上传成功提示
-            uni.showToast({
-              title: `"${status.name}" 上传成功`,
-              icon: 'success',
-              duration: 2000
-            })
+            // 不再显示单个文件的成功提示，等待批量完成后统一提示
         }
 
         // Remove from map after delay
