@@ -115,7 +115,58 @@
       </view>
     </view>
 
-    <!-- 4. Folder Selector Popup (Nested) -->
+    <!-- 4. Manage Tags Modal -->
+    <view v-if="showTagEditDialog" class="king-dialog-mask" @tap="showTagEditDialog = false">
+      <view class="king-dialog" @tap.stop>
+        <view class="king-dialog-header">
+          <view class="header-row">
+            <text class="king-dialog-title">管理标签</text>
+            <text class="king-dialog-subtitle">{{ targetFileForTags ? targetFileForTags.name : '' }}</text>
+          </view>
+        </view>
+        <view class="king-dialog-body" style="min-height: 200px;">
+           <view class="form-group">
+              <text class="form-label">当前标签</text>
+              <view class="tags-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; min-height: 32px;">
+                  <view v-if="!targetFileForTags || !targetFileForTags.tags || targetFileForTags.tags.length === 0" class="empty-tags">
+                     <text style="color: #6C757D; font-size: 13px;">暂无标签</text>
+                  </view>
+                  <TagChip 
+                    v-for="tag in (targetFileForTags ? targetFileForTags.tags : [])" 
+                    :key="tag.id" 
+                    :tag="tag" 
+                    :removable="true"
+                    @remove="handleRemoveTag(tag)"
+                  />
+              </view>
+           </view>
+           
+           <view class="form-group">
+              <text class="form-label">添加标签</text>
+              <TagSelector
+                :available-tags="projectTags"
+                :existing-tag-ids="(targetFileForTags && targetFileForTags.tags) ? targetFileForTags.tags.map(t => t.id) : []"
+                :project-id="projectId"
+                @select="handleAddTag"
+                @create="handleCreateNewTag"
+                @manage="showTagManager = true"
+              />
+           </view>
+        </view>
+        <view class="king-dialog-footer">
+          <view class="king-btn king-btn-primary" @tap="showTagEditDialog = false">完成</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 5. Tag Manager (Global) -->
+    <view v-if="showTagManager" class="king-dialog-mask" style="z-index: 3100;" @tap="showTagManager = false">
+       <view @tap.stop>
+          <TagManager :project-id="projectId" @close="showTagManager = false" />
+       </view>
+    </view>
+
+    <!-- 6. Folder Selector Popup (Nested) -->
     <view v-if="showFolderSelector" class="king-dialog-mask" style="z-index: 3000;" @tap="showFolderSelector = false">
       <view class="king-dialog" @tap.stop>
         <view class="king-dialog-header">
@@ -205,19 +256,49 @@
         @tap.stop
       >
         <view v-if="canCompareDocuments()" class="context-menu-item" @tap="startDocumentCompare">
-          <text class="context-menu-icon">📊</text>
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 19V5M15 19V5" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </view>
           <text class="context-menu-text">比较文档</text>
         </view>
         <view v-if="contextMenu.targetItem && !contextMenu.targetItem.isFolder" class="context-menu-item" @tap="handleDownload(contextMenu.targetItem); closeContextMenu()">
-          <text class="context-menu-icon">⬇️</text>
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round"/>
+              <polyline points="7 10 12 15 17 10" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="12" y1="15" x2="12" y2="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </view>
           <text class="context-menu-text">下载</text>
         </view>
         <view v-if="contextMenu.targetItem" class="context-menu-item" @tap="handleRename(contextMenu.targetItem); closeContextMenu()">
-          <text class="context-menu-icon">✏️</text>
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </view>
           <text class="context-menu-text">重命名</text>
         </view>
+        <view v-if="contextMenu.targetItem && !contextMenu.targetItem.isFolder" class="context-menu-item" @tap="openTagEditDialog(contextMenu.targetItem); closeContextMenu()">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="7" y1="7" x2="7.01" y2="7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">管理标签</text>
+        </view>
         <view v-if="contextMenu.targetItem" class="context-menu-item context-menu-item-danger" @tap="handleDelete(contextMenu.targetItem); closeContextMenu()">
-          <text class="context-menu-icon">🗑️</text>
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </view>
           <text class="context-menu-text">删除</text>
         </view>
       </view>
@@ -269,8 +350,7 @@
         </view>
         <!-- #endif -->
       </view>
-      <view v-else class="tree-list-container">
-        <view class="tree-list">
+      <view v-else class="tree-list">
           <!-- 框选区域（H5） -->
           <view v-if="marquee.active" class="marquee" :style="marqueeStyle"></view>
 
@@ -294,6 +374,12 @@
           @drop="handleDrop($event, index)"
           @dragend="handleDragEnd"
         >
+          <!-- Tag Strip (Vertical color bar on left) -->
+          <view 
+            v-if="!item.isFolder && item.tags && item.tags.length"
+            class="tag-strip"
+            :style="getTagStripStyle(item.tags)"
+          ></view>
           <view class="tree-item-content" :style="{ paddingLeft: getItemPadding(item) }">
             <!-- Progress Background Bar -->
             <view
@@ -425,6 +511,12 @@
           @touchmove="handleTouchMove($event, index)"
           @touchend="handleTouchEnd($event, index)"
         >
+          <!-- Tag Strip (Vertical color bar on left) -->
+          <view 
+            v-if="!item.isFolder && item.tags && item.tags.length"
+            class="tag-strip"
+            :style="getTagStripStyle(item.tags)"
+          ></view>
           <view class="tree-item-content" :style="{ paddingLeft: getItemPadding(item) }">
             <!-- Progress Background Bar -->
             <view
@@ -540,14 +632,15 @@
           <text>拖拽到此处移至根目录</text>
         </view>
         <!-- #endif -->
-      </view>
-    </view>
+      </view> <!-- Close tree-list -->
+
+    </view> <!-- Close tree-content -->
 
     <!-- 独立于 Footer 的上传进度显示 -->
-    <view
-        v-if="isBatchUploading || Object.keys(uploadStatusMap).length > 0"
-        class="upload-status-footer-fixed"
-        style=""
+    <view 
+        v-if="isBatchUploading || Object.keys(uploadStatusMap).length > 0" 
+        class="upload-status-footer-fixed" 
+        style="padding: 10px; border-top: 1px solid #eee; background: white; position: relative; flex-shrink: 0;"
         @mouseenter="showUploadDetails = true"
         @mouseleave="showUploadDetails = false"
     >
@@ -555,7 +648,13 @@
         <view v-if="showUploadDetails" class="upload-details-popover" style="position: absolute; bottom: 100%; left: 0; right: 0; background: white; border: 1px solid #eee; border-radius: 4px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); max-height: 200px; overflow-y: auto; z-index: 100;">
             <view class="popover-header" style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; background: #f9fafb;">
                 <text style="font-size: 12px; font-weight: bold; color: #333;">上传列表 ({{ Object.keys(uploadStatusMap).length }})</text>
-                <text style="font-size: 12px; color: #666; cursor: pointer;" @tap.stop="showUploadDetails = false">▼</text>
+                <view style="display: flex; align-items: center; gap: 12px;">
+                    <text 
+                        style="font-size: 11px; color: #ef4444; cursor: pointer; padding: 2px 8px; border: 1px solid #fecaca; border-radius: 4px; background: #fef2f2;" 
+                        @tap.stop="cancelAllUploads"
+                    >取消全部</text>
+                    <text style="font-size: 12px; color: #666; cursor: pointer;" @tap.stop="showUploadDetails = false">▼</text>
+                </view>
             </view>
             <view class="popover-list">
                 <view v-for="status in uploadStatusMap" :key="status.fileId" class="popover-item" style="padding: 8px 12px; border-bottom: 1px solid #f5f5f5; display: flex; align-items: center; justify-content: space-between;">
@@ -616,10 +715,16 @@
           >
             <text style="font-size: 12px; font-weight: bold;">{{ Math.floor(globalUploadProgress || 0) }}%</text>
           </CircularProgress>
+          <view class="upload-status-text" style="display: flex; flex-direction: column; flex: 1;">
+             <text class="status-title" style="font-size: 12px; color: #333;">正在上传... ({{ uploadedCount }}/{{ totalUploadCount }})</text>
+             <text class="status-detail" v-if="globalUploadProgress !== null" style="font-size: 10px; color: #666;">{{ Math.floor(globalUploadProgress) }}%</text>
+          </view>
+          <text 
+            style="font-size: 11px; color: #ef4444; cursor: pointer; padding: 4px 10px; border: 1px solid #fecaca; border-radius: 4px; background: #fef2f2; flex-shrink: 0;" 
+            @tap.stop="cancelAllUploads"
+          >取消全部</text>
         </view>
     </view>
-
-    </view> <!-- Close tree-content -->
 
     <!-- 文档对比按钮（选中 2 个文档时显示） -->
     <view v-if="canCompareDocuments()" class="compare-bar">
@@ -701,12 +806,24 @@ import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, dele
 import { getAuthHeaders } from '@/utils/auth.js'
 import CircularProgress from '@/components/CircularProgress.vue'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
+import TagChip from '@/components/TagChip.vue'
+import TagSelector from '@/components/TagSelector.vue'
+import TagManager from '@/components/TagManager.vue'
+import { 
+  getProjectTags, 
+  addTagToFile, 
+  removeTagFromFile, 
+  createTag
+} from '@/services/api.js'
 
 export default {
   name: 'FileTree',
   components: {
     CircularProgress,
-    FileTypeIcon
+    FileTypeIcon,
+    TagChip,
+    TagSelector,
+    TagManager
   },
   props: {
     projectId: {
@@ -824,7 +941,14 @@ export default {
         targetItem: null
       },
       // Global Drag Support
-      isAnyDragging: false
+      isAnyDragging: false,
+      
+      // Tag Management
+      showTagManager: false,
+      showTagEditDialog: false,
+      projectTags: [],
+      targetFileForTags: null,
+      editingFileId: null // ID of file currently editing tags for
     }
 
   },
@@ -988,6 +1112,12 @@ export default {
     projectId: {
       immediate: true,
       handler() {
+        // 切换项目时，清空当前上传状态，并恢复新项目的状态
+        this.uploadStatusMap = {}
+        this.isBatchUploading = false
+        this.batchUploadTotalSize = 0
+        this.batchUploadFinishedSize = 0
+        this.restoreUploadState()
         this.loadFiles()
       }
     },
@@ -1017,7 +1147,8 @@ export default {
       this.clearChecked()
     }
     this.restoreUploadState()
-
+    this.refreshProjectTags() // Tag Management
+    
     // Listen for global drag events to show/hide root drop zone
     uni.$on('file-drag-start', () => { this.isAnyDragging = true })
     uni.$on('file-drag-end', () => { this.isAnyDragging = false })
@@ -2342,6 +2473,7 @@ export default {
     handleDragEnd() {
       this.draggedIndex = -1
       this.dragOverIndex = -1
+      this.$emit('file-drag-end')
       uni.$emit('file-drag-end')
     },
     onRootDragOver(e) {
@@ -2539,6 +2671,131 @@ export default {
       this.selectedUploadParent = this.tempSelectedParent
       this.showFolderSelector = false
     },
+    
+    // Tag Methods
+    async refreshProjectTags() {
+      if (!this.projectId) return
+      try {
+        const res = await getProjectTags(this.projectId)
+        this.projectTags = res.data || res || []
+      } catch (e) {
+        console.error('Failed to load project tags', e)
+      }
+    },
+    openTagEditDialog(file) {
+       this.targetFileForTags = file
+       this.showTagEditDialog = true
+       this.refreshProjectTags()
+    },
+    async handleAddTag(tag) {
+       if (!this.targetFileForTags) return
+       try {
+         await addTagToFile(this.projectId, this.targetFileForTags.id, tag.id)
+         // Optimistic update
+         if (!this.targetFileForTags.tags) this.$set(this.targetFileForTags, 'tags', [])
+         this.targetFileForTags.tags.push(tag)
+       } catch (e) {
+         uni.showToast({ title: 'Failed to add tag', icon: 'none' })
+       }
+    },
+    async handleCreateNewTag(payload) {
+       // payload can be string (legacy) or { name, color } object
+       const tagName = typeof payload === 'string' ? payload : payload?.name
+       const tagColor = typeof payload === 'object' ? payload?.color : '#5BD197'
+       
+       if (!this.targetFileForTags || !tagName) return
+       try {
+         // 1. Create Tag
+         const res = await createTag(this.projectId, { name: tagName, color: tagColor })
+         const newTag = res.data || res
+         
+         // 2. Refresh available tags
+         await this.refreshProjectTags()
+         
+         // 3. Add to file
+         await this.handleAddTag(newTag)
+         
+       } catch (e) {
+         console.error(e)
+         uni.showToast({ title: 'Failed to create tag', icon: 'none' })
+       }
+    },
+    async handleRemoveTag(tag) {
+       if (!this.targetFileForTags) return
+       try {
+         await removeTagFromFile(this.projectId, this.targetFileForTags.id, tag.id)
+         // Optimistic update
+         const idx = this.targetFileForTags.tags.findIndex(t => t.id === tag.id)
+         if (idx > -1) this.targetFileForTags.tags.splice(idx, 1)
+         
+       } catch (e) {
+         uni.showToast({ title: 'Failed to remove tag', icon: 'none' })
+       }
+    },
+
+    // ====== Tag Strip Styling ======
+    /**
+     * Generates inline style for the vertical tag strip.
+     * Sorts tags by color spectrum (hue) and creates a gradient if multiple tags.
+     */
+    getTagStripStyle(tags) {
+      if (!tags || tags.length === 0) {
+        return { display: 'none' }
+      }
+      
+      // Sort tags by spectral position (hue)
+      const sortedTags = this.sortTagsBySpectrum(tags)
+      const colors = sortedTags.map(t => t.color || '#5BD197')
+      
+      if (colors.length === 1) {
+        return { background: colors[0] }
+      }
+      
+      // Generate equal segments for gradient
+      const segments = colors.map((color, i) => {
+        const start = (i / colors.length) * 100
+        const end = ((i + 1) / colors.length) * 100
+        return `${color} ${start}%, ${color} ${end}%`
+      }).join(', ')
+      
+      return { background: `linear-gradient(to bottom, ${segments})` }
+    },
+    
+    /**
+     * Sorts tags by their color's hue value (spectral order).
+     * Red -> Orange -> Yellow -> Green -> Cyan -> Blue -> Purple
+     */
+    sortTagsBySpectrum(tags) {
+      if (!tags || tags.length <= 1) return tags
+      
+      const getHue = (hexColor) => {
+        if (!hexColor) return 180 // Default to cyan
+        const hex = hexColor.replace('#', '')
+        const r = parseInt(hex.substring(0, 2), 16) / 255
+        const g = parseInt(hex.substring(2, 4), 16) / 255
+        const b = parseInt(hex.substring(4, 6), 16) / 255
+        
+        const max = Math.max(r, g, b)
+        const min = Math.min(r, g, b)
+        let h = 0
+        
+        if (max === min) {
+          h = 0
+        } else if (max === r) {
+          h = 60 * (((g - b) / (max - min)) % 6)
+        } else if (max === g) {
+          h = 60 * (((b - r) / (max - min)) + 2)
+        } else {
+          h = 60 * (((r - g) / (max - min)) + 4)
+        }
+        
+        if (h < 0) h += 360
+        return h
+      }
+      
+      return [...tags].sort((a, b) => getHue(a.color) - getHue(b.color))
+    },
+
     toggleFolderExpand(folderId) {
       if (this.expandedFolderIds.has(folderId)) {
         this.expandedFolderIds.delete(folderId)
@@ -3164,7 +3421,42 @@ export default {
             })
         }
     },
-
+    
+    cancelAllUploads() {
+        const fileIds = Object.keys(this.uploadStatusMap)
+        if (fileIds.length === 0) return
+        
+        fileIds.forEach(fileId => {
+            const status = this.uploadStatusMap[fileId]
+            if (status) {
+                // Abort XHR if still running
+                if (status.xhr) {
+                    status.xhr.abort()
+                }
+                // Remove from files list
+                const idx = this.files.findIndex(f => f.id === fileId)
+                if (idx !== -1) {
+                    this.files.splice(idx, 1)
+                }
+                const allIdx = this.allFiles.findIndex(f => f.id === fileId)
+                if (allIdx !== -1) {
+                    this.allFiles.splice(allIdx, 1)
+                }
+            }
+        })
+        
+        // Clear all upload status
+        this.uploadStatusMap = {}
+        this.isBatchUploading = false
+        this.batchUploadTotalSize = 0
+        this.batchUploadFinishedSize = 0
+        this.saveUploadState()
+        
+        uni.showToast({
+            title: '已取消全部上传',
+            icon: 'none'
+        })
+    },
 
     resumeUpload(fileId) {
         this.resumingFileId = fileId
@@ -3249,29 +3541,34 @@ export default {
                     startTime: item.startTime
                 }
             }
-            uni.setStorageSync('upload_state_v2', JSON.stringify(state))
+            const storageKey = `upload_state_v2_project_${this.projectId}`
+            uni.setStorageSync(storageKey, JSON.stringify(state))
         } catch (e) { console.error('Save state failed', e) }
     },
 
     restoreUploadState() {
         try {
-            const data = uni.getStorageSync('upload_state_v2')
-                const state = JSON.parse(data)
-                // 恢复时，检查是否有正在进行的任务。由于刷新导致 File 对象丢失，无法自动继续。
-                // 必须将这些任务标记为中断/失败，避免 UI 假死。
-                const now = Date.now()
-                for (const fileId in state) {
-                    const item = state[fileId]
-                    // 如果任务未完成 (progress < 100)，标记为 error
-                    if (item.progress < 100) {
-                        item.error = true
-                        item.status = 'interrupted' // Add explicitly status
-                        item.errorMessage = '页面刷新导致中断'
-                        // 确保 xhr 是空的
-                        item.xhr = null
-                    }
+            const storageKey = `upload_state_v2_project_${this.projectId}`
+            const data = uni.getStorageSync(storageKey)
+            if (!data) {
+                this.uploadStatusMap = {}
+                return
+            }
+            const state = JSON.parse(data)
+            // 恢复时，检查是否有正在进行的任务。由于刷新导致 File 对象丢失，无法自动继续。
+            // 必须将这些任务标记为中断/失败，避免 UI 假死。
+            for (const fileId in state) {
+                const item = state[fileId]
+                // 如果任务未完成 (progress < 100)，标记为 error
+                if (item.progress < 100) {
+                    item.error = true
+                    item.status = 'interrupted' // Add explicitly status
+                    item.errorMessage = '页面刷新导致中断'
+                    // 确保 xhr 是空的
+                    item.xhr = null
                 }
-                this.uploadStatusMap = state
+            }
+            this.uploadStatusMap = state
         } catch (e) {}
     },
 
@@ -3392,22 +3689,24 @@ $bg-grey: $uni-bg-color-grey;
   flex: 1;
   overflow-y: auto;
 
+  /* Custom Scrollbar */
   &::-webkit-scrollbar {
     width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
+    background-color: transparent;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #CBD5E1;
+    background-color: transparent;
     border-radius: 3px;
-    transition: background 0.15s ease;
+    transition: background-color 0.2s;
+  }
 
-    &:hover {
-      background: #64748B;
-    }
+  &:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.3);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(148, 163, 184, 0.5);
   }
 }
 
@@ -3415,19 +3714,14 @@ $bg-grey: $uni-bg-color-grey;
   outline: none;
 }
 
-.tree-list-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding-bottom: 140px;
-}
 
 .tree-list {
+  flex: 1;
   position: relative;
   min-height: 100rpx;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .root-drop-zone,
@@ -3981,9 +4275,20 @@ $bg-grey: $uni-bg-color-grey;
   transition: background-color 0.18s ease, box-shadow 0.18s ease;
 }
 
+/* Tag Strip - Vertical color bar on left side of file items */
+.tag-strip {
+  position: absolute;
+  left: 0;
+  top: 4rpx;
+  bottom: 4rpx;
+  width: 4rpx;
+  border-radius: 2rpx;
+  z-index: 1;
+}
+
 /* Finder 风格：奇偶行浅色差（尽量克制） */
 .tree-list .tree-item:nth-child(odd) {
-  background-color: rgba(18, 52, 77, 0.02);
+  background-color: rgba(26, 83, 54, 0.02); /* Using Brand Color Tint */
 }
 
 .tree-list .tree-item:nth-child(even) {
@@ -3991,47 +4296,27 @@ $bg-grey: $uni-bg-color-grey;
 }
 
 .tree-item:hover {
-  background-color: rgba(18, 52, 77, 0.05);
+  background-color: rgba(26, 83, 54, 0.05);
 }
 
 .tree-item:active {
-  background-color: rgba(18, 52, 77, 0.06);
+  background-color: rgba(26, 83, 54, 0.08);
 }
 
-.tree-item-selected {
-  background-color: rgba(18, 52, 77, 0.08);
+/* Increase specificity to override zebra striping (.tree-list .tree-item:nth-child) */
+.tree-list .tree-item.tree-item-selected {
+  background-color: #D1E7DD !important; /* King Forest Lighter Tint - darkened for visibility */
 }
 
 /* Cmd/Ctrl 多选样式 */
-.tree-item-multi-selected {
-  background-color: rgba(37, 99, 235, 0.08);
+.tree-list .tree-item.tree-item-multi-selected {
+  background-color: #D1E7DD !important;
 }
 
-.tree-item-multi-selected::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 8rpx;
-  bottom: 8rpx;
-  width: 6rpx;
-  border-radius: 999px;
-  background-color: #2563eb;
-}
-
+/* Removed vertical bar indicators to avoid conflict with Tag Strip */
 .tree-item-multi-selected .tree-item-actions {
   opacity: 1;
-  background: linear-gradient(to right, transparent 0%, rgba(37, 99, 235, 0.08) 30%, rgba(37, 99, 235, 0.08) 100%);
-}
-
-.tree-item-selected::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 8rpx;
-  bottom: 8rpx;
-  width: 6rpx;
-  border-radius: 999px;
-  background-color: #12344D;
+  background: linear-gradient(to right, transparent 0%, #E8F3ED 30%, #E8F3ED 100%);
 }
 
 .tree-item-dragging {

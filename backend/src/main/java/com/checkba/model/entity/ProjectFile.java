@@ -107,6 +107,12 @@ public class ProjectFile {
      * 删除时间
      */
     private LocalDateTime deletedAt;
+
+    /**
+     * 文件关联的标签（非持久化字段）
+     */
+    @jakarta.persistence.Transient
+    private java.util.List<Tag> tags;
     
     // Getters and Setters
 
@@ -228,6 +234,14 @@ public class ProjectFile {
 
     public void setDeletedAt(LocalDateTime deletedAt) {
         this.deletedAt = deletedAt;
+    }
+
+    public java.util.List<Tag> getTags() {
+        return tags;
+    }
+
+    public void setTags(java.util.List<Tag> tags) {
+        this.tags = tags;
     }
 
     @Override

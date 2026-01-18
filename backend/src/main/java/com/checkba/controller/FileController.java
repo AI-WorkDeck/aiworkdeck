@@ -2,6 +2,7 @@ package com.checkba.controller;
 
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.repository.ProjectFileRepository;
+import com.checkba.service.ai.AutoTaggingService;
 import com.checkba.service.ai.ProjectRagService;
 import com.checkba.storage.StorageException;
 import com.checkba.storage.StorageService;
@@ -47,6 +48,9 @@ public class FileController {
     
     @Autowired
     private ProjectRagService projectRagService;
+
+    @Autowired
+    private AutoTaggingService autoTaggingService;
 
     private StorageService getStorageService() {
         return storageServiceFactory.getStorageService();
@@ -298,6 +302,13 @@ public class FileController {
                                  try {
                                      log.info("触发异步RAG索引: projectId={}, file={}", pid, savedPath);
                                      projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(pid), savedPath);
+                                     
+                                     // 触发自动打标签
+                                     try {
+                                         autoTaggingService.autoTagFile(pid, projectFileOpt.get().getId(), savedPath, projectFileOpt.get().getUserId());
+                                     } catch (Exception e) {
+                                         log.error("AutoTag failed", e);
+                                     }
                                  } catch (Exception e) {
                                      log.error("Async RAG indexing failed for file: " + savedPath, e);
                                  }
@@ -314,6 +325,13 @@ public class FileController {
                      java.util.concurrent.CompletableFuture.runAsync(() -> {
                          try {
                               projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(pid), savedPath);
+                              
+                              // 触发自动打标签 (Legacy)
+                              try {
+                                  autoTaggingService.autoTagFile(pid, projectFileOpt.get().getId(), savedPath, projectFileOpt.get().getUserId());
+                              } catch (Exception e) {
+                                  log.error("AutoTag (Legacy) failed", e);
+                              }
                          } catch (Exception e) {
                               log.error("Async RAG (Legacy) failed", e);
                          }

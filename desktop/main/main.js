@@ -1,6 +1,8 @@
 const path = require('path')
 const { app, BrowserWindow, BrowserView, ipcMain, shell, desktopCapturer, screen, clipboard, Menu, globalShortcut } = require('electron')
 const { BackendManager } = require('./backend')
+const { initLocalFileService } = require('./file-service')
+
 
 const DEV_SERVER_URL = process.env.CHECKBA_DEV_SERVER_URL || 'http://localhost:5173'
 const IS_DEV = process.env.CHECKBA_DESKTOP_DEV === '1'
@@ -1149,6 +1151,7 @@ ipcMain.handle('checkba:ui-confirm', async (_evt, payload) => {
 })
 
 app.whenReady().then(() => {
+  initLocalFileService()
   // 桌面端启动时自动拉起本机后端（9696）
   backend = new BackendManager({ projectRoot: path.join(__dirname, '..', '..') })
   backend

@@ -61,7 +61,22 @@ public class AiAgentController {
         Long userId = AuthController.getUserIdFromSession(sessionId); // Optional validation
         
         log.info("Client connecting to SSE: conversationId={}, userId={}", conversationId, userId);
-        return sseEmitterService.createConnection(conversationId);
+        SseEmitter emitter = sseEmitterService.createConnection(conversationId);
+        
+        // Check for active stream recovery
+        String snapshot = agentOrchestrator.getRecoverySnapshot(conversationId);
+        if (snapshot != null) {
+            log.info("Recovering active stream for conversation: {} ({} chars)", conversationId, snapshot.length());
+            // Send recovery event immediately after connection established
+            // Use a small delay or ensure SseEmitterService sends it properly
+            // SseEmitterService.createConnection sends initial "connected" event.
+            // We can send this right after.
+            sseEmitterService.send(conversationId, "state_recovery", "{\"content\":\"" + 
+                snapshot.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + 
+                "\"}");
+        }
+        
+        return emitter;
     }
 
     /**
