@@ -7683,6 +7683,24 @@ $bg-white: #FFFFFF;
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 3px;
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: #64748B;
+    }
+  }
 }
 
 .resize-handle {

@@ -2,7 +2,7 @@
   <view class="file-tree" tabindex="0" @keydown="handleKeyDown" @mousedown="focusTree">
 
     <!-- King IDE Style Modals System -->
-    
+
     <!-- 1. Delete Confirmation Modal -->
     <view v-if="showDeleteDialog" class="king-dialog-mask" @tap="showDeleteDialog = false">
       <view class="king-dialog" @tap.stop>
@@ -71,7 +71,7 @@
               </text>
             </view>
           </view>
-          
+
           <!-- H5 Folder Upload -->
           <!-- #ifdef H5 -->
           <view class="form-group">
@@ -104,8 +104,8 @@
         </view>
         <view class="king-dialog-footer">
           <view class="king-btn king-btn-secondary" @tap="cancelUpload">取消</view>
-          <view 
-            class="king-btn king-btn-primary" 
+          <view
+            class="king-btn king-btn-primary"
             :class="{ disabled: !selectedFiles.length }"
             @tap="selectedFiles.length ? confirmUpload() : null"
           >
@@ -140,12 +140,12 @@
                 mode="aspectFit"
               />
             </view>
-            <image 
-              :src="folderSelectorExpanded['root'] !== false ? '/static/folder-opened.png' : '/static/folder-closed.png'" 
-              class="folder-icon-img" 
+            <image
+              :src="folderSelectorExpanded['root'] !== false ? '/static/folder-opened.png' : '/static/folder-closed.png'"
+              class="folder-icon-img"
               :class="{ 'is-opened': folderSelectorExpanded['root'] !== false }"
-              style="margin-right: 8px;" 
-              mode="aspectFit" 
+              style="margin-right: 8px;"
+              mode="aspectFit"
             />
             <text class="folder-name">根目录</text>
           </view>
@@ -165,16 +165,16 @@
                 mode="aspectFit"
               />
             </view>
-            <image 
-              :src="folderSelectorExpanded[String(folder.id)] === true ? '/static/folder-opened.png' : '/static/folder-closed.png'" 
-              class="folder-icon-img" 
+            <image
+              :src="folderSelectorExpanded[String(folder.id)] === true ? '/static/folder-opened.png' : '/static/folder-closed.png'"
+              class="folder-icon-img"
               :class="{ 'is-opened': folderSelectorExpanded[String(folder.id)] === true }"
-              mode="aspectFit" 
+              mode="aspectFit"
             />
             <view v-if="renamingId === folder.id" class="rename-input-wrapper dialog-rename" @tap.stop>
-              <input 
-                class="rename-input" 
-                v-model="tempRenameValue" 
+              <input
+                class="rename-input"
+                v-model="tempRenameValue"
                 :focus="true"
                 @confirm="commitRename"
                 @blur="commitRename"
@@ -193,14 +193,14 @@
     </view>
 
     <!-- 右键上下文菜单 -->
-    <view 
-      v-if="contextMenu.visible" 
-      class="context-menu-mask" 
+    <view
+      v-if="contextMenu.visible"
+      class="context-menu-mask"
       @tap="closeContextMenu"
       @contextmenu.prevent="closeContextMenu"
     >
-      <view 
-        class="context-menu" 
+      <view
+        class="context-menu"
         :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
         @tap.stop
       >
@@ -257,7 +257,7 @@
         </view>
         <!-- Root Drop Zone for empty folders -->
         <!-- #ifdef H5 -->
-        <view 
+        <view
           v-if="isAnyDragging"
           class="root-drop-zone-empty"
           :class="{ 'drop-active': rootDropActive }"
@@ -273,7 +273,7 @@
         <view class="tree-list">
           <!-- 框选区域（H5） -->
           <view v-if="marquee.active" class="marquee" :style="marqueeStyle"></view>
-          
+
           <!-- H5端使用HTML5拖拽API -->
           <!-- #ifdef H5 -->
           <view
@@ -296,12 +296,12 @@
         >
           <view class="tree-item-content" :style="{ paddingLeft: getItemPadding(item) }">
             <!-- Progress Background Bar -->
-            <view 
-              v-if="uploadStatusMap[item.id]" 
+            <view
+              v-if="uploadStatusMap[item.id]"
               class="item-upload-progress-bg"
               :style="{ width: (uploadStatusMap[item.id].progress || 0) + '%' }"
             ></view>
-            
+
             <view v-if="selectionMode" class="tree-checkbox" @tap.stop="toggleChecked(item)">
               <view
                 class="checkbox-box"
@@ -312,18 +312,18 @@
               ></view>
             </view>
             <view v-if="item.isFolder && showTree" class="tree-expand-icon-wrapper" @tap.stop="toggleFolder(item.id)">
-              <image 
-                :src="expandedFolders.has(item.id) ? '/static/down.png' : '/static/right.png'" 
-                class="tree-expand-icon-img" 
-                mode="aspectFit" 
+              <image
+                :src="expandedFolders.has(item.id) ? '/static/down.png' : '/static/right.png'"
+                class="tree-expand-icon-img"
+                mode="aspectFit"
               />
             </view>
             <view v-else class="tree-expand-placeholder"></view>
-            
+
             <!-- Icon Logic: Folder uses CSS, Files use SVG Component -->
-            <image 
+            <image
               v-if="item.isFolder"
-              class="tree-item-icon-img" 
+              class="tree-item-icon-img"
               :class="{ 'is-opened': expandedFolders.has(item.id) }"
               :src="expandedFolders.has(item.id) ? '/static/folder-opened.png' : '/static/folder-closed.png'"
               mode="aspectFit"
@@ -332,11 +332,11 @@
                <FileTypeIcon :type="item.fileType" :active="selectedFileId === item.id" />
             </view>
             <view v-if="renamingId === item.id" class="rename-input-wrapper" @tap.stop @mousedown.stop>
-              <input 
-                class="rename-input" 
-                v-model="tempRenameValue" 
-                @confirm="commitRename" 
-                @blur="commitRename" 
+              <input
+                class="rename-input"
+                v-model="tempRenameValue"
+                @confirm="commitRename"
+                @blur="commitRename"
                 :focus="true"
                 @keydown.stop="handleRenameKeydown"
               />
@@ -363,30 +363,30 @@
                 </view>
               </template>
               <template v-else-if="viewMode === 'recycle'">
-                <view 
-                  class="action-btn icon-btn" 
-                  title="还原" 
+                <view
+                  class="action-btn icon-btn"
+                  title="还原"
                   @tap="restoreFile(item)"
                   @mouseenter="hoverRestore = { ...hoverRestore, [item.id]: true }"
                   @mouseleave="hoverRestore = { ...hoverRestore, [item.id]: false }"
                 >
-                  <image 
-                    :src="hoverRestore[item.id] ? '/static/restore.png' : '/static/restore_unselected.png'" 
-                    class="action-icon" 
-                    mode="aspectFit" 
+                  <image
+                    :src="hoverRestore[item.id] ? '/static/restore.png' : '/static/restore_unselected.png'"
+                    class="action-icon"
+                    mode="aspectFit"
                   />
                 </view>
-                <view 
-                  class="action-btn icon-btn" 
-                  title="彻底删除" 
+                <view
+                  class="action-btn icon-btn"
+                  title="彻底删除"
                   @tap="permDeleteFile(item)"
                   @mouseenter="hoverPermDelete = { ...hoverPermDelete, [item.id]: true }"
                   @mouseleave="hoverPermDelete = { ...hoverPermDelete, [item.id]: false }"
                 >
-                  <image 
-                    :src="hoverPermDelete[item.id] ? '/static/permnently_delete.png' : '/static/permnently_delete_unselected.png'" 
-                    class="action-icon" 
-                    mode="aspectFit" 
+                  <image
+                    :src="hoverPermDelete[item.id] ? '/static/permnently_delete.png' : '/static/permnently_delete_unselected.png'"
+                    class="action-icon"
+                    mode="aspectFit"
                   />
                 </view>
               </template>
@@ -413,10 +413,10 @@
           v-for="(item, index) in displayFiles"
           :key="item.id"
           class="tree-item"
-          :class="{ 
+          :class="{
             'tree-item-selected': selectedFileId === item.id,
             'tree-item-multi-selected': multiSelectedIds.includes(item.id),
-            'tree-item-dragging': draggingIndex === index 
+            'tree-item-dragging': draggingIndex === index
           }"
           :data-file-id="item.id"
           @tap="handleItemClick(item, $event)"
@@ -427,12 +427,12 @@
         >
           <view class="tree-item-content" :style="{ paddingLeft: getItemPadding(item) }">
             <!-- Progress Background Bar -->
-            <view 
-              v-if="uploadStatusMap[item.id]" 
+            <view
+              v-if="uploadStatusMap[item.id]"
               class="item-upload-progress-bg"
               :style="{ width: (uploadStatusMap[item.id].progress || 0) + '%' }"
             ></view>
-            
+
             <view v-if="selectionMode" class="tree-checkbox" @tap.stop="toggleChecked(item)">
               <view
                 class="checkbox-box"
@@ -443,18 +443,18 @@
               ></view>
             </view>
             <view v-if="item.isFolder && showTree" class="tree-expand-icon-wrapper" @tap.stop="toggleFolder(item.id)">
-              <image 
-                :src="expandedFolders.has(item.id) ? '/static/down.png' : '/static/right.png'" 
-                class="tree-expand-icon-img" 
-                mode="aspectFit" 
+              <image
+                :src="expandedFolders.has(item.id) ? '/static/down.png' : '/static/right.png'"
+                class="tree-expand-icon-img"
+                mode="aspectFit"
               />
             </view>
             <view v-else class="tree-expand-placeholder"></view>
-            
+
              <!-- Icon Logic: Folder uses CSS, Files use SVG Component -->
-            <image 
+            <image
               v-if="item.isFolder"
-              class="tree-item-icon-img" 
+              class="tree-item-icon-img"
               :class="{ 'is-opened': expandedFolders.has(item.id) }"
               :src="expandedFolders.has(item.id) ? '/static/folder-opened.png' : '/static/folder-closed.png'"
               mode="aspectFit"
@@ -463,11 +463,11 @@
                <FileTypeIcon :type="item.fileType" :active="selectedFileId === item.id" />
             </view>
             <view v-if="renamingId === item.id" class="rename-input-wrapper" @tap.stop @mousedown.stop>
-              <input 
-                class="rename-input" 
-                v-model="tempRenameValue" 
-                @confirm="commitRename" 
-                @blur="commitRename" 
+              <input
+                class="rename-input"
+                v-model="tempRenameValue"
+                @confirm="commitRename"
+                @blur="commitRename"
                 :focus="true"
                 @keydown.stop="handleRenameKeydown"
               />
@@ -494,30 +494,30 @@
                 </view>
               </template>
               <template v-else-if="viewMode === 'recycle'">
-                <view 
-                  class="action-btn icon-btn" 
-                  title="还原" 
+                <view
+                  class="action-btn icon-btn"
+                  title="还原"
                   @tap="restoreFile(item)"
                   @mouseenter="hoverRestore = { ...hoverRestore, [item.id]: true }"
                   @mouseleave="hoverRestore = { ...hoverRestore, [item.id]: false }"
                 >
-                  <image 
-                    :src="hoverRestore[item.id] ? '/static/restore.png' : '/static/restore_unselected.png'" 
-                    class="action-icon" 
-                    mode="aspectFit" 
+                  <image
+                    :src="hoverRestore[item.id] ? '/static/restore.png' : '/static/restore_unselected.png'"
+                    class="action-icon"
+                    mode="aspectFit"
                   />
                 </view>
-                <view 
-                  class="action-btn icon-btn" 
-                  title="彻底删除" 
+                <view
+                  class="action-btn icon-btn"
+                  title="彻底删除"
                   @tap="permDeleteFile(item)"
                   @mouseenter="hoverPermDelete = { ...hoverPermDelete, [item.id]: true }"
                   @mouseleave="hoverPermDelete = { ...hoverPermDelete, [item.id]: false }"
                 >
-                  <image 
-                    :src="hoverPermDelete[item.id] ? '/static/permnently_delete.png' : '/static/permnently_delete_unselected.png'" 
-                    class="action-icon" 
-                    mode="aspectFit" 
+                  <image
+                    :src="hoverPermDelete[item.id] ? '/static/permnently_delete.png' : '/static/permnently_delete_unselected.png'"
+                    class="action-icon"
+                    mode="aspectFit"
                   />
                 </view>
               </template>
@@ -526,10 +526,10 @@
           </view>
         </view>
         <!-- #endif -->
-        
+
         <!-- Root Drop Zone: 拖拽到此区域可移动到根目录 -->
         <!-- #ifdef H5 -->
-        <view 
+        <view
           v-if="isAnyDragging"
           class="root-drop-zone"
           :class="{ 'drop-active': rootDropActive }"
@@ -547,7 +547,7 @@
     <view
         v-if="isBatchUploading || Object.keys(uploadStatusMap).length > 0"
         class="upload-status-footer-fixed"
-        style="padding: 12px 16px; border-top: 2px solid #2563eb; background: linear-gradient(to bottom, #f8fafc, #ffffff); position: relative; box-shadow: 0 -2px 8px rgba(37, 99, 235, 0.1);"
+        style=""
         @mouseenter="showUploadDetails = true"
         @mouseleave="showUploadDetails = false"
     >
@@ -575,11 +575,11 @@
                     </view>
                     <view style="display: flex; align-items: center;">
                         <!-- Resume Button for Interrupted items -->
-                        <text 
-                            v-if="status.error || status.status === 'interrupted'" 
-                            class="btn-retry" 
-                            @tap.stop="resumeUpload(status.fileId)" 
-                            style="font-size: 14px; color: #2563eb; cursor: pointer; padding: 0 4px; margin-right: 4px;" 
+                        <text
+                            v-if="status.error || status.status === 'interrupted'"
+                            class="btn-retry"
+                            @tap.stop="resumeUpload(status.fileId)"
+                            style="font-size: 14px; color: #2563eb; cursor: pointer; padding: 0 4px; margin-right: 4px;"
                             title="继续上传"
                         >↻</text>
                         <text class="btn-cancel" @tap.stop="cancelSingleUpload(status.fileId)" style="font-size: 16px; color: #999; cursor: pointer; padding: 0 4px;" title="取消上传">×</text>
@@ -587,7 +587,7 @@
                 </view>
             </view>
         </view>
-        
+
         <!-- Hidden input removed (using uni.chooseFile) -->
 
         <view class="upload-status-content" style="display: flex; align-items: center; gap: 12px;">
@@ -651,7 +651,7 @@
         </button>
       </view>
     </view>
-    
+
     <!-- Recycle Bin Dialog -->
     <view v-if="showRecycleBin" class="upload-mask" @tap="showRecycleBin = false">
       <view class="upload-modal" @tap.stop>
@@ -779,7 +779,7 @@ export default {
       uploadStatusMap: {},
       // 文件夹选择器展开状态（id -> bool），默认 true
       folderSelectorExpanded: {},
-      
+
       // New Features State
       rootDropActive: false,
       activeFolderId: null,
@@ -790,19 +790,19 @@ export default {
       viewMode: 'files', // 'files' | 'recycle'
       renamingId: null,
       tempRenameValue: '',
-      
+
       // Sort
       sortMode: 'name', // 'name' | 'date' | 'type'
       sortOrder: 'asc', // 'asc' | 'desc'
       showSortMenu: false,
-      
+
       // Batch Upload Global Progress
       batchUploadTotalSize: 0,
       batchUploadFinishedSize: 0,
       isBatchUploading: false,
       showUploadDetails: false,
       resumingFileId: null,
-      
+
       // Delete Confirmation
       showDeleteDialog: false,
       deleteTargetItem: null, // The item being deleted
@@ -812,10 +812,10 @@ export default {
       // Hover states for Recycle Bin icons
       hoverRestore: {}, // { [fileId]: boolean }
       hoverPermDelete: {},
-      
+
       // Cmd/Ctrl 多选支持
       multiSelectedIds: [], // 多选的文件 ID 数组
-      
+
       // 右键菜单状态
       contextMenu: {
         visible: false,
@@ -845,7 +845,7 @@ export default {
 
        // Filter out staged files AND the staging folder itself
        const hiddenNames = new Set(['.stagezone', '__staging_area__'])
-       
+
        if (this.hiddenFileIds && this.hiddenFileIds.length > 0) {
          const hiddenIds = new Set(this.hiddenFileIds.map(id => Number(id)))
          result = result.filter(f => !hiddenIds.has(Number(f.id)) && !hiddenNames.has(f.name))
@@ -901,7 +901,7 @@ export default {
            level: 0
          })
        })
- 
+
        // 构建树结构
        const roots = []
        folders.forEach(f => {
@@ -914,7 +914,7 @@ export default {
            roots.push(node)
          }
        })
- 
+
        const result = []
        // 默认只展开根目录（即显示第一层级）
        const isRootExpanded = this.folderSelectorExpanded['root'] !== false
@@ -953,17 +953,17 @@ export default {
         })
         return Math.min(100, (this.batchUploadFinishedSize + currentUploaded) * 100 / this.batchUploadTotalSize)
       }
-      
+
       const keys = Object.keys(this.uploadStatusMap).filter(k => {
           const item = this.uploadStatusMap[k]
           // Filter out interrupted items from "active" progress calculation?
           // If we show them in the list, we might want to count them or not.
-          // User says "indicator shows 0/23 but not starting". 
+          // User says "indicator shows 0/23 but not starting".
           // Better to filter them out of the "Active" count.
           return !item.error && item.status !== 'interrupted'
       })
-      if (keys.length === 0) return null 
-      
+      if (keys.length === 0) return null
+
       let total = 0
       let uploaded = 0
       keys.forEach(key => {
@@ -1017,7 +1017,7 @@ export default {
       this.clearChecked()
     }
     this.restoreUploadState()
-    
+
     // Listen for global drag events to show/hide root drop zone
     uni.$on('file-drag-start', () => { this.isAnyDragging = true })
     uni.$on('file-drag-end', () => { this.isAnyDragging = false })
@@ -1053,7 +1053,7 @@ export default {
         console.warn('FileTree: projectId 未设置，无法加载文件列表')
         return
       }
-      
+
       this.loading = true
       try {
         // 确保 projectId 是数字类型
@@ -1064,7 +1064,7 @@ export default {
         if (this.viewMode === 'recycle') {
            this.files = [] // Clear existing
            this.recycleBin = await getRecycleBinFiles(projectId)
-           // Recycle mode usually displays `recycleBin` data, not `files`. 
+           // Recycle mode usually displays `recycleBin` data, not `files`.
            // Ensure the template uses `recycleBin`.
         } else if (this.showTree) {
           // 加载完整文件树
@@ -1188,7 +1188,7 @@ export default {
         const ext = '.docx'
         let name = baseName + ext
         let counter = 1
-        
+
         const existingNames = new Set(this.displayFiles.map(f => f.name))
         while (existingNames.has(name)) {
            name = `${baseName} (${counter})${ext}`
@@ -1197,7 +1197,7 @@ export default {
 
         // 生成唯一的 wpsFileId
         const wpsFileId = `project_${projectId}_doc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-        
+
         // 创建Word文件
         await createFile(
           projectId,
@@ -1208,7 +1208,7 @@ export default {
           null, // filePath
           wpsFileId
         )
-        
+
         await this.loadFiles()
         uni.showToast({
           title: '创建成功',
@@ -1231,7 +1231,7 @@ export default {
          const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
          // Duplicate file in same directory
          await batchCopyFiles(projectId, [item.id], item.parentId)
-         
+
          // Set clipboard
          uni.setClipboardData({
              data: item.name,
@@ -1239,7 +1239,7 @@ export default {
                  uni.showToast({ title: '已复制并创建副本', icon: 'none' })
              }
          })
-         
+
          await this.loadFiles()
        } catch (error) {
          console.error('复制失败:', error)
@@ -1347,7 +1347,7 @@ export default {
 
     async confirmDelete() {
       this.showDeleteDialog = false
-      
+
       try {
         if (this.deleteIsBatch) {
            await this.executeBatchDelete()
@@ -1366,22 +1366,22 @@ export default {
         this.deleteBatchIds = []
       }
     },
-    
+
     async executeSoftDelete(item) {
       const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
       if (isNaN(projectId)) throw new Error('项目ID格式错误')
-      
+
       // 2. Call API (Soft Delete)
       await deleteFile(projectId, item.id)
       await this.loadFiles()
       uni.showToast({ title: '已移入回收站', icon: 'success' })
-      
+
       if (this.selectedFileId === item.id) {
         this.selectedFileId = null
         this.$emit('file-select', null)
       }
     },
-    
+
     // Wrapper for perm delete with dialog
     permDeleteFile(item) {
        this.deleteTargetItem = item
@@ -1389,7 +1389,7 @@ export default {
        this.deleteIsBatch = false
        this.showDeleteDialog = true
     },
-    
+
     async executePermDelete(item) {
         const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
         try {
@@ -1404,14 +1404,14 @@ export default {
              uni.showToast({ title: '删除失败', icon: 'none' })
         }
     },
-    
+
     async executeBatchDelete() {
         const ids = this.deleteBatchIds
         const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
-        
+
         if (this.deleteMode === 'hard') {
             // Batch Perm Delete
-            // Currently backend doesn't have batch perm delete? 
+            // Currently backend doesn't have batch perm delete?
             // Loop and delete (or add NEW batch endpoint)
             // For now loop
             for (const id of ids) {
@@ -1484,10 +1484,10 @@ export default {
          // 文件夹始终置顶
          if (a.isFolder && !b.isFolder) return -1
          if (!a.isFolder && b.isFolder) return 1
-         
+
          let result = 0
          if (this.sortMode === 'date') {
-            // Newest first by default in 'date' mode? 
+            // Newest first by default in 'date' mode?
             // Existing was timeB - timeA. We now make it controllable.
             const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime()
             const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime()
@@ -1510,10 +1510,10 @@ export default {
          if (this.sortMode === 'date') {
             return this.sortOrder === 'asc' ? result : -result
          }
-         
+
          return this.sortOrder === 'desc' ? -result : result
       })
-      
+
       for (const item of children) {
         result.push(item)
         // 如果是文件夹且已展开，递归添加子项
@@ -1522,7 +1522,7 @@ export default {
           result.push(...subItems)
         }
       }
-      
+
       return result
     },
     setSortMode(mode) {
@@ -1533,9 +1533,9 @@ export default {
     },
     toggleSortOrder() {
       this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'
-      uni.showToast({ 
-        title: this.sortOrder === 'asc' ? '正序排列' : '倒序排列', 
-        icon: 'none' 
+      uni.showToast({
+        title: this.sortOrder === 'asc' ? '正序排列' : '倒序排列',
+        icon: 'none'
       })
       this.refreshTreeView()
     },
@@ -1574,17 +1574,17 @@ export default {
     // 为选择器设计的新建文件夹逻辑
     async handleSelectorCreateFolder() {
       if (!this.projectId) return
-      
+
       try {
         const pId = this.tempSelectedParent // 这个是当前的高亮选中项
         const folderName = '新建文件夹'
         // 1. 创建文件夹
         const res = await createFolder(this.projectId, pId, folderName)
         const newFolderId = res.id || res.data?.id
-        
+
         // 2. 刷新列表
         await this.loadFiles()
-        
+
         // 3. 展开父节点
         if (pId) {
           this.folderSelectorExpanded = {
@@ -1598,13 +1598,13 @@ export default {
             ['root']: true
           }
         }
-        
+
         // 4. 进入重命名模式
         this.$nextTick(() => {
           this.renamingId = newFolderId
           this.tempRenameValue = folderName
         })
-        
+
       } catch (error) {
         console.error('新建文件夹失败:', error)
         uni.showToast({ title: '新建文件夹失败', icon: 'none' })
@@ -1615,7 +1615,7 @@ export default {
       const sId = String(folderId)
       const isRoot = sId === 'root'
       const current = this.folderSelectorExpanded[sId]
-      
+
       // 根目录默认是展开的 (undefined 或 true)
       // 其他目录默认是收起的 (undefined 或 false)
       let nextState
@@ -1624,7 +1624,7 @@ export default {
       } else {
         nextState = current === true ? false : true
       }
-      
+
       this.folderSelectorExpanded = {
         ...this.folderSelectorExpanded,
         [sId]: nextState
@@ -1700,7 +1700,7 @@ export default {
     },
     handleItemClick(item, event) {
       if (!item) return
-      
+
       const now = Date.now()
       // Double Click Detection: Toggle Folder
       if (this.lastClickItemId === item.id && (now - this.lastClickTime < 350)) {
@@ -1712,7 +1712,7 @@ export default {
         this.lastClickItemId = null
         return
       }
-      
+
       this.lastClickItemId = item.id
       this.lastClickTime = now
 
@@ -1720,7 +1720,7 @@ export default {
         this.toggleChecked(item)
         return
       }
-      
+
       // Cmd/Ctrl 多选逻辑
       // 使用 try-catch 包裹事件属性访问，避免 WPS iframe 的跨域错误
       let isMultiSelect = false
@@ -1730,7 +1730,7 @@ export default {
         // 忽略跨域访问错误（WPS iframe 可能会拦截事件）
         console.warn('检测多选键时出错:', e)
       }
-      
+
       if (isMultiSelect) {
         // 阻止事件继续传播，避免触发 WPS iframe 的处理逻辑
         if (event && typeof event.stopPropagation === 'function') {
@@ -1739,7 +1739,7 @@ export default {
         if (event && typeof event.preventDefault === 'function') {
           event.preventDefault()
         }
-        
+
         // 多选模式：切换当前项的选中状态
         const idx = this.multiSelectedIds.indexOf(item.id)
         if (idx >= 0) {
@@ -1754,12 +1754,12 @@ export default {
         this.$emit('multi-select-change', this.multiSelectedIds)
         return
       }
-      
+
       // 单选模式：清空多选，只选中当前
       this.multiSelectedIds = [item.id]
       this.selectedFileId = item.id
       this.$emit('file-select', item)
-      
+
       // Update Active Folder for Creation Context
       if (item.isFolder) {
         this.activeFolderId = item.id
@@ -1801,7 +1801,7 @@ export default {
         this.showDeleteDialog = true
         return
       }
-      
+
       if (action === 'download') {
          this.executeBatchDownload(ids)
          return
@@ -1814,32 +1814,32 @@ export default {
     },
     async executeBatchDownload(ids) {
        if (!ids || !ids.length) return
-       
+
        // Ensure IDs are comparable (string vs number)
        const idSet = new Set(ids.map(String))
        const selectedItems = (this.allFiles || this.files || []).filter(f => idSet.has(String(f.id)))
-       
+
        if (selectedItems.length > 1) {
            uni.showToast({ title: '暂不支持批量下载', icon: 'error' })
            return
        }
-       
+
        const item = selectedItems[0]
        if (!item) return
-       
+
        if (item.isFolder) {
            uni.showToast({ title: '暂不支持批量下载', icon: 'error' })
            return
        }
 
        uni.showToast({ title: '开始下载...', icon: 'none' })
-       
+
        const baseUrl = getApiBaseUrl()
        const token = uni.getStorageSync('token') || ''
 
        try {
           const url = `${baseUrl}/api/files/${item.id}/download?token=${encodeURIComponent(token)}`
-          
+
           const link = document.createElement('a')
           link.href = url
           link.download = item.name || 'download'
@@ -1889,7 +1889,7 @@ export default {
       // Filter out restored items
       const restoreSet = new Set(itemsToRestore)
       this.recycleBin = this.recycleBin.filter(f => !restoreSet.has(f.id))
-      
+
       uni.showToast({ title: '已恢复', icon: 'success' })
     },
     handleDownload(item) {
@@ -1897,7 +1897,7 @@ export default {
         const baseUrl = getApiBaseUrl()
         const token = uni.getStorageSync('token') || ''
         const url = `${baseUrl}/api/files/${item.id}/download?token=${encodeURIComponent(token)}`
-        
+
         // Trigger browser download; handled by Main process to show Save As dialog
         const link = document.createElement('a')
         link.href = url
@@ -1911,18 +1911,18 @@ export default {
       if (item && item.isFolder && this.showTree && !this.expandedFolders.has(item.id)) {
         this.toggleFolder(item.id)
       }
-      
+
       // 显示右键菜单
       if (event && item) {
         event.preventDefault()
         event.stopPropagation()
-        
+
         // 如果右键点击的项不在多选列表中，则将其加入
         if (!this.multiSelectedIds.includes(item.id)) {
           this.multiSelectedIds = [item.id]
           this.selectedFileId = item.id
         }
-        
+
         this.contextMenu = {
           visible: true,
           x: event.clientX || event.pageX || 0,
@@ -1931,7 +1931,7 @@ export default {
         }
       }
     },
-    
+
     /**
      * 关闭右键菜单
      */
@@ -1939,28 +1939,28 @@ export default {
       this.contextMenu.visible = false
       this.contextMenu.targetItem = null
     },
-    
+
     /**
      * 检查是否可以进行文档对比（选中恰好 2 个文档文件）
      */
     canCompareDocuments() {
       if (this.multiSelectedIds.length !== 2) return false
       const docTypes = ['doc', 'docx']
-      const selectedFiles = this.multiSelectedIds.map(id => 
+      const selectedFiles = this.multiSelectedIds.map(id =>
         this.allFiles.find(f => f.id === id)
       ).filter(Boolean)
       return selectedFiles.every(f => !f.isFolder && docTypes.includes((f.fileType || '').toLowerCase()))
     },
-    
+
     /**
      * 获取选中的两个文档文件
      */
     getSelectedDocumentFiles() {
-      return this.multiSelectedIds.map(id => 
+      return this.multiSelectedIds.map(id =>
         this.allFiles.find(f => f.id === id)
       ).filter(Boolean)
     },
-    
+
     /**
      * 发起文档对比
      */
@@ -1970,7 +1970,7 @@ export default {
       this.$emit('compare-documents', docs)
       this.closeContextMenu()
     },
-    
+
     /**
      * 定位并展开到指定文件
      * @param {number|string} fileId - 要定位的文件 ID
@@ -1978,20 +1978,20 @@ export default {
      */
     revealFile(fileId) {
       if (!fileId) return false
-      
+
       // 确保文件数据已加载
       if (!this.allFiles || this.allFiles.length === 0) {
         console.warn('[FileTree] revealFile: allFiles 为空，无法定位')
         return false
       }
-      
+
       // 查找目标文件
       const targetFile = this.allFiles.find(f => f.id === fileId || String(f.id) === String(fileId))
       if (!targetFile) {
         console.warn('[FileTree] revealFile: 未找到文件', fileId)
         return false
       }
-      
+
       // 获取所有父目录 ID 链
       const parentIds = []
       let current = targetFile
@@ -1999,14 +1999,14 @@ export default {
         parentIds.push(current.parentId)
         current = this.allFiles.find(f => f.id === current.parentId)
       }
-      
+
       // 展开所有父目录
       parentIds.forEach(pid => {
         if (!this.expandedFolders.has(pid)) {
           this.expandedFolders.add(pid)
         }
       })
-      
+
       // 重新构建树形视图
       if (this.showTree && this.allFiles.length > 0) {
         this.files = this.buildTreeView(this.allFiles, this.parentId)
@@ -2028,10 +2028,10 @@ export default {
           // ignore scroll errors
         }
       })
-      
+
       return true
     },
-    
+
     handleKeyDown(e) {
       if (!e) return
       const key = e.key
@@ -2192,12 +2192,12 @@ export default {
         img.src = '/static/Drag.png'
         // 设置图片热点为中心 (假设图片大概 30x30, 这里的 offset 可以根据实际图调整)
         e.dataTransfer.setDragImage(img, 15, 15)
-        
+
         // 设置拖拽数据
         try {
           // 1. 基础索引，用于列表内排序
           e.dataTransfer.setData('text/plain', index.toString())
-          
+
           // 2. 完整文件信息，用于跨组件拖拽（如拖到 WPS）
           if (item && item.id) {
             const fileData = JSON.stringify({
@@ -2245,15 +2245,15 @@ export default {
     async handleDrop(e, index) {
       e.preventDefault()
       console.log('拖拽放下:', { draggedIndex: this.draggedIndex, targetIndex: index })
-      
+
       const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
       // BUGFIX: Use displayFiles instead of files since template v-for uses displayFiles
       const targetItem = this.displayFiles[index]
-      
+
       // Determine Target Parent ID
       let targetParentId
       let newSortOrder = targetItem.sortOrder
-      
+
       // If dropping onto a folder, move INTO it
       // If dropping onto a file, move to same parent (sibling)
       if (targetItem.isFolder) {
@@ -2270,11 +2270,11 @@ export default {
             this.draggedIndex = -1
             return
           }
-          
+
           try {
             // BUGFIX: Use displayFiles instead of files
             const draggedItem = this.displayFiles[this.draggedIndex]
-            
+
             // Prevent self-parenting or no-op moves if needed check
             if (draggedItem.id === targetParentId) return
 
@@ -2285,18 +2285,18 @@ export default {
             console.error('移动文件失败:', error)
             uni.showToast({ title: error.message || '移动失败', icon: 'none' })
           }
-      } 
+      }
       // Case 2: External Drag (e.g. from Staging Area)
       else {
           // Parse dropped data
           let droppedFileId = null
           let droppedFileName = ''
-          
+
           if (e.dataTransfer) {
               try {
                   let rawData = e.dataTransfer.getData('application/x-checkba-file')
                   if (!rawData) rawData = e.dataTransfer.getData('text/checkba-file-json')
-                  
+
                   if (rawData) {
                       const data = JSON.parse(rawData)
                       if (data.fileId) {
@@ -2306,28 +2306,28 @@ export default {
                   }
               } catch (err) {}
           }
-          
+
           // Fallback global check
           if (!droppedFileId && typeof document !== 'undefined' && document.__checkbaDraggedFile) {
               droppedFileId = document.__checkbaDraggedFile.fileId
               droppedFileName = document.__checkbaDraggedFile.name
               document.__checkbaDraggedFile = null // Consume
           }
-          
+
           if (droppedFileId) {
              try {
                  await moveFile(projectId, droppedFileId, targetParentId, newSortOrder)
                  await this.loadFiles()
                  uni.showToast({ title: '移动成功', icon: 'success' })
-                 
-                 // If Staging Area listens to file changes (it does via project-overview reloading), 
-                 // it will update automatically. 
+
+                 // If Staging Area listens to file changes (it does via project-overview reloading),
+                 // it will update automatically.
                  // However, project-overview needs to know to reload staging?
                  // Actually moveFile changes the parent, so it disappears from .stagezone
                  // Staging Area should refresh? project-overview usually listens to changes?
                  // We might need to emit an event to notify parent to refresh staging area
                  this.$emit('files-changed') // Standardize this event?
-                 
+
                  // Verify if project-overview handles this.
              } catch (error) {
                 console.error('从暂存区移动失败:', error)
@@ -2364,7 +2364,7 @@ export default {
       if (this.draggedIndex !== -1) {
           try {
             const draggedItem = this.displayFiles[this.draggedIndex]
-            
+
             // If already in root (parentId is null or matches), we might still want to allow movement if subfolder -> root
             await moveFile(projectId, draggedItem.id, targetParentId, newSortOrder)
             await this.loadFiles()
@@ -2374,7 +2374,7 @@ export default {
             console.error('移动到根目录失败:', error)
             uni.showToast({ title: error.message || '移动失败', icon: 'none' })
           }
-      } 
+      }
       // Case 2: External Drag (e.g. from Staging Area)
       else {
           let droppedFileId = null
@@ -2392,13 +2392,13 @@ export default {
               droppedFileId = document.__checkbaDraggedFile.fileId
               document.__checkbaDraggedFile = null
           }
-          
+
           if (droppedFileId) {
              try {
                  await moveFile(projectId, droppedFileId, targetParentId, newSortOrder)
                  await this.loadFiles()
                  uni.showToast({ title: '移动到根目录成功', icon: 'success' })
-                 this.$emit('files-changed') 
+                 this.$emit('files-changed')
              } catch (error) {
                 console.error('从外部移动到根目录失败:', error)
                 uni.showToast({ title: error.message || '移动失败', icon: 'none' })
@@ -2437,7 +2437,7 @@ export default {
           const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
           const draggedItem = this.displayFiles[index]
           const targetItem = this.displayFiles[targetIndex]
-          
+
           let targetParentId
           let newSortOrder = targetItem.sortOrder
 
@@ -2447,7 +2447,7 @@ export default {
           } else {
              targetParentId = this.showTree ? targetItem.parentId : this.parentId
           }
-          
+
           await moveFile(projectId, draggedItem.id, targetParentId, newSortOrder)
           await this.loadFiles()
           uni.showToast({
@@ -2481,11 +2481,11 @@ export default {
       input.webkitdirectory = true
       input.directory = true // 非标准，兼容性
       input.multiple = true
-      
+
       input.onchange = (e) => {
         const files = Array.from(e.target.files || [])
         if (files.length === 0) return
-        
+
         this.isFolderUpload = true
         this.selectedFiles = files.map(f => ({
           name: f.name,
@@ -2495,7 +2495,7 @@ export default {
           relativePath: f.webkitRelativePath || f.name // 保留相对路径结构
         }))
       }
-      
+
       input.click()
     },
     // #endif
@@ -2619,7 +2619,7 @@ export default {
         // 文件夹路径缓存 (path -> folderId)
         // key: relative path (e.g., "A", "A/B"), value: folderId
         const dirCache = { "": rootParentId }
-        
+
         // Helper to get directory path
         const getDirName = (path) => {
            if (!path) return ''
@@ -2649,34 +2649,34 @@ export default {
               }
            }
         })
-        
+
         // Initialize or update batch progress
         this.isBatchUploading = true
         if (!this.batchUploadTotalSize) this.batchUploadTotalSize = 0
         this.batchUploadTotalSize += totalSize
         // this.batchUploadFinishedSize already exists, don't reset it
         if (!this.batchUploadFinishedSize) this.batchUploadFinishedSize = 0
-        
+
         // 2. 排序：短路径在前（确保先创建父目录）
         const sortedDirs = Array.from(dirsToCreate).sort((a, b) => a.split('/').length - b.split('/').length)
-        
+
         // 3. 逐个创建目录
         for (const dirPath of sortedDirs) {
            if (dirCache[dirPath] !== undefined) continue // 已存在
-           
+
            const parts = dirPath.split('/')
            const folderName = parts.pop()
            const parentPath = parts.join('/')
            const parentId = dirCache[parentPath]
-           
+
            try {
               const newFolder = await createFolder(projectId, parentId, folderName)
               if (newFolder && newFolder.id) {
                 dirCache[dirPath] = newFolder.id
-                
+
                 // 乐观更新：如果新建的文件夹在当前视图下，立即加入显示列表
                 // 注意：parentId可能是null或数字，this.parentId可能是null或数字
-                const isCurrentDir = (parentId === this.parentId) || 
+                const isCurrentDir = (parentId === this.parentId) ||
                                      (parentId == null && this.parentId == null) ||
                                      (String(parentId) === String(this.parentId))
                 if (isCurrentDir) {
@@ -2698,7 +2698,7 @@ export default {
                   } else {
                       // 确实无法创建也找不到，回退到父目录
                       console.error(`无法创建也无法找到文件夹 ${folderName}`)
-                      dirCache[dirPath] = parentId 
+                      dirCache[dirPath] = parentId
                   }
               } catch (innerE) {
                   console.error('查找已存在文件夹失败', innerE)
@@ -2713,11 +2713,11 @@ export default {
         if (!this.uploadFileObjects) {
              this.uploadFileObjects = {}
         }
-        
+
         files.forEach((file, index) => {
             const tempId = `pending_${Date.now()}_${index}`
             this.uploadStatusMap[tempId] = {
-                fileId: tempId, 
+                fileId: tempId,
                 name: file.name,
                 size: file.size || 0,
                 uploaded: 0,
@@ -2730,12 +2730,12 @@ export default {
             uploadQueue.push({ file, tempId })
         })
         this.saveUploadState()
-        
+
         // 5. 并发上传控制
         const CONCURRENCY = 3
         let activeCount = 0
         let currentIndex = 0
-        
+
         const processNext = async () => {
              // Check if we are done with the queue
              if (currentIndex >= uploadQueue.length) {
@@ -2758,14 +2758,14 @@ export default {
                  }
                  return
              }
-             
+
              activeCount++
              const { file, tempId } = uploadQueue[currentIndex++]
-             
+
              const dirPath = getDirName(file.relativePath || '')
              // Resolve Parent ID: if we created a folder, use it; otherwise use root
              const targetParentId = dirCache[dirPath] !== undefined ? dirCache[dirPath] : rootParentId
- 
+
              try {
                  // Update cache with real ID later?
                  // uploadSingleFile returns the new fileId, but we might need to map tempId -> realId in cache?
@@ -2788,7 +2788,7 @@ export default {
                  processNext()
              }
         }
-        
+
         // Start initial batch
         for (let i = 0; i < Math.min(CONCURRENCY, uploadQueue.length); i++) {
              processNext()
@@ -2829,7 +2829,7 @@ export default {
       const wpsFileId = `project_${projectId}_doc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
       // 乐观更新：仅当文件属于当前视图（parentId匹配）时，才添加到前端列表
-      const isCurrentDir = (parentId === this.parentId) || 
+      const isCurrentDir = (parentId === this.parentId) ||
                            (parentId == null && this.parentId == null) ||
                            (String(parentId) === String(this.parentId))
 
@@ -2858,7 +2858,7 @@ export default {
           wpsFileId: wpsFileId,
           _isUploading: true // 标记为正在上传
       }
-      
+
       // 添加到本地列表，实现“立即刷新”效果
       if (isCurrentDir) {
            this.files.unshift(tempFileObj)
@@ -2965,11 +2965,11 @@ export default {
            while (offset < status.size) {
                const end = Math.min(offset + CHUNK_SIZE, status.size)
                const chunk = fileObject.slice(offset, end)
-               
+
                // Retry loop
                let retryCount = 0
                let success = false
-               
+
                while (!success && retryCount < MAX_RETRIES) {
                    try {
                        await new Promise((resolve, reject) => {
@@ -2982,16 +2982,16 @@ export default {
                    // 使用 uni.request 发送 ArrayBuffer (H5)
                    // 注意：uni.uploadFile 也可以，但 headers控制较弱，且通常用于 multipart
                    // 这里改用 request 发送二进制流
-                   
+
                    // #ifdef H5
                    const xhr = new XMLHttpRequest()
                    // 保存 XHR 以便取消
                    if (this.uploadStatusMap[fileId]) {
                       this.uploadStatusMap[fileId].xhr = xhr
                    }
-                   
+
                    xhr.open('POST', `${this.getApiBaseUrl()}/api/files/${status.wpsFileId}/upload`)
-                   
+
                    const headers = this.getAuthHeaders()
                    for (const key in headers) {
                        xhr.setRequestHeader(key, headers[key])
@@ -2999,7 +2999,7 @@ export default {
                    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
                    xhr.setRequestHeader('X-File-Offset', offset.toString())
                    xhr.setRequestHeader('X-File-Total-Size', status.size.toString()) // Notify backend of total size for RAG trigger
-                   
+
                    xhr.upload.onprogress = (e) => {
                        if (e.lengthComputable) {
                            // 块内进度
@@ -3007,7 +3007,7 @@ export default {
                            this.updateProgress(fileId, offset + chunkProgress, status.size)
                        }
                    }
-                   
+
                    xhr.onload = () => {
                        clearTimeout(timer)
                        if (xhr.status >= 200 && xhr.status < 300) {
@@ -3016,17 +3016,17 @@ export default {
                            reject(new Error(`HTTP ${xhr.status}`))
                        }
                    }
-                   
+
                    xhr.onabort = () => {
                        clearTimeout(timer)
                        reject(new Error('Aborted'))
                    }
-                   
+
                    xhr.onerror = () => {
                        clearTimeout(timer)
                        reject(new Error('Network Error'))
                    }
-                   
+
                    xhr.send(chunk)
                    // #endif
 
@@ -3038,9 +3038,9 @@ export default {
                    reject(new Error('非H5端暂不支持分片断点续传'))
                    // #endif
                })
-               
+
                success = true // Mark as success if promise resolves
-               
+
                } catch (e) {
                    console.warn(`Chunk upload failed, attempt ${retryCount + 1}/${MAX_RETRIES}`, e)
                    retryCount++
@@ -3051,12 +3051,12 @@ export default {
                    await new Promise(r => setTimeout(r, 1000 * retryCount))
                }
            } // End retry loop
-           
+
            offset = end
            this.saveUploadState()
        }
        this.completeUpload(fileId)
-       
+
        } catch (error) {
            console.error('分片上传失败:', error)
            // 显示具体的错误信息（使用模态对话框）
@@ -3073,17 +3073,17 @@ export default {
     updateProgress(fileId, uploaded, total) {
         const status = this.uploadStatusMap[fileId]
         if (!status) return
-        
+
         status.uploaded = uploaded
         status.progress = (uploaded / total) * 100
-        
+
         // Calculate speed
         const now = Date.now()
         const diffTime = (now - status.startTime) / 1000
         if (diffTime > 0) {
             status.speed = uploaded / diffTime
         }
-        
+
         this.$forceUpdate()
     },
 
@@ -3116,7 +3116,7 @@ export default {
             }
         }, 1000)
     },
-    
+
     cancelSingleUpload(fileId) {
         const status = this.uploadStatusMap[fileId]
         if (status) {
@@ -3124,11 +3124,11 @@ export default {
             if (status.xhr) {
                 status.xhr.abort()
             }
-            
+
             // Remove from map
             delete this.uploadStatusMap[fileId]
             this.saveUploadState()
-            
+
             // Optimistic UI cleanup
             // Remove from this.files if present
             const idx = this.files.findIndex(f => f.id === fileId)
@@ -3140,18 +3140,18 @@ export default {
             if (allIdx !== -1) {
                 this.allFiles.splice(allIdx, 1)
             }
-            
+
             uni.showToast({
                 title: '已取消上传',
                 icon: 'none'
             })
         }
     },
-    
+
 
     resumeUpload(fileId) {
         this.resumingFileId = fileId
-        
+
         // Strategy 1: Check In-Memory Cache (No user interaction needed)
         if (this.uploadFileObjects && this.uploadFileObjects[fileId]) {
             console.log('Resuming from cache flow', fileId)
@@ -3159,7 +3159,7 @@ export default {
             this.handleResumeFile(cachedFile)
             return
         }
-        
+
         // Strategy 2: Fallback to File Selection (If refreshed)
         // #ifdef H5
         uni.showToast({ title: '页面已刷新，请重新选择原文件', icon: 'none' })
@@ -3176,20 +3176,20 @@ export default {
             }
         })
         // #endif
-        
+
         // #ifndef H5
         uni.showToast({ title: 'App端暂不支持重新选择续传', icon: 'none' })
         // #endif
     },
-    
+
     handleResumeFile(file) {
         if (!file || !this.resumingFileId) return
-        
+
         const status = this.uploadStatusMap[this.resumingFileId]
         if (!status) return
-        
+
         // Validation: Verify if same file
-        if (file.name !== status.name || Math.abs(file.size - status.size) > 1024) { 
+        if (file.name !== status.name || Math.abs(file.size - status.size) > 1024) {
              if (file.name !== status.name) {
                  uni.showToast({ title: `请选择文件: ${status.name}`, icon: 'none' })
                  return
@@ -3199,7 +3199,7 @@ export default {
                  return
              }
         }
-        
+
         // Reset status
         this.$set(this.uploadStatusMap, this.resumingFileId, {
             ...status,
@@ -3208,11 +3208,11 @@ export default {
             errorMessage: null,
             xhr: null
         })
-        
+
         // Restart upload
         uni.showToast({ title: '正在恢复上传...', icon: 'none' })
         this.processChunkedUpload(this.resumingFileId, file)
-        
+
         this.resumingFileId = null
     },
 
@@ -3257,7 +3257,7 @@ export default {
                 this.uploadStatusMap = state
         } catch (e) {}
     },
-    
+
     // Placeholder for old method if called elsewhere
     async uploadSingleFileLegacy(projectId, file, parentId) {
        // ... kept for fallback if needed, or removed
@@ -3374,6 +3374,24 @@ $bg-grey: $uni-bg-color-grey;
 .tree-content {
   flex: 1;
   overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 3px;
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: #64748B;
+    }
+  }
 }
 
 .file-tree {
@@ -3385,6 +3403,7 @@ $bg-grey: $uni-bg-color-grey;
   display: flex;
   flex-direction: column;
   height: 100%;
+  padding-bottom: 140px;
 }
 
 .tree-list {
@@ -3409,11 +3428,11 @@ $bg-grey: $uni-bg-color-grey;
   background-color: #f8fafc;
   opacity: 0.8;
   animation: fadeIn 0.3s ease-out;
-  
+
   text {
     pointer-events: none;
   }
-  
+
   &.drop-active {
     background-color: #eff6ff;
     border-color: #3b82f6;
@@ -3444,7 +3463,7 @@ $bg-grey: $uni-bg-color-grey;
   flex-direction: column;
   padding: 40rpx 0;
   flex: 1;
-  
+
   .empty-content {
      display: flex;
      justify-content: center;
@@ -3797,7 +3816,7 @@ $bg-grey: $uni-bg-color-grey;
   flex-direction: column;
   box-shadow: 0 10px 30px rgba(0,0,0,0.2);
   /* 确保不被压缩 */
-  flex-shrink: 0; 
+  flex-shrink: 0;
 }
 
 .folder-list {
@@ -4096,6 +4115,19 @@ $bg-grey: $uni-bg-color-grey;
   transform: scale(1.2);
 }
 
+.upload-status-footer-fixed{
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border-top: 2px solid #2563eb;
+  background: linear-gradient(to bottom, #f8fafc, #ffffff);
+  box-shadow: 0 -2px 8px rgba(37, 99, 235, 0.1);
+  background-color: #fff;
+}
 
 
 
@@ -4139,9 +4171,9 @@ $bg-grey: $uni-bg-color-grey;
   padding-right: 12rpx; /* Spacing from right edge */
   opacity: 0;
   transition: opacity 0.2s;
-  
-  /* Prevent pointer events on the gradient part so clicks go through if empty, 
-     but here we want it to block text interaction, so auto is fine. 
+
+  /* Prevent pointer events on the gradient part so clicks go through if empty,
+     but here we want it to block text interaction, so auto is fine.
      The mask ensures actions are clickable. */
 }
 
