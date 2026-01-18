@@ -179,7 +179,20 @@
           :title="p.label"
           @tap="toggleLeftPane(p.key)"
         >
-          <text v-if="p.textIcon" class="rail-icon">{{ p.textIcon }}</text>
+          <view v-if="p.svgPaths" class="rail-icon-wrapper">
+            <svg class="rail-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                v-for="(path, idx) in p.svgPaths"
+                :key="idx"
+                :d="path.d"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="rail-icon-path"
+              />
+            </svg>
+          </view>
           <image
             v-else-if="p.activeIcon && p.icon"
             :src="((leftPaneKey === p.key && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned)) ? p.activeIcon : p.icon"
@@ -512,6 +525,8 @@
           <EasyVoicePane
              v-else-if="leftPaneKey === 'easyvoice'"
              @request-doc-text="handleEasyVoiceDocRequest"
+             @highlight-sentence="handleTtsHighlight"
+             @clear-highlight="handleTtsClearHighlight"
           />
           <SearchPanel
             v-else-if="leftPaneKey === 'search'"
@@ -645,7 +660,7 @@
               <view v-if="leftFiles.length === 0 && !splitMode" class="empty-workspace">
                 <view class="empty-content">
                   <image src="/static/iconmark.png" class="empty-state-img" mode="aspectFit" />
-                  <text class="empty-text">在左侧选择文件开始工作</text>
+                  <text class="empty-text">选择文件开始工作</text>
                 </view>
               </view>
 
@@ -2080,6 +2095,24 @@ export default {
                 if (this.easyVoiceImportCallback) {
                     this.easyVoiceImportCallback(text)
                 }
+                // P0: 打开文件到右侧标签页
+                
+                // Extract fileType from name if missing
+                let fileType = file.fileType
+                if (!fileType && file.name) {
+                  const ext = file.name.split('.').pop()
+                  if (ext && ext !== file.name) {
+                    fileType = ext.toLowerCase()
+                  }
+                }
+                
+                this.openFile({
+                  id: file.id,
+                  wpsFileId: file.wpsFileId,
+                  name: file.name,
+                  fileType: fileType,
+                  filePath: file.filePath
+                })
                 uni.showToast({ title: '导入成功', icon: 'success' })
             } else {
                 throw new Error(res.message || '导入失败')
@@ -2093,6 +2126,33 @@ export default {
         }
     },
 
+    // TTS Karaoke Highlighting
+    async handleTtsHighlight(sentence) {
+      console.log('[TTS Highlight] Highlighting:', sentence?.substring(0, 50) + '...')
+      
+      // Get current active WPS instance
+      const wpsInstance = this.wpsInstances.left || this.wpsInstances.right
+      if (!wpsInstance) {
+        console.warn('[TTS] No WPS instance available for highlighting')
+        return
+      }
+      
+      const { selectTextByFind } = useWpsBridge()
+      const result = await selectTextByFind(sentence, wpsInstance)
+      if (!result.success) {
+        console.warn('[TTS] Failed to highlight:', result.error)
+      }
+    },
+
+    async handleTtsClearHighlight() {
+      console.log('[TTS] Clearing highlight')
+      
+      const wpsInstance = this.wpsInstances.left || this.wpsInstances.right
+      if (!wpsInstance) return
+      
+      const { clearSelection } = useWpsBridge()
+      await clearSelection(wpsInstance)
+    },
 
     async removeMember(member) {
       if (!this.projectId) return
@@ -2165,8 +2225,8 @@ export default {
       if (isPlugin) {
         return this.leftPaneKey === file.id // Assuming plugin ID is its key
       }
-      // 普通文件在资源管理器或搜索模式下都可见
-      return this.leftPaneKey === 'files' || this.leftPaneKey === 'search'
+      // 普通文件在资源管理器、搜索或EasyVoice模式下都可见
+      return this.leftPaneKey === 'files' || this.leftPaneKey === 'search' || this.leftPaneKey === 'easyvoice'
     },
     startRenameProject() {
       this.renameProjectName = this.project.name || ''
@@ -6603,6 +6663,22 @@ $bg-white: #FFFFFF;
         border-bottom-right-radius: 2px;
     }
   }
+}
+
+.rail-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  @include flex-center;
+}
+
+.rail-icon-svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.rail-icon-path {
+  transition: stroke 0.2s ease;
 }
 
 .rail-icon-img {

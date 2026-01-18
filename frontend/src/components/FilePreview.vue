@@ -57,24 +57,19 @@
 
         <!-- 视频预览 -->
         <view v-else-if="isVideo" class="preview-video">
-          <!-- #ifdef H5 -->
+          <!-- 优先使用直接 URL 播放（支持流式传输，无需等待下载完成） -->
           <video
+            ref="videoPlayer"
             :src="fileUrl"
             controls
             autoplay
             class="preview-video-player"
             @error="handleVideoError"
-          ></video>
-          <!-- #endif -->
-          <!-- #ifndef H5 -->
-          <video
-            :src="fileUrl"
-            controls
-            autoplay
-            class="preview-video-player"
-            @error="handleVideoError"
-          ></video>
-          <!-- #endif -->
+            @loadeddata="onVideoLoaded"
+          >
+            <source :src="fileUrl" type="video/mp4">
+            您的浏览器不支持视频播放
+          </video>
         </view>
 
         <!-- 音频预览 -->
@@ -254,30 +249,63 @@ export default {
         if (!this.file || !this.fileUrl) return
 
         this.loading = true
-        try {
-           const header = getAuthHeaders() || {}
-           const response = await uni.request({
-             url: this.fileUrl,
-             method: 'GET',
-             responseType: 'arraybuffer',
-             header: header
-           })
-
-           if (response.statusCode === 200 && response.data) {
-               const blob = new Blob([response.data], { type: this.getMimeType(this.file.fileType) })
-               this.blobUrl = URL.createObjectURL(blob)
-           } else {
-               throw new Error('Load failed with status: ' + response.statusCode)
-           }
-        } catch (e) {
-            console.error('加载媒体资源失败:', e)
+        console.log('loadMediaResource: 开始加载', this.fileUrl)
+        
+        const headers = getAuthHeaders() || {}
+        console.log('loadMediaResource: 使用认证头', headers)
+        const mimeType = this.getMimeType(this.file.fileType)
+        const self = this
+        
+        // 使用 XMLHttpRequest 来正确处理大文件的 arraybuffer 响应
+        const xhr = new XMLHttpRequest()
+        xhr.open('GET', this.fileUrl, true)
+        xhr.responseType = 'blob'  // 直接获取 blob，避免 arraybuffer 大小限制
+        
+        // 设置认证头
+        Object.keys(headers).forEach(key => {
+          xhr.setRequestHeader(key, headers[key])
+        })
+        
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            const blob = xhr.response
+            console.log('loadMediaResource: 获取到数据', blob.size, 'bytes, MIME:', mimeType || blob.type)
+            
+            // 如果 blob 没有正确的 MIME 类型，重新创建一个带类型的 blob
+            let finalBlob = blob
+            if (mimeType && blob.type !== mimeType) {
+              finalBlob = new Blob([blob], { type: mimeType })
+            }
+            
+            self.blobUrl = URL.createObjectURL(finalBlob)
+            console.log('loadMediaResource: blobUrl 已创建', self.blobUrl)
+          } else {
+            console.error('loadMediaResource: 请求失败', xhr.status)
             uni.showToast({
-                title: '资源加载失败',
-                icon: 'none'
+              title: '资源加载失败: ' + xhr.status,
+              icon: 'none'
             })
-        } finally {
-            this.loading = false
+          }
+          self.loading = false
         }
+        
+        xhr.onerror = function() {
+          console.error('loadMediaResource: 网络错误')
+          uni.showToast({
+            title: '网络错误，资源加载失败',
+            icon: 'none'
+          })
+          self.loading = false
+        }
+        
+        xhr.onprogress = function(event) {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100)
+            console.log('loadMediaResource: 下载进度', percent + '%', event.loaded, '/', event.total)
+          }
+        }
+        
+        xhr.send()
     },
     getMimeType(fileType) {
         if (!fileType) return ''
@@ -293,14 +321,30 @@ export default {
             'mp4': 'video/mp4',
             'webm': 'video/webm',
             'ogg': 'video/ogg',
+            'mov': 'video/quicktime',
+            'mkv': 'video/x-matroska',
+            'avi': 'video/x-msvideo',
             'mp3': 'audio/mpeg',
-            'wav': 'audio/wav'
+            'wav': 'audio/wav',
+            'm4a': 'audio/mp4',
+            'flac': 'audio/flac',
+            'aac': 'audio/aac'
         }
         return map[type] || ''
     },
     handleEdit() {
       if (this.canEdit) {
         this.$emit('edit', this.file)
+      }
+    },
+    onVideoLoaded(e) {
+      console.log('视频加载成功，可以播放')
+      if (e.target) {
+        console.log('视频信息:', {
+          duration: e.target.duration,
+          videoWidth: e.target.videoWidth,
+          videoHeight: e.target.videoHeight
+        })
       }
     },
     handleImageError(e) {
@@ -312,8 +356,22 @@ export default {
     },
     handleVideoError(e) {
       console.error('视频加载失败:', e)
+      // 获取更详细的错误信息
+      const video = e.target
+      if (video && video.error) {
+        const errorCodes = {
+          1: 'MEDIA_ERR_ABORTED - 用户中止',
+          2: 'MEDIA_ERR_NETWORK - 网络错误',
+          3: 'MEDIA_ERR_DECODE - 解码错误（可能是编码格式不支持）',
+          4: 'MEDIA_ERR_SRC_NOT_SUPPORTED - 不支持的视频格式或编码'
+        }
+        console.error('视频错误代码:', video.error.code, errorCodes[video.error.code] || '未知错误')
+        console.error('视频错误消息:', video.error.message)
+      }
+      console.log('当前 blobUrl:', this.blobUrl)
+      console.log('视频 src:', video ? video.src : 'N/A')
       uni.showToast({
-        title: '视频播放失败',
+        title: '视频播放失败，可能是编码格式不支持',
         icon: 'none'
       })
     },
@@ -523,6 +581,16 @@ export default {
 .preview-video-player {
   width: 100%;
   height: 100%;
+}
+
+.loading-video {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #ffffff;
+  font-size: 28rpx;
 }
 
 .preview-audio {
