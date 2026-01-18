@@ -1,12 +1,12 @@
 <template>
   <div class="root-bubble-wrapper">
-      
+
     <!-- GHOST STATE: Only Show Thinking if not ready -->
     <div v-if="!isReady && bubble.thinking.status === 'thinking'" class="ghost-thinking">
-        <ThinkingCard 
-           :status="bubble.thinking.status" 
-           :duration="bubble.thinking.duration" 
-           :content="bubble.thinking.content" 
+        <ThinkingCard
+           :status="bubble.thinking.status"
+           :duration="bubble.thinking.duration"
+           :content="bubble.thinking.content"
            :start-time="bubble.thinking.startTime"
            variant="card"
         />
@@ -16,10 +16,10 @@
     <div v-else class="active-bubble-wrapper">
         <!-- 1. Thinking Card (Moved Out as Ghost) -->
         <div class="ghost-thinking-wrapper">
-             <ThinkingCard 
-               :status="bubble.thinking.status" 
-               :duration="bubble.thinking.duration" 
-               :content="bubble.thinking.content" 
+             <ThinkingCard
+               :status="bubble.thinking.status"
+               :duration="bubble.thinking.duration"
+               :content="bubble.thinking.content"
                :start-time="bubble.thinking.startTime"
                variant="ghost"
             />
@@ -31,18 +31,18 @@
 
             <!-- 3. Process Stream -->
             <div class="process-stream">
-               <ProcessCard 
-                 v-for="proc in bubble.processes" 
-                 :key="proc.id" 
-                 :process="proc" 
+               <ProcessCard
+                 v-for="proc in bubble.processes"
+                 :key="proc.id"
+                 :process="proc"
                />
             </div>
 
             <!-- 4. Artifacts -->
             <div class="artifacts-stream" v-if="bubble.artifacts.length > 0">
                <div v-for="art in bubble.artifacts" :key="art.id" class="artifact-wrapper">
-                  <ArtifactCard 
-                    :artifact="art" 
+                  <ArtifactCard
+                    :artifact="art"
                     :id="art.id"
                     :type="art.type"
                     :status="art.status"
@@ -60,10 +60,10 @@
             </div>
 
             <!-- 6. Walkthrough (Summary) - Temporarily hidden as per user request -->
-            <!-- <WalkthroughCard 
+            <!-- <WalkthroughCard
               v-if="bubble.walkthrough"
-              :content="bubble.walkthrough" 
-              :is-streaming="bubble.isStreaming" 
+              :content="bubble.walkthrough"
+              :is-streaming="bubble.isStreaming"
               :show-header="true"
               @open-tab="$emit('open-artifact-tab', $event)"
             /> -->
@@ -143,7 +143,7 @@ const isReady = computed(() => {
 }
 
 .main-content {
-  padding: 16px 20px; /* Increased padding */
+  padding: 0 16px 20px; /* Increased padding */
   font-size: 14px;
   line-height: 1.6;
   color: #2C3338; /* Gray-Dark */

@@ -1,10 +1,10 @@
 <template>
-  <div 
-    class="process-card" 
-    :class="{ 
-      'is-expanded': (isExpanded || isHeadless), 
-      'is-system-actions': isSystemActions, 
-      'headless-process': isHeadless 
+  <div
+    class="process-card"
+    :class="{
+      'is-expanded': (isExpanded || isHeadless),
+      'is-system-actions': isSystemActions,
+      'headless-process': isHeadless
     }"
   >
     <!-- Header Area -->
@@ -19,6 +19,7 @@
         <span class="title">{{ processTitle }}</span>
       </div>
       <div class="right">
+
         <div v-if="isFinished" class="status-badge success">成功</div>
         <div v-else class="status-badge processing">执行中</div>
         <div class="chevron-wrapper" :class="{ 'is-rotated': isExpanded }">
@@ -33,7 +34,7 @@
       <!-- Items List -->
       <div class="items-list" v-if="process.items && process.items.length > 0">
         <div v-for="(item, idx) in process.items" :key="idx" class="process-item">
-            
+
             <!-- CASE 1: Normal Step or File Attachment -->
             <div v-if="item.type === 'step'" class="step-container">
                 <template v-if="detectFile(item.text)">
@@ -64,11 +65,11 @@
 
             <!-- CASE 2: Nested Thinking -->
             <div v-else-if="item.type === 'thinking'" class="thinking-row">
-                <ThinkingCard 
+                <ThinkingCard
                    variant="inline"
                    :status="item.status"
                    :content="item.content"
-                   :duration="item.duration || 0" 
+                   :duration="item.duration || 0"
                    :start-time="item.startTime"
                 />
             </div>
@@ -88,7 +89,7 @@
 
         </div>
       </div>
-      
+
       <!-- Fallback for legacy 'steps' array -->
       <div class="steps-list" v-else-if="process.steps && process.steps.length > 0">
          <div class="step-item" v-for="(step, idx) in process.steps" :key="idx">
@@ -96,6 +97,8 @@
             <span class="step-text">{{ step.text }}</span>
          </div>
       </div>
+      <div style="width: 100%; border-bottom: 1px solid #ddd; margin: 0 auto; margin-top: 18px;"></div>
+
 
     </div>
   </div>
@@ -149,7 +152,7 @@ const formatToolName = (code) => {
     if (code.includes('read_document')) return '读取文档'
     if (code.includes('write_docx')) return '撰写文档'
     if (code.includes('pptx_generate')) return '生成幻灯片'
-    
+
     const match = code.match(/^([\w_.]+)\(/)
     return match ? match[1] : (code.length > 40 ? code.substring(0, 37) + '...' : code)
 }
@@ -175,9 +178,10 @@ const isSecondaryContent = (text) => {
 <style scoped>
 .process-card {
   background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
-  margin-bottom: 12px;
+  border-radius: 12px 12px 0 0;
+  /* border-bottom: 1px solid #1A5336; */
+  /* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1); */
+  /* margin-bottom: 12px; */
   overflow: hidden;
   transition: all 0.2s ease;
 }
