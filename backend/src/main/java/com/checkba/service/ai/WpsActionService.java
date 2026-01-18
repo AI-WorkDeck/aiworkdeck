@@ -41,6 +41,9 @@ public class WpsActionService {
     
     // 当前活跃的 conversationId（由 AgentOrchestrator 设置）
     private final ThreadLocal<String> currentConversationId = new ThreadLocal<>();
+
+    // ConversationID -> IsStreaming Mode
+    private final ConcurrentHashMap<String, Boolean> streamingModes = new ConcurrentHashMap<>();
     
     // WPS 操作超时时间（秒）
     private static final int WPS_ACTION_TIMEOUT = 30;
@@ -57,6 +60,18 @@ public class WpsActionService {
      */
     public String getCurrentConversationId() {
         return currentConversationId.get();
+    }
+
+    public void setStreamingMode(String conversationId, boolean enabled) {
+        if (enabled) {
+            streamingModes.put(conversationId, true);
+        } else {
+            streamingModes.remove(conversationId);
+        }
+    }
+
+    public boolean isStreamingMode(String conversationId) {
+        return streamingModes.getOrDefault(conversationId, false);
     }
 
     /**

@@ -186,8 +186,8 @@ EOF
     fi
     
     # 使用 docker-compose 启动 PPTX 服务
-    echo "📦 启动 PPTX 服务容器 (强制重新编译)..."
-    docker-compose up -d --build pptx-service
+    echo "📦 启动 PPTX 服务容器..."
+    docker-compose up -d pptx-service
     
     # 等待服务启动
     echo "⏳ 等待 PPTX 服务启动 (最多 30 秒)..."
@@ -216,9 +216,9 @@ echo ">>> [启动 1.5/5] 启动 MinerU 服务 (Docker)..."
 if [ "$DOCKER_AVAILABLE" = true ]; then
     cd "$PROJECT_ROOT"
     
-    # 使用 docker-compose 启动 MinerU 服务（强制重新编译）
-    echo "📦 启动 MinerU 服务容器 (强制重新编译)..."
-    docker-compose up -d --build mineru-service
+    # 使用 docker-compose 启动 MinerU 服务
+    echo "📦 启动 MinerU 服务容器..."
+    docker-compose up -d mineru-service
     
     # 等待服务启动（MinerU 需要更长时间来加载模型）
     echo "⏳ 等待 MinerU 服务启动 (最多 300 秒，模型加载需要时间)..."
@@ -254,7 +254,7 @@ if [ "$DOCKER_AVAILABLE" = true ]; then
     
     # 使用 docker-compose 启动 EasyVoice 服务
     echo "📦 启动 EasyVoice 服务容器..."
-    docker-compose up -d --build easyvoice
+    docker-compose up -d easyvoice
     
     # 等待服务启动
     echo "⏳ 等待 EasyVoice 服务启动 (最多 30 秒)..."

@@ -53,7 +53,12 @@
     "@dcloudio/uni-mp-xhs": "3.0.0-4080420251103001",
     "@dcloudio/uni-quickapp-webview": "3.0.0-4080420251103001",
     "animejs": "^4.2.2",
+    "entities": "^7.0.0",
+    "linkify-it": "^5.0.0",
     "markdown-it": "^14.1.0",
+    "mdurl": "^2.0.0",
+    "punycode": "^2.3.1",
+    "uc.micro": "^2.1.0",
     "vue": "^3.4.21",
     "vue-i18n": "^9.1.9"
   },

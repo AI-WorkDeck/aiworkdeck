@@ -20,6 +20,12 @@ export const LEFT_SIDEBAR_PLUGINS = [
     activeIcon: '/static/meeting_selected.png'
   },
   {
+    key: 'search',
+    label: '搜索',
+    icon: '/static/search_unselected.png',
+    activeIcon: '/static/search_selected.png'
+  },
+  {
     key: 'easyvoice',
     label: 'EasyVoice',
     icon: '/static/MPIS-TTS.png',

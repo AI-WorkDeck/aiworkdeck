@@ -110,6 +110,18 @@ public class AgentOrchestrator {
         // 清理状态
         clearCancelledState(conversationId);
     }
+    
+    /**
+     * 获取指定会话的当前恢复快照 (用于断线重连)
+     * 返回目前正在生成的流式内容
+     */
+    public String getRecoverySnapshot(String conversationId) {
+        StringBuilder sb = activeStreamContent.get(conversationId);
+        if (sb != null && sb.length() > 0) {
+            return sb.toString();
+        }
+        return null;
+    }
 
     // Correct signature accepting projectId, modelId, and userId for progress tracking
     private String executeNativeTool(dev.langchain4j.agent.tool.ToolExecutionRequest req, Long projectId, String conversationId, String modelId, Long userId) {
@@ -497,9 +509,25 @@ public class AgentOrchestrator {
             modelId
         );
         
+
+        // 实时更新当前生成的内容 (用于断线重连恢复)
+        handler.setOnToken(token -> {
+            StringBuilder sb = activeStreamContent.get(conversationId);
+            if (sb != null) {
+                sb.append(token);
+            }
+            // WPS Real-time Streaming Interception
+            if (wpsActionService.isStreamingMode(conversationId)) {
+                sseEmitterService.send(conversationId, "wps_stream_data", java.util.Map.of("content", token));
+            }
+        });
+        
         // Callback for Loop
         handler.setOnComplete(response -> {
           try {
+            // Unconditionally turn off streaming mode when generation ends
+            wpsActionService.setStreamingMode(conversationId, false);
+
             // 检查是否被取消
             if (isCancelled(conversationId)) {
                 log.info("Conversation {} was cancelled during streaming", conversationId);
@@ -832,6 +860,11 @@ public class AgentOrchestrator {
                         // ==================== WPS 通用工具 ====================
                         } else if (code.contains("wps_list_project_files")) {
                              result = wpsTools.wps_list_project_files(Long.parseLong(projectId));
+                        } else if (code.contains("wps_start_stream")) {
+                             String fileIdStr = extractStringArg(code, "fileId");
+                             // Allow null fileId (for new files)
+                             Long fileId = safeParseLong(fileIdStr, "fileId");
+                             result = wpsTools.wps_start_stream(fileId);
                         } else if (code.contains("wps_open_file")) {
                              String fileIdStr = extractStringArg(code, "fileId");
                              Long fileId = Long.parseLong(fileIdStr);
@@ -1086,12 +1119,14 @@ public class AgentOrchestrator {
             sseEmitterService.close(conversationId);
             // 清理取消状态
             clearCancelledState(conversationId);
+            activeStreamContent.remove(conversationId); // CLEANUP
           } catch (Exception e) {
             // 确保异常时也能正确结束 bubble，避免前端一直显示加载状态
             log.error("Error in onComplete callback for conversation: " + conversationId, e);
             sseEmitterService.send(conversationId, "error", "Callback Error: " + e.getMessage());
             sseEmitterService.close(conversationId);
             clearCancelledState(conversationId);
+            activeStreamContent.remove(conversationId); // CLEANUP
           }
         });
         
