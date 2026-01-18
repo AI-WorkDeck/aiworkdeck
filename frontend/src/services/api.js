@@ -1161,6 +1161,65 @@ export function sendWpsResult(conversationId, requestId, success, data, error = 
   })
 }
 
+// ==================== 标签管理 (Tag Management) ====================
+export function getProjectTags(projectId) {
+  return request({
+    url: `/api/projects/${projectId}/tags`,
+    method: 'GET'
+  })
+}
+
+export function createTag(projectId, data) {
+  return request({
+    url: `/api/projects/${projectId}/tags`,
+    method: 'POST',
+    data,
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function updateTag(projectId, tagId, data) {
+  return request({
+    url: `/api/projects/${projectId}/tags/${tagId}`,
+    method: 'PUT',
+    data,
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function deleteTag(projectId, tagId) {
+  return request({
+    url: `/api/projects/${projectId}/tags/${tagId}`,
+    method: 'DELETE'
+  })
+}
+
+export function addTagToFile(projectId, fileId, tagId) {
+  return request({
+    url: `/api/projects/${projectId}/files/${fileId}/tags`,
+    method: 'POST',
+    data: { tagId },
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function removeTagFromFile(projectId, fileId, tagId) {
+  return request({
+    url: `/api/projects/${projectId}/files/${fileId}/tags/${tagId}`,
+    method: 'DELETE'
+  })
+}
+
+// 全文搜索
+export function searchProjectContent(projectId, payload) {
+  return request({
+    url: `/api/projects/${projectId}/search`,
+    method: 'POST',
+    data: payload,
+    header: { 'Content-Type': 'application/json' }
+  })
+}
+
 export default {
   getApiBaseUrl,
   request,
@@ -1271,6 +1330,14 @@ export default {
       url: `/api/files/compare?sourceId=${sourceId}&targetId=${targetId}`,
       method: 'GET'
     })
-  }
+  },
+  // Tag Management
+  getProjectTags,
+  createTag,
+  updateTag,
+  deleteTag,
+  addTagToFile,
+  removeTagFromFile,
+  searchProjectContent
 }
 

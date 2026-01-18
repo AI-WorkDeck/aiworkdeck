@@ -1,16 +1,20 @@
 package com.checkba.controller;
 
 import com.checkba.model.entity.ProjectFile;
+import com.checkba.model.entity.Tag;
 import com.checkba.model.dto.ProjectFileBatchRequest;
+import com.checkba.service.FileTagService;
 import com.checkba.service.ProjectFileService;
 import com.checkba.service.ProjectMemberService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 项目文件管理控制器
@@ -23,6 +27,7 @@ public class ProjectFileController {
 
     private final ProjectFileService projectFileService;
     private final ProjectMemberService projectMemberService;
+    private final FileTagService fileTagService;
 
     /**
      * 获取文件列表（指定父文件夹）
@@ -43,11 +48,21 @@ public class ProjectFileController {
         checkFileTreeAccess(projectId, userId);
 
         // 如果请求完整文件树
+        List<ProjectFile> files;
         if (Boolean.TRUE.equals(tree)) {
-            return projectFileService.getFileTree(projectId);
+            files = projectFileService.getFileTree(projectId);
+        } else {
+            // 否则返回指定父文件夹下的文件
+            files = projectFileService.getFilesByParent(projectId, parentId);
         }
-        // 否则返回指定父文件夹下的文件
-        return projectFileService.getFilesByParent(projectId, parentId);
+        
+        // Populate tags
+        if (!files.isEmpty()) {
+            Map<Long, List<Tag>> tagsMap = fileTagService.getTagsByFileIds(files.stream().map(ProjectFile::getId).collect(Collectors.toList()));
+            files.forEach(f -> f.setTags(tagsMap.getOrDefault(f.getId(), Collections.emptyList())));
+        }
+        
+        return files;
     }
     
     private void checkFileTreeAccess(Long projectId, Long userId) {
@@ -355,6 +370,47 @@ public class ProjectFileController {
         public void setParentId(Long parentId) { this.parentId = parentId; }
         public Integer getSortOrder() { return sortOrder; }
         public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    }
+    
+    @Data
+    static class AddTagRequest {
+        private Long tagId;
+    }
+
+    /**
+     * 给文件打标签
+     * POST /api/projects/{projectId}/files/{fileId}/tags
+     */
+    @PostMapping("/{fileId}/tags")
+    public void addTagToFile(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @RequestBody AddTagRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        checkFileTreeAccess(projectId, userId);
+        fileTagService.addTagToFile(fileId, request.getTagId(), userId);
+    }
+
+    /**
+     * 移除文件标签
+     * DELETE /api/projects/{projectId}/files/{fileId}/tags/{tagId}
+     */
+    @DeleteMapping("/{fileId}/tags/{tagId}")
+    public void removeTagFromFile(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @PathVariable Long tagId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        checkFileTreeAccess(projectId, userId);
+        fileTagService.removeTagFromFile(fileId, tagId);
     }
 }
 

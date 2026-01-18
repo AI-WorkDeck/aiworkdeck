@@ -96,6 +96,53 @@ public class WpsTools {
         }
     }
 
+    // ==================== 流式写入 ====================
+
+    @Tool("开始实时流式写入 WPS 文档。使用此工具后，模型生成的后续内容将直接写入打开的文档中。" +
+          "**重要：调用此工具后，你必须立即开始生成文档内容，并且必须使用严格的 Markdown 格式（Markdown Heading #, ##, ### 等）。**" +
+          "不要在调用此工具后输出任何非文档内容的闲聊，直接开始输出文档标题和正文。")
+    public String wps_start_stream(
+            @P("要打开/创建并写入的文件ID (如果文件已打开可不填)") Long fileId
+    ) {
+        log.info("Tool: wps_start_stream called fileId={}", fileId);
+        try {
+            String conversationId = wpsActionService.getCurrentConversationId();
+            if (conversationId == null) {
+                return "Error: 无法获取当前会话上下文";
+            }
+
+            // 1. 如果指定了文件，先同步打开 (Wait for Ready)
+            if (fileId != null) {
+                ProjectFile file = projectFileService.getFile(fileId);
+                if (file == null) {
+                    return "Error: 文件不存在，ID=" + fileId;
+                }
+                
+                // Use executeWpsCommand to wait for frontend to report "Ready"
+                // Action: wps_open_file_sync
+                String resultJson = wpsActionService.executeWpsCommand("wps_open_file_sync", java.util.Map.of(
+                        "fileId", file.getId(),
+                        "fileName", file.getName(),
+                        "fileType", file.getFileType(),
+                        "wpsFileId", file.getWpsFileId() != null ? file.getWpsFileId() : "",
+                        "trackRevisions", true
+                ));
+                
+                if (resultJson.contains("\"error\"")) {
+                    return "Error opening file: " + resultJson;
+                }
+            }
+
+            // 2. 开启流式模式
+            wpsActionService.setStreamingMode(conversationId, true);
+
+            return "WPS 流式写入模式已激活。请立即开始生成文档内容。**务必使用 Markdown 格式 (H1=#, H2=##) 输出内容。**";
+        } catch (Exception e) {
+            log.error("Failed to start wps stream", e);
+            return "Error: " + e.getMessage();
+        }
+    }
+
     // ==================== 选区和光标操作 ====================
 
     @Tool("获取 WPS 文档中当前选区的文本内容和位置信息。用于了解用户当前光标位置和选中的文本。")

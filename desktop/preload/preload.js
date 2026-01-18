@@ -106,6 +106,11 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
   },
   utils: {
     readFile: (path) => ipcRenderer.invoke('checkba:fs-read-file', { path })
+  },
+  fs: {
+    readFile: (path) => ipcRenderer.invoke('fs:readFile', path),
+    writeFile: (path, data) => ipcRenderer.invoke('fs:writeFile', { filePath: path, data }),
+    showOpenDialog: (options) => ipcRenderer.invoke('fs:showOpenDialog', options)
   }
 })
 

@@ -492,42 +492,48 @@
           </view>
         </view>
 
-        <view v-if="!sidebarCollapsed" class="sidebar-content">
-          <FileTree
-            v-if="leftPaneKey === 'files'"
-            ref="fileTree"
-            :project-id="projectId"
-            :selection-mode="fileBatchMode"
-            :show-footer-actions="false"
-            :hidden-file-ids="stagedFileIds"
-            @checked-change="onFileTreeCheckedChange"
-            @file-select="handleFileTreeSelect"
-            @file-drag-start="onFileLinkDragStart"
-            @file-drag-end="onFileLinkDragEnd"
-            @compare-documents="onCompareDocumentsRequest"
-            @files-changed="loadStagingFiles"
-          />
-          <DdFilesPanel
-            v-else-if="leftPaneKey === 'dd-files'"
-            :project-id="projectId"
-            :current-user="currentUser"
-            @open-request="handleOpenDdRequest"
-          />
-          <EasyVoicePane
-             v-else-if="leftPaneKey === 'easyvoice'"
-             @request-doc-text="handleEasyVoiceDocRequest"
-          />
-          <PluginPane
-            v-else-if="leftPaneKey && dynamicPlugins.some(p => p.key === leftPaneKey)"
-            :url="dynamicPlugins.find(p => p.key === leftPaneKey)?.frontendEntry"
-            :plugin-id="leftPaneKey"
-          />
-          <view v-else class="sidebar-plugin-placeholder">
-            <text class="placeholder-title">{{ leftPaneTitle }}</text>
-            <text class="placeholder-desc">加载中...</text>
-          </view>
-          
-
+        <!-- 组件直接填充到 sidebar-left，无需额外 sidebar-content 包裹 -->
+        <FileTree
+          v-if="!sidebarCollapsed && leftPaneKey === 'files'"
+          ref="fileTree"
+          class="sidebar-panel-content"
+          :project-id="projectId"
+          :selection-mode="fileBatchMode"
+          :show-footer-actions="false"
+          :hidden-file-ids="stagedFileIds"
+          @checked-change="onFileTreeCheckedChange"
+          @file-select="handleFileTreeSelect"
+          @file-drag-start="onFileLinkDragStart"
+          @file-drag-end="onFileLinkDragEnd"
+          @compare-documents="onCompareDocumentsRequest"
+          @files-changed="loadStagingFiles"
+        />
+        <DdFilesPanel
+          v-else-if="!sidebarCollapsed && leftPaneKey === 'dd-files'"
+          :project-id="projectId"
+          :current-user="currentUser"
+          @open-request="handleOpenDdRequest"
+        />
+        <EasyVoicePane
+          v-else-if="!sidebarCollapsed && leftPaneKey === 'easyvoice'"
+          class="sidebar-panel-content"
+          @request-doc-text="handleEasyVoiceDocRequest"
+        />
+        <SearchPanel
+          v-else-if="!sidebarCollapsed && leftPaneKey === 'search'"
+          class="sidebar-panel-content"
+          :project-id="projectId"
+          @open-file="handleFileTreeSelect"
+        />
+        <PluginPane
+          v-else-if="!sidebarCollapsed && leftPaneKey && dynamicPlugins.some(p => p.key === leftPaneKey)"
+          class="sidebar-panel-content"
+          :url="dynamicPlugins.find(p => p.key === leftPaneKey)?.frontendEntry"
+          :plugin-id="leftPaneKey"
+        />
+        <view v-else-if="!sidebarCollapsed" class="sidebar-plugin-placeholder sidebar-panel-content">
+          <text class="placeholder-title">{{ leftPaneTitle }}</text>
+          <text class="placeholder-desc">加载中...</text>
         </view>
           
           <!-- 文件拖拽关联：浮窗落点区域 (移至侧边栏底部) -->
@@ -671,7 +677,7 @@
                       @open-new-tab="openBrowserTab($event)"
                     />
                     <WpsEditor
-                      v-else-if="isWpsFile(activeFileLeft)"
+                      v-if="isWpsFile(activeFileLeft)"
                       ref="wpsLeft"
                       :file-id="activeFileLeft.wpsFileId"
                       :file-name="activeFileLeft.name"
@@ -733,7 +739,7 @@
                       @open-new-tab="openBrowserTab($event)"
                     />
                     <WpsEditor
-                      v-else-if="isWpsFile(activeFileRight)"
+                      v-if="isWpsFile(activeFileRight)"
                       ref="wpsRight"
                       :file-id="activeFileRight.wpsFileId"
                       :file-name="activeFileRight.name"
@@ -1222,6 +1228,8 @@ import { useWpsBridge } from '@/composables/useWpsBridge.js'
 import DdFilesPanel from '@/components/DdFilesPanel.vue'
 import DdRequestEditor from '@/components/DdRequestEditor.vue'
 import ChatInterface from '@/components/ChatInterface.vue'
+import SearchPanel from '@/components/SearchPanel.vue'
+
 
 
 export default {
@@ -1244,7 +1252,9 @@ export default {
     CompareDocDialog,
     DocDiffViewer,
     EasyVoicePane,
-    FilePickerDialog
+    SearchPanel,
+    FilePickerDialog,
+
   },
   data() {
     return {
@@ -1408,6 +1418,11 @@ export default {
       rightFiles: [], // 右侧文件列表
       activeFileIdLeft: null, // 左侧当前激活ID
       activeFileIdRight: null, // 右侧当前激活ID
+
+      // Promise resolvers for file ready events (matrix storage? no just fileId)
+      // fileId -> resolve function
+      fileReadyResolvers: {},
+
       
       // Members
       projectMembers: [],
@@ -1480,7 +1495,8 @@ export default {
       dynamicPlugins: [], // Added for dynamic sidebar icons
       stagingPinned: false, // Added: keeps staging area open via sidebar button
       stagingManuallyCollapsed: false, // Track if user explicitly collapsed staging area
-      stagingFolderId: null // ID of the .stagezone folder
+      stagingFolderId: null, // ID of the .stagezone folder
+
     }
   },
   computed: {
@@ -1596,19 +1612,17 @@ export default {
     // 2. If Dragging AND Association Zone is NOT shown -> Show Staging Drop.
     // 3. User Requirement: "In absence of open WPS... position should be a staging area".
     showStagingArea() {
-       // 1. User explicitly collapsed - respect their choice
+       // Priority 1: Dragging always shows drop zone
+       if (this.fileLinkDrag.active) return true;
+
+       // Priority 2: Manual collapse overrides resident state
        if (this.stagingManuallyCollapsed) return false;
        
-       // 2. Explicitly pinned by user via sidebar button
+       // Priority 3: Resident if files exist or pinned
+       if (this.stagingFiles && this.stagingFiles.length > 0) return true;
        if (this.stagingPinned) return true;
 
-       // 3. If staging area has files, show it (resident behavior)
-       if (this.stagingFiles && this.stagingFiles.length > 0) return true;
-
-       // 4. If dragging AND Association not overriding (Auto-expand)
-       if (this.showAssociationDropZone) return false;
-       
-       return this.fileLinkDrag.active;
+       return false;
     },
     stagedFileIds() {
        return (this.stagingFiles || []).map(f => f.id);
@@ -1671,7 +1685,8 @@ export default {
     },
     moreFileActions() {
       return []
-    }
+    },
+
   },
   beforeUnmount() {
     this.teardownResponsiveListener()
@@ -2054,6 +2069,11 @@ export default {
     }
   },
   methods: {
+    isWpsFile(file) {
+      if (!file) return false
+      const ext = (file.name || '').toLowerCase().split('.').pop()
+      return ['doc', 'docx', 'wps'].includes(ext)
+    },
     // EasyVoice Integration
     async handleEasyVoiceDocRequest(callback) {
       console.log('[EasyVoice] Requesting doc text...')
@@ -2150,19 +2170,9 @@ export default {
       this.openFile(file)
     },
     isTabVisible(file) {
-      if (!file) return false
-      // dd-request 或者 fileType 为 dd 的属于尽调清单类标签
-      const isDd = file.type === 'dd-request' || file.fileType === 'dd'
-      if (isDd) {
-        return this.leftPaneKey === 'dd-files'
-      }
-      // 其他文件标签（资源管理器打开的文件、浏览器标签等）仅在资源管理器模式下显示
-      // 插件标签也只在插件模式下显示
-      const isPlugin = file.fileType === 'plugin'
-      if (isPlugin) {
-        return this.leftPaneKey === file.id // Assuming plugin ID is its key
-      }
-      return this.leftPaneKey === 'files'
+      // 所有标签页始终可见，不再根据 leftPaneKey 决定可见性
+      // 切换 sidebar（尽调、TTS、股东大会等）不会影响已打开的标签页
+      return !!file
     },
     startRenameProject() {
       this.renameProjectName = this.project.name || ''
@@ -2533,6 +2543,9 @@ export default {
         // Debug: log file names
         if (files.length > 0) {
           console.log('LoadStaging: Files:', files.map(f => f.name).join(', '))
+        } else {
+          // Auto-collapse if empty (User Request: "If user dragged all files away... auto collapse")
+          this.stagingPinned = false
         }
       } catch (e) {
         console.error('Failed to load staging files:', e)
@@ -2541,6 +2554,9 @@ export default {
     },
     async onStagingDrop(files) {
       console.log('onStagingDrop received:', files)
+      
+      // Auto-expand/keep open on drop
+      this.stagingManuallyCollapsed = false
       
       // Critical Fix: Ensure files is an array. 
       // If event object passed accidentally, return.
@@ -2804,13 +2820,8 @@ export default {
         return
       }
 
-      // 记录当前活跃 tab 到当前模式
-      const oldKey = this.leftPaneKey
-      if (oldKey) {
-        this.lastActiveIdsByMode.left[oldKey] = this.activeFileIdLeft
-        this.lastActiveIdsByMode.right[oldKey] = this.activeFileIdRight
-      }
-
+      // 切换 sidebar 时不再改变当前激活的标签页
+      // 标签页与 sidebar 解耦：用户可以在任意 sidebar 下看到所有已打开的标签页
       if (this.leftPaneKey === key) {
         this.sidebarCollapsed = !this.sidebarCollapsed
       } else {
@@ -2826,32 +2837,6 @@ export default {
             fileType: 'plugin',
             frontendEntry: plugin.frontendEntry
           })
-        }
-
-        // 恢复新模式下的活跃 tab
-        const savedLeft = this.lastActiveIdsByMode.left[key]
-        const savedRight = this.lastActiveIdsByMode.right[key]
-        
-        if (savedLeft) {
-          this.activeFileIdLeft = savedLeft
-        } else {
-          // 如果新模式没有记录，且当前 active 的 tab 在新模式下不可见，则设为 null
-          const curLeft = this.leftFiles.find(f => f.id === this.activeFileIdLeft)
-          if (curLeft && !this.isTabVisible(curLeft)) {
-            // 尝试找一个在新模式下可见的 tab
-            const firstVisible = this.leftFiles.find(f => this.isTabVisible(f))
-            this.activeFileIdLeft = firstVisible ? firstVisible.id : null
-          }
-        }
-
-        if (savedRight) {
-          this.activeFileIdRight = savedRight
-        } else {
-          const curRight = this.rightFiles.find(f => f.id === this.activeFileIdRight)
-          if (curRight && !this.isTabVisible(curRight)) {
-            const firstVisible = this.rightFiles.find(f => this.isTabVisible(f))
-            this.activeFileIdRight = firstVisible ? firstVisible.id : null
-          }
         }
       }
 
@@ -4881,6 +4866,21 @@ export default {
       console.log(`WPS Ready [${pane}]`, instance)
       this.wpsInstances[pane] = instance
       
+      // [NEW] Resolve pending open waits
+      this.$nextTick(() => {
+          const activeFile = pane === 'left' ? this.activeFileLeft : this.activeFileRight
+          if (activeFile && activeFile.id && this.fileReadyResolvers[activeFile.id]) {
+              console.log(`[ProjectOverview] Resolving pending open wait for file ${activeFile.id}`)
+              const resolve = this.fileReadyResolvers[activeFile.id]
+              delete this.fileReadyResolvers[activeFile.id]
+              resolve(true)
+          }
+      })
+
+      
+
+
+      
       // 注意：当前 WPS 环境会对未知事件名抛出 "Invalid event name"
       // fileSave/fileRename 在你的控制台里已验证会刷屏，因此这里不再监听，统一改为轮询同步文件信息。
       this.startFileInfoPolling(pane)
@@ -5437,6 +5437,34 @@ export default {
         console.log('[ProjectOverview] commandAction:', commandAction, 'requestId:', requestId)
         
         try {
+            // [NEW] Handle Synchronous Open File
+            if (commandAction === 'wps_open_file_sync') {
+                const fileId = params.fileId
+                console.log('[ProjectOverview] Handling Sync Open File:', fileId)
+                
+                // 1. Initiate Open
+                await this.handleWpsOpenFile({ fileId })
+                
+                // 2. Wait for Ready (Timeout 15s)
+                await new Promise((resolve, reject) => {
+                    const timer = setTimeout(() => {
+                        delete this.fileReadyResolvers[fileId]
+                        reject(new Error('Timeout waiting for file to open'))
+                    }, 15000)
+                    
+                    this.fileReadyResolvers[fileId] = (result) => {
+                        clearTimeout(timer)
+                        resolve(result)
+                    }
+                })
+                
+                console.log('[ProjectOverview] Sync Open File Completed')
+                
+                // 3. Return Success
+                this.reportWpsCommandResult(requestId, { success: true })
+                return
+            }
+
             // 获取当前活跃的 WPS 实例
             // FIX: 优先使用当前聚焦窗格的 WPS 实例，避免多窗口时操作错误的文档
             let wpsInstance = null
@@ -5797,6 +5825,29 @@ export default {
       } catch (e) {
         console.error('[WPS] 加载配置失败:', e)
       }
+    },
+
+
+    // [NEW] Report WPS Command Result
+    reportWpsCommandResult(requestId, result, conversationId) {
+        uni.request({
+            url: getApiBaseUrl() + '/api/ai/agent/wps-result',
+            method: 'POST',
+            header: getAuthHeaders(),
+            data: {
+                requestId,
+                conversationId,
+                success: result.success !== false,
+                data: result.data || null,
+                error: result.error || null
+            },
+            success: (res) => {
+                console.log('Reported WPS result:', res)
+            },
+            fail: (err) => {
+                console.error('Failed to report WPS result:', err)
+            }
+        })
     },
 
   // --- AI 相关 ---
@@ -7627,10 +7678,32 @@ $bg-white: #FFFFFF;
   color: $color-text-light;
 }
 
-.sidebar-content {
+/* 各面板组件的通用样式（直接填充 sidebar-left） */
+.sidebar-panel-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  min-height: 0; /* 确保 flex 子元素可以正确收缩 */
+
+  /* Custom Scrollbar */
+  &::-webkit-scrollbar {
+    width: 6px;
+    background-color: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.3);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(148, 163, 184, 0.5);
+  }
 }
 
 .resize-handle {
