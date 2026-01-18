@@ -215,7 +215,11 @@
                       v-for="(member, index) in projectMembers.slice(0, 3)"
                       :key="member.id"
                       class="stack-avatar-mini"
-                      :style="{ zIndex: 3 - index, top: (index * -4) + 'px', left: (index * 2) + 'px' }"
+                      :style="{
+                        zIndex: 3 - index,
+                        top: ((index - (Math.min(projectMembers.length, 3) - 1) / 2) * -2) + 'px',
+                        left: ((index - (Math.min(projectMembers.length, 3) - 1) / 2) * 8) + 'px'
+                      }"
                    >
                       <image v-if="member.avatarUrl" :src="member.avatarUrl" class="avatar-img" />
                       <view v-else class="avatar-placeholder">{{ member.displayName?.charAt(0) || 'U' }}</view>
@@ -9468,8 +9472,8 @@ $bg-white: #FFFFFF;
 }
 
 .members-stack-icon {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   position: relative;
   cursor: pointer;
 }

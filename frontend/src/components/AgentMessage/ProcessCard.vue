@@ -258,7 +258,7 @@ const isSecondaryContent = (text) => {
 }
 
 .process-body {
-  padding: 8px 16px 16px 16px;
+  padding: 8px 16px 6px 16px;
 }
 
 .process-item {

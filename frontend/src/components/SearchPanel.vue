@@ -2,8 +2,8 @@
   <view class="search-panel">
     <!-- Header Area -->
     <view class="search-header">
-      <text class="panel-title">搜索</text>
-      
+      <!-- <text class="panel-title">搜索</text> -->
+
       <!-- Search Input -->
       <view class="input-wrapper">
         <view class="input-box" :class="{ focused: isSearchFocused }">
@@ -34,8 +34,8 @@
       <!-- Tag Filters -->
       <view class="section-label" v-if="visibleTags && visibleTags.length > 0">按标签筛选</view>
       <view class="tags-container" v-if="visibleTags && visibleTags.length > 0">
-        <view 
-          v-for="tag in visibleTags" 
+        <view
+          v-for="tag in visibleTags"
           :key="tag.id"
           class="tag-chip"
           :class="{ selected: selectedTagIds.includes(tag.id) }"
@@ -45,13 +45,13 @@
           <text class="tag-name">{{ tag.name }}</text>
         </view>
       </view>
-    
+
       <!-- Search Stats -->
       <view class="search-stats" v-if="hasSearched">
          <text v-if="loading">正在搜索...</text>
          <text v-else-if="results.totalMatches === 0 && (!results.results || results.results.length === 0)">未找到结果</text>
          <template v-else>
-            <text class="highlight">{{ results.totalMatches }}</text> 个匹配 · 
+            <text class="highlight">{{ results.totalMatches }}</text> 个匹配 ·
             <text class="highlight">{{ results.totalFiles }}</text> 个文件
          </template>
       </view>
@@ -96,7 +96,7 @@
         </view>
       </view>
     </scroll-view>
-    
+
     <!-- Empty State -->
     <view class="empty-state" v-if="!hasSearched && !loading">
        <view class="empty-icon">
@@ -174,7 +174,7 @@ export default {
     getTagStyle(tag) {
         const isSelected = this.selectedTagIds.includes(tag.id);
         const color = tag.color || '#6C757D';
-        
+
         if (isSelected) {
             return {
                 backgroundColor: color,
@@ -198,19 +198,19 @@ export default {
             }
             return
         }
-        
+
         // Collect all tag IDs present in the result files
         const relevantTagIds = new Set()
-        
+
         // Also always include currently selected tags, so they don't disappear
         this.selectedTagIds.forEach(id => relevantTagIds.add(id))
-        
+
         fileResults.forEach(file => {
             if (file.tags) {
                 file.tags.forEach(tag => relevantTagIds.add(tag.id))
             }
         })
-        
+
         // Filter allProjectTags
         this.visibleTags = this.allProjectTags.filter(t => relevantTagIds.has(t.id))
     },
@@ -238,12 +238,12 @@ export default {
           tagIds: this.selectedTagIds,
           fileTypes: ['docx', 'pdf', 'pptx', 'xlsx', 'txt', 'md'] // Explicitly support these types
         })
-        
+
         this.results = response
-        
+
         // Update visible tags based on results
         this.updateVisibleTags(response.results)
-        
+
         // Expand all by default
         this.collapsedFiles = {}
       } catch (e) {
@@ -337,7 +337,7 @@ $border-color: #E9ECEF;
 }
 
 .search-header {
-    padding: 20px 16px 12px;
+    padding: 16px 12px 12px;
     background-color: $gray-pale;
     border-bottom: 1px solid transparent; /* Prepare for sticky behavior if needed */
 }
@@ -355,7 +355,7 @@ $border-color: #E9ECEF;
 .input-wrapper {
   position: relative;
   margin-bottom: 16px;
-  
+
   .input-box {
     display: flex;
     align-items: center;
@@ -365,7 +365,7 @@ $border-color: #E9ECEF;
     padding: 6px 10px;
     transition: all 0.2s ease;
     box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-    
+
     &.focused {
       border-color: $king-mint;
       box-shadow: 0 0 0 3px rgba($king-mint, 0.15);
@@ -386,12 +386,12 @@ $border-color: #E9ECEF;
       background: transparent;
       height: 20px;
       min-width: 0;
-      
+
       &::placeholder {
           color: #adb5bd;
       }
     }
-    
+
     .clear-icon {
         padding: 4px;
         cursor: pointer;
@@ -415,7 +415,7 @@ $border-color: #E9ECEF;
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 16px;
-  
+
   .tag-chip {
     padding: 4px 10px;
     border-radius: 100px; /* Pill shape */
@@ -424,16 +424,16 @@ $border-color: #E9ECEF;
     transition: all 0.15s ease;
     font-size: 11px;
     font-weight: 500;
-    
+
     &:hover {
       transform: translateY(-1px);
       box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    
+
     &:active {
         transform: translateY(0);
     }
-    
+
     .tag-name {
         line-height: 1.2;
     }
@@ -446,7 +446,7 @@ $border-color: #E9ECEF;
   display: flex;
   align-items: center;
   gap: 4px;
-  
+
   .highlight {
       color: $king-forest;
       font-weight: 600;
@@ -465,7 +465,7 @@ $border-color: #E9ECEF;
     margin-bottom: 8px;
     border-top: 1px solid transparent;
     border-bottom: 1px solid transparent;
-    
+
     &:first-child {
         border-top: 1px solid $border-color;
     }
@@ -477,14 +477,14 @@ $border-color: #E9ECEF;
 .file-header {
   display: flex;
   align-items: center;
-  padding: 8px 16px;
+  padding: 8px 12px;
   cursor: pointer;
   transition: background-color 0.1s;
-  
+
   &:hover {
     background-color: $gray-pale;
   }
-  
+
   .arrow-icon {
     display: flex;
     align-items: center;
@@ -494,28 +494,28 @@ $border-color: #E9ECEF;
     width: 16px;
     height: 16px;
     transition: transform 0.2s;
-    
+
     &.expanded {
       transform: rotate(-90deg);
     }
-    
+
     &.hidden {
         visibility: hidden;
     }
   }
-  
+
   .file-icon-wrapper {
       margin-right: 10px;
       display: flex;
       align-items: center;
   }
-  
+
   .file-info {
       flex: 1;
       min-width: 0;
       display: flex;
       flex-direction: column;
-      
+
       .file-name {
           font-size: 13px;
           font-weight: 500;
@@ -524,13 +524,13 @@ $border-color: #E9ECEF;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          
+
           &:hover {
               color: $king-forest;
               text-decoration: underline;
           }
       }
-      
+
       .file-path {
           font-size: 10px;
           color: #999;
@@ -539,7 +539,7 @@ $border-color: #E9ECEF;
           text-overflow: ellipsis;
       }
   }
-  
+
   .badge {
     background-color: $gray-light;
     color: $gray-medium;
@@ -559,31 +559,31 @@ $border-color: #E9ECEF;
 
 .match-item {
   display: flex;
-  padding: 4px 16px 4px 44px; /* Indented alignment */
+  padding: 4px 12px 4px 30px; /* Indented alignment */
   cursor: pointer;
   position: relative;
   font-family: "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
-  
+
   &:hover {
     background-color: rgba($king-mint, 0.05);
     .match-highlight {
         background-color: rgba($king-mint, 0.3);
     }
   }
-  
+
   .indent-line {
       position: absolute;
-      left: 23px; /* Align with file icon center roughly */
+      left: 18px; /* Align with file icon center roughly */
       top: 0;
       bottom: 0;
       width: 1px;
       background-color: $border-color;
   }
-  
+
   .line-number {
       font-size: 10px;
       color: #adb5bd;
-      width: 24px;
+      width: 10px;
       text-align: right;
       margin-right: 12px;
       flex-shrink: 0;
@@ -596,7 +596,7 @@ $border-color: #E9ECEF;
      white-space: pre;
      overflow: hidden;
      text-overflow: ellipsis;
-     
+
      .match-highlight {
          background-color: rgba($king-mint, 0.15);
          color: $king-forest;
@@ -613,12 +613,12 @@ $border-color: #E9ECEF;
    align-items: center;
    justify-content: center;
    padding: 60px 20px;
-   
+
    .empty-icon {
        margin-bottom: 16px;
        color: $gray-light;
    }
-   
+
    .empty-text {
       color: #adb5bd;
       font-size: 13px;
