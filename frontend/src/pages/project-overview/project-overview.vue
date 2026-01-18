@@ -509,6 +509,11 @@
              v-else-if="leftPaneKey === 'easyvoice'"
              @request-doc-text="handleEasyVoiceDocRequest"
           />
+          <SearchPanel
+            v-else-if="leftPaneKey === 'search'"
+            :project-id="projectId"
+            @open-file="handleSearchOpenFile"
+          />
           <PluginPane
             v-else-if="leftPaneKey && dynamicPlugins.some(p => p.key === leftPaneKey)"
             :url="dynamicPlugins.find(p => p.key === leftPaneKey)?.frontendEntry"
@@ -1158,6 +1163,7 @@ import FileStagingArea from '@/components/FileStagingArea.vue'
 import PluginPane from '@/components/PluginPane.vue' // Added
 import EasyVoicePane from '@/components/EasyVoicePane.vue'
 import ClipboardPanel from '@/components/ClipboardPanel.vue'
+import SearchPanel from '@/components/SearchPanel.vue'
 import InviteMemberDialog from '@/components/InviteMemberDialog.vue'
 import CompareDocDialog from '@/components/CompareDocDialog.vue'
 import DocDiffViewer from '@/components/DocDiffViewer.vue'
@@ -1236,7 +1242,8 @@ export default {
     CompareDocDialog,
     DocDiffViewer,
     EasyVoicePane,
-    FilePickerDialog
+    FilePickerDialog,
+    SearchPanel
   },
   data() {
     return {
@@ -4619,6 +4626,19 @@ export default {
     handleFileTreeSelect(file) {
       if (!file || file.isFolder) return
       this.openFile(file)
+    },
+
+    // Handle file open from SearchPanel
+    handleSearchOpenFile(file) {
+      if (!file) return
+      console.log('[project-overview] Open file from search:', file)
+      this.openFile({
+        id: file.id,
+        wpsFileId: file.wpsFileId,
+        name: file.name,
+        fileType: file.fileType,
+        filePath: file.filePath
+      })
     },
 
     // Handle file open request from ChatInterface (file changes popup)
