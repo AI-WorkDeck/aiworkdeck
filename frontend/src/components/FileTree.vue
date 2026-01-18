@@ -131,16 +131,16 @@
                   <view v-if="!targetFileForTags || !targetFileForTags.tags || targetFileForTags.tags.length === 0" class="empty-tags">
                      <text style="color: #6C757D; font-size: 13px;">暂无标签</text>
                   </view>
-                  <TagChip 
-                    v-for="tag in (targetFileForTags ? targetFileForTags.tags : [])" 
-                    :key="tag.id" 
-                    :tag="tag" 
+                  <TagChip
+                    v-for="tag in (targetFileForTags ? targetFileForTags.tags : [])"
+                    :key="tag.id"
+                    :tag="tag"
                     :removable="true"
                     @remove="handleRemoveTag(tag)"
                   />
               </view>
            </view>
-           
+
            <view class="form-group">
               <text class="form-label">添加标签</text>
               <TagSelector
@@ -375,7 +375,7 @@
           @dragend="handleDragEnd"
         >
           <!-- Tag Strip (Vertical color bar on left) -->
-          <view 
+          <view
             v-if="!item.isFolder && item.tags && item.tags.length"
             class="tag-strip"
             :style="getTagStripStyle(item.tags)"
@@ -512,7 +512,7 @@
           @touchend="handleTouchEnd($event, index)"
         >
           <!-- Tag Strip (Vertical color bar on left) -->
-          <view 
+          <view
             v-if="!item.isFolder && item.tags && item.tags.length"
             class="tag-strip"
             :style="getTagStripStyle(item.tags)"
@@ -637,9 +637,9 @@
     </view> <!-- Close tree-content -->
 
     <!-- 独立于 Footer 的上传进度显示 -->
-    <view 
-        v-if="isBatchUploading || Object.keys(uploadStatusMap).length > 0" 
-        class="upload-status-footer-fixed" 
+    <view
+        v-if="isBatchUploading || Object.keys(uploadStatusMap).length > 0"
+        class="upload-status-footer-fixed"
         style="padding: 10px; border-top: 1px solid #eee; background: white; position: relative; flex-shrink: 0;"
         @mouseenter="showUploadDetails = true"
         @mouseleave="showUploadDetails = false"
@@ -649,8 +649,8 @@
             <view class="popover-header" style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; background: #f9fafb;">
                 <text style="font-size: 12px; font-weight: bold; color: #333;">上传列表 ({{ Object.keys(uploadStatusMap).length }})</text>
                 <view style="display: flex; align-items: center; gap: 12px;">
-                    <text 
-                        style="font-size: 11px; color: #ef4444; cursor: pointer; padding: 2px 8px; border: 1px solid #fecaca; border-radius: 4px; background: #fef2f2;" 
+                    <text
+                        style="font-size: 11px; color: #ef4444; cursor: pointer; padding: 2px 8px; border: 1px solid #fecaca; border-radius: 4px; background: #fef2f2;"
                         @tap.stop="cancelAllUploads"
                     >取消全部</text>
                     <text style="font-size: 12px; color: #666; cursor: pointer;" @tap.stop="showUploadDetails = false">▼</text>
@@ -691,7 +691,7 @@
 
         <view class="upload-status-content" style="display: flex; align-items: center; gap: 12px;">
           <!-- 线性进度条 -->
-          <view style="flex: 1; max-width: 200px;">
+          <!-- <view style="flex: 1; max-width: 200px;">
             <view style="display: flex; justify-content: space-between; margin-bottom: 4px;">
               <text style="font-size: 13px; font-weight: 600; color: #1e40af;">正在上传文件...</text>
               <text style="font-size: 13px; font-weight: 600; color: #2563eb;">{{ Math.floor(globalUploadProgress || 0) }}%</text>
@@ -705,7 +705,7 @@
               <text style="font-size: 11px; color: #6b7280;">{{ uploadedCount }} / {{ totalUploadCount }} 文件</text>
               <text v-if="uploadSpeed" style="font-size: 11px; color: #6b7280;">{{ formatSpeed(uploadSpeed) }}</text>
             </view>
-          </view>
+          </view> -->
           <!-- 圆形进度条 -->
           <CircularProgress
             :percentage="globalUploadProgress || 0"
@@ -719,8 +719,8 @@
              <text class="status-title" style="font-size: 12px; color: #333;">正在上传... ({{ uploadedCount }}/{{ totalUploadCount }})</text>
              <text class="status-detail" v-if="globalUploadProgress !== null" style="font-size: 10px; color: #666;">{{ Math.floor(globalUploadProgress) }}%</text>
           </view>
-          <text 
-            style="font-size: 11px; color: #ef4444; cursor: pointer; padding: 4px 10px; border: 1px solid #fecaca; border-radius: 4px; background: #fef2f2; flex-shrink: 0;" 
+          <text
+            style="font-size: 11px; color: #ef4444; cursor: pointer; padding: 4px 10px; border: 1px solid #fecaca; border-radius: 4px; background: #fef2f2; flex-shrink: 0;"
             @tap.stop="cancelAllUploads"
           >取消全部</text>
         </view>
@@ -809,10 +809,10 @@ import FileTypeIcon from '@/components/FileTypeIcon.vue'
 import TagChip from '@/components/TagChip.vue'
 import TagSelector from '@/components/TagSelector.vue'
 import TagManager from '@/components/TagManager.vue'
-import { 
-  getProjectTags, 
-  addTagToFile, 
-  removeTagFromFile, 
+import {
+  getProjectTags,
+  addTagToFile,
+  removeTagFromFile,
   createTag
 } from '@/services/api.js'
 
@@ -942,7 +942,7 @@ export default {
       },
       // Global Drag Support
       isAnyDragging: false,
-      
+
       // Tag Management
       showTagManager: false,
       showTagEditDialog: false,
@@ -1148,7 +1148,7 @@ export default {
     }
     this.restoreUploadState()
     this.refreshProjectTags() // Tag Management
-    
+
     // Listen for global drag events to show/hide root drop zone
     uni.$on('file-drag-start', () => { this.isAnyDragging = true })
     uni.$on('file-drag-end', () => { this.isAnyDragging = false })
@@ -2671,7 +2671,7 @@ export default {
       this.selectedUploadParent = this.tempSelectedParent
       this.showFolderSelector = false
     },
-    
+
     // Tag Methods
     async refreshProjectTags() {
       if (!this.projectId) return
@@ -2702,19 +2702,19 @@ export default {
        // payload can be string (legacy) or { name, color } object
        const tagName = typeof payload === 'string' ? payload : payload?.name
        const tagColor = typeof payload === 'object' ? payload?.color : '#5BD197'
-       
+
        if (!this.targetFileForTags || !tagName) return
        try {
          // 1. Create Tag
          const res = await createTag(this.projectId, { name: tagName, color: tagColor })
          const newTag = res.data || res
-         
+
          // 2. Refresh available tags
          await this.refreshProjectTags()
-         
+
          // 3. Add to file
          await this.handleAddTag(newTag)
-         
+
        } catch (e) {
          console.error(e)
          uni.showToast({ title: 'Failed to create tag', icon: 'none' })
@@ -2727,7 +2727,7 @@ export default {
          // Optimistic update
          const idx = this.targetFileForTags.tags.findIndex(t => t.id === tag.id)
          if (idx > -1) this.targetFileForTags.tags.splice(idx, 1)
-         
+
        } catch (e) {
          uni.showToast({ title: 'Failed to remove tag', icon: 'none' })
        }
@@ -2742,43 +2742,43 @@ export default {
       if (!tags || tags.length === 0) {
         return { display: 'none' }
       }
-      
+
       // Sort tags by spectral position (hue)
       const sortedTags = this.sortTagsBySpectrum(tags)
       const colors = sortedTags.map(t => t.color || '#5BD197')
-      
+
       if (colors.length === 1) {
         return { background: colors[0] }
       }
-      
+
       // Generate equal segments for gradient
       const segments = colors.map((color, i) => {
         const start = (i / colors.length) * 100
         const end = ((i + 1) / colors.length) * 100
         return `${color} ${start}%, ${color} ${end}%`
       }).join(', ')
-      
+
       return { background: `linear-gradient(to bottom, ${segments})` }
     },
-    
+
     /**
      * Sorts tags by their color's hue value (spectral order).
      * Red -> Orange -> Yellow -> Green -> Cyan -> Blue -> Purple
      */
     sortTagsBySpectrum(tags) {
       if (!tags || tags.length <= 1) return tags
-      
+
       const getHue = (hexColor) => {
         if (!hexColor) return 180 // Default to cyan
         const hex = hexColor.replace('#', '')
         const r = parseInt(hex.substring(0, 2), 16) / 255
         const g = parseInt(hex.substring(2, 4), 16) / 255
         const b = parseInt(hex.substring(4, 6), 16) / 255
-        
+
         const max = Math.max(r, g, b)
         const min = Math.min(r, g, b)
         let h = 0
-        
+
         if (max === min) {
           h = 0
         } else if (max === r) {
@@ -2788,11 +2788,11 @@ export default {
         } else {
           h = 60 * (((r - g) / (max - min)) + 4)
         }
-        
+
         if (h < 0) h += 360
         return h
       }
-      
+
       return [...tags].sort((a, b) => getHue(a.color) - getHue(b.color))
     },
 
@@ -3421,11 +3421,11 @@ export default {
             })
         }
     },
-    
+
     cancelAllUploads() {
         const fileIds = Object.keys(this.uploadStatusMap)
         if (fileIds.length === 0) return
-        
+
         fileIds.forEach(fileId => {
             const status = this.uploadStatusMap[fileId]
             if (status) {
@@ -3444,14 +3444,14 @@ export default {
                 }
             }
         })
-        
+
         // Clear all upload status
         this.uploadStatusMap = {}
         this.isBatchUploading = false
         this.batchUploadTotalSize = 0
         this.batchUploadFinishedSize = 0
         this.saveUploadState()
-        
+
         uni.showToast({
             title: '已取消全部上传',
             icon: 'none'
@@ -3578,16 +3578,11 @@ export default {
     },
     // 统一的错误提示函数
     showErrorModal(message, title = '操作失败') {
-      uni.showModal({
-        title: title,
-        content: message,
-        showCancel: false,
-        confirmText: '我知道了',
-        success: (res) => {
-          if (res.confirm) {
-            console.log('用户点击了确认')
-          }
-        }
+      // 使用 Toast 替代 Modal，无需手动确认
+      uni.showToast({
+        title: message,
+        icon: 'none',
+        duration: 3000
       })
     },
     getFileTypeFromName(fileName) {
