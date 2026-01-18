@@ -2161,7 +2161,8 @@ export default {
       if (isPlugin) {
         return this.leftPaneKey === file.id // Assuming plugin ID is its key
       }
-      return this.leftPaneKey === 'files'
+      // 普通文件在资源管理器或搜索模式下都可见
+      return this.leftPaneKey === 'files' || this.leftPaneKey === 'search'
     },
     startRenameProject() {
       this.renameProjectName = this.project.name || ''
