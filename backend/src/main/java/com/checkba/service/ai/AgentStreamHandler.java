@@ -38,15 +38,32 @@ public class AgentStreamHandler implements StreamingResponseHandler<AiMessage> {
         this.modelId = modelId;
     }
 
+    // Callback for each token generated (for real-time tracking)
+    private java.util.function.Consumer<String> onToken;
+
+    public void setOnToken(java.util.function.Consumer<String> onToken) {
+        this.onToken = onToken;
+    }
+
     @Override
     public void onNext(String token) {
         log.trace("Token for {}: [{}]", conversationId, token);
-        fullContentBuilder.append(token);
-        buffer.append(token);
-        processBuffer();
+        if (token != null) {
+            // Notify token callback for real-time state tracking
+            if (onToken != null) {
+                onToken.accept(token);
+            }
+            
+            processBuffer(token);
+        }
     }
     
-    private void processBuffer() {
+    private void processBuffer(String token) {
+        // Accumulate full response for final saving
+        fullContentBuilder.append(token);
+        
+        buffer.append(token);
+        
         String content = buffer.toString();
         
         // 1. Check for complete <bubble_type ... /> tag

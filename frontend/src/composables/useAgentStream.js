@@ -1,8 +1,10 @@
 import { ref, reactive, nextTick } from 'vue'
 import { getApiBaseUrl, getConversationMetadata } from '@/services/api.js'
 import { getSessionId } from '@/utils/auth.js'
+import { useWpsBridge } from './useWpsBridge.js'
 
 export function useAgentStream() {
+    const wpsBridge = useWpsBridge()
     // STATE: List of all bubbles (history + active)
     const bubbles = ref([])
     const isConnected = ref(false)
@@ -359,6 +361,13 @@ export function useAgentStream() {
             } catch (e) {
                 console.error('Failed to parse title_update', e)
             }
+        } else if (evt === 'wps_stream_data') {
+            try {
+                const d = JSON.parse(dataStr)
+                wpsBridge.handleWpsStreamData(d.content || "")
+            } catch (e) {
+                console.error('Failed to handle wps_stream_data', e)
+            }
         } else if (evt === 'cancelled') {
             // 处理取消事件
             console.log('[SSE] Received cancelled event')
@@ -482,6 +491,53 @@ export function useAgentStream() {
                 }
             } catch (e) {
                 console.error('Failed to parse heartbeat', e)
+            }
+        }
+
+        // Handle state recovery (reconnection)
+        if (evt === 'state_recovery') {
+            try {
+                const d = JSON.parse(dataStr)
+                console.log('[SSE] State Recovery:', d.content.length, 'chars')
+
+                // 1. Ensure we have an active Assistant Bubble
+                // Check if last bubble is Assistant
+                let bubble = bubbles.value.length > 0 ? bubbles.value[bubbles.value.length - 1] : null
+
+                // If last bubble is USER, create new ASSISTANT bubble
+                if (!bubble || bubble.role !== 'ASSISTANT') {
+                    console.log('[AgentStream] Recovery: Creating new assistant bubble')
+                    bubble = createAssistantBubble()
+                    bubbles.value.push(bubble)
+                } else {
+                    console.log('[AgentStream] Recovery: reusing last assistant bubble')
+                    // Optional: Clear content if we want to re-parse from scratch to ensure consistency
+                    // But maybe the DB already loaded some? 
+                    // To be safe and avoid duplication/conflict, let's RESET this bubble's content
+                    // and let the snapshot re-fill it.
+                    bubble.content = ''
+                    bubble.thinking = { status: 'idle', content: '', duration: 0, startTime: 0, endTime: 0 }
+                    bubble.processes = []
+                    bubble.artifacts = []
+                    bubble.walkthrough = ''
+                }
+
+                currentAssistantBubble.value = bubble
+                currentAssistantBubble.value.isStreaming = true
+                isStreaming.value = true
+
+                // 2. Reset Parser State
+                resetParser()
+
+                // 3. Process the full snapshot
+                // Treat it like a huge chunk of text
+                if (d.content) {
+                    parserBuffer += d.content
+                    parseTags()
+                }
+
+            } catch (e) {
+                console.error('Failed to parse state_recovery', e)
             }
         }
 

@@ -1,0 +1,117 @@
+server:
+  port: 9696
+
+spring:
+  application:
+    name: checkba-backend
+  datasource:
+    # PostgreSQL with pgvector
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/checkba
+    username: checkba
+    password: checkba123
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        types:
+          print:
+            banner: false
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 20GB
+      max-request-size: 20GB
+      file-size-threshold: 1GB
+
+# 外部服务配置
+external:
+  qichacha:
+    base-url: https://api.qichacha.com
+    key: ***REMOVED***
+    secret: ***REMOVED***
+  wps:
+    app-id: AK20251215TTJNYB
+    app-secret: ***REMOVED***
+    callback-base-url: https://kingide500.cpolar.top  # 使用 cpolar 内网穿透地址，供 WPS 回调使用
+  tushare:
+    base-url: http://api.tushare.pro
+    token: ***REMOVED***
+  # PPTX 生成服务配置（banana-slides Docker 容器）
+  pptx-service:
+    # 服务地址（Docker 容器映射端口）
+    base-url: http://localhost:5001
+    # 请求超时时间（秒）- 生成 PPT 可能需要较长时间
+    timeout: 120
+
+# AI 大模型配置（供应商可切换）
+ai:
+  model:
+    # 当前启用的提供商：ollama（本地）或 gemini（Google 云端）
+    provider: open-router
+    gemini:
+      # 建议通过环境变量 GEMINI_API_KEY 注入，避免写死在配置文件
+      api-key: ***REMOVED***
+      # 默认使用官方当前推荐的通用文本模型，可按需调整为 gemini-2.5-flash 等
+      model-name: gemini-2.5-flash
+      api-base-url: https://generativelanguage.googleapis.com/v1beta
+      timeout: 60s
+    ollama:
+      # 与当前本地 Ollama 配置保持一致，方便一键切换回本地模型
+      base-url: http://localhost:11434
+      model-name: qwen3-vl:8b
+      temperature: 0.7
+      timeout: 300s
+    open-router:
+      # OpenRouter API Key (必填)
+      api-key: ***REMOVED***
+      base-url: https://openrouter.ai/api/v1
+      default-model: google/gemini-2.0-flash-exp:free
+      timeout: 120s
+
+# 文件存储配置
+storage:
+  # 存储类型：local（本地文件系统）或 oss（对象存储）
+  type: local
+  # 本地存储配置
+  local:
+    # 存储根目录（相对于项目根目录或绝对路径）
+    root-path: data
+    # 模板文件路径（用于新建文档的初始内容）
+    template-path: docs/template.docx
+  # 对象存储配置（当 type=oss 时生效）
+  oss:
+    # 对象存储提供商：aliyun（阿里云OSS）、aws（AWS S3）、minio（MinIO）
+    provider: aliyun
+    # 访问密钥ID
+    access-key-id: YOUR_ACCESS_KEY_ID
+    # 访问密钥Secret
+    access-key-secret: YOUR_ACCESS_KEY_SECRET
+    # 存储桶名称
+    bucket-name: your-bucket-name
+    # 存储桶所在区域（例如：oss-cn-hangzhou、us-east-1）
+    region: oss-cn-hangzhou
+    # 自定义端点（可选，用于MinIO或私有部署）
+    endpoint: 
+    # 文件存储路径前缀（可选，例如：wps-files/）
+    path-prefix: wps-files/
+    # 是否使用HTTPS
+    use-https: true
+    # CDN域名（可选，用于加速访问）
+    cdn-domain:
+
+# LangChain4j Ollama Configuration
+langchain4j:
+  ollama:
+    chat-model:
+      base-url: http://localhost:11434
+      model-name: qwen3-vl:8b
+      temperature: 0.7
+      timeout: 300s
+    embedding-model:
+      base-url: http://localhost:11434
+      model-name: nomic-embed-text
+      timeout: 300s
