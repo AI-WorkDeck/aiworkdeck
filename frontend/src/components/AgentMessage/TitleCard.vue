@@ -21,5 +21,6 @@ defineProps({
   font-size: 16px; /* 稍微减小字体 */
   font-weight: 600;
   color: #2c3e50;
+  padding: 8px 8px;
 }
 </style>

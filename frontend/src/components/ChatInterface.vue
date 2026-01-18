@@ -441,11 +441,11 @@
            </view>
 
            <!-- Right: Token Usage -->
-           <view v-if="tokenUsage && tokenUsage.totalTokens > 0" class="status-bar-right">
+           <!-- <view v-if="tokenUsage && tokenUsage.totalTokens > 0" class="status-bar-right">
                <text class="token-label">Tokens</text>
                <text class="token-value">{{ tokenUsage.totalTokens.toLocaleString() }}</text>
                <text class="token-detail">({{ tokenUsage.promptTokens.toLocaleString() }} / {{ tokenUsage.completionTokens.toLocaleString() }})</text>
-           </view>
+           </view> -->
        </view>
        <view class="input-card">
           <view v-if="isDragging" class="drop-overlay">
