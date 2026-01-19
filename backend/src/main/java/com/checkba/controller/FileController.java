@@ -81,7 +81,7 @@ public class FileController {
             
             // 如果没找到，尝试按 WPS File ID 查找 (Fallback)
             if (projectFileOpt.isEmpty()) {
-                projectFileOpt = projectFileRepository.findByWpsFileId(fileId);
+                projectFileOpt = projectFileRepository.findByWpsFileId(fileId).stream().findFirst();
                 log.info("[FileDownload] 按wpsFileId查找: wpsFileId={}, found={}", fileId, projectFileOpt.isPresent());
             }
             
@@ -217,7 +217,7 @@ public class FileController {
         InputStream inputStream = null;
         try {
             // 0. 检查项目总大小限制 (20GB)
-            Optional<ProjectFile> projectFileOpt = projectFileRepository.findByWpsFileId(fileId);
+            Optional<ProjectFile> projectFileOpt = projectFileRepository.findByWpsFileId(fileId).stream().findFirst();
             if (projectFileOpt.isPresent()) {
                 Long projectId = projectFileOpt.get().getProjectId();
                 Long totalSize = projectFileRepository.sumSizeByProjectId(projectId); // Need to add this method to repo

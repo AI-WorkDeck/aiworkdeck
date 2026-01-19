@@ -80,7 +80,7 @@ public class WpsController {
         
         // 根据 wpsFileId 查询真实的文件信息
         log.info("[WPS-getFileInfo] 开始查询文件: wpsFileId={}", idValue);
-        ProjectFile projectFile = projectFileRepository.findByWpsFileId(idValue).orElse(null);
+        ProjectFile projectFile = projectFileRepository.findByWpsFileId(idValue).stream().findFirst().orElse(null);
         if (projectFile == null) {
             log.warn("[WPS-getFileInfo] 未找到文件记录: wpsFileId={}", idValue);
         } else {
@@ -187,7 +187,7 @@ public class WpsController {
         try {
             // 确定文件存储路径（逻辑同 FileController）
             String path = fileId;
-            Optional<ProjectFile> projectFileOpt = projectFileRepository.findByWpsFileId(fileId);
+            Optional<ProjectFile> projectFileOpt = projectFileRepository.findByWpsFileId(fileId).stream().findFirst();
             log.info("[WPS-getDownloadUrl] 查找文件记录: wpsFileId={}, found={}", fileId, projectFileOpt.isPresent());
             
             if (projectFileOpt.isPresent()) {
@@ -551,7 +551,7 @@ public class WpsController {
         long currentTime = System.currentTimeMillis() / 1000;
         
         // 根据 wpsFileId 查询真实的文件信息
-        ProjectFile projectFile = projectFileRepository.findByWpsFileId(idValue).orElse(null);
+        ProjectFile projectFile = projectFileRepository.findByWpsFileId(idValue).stream().findFirst().orElse(null);
         
         // 使用真实的文件名，如果查询不到则使用默认值
         String fileName = "文档.docx";
@@ -632,7 +632,7 @@ public class WpsController {
 
         if (fileId != null && newName != null && !newName.trim().isEmpty()) {
             String idValue = fileId.trim();
-            ProjectFile projectFile = projectFileRepository.findByWpsFileId(idValue).orElse(null);
+            ProjectFile projectFile = projectFileRepository.findByWpsFileId(idValue).stream().findFirst().orElse(null);
             
             if (projectFile != null) {
                 String oldName = projectFile.getName();
@@ -669,7 +669,7 @@ public class WpsController {
         long now = System.currentTimeMillis() / 1000;
 
         // 根据 wpsFileId 查询真实的文件信息
-        ProjectFile projectFile = projectFileRepository.findByWpsFileId(fileId).orElse(null);
+        ProjectFile projectFile = projectFileRepository.findByWpsFileId(fileId).stream().findFirst().orElse(null);
         
         String fileName = "文档.docx";
         Long fileSize = 1024L;

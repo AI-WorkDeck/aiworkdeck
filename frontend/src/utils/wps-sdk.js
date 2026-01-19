@@ -143,6 +143,7 @@ export async function initWpsEditor(options) {
         wordOptions: {
             isShowAi: false,
             isShowSmartMenu: false, // 尝试关闭智能菜单（可能包含 AI）
+            isShowMiniToolBar: false, // 尝试关闭迷你工具栏（选区后出现的浮窗），避免触发 getAiPrivilege
         },
         // 通过 commandBars 隐藏 AI 相关按钮（如果有）
         commandBars: [
@@ -152,6 +153,10 @@ export async function initWpsEditor(options) {
             },
             {
                 cmbId: "SmartMenu",
+                attributes: { visible: false },
+            },
+            {
+                cmbId: "TextMenu", // 选区菜单
                 attributes: { visible: false },
             },
         ],
