@@ -3287,6 +3287,7 @@ export default {
   position: absolute;
   bottom: -24px;
   right: 0px;
+  min-width: 134px;
 }
 
 .rollback-btn {
