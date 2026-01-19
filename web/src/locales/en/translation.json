@@ -1,0 +1,110 @@
+{
+    "nav": {
+        "product": "Product",
+        "pricing": "Pricing",
+        "plugins": "Plugins",
+        "resources": "Resources",
+        "login": "Log In",
+        "download": "Download"
+    },
+    "hero": {
+        "badge": "v1.0 Now Available",
+        "title": "The Execution Terminal <br /> for Legal Professionals",
+        "subtitle": "One unified workspace for Due Diligence, Compliance, and Litigation. Verify with AI, trace every claim, and draft with confidence.",
+        "download_mac": "Download for Mac",
+        "view_pricing": "View Pricing",
+        "ui": {
+            "project_alpha": "Project Alpha",
+            "contracts": "Contracts",
+            "evidence": "Evidence",
+            "risk_detected": "Risk Detected",
+            "gap_analysis": "Gap Analysis",
+            "high": "High",
+            "risk_desc": "Clause 4.2 conflicts with labor laws provided in context.",
+            "done": "Done",
+            "ai_verification": "AI Verification"
+        }
+    },
+    "workflow": {
+        "step1": {
+            "title": "1. Import & Organize",
+            "desc": "Drag and drop thousands of files. We automatically classify contracts, evidence, and memos."
+        },
+        "step2": {
+            "title": "2. Structure Data",
+            "desc": "AI extracts key entities: parties, dates, amounts. Turn messy documents into structured tables."
+        },
+        "step3": {
+            "title": "3. Verify & Trace",
+            "desc": "Check claims against evidence. Every fact is linked to its source document for instant review."
+        },
+        "step4": {
+            "title": "4. Draft & Export",
+            "desc": "Generate memos or filings. Export typically takes hours, now done in seconds."
+        }
+    },
+    "value_prop": {
+        "efficiency": {
+            "title": "10x Efficiency",
+            "desc": "Split-screen workspace with integrated temporary storage and clipboard history. Stop switching apps."
+        },
+        "risk": {
+            "title": "Risk Control",
+            "desc": "Every verification is traceable. Review the evidence chain and audit logs for full compliance."
+        },
+        "assets": {
+            "title": "Knowledge Assets",
+            "desc": "Transform your due diligence and drafting work into reusable project assets for your team."
+        }
+    },
+    "feature_wall": {
+        "title": "Everything you need",
+        "subtitle": "Built for the modern legal workflow. No bloat, just power.",
+        "features": [
+            "AI Workspace",
+            "Plugin Ecosystem",
+            "LLM Integration",
+            "Legal Data API",
+            "Real-time Collab",
+            "Utility Tools",
+            "Smart Split-screen",
+            "Auto Timesheet"
+        ]
+    },
+    "footer": {
+        "description": "The AI-powered execution terminal for legal professionals. Streamline due diligence, compliance, and litigation.",
+        "product": "Product",
+        "overview": "Overview",
+        "pricing": "Pricing",
+        "download": "Download",
+        "changelog": "Changelog",
+        "ecosystem": "Ecosystem",
+        "plugins": "Plugins",
+        "developers": "Developers",
+        "submit_plugin": "Submit Plugin",
+        "resources": "Resources",
+        "documentation": "Documentation",
+        "community": "Community",
+        "help_center": "Help Center",
+        "legal": "Legal",
+        "terms": "Terms of Service",
+        "privacy": "Privacy Policy",
+        "data_sources": "Data Sources",
+        "security": "Security",
+        "rights_reserved": "All rights reserved."
+    },
+    "pricing": {
+        "title": "Pricing",
+        "promo": "Free during beta until Feb 28, 2026.",
+        "basic": "Then ¥199/mo (Basic)",
+        "pro": "¥499/mo (Pro)"
+    },
+    "plugins": {
+        "title": "Plugin Ecosystem",
+        "coming_soon": "Coming Soon"
+    },
+    "login": {
+        "title": "Log In",
+        "desc": "Please log in to access your workspace."
+    }
+}
