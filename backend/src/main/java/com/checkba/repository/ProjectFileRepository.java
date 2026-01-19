@@ -51,7 +51,7 @@ public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> 
     /**
      * 根据 WPS 文件 ID 查询文件
      */
-    Optional<ProjectFile> findByWpsFileId(String wpsFileId);
+    List<ProjectFile> findByWpsFileId(String wpsFileId);
     
     /**
      * 根据项目 ID、父文件夹 ID 和名称查询文件 (排除已删除)

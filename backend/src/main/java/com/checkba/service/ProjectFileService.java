@@ -838,7 +838,7 @@ public class ProjectFileService {
 
     private ProjectFile ensureConversationFolder(Long projectId, Long parentId, String conversationId, Long userId) {
         // 1. Try by wpsFileId (Robust lookup)
-        Optional<ProjectFile> byWpsId = projectFileRepository.findByWpsFileId(conversationId);
+        Optional<ProjectFile> byWpsId = projectFileRepository.findByWpsFileId(conversationId).stream().findFirst();
         if (byWpsId.isPresent() && !Boolean.TRUE.equals(byWpsId.get().getIsDeleted())) {
             return byWpsId.get();
         }
@@ -876,7 +876,7 @@ public class ProjectFileService {
         if (!StringUtils.hasText(newTitle)) return;
         
         // Find folder by wpsFileId = conversationId
-        Optional<ProjectFile> folderOpt = projectFileRepository.findByWpsFileId(conversationId);
+        Optional<ProjectFile> folderOpt = projectFileRepository.findByWpsFileId(conversationId).stream().findFirst();
         if (folderOpt.isPresent()) {
             ProjectFile folder = folderOpt.get();
             // Only rename if different

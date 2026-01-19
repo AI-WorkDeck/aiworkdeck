@@ -167,7 +167,7 @@ public class WpsTools {
                 wordDoc.save(targetPath.toFile());
 
                 // 注册到数据库
-                String wpsId = "stream_" + System.currentTimeMillis();
+                String wpsId = "stream_" + System.currentTimeMillis() + "_" + java.util.UUID.randomUUID().toString().substring(0, 8);
                 String storageRelativePath = "projects/" + projectId + "/" + fileName;
                 
                 file = projectFileService.createOrUpdateFile(
