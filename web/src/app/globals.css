@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root[data-theme="light"], :root {
+  --bg: #F8F9FA;
+  --surface: #FFFFFF;
+  --surface-alt: #E9ECEF;
+
+  --text-1: #2C3338;
+  --text-2: #6C757D;
+  --text-3: #ADB5BD;
+
+  --brand: #1A5336;
+  --brand-hover: #2D7A52;
+  --accent: #5BD197;
+  --accent-hover: #84E0B3;
+
+  --border: #E9ECEF;
+  --divider: #E9ECEF;
+  --focus: rgba(91, 209, 151, 0.35);
+
+  --shadow-sm: 0 6px 18px rgba(11, 15, 13, 0.08);
+  --shadow-md: 0 10px 30px rgba(11, 15, 13, 0.10);
+  --shadow-lg: 0 16px 48px rgba(11, 15, 13, 0.14);
+
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
+}
+
+:root[class="dark"] {
+  --bg: #212629;
+  --surface: #2C3338;
+  --surface-alt: #343A40;
+
+  --text-1: #FFFFFF;
+  --text-2: rgba(255,255,255,0.78);
+  --text-3: rgba(255,255,255,0.58);
+
+  --brand: #1A5336;
+  --brand-hover: #2D7A52;
+  --accent: #5BD197;
+  --accent-hover: #84E0B3;
+
+  --border: rgba(91, 209, 151, 0.18);
+  --divider: rgba(255, 255, 255, 0.10);
+  --focus: rgba(91, 209, 151, 0.40);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-inter);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

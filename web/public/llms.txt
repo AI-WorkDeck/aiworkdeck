@@ -1,0 +1,19 @@
+# 17-checkba_cloud / King IDE / 核查宝
+
+## Product Overview
+King IDE / 核查宝 is an all-in-one execution terminal for legal professionals, integrating Due Diligence, Compliance, and Litigation workflows. It features AI-powered verification, drafting, and collaboration tools.
+
+## Key Features
+- **AI Workspace**: Split-screen execution with AI assistance.
+- **Evidence Chain**: Traceable verification and drafting.
+- **Plugin Ecosystem**: Marketplace for specialized legal tools.
+
+## Documentation
+- [Pricing](/pricing)
+- [Download](/download)
+- [Plugins](/plugins)
+- [Documentation](/docs)
+
+## Technical
+- Stack: Next.js, Tailwind CSS
+- Data Sources: Integration with major legal databases.
