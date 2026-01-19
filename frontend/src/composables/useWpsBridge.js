@@ -2305,6 +2305,131 @@ export function useWpsBridge() {
         }
     }
 
+    // ==================== 流式输入支持 ====================
+
+    // 流式输入状态
+    let streamBuffer = ''
+    let isStreamProcessing = false
+    let cachedWpsApp = null  // 缓存 WPS Application 引用
+    let streamFlushTimer = null  // 定时刷新 timer
+    const STREAM_FLUSH_INTERVAL = 100  // 100ms 批量刷新一次
+
+    /**
+     * 处理 WPS 流式数据 - 将流式文本追加到文档末尾
+     * 使用缓冲区和定时刷新来减少 WPS API 调用次数
+     * 
+     * @param {string} content - 流式文本片段
+     */
+    const handleWpsStreamData = async (content) => {
+        if (!content) return { success: true }
+
+        // 将内容添加到缓冲区
+        streamBuffer += content
+
+        // 设置定时刷新（如果还没有设置）
+        if (!streamFlushTimer) {
+            streamFlushTimer = setTimeout(async () => {
+                streamFlushTimer = null
+                await flushStreamBuffer()
+            }, STREAM_FLUSH_INTERVAL)
+        }
+
+        return { success: true, buffered: true }
+    }
+
+    /**
+     * 刷新流式缓冲区 - 将缓冲的内容写入文档
+     */
+    const flushStreamBuffer = async () => {
+        if (streamBuffer.length === 0 || isStreamProcessing) {
+            return
+        }
+
+        isStreamProcessing = true
+        const textToInsert = streamBuffer
+        streamBuffer = ''
+
+        try {
+            await insertTextAtDocumentEndFast(textToInsert)
+        } catch (e) {
+            console.error('[WpsBridge] flushStreamBuffer error:', e)
+        } finally {
+            isStreamProcessing = false
+
+            // 如果缓冲区又有新内容，继续处理
+            if (streamBuffer.length > 0) {
+                streamFlushTimer = setTimeout(async () => {
+                    streamFlushTimer = null
+                    await flushStreamBuffer()
+                }, STREAM_FLUSH_INTERVAL)
+            }
+        }
+    }
+
+    /**
+     * 快速在文档末尾插入文本 - 使用缓存的 WPS 引用 (Modified to use insertAtCursor logic)
+     */
+    const insertTextAtDocumentEndFast = async (text) => {
+        if (!text) return
+
+        try {
+            // 使用缓存的 WPS Application
+            if (!cachedWpsApp) {
+                if (window.__wpsInstance) {
+                    const instance = window.__wpsInstance
+                    cachedWpsApp = instance.Application ? await instance.Application : instance
+                } else {
+                    cachedWpsApp = await getWpsInstance()
+                }
+            }
+
+            if (!cachedWpsApp) {
+                throw new Error('WPS Application 未就绪')
+            }
+
+            // [Modified] User requested insertAtCursor Strategy
+            // Instead of doc.Range(end).InsertAfter which was failing,
+            // we use ActiveWindow.Selection which is the standard way to insert.
+
+            // 1. Get Selection
+            const doc = await cachedWpsApp.ActiveDocument
+            const win = await doc.ActiveWindow
+            const sel = await win.Selection
+
+            // 2. Insert After Selection (Standard stream behavior: append at cursor)
+            // Note: If cursor is not at end, this inserts at cursor. 
+            // This is desired feature ("insertAtCursor").
+            await sel.InsertAfter(text)
+
+            // 3. Update Cursor Position (Collapse to end of inserted text)
+            // Similar to insertAtCursor logic
+            const range = await sel.Range
+            const newEnd = await range.End
+            await range.SetRange(newEnd, newEnd)
+
+        } catch (e) {
+            console.error('[WpsBridge] insertTextAtDocumentEndFast error:', e)
+            // 清除缓存，下次重新获取
+            cachedWpsApp = null
+            // We do NOT re-throw here to prevent crashing the whole stream loop. 
+            // Logging is sufficient for stream glitches.
+        }
+    }
+
+    /**
+     * 重置流式状态 - 在流式写入开始前调用
+     */
+    const resetStreamState = () => {
+        streamBuffer = ''
+        isStreamProcessing = false
+        cachedWpsApp = null  // 清除缓存的 WPS 引用
+        if (streamFlushTimer) {
+            clearTimeout(streamFlushTimer)
+            streamFlushTimer = null
+        }
+        console.log('[WpsBridge] Stream state reset')
+    }
+
     return {
         // 状态
         isProcessing,
@@ -2342,6 +2467,10 @@ export function useWpsBridge() {
         selectTextByFind,
         clearSelection,
 
+        // 流式输入支持
+        handleWpsStreamData,
+        resetStreamState,
+
         // PPT 操作方法
         isPptDocument,
         ppt_getPresentationInfo,
@@ -2357,4 +2486,3 @@ export function useWpsBridge() {
         executeWpsAction
     }
 }
-

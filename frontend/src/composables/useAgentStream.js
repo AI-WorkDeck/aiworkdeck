@@ -363,6 +363,15 @@ export function useAgentStream() {
             }
         } else if (evt === 'wps_stream_data') {
             try {
+                // Mark current bubble as WPS streaming to suppress chat duplication
+                if (currentAssistantBubble.value && !currentAssistantBubble.value.isWpsStreaming) {
+                    currentAssistantBubble.value.isWpsStreaming = true
+                    // Add a placeholder message if content is empty
+                    if (!currentAssistantBubble.value.content) {
+                        currentAssistantBubble.value.content = '*(Streaming content to document...)*'
+                    }
+                }
+
                 const d = JSON.parse(dataStr)
                 wpsBridge.handleWpsStreamData(d.content || "")
             } catch (e) {
@@ -710,6 +719,12 @@ export function useAgentStream() {
         } else {
             // Untagged text -> Main Content
             if (!bubble.content && !text.trim()) return
+
+            // [Modified] If we are streaming to WPS, suppress untagged content from chat bubble
+            if (bubble.isWpsStreaming) {
+                return
+            }
+
             bubble.content += text
         }
     }

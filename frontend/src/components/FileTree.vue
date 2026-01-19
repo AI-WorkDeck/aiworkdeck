@@ -1503,9 +1503,22 @@ export default {
       if (isNaN(projectId)) throw new Error('项目ID格式错误')
 
       // 2. Call API (Soft Delete)
-      await deleteFile(projectId, item.id)
+      try {
+        await deleteFile(projectId, item.id)
+      } catch (e) {
+        // 如果文件不存在，视为删除成功
+        if (e.statusCode === 404 || e.status === 404) {
+          console.warn('文件已不存在，跳过删除报错:', item.id)
+        } else {
+          throw e
+        }
+      }
+      
       await this.loadFiles()
       uni.showToast({ title: '已移入回收站', icon: 'success' })
+      
+      // Emit events
+      this.$emit('file-deleted', { ids: [item.id] })
 
       if (this.selectedFileId === item.id) {
         this.selectedFileId = null
@@ -1531,8 +1544,19 @@ export default {
               this.recycleBin.splice(idx, 1)
             }
             uni.showToast({ title: '彻底删除成功', icon: 'success' })
+            this.$emit('file-deleted', { ids: [item.id] })
         } catch (e) {
-             uni.showToast({ title: '删除失败', icon: 'none' })
+             if (e.statusCode === 404 || e.status === 404) {
+               console.warn('文件已不存在(彻底删除)，视为成功:', item.id)
+               const idx = this.recycleBin.findIndex(f => f.id === item.id)
+               if (idx > -1) {
+                 this.recycleBin.splice(idx, 1)
+               }
+               uni.showToast({ title: '彻底删除成功', icon: 'success' })
+               this.$emit('file-deleted', { ids: [item.id] })
+             } else {
+               uni.showToast({ title: '删除失败', icon: 'none' })
+             }
         }
     },
 
@@ -1542,21 +1566,32 @@ export default {
 
         if (this.deleteMode === 'hard') {
             // Batch Perm Delete
-            // Currently backend doesn't have batch perm delete?
-            // Loop and delete (or add NEW batch endpoint)
-            // For now loop
             for (const id of ids) {
-                 await deleteFilePerm(projectId, id)
+                 try {
+                   await deleteFilePerm(projectId, id)
+                 } catch (e) {
+                   if (e.statusCode !== 404 && e.status !== 404) {
+                     console.error('Batch perm delete fail:', id, e)
+                   }
+                 }
             }
             // Update local state
             const deletedSet = new Set(ids.map(Number));
             this.recycleBin = this.recycleBin.filter(f => !deletedSet.has(f.id));
              uni.showToast({ title: '已彻底删除', icon: 'success' })
+             this.$emit('file-deleted', { ids: ids })
         } else {
             // Soft Batch Delete
-             await batchDeleteFiles(projectId, ids)
+             try {
+                await batchDeleteFiles(projectId, ids)
+             } catch (e) {
+                // Batch delete API might not return granular 404s, but if it fails completely, we throw
+                console.error('Batch soft delete fail:', e)
+                throw e
+             }
              await this.loadFiles()
              uni.showToast({ title: '已移入回收站', icon: 'success' })
+             this.$emit('file-deleted', { ids: ids })
         }
         this.clearChecked()
     },

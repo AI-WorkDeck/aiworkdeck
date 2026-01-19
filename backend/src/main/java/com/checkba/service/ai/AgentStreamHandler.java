@@ -40,9 +40,14 @@ public class AgentStreamHandler implements StreamingResponseHandler<AiMessage> {
 
     // Callback for each token generated (for real-time tracking)
     private java.util.function.Consumer<String> onToken;
+    private java.util.function.Consumer<String> onWpsStream;
 
     public void setOnToken(java.util.function.Consumer<String> onToken) {
         this.onToken = onToken;
+    }
+
+    public void setOnWpsStream(java.util.function.Consumer<String> onWpsStream) {
+        this.onWpsStream = onWpsStream;
     }
 
     @Override
@@ -54,7 +59,180 @@ public class AgentStreamHandler implements StreamingResponseHandler<AiMessage> {
                 onToken.accept(token);
             }
             
+            // Process for WPS filtered stream
+            processWpsStream(token);
+            
             processBuffer(token);
+        }
+    }
+    
+    // ==================== WPS Stream Filtering Logic ====================
+    
+    // Buffer for WPS stream parser to handle split tags
+    private final StringBuilder wpsBuffer = new StringBuilder();
+    // Set of tags that should be hidden from WPS (but content might be hidden too?)
+    // Protocol:
+    // <thinking>...</thinking> -> Hide ALL
+    // <process>...</process> -> Hide ALL
+    // <tool_code>...</tool_code> -> Hide ALL
+    // <tool_output>...</tool_output> -> Hide ALL
+    // <question>...</question> -> Hide ALL
+    // <walkthrough>...</walkthrough> -> Hide ALL
+    // <title>...</title> -> Hide ALL
+    // <artifact>...</artifact> -> Hide ALL
+    // <final>Content</final> -> Hide TAGS, Show CONTENT
+    
+    // We maintain a stack of open hidden tags.
+    // If stack is empty, we are in "Display Mode" (mostly). 
+    // But we still need to strip <final> and </final> tags themselves.
+    
+    private boolean isInsideHiddenTag = false;
+    private String currentHiddenTagName = null;
+    
+    // Tags that should hide their content completely
+    private static final java.util.Set<String> HIDDEN_CONTENT_TAGS = java.util.Set.of(
+        "thinking", "process", "tool_code", "tool_output", 
+        "question", "walkthrough", "title", "artifact",
+        "bubble_type" // Also hide bubble control tags
+    );
+    
+    private void processWpsStream(String token) {
+        if (onWpsStream == null) return;
+        
+        wpsBuffer.append(token);
+        
+        while (wpsBuffer.length() > 0) {
+            // If we are NOT inside a hidden tag, we look for start of ANY tag
+            if (!isInsideHiddenTag) {
+                int ltIndex = wpsBuffer.indexOf("<");
+                if (ltIndex == -1) {
+                    // No tags in buffer, safe to emit all
+                    String text = wpsBuffer.toString();
+                    emitWpsText(text);
+                    wpsBuffer.setLength(0);
+                    return;
+                } else {
+                    // Valid text before the tag
+                    if (ltIndex > 0) {
+                        emitWpsText(wpsBuffer.substring(0, ltIndex));
+                        wpsBuffer.delete(0, ltIndex);
+                        // Now buffer starts with '<'
+                    }
+                    
+                    // Check if we have enough chars to identify the tag
+                    // Need at least "<x" or "</x"
+                    if (wpsBuffer.length() < 2) {
+                        return; // Wait for more data
+                    }
+                    
+                    // Determine if it's a start tag or end tag
+                    boolean isEndTag = wpsBuffer.charAt(1) == '/';
+                    
+                    // Try to find the closing '>'
+                    int gtIndex = wpsBuffer.indexOf(">");
+                    if (gtIndex == -1) {
+                        // Tag not fully received yet
+                        // Safety cap: if buffer gets too huge without '>', force flush?
+                         if (wpsBuffer.length() > 1000) {
+                             // Something wrong, just flush to avoid memory issues, though it might break protocol.
+                             // But for WPS stream, better to show garbage than crash.
+                             emitWpsText(wpsBuffer.toString());
+                             wpsBuffer.setLength(0);
+                         }
+                        return; // Wait for more data
+                    }
+                    
+                    // We have a full tag: <...>
+                    String fullTag = wpsBuffer.substring(0, gtIndex + 1);
+                    String tagName = extractTagName(fullTag);
+                    
+                    if (HIDDEN_CONTENT_TAGS.contains(tagName)) {
+                        if (!isEndTag) {
+                            // Start of a hidden block
+                            isInsideHiddenTag = true;
+                            currentHiddenTagName = tagName;
+                        }
+                        // If it's an end tag of a hidden block, typically we shouldn't see it if we are not inside one?
+                        // Unless it's unbalanced. Just ignore/strip it.
+                    } else if ("final".equals(tagName)) {
+                        // <final> or </final> -> Just strip the tag, content is allowed
+                    } else {
+                        // Unknown tag (maybe <b> or markdown formatting?)
+                        // If it's not a protocol tag, we might want to keep it?
+                        // But System Prompt says "Output RAW XML tags directly". 
+                        // It usually means specific control tags. 
+                        // Ideally, we should strip ALL xml-like tags that look like protocol, 
+                        // but keep things that might be part of the document (though Markdown doc shouldn't have HTML).
+                        // Safety: Strip it if it looks like our protocol tags. 
+                        // Let's rely on HIDDEN_CONTENT_TAGS + final.
+                        // If it's truly unknown (e.g. <br>), let's pass it through?
+                        // Actually, for a .docx, raw HTML tags might appear as text.
+                        // Let's pass unknown tags through as text.
+                        if (!"final".equals(tagName) && !HIDDEN_CONTENT_TAGS.contains(tagName)) {
+                            emitWpsText(fullTag); 
+                        }
+                    }
+                    
+                    // Remove the processed tag from buffer
+                    wpsBuffer.delete(0, gtIndex + 1);
+                }
+            } else {
+                // Inside Hidden Tag -> Look for the specific closing tag </tagName>
+                // OR self-closing />? (Protocol uses full tags mostly, except bubble_type/artifact sometimes?)
+                // Assuming standard </name>
+                
+                String closeTag = "</" + currentHiddenTagName + ">";
+                int closeIndex = wpsBuffer.indexOf(closeTag);
+                
+                if (closeIndex == -1) {
+                    // Check for self-closing if strictly required? 
+                    // <bubble_type ... />
+                    if ("bubble_type".equals(currentHiddenTagName)) {
+                         int selfClose = wpsBuffer.indexOf("/>");
+                         if (selfClose != -1) {
+                             wpsBuffer.delete(0, selfClose + 2);
+                             isInsideHiddenTag = false;
+                             currentHiddenTagName = null;
+                             return;
+                         }
+                    }
+                    
+                    // Not found, discard all buffer content (it's hidden!)
+                    // BUT be careful about partial tags at the end.
+                    // We can safely discard everything UP TO the last '<' to be safe?
+                    // Or just keep a small window?
+                    // To be safe: discard everything except the last few chars that might start the closing tag.
+                    if (wpsBuffer.length() > closeTag.length() * 2) {
+                        wpsBuffer.delete(0, wpsBuffer.length() - closeTag.length());
+                    }
+                    return; // Wait for more data
+                } else {
+                    // Found closing tag!
+                    // Discard everything up to and including the closing tag
+                    wpsBuffer.delete(0, closeIndex + closeTag.length());
+                    isInsideHiddenTag = false;
+                    currentHiddenTagName = null;
+                }
+            }
+        }
+    }
+    
+    private String extractTagName(String tag) {
+        // Remove <, </, > and attributes
+        String content = tag.startsWith("</") ? tag.substring(2) : tag.substring(1);
+        if (content.endsWith(">")) content = content.substring(0, content.length() - 1);
+        
+        // Handle <name attr="..."> or <name>
+        int spaceIdx = content.indexOf(' ');
+        if (spaceIdx != -1) {
+            return content.substring(0, spaceIdx);
+        }
+        return content;
+    }
+
+    private void emitWpsText(String text) {
+        if (onWpsStream != null && text != null && !text.isEmpty()) {
+            onWpsStream.accept(text);
         }
     }
     
@@ -232,6 +410,15 @@ public class AgentStreamHandler implements StreamingResponseHandler<AiMessage> {
         // Flush remaining buffer
         if (buffer.length() > 0) {
             emitText(buffer.toString());
+        }
+        
+        // Flush remaining WPS buffer
+        if (wpsBuffer.length() > 0) {
+            // If we are left with something in buffer, it might be incomplete tag or content
+            // Emit it if not inside hidden tag
+            if (!isInsideHiddenTag) {
+                emitWpsText(wpsBuffer.toString());
+            }
         }
         
         // Emit Token Usage to Frontend

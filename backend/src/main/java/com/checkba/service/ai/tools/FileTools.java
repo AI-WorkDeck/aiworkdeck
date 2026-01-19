@@ -41,6 +41,7 @@ public class FileTools {
     private final ProjectFileService projectFileService;
     private final ProjectFileRepository projectFileRepository;
     private final com.checkba.service.ai.WpsActionService wpsActionService;
+    private final com.checkba.service.ai.context.FileContentExtractorService fileContentExtractorService;
     private static final Long AGENT_USER_ID = 10001L;
 
     // We need to resolve the project root physically.
@@ -116,7 +117,13 @@ public class FileTools {
             if (Files.isDirectory(path)) return "Error: Path is a directory.";
             if (Files.size(path) > 10 * 1024 * 1024) return "Error: File too large (>10MB).";
             
-            return Files.readString(path, StandardCharsets.UTF_8);
+            // Use unified extractor
+            File file = path.toFile();
+            if (fileContentExtractorService.isOcrSupported(file.getName())) {
+               return fileContentExtractorService.extractTextWithOcr(file);
+            } else {
+               return fileContentExtractorService.extractText(file);
+            }
         } catch (Exception e) {
             return "Error reading file: " + e.getMessage();
         }

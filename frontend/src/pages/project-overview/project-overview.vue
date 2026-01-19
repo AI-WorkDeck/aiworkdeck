@@ -515,6 +515,7 @@
             @file-drag-end="onFileLinkDragEnd"
             @compare-documents="onCompareDocumentsRequest"
             @files-changed="loadStagingFiles"
+            @file-deleted="handleFileDeleted"
           />
           <DdFilesPanel
             v-else-if="leftPaneKey === 'dd-files'"
@@ -4847,6 +4848,28 @@ export default {
       }
     },
 
+    handleFileDeleted(payload) {
+      if (!payload || !payload.ids || !Array.isArray(payload.ids)) return
+      const ids = new Set(payload.ids)
+
+      // Close tabs if they match deleted IDs
+      // Iterate backwards to avoid index issues when closing (though closeFile uses findIndex, safety first)
+      
+      // Right Pane
+      for (let i = this.rightFiles.length - 1; i >= 0; i--) {
+        if (ids.has(this.rightFiles[i].id)) {
+           this.closeFile(this.rightFiles[i].id, 'right')
+        }
+      }
+      
+      // Left Pane
+      for (let i = this.leftFiles.length - 1; i >= 0; i--) {
+        if (ids.has(this.leftFiles[i].id)) {
+           this.closeFile(this.leftFiles[i].id, 'left')
+        }
+      }
+    },
+
     closeFile(fileId, pane) {
       const list = pane === 'left' ? this.leftFiles : this.rightFiles
       const idProp = pane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'
@@ -5011,6 +5034,11 @@ export default {
     onWpsReady(instance, pane) {
       console.log(`WPS Ready [${pane}]`, instance)
       this.wpsInstances[pane] = instance
+      
+      // 注册到全局变量，供 handleWpsStreamData 等方法使用
+      // 这样 useWpsBridge.getWpsInstance() 可以从 window.__wpsInstance 获取实例
+      window.__wpsInstance = instance
+      console.log('[ProjectOverview] WPS instance registered to window.__wpsInstance')
 
       // 注意：当前 WPS 环境会对未知事件名抛出 "Invalid event name"
       // fileSave/fileRename 在你的控制台里已验证会刷屏，因此这里不再监听，统一改为轮询同步文件信息。
@@ -5441,7 +5469,100 @@ export default {
         }
         // AI Agent 请求执行 WPS 命令
         else if (action.tool === 'wps_command') {
-            this.handleWpsCommand(action)
+            // 特殊处理 wps_open_file_sync 命令（新建文件流式写入）
+            if (action.action === 'wps_open_file_sync') {
+                this.handleWpsOpenFileSync(action)
+            } else {
+                this.handleWpsCommand(action)
+            }
+        }
+    },
+
+    /**
+     * 处理 AI Agent 的同步打开文件请求 (用于流式写入)
+     * 这个命令需要打开文件，等待 WPS 就绪后返回结果给后端
+     */
+    async handleWpsOpenFileSync(action) {
+        console.log('[ProjectOverview] WPS Open File Sync:', action)
+        const { params, requestId, conversationId } = action
+        
+        try {
+            if (!params || !params.fileId) {
+                console.error('[ProjectOverview] No fileId in wps_open_file_sync')
+                await sendWpsResult(conversationId, requestId, false, null, '缺少文件ID')
+                return
+            }
+
+            // 1. 刷新文件列表以获取最新文件
+            if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
+                await this.$refs.fileTree.loadFiles()
+            }
+
+            // 2. 获取文件详情
+            const file = await getFileDetail(this.projectId, params.fileId)
+            if (!file) {
+                console.error('[ProjectOverview] File not found:', params.fileId)
+                await sendWpsResult(conversationId, requestId, false, null, '文件不存在')
+                return
+            }
+
+            console.log('[ProjectOverview] Opening file for streaming:', file.name)
+
+            // 3. 打开文件（这会创建新的 WPS 实例或激活已有的）
+            await this.openFile(file)
+
+            // 4. 等待 WPS 实例就绪（最多等待 15 秒）
+            // 需要等待两个条件：
+            // a) wpsInstances 中存在实例
+            // b) window.__wpsInstance 已注册（这是在 onWpsReady 中设置的）
+            let wpsReady = false
+            for (let i = 0; i < 30; i++) {
+                await new Promise(resolve => setTimeout(resolve, 500))
+                
+                const wpsInstance = this.wpsInstances.left || this.wpsInstances.right
+                const globalInstance = window.__wpsInstance
+                
+                // 检查实例是否存在且有 Application 属性
+                if (wpsInstance && globalInstance) {
+                    try {
+                        // 尝试访问 Application 以确认 WPS 真正就绪
+                        const app = globalInstance.Application || globalInstance
+                        if (app) {
+                            wpsReady = true
+                            console.log('[ProjectOverview] WPS instance ready after', (i + 1) * 500, 'ms')
+                            console.log('[ProjectOverview] window.__wpsInstance is set:', !!window.__wpsInstance)
+                            break
+                        }
+                    } catch (e) {
+                        console.log('[ProjectOverview] WPS not fully ready yet, waiting...', e.message)
+                    }
+                }
+            }
+
+            if (!wpsReady) {
+                console.error('[ProjectOverview] WPS instance not ready after timeout')
+                await sendWpsResult(conversationId, requestId, false, null, 'WPS 编辑器未就绪')
+                return
+            }
+
+            // 5. 重置流式状态，准备接收新的流式数据
+            const wpsBridge = useWpsBridge()
+            wpsBridge.resetStreamState()
+            console.log('[ProjectOverview] Stream state reset, ready for streaming')
+            
+            // 6. 返回成功给后端
+            console.log('[ProjectOverview] WPS Open File Sync success')
+            await sendWpsResult(conversationId, requestId, true, { 
+                fileId: file.id, 
+                fileName: file.name,
+                status: 'ready'
+            }, null)
+
+            uni.showToast({ title: `已打开: ${file.name}`, icon: 'none' })
+
+        } catch (e) {
+            console.error('[ProjectOverview] handleWpsOpenFileSync error:', e)
+            await sendWpsResult(conversationId, requestId, false, null, e.message)
         }
     },
 

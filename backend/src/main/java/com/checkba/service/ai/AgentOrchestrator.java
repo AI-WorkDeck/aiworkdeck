@@ -518,7 +518,10 @@ public class AgentOrchestrator {
             if (sb != null) {
                 sb.append(token);
             }
-            // WPS Real-time Streaming Interception
+        });
+
+        // WPS Real-time Streaming Interception (Filtered)
+        handler.setOnWpsStream(token -> {
             if (wpsActionService.isStreamingMode(conversationId)) {
                 sseEmitterService.send(conversationId, "wps_stream_data", java.util.Map.of("content", token));
             }
@@ -864,9 +867,11 @@ public class AgentOrchestrator {
                              result = wpsTools.wps_list_project_files(Long.parseLong(projectId));
                         } else if (code.contains("wps_start_stream")) {
                              String fileIdStr = extractStringArg(code, "fileId");
+                             String fileNameArg = extractStringArg(code, "fileName");
                              // Allow null fileId (for new files)
                              Long fileId = safeParseLong(fileIdStr, "fileId");
-                             result = wpsTools.wps_start_stream(fileId);
+                             // projectId 来自当前上下文
+                             result = wpsTools.wps_start_stream(fileId, fileNameArg, Long.parseLong(projectId));
                         } else if (code.contains("wps_open_file")) {
                              String fileIdStr = extractStringArg(code, "fileId");
                              Long fileId = Long.parseLong(fileIdStr);

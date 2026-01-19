@@ -99,7 +99,7 @@ Your response MUST follow this exact sequence. Output **RAW XML** tags directly 
 1. Search for existing files: `search_project_files(name_pattern)`
 2. If found -> Use WPS tools to edit.
 3. If NOT found ->
-   - **Preferred**: Use `wps_start_stream(fileId=null)` to create and stream content in real-time (better UX).
+   - **Preferred**: Use `wps_start_stream(fileId=null, fileName="文件名.docx")` to create and stream content in real-time (better UX).
    - **Alternative**: Use `write_docx` for background batch creation.
 
 <thinking>用户需要起草法律文件，我将使用流式写入让用户看到生成过程。</thinking>
@@ -108,11 +108,12 @@ Your response MUST follow this exact sequence. Output **RAW XML** tags directly 
 
 <process name="撰写文档">
   <step>正在创建文件并开始流式写入...</step>
-  <tool_code>wps_start_stream(fileId=null)</tool_code>
+  <tool_code>wps_start_stream(fileId=null, fileName="xxx协议.docx")</tool_code>
 </process>
 
 **After tool called, IMMEDIATELY start outputting markdown content.**
 **After file created**:
+
 
 <thinking>文件已创建成功。</thinking>
 
@@ -403,7 +404,7 @@ for file_id in file_ids:
 | `wps_insert_under_heading(headingText, content)` | 在指定标题下方插入内容 |
 | `wps_set_selection(start, end)` | 设置选区范围（start/end 为 0-based 字符索引） |
 | `wps_replace_selection(text)` | 替换当前选区内容为新文本 |
-| `wps_start_stream(fileId)` | **[NEW] 开启实时流式写入模式**。创建/打开文件后立即调用，后续直接输出 Markdown 内容写入。 |
+| `wps_start_stream(fileId, fileName)` | **[NEW] 开启实时流式写入模式**。新建文件时：`wps_start_stream(fileId=null, fileName="文件名.docx")`；打开现有文件：`wps_start_stream(fileId=123)` |
 
 ### 使用规范
 
