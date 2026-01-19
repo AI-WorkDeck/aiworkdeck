@@ -4,10 +4,10 @@
     <view class="editor-header">
       <view class="header-left">
         <!-- Title Input -->
-        <input 
-          class="title-edit" 
-          v-model="requestName" 
-          @blur="updateRequestName" 
+        <input
+          class="title-edit"
+          v-model="requestName"
+          @blur="updateRequestName"
           @confirm="updateRequestName"
           :placeholder="request ? request.name : '加载中...'"
         />
@@ -16,7 +16,7 @@
         </view>
         <text class="progress-info" v-if="items.length > 0">完成进度: {{ completedCount }}/{{ items.length }}</text>
       </view>
-      
+
       <view style="display: flex; gap: 10px; align-items: center;">
         <button class="delete-list-btn" @tap="handleDeleteRequest">删除清单</button>
         <button class="new-btn" @tap="handleAddItem">
@@ -35,19 +35,19 @@
         <view class="col-qa">留言</view>
         <view class="col-action"></view>
       </view>
-      
+
       <scroll-view scroll-y class="items-list">
-        <view 
-          v-for="item in flattenedItems" 
-          :key="item.id" 
-          class="table-row" 
+        <view
+          v-for="item in flattenedItems"
+          :key="item.id"
+          class="table-row"
           :class="{ selected: item.id === selectedItemId }"
           @tap="selectItem(item)"
           @mouseenter="hoveredItemId = item.id"
           @mouseleave="hoveredItemId = null"
         >
           <!-- File Name (Tree Column) -->
-          <!-- 
+          <!--
              Padding logic:
              - Base indent: 20px
              - Per level: 24px
@@ -64,47 +64,47 @@
                 <view class="indent-placeholder" v-else></view>
 
                 <!-- Expand Toggle -->
-                <view 
-                  class="expand-icon" 
-                  @tap.stop="toggleExpand(item)" 
+                <view
+                  class="expand-icon"
+                  @tap.stop="toggleExpand(item)"
                   v-if="hasChildren(item)"
                 >
                   <text>{{ isExpanded(item) ? '▼' : '▶' }}</text>
                 </view>
                 <view class="expand-placeholder" v-else></view>
              </view>
-            
-            <input 
-              class="silent-input title-input" 
-              v-model="item.title" 
+
+            <input
+              class="silent-input title-input"
+              v-model="item.title"
               @blur="updateInfo(item)"
-              placeholder="输入名称" 
+              placeholder="输入名称"
             />
           </view>
-          
+
           <!-- Description -->
           <view class="col-desc">
-            <input 
-              class="silent-input" 
-              v-model="item.description" 
+            <input
+              class="silent-input"
+              v-model="item.description"
               @blur="updateInfo(item)"
-              placeholder="输入说明" 
+              placeholder="输入说明"
             />
           </view>
-          
+
           <!-- Example -->
           <view class="col-example">
             <text class="link-text" v-if="item.exampleFileId">查看</text>
           </view>
-          
+
           <!-- Upload -->
           <view class="col-upload">
             <view v-if="item.uploadedFileId" class="uploaded-info" @tap.stop="viewFile(item.uploadedFileId)">
                <text class="file-icon">📄</text>
-               <text class="file-name">已上传</text> 
+               <text class="file-name">已上传</text>
             </view>
-             <button 
-              class="mini-btn upload" 
+             <button
+              class="mini-btn upload"
               v-else-if="!isApproved(item.status)"
               @tap.stop="chooseFile(item)"
             >
@@ -114,7 +114,7 @@
                {{ getItemStatusText(item.status) }}
              </view>
           </view>
-          
+
           <!-- QA/Comments -->
           <view class="col-qa">
              <view class="comment-trigger" @tap.stop="toggleComments(item)">
@@ -122,7 +122,7 @@
                 <view class="dot" v-if="item.comments && item.comments.length > 0"></view>
              </view>
           </view>
-          
+
           <!-- Delete Action -->
           <view class="col-action">
               <view class="delete-btn" @tap.stop="handleDeleteItem(item)" title="删除">
@@ -130,7 +130,7 @@
               </view>
           </view>
         </view>
-        
+
         <view v-if="items.length === 0" class="empty-state">
           <text>点击右上角“+ 新建”添加清单项</text>
         </view>
@@ -138,7 +138,7 @@
         <view style="height: 100px;"></view>
       </scroll-view>
     </view>
-    
+
     <!-- Comment Drawer (Simplified) -->
     <view v-if="showCommentsDrawer" class="drawer-mask" @tap="showCommentsDrawer = false">
         <view class="drawer" @tap.stop>
@@ -174,12 +174,12 @@ export default {
     return {
       request: null,
       requestName: '',
-      items: [], 
+      items: [],
       isLawyer: true,
       selectedItemId: null,
       expandedItems: new Set(),
       hoveredItemId: null,
-      
+
       // Comments
       showCommentsDrawer: false,
       activeItem: null,
@@ -193,18 +193,18 @@ export default {
     },
     flattenedItems() {
       if (!this.items.length) return []
-      
+
       const rootItems = []
       const itemMap = new Map()
       const rawItems = JSON.parse(JSON.stringify(this.items))
-      
+
       rawItems.forEach(item => {
         item.children = []
         itemMap.set(item.id, item)
       })
-      
+
       rawItems.sort((a, b) => a.sortOrder - b.sortOrder)
-      
+
       rawItems.forEach(item => {
         if (item.parentId && itemMap.has(item.parentId)) {
           itemMap.get(item.parentId).children.push(item)
@@ -212,7 +212,7 @@ export default {
           rootItems.push(item)
         }
       })
-      
+
       const result = []
       const traverse = (nodes) => {
         nodes.forEach(node => {
@@ -222,7 +222,7 @@ export default {
           }
         })
       }
-      
+
       traverse(rootItems)
       return result
     }
@@ -249,7 +249,7 @@ export default {
         console.error('Fetch DD details failed', e)
       }
     },
-    
+
     async updateRequestName() {
         if (!this.requestName || this.requestName === this.request.name) return
         try {
@@ -263,32 +263,32 @@ export default {
             this.requestName = this.request.name // Revert
         }
     },
-    
+
     selectItem(item) {
       if (this.selectedItemId === item.id) {
-        this.selectedItemId = null 
+        this.selectedItemId = null
       } else {
         this.selectedItemId = item.id
       }
     },
-    
+
     isExpanded(item) {
       return this.expandedItems.has(item.id)
     },
-    
+
     hasChildren(item) {
        return this.items.some(i => i.parentId === item.id)
     },
-    
+
     toggleExpand(item) {
       if (this.expandedItems.has(item.id)) {
         this.expandedItems.delete(item.id)
       } else {
         this.expandedItems.add(item.id)
       }
-      this.$forceUpdate() 
+      this.$forceUpdate()
     },
-    
+
     async handleAddItem() {
       let parentId = this.selectedItemId || null
       if (this.selectedItemId) {
@@ -303,25 +303,25 @@ export default {
         uni.showToast({ title: '新建失败', icon: 'none' })
       }
     },
-    
+
     async handleIndent(item) {
       const flat = this.flattenedItems
       const idx = flat.findIndex(i => i.id === item.id)
-      if (idx <= 0) return 
-      
+      if (idx <= 0) return
+
       const prev = flat[idx - 1]
-      if (prev.id === item.parentId) return 
-      
+      if (prev.id === item.parentId) return
+
       await this.moveItem(item.id, prev.id)
     },
-    
+
     async handleOutdent(item) {
-       if (!item.parentId) return 
+       if (!item.parentId) return
        const currentParent = this.items.find(i => i.id === item.parentId)
        const newParentId = currentParent ? currentParent.parentId : null
        await this.moveItem(item.id, newParentId)
     },
-    
+
     async moveItem(itemId, newParentId) {
       try {
         await api.moveDdItem(itemId, newParentId)
@@ -332,7 +332,7 @@ export default {
         uni.showToast({ title: '操作失败', icon: 'none' })
       }
     },
-    
+
     async updateInfo(item) {
       try {
         await api.updateDdItemInfo(item.id, item.title, item.description)
@@ -347,7 +347,7 @@ export default {
       return map[s] || s
     },
     isApproved(s) { return s === 'APPROVED' },
-    
+
     async chooseFile(item) {
       uni.chooseFile({
         count: 1,
@@ -361,8 +361,8 @@ export default {
       uni.showLoading({ title: '上传中...' })
       uni.uploadFile({
         url: uploadUrl,
-        filePath: file.path, 
-        file: file, 
+        filePath: file.path,
+        file: file,
         name: 'file',
         header: { 'X-Session-Id': getSessionId() },
         success: (res) => {
@@ -381,7 +381,7 @@ export default {
        const url = `${getApiBaseUrl()}/api/files/${fileId}/download`
        window.open(url, '_blank')
     },
-    
+
     async toggleComments(item) {
         this.activeItem = item
         this.showCommentsDrawer = true
@@ -399,7 +399,7 @@ export default {
             this.activeItem.comments = res
         } catch(e) { console.error(e) }
     },
-    
+
     handleDeleteItem(item) {
         uni.showModal({
             title: '确认删除',
@@ -418,7 +418,7 @@ export default {
             }
         })
     },
-    
+
     handleDeleteRequest() {
         uni.showModal({
             title: '确认删除',
@@ -467,12 +467,12 @@ $white: #FFFFFF;
     align-items: center;
     padding: 16px 24px;
     border-bottom: 1px solid $gray-light;
-    
+
     .header-left {
       display: flex;
       align-items: center;
       gap: 12px;
-      
+
       .title-edit {
         font-size: 18px;
         font-weight: 600;
@@ -481,11 +481,11 @@ $white: #FFFFFF;
         border-radius: 4px;
         padding: 4px 8px;
         width: 200px;
-        
+
         &:hover { border-color: $gray-light; }
         &:focus { border-color: $king-mint; outline: none; background: #fff; }
       }
-      
+
       .status-badge {
         font-size: 12px;
         padding: 2px 8px;
@@ -493,14 +493,14 @@ $white: #FFFFFF;
         color: $gray-dark;
         border-radius: 4px;
       }
-      
+
       .progress-info {
         font-size: 12px;
         color: #999;
         margin-left: 10px;
       }
     }
-    
+
     .new-btn {
       background-color: $king-forest;
       color: $white;
@@ -511,16 +511,19 @@ $white: #FFFFFF;
       cursor: pointer;
       line-height: 1.5;
       transition: background-color 0.2s;
-      
+
       &:hover { background-color: #2D7A52; }
     }
-    
+
     .delete-list-btn {
         margin-left: 10px;
         background: transparent;
         color: #999;
         border: 1px solid #eee;
         padding: 6px 12px;
+        // height: 20px;
+        // box-sizing: border-box;
+        line-height: 1.5;
         border-radius: 4px;
         cursor: pointer;
         font-size: 13px;
@@ -533,7 +536,7 @@ $white: #FFFFFF;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    
+
     .table-header {
       display: flex;
       padding: 10px 0;
@@ -542,7 +545,7 @@ $white: #FFFFFF;
       font-size: 12px;
       font-weight: 600;
       color: #6C757D;
-      
+
       .col-name { width: 35%; padding-left: 20px; }
       .col-desc { flex: 1; }
       .col-example { width: 60px; text-align: center; }
@@ -550,11 +553,11 @@ $white: #FFFFFF;
       .col-qa { width: 60px; text-align: center; }
       .col-action { width: 40px; text-align: center; }
     }
-    
+
     .items-list {
       flex: 1;
     }
-    
+
     .table-row {
       display: flex;
       align-items: center;
@@ -563,28 +566,28 @@ $white: #FFFFFF;
       font-size: 13px;
       cursor: pointer;
       transition: background-color 0.1s;
-      
-      &:hover { 
-          background-color: #FAFAFA; 
-          .col-action .delete-btn { opacity: 1; } 
+
+      &:hover {
+          background-color: #FAFAFA;
+          .col-action .delete-btn { opacity: 1; }
       }
       &.selected { background-color: $king-mint-light; }
-      
-      .col-name { 
-        width: 35%; 
-        display: flex; 
-        align-items: center; 
+
+      .col-name {
+        width: 35%;
+        display: flex;
+        align-items: center;
         padding-right: 10px;
       }
       .col-desc { flex: 1; padding-right: 10px; }
       .col-example { width: 60px; text-align: center; }
       .col-upload { width: 100px; display: flex; justify-content: center; }
       .col-qa { width: 60px; display: flex; justify-content: center; }
-      .col-action { 
-          width: 40px; 
-          display: flex; 
-          justify-content: center; 
-          
+      .col-action {
+          width: 40px;
+          display: flex;
+          justify-content: center;
+
           .delete-btn {
               opacity: 0;
               color: #999;
@@ -594,22 +597,22 @@ $white: #FFFFFF;
               &:hover { color: #DC3545; }
           }
       }
-      
+
       /* Tree Indentation & Controls */
       .tree-controls-wrapper {
           display: flex;
           align-items: center;
           /* Fixed width container for controls to prevent shifting */
-          width: 50px; 
+          width: 50px;
           flex-shrink: 0;
           margin-right: 4px;
       }
-      
+
       .indent-controls {
         display: flex;
         gap: 2px;
         margin-right: 4px;
-        
+
         .arrow-btn {
           width: 14px;
           height: 18px;
@@ -625,9 +628,9 @@ $white: #FFFFFF;
           &:hover { color: $king-mint; border-color: $king-mint; }
         }
       }
-      
+
       .indent-placeholder { width: 32px; margin-right: 4px; /* Matches 2 arrows of 14px + gap */ }
-      
+
       .expand-icon {
         width: 16px;
         font-size: 10px;
@@ -636,7 +639,7 @@ $white: #FFFFFF;
         text-align: center;
       }
       .expand-placeholder { width: 16px; }
-      
+
       .silent-input {
         flex: 1;
         border: 1px solid transparent;
@@ -646,13 +649,13 @@ $white: #FFFFFF;
         font-size: 13px;
         color: $gray-dark;
         min-width: 0; /* Allow shrinking */
-        
+
         &:focus { background: #fff; border-color: $king-mint; outline: none; }
       }
       .title-input { font-weight: 500; }
-      
+
       .link-text { color: #3498DB; cursor: pointer; &:hover { text-decoration: underline; } }
-      
+
       .mini-btn {
         padding: 3px 10px;
         font-size: 12px;
@@ -661,10 +664,10 @@ $white: #FFFFFF;
         background: #fff;
         cursor: pointer;
         color: $gray-dark;
-        
+
         &:hover { border-color: $king-mint; color: $king-mint; }
       }
-      
+
       .uploaded-info {
          display: flex;
          align-items: center;
@@ -675,18 +678,18 @@ $white: #FFFFFF;
          border-radius: 4px;
          cursor: pointer;
          max-width: 90px;
-         
+
          .file-icon { font-size: 12px; }
          .file-name { font-size: 11px; color: $king-forest; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       }
-      
+
       .comment-trigger {
         font-size: 12px;
         color: #666;
         cursor: pointer;
         position: relative;
         &:hover { color: $king-mint; }
-        
+
         .dot {
           position: absolute;
           top: -2px;
@@ -704,7 +707,7 @@ $white: #FFFFFF;
 .drawer-mask {
     position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 1000;
     display: flex; justify-content: flex-end;
-    
+
     .drawer {
         width: 300px;
         background: #fff;
@@ -712,9 +715,9 @@ $white: #FFFFFF;
         display: flex;
         flex-direction: column;
         box-shadow: -2px 0 8px rgba(0,0,0,0.1);
-        
+
         .drawer-header { padding: 15px; font-weight: bold; border-bottom: 1px solid #eee; }
-        .drawer-body { flex: 1; padding: 15px; overflow-y: auto; 
+        .drawer-body { flex: 1; padding: 15px; overflow-y: auto;
             .comment-row { margin-bottom: 10px; font-size: 13px; .user{font-weight:bold; margin-right:5px;} }
             .no-data { text-align: center; color: #999; margin-top: 20px; }
         }

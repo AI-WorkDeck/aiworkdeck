@@ -3196,8 +3196,8 @@ export default {
 
 .status-btn.created:hover {
   background-color: #5BD197;
-  color: #ffffff;
-  /* border-color: #1A5336; */
+  /* color: #ffffff; */
+  border-color: #1A5336;
 }
 
 /* Status Popup */

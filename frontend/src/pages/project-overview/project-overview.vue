@@ -4928,7 +4928,9 @@ export default {
         // 音频
         'mp3', 'wav', 'm4a', 'flac', 'aac',
         // 文本文件
-        'txt', 'md', 'markdown', 'json', 'xml', 'html', 'css', 'js', 'java', 'py', 'sh', 'sql', 'log'
+        'txt', 'md', 'markdown', 'json', 'xml', 'html', 'css', 'js', 'java', 'py', 'sh', 'sql', 'log',
+        // 尽调清单
+        'dd'
       ]
 
       return supportedTypes.includes(type)
