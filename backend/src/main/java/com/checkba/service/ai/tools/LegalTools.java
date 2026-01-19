@@ -25,44 +25,49 @@ public class LegalTools {
 
     private final ProjectFileService projectFileService;
     private final McpClientService mcpClientService;
+    private final com.checkba.service.ai.context.FileContentExtractorService fileContentExtractorService;
 
     // --- File Operations ---
 
     @Tool("Read document content. Use this to read files from the project. Provide fileId.")
     public String read_document(String fileId) {
         log.info("Tool: read_document called for fileId={}", fileId);
+        java.nio.file.Path tempPath = null;
         try {
             Long fId = Long.parseLong(fileId);
             ProjectFile file = projectFileService.getFile(fId);
             if (file == null) return "Error: File not found.";
 
-            String filePath = file.getFilePath();
-            if (!StringUtils.hasText(filePath)) return "Error: File path is empty.";
-
             byte[] bytes = projectFileService.getFileBytes(fId);
             if (bytes == null || bytes.length == 0) return "File is empty.";
             
-            String fileName = file.getName().toLowerCase();
+            // Create temp file for extractor (needed for Tika/PDFBox/OCR)
+            String ext = file.getFileType() != null ? "." + file.getFileType() : ".tmp";
+            tempPath = java.nio.file.Files.createTempFile("checkba_legal_" + fId + "_", ext);
+            java.nio.file.Files.write(tempPath, bytes);
+            java.io.File tempFile = tempPath.toFile();
             
-            // Text Files
-            if (fileName.endsWith(".txt") || fileName.endsWith(".md") || fileName.endsWith(".java") 
-                || fileName.endsWith(".py") || fileName.endsWith(".xml") || fileName.endsWith(".json")
-                || fileName.endsWith(".yaml") || fileName.endsWith(".yml") || fileName.endsWith(".log")) {
-                return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+            String result;
+            if (fileContentExtractorService.isOcrSupported(file.getName())) {
+               result = fileContentExtractorService.extractTextWithOcr(tempFile);
+            } else {
+               result = fileContentExtractorService.extractText(tempFile);
             }
             
-            // Heavy Files (PDF, DOCX) -> Use Tika
-            try (java.io.InputStream is = new java.io.ByteArrayInputStream(bytes)) {
-                dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser parser = new dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser();
-                dev.langchain4j.data.document.Document doc = parser.parse(is);
-                return doc.text();
-            }
+            return result;
             
         } catch (Exception e) {
             log.error("Failed to read document {}", fileId, e);
             return "Error reading document: " + e.getMessage();
+        } finally {
+            if (tempPath != null) {
+                try {
+                    java.nio.file.Files.deleteIfExists(tempPath);
+                } catch (Exception ignore) {}
+            }
         }
     }
+
 
     // --- PKULaw MCP Integration (using standard MCP SDK) ---
 

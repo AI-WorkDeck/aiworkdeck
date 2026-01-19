@@ -98,45 +98,111 @@ public class WpsTools {
 
     // ==================== 流式写入 ====================
 
+    private static final Long AGENT_USER_ID = 10001L;
+
     @Tool("开始实时流式写入 WPS 文档。使用此工具后，模型生成的后续内容将直接写入打开的文档中。" +
-          "**重要：调用此工具后，你必须立即开始生成文档内容，并且必须使用严格的 Markdown 格式（Markdown Heading #, ##, ### 等）。**" +
+          "**重要：创建新文件时必须提供 fileName 和 projectId 参数。** " +
+          "调用此工具后，你必须立即开始生成文档内容，并且必须使用严格的 Markdown 格式（Markdown Heading #, ##, ### 等）。" +
           "不要在调用此工具后输出任何非文档内容的闲聊，直接开始输出文档标题和正文。")
     public String wps_start_stream(
-            @P("要打开/创建并写入的文件ID (如果文件已打开可不填)") Long fileId
+            @P("要打开的文件ID (如果是新建文件则传 null)") Long fileId,
+            @P("新建文件名 (如 '法律意见书.docx')，仅当 fileId=null 时必填") String fileName,
+            @P("项目ID，仅当 fileId=null 时必填") Long projectId
     ) {
-        log.info("Tool: wps_start_stream called fileId={}", fileId);
+        log.info("Tool: wps_start_stream called fileId={}, fileName={}, projectId={}", fileId, fileName, projectId);
         try {
             String conversationId = wpsActionService.getCurrentConversationId();
             if (conversationId == null) {
                 return "Error: 无法获取当前会话上下文";
             }
 
-            // 1. 如果指定了文件，先同步打开 (Wait for Ready)
-            if (fileId != null) {
-                ProjectFile file = projectFileService.getFile(fileId);
+            ProjectFile file = null;
+
+            // 1. 如果 fileId=null，创建新的空白 docx 文件
+            if (fileId == null) {
+                if (fileName == null || fileName.trim().isEmpty()) {
+                    return "Error: 创建新文件时必须提供 fileName 参数";
+                }
+                if (projectId == null) {
+                    return "Error: 创建新文件时必须提供 projectId 参数";
+                }
+
+                // 确保文件名以 .docx 结尾
+                if (!fileName.toLowerCase().endsWith(".docx")) {
+                    fileName = fileName + ".docx";
+                }
+
+                // 创建空白 docx 文件
+                java.nio.file.Path projectDataDir = java.nio.file.Paths.get(System.getProperty("user.dir"))
+                        .getParent().resolve("data/projects/" + projectId);
+                if (!java.nio.file.Files.exists(projectDataDir)) {
+                    java.nio.file.Files.createDirectories(projectDataDir);
+                }
+                java.nio.file.Path targetPath = projectDataDir.resolve(fileName);
+
+                // 检查文件是否已存在，如果存在则自动重命名
+                String originalFileName = fileName;
+                String baseName = originalFileName;
+                String extension = ".docx";
+                if (originalFileName.toLowerCase().endsWith(".docx")) {
+                    baseName = originalFileName.substring(0, originalFileName.length() - 5);
+                }
+
+                int counter = 1;
+                while (java.nio.file.Files.exists(targetPath)) {
+                    fileName = baseName + " (" + counter + ")" + extension;
+                    targetPath = projectDataDir.resolve(fileName);
+                    counter++;
+                }
+                
+                if (counter > 1) {
+                    log.info("File '{}' already exists. Renamed to '{}'", originalFileName, fileName);
+                    // Update fileName argument effectively for the rest of the method? 
+                    // No, 'fileName' variable is used below, so we are good.
+                }
+
+                // 创建空白 Word 文档
+                org.docx4j.openpackaging.packages.WordprocessingMLPackage wordDoc = 
+                        org.docx4j.openpackaging.packages.WordprocessingMLPackage.createPackage();
+                wordDoc.save(targetPath.toFile());
+
+                // 注册到数据库
+                String wpsId = "stream_" + System.currentTimeMillis();
+                String storageRelativePath = "projects/" + projectId + "/" + fileName;
+                
+                file = projectFileService.createOrUpdateFile(
+                        projectId, null, fileName, "docx", targetPath.toFile().length(),
+                        storageRelativePath, wpsId, AGENT_USER_ID
+                );
+                
+                log.info("Created new docx file for streaming: id={}, name={}", file.getId(), file.getName());
+                
+                // 通知前端刷新文件列表
+                wpsActionService.sendRefreshFilesAction();
+            } else {
+                file = projectFileService.getFile(fileId);
                 if (file == null) {
                     return "Error: 文件不存在，ID=" + fileId;
                 }
-                
-                // Use executeWpsCommand to wait for frontend to report "Ready"
-                // Action: wps_open_file_sync
-                String resultJson = wpsActionService.executeWpsCommand("wps_open_file_sync", java.util.Map.of(
-                        "fileId", file.getId(),
-                        "fileName", file.getName(),
-                        "fileType", file.getFileType(),
-                        "wpsFileId", file.getWpsFileId() != null ? file.getWpsFileId() : "",
-                        "trackRevisions", true
-                ));
-                
-                if (resultJson.contains("\"error\"")) {
-                    return "Error opening file: " + resultJson;
-                }
             }
 
-            // 2. 开启流式模式
+            // 2. 同步打开文件 (Wait for Ready)
+            String resultJson = wpsActionService.executeWpsCommand("wps_open_file_sync", java.util.Map.of(
+                    "fileId", file.getId(),
+                    "fileName", file.getName(),
+                    "fileType", file.getFileType(),
+                    "wpsFileId", file.getWpsFileId() != null ? file.getWpsFileId() : "",
+                    "trackRevisions", false  // 流式写入不需要修订模式
+            ));
+            
+            if (resultJson.contains("\"error\"")) {
+                return "Error opening file: " + resultJson;
+            }
+
+            // 3. 开启流式模式
             wpsActionService.setStreamingMode(conversationId, true);
 
-            return "WPS 流式写入模式已激活。请立即开始生成文档内容。**务必使用 Markdown 格式 (H1=#, H2=##) 输出内容。**";
+            return "WPS 流式写入模式已激活，文件: " + file.getName() + "。请立即开始生成文档内容。**务必使用 Markdown 格式 (H1=#, H2=##) 输出内容。**";
         } catch (Exception e) {
             log.error("Failed to start wps stream", e);
             return "Error: " + e.getMessage();

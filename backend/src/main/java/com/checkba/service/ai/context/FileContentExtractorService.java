@@ -1,5 +1,7 @@
 package com.checkba.service.ai.context;
 
+import com.checkba.service.OcrService;
+import com.checkba.service.ocr.OcrResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -9,6 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -25,19 +28,21 @@ public class FileContentExtractorService {
             "xml", "yml", "yaml", "json", "properties", "toml", // Config
             "md", "txt", "csv", "sql", "sh", "bat", "dockerfile", ".gitignore", ".env" // Misc
     ));
+    
+    // 支持 OCR 的文件扩展名（图片和 PDF）
+    private static final Set<String> OCR_EXTENSIONS = new HashSet<>(Arrays.asList(
+            "jpg", "jpeg", "png", "gif", "bmp", "webp", "pdf"
+    ));
 
-    private final dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser tikaParser;
+    private final OcrService ocrService;
 
-    public FileContentExtractorService() {
-        this.tikaParser = new dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser();
+    public FileContentExtractorService(OcrService ocrService) {
+        this.ocrService = ocrService;
     }
 
     /**
-     * Extract text from a file.
-     * Checks file size limit and file type validity.
-     *
-     * @param file The file to read.
-     * @return Extracted text or an error message/empty string if skipped.
+     * Extract text from a file (text files only, for backward compatibility).
+     * For images/PDF, use extractTextWithOcr() instead.
      */
     public String extractText(File file) {
         if (file == null || !file.exists() || file.isDirectory()) {
@@ -53,11 +58,9 @@ public class FileContentExtractorService {
         try {
             if (isTextFile(fileName)) {
                 return Files.readString(file.toPath());
-            } else if (isSupportedBinary(fileName)) {
-                return parseBinary(file);
             } else {
-                // Unknown/Unsupported type, skip silently or return indicator
-                return ""; // Skip
+                // Non-text files: skip or hint to use OCR
+                return "";
             }
         } catch (Exception e) {
             log.warn("Failed to extract text from file: {}", fileName, e);
@@ -65,27 +68,118 @@ public class FileContentExtractorService {
         }
     }
 
+    /**
+     * Extract text from image or PDF files using Aliyun OCR.
+     * For multimodal-capable models, prefer sending raw file instead of OCR text.
+     * 
+     * @param file The image or PDF file
+     * @return Extracted text via OCR, or error message
+     */
+    public String extractTextWithOcr(File file) {
+        if (file == null || !file.exists() || file.isDirectory()) {
+            return "";
+        }
+
+        String fileName = file.getName();
+        String ext = getExtension(fileName);
+        
+        if (!isOcrSupported(fileName)) {
+            log.warn("File type not supported for OCR: {}", fileName);
+            return "[System: 该文件类型不支持 OCR]";
+        }
+
+        if (file.length() > MAX_FILE_SIZE) {
+            log.warn("File skipped due to size limit ({} > 10MB): {}", file.length(), file.getName());
+            return "[System: 文件超过 10MB 限制]";
+        }
+
+        try {
+            if ("pdf".equals(ext)) {
+                // PDF: 使用 PDFBox 渲染为图片后 OCR
+                log.info("Starting PDF OCR for file: {} (size={} bytes)", fileName, file.length());
+                String result = extractTextFromPdfWithOcr(file);
+                log.info("Completed PDF OCR for file: {}. Result length: {}", fileName, result.length());
+                return result;
+            } else {
+                // Image: 直接 OCR
+                log.info("Starting Image OCR for file: {}", fileName);
+                byte[] bytes = Files.readAllBytes(file.toPath());
+                String base64 = Base64.getEncoder().encodeToString(bytes);
+                OcrResult result = ocrService.recognizeGeneral(base64);
+                log.info("Completed Image OCR for file: {}. Text length: {}", fileName, result.getText().length());
+                return result.getText();
+            }
+        } catch (Exception e) {
+            log.error("OCR extraction failed for: {}", fileName, e);
+            return "[System: OCR 识别失败: " + e.getMessage() + "]";
+        }
+    }
+    
+    /**
+     * Extract text from PDF by rendering pages to images and OCR each.
+     * Uses Apache PDFBox for rendering.
+     */
+    private String extractTextFromPdfWithOcr(File pdfFile) throws Exception {
+        StringBuilder allText = new StringBuilder();
+        
+        try (org.apache.pdfbox.pdmodel.PDDocument document = org.apache.pdfbox.pdmodel.PDDocument.load(pdfFile)) {
+            org.apache.pdfbox.rendering.PDFRenderer renderer = new org.apache.pdfbox.rendering.PDFRenderer(document);
+            int pageCount = document.getNumberOfPages();
+            
+            // 限制最多处理 20 页，避免超大 PDF
+            int maxPages = Math.min(pageCount, 20);
+            
+            for (int page = 0; page < maxPages; page++) {
+                try {
+                    // 渲染为 150 DPI 的图片（平衡质量和性能）
+                    java.awt.image.BufferedImage image = renderer.renderImageWithDPI(page, 150);
+                    
+                    // 转为 PNG Base64
+                    java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                    javax.imageio.ImageIO.write(image, "png", baos);
+                    String base64 = Base64.getEncoder().encodeToString(baos.toByteArray());
+                    
+                    // OCR
+                    OcrResult result = ocrService.recognizeGeneral(base64);
+                    if (StringUtils.hasText(result.getText())) {
+                        allText.append("--- 第 ").append(page + 1).append(" 页 ---\n");
+                        allText.append(result.getText()).append("\n\n");
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to OCR page {} of {}", page + 1, pdfFile.getName(), e);
+                    allText.append("--- 第 ").append(page + 1).append(" 页 (OCR 失败) ---\n\n");
+                }
+            }
+            
+            if (pageCount > maxPages) {
+                allText.append("[System: PDF 共 ").append(pageCount).append(" 页，仅处理前 ").append(maxPages).append(" 页]\n");
+            }
+        }
+        
+        return allText.toString();
+    }
+
     public boolean isTextFile(String fileName) {
         if (!StringUtils.hasText(fileName)) return false;
         String ext = getExtension(fileName);
         return ALLOWED_TEXT_EXTENSIONS.contains(ext) || isConfigFile(fileName);
     }
-
-    public boolean isSupportedBinary(String fileName) {
+    
+    /**
+     * Check if file is supported for OCR (images and PDF).
+     */
+    public boolean isOcrSupported(String fileName) {
         if (!StringUtils.hasText(fileName)) return false;
         String ext = getExtension(fileName);
-        return "pdf".equals(ext) || "doc".equals(ext) || "docx".equals(ext) ||
-               "ppt".equals(ext) || "pptx".equals(ext) || "xls".equals(ext) || "xlsx".equals(ext);
+        return OCR_EXTENSIONS.contains(ext);
     }
 
-    private String parseBinary(File file) {
-        try {
-            dev.langchain4j.data.document.Document doc = tikaParser.parse(Files.newInputStream(file.toPath()));
-            return doc.text();
-        } catch (Exception e) {
-            log.error("Tika extraction failed for: {}", file.getName(), e);
-            return "[System: Binary file parsing failed]";
-        }
+    /**
+     * @deprecated Use isOcrSupported() for images/PDF. This method is kept for compatibility.
+     */
+    @Deprecated
+    public boolean isSupportedBinary(String fileName) {
+        return isOcrSupported(fileName);
     }
 
     private String getExtension(String fileName) {

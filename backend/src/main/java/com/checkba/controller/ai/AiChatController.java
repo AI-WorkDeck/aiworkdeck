@@ -208,16 +208,24 @@ public class AiChatController {
                 if (isImage || isVideo) {
                     try {
                         Long fileId = Long.parseLong(ctx.getFileId());
-                        com.checkba.model.entity.ProjectFile fileEntity = projectFileService.getFile(fileId);
-                        if (fileEntity != null && StringUtils.hasText(fileEntity.getFilePath())) {
-                            java.io.File physicalFile = new java.io.File(fileEntity.getFilePath());
+                        // Use getFileBytes for safe retrieval
+                        byte[] fileBytes = projectFileService.getFileBytes(fileId);
+                        
+                        if (fileBytes != null && fileBytes.length > 0) {
                             java.util.List<String> images = new java.util.ArrayList<>();
                             
                             if (isImage) {
-                                byte[] bytes = java.nio.file.Files.readAllBytes(physicalFile.toPath());
-                                images.add(java.util.Base64.getEncoder().encodeToString(bytes));
+                                images.add(java.util.Base64.getEncoder().encodeToString(fileBytes));
                             } else if (isVideo) {
-                                images = mediaProcessingService.extractKeyframes(physicalFile, 5); 
+                                // For video keyframes, we need a physical temp file
+                                String ext = fType != null ? "." + fType : ".mp4";
+                                java.nio.file.Path tempVid = java.nio.file.Files.createTempFile("vid_ctx_" + fileId, ext);
+                                java.nio.file.Files.write(tempVid, fileBytes);
+                                try {
+                                    images = mediaProcessingService.extractKeyframes(tempVid.toFile(), 5); 
+                                } finally {
+                                    java.nio.file.Files.deleteIfExists(tempVid);
+                                }
                             }
 
                             for (String base64 : images) {
@@ -340,15 +348,25 @@ public class AiChatController {
                 // The service handles size check and type check.
                 if (Boolean.TRUE.equals(file.getIsFolder())) continue; // Just in case
                 
-                if (StringUtils.hasText(file.getFilePath())) {
-                    java.io.File physical = new java.io.File(file.getFilePath());
-                    String extracted = fileContentExtractorService.extractText(physical);
-                    
-                    if (StringUtils.hasText(extracted)) {
-                        sb.append("\n--- File: ").append(file.getName()).append(" ---\n");
-                        sb.append(extracted).append("\n");
-                        counter.count++;
+                try {
+                    byte[] fileBytes = projectFileService.getFileBytes(file.getId());
+                    if (fileBytes != null && fileBytes.length > 0) {
+                        java.nio.file.Path tempP = java.nio.file.Files.createTempFile("folder_scan_" + file.getId(), ".tmp");
+                        try {
+                            java.nio.file.Files.write(tempP, fileBytes);
+                            String extracted = fileContentExtractorService.extractText(tempP.toFile());
+                            
+                            if (StringUtils.hasText(extracted)) {
+                                sb.append("\n--- File: ").append(file.getName()).append(" ---\n");
+                                sb.append(extracted).append("\n");
+                                counter.count++;
+                            }
+                        } finally {
+                            java.nio.file.Files.deleteIfExists(tempP);
+                        }
                     }
+                } catch (Exception e) {
+                    log.warn("Failed to read folder file content: {}", file.getName(), e);
                 }
             }
         }
@@ -580,9 +598,76 @@ public class AiChatController {
                     Long fileId = Long.parseLong(ctx.getFileId());
                     com.checkba.model.entity.ProjectFile fileEntity = projectFileService.getFile(fileId);
                     if (fileEntity != null && StringUtils.hasText(fileEntity.getFilePath())) {
-                        java.io.File file = new java.io.File(fileEntity.getFilePath());
-                        if (file.exists()) {
-                            documentText = fileContentExtractorService.extractText(file);
+                        // Use getFileBytes to support both Local and OSS, avoiding relative path issues
+                        String fType = ctx.getFileType() != null ? ctx.getFileType().toLowerCase() : "";
+                        boolean isMediaFile = fType.matches("pdf|jpg|jpeg|png|gif|bmp|webp|image") || 
+                                              fileContentExtractorService.isOcrSupported(fileEntity.getName());
+                        
+                        boolean isMultiModalCapable = modelKey.contains("gemini") || 
+                                                      modelKey.contains("gpt-4") || 
+                                                      modelKey.contains("claude-3");
+                        
+                        boolean isPdf = fType.endsWith("pdf");
+                        boolean isImage = fType.matches("jpg|jpeg|png|gif|bmp|webp|image");
+                        
+                        // 决策：这类文件是否可以直接发送给模型（从而跳过文本提取）
+                        boolean canDirectSend = false;
+                        
+                        if (isPdf) {
+                            // 目前只有 Gemini 原生支持 PDF 直传
+                            canDirectSend = modelKey.contains("gemini") || modelKey.contains("google");
+                        } else if (isImage) {
+                            // 图片通常所有多模态模型都支持
+                            canDirectSend = isMultiModalCapable;
+                        }
+                        
+                        if (isMediaFile) { // isMediaFile 包含了 OCR_EXTENSIONS (pdf, images)
+                            log.info("Process Context File: name={}, type={}, isMultiModal={}, canDirectSend={}", 
+                                    fileEntity.getName(), fType, isMultiModalCapable, canDirectSend);
+                                    
+                            if (canDirectSend) {
+                                // 多模态模型：跳过文本提取，将在多模态路径直传原文件
+                                documentText = "[多模态模型将直接处理该文件，无需文本提取]";
+                                log.info("-> Skip extraction for multimodal (Direct Send)");
+                            }
+                        }
+                        
+                        // 4. 读取文件内容（针对非多模态模型或 PDF 回退 OCR）
+                        java.nio.file.Path tempPath = null;
+                        try {
+                            if (documentText == null) { // 如果上面多模态直传没处理
+                                log.info("-> Text extraction needed. Retrieving file content...");
+                                
+                                byte[] fileBytes = projectFileService.getFileBytes(fileEntity.getId());
+                                if (fileBytes != null && fileBytes.length > 0) {
+                                    // 创建临时文件用于 OCR/Tika
+                                    String tempName = "ocr_ctx_" + fileEntity.getId() + "_" + System.currentTimeMillis();
+                                    String ext = fileEntity.getFileType() != null ? "." + fileEntity.getFileType() : ".tmp";
+                                    tempPath = java.nio.file.Files.createTempFile(tempName, ext);
+                                    java.nio.file.Files.write(tempPath, fileBytes);
+                                    java.io.File physicalFile = tempPath.toFile();
+                                    
+                                    if (fileContentExtractorService.isOcrSupported(fileEntity.getName())) {
+                                        log.info("-> Using OCR extraction for: {}", fileEntity.getName());
+                                        documentText = fileContentExtractorService.extractTextWithOcr(physicalFile);
+                                    } else {
+                                        log.info("-> Using standard extraction for: {}", fileEntity.getName());
+                                        documentText = fileContentExtractorService.extractText(physicalFile);
+                                    }
+                                } else {
+                                     log.warn("File content is empty or not found via service: {}", fileEntity.getName());
+                                     documentText = "[文件内容为空或无法读取]";
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.warn("Failed to read context file content in backend", e);
+                            documentText = "[读取文件失败: " + e.getMessage() + "]";
+                        } finally {
+                            if (tempPath != null) {
+                                try {
+                                    java.nio.file.Files.deleteIfExists(tempPath);
+                                } catch (Exception ignore) {}
+                            }
                         }
                     }
                 } catch (Exception e) {
