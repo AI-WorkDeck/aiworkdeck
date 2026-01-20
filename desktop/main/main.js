@@ -230,6 +230,7 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    icon: path.join(__dirname, '../../frontend/src/static/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
@@ -244,8 +245,9 @@ function createMainWindow() {
     mainWindow.loadURL(DEV_SERVER_URL)
     mainWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
-    // TODO：补齐 production build 输出路径（uni build h5 输出路径）
-    mainWindow.loadURL(DEV_SERVER_URL)
+    // Production Mode: Load from dist
+    const distPath = path.join(__dirname, '../../frontend/dist/build/h5/index.html')
+    mainWindow.loadFile(distPath)
   }
 
   // 拦截渲染进程里的 window.open（包括 WPS iframe 点击超链接）

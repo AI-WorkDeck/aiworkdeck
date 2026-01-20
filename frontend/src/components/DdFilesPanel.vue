@@ -84,7 +84,7 @@
     </view>
   </view>
 
-  <!-- Custom King IDE Delete Confirm Dialog -->
+  <!-- Custom AI Workdeck Delete Confirm Dialog -->
   <view class="dd-dialog-mask" v-if="showDeleteDialog" @tap="showDeleteDialog = false">
     <view class="dd-dialog-content" @tap.stop>
       <view class="dd-dialog-header">

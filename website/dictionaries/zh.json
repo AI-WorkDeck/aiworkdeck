@@ -1,0 +1,82 @@
+{
+    "common": {
+        "productName": "AI Workdeck",
+        "productTagline": "AI 时代文档工作者的一站式工作平台",
+        "nav": {
+            "product": "产品",
+            "plugins": "插件广场",
+            "pricing": "定价",
+            "download": "下载",
+            "login": "登录"
+        },
+        "hero": {
+            "title": "AI Workdeck",
+            "subtitle": "AI 时代的文档工作台。",
+            "description": "写、看、查、管，一站搞定。",
+            "cta": {
+                "download": "立即下载",
+                "pricing": "查看定价",
+                "plugins": "逛插件广场"
+            }
+        },
+        "features": {
+            "ai": {
+                "title": "AI 加持，让人聚焦专业判断",
+                "desc1": "AI 帮你从材料中抽取要点、对齐信息、生成结构化结果。",
+                "desc2": "你保留最终判断与表达，AI 只是加速器，不替代责任。",
+                "desc3": "全流程可回看，产出可复盘。"
+            },
+            "oneStop": {
+                "title": "一站式 Workdeck",
+                "subtitle": "把分散工具收拢成一个工作台"
+            },
+            "ecosystem": {
+                "title": "开放插件生态",
+                "subtitle": "按行业与任务自由装配"
+            }
+        },
+        "pricing": {
+            "title": "简单透明的定价",
+            "subtitle": "个人免费起步，专业人士进阶。",
+            "free": {
+                "title": "免费版",
+                "price": "¥0",
+                "period": "/永久",
+                "perk1": "基础 Workdeck",
+                "perk2": "限制安装 3 个插件",
+                "cta": "免费下载"
+            },
+            "pro": {
+                "title": "专业版",
+                "price": "¥128",
+                "period": "/终身",
+                "perk1": "无限安装插件",
+                "perk2": "AI Copilot 智能助手",
+                "perk3": "优先技术支持",
+                "cta": "立即购买"
+            },
+            "team": {
+                "title": "团队版",
+                "price": "定制",
+                "period": "",
+                "perk1": "SSO & 团队管理",
+                "perk2": "私有插件部署",
+                "cta": "联系销售"
+            }
+        },
+        "footer": {
+            "product": "产品",
+            "features": "特性",
+            "pricing": "定价",
+            "download": "下载",
+            "changelog": "更新日志",
+            "ecosystem": "生态",
+            "plugins": "插件广场",
+            "developers": "开发者文档",
+            "legal": "法律信息",
+            "terms": "服务条款",
+            "privacy": "隐私政策",
+            "copyright": "© {year} AI Workdeck. 保留所有权利。"
+        }
+    }
+}

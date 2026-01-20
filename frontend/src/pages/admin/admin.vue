@@ -642,14 +642,14 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* King IDE Color System */
-$king-forest: #1A5336;
-$king-mint: #5BD197;
-$king-mint-light: #E6F9F0;
-$king-forest-dark: #123A26;
+/* AI Workdeck Color System */
+$brand-forest: #1A5336;
+$brand-mint: #5BD197;
+$brand-mint-light: #E6F9F0;
+$brand-forest-dark: #123A26;
 
-$brand-primary: $king-forest;
-$brand-accent: $king-mint;
+$brand-primary: $brand-forest;
+$brand-accent: $brand-mint;
 $brand-bg: #F8F9FA; // Gray-Pale
 $brand-white: #FFFFFF;
 $text-main: #2C3338; // Gray-Dark
@@ -677,7 +677,7 @@ $border-color: #E9ECEF; // Gray-Light
 }
 .page-admin {
   min-height: 100vh;
-  /* King IDE Palette Background */
+  /* AI Workdeck Palette Background */
   background: linear-gradient(135deg, #F8F9FA 0%, #E8F3ED 100%);
   display: flex;
   flex-direction: column;
@@ -762,7 +762,7 @@ $border-color: #E9ECEF; // Gray-Light
 }
 
 .nav-item.active {
-  background: $king-mint-light;
+  background: $brand-mint-light;
 }
 
 .nav-text {
@@ -945,7 +945,7 @@ $border-color: #E9ECEF; // Gray-Light
 
 .radio-item.checked {
   border-color: $brand-primary;
-  background: $king-mint-light;
+  background: $brand-mint-light;
 }
 
 .radio-dot {
@@ -990,7 +990,7 @@ $border-color: #E9ECEF; // Gray-Light
     &:hover {
         color: $brand-primary;
         border-color: $brand-primary;
-        background: $king-mint-light;
+        background: $brand-mint-light;
     }
 }
 
@@ -1210,7 +1210,7 @@ $border-color: #E9ECEF; // Gray-Light
   transition: background 0.2s;
   
   &:active {
-      background: $king-forest-dark;
+      background: $brand-forest-dark;
   }
   
   &[loading] {
@@ -1279,7 +1279,7 @@ $border-color: #E9ECEF; // Gray-Light
   font-size: 11px;
   padding: 1px 8px;
   border-radius: 4px;
-  background: $king-mint-light;
+  background: $brand-mint-light;
   color: $brand-primary;
   font-weight: 500;
   vertical-align: middle;

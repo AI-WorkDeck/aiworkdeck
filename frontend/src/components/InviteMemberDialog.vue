@@ -1,8 +1,8 @@
 <template>
-  <view v-if="visible" class="king-dialog-mask" @tap="close">
-    <view class="king-dialog" @tap.stop>
-      <view class="king-dialog-header">
-        <text class="king-dialog-title">邀请成员</text>
+  <view v-if="visible" class="workdeck-dialog-mask" @tap="close">
+    <view class="workdeck-dialog" @tap.stop>
+      <view class="workdeck-dialog-header">
+        <text class="workdeck-dialog-title">邀请成员</text>
         <view class="modal-close" @tap="close">×</view>
       </view>
 
@@ -26,13 +26,13 @@
         <view class="tab-line" :style="{ left: activeTab === 'MEMBER' ? '0%' : '50%' }"></view>
       </view>
 
-      <view class="king-dialog-body">
+      <view class="workdeck-dialog-body">
         <!-- Internal Member Form -->
         <view v-if="activeTab === 'MEMBER'">
           <view class="form-group">
             <text class="form-label">用户名</text>
             <input 
-              class="king-input" 
+              class="workdeck-input" 
               v-model="memberForm.username" 
               placeholder="请输入对方用户名" 
               :focus="activeTab === 'MEMBER'"
@@ -79,7 +79,7 @@
                <view class="form-group">
                  <text class="form-label">客户名称</text>
                  <input 
-                   class="king-input" 
+                   class="workdeck-input" 
                    v-model="clientName" 
                    placeholder="请输入客户名称（可选）" 
                  />
@@ -96,19 +96,19 @@
         </view>
       </view>
 
-      <view class="king-dialog-footer">
-        <view class="king-btn king-btn-secondary" @tap="close">取消</view>
+      <view class="workdeck-dialog-footer">
+        <view class="workdeck-btn workdeck-btn-secondary" @tap="close">取消</view>
         
         <block v-if="activeTab === 'MEMBER'">
-            <view class="king-btn king-btn-primary" @tap="submitMemberInvite" :class="{ disabled: loading }">
+            <view class="workdeck-btn workdeck-btn-primary" @tap="submitMemberInvite" :class="{ disabled: loading }">
                 {{ loading ? '邀请中...' : '确认邀请' }}
             </view>
         </block>
         <block v-else>
-            <view v-if="!clientInviteCode" class="king-btn king-btn-primary" @tap="generateClientCode" :class="{ disabled: loading }">
+            <view v-if="!clientInviteCode" class="workdeck-btn workdeck-btn-primary" @tap="generateClientCode" :class="{ disabled: loading }">
                 {{ loading ? '生成...' : '生成访问码' }}
             </view>
-            <view v-else class="king-btn king-btn-primary" @tap="close">完成</view>
+            <view v-else class="workdeck-btn workdeck-btn-primary" @tap="close">完成</view>
         </block>
       </view>
     </view>
@@ -205,8 +205,8 @@ export default {
 </script>
 
 <style scoped>
-/* Copied King Dialog Styles + Specifics */
-.king-dialog-mask {
+/* Workdeck Dialog Styles + Specifics */
+.workdeck-dialog-mask {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   background-color: rgba(0, 0, 0, 0.4);
@@ -217,7 +217,7 @@ export default {
   backdrop-filter: blur(2px);
 }
 
-.king-dialog {
+.workdeck-dialog {
   width: 618px; /* Golden Ratio */
   background: #ffffff;
   border-radius: 12px;
@@ -228,7 +228,7 @@ export default {
   box-sizing: border-box;
 }
 
-.king-dialog-header {
+.workdeck-dialog-header {
   padding: 24px 32px 0;
   position: relative;
   display: flex;
@@ -236,7 +236,7 @@ export default {
   align-items: center;
 }
 
-.king-dialog-title {
+.workdeck-dialog-title {
   font-size: 20px;
   font-weight: 600;
   color: #0f172a;
@@ -292,7 +292,7 @@ export default {
   transition: left 0.3s ease;
 }
 
-.king-dialog-body {
+.workdeck-dialog-body {
   padding: 24px 32px;
   min-height: 200px;
 }
@@ -309,7 +309,7 @@ export default {
   margin-bottom: 8px;
 }
 
-.king-input {
+.workdeck-input {
   width: 100%;
   height: 44px;
   padding: 0 12px;
@@ -321,7 +321,7 @@ export default {
   box-sizing: border-box;
 }
 
-.king-input:focus {
+.workdeck-input:focus {
   border-color: #1A5336;
   outline: none;
   box-shadow: 0 0 0 3px rgba(26, 83, 54, 0.1);
@@ -429,7 +429,7 @@ export default {
   text-decoration: underline;
 }
 
-.king-dialog-footer {
+.workdeck-dialog-footer {
   padding: 20px 32px 24px;
   background: #f8f9fa;
   display: flex;
@@ -438,7 +438,7 @@ export default {
   border-top: 1px solid #f1f5f9;
 }
 
-.king-btn {
+.workdeck-btn {
   height: 40px;
   padding: 0 24px;
   border-radius: 6px;
@@ -451,28 +451,28 @@ export default {
   transition: all 0.2s;
 }
 
-.king-btn-primary {
+.workdeck-btn-primary {
   background: #1A5336;
   color: #ffffff;
   border: 1px solid transparent;
 }
 
-.king-btn-primary:hover {
+.workdeck-btn-primary:hover {
   background: #14422b;
 }
 
-.king-btn-primary.disabled {
+.workdeck-btn-primary.disabled {
   background: #94a3b8;
   cursor: not-allowed;
 }
 
-.king-btn-secondary {
+.workdeck-btn-secondary {
   background: #ffffff;
   color: #475569;
   border: 1px solid #cbd5e1;
 }
 
-.king-btn-secondary:hover {
+.workdeck-btn-secondary:hover {
   background: #f1f5f9;
   border-color: #94a3b8;
   color: #1e293b;

@@ -213,7 +213,7 @@ const isSecondaryContent = (text) => {
 }
 
 .header-icon-wrapper {
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -222,7 +222,7 @@ const isSecondaryContent = (text) => {
 .title {
   font-size: 14px;
   font-weight: 600;
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
 }
 
 .right {
@@ -240,7 +240,7 @@ const isSecondaryContent = (text) => {
 
 .status-badge.success {
   background: #E6F9F0; /* Mint Lightest */
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
 }
 
 .status-badge.processing {
@@ -287,7 +287,7 @@ const isSecondaryContent = (text) => {
 }
 
 .step-dot.done {
-    background: #5BD197; /* King Mint */
+    background: #5BD197; /* Mint Green */
 }
 
 .step-text {

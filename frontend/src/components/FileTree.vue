@@ -1,7 +1,7 @@
 <template>
   <view class="file-tree" tabindex="0" @keydown="handleKeyDown" @mousedown="focusTree">
 
-    <!-- King IDE Style Modals System -->
+    <!-- AI Workdeck Style Modals System -->
 
     <!-- 1. Delete Confirmation Modal -->
     <view v-if="showDeleteDialog" class="king-dialog-mask" @tap="showDeleteDialog = false">
@@ -4335,7 +4335,7 @@ $bg-grey: $uni-bg-color-grey;
 
 /* Increase specificity to override zebra striping (.tree-list .tree-item:nth-child) */
 .tree-list .tree-item.tree-item-selected {
-  background-color: #D1E7DD !important; /* King Forest Lighter Tint - darkened for visibility */
+  background-color: #D1E7DD !important; /* Forest Green Lighter Tint - darkened for visibility */
 }
 
 /* Cmd/Ctrl 多选样式 */
@@ -4895,7 +4895,7 @@ $bg-grey: $uni-bg-color-grey;
   line-height: 1;
 }
 
-/* KING IDE Dialog Styles */
+/* AI WORKDECK Dialog Styles */
 .king-dialog-mask {
   position: fixed;
   top: 0;
@@ -4950,7 +4950,7 @@ $bg-grey: $uni-bg-color-grey;
 .king-dialog-title {
   font-size: 20px;
   font-weight: 600;
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
   line-height: 1.4;
   display: block;
 }
@@ -4992,7 +4992,7 @@ $bg-grey: $uni-bg-color-grey;
 }
 
 .king-input:focus {
-  border-color: #5BD197; /* King Mint */
+  border-color: #5BD197; /* Mint Green */
   box-shadow: 0 0 0 3px rgba(91, 209, 151, 0.15);
 }
 
@@ -5025,9 +5025,9 @@ $bg-grey: $uni-bg-color-grey;
   transform: translateY(1px);
 }
 
-/* Primary is now Forest Green to match King IDE */
+/* Primary is now Forest Green to match AI Workdeck */
 .king-btn-primary {
-  background-color: #1A5336; /* King Forest */
+  background-color: #1A5336; /* Forest Green */
   color: #ffffff;
   border: 1px solid transparent;
 }

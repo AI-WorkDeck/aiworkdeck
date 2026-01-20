@@ -37,11 +37,11 @@ export default {
     colors() {
         return {
             neutral: '#6C757D',
-            activeBody: '#1A5336', // King Forest
+            activeBody: '#1A5336', // Forest Green
             word: '#7E94B3',
             ppt: '#B38F7E',
             pdf: '#B37E7E',
-            excel: '#5CA67D', // Muted King Mint
+            excel: '#5CA67D', // Muted Mint Green
             image: '#7EABB3', // Muted Cyan
             video: '#947EB3', // Muted Purple
             audio: '#B3B37E', // Muted Olive

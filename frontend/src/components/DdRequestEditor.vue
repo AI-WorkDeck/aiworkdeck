@@ -446,9 +446,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-$king-forest: #1A5336;
-$king-mint: #5BD197;
-$king-mint-light: #E6F9F0;
+$brand-forest: #1A5336;
+$brand-mint: #5BD197;
+$brand-mint-light: #E6F9F0;
 $gray-pale: #F8F9FA;
 $gray-light: #E9ECEF;
 $gray-dark: #2C3338;
@@ -476,14 +476,14 @@ $white: #FFFFFF;
       .title-edit {
         font-size: 18px;
         font-weight: 600;
-        color: $king-forest;
+        color: $brand-forest;
         border: 1px solid transparent;
         border-radius: 4px;
         padding: 4px 8px;
         width: 200px;
 
         &:hover { border-color: $gray-light; }
-        &:focus { border-color: $king-mint; outline: none; background: #fff; }
+        &:focus { border-color: $brand-mint; outline: none; background: #fff; }
       }
 
       .status-badge {
@@ -502,7 +502,7 @@ $white: #FFFFFF;
     }
 
     .new-btn {
-      background-color: $king-forest;
+      background-color: $brand-forest;
       color: $white;
       font-size: 14px;
       padding: 6px 16px;
@@ -571,7 +571,7 @@ $white: #FFFFFF;
           background-color: #FAFAFA;
           .col-action .delete-btn { opacity: 1; }
       }
-      &.selected { background-color: $king-mint-light; }
+      &.selected { background-color: $brand-mint-light; }
 
       .col-name {
         width: 35%;
@@ -625,7 +625,7 @@ $white: #FFFFFF;
           color: #666;
           cursor: pointer;
           border-radius: 2px;
-          &:hover { color: $king-mint; border-color: $king-mint; }
+          &:hover { color: $brand-mint; border-color: $brand-mint; }
         }
       }
 
@@ -650,7 +650,7 @@ $white: #FFFFFF;
         color: $gray-dark;
         min-width: 0; /* Allow shrinking */
 
-        &:focus { background: #fff; border-color: $king-mint; outline: none; }
+        &:focus { background: #fff; border-color: $brand-mint; outline: none; }
       }
       .title-input { font-weight: 500; }
 
@@ -665,7 +665,7 @@ $white: #FFFFFF;
         cursor: pointer;
         color: $gray-dark;
 
-        &:hover { border-color: $king-mint; color: $king-mint; }
+        &:hover { border-color: $brand-mint; color: $brand-mint; }
       }
 
       .uploaded-info {
@@ -680,7 +680,7 @@ $white: #FFFFFF;
          max-width: 90px;
 
          .file-icon { font-size: 12px; }
-         .file-name { font-size: 11px; color: $king-forest; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+         .file-name { font-size: 11px; color: $brand-forest; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       }
 
       .comment-trigger {
@@ -688,7 +688,7 @@ $white: #FFFFFF;
         color: #666;
         cursor: pointer;
         position: relative;
-        &:hover { color: $king-mint; }
+        &:hover { color: $brand-mint; }
 
         .dot {
           position: absolute;
@@ -724,7 +724,7 @@ $white: #FFFFFF;
         .drawer-footer {
             padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px;
             input { flex: 1; border: 1px solid #ddd; padding: 6px; border-radius: 4px; }
-            button { background: $king-mint; border: none; color: white; padding: 0 12px; border-radius: 4px; font-size: 12px; }
+            button { background: $brand-mint; border: none; color: white; padding: 0 12px; border-radius: 4px; font-size: 12px; }
         }
     }
 }

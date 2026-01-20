@@ -213,11 +213,11 @@ const formatTime = (seconds) => {
 
 .header-title i {
   margin-right: 8px;
-  color: #5BD197; /* King Mint */
+  color: #5BD197; /* Mint Green */
 }
 
 .task-count {
-  background: #1A5336; /* King Forest */
+  background: #1A5336; /* Forest Green */
   color: white;
   padding: 2px 8px;
   border-radius: 12px;

@@ -2567,7 +2567,7 @@ export default {
 }
 
 /* =============================================
-   King IDE Style - Input Image Preview
+   AI Workdeck Style - Input Image Preview
    ============================================= */
 .input-images-preview {
   display: flex;
@@ -2615,7 +2615,7 @@ export default {
 }
 
  /* =============================================
-    King IDE Style - Inline Context Tags (Input Box)
+    AI Workdeck Style - Inline Context Tags (Input Box)
     Transparent background + border style
     ============================================= */
  :deep(.context-tag-inline) {
@@ -2692,7 +2692,7 @@ export default {
  }
 
  /* =============================================
-    King IDE Style - Inline Context Tags (User Bubble)
+    AI Workdeck Style - Inline Context Tags (User Bubble)
     Lighter/transparent background for visibility
     ============================================= */
 .user-bubble .context-tag-inline {
@@ -2774,7 +2774,7 @@ export default {
 }
 
 /* =============================================
-   King IDE Style - Upload Dialog Styles
+   AI Workdeck Style - Upload Dialog Styles
    ============================================= */
 .king-dialog-mask {
   position: fixed;
@@ -2866,7 +2866,7 @@ export default {
 .king-dialog-title {
   font-size: 20px;
   font-weight: 600;
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
   line-height: 1.4;
   display: block;
 }
@@ -2924,7 +2924,7 @@ export default {
 }
 
 .king-btn-primary {
-  background-color: #1A5336; /* King Forest */
+  background-color: #1A5336; /* Forest Green */
   color: #ffffff;
 }
 .king-btn-primary:hover {
@@ -3177,12 +3177,12 @@ export default {
 
 .status-btn.modified {
   border-color: rgba(26, 83, 54, 0.2);
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
   background-color: #E6F9F0; /* Mint Lightest */
 }
 
 .status-btn.modified:hover {
-  /* background-color: #5BD197; King Mint */
+  /* background-color: #5BD197; Mint Green */
   background-color: #5BD197;
   /* color: #ffffff; */
   /* border-color: #1A5336; */
@@ -3308,7 +3308,7 @@ export default {
 }
 
 .rollback-btn:hover {
-  /* background-color: #5BD197; King Mint */
+  /* background-color: #5BD197; Mint Green */
   /* border-color: #1A5336; */
 }
 
@@ -3317,7 +3317,7 @@ export default {
   align-items: center;
   justify-content: center;
   margin-right: 4px;
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
 }
 
 /* .rollback-btn:hover .rollback-icon-svg,
