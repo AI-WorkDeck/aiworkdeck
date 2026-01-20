@@ -866,9 +866,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* 品牌配色变量 - Updated to King IDE Palette */
-$brand-primary: #1A5336; /* King Forest */
-$brand-accent: #5BD197;  /* King Mint */
+/* 品牌配色变量 - Updated to AI Workdeck Palette */
+$brand-primary: #1A5336; /* Forest Green */
+$brand-accent: #5BD197;  /* Mint Green */
 $brand-dark: #212629;    /* Dark BG */
 $brand-bg: #F8F9FA;      /* Gray-Pale */
 $brand-white: #FFFFFF;

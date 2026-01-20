@@ -13,7 +13,7 @@ export default {
 </script>
 
 <style>
-/* King IDE Global Overrides */
+/* AI Workdeck Global Overrides */
 /* uni.showModal Style Override (Web/H5) */
 uni-modal .uni-modal {
     border-radius: 12px;
@@ -24,7 +24,7 @@ uni-modal .uni-modal {
 uni-modal .uni-modal__title {
     font-size: 18px;
     font-weight: 600;
-    color: #1A5336; /* King Forest */
+    color: #1A5336; /* Forest Green */
     padding-top: 24px;
 }
 
@@ -50,7 +50,7 @@ uni-modal .uni-modal__btn_default {
 
 /* Confirm Button */
 uni-modal .uni-modal__btn_primary {
-    color: #5BD197 !important; /* King Mint */
+    color: #5BD197 !important; /* Mint Green */
     font-weight: 600;
 }
 

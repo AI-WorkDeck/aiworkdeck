@@ -1,0 +1,82 @@
+{
+    "common": {
+        "productName": "AI Workdeck",
+        "productTagline": "One-Stop Workspace for Document Professionals in the AI Era",
+        "nav": {
+            "product": "Product",
+            "plugins": "Plugins",
+            "pricing": "Pricing",
+            "download": "Download",
+            "login": "Login"
+        },
+        "hero": {
+            "title": "AI Workdeck",
+            "subtitle": "The AI Workspace for Document Pros.",
+            "description": "Write, Read, Research. All in one deck.",
+            "cta": {
+                "download": "Download",
+                "pricing": "Pricing",
+                "plugins": "Plugins"
+            }
+        },
+        "features": {
+            "ai": {
+                "title": "AI Powered, Focus on Judgment",
+                "desc1": "AI helps extract key points, align information, and generate structured results.",
+                "desc2": "You retain final judgment and expression; AI is an accelerator, not a replacement.",
+                "desc3": "Full process reviewable, outputs reproducible."
+            },
+            "oneStop": {
+                "title": "One-Stop Workdeck",
+                "subtitle": "Consolidate scattered tools into one desk"
+            },
+            "ecosystem": {
+                "title": "Open Plugin Ecosystem",
+                "subtitle": "Assemble freely by industry and task"
+            }
+        },
+        "pricing": {
+            "title": "Simple Pricing",
+            "subtitle": "Start for free, upgrade for professionals.",
+            "free": {
+                "title": "Free",
+                "price": "$0",
+                "period": "/forever",
+                "perk1": "Basic Workdeck",
+                "perk2": "3 Plugins Limit",
+                "cta": "Download"
+            },
+            "pro": {
+                "title": "Professional",
+                "price": "$19",
+                "period": "/lifetime",
+                "perk1": "Unlimited Plugins",
+                "perk2": "AI Copilot",
+                "perk3": "Priority Support",
+                "cta": "Buy Now"
+            },
+            "team": {
+                "title": "Team",
+                "price": "Custom",
+                "period": "",
+                "perk1": "SSO & Admin",
+                "perk2": "Custom Plugins",
+                "cta": "Contact Sales"
+            }
+        },
+        "footer": {
+            "product": "Product",
+            "features": "Features",
+            "pricing": "Pricing",
+            "download": "Download",
+            "changelog": "Changelog",
+            "ecosystem": "Ecosystem",
+            "plugins": "Plugin Square",
+            "developers": "Developer Docs",
+            "legal": "Legal",
+            "terms": "Terms of Service",
+            "privacy": "Privacy Policy",
+            "copyright": "© {year} AI Workdeck. All rights reserved."
+        }
+    }
+}

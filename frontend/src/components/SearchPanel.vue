@@ -317,10 +317,10 @@ export default {
 
 <style lang="scss" scoped>
 /* Brands Colors from color.md */
-$king-forest: #1A5336;
-$king-mint: #5BD197;
-$king-mint-light: #5BD197; /* Keeping same for now */
-$king-mint-lightest: #E6F9F0;
+$brand-forest: #1A5336;
+$brand-mint: #5BD197;
+$brand-mint-light: #5BD197; /* Keeping same for now */
+$brand-mint-lightest: #E6F9F0;
 $gray-pale: #F8F9FA;
 $gray-light: #E9ECEF;
 $gray-medium: #6C757D;
@@ -367,8 +367,8 @@ $border-color: #E9ECEF;
     box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 
     &.focused {
-      border-color: $king-mint;
-      box-shadow: 0 0 0 3px rgba($king-mint, 0.15);
+      border-color: $brand-mint;
+      box-shadow: 0 0 0 3px rgba($brand-mint, 0.15);
     }
 
     .search-icon {
@@ -448,7 +448,7 @@ $border-color: #E9ECEF;
   gap: 4px;
 
   .highlight {
-      color: $king-forest;
+      color: $brand-forest;
       font-weight: 600;
   }
 }
@@ -526,7 +526,7 @@ $border-color: #E9ECEF;
           text-overflow: ellipsis;
 
           &:hover {
-              color: $king-forest;
+              color: $brand-forest;
               text-decoration: underline;
           }
       }
@@ -565,9 +565,9 @@ $border-color: #E9ECEF;
   font-family: "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
 
   &:hover {
-    background-color: rgba($king-mint, 0.05);
+    background-color: rgba($brand-mint, 0.05);
     .match-highlight {
-        background-color: rgba($king-mint, 0.3);
+        background-color: rgba($brand-mint, 0.3);
     }
   }
 
@@ -598,8 +598,8 @@ $border-color: #E9ECEF;
      text-overflow: ellipsis;
 
      .match-highlight {
-         background-color: rgba($king-mint, 0.15);
-         color: $king-forest;
+         background-color: rgba($brand-mint, 0.15);
+         color: $brand-forest;
          border-radius: 2px;
          padding: 0 1px;
          font-weight: 500;

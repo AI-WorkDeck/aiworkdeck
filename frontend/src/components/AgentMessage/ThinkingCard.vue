@@ -223,7 +223,7 @@ const toggle = () => {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 2px solid #5BD197; /* King Mint */
+  border: 2px solid #5BD197; /* Mint Green */
   opacity: 0;
   animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
 }

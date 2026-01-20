@@ -176,7 +176,7 @@ export default {
 /* --- TASK CARD MODE (Plan/Execution) --- */
 .task-card {
   background-color: #FAFAFA;
-  border: 1px solid #D1E7DC; /* King Mint Border */
+  border: 1px solid #D1E7DC; /* Mint Green Border */
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 4px rgba(0,0,0,0.02);
@@ -195,7 +195,7 @@ export default {
 .task-title-text {
   font-size: 12px;
   font-weight: 700;
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }

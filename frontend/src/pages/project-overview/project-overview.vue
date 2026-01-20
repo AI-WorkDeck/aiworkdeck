@@ -290,7 +290,7 @@
         @confirm="handleFilePickerConfirm"
       />
 
-      <!-- Invite Modal (Refactored to King IDE) -->
+      <!-- Invite Modal (Refactored to AI Workdeck) -->
       <!-- Invite Member Dialog -->
       <InviteMemberDialog
         v-model:visible="showInviteModal"
@@ -5968,7 +5968,7 @@ export default {
            ? file.name.substring(0, maxLen) + '...'
            : file.name
 
-       // Use King IDE brand colors for the tag
+       // Use AI Workdeck brand colors for the tag
        const tagHtml = `<span class="ai-tag" contenteditable="false" data-file-id="${file.id || file.fileId}" data-full-name="${file.name}" title="${file.name}" style="background: linear-gradient(135deg, #1A5336 0%, #2D7A52 100%); color: #FFFFFF; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; box-shadow: 0 1px 3px rgba(26,83,54,0.2);">@${displayName}</span>&nbsp;`
 
 
@@ -6475,11 +6475,11 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* Color Config - King IDE Palette */
-$color-primary: #1A5336; // King Forest
+/* Color Config - AI Workdeck Palette */
+$color-primary: #1A5336; // Forest Green
 $color-primary-light: #2D7A52; // Hover
 $color-primary-dark: #123A26; // Active
-$color-accent: #5BD197; // King Mint
+$color-accent: #5BD197; // Mint Green
 $color-accent-light: #84E0B3; // Hover
 $color-accent-pale: #E6F9F0; // Lightest (Selection)
 $color-text-main: #2C3338; // Gray-Dark
@@ -6594,7 +6594,7 @@ $bg-white: #FFFFFF;
 .project-name {
   font-size: 16px;
   font-weight: 600;
-  color: $color-primary; // King Forest for title
+  color: $color-primary; // Forest Green for title
   letter-spacing: -0.2px;
   cursor: pointer;
 
@@ -6742,7 +6742,7 @@ $bg-white: #FFFFFF;
 /* Left Rail (Activity Bar) - Match Doc Dark BG */
 .left-rail {
   width: 50px;
-  background-color: #F8F9FA; // King IDE Gray-Pale (Light Mode)
+  background-color: #F8F9FA; // AI Workdeck Gray-Pale (Light Mode)
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -6763,7 +6763,7 @@ $bg-white: #FFFFFF;
   transition: all 0.2s;
 
   &:hover {
-    color: #1A5336; // King Forest
+    color: #1A5336; // Forest Green
     background-color: #f1f5f9; // Slate-100
   }
 
@@ -6781,7 +6781,7 @@ $bg-white: #FFFFFF;
         top: 0;
         bottom: 0;
         width: 3px;
-        background-color: #1A5336; // King Forest (Accent)
+        background-color: #1A5336; // Forest Green (Accent)
         border-top-right-radius: 2px;
         border-bottom-right-radius: 2px;
     }
@@ -6877,7 +6877,7 @@ $bg-white: #FFFFFF;
 
   &.active {
     background: $bg-white;
-    color: $color-primary; // King Forest for active text
+    color: $color-primary; // Forest Green for active text
     font-weight: 500;
     border-color: $color-border;
     border-bottom: 1px solid $bg-white; // Merge with content below
@@ -6892,7 +6892,7 @@ $bg-white: #FFFFFF;
       left: 2px;
       right: 2px;
       height: 2px;
-      background: $color-accent; // King Mint highlight
+      background: $color-accent; // Mint Green highlight
       border-top-left-radius: 6px;
       border-top-right-radius: 6px;
     }
@@ -7772,7 +7772,7 @@ $bg-white: #FFFFFF;
 }
 
 .icon-btn.mini:hover {
-  background-color: #E8F3ED; /* King Mint Lightest */
+  background-color: #E8F3ED; /* Mint Green Lightest */
   border: none !important;
   outline: none !important;
 }
@@ -7839,8 +7839,8 @@ $bg-white: #FFFFFF;
   align-items: center;
   justify-content: center;
   padding: 4px 8px;
-  background-color: #E8F3ED; /* King Mint Lightest */
-  color: #1A5336; /* King Forest */
+  background-color: #E8F3ED; /* Mint Green Lightest */
+  color: #1A5336; /* Forest Green */
   font-size: 11px;
   font-weight: 600;
   border-radius: 4px;
@@ -8852,11 +8852,11 @@ $bg-white: #FFFFFF;
   display: block;
 }
 
-/* Inline Tag Style - King IDE Brand Colors */
+/* Inline Tag Style - AI Workdeck Brand Colors */
 .ai-tag {
   display: inline-flex;
   align-items: center;
-  background: linear-gradient(135deg, #1A5336 0%, #2D7A52 100%); /* King Forest gradient */
+  background: linear-gradient(135deg, #1A5336 0%, #2D7A52 100%); /* Forest Green gradient */
   color: #FFFFFF;
   padding: 2px 8px;
   border-radius: 4px;
@@ -9197,7 +9197,7 @@ $bg-white: #FFFFFF;
   border: none;
   background: transparent;
   font-size: 13px;
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
   cursor: pointer;
   user-select: none;
   font-weight: 500;
@@ -9331,8 +9331,8 @@ $bg-white: #FFFFFF;
 }
 
 .folder-item.active {
-  background-color: #E6F9F0; /* King Mint Lightest */
-  color: #1A5336; /* King Forest */
+  background-color: #E6F9F0; /* Mint Green Lightest */
+  color: #1A5336; /* Forest Green */
   font-weight: 500;
 }
 
@@ -9384,7 +9384,7 @@ $bg-white: #FFFFFF;
 }
 
 .check-icon {
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
   font-weight: bold;
   font-size: 14px;
   margin-left: 8px;
@@ -9444,7 +9444,7 @@ $bg-white: #FFFFFF;
 }
 
 .upload-btn-primary {
-  background-color: #1A5336; /* King Forest */
+  background-color: #1A5336; /* Forest Green */
   color: #ffffff;
   border: 1px solid transparent;
 }
@@ -9472,7 +9472,7 @@ $bg-white: #FFFFFF;
 }
 
 .dialog-input:focus {
-  border-color: #5BD197; /* King Mint */
+  border-color: #5BD197; /* Mint Green */
   outline: none;
 }
 
@@ -9866,7 +9866,7 @@ $bg-white: #FFFFFF;
   justify-content: center;
 }
 
-/* King IDE Dialog System (Copied for project-overview.vue usage) */
+/* AI Workdeck Dialog System (Copied for project-overview.vue usage) */
 .king-dialog-mask {
   position: fixed;
   top: 0;
@@ -9955,7 +9955,7 @@ $bg-white: #FFFFFF;
 }
 
 .king-btn-primary {
-  background: #1A5336; /* King Forest */
+  background: #1A5336; /* Forest Green */
   color: #ffffff;
   border: 1px solid transparent;
 }
@@ -10180,7 +10180,7 @@ $bg-white: #FFFFFF;
   left: 0;
   width: 100%;
   height: 2px;
-  background: #5BD197; /* King Mint */
+  background: #5BD197; /* Mint Green */
   border-radius: 2px 2px 0 0;
 }
 
@@ -10250,7 +10250,7 @@ $bg-white: #FFFFFF;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: rgba(44, 51, 56, 0.9); /* King IDE Gray-Dark with opacity */
+  background-color: rgba(44, 51, 56, 0.9); /* AI Workdeck Gray-Dark with opacity */
   color: #fff;
   padding: 12px 24px;
   border-radius: 8px;

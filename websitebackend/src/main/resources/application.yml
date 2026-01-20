@@ -1,0 +1,19 @@
+server:
+  port: 8081
+
+spring:
+  mail:
+    host: smtp.example.com
+    port: 587
+    username: user@example.com
+    password: password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+contact:
+  email:
+    to: sales@checkba.com

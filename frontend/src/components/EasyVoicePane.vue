@@ -14,7 +14,7 @@
         </view>
       </view>
       <textarea
-        class="king-textarea"
+        class="voice-textarea"
         v-model="text"
         placeholder="在此输入要转换的文本..."
         maxlength="-1"
@@ -29,7 +29,7 @@
       <view class="form-item relative">
         <text class="label">说话人</text>
         
-        <view class="king-select-trigger" @tap="toggleVoiceDropdown">
+        <view class="voice-select-trigger" @tap="toggleVoiceDropdown">
           <view class="selected-text">
              <text v-if="selectedVoiceLabel">{{ selectedVoiceLabel }}</text>
              <text v-else class="placeholder">选择语音...</text>
@@ -130,7 +130,7 @@
     <!-- Generate Action -->
     <view class="action-area">
       <button 
-        class="king-btn king-btn-primary full-width" 
+        class="workdeck-btn workdeck-btn-primary full-width" 
         @tap="handleGenerate"
         :disabled="generating || !text"
         :loading="generating"
@@ -493,7 +493,7 @@ export default {
     border-color: #d1d5db;
 }
 
-.king-textarea {
+.voice-textarea {
   width: 100%;
   height: 140px;
   border: 1px solid #e5e7eb;
@@ -506,7 +506,7 @@ export default {
   resize: none;
   transition: border-color 0.2s;
 }
-.king-textarea:focus {
+.voice-textarea:focus {
     border-color: #1A5336;
     outline: none;
 }
@@ -527,7 +527,7 @@ export default {
 }
 
 /* Custom Select Trigger */
-.king-select-trigger {
+.voice-select-trigger {
     width: 100%;
     height: 40px;
     border: 1px solid #d1d5db;
@@ -541,7 +541,7 @@ export default {
     cursor: pointer;
     transition: all 0.2s;
 }
-.king-select-trigger:active {
+.voice-select-trigger:active {
     border-color: #1A5336;
 }
 .selected-text {
@@ -668,7 +668,7 @@ export default {
   margin-bottom: 24px;
 }
 
-.king-btn {
+.workdeck-btn {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -683,15 +683,15 @@ export default {
   transition: all 0.2s;
 }
 
-.king-btn-primary {
+.workdeck-btn-primary {
   background-color: #1A5336;
   color: #fff;
 }
-.king-btn-primary:active {
+.workdeck-btn-primary:active {
   background-color: #14402a;
   transform: translateY(1px);
 }
-.king-btn:disabled {
+.workdeck-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     background-color: #9ca3af;

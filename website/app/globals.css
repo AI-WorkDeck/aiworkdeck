@@ -1,0 +1,69 @@
+@import "tailwindcss";
+@source "../components/**/*.{js,ts,jsx,tsx}";
+@source "../app/**/*.{js,ts,jsx,tsx}";
+
+:root {
+  /* King Forest Palette */
+  --king-forest: #1A5336;
+  --king-forest-darker: #123A26;
+  --king-forest-lighter: #2D7A52;
+  --king-forest-lightest: #E8F3ED;
+
+  /* King Mint Palette */
+  --king-mint: #5BD197;
+  --king-mint-lighter: #84E0B3;
+  --king-mint-lightest: #E6F9F0;
+
+  /* Neutral Palette */
+  --neutral-white: #FFFFFF;
+  --neutral-dark-bg: #212629;
+  --neutral-gray-dark: #2C3338;
+  --neutral-gray-medium: #6C757D;
+  --neutral-gray-light: #E9ECEF;
+  --neutral-gray-pale: #F8F9FA;
+
+  --background: var(--neutral-white);
+  --foreground: var(--neutral-gray-dark);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-king-forest: var(--king-forest);
+  --color-king-forest-darker: var(--king-forest-darker);
+  --color-king-forest-lighter: var(--king-forest-lighter);
+  --color-king-forest-lightest: var(--king-forest-lightest);
+
+  --color-king-mint: var(--king-mint);
+  --color-king-mint-lighter: var(--king-mint-lighter);
+  --color-king-mint-lightest: var(--king-mint-lightest);
+
+  --color-neutral-dark-bg: var(--neutral-dark-bg);
+  --color-neutral-gray-dark: var(--neutral-gray-dark);
+  --color-neutral-gray-medium: var(--neutral-gray-medium);
+  --color-neutral-gray-light: var(--neutral-gray-light);
+  --color-neutral-gray-pale: var(--neutral-gray-pale);
+  --color-neutral-white: var(--neutral-white);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: var(--neutral-dark-bg);
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+html {
+  scroll-behavior: smooth;
+}

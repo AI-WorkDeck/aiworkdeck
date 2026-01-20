@@ -32,7 +32,7 @@
                   <view class="control yellow"></view>
                   <view class="control green"></view>
                 </view>
-                <text class="window-title">King · IDE - Professional Workspace</text>
+                <text class="window-title">AI Workdeck - Professional Workspace</text>
               </view>
               <view class="ide-body">
                 <view class="ide-sidebar">
@@ -96,7 +96,7 @@
           <view class="card-header">
             <image class="card-logo" src="/static/iconmark.png" mode="heightFix" />
             <view class="card-texts">
-              <text class="product-name">King · IDE</text>
+              <text class="product-name">AI Workdeck</text>
               <text class="product-subtitle">律师一站式工作平台</text>
             </view>
           </view>
@@ -334,8 +334,8 @@ export default {
 
 <style lang="scss" scoped>
 /* Color Config */
-$color-primary: #1A5336; // King Forest
-$color-accent: #5BD197; // King Mint
+$color-primary: #1A5336; // Forest Green
+$color-accent: #5BD197; // Mint Green
 $color-text-main: #2C3338;
 $color-text-light: #6C757D;
 $bg-dark: #212629;

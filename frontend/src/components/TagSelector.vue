@@ -107,7 +107,7 @@ export default {
       showDropdown: false,
       isCreatingTag: false,
       pendingTagName: '',
-      selectedColor: '#5BD197', // Default to King Mint
+      selectedColor: '#5BD197', // Default to Mint Green
       presetColors: [
         '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#10B981', 
         '#5BD197', '#14B8A6', '#06B6D4', '#3B82F6', '#6366F1',

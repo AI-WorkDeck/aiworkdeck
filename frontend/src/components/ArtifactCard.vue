@@ -156,13 +156,13 @@ export default {
 .card-title {
   font-size: 13px;
   font-weight: 600;
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
 }
 
 .status-badge.resolved {
   font-size: 9px;
   background: #E6F9F0; /* Mint Lightest */
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 600;
@@ -174,7 +174,7 @@ export default {
 }
 
 .btn-approve {
-  background: #1A5336; /* King Forest */
+  background: #1A5336; /* Forest Green */
   color: #fff;
   font-size: 11px;
   padding: 4px 12px;
@@ -183,7 +183,7 @@ export default {
   font-weight: 600;
   transition: background 0.15s;
 }
-.btn-approve:hover { background: #123A26; } /* King Forest Darker */
+.btn-approve:hover { background: #123A26; } /* Forest Green Darker */
 
 .btn-view {
   background: transparent;

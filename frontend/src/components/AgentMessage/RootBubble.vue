@@ -172,13 +172,13 @@ const hasContent = computed(() => {
   padding-left: 20px;
 }
 
-/* Inline Code Style - King Mint Tint */
+/* Inline Code Style - Mint Green Tint */
 .main-content:deep(code) {
-  background: rgba(91, 209, 151, 0.1); /* Subtle King Mint Tint */
+  background: rgba(91, 209, 151, 0.1); /* Subtle Mint Green Tint */
   padding: 2px 5px;
   border-radius: 4px;
   font-size: 85%;
-  color: #1A5336; /* King Forest */
+  color: #1A5336; /* Forest Green */
   font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
 }
 
@@ -224,6 +224,6 @@ const hasContent = computed(() => {
   margin-top: 20px !important;
   margin-bottom: 10px !important;
   font-weight: 600;
-  color: #1A5336; /* King Forest for headings */
+  color: #1A5336; /* Forest Green for headings */
 }
 </style>

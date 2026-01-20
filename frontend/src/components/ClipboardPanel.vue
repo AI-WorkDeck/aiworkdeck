@@ -224,7 +224,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* Unified King IDE Palette */
+/* Unified AI Workdeck Palette */
 $color-primary: #1A5336;
 $color-accent: #5BD197;
 $color-accent-pale: #E6F9F0;

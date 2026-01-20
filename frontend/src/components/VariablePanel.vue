@@ -475,9 +475,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* Color Config - King IDE Palette */
-$color-primary: #1A5336; // King Forest
-$color-accent: #5BD197; // King Mint
+/* Color Config - AI Workdeck Palette */
+$color-primary: #1A5336; // Forest Green
+$color-accent: #5BD197; // Mint Green
 $color-accent-pale: #E6F9F0;
 $color-text-main: #2C3338;
 $color-text-light: #6C757D;
