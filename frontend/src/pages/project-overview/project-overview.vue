@@ -529,6 +529,13 @@
              @highlight-sentence="handleTtsHighlight"
              @clear-highlight="handleTtsClearHighlight"
           />
+          <DesensitizePane
+             v-else-if="leftPaneKey === 'desensitize'"
+             :project-id="projectId"
+             @request-file-select="handleDesensitizeSelectFile"
+             @request-active-file="handleDesensitizeActiveFile"
+             @open-file="handleDesensitizeSuccess"
+          />
           <SearchPanel
             v-else-if="leftPaneKey === 'search'"
             :project-id="projectId"
@@ -1182,6 +1189,7 @@ import FileLinkDropZone from '@/components/FileLinkDropZone.vue'
 import FileStagingArea from '@/components/FileStagingArea.vue'
 import PluginPane from '@/components/PluginPane.vue' // Added
 import EasyVoicePane from '@/components/EasyVoicePane.vue'
+import DesensitizePane from '@/components/DesensitizePane.vue'
 import ClipboardPanel from '@/components/ClipboardPanel.vue'
 import SearchPanel from '@/components/SearchPanel.vue'
 import InviteMemberDialog from '@/components/InviteMemberDialog.vue'
@@ -1262,6 +1270,7 @@ export default {
     CompareDocDialog,
     DocDiffViewer,
     EasyVoicePane,
+    DesensitizePane,
     FilePickerDialog,
     SearchPanel
   },
@@ -1417,6 +1426,9 @@ export default {
         files: [],
         linkKey: ''
       },
+      // Desensitize Callback
+      desensitizeFileSelectCallback: null,
+
       stagingFiles: [], // 文件暂存区列表
       stagingOriginalParents: {}, // 记录文件进入暂存区前的原始 parentId: { fileId: originalParentId }
       splitMode: false,
@@ -2080,8 +2092,39 @@ export default {
       this.showFilePicker = true
     },
 
+    // ==================== Desensitize Handlers ====================
+    handleDesensitizeSelectFile(callback) {
+        this.desensitizeFileSelectCallback = callback
+        this.showFilePicker = true
+    },
+    handleDesensitizeActiveFile(callback) {
+        const active = this.focusedPane === 'left' ? this.activeFileLeft : this.activeFileRight
+        // If no file focused but files open, pick the first one from left
+        const target = active || (this.leftFiles.length > 0 ? this.activeFileLeft : null)
+        callback(target)
+    },
+    handleDesensitizeSuccess(file) {
+        if (!file) return
+        
+        // Refresh file tree to show the new file
+        if (this.$refs.fileTree && this.$refs.fileTree.refresh) {
+            this.$refs.fileTree.refresh()
+        }
+        
+        // Open the file directly
+        // The backend returns the full ProjectFile object now
+        this.openFile(file)
+    },
+
     async handleFilePickerConfirm(file) {
         if (!file || !file.id) return
+
+        // Desensitize File Picker callback
+        if (this.desensitizeFileSelectCallback) {
+            this.desensitizeFileSelectCallback(file)
+            this.desensitizeFileSelectCallback = null
+            return
+        }
 
         try {
             uni.showLoading({ title: '正在导入...' })
@@ -5158,17 +5201,36 @@ export default {
           }
         }
       } catch (e) {
-        console.error('同步文件信息失败:', e)
+        // 如果遇到权限错误（deleted）或文件不存在，停止轮询
+        const errStr = (e && e.toString()) || ''
+        const shouldStop = errStr.includes('403') || errStr.includes('404') || errStr.includes('无权访问')
+        if (shouldStop) {
+           console.log(`[ProjectOverview] Stop polling due to error: ${errStr}`)
+           if (this.fileInfoPollingIntervals && this.fileInfoPollingIntervals[pane]) {
+                clearInterval(this.fileInfoPollingIntervals[pane])
+                delete this.fileInfoPollingIntervals[pane]
+           }
+        } else {
+            console.error('同步文件信息失败:', e)
+        }
       }
     },
 
     // 启动文件信息轮询（用于检测重命名）
     startFileInfoPolling(pane) {
+      // 防止重复创建
+      if (this.fileInfoPollingIntervals && this.fileInfoPollingIntervals[pane]) {
+        clearInterval(this.fileInfoPollingIntervals[pane])
+      }
+
       // 每5秒轮询一次文件信息
       const intervalId = setInterval(() => {
         const activeFile = pane === 'left' ? this.activeFileLeft : this.activeFileRight
         if (!activeFile) {
-          clearInterval(intervalId)
+          // 不清除，等待下次有文件时继续（或者也可以选择清除）
+          // 这里保持原逻辑：仅仅是return，不clearInterval，
+          // 因为 activeFile 可能会因为用户关闭标签变为空，但后续又打开
+          // 但其实 activeFile 变化很大... 简单的做法是 keep checking
           return
         }
         this.syncFileInfo(pane)
@@ -5179,6 +5241,18 @@ export default {
         this.fileInfoPollingIntervals = {}
       }
       this.fileInfoPollingIntervals[pane] = intervalId
+    },
+
+    // 生命周期钩子：组件销毁前清理定时器
+    beforeDestroy() {
+      if (this.fileInfoPollingIntervals) {
+        Object.values(this.fileInfoPollingIntervals).forEach(id => clearInterval(id))
+        this.fileInfoPollingIntervals = {}
+      }
+      // 清理 window 上的引用
+      if (window.__wpsInstance) {
+          window.__wpsInstance = null
+      }
     },
 
     // 获取当前聚焦的 WPS 实例

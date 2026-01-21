@@ -122,7 +122,7 @@ public class FileContentExtractorService {
     private String extractTextFromPdfWithOcr(File pdfFile) throws Exception {
         StringBuilder allText = new StringBuilder();
         
-        try (org.apache.pdfbox.pdmodel.PDDocument document = org.apache.pdfbox.pdmodel.PDDocument.load(pdfFile)) {
+        try (org.apache.pdfbox.pdmodel.PDDocument document = org.apache.pdfbox.Loader.loadPDF(pdfFile)) {
             org.apache.pdfbox.rendering.PDFRenderer renderer = new org.apache.pdfbox.rendering.PDFRenderer(document);
             int pageCount = document.getNumberOfPages();
             

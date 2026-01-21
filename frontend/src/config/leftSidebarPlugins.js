@@ -32,6 +32,13 @@ export const LEFT_SIDEBAR_PLUGINS = [
     label: 'EasyVoice',
     icon: '/static/MPIS-TTS.png',
     activeIcon: '/static/MPIS-TTS_selected.png'
+  },
+  {
+    key: 'desensitize',
+    label: '文件脱敏',
+    svgPaths: [
+      { d: "M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" }
+    ]
   }
 ]
 

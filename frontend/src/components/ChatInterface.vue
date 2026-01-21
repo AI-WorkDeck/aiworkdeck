@@ -334,7 +334,7 @@
                 @paste="handlePaste"
                 @keydown.enter="handleEnterKey"
                 @click="handleInputClick"
-                data-placeholder="请输入法律问题、拖拽文件/文件夹至此、粘贴合同文本或描述案情..."
+                data-placeholder="请输入问题、拖拽文件/文件夹至此、粘贴合同文本或描述案情..."
               ></div>
               <!-- Note: Context files are now shown as inline tags inside the rich input -->
               <view class="input-footer">
@@ -399,7 +399,7 @@
           <view v-else class="history-empty-placeholder">
              <text>Your recent chats will appear here</text>
           </view>
-          <view class="history-disclaimer">AI生成内容仅供参考，不构成正式法律意见。</view>
+          <view class="history-disclaimer">AI生成内容仅供参考，不构成正式意见，请自负责任使用。</view>
        </view>
     </view>
 

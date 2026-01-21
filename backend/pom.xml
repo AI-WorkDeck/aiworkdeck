@@ -184,11 +184,33 @@
             <version>3.1.3</version>
         </dependency>
 
+
         <!-- JavaCV (FFmpeg wrapper) for Video Processing -->
-    <dependency>
+        <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>javacv-platform</artifactId>
             <version>1.5.10</version>
+        </dependency>
+
+        <!-- Apache POI for DOCX Processing -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+
+        <!-- Apache PDFBox for PDF Processing -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.1</version>
+        </dependency>
+
+        <!-- Sensitive Data Desensitization (Optional, primarily for reference or future use) -->
+        <dependency>
+            <groupId>com.github.houbb</groupId>
+            <artifactId>sensitive-word</artifactId>
+            <version>0.2.0</version>
         </dependency>
 
         <!-- JAXB for Java 11+ (Required by docx4j) -->

@@ -23,6 +23,7 @@ public class ChatModelFactory {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ChatModelFactory.class);
 
     private final AiModelProperties aiModelProperties;
+    private final com.checkba.service.SystemSettingService systemSettingService;
 
     // 缓存: key = provider + ":" + modelName
     private final Map<String, ChatLanguageModel> modelCache = new ConcurrentHashMap<>();
@@ -56,7 +57,8 @@ public class ChatModelFactory {
         // Fallback to configured default provider (Legacy behavior)
         // If the user wants to force specific internal models (Gemini/Ollama) via "default"
         if (provider == AiModelProperties.Provider.GEMINI || (targetModel.toLowerCase().contains("gemini") && !targetModel.contains("/"))) {
-            return getOrCreateGeminiModel(aiModelProperties.getGemini().getModelName()); // fallback to config model name if generic request
+            String defaultModel = systemSettingService.get("external.google.modelName", aiModelProperties.getGemini().getModelName());
+            return getOrCreateGeminiModel(defaultModel); // fallback to config model name if generic request
         }
 
         // Default to Ollama
@@ -68,9 +70,13 @@ public class ChatModelFactory {
         return modelCache.computeIfAbsent(cacheKey, k -> {
             log.info("Creating new OpenRouter ChatModel instance for: {}", modelId);
             AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();
+            
+            String apiKey = systemSettingService.get("external.openrouter.apiKey", config.getApiKey());
+            String baseUrl = systemSettingService.get("external.openrouter.baseUrl", config.getBaseUrl());
+            
             return OpenAiChatModel.builder()
-                    .apiKey(config.getApiKey())
-                    .baseUrl(config.getBaseUrl())
+                    .apiKey(apiKey)
+                    .baseUrl(baseUrl)
                     .modelName(modelId)
                     .timeout(config.getTimeout())
                     .logRequests(true)
@@ -103,10 +109,14 @@ public class ChatModelFactory {
         return modelCache.computeIfAbsent(cacheKey, k -> {
             log.info("Creating new Gemini ChatModel instance for: {}", modelName);
             AiModelProperties.Gemini config = aiModelProperties.getGemini();
+            
+            String apiKey = systemSettingService.get("external.google.apiKey", config.getApiKey());
+            String baseUrl = systemSettingService.get("external.google.apiBaseUrl", config.getApiBaseUrl());
+
             return new GeminiChatLanguageModel(
-                    config.getApiBaseUrl(),
+                    baseUrl,
                     modelName,
-                    config.getApiKey(),
+                    apiKey,
                     config.getTimeout()
             );
         });
@@ -141,9 +151,13 @@ public class ChatModelFactory {
         return streamingModelCache.computeIfAbsent(cacheKey, k -> {
             log.info("Creating new OpenRouter StreamingChatModel for: {}", modelId);
             AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();
+            
+            String apiKey = systemSettingService.get("external.openrouter.apiKey", config.getApiKey());
+            String baseUrl = systemSettingService.get("external.openrouter.baseUrl", config.getBaseUrl());
+            
             return dev.langchain4j.model.openai.OpenAiStreamingChatModel.builder()
-                    .apiKey(config.getApiKey())
-                    .baseUrl(config.getBaseUrl())
+                    .apiKey(apiKey)
+                    .baseUrl(baseUrl)
                     .modelName(modelId)
                     .timeout(config.getTimeout())
                     .logRequests(true)

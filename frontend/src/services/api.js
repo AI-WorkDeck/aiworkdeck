@@ -10,7 +10,11 @@ import { getAuthHeaders, getSessionId } from '@/utils/auth.js'
 // - 本地 H5 开发（localhost/127.0.0.1）：自动指向后端 9696
 // - 其他环境：可通过 VITE_API_BASE_URL 覆盖；否则使用默认网关地址
 // 注意：用户当前环境后端就挂在 checkbahttps 域名下
-const DEFAULT_API_BASE_URL = 'https://checkbahttps.vip.cpolar.cn';
+// 默认后端地址：
+// - 本地 H5 开发（localhost/127.0.0.1）：自动指向后端 9696
+// - 其他环境：必须通过 VITE_API_BASE_URL 配置
+// 注意：生产环境请确保 .env.production 中配置了 VITE_API_BASE_URL
+const DEFAULT_API_BASE_URL = '';
 
 // 本地开发环境后端地址
 const LOCAL_API_BASE_URL = 'http://localhost:9696';
@@ -105,6 +109,10 @@ export function getApiBaseUrl() {
     cachedApiBaseUrl = LOCAL_API_BASE_URL;
     console.log('[API] 检测到本地开发环境，使用本地后端:', cachedApiBaseUrl);
     return cachedApiBaseUrl;
+  }
+
+  if (import.meta.env.PROD && !DEFAULT_API_BASE_URL) {
+    console.warn('[API] 警告：生产环境未配置 VITE_API_BASE_URL，后续请求可能会失败');
   }
 
   cachedApiBaseUrl = DEFAULT_API_BASE_URL;
@@ -787,6 +795,28 @@ export function batchCopyFiles(projectId, fileIds, targetParentId) {
   });
 }
 
+
+// ===================== 脱敏处理 API =====================
+// ===================== 脱敏处理 API =====================
+export function getSensitiveOptions() {
+  return request({
+    url: '/api/sensitive/options',
+    method: 'GET',
+  });
+}
+
+export function desensitizeFile(payload) {
+  return request({
+    url: '/api/sensitive/desensitize',
+    method: 'POST',
+    data: payload,
+    header: {
+      'Content-Type': 'application/json',
+    },
+    timeout: 300000, // 5 minutes timeout for large files
+  });
+}
+
 // 获取文件详情
 export function getFileDetail(projectId, fileId) {
   return request({
@@ -1316,6 +1346,9 @@ export default {
   deleteDdItem,
   deleteDdRequest,
   copyDdRequest,
+  // Desensitization
+  getSensitiveOptions,
+  desensitizeFile,
   // WPS 操作
   sendWpsResult,
   addDdRequestItems(requestId, content) {
