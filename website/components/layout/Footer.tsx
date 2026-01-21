@@ -23,66 +23,80 @@ export function Footer({ lang, dict }: FooterProps) {
     ];
 
     return (
-        <footer className="bg-neutral-gray-pale">
-            {/* Links Section */}
+        <footer className="bg-neutral-gray-pale border-t border-neutral-gray-light">
+            {/* Main Footer Content */}
             <div className="container mx-auto px-4 md:px-8 py-12">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 text-sm">
+                <div className="flex flex-col lg:flex-row gap-12 lg:gap-20 xl:gap-24">
 
-                    {/* Product Column */}
-                    <div className="flex flex-col gap-3">
-                        <h4 className="font-semibold text-neutral-dark-bg mb-2">{dict.common.footer.product}</h4>
-                        <Link
-                            href={`/${lang}#product`}
-                            className="text-neutral-gray-medium hover:text-king-forest transition-colors"
-                        >
-                            {dict.common.footer.features}
+                    {/* Brand / Logo Section (Left) */}
+                    <div className="lg:w-64 flex flex-col gap-4 shrink-0">
+                        <Link href={`/${lang}`} className="block">
+                            <img src="/logo.png" alt="AI Workdeck" className="h-8 w-auto" />
                         </Link>
-                        <Link
-                            href={`/${lang}#pricing`}
-                            className="text-neutral-gray-medium hover:text-king-forest transition-colors"
-                        >
-                            {dict.common.footer.pricing}
-                        </Link>
-                        <Link
-                            href="https://github.com/checkba/ai-workdeck"
-                            target="_blank"
-                            className="text-neutral-gray-medium hover:text-king-forest transition-colors"
-                        >
-                            {dict.common.footer.download}
-                        </Link>
+                        <p className="text-neutral-gray-medium text-sm leading-relaxed">
+                            {dict.common.productTagline}
+                        </p>
                     </div>
 
-                    {/* Showcase Column - 两列插件 */}
-                    <div className="md:col-span-2">
-                        <h4 className="font-semibold text-neutral-dark-bg mb-4">{dict.common.footer.showcase}</h4>
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                            {/* Column 1 */}
-                            <div className="flex flex-col gap-3">
-                                {pluginsColumn1.map((plugin) => (
-                                    <Link
-                                        key={plugin.id}
-                                        href={`/${lang}/showcase#${plugin.id}`}
-                                        className="text-neutral-gray-medium hover:text-king-forest transition-colors"
-                                    >
-                                        {dict.common.footer.plugins_list?.[plugin.key] ||
-                                            dict.showcasePage?.plugins?.[plugin.id]?.title ||
-                                            plugin.key}
-                                    </Link>
-                                ))}
-                            </div>
-                            {/* Column 2 */}
-                            <div className="flex flex-col gap-3">
-                                {pluginsColumn2.map((plugin) => (
-                                    <Link
-                                        key={plugin.id}
-                                        href={`/${lang}/showcase#${plugin.id}`}
-                                        className="text-neutral-gray-medium hover:text-king-forest transition-colors"
-                                    >
-                                        {dict.common.footer.plugins_list?.[plugin.key] ||
-                                            dict.showcasePage?.plugins?.[plugin.id]?.title ||
-                                            plugin.key}
-                                    </Link>
-                                ))}
+                    {/* Links Grid (Right) */}
+                    <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12 text-sm">
+
+                        {/* Product Column */}
+                        <div className="flex flex-col gap-3">
+                            <h4 className="font-semibold text-neutral-dark-bg mb-2">{dict.common.footer.product}</h4>
+                            <Link
+                                href={`/${lang}#product`}
+                                className="text-neutral-gray-medium hover:text-king-forest transition-colors"
+                            >
+                                {dict.common.footer.features}
+                            </Link>
+                            <Link
+                                href={`/${lang}#pricing`}
+                                className="text-neutral-gray-medium hover:text-king-forest transition-colors"
+                            >
+                                {dict.common.footer.pricing}
+                            </Link>
+                            <Link
+                                href="https://github.com/checkba/ai-workdeck"
+                                target="_blank"
+                                className="text-neutral-gray-medium hover:text-king-forest transition-colors"
+                            >
+                                {dict.common.footer.download}
+                            </Link>
+                        </div>
+
+                        {/* Showcase Column - Spans 2 cols visually in the grid logic implies we treat it as 2 cols here */}
+                        <div className="col-span-2">
+                            <h4 className="font-semibold text-neutral-dark-bg mb-4">{dict.common.footer.showcase}</h4>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                                {/* Column 1 */}
+                                <div className="flex flex-col gap-3">
+                                    {pluginsColumn1.map((plugin) => (
+                                        <Link
+                                            key={plugin.id}
+                                            href={`/${lang}/showcase#${plugin.id}`}
+                                            className="text-neutral-gray-medium hover:text-king-forest transition-colors"
+                                        >
+                                            {dict.common.footer.plugins_list?.[plugin.key] ||
+                                                dict.showcasePage?.plugins?.[plugin.id]?.title ||
+                                                plugin.key}
+                                        </Link>
+                                    ))}
+                                </div>
+                                {/* Column 2 */}
+                                <div className="flex flex-col gap-3">
+                                    {pluginsColumn2.map((plugin) => (
+                                        <Link
+                                            key={plugin.id}
+                                            href={`/${lang}/showcase#${plugin.id}`}
+                                            className="text-neutral-gray-medium hover:text-king-forest transition-colors"
+                                        >
+                                            {dict.common.footer.plugins_list?.[plugin.key] ||
+                                                dict.showcasePage?.plugins?.[plugin.id]?.title ||
+                                                plugin.key}
+                                        </Link>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -93,7 +107,7 @@ export function Footer({ lang, dict }: FooterProps) {
             <div className="border-t border-neutral-gray-light"></div>
 
             {/* Legal Footer Bar */}
-            <div className="container mx-auto px-4 md:px-8 py-4">
+            <div className="container mx-auto px-4 md:px-8 py-6">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs">
                     {/* Copyright */}
                     <p className="text-neutral-gray-medium">
