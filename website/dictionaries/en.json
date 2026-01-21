@@ -4,56 +4,114 @@
         "productTagline": "One-Stop Workspace for Document Professionals in the AI Era",
         "nav": {
             "product": "Product",
-            "plugins": "Plugins",
+            "showcase": "Showcase",
             "pricing": "Pricing",
-            "download": "Download",
-            "login": "Login"
+            "download": "Download"
         },
         "hero": {
             "title": "AI Workdeck",
-            "subtitle": "The AI Workspace for Document Pros.",
+            "subtitle": "One-Stop Workspace for Document Pros.",
             "description": "Write, Read, Research. All in one deck.",
             "cta": {
-                "download": "Download",
+                "download": "GitHub",
                 "pricing": "Pricing",
                 "plugins": "Plugins"
             }
         },
         "features": {
             "ai": {
-                "title": "AI Powered, Focus on Judgment",
-                "desc1": "AI helps extract key points, align information, and generate structured results.",
-                "desc2": "You retain final judgment and expression; AI is an accelerator, not a replacement.",
-                "desc3": "Full process reviewable, outputs reproducible."
+                "title": "Buer Agent",
+                "subtitle": "Zero Errors, Zero Rework",
+                "desc1": "Reading, extraction, scrubbing, drafting—complexity becomes simplicity.",
+                "desc2": "Let the mind return to profession; give decision-making its composure."
             },
             "oneStop": {
                 "title": "One-Stop Workdeck",
-                "subtitle": "Consolidate scattered tools into one desk"
+                "subtitle": "One Case in Hand, All Tools Ready",
+                "desc1": "Voice transcription, visual recognition, document management—encompassing all in one case.",
+                "desc2": "What you think is what you get; smooth and seamless."
             },
             "ecosystem": {
-                "title": "Open Plugin Ecosystem",
-                "subtitle": "Assemble freely by industry and task"
+                "title": "Plugin Ecosystem",
+                "subtitle": "Infinite Possibilities",
+                "desc1": "From due diligence to shareholder checks, from industry insights to specialized data. Boundless as the sea.",
+                "desc2": "An open realm of symbiotic growth.",
+                "items": [
+                    {
+                        "title": "Text to Speech",
+                        "subtitle": "Give Voice to Text",
+                        "description": "Integration with ElevenLabs top-tier speech synthesis. Make your documents speak.",
+                        "showcaseId": "tts"
+                    },
+                    {
+                        "title": "Banana PPT",
+                        "subtitle": "Presentation in a Click",
+                        "description": "Powered by Nano Banana. Intelligently parses outlines to generate stunning PPTs instantly.",
+                        "showcaseId": "ppt"
+                    },
+                    {
+                        "title": "Meeting Verification",
+                        "subtitle": "Smart Compliance",
+                        "description": "Automatically verifies process compliance and document integrity for shareholder meetings.",
+                        "showcaseId": "top"
+                    },
+                    {
+                        "title": "Due Diligence",
+                        "subtitle": "Collaborative Power",
+                        "description": "Collaborate efficiently with clients to manage due diligence lists and documents.",
+                        "showcaseId": "dueDiligence"
+                    },
+                    {
+                        "title": "Smart Clipboard",
+                        "subtitle": "Copy Once, Remember Forever",
+                        "description": "Records every copy action with infinite backtracking history.",
+                        "showcaseId": "clipboard"
+                    },
+                    {
+                        "title": "File Staging",
+                        "subtitle": "Temporary Dock",
+                        "description": "Temporary staging for quick access, keeping your workspace clutter-free.",
+                        "showcaseId": "staging"
+                    },
+                    {
+                        "title": "Auto Work Log",
+                        "subtitle": "Tracing Every Step",
+                        "description": "Automatically tracks your work activity to generate daily/weekly reports.",
+                        "showcaseId": "workLog"
+                    },
+                    {
+                        "title": "Doc Link",
+                        "subtitle": "Drag, Drop, Connect",
+                        "description": "Select text, drag a file over, and link instantly.",
+                        "showcaseId": "docLink"
+                    }
+                ]
             }
         },
         "pricing": {
             "title": "Simple Pricing",
-            "subtitle": "Start for free, upgrade for professionals.",
+            "subtitle": "Open Source for full control. Professional Services for peace of mind.",
             "free": {
-                "title": "Free",
-                "price": "$0",
-                "period": "/forever",
-                "perk1": "Basic Workdeck",
-                "perk2": "3 Plugins Limit",
-                "cta": "Download"
+                "title": "Open Source",
+                "price": "Free",
+                "period": "",
+                "desc": "For Geeks and Builders",
+                "perk1": "Free to use",
+                "perk2": "Self-hosted ready",
+                "perk3": "Community support",
+                "perk4": "Access to basic plugins",
+                "cta": "Download on GitHub"
             },
             "pro": {
-                "title": "Professional",
-                "price": "$19",
-                "period": "/lifetime",
-                "perk1": "Unlimited Plugins",
-                "perk2": "AI Copilot",
-                "perk3": "Priority Support",
-                "cta": "Buy Now"
+                "title": "Commercial",
+                "price": "Custom",
+                "period": "",
+                "desc": "For Teams and Enterprises",
+                "perk1": "Commercial License",
+                "perk2": "Professional Support",
+                "perk3": "Advanced Enterprise Plugins",
+                "perk4": "Custom Integration",
+                "cta": "Contact Sales"
             },
             "team": {
                 "title": "Team",
@@ -64,19 +122,72 @@
                 "cta": "Contact Sales"
             }
         },
+        "ctaSection": {
+            "title": "Master Your Documents. Master Your Future."
+        },
         "footer": {
             "product": "Product",
             "features": "Features",
             "pricing": "Pricing",
-            "download": "Download",
-            "changelog": "Changelog",
-            "ecosystem": "Ecosystem",
+            "download": "GitHub",
             "plugins": "Plugin Square",
-            "developers": "Developer Docs",
+            "showcase": "Showcase",
+            "sections": {
+                "overview": "Overview"
+            },
+            "plugins_list": {
+                "tts": "Text to Speech",
+                "ppt": "Banana PPT",
+                "dueDiligence": "Due Diligence",
+                "meetingVerification": "Meeting Verification",
+                "clipboard": "Smart Clipboard",
+                "staging": "File Staging",
+                "workLog": "Auto Work Log",
+                "docLink": "Doc Link"
+            },
             "legal": "Legal",
             "terms": "Terms of Service",
             "privacy": "Privacy Policy",
+            "more": "More",
             "copyright": "© {year} AI Workdeck. All rights reserved."
+        }
+    },
+    "showcasePage": {
+        "title": "Showcase",
+        "subtitle": "Witness how AI reshapes your workflow",
+        "introVideo": {
+            "title": "AI Workdeck Overview",
+            "description": "5-minute quick tour of core capabilities."
+        },
+        "plugins": {
+            "tts": {
+                "title": "Text to Speech",
+                "desc": "Give voice to your documents."
+            },
+            "ppt": {
+                "title": "Banana PPT",
+                "desc": "One click from outline to presentation."
+            },
+            "dueDiligence": {
+                "title": "Due Diligence",
+                "desc": "Efficient collaboration for DD lists."
+            },
+            "clipboard": {
+                "title": "Smart Clipboard",
+                "desc": "Infinite history, copy is memory."
+            },
+            "staging": {
+                "title": "File Staging",
+                "desc": "Temporary dock for a clean desktop."
+            },
+            "workLog": {
+                "title": "Auto Work Log",
+                "desc": "Track every step automatically."
+            },
+            "docLink": {
+                "title": "Doc Link",
+                "desc": "Drag and connect to build knowledge."
+            }
         }
     }
 }

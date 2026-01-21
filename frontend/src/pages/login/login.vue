@@ -7,7 +7,7 @@
     <!-- Top Navigation -->
     <view class="top-nav">
       <view class="nav-left">
-        <image class="nav-logo" src="/static/logo_full.png" mode="heightFix" />
+        <image class="nav-logo" src="/static/logo_full_v2.png" mode="heightFix" />
       </view>
       <view class="nav-right">
         <text class="nav-item">使用指引</text>
@@ -94,10 +94,10 @@
       <view class="login-section">
         <view class="glass-card">
           <view class="card-header">
-            <image class="card-logo" src="/static/iconmark.png" mode="heightFix" />
+            <image class="card-logo" src="/static/iconmark_v2.png" mode="heightFix" />
             <view class="card-texts">
               <text class="product-name">AI Workdeck</text>
-              <text class="product-subtitle">律师一站式工作平台</text>
+              <text class="product-subtitle">一站式AI文档工作台</text>
             </view>
           </view>
 

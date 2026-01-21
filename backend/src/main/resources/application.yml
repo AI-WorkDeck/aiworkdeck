@@ -40,6 +40,12 @@ external:
   tushare:
     base-url: http://api.tushare.pro
     token: ***REMOVED***
+  # ElevenLabs TTS 配置
+  elevenlabs:
+    api-key: ***REMOVED***
+    base-url: https://api.elevenlabs.io/v1
+    model-id: eleven_multilingual_v2
+    default-voice-id: JBFqnCBsd6RMkjVDRZzb
   # PPTX 生成服务配置（banana-slides Docker 容器）
   pptx-service:
     # 服务地址（Docker 容器映射端口）

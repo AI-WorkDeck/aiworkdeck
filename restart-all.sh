@@ -71,23 +71,23 @@ else
 fi
 
 # ==========================================
-# 1.8 停止 EasyVoice 服务 (Docker)
+# 1.8 停止 EasyVoice 服务 (Docker) -> Skipped (Using ElevenLabs)
 # ==========================================
-echo ""
-echo ">>> [1.8/6] 停止 EasyVoice 服务 (Docker)..."
-if [ "$DOCKER_AVAILABLE" = true ]; then
-    if docker ps -q -f name=checkba-easyvoice 2>/dev/null | grep -q .; then
-        echo "找到 EasyVoice 服务容器，正在停止..."
-        docker stop checkba-easyvoice 2>/dev/null || true
-        docker rm checkba-easyvoice 2>/dev/null || true
-        sleep 1
-        echo "✓ EasyVoice 服务已停止"
-    else
-        echo "未找到运行中的 EasyVoice 服务容器"
-    fi
-else
-    echo "Docker 不可用，跳过..."
-fi
+# echo ""
+# echo ">>> [1.8/6] 停止 EasyVoice 服务 (Docker)..."
+# if [ "$DOCKER_AVAILABLE" = true ]; then
+#     if docker ps -q -f name=checkba-easyvoice 2>/dev/null | grep -q .; then
+#         echo "找到 EasyVoice 服务容器，正在停止..."
+#         docker stop checkba-easyvoice 2>/dev/null || true
+#         docker rm checkba-easyvoice 2>/dev/null || true
+#         sleep 1
+#         echo "✓ EasyVoice 服务已停止"
+#     else
+#         echo "未找到运行中的 EasyVoice 服务容器"
+#     fi
+# else
+#     echo "Docker 不可用，跳过..."
+# fi
 
 # ==========================================
 # 2. 停止后端 Java 服务 (端口 9696)
@@ -245,35 +245,35 @@ else
 fi
 
 # ==========================================
-# 1.8 启动 EasyVoice 服务 (Docker)
+# 1.8 启动 EasyVoice 服务 (Docker) -> Skipped (Using ElevenLabs)
 # ==========================================
-echo ""
-echo ">>> [启动 1.8/5] 启动 EasyVoice 服务 (Docker)..."
-if [ "$DOCKER_AVAILABLE" = true ]; then
-    cd "$PROJECT_ROOT"
-    
-    # 使用 docker-compose 启动 EasyVoice 服务
-    echo "📦 启动 EasyVoice 服务容器..."
-    docker-compose up -d easyvoice
-    
-    # 等待服务启动
-    echo "⏳ 等待 EasyVoice 服务启动 (最多 30 秒)..."
-    for i in {1..30}; do
-        if curl -s http://localhost:9549/api/health > /dev/null 2>&1; then
-            echo "✓ EasyVoice 服务已启动: http://localhost:9549"
-            break
-        fi
-        sleep 1
-    done
-    
-    # 检查是否启动成功 (EasyVoice app.ts mounts /api/health)
-    if ! curl -s http://localhost:9549/api/health > /dev/null 2>&1; then
-         echo "⚠️ EasyVoice 服务启动可能超时或健康检查失败，请检查 Docker 日志:"
-         echo "   docker-compose logs easyvoice"
-    fi
-else
-    echo "Docker 不可用，跳过 EasyVoice 服务启动..."
-fi
+# echo ""
+# echo ">>> [启动 1.8/5] 启动 EasyVoice 服务 (Docker)..."
+# if [ "$DOCKER_AVAILABLE" = true ]; then
+#     cd "$PROJECT_ROOT"
+#     
+#     # 使用 docker-compose 启动 EasyVoice 服务
+#     echo "📦 启动 EasyVoice 服务容器..."
+#     docker-compose up -d easyvoice
+#     
+#     # 等待服务启动
+#     echo "⏳ 等待 EasyVoice 服务启动 (最多 30 秒)..."
+#     for i in {1..30}; do
+#         if curl -s http://localhost:9549/api/health > /dev/null 2>&1; then
+#             echo "✓ EasyVoice 服务已启动: http://localhost:9549"
+#             break
+#         fi
+#         sleep 1
+#     done
+#     
+#     # 检查是否启动成功 (EasyVoice app.ts mounts /api/health)
+#     if ! curl -s http://localhost:9549/api/health > /dev/null 2>&1; then
+#          echo "⚠️ EasyVoice 服务启动可能超时或健康检查失败，请检查 Docker 日志:"
+#          echo "   docker-compose logs easyvoice"
+#     fi
+# else
+#     echo "Docker 不可用，跳过 EasyVoice 服务启动..."
+# fi
 
 
 # ==========================================
@@ -391,11 +391,12 @@ if [ "$DOCKER_AVAILABLE" = true ]; then
         echo "⏳ MinerU 服务:      启动中... (端口 8001，模型加载需要时间)"
     fi
     
-    if curl -s http://localhost:9549/api/health > /dev/null 2>&1; then
-        echo "✓ EasyVoice 服务:   http://localhost:9549"
-    else
-        echo "✗ EasyVoice 服务:   未启动 (端口 9549)"
-    fi
+    # if curl -s http://localhost:9549/api/health > /dev/null 2>&1; then
+    #     echo "✓ EasyVoice 服务:   http://localhost:9549"
+    # else
+    #     echo "✗ EasyVoice 服务:   未启动 (端口 9549)"
+    # fi
+    echo "✓ TTS 服务:         ElevenLabs Cloud API (Enabled)"
 else
     echo "- MinerU 服务:      Docker 不可用"
 fi

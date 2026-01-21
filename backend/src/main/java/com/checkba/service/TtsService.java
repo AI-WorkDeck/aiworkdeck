@@ -1,10 +1,12 @@
 package com.checkba.service;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -12,204 +14,162 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.*;
 
+/**
+ * TTS Service using ElevenLabs API
+ * API Documentation: https://elevenlabs.io/docs/api-reference
+ */
 @Service
 public class TtsService {
 
     private static final Logger logger = LoggerFactory.getLogger(TtsService.class);
-    private static final String TEMP_AUDIO_DIR = System.getProperty("java.io.tmpdir") + File.separator + "easyvoice_audio";
-    // Mapped via Docker: host port 9549 -> container port 3000
-    private static final String TTS_API_BASE = "http://localhost:9549/api/v1/tts";
+    private static final String TEMP_AUDIO_DIR = System.getProperty("java.io.tmpdir") + File.separator + "elevenlabs_audio";
+    
+    @Value("${external.elevenlabs.api-key}")
+    private String apiKey;
+    
+    @Value("${external.elevenlabs.base-url}")
+    private String baseUrl;
+    
+    @Value("${external.elevenlabs.model-id}")
+    private String modelId;
+    
+    @Value("${external.elevenlabs.default-voice-id}")
+    private String defaultVoiceId;
+    
     private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public TtsService() {
         new File(TEMP_AUDIO_DIR).mkdirs();
     }
 
+    /**
+     * Get available voices from ElevenLabs API
+     * GET /voices
+     */
     public List<VoiceOption> getVoices() {
         try {
-            String url = TTS_API_BASE + "/voiceList";
-            ResponseEntity<VoiceListResponse> response = restTemplate.getForEntity(url, VoiceListResponse.class);
+            String url = baseUrl + "/voices";
             
-            if (response.getBody() != null && response.getBody().isSuccess()) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("xi-api-key", apiKey);
+            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+            
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+            
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                JsonNode voicesNode = root.get("voices");
+                
                 List<VoiceOption> result = new ArrayList<>();
-                List<VoiceJson> data = response.getBody().getData();
-                if (data != null) {
-                    for (VoiceJson v : data) {
+                if (voicesNode != null && voicesNode.isArray()) {
+                    for (JsonNode voiceNode : voicesNode) {
                         VoiceOption vo = new VoiceOption();
-                        vo.setName(v.getName());
-                        vo.setGender(v.getGender());
+                        vo.setVoiceId(voiceNode.path("voice_id").asText());
+                        vo.setName(voiceNode.path("name").asText());
                         
-                        // Extract locale from Name (e.g. en-US-AriaNeural -> en-US)
-                        String name = v.getName();
-                        if (name != null) {
-                            String[] parts = name.split("-");
-                            if (parts.length >= 2) {
-                                vo.setLocale(parts[0] + "-" + parts[1]);
-                            } else {
-                                vo.setLocale("Unknown");
-                            }
+                        // Extract gender and locale from labels
+                        JsonNode labels = voiceNode.get("labels");
+                        if (labels != null) {
+                            vo.setGender(labels.path("gender").asText("unknown"));
+                            vo.setLocale(labels.path("accent").asText(""));
+                        } else {
+                            vo.setGender("unknown");
+                            vo.setLocale("");
                         }
                         
                         result.add(vo);
                     }
                 }
+                
+                logger.info("Loaded {} voices from ElevenLabs", result.size());
                 return result;
             }
-            logger.warn("Voice list response unsuccessful or empty: {}", response.getBody());
+            
+            logger.warn("Voice list response unsuccessful: {}", response.getStatusCode());
             return new ArrayList<>();
         } catch (Exception e) {
-            logger.error("Failed to list voices from EasyVoice service at {}", TTS_API_BASE, e);
-            // Return empty list instead of throwing to prevent crashing the UI completely
+            logger.error("Failed to list voices from ElevenLabs API", e);
             return new ArrayList<>();
-        }
-    }
-
-    private static final int MAX_SHORT_TEXT_LENGTH = 200;
-
-    public File generateAudio(String text, String voice, String rate, String pitch, String volume) {
-        // Use streaming API for long text
-        if (text != null && text.length() > MAX_SHORT_TEXT_LENGTH) {
-            return generateAudioStream(text, voice, rate, pitch, volume);
-        }
-        return generateAudioShort(text, voice, rate, pitch, volume);
-    }
-
-    /**
-     * Generate audio for short text using the /generate endpoint
-     */
-    private File generateAudioShort(String text, String voice, String rate, String pitch, String volume) {
-        try {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("text", text);
-            payload.put("voice", voice);
-            payload.put("rate", rate);
-            payload.put("pitch", pitch);
-            payload.put("volume", volume);
-            
-            String generateUrl = TTS_API_BASE + "/generate";
-            logger.info("Sending short text TTS request to {}: text length={}", generateUrl, text.length());
-            
-            ResponseEntity<GenerateResponse> response = restTemplate.postForEntity(generateUrl, payload, GenerateResponse.class);
-            
-            if (response.getBody() == null || !response.getBody().isSuccess()) {
-                 throw new RuntimeException("TTS Generation failed: " + (response.getBody() != null ? response.getBody().toString() : "Null response"));
-            }
-            
-            String filename = response.getBody().getData().getFile();
-            String downloadUrl = TTS_API_BASE + "/download/" + filename;
-            
-            logger.info("Downloading audio from: {}", downloadUrl);
-            ResponseEntity<byte[]> downloadResp = restTemplate.exchange(downloadUrl, HttpMethod.GET, null, byte[].class);
-            
-            if (downloadResp.getStatusCode().is2xxSuccessful() && downloadResp.getBody() != null) {
-                 String outName = UUID.randomUUID().toString() + ".mp3";
-                 File outputFile = new File(TEMP_AUDIO_DIR, outName);
-                 try (FileOutputStream fos = new FileOutputStream(outputFile)) {
-                     fos.write(downloadResp.getBody());
-                 }
-                 return outputFile;
-            } else {
-                throw new RuntimeException("Failed to download audio file from EasyVoice");
-            }
-
-        } catch (Exception e) {
-            logger.error("Failed to generate short audio via EasyVoice", e);
-            throw new RuntimeException("Failed to generate audio: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Generate audio for long text using streaming API (/createStream)
-     * Audio plays immediately; SRT subtitle is fetched asynchronously for karaoke feature
+     * Generate audio from text using ElevenLabs TTS API
+     * POST /text-to-speech/{voice_id}
+     * 
+     * @param text Text to convert to speech
+     * @param voiceId ElevenLabs voice ID (or voice name for backward compatibility)
+     * @param rate Unused (ElevenLabs uses different settings)
+     * @param pitch Unused (ElevenLabs uses different settings)
+     * @param volume Unused (ElevenLabs uses different settings)
      */
-    private File generateAudioStream(String text, String voice, String rate, String pitch, String volume) {
+    public File generateAudio(String text, String voiceId, String rate, String pitch, String volume) {
         try {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("text", text);
-            payload.put("voice", voice);
-            payload.put("rate", rate);
-            payload.put("pitch", pitch);
-            payload.put("volume", volume);
+            // Use default voice if not specified
+            if (voiceId == null || voiceId.isEmpty()) {
+                voiceId = defaultVoiceId;
+            }
             
-            String streamUrl = TTS_API_BASE + "/createStream";
-            logger.info("Sending long text TTS stream request to {}: text length={}", streamUrl, text.length());
+            String url = baseUrl + "/text-to-speech/" + voiceId;
             
-            // Get audio stream immediately for fast playback
-            ResponseEntity<byte[]> response = restTemplate.postForEntity(streamUrl, payload, byte[].class);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("xi-api-key", apiKey);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setAccept(Collections.singletonList(MediaType.parseMediaType("audio/mpeg")));
+            
+            // Build request body
+            Map<String, Object> body = new HashMap<>();
+            body.put("text", text);
+            body.put("model_id", modelId);
+            
+            // Voice settings (use defaults for natural sound)
+            Map<String, Object> voiceSettings = new HashMap<>();
+            voiceSettings.put("stability", 0.5);
+            voiceSettings.put("similarity_boost", 0.75);
+            voiceSettings.put("style", 0.0);
+            voiceSettings.put("use_speaker_boost", true);
+            body.put("voice_settings", voiceSettings);
+            
+            logger.info("Generating TTS via ElevenLabs: voice={}, text length={}", voiceId, text.length());
+            
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+            ResponseEntity<byte[]> response = restTemplate.exchange(url, HttpMethod.POST, entity, byte[].class);
             
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                throw new RuntimeException("TTS Stream generation failed: " + response.getStatusCode());
+                throw new RuntimeException("TTS generation failed: " + response.getStatusCode());
             }
             
             byte[] audioData = response.getBody();
-            logger.info("Received streaming audio data: {} bytes", audioData.length);
+            logger.info("Received audio data: {} bytes", audioData.length);
             
+            // Save to temp file
             String outName = UUID.randomUUID().toString() + ".mp3";
             File outputFile = new File(TEMP_AUDIO_DIR, outName);
             try (FileOutputStream fos = new FileOutputStream(outputFile)) {
                 fos.write(audioData);
             }
             
-            logger.info("Saved streaming audio to: {}", outputFile.getAbsolutePath());
+            logger.info("Saved audio to: {}", outputFile.getAbsolutePath());
             return outputFile;
 
         } catch (Exception e) {
-            logger.error("Failed to generate streaming audio via EasyVoice", e);
-            throw new RuntimeException("Failed to generate streaming audio: " + e.getMessage(), e);
+            logger.error("Failed to generate audio via ElevenLabs", e);
+            throw new RuntimeException("Failed to generate audio: " + e.getMessage(), e);
         }
     }
 
     // Response DTOs
-    public static class VoiceListResponse {
-        private int code;
-        private boolean success;
-        private List<VoiceJson> data;
-        
-        public boolean isSuccess() { return success; }
-        public void setSuccess(boolean success) { this.success = success; }
-        public List<VoiceJson> getData() { return data; }
-        public void setData(List<VoiceJson> data) { this.data = data; }
-    }
-
-    public static class VoiceJson {
-        @JsonProperty("Name")
-        private String Name;
-        @JsonProperty("Gender")
-        private String Gender;
-        
-        public String getName() { return Name; }
-        public void setName(String name) { Name = name; }
-        public String getGender() { return Gender; }
-        public void setGender(String gender) { Gender = gender; }
-    }
-
-    public static class GenerateResponse {
-        private int code;
-        private boolean success;
-        private GenerateData data;
-        
-        public boolean isSuccess() { return success; }
-        public void setSuccess(boolean success) { this.success = success; }
-        public GenerateData getData() { return data; }
-        public void setData(GenerateData data) { this.data = data; }
-    }
-
-    public static class GenerateData {
-        private String file; // Filename for download
-        private String audio; // Absolute path inside container
-        
-        public String getFile() { return file; }
-        public void setFile(String file) { this.file = file; }
-        public String getAudio() { return audio; }
-        public void setAudio(String audio) { this.audio = audio; }
-    }
-
     public static class VoiceOption {
+        private String voiceId;  // ElevenLabs voice ID
         private String name;
         private String gender;
         private String locale;
         private String cnName;
 
+        public String getVoiceId() { return voiceId; }
+        public void setVoiceId(String voiceId) { this.voiceId = voiceId; }
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
         public String getGender() { return gender; }

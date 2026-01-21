@@ -67,3 +67,38 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  .translate-z-10 {
+    transform: translateZ(20px);
+  }
+
+  .translate-z-20 {
+    transform: translateZ(40px);
+  }
+}
+
+@theme inline {
+  --animate-float-slow: float 6s ease-in-out infinite;
+  --animate-float-delayed: float 7s ease-in-out infinite 2s;
+
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0px) translateZ(20px);
+    }
+
+    50% {
+      transform: translateY(-10px) translateZ(20px);
+    }
+  }
+}
