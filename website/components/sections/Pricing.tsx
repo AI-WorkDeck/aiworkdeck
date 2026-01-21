@@ -14,7 +14,7 @@ interface PricingProps {
 
 export function Pricing({ lang, dict }: PricingProps) {
     return (
-        <section className="py-24 bg-white" id="pricing">
+        <section className="py-16 bg-white" id="pricing">
             <div className="container mx-auto px-4 md:px-8">
                 <div className="text-center mb-16">
                     <h2 className="text-3xl font-bold text-neutral-dark-bg mb-4">{dict.common.pricing.title}</h2>

@@ -14,9 +14,9 @@ export default async function DownloadFree({
     const dict = await getDictionary(lang);
 
     return (
-        <div className="min-h-screen bg-neutral-gray-pale pb-20">
+        <div className="min-h-screen bg-neutral-gray-pale pb-14">
             {/* Header */}
-            <section className="bg-king-forest text-white py-20">
+            <section className="bg-king-forest text-white py-14">
                 <div className="container mx-auto px-4 text-center">
                     <h1 className="text-4xl md:text-5xl font-bold mb-4">Download AI Workdeck (Free Version)</h1>
                     <p className="text-xl text-king-mint-lightest max-w-2xl mx-auto">

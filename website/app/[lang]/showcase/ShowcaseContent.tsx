@@ -33,7 +33,7 @@ export function ShowcaseContent({ lang, dict }: { lang: Locale; dict: any }) {
     ];
 
     return (
-        <div className="min-h-screen pt-24 pb-20 bg-gradient-to-b from-white via-neutral-50 to-neutral-100">
+        <div className="min-h-screen pt-16 pb-14 bg-gradient-to-b from-white via-neutral-50 to-neutral-100">
             <div className="container mx-auto px-4">
 
                 {/* Header */}
@@ -47,7 +47,7 @@ export function ShowcaseContent({ lang, dict }: { lang: Locale; dict: any }) {
                 </header>
 
                 {/* Main Intro Video */}
-                <section className="mb-20">
+                <section className="mb-14">
                     <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden border border-neutral-200/60 ring-1 ring-black/5">
                         <div className="aspect-video bg-black relative flex items-center justify-center group">
                             <video
