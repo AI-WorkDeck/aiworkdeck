@@ -99,6 +99,30 @@ public class AdminConfigController {
     @Value("${external.aliyun-ocr.public-base-url:}")
     private String defaultAliyunOcrPublicBaseUrl;
 
+    // PKULaw 默认值
+    @Value("${external.pkulaw.token:}")
+    private String defaultPkulawToken;
+
+    // ElevenLabs 默认值
+    @Value("${external.elevenlabs.api-key:}")
+    private String defaultElevenLabsApiKey;
+
+    @Value("${external.elevenlabs.base-url:https://api.elevenlabs.io/v1}")
+    private String defaultElevenLabsBaseUrl;
+
+    @Value("${external.elevenlabs.model-id:eleven_multilingual_v2}")
+    private String defaultElevenLabsModelId;
+
+    @Value("${external.elevenlabs.default-voice-id:JBFqnCBsd6RMkjVDRZzb}")
+    private String defaultElevenLabsDefaultVoiceId;
+
+    // OpenRouter 默认值
+    @Value("${ai.model.open-router.api-key:}")
+    private String defaultOpenRouterApiKey;
+
+    @Value("${ai.model.open-router.base-url:https://openrouter.ai/api/v1}")
+    private String defaultOpenRouterBaseUrl;
+
     // Google / Gemini 默认值来自 AiModelProperties
 
     // === 配置 key 常量 ===
@@ -128,6 +152,19 @@ public class AdminConfigController {
     private static final String KEY_ALIYUN_OCR_ENDPOINT = "external.aliyunOcr.endpoint";
     private static final String KEY_ALIYUN_OCR_REGION_ID = "external.aliyunOcr.regionId";
     private static final String KEY_ALIYUN_OCR_PUBLIC_BASE_URL = "external.aliyunOcr.publicBaseUrl";
+
+    // PKULaw
+    private static final String KEY_PKULAW_TOKEN = "external.pkulaw.token";
+
+    // ElevenLabs
+    private static final String KEY_ELEVENLABS_API_KEY = "external.elevenlabs.apiKey";
+    private static final String KEY_ELEVENLABS_BASE_URL = "external.elevenlabs.baseUrl";
+    private static final String KEY_ELEVENLABS_MODEL_ID = "external.elevenlabs.modelId";
+    private static final String KEY_ELEVENLABS_DEFAULT_VOICE_ID = "external.elevenlabs.defaultVoiceId";
+
+    // OpenRouter
+    private static final String KEY_OPENROUTER_API_KEY = "external.openrouter.apiKey";
+    private static final String KEY_OPENROUTER_BASE_URL = "external.openrouter.baseUrl";
 
     // Google / Gemini
     private static final String KEY_GOOGLE_API_KEY = "external.google.apiKey";
@@ -173,6 +210,19 @@ public class AdminConfigController {
                 : defaultAliyunOcrPublicBaseUrl;
         defaults.put(KEY_ALIYUN_OCR_PUBLIC_BASE_URL, defaultPublicBase == null ? "" : defaultPublicBase);
 
+        // PKULaw
+        defaults.put(KEY_PKULAW_TOKEN, defaultPkulawToken);
+
+        // ElevenLabs
+        defaults.put(KEY_ELEVENLABS_API_KEY, defaultElevenLabsApiKey);
+        defaults.put(KEY_ELEVENLABS_BASE_URL, defaultElevenLabsBaseUrl);
+        defaults.put(KEY_ELEVENLABS_MODEL_ID, defaultElevenLabsModelId);
+        defaults.put(KEY_ELEVENLABS_DEFAULT_VOICE_ID, defaultElevenLabsDefaultVoiceId);
+
+        // OpenRouter
+        defaults.put(KEY_OPENROUTER_API_KEY, defaultOpenRouterApiKey);
+        defaults.put(KEY_OPENROUTER_BASE_URL, defaultOpenRouterBaseUrl);
+
         // Google / Gemini 默认值来自配置类
         defaults.put(KEY_GOOGLE_API_KEY, aiModelProperties.getGemini().getApiKey());
         defaults.put(KEY_GOOGLE_MODEL_NAME, aiModelProperties.getGemini().getModelName());
@@ -196,6 +246,10 @@ public class AdminConfigController {
                 all.get(KEY_GOOGLE_MODEL_NAME),
                 all.get(KEY_GOOGLE_API_BASE_URL)
         ));
+        external.setOpenRouter(new OpenRouterConfig(
+                all.get(KEY_OPENROUTER_API_KEY),
+                all.get(KEY_OPENROUTER_BASE_URL)
+        ));
         external.setQichacha(new QichachaConfig(
                 all.get(KEY_QICHACHA_BASE_URL),
                 all.get(KEY_QICHACHA_KEY),
@@ -216,6 +270,15 @@ public class AdminConfigController {
                 all.get(KEY_ALIYUN_OCR_ENDPOINT),
                 all.get(KEY_ALIYUN_OCR_REGION_ID),
                 all.get(KEY_ALIYUN_OCR_PUBLIC_BASE_URL)
+        ));
+        external.setPkulaw(new PkulawConfig(
+                all.get(KEY_PKULAW_TOKEN)
+        ));
+        external.setElevenLabs(new ElevenLabsConfig(
+                all.get(KEY_ELEVENLABS_API_KEY),
+                all.get(KEY_ELEVENLABS_BASE_URL),
+                all.get(KEY_ELEVENLABS_MODEL_ID),
+                all.get(KEY_ELEVENLABS_DEFAULT_VOICE_ID)
         ));
         resp.setExternal(external);
 
@@ -268,6 +331,10 @@ public class AdminConfigController {
                 updates.put(KEY_GOOGLE_MODEL_NAME, safe(ext.getGoogle().getModelName()));
                 updates.put(KEY_GOOGLE_API_BASE_URL, safe(ext.getGoogle().getApiBaseUrl()));
             }
+            if (ext.getOpenRouter() != null) {
+                updates.put(KEY_OPENROUTER_API_KEY, safe(ext.getOpenRouter().getApiKey()));
+                updates.put(KEY_OPENROUTER_BASE_URL, safe(ext.getOpenRouter().getBaseUrl()));
+            }
             if (ext.getQichacha() != null) {
                 updates.put(KEY_QICHACHA_BASE_URL, safe(ext.getQichacha().getBaseUrl()));
                 updates.put(KEY_QICHACHA_KEY, safe(ext.getQichacha().getKey()));
@@ -288,6 +355,15 @@ public class AdminConfigController {
                 updates.put(KEY_ALIYUN_OCR_ENDPOINT, safe(ext.getAliyunOcr().getEndpoint()));
                 updates.put(KEY_ALIYUN_OCR_REGION_ID, safe(ext.getAliyunOcr().getRegionId()));
                 updates.put(KEY_ALIYUN_OCR_PUBLIC_BASE_URL, safe(ext.getAliyunOcr().getPublicBaseUrl()));
+            }
+            if (ext.getPkulaw() != null) {
+                updates.put(KEY_PKULAW_TOKEN, safe(ext.getPkulaw().getToken()));
+            }
+            if (ext.getElevenLabs() != null) {
+                updates.put(KEY_ELEVENLABS_API_KEY, safe(ext.getElevenLabs().getApiKey()));
+                updates.put(KEY_ELEVENLABS_BASE_URL, safe(ext.getElevenLabs().getBaseUrl()));
+                updates.put(KEY_ELEVENLABS_MODEL_ID, safe(ext.getElevenLabs().getModelId()));
+                updates.put(KEY_ELEVENLABS_DEFAULT_VOICE_ID, safe(ext.getElevenLabs().getDefaultVoiceId()));
             }
         }
 
@@ -401,13 +477,18 @@ public class AdminConfigController {
 
     public static class ExternalServicesConfig {
         private GoogleConfig google;
+        private OpenRouterConfig openRouter;
         private QichachaConfig qichacha;
         private TushareConfig tushare;
         private WpsConfig wps;
         private AliyunOcrConfig aliyunOcr;
+        private PkulawConfig pkulaw;
+        private ElevenLabsConfig elevenLabs;
 
         public GoogleConfig getGoogle() { return google; }
         public void setGoogle(GoogleConfig google) { this.google = google; }
+        public OpenRouterConfig getOpenRouter() { return openRouter; }
+        public void setOpenRouter(OpenRouterConfig openRouter) { this.openRouter = openRouter; }
         public QichachaConfig getQichacha() { return qichacha; }
         public void setQichacha(QichachaConfig qichacha) { this.qichacha = qichacha; }
         public TushareConfig getTushare() { return tushare; }
@@ -416,6 +497,10 @@ public class AdminConfigController {
         public void setWps(WpsConfig wps) { this.wps = wps; }
         public AliyunOcrConfig getAliyunOcr() { return aliyunOcr; }
         public void setAliyunOcr(AliyunOcrConfig aliyunOcr) { this.aliyunOcr = aliyunOcr; }
+        public PkulawConfig getPkulaw() { return pkulaw; }
+        public void setPkulaw(PkulawConfig pkulaw) { this.pkulaw = pkulaw; }
+        public ElevenLabsConfig getElevenLabs() { return elevenLabs; }
+        public void setElevenLabs(ElevenLabsConfig elevenLabs) { this.elevenLabs = elevenLabs; }
     }
 
     public static class GoogleConfig {
@@ -525,6 +610,54 @@ public class AdminConfigController {
         public void setRegionId(String regionId) { this.regionId = regionId; }
         public String getPublicBaseUrl() { return publicBaseUrl; }
         public void setPublicBaseUrl(String publicBaseUrl) { this.publicBaseUrl = publicBaseUrl; }
+    }
+
+    public static class PkulawConfig {
+        private String token;
+        public PkulawConfig() {}
+        public PkulawConfig(String token) { this.token = token; }
+        public String getToken() { return token; }
+        public void setToken(String token) { this.token = token; }
+    }
+
+    public static class ElevenLabsConfig {
+        private String apiKey;
+        private String baseUrl;
+        private String modelId;
+        private String defaultVoiceId;
+
+        public ElevenLabsConfig() {}
+        public ElevenLabsConfig(String apiKey, String baseUrl, String modelId, String defaultVoiceId) {
+            this.apiKey = apiKey;
+            this.baseUrl = baseUrl;
+            this.modelId = modelId;
+            this.defaultVoiceId = defaultVoiceId;
+        }
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+        public String getModelId() { return modelId; }
+        public void setModelId(String modelId) { this.modelId = modelId; }
+        public String getDefaultVoiceId() { return defaultVoiceId; }
+        public void setDefaultVoiceId(String defaultVoiceId) { this.defaultVoiceId = defaultVoiceId; }
+    }
+
+    public static class OpenRouterConfig {
+        private String apiKey;
+        private String baseUrl;
+        
+        public OpenRouterConfig() {}
+        public OpenRouterConfig(String apiKey, String baseUrl) {
+            this.apiKey = apiKey;
+            this.baseUrl = baseUrl;
+        }
+        
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
     }
 
     public static class AiConfig {
