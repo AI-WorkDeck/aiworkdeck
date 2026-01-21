@@ -37,3 +37,10 @@ mineru-service/temp/
 *.env
 *.env.production
 *.env.development
+
+# Local/Private folders
+.agent/
+.cursor/
+.shared/
+.trae/
+King IDE汇报/
