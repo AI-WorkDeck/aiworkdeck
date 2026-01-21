@@ -80,6 +80,29 @@
                 </view>
               </view>
 
+              <!-- OpenRouter -->
+              <view class="provider-card">
+                <view class="provider-header">
+                  <text class="provider-name">OpenRouter</text>
+                </view>
+                <view class="form-row">
+                  <text class="form-label">API Key</text>
+                  <input
+                    v-model="form.external.openRouter.apiKey"
+                    class="form-input"
+                    placeholder="请输入 OpenRouter API Key"
+                  />
+                </view>
+                <view class="form-row">
+                  <text class="form-label">API 地址</text>
+                  <input
+                    v-model="form.external.openRouter.baseUrl"
+                    class="form-input"
+                    placeholder="https://openrouter.ai/api/v1"
+                  />
+                </view>
+              </view>
+
               <!-- 企查查 -->
               <view class="provider-card">
                 <view class="provider-header">
@@ -209,6 +232,61 @@
                     v-model="form.external.aliyunOcr.publicBaseUrl"
                     class="form-input"
                     placeholder="例如：https://你的域名（用于 /api/ocr/temp 供阿里云拉图）"
+                  />
+                </view>
+              </view>
+
+
+              <!-- PKULaw -->
+              <view class="provider-card">
+                <view class="provider-header">
+                  <text class="provider-name">北大法宝 (PKULam)</text>
+                </view>
+                <view class="form-row">
+                  <text class="form-label">Token</text>
+                  <input
+                    v-model="form.external.pkulaw.token"
+                    class="form-input"
+                    placeholder="请输入 PKULaw Access Token"
+                  />
+                </view>
+              </view>
+
+              <!-- ElevenLabs -->
+              <view class="provider-card">
+                <view class="provider-header">
+                  <text class="provider-name">ElevenLabs (TTS)</text>
+                </view>
+                <view class="form-row">
+                  <text class="form-label">API Key</text>
+                  <input
+                    v-model="form.external.elevenLabs.apiKey"
+                    class="form-input"
+                    placeholder="请输入 ElevenLabs API Key"
+                  />
+                </view>
+                <view class="form-row">
+                  <text class="form-label">API 地址</text>
+                  <input
+                    v-model="form.external.elevenLabs.baseUrl"
+                    class="form-input"
+                    placeholder="https://api.elevenlabs.io/v1"
+                  />
+                </view>
+                <view class="form-row">
+                  <text class="form-label">模型 ID</text>
+                  <input
+                    v-model="form.external.elevenLabs.modelId"
+                    class="form-input"
+                    placeholder="eleven_multilingual_v2"
+                  />
+                </view>
+                <view class="form-row">
+                  <text class="form-label">默认 Voice ID</text>
+                  <input
+                    v-model="form.external.elevenLabs.defaultVoiceId"
+                    class="form-input"
+                    placeholder="例如: JBFqnCBsd6RMkjVDRZzb"
                   />
                 </view>
               </view>
@@ -445,10 +523,13 @@ export default {
       form: {
         external: {
           google: { apiKey: '', modelName: '', apiBaseUrl: '' },
+          openRouter: { apiKey: '', baseUrl: '' },
           qichacha: { baseUrl: '', key: '', secret: '' },
           tushare: { baseUrl: '', token: '' },
           wps: { appId: '', appSecret: '', callbackBaseUrl: '' },
           aliyunOcr: { accessKeyId: '', accessKeySecret: '', endpoint: '', regionId: '', publicBaseUrl: '' },
+          pkulaw: { token: '' },
+          elevenLabs: { apiKey: '', baseUrl: '', modelId: '', defaultVoiceId: '' },
         },
         ai: {
           systemPromptOllama: '',
@@ -460,6 +541,7 @@ export default {
       aiProviderOptions: [
         { value: 'OLLAMA', label: '本地 Ollama' },
         { value: 'GEMINI', label: 'Google Gemini' },
+        { value: 'OPENROUTER', label: 'OpenRouter' },
       ],
       // Helpers
       defaultAssistants: [
@@ -533,6 +615,20 @@ export default {
               endpoint: data.external.aliyunOcr?.endpoint || 'ocr-api.cn-hangzhou.aliyuncs.com',
               regionId: data.external.aliyunOcr?.regionId || 'cn-hangzhou',
               publicBaseUrl: data.external.aliyunOcr?.publicBaseUrl || data.external.wps?.callbackBaseUrl || '',
+              publicBaseUrl: data.external.aliyunOcr?.publicBaseUrl || data.external.wps?.callbackBaseUrl || '',
+            },
+            openRouter: {
+              apiKey: data.external.openRouter?.apiKey || '',
+              baseUrl: data.external.openRouter?.baseUrl || '',
+            },
+            pkulaw: {
+              token: data.external.pkulaw?.token || '',
+            },
+            elevenLabs: {
+              apiKey: data.external.elevenLabs?.apiKey || '',
+              baseUrl: data.external.elevenLabs?.baseUrl || '',
+              modelId: data.external.elevenLabs?.modelId || '',
+              defaultVoiceId: data.external.elevenLabs?.defaultVoiceId || '',
             },
           }
         }

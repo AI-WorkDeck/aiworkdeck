@@ -13,16 +13,21 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+import org.springframework.beans.factory.annotation.Autowired;
+
 @Service
 public class TushareService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TushareService.class);
 
+    @Autowired
+    private SystemSettingService systemSettingService;
+
     @Value("${external.tushare.base-url:http://api.tushare.pro}")
-    private String tushareApiUrl;
+    private String defaultTushareApiUrl;
 
     @Value("${external.tushare.token:}")
-    private String tushareToken;
+    private String defaultTushareToken;
 
     /**
      * Fetch listed company data and return a DTO for frontend display.
@@ -245,14 +250,17 @@ public class TushareService {
     }
 
     private JSONObject callTushare(String apiName, JSONObject params, String fields) {
+        String token = systemSettingService.get("external.tushare.token", defaultTushareToken);
+        String apiUrl = systemSettingService.get("external.tushare.baseUrl", defaultTushareApiUrl);
+
         JSONObject body = new JSONObject();
         body.put("api_name", apiName);
-        body.put("token", tushareToken);
+        body.put("token", token);
         body.put("params", params);
         body.put("fields", fields);
 
         try {
-            String result = HttpRequest.post(tushareApiUrl)
+            String result = HttpRequest.post(apiUrl)
                     .body(body.toString())
                     .timeout(10000)
                     .execute()

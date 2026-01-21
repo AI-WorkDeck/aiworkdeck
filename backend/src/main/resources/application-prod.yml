@@ -8,7 +8,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/checkba?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: checkba
-    password: checkba123
+    password: ${DB_PASSWORD:checkba123}
   jpa:
     hibernate:
       ddl-auto: update
@@ -18,15 +18,24 @@ spring:
 external:
   qichacha:
     base-url: https://api.qichacha.com
-    key: ***REMOVED***
-    secret: ***REMOVED***
+    key: ${QICHACHA_KEY:***REMOVED***}
+    secret: ${QICHACHA_SECRET:***REMOVED***}
   wps:
     app-id: SX20260104RLPEYU
-    app-secret: ***REMOVED***
+    app-secret: ${WPS_APP_SECRET:***REMOVED***}
     callback-base-url: https://6e783f5e.r3.cpolar.cn  # 使用 cpolar 内网穿透地址（当前实际URL，每次重启会变化）
   tushare:
     base-url: http://api.tushare.pro
     token: ${TUSHARE_TOKEN:}
+  # PKULaw
+  pkulaw:
+    token: ${PKULAW_TOKEN:}
+  # ElevenLabs
+  elevenlabs:
+    api-key: ${ELEVENLABS_API_KEY:}
+    base-url: https://api.elevenlabs.io/v1
+    model-id: eleven_multilingual_v2
+    default-voice-id: JBFqnCBsd6RMkjVDRZzb
 
 # AI 大模型配置（生产环境建议全部走环境变量）
 ai:
@@ -37,6 +46,11 @@ ai:
       model-name: ${GEMINI_MODEL_NAME:gemini-1.5-pro}
       api-base-url: ${GEMINI_API_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
       timeout: ${GEMINI_TIMEOUT:60s}
+    open-router:
+      api-key: ${OPENROUTER_API_KEY:}
+      base-url: https://openrouter.ai/api/v1
+      default-model: google/gemini-2.0-flash-exp:free
+      timeout: 120s
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       model-name: ${OLLAMA_MODEL_NAME:qwen3-vl:8b}
