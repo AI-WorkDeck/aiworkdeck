@@ -14,185 +14,157 @@ interface HeroProps {
 
 export function Hero({ lang, dict }: HeroProps) {
     const containerRef = useRef<HTMLDivElement>(null);
+    const cardRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!containerRef.current) return;
+        if (!cardRef.current) return;
 
-        // Elements
-        const filePanel = containerRef.current.querySelector('.hero-file-panel');
-        const mainPanel = containerRef.current.querySelector('.hero-main-panel');
-        const sidePanel = containerRef.current.querySelector('.hero-side-panel');
-        const splitLine = containerRef.current.querySelector('.hero-split-line');
-        const connectLine = containerRef.current.querySelector('.hero-connect-line');
-        const pluginCard = containerRef.current.querySelectorAll('.hero-plugin-card');
+        const card = cardRef.current;
 
-        // Reset initial state
-        anime.set([filePanel, mainPanel, sidePanel], { opacity: 0, translateY: 50 });
-        anime.set(splitLine, { scaleY: 0, opacity: 0 });
-        anime.set(connectLine, { opacity: 0, width: 0 });
-        anime.set(pluginCard, { opacity: 0, scale: 0.8, translateX: 50 });
-
-        const tl = anime.timeline({
+        // Initial entrance animation
+        anime({
+            targets: card,
+            opacity: [0, 1],
+            translateY: [100, 0],
+            rotateX: [20, 0],
+            duration: 1200,
             easing: 'easeOutExpo',
-            duration: 800,
+            delay: 200
         });
 
-        tl
-            // 0.0-0.8s: Panels slide in
-            .add({
-                targets: [filePanel, mainPanel, sidePanel],
-                opacity: 1,
-                translateY: 0,
-                delay: anime.stagger(100),
-            })
-            // 0.8-1.6s: Split screen emphasis
-            .add({
-                targets: splitLine,
-                scaleY: 1,
-                opacity: 1,
-            })
-            // 1.6-2.4s: Connection lines
-            .add({
-                targets: connectLine,
-                width: '100%',
-                opacity: 1,
-                easing: 'easeInOutQuad',
-            })
-            // 2.4-3.2s: Plugins snap in
-            .add({
-                targets: pluginCard,
-                opacity: 1,
-                scale: 1,
-                translateX: 0,
-                delay: anime.stagger(100),
-                begin: () => {
-                    // Add snap sound effect if desired?
-                }
-            })
-            // Breathing effect
-            .add({
-                targets: [mainPanel, sidePanel],
-                boxShadow: [
-                    '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                    '0 20px 25px -5px rgba(26, 83, 54, 0.1)' // King Forest tint
-                ],
-                duration: 2000,
-                direction: 'alternate',
-                loop: true,
-                easing: 'easeInOutSine'
+        // 3D Tilt Effect on Mouse Move
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!containerRef.current || !cardRef.current) return;
+
+            const container = containerRef.current;
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+
+            // Calculate rotation values (limit to +/- 5 degrees)
+            const rotateX = ((y - centerY) / centerY) * -5;
+            const rotateY = ((x - centerX) / centerX) * 5;
+
+            anime({
+                targets: card,
+                rotateX: rotateX,
+                rotateY: rotateY,
+                duration: 400,
+                easing: 'easeOutQuad'
             });
+        };
+
+        const handleMouseLeave = () => {
+            anime({
+                targets: card,
+                rotateX: 0,
+                rotateY: 0,
+                duration: 600,
+                easing: 'easeOutElastic(1, .8)'
+            });
+        };
+
+        const container = containerRef.current;
+        if (container) {
+            container.addEventListener('mousemove', handleMouseMove);
+            container.addEventListener('mouseleave', handleMouseLeave);
+        }
 
         return () => {
-            tl.pause();
+            if (container) {
+                container.removeEventListener('mousemove', handleMouseMove);
+                container.removeEventListener('mouseleave', handleMouseLeave);
+            }
         };
     }, []);
 
     return (
-        <section className="relative overflow-hidden bg-white pt-24 pb-32 lg:pt-40 lg:pb-48">
+        <section className="relative overflow-hidden bg-white pt-24 pb-12 lg:pt-40 lg:pb-24">
 
-            {/* Background decoration */}
+            {/* Background decoration - Enhanced */}
             <div className="absolute top-0 right-0 -z-10 h-full w-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-king-mint-lightest/40 via-transparent to-transparent" />
+            <div className="absolute top-1/4 right-0 -z-10 w-[600px] h-[600px] bg-king-mint/5 rounded-full blur-3xl opacity-50 pointer-events-none" />
 
             <div className="container mx-auto px-4 md:px-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
 
-                    {/* Text Content */}
-                    <div className="max-w-2xl">
+                    {/* Text Content - Spans 5 cols */}
+                    <div className="max-w-2xl z-10 lg:col-span-5">
                         <h1 className="text-4xl font-extrabold tracking-tight text-neutral-dark-bg sm:text-5xl md:text-6xl lg:text-5xl xl:text-6xl mb-6">
                             <span className="block">{dict.common.hero.title}</span>
                             <span className="block text-king-forest mt-2">{dict.common.hero.subtitle.split('，')[0]}</span>
                         </h1>
-                        <p className="mt-8 text-xl text-neutral-gray-medium max-w-lg mb-12">
-                            {dict.common.hero.subtitle} {dict.common.hero.description}
+                        <p className="mt-8 text-xl text-neutral-gray-medium max-w-lg mb-12 leading-relaxed">
+                            {dict.common.hero.description}
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-6">
-                            <Link href={`/${lang}/download`}>
-                                <Button size="lg" className="w-full sm:w-auto gap-2 text-base font-bold shadow-lg shadow-king-forest/20">
-                                    <Download className="w-4 h-4" />
-                                    {dict.common.hero.cta.download}
-                                </Button>
-                            </Link>
-                            <Link href={`/${lang}/pricing`}>
-                                <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2 text-base">
+                            <Link href={`/${lang}#pricing`}>
+                                <Button size="lg" className="w-full sm:w-auto gap-2 text-base font-bold shadow-lg shadow-king-forest/20 hover:shadow-xl hover:-translate-y-0.5 transition-all bg-king-forest text-white hover:bg-king-forest/90">
                                     <CreditCard className="w-4 h-4" />
                                     {dict.common.hero.cta.pricing}
                                 </Button>
                             </Link>
-                            <Link href={`/${lang}/plugins`}>
-                                <Button variant="ghost" size="lg" className="w-full sm:w-auto gap-2 text-king-forest hover:bg-king-mint-lightest font-medium">
+                            <Link href={`/${lang}#plugins`}>
+                                <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2 text-base bg-white border-2 border-neutral-gray-light text-neutral-dark-bg hover:bg-neutral-gray-pale hover:border-neutral-gray-medium transition-all font-bold">
                                     <Puzzle className="w-4 h-4" />
-                                    {dict.common.hero.cta.plugins} <ArrowRight className="w-4 h-4 ml-1" />
+                                    {dict.common.hero.cta.plugins}
                                 </Button>
                             </Link>
                         </div>
                     </div>
 
-                    {/* Animation Stage */}
-                    <div ref={containerRef} className="relative h-[400px] w-full rounded-2xl border border-neutral-gray-light bg-neutral-gray-pale p-4 shadow-xl lg:h-[500px] overflow-hidden">
+                    {/* Animation Stage - 3D Tilt Container - Spans 7 cols and overflows */}
+                    <div className="lg:col-span-7 relative w-full perspective-1000 flex items-center justify-center lg:justify-end">
+                        <div ref={containerRef} className="relative w-full h-[350px] sm:h-[450px] lg:h-[600px] flex items-center justify-center z-10">
+                            {/* Tilting Card - Massive Size */}
+                            <div ref={cardRef} className="relative w-full aspect-[16/10] rounded-2xl shadow-2xl shadow-king-forest/10 bg-white border border-white/50 backdrop-blur-sm overflow-hidden transform-gpu" style={{ transformStyle: 'preserve-3d' }}>
 
-                        {/* Abstract Workdeck UI */}
-                        <div className="absolute inset-0 flex p-6 gap-4">
+                                {/* Main Image */}
+                                <img
+                                    src="/images/hero-dashboard.png"
+                                    alt="AI Workdeck Dashboard"
+                                    className="w-full h-full object-cover object-top scale-105 hover:scale-100 transition-transform duration-700"
+                                    onError={(e) => {
+                                        // Fallback if image doesn't exist
+                                        (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIiB2aWV3Qm94PSIwIDAgODAwIDYwMCI+PHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiNmMmZjZjkiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXNpemU9IjI0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOWJiZWE1Ij5IZXJvIERhc2hib2FyZCBJbWFnZTwvdGV4dD48L3N2Zz4=';
+                                    }}
+                                />
 
-                            {/* File Panel (Left) */}
-                            <div className="hero-file-panel w-1/4 h-full bg-white rounded-xl border border-neutral-gray-light shadow-sm flex flex-col p-3 gap-2">
-                                <div className="h-4 w-1/2 bg-neutral-gray-light/30 rounded" />
-                                <div className="h-2 w-full bg-neutral-gray-light/20 rounded mt-4" />
-                                <div className="h-2 w-3/4 bg-neutral-gray-light/20 rounded" />
-                                <div className="h-2 w-full bg-neutral-gray-light/20 rounded" />
-                            </div>
+                                {/* Floating Overlay Badge 1 - Top Right - More Premium */}
+                                <div className="absolute top-6 right-6 lg:top-10 lg:right-10 bg-white/80 backdrop-blur-md border border-white/60 shadow-xl rounded-2xl p-4 flex items-center gap-4 transform translate-z-20 animate-float-slow ring-1 ring-black/5">
+                                    <div className="relative">
+                                        <div className="w-3 h-3 rounded-full bg-king-mint animate-pulse relative z-10" />
+                                        <div className="absolute inset-0 w-3 h-3 rounded-full bg-king-mint animate-ping opacity-75" />
+                                    </div>
+                                    <span className="text-sm font-bold text-neutral-dark-bg tracking-wide">AI Analyzing...</span>
+                                </div>
 
-                            {/* Main Workspace (Middle) */}
-                            <div className="hero-main-panel flex-1 h-full bg-white rounded-xl border border-neutral-gray-light shadow-sm relative overflow-hidden flex">
-                                {/* Left Half of Main */}
-                                <div className="w-1/2 h-full p-4 border-r border-dashed border-neutral-gray-light/50">
-                                    <div className="h-6 w-1/3 bg-neutral-gray-light/40 rounded mb-4" />
-                                    <div className="space-y-3">
-                                        <div className="h-2 w-full bg-neutral-gray-light/20 rounded" />
-                                        <div className="h-2 w-full bg-neutral-gray-light/20 rounded" />
-                                        <div className="h-2 w-5/6 bg-neutral-gray-light/20 rounded" />
-
-                                        {/* Connect Line Origin */}
-                                        <div className="relative">
-                                            <span className="block h-2 w-full bg-king-forest/10 rounded" />
-                                            <div className="hero-connect-line absolute top-1/2 left-full h-0.5 bg-king-mint z-10" style={{ transformOrigin: 'left' }} />
-                                        </div>
-
-                                        <div className="h-2 w-full bg-neutral-gray-light/20 rounded" />
+                                {/* Floating Overlay Badge 2 - Bottom Left - More Detailed */}
+                                <div className="absolute bottom-6 left-6 lg:bottom-12 lg:left-12 bg-white/80 backdrop-blur-md border border-white/60 shadow-xl rounded-2xl p-4 flex items-center gap-4 transform translate-z-20 animate-float-delayed ring-1 ring-black/5">
+                                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-king-mint-lightest to-white text-king-forest shadow-sm">
+                                        <Puzzle className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] uppercase tracking-wider text-neutral-gray-medium font-semibold">Plugin Loaded</span>
+                                        <span className="text-sm font-bold text-neutral-dark-bg">Data Extractor Pro</span>
                                     </div>
                                 </div>
 
-                                {/* Split Line Indicator */}
-                                <div className="hero-split-line absolute left-1/2 top-0 bottom-0 w-px bg-king-forest/20" />
-
-                                {/* Right Half of Main (Reference/AI) */}
-                                <div className="w-1/2 h-full bg-neutral-gray-pale/30 p-4">
-                                    <div className="h-6 w-1/2 bg-king-mint-lightest rounded mb-4" />
-                                    <div className="space-y-3">
-                                        <div className="h-16 w-full bg-white border border-king-mint/20 rounded-lg shadow-sm p-2">
-                                            <div className="h-2 w-1/3 bg-king-mint/20 rounded mb-1" />
-                                            <div className="h-1.5 w-full bg-neutral-gray-light/20 rounded" />
-                                        </div>
-                                    </div>
-                                </div>
+                                {/* Glare Effect - Subtler */}
+                                <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/0 to-white/20 pointer-events-none mix-blend-overlay" />
                             </div>
-
-                            {/* Side Panel (Right) - Plugins */}
-                            <div className="hero-side-panel w-1/5 h-full bg-neutral-gray-pale rounded-xl border border-neutral-gray-light/50 flex flex-col items-center py-4 gap-3">
-                                <div className="hero-plugin-card w-12 h-12 rounded-xl bg-white shadow-md border border-king-mint/20 flex items-center justify-center">
-                                    <div className="w-6 h-6 rounded bg-king-mint/20" />
-                                </div>
-                                <div className="hero-plugin-card w-12 h-12 rounded-xl bg-white shadow-md border border-neutral-gray-light flex items-center justify-center">
-                                    <div className="w-6 h-6 rounded bg-orange-100" />
-                                </div>
-                                <div className="hero-plugin-card w-12 h-12 rounded-xl bg-white shadow-md border border-neutral-gray-light flex items-center justify-center">
-                                    <div className="w-6 h-6 rounded bg-blue-100" />
-                                </div>
-                            </div>
-
                         </div>
-
                     </div>
+                </div>
+            </div>
+            {/* Scroll Indicator */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 animate-bounce hidden md:block">
+                <div className="p-2 rounded-full bg-white/50 backdrop-blur border border-neutral-gray-light text-neutral-gray-medium shadow-sm">
+                    <ArrowRight className="w-5 h-5 rotate-90" />
                 </div>
             </div>
         </section>

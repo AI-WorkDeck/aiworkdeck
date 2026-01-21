@@ -33,10 +33,42 @@ export function Navbar({ lang, dict }: NavbarProps) {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    const handleScrollToHash = (e: React.MouseEvent<HTMLAnchorElement>, hash: string) => {
+        // If we are not on the homepage (pathname like /en or /zh), let default Link behavior happen if it is a cross-page link
+        // But the hrefs are being set securely. 
+        // Let's refine the logic:
+        // 1. If the link is to a different page (e.g. /showcase), don't intercept.
+        // 2. If the link is a hash on the current page, intercept and scroll.
+
+        // However, we are using `href` in links.
+        // Let's construct `href` to be absolute path `/${lang}#hash`.
+        // If we are on `/${lang}`, we intercept.
+
+        const isHomePage = pathname === `/${lang}` || pathname === `/${lang}/`;
+
+        if (hash.startsWith('#') && isHomePage) {
+            e.preventDefault();
+            const element = document.getElementById(hash.substring(1));
+            if (element) {
+                const offset = 80;
+                const bodyRect = document.body.getBoundingClientRect().top;
+                const elementRect = element.getBoundingClientRect().top;
+                const elementPosition = elementRect - bodyRect;
+                const offsetPosition = elementPosition - offset;
+
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+                setIsMobileMenuOpen(false);
+            }
+        }
+    };
+
     const navLinks = [
-        { href: `/${lang}/product`, label: dict.common.nav.product },
-        { href: `/${lang}/plugins`, label: dict.common.nav.plugins },
-        { href: `/${lang}/pricing`, label: dict.common.nav.pricing },
+        { href: `/${lang}#product`, label: dict.common.nav.product, hash: '#product' },
+        { href: `/${lang}/showcase`, label: dict.common.nav.showcase, hash: '' }, // No hash interception needed
+        { href: `/${lang}#pricing`, label: dict.common.nav.pricing, hash: '#pricing' },
     ];
 
     return (
@@ -51,11 +83,7 @@ export function Navbar({ lang, dict }: NavbarProps) {
             <div className="relative flex h-16 items-center justify-between px-4 md:px-8">
                 {/* Logo - Left aligned */}
                 <Link href={`/${lang}`} className="flex items-center gap-2 z-10">
-                    {/* Placeholder for Logo */}
-                    <div className="h-8 w-8 rounded-lg bg-king-forest" />
-                    <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-king-forest to-king-forest-lighter">
-                        {dict.common.productName}
-                    </span>
+                    <img src="/logo.png" alt="AI Workdeck" className="h-8 w-auto" />
                 </Link>
 
                 {/* Desktop Nav - Absolutely Centered */}
@@ -64,7 +92,8 @@ export function Navbar({ lang, dict }: NavbarProps) {
                         <Link
                             key={link.href}
                             href={link.href}
-                            className="text-sm font-medium text-neutral-gray-dark hover:text-king-forest transition-colors"
+                            onClick={(e) => link.hash ? handleScrollToHash(e, link.hash) : setIsMobileMenuOpen(false)}
+                            className="text-sm font-medium text-neutral-gray-dark hover:text-king-forest transition-colors cursor-pointer"
                         >
                             {link.label}
                         </Link>
@@ -83,12 +112,7 @@ export function Navbar({ lang, dict }: NavbarProps) {
 
                     <div className="h-4 w-px bg-neutral-gray-light" />
 
-                    <Link href={`/${lang}/account/login`}>
-                        <Button variant="secondary" className="text-neutral-gray-dark font-semibold hover:bg-neutral-gray-light/80">
-                            {dict.common.nav.login}
-                        </Button>
-                    </Link>
-                    <Link href={`/${lang}/download`}>
+                    <Link href={`/${lang}#pricing`} onClick={(e) => handleScrollToHash(e, '#pricing')}>
                         <Button className="font-bold shadow-md shadow-king-forest/10">
                             {dict.common.nav.download}
                         </Button>
@@ -119,10 +143,7 @@ export function Navbar({ lang, dict }: NavbarProps) {
                             </Link>
                         ))}
                         <div className="flex flex-col gap-2 pt-4 border-t border-gray-100">
-                            <Link href={`/${lang}/account/login`}>
-                                <Button variant="ghost" className="w-full justify-start">{dict.common.nav.login}</Button>
-                            </Link>
-                            <Link href={`/${lang}/download`}>
+                            <Link href={`/${lang}#pricing`}>
                                 <Button className="w-full">{dict.common.nav.download}</Button>
                             </Link>
                         </div>

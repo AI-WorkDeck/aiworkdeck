@@ -39,7 +39,7 @@
 
       <!-- Center Logo -->
       <view class="header-center">
-         <image src="/static/logo_full.png" mode="heightFix" class="project-logo" />
+         <image src="/static/logo_full_v2.png" mode="heightFix" class="project-logo" />
       </view>
 
       <view class="header-right">

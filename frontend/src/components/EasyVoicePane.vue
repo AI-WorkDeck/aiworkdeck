@@ -50,9 +50,9 @@
            <scroll-view scroll-y class="voice-list-scroll">
               <view 
                  v-for="voice in filteredVoices" 
-                 :key="voice.name" 
+                 :key="voice.voiceId" 
                  class="voice-option"
-                 :class="{ active: selectedVoice === voice.name }"
+                 :class="{ active: selectedVoiceId === voice.voiceId }"
                  @tap="selectVoice(voice)"
               >
                  <view class="voice-info-row">
@@ -169,7 +169,8 @@ export default {
     return {
       text: '',
       voices: [],
-      selectedVoice: '',
+      selectedVoiceId: '',  // ElevenLabs voice ID
+      selectedVoiceName: '',  // Display name
       voiceSearch: '',
       showVoiceDropdown: false,
       rate: 0,
@@ -188,8 +189,8 @@ export default {
   },
   computed: {
     selectedVoiceLabel() {
-        const v = this.voices.find(v => v.name === this.selectedVoice)
-        return v ? `${v.name} (${v.gender})` : ''
+        const v = this.voices.find(v => v.voiceId === this.selectedVoiceId)
+        return v ? `${v.name} (${v.gender || 'voice'})` : ''
     },
     filteredVoices() {
        if (!this.voiceSearch) return this.voices
@@ -332,7 +333,8 @@ export default {
        }
     },
     selectVoice(voice) {
-       this.selectedVoice = voice.name
+       this.selectedVoiceId = voice.voiceId
+       this.selectedVoiceName = voice.name
        this.showVoiceDropdown = false
     },
     async fetchVoices() {
@@ -343,10 +345,11 @@ export default {
         
         if (res && Array.isArray(res)) {
             this.voices = res
-            // Default to a Chinese voice if available, else first
-            const defaultVoice = this.voices.find(v => v.name.includes('Xiaoxiao') || v.locale.includes('zh')) || this.voices[0]
+            // Default to first available voice (ElevenLabs voices)
+            const defaultVoice = this.voices[0]
             if (defaultVoice) {
-                this.selectedVoice = defaultVoice.name
+                this.selectedVoiceId = defaultVoice.voiceId
+                this.selectedVoiceName = defaultVoice.name
             }
         } else {
             console.warn('[EasyVoicePane] Invalid voices response format', res)
@@ -393,10 +396,10 @@ export default {
       try {
         const payload = {
             text: this.text,
-            voice: this.selectedVoice,
-            rate: this.rate != 0 ? (this.rate > 0 ? `+${this.rate}%` : `${this.rate}%`) : '+0%',
-            pitch: this.pitch != 0 ? (this.pitch > 0 ? `+${this.pitch}Hz` : `${this.pitch}Hz`) : '+0Hz',
-            volume: this.volume != 0 ? (this.volume > 0 ? `+${this.volume}%` : `${this.volume}%`) : '+0%'
+            voice: this.selectedVoiceId,  // Use voiceId for ElevenLabs API
+            rate: '+0%',  // ElevenLabs uses different settings, kept for backward compatibility
+            pitch: '+0Hz',
+            volume: '+0%'
         }
         
         console.log('[EasyVoicePane] Generating with payload:', payload)

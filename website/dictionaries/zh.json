@@ -4,56 +4,114 @@
         "productTagline": "AI 时代文档工作者的一站式工作平台",
         "nav": {
             "product": "产品",
-            "plugins": "插件广场",
+            "showcase": "功能演练",
             "pricing": "定价",
-            "download": "下载",
-            "login": "登录"
+            "download": "下载"
         },
         "hero": {
             "title": "AI Workdeck",
-            "subtitle": "AI 时代的文档工作台。",
+            "subtitle": "一站式文档工作台。",
             "description": "写、看、查、管，一站搞定。",
             "cta": {
-                "download": "立即下载",
+                "download": "GitHub",
                 "pricing": "查看定价",
                 "plugins": "逛插件广场"
             }
         },
         "features": {
             "ai": {
-                "title": "AI 加持，让人聚焦专业判断",
-                "desc1": "AI 帮你从材料中抽取要点、对齐信息、生成结构化结果。",
-                "desc2": "你保留最终判断与表达，AI 只是加速器，不替代责任。",
-                "desc3": "全流程可回看，产出可复盘。"
+                "title": "不二 Agent",
+                "subtitle": "人不二过，事不二做",
+                "desc1": "阅读、抽取、脱敏、起草，须臾之间，化繁为简。",
+                "desc2": "让心智回归专业，予决断以从容。"
             },
             "oneStop": {
                 "title": "一站式 Workdeck",
-                "subtitle": "把分散工具收拢成一个工作台"
+                "subtitle": "一案在手，万器皆备",
+                "desc1": "语音转录、视像识别、文书经纬,万象森罗，一案尽揽。",
+                "desc2": "所想即所得，行云流水，一气呵成。"
             },
             "ecosystem": {
-                "title": "开放插件生态",
-                "subtitle": "按行业与任务自由装配"
+                "title": "插件生态",
+                "subtitle": "随需而变，无限可能",
+                "desc1": "从尽调到股东核查，从行业到专项数据。海纳百川，无远弗届。",
+                "desc2": "开放之境，共生共荣。",
+                "items": [
+                    {
+                        "title": "文本转语音",
+                        "subtitle": "赋予文字灵魂",
+                        "description": "集成 ElevenLabs 顶级语音合成技术，让您的文档开口说话。",
+                        "showcaseId": "tts"
+                    },
+                    {
+                        "title": "Banana PPT",
+                        "subtitle": "一键生成演示文稿",
+                        "description": "集成 Nano Banana，智能解析大纲，瞬间生成精美 PPT。",
+                        "showcaseId": "ppt"
+                    },
+                    {
+                        "title": "股东大会核查",
+                        "subtitle": "智能合规助手",
+                        "description": "专为股东大会设计，自动核查流程合规性与文件完整性。",
+                        "showcaseId": "top"
+                    },
+                    {
+                        "title": "尽职调查",
+                        "subtitle": "协作管理利器",
+                        "description": "与客户高效协作，集中管理尽调清单与文档。",
+                        "showcaseId": "dueDiligence"
+                    },
+                    {
+                        "title": "剪贴板",
+                        "subtitle": "复制一次，永久记忆",
+                        "description": "记录您的每一次复制，支持无限回溯。",
+                        "showcaseId": "clipboard"
+                    },
+                    {
+                        "title": "文件暂存区",
+                        "subtitle": "临时中转站",
+                        "description": "随手暂存，随时调用，保持桌面整洁。",
+                        "showcaseId": "staging"
+                    },
+                    {
+                        "title": "自动工作日志",
+                        "subtitle": "一切皆有痕迹",
+                        "description": "自动记录您的工作轨迹，生成日报周报。",
+                        "showcaseId": "workLog"
+                    },
+                    {
+                        "title": "文档关联",
+                        "subtitle": "拖拽之间，建立连接",
+                        "description": "选中编辑区文本，将文件拖拽至此，即可建立超链接。",
+                        "showcaseId": "docLink"
+                    }
+                ]
             }
         },
         "pricing": {
             "title": "简单透明的定价",
-            "subtitle": "个人免费起步，专业人士进阶。",
+            "subtitle": "开源共建，自主掌控；托付专业，安享无忧。",
             "free": {
-                "title": "免费版",
-                "price": "¥0",
-                "period": "/永久",
-                "perk1": "基础 Workdeck",
-                "perk2": "限制安装 3 个插件",
-                "cta": "免费下载"
+                "title": "开源社区版",
+                "price": "免费",
+                "period": "",
+                "desc": "极客探索，自主构建",
+                "perk1": "免费使用",
+                "perk2": "支持私有化部署",
+                "perk3": "社区技术支持",
+                "perk4": "访问基础插件",
+                "cta": "GitHub 下载"
             },
             "pro": {
-                "title": "专业版",
-                "price": "¥128",
-                "period": "/终身",
-                "perk1": "无限安装插件",
-                "perk2": "AI Copilot 智能助手",
-                "perk3": "优先技术支持",
-                "cta": "立即购买"
+                "title": "商业定制版",
+                "price": "定制",
+                "period": "",
+                "desc": "团队协作，专业护航",
+                "perk1": "商业授权许可",
+                "perk2": "专业技术支持",
+                "perk3": "高级企业插件",
+                "perk4": "定制化集成服务",
+                "cta": "联系销售"
             },
             "team": {
                 "title": "团队版",
@@ -64,19 +122,72 @@
                 "cta": "联系销售"
             }
         },
+        "ctaSection": {
+            "title": "万卷归一，运筹帷幄"
+        },
         "footer": {
             "product": "产品",
             "features": "特性",
             "pricing": "定价",
-            "download": "下载",
-            "changelog": "更新日志",
-            "ecosystem": "生态",
+            "download": "GitHub",
             "plugins": "插件广场",
-            "developers": "开发者文档",
+            "showcase": "功能演练",
+            "sections": {
+                "overview": "综述"
+            },
+            "plugins_list": {
+                "tts": "文本转语音",
+                "ppt": "Banana PPT",
+                "dueDiligence": "尽职调查",
+                "meetingVerification": "股东大会核查",
+                "clipboard": "剪贴板",
+                "staging": "文件暂存区",
+                "workLog": "自动工作日志",
+                "docLink": "文档关联"
+            },
             "legal": "法律信息",
             "terms": "服务条款",
             "privacy": "隐私政策",
+            "more": "更多",
             "copyright": "© {year} AI Workdeck. 保留所有权利。"
+        }
+    },
+    "showcasePage": {
+        "title": "功能演练",
+        "subtitle": "见证 AI 如何重塑您的工作流",
+        "introVideo": {
+            "title": "AI Workdeck 综述",
+            "description": "5分钟快速了解 AI Workdeck 的核心能力与操作流程。"
+        },
+        "plugins": {
+            "tts": {
+                "title": "文本转语音",
+                "desc": "让文档开口说话，多语言自然合成。"
+            },
+            "ppt": {
+                "title": "Banana PPT",
+                "desc": "一键生成，从大纲到精美演示文稿。"
+            },
+            "dueDiligence": {
+                "title": "尽职调查",
+                "desc": "协作无间，尽调清单高效管理。"
+            },
+            "clipboard": {
+                "title": "剪贴板",
+                "desc": "无限回溯，复制即记忆。"
+            },
+            "staging": {
+                "title": "文件暂存区",
+                "desc": "随用随取，桌面整洁如新。"
+            },
+            "workLog": {
+                "title": "自动工作日志",
+                "desc": "自动记录，工作轨迹一目了然。"
+            },
+            "docLink": {
+                "title": "文档关联",
+                "desc": "拖拽连接，构建知识网络。"
+            }
         }
     }
 }
