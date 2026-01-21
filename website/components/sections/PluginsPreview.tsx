@@ -42,7 +42,7 @@ export function PluginsPreview({ lang, dict }: PluginsPreviewProps) {
     };
 
     return (
-        <section className="py-24 bg-neutral-gray-pale overflow-hidden" id="plugins">
+        <section className="py-16 bg-neutral-gray-pale overflow-hidden" id="plugins">
             <div className="container mx-auto px-4 md:px-8 text-center mb-16">
                 <h2 className="text-3xl font-bold text-neutral-dark-bg mb-4">
                     {dict.common.features.ecosystem.title}

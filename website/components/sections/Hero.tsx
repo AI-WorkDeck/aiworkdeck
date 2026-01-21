@@ -82,7 +82,7 @@ export function Hero({ lang, dict }: HeroProps) {
     }, []);
 
     return (
-        <section className="relative overflow-hidden bg-white pt-24 pb-12 lg:pt-40 lg:pb-24">
+        <section className="relative bg-white pt-16 pb-8 lg:pt-24 lg:pb-16">
 
             {/* Background decoration - Enhanced */}
             <div className="absolute top-0 right-0 -z-10 h-full w-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-king-mint-lightest/40 via-transparent to-transparent" />
@@ -121,13 +121,13 @@ export function Hero({ lang, dict }: HeroProps) {
                     <div className="lg:col-span-7 relative w-full perspective-1000 flex items-center justify-center lg:justify-end">
                         <div ref={containerRef} className="relative w-full h-[350px] sm:h-[450px] lg:h-[600px] flex items-center justify-center z-10">
                             {/* Tilting Card - Massive Size */}
-                            <div ref={cardRef} className="relative w-full aspect-[16/10] rounded-2xl shadow-2xl shadow-king-forest/10 bg-white border border-white/50 backdrop-blur-sm overflow-hidden transform-gpu" style={{ transformStyle: 'preserve-3d' }}>
+                            <div ref={cardRef} className="relative w-full aspect-[4/3] rounded-2xl shadow-2xl shadow-king-forest/10 bg-white border border-white/50 backdrop-blur-sm overflow-hidden transform-gpu" style={{ transformStyle: 'preserve-3d' }}>
 
                                 {/* Main Image */}
                                 <img
                                     src="/images/hero-dashboard.png"
                                     alt="AI Workdeck Dashboard"
-                                    className="w-full h-full object-cover object-top scale-105 hover:scale-100 transition-transform duration-700"
+                                    className="w-full h-full object-cover object-center scale-105 hover:scale-100 transition-transform duration-700"
                                     onError={(e) => {
                                         // Fallback if image doesn't exist
                                         (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIiB2aWV3Qm94PSIwIDAgODAwIDYwMCI+PHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiNmMmZjZjkiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9ImFyaWFsIiBmb250LXNpemU9IjI0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOWJiZWE1Ij5IZXJvIERhc2hib2FyZCBJbWFnZTwvdGV4dD48L3N2Zz4=';
@@ -162,7 +162,7 @@ export function Hero({ lang, dict }: HeroProps) {
                 </div>
             </div>
             {/* Scroll Indicator */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 animate-bounce hidden md:block">
+            <div className="absolute left-1/2 -translate-x-1/2 animate-bounce hidden md:block" style={{ bottom: "-20px" }}>
                 <div className="p-2 rounded-full bg-white/50 backdrop-blur border border-neutral-gray-light text-neutral-gray-medium shadow-sm">
                     <ArrowRight className="w-5 h-5 rotate-90" />
                 </div>

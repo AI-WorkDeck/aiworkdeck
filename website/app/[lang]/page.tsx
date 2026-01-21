@@ -22,7 +22,7 @@ export default async function Home({
       <Pricing lang={lang} dict={dict} />
 
       {/* Final CTA */}
-      <section className="py-24 bg-king-forest text-white flex items-center justify-center">
+      <section className="py-16 bg-king-forest text-white flex items-center justify-center">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight">
             {dict.common.ctaSection.title}
