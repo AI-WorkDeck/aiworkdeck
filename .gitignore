@@ -32,3 +32,8 @@ mineru-service/temp/
 .vscode/
 .trae/
 *.iml
+
+#env
+*.env
+*.env.production
+*.env.development
