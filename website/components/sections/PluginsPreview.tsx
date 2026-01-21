@@ -47,10 +47,10 @@ export function PluginsPreview({ lang, dict }: PluginsPreviewProps) {
                 <h2 className="text-3xl font-bold text-neutral-dark-bg mb-4">
                     {dict.common.features.ecosystem.title}
                 </h2>
-                <p className="text-xl text-neutral-gray-medium max-w-2xl mx-auto">
+                <p className="text-xl text-neutral-gray-medium max-w-2xl mx-auto text-center">
                     {dict.common.features.ecosystem.subtitle}
                 </p>
-                <p className="text-neutral-gray-medium mt-4 max-w-2xl mx-auto">
+                <p className="text-neutral-gray-medium mt-4 max-w-2xl mx-auto text-center">
                     {dict.common.features.ecosystem.desc1}
                 </p>
             </div>

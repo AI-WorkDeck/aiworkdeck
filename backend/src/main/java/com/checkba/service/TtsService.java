@@ -18,23 +18,28 @@ import java.util.*;
  * TTS Service using ElevenLabs API
  * API Documentation: https://elevenlabs.io/docs/api-reference
  */
+import org.springframework.beans.factory.annotation.Autowired;
+
 @Service
 public class TtsService {
 
     private static final Logger logger = LoggerFactory.getLogger(TtsService.class);
     private static final String TEMP_AUDIO_DIR = System.getProperty("java.io.tmpdir") + File.separator + "elevenlabs_audio";
     
+    @Autowired
+    private SystemSettingService systemSettingService;
+
     @Value("${external.elevenlabs.api-key}")
-    private String apiKey;
+    private String defaultApiKey;
     
     @Value("${external.elevenlabs.base-url}")
-    private String baseUrl;
+    private String defaultBaseUrl;
     
     @Value("${external.elevenlabs.model-id}")
-    private String modelId;
+    private String defaultModelId;
     
     @Value("${external.elevenlabs.default-voice-id}")
-    private String defaultVoiceId;
+    private String defaultDefaultVoiceId;
     
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -49,6 +54,9 @@ public class TtsService {
      */
     public List<VoiceOption> getVoices() {
         try {
+            String baseUrl = systemSettingService.get("external.elevenlabs.baseUrl", defaultBaseUrl);
+            String apiKey = systemSettingService.get("external.elevenlabs.apiKey", defaultApiKey);
+
             String url = baseUrl + "/voices";
             
             HttpHeaders headers = new HttpHeaders();
@@ -107,6 +115,11 @@ public class TtsService {
      */
     public File generateAudio(String text, String voiceId, String rate, String pitch, String volume) {
         try {
+            String baseUrl = systemSettingService.get("external.elevenlabs.baseUrl", defaultBaseUrl);
+            String apiKey = systemSettingService.get("external.elevenlabs.apiKey", defaultApiKey);
+            String modelId = systemSettingService.get("external.elevenlabs.modelId", defaultModelId);
+            String defaultVoiceId = systemSettingService.get("external.elevenlabs.defaultVoiceId", defaultDefaultVoiceId);
+
             // Use default voice if not specified
             if (voiceId == null || voiceId.isEmpty()) {
                 voiceId = defaultVoiceId;

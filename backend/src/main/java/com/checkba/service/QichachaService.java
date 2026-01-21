@@ -17,20 +17,24 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class QichachaService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(QichachaService.class);
 
-    @Value("${external.qichacha.key}")
-    private String appKey;
+    @Autowired
+    private SystemSettingService systemSettingService;
 
-    @Value("${external.qichacha.secret}")
-    private String secretKey;
+    @Value("${external.qichacha.key:}")
+    private String defaultAppKey;
 
-    @Value("${external.qichacha.base-url}")
-    private String baseUrl;
+    @Value("${external.qichacha.secret:}")
+    private String defaultSecretKey;
+
+    @Value("${external.qichacha.base-url:https://api.qichacha.com}")
+    private String defaultBaseUrl;
 
     /**
      * 调用企查查企业工商详情接口
@@ -38,6 +42,13 @@ public class QichachaService {
     public CompanyBasicInfoDTO searchCompany(String searchKey, String role) {
         // 如果是纯 6 位数字，视为股票代码，暂不直接传给企查查，优先按名称处理。
         // 这里保留原实现，但在上层先做一层股票代码 → 公司名称的解析。
+        // 0. 获取配置（优先 DB，兜底 Env）
+        String appKey = systemSettingService.get("external.qichacha.key", defaultAppKey);
+        String secretKey = systemSettingService.get("external.qichacha.secret", defaultSecretKey);
+        String baseUrl = systemSettingService.get("external.qichacha.baseUrl", defaultBaseUrl);
+
+
+
         // 1. 准备请求参数
         String timeSpan = String.valueOf(System.currentTimeMillis() / 1000);
         // Token = Md5(key + Timespan + SecretKey)

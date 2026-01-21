@@ -2,8 +2,11 @@ package com.checkba.service.ai.mcp;
 
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.checkba.service.SystemSettingService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -26,9 +29,13 @@ import org.slf4j.LoggerFactory;
 public class McpClientService {
     private static final Logger log = LoggerFactory.getLogger(McpClientService.class);
 
+
+    @Autowired
+    private SystemSettingService systemSettingService;
+
     // PKULaw Token
-    // Note: Should conceptually be in application.properties
-    private static final String PKULAW_TOKEN = "***REMOVED***";
+    @Value("${external.pkulaw.token:}")
+    private String defaultPkulawToken;
     
     // PKULaw MCP Server URLs
     private static final Map<String, String> SERVER_URLS = Map.of(
@@ -78,10 +85,14 @@ public class McpClientService {
             String jsonPayload = requestBody.toString();
             log.debug("MCP Payload: {}", jsonPayload);
 
+            String pkulawToken = systemSettingService.get("external.pkulaw.token", defaultPkulawToken);
+
+
+
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + PKULAW_TOKEN)
+                .header("Authorization", "Bearer " + pkulawToken)
                 .header("Accept", "application/json, text/event-stream")
                 .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                 .timeout(REQUEST_TIMEOUT)
