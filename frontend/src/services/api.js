@@ -795,6 +795,28 @@ export function batchCopyFiles(projectId, fileIds, targetParentId) {
   });
 }
 
+
+// ===================== 脱敏处理 API =====================
+// ===================== 脱敏处理 API =====================
+export function getSensitiveOptions() {
+  return request({
+    url: '/api/sensitive/options',
+    method: 'GET',
+  });
+}
+
+export function desensitizeFile(payload) {
+  return request({
+    url: '/api/sensitive/desensitize',
+    method: 'POST',
+    data: payload,
+    header: {
+      'Content-Type': 'application/json',
+    },
+    timeout: 300000, // 5 minutes timeout for large files
+  });
+}
+
 // 获取文件详情
 export function getFileDetail(projectId, fileId) {
   return request({
@@ -1324,6 +1346,9 @@ export default {
   deleteDdItem,
   deleteDdRequest,
   copyDdRequest,
+  // Desensitization
+  getSensitiveOptions,
+  desensitizeFile,
   // WPS 操作
   sendWpsResult,
   addDdRequestItems(requestId, content) {
