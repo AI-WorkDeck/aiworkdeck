@@ -32,3 +32,16 @@ mineru-service/temp/
 .vscode/
 .trae/
 *.iml
+
+#env
+*.env
+*.env.production
+*.env.development
+
+# Local/Private folders
+.agent/
+.cursor/
+.shared/
+.trae/
+King IDE汇报/
+docs/
