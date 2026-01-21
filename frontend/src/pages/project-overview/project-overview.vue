@@ -4073,20 +4073,54 @@ export default {
 
     // copyOcrText / insertOcrToWps 已被快捷命令条替代
 
-    async insertPlainTextToWps(text) {
-      const t = (text || '').trim()
-      if (!t) return
-      const wpsComp = this.getCurrentWpsInstance()
-      if (!wpsComp) {
-        uni.showToast({ title: '请先激活一个 WPS 文档窗口', icon: 'none' })
-        return
+    async insertPlainTextToWps(payload) {
+      // 兼容旧的 pure string 调用
+      let text = ''
+      let type = 'TEXT'
+      let content = ''
+
+      if (typeof payload === 'string') {
+        text = payload
+        content = payload
+      } else if (payload && typeof payload === 'object') {
+        type = payload.type || 'TEXT'
+        content = payload.content || ''
+        text = (type === 'TEXT') ? content : ''
       }
-      try {
-        await wpsComp.insertTextWithBookmark(t, `WEB_CLIP_${Date.now()}`)
-        uni.showToast({ title: '已插入文档', icon: 'success' })
-      } catch (e) {
-        console.error(e)
-        uni.showToast({ title: '插入失败', icon: 'none' })
+
+      if (type === 'TEXT') {
+         const t = (text || '').trim()
+         if (!t) return
+         const wpsComp = this.getCurrentWpsInstance()
+         if (!wpsComp) {
+           uni.showToast({ title: '请先激活一个 WPS 文档窗口', icon: 'none' })
+           return
+         }
+         try {
+           await wpsComp.insertTextWithBookmark(t, `WEB_CLIP_${Date.now()}`)
+           uni.showToast({ title: '已插入文档', icon: 'success' })
+         } catch (e) {
+           console.error(e)
+           uni.showToast({ title: '插入失败', icon: 'none' })
+         }
+      } else if (type === 'IMAGE') {
+         if (!content) return
+         const wpsComp = this.getCurrentWpsInstance()
+         if (!wpsComp) {
+           uni.showToast({ title: '请先激活一个 WPS 文档窗口', icon: 'none' })
+           return
+         }
+         try {
+           if (wpsComp.insertImage) {
+             await wpsComp.insertImage(content)
+             uni.showToast({ title: '已插入图片', icon: 'success' })
+           } else {
+             uni.showToast({ title: '当前编辑器不支持图片插入', icon: 'none' })
+           }
+         } catch (e) {
+           console.error(e)
+           uni.showToast({ title: '插入图片失败', icon: 'none' })
+         }
       }
     },
 

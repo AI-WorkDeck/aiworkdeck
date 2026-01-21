@@ -20,7 +20,12 @@
                <view v-if="it.type === 'TEXT'" class="cli-btn" @tap.stop="copy(it.text)" title="复制">
                  <text class="icon">⧉</text>
                </view>
-               <view v-if="it.type === 'TEXT'" class="cli-btn" @tap.stop="$emit('insert', it.text)" title="插入">
+               <!-- Text Insert -->
+               <view v-if="it.type === 'TEXT'" class="cli-btn" @tap.stop="$emit('insert', { type: 'TEXT', content: it.text })" title="插入">
+                 <text class="icon">⚡</text>
+               </view>
+               <!-- Image Insert -->
+               <view v-if="it.type === 'IMAGE'" class="cli-btn" @tap.stop="$emit('insert', { type: 'IMAGE', content: getImageUrl(it) })" title="插入">
                  <text class="icon">⚡</text>
                </view>
                <view class="del-wrapper" style="position: relative;">

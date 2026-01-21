@@ -862,6 +862,25 @@ export default {
     },
 
     /**
+     * [API] 在光标处插入图片
+     * @param {string} url 图片URL
+     */
+    async insertImage(url) {
+      if (!this.instance) return false
+      try {
+        const app = this.instance.Application
+        const selection = await app.ActiveDocument.Selection
+        const inlineShapes = await selection.InlineShapes
+        
+        await inlineShapes.AddPicture(url)
+        return true
+      } catch (e) {
+        console.error('插入图片失败', e)
+        throw e
+      }
+    },
+
+    /**
      * [API] 插入“网核证据链接”（带书签名，且尽量以超链接样式呈现）
      * 说明：WPS WebOffice 的不同版本对 Hyperlinks.Add 的参数形态支持不完全一致；
      * 这里做“尽力而为”，失败则退化为普通书签文本。
