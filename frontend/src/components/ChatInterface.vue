@@ -309,8 +309,8 @@
     <view v-if="bubbles.length === 0 && !isStreaming" class="empty-flow-container">
        <!-- Top: Welcome Text (between header and input) -->
        <view class="empty-top-section">
-          <text class="welcome-text">今天需要处理什么法律事务？</text>
-          <text class="welcome-subtitle">随时为您解答法律疑问、起草文档或分析案情。</text>
+          <text class="welcome-text">有什么可以帮您？</text>
+          <text class="welcome-subtitle">随时为您解答疑问、起草文档或分析数据。</text>
        </view>
 
        <!-- Center: Input -->
