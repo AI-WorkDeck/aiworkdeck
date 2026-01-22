@@ -46,3 +46,7 @@ env.production
 .trae/
 King IDE汇报/
 docs/
+
+# Website source code (separate repo)
+website/
+websitebackend/
