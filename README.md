@@ -49,10 +49,18 @@ cd aiworkdeck
 ```
 
 ### 2. Prerequisites
-Before running the project, ensure you have the following installed:
-- **Docker**: Required for PPTX generation and MinerU services.
-- **Java 17+**: Required for the Backend service.
-- **Node.js 18+**: Required for Frontend and Desktop services.
+Before running the project, ensure you have the following installed. We provide links to the official installation guides:
+
+- **Docker** (Required for PPTX generation & MinerU)
+    - [Install Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- **Java 17+** (Required for Backend)
+    - [Install JDK 17](https://www.oracle.com/java/technologies/downloads/#java17) or use [SDKMAN!](https://sdkman.io/) (`sdk install java 17.0.10-tem`)
+- **Node.js 18+** (Required for Frontend & Desktop)
+    - [Install Node.js](https://nodejs.org/en/download/) or use [nvm](https://github.com/nvm-sh/nvm) (`nvm install 18`)
+- **PostgreSQL Database** (Required for Backend)
+    - The project does **not** provide a Docker database container. You must have a running PostgreSQL instance.
+    - [Download PostgreSQL](https://www.postgresql.org/download/) or use a Cloud Database.
+    - **Setup**: Create a database named `checkba` (or customize in `.env`).
 
 ### 3. Configuration
 Copy the example configuration files to their production counterparts and fill in your API keys.
@@ -60,23 +68,15 @@ Copy the example configuration files to their production counterparts and fill i
 #### 3.1 Backend Configuration
 Copy `backend/.env.example` to `backend/.env.production`.
 
-> **Note**: You must have a PostgreSQL database running. This project does not provide a Docker container for the database.
-
 | Variable | Description | Default / Fallback | How to Obtain |
 | :--- | :--- | :--- | :--- |
 | **Server** | | | |
 | `SERVER_PORT` | Backend Port | `9696` | N/A |
-| **Database** | | | |
-| `DB_HOST` | Database Host | `localhost` | Local Install or Cloud Provider |
-| `DB_PORT` | Database Port | `5432` | |
-| `DB_NAME` | Database Name | `checkba` | `CREATE DATABASE checkba;` |
-| `DB_USERNAME` | Database User | `postgres` | |
-| `DB_PASSWORD` | Database Password | (Required) | |
 | **External APIs** | | | |
 | `QICHACHA_KEY` | Company Data | N/A | [Qichacha Open Platform](https://openapi.qcc.com/) |
 | `TUSHARE_TOKEN` | Stock Data | N/A | [Tushare](https://tushare.pro/) |
 | `ELEVENLABS_KEY`| TTS Service | N/A | [ElevenLabs](https://elevenlabs.io/) |
-| `PKULAW_TOKEN` | Legal Data | N/A | [PKULaw](https://www.pkulaw.com/) |
+| `PKULAW_TOKEN` | Legal Data | N/A | [PKULaw](https://mcp.pkulaw.com/) |
 | `WPS_APP_ID` | Document Editor | N/A | [WPS WebOffice](https://wwo.wps.cn/) |
 | **AI Models** | | | |
 | `OPENROUTER_KEY`| LLM Aggregator | N/A | [OpenRouter](https://openrouter.ai/) |
