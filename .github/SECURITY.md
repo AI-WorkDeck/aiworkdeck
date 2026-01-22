@@ -5,7 +5,7 @@ We take security seriously. If you discover a security vulnerability in AI Workd
 
 Instead, please report it privately:
 
-- **Email:** [Insert Security Email Here]
+- **Email:** hi@aiworkdeck.com
 
 ## Process
 1. We will acknowledge receipt of your report.

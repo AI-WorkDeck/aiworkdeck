@@ -22,12 +22,14 @@ You likely need a commercial license if:
 ## How to Acquire
 Please contact our licensing team to discuss your specific use case and pricing:
 
-- **Email:** [Insert Email Here]
-- **Website:** [Insert Website/Contact Form Link Here]
+- **Email:** hi@aiworkdeck.com
+- **Website:** [www.aiworkdeck.com](https://www.aiworkdeck.com)
 
 ## FAQ
 **Q: Can I use the Community Edition for internal company tools?**
 A: Yes, as long as you comply with AGPLv3. Generally, internal use that isn't exposed to external users doesn't trigger distribution clauses, but you should consult your legal counsel.
 
-**Q: If I write a plugin, do I need a commercial license?**
 A: If the plugin runs in the same process and relies on the kernel, it may be subject to AGPLv3 viral effects. If you want to keep your plugin proprietary while selling a service based on it, a Commercial License is recommended.
+
+**Q: I want to copy the "IDE for Documents" workflow and logic but rewrite the code. Can I do that closed-source?**
+A: **Likely No.** We consider the specific Structure, Sequence, and Organization (SSO) of our IDE workflow to be a protected part of the software's expression. If your product is substantially similar in *function, logic flow, and user experience* to AI Workdeck (a "clone"), we assert that you are creating a derivative work of our protected design. You should acquire a Commercial License to avoid legal ambiguity and potential infringement claims regarding Trade Dress and Copyright in the software's structure.

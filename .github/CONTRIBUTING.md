@@ -2,9 +2,14 @@
 
 Thank you for your interest in contributing to AI Workdeck! We welcome contributions from the community to help improve the kernel.
 
-## Licensing
-**Important:** By contributing to this repository, you agree that your contributions will be licensed under the **AGPLv3**. 
-*If we implement a CLA (Contributor License Agreement) in the future, you may be required to sign it to ensure the project maintains its dual-licensing capability.*
+## Licensing & CLA
+**By submitting a Pull Request, you agree to the terms in our [Contributor License Agreement (CLA)](../legal/CLA.md).**
+
+Briefly:
+1. You assert that you own the code you are submitting (DCO).
+2. You grant the project maintainers the right to distribute your code under both the **AGPLv3** (for the community) and a **Commercial License** (for enterprise customers).
+
+*This rights grant is essential for the project's long-term sustainability and dual-licensing model.*
 
 ## How to Contribute
 1. **Fork the repository** on GitHub.
