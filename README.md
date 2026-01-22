@@ -57,17 +57,46 @@ Before running the project, ensure you have the following installed:
 ### 3. Configuration
 Copy the example configuration files to their production counterparts and fill in your API keys.
 
-**Backend:**
-```bash
-cp backend/.env.example backend/.env.production
-# Edit backend/.env.production with your DB credentials and API keys
-```
+#### 3.1 Backend Configuration
+Copy `backend/.env.example` to `backend/.env.production`.
 
-**PPTX Service (AI Slides):**
-```bash
-cp pptx-service/.env.example pptx-service/.env
-# Edit pptx-service/.env with your Google Gemini/OpenAI keys
-```
+| Variable | Description | Impacted Feature |
+| :--- | :--- | :--- |
+| **Server** | | |
+| `SERVER_PORT` | Port for the Java backend (Default: 9696) | API access |
+| **Database** | | |
+| `DB_HOST`, `DB_PORT` | PostgreSQL connection details | core data storage |
+| `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` | Database credentials | core data storage |
+| **External APIs** | | |
+| `QICHACHA_KEY`, `QICHACHA_SECRET` | Qichacha API credentials | **Enterprise Data**: Company search & details |
+| `TUSHARE_TOKEN` | Tushare API Token | **Financial Data**: Stock market data retrieval |
+| `ELEVENLABS_API_KEY` | ElevenLabs API Key | **TTS**: High-quality text-to-speech generation |
+| `PKULAW_TOKEN` | PKULaw API Token | **Legal Data**: Search laws and regulations |
+| `WPS_APP_ID`, `WPS_APP_SECRET` | WPS WebOffice credentials | **Document Editor**: Embedded WPS editor integration |
+| **AI Models** | | |
+| `OPENROUTER_API_KEY` | OpenRouter API Key | **LLM**: Access to various LLMs via OpenRouter |
+| `GEMINI_API_KEY` | Google Gemini API Key | **LLM**: Access to Google Gemini models |
+| **Cloud Storage** | | |
+| `OSS_ACCESS_KEY_ID`, `OSS_ACCESS_KEY_SECRET` | Aliyun OSS credentials | **OCR/Storage**: File upload & OCR processing |
+
+#### 3.2 PPTX Service Configuration (AI Slides)
+Copy `pptx-service/.env.example` to `pptx-service/.env`.
+
+| Variable | Description | Impacted Feature |
+| :--- | :--- | :--- |
+| `AI_PROVIDER_FORMAT` | `gemini` or `openai` | Determines which SDK to use for generation |
+| **Gemini Provider** | (Used when `AI_PROVIDER_FORMAT=gemini`) | |
+| `GOOGLE_API_KEY` | Google GenAI API Key | **AI Slides**: Content generation via Gemini |
+| `GOOGLE_API_BASE` | API Base URL (optional proxy) | Connectivity |
+| **OpenAI Provider** | (Used when `AI_PROVIDER_FORMAT=openai`) | |
+| `OPENAI_API_KEY` | OpenAI API Key | **AI Slides**: Content generation via OpenAI-compatible API |
+| `OPENAI_API_BASE` | API Base URL | Connectivity |
+| **Common** | | |
+| `TEXT_MODEL` | LLM Model Name (e.g., `gpt-4o`) | **AI Slides**: Text content generation quality |
+| `IMAGE_MODEL` | Image Model Name | **AI Slides**: Image generation (if enabled) |
+| `MINERU_LOCAL_URL` | Local MinerU Service URL | **File Parsing**: PDF/Doc parsing via local docker |
+| `MINERU_TOKEN` | Cloud MinerU Token (optional) | **File Parsing**: Fallback to cloud parsing |
+| `OUTPUT_LANGUAGE` | Output language (e.g., `zh`, `en`) | **AI Slides**: Default language of generated slides |
 
 ### 4. Build & Run
 We provide a one-click script to build and start all services (Backend, Frontend, Desktop, and Docker containers).
