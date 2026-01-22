@@ -37,6 +37,7 @@ mineru-service/temp/
 *.env
 *.env.production
 *.env.development
+env.production
 
 # Local/Private folders
 .agent/
