@@ -60,43 +60,46 @@ Copy the example configuration files to their production counterparts and fill i
 #### 3.1 Backend Configuration
 Copy `backend/.env.example` to `backend/.env.production`.
 
-| Variable | Description | Impacted Feature |
-| :--- | :--- | :--- |
-| **Server** | | |
-| `SERVER_PORT` | Port for the Java backend (Default: 9696) | API access |
-| **Database** | | |
-| `DB_HOST`, `DB_PORT` | PostgreSQL connection details | core data storage |
-| `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` | Database credentials | core data storage |
-| **External APIs** | | |
-| `QICHACHA_KEY`, `QICHACHA_SECRET` | Qichacha API credentials | **Enterprise Data**: Company search & details |
-| `TUSHARE_TOKEN` | Tushare API Token | **Financial Data**: Stock market data retrieval |
-| `ELEVENLABS_API_KEY` | ElevenLabs API Key | **TTS**: High-quality text-to-speech generation |
-| `PKULAW_TOKEN` | PKULaw API Token | **Legal Data**: Search laws and regulations |
-| `WPS_APP_ID`, `WPS_APP_SECRET` | WPS WebOffice credentials | **Document Editor**: Embedded WPS editor integration |
-| **AI Models** | | |
-| `OPENROUTER_API_KEY` | OpenRouter API Key | **LLM**: Access to various LLMs via OpenRouter |
-| `GEMINI_API_KEY` | Google Gemini API Key | **LLM**: Access to Google Gemini models |
-| **Cloud Storage** | | |
-| `OSS_ACCESS_KEY_ID`, `OSS_ACCESS_KEY_SECRET` | Aliyun OSS credentials | **OCR/Storage**: File upload & OCR processing |
+> **Note**: You must have a PostgreSQL database running. This project does not provide a Docker container for the database.
+
+| Variable | Description | Default / Fallback | How to Obtain |
+| :--- | :--- | :--- | :--- |
+| **Server** | | | |
+| `SERVER_PORT` | Backend Port | `9696` | N/A |
+| **Database** | | | |
+| `DB_HOST` | Database Host | `localhost` | Local Install or Cloud Provider |
+| `DB_PORT` | Database Port | `5432` | |
+| `DB_NAME` | Database Name | `checkba` | `CREATE DATABASE checkba;` |
+| `DB_USERNAME` | Database User | `postgres` | |
+| `DB_PASSWORD` | Database Password | (Required) | |
+| **External APIs** | | | |
+| `QICHACHA_KEY` | Company Data | N/A | [Qichacha Open Platform](https://openapi.qcc.com/) |
+| `TUSHARE_TOKEN` | Stock Data | N/A | [Tushare](https://tushare.pro/) |
+| `ELEVENLABS_KEY`| TTS Service | N/A | [ElevenLabs](https://elevenlabs.io/) |
+| `PKULAW_TOKEN` | Legal Data | N/A | [PKULaw](https://www.pkulaw.com/) |
+| `WPS_APP_ID` | Document Editor | N/A | [WPS WebOffice](https://wwo.wps.cn/) |
+| **AI Models** | | | |
+| `OPENROUTER_KEY`| LLM Aggregator | N/A | [OpenRouter](https://openrouter.ai/) |
+| `GEMINI_API_KEY`| Google LLM | N/A | [Google AI Studio](https://aistudio.google.com/) |
+| **Storage** | | | |
+| `OSS_ACCESS_KEY`| Aliyun OSS | N/A | [Aliyun Console](https://oss.console.aliyun.com/) |
 
 #### 3.2 PPTX Service Configuration (AI Slides)
 Copy `pptx-service/.env.example` to `pptx-service/.env`.
 
-| Variable | Description | Impacted Feature |
-| :--- | :--- | :--- |
-| `AI_PROVIDER_FORMAT` | `gemini` or `openai` | Determines which SDK to use for generation |
-| **Gemini Provider** | (Used when `AI_PROVIDER_FORMAT=gemini`) | |
-| `GOOGLE_API_KEY` | Google GenAI API Key | **AI Slides**: Content generation via Gemini |
-| `GOOGLE_API_BASE` | API Base URL (optional proxy) | Connectivity |
-| **OpenAI Provider** | (Used when `AI_PROVIDER_FORMAT=openai`) | |
-| `OPENAI_API_KEY` | OpenAI API Key | **AI Slides**: Content generation via OpenAI-compatible API |
-| `OPENAI_API_BASE` | API Base URL | Connectivity |
-| **Common** | | |
-| `TEXT_MODEL` | LLM Model Name (e.g., `gpt-4o`) | **AI Slides**: Text content generation quality |
-| `IMAGE_MODEL` | Image Model Name | **AI Slides**: Image generation (if enabled) |
-| `MINERU_LOCAL_URL` | Local MinerU Service URL | **File Parsing**: PDF/Doc parsing via local docker |
-| `MINERU_TOKEN` | Cloud MinerU Token (optional) | **File Parsing**: Fallback to cloud parsing |
-| `OUTPUT_LANGUAGE` | Output language (e.g., `zh`, `en`) | **AI Slides**: Default language of generated slides |
+| Variable | Description | Default / Fallback | How to Obtain |
+| :--- | :--- | :--- | :--- |
+| `AI_PROVIDER` | SDK Format | `gemini` | `gemini` or `openai` |
+| **Gemini** | | | |
+| `GOOGLE_API_KEY` | GenAI Key | (Required) | [Google AI Studio](https://aistudio.google.com/) |
+| `GOOGLE_API_BASE`| Base URL | `https://generativelanguage.googleapis.com`| Optional Proxy |
+| **OpenAI** | | | |
+| `OPENAI_API_KEY` | OpenAI Key | N/A | [OpenAI Platform](https://platform.openai.com/) |
+| `OPENAI_API_BASE`| Base URL | `https://api.openai.com/v1` | Optional Proxy |
+| **Common** | | | |
+| `TEXT_MODEL` | LLM Model | `gemini-2.0-flash-exp` | Model ID from Provider |
+| `IMAGE_MODEL` | Image Model | `gemini-2.0-flash-exp` | Model ID from Provider |
+| `MINERU_URL` | MinerU URL | `http://mineru-service:8000` | Local Docker Service |
 
 ### 4. Build & Run
 We provide a one-click script to build and start all services (Backend, Frontend, Desktop, and Docker containers).
