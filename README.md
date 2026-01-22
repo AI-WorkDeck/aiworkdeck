@@ -41,10 +41,46 @@ Please [contact us to acquire a Commercial License](mailto:hi@aiworkdeck.com).
 *See [LICENSE](legal/LICENSE) for the full AGPLv3 text and [COMMERCIAL-LICENSE](legal/COMMERCIAL-LICENSE.md) for commercial licensing details.*
 
 ## Quick Start
-*(Placeholder for Quick Start Instructions)*
+
+### 1. Clone Repository
 ```bash
-# Example setup
 git clone https://github.com/zeweihan/aiworkdeck.git
 cd aiworkdeck
-./start-all.sh
 ```
+
+### 2. Prerequisites
+Before running the project, ensure you have the following installed:
+- **Docker**: Required for PPTX generation and MinerU services.
+- **Java 17+**: Required for the Backend service.
+- **Node.js 18+**: Required for Frontend and Desktop services.
+
+### 3. Configuration
+Copy the example configuration files to their production counterparts and fill in your API keys.
+
+**Backend:**
+```bash
+cp backend/.env.example backend/.env.production
+# Edit backend/.env.production with your DB credentials and API keys
+```
+
+**PPTX Service (AI Slides):**
+```bash
+cp pptx-service/.env.example pptx-service/.env
+# Edit pptx-service/.env with your Google Gemini/OpenAI keys
+```
+
+### 4. Build & Run
+We provide a one-click script to build and start all services (Backend, Frontend, Desktop, and Docker containers).
+
+```bash
+chmod +x restart-all.sh
+./restart-all.sh
+```
+*Note: This script automatically checks for dependencies, stops old processes, packages the backend, and starts all services in the correct order.*
+
+### 5. Local Access (Intranet Penetration)
+If you are running this locally and need to expose it to the internet (e.g., for external API callbacks or remote access), we recommend using **cpolar**.
+
+- **Official Website**: [https://www.cpolar.com/](https://www.cpolar.com/)
+
+You can use cpolar to easily map your local ports (e.g., 5173 for Frontend, 9696 for Backend) to a public URL.
