@@ -261,6 +261,16 @@ export async function initWpsEditor(options) {
         console.error("[WPS-SDK] WPS错误事件:", data);
     });
 
+    // 监听加载失败事件
+    instance.ApiEvent.AddApiEventListener("fileLoadFail", (data) => {
+        console.error("[WPS-SDK] 文件加载失败事件:", data);
+    });
+
+    // 监听网络错误事件
+    instance.ApiEvent.AddApiEventListener("netError", (data) => {
+        console.error("[WPS-SDK] 网络错误事件:", data);
+    });
+
 
 
     return instance;
