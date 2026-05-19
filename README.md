@@ -18,6 +18,7 @@
   <a href="legal/COMMERCIAL-LICENSE.md"><img src="https://img.shields.io/badge/commercial%20license-available-0b5f3a.svg" alt="Commercial license"></a>
   <a href="https://www.aiworkdeck.com"><img src="https://img.shields.io/badge/website-aiworkdeck.com-0b5f3a.svg" alt="Website"></a>
   <a href="https://github.com/zeweihan/aiworkdeck/issues"><img src="https://img.shields.io/github/issues/zeweihan/aiworkdeck" alt="Issues"></a>
+  <a href="https://star-history.com/#zeweihan/aiworkdeck&Date"><img src="https://img.shields.io/github/stars/zeweihan/aiworkdeck?style=social&label=Star%20History" alt="Star History"></a>
 </p>
 
 <p align="center">
@@ -176,6 +177,10 @@ See [LICENSE](legal/LICENSE) and [COMMERCIAL-LICENSE.md](legal/COMMERCIAL-LICENS
 Read [WHY.md](WHY.md) for the product thesis and founder story.
 
 ---
+
+## ⭐ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=zeweihan/aiworkdeck&type=Date)](https://star-history.com/#zeweihan/aiworkdeck&Date)
 
 <p align="center">
   If this direction matters to you, please <a href="https://github.com/zeweihan/aiworkdeck/stargazers">⭐ star the repo</a> and share it with someone building legal AI, document AI, or professional-service infrastructure.
