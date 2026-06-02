@@ -80,6 +80,93 @@ flowchart TB
   Services --> Security
 ```
 
+
+
+## Data Processing & Privacy
+
+AI Workdeck is designed for **self-hosted, private deployment**. The following diagram shows which components process data locally vs. externally:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Your Infrastructure (private network)                          │
+│                                                                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │
+│  │ AI Agent │  │  MinerU  │  │   PPTX   │  │ Sensitive Data │  │
+│  │ (Ollama) │  │ (Docker) │  │ (Docker) │  │    Masking     │  │
+│  │  LOCAL   │  │  LOCAL   │  │  LOCAL   │  │     LOCAL      │  │
+│  └──────────┘  └──────────┘  └──────────┘  └────────────────┘  │
+│                                                                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────────────────┐  │
+│  │PostgreSQL│  │   RAG    │  │    Local File Storage        │  │
+│  │  LOCAL   │  │  LOCAL   │  │          LOCAL               │  │
+│  └──────────┘  └──────────┘  └──────────────────────────────┘  │
+│                                                                 │
+├────────────────────────── Optional External ────────────────────┤
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
+│  │   OCR    │  │   TTS    │  │ Company  │  │  Gemini /    │   │
+│  │ (Aliyun) │  │(ElevenLb)|  │(Qichacha)│  │  OpenRouter  │   │
+│  │ EXTERNAL │  │ EXTERNAL │  │ EXTERNAL │  │  CONFIGURABLE│   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Component | Default Location | Can Run Locally? | Notes |
+|---|---|---|---|
+| AI inference (chat/agent) | Local (Ollama) | ✅ Yes | Default is localhost:11434 |
+| RAG / embeddings | Local (Apache Tika) | ✅ Yes | InMemoryEmbeddingStore |
+| Document parsing (MinerU) | Local (Docker) | ✅ Yes | No external call |
+| PPTX generation | Local (Docker) | ✅ Yes | No external call |
+| Sensitive data masking | Local (regex) | ✅ Yes | Chinese PII patterns, no external call |
+| Document storage | Local filesystem | ✅ Yes | Configurable: local / OSS / S3 |
+| OCR | **External** (Aliyun) | ⚠️ No fallback | Can be disabled |
+| Text-to-speech | **External** (ElevenLabs) | ⚠️ No fallback | Can be disabled |
+| Company data lookup | **External** (Qichacha) | ⚠️ No fallback | Optional feature |
+| AI model (cloud) | **External** (Gemini/OpenRouter) | ✅ Use Ollama | Configurable provider |
+
+**For air-gapped deployments**: Ollama + local storage + MinerU + PPTX service keeps all documents entirely within your network. Disable OCR, TTS, and cloud AI providers — the core workspace, document editing, agent orchestration, and due-diligence workflows function without external services.
+
+## Evidence Chain & Audit Status
+
+> **Status**: Foundation in place, cryptographic provenance is on the roadmap.
+
+The Community Edition currently provides **relational audit logging**:
+
+- **Activity logging**: `UserActivityLog` records every user action (LOGIN, OPEN_FILE, PAGE_VIEW, etc.) with timestamps via Hibernate `@CreationTimestamp` and metadata stored as JSON
+- **Due-diligence tracking**: `DdItem` records state transitions (PENDING → UPLOADED → APPROVED/REJECTED) with `uploadedAt` and `uploadedBy`
+- **Conversation audit**: `ConversationFileChange` logs document additions and modifications per session
+- **File metadata**: `ProjectFile` stores `createdAt`/`updatedAt` timestamps and file paths in PostgreSQL
+
+**What is NOT yet implemented** (on the roadmap):
+- Cryptographic document hashing (SHA-256 checksums)
+- Tamper-evident audit trails (Merkle chains or signed logs)
+- File version history and diff tracking
+- Immutable append-only evidence log
+
+The architecture's plugin surface is designed to accommodate these features. If you need cryptographic provenance for compliance or litigation support, please open an issue describing your requirements — it helps us prioritize.
+
+## Licensing FAQ for Law Firms
+
+### Can our firm use AI Workdeck internally without disclosing our modifications?
+
+**Yes, in most cases.** AGPLv3's disclosure obligation is triggered when you *convey* modified software to others — i.e., distribute or provide it as a network service to external users. Internal use within a single firm, even with modifications, generally does not require source code disclosure.
+
+### What about the network-use clause (AGPLv3 Section 13)?
+
+This clause applies when you host a modified version as a **network service accessible to external users**. If you deploy AI Workdeck as an internal tool behind your firm's firewall, the network-use clause does not apply. If you create a client-facing portal powered by modified AI Workdeck code, AGPLv3 would require offering the source to those clients.
+
+### What about proprietary plugins and extensions?
+
+The current architecture runs plugins in-process. Under AGPLv3, this means the copyleft *may* extend to proprietary plugins. If your firm plans to build proprietary workflow extensions, the **commercial license** provides a clean legal basis for:
+- Closed-source plugins and integrations
+- Proprietary on-premise deployment without source disclosure
+- Commercial SaaS products built on the AI Workdeck kernel
+
+See [`legal/COMMERCIAL-LICENSE.md`](legal/COMMERCIAL-LICENSE.md) or contact [hi@aiworkdeck.com](mailto:hi@aiworkdeck.com).
+
+### Where does our data go?
+
+In a self-hosted deployment with Ollama + local storage + Docker services, **documents never leave your network**. No telemetry, no phone-home, no analytics by default. Optional external services (OCR, TTS, cloud AI) are explicitly configured and can be disabled entirely.
+
 ## Quick Start
 
 ### Prerequisites
