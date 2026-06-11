@@ -5,7 +5,7 @@ const { initLocalFileService } = require('./file-service')
 
 
 const DEV_SERVER_URL = process.env.CHECKBA_DEV_SERVER_URL || 'http://localhost:5173'
-const IS_DEV = process.env.CHECKBA_DESKTOP_DEV === '1'
+const IS_DEV = process.env.AIWORKDECK_DESKTOP_DEV === '1'
 
 function escapeHtml(s) {
   return String(s || '')

@@ -1,5 +1,5 @@
 {
-  "name": "checkba-desktop",
+  "name": "aiworkdeck-desktop",
   "private": true,
   "version": "0.1.0",
   "description": "AI Workdeck desktop shell (Electron)",
@@ -7,7 +7,7 @@
   "main": "main/main.js",
   "scripts": {
     "clean": "node scripts/clean.js",
-    "dev": "cross-env CHECKBA_DESKTOP_DEV=1 electron .",
+    "dev": "cross-env AIWORKDECK_DESKTOP_DEV=1 electron .",
     "start": "electron .",
     "build": "electron-builder"
   },
