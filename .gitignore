@@ -58,3 +58,6 @@ docs/
 # Website source code (separate repo)
 website/
 websitebackend/
+
+# Desktop build output
+desktop/release/
