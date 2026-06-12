@@ -31,21 +31,21 @@ spring:
 external:
   qichacha:
     base-url: https://api.qichacha.com
-    key: ${QICHACHA_KEY:***REMOVED***}
-    secret: ${QICHACHA_SECRET:***REMOVED***}
+    key: ${QICHACHA_KEY:}
+    secret: ${QICHACHA_SECRET:}
   wps:
-    app-id: SX20260104RLPEYU
-    app-secret: ${WPS_APP_SECRET:***REMOVED***}
+    app-id: ${WPS_APP_ID:}
+    app-secret: ${WPS_APP_SECRET:}
     callback-base-url: https://zuolinya.cpolar.top  # 使用 cpolar 内网穿透地址（当前实际URL，每次重启会变化）
   tushare:
     base-url: http://api.tushare.pro
-    token: ${TUSHARE_TOKEN:***REMOVED***}
+    token: ${TUSHARE_TOKEN:}
   # PKULaw Configuration
   pkulaw:
-    token: ${PKULAW_TOKEN:***REMOVED***}
+    token: ${PKULAW_TOKEN:}
   # ElevenLabs TTS 配置
   elevenlabs:
-    api-key: ${ELEVENLABS_API_KEY:***REMOVED***}
+    api-key: ${ELEVENLABS_API_KEY:}
     base-url: https://api.elevenlabs.io/v1
     model-id: eleven_multilingual_v2
     default-voice-id: JBFqnCBsd6RMkjVDRZzb
@@ -63,7 +63,7 @@ ai:
     provider: open-router
     gemini:
       # 建议通过环境变量 GEMINI_API_KEY 注入，避免写死在配置文件
-      api-key: ${GEMINI_API_KEY:***REMOVED***}
+      api-key: ${GEMINI_API_KEY:}
       # 默认使用官方当前推荐的通用文本模型，可按需调整为 gemini-2.5-flash 等
       model-name: gemini-2.5-flash
       api-base-url: https://generativelanguage.googleapis.com/v1beta
@@ -76,7 +76,7 @@ ai:
       timeout: 300s
     open-router:
       # OpenRouter API Key (必填)
-      api-key: ${OPENROUTER_API_KEY:***REMOVED***}
+      api-key: ${OPENROUTER_API_KEY:}
       base-url: https://openrouter.ai/api/v1
       default-model: google/gemini-2.0-flash-exp:free
       timeout: 120s
