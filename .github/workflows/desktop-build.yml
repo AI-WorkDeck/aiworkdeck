@@ -1,7 +1,8 @@
 name: Desktop Build
 
-# Builds desktop installers (experimental: UI shell + bundled frontend; backend
-# services still require a local environment — see issue #11).
+# Builds desktop installers with the backend bundled in (Epic #18 T2):
+# Spring Boot jar (per-platform javacpp natives) + jlink-trimmed JRE, so the
+# installer works without a local Java/PostgreSQL environment.
 on:
   workflow_dispatch:
   push:
@@ -10,6 +11,7 @@ on:
     paths:
       - '.github/workflows/desktop-build.yml'
       - 'desktop/**'
+      - 'backend/**'
 
 jobs:
   build:
@@ -24,6 +26,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - uses: actions/setup-java@v4
+        id: jdk
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      # x64 JDK on the arm64 macOS runner: its jmods feed the cross-arch
+      # jlink for the Intel build (the backend jar itself is arch-specific
+      # too, via javacpp.platform)
+      - uses: actions/setup-java@v4
+        id: jdk-x64
+        if: runner.os == 'macOS'
+        with:
+          distribution: temurin
+          java-version: '21'
+          architecture: x64
       - name: Build frontend
         working-directory: frontend
         run: |
@@ -32,6 +50,84 @@ jobs:
       - name: Install desktop dependencies
         working-directory: desktop
         run: npm ci
+      - name: Bundle backend (macOS arm64 + x64)
+        if: runner.os == 'macOS'
+        env:
+          JAVA_HOME: ${{ steps.jdk.outputs.path }}
+        run: |
+          # One universal jar for both arches: javacpp.platform collapses to
+          # the build host (arm64) regardless of the requested value, so the
+          # Intel natives come from the mac-universal-natives pom profile.
+          mvn -B -q -DskipTests -Djavacpp.platform=macosx-arm64 -Dmac-universal -f backend/pom.xml package
+          node desktop/scripts/prepare-backend.js \
+            --jar backend/target/backend-0.0.1-SNAPSHOT.jar \
+            --out desktop/bundled/mac-arm64
+          node desktop/scripts/prepare-backend.js \
+            --jar backend/target/backend-0.0.1-SNAPSHOT.jar \
+            --out desktop/bundled/mac-x64 \
+            --jmods '${{ steps.jdk-x64.outputs.path }}/jmods'
+      - name: Bundle backend (Windows x64)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          JAVA_HOME: ${{ steps.jdk.outputs.path }}
+        run: |
+          mvn -B -q -DskipTests -Djavacpp.platform=windows-x86_64 -f backend/pom.xml package
+          node desktop/scripts/prepare-backend.js \
+            --jar backend/target/backend-0.0.1-SNAPSHOT.jar \
+            --out desktop/bundled/win-x64
+      - name: Sign bundled backend natives (macOS)
+        if: runner.os == 'macOS'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          # Notarization rejects the adhoc-signed bytedeco dylibs inside the
+          # fat jar (and any unsigned JRE binaries), so they must carry our
+          # Developer ID signature before electron-builder seals the app.
+          if [ -z "$CSC_LINK" ]; then
+            echo "No signing cert (fork PR) — skipping native signing"
+            exit 0
+          fi
+          KC="$RUNNER_TEMP/awd-sign.keychain-db"
+          KCPASS="awd-tmp-keychain"
+          echo "$CSC_LINK" | base64 --decode > "$RUNNER_TEMP/awd-cert.p12"
+          security create-keychain -p "$KCPASS" "$KC"
+          security unlock-keychain -p "$KCPASS" "$KC"
+          security import "$RUNNER_TEMP/awd-cert.p12" -k "$KC" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPASS" "$KC" > /dev/null
+          security list-keychains -d user -s "$KC" login.keychain-db
+          IDENTITY=$(security find-identity -v -p codesigning "$KC" | awk 'NR==1{print $2}')
+          echo "Signing with identity: $IDENTITY"
+          for d in desktop/bundled/mac-arm64 desktop/bundled/mac-x64; do
+            bash desktop/scripts/sign-mac-natives.sh "$IDENTITY" "$d" desktop/build/entitlements.mac.plist
+          done
+      - name: Smoke test bundled backend (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Boot the signed jar on the trimmed JRE exactly as the packaged app
+          # will — catches runtime/JRE/signing breakage that packaging alone
+          # cannot. (Cannot be tested on SIP-disabled dev machines: JDK-8326663.)
+          mkdir -p "$RUNNER_TEMP/awd-home"
+          desktop/bundled/mac-arm64/jre/bin/java \
+            -Duser.home="$RUNNER_TEMP/awd-home" \
+            -jar desktop/bundled/mac-arm64/backend.jar \
+            --spring.profiles.active=desktop --server.port=9696 \
+            > "$RUNNER_TEMP/backend-smoke.log" 2>&1 &
+          BACK_PID=$!
+          for i in $(seq 1 60); do
+            sleep 2
+            if curl -sf -o /dev/null http://127.0.0.1:9696/api/admin/wizard; then
+              echo "backend up after ~$((i*2))s"
+              curl -s http://127.0.0.1:9696/api/admin/wizard; echo
+              kill $BACK_PID
+              exit 0
+            fi
+          done
+          echo "backend failed to start within 120s"
+          tail -80 "$RUNNER_TEMP/backend-smoke.log"
+          kill $BACK_PID 2>/dev/null || true
+          exit 1
       - name: Package installers (macOS, signed & notarized)
         if: runner.os == 'macOS'
         working-directory: desktop
@@ -48,6 +144,54 @@ jobs:
           # electron-builder's default unsigned PR build.
           CSC_FOR_PULL_REQUEST: ${{ secrets.CSC_LINK != '' }}
         run: npx electron-builder --publish never
+      - name: Notarization failure log (macOS)
+        if: failure() && runner.os == 'macOS'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          # NOT the APPLE_TEAM_ID secret: notarytool history rejects it with
+          # 403 (it works for submission but not for the history API); the
+          # team id is public anyway (package.json mac.notarize.teamId)
+          TEAM_ID: X9B97KVA84
+        run: |
+          # Surface Apple's per-file rejection reasons; without this the build
+          # log only says "Invalid"
+          HISTORY=$(xcrun notarytool history --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$TEAM_ID" \
+            --output-format json || true)
+          echo "$HISTORY" | head -c 2000; echo
+          for SUB_ID in $(echo "$HISTORY" | jq -r '.history[0:2][].id // empty'); do
+            echo "=== notarization log for $SUB_ID"
+            xcrun notarytool log "$SUB_ID" --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$TEAM_ID" \
+              "$RUNNER_TEMP/notary-log-$SUB_ID.json" || true
+            cat "$RUNNER_TEMP/notary-log-$SUB_ID.json" || true
+            echo
+          done
+      - name: Smoke test bundled backend (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/awd-home"
+          desktop/bundled/win-x64/jre/bin/java.exe \
+            -Duser.home="$RUNNER_TEMP/awd-home" \
+            -jar desktop/bundled/win-x64/backend.jar \
+            --spring.profiles.active=desktop --server.port=9696 \
+            > "$RUNNER_TEMP/backend-smoke.log" 2>&1 &
+          BACK_PID=$!
+          for i in $(seq 1 60); do
+            sleep 2
+            if curl -sf -o /dev/null http://127.0.0.1:9696/api/admin/wizard; then
+              echo "backend up after ~$((i*2))s"
+              curl -s http://127.0.0.1:9696/api/admin/wizard; echo
+              kill $BACK_PID
+              exit 0
+            fi
+          done
+          echo "backend failed to start within 120s"
+          tail -80 "$RUNNER_TEMP/backend-smoke.log"
+          kill $BACK_PID 2>/dev/null || true
+          exit 1
       - name: Package installers (Windows, unsigned)
         if: runner.os == 'Windows'
         working-directory: desktop
