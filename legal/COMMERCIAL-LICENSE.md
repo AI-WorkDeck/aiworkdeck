@@ -28,13 +28,13 @@ Please contact our licensing team to discuss your specific use case and pricing:
 ## Brand & Certification Programs
 **AI Workdeck®** is a registered trademark (see [`TRADEMARKS.md`](TRADEMARKS.md)). We license the brand to partners who meet our quality bar, so customers can trust that a deployment, plugin, or integration is genuinely compatible and supported.
 
-| Program | What you get | Indicative annual fee |
-|---|---|---|
-| **Certified Deployment** | Right to advertise a hosted/on-premise deployment as "AI Workdeck Certified", logo usage, priority compatibility testing | from ¥30,000 / year *(indicative)* |
-| **Certified Plugin** | Listing and "Certified for AI Workdeck" badge for a proprietary plugin or integration, compatibility review | from ¥20,000 / year *(indicative)* |
-| **Certified Partner** | Co-marketing, named partner status, referral pipeline, joint solution delivery | Contact for quote |
+| Program | What you get |
+|---|---|
+| **Certified Deployment** | Right to advertise a hosted/on-premise deployment as "AI Workdeck Certified", logo usage, priority compatibility testing |
+| **Certified Plugin** | Listing and "Certified for AI Workdeck" badge for a proprietary plugin or integration, compatibility review |
+| **Certified Partner** | Co-marketing, named partner status, referral pipeline, joint solution delivery |
 
-> Pricing above is indicative and subject to scope. For a formal quote, email **hi@aiworkdeck.com** with your use case, deployment size, and target customers.
+> For program details and pricing, email **hi@aiworkdeck.com** with your use case, deployment size, and target customers.
 
 Use of the **AI Workdeck®** name or logo in connection with a commercial offering requires one of these programs or a written agreement. See [`TRADEMARKS.md`](TRADEMARKS.md) for permitted nominative use.
 
