@@ -262,7 +262,7 @@ Commercial licensing is available for:
 
 See [LICENSE](legal/LICENSE) and [COMMERCIAL-LICENSE.md](legal/COMMERCIAL-LICENSE.md). For commercial licensing, contact [hi@aiworkdeck.com](mailto:hi@aiworkdeck.com).
 
-**AI Workdeck®** is a registered trademark in China (classes 9, 42, 45). Building on the kernel is welcome under the licenses above, but using the **AI Workdeck** name or logo for a commercial offering requires a brand or certification agreement — see [TRADEMARKS.md](legal/TRADEMARKS.md) and the **Brand & Certification Programs** in [COMMERCIAL-LICENSE.md](legal/COMMERCIAL-LICENSE.md).
+**AI Workdeck®** is a registered trademark in China (classes 9, 35, 42). Building on the kernel is welcome under the licenses above, but using the **AI Workdeck** name or logo for a commercial offering requires a brand or certification agreement — see [TRADEMARKS.md](legal/TRADEMARKS.md) and the **Brand & Certification Programs** in [COMMERCIAL-LICENSE.md](legal/COMMERCIAL-LICENSE.md).
 
 ## Background
 
