@@ -148,11 +148,14 @@ The architecture's plugin surface is designed to accommodate these features. If 
 
 ### Can our firm use AI Workdeck internally without disclosing our modifications?
 
-**Yes, in most cases.** AGPLv3's disclosure obligation is triggered when you *convey* modified software to others — i.e., distribute or provide it as a network service to external users. Internal use within a single firm, even with modifications, generally does not require source code disclosure.
+**Usually yes — with one nuance worth understanding.** AGPLv3 affirms your right to run the software and to modify it for your own use. Running an *unmodified* copy internally creates no source-disclosure obligation. If you *modify* AI Workdeck and then make the modified version available to people over a network — which can include your own lawyers and staff using it as an internal web application — AGPLv3 Section 13 can require you to offer **those users** the corresponding source code of your modified version. That source stays within your firm: you are not required to publish it to the public or to us. If you would rather keep your modifications, plugins, or integrations proprietary and free of any AGPLv3 obligation, a commercial license removes the copyleft requirement entirely.
 
 ### What about the network-use clause (AGPLv3 Section 13)?
 
-This clause applies when you host a modified version as a **network service accessible to external users**. If you deploy AI Workdeck as an internal tool behind your firm's firewall, the network-use clause does not apply. If you create a client-facing portal powered by modified AI Workdeck code, AGPLv3 would require offering the source to those clients.
+Section 13 is triggered by **network interaction with a modified version**, and the people entitled to the corresponding source are the **users of that modified version**. Two common cases:
+
+- **Internal tool behind your firewall (modified).** Your staff are the users. You may need to offer them the corresponding source, but you are not required to disclose it publicly or to us. An unmodified deployment carries no such obligation.
+- **Client-facing portal or external service (modified).** Your clients are the users, and AGPLv3 would require offering them the source of your modified version. If you do not want to do that, a commercial license is the clean path.
 
 ### What about proprietary plugins and extensions?
 
@@ -258,6 +261,8 @@ Commercial licensing is available for:
 - Dedicated enterprise support and implementation assistance
 
 See [LICENSE](legal/LICENSE) and [COMMERCIAL-LICENSE.md](legal/COMMERCIAL-LICENSE.md). For commercial licensing, contact [hi@aiworkdeck.com](mailto:hi@aiworkdeck.com).
+
+**AI Workdeck®** is a registered trademark in China (classes 9, 42, 45). Building on the kernel is welcome under the licenses above, but using the **AI Workdeck** name or logo for a commercial offering requires a brand or certification agreement — see [TRADEMARKS.md](legal/TRADEMARKS.md) and the **Brand & Certification Programs** in [COMMERCIAL-LICENSE.md](legal/COMMERCIAL-LICENSE.md).
 
 ## Background
 
