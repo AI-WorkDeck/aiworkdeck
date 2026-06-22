@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: MIT -->
+<!-- ZetaOffice (LibreOffice WASM) spike harness — #39 Phase 0. See README.md. -->
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>ZetaOffice Spike · AI Workdeck #39</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100vh; overflow: hidden; font: 13px/1.5 system-ui, sans-serif; }
+    #bar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: #1F2937; color: #fff; flex-wrap: wrap; }
+    #bar button { font: inherit; padding: 4px 10px; border: 0; border-radius: 4px; background: #059669; color: #fff; cursor: pointer; }
+    #bar button:disabled { background: #6b7280; cursor: not-allowed; }
+    #iso { padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+    #iso.ok { background: #065f46; } #iso.bad { background: #991b1b; }
+    #wrap { display: flex; height: calc(100vh - 41px); }
+    #canvas-col { position: relative; flex: 1 1 65%; min-width: 0; }
+    #qtcanvas { width: 100%; height: 100%; border: 0; padding: 0; outline: 1px solid #ccc; visibility: hidden; }
+    #spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #374151; text-align: center; }
+    #log { flex: 0 0 35%; max-width: 460px; margin: 0; padding: 8px; background: #0b1220; color: #d1fae5;
+           font: 11px/1.45 ui-monospace, monospace; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+    .k { color: #fbbf24; } .e { color: #fca5a5; } .ime { color: #93c5fd; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <strong>ZetaOffice Spike · #39</strong>
+    <span id="iso">crossOriginIsolated: …</span>
+    <button id="btnBoot">Boot ZetaOffice</button>
+    <button id="btnSel" disabled>测选区 selection</button>
+    <button id="btnRed" disabled>测修订 redline</button>
+    <button id="btnPerf" disabled>测50页性能 perf</button>
+    <button id="btnCjk" disabled>插入中文(无IME)</button>
+    <button id="btnExec" disabled>executor 自测(产品客户端)</button>
+    <input id="imeBridge" disabled placeholder="① 在此用输入法打中文 → 自动插入文档（IME 桥 PoC）"
+      style="font:inherit;padding:4px 8px;border:0;border-radius:4px;width:280px" autocomplete="off" />
+    <span style="opacity:.8">canvas 上 Qt5-WASM 无 IME；这个输入框承接 IME 合成→经 UNO 插入光标处</span>
+  </div>
+  <div id="wrap">
+    <div id="canvas-col" onselectstart="event.preventDefault()">
+      <div id="spinner">点 “Boot ZetaOffice” 加载运行时<br>（首次数百 MB，看右侧进度）</div>
+      <!-- Qt REQUIRES id="qtcanvas"; canvas must have no border/padding (outline ok). -->
+      <canvas id="qtcanvas" contenteditable="true"
+        oncontextmenu="event.preventDefault()" onkeydown="event.preventDefault()"></canvas>
+    </div>
+    <pre id="log"></pre>
+  </div>
+
+  <script>
+    'use strict';
+    // ---- LOWA runtime location. CDN by default; self-host for the product. ----
+    // The CDN serves the LOWA build (soffice.{js,wasm,data}) but NOT the zetajs
+    // bridge — that is vendored locally as ./zeta.js (from allotropia/zetajs
+    // source/zeta.js, MIT). Loading zeta.js from the CDN fails with a worker
+    // importScripts NetworkError that cascades into "emscripten_proxy_async
+    // failed" — verified, see README.
+    const SOFFICE_BASE_URL = 'https://cdn.zetaoffice.net/zetaoffice_latest/';
+    const ZETA_JS = './zeta.js';
+
+    const logEl = document.getElementById('log');
+    const canvas = document.getElementById('qtcanvas');
+    const spinner = document.getElementById('spinner');
+    const isoEl = document.getElementById('iso');
+    const btnBoot = document.getElementById('btnBoot');
+    const btnSel = document.getElementById('btnSel');
+    const btnRed = document.getElementById('btnRed');
+    const btnPerf = document.getElementById('btnPerf');
+    const btnCjk = document.getElementById('btnCjk');
+    const btnExec = document.getElementById('btnExec');
+    const imeBridge = document.getElementById('imeBridge');
+
+    // The REAL product executor client (frontend/src/composables/), imported via
+    // the server's /shared/ route so this spike drives product code, not a copy.
+    let loExec = null;
+
+    // NOTE: named zlog, NOT `out` — emscripten/soffice.js defines a global `out`
+    // (its stdout printer) that overwrites a global `out` after boot, which
+    // silently swallowed all post-boot log lines until this was found.
+    function zlog(html, cls) { logEl.insertAdjacentHTML('beforeend', (cls ? '<span class="' + cls + '">' : '<span>') + html + '</span>\n'); logEl.scrollTop = logEl.scrollHeight; }
+
+    // ---- cross-origin isolation self-check (SharedArrayBuffer prerequisite) ----
+    // COOP/COEP can ONLY come from HTTP response headers (no <meta> equivalent),
+    // so opening this file directly / through a preview that doesn't set them
+    // leaves crossOriginIsolated=false and ZetaOffice cannot boot. Not a bug in
+    // the harness — gate the Boot button and tell the user exactly what to do.
+    if (self.crossOriginIsolated) {
+      isoEl.textContent = 'crossOriginIsolated: true ✓'; isoEl.className = 'ok';
+    } else {
+      isoEl.textContent = 'crossOriginIsolated: false ✗'; isoEl.className = 'bad';
+      btnBoot.disabled = true;
+      spinner.innerHTML = '⚠️ 本页缺少 COOP/COEP 头，SharedArrayBuffer 不可用，无法启动 ZetaOffice。<br><br>'
+        + '请用本目录的服务器打开（已带正确响应头）：<br>'
+        + '<code style="background:#e5e7eb;padding:2px 6px;border-radius:4px">node serve.mjs</code>'
+        + ' &nbsp;→&nbsp; 浏览器开 <code style="background:#e5e7eb;padding:2px 6px;border-radius:4px">http://localhost:8777</code><br><br>'
+        + '<small>（直接打开文件 / 不带头的预览面板都会是这个状态——这是正常的，不是 harness 的 bug。'
+        + '产品集成时在 Electron 用 session.webRequest.onHeadersReceived 注入同样的头。）</small>';
+      zlog('crossOriginIsolated=false → SharedArrayBuffer 不可用，Boot 已禁用。请用 `node serve.mjs` 打开本页（带 COOP/COEP 头）。', 'e');
+    }
+
+    // ---- IME diagnostics on the DOM side: composition events on the canvas. ----
+    // Compare this stream with the worker's XKeyHandler stream. If composition
+    // fires here but XKeyHandler gets nothing meaningful, that pinpoints the gap.
+    for (const ev of ['compositionstart', 'compositionupdate', 'compositionend']) {
+      canvas.addEventListener(ev, (e) => zlog('[DOM ' + ev + '] data=' + JSON.stringify(e.data), 'ime'));
+    }
+
+    let thrPort = null;
+    function send(cmd, extra) { if (thrPort) thrPort.postMessage(Object.assign({ cmd }, extra || {})); else zlog('worker 未就绪 / not ready', 'e'); }
+
+    btnSel.onclick = () => send('selection');
+    btnRed.onclick = () => send('redline');
+    btnPerf.onclick = () => send('perf', { pages: 50 });
+    btnCjk.onclick = () => send('inserttext');
+
+    // Self-test the REAL product executor client end-to-end: client.executeCommand
+    // -> worker -> UNO -> result. Proves the product code path (not eval-driven).
+    btnExec.onclick = async () => {
+      if (!loExec) { zlog('executor 未连接', 'e'); return; }
+      zlog('=== executor 自测：§0.2 锚点定位流程（产品客户端）===', 'k');
+      // 1. insert a known target
+      await loExec.executeCommand('insert_at_cursor', { text: '甲方：示例公司A；甲方负责交付。' });
+      // 2. locate -> stable anchors (NOT offsets)
+      const loc = await loExec.executeCommand('find_text_locations', { keyword: '甲方' });
+      zlog('find_text_locations → ' + JSON.stringify(loc), 'k');
+      const anchor = loc && loc.matches && loc.matches[0] && loc.matches[0].anchorId;
+      if (!anchor) { zlog('无锚点，停止', 'e'); return; }
+      // 3. select by anchor, confirm it points at the right text
+      const sel = await loExec.executeCommand('set_selection', { anchor: anchor });
+      zlog('set_selection(anchor) → ' + JSON.stringify(sel), 'k');
+      // 4. integer offsets must be rejected (§0.2)
+      const off = await loExec.executeCommand('set_selection', { start: 0, end: 2 });
+      zlog('set_selection(offset, 应拒绝) → ' + JSON.stringify(off), 'k');
+      // 5. replace at the anchor under redline
+      const rep = await loExec.executeCommand('replace_at_position', { anchor: anchor, newText: '【甲方】' });
+      zlog('replace_at_position(anchor) → ' + JSON.stringify(rep), 'k');
+      const after = await loExec.executeCommand('find_text_locations', { keyword: '【甲方】' });
+      zlog('替换后定位【甲方】→ count=' + (after && after.count), 'k');
+      await loExec.executeCommand('clear_anchors', {});
+      zlog('=== executor 自测结束 ===', 'k');
+    };
+
+    // ---- IME input bridge PoC (#39) ----------------------------------------
+    // Qt5-WASM gives the canvas no usable IME (no candidate box). A normal
+    // <input> DOES run the system IME natively, so we let it host composition,
+    // grab the committed text on compositionend, and insert it at the LO view
+    // cursor via UNO — bypassing Qt input entirely. ASCII (no composition)
+    // routes the same way via the input event. (Product: overlay a transparent
+    // editable on the canvas anchored at the cursor; here a visible field proves
+    // the mechanism.) dedup: the input event that trails compositionend is skipped.
+    let imeComposing = false, imeSkipNextInput = false;
+    function imeCommit(text) { if (text) { send('inserttext', { text: text }); zlog('IME 桥 → 插入「' + text + '」', 'ime'); } imeBridge.value = ''; }
+    imeBridge.addEventListener('compositionstart', () => { imeComposing = true; });
+    imeBridge.addEventListener('compositionend', (e) => { imeComposing = false; imeSkipNextInput = true; imeCommit(e.data); });
+    imeBridge.addEventListener('input', (e) => {
+      if (imeComposing) return;                       // mid-composition: wait for end
+      if (imeSkipNextInput) { imeSkipNextInput = false; return; } // trailing event after compositionend
+      imeCommit(e.data != null ? e.data : imeBridge.value);
+    });
+
+    // FOCUS RACE FIX: clicking the canvas positions the LO cursor (Qt handles the
+    // click) but the canvas also STEALS keyboard focus — so the first keystroke
+    // after a click lands on the canvas (reported: typing "women", the leading
+    // "w" goes to the canvas and the bridge only sees "omen"). After Qt has
+    // processed the click (mouseup), hand keyboard focus back to the bridge so
+    // ALL typing — including the first char — goes through the IME bridge. The
+    // cursor position is set by the click coords, not by sustained focus, so it
+    // stays put. (Product overlay would do the same: pass clicks to Qt, keep the
+    // editable overlay focused for keys.)
+    canvas.addEventListener('mouseup', () => { if (!imeBridge.disabled) setTimeout(() => imeBridge.focus(), 0); });
+
+    btnBoot.onclick = async function () {
+      btnBoot.disabled = true;
+      zlog('Loading LOWA from ' + SOFFICE_BASE_URL + ' …');
+
+      // ---- CJK font PoC (#39) -------------------------------------------------
+      // The CDN LOWA build ships NO CJK font, so Chinese renders as tofu (口口).
+      // Fix proven here: fetch a CJK font (served same-origin) and write it into
+      // the LOWA font dir in preRun — i.e. BEFORE LibreOffice's fontconfig startup
+      // scan (writing after boot is too late; fonts are scanned once at init).
+      // In the product this font ships inside the self-hosted LOWA bundle.
+      // Optional: if ./cjk-test.ttc isn't served (it's gitignored), skip cleanly.
+      let cjkBytes = null;
+      try {
+        const r = await fetch('./cjk-test.ttc');
+        if (r.ok) { cjkBytes = new Uint8Array(await r.arrayBuffer()); zlog('CJK 字体已取 (' + Math.round(cjkBytes.length / 1024) + ' KB)，将在 boot 前注入 LOWA 字体目录'); }
+        else { zlog('未找到 ./cjk-test.ttc（跳过字体注入；中文仍会是豆腐块）', 'e'); }
+      } catch (e) { zlog('CJK 字体 fetch 失败：' + e + '（跳过）', 'e'); }
+
+      // The two globals `canvas` and `Module` must exist before soffice.js loads.
+      window.Module = {
+        canvas,
+        uno_scripts: [ZETA_JS, './office_thread.js'],
+        locateFile: function (path, prefix) { return (prefix || SOFFICE_BASE_URL) + path; },
+        preRun: cjkBytes ? [function () {
+          // Runs before LibreOffice init. At this point /instdir is NOT mounted
+          // yet (FS / = tmp,home,dev,proc), but creating the dir tree and writing
+          // the font here WORKS: the LOWA data mount merges into MEMFS rather than
+          // replacing, so the font is present when fontconfig scans at startup.
+          // PROVEN: tofu (口口) -> real Chinese glyphs. In the product the font is
+          // baked into the self-hosted LOWA bundle's font dir at build time.
+          var dir = '/instdir/share/fonts/truetype';
+          var parts = dir.split('/').filter(Boolean), cur = '';
+          for (var i = 0; i < parts.length; i++) { cur += '/' + parts[i]; try { FS.mkdir(cur); } catch (e) {} }
+          try { FS.writeFile(dir + '/AAA-CJK-test.ttc', cjkBytes); zlog('CJK 字体已写入 ' + dir + ' ✓（boot 前，fontconfig 启动会扫到）'); }
+          catch (e) { zlog('CJK 字体写入 FS 失败：' + e, 'e'); }
+        }] : undefined,
+      };
+      if (SOFFICE_BASE_URL !== '') {
+        window.Module.mainScriptUrlOrBlob = new Blob(
+          ["importScripts('" + SOFFICE_BASE_URL + "soffice.js');"], { type: 'text/javascript' });
+      }
+
+      function onWorkerMessage(e) {
+        const d = e.data;
+        switch (d.cmd) {
+          case 'thr_running': zlog('worker running ✓'); break;
+          case 'ui_ready':
+            spinner.style.display = 'none'; canvas.style.visibility = 'visible';
+            btnSel.disabled = btnRed.disabled = btnPerf.disabled = btnCjk.disabled = btnExec.disabled = false;
+            imeBridge.disabled = false; imeBridge.focus();
+            zlog('UI ready ✓ — 现在可以在文档里打中文、点测试按钮');
+            // resize last + guarded: a Qt relayout during init can throw, and it
+            // must not swallow the log line above or stall the message pump.
+            try { window.dispatchEvent(new Event('resize')); } catch (err) { zlog('resize warn: ' + err, 'e'); }
+            break;
+          case 'log': zlog(d.msg); break;
+          case 'key': zlog('[UNO key ' + d.phase + '] code=' + d.code + ' char=' + JSON.stringify(d.ch), 'k'); break;
+          default: zlog('main: unknown cmd ' + d.cmd, 'e');
+        }
+      }
+
+      // Keep the embedded Qt window sized to the canvas.
+      setInterval(function () { window.dispatchEvent(new Event('resize')); }, 1000);
+
+      const s = document.createElement('script');
+      s.src = SOFFICE_BASE_URL + 'soffice.js';
+      s.onerror = () => zlog('soffice.js 加载失败 / failed to load — 检查网络与 CDN 路径', 'e');
+      // On the MAIN thread the thread port is Module.uno_main (NOT Module.zetajs,
+      // which only exists inside the office worker), and it is only available
+      // after soffice.js has run — so wire it in onload. (Verified against the
+      // allotropia/zetajs web-office example.)
+      s.onload = function () {
+        zlog('soffice.js loaded — 初始化 office 线程…');
+        Module.uno_main.then(function (pThrPort) {
+          thrPort = pThrPort;
+          thrPort.onmessage = onWorkerMessage;
+          zlog('thread port ready ✓');
+          // Import + connect the REAL product executor client (verifies the
+          // useLibreOfficeBridge core path drives the worker, not just hand rolled).
+          import('/shared/libreofficeExecutorClient.js').then(function (m) {
+            loExec = m.createLibreOfficeExecutor({ onError: function (e) { zlog('executor error: ' + e, 'e'); } });
+            loExec.connect(thrPort);
+            zlog('产品 executor 客户端已连接 ✓ (libreofficeExecutorClient)');
+          }).catch(function (e) { zlog('executor import 失败: ' + e, 'e'); });
+        }, function (err) { zlog('uno_main rejected: ' + err, 'e'); });
+      };
+      document.body.appendChild(s);
+    };
+  </script>
+</body>
+</html>

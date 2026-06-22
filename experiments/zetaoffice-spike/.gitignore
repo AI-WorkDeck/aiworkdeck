@@ -1,0 +1,15 @@
+# Local LOWA runtime — fetched from the CDN at runtime, never committed.
+# (zeta.js, the MIT zetajs bridge, IS committed — the CDN does not serve it.)
+config.js
+soffice.*
+*.wasm
+*.data
+*.data.js.metadata
+node_modules/
+# Local test documents.
+*.docx
+*.odt
+
+# Local PoC CJK font (not committed; product bundles Noto OFL).
+cjk-test.*
+*.ttc
