@@ -31,6 +31,7 @@
     <button id="btnPerf" disabled>测50页性能 perf</button>
     <button id="btnCjk" disabled>插入中文(无IME)</button>
     <button id="btnExec" disabled>executor 自测(产品客户端)</button>
+    <button id="btnRect" disabled>测光标矩形 cursor-rect</button>
     <input id="imeBridge" disabled placeholder="① 在此用输入法打中文 → 自动插入文档（IME 桥 PoC）"
       style="font:inherit;padding:4px 8px;border:0;border-radius:4px;width:280px" autocomplete="off" />
     <span style="opacity:.8">canvas 上 Qt5-WASM 无 IME；这个输入框承接 IME 合成→经 UNO 插入光标处</span>
@@ -41,6 +42,10 @@
       <!-- Qt REQUIRES id="qtcanvas"; canvas must have no border/padding (outline ok). -->
       <canvas id="qtcanvas" contenteditable="true"
         oncontextmenu="event.preventDefault()" onkeydown="event.preventDefault()"></canvas>
+      <!-- Phase B calibration: a visible box drawn at the COMPUTED cursor rect.
+           If it lands on the real LO cursor, the mm->px mapping is right. -->
+      <div id="cursorbox" style="position:absolute;display:none;pointer-events:none;
+        outline:2px solid #ef4444;background:rgba(239,68,68,.18);z-index:6"></div>
     </div>
     <pre id="log"></pre>
   </div>
@@ -66,7 +71,12 @@
     const btnPerf = document.getElementById('btnPerf');
     const btnCjk = document.getElementById('btnCjk');
     const btnExec = document.getElementById('btnExec');
+    const btnRect = document.getElementById('btnRect');
+    const cursorbox = document.getElementById('cursorbox');
     const imeBridge = document.getElementById('imeBridge');
+
+    // Phase B overlay handle (self-calibrating via clicks), set after boot.
+    let imeOverlay = null;
 
     // The REAL product executor client (frontend/src/composables/), imported via
     // the server's /shared/ route so this spike drives product code, not a copy.
@@ -106,6 +116,27 @@
     let thrPort = null;
     function send(cmd, extra) { if (thrPort) thrPort.postMessage(Object.assign({ cmd }, extra || {})); else zlog('worker 未就绪 / not ready', 'e'); }
 
+    // Direct worker request/response — for UI PLUMBING commands (get_cursor_rect)
+    // that are NOT part of the backend AI-command contract (EDITOR_ACTIONS in
+    // libreofficeExecutorClient.js, which rejects unknown actions on purpose).
+    // Cursor positioning is editor-internal UI, not something the agent calls, so
+    // it talks to the worker's exec loop straight, correlating by reqId. Coexists
+    // with the boot dispatcher + the executor client (both ignore others' reqIds).
+    let workerReqSeq = 0;
+    function workerRequest(action, params) {
+      if (!thrPort) return Promise.reject(new Error('worker not ready'));
+      const reqId = 'ui_' + (++workerReqSeq);
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { thrPort.removeEventListener('message', onMsg); reject(new Error('timeout: ' + action)); }, 8000);
+        function onMsg(e) {
+          const d = (e && e.data) || {};
+          if (d.cmd === 'result' && d.reqId === reqId) { clearTimeout(timer); thrPort.removeEventListener('message', onMsg); resolve(d.result); }
+        }
+        thrPort.addEventListener('message', onMsg);
+        thrPort.postMessage({ cmd: 'exec', reqId, action, params: params || {} });
+      });
+    }
+
     btnSel.onclick = () => send('selection');
     btnRed.onclick = () => send('redline');
     btnPerf.onclick = () => send('perf', { pages: 50 });
@@ -136,6 +167,27 @@
       zlog('替换后定位【甲方】→ count=' + (after && after.count), 'k');
       await loExec.executeCommand('clear_anchors', {});
       zlog('=== executor 自测结束 ===', 'k');
+    };
+
+    // ---- Phase B debug box: draw the overlay's COMPUTED cursor rect ----
+    // The overlay self-calibrates from clicks (offset = clickPx - scale*docPos),
+    // so click in the document first to anchor, then click this to see where the
+    // overlay thinks the cursor is. The red box should sit ON the LO caret.
+    btnRect.onclick = async () => {
+      if (!imeOverlay) { zlog('overlay 未挂载', 'e'); return; }
+      const raw = await workerRequest('get_cursor_rect', {});
+      const rect = await imeOverlay.computeRect();
+      zlog('get_cursor_rect raw → ' + JSON.stringify(raw), 'k');
+      zlog('overlay computeRect → ' + JSON.stringify(rect) + (rect ? '' : '（先点一下文档放光标以锚定）'), 'k');
+      if (rect) {
+        Object.assign(cursorbox.style, {
+          display: 'block',
+          left: Math.round(rect.left) + 'px', top: Math.round(rect.top) + 'px',
+          width: '8px', height: Math.round(rect.height) + 'px',
+        });
+      } else {
+        cursorbox.style.display = 'none';
+      }
     };
 
     // ---- IME input bridge PoC (#39) ----------------------------------------
@@ -187,7 +239,7 @@
           onLog: function (m) { zlog(m); },
           onReady: function () {
             spinner.style.display = 'none'; canvas.style.visibility = 'visible';
-            btnSel.disabled = btnRed.disabled = btnPerf.disabled = btnCjk.disabled = btnExec.disabled = false;
+            btnSel.disabled = btnRed.disabled = btnPerf.disabled = btnCjk.disabled = btnExec.disabled = btnRect.disabled = false;
             imeBridge.disabled = false; imeBridge.focus();
             zlog('UI ready ✓ — 现在可以在文档里打中文、点测试按钮');
             try { window.dispatchEvent(new Event('resize')); } catch (err) { zlog('resize warn: ' + err, 'e'); }
@@ -213,12 +265,26 @@
         // via the product executor. The visible #imeBridge above stays as a
         // fallback/comparison. Phase A — not cursor-positioned, no inline preview.
         const ov = await import('/shared/zetaOfficeImeOverlay.js');
-        ov.attachImeOverlay({
+        imeOverlay = ov.attachImeOverlay({
           canvas: canvas,
           commit: function (text) { return loExec.executeCommand('insert_at_cursor', { text: text }); },
+          // Phase B: overlay reads the raw view-cursor measurement; it derives the
+          // px mapping itself (stable scale + live offset from each click).
+          getCursorRaw: function () { return workerRequest('get_cursor_rect', {}); },
+          // Enter -> paragraph break at the LO cursor (single-line input can't).
+          onEnter: function () { return workerRequest('insert_paragraph', {}); },
           onLog: function (msg) { zlog(msg, 'ime'); },
         });
-        zlog('IME 透明覆盖层已挂载 ✓ — 点文档定位光标后直接打中文（无需点上面的输入框）', 'ime');
+        zlog('IME 透明覆盖层已挂载 ✓ (Phase B 自标定) — 点文档放光标后直接打中文、回车换行', 'ime');
+
+        // Debug hooks. tuneCursorMap({nudgeX,nudgeY}) shifts the box by a constant
+        // px to zero out the small click-snap / caret-top residual — click the doc,
+        // type, nudge until the box sits exactly on the caret, report the values.
+        window.measureCursor = function () { return workerRequest('get_cursor_rect', {}); };
+        window.overlayRect = function () { return imeOverlay.computeRect(); };
+        window.cursorMap = ov.CURSOR_MAP;
+        window.tuneCursorMap = function (patch) { Object.assign(ov.CURSOR_MAP, patch || {}); if (imeOverlay) imeOverlay.reposition(); zlog('CURSOR_MAP = ' + JSON.stringify(ov.CURSOR_MAP), 'k'); return ov.CURSOR_MAP; };
+        zlog('调试钩子就绪：tuneCursorMap({nudgeX,nudgeY}) / measureCursor() / overlayRect()', 'k');
       } catch (e) {
         zlog('boot 失败：' + e, 'e');
         btnBoot.disabled = false;
