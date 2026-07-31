@@ -250,15 +250,22 @@ class CloudSyncUploadTest {
         assertEquals(repoSvc.resolveRef(7L, "master"), remoteMasterShaOfBare());
     }
 
+    /**
+     * Task 8 时这条路径只置黄灯（REMOTE_AHEAD）。Task 9 升级：没有未收尾工作/没站在稿上
+     * 时被拒后会自动整合——这里两边真改了同一处（合同.txt 的内容），整合遇到真实冲突，
+     * 状态从 REMOTE_AHEAD 变成新增的 CONFLICT，仓库停在合并窗口等裁决（同 CloudSyncUpdateTest
+     * 的冲突用例），不再是简单的"下次再试"。
+     */
     @Test
-    void rejectedUploadMarksPendingAndReportsRemoteAhead() throws Exception {
+    void rejectedUploadWithRealConflictOpensConflictWindow() throws Exception {
         linkToBareRemote(7L);
         cloud.uploadToCloud(7L, false);
         advanceBareRemoteFromPeer("同事的第二稿");
         Files.writeString(root.resolve("projects/7/合同.txt"), "我的第二稿");
         repoSvc.commitAll(7L, "我的修改", "auto", null, "韩泽伟", "hzw@example.com");
         CloudSyncService.UploadResult r = cloud.uploadToCloud(7L, false);
-        assertEquals(CloudSyncService.UploadStatus.REMOTE_AHEAD, r.status());
+        assertEquals(CloudSyncService.UploadStatus.CONFLICT, r.status());
+        assertTrue(repoSvc.repositoryMerging(7L));
         assertTrue(remoteRowOf(7L).getPendingUpload());
     }
 
