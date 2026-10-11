@@ -581,25 +581,25 @@ export default {
   padding: 0 8px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
 
   &:focus-within {
-    border-color: var(--awd-mint);
-    box-shadow: 0 0 0 2px rgba(137, 168, 160, 0.15);
+    border-color: var(--awd-accent-text);
+    box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-accent-text);
   }
 }
 
 .msb-search-icon {
   width: 13px;
   height: 13px;
-  color: var(--awd-text-3);
+  color: var(--awd-text-2);
   flex-shrink: 0;
 }
 
 .msb-search-input {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   background: transparent;
   border: none;
@@ -613,9 +613,9 @@ export default {
   height: 16px;
   line-height: 15px;
   text-align: center;
-  border-radius: 4px;
-  color: var(--awd-text-3);
-  font-size: 13px;
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text-2);
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
 
   &:hover {
@@ -646,7 +646,7 @@ export default {
 
 .msb-sec-chevron {
   width: 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   transition: transform 0.12s ease;
   transform-origin: center;
@@ -657,14 +657,14 @@ export default {
 }
 
 .msb-sec-title {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--awd-text-2);
 }
 
 .msb-sec-count {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   background: var(--awd-surface-2);
   border-radius: 999px;
@@ -683,7 +683,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-text-2);
   cursor: pointer;
 
@@ -726,7 +726,7 @@ export default {
   background: transparent;
 
   text {
-    font-size: 10.5px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: 600;
     letter-spacing: 0.03em;
     color: var(--awd-text-2);
@@ -746,8 +746,8 @@ export default {
 }
 
 .msb-tab-count {
-  font-size: 9.5px;
-  color: var(--awd-text-3);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
 }
 
 .msb-tab.active .msb-tab-count {
@@ -757,8 +757,8 @@ export default {
 
 .msb-empty {
   padding: 8px 12px 10px 22px;
-  font-size: 11px;
-  color: var(--awd-text-3);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
 
   &.msb-error {
     color: var(--awd-danger-text);
@@ -783,7 +783,7 @@ export default {
   height: 26px;
   flex-shrink: 0;
   margin-top: 1px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent-soft);
   display: flex;
   align-items: center;
@@ -811,7 +811,7 @@ export default {
 }
 
 .msb-row-name {
-  font-size: 12.5px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
   white-space: nowrap;
@@ -820,7 +820,7 @@ export default {
 }
 
 .msb-row-desc {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 15px;
   color: var(--awd-text-2);
   white-space: nowrap;
@@ -829,8 +829,8 @@ export default {
 }
 
 .msb-row-meta {
-  font-size: 10px;
-  color: var(--awd-text-3);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -842,13 +842,13 @@ export default {
   height: 20px;
   line-height: 18px;
   padding: 0 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-accent);
   border: 1px solid var(--awd-accent);
   cursor: pointer;
 
   text {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: 600;
     color: var(--awd-text-on-accent);
   }
@@ -880,7 +880,7 @@ export default {
 .msb-row-state {
   flex-shrink: 0;
   align-self: center;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   padding: 1px 6px;
   border-radius: 999px;
 
@@ -889,7 +889,7 @@ export default {
 
     text {
       color: var(--awd-accent-text);
-      font-size: 10px;
+      font-size: var(--awd-panel-fs-meta);
     }
   }
 
@@ -898,7 +898,7 @@ export default {
 
     text {
       color: var(--awd-text-2);
-      font-size: 10px;
+      font-size: var(--awd-panel-fs-meta);
     }
   }
 
@@ -909,7 +909,7 @@ export default {
 
     text {
       color: var(--awd-warning-text);
-      font-size: 10px;
+      font-size: var(--awd-panel-fs-meta);
     }
 
     &:hover {
@@ -923,7 +923,7 @@ export default {
 
     text {
       color: var(--awd-warning-text);
-      font-size: 10px;
+      font-size: var(--awd-panel-fs-meta);
     }
   }
 }

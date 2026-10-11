@@ -498,7 +498,7 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--awd-bg);
+  background: var(--awd-surface);
 }
 
 .variable-layout {
@@ -525,13 +525,13 @@ export default {
   flex-direction: column;
   align-items: stretch;
   padding: 12px 8px;
-  gap: 4px;
+  gap: var(--awd-space-1);
 }
 
 .scope-item {
   padding: 8px 10px;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
   text-align: left;
@@ -551,32 +551,32 @@ export default {
 }
 
 .panel-topbar {
-  height: 48px; /* Slightly taller for better spacing */
+  min-height: var(--awd-control-height);
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0 16px;
+  padding: var(--awd-space-1) var(--awd-panel-pad-x);
   border-bottom: 1px solid var(--awd-border);
   background: var(--awd-surface);
   flex-shrink: 0;
-  gap: 12px;
+  gap: var(--awd-space-3);
 }
 
 .top-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--awd-space-3);
   flex: 0 0 auto;
 }
 
 .top-btn {
-  height: 32px;
-  line-height: 30px; /* Center vertical alignment */
+  min-height: var(--awd-control-height);
+  line-height: var(--awd-line-height-ui);
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   border: 1px solid var(--awd-border);
   background: var(--awd-surface);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   cursor: pointer;
   display: flex;
@@ -586,7 +586,7 @@ export default {
   font-weight: 500;
 
   &:hover {
-    border-color: var(--awd-mint);
+    border-color: var(--awd-accent-text);
     color: var(--awd-accent-text);
     background: var(--awd-accent-soft);
   }
@@ -607,14 +607,14 @@ export default {
   flex: 1;
   overflow: hidden;
   padding: 0;
-  background: var(--awd-bg); 
+  background: var(--awd-bg);
 }
 
 .loading, .empty {
   text-align: center;
   color: var(--awd-text-2);
   padding: 48px 20px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 
 /* Horizontal Scroll Layout */
@@ -623,14 +623,14 @@ export default {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 16px;
+  padding: var(--awd-space-4);
   /* Use flex row for horizontal scrolling container */
   white-space: nowrap;
 }
 
 .list-grid {
   display: inline-flex;
-  gap: 16px;
+  gap: var(--awd-space-4);
   height: 100%;
   align-items: stretch;
 }
@@ -638,24 +638,24 @@ export default {
 .var-card {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: var(--awd-radius-md);
+  padding: var(--awd-space-3);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--awd-space-3);
   width: 260px; /* Fixed width for horizontal items */
   flex-shrink: 0;
   transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
   position: relative;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  box-shadow: var(--awd-shadow-sm);
   /* Fixed Height independent of content */
   height: 140px; 
   overflow: hidden;
 }
 
 .var-card:hover {
-  border-color: var(--awd-mint);
-  box-shadow: 0 8px 24px rgba(137, 168, 160, 0.15); /* Mint shadow */
+  border-color: var(--awd-accent-text);
+  box-shadow: var(--awd-shadow-md); /* Mint shadow */
   transform: translateY(-2px);
 }
 
@@ -663,7 +663,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--awd-space-2);
   flex-shrink: 0;
 }
 
@@ -676,7 +676,7 @@ export default {
 }
 
 .var-name {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
   overflow: hidden;
@@ -685,7 +685,7 @@ export default {
 }
 
 .var-creator {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -693,8 +693,8 @@ export default {
 }
 
 .var-time-top {
-  font-size: 11px;
-  color: var(--awd-text-3); 
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -705,7 +705,7 @@ export default {
 .var-actions-top {
   display: flex;
   flex-direction: row; 
-  gap: 4px;
+  gap: var(--awd-space-1);
   flex-shrink: 0;
   align-items: flex-start; /* Align top */
 }
@@ -716,12 +716,12 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: transparent;
   border: 1px solid transparent; 
   color: var(--awd-text-2);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   padding: 0;
   transition: all 0.2s;
   
@@ -737,11 +737,11 @@ export default {
 }
 
 .var-value {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   background: var(--awd-surface-2);
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   flex: 1;
   overflow: hidden;
   word-break: break-all;
@@ -772,54 +772,54 @@ export default {
 .modal {
   width: 360px;
   background: var(--awd-surface);
-  border-radius: 12px; /* More rounded */
-  padding: 24px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-radius: var(--awd-radius-dialog);
+  padding: var(--awd-space-6);
+  box-shadow: var(--awd-shadow-md);
 }
 
 .modal-title { 
   font-weight: 600; 
-  font-size: 16px; 
+  font-size: var(--awd-font-size-title);
   color: var(--awd-text);
   margin-bottom: 8px; 
 }
 
 .modal-subtitle { 
-  font-size: 13px; 
-  color: var(--awd-text-2); 
+  font-size: var(--awd-font-size-body);
+  color: var(--awd-text-2);
   margin-bottom: 16px; 
 }
 
 .modal-input {
   width: 100%; 
-  height: 40px;
+  min-height: var(--awd-control-height);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 0 12px; 
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   box-sizing: border-box;
   transition: border-color 0.2s;
   
   &:focus {
-    border-color: var(--awd-mint);
+    border-color: var(--awd-accent-text);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(137, 168, 160, 0.2);
+    box-shadow: var(--awd-shadow-sm);
   }
 }
 
 .modal-actions { 
   display: flex; 
   justify-content: flex-end; 
-  gap: 12px; 
+  gap: var(--awd-space-3);
   margin-top: 24px; 
 }
 
 .modal-btn {
   padding: 8px 16px; 
-  border-radius: 6px; 
-  font-size: 13px; 
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
-  border: 1px solid var(--awd-border); 
+  border: 1px solid var(--awd-border);
   background: var(--awd-surface);
   color: var(--awd-text);
   transition: all 0.2s;
@@ -837,9 +837,9 @@ export default {
   margin-top: 8px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  padding: 8px;
+  border-radius: var(--awd-radius-md);
+  box-shadow: var(--awd-shadow-md);
+  padding: var(--awd-space-2);
   z-index: 100;
   min-width: 120px;
   display: flex;
@@ -866,7 +866,7 @@ export default {
 }
 
 .pop-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   text-align: center;
   font-weight: 500;
@@ -875,15 +875,15 @@ export default {
 .pop-row {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--awd-space-2);
 }
 
 .pop-btn {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   padding: 4px 0;
   text-align: center;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   cursor: pointer;
   background: var(--awd-bg);
   color: var(--awd-text-2);
@@ -905,8 +905,8 @@ export default {
 }
 
 .modal-btn.primary { 
-  background: var(--awd-accent); 
-  color: var(--awd-text-on-accent); 
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
   border-color: transparent; 
   
   &:hover {

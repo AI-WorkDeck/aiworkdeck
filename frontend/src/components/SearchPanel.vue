@@ -468,7 +468,7 @@ $brand-mint: var(--awd-mint);
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--awd-bg);
+  background-color: var(--awd-surface);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -486,17 +486,17 @@ $brand-mint: var(--awd-mint);
   .input-box {
     display: flex;
     align-items: center;
-    height: var(--awd-panel-row-h);
+    min-height: var(--awd-control-height);
     background: var(--awd-surface);
     border: 1px solid var(--awd-panel-border);
     border-radius: var(--awd-panel-radius);
     padding: 0 8px;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    box-shadow: var(--awd-shadow-sm);
 
     &.focused {
-      border-color: var(--awd-mint);
-      box-shadow: 0 0 0 3px var(--awd-accent-soft);
+      border-color: var(--awd-accent-text);
+      box-shadow: var(--awd-shadow-sm);
     }
 
     .search-icon {
@@ -516,12 +516,12 @@ $brand-mint: var(--awd-mint);
       min-width: 0;
 
       &::placeholder {
-          color: var(--awd-text-3);
+          color: var(--awd-text-2);
       }
     }
 
     .clear-icon {
-        padding: 4px;
+        padding: var(--awd-space-1);
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -535,7 +535,7 @@ $brand-mint: var(--awd-mint);
 .tag-sec-head {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--awd-space-1);
   height: var(--awd-panel-sec-h);
   padding: 0 var(--awd-panel-pad-x);
   cursor: pointer;
@@ -546,7 +546,7 @@ $brand-mint: var(--awd-mint);
 
 .tag-sec-chevron {
   width: 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-panel-text-3);
   transition: transform 0.12s ease;
   transform-origin: center;
@@ -562,7 +562,7 @@ $brand-mint: var(--awd-mint);
 }
 
 .tag-sec-count {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-panel-text-3);
   background: var(--awd-panel-hover);
   border-radius: 999px;
@@ -573,7 +573,7 @@ $brand-mint: var(--awd-mint);
 .tag-sec-spacer { flex: 1; }
 
 .tag-sec-clear {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-panel-accent);
   cursor: pointer;
 
@@ -609,16 +609,16 @@ $brand-mint: var(--awd-mint);
   color: var(--awd-panel-text);
   background: var(--awd-surface);
   border: 1px solid var(--awd-panel-border);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   outline: none;
 
-  &::placeholder { color: var(--awd-panel-text-4); }
+  &::placeholder { color: var(--awd-panel-text-2); }
 }
 
 .tags-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--awd-space-1);
   padding: 0 var(--awd-panel-pad-x);
   margin-bottom: var(--awd-panel-gap);
 
@@ -626,10 +626,10 @@ $brand-mint: var(--awd-mint);
 
   .tag-chip {
     padding: 1px 7px;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     border: 1px solid; /* Color coming from inline style */
     cursor: pointer;
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     line-height: 16px;
     font-weight: 500;
     max-width: 100%;
@@ -646,7 +646,7 @@ $brand-mint: var(--awd-mint);
 .tag-empty {
   display: block;
   padding: 0 var(--awd-panel-pad-x) var(--awd-panel-gap);
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-panel-text-3);
 }
 
@@ -663,7 +663,7 @@ $brand-mint: var(--awd-mint);
   padding: 0 var(--awd-panel-pad-x);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--awd-space-1);
 
   .highlight {
       color: var(--awd-accent-text);
@@ -735,7 +735,7 @@ $brand-mint: var(--awd-mint);
       flex-direction: column;
 
       .file-name {
-          font-size: 13px;
+          font-size: var(--awd-font-size-body);
           font-weight: 500;
           color: var(--awd-text);
           margin-bottom: 2px;
@@ -750,8 +750,8 @@ $brand-mint: var(--awd-mint);
       }
 
       .file-path {
-          font-size: 10px;
-          color: var(--awd-text-3);
+          font-size: var(--awd-panel-fs-meta);
+          color: var(--awd-text-2);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -761,7 +761,7 @@ $brand-mint: var(--awd-mint);
   .badge {
     background-color: var(--awd-surface-3);
     color: var(--awd-text-2);
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: 600;
     padding: 2px 6px;
     border-radius: 99px;
@@ -785,7 +785,7 @@ $brand-mint: var(--awd-mint);
   &:hover {
     background-color: var(--awd-accent-wash);
     .match-highlight {
-        background-color: rgba($brand-mint, 0.3);
+        background-color: var(--awd-accent-soft);
     }
   }
 
@@ -799,8 +799,8 @@ $brand-mint: var(--awd-mint);
   }
 
   .line-number {
-      font-size: 10px;
-      color: var(--awd-text-3);
+      font-size: var(--awd-panel-fs-meta);
+      color: var(--awd-text-2);
       width: 10px;
       text-align: right;
       margin-right: 12px;
@@ -808,7 +808,7 @@ $brand-mint: var(--awd-mint);
   }
 
   .match-content {
-     font-size: 11px;
+     font-size: var(--awd-panel-fs-meta);
      line-height: 1.5;
      color: var(--awd-text-2);
      white-space: pre;
@@ -818,7 +818,7 @@ $brand-mint: var(--awd-mint);
      .match-highlight {
          background-color: var(--awd-accent-soft);
          color: var(--awd-accent-text);
-         border-radius: 2px;
+         border-radius: calc(var(--awd-space-1) / 2);
          padding: 0 1px;
          font-weight: 500;
      }
@@ -838,8 +838,8 @@ $brand-mint: var(--awd-mint);
    }
 
    .empty-text {
-      color: var(--awd-text-3);
-      font-size: 13px;
+      color: var(--awd-text-2);
+      font-size: var(--awd-font-size-body);
    }
 }
 </style>

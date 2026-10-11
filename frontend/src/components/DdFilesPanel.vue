@@ -234,7 +234,7 @@ export default {
   padding: 0 var(--awd-panel-pad-x);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--awd-space-1);
   background-color: var(--awd-surface);
   box-sizing: border-box;
   flex-shrink: 0;
@@ -247,7 +247,7 @@ export default {
   }
 
   .dd-sec-count {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-panel-text-3);
     background: var(--awd-panel-hover);
     border-radius: 999px;
@@ -265,18 +265,18 @@ export default {
     justify-content: center;
     cursor: pointer;
     color: var(--awd-text-2);
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     border: 1px solid transparent;
     transition: all 0.2s;
     
     &:hover {
-      background-color: rgba(0,0,0,0.05);
+      background-color: var(--awd-surface-2);
       border-color: transparent;
       color: var(--awd-text);
     }
     
     .dd-add-icon {
-        font-size: 14px;
+        font-size: var(--awd-font-size-body);
         line-height: 1;
     }
   }
@@ -316,7 +316,7 @@ export default {
   &.active {
     border-color: var(--awd-accent);
     background-color: var(--awd-accent-soft);
-    box-shadow: 0 2px 8px rgba(46, 90, 80, 0.1);
+    box-shadow: var(--awd-shadow-md);
   }
 
   &.active:hover {
@@ -345,7 +345,7 @@ export default {
     min-width: 0;
 
     .dd-req-name {
-      font-size: 13px;
+      font-size: var(--awd-font-size-body);
       color: var(--awd-text);
       margin-bottom: 2px;
       white-space: nowrap;
@@ -355,18 +355,18 @@ export default {
     }
 
     .dd-req-status {
-      font-size: 11px;
-      color: var(--awd-text-3);
+      font-size: var(--awd-panel-fs-meta);
+      color: var(--awd-text-2);
       
       &.published { color: var(--awd-accent-text); }
       &.completed { color: var(--awd-text-2); }
     }
     
     .dd-rename-input {
-        font-size: 13px;
+        font-size: var(--awd-font-size-body);
         border: 1px solid var(--awd-info);
         background: var(--awd-surface);
-        border-radius: 4px;
+        border-radius: var(--awd-radius-sm);
         padding: 2px 4px;
         width: 100%;
     }
@@ -431,10 +431,10 @@ export default {
   width: 320px;
   height: 198px;
   background-color: var(--awd-surface);
-  border-radius: 12px;
+  border-radius: var(--awd-radius-dialog);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--awd-shadow-md);
   overflow: hidden;
   border: 1px solid var(--awd-border);
 }
@@ -444,7 +444,7 @@ export default {
   border-bottom: 1px solid var(--awd-border-subtle);
   
   .dd-dialog-title {
-    font-size: 15px;
+    font-size: var(--awd-font-size-reading);
     font-weight: 600;
     color: var(--awd-text);
   }
@@ -452,13 +452,13 @@ export default {
 
 .dd-dialog-body {
   flex: 1;
-  padding: 20px;
+  padding: var(--awd-space-5);
   display: flex;
   align-items: center;
   justify-content: center;
   
   .dd-dialog-msg {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text-2);
     line-height: 1.6;
     text-align: center;
@@ -468,13 +468,13 @@ export default {
 .dd-dialog-footer {
   display: flex;
   padding: 12px 20px 20px;
-  gap: 12px;
+  gap: var(--awd-space-3);
   justify-content: flex-end;
 
   .dd-dialog-btn {
     padding: 6px 20px;
-    border-radius: 6px;
-    font-size: 13px;
+    border-radius: var(--awd-radius-md);
+    font-size: var(--awd-font-size-body);
     cursor: pointer;
     transition: all 0.2s;
     
@@ -497,9 +497,9 @@ export default {
 }
 
 .dd-empty-state {
-  padding: 20px;
+  padding: var(--awd-space-5);
   text-align: center;
-  color: var(--awd-text-3);
-  font-size: 12px;
+  color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs);
 }
 </style>
