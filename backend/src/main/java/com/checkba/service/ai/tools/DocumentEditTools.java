@@ -479,7 +479,7 @@ public class DocumentEditTools implements AgentToolComponent {
     // ==================== 查找和替换 ====================
 
     @ToolMeta(displayName = "查找定位", category = "document")
-    @Tool("【找】在文档中查找文本。anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位，不在替换范围内。每个匹配返回：text（匹配原文）、matchIndex（序号，从 1 开始）、anchorId（通常随编辑移动的临时书签，目标原文未变时可复用；目标原文变化须重新查找；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找）、前后文 contextBefore/contextAfter、段落片段 paragraph（最多160字，paragraphLength 为完整长度；paragraphTruncated=true 时须回读完整目标段落）。" +
+    @Tool("【找】在文档中查找文本。anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位，不在替换范围内。每个匹配返回：text（匹配原文）、matchIndex（序号，从 1 开始）、anchorId（通常随编辑移动的临时书签，并非用一次就失效，目标原文未变时可复用；目标原文变化须重新查找；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找）、前后文 contextBefore/contextAfter、段落片段 paragraph（最多160字，paragraphLength 为完整长度；paragraphTruncated=true 时须回读完整目标段落）。" +
           "有多个匹配时先根据上下文确认哪一个才是目标，再用 anchorId 直接 doc_replace_at_anchor（精准替换，会自动滚动定位并返回改后段落）。" +
           "单处修改先定位并核对上下文，不凭印象判断全文唯一。正文查找排除已删除修订；删除历史用 doc_list_revisions。多处独立修改拿到各自 anchorId 后连续调用。")
     public String doc_find_text(

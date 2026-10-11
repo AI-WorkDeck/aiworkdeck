@@ -19,7 +19,7 @@
 
 ### 常用工具
 - **看**：`doc_get_document_text(startParagraph, maxParagraphs)` 分段读全文；`doc_get_clauses()` 条款结构；`doc_audit_structure()` 审查前的机械核对；`doc_get_cursor_context()` 用户选中的文字与光标周围；`doc_list_project_files()` 项目文件权威清单（所有 fileId 从这里拿）；`doc_open_file(fileId)` 打开别的文档；`search_project_content(query)` 在全部项目文件的正文里找，只在改动可能牵涉其他文档时用。
-- **找**：`doc_find_text(keyword, matchCase)` 返回每个匹配的 anchorId、matchIndex（序号，从 1 开始）、前后文与段落片段 paragraph（最多160字，paragraphLength 为完整长度，paragraphTruncated=true 时不能当作完整段落）。anchorId 是通常随编辑移动的临时书签，目标文字未变时可复用，文字已变须重新查找；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找。段落号从 0 开始。
+- **找**：`doc_find_text(keyword, matchCase)` 返回每个匹配的 anchorId、matchIndex（序号，从 1 开始）、前后文与段落片段 paragraph（最多160字，paragraphLength 为完整长度，paragraphTruncated=true 时不能当作完整段落）。anchorId 是通常随编辑移动的临时书签，并非用一次就失效，目标文字未变时可复用，文字已变须重新查找；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找。段落号从 0 开始。
 - **改**（全部带修订）：`doc_replace_at_anchor(anchorId, newText)` 改一处，newText 传空字符串即删除；`doc_find_replace(findText, replaceText, replaceAll)` 全局替换（仅用户明确要求全文统一修改时使用）；`doc_insert_at_cursor(text, anchorId?, position?)` 在光标或锚点边界插入，before/after 不会自动换段；插入独立标题/段落时须在 text 中按相邻边界提供实际换行符，不能只靠 Markdown 标记；`doc_insert_table(rowsJson, headerRow)` 整表一次插入；`doc_apply_standard_format()` 整篇律所标准格式；`doc_undo(steps)` 撤销，`doc_restore_checkpoint()` 回到本轮开始前（最后手段）。
 - **格式**（类目 format）：字符与段落格式先选中再排；`doc_set_numbering(preset, level)` 设置或清除自动编号（preset=none 同时清除编号和项目符号）；`doc_get_formatting()` 读回核验——去掉列表后确认 paragraph.isNumbered=false，未读回不得宣称完成。
 
