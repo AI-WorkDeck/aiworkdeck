@@ -20,6 +20,12 @@ class ProjectCatalogServiceTest {
     com.checkba.storage.StorageService bytes=mock(com.checkba.storage.StorageService.class);
     ProjectCatalogService service=new ProjectCatalogService(projects,files,dirs,links,manifests,relay,storage);
     @BeforeEach void storage(){when(storage.getStorageService()).thenReturn(bytes);}
+    @Test void standaloneFilesAreNotPublishedToTheAccountCatalog() {
+        Project loose=cloud(8L,"Standalone files");loose.setProjectType(Project.LOOSE_FILES);
+        when(projects.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(loose));
+        assertTrue(service.catalog(1L).isEmpty());
+        verifyNoInteractions(files);
+    }
     Project cloud(long id,String name) { Project p=new Project();p.setId(id);p.setUserId(1L);p.setName(name);p.setUid(UUID.randomUUID().toString());return p; }
     MobileProjectDir desktop(String device,String key,String name,String uid,Long cloudId) {
         MobileProjectDir d=new MobileProjectDir();d.setUserId(1L);d.setDeviceId(device);d.setProjectKey(key);d.setName(name);d.setProjectUid(uid);d.setCloudProjectId(cloudId);return d;

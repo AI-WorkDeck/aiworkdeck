@@ -72,6 +72,15 @@ public class ProjectFile {
     @Column(length = 512)
     private String filePath;
 
+    /** Exact file selected on this computer; never a directory grant or cloud metadata. */
+    @Column(columnDefinition = "TEXT")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String externalPath;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getExternalPath() { return externalPath; }
+    public void setExternalPath(String externalPath) { this.externalPath = externalPath; }
+
     /**
      * WPS 文件 ID（仅文件有效，用于 WPS 在线编辑）
      * 例如：project_1_doc_1_v1234567890

@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 工作台（pages/project-overview/project-overview.vue）文案。
 export default {
+  looseFiles: '独立文件',
+  looseFilesEmpty: '打开一份文件，开始工作',
+  looseFilesHint: '直接编辑原文件，也可以打开文件夹作为项目。',
+  looseFilesOpenFile: '打开文件…',
+  looseFilesOpenFolder: '打开文件夹…',
   mobileBackup: {
     "title": "文件云端备份",
     "message": "是否开启文件云端备份？开启后，桌面端会将项目中支持手机预览的图片、DOCX、PPTX、XLSX、PDF、音频和视频上传到你的账户云空间。订阅有效期间，即使桌面端离线，也能调取已完成备份的文件。默认关闭，你可以随时在设置中关闭。",

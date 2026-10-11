@@ -21,6 +21,8 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      */
     List<Project> findByUserIdOrderByCreatedAtDesc(Long userId);
 
+    java.util.Optional<Project> findFirstByUserIdAndProjectTypeOrderByIdAsc(Long userId, String projectType);
+
     /**
      * 查询所有 userId 为 null 的项目
      */

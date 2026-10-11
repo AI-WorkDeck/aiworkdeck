@@ -92,7 +92,7 @@ export const panelDockingMethods = {
     const leftKeys = docks.left.map((p) => p.key)
     if (isMovablePanel(this.leftPaneKey) && !leftKeys.includes(this.leftPaneKey)) {
       // 无项目态没有资源管理器，回落「项目」面板（dev-board#1047）
-      this.leftPaneKey = this.hasProject ? 'files' : NO_PROJECT_DEFAULT_PANE
+      this.leftPaneKey = this.hasProject && !this.isLooseWorkspace ? 'files' : NO_PROJECT_DEFAULT_PANE
     }
   },
 

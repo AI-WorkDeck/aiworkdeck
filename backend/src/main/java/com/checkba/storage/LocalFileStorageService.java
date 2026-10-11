@@ -41,6 +41,10 @@ public class LocalFileStorageService implements StorageService {
         Path filePath = resolveFilePath(fileId);
         
         try {
+            if (storageResolver.isExternalFileKey(fileId)) {
+                saveExternal(fileId, filePath, inputStream, false);
+                return fileId;
+            }
             // 确保父目录存在
             Files.createDirectories(filePath.getParent());
             
@@ -89,6 +93,7 @@ public class LocalFileStorageService implements StorageService {
         if (Files.exists(filePath)) {
             return;
         }
+        if (storageResolver.isExternalFileKey(fileId)) throw new StorageException("原文件已不存在，请重新打开文件");
         try {
             Files.createDirectories(filePath.getParent());
             if (Files.exists(templateDoc)) {
@@ -111,6 +116,7 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public void delete(String fileId) throws StorageException {
+        rejectExternalStructureChange(fileId);
         Path filePath = resolveFilePath(fileId);
         
         try {
@@ -128,6 +134,8 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public void moveNew(String fromId, String toId) throws StorageException {
+        rejectExternalStructureChange(fromId);
+        rejectExternalStructureChange(toId);
         try {
             Path target = resolveFilePath(toId);
             Files.createDirectories(target.getParent());
@@ -147,6 +155,8 @@ public class LocalFileStorageService implements StorageService {
     /** 原子 move（同卷）：覆盖式落盘的收尾步。ATOMIC_MOVE 不支持时退化为普通 REPLACE move。 */
     @Override
     public void move(String fromId, String toId) throws StorageException {
+        rejectExternalStructureChange(fromId);
+        rejectExternalStructureChange(toId);
         Path from = resolveFilePath(fromId);
         Path to = resolveFilePath(toId);
         try {
@@ -172,11 +182,48 @@ public class LocalFileStorageService implements StorageService {
         return storageResolver.resolve(relative);
     }
 
+    private void rejectExternalStructureChange(String key) {
+        if (storageResolver.isExternalFileKey(key)) throw new StorageException(
+                "独立文件请在 Finder 或资源管理器中移动、改名或删除");
+    }
+
+    /** Finish reading the upload before replacing the original; failed input leaves it untouched. */
+    private void saveExternal(String key, Path original, InputStream input, boolean append) throws IOException {
+        if (!Files.isRegularFile(original) || !Files.isWritable(original)) {
+            throw new IOException("原文件已不存在或不可写");
+        }
+        // Existing watcher and Git rules both exclude Office's ~$ prefix.
+        Path pending = Files.createTempFile(original.getParent(), "~$awd-save-", ".tmp");
+        try {
+            var posix = Files.getFileAttributeView(original, java.nio.file.attribute.PosixFileAttributeView.class);
+            if (posix != null) Files.setPosixFilePermissions(pending, posix.readAttributes().permissions());
+            try (OutputStream out = Files.newOutputStream(pending)) {
+                if (append) Files.copy(original, out);
+                input.transferTo(out);
+            }
+            // An external rename/deletion while uploading must not resurrect the old path.
+            if (!resolveFilePath(key).equals(original) || !Files.isRegularFile(original)) {
+                throw new IOException("原文件位置已变化，请重新打开文件");
+            }
+            try {
+                Files.move(pending, original, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(pending, original, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(pending);
+        }
+    }
+
     @Override
     public String append(String fileId, InputStream inputStream) throws StorageException {
         Path filePath = resolveFilePath(fileId);
 
         try {
+            if (storageResolver.isExternalFileKey(fileId)) {
+                saveExternal(fileId, filePath, inputStream, true);
+                return fileId;
+            }
             // 确保父目录存在
             if (!Files.exists(filePath.getParent())) {
                 Files.createDirectories(filePath.getParent());

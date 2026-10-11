@@ -81,6 +81,9 @@ public class ProjectService {
 
     @Transactional
     public Project createProject(ProjectCreateRequest request, Long userId) {
+        if (Project.LOOSE_FILES.equals(request.getProjectType())) {
+            throw new IllegalArgumentException(LangText.of("请通过打开文件创建独立文件工作区", "Open a file to create a standalone workspace"));
+        }
         if (!StringUtils.hasText(request.getProjectType())) {
             throw new IllegalArgumentException(LangText.of("项目类型不能为空", "Project type must not be empty"));
         }
@@ -198,6 +201,7 @@ public class ProjectService {
         allProjects.addAll(memberProjects);
 
         return allProjects.stream()
+                .filter(p -> !p.isLooseFileWorkspace())
                 .sorted((p1, p2) -> {
                      if (p1.getCreatedAt() == null || p2.getCreatedAt() == null) return 0;
                      return p2.getCreatedAt().compareTo(p1.getCreatedAt());

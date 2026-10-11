@@ -31,14 +31,6 @@ if (!singleInstanceLock) {
   app.quit()
   return
 }
-app.on('second-instance', () => {
-  // 用户又点了一次图标/关联文件：把已经在跑的这个实例的窗口拉到前台，
-  // 而不是让第二次点击悄无声息地什么都不发生
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.focus()
-  }
-})
 
 // BUG-28：Chromium 内置 PDF 查看器的「更多」菜单（Two page view / Annotations /
 // Document properties）字符串来自 Chromium 自己那份 .pak 本地化资源，只认启动期
@@ -1699,26 +1691,19 @@ ipcMain.on('checkba:app-language', (_evt, lang) => {
 // （system 态下渲染层拿不准——见 applyNativeTheme 的注释）。
 ipcMain.handle('checkba:set-theme', (_evt, mode) => applyNativeTheme(String(mode || 'light')))
 
-// IDE 化：Finder「打开方式」/ 拖到 Dock 图标进来的路径（macOS open-file 事件，
-// 可能早于窗口创建，先存后发；目录/文件在主进程判好再交渲染层走 open-path 流程）
-let pendingOpenPath = null
-function dispatchOpenPath(p) {
-  if (!p) return
-  let isDirectory = false
-  try {
-    isDirectory = require('fs').statSync(p).isDirectory()
-  } catch (e) {
-    return
-  }
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('checkba:menu-action', { action: 'open-path', path: p, isDirectory })
-  } else {
-    pendingOpenPath = p
-  }
-}
-app.on('open-file', (event, p) => {
-  event.preventDefault()
-  dispatchOpenPath(p)
+// 系统文件打开请求由主进程排队，直到工作台明确 ready；每条处理后 ack 再发下一条。
+// Windows 启动 argv / second-instance 与 macOS open-file 共用同一条交付链。
+require('./open-paths').installOpenPaths({
+  app, ipcMain,
+  getWindow: () => mainWindow,
+  focusWindow: () => {
+    if ((!mainWindow || mainWindow.isDestroyed()) && mainWindowStartupReady) createMainWindow()
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  },
 })
 
 app.whenReady().then(() => {
@@ -1815,14 +1800,6 @@ app.whenReady().then(() => {
         })
         updateService.start()
       } catch (e) { console.error('[update]', e) }
-      // 启动前就收到的 open-file 路径：等渲染层就绪（App.onLaunch 注册好处理器）再补发
-      if (pendingOpenPath && mainWindow) {
-        const queued = pendingOpenPath
-        pendingOpenPath = null
-        mainWindow.webContents.once('did-finish-load', () => {
-          setTimeout(() => dispatchOpenPath(queued), 1500)
-        })
-      }
       const b = results.backend
       if (b && !b.ok) {
         // 后端失败也允许打开 UI（方便你调试），但会提示错误

@@ -138,6 +138,12 @@ public class ProjectRepoService {
         return storageResolver.projectRoot(projectId);
     }
 
+    public void requireVersionRecordingSupported(long projectId) {
+        if (storageResolver.isLooseFileWorkspace(projectId)) throw VersionException.userFacing(
+                com.checkba.service.LangText.of("独立文件不启用项目版本记录，请先打开项目文件夹",
+                        "Open a project folder to use version history"));
+    }
+
     public boolean isInitialized(long projectId) {
         return Files.isDirectory(gitDir(projectId).resolve("objects"));
     }
@@ -253,6 +259,7 @@ public class ProjectRepoService {
 
     /** 建仓库并落一笔「初始版本」。已存在则直接返回。 */
     public void init(long projectId, String authorName, String authorEmail) {
+        requireVersionRecordingSupported(projectId);
         if (isInitialized(projectId)) return;
         try {
             Files.createDirectories(workTree(projectId));
@@ -1916,6 +1923,7 @@ public class ProjectRepoService {
      * 只建仓、把 HEAD 指到 master，不调用 commit。已初始化则 no-op（幂等）。
      */
     public void initEmptyForReceive(long projectId) {
+        requireVersionRecordingSupported(projectId);
         if (isInitialized(projectId)) return;
         try {
             Files.createDirectories(workTree(projectId));
@@ -1935,6 +1943,7 @@ public class ProjectRepoService {
 
     /** 从云端整仓克隆（gitDir/workTree 分离布局与 init 一致）。 */
     public void cloneFromRemote(long projectId, String url, String username, String token) {
+        requireVersionRecordingSupported(projectId);
         try {
             Files.createDirectories(workTree(projectId));
             Git.cloneRepository()
