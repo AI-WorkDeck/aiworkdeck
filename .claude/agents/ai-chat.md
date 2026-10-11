@@ -1659,3 +1659,13 @@ dev-board#285 那条「**本会话能直接编辑的只有上面这一份打开�
 ```bash
 cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='ReferenceSourceServiceTest,ReferenceToolsTest,OpenDocSourceTest,DesktopSourceTest,CloudProjectSourceTest,CaseLibrarySourceTest,CaseRefClientTest,GitProviderSourceTest,PaneRegistryTest,AddinPaneControllerTest,AddinGitLinkControllerTest,GitProviderClientTest,GitTokenCipherTest,OfficeBridgeCrossPaneTest,ClientCapabilityServiceTest,ContextAssemblerServiceTest,ProjectFileTextExtractorTest,ProjectFileServicePathTest'
 ```
+
+
+### 2026-10-11 问题卡与本轮文件成果（dev-board #1200–1202）
+
+- 普通对话和插件/技能共用 ContextAssemblerService 的末位交互契约：确需用户决定或补充信息才提问；AGENT 调 `ask_user`，无此工具的 ASK/PLAN 用既有 `<question>`。不得把普通正文中的 A/B 选择正则转成授权卡。QuestionCard 的兼容问题也能在卡内输入/提交，结构化回答仍保留服务器 question id；已回答历史不可再次提交。
+- ProcessCard 只隐藏 `litigation_reference`、`list_tools`、`use_skill` 的内部原始输出；业务文件内容和用户要求的代码答案仍可展示，不全局剥除 Markdown 代码块。
+- `file_change` 携带 conversationId、clientRequestId、assistantMessageId；前端按原请求/持久消息匹配，已知但不匹配的事件不能塞当前气泡。ConversationFileChange 新增可空 fileId/projectId/assistantMessageId，历史旧行仍保留独立入口，不冒充新一轮计数。RootBubble 末尾成果与本轮改动/新增数使用同一去重口径。
+- FileChangeTurn 随助手段创建，锁内绑定真实消息 ID、排队保存和去重；子 Agent listener 冻结此对象，超时后工具真实成功返回仍可归原段。待存队列与去重同锁，保存失败保留待存、后续保存/重复回执重试。无法确认的 ID/外项目/已删除/目录不生成文件成果。
+- 子 Agent 接收可信 activeFileId；成功 doc_open_file/doc_start_stream 或打开新编辑文档的 doc_start_stream/sheet_create_file/pdf_to_word 才更新当前文档身份，普通 write_file 不切换。确认产物经 listener 即时上报，同时保留子任务结果快照；部分失败保留此前真实成功文件。
+- 回归：chat-turn-files.test.mjs、question-card-response.test.mjs；ConversationFileChangeServiceTest、AgentOrchestratorFileChangeTargetTest、ContextAssemblerAskUserTest、SubAgentServiceTest。

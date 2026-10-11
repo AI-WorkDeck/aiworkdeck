@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // AI chat panel (ChatInterface + AgentMessage cards + ArtifactCard + BackgroundTaskIndicator)
 export default {
+  earlierFiles: 'Earlier conversation files',
+  fileCreated: 'Created',
+  fileModified: 'Modified',
   decisionAssistLabel: 'Decision assistance (experimental)',
   decisionAssistOn: 'On',
   decisionAssistOff: 'Off',

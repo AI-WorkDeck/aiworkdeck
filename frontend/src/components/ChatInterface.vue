@@ -403,6 +403,8 @@
                :bubble="msg"
                :is-latest="index === bubbles.length - 1"
                :review-states="reviewStates"
+               :file-changes="filesForBubble(msg)"
+               @open-file="handleOpenFile"
                @open-artifact-tab="handleArtifactOpenTab"
                @approve="handleArtifactApprove"
                @open-review="handleArtifactOpenReview"
@@ -659,6 +661,12 @@
                    <view v-if="showNewPopup && createdFiles.length > 0" class="popup-mask-transparent"
                          :style="{ pointerEvents: draggingCreatedFile ? 'none' : '' }" @tap.stop="showNewPopup = false"></view>
                </view>
+               <view v-if="legacyFileChanges.length" class="status-btn-wrapper">
+                 <button type="button" class="status-btn" @click="showLegacyFilesPopup = !showLegacyFilesPopup">{{ $t('chat.earlierFiles') }}</button>
+                 <view v-if="showLegacyFilesPopup" class="status-popup up">
+                   <button v-for="(file, i) in legacyFileChanges" :key="i" type="button" class="status-popup-item" @click="handleOpenFile(file); showLegacyFilesPopup = false">{{ fileChangeLabel(file) }}</button>
+                 </view>
+               </view>
            </view>
 
            <!-- Right: Token Usage
@@ -852,6 +860,7 @@
 </template>
 
 <script>
+import { fileChangesForBubble, summarizeFileChanges } from '@/utils/chatFileChange.js'
 import RootBubble from './AgentMessage/RootBubble.vue'
 import ChatTurnRail from './AgentMessage/ChatTurnRail.vue'
 import MentionPicker from './AgentMessage/MentionPicker.vue'
@@ -1804,12 +1813,20 @@ export default {
         endCreatedFileDrag()
     }
 
+    const filesForBubble = (bubble) => fileChangesForBubble(bubble, fileChanges.value || [])
+    const latestFileChanges = computed(() => {
+        const latest = [...bubbles.value].reverse().find(b => b.role === 'ASSISTANT')
+        return latest ? filesForBubble(latest) : []
+    })
+    const legacyFileChanges = computed(() => summarizeFileChanges((fileChanges.value || [])
+        .filter(f => !f.assistantMessageId && !f.assistantBubbleId)))
+    const showLegacyFilesPopup = ref(false)
     const createdFiles = computed(() => {
-        return (fileChanges.value || []).filter(f => f.changeType === 'ADDED')
+        return latestFileChanges.value.filter(f => f.changeType === 'ADDED')
     })
 
     const modifiedFiles = computed(() => {
-        return (fileChanges.value || []).filter(f => f.changeType === 'MODIFIED')
+        return latestFileChanges.value.filter(f => f.changeType === 'MODIFIED')
     })
 
     const toggleModifiedPopup = () => {
@@ -2611,6 +2628,7 @@ export default {
           } else {
               const bubble = parseAssistantHistory(msg.content || '', msg.reasoning)
               bubble.id = msg.id
+              bubble.originClientRequestId = [...built].reverse().find(b => b.role === 'USER')?.clientRequestId || null
               bubble.timestamp = formatTime(msg.createdAt)
               const recoveredTodos = recoverPlanTodos(bubble.processes)
               if (recoveredTodos !== null) {
@@ -4260,6 +4278,9 @@ export default {
        stoppingTasks,
        handleCancelTask,
        modifiedFiles,
+       filesForBubble,
+       legacyFileChanges,
+       showLegacyFilesPopup,
        fileChangeLabel,
        createdFiles,
        showModifiedPopup,

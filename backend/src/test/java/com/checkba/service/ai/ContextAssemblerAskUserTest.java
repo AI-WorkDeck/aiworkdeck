@@ -43,6 +43,7 @@ class ContextAssemblerAskUserTest {
     private ContextAssemblerService assembler;
     private com.checkba.service.AppLanguageService appLanguageService;
     private LegalTools legalTools;
+    private SkillRouter skillRouter;
 
     private static final String ANSWER = "<ask_user_answer id=\"ask-1\">\nQuestion: 「清理」具体指哪一种？\n"
             + "Selected:\n- 删除混入的审查报告\n</ask_user_answer>";
@@ -52,7 +53,7 @@ class ContextAssemblerAskUserTest {
         legalTools = mock(LegalTools.class);
         ProjectAiMessageService messageService = mock(ProjectAiMessageService.class);
         when(messageService.listByConversationId(anyString())).thenReturn(Collections.emptyList());
-        SkillRouter skillRouter = mock(SkillRouter.class);
+        skillRouter = mock(SkillRouter.class);
         when(skillRouter.match(anyString())).thenReturn(Optional.empty());
         MemoryManager memoryManager = mock(MemoryManager.class);
         when(memoryManager.getProjectMemory(anyLong())).thenReturn(Optional.empty());
@@ -78,6 +79,31 @@ class ContextAssemblerAskUserTest {
         return ((UserMessage) messages.get(messages.size() - 1)).singleText();
     }
 
+    @Test
+    void ordinaryAndPluginQuestionsUseTheSameInteractiveContract() {
+        for (boolean plugin : new boolean[] {false, true}) {
+            var definition = new com.checkba.service.ai.skill.SkillDefinition();
+            definition.setId("test-plugin");
+            definition.setSourcePluginId("test-plugin");
+            when(skillRouter.activeSkills("run-1")).thenReturn(plugin
+                    ? List.of(new SkillRouter.ActiveSkill(definition, "测试插件", "plugin")) : List.of());
+            when(skillRouter.promptInjectionFor(definition)).thenReturn("\nPLUGIN_WORKFLOW: 请用户选择方案 A 或 B\n");
+            for (boolean english : new boolean[] {false, true}) {
+                when(appLanguageService.isEnglish()).thenReturn(english);
+                for (AgentMode mode : List.of(AgentMode.AGENT, AgentMode.ASK, AgentMode.PLAN)) {
+                    var messages = assemble("帮我安排本次工作", mode, null);
+                    String tail = lastUserText(messages);
+                    assertTrue(tail.contains(mode == AgentMode.AGENT ? "use ask_user" : "use <question>")
+                            || tail.contains(mode == AgentMode.AGENT ? "使用 ask_user" : "使用 <question>"));
+                    assertTrue(tail.contains(english ? "do not require another question; proceed" : "不为展示卡片而反问"));
+                    if (plugin && mode != AgentMode.ASK) {
+                        assertTrue(((SystemMessage) messages.get(0)).text().contains("PLUGIN_WORKFLOW"));
+                    }
+                }
+            }
+        }
+    }
+
     private static AiAgentController.ContextItem activeDoc() {
         AiAgentController.ContextItem item = new AiAgentController.ContextItem();
         item.setId("123");
@@ -97,7 +123,7 @@ class ContextAssemblerAskUserTest {
         assertTrue(activeDocReminder < rule, "ask_user 规则必须排在活跃文档提醒之后（最末位）: " + text);
         assertTrue(text.contains("句末是「吗」「么」「？」"), "疑问句判据要点名: " + text);
         assertTrue(text.contains("不要写任务清单"), "病灶里模型先写了任务清单再开删: " + text);
-        assertTrue(text.endsWith("直接执行，不要反问。"), "规则必须两头都说——含「指令明确就直接做」的反例: " + text);
+        assertTrue(text.contains("直接执行，不要反问。"), "规则必须两头都说——含「指令明确就直接做」的反例: " + text);
     }
 
     @Test
@@ -168,7 +194,9 @@ class ContextAssemblerAskUserTest {
     void askAndPlanModesGetNoTailRule() {
         for (AgentMode mode : List.of(AgentMode.ASK, AgentMode.PLAN)) {
             String text = lastUserText(assemble("你能帮我清理一下么", mode, null));
-            assertEquals("你能帮我清理一下么", text, mode + " 模式不挂 ask_user 规则");
+            assertTrue(text.startsWith("你能帮我清理一下么"));
+            assertTrue(text.contains("<question>...</question>"));
+            assertFalse(text.contains("先调用 ask_user"), mode + " has no ask_user tool");
         }
     }
 

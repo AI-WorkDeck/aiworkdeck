@@ -55,6 +55,7 @@ class PdfToolsPageOpsTest {
     private static final long PROJECT_ID = 7L;
 
     private PdfTools tools;
+    private ProjectFileService fileService;
     private Path projectRoot;
     private final Map<Long, ProjectFile> registry = new HashMap<>();
     private final AtomicLong nextId = new AtomicLong(100);
@@ -64,7 +65,7 @@ class PdfToolsPageOpsTest {
         projectRoot = tempDir.resolve("project-" + PROJECT_ID);
         Files.createDirectories(projectRoot);
 
-        ProjectFileService fileService = mock(ProjectFileService.class);
+        fileService = mock(ProjectFileService.class);
         ProjectFileRepository repository = mock(ProjectFileRepository.class);
         ProjectStorageResolver resolver = mock(ProjectStorageResolver.class);
 
@@ -206,6 +207,20 @@ class PdfToolsPageOpsTest {
         while (m.find()) names.add(m.group(1));
         assertEquals(List.of("卷宗_第1-3页.pdf", "卷宗_第5页.pdf", "卷宗_第8-10页.pdf"), names, output);
         assertEquals(10, pagesOfSource("卷宗.pdf"));
+    }
+
+    @Test void splitPartialFailureReturnsOnlyPersistedIdentitiesAndKeepsFailureReason() throws Exception {
+        long id = givenPdf("卷宗.pdf", 4);
+        when(fileService.createFile(anyLong(), any(), org.mockito.ArgumentMatchers.eq("卷宗_第2页.pdf"),
+                any(), any(), any(), any(), anyLong(), any())).thenThrow(new IllegalStateException("disk unavailable"));
+        String output = tools.pdf_split(id, "1,2,3");
+        var result = new com.fasterxml.jackson.databind.ObjectMapper().readTree(output);
+        assertEquals("success", result.path("status").asText());
+        assertEquals(2, result.path("files").size());
+        assertTrue(result.path("message").asText().contains("1 段失败"));
+        assertTrue(result.path("message").asText().contains("disk unavailable"));
+        assertEquals(2, GeneratedFileLocation.createdIds("pdf_split", output).size());
+        assertEquals(4, pagesOfSource("卷宗.pdf"));
     }
 
     @Test

@@ -312,7 +312,7 @@ public class LitigationVisualTools implements AgentToolComponent {
                             + "|" + diagramName + "|" + parentFolderId + "|" + mode + "|" + formats);
             if (st != null && renderFingerprint.equals(st.lastRenderFingerprint)
                     && st.lastRenderNote != null) {
-                return st.lastRenderNote
+                return com.checkba.service.ai.ToolRegistry.ToolResult.UNCHANGED_PREFIX + st.lastRenderNote
                         + "\n\n[本次调用没有重新出图] 这张图刚刚已经用同一份语义地图出过了，"
                         + "文件都在上面那个文件夹里。不要再调用 litigation_render；"
                         + "直接把交付说明讲给用户即可。";
@@ -353,6 +353,7 @@ public class LitigationVisualTools implements AgentToolComponent {
             ProjectFile folder = createFolderTolerant(projectId, parentFolderId, folderName);
 
             List<String> registered = new ArrayList<>();
+            List<ProjectFile> deliveredFiles = new ArrayList<>();
             ProjectFile svg = null;
             ProjectFile drawio = null;
             for (int i = 0; i < files.size(); i++) {
@@ -361,6 +362,7 @@ public class LitigationVisualTools implements AgentToolComponent {
                 ProjectFile pf = registerArtifact(projectId, folder.getId(), src, MARKER_ARTIFACT);
                 if (pf == null) continue;
                 registered.add(pf.getName());
+                deliveredFiles.add(pf);
                 if (svg == null && pf.getName().endsWith(".svg") && !pf.getName().endsWith(".drawio.svg")) {
                     svg = pf;
                 }
@@ -392,7 +394,7 @@ public class LitigationVisualTools implements AgentToolComponent {
                 st.pendingCheckpointQuestions = null;
                 st.checkpointCalls = 0;
             }
-            return note;
+            return GeneratedFileLocation.createdResults(deliveredFiles, note);
 
         } catch (IllegalArgumentException e) {
             return "语义地图不是合法 JSON：" + e.getMessage();
