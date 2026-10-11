@@ -44,6 +44,41 @@ dev-board#30）；更早的产品设计 `2026-08-17-mobile-clients-design.md`。
   `MobileCloudCaptureServiceTest`、`MobileApiContractTest.unifiedCatalogAndCloudCaptureMatchSpecAndPreserveBytes`、
   `MobileRelayClientHttpTest.catalog*`。手机端以 OpenAPI 钉版文件为唯一接口来源。
 
+## 手机预览与明确同意的文件备份（dev-board#1208/#1210，2026-10-11）
+
+- 手机列表继续 `GET /api/mobile/catalog/{uid}/files`；LIST、云目录、备份 manifest 都保留
+  `isFolder/parentId/path`，包括空文件夹。`id/parentId` 只在来源内有效，跨来源合并按相对 path
+  建树。同 uid 的在线桌面条目优先，离线且有权益和同意时可用 `source:backup`。
+- 手机下载使用 `POST /api/mobile/preview/pull`（deviceId/projectKey/remoteFileId/requestId），
+  文件名和大小从服务端已保存的桌面清单取；支持类型由 `MobilePreviewPolicy` 唯一定义。
+  它给传输行/命令加 `previewOnly:true`，桌面再次检查真实本地文件名后才读文件上传。
+  通用 `/transfer/pull` 和 `/catalog/.../content` 仍服务桌面/Office用途，不全面套用手机限制。
+- 手机云/备份原件入口是 `GET /api/mobile/preview/catalog/{uid}/files/{fileUid}/content`，
+  读取目录实际选定来源，要求账户有效订阅、`app_users` 上明确备份同意且扩展名支持；
+  未同意、订阅过期、备份缺失提示需桌面在线。不得把客户端文件名或本机账户权益当云端权限。
+- `GET/PUT /api/mobile/backup-consent` 保存账户决定；PUT 必须显式传 enabled 和当前
+  `consentVersion:2026-10-11`。旧行 nullable 字段默认关闭/未决定，不替用户同意。
+  返回 `enabled/decided/subscriptionActive/consentVersion/cleanupPending`。
+- 桌面 worker 定期查账户决定和订阅；同意后推 `/backup/manifest` 元数据（含空文件夹），
+  仅为支持格式计算 SHA256、读取字节；`GET /backup/files?deviceId=&projectKey=` 对账，
+  省略 projectKey 返回此设备全部备份，便于清理已删除项目。`PUT /backup/files` 是 query
+  元数据 + multipart 单 file，成功返回裸 TransferFile 元数据（**没有 code:0**）。
+  `/backup/manifest` PUT JSON、`/backup/files` DELETE 则返回 code 信封。
+- `MobileFileBackup` 是独立于临时中转的持久行。服务端在同一用户锁下检查订阅、同意、项目
+  归属、200MiB 单件限制、SHA256/实际长度与持久配额；备份和既有云项目共用 3GiB 池。
+  替换先写新对象，旧对象转删除收据，待清理字节仍计占用，故替换需要整份新文件的余量。
+- Blob 接缝新增 `putPersistent`：本地 `mobile-backup/`，OSS key `mobile-backup/{user}/{uuid}`。
+  **旧 OSS setup 曾有全桶35天生命周期，换前缀并不够**：首次使用新版本前必须将真实桶规则
+  限制为 `mobile-relay/` 并授予 GetBucketLifecycle；每次持久写先读取规则，若会过期备份则拒绝。
+  临时 ACK/TTL 不管理备份对象。
+- 关闭同意立即禁读并将所有备份标为待删；账号注销也保留待删收据。每60秒逐行独立事务删除，
+  失败保留行重试。写入散列失败、部分失败或事务回滚也建立独立删除收据，不能只依赖
+  deleteQuietly（备份对象没有TTL兜底）。清理重读用户锁下状态，防与重新启用后的替换竞争。
+- 验证：`MobileBackupServiceTest`、`MobileRelayOssBlobStoreTest` 生命周期护栏、
+  `MobileApiContractTest.backupConsentPreviewAndFolderContractPreserveBytesAndDenyByDefault`、
+  `MobileTransferLoopbackIntegrationTest.realBackupWorkerConsentUploadOfflinePreviewAndRevocationRoundTrip`
+  （真实随机端口/控制器/H2/本地blob/worker，外部账单为合成桩，不代表生产或真机验证）。
+
 ## 关键文件
 
 - `service/mobile/MobileRelayStoreService.java` — 云端（server 侧）：目录按 (userId,

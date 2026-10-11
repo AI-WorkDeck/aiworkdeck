@@ -26,6 +26,9 @@ public class ProjectCatalogService {
     private final MobileRelayStoreService relay;
     private final StorageServiceFactory storage;
     private final ObjectMapper mapper = new ObjectMapper();
+    @org.springframework.beans.factory.annotation.Autowired private MobileFileBackupRepository backups;
+    @org.springframework.beans.factory.annotation.Autowired private UserRepository users;
+    @org.springframework.beans.factory.annotation.Autowired private CloudStorageQuotaService quota;
 
     public ProjectCatalogService(ProjectRepository projects, ProjectFileRepository files,
             MobileProjectDirRepository directories, AddinProjectLinkRepository links,
@@ -110,11 +113,13 @@ public class ProjectCatalogService {
             Map<Long, ProjectFile> byId = new HashMap<>();
             for (ProjectFile f : tree) byId.put(f.getId(), f);
             for (ProjectFile file : tree) {
-                if (Boolean.TRUE.equals(file.getIsFolder())) continue;
+
                 ensureFileUid(file);
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("id", file.getId().toString()); entry.put("uid", file.getUid());
                 entry.put("name", file.getName()); entry.put("path", relativePath(file, byId));
+                entry.put("isFolder", Boolean.TRUE.equals(file.getIsFolder()));
+                entry.put("parentId", file.getParentId() == null ? null : file.getParentId().toString());
                 long size = file.getFileSize() == null ? 0 : file.getFileSize();
                 var blob = storage.getStorageService();
                 if (file.getFilePath() != null && blob.exists(file.getFilePath())) size = blob.getSize(file.getFilePath());
@@ -138,14 +143,40 @@ public class ProjectCatalogService {
                     entry.put("projectKey", location.get("key")); entry.put("online", location.get("online"));
                     String fileUid = validUid(f.path("uid").asText());
                     String identity = fileUid != null ? fileUid : location.get("deviceId") + ":" + location.get("key") + ":" + f.path("id").asText();
-                    entries.putIfAbsent(identity, entry);
+                    if (Boolean.TRUE.equals(location.get("online"))) entries.put(identity, entry);
+                    else entries.putIfAbsent(identity, entry);
                 }
             } catch (IOException e) { throw new IllegalStateException("Invalid catalogue snapshot", e); }
+        }
+        if (includeBackups(userId)) {
+            for (Map<String,Object> location : locations) {
+                if (!"desktop".equals(location.get("kind")) || Boolean.TRUE.equals(location.get("online"))) continue;
+                for (MobileFileBackup backup : backups.findByUserIdAndDeviceIdAndProjectKey(userId,
+                        (String)location.get("deviceId"), (String)location.get("key"))) {
+                    if (backup.isPendingDeletion()) continue;
+                    Map<String,Object> existing=entries.get(backup.getUid());
+                    if (existing!=null && "cloud".equals(existing.get("source"))) continue;
+                    Map<String,Object> entry=new LinkedHashMap<>();
+                    entry.put("id",backup.getFileId());entry.put("uid",backup.getUid());entry.put("name",backup.getName());
+                    entry.put("path",backup.getPath());entry.put("parentId",backup.getParentId());entry.put("isFolder",false);
+                    entry.put("size",backup.getSize());entry.put("sha256",backup.getSha256());entry.put("source","backup");
+                    entry.put("deviceId",backup.getDeviceId());entry.put("projectKey",backup.getProjectKey());entry.put("online",true);
+                    entries.put(backup.getUid(),entry);
+                }
+            }
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("files", new ArrayList<>(entries.values())); result.put("count", entries.size());
         result.put("totalCount", truncated ? null : entries.size()); result.put("truncated", truncated);
         result.put("source", "catalog"); result.put("cached", cached); return result;
+    }
+    private boolean includeBackups(Long userId) {
+        if (backups == null || !users.findById(userId).map(User::isFileCloudBackupEnabled).orElse(false)) return false;
+        try { return quota.persistentQuota(userId) > 0; }
+        catch (MobileBillingFailureException e) {
+            // Subscription verification gates backup bytes, not independent catalogue metadata.
+            return false;
+        }
     }
     @Transactional
     public void rememberFiles(Long userId, String deviceId, String key, String payload) {

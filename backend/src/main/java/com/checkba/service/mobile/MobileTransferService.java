@@ -180,9 +180,22 @@ public class MobileTransferService {
      */
     public MobileTransferRequest pull(Long userId, String deviceId, String projectKey, String remoteFileId,
                                        String fileName, long fileSize, String requestId) {
+        return pull(userId, deviceId, projectKey, remoteFileId, fileName, fileSize, requestId, false);
+    }
+
+    public MobileTransferRequest pull(Long userId, String deviceId, String projectKey, String remoteFileId,
+            String fileName, long fileSize, String requestId, boolean previewOnly) {
         requireRequestId(requestId);
         Optional<MobileTransferRequest> existing = repository.findByUserIdAndRequestId(userId, requestId);
-        if (existing.isPresent()) return existing.get();
+        if (existing.isPresent()) {
+            MobileTransferRequest row = existing.get();
+            if (previewOnly && (!Boolean.TRUE.equals(row.getPreviewOnly())
+                    || !java.util.Objects.equals(deviceId, row.getDeviceId()) || !java.util.Objects.equals(projectKey, row.getProjectKey())
+                    || !java.util.Objects.equals(remoteFileId, row.getRemoteFileId()))) {
+                throw new IllegalArgumentException(LangText.of("预览请求标识冲突", "Preview request identity conflict"));
+            }
+            return row;
+        }
 
         requireDeviceId(deviceId);
         requireProjectKey(projectKey);
@@ -199,6 +212,7 @@ public class MobileTransferService {
         row.setUserId(userId);
         row.setRequestId(requestId);
         row.setKind(KIND_PULL);
+        row.setPreviewOnly(previewOnly);
         row.setStatus(STATUS_PENDING);
         row.setDeviceId(deviceId);
         row.setProjectKey(truncate(projectKey.trim(), 64));
@@ -414,6 +428,7 @@ public class MobileTransferService {
             m.put("remoteFileId", r.getRemoteFileId());
             m.put("fileName", r.getFileName());
             m.put("fileSize", r.getFileSize());
+            m.put("previewOnly", Boolean.TRUE.equals(r.getPreviewOnly()));
             out.add(m);
         }
         return new CommandsResult(out, hot);
@@ -453,6 +468,8 @@ public class MobileTransferService {
             if (uid != null) s.put("uid", uid);
             s.put("name", truncate(str(f.get("name")), 512));
             s.put("path", truncate(str(f.get("path")), 1024));
+            s.put("isFolder", Boolean.TRUE.equals(f.get("isFolder")));
+            s.put("parentId", f.get("parentId") == null ? null : truncate(str(f.get("parentId")), 128));
             Object sizeObj = f.get("size");
             s.put("size", sizeObj instanceof Number ? ((Number) sizeObj).longValue() : 0L);
             sanitized.add(s);

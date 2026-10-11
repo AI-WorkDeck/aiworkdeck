@@ -84,6 +84,8 @@ public class AccountDeletionService {
     private final DeviceTokenRepository deviceTokenRepository;
     private final CompletionEntryRepository completionEntryRepository;
     private final EntityManager entityManager;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.MobileFileBackupRepository mobileBackups;
     private final MobileRelayBlobStore blobStore;
     /** 官网统一账户的内部记账口，注销传导用（dev-board#434）。 */
     private final MobileBillingClient billing;
@@ -134,6 +136,9 @@ public class AccountDeletionService {
                     "The account does not exist or has already been deleted"));
         }
 
+        if (mobileBackups != null) for (var backup : mobileBackups.findByUserId(userId)) {
+            backup.setPendingDeletion(true);mobileBackups.save(backup);
+        }
         List<MobileMediaInbox> items = inboxRepository.findByUserId(userId);
         for (MobileMediaInbox item : items) {
             if (item.getStoragePath() != null) {
