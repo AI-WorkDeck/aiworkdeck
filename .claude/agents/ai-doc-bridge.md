@@ -456,3 +456,8 @@ txt/md/markdown 自 dev-board#37 起不进 LOWA（前端走 PlainTextEditor.vue�
 ## 长文结果完整性（2026-09-15，dev-board#650）
 
 `get_clauses`返回最多300项，但额外返回`totalClauseCount/truncated/nextStartParagraph`，不能把数组长度当全文条款数。后端/relay超时返回`EDITOR_RESULT_TIMEOUT`、`outcomeUnknown=true`、`retryable=false`，先读回文档/修订再决定是否写入；message与error同时保留。`build_merge_draft`的三层预算对齐180秒。真实150/300分页夹具及导出核验见 `doc/verification/` 与 `doc/document-resilience-audit.md`。
+
+
+### 2026-10-11 导出与多产物身份回执（dev-board #1202）
+
+`doc_export_pdf` 继续不把源文档标成 ADDED；现在真实新 PDF 落盘后通过 GeneratedFileLocation 的 `{status:success,db_id,...}` 回执报告新文件。PdfTools 的衍生 PDF/Word、诉讼图/时间轴的已注册交付文件、dd_export 同样返回真实 ID；多产物用 files 数组，每一项独立成功。部分拆分失败保留失败原因，只列已落盘项；语义地图等内部中间数据不作为用户交付物。GeneratedFileLocation 的“新文件身份解析”和“默认输出目录策略”相互独立，PDF 仍继承源目录。编排器再次验证所属项目后才发 file_change，失败及重复未改动回执不伪造新成果。

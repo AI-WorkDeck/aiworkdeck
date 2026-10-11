@@ -42,8 +42,10 @@ public class DdExportTools implements AgentToolComponent {
         try {
             Long resolvedDocFileId = docFileId != null ? docFileId : resolveSoleDocFileId(projectId);
             DdExportService.ExportResult r = ddExportService.export(userId, projectId, resolvedDocFileId, kind, format);
-            return String.format("已生成交付件：%s（文件ID: %d，共 %d 条）。可用 extract_file_text 或 doc_open_file 查看。",
+            String message = String.format("已生成交付件：%s（文件ID: %d，共 %d 条）。可用 extract_file_text 或 doc_open_file 查看。",
                     r.path(), r.fileId(), r.rows());
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
+                    java.util.Map.of("status", "success", "db_id", r.fileId(), "message", message));
         } catch (IllegalArgumentException e) {
             return "Error: " + e.getMessage();
         } catch (Exception e) {

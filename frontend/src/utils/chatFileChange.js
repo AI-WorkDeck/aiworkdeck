@@ -94,3 +94,27 @@ export function findChatFile(files, { name, fileId } = {}) {
     return ((ra < 0 ? rank.length : ra) - (rb < 0 ? rank.length : rb)) || rootFirst(a, b)
   })[0] || null
 }
+
+
+/** Only confirmed effects, one row per actual file; newly created + edited stays Added. */
+export function summarizeFileChanges(changes = []) {
+  const result = []
+  for (const change of changes) {
+    if (!change || !['ADDED', 'MODIFIED'].includes(change.changeType)
+        || change.success === false || change.status === 'error' || !change.fileName) continue
+    const index = result.findIndex(f => (hasId(f.projectId) && hasId(change.projectId)
+      && !sameId(f.projectId, change.projectId)) ? false
+      : hasId(f.fileId) && hasId(change.fileId) ? sameId(f.fileId, change.fileId)
+        : !hasId(f.fileId) && !hasId(change.fileId) && f.fileName === change.fileName)
+    if (index < 0) result.push({ ...change })
+    else result[index] = { ...result[index], ...change,
+      changeType: result[index].changeType === 'ADDED' ? 'ADDED' : change.changeType }
+  }
+  return result
+}
+
+/** Older records lack a turn id and must not be presented as this turn's results. */
+export function fileChangesForBubble(bubble, metadata = []) {
+  return summarizeFileChanges([...(bubble.fileChanges || []), ...metadata.filter(change =>
+    hasId(change.assistantMessageId) && sameId(change.assistantMessageId, bubble.id))])
+}

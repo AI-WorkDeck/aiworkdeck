@@ -1152,7 +1152,8 @@ public class ContextAssemblerService {
                         clientCapabilityService.capabilityOf(conversationId),
                         clientCapabilityService.officeHostOf(conversationId)))
                 + templateProfileFact(activeContext, clientCapabilityService.capabilityOf(conversationId), projectId)
-                + clarificationReminder(agentMode, userPrompt, english);
+                + clarificationReminder(agentMode, userPrompt, english)
+                + questionPresentationReminder(agentMode, english);
 
         if (visionAttachments.isEmpty()) {
             // 没有图片时**保持旧构造**。语义上「只含一个 TextContent 的 list」与纯文本等价
@@ -1699,8 +1700,23 @@ public class ContextAssemblerService {
                   + "不要去 list_files / search_project_files 找模板文件夹，也不要调 `doc_apply_style_profile`。";
     }
 
+    /** Common to ordinary conversations and plugin/skill workflows; never infer a question from prose. */
+    static String questionPresentationReminder(AgentMode mode, boolean english) {
+        boolean hasAskTool = mode == null || mode == AgentMode.AGENT;
+        String protocol = hasAskTool ? "ask_user" : "<question>...</question>";
+        return english
+                ? "\n\n[Interaction contract] Only when a real user choice or missing information prevents useful progress, use "
+                    + protocol + " to present an interactive question and end the turn. Do not ask the user to type A/B, a number, or an option into chat prose. "
+                    + "This also applies inside plugin/skill workflows. Preserve required confirmation details in the question. "
+                    + "Clear requests, capability questions that request action, and answers already given do not require another question; proceed."
+                : "\n\n[交互约定] 仅在确有需要用户决定的选择或缺失信息阻碍继续完成任务时，使用 "
+                    + protocol + " 显示可交互问题卡并结束本轮；不要只在正文列出选项后要求用户在聊天中回复字母、编号或选项。"
+                    + "插件和技能流程同样遵守此约定，必要的确认细节保留在问题中。"
+                    + "要求明确、以能力问句提出的行动要求、用户已经回答过的事项，直接继续，不为展示卡片而反问。";
+    }
+
     /**
-     * 「拿不准先问」的末位提醒（dev-board#868），拼在用户消息的<b>最末尾</b>。
+     * 「拿不准先问」的末位提醒（dev-board#868），拼在用户消息末尾的交互约定之前。
      *
      * <p>为什么非挂末位不可：同样的规则在基底 prompt 的 Clarification 一节与 AGENT 模式约束里
      * 都写了，但弱模型对 system prompt 中段的行为约束稳定无视（PR#209 实证，本仓的

@@ -510,9 +510,10 @@ class ContextAssemblerServiceTest {
     @Test
     @DisplayName("无活跃文档时用户消息不夹带活跃文档提醒")
     void noReminderWhenNoActiveContext() {
-        // 末尾只剩 AGENT 模式通用的「拿不准先问」一句（dev-board#868，ContextAssemblerAskUserTest 守），
+        // 末尾保留通用澄清与问题卡交互约定（ContextAssemblerAskUserTest 守），
         // 活跃文档那段提醒一个字都不许出现
-        assertEquals("帮我修订一下" + ContextAssemblerService.clarificationReminder(AgentMode.AGENT, "帮我修订一下", false),
+        assertEquals("帮我修订一下" + ContextAssemblerService.clarificationReminder(AgentMode.AGENT, "帮我修订一下", false)
+                        + ContextAssemblerService.questionPresentationReminder(AgentMode.AGENT, false),
                 assembleLastUserText(null), "无活跃文档时不应夹带活跃文档提醒");
     }
 

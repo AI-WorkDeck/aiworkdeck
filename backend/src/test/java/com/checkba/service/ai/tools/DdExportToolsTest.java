@@ -42,6 +42,7 @@ class DdExportToolsTest {
         String out = tools().dd_export("docket", "docx", 10L, 1L, 5L);
         assertTrue(out.contains("_交付件/底稿目录.docx"), out);
         assertTrue(out.contains("3"), out);
+        org.junit.jupiter.api.Assertions.assertEquals(List.of(300L), GeneratedFileLocation.createdIds("dd_export", out));
         verify(evidenceLinkRepository, never()).findDistinctDocFileIdsByProjectId(org.mockito.ArgumentMatchers.any());
     }
 

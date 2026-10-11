@@ -84,6 +84,13 @@ public class AgentOrchestrator {
                 return t;
             });
 
+    private static final class FileChangeTurn {
+        String clientRequestId;
+        Long assistantMessageId;
+        final java.util.Set<String> reported = new java.util.HashSet<>();
+        final java.util.List<com.checkba.model.entity.ConversationFileChange> pending = new java.util.ArrayList<>();
+    }
+
     /**
      * 单次 Agent 运行（= 一个轮次 = 一个 runId）的全部状态（随递归与两处回调传递）。
      *
@@ -122,6 +129,8 @@ public class AgentOrchestrator {
         final TurnStreamTrace trace = new TurnStreamTrace();
         /** 本轮 ASSISTANT 消息的行 ID：本轮内的增量/最终保存更新同一行，跨轮次互不覆盖。 */
         private volatile Long assistantMessageId;
+        private volatile String clientRequestId;
+        private FileChangeTurn fileChangeTurn = new FileChangeTurn();
         /** 本轮的取消标志。只有 {@link AgentOrchestrator#setCancelled} 解析到的那一轮会被置位。 */
         private final java.util.concurrent.atomic.AtomicBoolean cancelled =
                 new java.util.concurrent.atomic.AtomicBoolean();
@@ -194,8 +203,9 @@ public class AgentOrchestrator {
             }
         }
 
-        void startAssistantSegment() {
+        synchronized void startAssistantSegment() {
             assistantMessageId = null;
+            fileChangeTurn = new FileChangeTurn();
             // 新的一段是一条新消息、前端也是一个新气泡：回放与思考记录都从空开始
             trace.resetSegment();
         }
@@ -534,16 +544,21 @@ public class AgentOrchestrator {
      * 本轮内后续（增量/最终）保存更新同一行；别的轮次有别的 RunGuard，天然互不覆盖。
      */
     private void saveAssistantMessage(RunGuard guard, String projectId, Long userId, String content) {
-        // 思考全文随消息落库（dev-board#1060）：只是给用户回看的，模型永远只读 content。
-        // 本段没有思考时仍走五参重载——非思考型模型的落库路径与改造前逐字一致
-        String reasoning = guard.trace.reasoningJson();
-        Long id = reasoning == null
-                ? messageService.upsertAssistantMessage(
-                        projectId, userId, guard.conversationId, guard.assistantMessageId, content)
-                : messageService.upsertAssistantMessage(
-                        projectId, userId, guard.conversationId, guard.assistantMessageId, content, reasoning);
-        if (id != null) {
+        synchronized (guard) {
+            String reasoning = guard.trace.reasoningJson();
+            Long id = reasoning == null
+                    ? messageService.upsertAssistantMessage(
+                            projectId, userId, guard.conversationId, guard.assistantMessageId, content)
+                    : messageService.upsertAssistantMessage(
+                            projectId, userId, guard.conversationId, guard.assistantMessageId, content, reasoning);
+            if (id == null) return;
             guard.assistantMessageId = id;
+            // Bind queued effects only to the real persisted assistant row. A late child
+            // retains this segment object even after startAssistantSegment replaces it.
+            synchronized (guard.fileChangeTurn) {
+                guard.fileChangeTurn.assistantMessageId = id;
+                persistFileChanges(guard.conversationId, guard.fileChangeTurn);
+            }
         }
     }
 
@@ -779,6 +794,7 @@ public class AgentOrchestrator {
         executionLog.setLength(0);
 
         for (com.checkba.model.entity.AgentInboxItem input : inputs) {
+            guard.clientRequestId = input.getClientRequestId();
             AiAgentController.AgentChatRequest request = inbox.requestOf(input);
             // clientRequestId 一起落库：它是「回退到这条消息」的定位键，而主键要到这一刻才生成、
             // 回执与 input_applied 都赶在它前面（见 ProjectAiMessage#clientRequestId）。
@@ -957,7 +973,15 @@ public class AgentOrchestrator {
                         guard == null ? null : guard.roundOffered,
                         guard == null ? null : guard.runId,
                         disclosedCategories, guard == null ? null : guard::isCancelled,
-                        guard == null ? null : guard.defaultOutputFolderId);
+                        guard == null ? null : guard.defaultOutputFolderId, guard == null ? null : guard.activeFileId);
+        final FileChangeTurn effectTurn = guard == null ? null : guard.fileChangeTurn;
+        if (effectTurn != null) effectTurn.clientRequestId = guard.clientRequestId;
+        if (effectTurn != null && "dispatch_subtask".equals(toolName)) {
+            ctx = new com.checkba.service.ai.tools.ToolContext(ctx.projectId(), ctx.conversationId(), ctx.userId(),
+                    ctx.modelId(), ctx.sessionTools(), ctx.offeredTools(), ctx.runId(), ctx.disclosedCategories(),
+                    ctx.cancellationCheck(), ctx.defaultOutputFolderId(), ctx.activeFileId(),
+                    (id, kind) -> notifyVerifiedFile(conversationId, id, kind, projectId, effectTurn));
+        }
         long toolStartMs = System.currentTimeMillis();
         ToolRegistry.ToolResult result = toolRegistry.execute(toolName, argsJson, ctx);
         // 目录展开只在下一轮生效：本轮的工具集已经发给模型了，中途加进去会让
@@ -1140,6 +1164,18 @@ public class AgentOrchestrator {
      */
     private void applyToolSideEffects(ToolRegistry.ToolResult result, String toolName, String argsJson,
                                       String conversationId, RunGuard guard, Long projectId) {
+        // A subtask may fail after successfully saving files. Only its server-built
+        // effect list is accepted, never filenames or claims from the model's summary.
+        if ("dispatch_subtask".equals(toolName)) {
+            try {
+                var effects = SKILL_UPDATE_MAPPER.readTree(result.output()).path("fileChanges");
+                if (effects.isArray()) for (var effect : effects) {
+                    String type = effect.path("changeType").asText();
+                    if (!java.util.Set.of("ADDED", "MODIFIED").contains(type) || !effect.path("fileId").isIntegralNumber()) continue;
+                    notifyVerifiedFile(conversationId, effect.path("fileId").asLong(), type, projectId, guard);
+                }
+            } catch (Exception ignored) { /* Older subtask results have no effects. */ }
+        }
         if (!result.success() || result.tool() == null || result.tool().meta() == null) {
             return;
         }
@@ -1147,6 +1183,14 @@ public class AgentOrchestrator {
         if (meta.refreshFiles()) {
             sseEmitterService.send(conversationId, "client_action", "{\"action\":\"refresh_files\"}");
         }
+        var generatedIds = com.checkba.service.ai.tools.GeneratedFileLocation.createdIds(toolName, result.output());
+        if (!generatedIds.isEmpty()) {
+            for (Long id : generatedIds) notifyVerifiedFile(conversationId, id, "ADDED", projectId, guard);
+            return;
+        }
+        // PDF derivatives never count the input/source as newly created, including
+        // a download prompt or malformed/failed result with no confirmed identity.
+        if (toolName.startsWith("pdf_") && "ADDED".equals(meta.fileEffect())) return;
         // 「执行成功」不等于「改过文件」：查找替换一次都没命中时照发 MODIFIED，
         // 用户会被告知本轮改了这个文件，去找却找不到任何改动。
         if (!meta.fileEffect().isEmpty() && result.fileChanged()) {
@@ -1180,7 +1224,7 @@ public class AgentOrchestrator {
                 fileName = activeDocDisplayName(null);
             }
             notifyFileChange(conversationId, fileName, fileId, generated != null && "doc_start_stream".equals(toolName)
-                    && extractArg(argsJson, "fileId") == null ? "ADDED" : meta.fileEffect(), projectId);
+                    && extractArg(argsJson, "fileId") == null ? "ADDED" : meta.fileEffect(), projectId, guard);
         }
     }
 
@@ -1403,6 +1447,7 @@ public class AgentOrchestrator {
     private void handleUserMessageInScope(AiAgentController.AgentChatRequest request, Long userId,
                                           RunGuard guard) {
         String conversationId = request.getConversationId();
+        guard.clientRequestId = request.getClientRequestId();
         String projectId = String.valueOf(request.getProjectId());
         AgentMode agentMode = request.getAgentMode(); // 获取 Agent 模式
         
@@ -3671,31 +3716,86 @@ public class AgentOrchestrator {
     // =================================================================================
     // Helper to notify frontend of file changes (Added/Modified)
     // =================================================================================
-    private void notifyFileChange(String conversationId, String fileName, Long fileId, String changeType, Long projectId) {
-        try {
-            // Determine pure filename if path is given
-            String name = fileName;
-            if (name.contains("/") || name.contains("\\")) {
-                java.nio.file.Path p = java.nio.file.Paths.get(name);
-                name = p.getFileName().toString();
+    private void notifyVerifiedFile(String conversationId, Long fileId, String changeType, Long projectId, RunGuard guard) {
+        notifyVerifiedFile(conversationId, fileId, changeType, projectId, guard == null ? null : guard.fileChangeTurn);
+    }
+
+    private void notifyVerifiedFile(String conversationId, Long fileId, String changeType, Long projectId, FileChangeTurn turn) {
+        var file = projectFileService.findFile(fileId).orElse(null);
+        if (projectId == null || file == null || !projectId.equals(file.getProjectId())
+                || Boolean.TRUE.equals(file.getIsDeleted()) || Boolean.TRUE.equals(file.getIsFolder())) return;
+        notifyFileChange(conversationId, file.getName(), fileId, changeType, projectId, turn);
+        sseEmitterService.send(conversationId, "client_action", "{\"action\":\"refresh_files\"}");
+    }
+
+    private void notifyFileChange(String conversationId, String fileName, Long fileId, String changeType, Long projectId, RunGuard guard) {
+        FileChangeTurn turn = guard == null ? null : guard.fileChangeTurn;
+        if (turn != null) turn.clientRequestId = guard.clientRequestId;
+        notifyFileChange(conversationId, fileName, fileId, changeType, projectId, turn);
+    }
+
+    /** Caller holds the segment lock; failed writes remain available for the next save/duplicate receipt. */
+    private void persistFileChanges(String conversationId, FileChangeTurn turn) {
+        if (turn.assistantMessageId == null) return;
+        var pending = turn.pending.iterator();
+        while (pending.hasNext()) {
+            var change = pending.next();
+            try {
+                conversationFileChangeService.saveFileChange(conversationId, change.getFileName(), change.getChangeType(),
+                        change.getFileId(), change.getProjectId(), turn.assistantMessageId);
+                pending.remove();
+            } catch (Exception error) {
+                log.warn("File result history could not be saved for message {}", turn.assistantMessageId, error);
             }
-
-            // Send SSE event to frontend. fileId（dev-board#852）：知道是哪份文件时带上，
-            // 前端按 id 打开，不再靠文件名去猜；说不出来时为 null。只加字段，旧客户端不受影响。
-            // 用 Jackson 序列化（与 skill_update 共用那个无状态 mapper）：手拼 JSON 遇到文件名里的反斜杠会坏。
-            java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
-            payload.put("fileName", name);
-            payload.put("changeType", changeType);
-            payload.put("fileId", fileId);
-            payload.put("projectId", projectId);
-            sseEmitterService.send(conversationId, "file_change", SKILL_UPDATE_MAPPER.writeValueAsString(payload));
-
-            // Persist to database for history retrieval
-            conversationFileChangeService.saveFileChange(conversationId, name, changeType);
-        } catch (Exception e) {
-            log.warn("Failed to notify file change", e);
         }
     }
+
+    private void notifyFileChange(String conversationId, String fileName, Long fileId, String changeType, Long projectId, FileChangeTurn turn) {
+        synchronized (turn != null ? turn : this) {
+            if (turn != null && !turn.reported.add(changeType + ":" + (fileId == null ? fileName : fileId))) {
+                persistFileChanges(conversationId, turn);
+                return;
+            }
+            try {
+                // Determine pure filename if path is given
+                String name = fileName;
+                if (name.contains("/") || name.contains("\\")) {
+                    java.nio.file.Path p = java.nio.file.Paths.get(name);
+                    name = p.getFileName().toString();
+                }
+
+                // Persist to database for history retrieval
+                if (turn != null) {
+                    var change = new com.checkba.model.entity.ConversationFileChange(conversationId, name, changeType);
+                    change.setFileId(fileId);
+                    change.setProjectId(projectId);
+                    turn.pending.add(change);
+                    persistFileChanges(conversationId, turn);
+                } else {
+                    conversationFileChangeService.saveFileChange(conversationId, name, changeType,
+                            fileId, projectId, turn == null ? null : turn.assistantMessageId);
+                }
+
+                // Send SSE event to frontend. fileId（dev-board#852）：知道是哪份文件时带上，
+                // 前端按 id 打开，不再靠文件名去猜；说不出来时为 null。只加字段，旧客户端不受影响。
+                // 用 Jackson 序列化（与 skill_update 共用那个无状态 mapper）：手拼 JSON 遇到文件名里的反斜杠会坏。
+                java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+                payload.put("fileName", name);
+                payload.put("changeType", changeType);
+                payload.put("fileId", fileId);
+                payload.put("projectId", projectId);
+                payload.put("conversationId", conversationId);
+                payload.put("clientRequestId", turn == null ? null : turn.clientRequestId);
+                payload.put("assistantMessageId", turn == null ? null : turn.assistantMessageId);
+                sseEmitterService.send(conversationId, "file_change", SKILL_UPDATE_MAPPER.writeValueAsString(payload));
+
+
+            } catch (Exception e) {
+                log.warn("Failed to notify file change", e);
+            }
+        }
+    }
+
 
     // Simple naive JSON extractor for single String arg tools
     private String extractArg(String jsonArgs, String key) {

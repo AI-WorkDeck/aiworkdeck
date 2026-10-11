@@ -128,7 +128,9 @@ public class SubAgentService {
      * 的口径保持一致。
      */
     static final class Progress {
+        Long activeFileId;
         private final List<String> toolsUsed = new java.util.concurrent.CopyOnWriteArrayList<>();
+        private final List<SubAgentResult.FileChange> fileChanges = new java.util.concurrent.CopyOnWriteArrayList<>();
         private final AtomicInteger completedRounds = new AtomicInteger(0);
         private final AtomicBoolean cancelled = new AtomicBoolean();
 
@@ -302,7 +304,7 @@ public class SubAgentService {
                 result.success() ? com.checkba.service.LangText.of("子任务完成", "Subtask completed")
                         : cancelledByUser ? com.checkba.service.LangText.of("子任务已停止", "Subtask stopped")
                         : com.checkba.service.LangText.of("子任务失败：", "Subtask failed: ") + brief(result.error()));
-        return result;
+        return result.withFileChanges(progress.fileChanges);
     }
 
     /**
@@ -357,11 +359,12 @@ public class SubAgentService {
                 .toList();
 
         // 继承会话身份和取消 checker；父 runId 只留在取消句柄，不能把父技能状态当作子消息栈已有上下文。
+        progress.activeFileId = parentCtx == null ? null : parentCtx.activeFileId();
         ToolContext subCtx = parentCtx == null
                 ? new ToolContext(null, null, null, modelId, specs, allowed, null, null,
                         () -> progress.isCancelled(null))
                 : new ToolContext(parentCtx.projectId(), parentCtx.conversationId(), parentCtx.userId(), modelId,
-                        specs, allowed, null, null, () -> progress.isCancelled(parentCtx), parentCtx.defaultOutputFolderId());
+                        specs, allowed, null, null, () -> progress.isCancelled(parentCtx), parentCtx.defaultOutputFolderId(), parentCtx.activeFileId(), parentCtx.fileChangeListener());
 
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(SystemMessage.from(buildSystemPrompt(expectedOutput, allowed)));
@@ -405,7 +408,7 @@ public class SubAgentService {
             // 协议 1：原生 function calling
             if (aiMessage.hasToolExecutionRequests()) {
                 for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
-                    String output = executeScoped(req.name(), req.arguments(), allowed, subCtx, toolsUsed);
+                    String output = executeScoped(req.name(), req.arguments(), allowed, subCtx, toolsUsed, progress);
                     messages.add(ToolExecutionResultMessage.from(req, output));
                 }
                 continue;
@@ -418,7 +421,7 @@ public class SubAgentService {
                 boolean executed = false;
                 for (XmlToolCallParser.ParsedCall call : xmlToolCallParser.parse(text)) {
                     String output = call.parseError() != null ? call.parseError()
-                            : executeScoped(call.toolName(), call.argsJson(), allowed, subCtx, toolsUsed);
+                            : executeScoped(call.toolName(), call.argsJson(), allowed, subCtx, toolsUsed, progress);
                     messages.add(UserMessage.from("[Tool Execution Result]\nTool: " + call.rawCode()
                             + "\nOutput: " + output));
                     executed = true;
@@ -462,7 +465,7 @@ public class SubAgentService {
 
     /** 受限分发：先别名解析，再做防递归与工具域校验，最后经 ToolRegistry 执行 */
     private String executeScoped(String rawName, String argsJson, Set<String> allowed,
-                                 ToolContext subCtx, List<String> toolsUsed) {
+                                 ToolContext subCtx, List<String> toolsUsed, Progress progress) {
         if (subCtx.isCancelled()) throw new CancellationException();
         String resolved = ToolRegistry.TOOL_NAME_ALIASES.getOrDefault(rawName, rawName);
         if (DISPATCH_TOOL_NAME.equals(resolved)) {
@@ -478,6 +481,27 @@ public class SubAgentService {
         }
         toolsUsed.add(resolved);
         ToolRegistry.ToolResult result = toolRegistry.execute(rawName, argsJson, subCtx);
+        if (result.success() && result.fileChanged()) {
+            if ("doc_open_file".equals(resolved) || "doc_start_stream".equals(resolved)) {
+                try { progress.activeFileId = Long.parseLong(new com.fasterxml.jackson.databind.ObjectMapper()
+                        .readTree(argsJson).path("fileId").asText()); } catch (Exception ignored) { progress.activeFileId = null; }
+            }
+            var generated = com.checkba.service.ai.tools.GeneratedFileLocation.createdIds(resolved, result.output());
+            if (!generated.isEmpty() && java.util.Set.of("doc_start_stream", "sheet_create_file", "pdf_to_word").contains(resolved)) {
+                progress.activeFileId = generated.get(0);
+            }
+            for (Long id : generated) reportFileChange(progress, subCtx, id, "ADDED");
+            if (generated.isEmpty() && result.tool() != null && result.tool().meta() != null
+                    && "MODIFIED".equals(result.tool().meta().fileEffect())) {
+                try {
+                    var id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(argsJson).path("fileId");
+                    long value = id.isIntegralNumber() || id.isTextual() ? Long.parseLong(id.asText())
+                            : result.tool().meta().fileArg().isBlank() && progress.activeFileId != null
+                                ? progress.activeFileId : 0;
+                    if (value > 0) reportFileChange(progress, subCtx, value, "MODIFIED");
+                } catch (Exception ignored) { /* No confirmed target identity. */ }
+            }
+        }
         String output = result.output();
         // 空输出归一（同主编排器）：ToolExecutionResultMessage.from 的 ensureNotBlank 会对空白
         // 抛异常，一个返回空串的工具就能把整个子任务打成 LLM call failed。两条协议分支共用这里。
@@ -489,6 +513,15 @@ public class SubAgentService {
      * 解析 tool_scope 为别名解析后的可用工具名集合。
      * 空 scope = 全部已注册工具；dispatch_subtask 无条件排除（防递归第一道防线）。
      */
+    private void reportFileChange(Progress progress, ToolContext context, Long fileId, String kind) {
+        progress.fileChanges.add(new SubAgentResult.FileChange(fileId, kind));
+        // May finish after dispatch timed out: the listener owns the original assistant segment.
+        if (context.fileChangeListener() != null) {
+            try { context.fileChangeListener().accept(fileId, kind); }
+            catch (RuntimeException error) { log.warn("Could not report completed subtask file {}", fileId, error); }
+        }
+    }
+
     private Set<String> resolveScope(List<String> toolScope, String conversationId) {
         Set<String> allowed = new LinkedHashSet<>();
         if (toolScope == null || toolScope.isEmpty()) {
