@@ -479,9 +479,9 @@ public class DocumentEditTools implements AgentToolComponent {
     // ==================== 查找和替换 ====================
 
     @ToolMeta(displayName = "查找定位", category = "document")
-    @Tool("【找】在文档中查找文本。anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位，不在替换范围内。每个匹配返回：text（匹配原文）、matchIndex（序号，从 1 开始）、anchorId（通常随编辑移动的临时书签，并非用一次就失效；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找）、前后文 contextBefore/contextAfter、段落片段 paragraph（最多160字，paragraphLength 为完整长度；paragraphTruncated=true 时须回读完整目标段落）。" +
+    @Tool("【找】在文档中查找文本。anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位，不在替换范围内。每个匹配返回：text（匹配原文）、matchIndex（序号，从 1 开始）、anchorId（通常随编辑移动的临时书签，并非用一次就失效，目标原文未变时可复用；目标原文变化须重新查找；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找）、前后文 contextBefore/contextAfter、段落片段 paragraph（最多160字，paragraphLength 为完整长度；paragraphTruncated=true 时须回读完整目标段落）。" +
           "有多个匹配时先根据上下文确认哪一个才是目标，再用 anchorId 直接 doc_replace_at_anchor（精准替换，会自动滚动定位并返回改后段落）。" +
-          "多处独立修改：拿到各自 anchorId 后在同一轮连续输出多个替换调用。目标文本全文唯一时不必先找，直接 doc_find_replace。")
+          "单处修改先定位并核对上下文，不凭印象判断全文唯一。正文查找排除已删除修订；删除历史用 doc_list_revisions。多处独立修改拿到各自 anchorId 后连续调用。")
     public String doc_find_text(
             @P("要查找的文本") String keyword,
             @P("是否区分大小写，默认 false") Boolean matchCase
@@ -522,7 +522,7 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "查找替换", category = "document", fileEffect = "MODIFIED")
-    @Tool("在文档中查找并替换文本。所有修改将以修订模式进行，用户可以审阅后接受或拒绝。" +
+    @Tool("仅在用户明确要求全文统一修改时使用查找替换；单处修改先 doc_find_text 核对上下文，再 doc_replace_at_anchor。查找以最终正文为准，排除已删除修订。所有修改将以修订模式进行，用户可以审阅后接受或拒绝。" +
           "全文替换一次调用即可完成（大量命中也很快；纯插入型替换会分批处理并回传进度），不要因为耗时较长而重复调用；" +
           "返回 replaced（已替换数）与 total（命中数），cancelled=true 表示用户中途取消、done 为已完成数。" +
           "replaceText 传空字符串即删除（以修订删除痕迹呈现）。" +
@@ -1097,7 +1097,7 @@ public class DocumentEditTools implements AgentToolComponent {
 
     @ToolMeta(displayName = "锚点替换", category = "document", fileEffect = "MODIFIED")
     @Tool("【改】仅把 anchorId 覆盖的 matches[].text 替换为 newText，以修订模式进行，锚点外文字保持不变。contextBefore/contextAfter 和 paragraph 仅供定位，不要把它们拼进 newText。整段重写须先查找完整原段取得整段锚点，或用 doc_modify_paragraph；仅被替换范围内未改动的字需照抄。会自动把编辑器视图滚动到该处；返回 paragraphAfterEdit（最多200字）及完整长度 paragraphAfterEditLength；paragraphAfterEditTruncated=true 时用 doc_get_paragraph 回读完整目标段落（段号未知先用 doc_get_document_text 定位），不得把片段当作完整验证；未截断时核对回执即可，不需要先 doc_select_anchor。" +
-          "先 doc_find_text 拿到带上下文的匹配列表，选定目标的 anchorId 后用本工具替换；多处独立替换在同一轮连续输出多个调用。" +
+          "先 doc_find_text 拿到带上下文的匹配列表，选定目标的 anchorId 后用本工具替换；执行前自动核对锚点原文，变化或失效则拒绝，须重新查找核对，不能用全文替换绕过；多处独立替换在同一轮连续输出多个调用。" +
           "newText 传空字符串即删除该处文本（以修订删除痕迹呈现）。" +
           REDLINE_GRANULARITY_NOTE)
     public String doc_replace_at_anchor(

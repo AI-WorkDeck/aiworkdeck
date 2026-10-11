@@ -86,6 +86,7 @@ const IMPORT_FILTERS = {
 // §0.2 anchors: a bookmark spanning a text range is a STABLE location handle that
 // moves with edits — the model-native replacement for fragile integer offsets.
 const ANCHOR_PREFIX = '__ai_anchor_';
+const anchorTexts = new Map();
 function anchorBookmark(range) {
   const name = ANCHOR_PREFIX + (++anchorSeq);
   const bm = xModel.createInstance('com.sun.star.text.Bookmark');
@@ -102,14 +103,16 @@ function anchorBookmark(range) {
   // 同名从哪来：锚点书签会跟着 docx 存盘（书签经 export/load 往返存活），而 anchorSeq
   // 是 worker 级计数器、每开一个 webview 都从 0 重来。下面 dropAiAnchors() 在换文档时
   // 清掉陈旧锚点是主闸，这里的回读是第二道闸。
-  try { const real = bm.getName(); if (real) return String(real); } catch (e) {}
-  return name;
+  const real = String(bm.getName() || name);
+  anchorTexts.set(real, range.getString());
+  return real;
 }
 // 摘掉文档里全部 __ai_anchor_* 书签，返回摘掉的个数。锚点是一次会话内的临时定位
 // 句柄（§0.2），不该留在用户的 docx 里——clear_anchors（housekeeping）与换文档
 // 时的清场共用这一份。摘除与插入不同源：removeTextContent 本引擎实测容得下别的
 // story 的书签（单元格锚点用正文 XText 照样摘得掉，table-retype 的锚点组守着）。
 function dropAiAnchors() {
+  anchorTexts.clear();
   const bms = xModel.getBookmarks();
   const names = (bms.getElementNames && bms.getElementNames()) || [];
   const xText = xModel.getText();
@@ -125,6 +128,15 @@ function anchorRange(name) {
   const bms = xModel.getBookmarks();
   if (!bms.hasByName(name)) return null;
   return bms.getByName(name).getAnchor(); // XTextRange
+}
+// Compare in the final-text view immediately before selecting/writing. Unrelated
+// edits may move a bookmark without invalidating its unchanged target text.
+function anchorEditError(name, range) {
+  if (!String(name).startsWith(ANCHOR_PREFIX)) return null;
+  if (!anchorTexts.has(String(name)) || range.getString() !== anchorTexts.get(String(name))) {
+    return '锚点原文已变化或失效，未执行编辑；请重新 doc_find_text 核对上下文后再试';
+  }
+  return null;
 }
 // ---- EvidenceLink 书签原语 helpers（dev-board#103）-----------------------------
 function bmFail(msg) { return { success: false, error: msg, message: msg }; }
@@ -4357,6 +4369,8 @@ const EXEC = {
     if (!p.anchor) return { success: false, message: 'set_selection requires {anchor}; integer offsets unsupported (§0.2)' };
     const range = anchorRange(String(p.anchor));
     if (!range) return { success: false, message: 'anchor not found: ' + p.anchor };
+    const anchorError = anchorEditError(p.anchor, range);
+    if (anchorError) return { success: false, error: anchorError, message: anchorError };
     // 拟人：光标跳过去、视图滚过去、选区亮出来 — 用户看得见 AI 在操作哪里。
     if (!selectVisibly(range)) return { success: false, message: 'could not select anchor: ' + p.anchor };
     const ctx = contextAround(range, 40);
@@ -4368,7 +4382,9 @@ const EXEC = {
     xModel.setPropertyValue('RecordChanges', true);
     const range = anchorRange(String(p.anchor));
     if (!range) return { success: false, message: 'anchor not found: ' + p.anchor };
-    selectVisibly(range); // 拟人：先看见目标再动手
+    const anchorError = anchorEditError(p.anchor, range);
+    if (anchorError) return { success: false, error: anchorError, message: anchorError };
+    if (!selectVisibly(range)) return { success: false, message: 'could not select anchor: ' + p.anchor };
     if (!applyMinimalRedline(range, String(p.newText || ''))) range.setString(String(p.newText || ''));
     // Keep the excerpt budget, but expose whether verification needs a full paragraph read.
     const paragraph = paragraphTextOf(range) || '';
@@ -9443,6 +9459,12 @@ function runAgentCommandInMarginView(action, fn) {
     // 左右横跳」就是这一左一右（真机实测 ±2142 twip / 每次读，dev-board#725）。
     try { paragraphTextOf(ctrl.getViewCursor()); } catch (e) {}
   };
+  // Neither view switch is guaranteed to succeed. Do not search or edit a body
+  // that may still contain deleted revision text, including a first AI write.
+  if (revisionViewState().mode === 'all') {
+    restore();
+    return tableFail('无法排除删除修订，未执行文档操作。请重新打开文档后再定位目标。');
+  }
   let out;
   try { out = fn(); }
   catch (e) { restore(); throw e; }

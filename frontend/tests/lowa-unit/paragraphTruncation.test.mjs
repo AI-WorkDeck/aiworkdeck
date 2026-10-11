@@ -13,7 +13,7 @@ function workerMethods(paragraph) {
       findFirst: () => ({ getString: () => '旧' }), findNext: () => null, setPropertyValue() {} },
     anchorBookmark: () => 'anchor', contextAround: () => ({ before: '', after: '' }),
     paragraphTextOf: () => paragraph,
-    anchorRange: () => ({}), selectVisibly() {}, applyMinimalRedline: () => true,
+    anchorRange: () => ({}), anchorEditError: () => null, selectVisibly: () => true, applyMinimalRedline: () => true,
   })
   const find = source.slice(source.indexOf('  find_text_locations(p) {'), source.indexOf('  // [verified-extend] replace the Nth'))
   const replace = source.slice(source.indexOf('  replace_at_position(p) {'), source.indexOf('  // [verified-extend] insert a paragraph break'))
