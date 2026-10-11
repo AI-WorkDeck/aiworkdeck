@@ -95,9 +95,9 @@
 ## 手机影像云中转的 OSS 存储（dev-board#236）
 
 - blob 不再落 ECS 本地盘，走平台私有桶：北京 `awd-mobile-relay`（cn-beijing），
-  国际站 `awd-mobile-relay-intl`（ap-southeast-1，国际站账号）。桶生命周期 35 天
-  过期 + 7 天清失败分片，只是兜底——主删除机制仍是桌面端 ACK 即删（代码 TTL 30 天次之）。
-- RAM 子用户 `awd-mobile-relay`：仅该桶 Get/Put/Delete/List/HeadObject + GetBucketStat，
+  国际站 `awd-mobile-relay-intl`（ap-southeast-1，国际站账号）。`mobile-relay/` 前缀生命周期 35 天
+  过期 + 7 天清失败分片，`mobile-backup/` 持久备份不设自动过期。生命周期仅为中转兜底——主删除机制仍是桌面端 ACK 即删（代码 TTL 30 天次之）。
+- RAM 子用户 `awd-mobile-relay`：仅该桶 Get/Put/Delete/List/HeadObject + GetBucketStat + GetBucketLifecycle，
   secret 位置见 EXTERNAL_SERVICES.md §1.1。
 - 开关与凭证 = env 里的 `MOBILE_RELAY_OSS_*` 五项（见 env.example）；不配即回落本地盘
   （desktop/团队服务器形态）。enabled=true 而配置不全会拒绝启动，属刻意设计。

@@ -282,15 +282,20 @@ class MobileRelayClientHttpTest {
         ex.close();
     }
 
-    @Test
-    void catalogImportDownloadsOriginalBeforeMetadataAndNeverAcknowledgesCloudCopies() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"cloud", "backup"})
+    void catalogImportDownloadsOriginalBeforeMetadataAndNeverAcknowledgesCloudCopies(String source) throws Exception {
         String uid = "11111111-1111-4111-8111-111111111111";
         String fileUid = "22222222-2222-4222-8222-222222222222";
         server.createContext("/api/mobile/catalog/" + uid + "/files", exchange -> {
             if (exchange.getRequestURI().getPath().endsWith("/content")) {
                 exchange.getResponseHeaders().add("Content-Type", "application/octet-stream");
                 respond(exchange, 200, "ORIGINAL");
-            } else respond(exchange, 200, "{\"files\":[{\"uid\":\"" + fileUid + "\",\"source\":\"cloud\",\"name\":\"a.docx\",\"size\":8}]}");
+            } else respond(exchange, 200, "{\"files\":[{\"uid\":\"" + fileUid + "\",\"source\":\"" + source + "\",\"name\":\"a.docx\",\"size\":8}]}");
+        });
+        server.createContext("/api/mobile/preview/catalog/" + uid + "/files/" + fileUid + "/content", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "application/octet-stream");
+            respond(exchange, 200, "ORIGINAL");
         });
         when(storageService.load(anyString())).thenAnswer(inv -> new ByteArrayResource(savedBytes.get(savedBytes.size()-1)));
         MobileRelayClientService svc = service();
@@ -787,7 +792,7 @@ class MobileRelayClientHttpTest {
     // ==================== 跨设备文件传输（dev-board#251 B 侧） ====================
 
     @Test
-    @DisplayName("传输命令 LIST：清单按 parentId 逐级拼路径上报，文件夹本身不进清单")
+    @DisplayName("传输命令 LIST：清单按 parentId 逐级拼路径上报，保留文件夹和父子关系")
     void transferListCommandReportsFileTreeWithPaths() {
         ProjectFile folder = addNode(null, "合同", true);
         ProjectFile f1 = addNode(folder.getId(), "结算书.docx", false);
@@ -804,7 +809,9 @@ class MobileRelayClientHttpTest {
         assertTrue(body.contains("\"size\":2048"), body);
         assertTrue(body.contains("\"path\":\"备忘录.txt\""), body);
         assertTrue(body.contains("\"size\":100"), body);
-        assertFalse(body.contains("\"name\":\"合同\""), "文件夹本身不该进清单: " + body);
+        assertTrue(body.contains("\"name\":\"合同\""), "文件夹必须进入清单: " + body);
+        assertTrue(body.contains("\"isFolder\":true"), body);
+        assertTrue(body.contains("\"parentId\":\"" + folder.getId() + "\""), body);
     }
 
     @Test
@@ -816,7 +823,7 @@ class MobileRelayClientHttpTest {
         assertEquals(1, transferFilesBodies.size());
         var body = new com.fasterxml.jackson.databind.ObjectMapper().readTree(transferFilesBodies.get(0));
         assertEquals(2000, body.path("files").size());
-        assertEquals(2001, body.path("totalCount").asInt());
+        assertEquals(2002, body.path("totalCount").asInt());
         verify(storageService, never()).load(anyString());
     }
 
@@ -999,4 +1006,101 @@ class MobileRelayClientHttpTest {
         svc.pollInbox();
         assertEquals(1, convSyncRequests.get(), "404 后不该再打这个端点");
     }
+    @Test
+    void backupDoesNotReadAnyFileWithoutBothConsentAndSubscription() {
+        var decision = new java.util.concurrent.atomic.AtomicReference<>("{\"enabled\":false,\"subscriptionActive\":true}");
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, decision.get()));
+        MobileRelayClientService client = service();
+        client.syncFileBackups();
+        decision.set("{\"enabled\":true,\"subscriptionActive\":false}");
+        client.syncFileBackups();
+        verify(projectFileService, never()).getFileTree(anyLong());
+        verifyNoInteractions(storageService);
+        assertTrue(dirBodies.isEmpty());
+    }
+
+    @Test
+    void backupUploadsSupportedBytesOnceAndIncludesEmptyFolders() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        byte[] bytes = "synthetic-backup-pdf".getBytes(StandardCharsets.UTF_8);
+        String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        var folder = addNode(null, "空目录", true);
+        var file = addNode(null, "资料.pdf", false);
+        file.setUid("79db0af1-8912-4b62-b659-58b7baabca17"); file.setFilePath("synthetic/doc.pdf");
+        addNode(null, "script.exe", false).setFilePath("synthetic/script.exe");
+        when(storageService.load("synthetic/doc.pdf")).thenReturn(new ByteArrayResource(bytes));
+        List<String> manifests = new CopyOnWriteArrayList<>();
+        List<byte[]> uploads = new CopyOnWriteArrayList<>();
+        server.createContext("/api/mobile/backup/manifest", ex -> { manifests.add(readBody(ex.getRequestBody())); respond(ex, 200, "{\"code\":0}"); });
+        server.createContext("/api/mobile/backup/files", ex -> {
+            if (ex.getRequestMethod().equals("PUT")) {
+                assertTrue(ex.getRequestURI().getRawQuery().contains("sha256=" + hash));
+                uploads.add(ex.getRequestBody().readAllBytes()); respond(ex, 200, "{\"sha256\":\"" + hash + "\"}");
+            } else respond(ex, 200, uploads.isEmpty() ? "{\"files\":[]}" : "{\"files\":[{\"projectKey\":\"42\",\"id\":\"" + file.getId() + "\",\"sha256\":\"" + hash + "\",\"name\":\"资料.pdf\",\"path\":\"资料.pdf\"}]}");
+        });
+        var client = service(); client.syncFileBackups(); client.syncFileBackups();
+        assertEquals(1, uploads.size());
+        assertTrue(new String(uploads.get(0), StandardCharsets.UTF_8).contains("synthetic-backup-pdf"));
+        var data = new com.fasterxml.jackson.databind.ObjectMapper().readTree(manifests.get(0));
+        assertEquals(3, data.path("files").size());
+        assertTrue(data.path("files").get(0).path("isFolder").asBoolean());
+        assertEquals(folder.getId().toString(), data.path("files").get(0).path("id").asText());
+        verify(storageService, never()).load("synthetic/script.exe");
+    }
+
+    @Test
+    void backupRemovesDeletedProjectsOnlyAfterSuccessfulLocalScan() {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        AtomicInteger deletes = new AtomicInteger();
+        server.createContext("/api/mobile/backup/manifest", ex -> respond(ex, 200, "{\"code\":0}"));
+        server.createContext("/api/mobile/backup/files", ex -> {
+            if (ex.getRequestMethod().equals("DELETE")) { deletes.incrementAndGet(); respond(ex, 200, "{\"code\":0}"); }
+            else respond(ex, 200, "{\"files\":[{\"id\":\"10\",\"projectKey\":\"99\"}]}");
+        });
+        var client = service();
+        when(projectFileService.getFileTree(42L)).thenThrow(new IllegalStateException("unavailable"));
+        client.syncFileBackups(); assertEquals(0, deletes.get());
+        doReturn(List.of()).when(projectFileService).getFileTree(42L);
+        client.syncFileBackups(); assertEquals(1, deletes.get());
+    }
+
+    @Test
+    void backupDeletesObsoleteCopyWhenFileExceedsTransferLimit() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        var file = addNode(null, "large.pdf", false);
+        file.setFilePath("synthetic/large.pdf");
+        var resource = mock(org.springframework.core.io.Resource.class);
+        when(resource.contentLength()).thenReturn(MobileTransferService.MAX_TRANSFER_BYTES + 1);
+        when(storageService.load("synthetic/large.pdf")).thenReturn(resource);
+        AtomicInteger deletes = new AtomicInteger();
+        server.createContext("/api/mobile/backup/manifest", ex -> respond(ex, 200, "{\"code\":0}"));
+        server.createContext("/api/mobile/backup/files", ex -> {
+            if (ex.getRequestMethod().equals("DELETE")) { deletes.incrementAndGet(); respond(ex, 200, "{\"code\":0}"); }
+            else respond(ex, 200, "{\"files\":[{\"id\":\"" + file.getId() + "\",\"projectKey\":\"42\"}]}");
+        });
+        service().syncFileBackups();
+        assertEquals(1, deletes.get());
+        verify(resource, never()).getInputStream();
+    }
+
+    @Test
+    void backupAccountSwitchStopsBeforeUploadingFileBytes() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        AtomicInteger uploads = new AtomicInteger();
+        server.createContext("/api/mobile/backup/files", ex -> {
+            if (ex.getRequestMethod().equals("PUT")) uploads.incrementAndGet();
+            respond(ex, 200, "{\"files\":[]}");
+        });
+        server.createContext("/api/mobile/backup/manifest", ex -> {
+            when(accountService.accountFingerprintOrNull()).thenReturn("other-account");
+            respond(ex, 200, "{\"code\":0}");
+        });
+        var file = addNode(null, "fixture.pdf", false);
+        file.setUid("79db0af1-8912-4b62-b659-58b7baabca17"); file.setFilePath("synthetic/doc.pdf");
+        when(storageService.load(anyString())).thenReturn(new ByteArrayResource(new byte[]{1,2,3}));
+        service().syncFileBackups();
+        assertEquals(0, uploads.get());
+        verify(storageService, never()).load(anyString());
+    }
+
 }

@@ -103,13 +103,26 @@ components:
         source: { type: string, enum: [desktop, cloud, catalog] }
         cached: { type: boolean }
         updatedAt: { type: string }
+    BackupConsent:
+      type: object
+      required: [enabled, decided, subscriptionActive, consentVersion, cleanupPending]
+      properties:
+        enabled: { type: boolean }
+        decided: { type: boolean }
+        subscriptionActive: { type: boolean }
+        subscriptionAvailable: { type: boolean, description: false代表暂时无法核实订阅，不等于免费用户 }
+        consentVersion: { type: string }
+        cleanupPending: { type: boolean, description: 关闭后立即禁读；后台删除重试尚未完成 }
     TransferFile:
       type: object
       required: [id, name, path, size]
       properties:
         id: { type: string, description: 来源本地文件 id，只能连 deviceId/projectKey 使用 }
         uid: { type: string, format: uuid, description: 稳定文件身份，旧桌面可能缺失 }
-        source: { type: string, enum: [desktop, cloud], description: catalogue 列表明确每件的字节来源 }
+        isFolder: { type: boolean, description: 文件夹也作为条目返回，包括空文件夹 }
+        parentId: { type: string, nullable: true, description: 同一来源内的父文件夹id；跨来源显示按path构树 }
+        sha256: { type: string, description: 持久备份内容散列 }
+        source: { type: string, enum: [desktop, cloud, backup], description: catalogue 列表明确每件的字节来源 }
         deviceId: { type: string }
         projectKey: { type: string }
         online: { type: boolean }
@@ -132,7 +145,7 @@ components:
           type: array
           maxItems: 2000
           items: { $ref: '#/components/schemas/TransferFile' }
-          description: 仅 LIST DONE 返回；不含文件夹，按 path 分组展示
+          description: 仅 LIST DONE 返回；含文件夹，按 path 构树展示
         count: { type: integer, minimum: 0, description: LIST DONE 返回的文件数量 }
         totalCount:
           type: integer
@@ -331,6 +344,169 @@ components:
         fromCamera: { type: boolean, description: 是否强制来自相机 }
         tsaToken: { type: string, nullable: true, description: 可信时间戳，当前恒 null }
 paths:
+  /api/mobile/backup-consent:
+    get:
+      summary: 账户文件云备份决定，旧账户默认未决定且关闭
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses:
+        "200":
+          description: 备份决定或错误信封
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/BackupConsent'
+                  - $ref: '#/components/schemas/Envelope'
+    put:
+      summary: 明确同意或关闭账户文件备份，开启要求有效订阅
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled, consentVersion]
+              properties:
+                enabled: { type: boolean }
+                consentVersion: { type: string, enum: ['2026-10-11'] }
+      responses:
+        "200":
+          description: 决定立即生效；关闭后清理云备份，不删除桌面原件
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/BackupConsent'
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/backup/files:
+    get:
+      summary: 桌面备份版本清单，省略projectKey时返回此设备所有项目的备份
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: deviceId, in: query, required: true, schema: { type: string } }
+        - { name: projectKey, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: 文件备份元数据
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [files]
+                    properties:
+                      files:
+                        type: array
+                        items: { $ref: '#/components/schemas/TransferFile' }
+                  - $ref: '#/components/schemas/Envelope'
+    put:
+      summary: 桌面上传持久备份；订阅、同意、目录归属、扩展名、大小和SHA256由服务端校验
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: deviceId, in: query, required: true, schema: { type: string } }
+        - { name: projectKey, in: query, required: true, schema: { type: string } }
+        - { name: fileId, in: query, required: true, schema: { type: string } }
+        - { name: uid, in: query, required: true, schema: { type: string } }
+        - { name: name, in: query, required: true, schema: { type: string } }
+        - { name: path, in: query, required: true, schema: { type: string } }
+        - { name: parentId, in: query, schema: { type: string } }
+        - { name: sha256, in: query, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: 已校验备份元数据或错误信封
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TransferFile'
+                  - $ref: '#/components/schemas/Envelope'
+    delete:
+      summary: 桌面删除备份，立即禁读、后台重试删除对象
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: deviceId, in: query, required: true, schema: { type: string } }
+        - { name: projectKey, in: query, required: true, schema: { type: string } }
+        - { name: fileId, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 处理结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/backup/manifest:
+    put:
+      summary: 桌面同步含空目录的完整元数据清单，最多保留2000项并标记截断
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, projectKey, files, totalCount]
+              properties:
+                deviceId: { type: string }
+                projectKey: { type: string }
+                totalCount: { type: integer }
+                files:
+                  type: array
+                  items: { $ref: '#/components/schemas/TransferFile' }
+      responses:
+        "200":
+          description: 处理结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/mobile/preview/pull:
+    post:
+      summary: 手机预览拉取，真实文件名和大小来自桌面清单；拒绝不支持类型而不收费不传输
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, projectKey, remoteFileId, requestId]
+              properties:
+                deviceId: { type: string }
+                projectKey: { type: string }
+                remoteFileId: { type: string }
+                requestId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 后续复用transfer查询/下载/ACK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TransferCreated'
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/preview/catalog/{uid}/files/{fileUid}/content:
+    get:
+      summary: 手机下载持久云或备份文件，必须有效订阅并明确开启备份
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: uid, in: path, required: true, schema: { type: string } }
+        - { name: fileUid, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 裸字节或错误信封；持久对象无须ACK
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
   /api/auth/sms-login/send-code:
     post:
       summary: 发送短信验证码

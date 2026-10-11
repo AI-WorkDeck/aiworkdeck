@@ -69,6 +69,9 @@ public class MobileTransferRequest {
     @Column(length = 512)
     private String fileName;
 
+    /** Mobile preview requests must be validated against the desktop file before uploading. */
+    private Boolean previewOnly;
+
     /** 声明大小；upload 后以实际字节覆盖。 */
     private Long fileSize;
 

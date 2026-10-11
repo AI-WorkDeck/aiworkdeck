@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 工作台（pages/project-overview/project-overview.vue）文案。
 export default {
+  mobileBackup: {
+    "title": "文件云端备份",
+    "message": "是否开启文件云端备份？开启后，桌面端会将项目中支持手机预览的图片、DOCX、PPTX、XLSX、PDF、音频和视频上传到你的账户云空间。订阅有效期间，即使桌面端离线，也能调取已完成备份的文件。默认关闭，你可以随时在设置中关闭。",
+    "enable": "同意并开启",
+    "decline": "暂不开启",
+    "enabled": "已开启",
+    "disabled": "未开启",
+    "subscriptionRequired": "文件云端备份需要有效订阅；未开启时，仅当桌面端在线才可以调取文件。",
+    "disable": "关闭云端备份",
+    "disableMessage": "关闭后将删除自动备份副本，桌面端原件不受影响。是否关闭？",
+    "pending": "已同意备份；文件须在桌面端完成上传后才可离线调取。",
+    "error": "云备份设置暂不可用，请重试。",
+    "close": "关闭"
+},
   mobileReceive: {
     "failed": "接收失败",
     "updated": "状态更新时间",
