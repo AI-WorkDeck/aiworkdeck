@@ -120,6 +120,19 @@ class RedlineGranularityContractTest {
         }
     }
 
+    @Test
+    void singleEditsLocateFirstAndDeletedRevisionsAreNotBodyText() throws Exception {
+        String zh = readResource("prompts/tools-lowa.md");
+        String en = readResource("prompts/tools-lowa.en.md");
+        assertTrue(zh.contains("单处修改先 `doc_find_text`") && zh.contains("排除已删除修订"));
+        assertTrue(en.contains("first use `doc_find_text`") && en.contains("excluding deleted revisions"));
+        assertTrue(!zh.contains("目标文本全文唯一时跳过找") && !en.contains("skip locating"));
+        assertTrue(zh.contains("不能用全文替换绕过") || zh.contains("不改用全文替换绕过"));
+        assertTrue(en.contains("never bypass the check with global replacement"));
+        assertTrue(toolDescription("doc_find_replace").contains("仅在用户明确要求全文统一修改"));
+        assertTrue(toolDescription("doc_replace_at_anchor").contains("执行前自动核对锚点原文"));
+    }
+
     private static String readResource(String path) throws Exception {
         try (InputStream in = RedlineGranularityContractTest.class.getClassLoader().getResourceAsStream(path)) {
             assertNotNull(in, "classpath 上找不到 " + path);
