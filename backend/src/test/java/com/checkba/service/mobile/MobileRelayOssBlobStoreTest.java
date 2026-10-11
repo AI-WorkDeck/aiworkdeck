@@ -33,6 +33,20 @@ class MobileRelayOssBlobStoreTest {
             new MobileRelayOssBlobStore(oss, "awd-mobile-relay", "mobile-relay/");
 
     @Test
+    void persistentNamespaceRejectsWholeBucketExpirationAndAllowsRelayOnlyRule() throws Exception {
+        var rule=new com.aliyun.oss.model.LifecycleRule("expire", "", com.aliyun.oss.model.LifecycleRule.RuleStatus.Enabled, 35);
+        when(oss.getBucketLifecycle("awd-mobile-relay")).thenReturn(java.util.List.of(rule));
+        assertThrows(IllegalStateException.class,()->store.putPersistent(1L,"id",new ByteArrayInputStream(new byte[1]),1));
+        verify(oss,never()).putObject(anyString(),anyString(),any(InputStream.class),any(ObjectMetadata.class));
+        rule.setPrefix("mobile-relay/");
+        when(oss.putObject(anyString(),anyString(),any(InputStream.class),any(ObjectMetadata.class))).thenAnswer(inv -> {
+            inv.getArgument(2,InputStream.class).readAllBytes();return new PutObjectResult();
+        });
+        var result=store.putPersistent(1L,"id",new ByteArrayInputStream(new byte[1]),1);
+        assertEquals("mobile-backup/1/id",result.locator());assertEquals(1,result.size());
+    }
+
+    @Test
     void putComposesKeyAndCountsRealBytes() {
         when(oss.putObject(anyString(), anyString(), any(InputStream.class), any(ObjectMetadata.class)))
                 .thenAnswer(inv -> {

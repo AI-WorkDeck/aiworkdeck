@@ -39,6 +39,18 @@ public final class MobileRelayLocalBlobStore implements MobileRelayBlobStore {
     }
 
     @Override
+    public StoredBlob putPersistent(Long userId, String blobId, InputStream content, long declaredSize) {
+        Path blob = relayRoot.resolveSibling("mobile-backup").resolve(String.valueOf(userId)).resolve(blobId);
+        try {
+            Files.createDirectories(blob.getParent());
+            return new StoredBlob(blob.toString(), Files.copy(content, blob, StandardCopyOption.REPLACE_EXISTING));
+        } catch (IOException e) {
+            long size=0;try { if (Files.exists(blob)) size=Files.size(blob); } catch (IOException ignored) { size=Math.max(0,declaredSize); }
+            throw new PersistentWriteException(new StoredBlob(blob.toString(),size),e);
+        }
+    }
+
+    @Override
     public InputStream open(String locator) throws IOException {
         return Files.newInputStream(Path.of(locator));
     }

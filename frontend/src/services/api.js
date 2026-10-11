@@ -4333,3 +4333,10 @@ export function requestAccountCatalog(method, path, body, accountScope) {
 export function importAccountCatalogFile(data) {
   return request({ url: '/api/mobile-receive/catalog/import', method: 'POST', data, timeout: 600000 })
 }
+
+export function getMobileBackupConsent() {
+  return request({ url: '/api/mobile-receive/backup-consent', method: 'GET' })
+}
+export function setMobileBackupConsent(data) {
+  return request({ url: '/api/mobile-receive/backup-consent', method: 'PUT', data })
+}

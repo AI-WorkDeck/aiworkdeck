@@ -112,6 +112,11 @@ class MobileTransferLoopbackIntegrationTest {
     @Autowired MobileRelayBlobStore blobs;
     @Autowired ApplicationContext context;
     @MockBean TransferBillingClient billing;
+    @MockBean MobileBillingClient mobileBilling;
+    @Autowired MobileBillingService mobileBillingService;
+    @Autowired MobileBackupService backupService;
+    @Autowired com.checkba.repository.MobileFileBackupRepository backupRepository;
+    @Autowired com.checkba.repository.MobileDeviceStateRepository deviceStates;
     @MockBean WebTools webTools;
     @MockBean EmbeddingModel embeddingModel;
     @MockBean PluginRevocationService pluginRevocation;
@@ -129,6 +134,68 @@ class MobileTransferLoopbackIntegrationTest {
                 }
             };
         }
+    }
+
+    @Test
+    void realBackupWorkerConsentUploadOfflinePreviewAndRevocationRoundTrip() throws Exception {
+        String suffix=UUID.randomUUID().toString();
+        String session=json("POST","/api/auth/register",null,Map.of("username","backup-loop-"+suffix,
+                "password","synthetic-only","displayName","Backup fixture")).path("data").path("sessionId").asText();
+        long userId=json("GET","/api/auth/me",session,null).path("data").path("id").asLong();
+        AccountBinding binding=new AccountBinding();binding.setUserId(userId);binding.setExternalAccountId("backup-loop-"+suffix);
+        binding.setCreatedAt(LocalDateTime.now());bindings.save(binding);
+        when(mobileBilling.balance(anyString())).thenReturn(new MobileBillingClient.BalanceResult(0L,"CNY","paid",
+                Map.of("active",true,"expiresAt","2030-01-01T00:00:00Z","cloudStorageBytes",3L*1024*1024*1024)));
+        Project project=new Project();project.setId(42000L);project.setUid(UUID.randomUUID().toString());
+        project.setUserId(userId);project.setName("Synthetic desktop-only backup");
+        ProjectFile document=new ProjectFile();document.setId(2L);document.setUid(UUID.randomUUID().toString());document.setProjectId(project.getId());
+        document.setName("sample.pdf");document.setFilePath("desktop-only.pdf");document.setParentId(1L);document.setIsFolder(false);
+        ProjectFile folder=new ProjectFile();folder.setId(1L);folder.setUid(UUID.randomUUID().toString());folder.setName("empty-and-file-folder");folder.setIsFolder(true);
+        ProjectFile unsupported=new ProjectFile();unsupported.setId(3L);unsupported.setUid(UUID.randomUUID().toString());unsupported.setName("never-upload.zip");unsupported.setIsFolder(false);
+        byte[] expected="%PDF-synthetic-private-fixture".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        document.setFileSize((long)expected.length);
+        Path localFile=ROOT.resolve("synthetic-desktop-original.pdf");Files.write(localFile,expected);
+        ProjectRepository desktopProjects=mock(ProjectRepository.class);when(desktopProjects.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(java.util.List.of(project));
+        when(desktopProjects.findById(project.getId())).thenReturn(java.util.Optional.of(project));
+        ProjectFileService desktopFiles=mock(ProjectFileService.class);when(desktopFiles.getFileTree(project.getId())).thenReturn(java.util.List.of(folder,document,unsupported));
+        StorageServiceFactory desktopStorage=mock(StorageServiceFactory.class);com.checkba.storage.StorageService desktopBytes=mock(com.checkba.storage.StorageService.class);
+        when(desktopStorage.getStorageService()).thenReturn(desktopBytes);when(desktopBytes.load("desktop-only.pdf")).thenReturn(new org.springframework.core.io.FileSystemResource(localFile));
+        String device="backup-"+suffix;Path stateDirectory=ROOT.resolve(device);Files.createDirectories(stateDirectory);
+        mapper.writeValue(stateDirectory.resolve("mobile-relay.json").toFile(),Map.of("deviceId",device,
+                "token",tokens.issue(userId,"Backup synthetic desktop").plaintext(),"accountFingerprint","backup-fixture"));
+        AccountService account=mock(AccountService.class);when(account.currentKeyOrNull()).thenReturn("awdk_synthetic_unused");
+        when(account.accountFingerprintOrNull()).thenReturn("backup-fixture");
+        LocalIdentityService identity=mock(LocalIdentityService.class);when(identity.localUserId()).thenReturn(userId);
+        MobileRelayClientService desktop=new MobileRelayClientService(true,true,baseURL(),baseURL(),stateDirectory.toString(),
+                account,identity,desktopProjects,desktopFiles,desktopStorage,mock(ProjectAiMessageService.class),mock(DesktopRefHandler.class));
+        ProjectCatalogService desktopCatalog=mock(ProjectCatalogService.class);
+        when(desktopCatalog.ensureProjectUid(project)).thenReturn(project.getUid());
+        when(desktopCatalog.ensureFileUid(any())).thenAnswer(inv -> ((ProjectFile)inv.getArgument(0)).getUid());
+        org.springframework.test.util.ReflectionTestUtils.setField(desktop,"projectCatalog",desktopCatalog);
+        desktop.syncFileBackups();assertTrue(backupRepository.findByUserId(userId).isEmpty());verifyNoInteractions(desktopBytes);
+        assertFalse(json("GET","/api/mobile/backup-consent",session,null).path("enabled").asBoolean());
+        assertTrue(json("PUT","/api/mobile/backup-consent",session,Map.of("enabled",true,"consentVersion",MobileBackupService.CONSENT_VERSION)).path("enabled").asBoolean());
+        desktop.syncFileBackups();desktop.syncFileBackups();
+        var saved=backupRepository.findByUserId(userId);assertEquals(1,saved.size());
+        assertEquals(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(expected)),saved.get(0).getSha256());
+        assertTrue(saved.get(0).getStoragePath().contains("mobile-backup"));
+        assertTrue(Files.exists(Path.of(saved.get(0).getStoragePath())));
+        var heartbeat=deviceStates.findByUserIdAndDeviceId(userId,device).orElseThrow();heartbeat.setLastSeenAt(LocalDateTime.now().minusHours(1));deviceStates.save(heartbeat);
+        JsonNode catalog=json("GET","/api/mobile/catalog/"+project.getUid()+"/files",session,null);
+        assertEquals(3,catalog.path("files").size());
+        assertTrue(catalog.path("files").get(0).path("isFolder").asBoolean());
+        assertEquals("backup",catalog.path("files").get(1).path("source").asText());
+        String preview="/api/mobile/preview/catalog/"+project.getUid()+"/files/"+document.getUid()+"/content";
+        HttpResponse<byte[]> content=request("GET",preview,session,null);
+        assertEquals(200,content.statusCode());assertEquals("application/octet-stream",content.headers().firstValue("Content-Type").orElse(""));
+        assertArrayEquals(expected,content.body());
+        when(mobileBilling.balance(anyString())).thenReturn(new MobileBillingClient.BalanceResult(0L,"CNY","free",Map.of()));
+        mobileBillingService.invalidateBalance(userId);
+        assertEquals(1,json("GET",preview,session,null).path("code").asInt());
+        assertFalse(json("PUT","/api/mobile/backup-consent",session,Map.of("enabled",false,"consentVersion",MobileBackupService.CONSENT_VERSION)).path("enabled").asBoolean());
+        assertEquals(1,json("GET",preview,session,null).path("code").asInt());
+        backupService.cleanDeleted();assertTrue(backupRepository.findByUserId(userId).isEmpty());
+        assertFalse(Files.exists(Path.of(saved.get(0).getStoragePath())));assertArrayEquals(expected,Files.readAllBytes(localFile));
     }
 
     @Test

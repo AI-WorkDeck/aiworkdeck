@@ -33,8 +33,8 @@
         </template>
         <text v-if="importing" class="catalog-note" role="status">{{ $t('projects.catalogWorking') }}</text>
         <view v-for="file in files" :key="file.uid || [file.deviceId,file.projectKey,file.id].join(':')" class="catalog-file">
-          <view><text>{{ file.path || file.name }}</text><text class="catalog-note">{{ file.source === 'cloud' ? $t('projects.catalogCloud') : file.deviceName || $t('projects.catalogOtherDevice') }}</text></view>
-          <button class="catalog-action" :disabled="importing || !targetId || (file.source === 'desktop' && !file.online)" @tap="download(file)" @keydown.enter.prevent="download(file)" @keydown.space.prevent="download(file)">{{ $t('projects.catalogImport') }}</button>
+          <view><text>{{ file.path || file.name }}</text><text class="catalog-note">{{ (file.source === 'cloud' || file.source === 'backup') ? $t('projects.catalogCloud') : file.deviceName || $t('projects.catalogOtherDevice') }}</text></view>
+          <button class="catalog-action" :disabled="file.isFolder || importing || !targetId || (file.source === 'desktop' && !file.online)" @tap="download(file)" @keydown.enter.prevent="download(file)" @keydown.space.prevent="download(file)">{{ $t('projects.catalogImport') }}</button>
         </view>
       </view>
     </view>
@@ -140,7 +140,7 @@ export default {
       finally { if (current()) this.listing = false }
     },
     async download(file) {
-      if (this.importing || !this.selected || !this.targetId || (file.source === 'desktop' && !file.online)) return
+      if (file.isFolder || this.importing || !this.selected || !this.targetId || (file.source === 'desktop' && !file.online)) return
       // Stop stale LIST replies before importing; keep the selected project stable until it finishes.
       this.generation++; this.listing = false
       this.importing = true; this.error = ''

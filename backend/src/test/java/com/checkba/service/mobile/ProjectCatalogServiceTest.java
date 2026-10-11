@@ -48,6 +48,35 @@ class ProjectCatalogServiceTest {
         var catalog=service.catalog(1L);assertEquals(1,catalog.size());assertEquals(owned.getUid(),catalog.get(0).get("projectUid"));
         assertEquals(3,((List<?>)catalog.get(0).get("locations")).size());
     }
+    @Test void unavailableSubscriptionOnlyExcludesBackupsAndPreservesCloudAndDesktopMetadata() {
+        MobileFileBackupRepository backups=mock(MobileFileBackupRepository.class);
+        UserRepository users=mock(UserRepository.class);
+        CloudStorageQuotaService quota=mock(CloudStorageQuotaService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"backups",backups);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"users",users);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"quota",quota);
+        User user=new User();user.setFileCloudBackupEnabled(true);
+        when(users.findById(1L)).thenReturn(Optional.of(user));
+        when(quota.persistentQuota(1L)).thenThrow(new MobileBillingFailureException(MobileBillingKind.UNAVAILABLE,"billing unavailable"));
+        Project cloud=cloud(8L,"case");
+        when(projects.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(cloud));
+        when(dirs.findByUserIdOrderByUpdatedAtDesc(1L)).thenReturn(List.of(desktop("a","1","case",null,8L)));
+        ProjectFile file=new ProjectFile();file.setId(10L);file.setName("cloud.pdf");file.setUid(UUID.randomUUID().toString());
+        when(files.findByProjectIdAndIsDeletedFalseOrderBySortOrderAsc(8L)).thenReturn(List.of(file));
+        MobileProjectManifest snapshot=new MobileProjectManifest();
+        snapshot.setPayloadJson("{\"files\":[{\"id\":\"2\",\"name\":\"desktop.pdf\",\"path\":\"desktop.pdf\",\"size\":42}],\"truncated\":false}");
+        when(manifests.findByUserIdAndDeviceIdAndProjectKey(1L,"a","1")).thenReturn(Optional.of(snapshot));
+        for(boolean online:List.of(false,true)) {
+            when(relay.isDeviceOnline(1L,"a")).thenReturn(online);
+            var result=service.fileList(1L,cloud.getUid());var entries=(List<Map<String,Object>>)result.get("files");
+            assertEquals(2,entries.size());assertEquals("cloud",entries.get(0).get("source"));
+            assertEquals("cloud.pdf",entries.get(0).get("name"));assertEquals("desktop",entries.get(1).get("source"));
+            assertEquals("desktop.pdf",entries.get(1).get("name"));assertEquals(online,entries.get(1).get("online"));
+            assertEquals(false,result.get("truncated"));
+        }
+        verifyNoInteractions(backups);
+    }
+
     @Test void cloudAndCachedDesktopFilesMergeOnlyByUidAndKeepRoutes() {
         Project owned=cloud(8L,"case");String fileUid=UUID.randomUUID().toString();
         when(projects.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(owned));

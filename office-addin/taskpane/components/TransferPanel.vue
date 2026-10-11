@@ -254,7 +254,7 @@ async function fetchList() {
       return done ? cur : null
     }, { intervalMs: 3000, timeoutMs: 10 * 60 * 1000 })
     if (tr.status === 'DONE') {
-      pullFiles.value = Array.isArray(tr.files) ? tr.files : []
+      pullFiles.value = Array.isArray(tr.files) ? tr.files.filter(file => !file.isFolder) : []
       pullListStage.value = 'done'
     } else {
       pullListError.value = tr.error || t('transferBadResponse')
@@ -267,7 +267,7 @@ async function fetchList() {
 }
 
 function selectPullFile(f) {
-  if (f.size > MAX_TRANSFER_BYTES) return
+  if (f.isFolder || f.size > MAX_TRANSFER_BYTES) return
   pullSelectedFile.value = f
   pullQuote.value = null
   pullQuoteError.value = ''
@@ -276,7 +276,7 @@ function selectPullFile(f) {
 }
 
 async function loadPullQuote() {
-  if (!pullSelectedFile.value) return
+  if (!pullSelectedFile.value || pullSelectedFile.value.isFolder) return
   pullQuoteLoading.value = true
   pullQuoteError.value = ''
   try {
@@ -289,7 +289,7 @@ async function loadPullQuote() {
 }
 
 async function confirmPull() {
-  if (!pullSelectedFile.value || pullStage.value === 'pulling') return
+  if (!pullSelectedFile.value || pullSelectedFile.value.isFolder || pullStage.value === 'pulling') return
   pullStage.value = 'pulling'
   pullError.value = ''
   const file = pullSelectedFile.value

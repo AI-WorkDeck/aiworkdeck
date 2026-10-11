@@ -46,6 +46,23 @@ public class MobileReceiveController {
                 body.path("fileUid").asText(), body.hasNonNull("transferId") ? body.get("transferId").asLong() : null, body.path("accountScope").asText());
     }
 
+    @GetMapping("/backup-consent")
+    public com.fasterxml.jackson.databind.JsonNode backupConsent(
+            @RequestHeader(value = "X-Session-Id", required = false) String session) {
+        requireUser(session);
+        return client.backupConsent();
+    }
+
+    @PutMapping("/backup-consent")
+    public com.fasterxml.jackson.databind.JsonNode setBackupConsent(
+            @RequestBody com.fasterxml.jackson.databind.JsonNode body,
+            @RequestHeader(value = "X-Session-Id", required = false) String session) {
+        requireUser(session);
+        if (!body.path("enabled").isBoolean()) throw new IllegalArgumentException("Missing explicit consent decision");
+        return client.setBackupConsent(body.path("enabled").asBoolean(), body.path("consentVersion").asText(),
+                body.path("accountScope").asText());
+    }
+
     @GetMapping("/status")
     public Map<String, Object> status(
             @RequestHeader(value = "X-Session-Id", required = false) String session,

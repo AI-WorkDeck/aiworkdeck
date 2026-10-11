@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.List;
 
 import static com.atlassian.oai.validator.mockmvc.OpenApiValidationMatchers.openApi;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -79,6 +80,9 @@ class MobileApiContractTest {
     @MockBean private MobileBillingClient billing;
     @MockBean private TransferBillingClient transferBilling;
     @Autowired private MobileRelayStoreService relayStore;
+    @Autowired private com.checkba.service.mobile.MobileBackupService backupService;
+    @Autowired private com.checkba.service.mobile.MobileBillingService mobileBillingService;
+    @Autowired private com.checkba.repository.MobileFileBackupRepository backupRepository;
 
     @BeforeAll
     static void loadSpec() throws Exception {
@@ -135,7 +139,7 @@ class MobileApiContractTest {
         String fileUid = om.readTree(receipt.getResponse().getContentAsString()).path("fileUid").asText();
         mvc.perform(upload).andExpect(jsonPath("$.fileUid").value(fileUid)).andExpect(openApi().isValid(validator));
         mvc.perform(get("/api/mobile/catalog/" + uid + "/files").header("X-Session-Id", sid))
-                .andExpect(jsonPath("$.count").value(1)).andExpect(jsonPath("$.files[0].source").value("cloud"))
+                .andExpect(jsonPath("$.count").value(3)).andExpect(jsonPath("$.files[0].source").value("cloud"))
                 .andExpect(openApi().isValid(validator));
         mvc.perform(get("/api/mobile/catalog/" + uid + "/files/" + fileUid + "/content").header("X-Session-Id", sid))
                 .andExpect(content().contentType("application/octet-stream")).andExpect(content().bytes(bytes))
@@ -146,6 +150,70 @@ class MobileApiContractTest {
         String other = register("catalog_other_" + System.nanoTime());
         mvc.perform(get("/api/mobile/catalog/" + uid + "/files/" + fileUid + "/content").header("X-Session-Id", other))
                 .andExpect(jsonPath("$.code").value(1)).andExpect(openApi().isValid(validator));
+    }
+
+    @Test
+    void backupConsentPreviewAndFolderContractPreserveBytesAndDenyByDefault() throws Exception {
+        String sid=register("backup_"+System.nanoTime());
+        Long userId=com.checkba.controller.AuthController.getUserIdFromSession(sid);
+        AccountBinding binding=new AccountBinding();binding.setUserId(userId);binding.setExternalAccountId("backup-"+userId);
+        binding.setCreatedAt(LocalDateTime.now());accountBindingRepository.save(binding);
+        when(billing.balance(anyString())).thenReturn(new MobileBillingClient.BalanceResult(0L,"CNY","paid",
+                Map.of("active",true,"expiresAt","2030-01-01T00:00:00Z","cloudStorageBytes",3L*1024*1024*1024)));
+        mvc.perform(get("/api/mobile/backup-consent").header("X-Session-Id",sid))
+                .andExpect(jsonPath("$.enabled").value(false)).andExpect(jsonPath("$.decided").value(false))
+                .andExpect(openApi().isValid(validator));
+        String uid=java.util.UUID.randomUUID().toString(), fileUid=java.util.UUID.randomUUID().toString();
+        mvc.perform(put("/api/mobile/projects").header("X-Session-Id",sid).contentType(APPLICATION_JSON)
+                .content(om.writeValueAsString(Map.of("deviceId","backup-device","projects",List.of(Map.of("key","42","name","Backup fixture","projectUid",uid))))))
+                .andExpect(jsonPath("$.code").value(0));
+        byte[] bytes="persistent sample".getBytes(StandardCharsets.UTF_8);
+        String hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        var upload=multipart("/api/mobile/backup/files").file(new MockMultipartFile("file","sample.pdf","application/pdf",bytes))
+                .param("deviceId","backup-device").param("projectKey","42").param("fileId","2").param("uid",fileUid)
+                .param("name","sample.pdf").param("path","folder/sample.pdf").param("parentId","1").param("sha256",hash)
+                .header("X-Session-Id",sid).with(request -> {request.setMethod("PUT");return request;});
+        mvc.perform(upload).andExpect(jsonPath("$.code").value(1)).andExpect(openApi().isValid(validator));
+        mvc.perform(put("/api/mobile/backup-consent").header("X-Session-Id",sid).contentType(APPLICATION_JSON)
+                .content("{\"enabled\":true,\"consentVersion\":\"old\"}"))
+                .andExpect(jsonPath("$.code").value(1)).andExpect(openApi().isValid(validator));
+        mvc.perform(put("/api/mobile/backup-consent").header("X-Session-Id",sid).contentType(APPLICATION_JSON)
+                .content("{\"enabled\":true,\"consentVersion\":\"2026-10-11\"}"))
+                .andExpect(jsonPath("$.enabled").value(true)).andExpect(jsonPath("$.decided").value(true)).andExpect(openApi().isValid(validator));
+        mvc.perform(upload).andExpect(jsonPath("$.sha256").value(hash)).andExpect(jsonPath("$.source").value("backup"))
+                .andExpect(openApi().isValid(validator));
+        var corrupt=multipart("/api/mobile/backup/files").file(new MockMultipartFile("file","corrupt.pdf","application/pdf",bytes))
+                .param("deviceId","backup-device").param("projectKey","42").param("fileId","bad").param("uid",java.util.UUID.randomUUID().toString())
+                .param("name","corrupt.pdf").param("path","corrupt.pdf").param("sha256","0".repeat(64))
+                .header("X-Session-Id",sid).with(request -> {request.setMethod("PUT");return request;});
+        mvc.perform(corrupt).andExpect(jsonPath("$.code").value(1)).andExpect(openApi().isValid(validator));
+        org.junit.jupiter.api.Assertions.assertEquals(1,backupRepository.findByUserId(userId).size(),"Invalid bytes leave no live or orphan backup");
+        var entries=List.of(Map.of("id","1","name","folder","path","folder","isFolder",true,"size",0),
+                Map.of("id","2","uid",fileUid,"name","sample.pdf","path","folder/sample.pdf","parentId","1","isFolder",false,"size",bytes.length),
+                Map.of("id","3","name","unsupported.zip","path","unsupported.zip","isFolder",false,"size",2));
+        mvc.perform(put("/api/mobile/backup/manifest").header("X-Session-Id",sid).contentType(APPLICATION_JSON)
+                .content(om.writeValueAsString(Map.of("deviceId","backup-device","projectKey","42","files",entries,"totalCount",3))))
+                .andExpect(jsonPath("$.code").value(0)).andExpect(openApi().isValid(validator));
+        mvc.perform(get("/api/mobile/catalog/"+uid+"/files").header("X-Session-Id",sid))
+                .andExpect(jsonPath("$.files[0].isFolder").value(true)).andExpect(jsonPath("$.files[1].parentId").value("1"))
+                .andExpect(openApi().isValid(validator));
+        mvc.perform(get("/api/mobile/backup/files").param("deviceId","backup-device").header("X-Session-Id",sid))
+                .andExpect(jsonPath("$.files[0].sha256").value(hash)).andExpect(openApi().isValid(validator));
+        mvc.perform(post("/api/mobile/preview/pull").header("X-Session-Id",sid).contentType(APPLICATION_JSON)
+                .content(om.writeValueAsString(Map.of("deviceId","backup-device","projectKey","42","remoteFileId","3","requestId",java.util.UUID.randomUUID().toString()))))
+                .andExpect(jsonPath("$.code").value(1)).andExpect(openApi().isValid(validator));
+        String contentPath="/api/mobile/preview/catalog/"+uid+"/files/"+fileUid+"/content";
+        mvc.perform(get(contentPath).header("X-Session-Id",sid)).andExpect(content().bytes(bytes))
+                .andExpect(header().longValue("Content-Length",bytes.length)).andExpect(openApi().isValid(validator));
+        when(billing.balance(anyString())).thenReturn(new MobileBillingClient.BalanceResult(0L,"CNY","free",Map.of()));
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(mobileBillingService,"invalidateBalance",userId);
+        mvc.perform(get(contentPath).header("X-Session-Id",sid)).andExpect(jsonPath("$.code").value(1)).andExpect(openApi().isValid(validator));
+        mvc.perform(put("/api/mobile/backup-consent").header("X-Session-Id",sid).contentType(APPLICATION_JSON)
+                .content("{\"enabled\":false,\"consentVersion\":\"2026-10-11\"}"))
+                .andExpect(jsonPath("$.enabled").value(false)).andExpect(jsonPath("$.cleanupPending").value(true)).andExpect(openApi().isValid(validator));
+        backupService.cleanDeleted();
+        assertTrue(backupRepository.findByUserId(userId).isEmpty());
+        mvc.perform(get(contentPath).header("X-Session-Id",sid)).andExpect(jsonPath("$.code").value(1));
     }
 
     @Test
