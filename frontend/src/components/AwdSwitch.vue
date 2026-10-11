@@ -15,7 +15,12 @@
     class="awd-switch"
     :class="{ 'is-on': checked, 'is-disabled': disabled }"
     role="switch"
+    :aria-label="ariaLabel || undefined"
     :aria-checked="checked ? 'true' : 'false'"
+    :aria-disabled="disabled ? 'true' : 'false'"
+    :tabindex="disabled ? -1 : 0"
+    @keydown.enter.prevent="toggle"
+    @keydown.space.prevent="toggle"
     @tap.stop="toggle"
   >
     <view class="awd-switch-knob"></view>
@@ -27,6 +32,7 @@ export default {
   name: 'AwdSwitch',
   props: {
     checked: { type: Boolean, default: false },
+    ariaLabel: { type: String, default: '' },
     disabled: { type: Boolean, default: false },
   },
   emits: ['change'],
@@ -43,36 +49,49 @@ export default {
 .awd-switch {
   position: relative;
   flex: none;
-  width: 38px;
-  height: 22px;
-  border-radius: 11px;
-  background: var(--awd-surface-3);
+  width: var(--awd-switch-width);
+  min-height: var(--awd-panel-row-h);
   cursor: pointer;
-  transition: background 0.18s ease;
 }
-
-.awd-switch.is-on {
-  background: var(--awd-accent);
+.awd-switch::before {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: var(--awd-switch-width);
+  height: var(--awd-switch-track-height);
+  transform: translate(-50%, -50%);
+  border-radius: var(--awd-switch-track-height);
+  background: var(--awd-surface-3);
+  border: 1px solid var(--awd-text-2);
+  box-sizing: border-box;
+  transition: background var(--awd-motion-fast) ease;
 }
-
-.awd-switch.is-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.awd-switch.is-on::before { background: var(--awd-accent); border-color: var(--awd-accent-text); }
+.awd-switch.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.awd-switch:focus-visible {
+  outline: var(--awd-focus-width) solid var(--awd-accent-text);
+  outline-offset: var(--awd-focus-offset);
+  border-radius: var(--awd-radius-sm);
 }
-
 .awd-switch-knob {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 18px;
-  height: 18px;
+  top: calc(50% - var(--awd-switch-knob-size) / 2);
+  left: calc(50% - var(--awd-switch-width) / 2 + (var(--awd-switch-track-height) - var(--awd-switch-knob-size)) / 2);
+  width: var(--awd-switch-knob-size);
+  height: var(--awd-switch-knob-size);
   border-radius: 50%;
-  background: var(--awd-surface);
-  box-shadow: 0 1px 3px rgba(18, 52, 77, 0.28);
-  transition: transform 0.18s ease;
+  background: var(--awd-text-2);
+  box-shadow: var(--awd-shadow-sm);
+  transition: transform var(--awd-motion-fast) ease;
 }
-
 .awd-switch.is-on .awd-switch-knob {
-  transform: translateX(16px);
+  background: var(--awd-text-on-accent);
+  transform: translateX(calc(var(--awd-switch-width) - var(--awd-switch-track-height)));
+}
+@media (pointer: coarse) {
+  .awd-switch { min-width: var(--awd-control-height-touch); min-height: var(--awd-control-height-touch); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .awd-switch::before, .awd-switch-knob { transition: none; }
 }
 </style>

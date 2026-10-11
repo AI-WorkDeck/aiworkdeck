@@ -21,7 +21,9 @@
 -->
 <template>
   <view class="awd-select" :class="{ 'is-disabled': disabled, 'is-open': open }">
-    <view class="awd-select-trigger" @tap.stop="toggle">
+    <view class="awd-select-trigger" role="button" aria-haspopup="listbox" :aria-label="ariaLabel || currentLabel"
+      :aria-expanded="open ? 'true' : 'false'" :aria-disabled="disabled ? 'true' : 'false'"
+      :tabindex="disabled ? -1 : 0" @keydown="onTriggerKey" @tap.stop="toggle">
       <slot>
         <view class="awd-select-value">
           <text class="awd-select-text">{{ currentLabel }}</text>
@@ -32,11 +34,13 @@
 
     <!-- 蒙层负责「点外面关掉」；透明但要吃掉点击，否则关菜单的同时会点到下面的东西 -->
     <view v-if="open" class="awd-select-mask" @tap.stop="close"></view>
-    <view v-if="open" class="awd-select-menu" :style="menuStyle">
+    <view v-if="open" class="awd-select-menu" role="listbox" :style="menuStyle">
       <view
         v-for="(label, i) in range"
         :key="i"
         class="awd-select-item"
+        role="option" :aria-selected="i === value ? 'true' : 'false'" tabindex="-1"
+        @keydown="onOptionKey($event, i)"
         :class="{ 'is-active': i === value }"
         @tap.stop="pick(i)"
       >
@@ -53,6 +57,7 @@ export default {
   props: {
     /** 标签数组，与 <picker> 的 range 同义 */
     range: { type: Array, default: () => [] },
+    ariaLabel: { type: String, default: '' },
     /** 当前选中项下标 */
     value: { type: Number, default: 0 },
     disabled: { type: Boolean, default: false },
@@ -73,6 +78,31 @@ export default {
     this.detachDismiss()
   },
   methods: {
+    onTriggerKey(event) {
+      if (this.disabled) return
+      if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+        event.preventDefault()
+        if (!this.open) this.openMenu()
+        this.$nextTick(() => this.focusOption(event.key === 'ArrowUp' ? this.range.length - 1 : this.value))
+      } else if (event.key === 'Escape') this.close()
+    },
+    focusOption(index) {
+      const items = this.$el && this.$el.querySelectorAll('.awd-select-item')
+      if (items && items.length) items[Math.max(0, Math.min(index, items.length - 1))].focus()
+    },
+    onOptionKey(event, index) {
+      if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', ' ', 'Escape'].includes(event.key)) event.preventDefault()
+      if (event.key === 'ArrowDown') this.focusOption((index + 1) % this.range.length)
+      else if (event.key === 'ArrowUp') this.focusOption((index + this.range.length - 1) % this.range.length)
+      else if (event.key === 'Home') this.focusOption(0)
+      else if (event.key === 'End') this.focusOption(this.range.length - 1)
+      else if (event.key === 'Enter' || event.key === ' ') { this.pick(index); this.focusTrigger() }
+      else if (event.key === 'Escape') { this.close(); this.focusTrigger() }
+      else if (event.key === 'Tab') this.close()
+    },
+    focusTrigger() {
+      this.$nextTick(() => this.$el?.querySelector('.awd-select-trigger')?.focus())
+    },
     toggle() {
       if (this.disabled) return
       if (this.open) this.close()
@@ -144,6 +174,11 @@ export default {
   cursor: pointer;
 }
 
+.awd-select-trigger:focus-visible, .awd-select-item:focus-visible {
+  outline: var(--awd-focus-width) solid var(--awd-accent-text);
+  outline-offset: var(--awd-focus-offset);
+}
+
 .awd-select.is-disabled .awd-select-trigger {
   cursor: not-allowed;
   opacity: 0.55;
@@ -154,21 +189,21 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  height: 36px;
-  padding: 0 12px;
+  gap: var(--awd-space-2);
+  min-height: var(--awd-control-height);
+  padding: var(--awd-space-1) var(--awd-space-3);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background-color: var(--awd-surface);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   box-sizing: border-box;
-  transition: border-color 0.15s ease;
+  transition: border-color var(--awd-motion-fast) ease;
 }
 
 .awd-select-value:hover,
 .awd-select.is-open .awd-select-value {
-  border-color: var(--awd-mint);
+  border-color: var(--awd-accent-text);
 }
 
 .awd-select-text {
@@ -180,8 +215,8 @@ export default {
 .awd-select-caret {
   flex: none;
   color: var(--awd-text-2);
-  font-size: 12px;
-  transition: transform 0.15s ease;
+  font-size: var(--awd-panel-fs);
+  transition: transform var(--awd-motion-fast) ease;
 }
 
 .awd-select.is-open .awd-select-caret {
@@ -199,21 +234,24 @@ export default {
   z-index: 4001;
   max-height: 280px;
   overflow-y: auto;
-  padding: 4px;
+  padding: var(--awd-space-1);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  box-shadow: 0 8px 28px rgba(18, 52, 77, 0.16);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
 }
 
 .awd-select-item {
+  min-height: var(--awd-panel-row-h);
+  box-sizing: border-box;
+  line-height: var(--awd-line-height-ui);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 7px 10px;
-  border-radius: 5px;
-  font-size: 13px;
+  gap: var(--awd-space-3);
+  padding: var(--awd-space-1) var(--awd-panel-pad-x);
+  border-radius: var(--awd-radius-sm);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   cursor: pointer;
   white-space: nowrap;
@@ -231,6 +269,12 @@ export default {
 .awd-select-check {
   flex: none;
   color: var(--awd-accent-text);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
+}
+@media (pointer: coarse) {
+  .awd-select-value, .awd-select-item { min-height: var(--awd-control-height-touch); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .awd-select-value, .awd-select-caret { transition: none; }
 }
 </style>

@@ -3480,12 +3480,12 @@ export default {
 
   &::-webkit-scrollbar-thumb {
     background-color: transparent;
-    border-radius: 3px;
+    border-radius: calc(var(--awd-space-1) / 2);
     transition: background-color 0.2s;
   }
 
   &:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(148, 163, 184, 0.3);
+    background-color: var(--awd-surface-3);
   }
 
   &::-webkit-scrollbar-thumb:hover {
@@ -3534,7 +3534,7 @@ export default {
     border-style: solid;
     transform: scale(1.005);
     opacity: 1;
-    box-shadow: 0 2rpx 8rpx rgba(59, 130, 246, 0.08);
+    box-shadow: var(--awd-shadow-md);
   }
 }
 
@@ -3573,7 +3573,7 @@ export default {
   border: 1px solid var(--awd-info);
   background: var(--awd-info-soft);
   pointer-events: none;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
 }
 
 /* 右键上下文菜单样式 */
@@ -3591,8 +3591,8 @@ export default {
   position: fixed;
   min-width: 160px;
   background: var(--awd-surface);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border-radius: var(--awd-radius-md);
+  box-shadow: var(--awd-shadow-md);
   padding: 4px 0;
   z-index: 10000;
   border: 1px solid var(--awd-border);
@@ -3605,7 +3605,7 @@ export default {
 }
 
 .context-menu-header-text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 700;
   color: var(--awd-text-2);
 }
@@ -3631,14 +3631,14 @@ export default {
 }
 
 .context-menu-icon {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   margin-right: 10px;
   width: 20px;
   text-align: center;
 }
 
 .context-menu-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
 }
 
@@ -3657,7 +3657,7 @@ export default {
 }
 
 .compare-bar-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-info-text);
   font-weight: 500;
 }
@@ -3670,18 +3670,18 @@ export default {
   background: linear-gradient(135deg, var(--awd-info) 0%, var(--awd-info) 100%);
   color: var(--awd-text-on-accent);
   border: none;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .btn-compare:hover {
   background: linear-gradient(135deg, var(--awd-info) 0%, var(--awd-info) 100%);
   transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.3);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .btn-compare:active {
@@ -3705,7 +3705,7 @@ export default {
 .checkbox-box {
   width: 14px;
   height: 14px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-info);
   background: var(--awd-surface);
   box-sizing: border-box;
@@ -3743,7 +3743,7 @@ export default {
   width: 8px;
   height: 2px;
   background: var(--awd-accent);
-  border-radius: 2px;
+  border-radius: calc(var(--awd-space-1) / 2);
 }
 
 .batch-bar {
@@ -3783,12 +3783,12 @@ export default {
 }
 
 .batch-btn-danger {
-  border-color: rgba(220, 38, 38, 0.25);
+  border-color: var(--awd-danger);
   color: var(--awd-danger-text);
 }
 
 .batch-btn-danger:active {
-  background: rgba(220, 38, 38, 0.06);
+  background: var(--awd-danger-soft);
 }
 
 .batch-btn-ghost {
@@ -3843,14 +3843,14 @@ export default {
   .btn-new-word {
     height: 28px;
     line-height: 28px;
-    font-size: 12px;
-    border-radius: 10px;
+    font-size: var(--awd-panel-fs);
+    border-radius: var(--awd-radius-dialog);
   }
   .tree-footer {
     padding: 8px 10px;
   }
   .tree-item-name {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
   }
 
   .tree-expand-icon,
@@ -3892,7 +3892,7 @@ export default {
   align-items: center;
   padding: 10px 12px;
   margin-bottom: 4px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: all 0.2s;
   background-color: transparent;
@@ -3945,7 +3945,7 @@ export default {
   text-align: center;
   color: var(--awd-text-3);
   padding: 20px;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
 }
 
 .folder-item:active {
@@ -4087,7 +4087,7 @@ export default {
 
 /* 外部文件正拖在树上：整个容器描一圈，提示「松手即导入」（dev-board#363） */
 .tree-content.external-drag-over {
-  box-shadow: inset 0 0 0 2px var(--awd-info);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .tree-item[draggable="true"]:hover {
@@ -4187,11 +4187,11 @@ export default {
   overflow: hidden;
   text-overflow: clip;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 15px;
   padding: 0 5px;
   margin-right: 6px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-text-2);
   background: var(--awd-surface-2);
 
@@ -4282,7 +4282,7 @@ export default {
 
 .recycle-back-btn {
   color: var(--awd-info-text) !important;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   cursor: pointer;
   padding: 0 12rpx;
   transition: all 0.2s;
@@ -4341,7 +4341,7 @@ export default {
   max-width: 92vw;
   background-color: var(--awd-surface);
   border-radius: 16rpx;
-  box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.08);
+  box-shadow: var(--awd-shadow-md);
   display: flex;
   flex-direction: column;
 }
@@ -4351,7 +4351,7 @@ export default {
   max-width: 88vw;
   background-color: var(--awd-surface);
   border-radius: 16rpx;
-  box-shadow: 0 12rpx 32rpx rgba(0, 0, 0, 0.08);
+  box-shadow: var(--awd-shadow-md);
   display: flex;
   flex-direction: column;
 }
@@ -4469,14 +4469,14 @@ export default {
   width: 120px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-radius: var(--awd-radius-md);
+  box-shadow: var(--awd-shadow-md);
   padding: 4px 0;
   z-index: 100;
 }
 .sort-item {
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   display: flex;
   justify-content: space-between;
@@ -4502,9 +4502,9 @@ export default {
   padding: 4px 12px;
   background-color: var(--awd-surface-2);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   transition: all 0.2s;
   margin-left: auto;
@@ -4546,8 +4546,8 @@ export default {
      滚动而不是让盒子无限长高。 */
   max-height: 85vh;
   background-color: var(--awd-surface);
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
   overflow: hidden;
   animation: awd-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
@@ -4576,7 +4576,7 @@ export default {
 }
 
 .awd-dialog-title {
-  font-size: 20px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-accent-text); /* Forest Green */
   line-height: 1.4;
@@ -4585,7 +4585,7 @@ export default {
 
 .awd-dialog-subtitle {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2); /* Gray Medium */
   line-height: 1.5;
   display: block;
@@ -4604,7 +4604,7 @@ export default {
 }
 
 .awd-dialog-text {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
   line-height: 1.6;
 }
@@ -4614,15 +4614,15 @@ export default {
   height: 48px;
   padding: 0 16px;
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  font-size: 15px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
   transition: all 0.2s;
 }
 
 .awd-input:focus {
   border-color: var(--awd-mint); /* Mint Green */
-  box-shadow: 0 0 0 3px rgba(137, 168, 160, 0.15);
+  box-shadow: var(--awd-shadow-md);
 }
 
 .awd-dialog-footer {
@@ -4642,9 +4642,9 @@ export default {
   justify-content: center;
   height: 44px; /* Slightly taller */
   padding: 0 32px; /* Wider padding */
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: all 0.2s;
   min-width: 100px;
@@ -4705,7 +4705,7 @@ export default {
 
 .form-label {
   display: block;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   color: var(--awd-text);
   margin-bottom: 8px;
@@ -4717,7 +4717,7 @@ export default {
   align-items: center;
   padding: 10px 12px;
   margin-bottom: 2px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -4753,7 +4753,7 @@ export default {
 }
 .folder-name {
   margin-left: 8px;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
 }
 
 .rename-input-wrapper.dialog-rename {
@@ -4766,15 +4766,15 @@ export default {
   height: 28px;
   padding: 0 8px;
   border: 1px solid var(--awd-mint);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background-color: var(--awd-surface);
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
 }
 .empty-tip {
   padding: 16px;
   text-align: center;
   color: var(--awd-text-3);
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
 }
 
 
