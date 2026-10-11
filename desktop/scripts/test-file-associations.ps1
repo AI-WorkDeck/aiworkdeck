@@ -72,6 +72,7 @@ function Assert-Preserved([string]$Default) {
     }
 }
 function Assert-Installed([string]$Default) {
+    Write-Host ('Expected executable: ' + $exe + '; registered command: ' + (Read-Value "$appKey\shell\open\command" ''))
     Assert-Equal (Test-Path -LiteralPath $exe -PathType Leaf) $true 'Installed application executable'
     foreach ($ext in $extensions) {
         Assert-Equal (Has-Value "$classes\.$ext\OpenWithProgids" $progId) $true ".$ext candidate present"
@@ -115,13 +116,14 @@ try {
         Write-Value "$classes\.$ext" '' $otherHandler
         Write-Value "$classes\.$ext\OpenWithProgids" $otherHandler ''
     }
-    # NSIS /D must be last and unquoted, even when the installation path contains spaces.
-    Run-Installer $installer "/S /D=$installDir"
+    # electron-builder 24 re-parses /D using StdUtils.GetParameter (CRT argv),
+    # so quote its value to retain spaces; bare NSIS /D quoting rules do not apply here.
+    Run-Installer $installer "/S /D=`"$installDir`""
     Assert-Installed $otherHandler
     Write-Host 'PASS: real installer registers all 17 types without replacing existing defaults.'
 
     foreach ($ext in $extensions) { Write-Value "$classes\.$ext" '' $changedHandler }
-    Run-Installer $installer "/S /D=$installDir"
+    Run-Installer $installer "/S /D=`"$installDir`""
     Assert-Installed $changedHandler
     Write-Host 'PASS: reinstall preserves a default changed after the first installation.'
 
