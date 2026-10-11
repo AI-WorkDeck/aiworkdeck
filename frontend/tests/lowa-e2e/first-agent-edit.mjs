@@ -84,6 +84,39 @@ try {
     assert.equal((await ok('set_revision_view', {})).mode, 'all')
     console.log('PASS first edit + final-text receipt + user undo/redo + revisions + export/reload: ' + original.slice(0, 35))
   }
+  // #1206: historical deletions and identical live occurrences stay separate.
+  for (const mode of ['all', 'final', 'margin', 'balloons']) {
+    const zip = await JSZip.loadAsync(Uint8Array.from(await fixture('fixture')))
+    zip.file('word/document.xml', `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>历史：</w:t></w:r><w:del w:id="1" w:author="Earlier reviewer" w:date="2026-10-01T00:00:00Z"><w:r><w:delText>30日</w:delText></w:r></w:del><w:r><w:t>；付款：30日；交货：30日。</w:t></w:r></w:p></w:body></w:document>`)
+    await ok('load_document', { name: 'anchor-safety.docx', bytes: Array.from(await zip.generateAsync({ type: 'uint8array' })) })
+    assert.equal((await ok('set_revision_view', { mode })).mode, mode)
+    const found = await ok('find_text_locations', { keyword: '30日', __agent: true })
+    assert.equal(found.count, 2, mode + ': deleted occurrence must not count')
+    const [payment, delivery] = found.matches
+    assert.match(payment.contextBefore, /付款：$/)
+    assert.match(delivery.contextBefore, /交货：$/)
+    await ok('find_replace', { findText: '付款：30日', replaceText: '付款：45日', replaceAll: false, __agent: true })
+    const stale = await page.evaluate(p => window.__loExecutor.executeCommand('replace_at_position', p),
+      { anchor: payment.anchorId, newText: '60日', __agent: true })
+    assert.equal(stale.success, false, 'changed anchor must not overwrite intervening work')
+    assert.match(stale.message, /doc_find_text/)
+    assert.equal((await ok('get_paragraph', { index: 0, __agent: true })).text, '历史：；付款：45日；交货：30日。')
+    await ok('replace_at_position', { anchor: delivery.anchorId, newText: '40日', __agent: true })
+    assert.equal((await ok('get_paragraph', { index: 0, __agent: true })).text, '历史：；付款：45日；交货：40日。',
+      'unrelated edit must not invalidate the other occurrence')
+    assert.equal((await ok('set_revision_view', {})).mode, mode, 'restore user view')
+    const saved = await page.evaluate(async () => {
+      const r = await window.__loExecutor.executeCommand('export_document', { name: 'anchor-safety.docx' })
+      if (!r.success) throw Error(JSON.stringify(r))
+      return Array.from(r.bytes)
+    })
+    await ok('load_document', { name: 'reopened.docx', bytes: saved })
+    assert.equal((await ok('get_paragraph', { index: 0, __agent: true })).text, '历史：；付款：45日；交货：40日。')
+    const revisions = await ok('list_revisions', { limit: 100 })
+    assert.ok(revisions.revisions.some(r => r.type === 'Delete' && r.author === 'Earlier reviewer' && r.text === '30日'),
+      'original deleted history survives save/reopen')
+    console.log('PASS revision-aware anchors, stale rejection, unrelated target and save/reopen: ' + mode)
+  }
 } finally {
   await browser.close()
   server.close()
