@@ -88,9 +88,9 @@ dev-board#30）；更早的产品设计 `2026-08-17-mobile-clients-design.md`。
   见地雷 9）：file_type 全仓语义是**文件扩展名**，落盘时一律走
   `MobileRelayClientService.fileTypeOf(landedName, mediaType)`（有扩展名取扩展名，
   没有才退回 mediaType）。
-- **每用户 3GB 配额**（dev-board#226）：只计未投递 blob（storagePath 非空行）的 fileSize
-  之和，ACK 即删 = 释放配额。检查在写盘前按声明大小做（幂等重传先于配额检查，不占新
-  空间不得拒）；并发上传可略超上限（最多一件，接受的软度）。拒绝走
+- **临时中转 200MiB、Pro 持久云存储 3GiB**（dev-board#1188，替代 #226 的旧临时池 3GB）：
+  临时池合计媒体与文件传输的未投递 blob，ACK 即释放；持久池不随下载删除。
+  写入在同一用户锁下检查配额，幂等重传不重复占用；不能沿用旧软限额的并发口径。拒绝走
   IllegalArgumentException → HTTP 200 + `{code:1,message:"云端空间已满…"}`，恰是两端
   客户端能透传到界面的形状（非 2xx 的 body 会被客户端丢弃，别改成 413）。
 - `GET /api/mobile/media/usage` → `{usedBytes, quotaBytes}`（裸对象）；
