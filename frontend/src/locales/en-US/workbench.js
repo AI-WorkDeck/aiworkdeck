@@ -46,6 +46,7 @@ export default {
   commandPaletteEmpty: 'No matching commands',
   // Top bar project info
   renameProject: 'Rename Project…',
+  renameProjectHint: 'Click to rename; Enter to save, Esc to cancel',
   unnamedProject: 'Untitled Project',
   switchRecentProject: 'Switch to a recent project',
   recentProjects: 'Recent Projects',

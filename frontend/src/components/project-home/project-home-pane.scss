@@ -6,7 +6,7 @@
 .project-home-pane {
   container-type: inline-size;
   container-name: home-pane;
-  padding: 24px;
+  padding: var(--awd-space-4);
   box-sizing: border-box;
   background: var(--awd-bg);
   color: var(--awd-text);
@@ -34,14 +34,14 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--awd-space-3);
 }
 
 .home-section {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
-  padding: 16px 18px;
+  border-radius: var(--awd-radius-md);
+  padding: var(--awd-space-3);
 }
 
 // 「已学习模板」一行：档案头下方的一句话状态，不是卡片，弱化成说明文字
@@ -50,9 +50,9 @@
 }
 
 .home-template-line-text {
-  font-size: 12px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
-  line-height: 1.6;
+  line-height: var(--awd-line-height-ui);
 }
 
 .home-section-title {
@@ -61,14 +61,14 @@
   padding: 0 0 8px 8px;
   border-left: 3px solid var(--awd-mint);
   border-bottom: 1px solid var(--awd-border);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-accent-text);
 }
 
 @media (max-width: 720px) {
   .project-home-pane {
-    padding: 16px 12px;
+    padding: var(--awd-space-3);
   }
 }
 
@@ -81,34 +81,34 @@
 /* 微窄：单列、最紧凑密度 */
 @container home-pane (max-width: 359px) {
   .home-column {
-    gap: 10px;
+    gap: var(--awd-space-2);
   }
 
   .home-section {
-    padding: 10px 12px;
+    padding: var(--awd-space-2) var(--awd-panel-pad-x);
   }
 
   .home-section-title {
     margin-bottom: 8px;
     padding-bottom: 6px;
-    font-size: 11px;
+    font-size: var(--awd-font-size-body);
   }
 }
 
 /* 窄中：两列起步，字号/间距升一档——拖左栏最常落的区间，重点打磨 */
 @container home-pane (min-width: 360px) and (max-width: 559px) {
   .home-column {
-    gap: 14px;
+    gap: var(--awd-space-3);
   }
 
   .home-section {
-    padding: 12px 14px;
+    padding: var(--awd-space-3);
   }
 
   .home-section-title {
     margin-bottom: 10px;
     padding-bottom: 7px;
-    font-size: 12px;
+    font-size: var(--awd-font-size-body);
   }
 }
 

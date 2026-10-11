@@ -198,8 +198,17 @@ test('ProjectListPane 是面板不是页面：没有页面级生命周期，跳�
   assert.match(pane, /inject:\s*\{\s*leaveWorkbench:\s*\{\s*default:\s*null\s*\}/)
   assert.match(pane, /\n  mounted\(\) \{[\s\S]*?this\.loadProjects\(\)/, '挂载即拉项目清单')
   assert.match(pane, /class="project-list-pane"/)
-  // 点的是当前打开的那个项目：什么都不做（重进一次等于把标签与编辑器全拆了）
-  assert.match(pane, /goToProject\(projectId\) \{\s*if \(this\.currentProjectId != null && Number\(projectId\) === Number\(this\.currentProjectId\)\) return/)
+  // 当前项目只打开文件面板，不能重建仍有编辑器的工作台。
+  const events = []
+  const goToProject = new Function('uni', `return function(projectId) ${methodBody(pane, 'goToProject(projectId) {')}`)({
+    reLaunch() { assert.fail('当前项目不应重建工作台') }
+  })
+  goToProject.call({
+    currentProjectId: 12,
+    $emit: (...args) => events.push(args),
+    leaveWorkbench() { assert.fail('当前项目不应离开工作台') }
+  }, '12')
+  assert.deepEqual(events, [['activate-current-project']])
 })
 
 test('项目列表页退成薄壳：路由保留，不再承载内容', () => {
