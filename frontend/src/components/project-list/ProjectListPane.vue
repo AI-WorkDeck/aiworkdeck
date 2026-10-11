@@ -7,31 +7,8 @@
   <view class="project-list-pane" :class="{ 'is-client': isClientUser }">
     <view class="project-list-container">
       <view class="main-content">
-        <view v-if="projects.length > 0 || (SHOW_CLOUD_ACCEPT && !isClientUser)" class="content-header">
+        <view v-if="SHOW_CLOUD_ACCEPT && !isClientUser && projects.length > 0" class="content-header">
           <view class="header-actions">
-            <!-- 视图切换：方块 / 列表。选择记在本机（checkba_project_list_view）。 -->
-            <view v-if="projects.length > 0" class="view-toggle">
-              <view
-                class="view-toggle-btn"
-                :class="{ active: viewMode === 'grid' }"
-                :title="$t('projects.gridView')"
-                @tap="setViewMode('grid')"
-              >
-                <svg class="view-toggle-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path v-for="(d, gi) in ICONS.gridView" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </view>
-              <view
-                class="view-toggle-btn"
-                :class="{ active: viewMode === 'list' }"
-                :title="$t('projects.listView')"
-                @tap="setViewMode('list')"
-              >
-                <svg class="view-toggle-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path v-for="(d, gi) in ICONS.listView" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </view>
-            </view>
             <!-- 「从团队案件库取一份案卷」：被邀请的同事取回案卷的唯一入口（dev-board#444 邀请话术第 2 步指的就是它）。 -->
             <template v-if="SHOW_CLOUD_ACCEPT && !isClientUser && projects.length > 0">
               <button class="btn-secondary-small" @tap="openCloudAccept">{{ $t('projects.pullFromTeamLibrary') }}</button>
@@ -71,7 +48,7 @@
           <text v-if="busy" class="create-busy-hint">{{ busyText }}</text>
         </view>
 
-        <AccountProjectCatalog v-if="isDesktop && !isClientUser" :local-projects="projects" :current-project-id="currentProjectId" @imported="onCatalogImported" />
+        <AccountProjectCatalog v-if="isDesktop && !isClientUser" :local-projects="projects" :current-project-id="currentProjectId" @imported="onCatalogImported" @open-project="goToProject" />
         <view class="panel-projects">
           <!-- 事项概览条（dev-board#898，spec 2026-09-25-task-calendar-redesign E2）：取代原来那张
                「N 全部项目」大统计卡。后三格可点，进日程页并滚到对应分组。
@@ -104,8 +81,7 @@
             </view>
           </view>
 
-          <!-- 名称搜索与排序（v0.49.0 BUG-09）：纯前端过滤。列表视图点表头排序，
-               方块视图没有表头，给一个排序下拉。排序选择记在本机。 -->
+          <!-- 名称搜索与排序：纯前端过滤，窄栏用下拉选择隐藏日期列的排序。 -->
           <view v-if="!projectsLoading && projects.length > 0" class="project-list-toolbar">
             <input
               class="project-search-input"
@@ -114,7 +90,7 @@
               :placeholder="$t('projects.searchPlaceholder')"
               @input="e => { searchQuery = (e.detail && e.detail.value) || '' }"
             />
-            <view v-if="viewMode === 'grid'" class="project-sort">
+            <view class="project-sort">
               <text class="project-sort-label">{{ $t('projects.sortLabel') }}</text>
               <AwdSelect class="project-sort-select" :range="sortOptionLabels" :value="sortOptionIndex" @change="onSortPick" />
             </view>
@@ -153,112 +129,7 @@
             </view>
           </view>
 
-          <view v-else-if="viewMode === 'grid'" class="project-grid">
-            <view
-              v-for="project in visibleProjects"
-              :key="project.id"
-              class="project-item-card"
-              :class="[getProjectCardClass(project.projectType), { 'is-current': isCurrent(project) }]"
-              @tap="goToProject(project.id)"
-            >
-              <view class="card-top-row">
-                <!-- 「空白项目」这个标签不再渲染：绝大多数案卷都是 BLANK，一屏
-                     全是同一个词，占着卡片最显眼的一行却什么也没说。非 BLANK 的
-                     历史项目（重组/收购/定增…）保留标签，那里它确实是信息。 -->
-                <view v-if="project.projectType && project.projectType !== 'BLANK'" class="project-type-badge-new">
-                  <text class="badge-text-new">{{ getProjectTypeLabel(project.projectType) }}</text>
-                </view>
-                <view v-else class="card-top-spacer"></view>
-                <view v-if="!isClientUser" class="card-actions">
-                  <view class="action-btn-icon danger" @tap.stop="handleDeleteProject(project.id)" :title="$t('projects.delete')"><svg class="act-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in ICONS.trash" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg></view>
-                </view>
-              </view>
-
-              <view class="card-main-content">
-                <view class="project-title-area">
-                  <view v-if="renamingProjectId === project.id" class="rename-box" @tap.stop>
-                    <input
-                      class="rename-input"
-                      v-model="renameValue"
-                      :focus="true"
-                      @confirm="confirmRename"
-                      @blur="cancelRename"
-                    />
-                  </view>
-                  <view v-else class="title-row-flex">
-                    <text class="project-title-new" @tap.stop="startRename(project)" :title="$t('projects.renameHint')">{{ project.name }}</text>
-                    <view class="project-role-badge" :class="getRoleClass(project.myRole)">
-                      <text class="role-text">{{ getRoleLabel(project.myRole) }}</text>
-                    </view>
-                  </view>
-                </view>
-
-                <!-- 卡片正文：原先 BLANK 项目这里只有一句「通用项目工作区」，
-                     等于一张没有任何有效信息的卡。改成真实字段——客户与最近修改。 -->
-                <view class="company-info-area">
-                  <view class="info-row-new" v-if="shouldShowListedCompany(project.projectType)">
-                    <text class="info-label-new">{{ $t('projects.listedCompany') }}</text>
-                    <text class="info-val-new highlight">{{ project.listedCompanyName || '-' }}</text>
-                  </view>
-                  <view class="info-row-new" v-if="shouldShowTargetCompany(project.projectType)">
-                    <text class="info-label-new">{{ $t('projects.targetCompany') }}</text>
-                    <text class="info-val-new">{{ project.targetCompanyName || '-' }}</text>
-                  </view>
-                  <view class="info-row-new" v-if="showClientRow(project)">
-                    <text class="info-label-new">{{ $t('projects.clientColumn') }}</text>
-                    <text class="info-val-new">{{ clientText(project) }}</text>
-                  </view>
-                  <view class="info-row-new">
-                    <text class="info-label-new">{{ $t('projects.updatedColumn') }}</text>
-                    <text class="info-val-new">{{ formatTime(project.lastActivityAt) || '—' }}</text>
-                  </view>
-                </view>
-              </view>
-
-              <view class="card-footer-new">
-                <view class="members-area-new">
-                  <view class="manager-avatar-wrapper" v-if="project.managerId && !isSoloLocal(project)" :title="$t('projects.managerLabel', { name: project.managerName || $t('projects.unknown') })">
-                    <image v-if="project.managerAvatarUrl" :src="project.managerAvatarUrl" class="manager-avatar-img" />
-                    <view v-else class="manager-avatar-placeholder">{{ project.managerName?.charAt(0) || 'M' }}</view>
-                    <view class="manager-badge-icon"><svg class="badge-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in ICONS.crown" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg></view>
-                  </view>
-                  <view class="members-divider" v-if="project.managerId && !isSoloLocal(project) && getInternalMembers(project).length > 0"></view>
-
-                  <view class="members-split-container">
-                    <view class="members-group">
-                      <view v-for="member in getInternalMembers(project)" :key="member.id" class="member-avatar-new" :title="member.displayName">
-                        <image v-if="member.avatarUrl" :src="member.avatarUrl" class="avatar-img-new" />
-                        <view v-else class="avatar-placeholder-new">{{ member.displayName?.charAt(0) || 'U' }}</view>
-                        <view v-if="canManageMembers(project) && member.userId !== userInfo.id" class="member-remove-overlay" @tap.stop="removeMember(project.id, member.userId)">×</view>
-                      </view>
-                      <view v-if="canManageMembers(project)" class="add-member-btn-new" @tap.stop="openInviteModal(project.id)">+</view>
-                    </view>
-
-                    <view class="members-vertical-divider" v-if="getClientMembers(project).length > 0"></view>
-
-                    <view class="members-group clients-group" v-if="getClientMembers(project).length > 0">
-                      <text class="client-group-label">{{ $t('projects.clientLabel') }}</text>
-                      <view v-for="member in getClientMembers(project)" :key="member.id" class="member-avatar-new client-avatar" :title="$t('projects.clientMemberTitle', { name: member.displayName })">
-                        <image v-if="member.avatarUrl" :src="member.avatarUrl" class="avatar-img-new" />
-                        <view v-else class="avatar-placeholder-new client-placeholder">{{ member.displayName?.charAt(0) || $t('projects.clientInitial') }}</view>
-                        <view v-if="canManageMembers(project)" class="member-remove-overlay" @tap.stop="removeMember(project.id, member.userId)">×</view>
-                      </view>
-                    </view>
-                  </view>
-                </view>
-                <view class="footer-meta">
-                  <text class="time-text-new">{{ $t('projects.createdAtShort', { time: formatTime(project.createdAt) }) }}</text>
-                  <view class="enter-btn-arrow">
-                    <text class="arrow-char">→</text>
-                  </view>
-                </view>
-              </view>
-            </view>
-          </view>
-
-          <!-- 列表视图。方块视图一行只放得下三张卡、每张卡还只承载两三个字段；
-               案卷上了两位数之后要找一份具体的案卷，列表才是能一眼扫完的形态。
-               列名与方块视图承载的是同一批字段，没有哪个视图独占信息。 -->
+          <!-- 项目侧栏统一紧凑列表；旧网格偏好不再改变此处布局。 -->
           <view v-else class="project-table">
             <view class="ptable-head">
               <text class="ptable-col col-name is-sortable" :class="{ 'is-sorted': sort.key === 'name' }" @tap="toggleSort('name')">{{ $t('projects.nameColumn') }}{{ sortArrow('name') }}</text>
@@ -287,7 +158,7 @@
                   />
                 </view>
                 <template v-else>
-                  <text class="ptable-name">{{ project.name }}</text>
+                  <text class="ptable-name" :title="project.name">{{ project.name }}</text>
                   <view class="project-role-badge" :class="getRoleClass(project.myRole)">
                     <text class="role-text">{{ getRoleLabel(project.myRole) }}</text>
                   </view>
@@ -319,8 +190,7 @@
                 <view v-if="canManageMembers(project)" class="add-member-btn-new" @tap.stop="openInviteModal(project.id)">+</view>
               </view>
               <view class="ptable-col col-ops">
-                <!-- 列表里点行是「打开」，所以改名不能再挂在名字上（方块视图那边
-                     点标题改名的老交互保留不动），单独给一个动作按钮。 -->
+                <!-- 点行打开项目；改名单独给一个动作按钮。 -->
                 <view v-if="!isClientUser" class="action-btn-icon" @tap.stop="startRename(project)" :title="$t('projects.rename')">
                   <svg class="act-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in ICONS.pencil" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
                 </view>
@@ -405,8 +275,6 @@ import AwdSelect from '@/components/AwdSelect.vue'
 import AccountProjectCatalog from './AccountProjectCatalog.vue'
 import { SORT_KEYS, DEFAULT_SORT, SORT_STORAGE_KEY, normalizeSort, nextSort, filterAndSortProjects } from '@/utils/projectListSort.js'
 
-const VIEW_MODE_KEY = 'checkba_project_list_view'
-
 // 「从团队案件库取一份案卷」入口暂时收起（用户反馈 5）。方法 openCloudAccept 与
 // 「从团队案件库取一份案卷」入口开关：官方案件库上线后必须为 true（被邀请方没有别的取回入口）。
 const SHOW_CLOUD_ACCEPT = true
@@ -432,7 +300,7 @@ export default {
     /** 工作台当前打开的项目 id（无项目态为 null）：高亮那一张卡，点它不再重进一次 */
     currentProjectId: { type: [Number, String], default: null },
   },
-  emits: ['project-renamed'],
+  emits: ['activate-current-project', 'project-renamed'],
   computed: {
     ICONS() {
       return ICONS
@@ -440,11 +308,11 @@ export default {
     SHOW_CLOUD_ACCEPT() {
       return SHOW_CLOUD_ACCEPT
     },
-    // 两个视图渲染的都是它：名称搜索 + 排序之后的结果（this.projects 原样不动）
+    // 列表使用名称搜索 + 排序之后的结果（this.projects 原样不动）
     visibleProjects() {
       return filterAndSortProjects(this.projects, this.searchQuery, this.sort)
     },
-    // 方块视图的排序下拉：三列 × 两个方向摊平成六项（AwdSelect 点当前项不发 change，
+    // 排序下拉：三列 × 两个方向摊平成六项（窄栏会隐藏日期列，仍可在这里选排序；AwdSelect 点当前项不发 change，
     // 没法靠「再点一次」翻方向）
     sortOptions() {
       return SORT_KEYS.flatMap((key) => (key === 'name' ? ['asc', 'desc'] : ['desc', 'asc']).map((dir) => ({ key, dir })))
@@ -521,9 +389,6 @@ export default {
       currentInviteProjectId: null,
       showCloudAccept: false,
 
-      // 视图模式：'grid' 方块 / 'list' 列表。默认方块（与改造前形态一致），
-      // 选择记在本机，不进后端——它是这台机器上这个人的习惯，不是账户设置。
-      viewMode: 'grid',
       // 名称搜索关键词（不记住：回到列表页该看到全部案卷）与排序（记在本机）
       searchQuery: '',
       sort: { ...DEFAULT_SORT },
@@ -551,7 +416,6 @@ export default {
     this._overlayHolder = 'project-list-pane-' + overlaySeq
   },
   mounted() {
-    this.restoreViewMode()
     this.restoreSort()
     this.loadUserInfo()
     this.loadProjects()
@@ -628,19 +492,6 @@ export default {
       } finally {
         if (shouldAcceptResponse(seq, this.loadProjectsSeq)) this.projectsLoading = false
       }
-    },
-
-    // ---- 视图模式 ----
-    restoreViewMode() {
-      try {
-        const saved = uni.getStorageSync(VIEW_MODE_KEY)
-        if (saved === 'grid' || saved === 'list') this.viewMode = saved
-      } catch (e) { /* 存储不可用就用默认值，不拦路 */ }
-    },
-    setViewMode(mode) {
-      if (mode !== 'grid' && mode !== 'list') return
-      this.viewMode = mode
-      try { uni.setStorageSync(VIEW_MODE_KEY, mode) } catch (e) { /* ignore */ }
     },
 
     // ---- 排序 ----
@@ -741,18 +592,6 @@ export default {
      *   ③ 都没有就显示 —，不编一个
      * **推断值不写回档案**：档案字段的语义是「谁说的算」，把猜的混进去会稀释掉手填锁。
      */
-    /**
-     * 方块视图要不要单列一行「客户」。列表视图没有上市/标的公司那两行，永远显示。
-     * 这里的条件只为躲一种重复：旧类型项目已经把上市公司列在上面，而
-     * clientText 在没有客户成员时正好回落到同一个名字，两行会一模一样。
-     */
-    showClientRow(project) {
-      // 律师自己填过就一定显示，哪怕上面已经列了上市公司——那是他指定的客户
-      if (this.profileValue(project, 'client')) return true
-      if (this.getClientMembers(project).length) return true
-      // 剩下的是推断值，已单列上市公司时不再重复一遍
-      return !this.shouldShowListedCompany(project.projectType)
-    },
     /** 这一行的客户是律师自己填的，还是我们推出来的——列表视图据此给个弱提示 */
     clientIsInferred(project) {
       return !this.profileValue(project, 'client') && this.clientText(project) !== '—'
@@ -777,27 +616,11 @@ export default {
       return '—'
     },
 
-    // ---- 卡片展示 ----
+    // ---- 项目字段展示 ----
     // Project.projectType 是重大资产重组时代的遗留列，只用于旧数据回显；
     // 概览页的「事项类型」以 project_profile_field.matterType 为准，两者冲突时不提示
     getProjectTypeLabel(projectType) {
       return getProjectTypeLabel(projectType) || projectType
-    },
-    getProjectCardClass(type) {
-      if (['MAJOR_ASSET_RESTRUCTURING', 'ACQUISITION'].includes(type)) {
-        return 'card-style-restructuring'
-      } else if (['PRIVATE_PLACEMENT', 'PUBLIC_PLACEMENT'].includes(type)) {
-        return 'card-style-refinancing'
-      } else if (type === 'BLANK') {
-        return 'card-style-blank'
-      }
-      return 'card-style-default'
-    },
-    shouldShowListedCompany(type) {
-      return type !== 'BLANK'
-    },
-    shouldShowTargetCompany(type) {
-      return ['MAJOR_ASSET_RESTRUCTURING', 'ACQUISITION'].includes(type)
     },
     formatTime(timeStr) {
       if (!timeStr) return ''
@@ -816,12 +639,15 @@ export default {
     isCurrent(project) {
       return this.currentProjectId != null && Number(project && project.id) === Number(this.currentProjectId)
     },
-    // 点卡片直接进工作台（带 id）。本面板就挂在工作台里，这一跳是「离开当前工作台」：
+    // 点项目行直接进工作台（带 id）。本面板就挂在工作台里，这一跳是「离开当前工作台」：
     // 走注入的 leaveWorkbench 先落盘再 reLaunch（工作台参与的跳转一律 reLaunch）。
-    // 点的就是当前打开的那个项目时什么都不做——重进一次等于把标签与编辑器全拆了。
+    // 点当前项目只展开资源管理器；不重建页面，以保留标签与编辑器。
     goToProject(projectId) {
-      if (this.currentProjectId != null && Number(projectId) === Number(this.currentProjectId)) return
-      const url = `/pages/project-overview/project-overview?id=${projectId}`
+      if (this.currentProjectId != null && Number(projectId) === Number(this.currentProjectId)) {
+        this.$emit('activate-current-project')
+        return
+      }
+      const url = `/pages/project-overview/project-overview?id=${projectId}&pane=files`
       if (this.leaveWorkbench) {
         this.leaveWorkbench(url)
         return

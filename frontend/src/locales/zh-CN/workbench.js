@@ -46,6 +46,7 @@ export default {
   commandPaletteEmpty: '没有匹配的命令',
   // 顶栏项目信息
   renameProject: '重命名项目…',
+  renameProjectHint: '点击改名；Enter 保存，Esc 取消',
   unnamedProject: '未命名项目',
   switchRecentProject: '切换到最近项目',
   recentProjects: '最近项目',

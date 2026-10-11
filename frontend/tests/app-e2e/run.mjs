@@ -656,7 +656,7 @@ try {
   }
 
   // ============ J2 左栏「项目」面板 + 统一设置页的「个人」组 ============
-  //  ① 项目列表直链落到工作台外壳的「项目」面板，能加载出卡片（J3 的起点，必须先立住）。
+  //  ① 项目列表直链落到工作台外壳的「项目」面板，能加载出项目行（J3 的起点，必须先立住）。
   //     dev-board#1047 起 pages/project-list 是直链薄壳：redirectTo 外壳 ?pane=projects，
   //     内容本体是 components/project-list/ProjectListPane.vue（.project-list-pane）。
   //  ② 个人内容仍然到得了、四个栏目都不是空白页
@@ -679,10 +679,10 @@ try {
         () => location.hash.includes('pages/project-overview/project-overview') && location.hash.includes('pane=projects'),
         { timeout: 20000 })
     }
-    await page.waitForSelector('.project-list-pane .project-item-card', { timeout: 20000 })
+    await page.waitForSelector('.project-list-pane .ptable-row', { timeout: 20000 })
   }
 
-  await step('项目列表直链 → 外壳「项目」面板加载出项目卡片', async () => {
+  await step('项目列表直链 → 外壳「项目」面板加载出项目行', async () => {
     // 这一步刻意走直链（新文档，不在工作台里），验薄壳页的 redirectTo
     if (await page.$('.page-project-overview')) throw new Error('直链断言要从工作台之外出发')
     await gotoProjectsPane()
@@ -758,11 +758,11 @@ try {
   // 所以后面回工作台必须先点回「资源管理器」（见「回到工作台继续后续旅程」）。
   console.log('== J3 两级导航 ==')
 
-  await step('「项目」面板点卡片 → 直达工作台', async () => {
+  await step('「项目」面板点项目行 → 直达工作台', async () => {
     await gotoProjectsPane()
     await waitText(QA.project.slice(0, 8))
-    // 卡片标题绑定 @tap.stop=startRename（点名字=重命名），进入要点卡片主体
-    await mouseClickSel('.project-item-card')
+    // 项目行主体（包括名称）进入项目；重命名使用独立操作按钮。
+    await mouseClickSel('.project-list-pane .ptable-row')
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview'), { timeout: 20000 })
     await waitText('资源管理器', 30000)
@@ -787,7 +787,7 @@ try {
     if (cards !== 1) throw new Error('浏览器降级下新建卡应当恰好 1 张，实际 ' + cards)
     if (!t.includes('新建项目')) throw new Error('列表下方缺新建入口')
     if (t.includes('打开文件…')) throw new Error('「单独打开文件」应当已从新建入口去掉')
-    await mouseClickSel('.project-item-card')
+    await mouseClickSel('.project-list-pane .ptable-row')
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview'), { timeout: 20000 })
     await waitText('资源管理器', 30000)
@@ -858,7 +858,7 @@ try {
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview') && location.hash.includes('pane=projects'),
       { timeout: 15000 })
-    await page.waitForSelector('.project-list-pane .project-item-card', { timeout: 15000 })
+    await page.waitForSelector('.project-list-pane .ptable-row', { timeout: 15000 })
     // uni h5 的页面栈在 DOM 里是并存的（navigateTo 压栈时旧页留在文档里只是隐藏），
     // 所以根节点计数就是页面栈实例数的直接证据。
     const n = await page.evaluate(() => ({
@@ -870,7 +870,7 @@ try {
   })
 
   await step('回到工作台继续后续旅程', async () => {
-    await mouseClickSel('.project-item-card')
+    await mouseClickSel('.project-list-pane .ptable-row')
     await page.waitForFunction(
       () => location.hash.includes('pages/project-overview/project-overview'), { timeout: 20000 })
     // **这里不能用 waitText('资源管理器')**：上一步点过「项目概览」，leftPaneKey 已经

@@ -23,19 +23,31 @@
               <input
                 class="rename-input"
                 v-model="renameProjectName"
-                :focus="true"
+                :focus="renameProjectFocused"
+                :disabled="renameProjectSaving"
+                :ignore-composition-event="false"
+                :confirm-hold="true"
+                :aria-label="$t('workbench.renameProject')"
+                :title="$t('workbench.renameProjectHint')"
+                @input="updateRenameProjectDraft"
                 @confirm="confirmRenameProject"
+                @keydown="handleRenameProjectKeydown"
+                @compositionstart="renameProjectComposing = true"
+                @compositionend="renameProjectComposing = false"
                 @blur="cancelRenameProject"
               />
             </view>
-            <!-- IDE 化：最近项目切换器（VS Code 的 Open Recent 语义）。
-                 整块「项目名 + ▾」都是切换器的命中区：启动落点改成项目列表页之后，
-                 「换一个项目」成了高频动作，只把一个 11px 的箭头当热区没人找得到。
-                 重命名随之移进菜单（点名字改名是隐藏交互，本来也没人知道）。 -->
-            <view v-else class="project-switcher" @tap.stop="toggleProjectSwitcher" :title="$t('workbench.switchRecentProject')">
-              <text class="project-name" :title="project.name || $t('workbench.unnamedProject')">{{ project.name || $t('workbench.unnamedProject') }}</text>
-              <text class="switcher-arrow" :class="{ 'is-open': projectSwitcherOpen }">▾</text>
-            </view>
+            <button v-else-if="canRenameProject" type="button" class="project-name project-name-edit" role="button" tabindex="0"
+              :title="$t('workbench.renameProjectHint')" :aria-label="$t('workbench.renameProject')"
+              @click.stop="startRenameProject" @keydown="handleProjectTitleActivation($event, 'rename')"
+              @keyup="handleProjectTitleActivation($event, 'rename')">{{ project.name || $t('workbench.unnamedProject') }}</button>
+            <text v-else class="project-name" :title="project.name || $t('workbench.unnamedProject')">{{ project.name || $t('workbench.unnamedProject') }}</text>
+            <button type="button" class="project-switcher" role="button" tabindex="0" :title="$t('workbench.switchRecentProject')"
+              :aria-label="$t('workbench.switchRecentProject')" :aria-expanded="projectSwitcherOpen"
+              @click.stop="toggleProjectSwitcher" @keydown="handleProjectTitleActivation($event, 'switch')"
+              @keyup="handleProjectTitleActivation($event, 'switch')">
+              <text class="switcher-arrow" :class="{ 'is-open': projectSwitcherOpen }" aria-hidden="true">▾</text>
+            </button>
             <view v-if="projectSwitcherOpen" class="switcher-mask" @tap.stop="projectSwitcherOpen = false"></view>
             <view v-if="projectSwitcherOpen" class="switcher-menu" @tap.stop>
               <view class="switcher-title"><text>{{ $t('workbench.recentProjects') }}</text></view>
@@ -55,9 +67,6 @@
               </view>
               <view class="switcher-item switcher-home" @tap="goProjectHome">
                 <text>{{ $t('workbench.projectHome') }}</text>
-              </view>
-              <view class="switcher-item switcher-rename" @tap="startRenameFromSwitcher">
-                <text>{{ $t('workbench.renameProject') }}</text>
               </view>
               <view class="switcher-item switcher-all" @tap="goAllProjects">
                 <text>{{ $t('workbench.allProjects') }}</text>
@@ -657,6 +666,7 @@
             v-else-if="leftPaneKey === 'projects'"
             :current-project-id="projectId"
             @project-renamed="onProjectRenamedFromPane"
+            @activate-current-project="showCurrentProjectFiles"
           />
           <DdFilesPanel
             v-else-if="leftPaneKey === 'dd-files'"
@@ -2608,6 +2618,11 @@ export default {
       enabledSkillIds: null,
       easyVoiceImportCallback: null,
       renameProjectName: '',
+      renameProjectTargetId: null,
+      renameProjectSaving: false,
+      renameProjectComposing: false,
+      renameProjectSkipConfirm: false,
+      renameProjectFocused: false,
       userDisplayName: this.$t('workbench.defaultUserName'),
 
       // 授权状态（试用版标识，商业化解锁门）
@@ -3147,6 +3162,12 @@ export default {
       const me = (this.projectMembers || []).find(m => Number(m.userId) === Number(uid))
       if (!me || !me.role) return true
       return me.role === 'ADMIN' || me.role === 'PARTICIPANT'
+    },
+    // ProjectController.updateProject is owner-only, stricter than document write access.
+    canRenameProject() {
+      const uid = this.currentUser && this.currentUser.id
+      return !this.isClientView && uid != null && this.project?.userId != null
+        && String(uid) === String(this.project.userId)
     },
     FILE_BATCH_ACTIONS() {
       return FILE_BATCH_ACTIONS
@@ -3787,6 +3808,10 @@ export default {
     if (query && query.pane === 'projects') {
       this.leftPaneKey = 'projects'
       this.sidebarCollapsed = false
+    }
+
+    if (query?.pane === 'files' && this.hasProject && user?.role !== 'CLIENT') {
+      this.showCurrentProjectFiles()
     }
 
     // Restore active tabs for this project/mode
@@ -4529,6 +4554,11 @@ export default {
         this.switcherLoadFailed = true
       }
     },
+    showCurrentProjectFiles() {
+      this.leftPaneKey = this.isClientView ? 'dd-files' : 'files'
+      this.sidebarCollapsed = false
+      uni.setStorageSync(workbenchStorageKey(this.projectId, 'leftPaneKey'), this.leftPaneKey)
+    },
     switchToProject(p) {
       this.projectSwitcherOpen = false
       if (!p || Number(p.id) === Number(this.projectId)) return
@@ -5213,36 +5243,92 @@ export default {
       return isTabVisibleInPane(file, this.leftPaneKey)
     },
     startRenameProject() {
+      if (this.isClientView || !this.canRenameProject || this.renameProjectSaving) return
+      this.projectSwitcherOpen = false
+      this.renameProjectTargetId = this.projectId
       this.renameProjectName = this.project.name || ''
+      this.renameProjectComposing = false
+      this.renameProjectSkipConfirm = false
+      this.renameProjectFocused = true
       this.isRenamingProject = true
     },
-    startRenameFromSwitcher() {
-      this.projectSwitcherOpen = false
-      this.startRenameProject()
+    handleProjectTitleActivation(event, action) {
+      if (event.isComposing || event.keyCode === 229 || !['Enter', ' '].includes(event.key)) return
+      // Activate on release: otherwise the newly focused uni-input receives Enter keyup and confirms immediately.
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.repeat || event.type !== 'keyup') return
+      if (action === 'rename') this.startRenameProject()
+      else if (action === 'switch') this.toggleProjectSwitcher()
     },
-    async confirmRenameProject() {
-      // 名字必须在 await 之前取下来存成局部变量。uni-app H5 的 input 在派发 @confirm
-      // 之后会立刻 input.blur()（confirm-hold 默认 false），模板上 @blur 绑的正是
-      // cancelRenameProject——它同步把 renameProjectName 清成 ''。await 回来再读这个
-      // 字段，写进标题的就是空串（显示成「未命名项目」），而服务端存的其实是对的。
-      const newName = (this.renameProjectName || '').trim()
+    updateRenameProjectDraft(event) {
+      const value = event && event.detail && event.detail.value
+      if (typeof value === 'string') this.renameProjectName = value
+    },
+    handleRenameProjectKeydown(event) {
+      if (event.isComposing || event.keyCode === 229 || this.renameProjectComposing) {
+        // uni's keyup confirm drops native IME flags, even after compositionend.
+        this.renameProjectSkipConfirm = true
+        return
+      }
+      this.renameProjectSkipConfirm = false
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        this.cancelRenameProject()
+      } else if (event.key === 'Enter') {
+        // The uni confirm event on keyup owns submission (and the latest input value).
+        event.preventDefault()
+      }
+    },
+    async confirmRenameProject(event) {
+      if (this.renameProjectSkipConfirm) {
+        this.renameProjectSkipConfirm = false
+        return
+      }
+      if (!this.isRenamingProject || this.renameProjectSaving || this.renameProjectComposing
+          || event?.isComposing || event?.keyCode === 229 || this.isClientView || !this.canRenameProject) return
+      // uni v-model may lag the native field by 100ms; confirm/keydown owns the latest value.
+      const submitted = event?.detail?.value ?? event?.target?.value
+      const newName = (typeof submitted === 'string' ? submitted : this.renameProjectName || '').trim()
+      this.renameProjectName = newName
       if (!newName) {
         uni.showToast({ title: this.$t('workbench.projectNameEmpty'), icon: 'none' })
         return
       }
+      const projectId = this.renameProjectTargetId
+      if (String(projectId) !== String(this.projectId)) return this.cancelRenameProject()
+      if (newName === this.project.name) return this.cancelRenameProject()
+      this.renameProjectSaving = true
+      this.renameProjectFocused = false
       try {
-        await renameProject(this.projectId, newName)
+        await renameProject(projectId, newName)
+        if (String(this.projectId) !== String(projectId)) return
         this.project.name = newName
         this.isRenamingProject = false
         uni.showToast({ title: this.$t('workbench.renameSuccess'), icon: 'success' })
       } catch (e) {
-        console.error('重命名失败', e)
+        if (String(this.projectId) !== String(projectId)) return
+        // Keep the failed draft editable; Enter can retry without opening another dialog.
         uni.showToast({ title: this.$t('workbench.renameFailed'), icon: 'none' })
+      } finally {
+        this.renameProjectSaving = false
+        if (String(this.projectId) !== String(projectId)) this.cancelRenameProject()
+        else if (this.isRenamingProject) {
+          // uni watches focus changes; wait until the failed field is enabled before refocusing.
+          await this.$nextTick()
+          if (this.isRenamingProject && String(this.projectId) === String(projectId)) this.renameProjectFocused = true
+        }
       }
     },
     cancelRenameProject() {
+      // confirm may trigger blur while the request is pending. Do not destroy a retryable draft.
+      if (this.renameProjectSaving) return
       this.isRenamingProject = false
       this.renameProjectName = ''
+      this.renameProjectTargetId = null
+      this.renameProjectComposing = false
+      this.renameProjectSkipConfirm = false
+      this.renameProjectFocused = false
     },
     toggleFileMoreMenu() {
       this.showFileMoreMenu = !this.showFileMoreMenu
