@@ -5965,10 +5965,11 @@ export default {
         }
         recordProjectVisit(this.projectId)
         syncRecentToMenuFetching()
-        this.loadProjectMembers()
         this.checkAdoptConflict()
         loadProjectTasks(this.projectId).catch((e) => console.warn('[project-overview] 读取事项失败', e))
         this.fetchCollabState().then(() => {
+          // 先确认是否已关联案件库，否则首次加载会只留下本机成员。
+          this.loadProjectMembers()
           if (!this.collabLinked) return
           this.fetchCollabState({ online: true })
           this.startCollabPolling()

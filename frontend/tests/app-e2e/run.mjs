@@ -3075,13 +3075,21 @@ try {
   })
 
   await step('J12 左栏面板标题是 Explorer（.sidebar-title 文本）', async () => {
-    // 左栏面板 key 跨 reload 持久（J11/J10 收尾停在版本面板），先点 rail 切回
-    // 资源管理器——顺带就是对 [title="Explorer"] 这个英文锚点的真实点击验证。
+    // 面板 key 和收起状态都跨 reload 持久。同一 rail 按钮会切换展开/收起，
+    // 已展开 Explorer 时先验证收起，再真实点击打开，避免盲点一次反而把它关掉。
+    const explorerOpen = await page.evaluate(() => {
+      const el = document.querySelector('.sidebar-left:not(.collapsed) .sidebar-title')
+      return !!el && el.innerText.trim().toLowerCase() === 'explorer'
+    })
+    if (explorerOpen) {
+      await mouseClickSel('[title="Explorer"]')
+      await page.waitForSelector('.sidebar-left.collapsed', { timeout: 15000 })
+    }
     await mouseClickSel('[title="Explorer"]')
     // 大小写不敏感：.sidebar-title 带 text-transform:uppercase，而 innerText 返回的是
     // 变换后的文本（"EXPLORER"）——按原文大小写断言会永远失败。
     await page.waitForFunction(() => {
-      const el = document.querySelector('.sidebar-title')
+      const el = document.querySelector('.sidebar-left:not(.collapsed) .sidebar-title')
       return !!el && el.innerText.trim().toLowerCase() === 'explorer'
     }, { timeout: 15000 })
   })
