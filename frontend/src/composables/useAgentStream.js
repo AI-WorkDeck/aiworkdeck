@@ -282,6 +282,7 @@ export function useAgentStream() {
         // TodoListService 约定跨轮保留直到下一次 todo_write，不能在“继续”时清空。
         planTodos: [...planTodos.value],
         artifacts: [],
+        fileChanges: [],
         walkthrough: '',
         content: '', // Main Answer (from <final> tag)
         // 模型反问（<question> 标签）解析结果，供问题卡渲染：
@@ -439,6 +440,7 @@ export function useAgentStream() {
         if (currentConversationId.value !== id) {
             console.log('[AgentStream] Conversation changing:', currentConversationId.value, '->', id)
             resetSSE()
+            fileChanges.value = []
         }
         currentConversationId.value = id
     }
@@ -800,6 +802,7 @@ export function useAgentStream() {
         }
         resetParser()
         const next = createAssistantBubble()
+        next.originClientRequestId = entry.clientRequestId || null
         next.isStreaming = true
         next.thinking.status = 'thinking'
         next.thinking.startTime = Date.now()
@@ -863,6 +866,7 @@ export function useAgentStream() {
             }
 
             const newBubble = createAssistantBubble()
+            newBubble.originClientRequestId = requestId
             newBubble.isStreaming = true
             newBubble.thinking.status = 'thinking'
             newBubble.thinking.startTime = Date.now()
@@ -1460,6 +1464,36 @@ export function useAgentStream() {
             return
         }
 
+        // Handle File Changes (Added/Modified)
+        if (evt === 'file_change') {
+            try {
+                const d = JSON.parse(dataStr)
+                // d: { fileName: "...", changeType: "ADDED" | "MODIFIED", fileId: 42 | null }
+                // fileId（dev-board#852）：后端知道是哪份文件时带上，卡片按 id 打开；旧后端没有这个字段。
+                if (!['ADDED', 'MODIFIED'].includes(d.changeType) || !d.fileName || d.success === false || d.status === 'error') return
+                const change = { fileName: d.fileName, changeType: d.changeType, fileId: d.fileId ?? null, projectId: d.projectId ?? null }
+                if (d.conversationId && d.conversationId !== currentConversationId.value) return
+                const bubble = d.clientRequestId
+                    ? (bubbles.value.find(b => b.role === 'ASSISTANT' && b.originClientRequestId === d.clientRequestId)
+                        || (d.assistantMessageId && bubbles.value.find(b => b.role === 'ASSISTANT' && String(b.id) === String(d.assistantMessageId))))
+                    : d.assistantMessageId ? bubbles.value.find(b => String(b.id) === String(d.assistantMessageId))
+                        : currentAssistantBubble.value // Older backends have no correlation fields.
+                if (!bubble) return // Never attach a known but unmatched old turn to the current one.
+                if (bubble) {
+                    bubble.fileChanges ||= []
+                    if (!bubble.fileChanges.some(f => isSameFileChange(f, change))) bubble.fileChanges.push(change)
+                }
+                const exists = fileChanges.value.some(f => f.assistantBubbleId === bubble.id && isSameFileChange(f, change))
+                if (!exists) {
+                    fileChanges.value.push({ ...change, assistantBubbleId: bubble?.id })
+                }
+                console.log('[AgentStream] File Change:', d)
+            } catch (e) {
+                console.error('Failed to parse file_change', e)
+            }
+            return
+        }
+
         if (!currentAssistantBubble.value) {
             // 终态事件不能因气泡指针缺失而丢弃：重连落在"RUNNING 但快照未建"窗口时
             // 若把 bubble_end/error/cancelled 一并吞掉，isStreaming 永久锁死、输入框
@@ -1745,22 +1779,7 @@ export function useAgentStream() {
 
         // heartbeat 与三个后台任务事件已在气泡守卫之前处理（见上）
 
-        // Handle File Changes (Added/Modified)
-        if (evt === 'file_change') {
-            try {
-                const d = JSON.parse(dataStr)
-                // d: { fileName: "...", changeType: "ADDED" | "MODIFIED", fileId: 42 | null }
-                // fileId（dev-board#852）：后端知道是哪份文件时带上，卡片按 id 打开；旧后端没有这个字段。
-                const change = { fileName: d.fileName, changeType: d.changeType, fileId: d.fileId ?? null, projectId: d.projectId ?? null }
-                const exists = fileChanges.value.some(f => isSameFileChange(f, change))
-                if (!exists) {
-                    fileChanges.value.push(change)
-                }
-                console.log('[AgentStream] File Change:', d)
-            } catch (e) {
-                console.error('Failed to parse file_change', e)
-            }
-        }
+
     }
 
     // 状态恢复（重连续流）：后端把本轮已生成的全量文本快照重放给前端。
@@ -2794,6 +2813,7 @@ export function useAgentStream() {
             if (!conversationId) return
             try {
                 const resp = await getConversationMetadata(conversationId)
+                if (currentConversationId.value !== conversationId) return
                 // resp: { fileChanges: [...], tokenUsage: { promptTokens, completionTokens, totalTokens } }
                 if (resp.fileChanges) {
                     fileChanges.value = resp.fileChanges

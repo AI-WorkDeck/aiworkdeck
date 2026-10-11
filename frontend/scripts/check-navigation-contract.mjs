@@ -183,20 +183,19 @@ check('项目列表页薄壳与「项目」面板的文件都存在', () => {
 const hasSelector = (css, sel) =>
   css.includes(sel + ' ') || css.includes(sel + '\n') || css.includes(sel + ',')
 
-check('project-list-pane.scss 搬齐了必需的样式块', () => {
+check('project-list-pane.scss 保留统一紧凑列表所需的样式块', () => {
   const css = readFrontend(LIST_PANE_SCSS)
-  // .btn-primary-small 已被 .awd-btn/.awd-btn-primary 取代（命名弹窗按钮改走 awd-* 视觉语言）；
-  // .card-deco-header 已随卡片重设计删除（不再用顶部 4px 色条区分项目类型，见「Card 重设计」提交）——
-  // 两处都是有意的设计变更，不是搬迁遗漏，从必需清单里去掉。
+  // #1205：窄侧栏统一列表，旧网格/卡片不是必要结构；继续保护项目行、
+  // 搜索排序、成员操作与加载/空态。命名弹窗仍使用 awd-* 按钮。
   const need = [
     '.project-list-pane', '.project-list-container', '.main-content',
     '.content-header', '.header-actions', '.awd-btn', '.awd-btn-primary', '.btn-secondary-small',
     '.cloud-accept-entry', '.projects-stats-row', '.stat-card',
-    '.project-grid', '.project-item-card', '.action-btn-icon',
-    '.project-title-new', '.card-footer-new', '.member-avatar-new', '.add-member-btn-new',
-    '.enter-btn-arrow', '.empty-state-dashed', '.dashed-icon',
+    '.project-table', '.ptable-head', '.ptable-row', '.ptable-item', '.ptable-name', '.ptable-sub',
+    '.project-list-toolbar', '.project-search-input', '.project-sort', '.action-btn-icon',
+    '.member-avatar-new', '.add-member-btn-new', '.empty-state-dashed', '.dashed-icon',
     '.project-role-badge', '.role-owner', '.role-text',
-    '.manager-avatar-wrapper', '.members-split-container', '.clients-group',
+    '.manager-avatar-wrapper',
     '.act-glyph', '.badge-glyph',
   ].filter((sel) => !hasSelector(css, sel))
   return need.length ? '缺样式块: ' + need.join(', ') : null

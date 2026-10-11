@@ -11,10 +11,10 @@ const SRC = readFileSync(new URL('../../src/components/project-list/ProjectListP
 const ZH = readFileSync(new URL('../../src/locales/zh-CN/projects.js', import.meta.url), 'utf8')
 const EN = readFileSync(new URL('../../src/locales/en-US/projects.js', import.meta.url), 'utf8')
 
-test('project-title-new（方块视图点名重命名）带 title 提示', () => {
-  const line = SRC.split('\n').find((l) => l.includes('class="project-title-new"'))
-  assert.ok(line, '应能找到 project-title-new 渲染行')
-  assert.match(line, /:title="\$t\('projects\.renameHint'\)"/, '点名重命名的入口缺少可发现性 tooltip')
+test('统一列表的重命名动作有明确 title，点名称只进入项目', () => {
+  assert.match(SRC, /@tap.stop="startRename\(project\)" :title="\$t\('projects.rename'\)"/)
+  assert.match(SRC, /class="ptable-row" @tap="goToProject\(project.id\)"/)
+  assert.doesNotMatch(SRC, /class="project-title-new"/)
 })
 
 test('projects.renameHint 中英文案齐备', () => {

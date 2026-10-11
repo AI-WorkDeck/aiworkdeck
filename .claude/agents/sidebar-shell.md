@@ -1126,16 +1126,9 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - `frontend/src/config/panelRegistry.js` — 可停靠面板注册表（**取代了原 `config/tools.js` 的 `WORKBENCH_TOOLS`，那个文件已删**，底栏三项现在是「停在 bottom 档的面板」）；`fileActions.js` — 文件树批量操作；`workbenchActions.js` — OCR/内链 scheme 常量。
 - `frontend/src/components/FileTree.vue`（5225 行）— 左栏文件树。
 - 各页面（行数实测）：login.vue(931)、newproject/index.vue(680)、wizard.vue(1007，重跑语义见 PR#134)、userprofile.vue（**已是薄壳页**，2026-08-20 起挂 `AdminPane initial-nav="work_log"`，个人中心的四栏内容在 `components/userprofile/Personal*Panel.vue`）、variable-library.vue(543)、admin.vue(**已是薄壳页 ~30 行**，实体在 `components/admin/AdminPane.vue`，含插件广场入口；原来的「记忆同步」面板 nav key `memory` 已随 dev-board#440 撤掉，见 version-control.md)、plugin-market.vue(22，**已是薄壳页**，实体在 `MarketPane`)。
-- **项目列表**（2026-09-29 起）：内容本体 `frontend/src/components/project-list/ProjectListPane.vue` + 同目录 `project-list-pane.scss`（根 `.project-list-pane`，开容器查询 `project-list-pane`，≤520px 收成单列卡 / 三列表）；`pages/project-list/project-list.vue` 是直链薄壳（根仍是 `.page-project-list`）。下面这段描述的内容、类名与门控全部跟着搬进了 Pane，只有三处不同：没有页面大标题（外壳 `.sidebar-header` 出「项目」）、页头的「日程 / 反馈 / 个人中心」按钮不搬（rail 上各有入口）、离开工作台的跳转（进项目 / 删当前项目 / 去日程 / 浏览器端新建）一律走注入的 `leaveWorkbench`。首次启动的「可选组件」面板搬到工作台 `onLoad`（只在无项目态触发），当日事项摘要 `todayDigest` 搬到工作台 `mounted`。
+- **项目列表**（2026-09-29 起）：内容本体 `frontend/src/components/project-list/ProjectListPane.vue` + 同目录 `project-list-pane.scss`（根 `.project-list-pane`，开容器查询 `project-list-pane`，≤520px 收成紧凑项目行）；`pages/project-list/project-list.vue` 是直链薄壳（根仍是 `.page-project-list`）。下面这段描述的内容、类名与门控全部跟着搬进了 Pane，只有三处不同：没有页面大标题（外壳 `.sidebar-header` 出「项目」）、页头的「日程 / 反馈 / 个人中心」按钮不搬（rail 上各有入口）、离开工作台的跳转（进项目 / 删当前项目 / 去日程 / 浏览器端新建）一律走注入的 `leaveWorkbench`。首次启动的「可选组件」面板搬到工作台 `onLoad`（只在无项目态触发），当日事项摘要 `todayDigest` 搬到工作台 `mounted`。
 - **项目列表页（2026-09-29 前的形态）** `frontend/src/pages/project-list/project-list.vue` + 同目录 `project-list.scss`（样式 `@import` 引入，照 project-overview.vue + .scss 的既有形制）。整块搬自 `userprofile.vue` 的 projects tab，卡片类名 `.project-item-card` 保持不变（e2e 锚点）；页面根 `.page-project-list`。**新建入口在列表下方**（`.create-section`，两张 `.create-card`：打开文件夹 / 新建项目文件夹，走 `utils/ideOpen.js` 的 `openFolderFlow`/`createFolderFlow`，命名弹窗同页）；「单独打开一个文件」已去掉——它造出的是没有归属的临时项目（`openFileFlow` 仍留给应用菜单与拖拽）。浏览器版没有系统文件夹对话框，降级为 navigateTo `newproject` 页填表建托管空白项目。承载 `InviteMemberDialog` 与 `CloudAcceptDialog`（**这两个必须一起搬**，`CloudAcceptDialog` 的两个入口是协作唯一入口，`CollabDialog.vue:271` 的邀请话术还指着它）。CLIENT 隐藏「+ 新建项目」「从团队案件库取一份案卷」与卡片上的删除/重命名/邀请。角色文案唯一来源是 `config/memberRoles.js`（搬迁时把原来硬编码的 `getRoleLabel` 映射表换掉）。**不要搬**「进行中/已完成」那两张统计卡——它们是写死的字面量 0，Project 实体根本没有状态字段。
-**双视图（2026-08-18）**：页头右侧 `.view-toggle` 两个按钮切 `viewMode`（`'grid'`/`'list'`），
-选择记在 `uni.storage` 的 `checkba_project_list_view`（本机习惯，不进后端）。默认仍是 grid，
-`.project-item-card` 因此一直在——**app-e2e 的 J2 就钉在这个类名上，改默认视图会让它红**。
-列表视图根 `.project-table`，行 `.ptable-row`，列 `.col-name/.col-client/.col-created/.col-updated/.col-members/.col-ops`。
-两个视图承载同一批字段（名称/客户/创建时间/最近修改/成员），没有哪个视图独占信息。
-卡片上**「空白项目」标签已不渲染**（`projectType === 'BLANK'` 时留 `.card-top-spacer` 占位，
-非 BLANK 的历史项目照旧显示类型），原来那句「通用项目工作区」占位与
-`projects.blankWorkspace` 文案一并删除。
+**统一列表（2026-10-11，dev-board#1205）**：用户明确窄侧栏只要言简意赅的高密度项目行。已删除 grid/list 切换、网格分支与旧 `checkba_project_list_view` 偏好读取；旧值不影响布局。列表根 `.project-table`、行 `.ptable-row`，E2E 使用 `.project-list-pane .ptable-row`。账户目录同样单行呈现名称和“本机 / 云端 / 可获取 / 待电脑开启”，完整位置放 title，“其他位置”独立按钮保留。
 **项目档案接进列表了（2026-08-18 二改）**：`ProjectCardDTO.profile` 是
 `fieldKey → 值` 的 map，**只含已填的**，键就是 `ProjectProfileService.FIELD_KEYS`
 （client / matterType / openedAt / nextStep / counterparty）。取数是
@@ -1147,13 +1140,12 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - **客户是一等列，常显**；`clientText()` 先读 `profile.client`（律师手填、`source='user'`
   锁定、AI 抽取只写 pending 永不覆盖），**没填过才**回落到推断：① CLIENT 系角色成员
   ② listedCompanyName ③ targetCompanyName ④ `—`。列表视图给推断值加灰字 +「推断」小标，
-  免得律师以为那是自己填的（`clientIsInferred()`）；方块视图里手填值一定显示，
-  推断值才被「已单列上市公司」那条躲开（`showClientRow()`）。
+  免得律师以为那是自己填的（`clientIsInferred()`）。
 - **推断值绝不回写档案**：档案字段的语义是「谁说的算」，把猜的混进去会稀释掉那把手填锁。
 - 其余四项收在**页头的「详情」开关**后面（`.detail-toggle`，`checkba_project_list_detail`，
-  默认关，两个视图共用同一个开关）。列表视图渲染成主行下面的第二行（`.ptable-detail`，
+  默认关，统一列表沿用同一个开关）。列表视图渲染成主行下面的第二行（`.ptable-detail`，
   因此 `v-for` 挂在外层 `.ptable-item` 上、边框与悬停也上提到那一层，主行只剩高度）；
-  方块视图追加成卡片里的 info-row。**一项没填的案卷整条详情行不渲染**——空行只占地方。
+  **一项没填的案卷整条详情行不渲染**——空行只占地方。
   显示顺序是「事项类型 / 对方 / 立项时间 / 下一步」，不照搬 FIELD_KEYS（那是档案头的排版序）：
   先认这是哪一类活、跟谁打，`nextStep` 常常是一整句话，放末位才不会把前面几项挤没。
 - 想再加字段：后端不用动（map 是全量的），前端在 `detailFields()` 里加一行 + 补两条 locale。
@@ -1379,3 +1371,21 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 同一个项目只有一个 projectUid，可从此处查看云附件与其他设备文件，包括已有本地副本的项目。
 目标本机项目必须明确选择；云文件直接取回，桌面文件先报价确认，再持久化 requestId 后 PULL；
 读取各来源失败保留已成功加载部分并说明原因。账户scope守卫、落盘/ACK顺序见 mobile-sync.md。
+
+## 账户项目入口与等待（dev-board#1195/#1199）
+
+`AccountProjectCatalog` 的 `localProjectId` 由本地后端按本设备 deviceId、项目 key 和项目所有者核对，只以此判断本机项目，禁止按名称合并。本机项目点击 emit `open-project`，`ProjectListPane.goToProject` 走注入的 `leaveWorkbench`（保留 flushDirtyEditors）并带 `pane=files`。当前项目点击只 emit `activate-current-project` 打开文件面板，不能重建工作台丢编辑器状态；客户角色仍走 dd-files。
+
+本机项目若存在其他文件来源，显示独立兄弟按钮“其他位置”，调用 openLocations 查看云附件及其他设备，不与主按钮嵌套。远程项目就地展开文件清单，不阻塞其他项目按钮。目录加载、LIST 等待和单文件导入各自有状态。项目选择/关闭递增 generation，LIST 每次 await 后及轮询前后核对；请求固定 accountScope，不再从可能已切换的 selected 动态取值。关闭仅停止 UI 等待，不冒称撤销已发往设备的服务端任务。云端快照文件可在其他设备 LIST 等待时按需获取，仍沿用目标本机项目、报价确认、幂等下载及 ACK 既有链路。
+
+律师可见状态改为“这台电脑·可直接打开 / 可获取·设备名 / 需打开电脑·设备名 / 云端文件”；长设备名省略，title 保留完整操作说明，不直接显示 deviceId。只有服务端确定的本机映射才能使用本机入口。
+
+## 项目页面密度（dev-board#1196）
+
+项目侧栏统一紧凑列表，移除双视图与旧偏好读取。圆角/主字号/间距消费全局 token；窄于 360px 隐藏固定宽日期列，保留搜索和日期排序。Catalog 为边界分隔的整行按钮，不再是大圆角卡片包小卡片；项目概览 Profile/Stats 保留容器查询，主信息使用 body13，减少块间留白而非缩字。
+
+验证：项目入口行为回归、脏编辑器保护、迟到响应与本机来源核验通过；主任务用QA账号真实H5工作台验证点击进入pane=files并显示测试文件，用独立真实组件合成夹具验证220/260px入口和其他位置。正式桌面发布不包含在本次源码修复交付中。
+
+## 顶部项目名称原位编辑（dev-board#1204）
+
+名称点击进入原位输入，Enter/confirm保存、Esc取消；小箭头独立打开项目切换菜单，不再放重命名菜单项。按ProjectController所有者规则显示入口，CLIENT不编辑。uni会把button编译为uni-button，必须显式role/tabindex与Enter/Space处理，不能仅靠HTML标签假定键盘可用。草稿从input/confirm实时值取，防IME、重复请求和confirm后blur；失败保留草稿，迟到结果不覆盖已切换的项目。主任务用独立QA项目实际验证修改、取消及恢复原名。

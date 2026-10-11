@@ -9,6 +9,7 @@ const component=new Function('requestAccountCatalog',script)(()=>{})
 function fixture(request,poll){
   const vm={...component.data(),$t:k=>k,request,poll}
   vm.open=component.methods.open.bind(vm)
+  vm.openLocations=component.methods.openLocations.bind(vm)
   return vm
 }
 test('one unavailable desktop retains cloud files and exposes incomplete/error',async()=>{

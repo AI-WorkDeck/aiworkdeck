@@ -333,7 +333,7 @@ export default {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--awd-bg);
+  background: var(--awd-surface);
 }
 
 /* 额度提示贴在列表上方，不占据滚动区，避免翻到底才看到 */
@@ -345,7 +345,7 @@ export default {
 .clip-body {
   flex: 1;
   min-height: 0;
-  padding: 16px;
+  padding: var(--awd-space-4);
 }
 
 /* 空态（BUG-68）：与文档主区域 .empty-workspace 同一套图标+双行文案范式，
@@ -367,8 +367,8 @@ export default {
   justify-content: center;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 18px;
-  box-shadow: 0 1px 2px rgba(33, 38, 41, 0.04), 0 10px 24px rgba(46, 90, 80, 0.08);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
 }
 
 .empty-state-img {
@@ -378,39 +378,39 @@ export default {
 
 .empty-title {
   margin-top: 16px;
-  font-size: 13.5px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .empty-sub {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 /* Horizontal Scroll Layout */
 .list-grid {
   display: inline-flex;
-  gap: 16px;
+  gap: var(--awd-space-4);
   height: 100%;
   align-items: stretch;
-  padding: 4px; /* Fix border clipping */
+  padding: var(--awd-space-1); /* Fix border clipping */
 }
 
 .clip-card {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: var(--awd-radius-md);
+  padding: var(--awd-space-3);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--awd-space-3);
   width: 240px; /* Fixed width */
   flex-shrink: 0;
   transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
   position: relative;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  box-shadow: var(--awd-shadow-sm);
   /* Fixed Height */
   height: 130px; 
   cursor: default;
@@ -418,8 +418,8 @@ export default {
 }
 
 .clip-card:hover {
-  border-color: var(--awd-mint);
-  box-shadow: 0 8px 16px rgba(137, 168, 160, 0.12);
+  border-color: var(--awd-accent-text);
+  box-shadow: var(--awd-shadow-md);
   transform: translateY(-2px);
 }
 
@@ -427,7 +427,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--awd-space-2);
   flex-shrink: 0;
 }
 
@@ -447,13 +447,13 @@ export default {
 }
 
 .badge-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .clip-source {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -461,8 +461,8 @@ export default {
 }
 
 .time-label {
-  font-size: 11px;
-  color: var(--awd-text-3);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -473,7 +473,7 @@ export default {
 .cli-actions-top {
   display: flex;
   flex-direction: row;
-  gap: 4px;
+  gap: var(--awd-space-1);
   flex-shrink: 0;
   align-items: flex-start;
 }
@@ -484,7 +484,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: transparent;
   border: 1px solid transparent;
   cursor: pointer;
@@ -520,8 +520,8 @@ export default {
   flex: 1;
   min-height: 0;
   background: var(--awd-surface-2);
-  border-radius: 6px;
-  padding: 8px;
+  border-radius: var(--awd-radius-md);
+  padding: var(--awd-space-2);
   overflow: hidden;
   position: relative;
   display: block; /* Reset flex */
@@ -529,7 +529,7 @@ export default {
 
 /* Content Types */
 .content-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   line-height: 1.5;
   
@@ -548,13 +548,13 @@ export default {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
 }
 
 .content-file {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--awd-space-2);
   height: 100%;
 }
 
@@ -573,9 +573,9 @@ export default {
   margin-top: 8px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  padding: 8px;
+  border-radius: var(--awd-radius-md);
+  box-shadow: var(--awd-shadow-md);
+  padding: var(--awd-space-2);
   z-index: 100;
   min-width: 120px;
   display: flex;
@@ -602,7 +602,7 @@ export default {
 }
 
 .pop-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   text-align: center;
   font-weight: 500;
@@ -612,15 +612,15 @@ export default {
 .pop-row {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--awd-space-2);
 }
 
 .pop-btn {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   padding: 4px 0;
   text-align: center;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   cursor: pointer;
   background: var(--awd-bg);
   color: var(--awd-text-2);
@@ -642,7 +642,7 @@ export default {
 }
 
 .file-name {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   overflow: hidden;
   text-overflow: ellipsis;

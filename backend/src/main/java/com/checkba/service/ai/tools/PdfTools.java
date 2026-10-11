@@ -335,6 +335,7 @@ public class PdfTools implements AgentToolComponent {
 
             String base = baseName(file.getName());
             StringBuilder report = new StringBuilder();
+            java.util.List<Object> producedFiles = new java.util.ArrayList<>();
             int done = 0;
             // 逐段分别登记：某一段失败不回滚已经产出的那几份（文件已经在文件树里了，
             // 说成失败会让用户去找一个其实存在的文件），如实逐条报告成功与失败。
@@ -344,13 +345,20 @@ public class PdfTools implements AgentToolComponent {
                     int pages = pdfEditService.extractPages(localPath, target, seg.pages());
                     return String.format("%s（%d 页）", pageLabel(seg.pages()), pages);
                 });
-                if (!line.startsWith("Error:")) done++;
-                report.append(line).append('\n');
+                if (GeneratedFileLocation.createdId(line) != null) {
+                    done++;
+                    producedFiles.add(new com.fasterxml.jackson.databind.ObjectMapper().readTree(line));
+                } else {
+                    report.append(line).append('\n');
+                }
             }
             String failures = done == segments.size() ? ""
                     : String.format("（%d 段失败，只重试失败的那几段，不要整份重拆）", segments.size() - done);
-            return String.format("已把『%s』（共 %d 页）拆分为 %d / %d 份%s，原件保持不变：\n%s",
+            String message = String.format("已把『%s』（共 %d 页）拆分为 %d / %d 份%s，原件保持不变：\n%s",
                     file.getName(), total, done, segments.size(), failures, report.toString().strip());
+            if (done == 0) return "Error: " + message;
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of(
+                    "status", "success", "files", producedFiles, "message", message));
         } catch (Exception e) {
             return errorOf("拆分 PDF 失败", e);
         }
@@ -552,10 +560,10 @@ public class PdfTools implements AgentToolComponent {
                 editorBridgeService.noteGenerated(runKey, docx.getId());
                 editorBridgeService.sendRefreshFilesAction();
                 editorBridgeService.sendOpenFileAction(docx);
-                return String.format("已将扫描件『%s』经本地 MinerU OCR 识别并转换为 Word 文档『%s』（文件 ID: %d），已在编辑器中打开（加载需要时间；随后的 doc_* 调用若返回 EDITOR_BOOTING，就等一等再重试同一步）。\n" +
+                return GeneratedFileLocation.createdResult(docx, String.format("已将扫描件『%s』经本地 MinerU OCR 识别并转换为 Word 文档『%s』（文件 ID: %d），已在编辑器中打开（加载需要时间；随后的 doc_* 调用若返回 EDITOR_BOOTING，就等一等再重试同一步）。\n" +
                         "说明：这是 OCR 内容级转换（识别文字并保留段落结构，不保留原版式；识别结果建议人工核对）。\n" +
                         "接下来可用 doc_* 编辑工具修改该 docx（修改带修订痕迹）。",
-                        file.getName(), docx.getName(), docx.getId());
+                        file.getName(), docx.getName(), docx.getId()));
                 }
             }
 
@@ -581,10 +589,10 @@ public class PdfTools implements AgentToolComponent {
 
                     editorBridgeService.sendRefreshFilesAction();
                     editorBridgeService.sendOpenFileAction(docx);
-                    return String.format("已将『%s』版式级转换为 Word 文档『%s』（文件 ID: %d），已在编辑器中打开（加载需要时间；随后的 doc_* 调用若返回 EDITOR_BOOTING，就等一等再重试同一步）。\n" +
+                    return GeneratedFileLocation.createdResult(docx, String.format("已将『%s』版式级转换为 Word 文档『%s』（文件 ID: %d），已在编辑器中打开（加载需要时间；随后的 doc_* 调用若返回 EDITOR_BOOTING，就等一等再重试同一步）。\n" +
                             "说明：版式级转换（pdf2docx），段落/表格/图片/分栏尽量保留原排版。\n" +
                             "接下来可用 doc_* 编辑工具修改该 docx（修改带修订痕迹，用户可逐条接受/拒绝）。",
-                            file.getName(), docx.getName(), docx.getId());
+                            file.getName(), docx.getName(), docx.getId()));
                 } finally {
                     Files.deleteIfExists(tempOut);
                 }
@@ -606,7 +614,7 @@ public class PdfTools implements AgentToolComponent {
             editorBridgeService.noteGenerated(runKey, docx.getId());
             editorBridgeService.sendRefreshFilesAction();
             editorBridgeService.sendOpenFileAction(docx);
-            return LangText.of(
+            return GeneratedFileLocation.createdResult(docx, LangText.of(
                     String.format("已将『%s』按用户同意做了结构级转换，得到 Word 文档『%s』（文件 ID: %d），已在编辑器中打开（加载需要时间）。\n" +
                             "说明：结构级转换只保留文字与段落，原文的表格与版式已丢失。向用户如实说明这一点。\n" +
                             "接下来可用 doc_* 编辑工具修改该 docx（修改带修订痕迹）。",
@@ -616,7 +624,7 @@ public class PdfTools implements AgentToolComponent {
                             + "Note: a structural conversion keeps only the text and paragraphs; the original tables and "
                             + "layout have been lost. Tell the user this plainly.\n"
                             + "You can now edit the docx with the doc_* tools (edits are tracked).",
-                            file.getName(), docx.getName(), docx.getId()));
+                            file.getName(), docx.getName(), docx.getId())));
         } catch (Exception e) {
             return errorOf("PDF 转 Word 失败", e);
         }
@@ -773,8 +781,8 @@ public class PdfTools implements AgentToolComponent {
             created.setFileSize(Files.size(target));
             projectFileRepository.save(created);
 
-            return String.format("%s 新文件『%s』（文件 ID: %d）已保存在原件所在目录。",
-                    summary, created.getName(), created.getId());
+            return GeneratedFileLocation.createdResult(created, String.format("%s 新文件『%s』（文件 ID: %d）已保存在原件所在目录。",
+                    summary, created.getName(), created.getId()));
         } catch (PdfEditService.PdfEditException e) {
             return "Error: " + e.getMessage();
         } catch (Exception e) {

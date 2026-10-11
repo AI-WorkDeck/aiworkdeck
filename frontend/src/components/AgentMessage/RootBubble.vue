@@ -125,6 +125,15 @@
               @answer="$emit('answer-question', $event)"
             />
 
+            <div v-if="fileChanges.length" class="turn-files">
+              <button v-for="file in fileChanges" :key="String(file.fileId || file.fileName)"
+                type="button" class="turn-file" @click="$emit('open-file', file)">
+                <span class="turn-file-name">{{ file.fileName }}</span>
+                <span class="turn-file-kind">{{ $t(file.changeType === 'ADDED' ? 'chat.fileCreated' : 'chat.fileModified') }}</span>
+                <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+
             <!-- 6. Walkthrough (Summary) - Temporarily hidden as per user request -->
             <!-- <WalkthroughCard
               v-if="bubble.walkthrough"
@@ -161,13 +170,14 @@ import { resolveSavedPath } from '@/utils/planReview.js'
 
 const props = defineProps({
   bubble: { type: Object, required: true },
+  fileChanges: { type: Array, default: () => [] },
   /** 是否为最新一条助手消息（决定计划卡是否可操作） */
   isLatest: { type: Boolean, default: false },
   /** 计划审阅（dev-board#1022）：编辑器回传的审阅态，按 fileId 索引，由 ChatInterface 持有 */
   reviewStates: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'open-review', 'stop-generation'])
+const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'open-review', 'stop-generation', 'open-file'])
 
 // 计划文件的相对路径：历史回放没有 saved 事件，计划卡靠它反查 fileId。流式中不算（正文还在长）。
 const savedPath = computed(() => (props.bubble.isStreaming ? '' : resolveSavedPath(props.bubble.content) || ''))
@@ -273,6 +283,13 @@ function isApprovalPending(art) {
 </script>
 
 <style scoped>
+.turn-files { display: grid; gap: var(--awd-space-1); margin-top: var(--awd-space-3); }
+.turn-file { display: flex; align-items: center; gap: var(--awd-space-2); width: 100%; min-width: 0; min-height: var(--awd-control-height); margin: 0; padding: var(--awd-space-2); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); cursor: pointer; font: inherit; text-align: left; }
+.turn-file:hover { background: var(--awd-surface-2); }
+.turn-file:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent); outline-offset: var(--awd-focus-offset); }
+.turn-file-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.turn-file-kind { flex-shrink: 0; color: var(--awd-text-2); font-size: var(--awd-font-size-body); }
+
 .root-bubble-wrapper {
     width: 100%;
 }
@@ -533,5 +550,8 @@ function isApprovalPending(art) {
 }
 @media (prefers-reduced-motion: reduce) {
   .chat-attention-flash { animation: none; }
+}
+@media (pointer: coarse) {
+  .turn-file { min-height: var(--awd-control-height-touch); }
 }
 </style>

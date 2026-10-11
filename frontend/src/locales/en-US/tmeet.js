@@ -2,6 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  disconnectFailed: 'Could not disconnect Tencent Meeting. Please retry.',
+  installRequired: 'The Tencent Meeting connector is not installed on this computer. See the plugin instructions to install it.',
+  retry: 'Retry',
+  statusFailed: 'Unable to check the connection. Try again.',
+  connectFailed: 'Unable to start authorization. Check the connector and try again.',
+  configFailed: 'Unable to load or save sync settings. Try again.',
+  listFailed: 'Unable to load meetings. Try again.',
+  prepareFailed: 'Unable to prepare meeting material. Retry before sending it to AI.',
+
   panelTitle: 'Tencent Meeting',
   authStatus: 'Connection Status',
   account: 'Account',

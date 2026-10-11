@@ -909,8 +909,8 @@ public class DocumentEditTools implements AgentToolComponent {
             temp = null;
             created.setFileSize((long) bytes.length);
             projectFileRepository.save(created);
-            return String.format("已把『%s』导出为 PDF『%s』（文件 ID: %d，%d KB），放在原文档所在的文件夹；原文档没有改动。",
-                    source.getName(), created.getName(), created.getId(), Math.max(1, bytes.length / 1024));
+            return GeneratedFileLocation.createdResult(created, String.format("已把『%s』导出为 PDF『%s』（文件 ID: %d，%d KB），放在原文档所在的文件夹；原文档没有改动。",
+                    source.getName(), created.getName(), created.getId(), Math.max(1, bytes.length / 1024)));
         } catch (Exception e) {
             log.error("Failed to save exported pdf: {}", name, e);
             return "Error: 导出 PDF 失败：保存到项目时出错：" + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());

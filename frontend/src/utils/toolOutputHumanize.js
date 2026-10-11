@@ -88,3 +88,11 @@ export function humanizeToolOutput(raw) {
   if (lines.length >= MAX_LINES) lines.push('…（其余略）')
   return lines.length ? lines.join('\n') : null
 }
+
+
+// Tool catalog, skill instructions and rendering schemas guide the model; they are
+// not user results. Classify their provenance, never hide Markdown/code in answers.
+export function isInternalToolOutput(item) {
+  const name = String(item?.code || '').trim().match(/^(?:[\w]+\.)?([\w]+)\s*(?:\(|$)/)?.[1]
+  return ['litigation_reference', 'list_tools', 'use_skill'].includes(name)
+}
