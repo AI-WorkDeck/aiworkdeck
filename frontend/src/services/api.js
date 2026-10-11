@@ -4230,7 +4230,7 @@ export function getTmeetAuthStatus() {
 
 export function loginTmeet() {
   return request({
-    url: '/api/tmeet/auth/login',
+    url: '/api/tmeet/auth/login-start',
     method: 'POST'
   })
 }
@@ -4259,11 +4259,13 @@ export function updateTmeetSyncConfig(data) {
 }
 
 export function syncTmeetMeetings(options = {}) {
+  const params = new URLSearchParams()
+  if (options.projectId != null) params.set('projectId', String(options.projectId))
+  if (options.force != null) params.set('force', String(options.force))
+  const query = params.toString()
   return request({
-    url: '/api/tmeet/sync',
-    method: 'POST',
-    data: options,
-    header: { 'Content-Type': 'application/json' }
+    url: `/api/tmeet/sync${query ? `?${query}` : ''}`,
+    method: 'POST'
   })
 }
 
@@ -4301,14 +4303,14 @@ export function exportTmeetToDoc(recordId, projectId) {
 export function getTmeetMinutesPrompt(recordId) {
   return request({
     url: `/api/tmeet/meetings/${recordId}/minutes-prompt`,
-    method: 'GET'
+    method: 'POST'
   })
 }
 
 export function getTmeetTodosPrompt(recordId) {
   return request({
     url: `/api/tmeet/meetings/${recordId}/todos-prompt`,
-    method: 'GET'
+    method: 'POST'
   })
 }
 

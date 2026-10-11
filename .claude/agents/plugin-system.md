@@ -397,3 +397,9 @@ CSS 在弹窗期间把 `.pane-content` 里的 `iframe`/`webview` 置 `visibility
 验证：`mvn test -Dtest='Sensitive*Test'`（204 项，含新增 `SensitiveCredentialRulesTest`）；
 `npm run test:desensitize`（41 项，含新增 `tests/desensitize/credential-rules.test.mjs`）；
 `cd desktop && node --test tests/recovery-download.test.js`（7 项，已进 desktop `npm test` 清单）。
+
+## 内置腾讯会议面板契约（dev-board#1197，2026-10-11）
+
+用户截图对应旧内置TencentMeetingPanel，并非动态market插件。认证POST `/api/tmeet/auth/login-start`，状态字段为loggedIn/userName/cliAvailable；不存在`/auth/login`，错误请求会落到NoResourceFoundException。退出data=false不表示断开。同步POST `/sync` 的projectId/force在query（Controller @RequestParam）；两个AI材料端点minutes-prompt/todos-prompt为POST，取data.prompt字符串。失败不能伪造提示词或成功状态。
+
+面板统一消费awd语义token，搜索宽度100%/控件高度32px、触控至少48px，未知连接组件状态不启用连接。连接组件缺失、配置/列表读取失败有本地可操作说明；公共开关/选择器具可访问名称。验证见frontend/tests/tmeet/tmeet-panel-contract.test.mjs。QA隔离后端实读status/config/list通过；QA未装CLI，未声称完成供应商OAuth与真实同步。
