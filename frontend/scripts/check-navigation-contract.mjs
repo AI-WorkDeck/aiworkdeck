@@ -587,7 +587,8 @@ check('四条直达工作台的出口一条都没动', () => {
   // 2026-08-16：应用菜单的派发从 App.vue 收口进 appMenuBridge，「最近打开」与
   // 「切换项目」两条都落在那里。行为不变（仍是 reLaunch 直达工作台），锚点跟着搬。
   if (!readFrontend('src/utils/appMenuBridge.js').includes('/pages/project-overview/project-overview?id=')) bad.push('appMenuBridge 应用菜单「最近打开」')
-  if (!readFrontend('src/utils/ideOpen.js').includes('/pages/project-overview/project-overview?')) bad.push('ideOpen.js 打开本地文件夹/文件')
+  if (!readFrontend('src/utils/ideOpen.js').includes('createLocalOpenCoordinator') ||
+      !readFrontend('src/utils/localOpenCoordinator.js').includes('/pages/project-overview/project-overview?')) bad.push('ideOpen.js 打开本地文件夹/文件')
   const ov = readVue('src/pages/project-overview/project-overview.vue')
   const i = ov.indexOf('switchToProject(p) {') // 方法定义；'switchToProject(p)' 会先命中模板里的 @tap 调用
   if (i < 0 || !ov.slice(i, i + 400).includes('/pages/project-overview/project-overview?id=')) bad.push('顶栏切换器 switchToProject')
@@ -980,16 +981,19 @@ check('无项目态：项目面板不挂载、右栏 AI 不渲染、暂存区不
   const src = readVue('src/pages/project-overview/project-overview.vue')
   if (!extractDefinition(src, 'hasProject')) return '缺 hasProject 计算属性'
   const sw = readFrontend('src/pages/project-overview/panelSwitching.js')
-  if (!/if \(!this\.hasProject && !isPaneAllowedWithoutProject\(key\)\) return/.test(sw)) {
+  if (!/if \(\(!this\.hasProject \|\| this\.isLooseWorkspace\) && !isPaneAllowedWithoutProject\(key\)\) return/.test(sw)) {
     return 'toggleLeftPane 没有在无项目态拦下项目面板的 key'
   }
   if (!src.includes('v-if="aiPanelMounted && hasProject"')) return '右栏 AI 面板在无项目态仍会渲染'
   const tog = extractDefinition(src, 'toggleAiPanel')
   if (!tog || !tog.includes('if (!this.hasProject) return')) return 'toggleAiPanel 在无项目态没有直接返回'
   const onLoad = extractMethodBody(src, 'onLoad(query)')
-  const stagingAt = onLoad.indexOf('this.ensureStagingFolder()')
-  if (stagingAt < 0 || onLoad.lastIndexOf('if (query && query.id)', stagingAt) < 0) {
-    return 'ensureStagingFolder 必须留在 query.id 分支里（无项目态不建暂存区）'
+  const initProject = extractDefinition(src, 'loadProjectInfo') || ''
+  if (!onLoad.includes('if (query && query.id)') || !onLoad.includes('this.loadProjectInfo()') ||
+      !initProject.includes('if (this.isLooseWorkspace)') ||
+      initProject.indexOf('return') > initProject.indexOf('this.ensureStagingFolder()') ||
+      !initProject.includes('this.ensureStagingFolder()')) {
+    return '暂存区必须在真实项目初始化中创建，独立文件工作区须提前返回'
   }
   for (const f of ['src/pages/project-overview/project-overview.vue', 'src/pages/project-overview/panelSwitching.js']) {
     if (/`project_\$\{this\.projectId\}_(leftPaneKey|activeTabsByMode)`/.test(readFrontend(f))) {

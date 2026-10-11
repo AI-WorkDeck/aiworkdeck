@@ -545,3 +545,12 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
 - 即时审校（dev-board#547）：CI `test:inline-review` 覆盖宿主版本围栏、手动 AI 与 guest 中英文交互；`test:lowa-inline-review` 使用原生浏览器计时器并验证真实定位/修订/撤销，桌面 `tests/desktop-e2e/writing.mjs` 验证中文输入后本地规则自动启动。
 
 - 写作交互复测（dev-board#538/#541/#547/#549）：CI 增加 `test:insight` 覆盖链接预览、来源失效、目标已在后台时的分屏路由。`test:writing-caret` 可配 `LOWA_E2E_DPR=2` 在引擎启动前模拟 Retina，验证正文提取→光标菜单→Tab→撤销；`test:lowa-link-preview` 使用真实 Ctrl/Cmd 鼠标点击覆盖外链、书签和 REF。完整桌面用例要求 `WRITING_E2E_ROOT` 指向独立后端 cwd/user.home，复制壳并在 main 前隔离 Electron home/profile，避免接触用户资料。
+
+
+## 系统文件关联与打开队列（dev-board#1212）
+
+`desktop/main/open-paths.js` 接 macOS `open-file`、Windows 初次 argv 与 `second-instance`，主进程保留 FIFO 请求直到渲染层 ACK。`host.menu.openPathsReady()` 只在工作台 mounted 且标签恢复完成后调用；每条 `open-path` 的 `requestId` 在前端处理/显示错误后由 `ackOpenPath` 确认。hash 导航和重复 ready 不重投在途请求，真正 reload/crash/换窗重投未确认队首。窗口最小化不能注销仍存活的工作台保存出口。
+
+mac 的 `build.mac.fileAssociations` 用 `rank: Alternate`；Windows 在 `build/win/file-associations.nsh` 仅写本应用 ProgID、OpenWithProgids 和 Capabilities。**不要改成 electron-builder 24 的顶层 fileAssociations**：该版本 NSIS 内置宏会写扩展名默认值。安装/升级只登记候选，默认打开程序由用户选择；卸载只移除本应用登记。关联名单须与真实文件预览类型一致。
+
+回归：`desktop/tests/open-paths.test.js`、`file-associations.test.js`。`frontend/tests/desktop-e2e/local-files.mjs` 用全新 home/profile/H2/storage/端口测试源码 Electron 的冷启动队列、同名异目录、原位保存、PDF/Word；先构建 H5/editor/backend 并准备本地 LOWA 资源，`JAVA_HOME=<JDK21> node frontend/tests/desktop-e2e/local-files.mjs`。它注入原生打开事件，不能替代正式安装包的 Finder/Windows 打开方式验收。

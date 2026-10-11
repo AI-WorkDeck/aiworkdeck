@@ -252,6 +252,7 @@ public class ProjectFileService {
         Optional<ProjectFile> existing = projectFileRepository.findByProjectIdAndParentIdAndNameAndIsDeletedFalse(projectId, parentId, name);
         if (existing.isPresent()) {
             ProjectFile f = existing.get();
+            requireManagedFile(f);
             if (cloudStorageQuota != null && cloudStorageQuota.isEnabled()) {
                 cloudStorageQuota.lockFileForWrite(f);
                 // Metadata updates cannot hide physical bytes or orphan the previous storage key.
@@ -806,6 +807,8 @@ public class ProjectFileService {
         ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("文件不存在: ", "File not found: ") + fileId));
 
+        requireManagedFile(file);
+
         if (cloudStorageQuota != null) cloudStorageQuota.lockFileForWrite(file);
 
         // 权限检查已移至 Controller 层，这里不再检查创建者身份
@@ -885,6 +888,7 @@ public class ProjectFileService {
     public ProjectFile relinkExternallyMoved(Long fileId, Long newParentId, String newName, String logicalPath, Long userId) {
         ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("文件不存在: ", "File not found: ") + fileId));
+        requireManagedFile(file);
         file.setParentId(newParentId);
         file.setName(newName);
         file.setFilePath(requireProjectScopedPath(file.getProjectId(), logicalPath));
@@ -915,6 +919,7 @@ public class ProjectFileService {
     }
 
     private void softDeleteRecursive(ProjectFile file) {
+        requireManagedFile(file);
         // 如果是文件夹，递归软删除子文件
         if (Boolean.TRUE.equals(file.getIsFolder())) {
             List<ProjectFile> children = projectFileRepository.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(
@@ -987,6 +992,7 @@ public class ProjectFileService {
         if (file == null || storageResolver == null) {
             return List.of();
         }
+        requireManagedFile(file);
         List<java.nio.file.Path> resolved = new ArrayList<>();
         for (String key : collectPhysicalTargets(file)) {
             resolved.add(storageResolver.resolve(key));
@@ -1021,10 +1027,17 @@ public class ProjectFileService {
 
     /** 递归移除行（子孙含已软删除的，否则删不干净）；deletePhysical=false 时一个字节都不碰磁盘。 */
     private void purgeRecursive(ProjectFile file, boolean deletePhysical) {
+        requireManagedFile(file);
         if (deletePhysical) {
             deletePhysicalTargets(collectPhysicalTargets(file));
         }
         purgeRows(file);
+    }
+
+    private static void requireManagedFile(ProjectFile file) {
+        if (StringUtils.hasText(file.getExternalPath())) throw new IllegalArgumentException(LangText.of(
+                "独立文件请在 Finder 或资源管理器中移动、改名或删除",
+                "Move, rename or delete standalone files in Finder or File Explorer"));
     }
 
     /** 这一行在磁盘上对应的逻辑路径：文件取 filePath，文件夹按祖先链现拼。 */
@@ -1196,6 +1209,8 @@ public class ProjectFileService {
 
         ProjectFile file = projectFileRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("文件不存在: ", "File not found: ") + fileId));
+
+        requireManagedFile(file);
 
         if (cloudStorageQuota != null) cloudStorageQuota.lockFileForWrite(file);
 

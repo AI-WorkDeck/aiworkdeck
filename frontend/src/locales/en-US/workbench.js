@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Workbench copy (pages/project-overview/project-overview.vue).
 export default {
+  looseFiles: 'Open Files',
+  looseFilesEmpty: 'Open a file to get started',
+  looseFilesHint: 'Edit files in place, or open a folder as a project.',
+  looseFilesOpenFile: 'Open File…',
+  looseFilesOpenFolder: 'Open Folder…',
   mobileBackup: {
     "title": "Cloud file backup",
     "message": "Enable cloud file backup? Your desktop will upload supported project images, DOCX, PPTX, XLSX, PDF, audio and video to your account’s cloud storage. With an active subscription, files already backed up remain available while your desktop is offline. Backup is off by default and can be turned off in Settings.",

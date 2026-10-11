@@ -197,6 +197,7 @@ public class WorkSessionService {
      * 只此一笔提交，repoService.init 本身不认识清单也不需要改。
      */
     public void enableVersionRecording(long projectId, String authorName, String authorEmail) {
+        repoService.requireVersionRecordingSupported(projectId);
         ReentrantLock lock = repoLock(projectId);
         lock.lock();
         try {

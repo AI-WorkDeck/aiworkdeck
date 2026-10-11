@@ -1020,6 +1020,21 @@ class MobileRelayClientHttpTest {
     }
 
     @Test
+    void standaloneWorkspaceIsNotPublishedOrBackedUpEvenWithConsent() {
+        Project loose = new Project(); loose.setId(43L); loose.setName("Standalone files");
+        loose.setProjectType(Project.LOOSE_FILES); loose.setUserId(7L);
+        when(projectRepository.findByUserIdOrderByCreatedAtDesc(7L)).thenReturn(List.of(loose));
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        server.createContext("/api/mobile/backup/files", ex -> respond(ex, 200, "{\"files\":[]}"));
+        var client = service();
+        client.pushDirectory();
+        client.syncFileBackups();
+        assertTrue(dirBodies.isEmpty());
+        verify(projectFileService, never()).getFileTree(anyLong());
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
     void backupUploadsSupportedBytesOnceAndIncludesEmptyFolders() throws Exception {
         server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
         byte[] bytes = "synthetic-backup-pdf".getBytes(StandardCharsets.UTF_8);

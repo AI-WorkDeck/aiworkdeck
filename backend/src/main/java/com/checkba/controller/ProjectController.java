@@ -172,6 +172,20 @@ public class ProjectController {
         return result;
     }
 
+    @PostMapping("/open-local-file")
+    public Map<String, Object> openLocalFile(@RequestBody Map<String, Object> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new IllegalArgumentException("请先登录");
+        if (!localFolderProjectsEnabled) {
+            throw new IllegalArgumentException(com.checkba.service.LangText.of(
+                    "当前部署未开放打开本机文件功能", "This deployment does not support opening local files"));
+        }
+        LocalProjectService.OpenLocalFileResult r = localProjectService.openLocalFile((String) body.get("path"), userId);
+        return Map.of("code", 0, "data", Map.of("projectId", r.project().getId(),
+                "projectType", r.project().getProjectType(), "file", r.file(), "reused", r.reused()));
+    }
+
     /**
      * 项目物理根目录（「在 Finder 中显示」用）。托管项目也有物理目录，一样可用。
      */

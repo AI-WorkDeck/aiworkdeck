@@ -75,6 +75,7 @@ SetCompressorDictSize 32
 !endif
 
 !include "win\awd-oneclick-ui.nsh"
+!include "win\file-associations.nsh"
 
 !macro customWelcomePage
   !insertmacro AWD_UI_PAGE_WELCOME
@@ -106,6 +107,7 @@ SetCompressorDictSize 32
 !macroend
 
 !macro customInstall
+  !insertmacro AwdRegisterFileAssociations
   ; Windows 单包双架构（dev-board#341）：主体照旧是 x64 全量（后端 javacv 无
   ; windows-arm64 natives，Python 侧同样，只能留在转译层跑）；安装器额外携带一份
   ; 纯 arm64 Electron 壳（app.asar 零原生依赖、双架构通用，壳只有运行时文件，
@@ -123,4 +125,8 @@ SetCompressorDictSize 32
   !else
     !echo "arm64-shell 缺席：本次产物为纯 x64 安装器（CI 之外的构建路径属正常）"
   !endif
+!macroend
+
+!macro customUnInstall
+  !insertmacro AwdUnregisterFileAssociations
 !macroend

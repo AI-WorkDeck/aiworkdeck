@@ -1389,3 +1389,12 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 ## 顶部项目名称原位编辑（dev-board#1204）
 
 名称点击进入原位输入，Enter/confirm保存、Esc取消；小箭头独立打开项目切换菜单，不再放重命名菜单项。按ProjectController所有者规则显示入口，CLIENT不编辑。uni会把button编译为uni-button，必须显式role/tabindex与Enter/Space处理，不能仅靠HTML标签假定键盘可用。草稿从input/confirm实时值取，防IME、重复请求和confirm后blur；失败保留草稿，迟到结果不覆盖已切换的项目。主任务用独立QA项目实际验证修改、取消及恢复原名。
+
+
+## 独立文件工作区（dev-board#1212）
+
+系统打开方式与文件菜单共用 `utils/ideOpen.js` / `localOpenCoordinator.js`，单文件调用 `POST /api/projects/open-local-file {path}`；返回隐藏的每用户 `projectType=LOOSE_FILES` 工作区和 `file`。单文件不再切父目录项目；不同目录的文件进入同一工作区标签，重复打开聚焦已有标签。`hasProject` 保留编辑/AI上下文，`hasNamedProject` 控制项目管理入口；内部工作区不进最近项目/项目列表，不初始化暂存区、协作、版本和成员面板。
+
+工作台 mounted + restoreTabSnapshot 完成后注册打开接收器；只在 unload/销毁注销，不能在最小化的 onHide 注销。切工作区先等 `leaveWorkbench` 保存和导航回执，失败留原页；目标就绪超时从导航完成后计算，不把旧文档保存时间算进去。
+
+后端 `LocalProjectService.openLocalFile` 只登记明确选中的真实文件，`ProjectFile.externalPath` 不出 JSON。`ProjectStorageResolver` 按精确 key 映射外部文件，不授予父目录/兄弟文件访问；原文件保存先完整写同目录临时文件再替换，缺失或符号链接重绑失败，不重建原件。独立文件不启用 Git 项目版本，也不参与自动手机目录/备份；结构改动（删除/移动/改名）由 Finder/资源管理器处理。后端回归 `LooseFileWorkspaceTest`，前端 `loose-files-workspace.test.mjs`、`local-open-coordinator.test.mjs`。

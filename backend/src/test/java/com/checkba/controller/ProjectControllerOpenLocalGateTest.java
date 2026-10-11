@@ -46,6 +46,36 @@ class ProjectControllerOpenLocalGateTest {
     private ProjectController controller;
 
     @Test
+    void singleFileOpeningRequiresDesktopModeAndAnAuthenticatedSession() {
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
+            auth.when(() -> AuthController.getUserIdFromSession(null)).thenReturn(null);
+            assertThrows(IllegalArgumentException.class,
+                    () -> controller.openLocalFile(Map.of("path", "/tmp/file.pdf"), "sess"));
+            ReflectionTestUtils.setField(controller, "localFolderProjectsEnabled", true);
+            assertThrows(IllegalArgumentException.class,
+                    () -> controller.openLocalFile(Map.of("path", "/tmp/file.pdf"), null));
+            verify(localProjectService, never()).openLocalFile(any(), any());
+        }
+    }
+
+    @Test
+    void desktopSingleFileResponseContainsTheFileAndWorkspaceType() {
+        ReflectionTestUtils.setField(controller, "localFolderProjectsEnabled", true);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
+            Project p = new Project(); p.setId(7L); p.setProjectType(Project.LOOSE_FILES);
+            var file = new com.checkba.model.entity.ProjectFile(); file.setId(8L);
+            when(localProjectService.openLocalFile("/tmp/file.pdf", 1L))
+                    .thenReturn(new LocalProjectService.OpenLocalFileResult(p, file, false));
+            Map<?, ?> data = (Map<?, ?>) controller.openLocalFile(Map.of("path", "/tmp/file.pdf"), "sess").get("data");
+            assertEquals(7L, data.get("projectId"));
+            assertEquals(Project.LOOSE_FILES, data.get("projectType"));
+            assertEquals(file, data.get("file"));
+        }
+    }
+
+    @Test
     void cloudDefaultRejectsArbitraryLocalRoot() {
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);

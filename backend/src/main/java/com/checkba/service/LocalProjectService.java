@@ -99,6 +99,87 @@ public class LocalProjectService {
                                   int importedCount, boolean truncated, int truncatedCount,
                                   boolean truncatedCountCapped) {}
 
+    public record OpenLocalFileResult(Project project, ProjectFile file, boolean reused) {}
+
+    // Match fileOpenTabs.isFileTypeSupported: registration must not promise an unusable tab.
+    private static final java.util.Set<String> OPEN_FILE_TYPES = java.util.Set.of(
+            "doc", "docx", "xls", "xlsx", "ppt", "pptx", "pdf",
+            "jpg", "jpeg", "png", "gif", "bmp", "svg", "webp",
+            "mp4", "webm", "ogg", "mov", "mkv", "avi", "mp3", "wav", "m4a", "flac", "aac",
+            "txt", "md", "markdown", "json", "xml", "html", "css", "js", "java", "py", "sh", "sql", "log",
+            "zip", "rar", "7z", "drawio", "dd");
+
+    /** Register just the selected file. The lock covers transaction commit, including first open. */
+    public synchronized OpenLocalFileResult openLocalFile(String rawPath, Long userId) {
+        if (userId == null) throw new IllegalArgumentException("请先登录");
+        if (!StringUtils.hasText(rawPath)) throw new IllegalArgumentException(LangText.of("请选择文件", "Please select a file"));
+        Path selected = Path.of(rawPath);
+        if (!selected.isAbsolute()) throw new IllegalArgumentException(LangText.of("文件路径必须是绝对路径", "The file path must be absolute"));
+        final Path file;
+        final long size;
+        try {
+            file = selected.toRealPath();
+            if (!Files.isRegularFile(file) || !Files.isReadable(file)) throw new IOException("not readable");
+            size = Files.size(file);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(LangText.of("文件不存在或无法读取", "The file does not exist or cannot be read"));
+        }
+        Path internalRoot = storageResolver.globalRoot().toAbsolutePath().normalize();
+        try { if (Files.exists(internalRoot)) internalRoot = internalRoot.toRealPath(); }
+        catch (IOException e) { throw new IllegalArgumentException(LangText.of("无法核对文件位置", "Could not verify the file location")); }
+        if (file.startsWith(internalRoot)) throw new IllegalArgumentException(LangText.of("请勿通过此入口打开软件内部数据文件", "Application data files cannot be opened here"));
+        String filename = file.getFileName().toString();
+        int dot = filename.lastIndexOf('.');
+        String type = dot < 0 ? "" : filename.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);
+        if (!OPEN_FILE_TYPES.contains(type)) throw new IllegalArgumentException(LangText.of("暂不支持打开此类文件", "This file type is not supported"));
+        return transactionTemplate.execute(status -> {
+            Project project = projectRepository.findFirstByUserIdAndProjectTypeOrderByIdAsc(userId, Project.LOOSE_FILES)
+                    .orElseGet(() -> {
+                        Project p = new Project();
+                        p.setName(LangText.of("独立文件", "Standalone files"));
+                        p.setProjectType(Project.LOOSE_FILES);
+                        p.setListedCompanyName("");
+                        p.setTargetCompanyName("");
+                        p.setUserId(userId);
+                        p.setVersionOptOut(true);
+                        p.setCreatedAt(LocalDateTime.now());
+                        p.setUpdatedAt(p.getCreatedAt());
+                        p = projectRepository.save(p);
+                        ProjectMember member = new ProjectMember();
+                        member.setProjectId(p.getId());
+                        member.setUserId(userId);
+                        member.setRole("ADMIN");
+                        projectMemberRepository.save(member);
+                        return p;
+                    });
+            Optional<ProjectFile> previous = projectFileRepository
+                    .findFirstByProjectIdAndExternalPathAndIsDeletedFalse(project.getId(), file.toString());
+            if (previous.isPresent()) {
+                ProjectFile existing = previous.get();
+                if (!java.util.Objects.equals(existing.getFileSize(), size)) {
+                    existing.setFileSize(size);
+                    existing.setUpdatedAt(LocalDateTime.now());
+                    projectFileRepository.save(existing);
+                }
+                return new OpenLocalFileResult(project, existing, true);
+            }
+            ProjectFile row = new ProjectFile();
+            row.setProjectId(project.getId());
+            row.setIsFolder(false);
+            row.setName(filename);
+            row.setFileType(type);
+            row.setFileSize(size);
+            row.setFilePath("projects/" + project.getId() + "/loose/" + java.util.UUID.randomUUID() + "/" + filename);
+            row.setExternalPath(file.toString());
+            row.setUserId(userId);
+            row.setSortOrder(0);
+            row.setCreatedAt(LocalDateTime.now());
+            row.setUpdatedAt(row.getCreatedAt());
+            // Deliberately no template, directory scan, watcher, RAG or version-created event.
+            return new OpenLocalFileResult(project, projectFileRepository.save(row), false);
+        });
+    }
+
     /**
      * 打开/复用本地文件夹项目。
      *

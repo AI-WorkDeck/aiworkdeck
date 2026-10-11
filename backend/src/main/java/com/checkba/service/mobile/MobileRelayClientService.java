@@ -302,6 +302,7 @@ public class MobileRelayClientService {
             Map<String, JsonNode> previous = new LinkedHashMap<>();
             for (JsonNode file : remote.path("files")) previous.put(file.path("projectKey").asText() + ":" + file.path("id").asText(), file);
             for (Project project : projectRepository.findByUserIdOrderByCreatedAtDesc(localIdentityService.localUserId())) {
+                if (project.isLooseFileWorkspace()) continue;
                 requireCatalogAccountScope(session.scope());
                 String projectKey = project.getId().toString();
                 List<ProjectFile> tree = projectFileService.getFileTree(project.getId());
@@ -578,7 +579,7 @@ public class MobileRelayClientService {
             body.put("deviceName", deviceName());
             ArrayNode arr = body.putArray("projects");
             for (Project p : projects) {
-                if (p.getId() == null || p.getName() == null) continue;
+                if (p.getId() == null || p.getName() == null || p.isLooseFileWorkspace()) continue;
                 ObjectNode e = arr.addObject();
                 e.put("key", String.valueOf(p.getId()));
                 e.put("name", p.getName());
