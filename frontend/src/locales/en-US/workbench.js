@@ -2,6 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Workbench copy (pages/project-overview/project-overview.vue).
 export default {
+  mobileBackup: {
+    "title": "Cloud file backup",
+    "message": "Enable cloud file backup? Your desktop will upload supported project images, DOCX, PPTX, XLSX, PDF, audio and video to your account’s cloud storage. With an active subscription, files already backed up remain available while your desktop is offline. Backup is off by default and can be turned off in Settings.",
+    "enable": "Agree and enable",
+    "decline": "Not now",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "subscriptionRequired": "Cloud file backup requires an active subscription. When backup is off, files are available only while your desktop is online.",
+    "disable": "Turn off cloud backup",
+    "disableMessage": "Turning this off deletes automatic backup copies and keeps the desktop originals. Turn off backup?",
+    "pending": "Backup consent saved. Files become available offline after your desktop finishes uploading them.",
+    "error": "Cloud backup settings are unavailable. Please try again.",
+    "close": "Close"
+},
   mobileReceive: {
     "failed": "Failed",
     "updated": "Status updated",

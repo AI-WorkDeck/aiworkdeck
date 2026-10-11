@@ -21,7 +21,7 @@
 - **自备 Key**（OpenRouter 等）：你的机器直连该服务商；
 - **「AI WorkDeck 云端」**：我们的服务器只参与密钥签发与用量结算，对话内容仍由你的机器直连模型服务商。
 
-因此在**桌面端**，文档正文、合同内容、AI 对话文本在任何一档下都不流经 AI WorkDeck 的服务器。**Office/WPS 插件不适用这一句**：插件内当前文档的正文会发往我们托管的插件云后端做 AI 处理，见下文「跨文件参考与修改（Office/WPS 插件）」与「你主动触发的云端中转」。选用云端模型时内容会发往该第三方服务商，涉及执业保密义务的场合请据此判断；当前使用的模型与提供商在产品内可见，可随时更换或停用。
+因此在**桌面端的 AI 调用中**，文档正文、合同内容、AI 对话文本不流经 AI WorkDeck 的服务器。你主动开启文件云端备份、共享项目或发起跨设备传输时，适用下文列明的云端存储与中转规则。**Office/WPS 插件不适用这一句**：插件内当前文档的正文会发往我们托管的插件云后端做 AI 处理，见下文「跨文件参考与修改（Office/WPS 插件）」与「你主动触发的云端中转」。选用云端模型时内容会发往该第三方服务商，涉及执业保密义务的场合请据此判断；当前使用的模型与提供商在产品内可见，可随时更换或停用。
 
 **智能决策辅助（实验性，可选）。** 对话输入框下方显示开启/关闭状态，默认关闭，偏好按本机的登录用户和服务器分别保存。开启后，本次输入及可用工具的类目、工具名会经当前 OpenRouter 通道发送给 **TypeSafe Jev**，仅用于预选工具类目，尝试减少提供给主模型的工具说明 token 和总费用；它不更换你选定的主模型。Jev 调用本身会产生少量费用，按当前平台额度或自带密钥结算，回复可能稍慢；单次判断最多等待 2.5 秒，低置信度、超时或不可用时沿用原流程，不保证每次更快或更省。
 
@@ -72,7 +72,9 @@
 | 手机端影像中转 | 手机拍摄的照片、视频、录音与项目目录清单 | 手机端到我们的中转区，再由桌面端取件 | 桌面端取件并确认后立即删除文件，30 天 TTL 兜底；每用户 3GB | 以服务端配置为准 | 手机端不使用该功能，或桌面端不登录手机同步 |
 | 案件库协作 | 你选择上云或共享的项目及其完整版本历史（Git 仓库）；放进案件库的案卷的尽调清单（清单、条目、留言）；客户经访问码在客户门户（case.aiworkdeck.com/client/）上传的尽调材料 | case.aiworkdeck.com，或你自建的团队服务器 | 存放在该服务器上，具体保留期与备份以服务端配置为准；自建服务器由你自己掌控。客户上传的尽调材料存放在案件库服务器上，撤销客户访问码不删除已上传的材料；访问码 30 天有效，客户门户不做埋点 | 以服务端配置为准 | 不上云、不共享项目，或改连自建服务器；不给客户签发访问码即没有客户上传；桌面端的本地版本记录不出本机 |
 
-以上除案件库外，中转区里的文件都是「送达即删」：云端只做暂存，不做长期归档。
+文件云端备份默认关闭，只有有效订阅用户明确同意后才启用。桌面端会定期将项目中支持手机预览的图片、DOCX、PPTX、XLSX、PDF、音频和视频上传至账户所在区域的私有云存储，手机可在桌面离线时调取已完成备份的文件。其他类型不上传备份原件。备份与现有云文件共用账户存储配额；取消同意后立即停止备份读取，后台删除自动备份副本，清理失败会重试，桌面原件不受影响。订阅失效时停止备份上传和读取，不自动续订。
+
+以上除案件库与明确开启的文件云端备份外，中转区里的文件都是「送达即删」：云端只做暂存，不做长期归档。
 
 ## 三、会留下的记录：账务流水
 
@@ -177,7 +179,7 @@ Last updated: 2026-10-08
 
 ## Part 1 — Platform services
 
-**AI conversations never pass through our servers.** Whichever provider tier you choose, conversation content goes straight from your machine to the model provider: with local Ollama it stays on the device; with your own key you connect to that provider directly; with the "AI WorkDeck cloud" tier our servers only issue the key and settle usage, while the conversation itself still goes from your machine to the model provider. On the **desktop app**, document text, contract content, and AI conversation text therefore never flow through AI WorkDeck servers under any tier. **The Office/WPS add-in is an exception to this sentence:** the text of the current document in the add-in is sent to our hosted add-in backend for AI processing; see "Cross-file reference and editing (Office/WPS add-in)" and "Cloud relays you trigger yourself" below. Content sent to a cloud model does reach that third-party provider — judge accordingly where a duty of confidentiality applies. The model and provider in use are visible in the product and can be changed or disabled at any time.
+**AI conversations never pass through our servers.** Whichever provider tier you choose, conversation content goes straight from your machine to the model provider: with local Ollama it stays on the device; with your own key you connect to that provider directly; with the "AI WorkDeck cloud" tier our servers only issue the key and settle usage, while the conversation itself still goes from your machine to the model provider. During **desktop AI calls**, document text, contract content, and AI conversation text therefore do not flow through AI WorkDeck servers. Cloud file backup, shared projects, and cross-device transfers that you explicitly enable follow the storage and relay rules below. **The Office/WPS add-in is an exception to this sentence:** the text of the current document in the add-in is sent to our hosted add-in backend for AI processing; see "Cross-file reference and editing (Office/WPS add-in)" and "Cloud relays you trigger yourself" below. Content sent to a cloud model does reach that third-party provider — judge accordingly where a duty of confidentiality applies. The model and provider in use are visible in the product and can be changed or disabled at any time.
 
 **Decision assistance (experimental, optional).** An on/off control below the chat input is off by default. Its preference is stored separately for each signed-in user and server on this device. When enabled, your current input and the available tool categories and names are sent to **TypeSafe Jev** through your current OpenRouter channel, solely to preselect tool categories. It tries to reduce tool-description tokens and total cost without changing your chosen main model. The Jev call itself adds a small charge, billed through your platform credits or your own key, and replies may be slightly slower. Each decision waits at most 2.5 seconds; low confidence, timeouts or unavailability keep the original workflow. Faster or cheaper replies are not guaranteed.
 
@@ -211,7 +213,10 @@ This decision **does not separately include attachments, chat history or documen
 | Phone media relay | Photos, videos and recordings taken on the phone, and the project directory list | From the phone to our relay area, then collected by the desktop app | Deleted as soon as the desktop app collects and acknowledges it, with a 30-day TTL as backstop; 3GB per user | Per server configuration | Do not use it on the phone, or do not sign the desktop app in to phone sync |
 | Case library collaboration | Projects you choose to upload or share, with their full version history (a Git repository); due-diligence checklists (lists, items, comments) of case files in the library; due-diligence materials your clients upload through the client portal (case.aiworkdeck.com/client/) with an access code | case.aiworkdeck.com, or your own team server | Kept on that server; retention period and backups per server configuration; a self-hosted server is under your own control. Materials uploaded by clients are stored on the case library server; revoking a client's access code does not delete what they already uploaded; access codes are valid for 30 days, and the client portal collects no analytics | Per server configuration | Do not upload or share the project, or connect to your own server; issue no client access code and there are no client uploads; local version history on the desktop never leaves the machine |
 
-Apart from the case library, files in the relay area are deleted on delivery: the cloud only stages them and is not a long-term archive.
+Cloud file backup is off by default and requires an active subscription and explicit consent. The desktop periodically uploads supported project images, DOCX, PPTX, XLSX, PDF, audio and video to private cloud storage in the account's region. Files already backed up remain accessible on mobile while the desktop is offline. Unsupported file contents are not backed up. Backups share the account's existing cloud storage quota. Withdrawing consent immediately blocks backup access and queues automatic backup copies for deletion, retrying failed cleanup; desktop originals remain intact. An expired subscription stops backup uploads and access without renewing the subscription automatically. Unlike temporary relays, these consented backups are retained until deletion.
+
+
+Apart from the case library and explicitly enabled cloud file backups, files in the relay area are deleted on delivery: the cloud only stages them and is not a long-term archive.
 
 **What is kept: billing entries.** Each platform-sourced call leaves one ledger entry under your account recording the service name, operation, quantity (minutes / pages / calls / thousand characters), amount charged, timestamp, and idempotency key. It contains no request content, no result content, and no file names. These are financial records, kept for the life of the account, and visible to you under Settings → Account and Usage.
 

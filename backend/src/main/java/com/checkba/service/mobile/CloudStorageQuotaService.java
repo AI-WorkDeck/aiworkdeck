@@ -20,6 +20,8 @@ import java.util.Map;
 public class CloudStorageQuotaService {
     public static final long RELAY_BYTES = 200L * 1024 * 1024;
     public static final long PRO_BYTES = 3L * 1024 * 1024 * 1024;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.repository.MobileFileBackupRepository mobileBackups;
     private final MobileBillingService billing;
     private final ProjectFileRepository files;
     private final ProjectRepository projects;
@@ -101,6 +103,9 @@ public class CloudStorageQuotaService {
             String key = StringUtils.hasText(file.getFilePath()) ? file.getFilePath() : file.getWpsFileId();
             if (StringUtils.hasText(key) && !seen.add(key)) continue;
             total = Math.addExact(total, measuredBytes(file));
+        }
+        if (mobileBackups != null) for (var backup : mobileBackups.findByUserId(userId)) {
+            total = Math.addExact(total, backup.getSize());
         }
         return total;
     }

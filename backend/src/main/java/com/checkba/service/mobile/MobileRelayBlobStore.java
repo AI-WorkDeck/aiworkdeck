@@ -26,6 +26,18 @@ public interface MobileRelayBlobStore {
      */
     StoredBlob put(Long userId, String clientMediaId, InputStream content, long declaredSize);
 
+    /** A partial persistent write must retain its locator for reliable cleanup retries. */
+    final class PersistentWriteException extends RuntimeException {
+        private final StoredBlob partial;
+        public PersistentWriteException(StoredBlob partial, Throwable cause) { super(cause);this.partial=partial; }
+        public StoredBlob partial() { return partial; }
+    }
+
+    /** Persistent backup namespace, excluded from relay lifecycle expiration. */
+    default StoredBlob putPersistent(Long userId, String blobId, InputStream content, long declaredSize) {
+        throw new UnsupportedOperationException("Persistent backups unavailable");
+    }
+
     /** 打开内容流。调用方负责关闭。 */
     InputStream open(String locator) throws IOException;
 

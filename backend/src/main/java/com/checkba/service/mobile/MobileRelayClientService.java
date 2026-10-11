@@ -41,6 +41,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.Map;
@@ -191,10 +192,13 @@ public class MobileRelayClientService {
             if (ProjectCatalogService.validUid(projectUid) == null || ProjectCatalogService.validUid(fileUid) == null) throw new IllegalArgumentException("Invalid file identity");
             JsonNode list = readCatalogJson(session, "GET", "/api/mobile/catalog/" + projectUid + "/files", null);
             JsonNode found = null;
-            for (JsonNode file : list.path("files")) if (fileUid.equals(file.path("uid").asText()) && "cloud".equals(file.path("source").asText())) found = file;
+            for (JsonNode file : list.path("files")) if (fileUid.equals(file.path("uid").asText())
+                    && !file.path("isFolder").asBoolean()
+                    && Set.of("cloud", "backup").contains(file.path("source").asText())) found = file;
             if (found == null) throw new IllegalArgumentException("File not found");
             name = found.path("name").asText(); size = found.path("size").asLong(); marker = fileUid;
-            path = "/api/mobile/catalog/" + projectUid + "/files/" + fileUid + "/content";
+            path = ("backup".equals(found.path("source").asText()) ? "/api/mobile/preview/catalog/" : "/api/mobile/catalog/")
+                    + projectUid + "/files/" + fileUid + "/content";
         }
         String clean = name.replace('\\', '/'); clean = clean.substring(clean.lastIndexOf('/') + 1);
         int dot = clean.lastIndexOf('.');
@@ -242,6 +246,135 @@ public class MobileRelayClientService {
         if (projectCatalog != null) projectCatalog.preserveImportedFileUid(landedFile, fileUid);
         acknowledgeCatalogTransfer(session, transferId);
         return Map.of("fileId", landedFile.getId(), "projectId", targetProjectId);
+    }
+
+    /** Consent belongs to the connected account, never to this installation. */
+    public JsonNode backupConsent() {
+        if (!active()) return mapper.createObjectNode().put("available", false);
+        String scope = catalogAccountScope();
+        JsonNode result = backupJson(beginCatalogSession(scope), "GET", "/api/mobile/backup-consent", null);
+        ObjectNode out = (ObjectNode) result.deepCopy();
+        out.put("accountScope", scope);
+        out.put("available", true);
+        return out;
+    }
+
+    public JsonNode setBackupConsent(boolean enabled, String version, String scope) {
+        CatalogSession session = beginCatalogSession(scope);
+        ObjectNode body = mapper.createObjectNode().put("enabled", enabled).put("consentVersion", version);
+        JsonNode result = backupJson(session, "PUT", "/api/mobile/backup-consent", body);
+        if (enabled) dispatchNudge("backup", this::syncFileBackups);
+        return result;
+    }
+
+    private JsonNode backupJson(CatalogSession session, String method, String path, JsonNode body) {
+        try {
+            HttpResponse<String> response = catalogExchange(session, method, path,
+                    body == null ? null : mapper.writeValueAsString(body));
+            if (response.statusCode() != 200) throw new IOException("Backup request failed");
+            JsonNode data = mapper.readTree(response.body());
+            if (!data.isObject() || data.path("code").asInt(0) != 0)
+                throw new IOException("Backup request failed");
+            return data;
+        } catch (IOException e) {
+            throw new IllegalStateException(LangText.of("云备份暂不可用，请重试", "Cloud backup is unavailable; please retry"), e);
+        }
+    }
+
+    @Scheduled(initialDelay = 75_000, fixedDelay = 60_000)
+    public void scheduleFileBackups() {
+        if (active()) dispatchNudge("backup", this::syncFileBackups);
+    }
+
+    /** Separate worker: large backups cannot block the camera inbox or desktop heartbeat. */
+    private final AtomicBoolean backupRunning = new AtomicBoolean();
+
+    void syncFileBackups() {
+        if (!active() || !backupRunning.compareAndSet(false, true)) return;
+        try {
+            CatalogSession session = beginCatalogSession(catalogAccountScope());
+            JsonNode consent = backupJson(session, "GET", "/api/mobile/backup-consent", null);
+            if (!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean()) return;
+            pushDirectory();
+            requireCatalogAccountScope(session.scope());
+            String device = deviceId();
+            JsonNode remote = backupJson(session, "GET", "/api/mobile/backup/files?deviceId=" + queryValue(device), null);
+            Map<String, JsonNode> previous = new LinkedHashMap<>();
+            for (JsonNode file : remote.path("files")) previous.put(file.path("projectKey").asText() + ":" + file.path("id").asText(), file);
+            for (Project project : projectRepository.findByUserIdOrderByCreatedAtDesc(localIdentityService.localUserId())) {
+                requireCatalogAccountScope(session.scope());
+                String projectKey = project.getId().toString();
+                List<ProjectFile> tree = projectFileService.getFileTree(project.getId());
+                Map<Long, ProjectFile> byId = new HashMap<>();
+                for (ProjectFile file : tree) if (file.getId() != null) byId.put(file.getId(), file);
+                ObjectNode manifest = mapper.createObjectNode().put("deviceId", device).put("projectKey", projectKey);
+                ArrayNode entries = manifest.putArray("files");
+                for (ProjectFile file : tree) {
+                    boolean folder = Boolean.TRUE.equals(file.getIsFolder());
+                    // Metadata may include unsupported files; bytes never leave this machine.
+                    ObjectNode entry = entries.addObject();
+                    entry.put("id", file.getId().toString());
+                    String uid = projectCatalog != null ? projectCatalog.ensureFileUid(file) : file.getUid();
+                    entry.put("uid", uid); entry.put("name", file.getName());
+                    entry.put("path", listEntryPath(file, byId)); entry.put("isFolder", folder);
+                    entry.put("parentId", file.getParentId() == null ? null : file.getParentId().toString());
+                    entry.put("size", file.getFileSize() == null ? 0L : file.getFileSize());
+                }
+                manifest.put("totalCount", entries.size());
+                backupJson(session, "PUT", "/api/mobile/backup/manifest", manifest);
+                for (ProjectFile file : tree) {
+                    if (Boolean.TRUE.equals(file.getIsFolder()) || !MobilePreviewPolicy.supports(file.getName())) continue;
+                    if (file.getFilePath() == null) continue;
+                    String identity = projectKey + ":" + file.getId();
+                    var resource = storageServiceFactory.getStorageService().load(file.getFilePath());
+                    long size = resource.contentLength();
+                    if (size > MobileTransferService.MAX_TRANSFER_BYTES) continue;
+                    JsonNode old = previous.remove(identity);
+                    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                    try (InputStream input = resource.getInputStream()) {
+                        byte[] buffer = new byte[65536]; int count;
+                        while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count);
+                    }
+                    String hash = HexFormat.of().formatHex(digest.digest());
+                    String path = listEntryPath(file, byId);
+                    if (old != null && hash.equals(old.path("sha256").asText())
+                            && path.equals(old.path("path").asText()) && file.getName().equals(old.path("name").asText())) continue;
+                    String uid = projectCatalog != null ? projectCatalog.ensureFileUid(file) : file.getUid();
+                    if (ProjectCatalogService.validUid(uid) == null) continue;
+                    String query = "?deviceId=" + queryValue(device) + "&projectKey=" + queryValue(projectKey)
+                            + "&fileId=" + file.getId() + "&uid=" + queryValue(uid)
+                            + "&name=" + queryValue(file.getName()) + "&path=" + queryValue(path) + "&sha256=" + hash;
+                    if (file.getParentId() != null) query += "&parentId=" + file.getParentId();
+                    requireCatalogAccountScope(session.scope());
+                    String boundary = MultipartBody.newBoundary();
+                    try (InputStream input = resource.getInputStream()) {
+                        HttpRequest req = request("/api/mobile/backup/files" + query, Duration.ofMinutes(10))
+                                .header("X-Session-Id", session.token())
+                                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                                .PUT(MultipartBody.filePublisher(boundary, "file", file.getName(), input)).build();
+                        HttpResponse<String> response = http.send(req, HttpResponse.BodyHandlers.ofString());
+                        requireCatalogAccountScope(session.scope());
+                        if (response.statusCode() != 200) throw new IOException("Backup upload rejected");
+                        JsonNode result = mapper.readTree(response.body());
+                        if (result.path("code").asInt(0) != 0 || !hash.equals(result.path("sha256").asText()))
+                            throw new IOException("Backup upload rejected");
+                    }
+                }
+            }
+            // Only reconcile after every local project was read successfully; transient IO cannot erase backups.
+            for (JsonNode old : previous.values()) {
+                backupJson(session, "DELETE", "/api/mobile/backup/files?deviceId=" + queryValue(device)
+                        + "&projectKey=" + queryValue(old.path("projectKey").asText())
+                        + "&fileId=" + queryValue(old.path("id").asText()), null);
+            }
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            log.warn("Cloud file backup incomplete; will retry on next scheduled check ({})", e.getClass().getSimpleName());
+        } finally { backupRunning.set(false); }
+    }
+
+    private static String queryValue(String value) {
+        return java.net.URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private Long cloudProjectId(Project project) {
@@ -920,7 +1053,7 @@ public class MobileRelayClientService {
         }
     }
 
-    /** LIST：组本机项目的文件清单（不含文件夹）上报；项目不存在/不属本机用户则 /fail。 */
+    /** LIST：组本机项目的文件清单（含文件夹）上报；项目不存在/不属本机用户则 /fail。 */
     private void handleListCommand(long id, JsonNode cmd) {
         Long userId = localIdentityService.localUserId();
         Long projectId = parseLongOrNull(cmd.path("projectKey").asText());
@@ -938,7 +1071,6 @@ public class MobileRelayClientService {
         ArrayNode files = body.putArray("files");
         int totalCount = 0;
         for (ProjectFile f : tree) {
-            if (Boolean.TRUE.equals(f.getIsFolder())) continue;
             totalCount++;
             if (files.size() >= 2000) continue; // 只上报前 2000 条，仍统计完整数量
             ObjectNode e = files.addObject();
@@ -947,6 +1079,9 @@ public class MobileRelayClientService {
             else if (f.getUid() != null) e.put("uid", f.getUid());
             e.put("name", f.getName());
             e.put("path", listEntryPath(f, byId));
+            e.put("isFolder", Boolean.TRUE.equals(f.getIsFolder()));
+            if (f.getParentId() == null) e.putNull("parentId");
+            else e.put("parentId", f.getParentId().toString());
             e.put("size", f.getFileSize() == null ? 0L : f.getFileSize());
         }
         body.put("totalCount", totalCount);
@@ -1002,7 +1137,11 @@ public class MobileRelayClientService {
             failTransfer(id, LangText.of("文件不存在或已移动", "The file does not exist or has been moved"));
             return;
         }
-        String fileName = cmd.path("fileName").asText(file.getName());
+        if (cmd.path("previewOnly").asBoolean() && !MobilePreviewPolicy.supports(file.getName())) {
+            failTransfer(id, MobilePreviewPolicy.unsupported());
+            return;
+        }
+        String fileName = file.getName();
         try {
             var resource = storageServiceFactory.getStorageService().load(file.getFilePath());
             try (InputStream in = resource.getInputStream()) {
