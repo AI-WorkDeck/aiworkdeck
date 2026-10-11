@@ -248,30 +248,30 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: var(--awd-space-4);
   box-sizing: border-box;
   background: var(--awd-overlay);
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
   font-family: var(--awd-font-sans);
-  animation: awd-dlg-fade 160ms ease-out;
+  animation: awd-dlg-fade var(--awd-motion-fast) ease-out;
 }
 
 .awd-dlg {
   position: relative;
   width: 440px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 32px);
+  max-width: calc(100vw - var(--awd-space-8));
+  max-height: calc(100vh - var(--awd-space-8));
   overflow-y: auto;
   box-sizing: border-box;
-  padding: 26px 28px 22px;
-  border-radius: 16px;
+  padding: var(--awd-space-5) var(--awd-space-6);
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-surface);
   color: var(--awd-text);
-  box-shadow: 0 24px 64px rgba(35, 32, 26, 0.28);
+  box-shadow: var(--awd-shadow-lg);
   text-align: left;
   outline: none;
-  animation: awd-dlg-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: awd-dlg-in var(--awd-motion-fast) cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 html[data-theme='dark'] .awd-dlg {
   box-shadow: var(--awd-shadow-lg);
@@ -280,12 +280,12 @@ html[data-theme='dark'] .awd-dlg {
 .awd-dlg__head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 0 0 10px;
+  gap: var(--awd-space-2);
+  margin: 0 0 var(--awd-space-2);
 }
 
 .awd-dlg__title {
-  font: 600 17px/1.35 var(--awd-font-sans);
+  font: 600 var(--awd-font-size-title)/var(--awd-line-height-ui) var(--awd-font-sans);
   letter-spacing: -0.01em;
   color: var(--awd-text);
   word-break: break-word;
@@ -296,17 +296,17 @@ html[data-theme='dark'] .awd-dlg {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: var(--awd-space-6);
+  height: var(--awd-space-6);
   border-radius: 50%;
   background: var(--awd-danger-soft);
   color: var(--awd-danger);
-  font: 700 13px/1 var(--awd-font-sans);
+  font: 700 var(--awd-font-size-body)/1 var(--awd-font-sans);
 }
 
 .awd-dlg__body {
   margin: 0;
-  font: 400 14px/1.65 var(--awd-font-sans);
+  font: 400 var(--awd-font-size-body)/1.65 var(--awd-font-sans);
   color: var(--awd-text-2);
   white-space: pre-wrap;
   word-break: break-word;
@@ -315,19 +315,19 @@ html[data-theme='dark'] .awd-dlg {
 .awd-dlg__input {
   display: block;
   width: 100%;
-  height: 38px;
+  min-height: var(--awd-control-height);
   box-sizing: border-box;
-  margin: 4px 0 0;
-  padding: 0 12px;
+  margin: var(--awd-space-1) 0 0;
+  padding: var(--awd-space-1) var(--awd-space-3);
   border: 1px solid var(--awd-border);
-  border-radius: 9px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-bg);
   color: var(--awd-text);
-  font: 400 14px/38px var(--awd-font-sans);
+  font: 400 var(--awd-font-size-body)/var(--awd-line-height-ui) var(--awd-font-sans);
   outline: none;
 }
 .awd-dlg__input::placeholder {
-  color: var(--awd-text-3);
+  color: var(--awd-text-2);
 }
 .awd-dlg__input:focus {
   border-color: var(--awd-accent);
@@ -335,20 +335,21 @@ html[data-theme='dark'] .awd-dlg {
 
 .awd-dlg__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 24px;
+  gap: var(--awd-space-2);
+  margin-top: var(--awd-space-6);
 }
 
 .awd-dlg__btn {
-  height: 38px;
+  min-height: var(--awd-control-height);
   min-width: 88px;
   box-sizing: border-box;
   margin: 0;
-  padding: 0 18px;
+  padding: var(--awd-space-1) var(--awd-space-4);
   border: 1px solid transparent;
-  border-radius: 9px;
-  font: 500 14px/36px var(--awd-font-sans);
+  border-radius: var(--awd-radius-md);
+  font: 500 var(--awd-font-size-body)/var(--awd-line-height-ui) var(--awd-font-sans);
   text-align: center;
   white-space: nowrap;
   cursor: pointer;
@@ -377,33 +378,34 @@ html[data-theme='dark'] .awd-dlg {
 .awd-dlg__btn--danger:hover {
   filter: brightness(0.94);
 }
+.awd-dlg__input:focus-visible,
 .awd-dlg__btn:focus-visible,
 .awd-dlg__item:focus-visible {
-  outline: 2px solid var(--awd-bamboo);
-  outline-offset: 2px;
+  outline: var(--awd-focus-width) solid var(--awd-accent-text);
+  outline-offset: var(--awd-focus-offset);
 }
 
 /* 选项表：选项是整行按钮，取消单独落在底部 */
 .awd-dlg--sheet .awd-dlg__list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: calc(var(--awd-space-1) / 2);
 }
 .awd-dlg--sheet .awd-dlg__actions {
-  margin-top: 16px;
+  margin-top: var(--awd-space-4);
 }
 .awd-dlg__item {
   display: block;
   width: 100%;
-  min-height: 38px;
+  min-height: var(--awd-control-height);
   box-sizing: border-box;
   margin: 0;
-  padding: 8px 12px;
+  padding: var(--awd-space-2) var(--awd-space-3);
   border: none;
-  border-radius: 9px;
+  border-radius: var(--awd-radius-md);
   background: transparent;
   color: var(--awd-text);
-  font: 400 14px/1.5 var(--awd-font-sans);
+  font: 400 var(--awd-font-size-body)/var(--awd-line-height-ui) var(--awd-font-sans);
   text-align: left;
   word-break: break-word;
   cursor: pointer;
@@ -412,6 +414,10 @@ html[data-theme='dark'] .awd-dlg {
 }
 .awd-dlg__item:hover {
   background: var(--awd-surface-2);
+}
+
+@media (pointer: coarse) {
+  .awd-dlg__input, .awd-dlg__btn, .awd-dlg__item { min-height: var(--awd-control-height-touch); }
 }
 
 @keyframes awd-dlg-fade {

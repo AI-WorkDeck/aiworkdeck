@@ -20,8 +20,28 @@ public record ToolContext(
         String runId,
         java.util.Set<String> disclosedCategories,
         java.util.function.BooleanSupplier cancellationCheck,
-        Long defaultOutputFolderId
+        Long defaultOutputFolderId,
+        Long activeFileId,
+        java.util.function.BiConsumer<Long, String> fileChangeListener
 ) {
+
+    public ToolContext(Long projectId, String conversationId, Long userId, String modelId,
+                       java.util.List<dev.langchain4j.agent.tool.ToolSpecification> sessionTools,
+                       java.util.Set<String> offeredTools, String runId,
+                       java.util.Set<String> disclosedCategories,
+                       java.util.function.BooleanSupplier cancellationCheck, Long defaultOutputFolderId, Long activeFileId) {
+        this(projectId, conversationId, userId, modelId, sessionTools, offeredTools, runId,
+                disclosedCategories, cancellationCheck, defaultOutputFolderId, activeFileId, null);
+    }
+
+    public ToolContext(Long projectId, String conversationId, Long userId, String modelId,
+                       java.util.List<dev.langchain4j.agent.tool.ToolSpecification> sessionTools,
+                       java.util.Set<String> offeredTools, String runId,
+                       java.util.Set<String> disclosedCategories,
+                       java.util.function.BooleanSupplier cancellationCheck, Long defaultOutputFolderId) {
+        this(projectId, conversationId, userId, modelId, sessionTools, offeredTools, runId,
+                disclosedCategories, cancellationCheck, defaultOutputFolderId, null);
+    }
 
     public ToolContext(Long projectId, String conversationId, Long userId, String modelId,
                        java.util.List<dev.langchain4j.agent.tool.ToolSpecification> sessionTools,

@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // AI 对话面板（ChatInterface + AgentMessage 卡片族 + ArtifactCard + BackgroundTaskIndicator）
 export default {
+  earlierFiles: '早期会话文件',
+  fileCreated: '已新增',
+  fileModified: '已修改',
   decisionAssistLabel: '智能决策辅助（实验性）',
   decisionAssistOn: '已开启',
   decisionAssistOff: '已关闭',

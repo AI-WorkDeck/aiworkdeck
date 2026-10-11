@@ -4,27 +4,38 @@
   <view class="account-catalog">
     <view class="catalog-heading">
       <text>{{ $t('projects.accountCatalog') }}</text>
-      <button class="catalog-action" :disabled="busy" @tap="load">{{ $t('projects.catalogRefresh') }}</button>
+      <button class="catalog-action" :disabled="loading" @tap="load">{{ $t('projects.catalogRefresh') }}</button>
     </view>
-    <text v-if="error" class="catalog-note">{{ error }}</text>
-    <text v-else-if="!remoteProjects.length" class="catalog-note">{{ $t('projects.catalogAllLocal') }}</text>
+    <text v-if="loadError" class="catalog-note" role="status">{{ loadError }}</text>
+    <text v-else-if="!catalog.length && !loading" class="catalog-note">{{ $t('projects.catalogAllLocal') }}</text>
     <view v-for="project in remoteProjects" :key="project.projectUid" class="catalog-project">
-      <button class="catalog-project-name" :disabled="busy" @tap="open(project)">{{ project.name }}</button>
-      <text class="catalog-note">{{ locationsText(project) }}</text>
-    </view>
-    <view v-if="selected" class="catalog-files">
-      <view class="catalog-heading"><text>{{ selected.name }}</text><button class="catalog-action" @tap="selected = null">{{ $t('common.close') }}</button></view>
-      <text class="catalog-note">{{ $t('projects.catalogDestination') }}</text>
-      <select v-model="targetId" class="catalog-destination" :disabled="busy">
-        <option value="">{{ $t('projects.catalogChooseLocal') }}</option>
-        <option v-for="p in localProjects" :value="String(p.id)" :key="p.id">{{ p.name }}</option>
-      </select>
-      <text v-if="incomplete" class="catalog-note">{{ $t('projects.catalogIncomplete') }}</text>
-      <text v-if="busy" class="catalog-note">{{ $t('projects.catalogWorking') }}</text>
-      <text v-if="!busy && !files.length" class="catalog-note">{{ $t('projects.catalogNoFiles') }}</text>
-      <view v-for="file in files" :key="file.uid || [file.deviceId,file.projectKey,file.id].join(':')" class="catalog-file">
-        <view><text>{{ file.path || file.name }}</text><text class="catalog-note">{{ file.source === 'cloud' ? $t('projects.catalogCloud') : file.deviceName || file.deviceId }}</text></view>
-        <button class="catalog-action" :disabled="busy || !targetId || (file.source === 'desktop' && !file.online)" @tap="download(file)">{{ $t('projects.catalogImport') }}</button>
+      <view class="catalog-project-entry">
+      <button class="catalog-project-name" :class="{ 'is-selected': selected?.projectUid === project.projectUid }" :title="project.name + ' · ' + locationHelp(project)" role="button" tabindex="0" @tap="open(project)" @keydown.enter.prevent="open(project)" @keydown.space.prevent="open(project)">
+        <text class="catalog-project-title">{{ project.name }}</text><text class="catalog-note catalog-location">{{ availabilityText(project) }}</text>
+      </button>
+      <button v-if="project.localProjectId && (project.locations || []).length > 1" class="catalog-action catalog-other-locations" role="button" tabindex="0" :title="$t('projects.catalogOtherLocations')" :aria-label="$t('projects.catalogOtherLocations')" :disabled="importing" @tap="openLocations(project)" @keydown.enter.prevent="openLocations(project)" @keydown.space.prevent="openLocations(project)"><text aria-hidden="true">⋯</text></button>
+      </view>
+      <view v-if="selected?.projectUid === project.projectUid" class="catalog-files">
+        <view class="catalog-heading">
+          <button class="catalog-action" :disabled="importing" @tap="openLocations(project)">{{ $t('projects.catalogRefresh') }}</button>
+          <button class="catalog-action" :disabled="importing" @tap="close">{{ $t('common.close') }}</button>
+        </view>
+        <text v-if="error" class="catalog-note" role="status">{{ error }}</text>
+        <text v-if="listing" class="catalog-note" role="status">{{ $t('projects.catalogLoadingFiles') }}</text>
+        <text v-if="incomplete" class="catalog-note">{{ $t('projects.catalogIncomplete') }}</text>
+        <text v-if="!listing && !files.length && !error" class="catalog-note">{{ $t('projects.catalogNoFiles') }}</text>
+        <template v-if="files.length">
+          <text class="catalog-note">{{ $t('projects.catalogDestination') }}</text>
+          <select v-model="targetId" class="catalog-destination" :disabled="importing" :aria-label="$t('projects.catalogDestination')">
+            <option value="">{{ $t('projects.catalogChooseLocal') }}</option>
+            <option v-for="p in localProjects" :value="String(p.id)" :key="p.id">{{ p.name }}</option>
+          </select>
+        </template>
+        <text v-if="importing" class="catalog-note" role="status">{{ $t('projects.catalogWorking') }}</text>
+        <view v-for="file in files" :key="file.uid || [file.deviceId,file.projectKey,file.id].join(':')" class="catalog-file">
+          <view><text>{{ file.path || file.name }}</text><text class="catalog-note">{{ file.source === 'cloud' ? $t('projects.catalogCloud') : file.deviceName || $t('projects.catalogOtherDevice') }}</text></view>
+          <button class="catalog-action" :disabled="importing || !targetId || (file.source === 'desktop' && !file.online)" @tap="download(file)" @keydown.enter.prevent="download(file)" @keydown.space.prevent="download(file)">{{ $t('projects.catalogImport') }}</button>
+        </view>
       </view>
     </view>
   </view>
@@ -35,23 +46,46 @@ const pause = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 export default {
   name: 'AccountProjectCatalog',
   props: { localProjects: { type: Array, default: () => [] }, currentProjectId: { type: [String, Number], default: null } },
-  emits: ['imported'],
-  data() { return { catalog: [], selected: null, files: [], busy: false, error: '', incomplete: false, targetId: '' } },
+  emits: ['imported', 'open-project'],
+  data() { return { catalog: [], selected: null, files: [], loading: false, listing: false, importing: false, loadError: '', error: '', incomplete: false, targetId: '', generation: 0 } },
   computed: { remoteProjects() { return this.catalog } },
   mounted() { this.targetId = this.currentProjectId ? String(this.currentProjectId) : ''; this.load() },
+  beforeUnmount() { this.generation++ },
   methods: {
     async load() {
-      this.busy = true; this.error = ''
-      try { this.catalog = await getAccountProjectCatalog() } catch (e) { this.error = e.message }
-      finally { this.busy = false }
+      if (this.loading) return
+      this.loading = true; this.loadError = ''
+      try { this.catalog = await getAccountProjectCatalog() } catch (e) { this.loadError = e.message }
+      finally { this.loading = false }
     },
-    locationsText(p) { return (p.locations || []).map(l => l.kind === 'cloud' ? this.$t('projects.catalogCloud') : `${l.deviceName || l.deviceId} · ${this.$t(l.online ? 'projects.catalogOnline' : 'projects.catalogOffline')}`).join(' / ') },
-    request(method, path, body) {
-      return requestAccountCatalog(method, path, body, this.selected?.accountScope)
+    availabilityText(p) {
+      if (Number.isSafeInteger(Number(p.localProjectId)) && Number(p.localProjectId) > 0) return this.$t('projects.catalogAvailabilityLocal')
+      if ((p.locations || []).some(l => l.kind === 'cloud')) return this.$t('projects.catalogAvailabilityCloud')
+      return this.$t((p.locations || []).some(l => l.online) ? 'projects.catalogAvailabilityRemote' : 'projects.catalogAvailabilityWaiting')
     },
-    async poll(id, wanted) {
+    locationsText(p) {
+      if (Number.isSafeInteger(Number(p.localProjectId)) && Number(p.localProjectId) > 0) return this.$t('projects.catalogThisComputer')
+      return (p.locations || []).map(l => l.kind === 'cloud'
+        ? this.$t('projects.catalogCloud')
+        : this.$t(l.online ? 'projects.catalogDeviceAvailable' : 'projects.catalogDeviceUnavailable', { device: l.deviceName || this.$t('projects.catalogOtherDevice') })).join(' / ')
+    },
+    locationHelp(p) {
+      return (p.locations || []).map(l => l.kind === 'desktop' && !l.online && !p.localProjectId
+        ? this.$t('projects.catalogDeviceUnavailableHelp', { device: l.deviceName || this.$t('projects.catalogOtherDevice') })
+        : this.locationsText({ ...p, locations: [l] })).join(' / ')
+    },
+    request(method, path, body, scope = this.selected?.accountScope) {
+      return requestAccountCatalog(method, path, body, scope)
+    },
+    close() {
+      if (this.importing) return
+      this.generation++; this.selected = null; this.listing = false; this.error = ''; this.files = []
+    },
+    async poll(id, wanted, scope = this.selected?.accountScope, generation = this.generation) {
       for (let i = 0; i < 90; i++) {
-        const response = await this.request('GET', `/api/mobile/transfer/${id}`)
+        if (generation !== this.generation) throw new Error(this.$t('projects.catalogCancelled'))
+        const response = await this.request('GET', `/api/mobile/transfer/${id}`, undefined, scope)
+        if (generation !== this.generation) throw new Error(this.$t('projects.catalogCancelled'))
         const transfer = response.transfer
         if (transfer.status === wanted || (wanted === 'STAGED' && transfer.status === 'DELIVERED')) return transfer
         if (['FAILED', 'EXPIRED'].includes(transfer.status)) throw new Error(transfer.error || this.$t('projects.catalogFailed'))
@@ -60,19 +94,36 @@ export default {
       throw new Error(this.$t('projects.catalogPending'))
     },
     async open(project) {
-      this.selected = project; this.files = []; this.busy = true; this.error = ''
+      if (this.importing) return
+      if (Number.isSafeInteger(Number(project.localProjectId)) && Number(project.localProjectId) > 0) {
+        this.close()
+        this.$emit('open-project', Number(project.localProjectId))
+        return
+      }
+      return this.openLocations(project)
+    },
+    async openLocations(project) {
+      if (this.importing) return
+      const generation = ++this.generation
+      const current = () => generation === this.generation
+      const request = (method, path, body) => this.request(method, path, body, project.accountScope)
+      this.selected = project; this.files = []; this.listing = true; this.error = ''; this.incomplete = false
       try {
-        const snapshot = await this.request('GET', `/api/mobile/catalog/${project.projectUid}/files`)
+        const snapshot = await request('GET', `/api/mobile/catalog/${project.projectUid}/files`)
+        if (!current()) return
         const entries = new Map()
         for (const file of snapshot.files || []) entries.set(file.uid || `${file.deviceId}:${file.projectKey}:${file.id}`, file)
         const desktopLocations = (project.locations || []).filter(l => l.kind === 'desktop')
         const incomplete = new Map(desktopLocations.map(l => [`${l.deviceId}:${l.key}`, snapshot.truncated]))
         this.files = [...entries.values()]
         for (const location of desktopLocations.filter(l => l.online)) {
+          if (!current()) return
           const route = `${location.deviceId}:${location.key}`
           try {
-            const created = await this.request('POST', '/api/mobile/transfer/list', { deviceId: location.deviceId, projectKey: location.key, requestId: crypto.randomUUID() })
-            const listing = await this.poll(created.id, 'DONE')
+            const created = await request('POST', '/api/mobile/transfer/list', { deviceId: location.deviceId, projectKey: location.key, requestId: crypto.randomUUID() })
+            if (!current()) return
+            const listing = await this.poll(created.id, 'DONE', project.accountScope, generation)
+            if (!current()) return
             incomplete.set(route, !!listing.truncated)
             for (const [key, entry] of entries) if (entry.source === 'desktop' && `${entry.deviceId}:${entry.projectKey}` === route) entries.delete(key)
             for (const file of listing.files || []) {
@@ -80,16 +131,19 @@ export default {
               if (entries.get(key)?.source === 'cloud') continue
               entries.set(key, { ...file, source: 'desktop', deviceId: location.deviceId, deviceName: location.deviceName, projectKey: location.key, online: true })
             }
-          } catch (e) { incomplete.set(route, true); this.error = e.message }
+          } catch (e) { if (!current()) return; incomplete.set(route, true); this.error = e.message }
           this.files = [...entries.values()]
         }
         this.incomplete = [...incomplete.values()].some(Boolean)
         this.files = [...entries.values()]
-      } catch (e) { this.error = e.message }
-      finally { this.busy = false }
+      } catch (e) { if (current()) this.error = e.message }
+      finally { if (current()) this.listing = false }
     },
     async download(file) {
-      this.busy = true; this.error = ''
+      if (this.importing || !this.selected || !this.targetId || (file.source === 'desktop' && !file.online)) return
+      // Stop stale LIST replies before importing; keep the selected project stable until it finishes.
+      this.generation++; this.listing = false
+      this.importing = true; this.error = ''
       try {
         const body = { accountScope: this.selected.accountScope, targetProjectId: Number(this.targetId), projectUid: this.selected.projectUid, fileUid: file.uid }
         if (file.source === 'desktop') {
@@ -113,19 +167,32 @@ export default {
         }
         uni.showToast({ title: this.$t('projects.catalogSaved'), icon: 'success' })
       } catch (e) { this.error = e.message }
-      finally { this.busy = false }
+      finally { this.importing = false }
     },
   },
 }
 </script>
 <style scoped>
-.account-catalog { margin: 12px 0; padding: 12px; border: 1px solid var(--awd-border); border-radius: 8px; }
-.catalog-heading,.catalog-file { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.catalog-note { display: block; font-size: 12px; color: var(--awd-text-secondary); line-height: 1.6; overflow-wrap: anywhere; }
-.catalog-project { padding: 8px 0; }
-.catalog-project-name,.catalog-action { margin: 0; background: transparent; border: 0; font-size: 12px; color: var(--awd-text-primary); text-align: left; padding: 3px 6px; }
-.catalog-project-name { font-weight: 600; font-size: 13px; }
-.catalog-files { border-top: 1px solid var(--awd-border); padding-top: 10px; }
-.catalog-file { padding: 8px 0; font-size: 12px; overflow-wrap: anywhere; }
-.catalog-destination { width: 100%; margin: 8px 0; }
+.account-catalog { margin: var(--awd-space-2) 0; border-top: 1px solid var(--awd-panel-border); color: var(--awd-panel-text); }
+.catalog-heading,.catalog-file { display: flex; align-items: center; justify-content: space-between; gap: var(--awd-space-2); }
+.catalog-heading { min-height: var(--awd-control-height); font-size: var(--awd-panel-fs-sec); color: var(--awd-panel-text-2); }
+.catalog-note { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-2); line-height: var(--awd-line-height-ui); overflow-wrap: anywhere; }
+.catalog-project-entry { display: flex; align-items: center; }
+.catalog-other-locations { font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-accent); }
+.catalog-project { min-width: 0; border-bottom: 1px solid var(--awd-panel-border); }
+.catalog-project-name,.catalog-action { margin: 0; min-height: var(--awd-control-height); border: 0; border-radius: var(--awd-radius-sm); background: transparent; font-size: var(--awd-font-size-body); color: var(--awd-panel-text); text-align: left; padding: var(--awd-space-1) var(--awd-space-2); line-height: var(--awd-line-height-ui); cursor: pointer; }
+.catalog-project-name::after,.catalog-action::after { border: 0; }
+.catalog-project-name { display: flex; align-items: center; gap: var(--awd-space-1); flex: 1; min-width: 0; width: 100%; font-weight: 500; white-space: normal; overflow-wrap: anywhere; }
+.catalog-project-name:hover,.catalog-action:hover { background: var(--awd-panel-hover); }
+.catalog-project-name.is-selected { background: var(--awd-accent-wash); }
+.catalog-project-name:focus-visible,.catalog-action:focus-visible,.catalog-destination:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent); outline-offset: calc(-1 * var(--awd-focus-offset)); }
+.catalog-action { flex-shrink: 0; font-size: var(--awd-panel-fs); }
+.catalog-action:disabled { cursor: default; opacity: 0.5; }
+.catalog-project-title { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.catalog-location { flex-shrink: 0; white-space: nowrap; font-weight: 400; }
+.catalog-other-locations { width: var(--awd-control-height); padding: 0; text-align: center; }
+.catalog-files { padding: 0 var(--awd-space-2) var(--awd-space-2); border-top: 1px solid var(--awd-panel-border); }
+.catalog-file { padding: var(--awd-space-1) 0; font-size: var(--awd-font-size-body); overflow-wrap: anywhere; }
+.catalog-file > view { min-width: 0; }
+.catalog-destination { width: 100%; min-height: var(--awd-control-height); margin: var(--awd-space-2) 0; border: 1px solid var(--awd-panel-border); border-radius: var(--awd-radius-sm); background: var(--awd-surface); color: var(--awd-panel-text); font-size: var(--awd-font-size-body); }
 </style>

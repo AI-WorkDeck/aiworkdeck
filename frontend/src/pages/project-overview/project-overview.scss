@@ -122,7 +122,7 @@ $color-accent: var(--awd-mint); // Mint Green
   display: block;
   min-width: 0;
   @include text-ellipsis;
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-accent-text); // Forest Green for title
   letter-spacing: -0.2px;
@@ -179,37 +179,34 @@ $color-accent: var(--awd-mint); // Mint Green
   white-space: nowrap;
 }
 
-/* IDE 化：最近项目切换器 */
-/* 切换器现在包着项目名一起，是顶栏上「换项目」的主入口（启动落点改成项目列表页
-   之后这是高频动作）。给一条透明描边占位，hover 才显形——常显边框会让顶栏变吵。 */
+/* 名称原位编辑，箭头独立打开最近项目。 */
+.project-name-edit,
 .project-switcher {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 6px;
-  max-width: 320px;
-  cursor: pointer;
-  padding: 2px 8px;
-  margin-left: -8px; /* 抵消 padding，让项目名的左缘仍与原来对齐 */
+  appearance: none;
+  margin: 0;
+  padding: 0 var(--awd-space-1);
+  min-height: var(--awd-panel-row-h);
+  line-height: var(--awd-line-height-ui);
   border: 1px solid transparent;
-  border-radius: 5px;
-  transition: background 0.15s, border-color 0.15s;
-
-  &:hover {
-    background: var(--awd-accent-wash);
-    border-color: var(--awd-accent-soft);
-  }
+  border-radius: var(--awd-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  &::after { border: 0; }
+  &:hover { background: var(--awd-accent-wash); }
+  &:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent-text); outline-offset: var(--awd-focus-offset); }
 }
-
-.switcher-arrow {
+.project-name-edit { max-width: 320px; text-align: left; }
+.project-switcher {
   flex-shrink: 0;
-  font-size: 11px;
+  min-width: var(--awd-panel-row-h);
   color: var(--awd-accent-text);
-  transition: transform 0.15s;
-
-  &.is-open {
-    transform: rotate(180deg);
-  }
+}
+.switcher-arrow {
+  display: block;
+  font-size: var(--awd-panel-fs);
+  transition: transform var(--awd-motion-fast);
+  &.is-open { transform: rotate(180deg); }
 }
 
 .switcher-mask {
@@ -305,14 +302,17 @@ $color-accent: var(--awd-mint); // Mint Green
   }
 }
 
+.rename-container { min-width: 0; max-width: 320px; -webkit-app-region: no-drag; }
 .rename-input {
-  font-size: 16px;
+  box-sizing: border-box;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
-  border: 1px solid var(--awd-mint);
-  border-radius: 4px;
-  padding: 0 4px;
-  width: 200px;
+  border: 1px solid var(--awd-accent-text);
+  border-radius: var(--awd-radius-sm);
+  padding: 0 var(--awd-space-1);
+  min-height: var(--awd-panel-row-h);
+  width: 100%;
   background: var(--awd-surface);
 }
 

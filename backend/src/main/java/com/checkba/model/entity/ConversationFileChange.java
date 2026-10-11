@@ -36,6 +36,11 @@ public class ConversationFileChange {
     @Column(nullable = false, length = 16)
     private String changeType;
 
+    // Nullable for changes recorded by older releases.
+    private Long fileId;
+    private Long projectId;
+    private Long assistantMessageId;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -60,6 +65,13 @@ public class ConversationFileChange {
 
     public String getChangeType() { return changeType; }
     public void setChangeType(String changeType) { this.changeType = changeType; }
+
+    public Long getFileId() { return fileId; }
+    public void setFileId(Long fileId) { this.fileId = fileId; }
+    public Long getProjectId() { return projectId; }
+    public void setProjectId(Long projectId) { this.projectId = projectId; }
+    public Long getAssistantMessageId() { return assistantMessageId; }
+    public void setAssistantMessageId(Long assistantMessageId) { this.assistantMessageId = assistantMessageId; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

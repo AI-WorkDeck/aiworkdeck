@@ -86,10 +86,10 @@ test('normalizeSort：存储里的脏值回落默认值', () => {
 
 // ---------------- 页面接线 ----------------
 
-test('两个视图都渲染过滤排序后的 visibleProjects，而不是原始 projects', () => {
+test('统一列表渲染过滤排序后的 visibleProjects，而不是原始 projects', () => {
   assert.ok(!/v-for="project in projects"/.test(TEMPLATE), '还有视图直接遍历 projects，搜索/排序对它无效')
   const n = (TEMPLATE.match(/v-for="project in visibleProjects"/g) || []).length
-  assert.equal(n, 2, '网格与列表两个视图都要走 visibleProjects')
+  assert.equal(n, 1, '侧栏只保留统一列表，并继续使用过滤排序结果')
   assert.match(SRC, /visibleProjects\(\)\s*\{[\s\S]*?filterAndSortProjects\(this\.projects,\s*this\.searchQuery,\s*this\.sort\)/)
 })
 
@@ -106,7 +106,7 @@ test('列表视图表头可点：名称 / 创建时间 / 最近修改三列都�
   }
 })
 
-test('网格视图有排序下拉（AwdSelect）', () => {
+test('窄侧栏仍有排序下拉，隐藏日期列后也可选择日期排序（AwdSelect）', () => {
   assert.match(TEMPLATE, /<AwdSelect[^>]*class="project-sort-select"/)
   assert.match(SRC, /import AwdSelect from '@\/components\/AwdSelect\.vue'/)
 })

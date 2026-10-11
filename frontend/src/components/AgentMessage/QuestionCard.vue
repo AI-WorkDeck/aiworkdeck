@@ -16,31 +16,11 @@
       <MarkdownPreview :content="text" />
     </div>
 
-    <!-- 选项按钮组：形状照 ArtifactCard 的 approval-bar（同一套按钮语汇）。
-         选项之间是互斥的平级候选，所以不分主次按钮——谁都可能是正确答案。
-         点一下即等于用户自己打了这几个字（发出去的就是选项原文），
-         刻意不为它拼装「我选择了 X」这类机器口吻长句。 -->
-    <div v-if="!isAskUser && options.length" class="q-options">
-      <div
-        v-for="(opt, i) in options"
-        :key="i"
-        class="btn-option"
-        :class="{ disabled: !actionable }"
-        @click.stop="pick(opt)"
-      >
-        <span>{{ opt }}</span>
-      </div>
-    </div>
-
-    <!-- 无选项 = 开放式提问：只提示在既有输入框回答，绝不另造第二个输入框
-         （两个输入框的界面用户永远不知道该往哪个里打字） -->
-    <div v-else-if="!isAskUser && actionable" class="q-hint">{{ $t('chat.answerHint') }}</div>
-
     <!-- ask_user 工具的提问（dev-board#868，对标 Claude Code 的 AskUserQuestion）：
          可点选的选项（单选点一下即作答；多选勾完再提交）+ 一个「其他」自由输入。
          「其他」只在用户点开时出现、而且只在问题卡里——作答后整卡变只读，不会与主输入框并存
          成两个都能打字的地方。 -->
-    <template v-if="isAskUser">
+    <div class="q-response">
       <div
         v-if="options.length || actionable"
         class="q-choices"
@@ -84,6 +64,7 @@
           type="text"
           :maxlength="500"
           :placeholder="$t('chat.askUserOtherPlaceholder')"
+          :aria-label="text || $t('chat.askUserOtherPlaceholder')"
           @keydown.enter="onOtherEnter"
         />
       </div>
@@ -97,7 +78,7 @@
       <div v-if="!actionable && answer && answer.other" class="q-answer-other">
         {{ $t('chat.askUserOtherAnswer', { text: answer.other }) }}
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -136,11 +117,6 @@ const options = computed(() => (Array.isArray(props.options) ? props.options : [
 const descriptions = computed(() => (Array.isArray(props.descriptions) ? props.descriptions : []))
 const isAskUser = computed(() => props.kind === 'ask_user')
 
-function pick(opt) {
-  if (!props.actionable) return
-  emit('answer', opt)
-}
-
 // ---- ask_user ----
 const chosen = ref([]) // 选中的下标
 const otherOpen = ref(false)
@@ -150,7 +126,7 @@ const otherInput = ref(null)
 const sent = ref(false)
 
 // 换了一个问题（新一轮 ask_user 覆盖了这张卡）就清掉上一问的草稿
-watch(() => props.questionId, () => {
+watch(() => [props.questionId, props.text], () => {
   chosen.value = []
   otherOpen.value = false
   otherText.value = ''
@@ -221,6 +197,10 @@ function submit() {
   const selected = chosen.value.map(i => options.value[i]).filter(Boolean)
   if (!selected.length && !other) return
   sent.value = true
+  if (!isAskUser.value) {
+    emit('answer', [...selected, other].filter(Boolean).join('；'))
+    return
+  }
   emit('answer', {
     kind: 'ask_user',
     id: props.questionId,
@@ -235,7 +215,7 @@ function submit() {
 .question-card {
   background: var(--awd-surface);
   border-top: 1px solid var(--awd-border-subtle);
-  padding: 10px 16px 12px;
+  padding: var(--awd-space-3) var(--awd-space-4);
 }
 
 /* 历史态：去掉强调底色，只留一条痕迹 */
@@ -246,7 +226,7 @@ function submit() {
 .q-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--awd-space-2);
   margin-bottom: 6px;
 }
 
@@ -273,13 +253,13 @@ function submit() {
   background: var(--awd-accent-soft);
   color: var(--awd-accent-text);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   font-weight: 600;
 }
 
 .q-body {
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: var(--awd-font-size-body);
+  line-height: var(--awd-line-height-ui);
   color: var(--awd-text);
   margin-bottom: 8px;
 }
@@ -294,56 +274,11 @@ function submit() {
 }
 
 .q-body :deep(.markdown-body) {
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: var(--awd-font-size-body);
+  line-height: var(--awd-line-height-ui);
   margin: 0;
   padding: 0;
   color: var(--awd-text);
-}
-
-/* 选项按钮组（对齐 approval-bar 的 flex + 8px 间距；窄栏里换行堆叠） */
-.q-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.btn-option {
-  background: var(--awd-surface);
-  border: 1px solid var(--awd-border);
-  color: var(--awd-text);
-  font-size: 12px;
-  padding: 5px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.15s;
-  max-width: 100%;
-  word-break: break-word;
-}
-
-.btn-option:hover {
-  border-color: var(--awd-mint);
-  color: var(--awd-accent-text);
-  background: var(--awd-accent-soft);
-}
-
-.btn-option.disabled {
-  cursor: default;
-  color: var(--awd-text-2);
-  background: var(--awd-bg);
-}
-
-.btn-option.disabled:hover {
-  border-color: var(--awd-border);
-  color: var(--awd-text-2);
-  background: var(--awd-bg);
-}
-
-.q-hint {
-  font-size: 11px;
-  color: var(--awd-text-2);
 }
 
 /* ---- ask_user（dev-board#868）---- */
@@ -351,7 +286,7 @@ function submit() {
   font-size: 10px;
   line-height: 16px;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-border);
   color: var(--awd-text-2);
   background: var(--awd-surface-2);
@@ -364,7 +299,7 @@ function submit() {
 .q-choices {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--awd-space-1);
 }
 
 /* 真 <button>：打平 uni-h5 与浏览器的默认按钮样式（同 ChatInterface 的 .attention-locator） */
@@ -374,7 +309,7 @@ function submit() {
   -webkit-appearance: none;
   font: inherit;
   margin: 0;
-  line-height: 1.45;
+  line-height: var(--awd-line-height-ui);
 }
 
 .q-choice::after,
@@ -383,14 +318,15 @@ function submit() {
 }
 
 .q-choice {
+  min-height: var(--awd-control-height);
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--awd-space-2);
   width: 100%;
   text-align: left;
-  padding: 7px 10px;
+  padding: var(--awd-space-2);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface);
   color: var(--awd-text);
   cursor: pointer;
@@ -406,8 +342,8 @@ function submit() {
 .q-choice:focus-visible,
 .q-submit:focus-visible,
 .q-other-input:focus-visible {
-  outline: 2px solid var(--awd-accent);
-  outline-offset: 1px;
+  outline: var(--awd-focus-width) solid var(--awd-accent);
+  outline-offset: var(--awd-focus-offset);
 }
 
 .q-choice.is-chosen {
@@ -461,7 +397,7 @@ function submit() {
 }
 
 .q-choice-label {
-  font-size: 12.5px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
 }
 
@@ -470,7 +406,7 @@ function submit() {
 }
 
 .q-choice-desc {
-  font-size: 11.5px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
@@ -481,13 +417,13 @@ function submit() {
 .q-other-input {
   width: 100%;
   box-sizing: border-box;
-  height: 30px;
-  padding: 0 10px;
-  font-size: 12.5px;
+  height: var(--awd-control-height);
+  padding: 0 var(--awd-space-2);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   outline: none;
 }
 
@@ -502,10 +438,11 @@ function submit() {
 }
 
 .q-submit {
-  font-size: 12px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
-  padding: 5px 16px;
-  border-radius: 6px;
+  min-height: var(--awd-control-height);
+  padding: var(--awd-space-1) var(--awd-space-4);
+  border-radius: var(--awd-radius-md);
   border: 1px solid var(--awd-accent);
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
@@ -526,8 +463,11 @@ function submit() {
 
 .q-answer-other {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   word-break: break-word;
+}
+@media (pointer: coarse) {
+  .q-choice, .q-submit, .q-other-input { min-height: var(--awd-control-height-touch); }
 }
 </style>

@@ -82,6 +82,14 @@ public final class GeneratedFileLocation {
         catch (Exception impossible) { throw new IllegalStateException(impossible); }
     }
 
+    public static String createdResults(java.util.List<ProjectFile> files, String message) {
+        try {
+            var results = new java.util.ArrayList<Object>();
+            for (var file : files) results.add(JSON.readTree(createdResult(file, null)));
+            return JSON.writeValueAsString(Map.of("status", "success", "files", results, "message", message));
+        } catch (Exception impossible) { throw new IllegalStateException(impossible); }
+    }
+
     public static Long createdId(String output) {
         if (output == null) return null;
         try {
@@ -92,12 +100,37 @@ public final class GeneratedFileLocation {
         } catch (Exception malformed) { return null; }
     }
 
-    /** Never resolve a result by filename or accept a generated id from another project. */
+    /** Identity reporting is separate from destination policy (PDF derivatives keep their source folder). */
+    public static boolean reportsCreatedFiles(String toolName) {
+        return PARENTS.containsKey(toolName) || java.util.Set.of("doc_export_pdf", "pdf_merge", "pdf_split",
+                "pdf_extract_pages", "pdf_delete_pages", "pdf_rotate_pages", "pdf_add_page_numbers", "pdf_to_word",
+                "litigation_render", "litigation_timeline_render", "dd_export").contains(toolName);
+    }
+
+    public static java.util.List<Long> createdIds(String toolName, String output) {
+        if (!reportsCreatedFiles(toolName) || output == null) return java.util.List.of();
+        try {
+            var result = JSON.readTree(output);
+            if (!"success".equals(result.path("status").asText())) return java.util.List.of();
+            java.util.List<Long> ids = new java.util.ArrayList<>();
+            if (result.path("files").isArray()) {
+                for (var file : result.path("files")) {
+                    Long id = createdId(file.toString());
+                    if (id != null && !ids.contains(id)) ids.add(id);
+                }
+            } else {
+                Long id = createdId(output);
+                if (id != null) ids.add(id);
+            }
+            return ids;
+        } catch (Exception malformed) { return java.util.List.of(); }
+    }
+
+    /** Never resolve a result by filename or accept an id from another project. */
     public static ProjectFile createdFile(ProjectFileService files, Long projectId, String toolName, String output) {
-        if (!PARENTS.containsKey(toolName)) return null;
-        Long id = createdId(output);
-        if (id == null) return null;
-        ProjectFile file = files.findFile(id).orElse(null);
+        var ids = createdIds(toolName, output);
+        if (ids.isEmpty()) return null;
+        ProjectFile file = files.findFile(ids.get(0)).orElse(null);
         return belongsTo(file, projectId) && !Boolean.TRUE.equals(file.getIsFolder()) ? file : null;
     }
 }

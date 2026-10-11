@@ -652,7 +652,7 @@ export default {
 .section-header {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--awd-space-1);
   height: var(--awd-panel-sec-h);
 }
 
@@ -667,7 +667,7 @@ export default {
 
 .section-actions {
     display: flex;
-    gap: 4px;
+    gap: var(--awd-space-1);
 }
 
 .mini-btn {
@@ -678,8 +678,8 @@ export default {
     padding: 0 6px;
     background: var(--awd-surface);
     border: 1px solid var(--awd-panel-border);
-    border-radius: 4px;
-    font-size: 10px;
+    border-radius: var(--awd-radius-sm);
+    font-size: var(--awd-panel-fs-meta);
     cursor: pointer;
     color: var(--awd-panel-text-2);
 }
@@ -693,7 +693,7 @@ export default {
 /* 引擎未就绪时的就地出路（形制与会议录音的 .mr-tier-gate 同源） */
 .ev-gate {
     margin-bottom: var(--awd-panel-gap);
-    padding: 8px;
+    padding: var(--awd-space-2);
     border-radius: var(--awd-panel-radius);
     background: var(--awd-warning-soft);
     display: flex;
@@ -726,7 +726,7 @@ export default {
     justify-content: center;
     height: 24px;
     padding: 0 10px;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     font-size: var(--awd-panel-fs-meta);
     cursor: pointer;
     user-select: none;
@@ -753,7 +753,7 @@ export default {
   height: 110px;
   border: 1px solid var(--awd-panel-border);
   border-radius: var(--awd-panel-radius);
-  padding: 8px;
+  padding: var(--awd-space-2);
   font-size: var(--awd-panel-fs);
   line-height: 1.6;
   box-sizing: border-box;
@@ -807,10 +807,10 @@ export default {
     white-space: nowrap;
 }
 .selected-text .placeholder {
-    color: var(--awd-text-3);
+    color: var(--awd-text-2);
 }
 .select-arrow {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-2);
 }
 
@@ -822,8 +822,8 @@ export default {
     width: 100%;
     background: var(--awd-surface);
     border: 1px solid var(--awd-border);
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    border-radius: var(--awd-radius-md);
+    box-shadow: var(--awd-shadow-md);
     z-index: 100;
     margin-top: 4px;
     overflow: hidden;
@@ -841,17 +841,17 @@ export default {
 }
 
 .voice-search-box {
-    padding: 8px;
+    padding: var(--awd-space-2);
     border-bottom: 1px solid var(--awd-border-subtle);
 }
 .voice-search-input {
     width: 100%;
-    height: 32px;
+    min-height: var(--awd-control-height);
     background: var(--awd-bg);
     border: 1px solid var(--awd-border);
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     padding: 0 8px;
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     box-sizing: border-box;
 }
 
@@ -890,21 +890,21 @@ export default {
     color: var(--awd-panel-text);
 }
 .voice-gender-tag {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     background: var(--awd-surface-2);
     padding: 1px 4px;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     color: var(--awd-text-2);
 }
 .voice-locale-text {
-    font-size: 11px;
-    color: var(--awd-text-3);
+    font-size: var(--awd-panel-fs-meta);
+    color: var(--awd-text-2);
 }
 .empty-tip {
-    padding: 16px;
+    padding: var(--awd-space-4);
     text-align: center;
-    font-size: 12px;
-    color: var(--awd-text-3);
+    font-size: var(--awd-panel-fs);
+    color: var(--awd-text-2);
 }
 
 
@@ -931,14 +931,14 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 32px;
+  min-height: var(--awd-control-height);
   border-radius: var(--awd-panel-radius);
   font-size: var(--awd-panel-fs);
   font-weight: 600;
   cursor: pointer;
   border: none;
   outline: none;
-  box-shadow: 0 2px 4px rgba(46, 90, 80, 0.1);
+  box-shadow: var(--awd-shadow-sm);
   transition: all 0.2s;
 }
 
@@ -953,7 +953,7 @@ export default {
 .workdeck-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-    background-color: #9ca3af;
+    background-color: var(--awd-surface-3);
 }
 
 .full-width {
@@ -976,7 +976,7 @@ export default {
 }
 
 .download-link {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-panel-accent);
     cursor: pointer;
     font-weight: 500;
@@ -985,7 +985,7 @@ export default {
 .custom-player {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--awd-space-2);
     background: var(--awd-accent-wash);
     padding: 6px 8px;
     border-radius: var(--awd-panel-radius);
@@ -1002,7 +1002,7 @@ export default {
     color: var(--awd-text-on-accent);
     cursor: pointer;
     transition: transform 0.2s;
-    font-size: 14px;
+    font-size: var(--awd-font-size-body);
 }
 .play-btn:active {
     transform: scale(0.95);
@@ -1011,7 +1011,7 @@ export default {
     flex: 1;
 }
 .player-status {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text);
 }
 

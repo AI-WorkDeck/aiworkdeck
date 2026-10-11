@@ -4,7 +4,7 @@
  * 随内容本体一起搬来，原页面退成直链薄壳）。
  *
  * 更早的来源：2026-08-08 从 pages/userprofile/userprofile.vue 的「我的项目」tab 整块搬出。
- * .card-style-default / .badge-text-new / .arrow-char / .rename-box / .rename-input
+ * .badge-text-new / .rename-box / .rename-input
  * 在原页面就无定义，保持无定义。
  *
  * 宿主从整页换成了工作台左栏（默认 260px、可拖宽），所以根节点开了容器查询
@@ -22,7 +22,7 @@ $brand-dark: #221F1A;    /* Dark BG */
   height: 100%;
   overflow-y: auto;
   box-sizing: border-box;
-  padding: 10px var(--awd-panel-pad-x, 10px) 16px;
+  padding: var(--awd-space-2) var(--awd-panel-pad-x) var(--awd-space-4);
   color: var(--awd-text);
   container-type: inline-size;
   container-name: project-list-pane;
@@ -32,7 +32,7 @@ $brand-dark: #221F1A;    /* Dark BG */
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 12px;
+  gap: var(--awd-space-3);
 }
 
 .main-content {
@@ -53,7 +53,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     display: flex !important;
     flex-direction: row !important;
     justify-content: flex-start !important;
-    gap: 8px;
+    gap: var(--awd-space-2);
     align-items: center !important;
     margin-bottom: 12px;
 }
@@ -69,7 +69,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--awd-space-2);
     width: 100%;
 
     /* uni 的 <button> 默认 block + 左右 auto 外边距：不压掉会在窄栏里居中成一块灰条 */
@@ -82,10 +82,10 @@ $brand-dark: #221F1A;    /* Dark BG */
 .btn-secondary-small {
     background: var(--awd-surface);
     color: var(--awd-text-3);
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     font-weight: 500;
     padding: 6px 12px;
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     border: 1px solid var(--awd-border);
     cursor: pointer;
     line-height: 1.5;
@@ -104,7 +104,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 .cloud-accept-entry-text {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text-3);
     text-decoration: underline;
 }
@@ -123,7 +123,7 @@ $brand-dark: #221F1A;    /* Dark BG */
   align-items: stretch;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-radius-md);
   box-shadow: var(--awd-shadow-sm);
   padding: 4px;
 }
@@ -132,9 +132,9 @@ $brand-dark: #221F1A;    /* Dark BG */
 .ov-cell {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--awd-space-2);
   padding: 10px 20px;
-  border-radius: 7px;
+  border-radius: var(--awd-radius-md);
 
   & + .ov-cell {
     position: relative;
@@ -174,7 +174,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 .ov-label {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
@@ -189,8 +189,8 @@ $brand-dark: #221F1A;    /* Dark BG */
   align-self: center;
   margin-right: 8px;
   padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-accent-text);
   cursor: pointer;
 
@@ -236,7 +236,7 @@ $brand-dark: #221F1A;    /* Dark BG */
   height: 16px;
   padding: 0 5px;
   box-sizing: border-box;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-md);
   font-size: 10px;
   font-weight: 600;
   line-height: 16px;
@@ -245,88 +245,15 @@ $brand-dark: #221F1A;    /* Dark BG */
   background: var(--awd-danger);
 }
 
-/* 项目列表 Grid */
-.project-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
-}
-
-/* Card Base Style：白底、干净描边、悬停轻抬 + 柔和阴影（不做顶部色条、不做深色底） */
-.project-item-card {
-  background: var(--awd-surface);
-  border-radius: 12px;
-  box-shadow: none;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition: all 0.15s ease;
-  border: 1px solid var(--awd-border);
-  position: relative;
-  min-height: 200px;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--awd-shadow-md);
-    border-color: var(--awd-border-strong);
-  }
-}
-
-/* Card Variants：差异只落在类型徽章的浅色 tint 上，不再用顶部色条区分 */
-.card-style-restructuring {
-  .project-type-badge-new {
-      background: var(--awd-surface-3);
-      color: var(--awd-text);
-  }
-  .info-val-new.highlight {
-      color: var(--awd-text);
-      font-weight: 600;
-  }
-}
-
-.card-style-refinancing {
-  .project-type-badge-new {
-      background: var(--awd-accent-soft);
-      color: var(--awd-accent-text);
-  }
-  .info-val-new.highlight {
-      color: var(--awd-accent-text);
-      font-weight: 600;
-  }
-}
-
-.card-style-blank {
-  .project-type-badge-new {
-      background: var(--awd-surface-2);
-      color: var(--awd-text-3);
-  }
-  .project-title-new {
-      font-weight: 500;
-      color: var(--awd-text-2);
-  }
-}
-
-/* Card Header */
-.card-top-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding: 16px 16px 0;
-}
-
-/* 卡头小号浅色 tinted 徽章 */
+/* 项目类型徽章 */
 .project-type-badge-new {
     padding: 3px 8px;
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     font-size: 11px;
     font-weight: 600;
     display: inline-block;
 }
 
-.card-actions {
-    display: flex;
-    gap: 8px;
-}
 
 .action-btn-icon {
     width: 28px;
@@ -334,7 +261,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     cursor: pointer;
     font-size: 14px;
     opacity: 0.6;
@@ -349,79 +276,6 @@ $brand-dark: #221F1A;    /* Dark BG */
         background: var(--awd-bg);
         color: red;
     }
-}
-
-/* Card Content：间距体系 16/12/8 */
-.card-main-content {
-    padding: 12px 16px 16px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.project-title-area {
-    margin-bottom: 12px;
-    min-height: 44px; /* Ensure alignment */
-}
-
-.project-title-new {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--awd-text);
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-    cursor: pointer;
-
-    &:hover {
-        color: var(--awd-accent-text);
-    }
-}
-
-.company-info-area {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.info-row-new {
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-}
-
-.info-label-new {
-    color: var(--awd-text-2);
-    font-size: 12px;
-    width: 68px;
-    flex-shrink: 0;
-}
-
-.info-val-new {
-    color: var(--awd-text);
-    font-size: 13px;
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Footer：细分隔线隔开正文与卡脚 */
-.card-footer-new {
-    padding: 12px 16px;
-    border-top: 1px solid var(--awd-border-subtle);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--awd-surface);
-}
-
-.members-area-new {
-    display: flex;
-    align-items: center;
 }
 
 .members-list-new {
@@ -503,42 +357,11 @@ $brand-dark: #221F1A;    /* Dark BG */
     }
 }
 
-.footer-meta {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.time-text-new {
-    font-size: 12px;
-    color: var(--awd-text-3);
-}
-
-.enter-btn-arrow {
-    width: 24px;
-    height: 24px;
-    background: $brand-dark;
-    color: #EDE9DF;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    opacity: 0; /* Hidden by default, show on hover */
-    transform: translateX(-10px);
-    transition: all 0.2s;
-}
-
-.project-item-card:hover .enter-btn-arrow {
-    opacity: 1;
-    transform: translateX(0);
-}
-
 /* Dashed Empty State */
 .empty-state-dashed {
     height: 180px;
     border: 2px dashed var(--awd-border);
-    border-radius: 12px;
+    border-radius: var(--awd-radius-md);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -574,7 +397,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 .project-role-badge {
     margin-left: 8px;
     padding: 1px 7px;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     font-size: 10px;
     font-weight: 500;
 }
@@ -645,10 +468,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 /* New CSS for Layout Opt */
-.title-row-flex {
-    display: flex;
-    align-items: center;
-}
+
 
 .members-split-container {
     display: flex;
@@ -742,7 +562,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 
   .stat-card,
   .ov-cell {
-    padding: 8px 12px;
+    padding: var(--awd-space-2) var(--awd-panel-pad-x);
   }
 }
 
@@ -759,7 +579,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 .create-row {
     display: flex;
     flex-direction: row;
-    gap: 10px;
+    gap: var(--awd-space-2);
     flex-wrap: wrap;
 }
 
@@ -767,11 +587,11 @@ $brand-dark: #221F1A;    /* Dark BG */
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 8px;
+    gap: var(--awd-space-2);
     height: 44px;
     padding: 0 16px;
-    border-radius: 9px;
-    font-size: 13px;
+    border-radius: var(--awd-radius-md);
+    font-size: var(--awd-font-size-body);
     font-weight: 600;
     cursor: pointer;
     box-sizing: border-box;
@@ -821,7 +641,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 .create-title {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     font-weight: 600;
     white-space: nowrap;
 }
@@ -849,11 +669,11 @@ $brand-dark: #221F1A;    /* Dark BG */
     max-width: calc(100vw - 48px);
     padding: 20px;
     background: var(--awd-surface);
-    border-radius: 10px;
+    border-radius: var(--awd-radius-md);
     box-shadow: 0 16px 44px rgba(18, 52, 77, 0.2);
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--awd-space-3);
 }
 
 .naming-title {
@@ -869,11 +689,11 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 .naming-input {
-    height: 36px;
+    min-height: var(--awd-control-height);
     padding: 0 12px;
     border: 1px solid var(--awd-border);
-    border-radius: 6px;
-    font-size: 13px;
+    border-radius: var(--awd-radius-md);
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text);
     box-sizing: border-box;
 }
@@ -882,7 +702,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
-    gap: 10px;
+    gap: var(--awd-space-2);
 }
 
 /* awd-btn：与 CloudAcceptDialog 同一套视觉语言，本页按自己的 px 单位约定复制一份
@@ -892,8 +712,8 @@ $brand-dark: #221F1A;    /* Dark BG */
     align-items: center;
     justify-content: center;
     padding: 7px 16px;
-    border-radius: 6px;
-    font-size: 13px;
+    border-radius: var(--awd-radius-md);
+    font-size: var(--awd-font-size-body);
     font-weight: 600;
     cursor: pointer;
     border: 1px solid transparent;
@@ -928,57 +748,16 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 /* ===================== 视图切换与列表视图（2026-08-18） =====================
- * 方块视图信息密度太低：一屏放不下几张卡，每张卡上真正有用的字段只有名字。
- * 加一个列表视图，两个视图承载同一批字段（名称/客户/创建/最近修改/成员），
- * 没有哪一个视图独占信息——切视图只换排布，不换能看到什么。
+ * 项目侧栏统一紧凑列表，窄栏隐藏次要字段。
  */
-.view-toggle {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 2px;
-    background: var(--awd-bg);
-    border: 1px solid var(--awd-border);
-    border-radius: 8px;
-}
-
-.view-toggle-btn {
-    width: 28px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    cursor: pointer;
-    color: var(--awd-text-3);
-    transition: all 0.15s;
-
-    &:hover { color: var(--awd-accent-text); }
-
-    &.active {
-        background: var(--awd-surface);
-        color: var(--awd-accent-text);
-        box-shadow: 0 1px 2px rgba(18, 52, 77, 0.08);
-    }
-}
-
-.view-toggle-glyph {
-    width: 16px;
-    height: 16px;
-}
-
-/* 卡片顶行：BLANK 项目不再渲染类型标签，留一个占位把删除键顶到右边 */
-.card-top-spacer {
-    flex: 1;
-}
 
 /* ---- 列表视图 ---- */
 .project-table {
     background: var(--awd-surface);
     border: 1px solid var(--awd-border);
-    border-radius: 12px;
+    border-radius: var(--awd-radius-md);
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(18, 52, 77, 0.04);
+    box-shadow: none;
 }
 
 .ptable-head,
@@ -998,7 +777,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 
 /* 边框与悬停挂在外层 .ptable-item 上，这里只管高度 */
 .ptable-row {
-    min-height: 56px;
+    min-height: var(--awd-control-height);
     cursor: pointer;
 }
 
@@ -1006,9 +785,9 @@ $brand-dark: #221F1A;    /* Dark BG */
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 8px;
+    gap: var(--awd-space-2);
     min-width: 0;
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text);
 }
 
@@ -1019,6 +798,8 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 .col-name { flex: 2.2 1 0; }
+.col-name .project-role-badge,
+.col-name .project-type-badge-new { flex-shrink: 0; white-space: nowrap; }
 .col-client { flex: 1.4 1 0; }
 .col-time { flex: 0 0 100px; }
 .col-members { flex: 0 0 150px; }
@@ -1039,7 +820,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     display: block;
 }
 
-/* 成员格：头像小一号，行高 56px 放不下卡片视图那套 28px 的堆叠 */
+/* 成员格：紧凑行内头像 */
 .col-members .manager-avatar-wrapper,
 .col-members .member-avatar-new {
     width: 24px;
@@ -1051,15 +832,15 @@ $brand-dark: #221F1A;    /* Dark BG */
     width: 22px;
     height: 22px;
     line-height: 20px;
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
 }
 
-/* 窄窗口（桌面端窗口常被拖到 1100 以下）：先丢时间列，再丢客户列 */
-@media (max-width: 1080px) {
+/* 按侧栏实际宽度隐藏次要列，宽窗口里的窄侧栏也要给名称留空间。 */
+@container project-list-pane (max-width: 1080px) {
     .col-client { display: none; }
 }
 
-@media (max-width: 900px) {
+@container project-list-pane (max-width: 900px) {
     /* 两个日期只留「最近修改」——找案卷时它比创建日期有用 */
     .col-created { display: none; }
 }
@@ -1095,19 +876,19 @@ $brand-dark: #221F1A;    /* Dark BG */
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 12px;
+    gap: var(--awd-space-3);
     margin-bottom: 12px;
 }
 
 .project-search-input {
     flex: 0 1 280px;
     min-width: 0;
-    height: 32px;
+    min-height: var(--awd-control-height);
     padding: 0 12px;
     border: 1px solid var(--awd-border);
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     background: var(--awd-surface);
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text);
     box-sizing: border-box;
 }
@@ -1116,7 +897,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 8px;
+    gap: var(--awd-space-2);
     margin-left: auto;
 }
 
@@ -1134,10 +915,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 /* 工作台当前打开的那个项目：描边强调，点它不会重进 */
-.project-item-card.is-current {
-    border-color: var(--awd-accent);
-    box-shadow: 0 0 0 1px var(--awd-accent) inset;
-}
+
 
 .ptable-item.is-current {
     background: var(--awd-accent-wash);
@@ -1145,32 +923,9 @@ $brand-dark: #221F1A;    /* Dark BG */
 
 /* ---- 左栏窄宽（容器查询，按面板实际渲染宽度） ----
  * 左栏默认 260px、常被拖到 300-400px；整页时代按 1200px 排的卡片与六列表格在这里放不下。
- * 方块视图收成单列紧凑卡，列表视图只留「名称 + 最近修改 + 操作」三列。 */
+ * 项目统一紧凑列表，窄栏逐步隐藏次要字段。 */
 @container project-list-pane (max-width: 520px) {
-    .project-grid {
-        grid-template-columns: 1fr;
-        gap: 10px;
-    }
 
-    .project-item-card {
-        min-height: 0;
-    }
-
-    .card-top-row {
-        padding: 10px 12px 0;
-    }
-
-    .card-main-content {
-        padding: 4px 12px 10px;
-    }
-
-    .card-footer-new {
-        padding: 8px 12px;
-    }
-
-    .time-text-new {
-        white-space: nowrap;
-    }
 
     .col-client,
     .col-created,
@@ -1182,15 +937,15 @@ $brand-dark: #221F1A;    /* Dark BG */
         flex: 0 0 78px;
     }
 
-    /* 窄栏里名称是唯一要紧的一列：行内边距、列间距收紧，角色 / 类型徽章让位（方块视图里仍在） */
+    /* 窄栏里名称是唯一要紧的一列：行内边距、列间距收紧，角色 / 类型徽章让位 */
     .ptable-head,
     .ptable-row {
-        gap: 8px;
+        gap: var(--awd-space-2);
         padding: 0 10px;
     }
 
     .ptable-row {
-        min-height: 40px;
+        min-height: var(--awd-control-height);
     }
 
     .col-name .project-role-badge,
@@ -1208,7 +963,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 
     .project-list-toolbar {
         flex-wrap: wrap;
-        gap: 8px;
+        gap: var(--awd-space-2);
     }
 
     .project-search-input {
@@ -1226,7 +981,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     .create-card {
         flex: 1 1 0;
         min-width: 0;
-        height: 36px;
+        min-height: var(--awd-control-height);
         padding: 0 10px;
         justify-content: center;
     }
@@ -1235,4 +990,11 @@ $brand-dark: #221F1A;    /* Dark BG */
         overflow: hidden;
         text-overflow: ellipsis;
     }
+}
+
+/* Narrow rows prioritise the matter name; full names remain in title tooltips. */
+@container project-list-pane (max-width: 359px) {
+    .col-time { display: none; }
+    .ptable-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ptable-row { padding-top: var(--awd-space-1); padding-bottom: var(--awd-space-1); }
 }

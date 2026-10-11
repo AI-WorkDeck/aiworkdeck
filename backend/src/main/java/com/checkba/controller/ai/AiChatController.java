@@ -252,6 +252,9 @@ public class AiChatController {
                 Map<String, Object> m = new java.util.HashMap<>();
                 m.put("fileName", fc.getFileName());
                 m.put("changeType", fc.getChangeType());
+                m.put("fileId", fc.getFileId());
+                m.put("projectId", fc.getProjectId());
+                m.put("assistantMessageId", fc.getAssistantMessageId());
                 return m;
             }).collect(java.util.stream.Collectors.toList());
 

@@ -37,7 +37,18 @@ export const THEME_TOKEN_NAMES = [
   'info', 'info-text', 'info-soft',
   'file-word', 'file-ppt', 'file-excel', 'file-pdf', 'file-md', 'file-image',
   'shadow-sm', 'shadow-md', 'shadow-lg', 'overlay',
-  'halo-1', 'halo-2', 'halo-page', 'glass', 'glass-border', 'canvas'
+  'halo-1', 'halo-2', 'halo-page', 'glass', 'glass-border', 'canvas',
+  // iframe 与宿主共用字体、密度和交互尺寸，新增公共令牌须同时进入此表。
+  'font-serif', 'font-sans', 'font-mono',
+  'space-1', 'space-2', 'space-3', 'space-4', 'space-5', 'space-6', 'space-7', 'space-8',
+  'control-height', 'control-height-touch', 'radius-sm', 'radius-md', 'radius-dialog',
+  'font-size-body', 'font-size-reading', 'font-size-title', 'line-height-ui',
+  'focus-width', 'focus-offset', 'motion-fast', 'motion-base',
+  'switch-width', 'switch-track-height', 'switch-knob-size',
+  'panel-pad-x', 'panel-gap', 'panel-gap-lg', 'panel-sec-h', 'panel-row-h', 'panel-radius',
+  'panel-fs-sec', 'panel-fs', 'panel-fs-meta', 'panel-border', 'panel-hover',
+  'panel-text', 'panel-text-2', 'panel-text-3', 'panel-text-4',
+  'panel-accent', 'panel-accent-2', 'panel-accent-wash'
 ]
 
 // 计划审阅（dev-board#1022）的四个令牌：改动行底色 / 改动行左侧标记条 / 删除段小标记文字 /

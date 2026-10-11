@@ -367,6 +367,34 @@ html {
     --awd-titlebar-safe-inline-end: 0px;
 }
 
+/* ---- 跨页面尺寸与交互令牌（颜色仍由 palette 生成） ---- */
+html {
+    --awd-space-1: 4px;
+    --awd-space-2: 8px;
+    --awd-space-3: 12px;
+    --awd-space-4: 16px;
+    --awd-space-5: 20px;
+    --awd-space-6: 24px;
+    --awd-space-7: 28px;
+    --awd-space-8: 32px;
+    --awd-control-height: 32px;
+    --awd-control-height-touch: 48px;
+    --awd-radius-sm: 4px;
+    --awd-radius-md: 6px;
+    --awd-radius-dialog: 8px;
+    --awd-font-size-body: 13px;
+    --awd-font-size-reading: 15px;
+    --awd-font-size-title: 16px;
+    --awd-line-height-ui: 1.5;
+    --awd-focus-width: 2px;
+    --awd-focus-offset: 2px;
+    --awd-motion-fast: 140ms;
+    --awd-motion-base: 220ms;
+    --awd-switch-width: 38px;
+    --awd-switch-track-height: 22px;
+    --awd-switch-knob-size: 18px;
+}
+
 /* ---- 左栏面板密度令牌 ----
    左栏那一列宽度只有 260px，每个面板却各写各的边距（EasyVoice 是 16px 页边距 +
    24px 段间距 + 白卡片套白卡片，插件广场是 6-10px + 26px 分组头），并排看密度差一倍。

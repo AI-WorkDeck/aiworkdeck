@@ -16,9 +16,9 @@ export default {
 }
 </script>
 <style scoped>
-.plugin-summary { display: flex; flex-direction: column; gap: 16px; padding: 20px 16px; }
-.plugin-summary-name { font-size: 16px; font-weight: 600; color: var(--awd-text); }
-.plugin-summary-description { font-size: 13px; line-height: 1.7; color: var(--awd-text); }
-.plugin-summary-open { width: 100%; margin: 0; font-size: 13px; color: var(--awd-text-on-accent, #fff); background: var(--awd-accent); }
-.plugin-summary-hint { font-size: 12px; line-height: 1.6; color: var(--awd-text-3); }
+.plugin-summary { display: flex; flex-direction: column; gap: var(--awd-panel-gap-lg); padding: var(--awd-panel-gap) var(--awd-panel-pad-x); }
+.plugin-summary-name { font-size: var(--awd-font-size-title); font-weight: 600; color: var(--awd-text); }
+.plugin-summary-description { font-size: var(--awd-font-size-body); line-height: 1.7; color: var(--awd-text); }
+.plugin-summary-open { min-height: var(--awd-control-height); border-radius: var(--awd-radius-md); width: 100%; margin: 0; font-size: var(--awd-font-size-body); color: var(--awd-text-on-accent, #fff); background: var(--awd-accent); }
+.plugin-summary-hint { font-size: var(--awd-panel-fs); line-height: 1.6; color: var(--awd-text-2); }
 </style>
