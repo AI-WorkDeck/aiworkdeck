@@ -20,7 +20,7 @@
           <button
             v-if="!authStatus.authorized"
             class="tmeet-btn tmeet-btn-primary"
-            :disabled="loggingIn"
+            :disabled="loggingIn || authStatus.cliAvailable !== true"
             @tap="onLogin"
           >
             {{ loggingIn ? $t('tmeet.authorizingWait') : $t('tmeet.loginBtn') }}
@@ -49,6 +49,12 @@
       </view>
     </view>
 
+    <text v-if="authStatus.cliAvailable === false" class="tmeet-notice" role="status">{{ $t('tmeet.installRequired') }}</text>
+    <view v-if="loadError" class="tmeet-notice" role="alert">
+      <text>{{ loadError }}</text>
+      <button class="tmeet-btn tmeet-btn-secondary" @tap="refreshAll">{{ $t('tmeet.retry') }}</button>
+    </view>
+
     <!-- 同步配置与操作卡片 -->
     <view class="tmeet-card tmeet-sync-card">
       <view class="tmeet-row tmeet-between tmeet-sync-row">
@@ -56,6 +62,7 @@
           <text class="tmeet-label">{{ $t('tmeet.autoSync') }}</text>
         </view>
         <AwdSwitch
+          :aria-label="$t('tmeet.autoSync')"
           :checked="syncConfig.autoSync"
           @change="onToggleAutoSync"
         />
@@ -64,6 +71,7 @@
       <view v-if="syncConfig.autoSync" class="tmeet-row tmeet-between tmeet-interval-row">
         <text class="tmeet-label-sub">{{ $t('tmeet.syncInterval') }}</text>
         <AwdSelect
+          :aria-label="$t('tmeet.syncInterval')"
           :range="intervalLabels"
           :value="selectedIntervalIndex"
           @change="onIntervalChange"
@@ -73,7 +81,7 @@
       <view class="tmeet-sync-action-row">
         <button
           class="tmeet-btn tmeet-btn-primary tmeet-sync-btn"
-          :disabled="syncing"
+          :disabled="syncing || !authStatus.authorized"
           @tap="onSyncNow"
         >
           <text v-if="syncing" class="tmeet-spinner">↻</text>
@@ -88,6 +96,7 @@
         class="tmeet-search-input"
         v-model="searchKeyword"
         :placeholder="$t('tmeet.searchPlaceholder')"
+        :aria-label="$t('tmeet.searchPlaceholder')"
         @confirm="onSearch"
         @input="onSearchInput"
       />
@@ -203,10 +212,12 @@ export default {
   data() {
     return {
       authStatus: {
+        cliAvailable: null,
         authorized: false,
         accountName: '',
         authorizeUrl: ''
       },
+      loadError: '',
       loggingIn: false,
       authorizing: false,
       authPollTimer: null,
@@ -252,6 +263,7 @@ export default {
   },
   methods: {
     async refreshAll() {
+      this.loadError = ''
       await Promise.all([
         this.fetchAuthStatus(),
         this.fetchSyncConfig(),
@@ -263,30 +275,40 @@ export default {
       try {
         const res = await getTmeetAuthStatus()
         if (res && res.data) {
-          this.authStatus = res.data
+          this.authStatus = {
+            ...res.data,
+            authorized: res.data.loggedIn === true,
+            accountName: res.data.userName || '',
+            authorizeUrl: this.authorizing ? this.authStatus.authorizeUrl : ''
+          }
         }
       } catch (e) {
-        console.warn('获取腾讯会议认证状态失败:', e)
+        this.loadError = this.$t('tmeet.statusFailed')
       }
     },
 
     async onLogin() {
+      if (this.authStatus.cliAvailable !== true) return
       this.loggingIn = true
+      this.loadError = ''
       try {
         const res = await loginTmeet()
         if (res && res.data) {
-          this.authStatus = res.data
-          if (this.authStatus.authorizeUrl) {
+          const login = res.data
+          this.authStatus = { ...this.authStatus, authorizeUrl: login.authorizeUrl || '' }
+          if (login.loggedIn === true) {
+            await this.fetchAuthStatus()
+            await this.fetchMeetings()
+          } else if (this.authStatus.authorizeUrl) {
             this.authorizing = true
             this.openAuthLink()
             this.startAuthPoll()
-          } else if (this.authStatus.authorized) {
-            uni.showToast({ title: this.$t('tmeet.connected'), icon: 'success' })
-            this.fetchMeetings()
+          } else {
+            this.loadError = this.$t('tmeet.connectFailed')
           }
         }
       } catch (e) {
-        uni.showToast({ title: e.message || '登录失败', icon: 'none' })
+        this.loadError = this.$t('tmeet.connectFailed')
       } finally {
         this.loggingIn = false
       }
@@ -338,11 +360,14 @@ export default {
 
     async onLogout() {
       try {
-        await logoutTmeet()
-        this.authStatus = { authorized: false, accountName: '', authorizeUrl: '' }
+        const res = await logoutTmeet()
+        if (res?.data !== true) throw new Error('logout failed')
+        this.stopAuthPoll()
+        this.authorizing = false
+        this.authStatus = { ...this.authStatus, authorized: false, accountName: '', authorizeUrl: '' }
         uni.showToast({ title: this.$t('tmeet.notConnected'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e.message || '退出失败', icon: 'none' })
+        uni.showToast({ title: this.$t('tmeet.disconnectFailed'), icon: 'none' })
       }
     },
 
@@ -353,7 +378,7 @@ export default {
           this.syncConfig = res.data
         }
       } catch (e) {
-        console.warn('获取同步配置失败:', e)
+        this.loadError = this.$t('tmeet.configFailed')
       }
     },
 
@@ -371,7 +396,8 @@ export default {
       try {
         await updateTmeetSyncConfig(this.syncConfig)
       } catch (e) {
-        console.error('保存同步配置失败:', e)
+        this.loadError = this.$t('tmeet.configFailed')
+        await this.fetchSyncConfig()
       }
     },
 
@@ -384,7 +410,7 @@ export default {
           this.meetings = res.data
         }
       } catch (e) {
-        console.warn('获取会议列表失败:', e)
+        this.loadError = this.$t('tmeet.listFailed')
       }
     },
 
@@ -424,22 +450,20 @@ export default {
     async onGenerateMinutes(item) {
       try {
         const res = await getTmeetMinutesPrompt(item.id)
-        const prompt = res && res.data ? res.data : `腾讯会议纪要：请根据腾讯会议「${item.subject}」（recordId=${item.id}）生成专业会议纪要。`
-        this.$emit('generate-minutes', { prompt, meeting: item })
+        if (typeof res?.data?.prompt !== 'string' || !res.data.prompt.trim()) throw new Error('missing prompt')
+        this.$emit('generate-minutes', { prompt: res.data.prompt, meeting: item })
       } catch (e) {
-        const prompt = `腾讯会议纪要：请根据腾讯会议「${item.subject}」（recordId=${item.id}）生成专业会议纪要。`
-        this.$emit('generate-minutes', { prompt, meeting: item })
+        this.loadError = this.$t('tmeet.prepareFailed')
       }
     },
 
     async onGenerateTodos(item) {
       try {
         const res = await getTmeetTodosPrompt(item.id)
-        const prompt = res && res.data ? res.data : `腾讯会议待办：请提取腾讯会议「${item.subject}」（recordId=${item.id}）中的所有行动项（Action Items / ToDo List）。`
-        this.$emit('generate-todos', { prompt, meeting: item })
+        if (typeof res?.data?.prompt !== 'string' || !res.data.prompt.trim()) throw new Error('missing prompt')
+        this.$emit('generate-todos', { prompt: res.data.prompt, meeting: item })
       } catch (e) {
-        const prompt = `腾讯会议待办：请提取腾讯会议「${item.subject}」（recordId=${item.id}）中的所有行动项（Action Items / ToDo List）。`
-        this.$emit('generate-todos', { prompt, meeting: item })
+        this.loadError = this.$t('tmeet.prepareFailed')
       }
     },
 
@@ -492,23 +516,26 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 12px;
+  padding: var(--awd-panel-pad-x);
   box-sizing: border-box;
-  background-color: var(--color-bg-sidebar, #f8fafc);
-  color: var(--color-text-main, #0f172a);
-  font-size: 13px;
+  background-color: var(--awd-surface);
+  color: var(--awd-text);
+  font-size: var(--awd-font-size-body);
   overflow: hidden;
 }
 
 .tmeet-card {
-  background: var(--color-bg-card, #ffffff);
-  border: 1px solid var(--color-border-card, #e2e8f0);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 10px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--awd-border-subtle);
+  border-radius: 0;
+  padding: var(--awd-panel-gap) 0;
+  margin-bottom: var(--awd-panel-pad-x);
 }
 
 .tmeet-row {
+  flex-wrap: wrap;
+  gap: var(--awd-space-2);
   display: flex;
   align-items: center;
 }
@@ -518,119 +545,133 @@ export default {
 }
 
 .tmeet-auth-info {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--awd-space-1);
 }
 
 .tmeet-status-indicator {
   display: flex;
   align-items: center;
-  font-size: 12px;
-  color: #94a3b8;
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-text-2);
 }
 
 .tmeet-status-indicator.connected {
-  color: #10b981;
+  color: var(--awd-accent-text);
 }
 
 .tmeet-dot {
-  font-size: 12px;
-  margin-right: 4px;
+  font-size: var(--awd-panel-fs);
+  margin-right: var(--awd-space-1);
 }
 
 .tmeet-account-name {
-  font-size: 12px;
+  overflow-wrap: anywhere;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
-  color: var(--color-text-main, #334155);
+  color: var(--awd-text);
 }
 
 .tmeet-btn {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 6px;
+  min-height: var(--awd-control-height);
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--awd-panel-fs);
+  padding: var(--awd-space-1) var(--awd-panel-pad-x);
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   border: none;
   line-height: 1.5;
-  transition: all 0.2s;
+  transition: background var(--awd-motion-fast), color var(--awd-motion-fast);
+}
+
+.tmeet-btn[disabled] {
+  background: var(--awd-surface-2);
+  color: var(--awd-text-2);
+  border: 1px solid var(--awd-border-subtle);
+  cursor: default;
 }
 
 .tmeet-btn-primary {
-  background: #10b981;
-  color: #ffffff;
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
 }
 
 .tmeet-btn-primary:hover {
-  background: #059669;
+  background: var(--awd-accent-hover);
 }
 
 .tmeet-btn-ghost {
   background: transparent;
-  color: #64748b;
-  border: 1px solid #cbd5e1;
+  color: var(--awd-text-2);
+  border: 1px solid var(--awd-border);
 }
 
 .tmeet-btn-ghost:hover {
-  background: #f1f5f9;
-  color: #334155;
+  background: var(--awd-surface-2);
+  color: var(--awd-text);
 }
 
 .tmeet-btn-secondary {
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #cbd5e1;
+  background: var(--awd-surface-2);
+  color: var(--awd-text-2);
+  border: 1px solid var(--awd-border);
 }
 
 .tmeet-btn-secondary:hover {
-  background: #e2e8f0;
+  background: var(--awd-border);
 }
 
 .tmeet-btn-sm {
-  font-size: 11px;
-  padding: 2px 8px;
+  font-size: var(--awd-panel-fs-meta);
+  padding: 2px var(--awd-space-2);
 }
 
 .tmeet-auth-qr-box {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed #e2e8f0;
+  margin-top: var(--awd-panel-pad-x);
+  padding-top: var(--awd-space-2);
+  border-top: 1px dashed var(--awd-border);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: calc(var(--awd-space-3) / 2);
 }
 
 .tmeet-qr-hint {
-  font-size: 11px;
-  color: #64748b;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
 }
 
 .tmeet-qr-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--awd-space-2);
 }
 
 .tmeet-sync-row {
-  margin-bottom: 8px;
+  margin-bottom: var(--awd-space-2);
 }
 
 .tmeet-interval-row {
-  margin-bottom: 8px;
-  padding-top: 6px;
-  border-top: 1px solid #f1f5f9;
+  margin-bottom: var(--awd-space-2);
+  padding-top: calc(var(--awd-space-3) / 2);
+  border-top: 1px solid var(--awd-surface-2);
 }
 
 .tmeet-label {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
 }
 
 .tmeet-label-sub {
-  font-size: 12px;
-  color: #64748b;
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-text-2);
 }
 
 .tmeet-sync-action-row {
-  margin-top: 6px;
+  margin-top: calc(var(--awd-space-3) / 2);
 }
 
 .tmeet-sync-btn {
@@ -638,7 +679,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: calc(var(--awd-space-3) / 2);
 }
 
 .tmeet-spinner {
@@ -652,145 +693,172 @@ export default {
 }
 
 .tmeet-search-box {
-  margin-bottom: 8px;
+  margin-bottom: var(--awd-space-2);
 }
 
 .tmeet-search-input {
+  height: var(--awd-control-height);
+  min-height: var(--awd-control-height);
+  line-height: var(--awd-line-height-ui);
   width: 100%;
   box-sizing: border-box;
-  background: var(--color-bg-card, #ffffff);
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  padding: 0 var(--awd-panel-pad-x);
+  font-size: var(--awd-panel-fs);
 }
 
 .tmeet-meeting-list {
+  min-height: 0;
   flex: 1;
   overflow-y: auto;
 }
 
 .tmeet-empty {
   text-align: center;
-  padding: 30px 10px;
-  color: #94a3b8;
+  padding: var(--awd-space-8) var(--awd-panel-pad-x);
+  color: var(--awd-text-2);
 }
 
 .tmeet-empty-title {
   display: block;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
-  margin-bottom: 4px;
+  margin-bottom: var(--awd-space-1);
 }
 
 .tmeet-empty-hint {
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
 }
 
 .tmeet-meeting-card {
   cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color var(--awd-motion-fast);
 }
 
 .tmeet-meeting-card:hover {
-  border-color: #10b981;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-color: var(--awd-accent);
+  box-shadow: none;
 }
 
 .tmeet-card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 6px;
+  margin-bottom: calc(var(--awd-space-3) / 2);
 }
 
 .tmeet-card-title {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
-  color: var(--color-text-main, #1e293b);
+  color: var(--awd-text);
   flex: 1;
-  margin-right: 8px;
+  margin-right: var(--awd-space-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tmeet-badge {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 4px;
+  font-size: var(--awd-panel-fs-meta);
+  padding: 1px calc(var(--awd-space-3) / 2);
+  border-radius: var(--awd-radius-sm);
   white-space: nowrap;
 }
 
 .badge-synced {
-  background: #ecfdf5;
-  color: #059669;
+  background: var(--awd-accent-soft);
+  color: var(--awd-accent-text);
 }
 
 .badge-failed {
-  background: #fef2f2;
-  color: #dc2626;
+  background: var(--awd-danger-soft);
+  color: var(--awd-danger-text);
 }
 
 .badge-none {
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--awd-surface-2);
+  color: var(--awd-text-2);
 }
 
 .tmeet-card-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  font-size: 11px;
-  color: #64748b;
-  margin-bottom: 6px;
+  gap: var(--awd-space-2);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  margin-bottom: calc(var(--awd-space-3) / 2);
 }
 
 .tmeet-card-speakers {
-  font-size: 11px;
-  color: #475569;
-  margin-bottom: 8px;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  margin-bottom: var(--awd-space-2);
   line-height: 1.4;
 }
 
 .tmeet-speakers-label {
-  color: #94a3b8;
-  margin-right: 4px;
+  color: var(--awd-text-2);
+  margin-right: var(--awd-space-1);
 }
 
 .tmeet-card-actions {
+  flex-wrap: wrap;
   display: flex;
-  gap: 6px;
-  border-top: 1px solid #f1f5f9;
-  padding-top: 8px;
+  gap: calc(var(--awd-space-3) / 2);
+  border-top: 1px solid var(--awd-surface-2);
+  padding-top: var(--awd-space-2);
 }
 
 .tmeet-action-btn {
+  min-height: var(--awd-panel-row-h);
   flex: 1;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   padding: 3px 0;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   text-align: center;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  color: #334155;
+  border: 1px solid var(--awd-border);
+  background: var(--awd-surface);
+  color: var(--awd-text);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background var(--awd-motion-fast), color var(--awd-motion-fast);
 }
 
 .tmeet-action-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--awd-surface);
+  border-color: var(--awd-border);
 }
 
 .tmeet-action-btn.primary {
-  background: #10b981;
-  border-color: #10b981;
-  color: #ffffff;
+  background: var(--awd-accent);
+  border-color: var(--awd-accent);
+  color: var(--awd-text-on-accent);
 }
 
 .tmeet-action-btn.primary:hover {
-  background: #059669;
+  background: var(--awd-accent-hover);
+}
+.tmeet-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--awd-space-2);
+  margin-bottom: var(--awd-panel-gap);
+  color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs);
+  line-height: var(--awd-line-height-ui);
+}
+.tmeet-btn:disabled { opacity: .55; cursor: default; }
+.tmeet-btn:focus-visible, .tmeet-search-input:focus-within, .tmeet-action-btn:focus-visible {
+  outline: var(--awd-focus-width) solid var(--awd-accent-text);
+  outline-offset: var(--awd-focus-offset);
+}
+@media (pointer: coarse) {
+  .tmeet-btn, .tmeet-search-input, .tmeet-action-btn {
+  min-height: var(--awd-panel-row-h); min-height: var(--awd-control-height-touch); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tmeet-spinner { animation: none; }
 }
 </style>

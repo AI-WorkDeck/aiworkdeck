@@ -2,6 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  disconnectFailed: '未能断开腾讯会议，请重试。',
+  installRequired: '这台电脑尚未安装腾讯会议连接组件，请先在插件说明中查看安装步骤。',
+  retry: '重试',
+  statusFailed: '暂时无法检查连接，请重试。',
+  connectFailed: '未能打开腾讯会议授权，请检查连接组件后重试。',
+  configFailed: '同步设置未能加载或保存，请重试。',
+  listFailed: '会议列表暂时无法读取，请重试。',
+  prepareFailed: '会议材料暂时无法读取，请重试后再交给 AI。',
+
   panelTitle: '腾讯会议',
   authStatus: '连接状态',
   account: '当前账号',
