@@ -19,6 +19,7 @@ import java.net.http.*;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
+import com.checkba.util.DeadlineInputStream;
 
 /** Transfers immutable objects before Git can publish or materialize their references. */
 @Service
@@ -105,12 +106,12 @@ public class ProjectObjectSyncService {
                                     || !response.headers().firstValue("Content-Type").orElse("").startsWith("application/octet-stream")) {
                                 response.body().close(); throw new IOException("Version object part unavailable");
                             }
-                            return response.body();
+                            return new DeadlineInputStream(response.body(), Duration.ofSeconds(90));
                         } catch (IOException e) { throw new UncheckedIOException(e); }
                         catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new UncheckedIOException(new IOException(e)); }
                     }
                 };
-                try (InputStream in = new SequenceInputStream(parts)) { repos.objects().importObject(project, object, in); }
+                try (InputStream in = joinedParts(parts)) { repos.objects().importObject(project, object, in); }
             }
         } catch (IOException | InterruptedException | UncheckedIOException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
@@ -151,7 +152,7 @@ public class ProjectObjectSyncService {
 
     private JsonNode responseJson(HttpRequest request) throws IOException, InterruptedException {
         HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
-        try (InputStream in = response.body()) {
+        try (InputStream in = new DeadlineInputStream(response.body(), Duration.ofSeconds(90))) {
             if (response.statusCode() != 200) throw new IOException("Object endpoint status " + response.statusCode());
             byte[] payload = in.readNBytes(64 * 1024 + 1);
             if (payload.length > 64 * 1024) throw new IOException("Oversized object response");
@@ -160,6 +161,38 @@ public class ProjectObjectSyncService {
                 throw new IOException("Invalid object response");
             return result;
         }
+    }
+
+    // SequenceInputStream.close() opens every remaining stream in its enumeration. For HTTP parts
+    // that would start more downloads while unwinding a failed transfer, still holding the repo lock.
+    static InputStream joinedParts(Enumeration<InputStream> parts) {
+        return new InputStream() {
+            private InputStream current;
+            private boolean closed;
+            @Override public int read() throws IOException {
+                byte[] one = new byte[1];
+                return read(one, 0, 1) < 0 ? -1 : one[0] & 0xff;
+            }
+            @Override public int read(byte[] bytes, int offset, int length) throws IOException {
+                Objects.checkFromIndexSize(offset, length, bytes.length);
+                if (closed) throw new IOException("Object transfer is closed");
+                if (length == 0) return 0;
+                while (true) {
+                    if (current == null) {
+                        if (!parts.hasMoreElements()) return -1;
+                        current = parts.nextElement();
+                    }
+                    int count = current.read(bytes, offset, length);
+                    if (count >= 0) return count;
+                    current.close();
+                    current = null;
+                }
+            }
+            @Override public void close() throws IOException {
+                closed = true;
+                if (current != null) current.close();
+            }
+        };
     }
 
     private int partCount(ObjectRef ref) { return Math.toIntExact(Math.max(1, (ref.size() - 1) / ProjectObjectTransferService.PART_BYTES + 1)); }

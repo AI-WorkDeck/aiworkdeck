@@ -489,6 +489,8 @@ public class CloudSyncService {
         Path gitDir = repoService.gitDir(localProjectId);
         Path workTree = target != null ? target.root() : repoService.workTree(localProjectId);
         try {
+            // Preserve the project row if object cleanup fails, so the remaining bytes stay attributable.
+            repoService.objects().deleteProject(localProjectId);
             projectRepository.delete(project);
         } catch (Exception e) {
             log.warn("接入失败清理本地项目行失败: project={}", localProjectId, e);
