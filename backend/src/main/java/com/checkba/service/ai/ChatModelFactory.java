@@ -312,7 +312,16 @@ public class ChatModelFactory {
         String baseUrl = platform ? aiModelProperties.getOpenRouter().getBaseUrl() : resolveOpenRouterBaseUrl();
         recordModelUse(target.channel().name(), target.modelId(), true);
         return new OpenRouterStreamingChatModel(key, baseUrl, target.modelId(), remainingTimeout(timeout, started),
-                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), automatic ? reasoningEffortFor(target.modelId()) : null);
+                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), automatic ? automaticWritingReasoningEffortFor(target.modelId()) : null);
+    }
+
+    private String automaticWritingReasoningEffortFor(String modelId) {
+        var configured = reasoningProperties;
+        // An empty model list is an explicit global opt-out; named configurations retain precedence.
+        if (configured == null || configured.getModels() == null || configured.getModels().isEmpty()
+                || configured.listed(modelId)) return reasoningEffortFor(modelId);
+        // This automatic semantic task needs reasoning; only this exact endpoint is verified to support high.
+        return "deepseek/deepseek-v4-flash".equals(modelId) ? "high" : reasoningEffortFor(modelId);
     }
 
     private static java.time.Duration remainingTimeout(java.time.Duration budget, long started) {
