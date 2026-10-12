@@ -11,7 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * desktop profile 上下文启动冒烟测试。
@@ -51,6 +51,29 @@ class DesktopContextSmokeTest {
 
     @Autowired
     private ToolRegistry toolRegistry;
+
+    @Autowired
+    private com.checkba.controller.DesktopHealthController desktopHealth;
+
+    @Autowired
+    private com.checkba.controller.DesktopShutdownController desktopShutdown;
+
+    @Autowired
+    private javax.sql.DataSource dataSource;
+
+    @Autowired
+    private org.springframework.core.env.Environment environment;
+
+    @Test
+    void desktopHealthUsesRealDatabaseAndBoundedGracefulConfiguration() {
+        assertEquals(200, desktopHealth.health().getStatusCode().value());
+        assertNotNull(desktopShutdown);
+        var hikari = assertInstanceOf(com.zaxxer.hikari.HikariDataSource.class, dataSource);
+        assertEquals(2000, hikari.getConnectionTimeout());
+        assertEquals(1000, hikari.getValidationTimeout());
+        assertEquals("graceful", environment.getProperty("server.shutdown"));
+        assertEquals("30s", environment.getProperty("spring.lifecycle.timeout-per-shutdown-phase"));
+    }
 
     @Test
     void contextLoadsWithDesktopProfile() {

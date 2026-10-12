@@ -50,6 +50,10 @@ function findFreePort() {
  *   port: (ctx) => number|Promise<number>   // 分配端口（可读 env、可 findFreePort）
  *   verifyReuse?: (ctx, port) => Promise<boolean>  // 端口已被监听时验明是否自家服务；缺省视为是（旧语义）
  *   reallocatePort?: (ctx) => Promise<number>      // verifyReuse 失败（端口被陌生进程占）时重新分配
+ *   fixedPort?: boolean               // 分配后不得漂移（后端地址已注入渲染层）
+ *   health?: (ctx, port, build) => Promise<boolean> // 启动/运行共用 HTTP 健康定义
+ *   requestStop?: (ctx, port, controlToken) => Promise<boolean> // 本次 child 的优雅退出
+ *   stopTimeoutMs?: number            // SIGKILL 前宽限；后端需要覆盖 Spring graceful 时间
  *   startTimeoutMs: (ctx) => number
  *   prepare?: (ctx) => Promise<void>   // spawn 前置（dev 构建 jar / 打包态跑 DB 迁移）
  *   commands: (ctx) => [{cmd, args, env, cwd}]           // 候选命令，按序轮试
@@ -63,7 +67,11 @@ class ServiceManager {
     this.ports = this.ctx.ports
     this.descriptors = new Map()
     this.procs = new Map()
-    this.starting = new Map() // name -> in-flight start promise（并发去重，防重复 spawn）
+    this.operations = new Map()
+    this.healthChecks = new Map()
+    this.stopRequests = new Map()
+    this.managed = new Set() // 曾由本管理器启动；退出后仍可恢复
+    this.closing = false
     this.logStreams = new Map() // name -> 日志写入流（跟踪以便关闭，防 fd 泄漏）
   }
 
@@ -85,16 +93,28 @@ class ServiceManager {
     return fs.createWriteStream(path.join(dir, d.logName + '.log'), { flags: 'a' })
   }
 
-  async start(name) {
-    // 并发去重：同名服务的并发 start 复用同一 in-flight promise，防止重复 spawn 产生孤儿进程、抢同一端口
-    const inflight = this.starting.get(name)
-    if (inflight) return inflight
-    const p = this._start(name).finally(() => this.starting.delete(name))
-    this.starting.set(name, p)
-    return p
+  runExclusive(name, operation, action) {
+    const active = this.operations.get(name)
+    if (active && active.operation === operation) return active.promise
+    const promise = (active ? active.promise.catch(() => {}) : Promise.resolve()).then(action)
+    const entry = { operation, promise }
+    this.operations.set(name, entry)
+    promise.finally(() => {
+      if (this.operations.get(name) === entry) this.operations.delete(name)
+    }).catch(() => {})
+    return promise
   }
 
+  start(name) {
+    return this.runExclusive(name, 'start', () => this._start(name))
+  }
+
+  isOwned(name) { return this.managed.has(name) }
+  isBusy(name) { return this.operations.has(name) }
+  checkHealth(name) { return this.healthChecks.get(name)?.() || Promise.resolve(false) }
+
   async _start(name) {
+    if (this.closing) throw new Error('services are stopping')
     const d = this.descriptors.get(name)
     if (!d) throw new Error(`unknown service: ${name}`)
     if (d.enabled && !d.enabled(this.ctx)) return { ok: false, disabled: true }
@@ -108,19 +128,25 @@ class ServiceManager {
       return 'foreign'
     }
     let state = await probe()
-    if (state === 'foreign' && d.reallocatePort) {
+    if (state === 'foreign' && d.reallocatePort && !d.fixedPort) {
       port = await d.reallocatePort(this.ctx)
       this.ports[name] = port
       state = await probe()
     }
-    if (state === 'reuse') return { ok: true, reused: true }
+    if (state === 'reuse') {
+      if (!this.procs.has(name)) this.managed.delete(name)
+      return { ok: true, reused: true }
+    }
     if (state === 'foreign') throw new Error(`${name} port ${port} 被未知进程占用`)
 
     if (d.prepare) await d.prepare(this.ctx)
     const postPrepare = await probe()
-    if (postPrepare === 'reuse') return { ok: true, reused: true }
+    if (postPrepare === 'reuse') {
+      if (!this.procs.has(name)) this.managed.delete(name)
+      return { ok: true, reused: true }
+    }
     if (postPrepare === 'foreign') throw new Error(`${name} port ${port} 被未知进程占用`)
-    if (this.procs.get(name)) await this.stop(name)
+    if (this.procs.get(name)) await this._stop(name)
 
     let timeoutMs = d.startTimeoutMs(this.ctx)
     // Windows-on-ARM 转译环境（Mac 虚拟机等）：x64 JVM/Python 首启慢一个数量级，
@@ -136,25 +162,30 @@ class ServiceManager {
     let triedFallback = false
 
     for (let i = 0; i < candidates.length; i++) {
+      if (this.closing) throw new Error('services are stopping')
       const spec = candidates[i]
       const stdio = logStream ? ['ignore', 'pipe', 'pipe'] : 'inherit'
       const proc = spawn(spec.cmd, spec.args, { cwd: spec.cwd, env: spec.env, stdio })
       this.procs.set(name, proc)
+      this.managed.add(name)
+      if (d.requestStop) this.stopRequests.set(name, () => d.requestStop(this.ctx, port, spec.env?.AWD_BACKEND_CONTROL_TOKEN))
+      proc.once('exit', () => { if (this.procs.get(name) === proc) this.procs.delete(name) })
       if (logStream) {
-        proc.stdout.pipe(logStream)
-        proc.stderr.pipe(logStream)
+        proc.stdout.pipe(logStream, { end: false })
+        proc.stderr.pipe(logStream, { end: false })
       }
 
-      // 等"端口就绪"或"进程提前退出（崩溃）"，谁先到算谁
+      // 捕获本次启动的指纹，后台下载激活 overlay 不应把仍运行的旧版本判死。
+      const health = d.health ? () => d.health(this.ctx, port, spec.env?.AWD_BACKEND_BUILD) : null
+      if (health) this.healthChecks.set(name, health)
+      // 等 HTTP 就绪或进程退出；其它服务保留 TCP readiness。
       // eslint-disable-next-line no-await-in-loop
-      const result = await this.waitStartOrExit(proc, port, timeoutMs)
+      const result = await this.waitStartOrExit(proc, port, timeoutMs, health)
       if (result === 'started') return { ok: true, reused: false, cmd: spec.cmd }
-      if (result === 'timeout') {
+      if (result === 'timeout' || this.closing) {
         // 进程还活着但端口没起：杀掉再试下一个候选
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          await this.stop(name)
-        } catch (e) { /* ignore */ }
+        // eslint-disable-next-line no-await-in-loop
+        await this._stop(name)
       } else {
         // 'exited'：进程已崩溃退出，丢引用即可，继续尝试下一个候选
         this.procs.delete(name)
@@ -171,7 +202,7 @@ class ServiceManager {
   }
 
   // 等服务端口就绪或进程退出，返回 'started' | 'exited' | 'timeout'
-  waitStartOrExit(proc, port, timeoutMs) {
+  waitStartOrExit(proc, port, timeoutMs, health = null) {
     return new Promise((resolve) => {
       let settled = false
       const finish = (v) => {
@@ -185,13 +216,15 @@ class ServiceManager {
       const poll = async () => {
         while (!settled && Date.now() - start < timeoutMs) {
           // eslint-disable-next-line no-await-in-loop
-          if (await isPortOpen(port)) return finish('started')
+          if (this.closing || proc.exitCode != null || proc.signalCode != null) return finish('exited')
+          const ready = await (health ? health() : isPortOpen(port))
+          if (!settled && ready) return finish('started')
           // eslint-disable-next-line no-await-in-loop
           await sleep(200)
         }
         finish('timeout')
       }
-      poll()
+      poll().catch(() => finish('timeout'))
     })
   }
 
@@ -212,29 +245,49 @@ class ServiceManager {
     return results
   }
 
-  async stop(name) {
+  stop(name) {
+    return this.runExclusive(name, 'stop', () => this._stop(name))
+  }
+
+  async _stop(name) {
     const p = this.procs.get(name)
     if (!p) return { ok: true }
-    this.procs.delete(name)
-    return new Promise((resolve) => {
+    if (p.exitCode != null || p.signalCode != null) { this.procs.delete(name); return { ok: true } }
+    return new Promise((resolve, reject) => {
       let finished = false
       let killTimer = null
+      let exitTimer = null
       const done = () => {
         if (finished) return
         finished = true
         // 进程已经退了就把强杀定时器撤掉：原来这个 setTimeout 从不取消，每停一次服务
         // 就留一个 3 秒的悬挂句柄（退出路径上还会把事件循环多吊住 3 秒）
         if (killTimer) { clearTimeout(killTimer); killTimer = null }
+        if (exitTimer) clearTimeout(exitTimer)
+        if (this.procs.get(name) === p) this.procs.delete(name)
         resolve({ ok: true })
       }
-      p.once('exit', () => done())
-      try { p.kill('SIGTERM') } catch (e) { done(); return }
-      // 兜底：3s 后强杀。这个窗口刻意不缩小——后端的 H2 库就落在 ~/.aiworkdeck/local.mv.db，
-      // 缩窗只会提高硬杀概率，而后端关闭的真实阻塞点至今没定位（dev-board#602）。
+      p.once('exit', done)
+      const terminate = () => {
+        if (finished) return
+        try { p.kill('SIGTERM') } catch (e) { p.removeListener('exit', done); reject(e) }
+      }
+      const requestStop = this.stopRequests.get(name)
+      if (requestStop) {
+        // Windows SIGTERM 等价于强杀；先通过拥有者令牌请 Spring 优雅关闭。
+        Promise.resolve().then(requestStop).catch(() => false).then((accepted) => {
+          if (!accepted && process.platform !== 'win32') terminate()
+        })
+      } else terminate()
+      // 后端必须给事务和文件写入留下退出宽限；强杀后仍等 exit，不能与新 JVM 重叠。
+      const graceMs = this.descriptors.get(name)?.stopTimeoutMs || 3000
       killTimer = setTimeout(() => {
         try { p.kill('SIGKILL') } catch (e) { /* ignore */ }
-        done()
-      }, 3000)
+        if (!finished) exitTimer = setTimeout(() => {
+          p.removeListener('exit', done)
+          reject(new Error(`${name} did not exit after SIGKILL`))
+        }, 3000)
+      }, graceMs)
     })
   }
 
@@ -243,16 +296,20 @@ class ServiceManager {
   // 装死就够让「⌘Q 到应用消失」拖成 6 秒，用户看着一个还能点的窗口，最后整个应用
   // 在同一瞬间消失——观感与闪退不可区分（dev-board#602）。
   async stopAll() {
-    await Promise.all([...this.procs.keys()].map((name) => this.stop(name)))
+    this.closing = true
+    await Promise.all([...new Set([...this.procs.keys(), ...this.operations.keys()])].map((name) => this.stop(name)))
     // 退出/全停时关闭所有日志流，释放 fd
     for (const [, s] of this.logStreams) { try { s.end() } catch (e) { /* ignore */ } }
     this.logStreams.clear()
     return { ok: true }
   }
 
-  async restart(name) {
-    await this.stop(name)
-    return this.start(name)
+  restart(name) {
+    return this.runExclusive(name, 'restart', async () => {
+      if (this.closing) throw new Error('services are stopping')
+      await this._stop(name)
+      return this._start(name)
+    })
   }
 }
 

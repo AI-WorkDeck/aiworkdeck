@@ -2,6 +2,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Workbench copy (pages/project-overview/project-overview.vue).
 export default {
+  backendHealth: {
+    externalUnavailable: 'Existing local service unavailable; check the app that started it',
+    startupFailed: 'Local service failed to start; reopen the app',
+    externalUnverified: 'Connected to an older service; health checks are unavailable',
+    manualRestarting: 'Restarting local service…',
+    checking: 'Checking local service…',
+    unavailable: 'Local service status unavailable',
+    starting: 'Local service starting…',
+    healthy: 'Local service ready',
+    degraded: 'Local service not responding; checking…',
+    restarting: 'Local service recovering…',
+    failed: 'Local service recovery failed',
+    suspended: 'Local service checks paused',
+    stopped: 'Local service stopped',
+    recovered: 'Local service restored; retry saving unsaved documents',
+    retry: 'Restart service',
+    requesting: 'Requesting restart…',
+    restartFailed: 'Restart failed; please retry',
+    saveRetryReady: 'Service restored; document is unsaved. Retry saving',
+  },
   looseFiles: 'Open Files',
   looseFilesEmpty: 'Open a file to get started',
   looseFilesHint: 'Edit files in place, or open a folder as a project.',
