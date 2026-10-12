@@ -8,7 +8,7 @@ const preferenceListeners = new Map()
 
 /** Host-scoped vocabulary and explicit lookup. Dependencies stay injectable for isolation tests. */
 export function createWritingAssistanceHost({ projectId, fileId, userId, execute, send, api, storage, writable, language,
-  openSettings = null, openAccount = null, openRecharge = null, semantic = null,
+  openSettings = null, openAccount = null, openRecharge = null, semantic = null, onState = null,
   timers = { set: (fn, ms) => setTimeout(fn, ms), clear: id => clearTimeout(id) } }) {
   const session = `${projectId}:${fileId}:${Date.now()}:${Math.random().toString(36).slice(2)}`
   semantic?.bindSession(session)
@@ -18,14 +18,31 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
   let seedComplete = false, seedTimer = null
   let preferences = { enabled: true, learning: true, hints: true }
   try { const stored = storage.get(key); for (const name of Object.keys(preferences)) if (typeof stored?.[name] === 'boolean') preferences[name] = stored[name] } catch { /* defaults */ }
+  const reportState = (error = '') => {
+    try { onState?.({ session, available: !disposed && !!writable, ...preferences, error }) } catch { /* UI state is optional. */ }
+  }
   const receivePreferences = (next) => {
     if (disposed) return
     preferences = { ...next }
     // Only flags change: retain this guest's vocabulary, including recent typing.
     send({ __lo: 'lo-relay', type: 'writing-config', config: { ...preferences, session } })
+    reportState()
   }
   if (!preferenceListeners.has(key)) preferenceListeners.set(key, new Set())
   preferenceListeners.get(key).add(receivePreferences)
+  function writePreferences(data) {
+    if (disposed) return false
+    const next = { ...preferences }
+    for (const name of Object.keys(next)) if (typeof data?.[name] === 'boolean') next[name] = data[name]
+    try { storage.set(key, next) } catch {
+      // Roll back a guest setting's tentative value; never advertise an unsaved preference.
+      send({ __lo: 'lo-relay', type: 'writing-config', config: { ...preferences, session } })
+      reportState('PREFERENCES_SAVE_FAILED')
+      return false
+    }
+    for (const listener of preferenceListeners.get(key) || []) listener(next)
+    return true
+  }
   function publish() {
     // Document locality must not hide an existing entity's details. Keep the
     // original learned records too, so vocabulary management can still delete them.
@@ -42,7 +59,10 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
       const kind = ['WORD', 'PHRASE'].includes(known.kind) ? item.kind : known.kind || item.kind
       return { ...known, ...item, kind, uses: Math.max(item.uses || 0, usesByText.get(item.text) || 0) }
     })
-    if (!disposed) send({ __lo: 'lo-relay', type: 'writing-config', config: { ...preferences, session, writable, language, items: [...enriched, ...items] } })
+    if (!disposed) {
+      send({ __lo: 'lo-relay', type: 'writing-config', config: { ...preferences, session, writable, language, items: [...enriched, ...items] } })
+      reportState()
+    }
   }
   async function refresh() {
     const seq = ++loadSequence
@@ -110,10 +130,7 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
         if (!['project', 'user'].includes(data.scope)) throw new Error('Invalid learning scope')
         return api.learn(projectId, { scope: data.scope, entries: data.entries })
       case 'preferences': {
-        const next = { ...preferences }
-        for (const name of Object.keys(next)) if (typeof data[name] === 'boolean') next[name] = data[name]
-        storage.set(key, next)
-        for (const listener of preferenceListeners.get(key) || []) listener(next)
+        if (!writePreferences(data)) throw new Error('PREFERENCES_SAVE_FAILED')
         return preferences
       }
       case 'delete': {
@@ -143,6 +160,7 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
   }
   return {
     session,
+    setEnabled(next) { return writePreferences({ enabled: !!next }) },
     async start() {
       publish()
       await Promise.allSettled([refresh(), seedDocument()])
@@ -173,6 +191,7 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
     destroy() {
       if (disposed) return
       disposed = true; loadSequence++; seedSequence++
+      reportState()
       semantic?.destroy()
       if (seedTimer != null) timers.clear(seedTimer)
       const listeners = preferenceListeners.get(key)
