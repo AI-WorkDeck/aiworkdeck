@@ -24,7 +24,7 @@ function harness(t, overrides = {}) {
     send: msg => {
       if (msg.type === 'writing-assistance-state') { stateMessages.push(msg); return }
       messages.push(msg)
-      if (msg.action === 'preferences' || (msg.action === 'learn' && !overrides.deferLearning)) deliver({ type: 'writing-response', id: msg.id, session: msg.session, result: {} })
+      if ((msg.action === 'preferences' && !overrides.deferPreferences) || (msg.action === 'learn' && !overrides.deferLearning)) deliver({ type: 'writing-response', id: msg.id, session: msg.session, result: {} })
     },
   }
   const execute = async (action, params) => {
@@ -623,4 +623,41 @@ test('迟到的右键预解析不能覆盖新文档或关闭后的菜单', async
   waiting.resolve({ success: true, selectedText: '北京示例有限公司', token: 'old' }); await tick()
   assert.equal(h.panel().hidden, true)
   assert.equal(h.messages.some(m => m.action === 'lookup'), false)
+})
+
+
+test('候选可直接关闭自动弹出，重开恢复，手动补全不受影响', async t => {
+  const h = harness(t)
+  await suggestions(h)
+  h.button('关闭自动补全').click(); await tick()
+  assert.equal(h.panel().hidden, true)
+  assert.deepEqual(h.messages.findLast(m => m.action === 'preferences').data, { enabled: false })
+  h.config({ enabled: false })
+  const queries = h.queries().length
+  h.api.committed('北京当红'); await debounce()
+  assert.equal(h.queries().length, queries)
+  assert.equal(h.panel().hidden, true)
+  h.key('/', { altKey: true }); await tick()
+  assert.ok(h.doc.querySelector('[role="option"]'))
+  assert.equal(h.button('关闭自动补全'), undefined, '关闭时手动候选不冒充自动开启')
+  h.key('Escape')
+  h.config({ enabled: true })
+  await suggestions(h)
+  assert.ok(h.button('关闭自动补全'))
+})
+
+test('直接关闭保存失败显示失败且仍按原状态补全，迟到失败不干扰新输入', async t => {
+  const h = harness(t, { deferPreferences: true })
+  await suggestions(h)
+  h.button('关闭自动补全').click()
+  h.config({ enabled: true })
+  h.respond('preferences', undefined, 'PREFERENCES_SAVE_FAILED'); await tick()
+  assert.match(h.panel().textContent, /设置未能保存，仍保持原状态/)
+  h.key('Escape')
+  await suggestions(h)
+  h.button('关闭自动补全').click()
+  h.api.committed('北京当红')
+  h.respond('preferences', undefined, '旧保存失败'); await debounce()
+  assert.ok(h.doc.querySelector('[role="option"]'))
+  assert.doesNotMatch(h.panel().textContent, /旧保存失败/)
 })
