@@ -171,6 +171,7 @@ function quitHarness({ stopAll }) {
     stopClipboardWatcher: () => events.push('stopClipboardWatcher'),
   })
   vm.runInContext(`
+    let backendSupervisor = null
     let services = { stopAll: globalThis.__stopAll }
     let modelManager = { killAllActive: () => globalThis.__events.push('killAllActive') }
     ${section('const QUIT_STOP_TIMEOUT_MS', "ipcMain.handle('checkba:backend-restart'")}

@@ -294,7 +294,7 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 
 ## 端口体系（2026-08 起）
 
-- **打包态桌面后端：5269 → 5369 → 5169 → 随机**（`desktop/main/services/backend-service.js` allocateBackendPort：真实 bind 探测；被占时先探 `/api/admin/wizard` 验明是否自家后端，**并对比 build 指纹**（spawn 时注入 `AWD_BACKEND_BUILD`=app.jar 的 size-mtime，wizard 响应 `build` 字段回显，PR#589/dev-board#139：更新后残留的陈旧后端曾被静默复用导致新前端打旧后端 404）——同指纹复用；指纹不一致按端口找 pid 定点终止后原地重启（终止失败退而复用保可用性，因为旧进程握着 H2 文件锁）；陌生进程降级下一个端口。dev 态不校验指纹（restart-backend.sh 拉起的后端无指纹）。service-manager 的 verifyReuse/reallocatePort 契约即为此加）。实际端口经 BrowserWindow additionalArguments → preload → `window.checkbaDesktop.apiBaseUrl` 注入渲染层，`frontend/src/services/api.js` 最优先读它。
+- **打包态桌面后端：5269 → 5369 → 5169 → 随机**（`desktop/main/services/backend-service.js` allocateBackendPort：真实 bind 探测；被占时先探 `/api/admin/wizard` 验明是否自家后端，**并对比 build 指纹**（spawn 时注入 `AWD_BACKEND_BUILD`=app.jar 的 size-mtime，wizard 响应 `build` 字段回显，PR#589/dev-board#139：更新后残留的陈旧后端曾被静默复用导致新前端打旧后端 404）——同指纹复用；指纹不一致警告并复用，不能杀非本壳创建的进程（旧进程可能握着 H2 文件锁）；陌生进程降级下一个端口。dev 态不校验指纹（restart-backend.sh 拉起的后端无指纹）。service-manager 的 verifyReuse/reallocatePort 契约即为此加）。实际端口经 BrowserWindow additionalArguments → preload → `window.checkbaDesktop.apiBaseUrl` 注入渲染层，`frontend/src/services/api.js` 最优先读它。
 - **dev 态后端仍 9696**：restart-backend.sh / e2e / CI 全部不变；`CHECKBA_BACKEND_PORT` 可显式覆盖两种模式。注入优先级高于 `VITE_API_BASE_URL`，所以**凡是走 Electron 壳的测试/脚本，要换后端必须改 `CHECKBA_BACKEND_PORT`**，只指 dev server 的环境变量不管用（desktop-e2e 曾因此整条链失败）。
 - pptx/mineru/kokoro/asr 打包态是动态回环端口（由后端内部转发，前端不可见）；编辑器静态服务器 47613 因 COOP/COEP 跨源隔离必须独立源，勿并入。
 
@@ -556,3 +556,12 @@ mac 的 `build.mac.fileAssociations` 用 `rank: Alternate`；Windows 在 `build/
 Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Actions runner 上执行安装→改默认→重装→卸载，验证 17 类候选、已有默认与 UserChoice 保留。electron-builder 24 用 StdUtils 重读 `/D`，带空格路径必须给值加引号。其捆绑 NSIS 3.0.4.1 的 `DeleteRegKey /ifempty` 只检查子键，不检查命名值；**不得用它清理共享 OpenWithProgids 键**，只删本应用的值。该错误由真实重装门发现；模拟器须覆盖卸载后重装，不能把 `/ifempty` 当作无操作。
 
 回归：`desktop/tests/open-paths.test.js`、`file-associations.test.js`。`frontend/tests/desktop-e2e/local-files.mjs` 用全新 home/profile/H2/storage/端口测试源码 Electron 的冷启动队列、同名异目录、原位保存、PDF/Word；先构建 H5/editor/backend 并准备本地 LOWA 资源，`JAVA_HOME=<JDK21> node frontend/tests/desktop-e2e/local-files.mjs`。它注入原生打开事件，不能替代正式安装包的 Finder/Windows 打开方式验收。
+
+
+## 本地后端运行期自检（dev-board#1216）
+
+`desktop/main/services/backend-supervisor.js` 在服务启动完成后每 10s 检查后端，连续三次失败后按 5/15/45s 退避尝试恢复，最多三次；连续健康 5min 才重置预算。只恢复 `ServiceManager` 创建的 child，复用外部后端同样检查 `/api/desktop/health`，503/超时不能退回 wizard 假报健康；仅明确404且wizard识别成功时标记 `degraded/external-health-unverified`（旧版健康未知），不接管。原来按端口杀陈旧后端的路径已移除。后端初启 HTTP 就绪宽限 120s（Windows ARM 转译延长），运行期使用 `/api/desktop/health`（DB 检查+本次 child 的 build），不以 TCP 通等价健康。dev prod profile 兼容 `/api/admin/wizard`。健康检查固定本次 spawn 指纹，后台下载激活 overlay 不会触发运行中的旧版本被误判并自动换件。
+
+start/stop/restart 共用按服务串行队列。后端端口分配后固定，恢复不能改渲染层已注入的地址。本次 spawn 随机注入 `AWD_BACKEND_CONTROL_TOKEN`，优雅停止请求为 loopback POST `/api/desktop/shutdown` + `X-AWD-Backend-Control-Token`；令牌只在进程内存/env，不写日志。停止先等待 Spring graceful 关闭，45s 后才强杀，且确认 child exit 后才能起新 JVM；尤其 Windows 不能直接把 Node `SIGTERM` 当优雅退出。应用退出总等待55s；睡眠暂停检测，唤醒30s宽限，退出移除监测。恢复不刷新窗口，保留编辑器内未保存内容。
+
+preload `host.backend.getHealth()` / `onHealthChanged(callback)`；主进程 IPC `checkba:backend-health` / `checkba:backend-health-changed`。快照 `{state, ok, owned, attempts, reason, updatedAt}`；state 为 starting/healthy/degraded/restarting/failed/suspended/stopped。启动链异常也保留 failed/startup-failed 快照；只有已有本壳 child 所有权时才启动监督器允许恢复，端口分配失败不能永久显示 starting。回归 `desktop/tests/backend-supervisor.test.js`、`service-manager.test.js`、`quit-lifecycle.test.js` 用随机回环端口/合成 child；端口链测试同样注入随机端口，不占用户默认5269。mac/Windows正式包的数据库耗尽与真实文件写入恢复仍须隔离验收，不得在用户未保存文稿的客户端直接强杀演练。

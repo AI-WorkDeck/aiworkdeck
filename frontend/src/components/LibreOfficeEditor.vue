@@ -310,6 +310,9 @@ export default {
       webviewEl: null,
       executor: null,
       saving: false,
+      backendHealthState: null,
+      backendHealthRecoverySeq: 0,
+      backendFailedUpload: null,
       // Autosave: set by the worker's modify signal, cleared when a save starts;
       // read by the host (closeFile / evict) to know if a flush is needed.
       dirty: false,
@@ -385,6 +388,7 @@ export default {
     saveStateText() {
       if (!this.ready || !this.file || this.loadingOverlayVisible || this.docLoadFailed) return ''
       if (this.saving) return this.$t('editor.status.saving')
+      if (this.statusKey === 'saveFailed' && this.backendSaveRetryReady()) return this.$t('workbench.backendHealth.saveRetryReady')
       if (this.statusKey === 'saveFailed' || this.statusKey === 'movedSaveFailed') return this.$t('editor.status.' + this.statusKey)
       if (this.statusKey !== 'ready') return ''
       if (this.dirty) return this.$t('editor.status.pendingSave')
@@ -459,6 +463,7 @@ export default {
     // 可能已空白就绪（_endpointUp），也可能仍在 boot——后者只预取字节，
     // onEndpointReady 会照常装载。file→file 换文档不支持（池按实例=文档）。
     file(newFile, oldFile) {
+      if (newFile?.id !== oldFile?.id) this.invalidateBackendSaveHint()
       if (!newFile || oldFile) return
       this._adoptedSpare = true
       this.prefetchBytes()
@@ -494,6 +499,7 @@ export default {
     },
   },
   async mounted() {
+    this.watchBackendHealth()
     this._onEvidenceDragStart = () => { this.evidenceDropArmed = true }
     // _dragEndedAt：客体代收的 drop 经 IPC 转发到达时，dragend 往往已经先一步把
     // armed 翻回 false（drop 与 dragend 之间只差几百毫秒，IPC 又要过一跳）。
@@ -533,6 +539,10 @@ export default {
     }
   },
   beforeUnmount() {
+    this._backendHealthDisposed = true
+    this._backendHealthUnsubscribe?.()
+    this._backendHealthUnsubscribe = null
+    this.invalidateBackendSaveHint()
     clearTimeout(this._provReloadTimer)
     clearTimeout(this._provRetryTimer)
     this._provSeq = (this._provSeq || 0) + 1
@@ -568,6 +578,41 @@ export default {
     this.executor = null
   },
   methods: {
+    async watchBackendHealth() {
+      const api = host.backend
+      if (typeof api?.getHealth !== 'function' || typeof api?.onHealthChanged !== 'function') return
+      this._backendHealthDisposed = false
+      this._backendHealthEvents = 0
+      try {
+        this._backendHealthUnsubscribe = api.onHealthChanged(snapshot => {
+          this._backendHealthEvents++
+          this.onBackendHealth(snapshot)
+        })
+        const events = this._backendHealthEvents
+        const snapshot = await api.getHealth()
+        if (!this._backendHealthDisposed && events === this._backendHealthEvents) this.onBackendHealth(snapshot)
+      } catch (e) { /* 旧壳或状态暂不可取时保留原保存失败与手动重试。 */ }
+    },
+    onBackendHealth(snapshot) {
+      if (this._backendHealthDisposed || !snapshot || typeof snapshot.state !== 'string') return
+      if (this.backendHealthState?.updatedAt && snapshot.updatedAt < this.backendHealthState.updatedAt) return
+      if (snapshot.state === 'healthy' && snapshot.ok === true && ['degraded', 'restarting', 'failed'].includes(this.backendHealthState?.state)) {
+        this.backendHealthRecoverySeq = (this.backendHealthRecoverySeq || 0) + 1
+      }
+      this.backendHealthState = snapshot
+      // 只更新提示。上传结果不明时即使服务恢复，也不能擅自把旧稿再次写回。
+    },
+    invalidateBackendSaveHint() {
+      this.backendFailedUpload = null
+      this._backendSaveContext = (this._backendSaveContext || 0) + 1
+    },
+    backendSaveRetryReady() {
+      const failure = this.backendFailedUpload
+      return Boolean(failure && !this._backendHealthDisposed && !this._saveDiscarded && !this._reloading && !this._checkpointInvalidated &&
+        this.backendHealthState?.state === 'healthy' && this.backendHealthState.ok === true &&
+        failure.fileId === this.file?.id && failure.projectId === this.projectId &&
+        this.backendHealthRecoverySeq > failure.recoverySeq)
+    },
     // ---- 修订署名 ----
     // 展示名可能不在本地缓存里（桌面 local-mode 免登从不写那个键）：问一次后端，
     // 拿到就同时补给审阅面板的「我」这一桶与引擎的修订署名。拿不到就什么都不做，
@@ -1737,6 +1782,7 @@ export default {
       this.dirty = false
     },
     async reloadFromBackend(checkpointRestoreId) {
+      this.invalidateBackendSaveHint()
       const restoreOwner = checkpointRestoreId || null
       const ownsReload = () => (this._checkpointRestoreId || null) === restoreOwner
       if (!ownsReload()) return false
@@ -2051,6 +2097,7 @@ export default {
     },
     // 用户明确放弃后关闭上传闸；迟到的导出不能把已关闭的旧副本写回磁盘。
     discardPendingSave() {
+      this.invalidateBackendSaveHint()
       this._saveDiscarded = true
       this._savePaused = true
       clearTimeout(this._saveTimer)
@@ -2200,6 +2247,10 @@ export default {
       const lease = beginDocumentSave(this.projectId, fileId)
       if (lease === null) return false
       let safeToOverwrite = true // false only while an HTTP upload has an uncertain outcome
+      const saveContext = this._backendSaveContext || 0
+      const saveProjectId = this.projectId
+      let uploadRecoverySeq = null
+      this.backendFailedUpload = null
       this.saving = true
       // 固定细栏通过 saving/dirty 显示保存状态；statusKey 保留慢保存的兼容状态。
       // 上一次的「保存失败」不能当成要恢复的状态，这次成功了就该回到就绪。
@@ -2240,6 +2291,7 @@ export default {
         // 而不是在旧路径把旧文件名重新建出来。新建空白文档的第一笔不带：那时它还不在磁盘上。
         const mustExist = f.fileSize > 0 || this._savedOnce
         safeToOverwrite = false
+        uploadRecoverySeq = this.backendHealthRecoverySeq || 0
         await this.uploadBytes(getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : ''), u8, name)
         safeToOverwrite = true
         this._savedOnce = true
@@ -2250,6 +2302,10 @@ export default {
         this.scheduleProvenanceReload()
         return true
       } catch (e) {
+        if (uploadRecoverySeq !== null && e?.backendUnavailable && !this._backendHealthDisposed && !this._saveDiscarded && !this._reloading &&
+            saveContext === (this._backendSaveContext || 0) && this.projectId === saveProjectId && this.file?.id === fileId) {
+          this.backendFailedUpload = { fileId, projectId: saveProjectId, recoverySeq: uploadRecoverySeq }
+        }
         // 409 = 文件已被移动 / 改名 / 删除（后端 mustExist 围栏）：单独一个状态，让律师知道
         // 不是网络问题；改动留脏，对账把这一行改指到新路径之后「重试保存」即可落到新文件。
         // 404 = 对账认不出新位置、这一行已出索引（外部删除不进回收站，dev-board#903）——
@@ -2331,9 +2387,9 @@ export default {
         xhr.open('POST', url, true)
         xhr.timeout = 60000
         Object.keys(headers).forEach((k) => { if (k.toLowerCase() !== 'content-type') xhr.setRequestHeader(k, headers[k]) })
-        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.response) : reject(Object.assign(new Error('HTTP ' + xhr.status), { status: xhr.status })))
-        xhr.onerror = () => reject(new Error('网络错误 / network error'))
-        xhr.ontimeout = () => reject(new Error(this.$t('editor.saveTimeout')))
+        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.response) : reject(Object.assign(new Error('HTTP ' + xhr.status), { status: xhr.status, backendUnavailable: xhr.status >= 500 })))
+        xhr.onerror = () => reject(Object.assign(new Error('网络错误 / network error'), { backendUnavailable: true }))
+        xhr.ontimeout = () => reject(Object.assign(new Error(this.$t('editor.saveTimeout')), { backendUnavailable: true }))
         xhr.onabort = () => reject(new Error(this.$t('editor.saveCancelled')))
         xhr.onloadend = () => { if (this._saveXhr === xhr) this._saveXhr = null }
         xhr.send(form)

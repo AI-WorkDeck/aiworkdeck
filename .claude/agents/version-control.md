@@ -18,9 +18,10 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
   - `mergeKeepingConflicts()`/`mergeNoCommit()`（:424-449）——第 3 期采纳一稿用，与 `merge()` 共用同一个 `mergeCore` 内核（三者只是 `resetOnConflict`/`commitOnClean` 两个开关不同）：前者冲突时**不** reset（仓库留在 MERGING 态待裁决），后者连**干净合并也不提交**（停在 `MERGED_NOT_COMMITTED`，`mergeSha` 返回 null，交给 `commitMergeResolution` 补齐清单后统一提交）——`adoptDraft` 实际只用 `mergeNoCommit`，`mergeKeepingConflicts` 目前是 `mergeCore` 的可测试拆分产物，未被业务直接调用。`repositoryMerging()`（:504）判断 `RepositoryState` 是否 `MERGING`/`MERGING_RESOLVED`；`conflictingPaths()`（:520）读索引里的冲突路径；`mergeHeadRef()`（:529）读 `MERGE_HEAD` 指向的稿分支 tip；`abortMerge()`（:546）无损中止——**只按路径还原**（冲突路径 ∪ `HEAD↔MERGE_HEAD` 的差异），逐路径写回 HEAD 的字节、HEAD 里没有的删掉，再 `writeMergeCommitMsg(null)`/`writeMergeHeads(null)` 清合并态，**不做全树 `reset --hard`**（见下方「裁决窗口是数据安全窗口」）；`commitMergeResolution()`（:564）冲突裁决后手工双亲提交（`MergeCommand` 会自动读 `MERGE_HEAD` 作为第二父）。
   - `gc()`（:366）：只重打包 + 清理不可达对象，不碰可达历史。
   - `ensureExcludes()`（dev-board#463，私有）：幂等把 `~$*` 写进 `$GIT_DIR/info/exclude`，`init()`（在那笔 `add(".")` 之前）与 `open()` 两处各调一次。见下方「忽略规则只有两处」。
-  - `repoSizeBytes()`/`deleteRepository()`（dev-board#438）：前者 walk gitDir 求和（缺失回 0，**不做缓存**——`/status` 本身已经在跑两次 `git add "."`，相比之下走一遍目录项可以忽略），后者删掉整个 gitDir、**绝不碰工作区**（这是「历史永不重写」唯一的例外口子：删的是整座仓库而不是改写其中某段历史）。
+  - `repoSizeBytes()`/`deleteRepository()`（dev-board#438）：前者 walk gitDir 求和（缺失回 0，不读取文件正文、不写索引或对象库），后者删掉整个 gitDir、**绝不碰工作区**（这是「历史永不重写」唯一的例外口子：删的是整座仓库而不是改写其中某段历史）。
+  - `pendingChanges()`（dev-board#1216/#1218）：只读 `git.status` 分类工作区相对 HEAD 的增删改；暂存与工作区交叠时仅对相关路径做 HEAD→工作区 diff，识别暂存后恢复原文。未跟踪文件不读取内容，不允许为状态查询执行 `git add`；MERGING/MERGING_RESOLVED 仍只返回待裁决路径。`pendingChangesLocked()` 仓库忙时立即返回可见提示，不能阻塞 HTTP 请求与数据库连接；待恢复的远端 ingest 仅派发去重后台任务，不在查询线程物化工作区，原工作段收尾重试仍保留。
 - `WorkSessionService.java` —— 工作段/稿生命周期业务逻辑，唯一认识「工作段」「稿」业务语义的类。
-  - `onChangeSignal()`（:186）：外部改动信号入口，非稿分支才隐式开工作段 + 武装空闲定时器；防抖（默认 2 分钟，`setDebounceMillis` 测试用）调度自动存档两种分支都照排。`onDraftBranch()`（:131）/`awaitingAdoptResolution()`（:149）两道守卫，查询失败一律按「否」处理（版本记录是保险，不能自己查询失败反而阻断主流程）。
+  - `onChangeSignal()`：外部改动信号入口，事务内调用只注册 afterCommit，回调只入后台队列，不沿用事务连接读写数据库；非事务入口 tryLock，仓库忙时按项目合并信号异步重试，绝不让保存请求持连接等待仓库锁。分支判定、开段、署名与定时器同锁，结束/丢弃/切线时 cancelPending 也清理未处理信号，避免迟到信号重开工作段。非稿分支才隐式开工作段 + 武装空闲定时器；防抖（默认 2 分钟，`setDebounceMillis` 测试用）调度自动存档两种分支都照排。`onDraftBranch()`（:131）/`awaitingAdoptResolution()`（:149）两道守卫，查询失败一律按「否」处理（版本记录是保险，不能自己查询失败反而阻断主流程）。
   - `ensureSession()`（:298）：没有 ACTIVE 工作段则建分支 `work/{currentTimeMillis}` 并切过去，同时武装空闲定时器（唯一真正建段的入口）。
   - `endSession()`/`discardSession()`/`revertTo()`：见下方状态机与契约。`endSession` 返回 `SessionEndResult(sha, notice)`——空工作段（分支 tip == master tip）**不抛异常**，返回 `sha=null` + `notice="本次工作没有任何改动，未生成版本"`。理由：那条路径已经改完状态（删分支、标 DISCARDED），抛异常会让前端只 toast、不关命名弹窗、不刷状态条，界面停在「工作中」而后台已结束。凡是「改了状态还要报信」的路径都用返回值，不用异常。`discardSession` 返回 `List<Long> affectedFileIds`（checkout 主线前算 `diffNameStatus(HEAD, master)`，形制照 `revertTo`）——丢弃同样改写磁盘，不接重载链的话打开中的编辑器会把刚丢弃的工作 autosave 写回去。
   - `revertTo` 收尾时对仍 ACTIVE 的工作段**显式重新武装空闲定时器**：`cancelPending` 把空闲定时器连 actors 一起清了，而 `ensureSession` 只在真正新建分支时武装——活动段内退回等于永久拆掉这段工作的空闲自动结束。护栏 `WorkSessionServiceTest.revertInsideAnActiveSessionRearmsTheIdleTimer`。
@@ -897,6 +898,8 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
   护栏 `tests/project-home/dd-files-cloud-track.test.mjs`。
 
 ### 验证
+
+- dev-board#1216/#1218：`ProjectRepoHistoryTest` 钉查询不改索引/对象、暂存后恢复原文与 rm --cached 后的工作区语义；`ChangeSignalNonBlockingTest` 钉仓库忙时保存信号立即返回、同项目合并最新署名、提交后异步派发/回滚不派发、异常重试与关闭版本取消迟到信号、状态查询忙时快速返回。现场根因是状态查询全量 add 大文件，上传事务随后持数据库连接等同一把仓库锁；try/catch 只能降级异常，不能解除无限等待。
 
 ```bash
 cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='ClientPortalRoundTripTest,DdControllerClientWhitelistTest,DdItemReviewStatusTest,DdCloudProxyFilterTest,AuthClientLoginGuardTest,ClientInvitationServiceTest'

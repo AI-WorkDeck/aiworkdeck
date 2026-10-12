@@ -252,6 +252,7 @@ for (const state of ['dirty', 'saving']) {
 test('保存状态固定展示待保存、保存中、已保存及失败；不再使用保存浮动胶囊', () => {
   const options = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', body)(...Object.values(barriers), null, null, null)
   const vm = { ready: true, file: { id: 7, fileSize: 100 }, statusKey: 'ready', dirty: true, saving: false, $t: k => k }
+  vm.backendSaveRetryReady = options.methods.backendSaveRetryReady.bind(vm)
   const state = () => options.computed.saveStateText.call(vm)
   assert.equal(state(), 'editor.status.pendingSave')
   vm.saving = true
@@ -262,6 +263,11 @@ test('保存状态固定展示待保存、保存中、已保存及失败；不�
   vm.statusKey = 'saveFailed'
   vm.dirty = true
   assert.equal(state(), 'editor.status.saveFailed')
+  vm.backendHealthState = { state: 'healthy', ok: true }
+  vm.backendHealthRecoverySeq = 1
+  vm.backendFailedUpload = { fileId: 7, projectId: undefined, recoverySeq: 0 }
+  assert.equal(state(), 'workbench.backendHealth.saveRetryReady', '服务恢复也必须明确文稿尚未保存')
+  vm.backendFailedUpload = null
   vm.saving = true
   assert.equal(state(), 'editor.status.saving', '重试期间不能继续说保存失败')
   vm.saving = false
@@ -278,4 +284,85 @@ test('保存状态固定展示待保存、保存中、已保存及失败；不�
   for (const statusKey of ['saving', 'saveFailed', 'movedSaveFailed']) {
     assert.equal(options.computed.displayStatus.call({ statusKey, saveStateText: 'status', $t: k => k }), '')
   }
+})
+
+for (const recoveryFirst of [false, true]) {
+  test(`本地服务恢复${recoveryFirst ? '先于' : '晚于'}上传失败：只提示手动重试，绝不自动补写`, async () => {
+    const gate = deferred(); let uploads = 0
+    const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null,
+      uploadBytes: () => { uploads++; return gate.promise } })
+    vm.onBackendHealth( { state: 'degraded', ok: false, updatedAt: 1 })
+    const pending = vm.autoSave()
+    await tick()
+    if (recoveryFirst) vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
+    gate.reject(Object.assign(new Error('network'), { backendUnavailable: true }))
+    await pending
+    if (!recoveryFirst) vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
+    assert.equal(vm.backendSaveRetryReady(), true)
+    assert.equal(vm.dirty, true)
+    assert.equal(vm._savePaused, true)
+    assert.equal(uploads, 1, '健康恢复只给恢复保存入口，不写入文稿')
+    vm.discardPendingSave()
+    assert.equal(vm.backendSaveRetryReady(), false)
+  })
+}
+
+test('服务恢复不替引擎错误或404/409/权限错误声称可恢复；旧文件/重载/销毁不留恢复提示', async () => {
+  for (const error of [new Error('export timeout'), Object.assign(new Error('HTTP 404'), { status: 404 }), Object.assign(new Error('HTTP 409'), { status: 409 }), Object.assign(new Error('HTTP 403'), { status: 403 })]) {
+    const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null, uploadBytes: async () => { throw error } })
+    vm.onBackendHealth({ state: 'degraded', ok: false, updatedAt: 1 })
+    await vm.autoSave()
+    vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
+    assert.equal(vm.backendSaveRetryReady(), false)
+  }
+  const vm = makeVm({ backendHealthRecoverySeq: 1, backendHealthState: { state: 'healthy', ok: true }, backendFailedUpload: { fileId: 7, projectId: undefined, recoverySeq: 0 } })
+  assert.equal(vm.backendSaveRetryReady(), true)
+  vm.file = { id: 8 }
+  assert.equal(vm.backendSaveRetryReady(), false)
+  vm.file = { id: 7 }; vm._reloading = true
+  assert.equal(vm.backendSaveRetryReady(), false)
+  vm._reloading = false; vm._backendHealthDisposed = true
+  assert.equal(vm.backendSaveRetryReady(), false)
+})
+
+test('仅上传网络/超时/5xx有恢复资格，取消及4xx没有', async () => {
+  for (const outcome of ['error', 'timeout', 'abort', 500, 503, 404, 409, 403]) {
+    let xhr
+    class Xhr { constructor() { xhr = this } open() {} setRequestHeader() {} send() {} }
+    const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getAuthHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, () => ({}), Xhr)
+    const pending = opts.methods.uploadBytes.call({ $t: k => k }, '/upload/7', new Uint8Array([1]), 'a.docx')
+    if (typeof outcome === 'number') { xhr.status = outcome; xhr.onload() } else xhr['on' + outcome]()
+    await assert.rejects(pending, e => Boolean(e.backendUnavailable) === (outcome === 'error' || outcome === 'timeout' || outcome >= 500))
+  }
+})
+
+test('编辑器健康监听忽略迟到初始响应，卸载清理订阅且迟到事件不能触发保存', async () => {
+  const gate = deferred(); let handler, unsubscribed = 0
+  const backend = { getHealth: () => gate.promise, onHealthChanged: fn => { handler = fn; return () => unsubscribed++ } }
+  const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'host', 'uni', body)(...Object.values(barriers), null, null, null, { backend }, { $off() {} })
+  const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null })
+  const watching = opts.methods.watchBackendHealth.call(vm)
+  handler({ state: 'failed', ok: false, updatedAt: 2 })
+  gate.resolve({ state: 'healthy', ok: true, updatedAt: 1 }); await watching
+  assert.equal(vm.backendHealthState.state, 'failed')
+  opts.beforeUnmount.call(vm)
+  handler({ state: 'healthy', ok: true, updatedAt: 3 })
+  assert.equal(vm.backendHealthState.state, 'failed')
+  assert.equal(unsubscribed, 1)
+  assert.equal(vm.backendFailedUpload, null)
+})
+
+test('重载或身份换代后迟到的上传失败不能重新挂恢复提示，引擎错误也不冒充上传错误', async () => {
+  const gate = deferred()
+  const vm = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null, uploadBytes: () => gate.promise })
+  vm.onBackendHealth({ state: 'failed', ok: false, updatedAt: 1 })
+  const pending = vm.autoSave(); await tick()
+  vm.invalidateBackendSaveHint()
+  vm.onBackendHealth({ state: 'healthy', ok: true, updatedAt: 2 })
+  gate.reject(Object.assign(new Error('network'), { backendUnavailable: true })); await pending
+  assert.equal(vm.backendFailedUpload, null)
+  const engine = makeVm({ backendHealthRecoverySeq: 0, backendHealthState: null, backendFailedUpload: null,
+    executor: { executeCommand: async () => { throw Object.assign(new Error('engine'), { backendUnavailable: true }) } } })
+  await engine.autoSave()
+  assert.equal(engine.backendFailedUpload, null)
 })
