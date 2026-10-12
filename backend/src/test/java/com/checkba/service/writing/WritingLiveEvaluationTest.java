@@ -49,6 +49,7 @@ class WritingLiveEvaluationTest {
             new Case("auto-review-management-overreach",general,"工作记录\n报名信息通过问卷收集。\n出席信息通过现场签到收集。", "报名信息通过问卷收集，出席信息通过现场签到收集。这两类记录分别反映", "autocomplete",false,""),
             new Case("auto-review-narrowed-facility",general,"服务说明\n居民咨询通过网站或者现场窗口受理。\n企业咨询通过网上平台或者线下服务站受理。", "居民与企业咨询面向不同群体。根据上述受理渠道，两项服务共同提供的办理选择是", "autocomplete",false,""),
             new Case("auto-review-broken-insertion",general,"服务说明\n居民咨询通过网站或者现场窗口受理。\n企业咨询通过网上平台或者线下服务站受理。", "居民与企业咨询面向不同群体。根据上述受理渠道，两项服务共同提供的办理选择是", "autocomplete",false,""),
+            new Case("auto-review-unsupported-efficiency",general,"工作报告\n目前申请通过邮件、电话和现场三种方式提交，登记记录分别保存在三个表格中，项目组需要逐一核对。", "目前申请通过邮件、电话和现场三种方式提交，登记记录分别保存在三个表格中。这意味着，", "autocomplete",false,""),
             new Case("auto-review-supported-increase",general,"流程调整说明\n流程调整前，每项材料核对一次。\n流程调整后，每项材料核对三次。", "按上述流程调整前后的逐项核对要求，", "autocomplete",true,"工作量|效率"),
             new Case("lit-role",lit,loan,"原告：","sentence",true,"顾青原"),
             new Case("lit-attributed",lit,loan,"原告主张：","paragraph",true,"法院认定"),
@@ -75,7 +76,8 @@ class WritingLiveEvaluationTest {
                 "auto-review-management-overreach","不同的信息采集渠道与管理方式。",
                 "auto-review-narrowed-facility","线上受理与线下窗口办理。",
                 "auto-review-broken-insertion","均支持线上与线下两种办理方式。",
-                "auto-review-supported-increase","核对次数有所增加。");
+                "auto-review-supported-increase","核对次数有所增加。",
+                "auto-review-unsupported-efficiency","登记信息分散，核对效率较低。");
         ObjectMapper json=new ObjectMapper().findAndRegisterModules(); List<Map<String,Object>> report=new ArrayList<>();
         String onlyCase=System.getenv().getOrDefault("WRITING_EVAL_CASE","");
         assertTrue(onlyCase.isEmpty() || cases.stream().anyMatch(c -> c.name.equals(onlyCase)),"Unknown evaluation case");
@@ -130,9 +132,10 @@ class WritingLiveEvaluationTest {
                         boolean nonempty=!view.advice().isEmpty();
                         boolean passed=(c.expectAnswer==null?Set.of("READY","EMPTY").contains(view.status()):c.expectAnswer?(c.mode.equals("autocomplete")?Set.of("READY","EMPTY").contains(view.status()):nonempty && view.status().equals("READY")):!nonempty && view.status().equals("EMPTY")) && (c.forbidden.isEmpty() || view.advice().stream().noneMatch(a -> Arrays.stream(c.forbidden.split("\\|" )).anyMatch(value -> (c.before+a.text()).contains(value))));
                         if(reviewFixtures.containsKey(c.name)) {
-                            passed=passed && responses.size()==2;
-                            if(Boolean.TRUE.equals(c.expectAnswer)) passed=passed && view.status().equals("READY")
+                            passed=passed && responses.size()>=2 && responses.size()<=3;
+                            if(Boolean.TRUE.equals(c.expectAnswer)) passed=passed && responses.size()==3 && view.status().equals("READY")
                                     && view.advice().size()==1 && reviewFixtures.get(c.name).equals(view.advice().get(0).text());
+                            else passed=passed && explicitReviewRejection(json,responses,c.before+reviewFixtures.get(c.name));
                         }
                         Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get());
                         synchronized(report) {
@@ -161,13 +164,35 @@ class WritingLiveEvaluationTest {
         }
         assertEquals(futures.size(),report.size(),"Every selected evaluation must produce a report row");
         if ("1".equals(System.getenv("WRITING_EVAL_AUTOMATIC")) && onlyCase.isEmpty())
-            assertEquals(42,report.size(),"Keep all fourteen automatic cases across three fixed repetitions");
+            assertEquals(45,report.size(),"Keep all fifteen automatic cases across three fixed repetitions");
         assertTrue(report.stream().allMatch(r -> Boolean.TRUE.equals(r.get("passed"))),"Inspect synthetic evaluation report and the actual joined text");
         if ("1".equals(System.getenv("WRITING_EVAL_AUTOMATIC")) && onlyCase.isEmpty())
             assertTrue(report.stream().anyMatch(r -> Boolean.TRUE.equals(r.get("expectedAnswer"))
                     && r.get("evaluationKind").equals("real-generation-and-review")
                     && ((WritingSuggestionService.View)r.get("result")).status().equals("READY")),
                     "Automatic positive opportunities all abstained; do not claim usable semantic continuation");
+    }
+    private static boolean explicitReviewRejection(ObjectMapper json,List<String> responses,String assembled) {
+        try {
+            if(responses.size()<2 || responses.size()>3) return false;
+            var reader=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+            var review=reader.readTree(responses.get(1));
+            if(review==null || !review.isObject() || !review.path("approve").isBoolean()
+                    || !review.path("counterexamplePossible").isBoolean() || !review.path("counterexample").isTextual()
+                    || !review.path("reason").isTextual() || review.path("reason").asText().isBlank()
+                    || review.path("reason").asText().length()>240 || !review.path("reviewedText").isTextual()
+                    || !assembled.equals(review.path("reviewedText").asText())) return false;
+            boolean counterexample=review.path("counterexamplePossible").asBoolean();
+            String example=review.path("counterexample").asText();
+            if(counterexample?example.isBlank():!example.isEmpty()) return false;
+            if(!review.path("approve").asBoolean()) return responses.size()==2;
+            // Approval followed by a timeout or malformed proofreading is not a demonstrated rejection.
+            if(counterexample || responses.size()!=3) return false;
+            var proof=reader.readTree(responses.get(2));
+            return proof!=null && proof.isObject() && proof.path("correctedText").isTextual()
+                    && !proof.path("correctedText").asText().isBlank() && proof.path("error").isTextual()
+                    && (!assembled.equals(proof.path("correctedText").asText()) || !proof.path("error").asText().isBlank());
+        } catch(Exception e) { return false; }
     }
     private record ServiceResource(WritingSuggestionService value) implements AutoCloseable { public void close(){value.close();} }
 }
