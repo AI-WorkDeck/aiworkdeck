@@ -911,4 +911,74 @@ class WorkSessionServiceTest {
 
         assertEquals(0, autosaveFailureStreak(svc, 7L), "成功一轮之后连续失败计数必须清零");
     }
+    @Test
+    void mediaRevertAndDiscardRestoreCompleteObjectVersions() throws Exception {
+        Path media = root.resolve("projects/7/recording.mp4");
+        Files.writeString(media, "first recording");
+        svc.commitNow(7L, 1L, "Tester", "first");
+        svc.endSession(7L, 1L, "Tester", "first recording");
+        String first = repoSvc.resolveRef(7L, "HEAD");
+        Files.writeString(media, "second recording");
+        svc.commitNow(7L, 1L, "Tester", "second");
+        svc.endSession(7L, 1L, "Tester", "second recording");
+        String second = repoSvc.resolveRef(7L, "HEAD");
+        svc.revertTo(7L, first, 1L, "Tester");
+        assertEquals("first recording", Files.readString(media));
+        svc.revertTo(7L, second, 1L, "Tester");
+        assertEquals("second recording", Files.readString(media));
+        svc.endSession(7L, 1L, "Tester", "restored");
+        Files.writeString(media, "unsaved edit");
+        svc.commitNow(7L, 1L, "Tester", "editing");
+        svc.discardSession(7L, 1L);
+        assertEquals("second recording", Files.readString(media));
+        assertTrue(repoSvc.pendingChanges(7L).isEmpty());
+    }
+
+    @Test
+    void deletionWaitsForPublicationAndRejectsLateVersionWriters() throws Exception {
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try {
+            var publication = executor.submit(() -> svc.runLocked(7, () -> {
+                entered.countDown();
+                try {
+                    assertTrue(release.await(5, TimeUnit.SECONDS));
+                    repoSvc.objects().put(7, new java.io.ByteArrayInputStream("recording".getBytes()));
+                } catch (Exception e) { throw new RuntimeException(e); }
+            }));
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            var deletion = executor.submit(() -> svc.runProjectDeletion(7, () -> repoSvc.deleteRepository(7)));
+            assertThrows(java.util.concurrent.TimeoutException.class, () -> deletion.get(100, TimeUnit.MILLISECONDS));
+            release.countDown();
+            publication.get(5, TimeUnit.SECONDS);
+            deletion.get(5, TimeUnit.SECONDS);
+            assertNull(svc.commitNow(7, 1L, "Tester", null));
+            assertNull(svc.commitAiRound(7, 1L, true));
+            svc.onChangeSignal(7, 1L, "Tester");
+            svc.enableVersionRecording(7, "Tester", "test@example.test");
+            assertThrows(VersionException.class, () -> svc.runLocked(7, () -> fail("late import ran")));
+            assertFalse(repoSvc.isInitialized(7));
+            assertFalse(Files.exists(repoSvc.objects().projectRoot(7)));
+        } finally { release.countDown(); executor.shutdownNow(); }
+    }
+
+    @Test
+    void deletionHoldsRepositoryLockUntilTransactionCompletionAndRollbackAllowsRetry() throws Exception {
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            svc.runProjectDeletion(7, () -> {});
+            assertTrue(svc.repoLock(7).isHeldByCurrentThread());
+            var synchronizations = org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations();
+            assertEquals(1, synchronizations.size());
+            synchronizations.get(0).afterCompletion(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK);
+            assertFalse(svc.repoLock(7).isHeldByCurrentThread());
+            svc.runLocked(7, () -> {});
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+    }
+
 }

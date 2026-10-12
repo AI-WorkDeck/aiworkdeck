@@ -960,19 +960,30 @@ public class VersionController {
     }
 
     @GetMapping("/versions/{ref}/file-bytes")
-    public ResponseEntity<byte[]> fileBytesAtRef(
+    public ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> fileBytesAtRef(
             @PathVariable Long projectId, @PathVariable String ref,
             @RequestParam("path") String path,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireMember(projectId, sessionId);
         String rel = WorkSessionService.safeRepoPath(path);
-        byte[] bytes = repoService.readBlobAtCommit(projectId, ref, rel);
-        if (bytes == null) {
+        String commit = repoService.resolveRef(projectId, ref + "^{commit}");
+        long size = commit == null ? -1 : repoService.blobSizeAtCommit(projectId, commit, rel);
+        if (size < 0) {
             throw VersionException.userFacing(LangText.of("这一版里没有这份文件", "This file isn't in this version"));
         }
+        // Preflight only this file; unrelated recordings must not be downloaded for a text export.
+        try (java.io.InputStream input = repoService.openBlobAtCommit(projectId, commit, rel)) {
+            if (input == null) throw new java.io.IOException("Version file is unavailable");
+        } catch (java.io.IOException e) { throw new VersionException("读取版本内容失败", e); }
         return ResponseEntity.ok()
                 .header("Content-Type", "application/octet-stream")
-                .body(bytes);
+                .contentLength(size)
+                .body(output -> {
+                    try (java.io.InputStream input = repoService.openBlobAtCommit(projectId, commit, rel)) {
+                        if (input == null) throw new java.io.IOException("Version file is unavailable");
+                        input.transferTo(output);
+                    }
+                });
     }
 
     @GetMapping("/versions/{ref}/file-text")

@@ -93,6 +93,7 @@ public class WorkSessionService {
      * 装箱的 Long 相同数值不保证是同一对象，拿它当锁语义不可靠。
      */
     private final Map<Long, ReentrantLock> repoLocks = new ConcurrentHashMap<>();
+    private final Set<Long> deletedProjects = ConcurrentHashMap.newKeySet();
 
     /**
      * push 落库延后的项目 → 最早的基线 sha（Task 6）。内存态，服务端重启即丢失——
@@ -118,6 +119,35 @@ public class WorkSessionService {
 
     ReentrantLock repoLock(long projectId) {
         return repoLocks.computeIfAbsent(projectId, id -> new ReentrantLock());
+    }
+
+    /** Acquire the repository lock before deletion takes DB locks, and keep it through commit. */
+    public void runProjectDeletion(long projectId, Runnable body) {
+        ReentrantLock lock = repoLock(projectId);
+        lock.lock();
+        boolean synchronizedTransaction = TransactionSynchronizationManager.isSynchronizationActive()
+                && TransactionSynchronizationManager.isActualTransactionActive();
+        boolean success = false;
+        try {
+            cancelPending(projectId);
+            pendingIngestBase.remove(projectId);
+            autosaveFailureStreak.remove(projectId);
+            if (synchronizedTransaction) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override public void afterCompletion(int status) {
+                        if (status == STATUS_COMMITTED) deletedProjects.add(projectId);
+                        lock.unlock();
+                    }
+                });
+            }
+            body.run();
+            success = true;
+        } finally {
+            if (!synchronizedTransaction) {
+                if (success) deletedProjects.add(projectId);
+                lock.unlock();
+            }
+        }
     }
 
     /**
@@ -208,6 +238,7 @@ public class WorkSessionService {
         ReentrantLock lock = repoLock(projectId);
         lock.lock();
         try {
+            if (deletedProjects.contains(projectId)) return;
             if (repoService.isInitialized(projectId)) return;
             manifestService.writeToWorkTree(projectId, manifestService.capture(projectId));
             repoService.init(projectId, authorName, authorEmail);
@@ -452,6 +483,7 @@ public class WorkSessionService {
      * 自动结束）。防抖自动存档仍然照排，稿上的改动也需要落盘存档。
      */
     public void onChangeSignal(long projectId, Long userId, String userName) {
+        if (deletedProjects.contains(projectId)) return;
         PendingActor actor = new PendingActor(userId, userName);
         if (TransactionSynchronizationManager.isActualTransactionActive()
                 && TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -478,6 +510,7 @@ public class WorkSessionService {
     }
 
     private void deferSignal(long projectId, PendingActor actor) {
+        if (deletedProjects.contains(projectId)) return;
         deferredSignals.put(projectId, actor);
         scheduleSignal(projectId);
     }
@@ -513,6 +546,7 @@ public class WorkSessionService {
 
     /** 仓库锁内处理，分支守卫、工作段、署名与定时器保持同一顺序。 */
     private void applyChangeSignal(long projectId, PendingActor actor) {
+        if (deletedProjects.contains(projectId)) return;
         if (!repoService.isInitialized(projectId)) {
             requestAutoEnable(projectId, actor.userId(), actor.userName());
             return;
@@ -775,6 +809,8 @@ public class WorkSessionService {
         ReentrantLock lock = repoLock(projectId);
         lock.lock();
         try {
+            if (deletedProjects.contains(projectId)) throw VersionException.userFacing(
+                    LangText.of("项目已删除", "Project has been deleted"));
             body.run();
         } finally {
             lock.unlock();
@@ -884,10 +920,10 @@ public class WorkSessionService {
      * 但清单写入与提交照旧，稿上的防抖自动存档必须正常工作。
      */
     public String commitNow(long projectId, Long userId, String userName, String message) {
-        if (!repoService.isInitialized(projectId)) return null;
         ReentrantLock lock = repoLock(projectId);
         lock.lock();
         try {
+            if (deletedProjects.contains(projectId) || !repoService.isInitialized(projectId)) return null;
             if (awaitingAdoptResolution(projectId)) {
                 log.info("采纳裁决进行中，跳过这次自动存档: project={}", projectId);
                 return null;
@@ -931,10 +967,10 @@ public class WorkSessionService {
      * 读取待提交变更失败时按「有改动」处理：版本记录是保险，宁可多开一段也不能漏掉一次落版。
      */
     public String commitAiRound(long projectId, Long userId, boolean documentEdited) {
-        if (!repoService.isInitialized(projectId)) return null;
         ReentrantLock lock = repoLock(projectId);
         lock.lock();
         try {
+            if (deletedProjects.contains(projectId) || !repoService.isInitialized(projectId)) return null;
             if (awaitingAdoptResolution(projectId)) {
                 log.info("采纳裁决进行中，跳过这次 AI 轮次落版: project={}", projectId);
                 return null;
@@ -1339,6 +1375,7 @@ public class WorkSessionService {
         lock.lock();
         try {
             requireNotMerging(projectId);
+            repoService.requireObjectsAt(projectId, ref);
             cancelPending(projectId);
 
             // 先给当前状态留一笔，保证「退回」这个动作本身可撤销
@@ -1816,36 +1853,21 @@ public class WorkSessionService {
         // 见 requireMergedHasPendingRecord）。这一档一个字节都不许再写：写 = 用合并前
         // 某一侧的原文把律师刚裁完的成果覆盖掉，而他不会收到任何提示。
         if (choice == Resolution.MERGED) return;
-        byte[] mainBytes = repoService.readBlobAtCommit(projectId, mainTip, rel);
-        byte[] draftBytes = repoService.readBlobAtCommit(projectId, draftTip, rel);
-
+        if (choice != Resolution.DRAFT) repoService.requireObjectsAt(projectId, mainTip);
+        if (choice != Resolution.MAIN) repoService.requireObjectsAt(projectId, draftTip);
         switch (choice) {
-            case MERGED -> { }   // 上面已经 return，这一支只为让 switch 保持穷尽
-            case MAIN -> writeOrDelete(work.resolve(rel), mainBytes);
-            case DRAFT -> writeOrDelete(work.resolve(rel), draftBytes);
+            case MERGED -> { }
+            case MAIN -> repoService.copyBlobAtCommit(projectId, mainTip, rel, work.resolve(rel));
+            case DRAFT -> repoService.copyBlobAtCommit(projectId, draftTip, rel, work.resolve(rel));
             case BOTH -> {
-                writeOrDelete(work.resolve(rel), mainBytes);
-                // 稿把这个文件删掉了的话，「两份都留」里稿的那一份根本不存在，
-                // 留主线那一份就是全部。
-                if (draftBytes != null) {
+                long draftSize = repoService.blobSizeAtCommit(projectId, draftTip, rel);
+                repoService.copyBlobAtCommit(projectId, mainTip, rel, work.resolve(rel));
+                if (draftSize >= 0) {
                     String copyRel = sideBySideRelPath(projectId, rel, draftName);
-                    writeOrDelete(work.resolve(copyRel), draftBytes);
-                    createSideBySideRow(projectId, rel, copyRel, draftBytes.length);
+                    repoService.copyBlobAtCommit(projectId, draftTip, rel, work.resolve(copyRel));
+                    createSideBySideRow(projectId, rel, copyRel, draftSize);
                 }
             }
-        }
-    }
-
-    private void writeOrDelete(Path target, byte[] bytes) {
-        try {
-            if (bytes == null) {
-                Files.deleteIfExists(target);
-                return;
-            }
-            Files.createDirectories(target.getParent());
-            Files.write(target, bytes);
-        } catch (Exception e) {
-            throw new VersionException("写入裁决结果失败: " + target, e);
         }
     }
 
@@ -2051,6 +2073,7 @@ public class WorkSessionService {
      */
     private void restoreWorkTreeFrom(long projectId, String ref, List<FileChange> changes) {
         Path work = repoService.workTree(projectId);
+        repoService.requireObjectsAt(projectId, ref);
         try {
             for (FileChange c : changes) {
                 // push 上来的提交不可信（ingestPushedMainline 的 diff 直接吃远端内容）：
@@ -2061,13 +2084,7 @@ public class WorkSessionService {
                     continue;
                 }
                 Path target = work.resolve(c.path());
-                byte[] bytes = repoService.readBlobAtCommit(projectId, ref, c.path());
-                if (bytes == null) {
-                    Files.deleteIfExists(target);
-                } else {
-                    Files.createDirectories(target.getParent());
-                    Files.write(target, bytes);
-                }
+                repoService.copyBlobAtCommit(projectId, ref, c.path(), target);
             }
         } catch (Exception e) {
             throw new VersionException("还原文件失败: project=" + projectId + " ref=" + ref, e);

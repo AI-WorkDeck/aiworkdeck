@@ -58,6 +58,9 @@ public class ProjectService {
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.storage.StorageServiceFactory storageServiceFactory;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.version.WorkSessionService workSessions;
+
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProjectService.class);
 
     /**
@@ -286,6 +289,10 @@ public class ProjectService {
      */
     @Transactional
     public void deleteProject(Long id) {
+        workSessions.runProjectDeletion(id, () -> deleteProjectLocked(id));
+    }
+
+    private void deleteProjectLocked(Long id) {
         boolean officialCloud = cloudStorageQuota != null && cloudStorageQuota.isEnabled();
         if (officialCloud) cloudStorageQuota.lockProjectForWrite(id);
         Project project = entityManager.find(Project.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
@@ -313,6 +320,12 @@ public class ProjectService {
             }
             for (String key : keys) storageServiceFactory.getStorageService().delete(key);
             deleteDirectoryStrictly(projectDir);
+        }
+
+        try {
+            projectRepoService.objects().deleteProject(id);
+        } catch (IOException e) {
+            throw new IllegalStateException(LangText.of("版本文件未能完整删除，请重试", "Version files could not be fully deleted; please retry"), e);
         }
 
         // evidence_link_target 没有 project_id 列，只能先按 link id 级联，再删 evidence_link 本身。

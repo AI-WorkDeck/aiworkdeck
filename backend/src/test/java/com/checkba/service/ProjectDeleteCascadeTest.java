@@ -98,8 +98,10 @@ class ProjectDeleteCascadeTest {
         Files.createDirectories(projectDir.resolve("客户上传"));
         Files.writeString(projectDir.resolve("客户上传").resolve("尽调材料.txt"), "机密");
         Files.createDirectories(gitDir.resolve("objects"));
+        projectRepoService.objects().put(projectId, new java.io.ByteArrayInputStream("synthetic media".getBytes()));
 
         projectService.deleteProject(projectId);
+        assertFalse(Files.exists(projectRepoService.objects().projectRoot(projectId)));
 
         assertFalse(projectRepository.existsById(projectId), "project 行应被删除");
         assertTrue(memberRepository.findByProjectId(projectId).isEmpty(), "project_member 残留孤儿行");
@@ -189,6 +191,30 @@ class ProjectDeleteCascadeTest {
 
         assertFalse(projectRepository.existsById(projectId));
         assertTrue(Files.exists(userFolder.resolve("用户自己的文件.txt")), "用户自己的文件夹被误删");
+    }
+
+    @Test
+    void objectDeletionFailureKeepsProjectRowAndNeverFollowsExternalLink() throws IOException {
+        Long projectId = seedProject();
+        Path objectRoot = projectRepoService.objects().projectRoot(projectId);
+        Path outside = Files.createTempDirectory("awd-delete-protected-");
+        Files.writeString(outside.resolve("keep.txt"), "do not delete");
+        Files.createDirectories(objectRoot.getParent());
+        try {
+            try { Files.createSymbolicLink(objectRoot, outside); }
+            catch (UnsupportedOperationException | IOException e) {
+                org.junit.jupiter.api.Assumptions.assumeTrue(false, "Symbolic links unavailable");
+            }
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                    () -> projectService.deleteProject(projectId));
+            assertTrue(projectRepository.existsById(projectId));
+            org.junit.jupiter.api.Assertions.assertEquals("do not delete", Files.readString(outside.resolve("keep.txt")));
+        } finally {
+            Files.deleteIfExists(objectRoot);
+            Files.deleteIfExists(outside.resolve("keep.txt"));
+            Files.deleteIfExists(outside);
+            projectService.deleteProject(projectId);
+        }
     }
 
     @Test
