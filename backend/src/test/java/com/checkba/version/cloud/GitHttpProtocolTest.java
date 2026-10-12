@@ -175,4 +175,61 @@ class GitHttpProtocolTest {
         assertTrue(e.getMessage().contains("not authorized")
                 || e.getMessage().contains("401") || e.getMessage().contains("403"));
     }
+
+    @Test
+    void objectsMustArriveBeforeRefsAndCloneRestoresCompleteMedia(@TempDir Path machines) throws Exception {
+        long remote = 72001L;
+        seedMembership(remote);
+        repoService.initEmptyForReceive(remote);
+        ProjectRepoService sender = isolated(machines.resolve("sender"));
+        Files.createDirectories(sender.workTree(1));
+        Path media = sender.workTree(1).resolve("录音.mp4");
+        // Cross the 32 MiB HTTP boundary without retaining the full file in memory.
+        try (var out = Files.newOutputStream(media)) {
+            byte[] block = new byte[64 * 1024];
+            new java.util.Random(17).nextBytes(block);
+            for (int i = 0; i < 513; i++) out.write(block);
+        }
+        Files.writeString(sender.workTree(1).resolve("说明.txt"), "小文档仍在版本库中");
+        sender.init(1, "Synthetic sender", "test@example.com");
+        sender.setRemoteOrigin(1, remoteUrl(remote));
+        String token = tokenByProject.get(remote);
+        var rejected = sender.pushMainlineToOrigin(1, "test", token);
+        assertFalse(rejected.pushed(), "Receiving only Git pointers must never publish an incomplete version");
+        assertNull(repoService.resolveRef(remote, "master"));
+
+        var provider = org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+        var consent = org.mockito.Mockito.mock(com.checkba.service.mobile.MobileRelayClientService.class);
+        org.mockito.Mockito.when(provider.getIfAvailable()).thenReturn(consent);
+        var sync = new ProjectObjectSyncService(sender, provider, new com.fasterxml.jackson.databind.ObjectMapper());
+        sync.upload(1, remoteUrl(remote), "test", token);
+        assertTrue(sender.pushMainlineToOrigin(1, "test", token).pushed());
+        var ref = sender.objects().list(1).get(0);
+        repoService.objects().verify(remote, ref);
+
+        ProjectRepoService receiver = isolated(machines.resolve("receiver"));
+        var receive = new ProjectObjectSyncService(receiver, provider, new com.fasterxml.jackson.databind.ObjectMapper());
+        receiver.cloneFromRemote(2, remoteUrl(remote), "test", token,
+                () -> receive.download(2, remoteUrl(remote), "test", token, "HEAD"));
+        assertEquals(-1, Files.mismatch(media, receiver.workTree(2).resolve("录音.mp4")));
+        assertEquals("小文档仍在版本库中", Files.readString(receiver.workTree(2).resolve("说明.txt")));
+        assertTrue(receiver.pendingChanges(2).isEmpty());
+        org.mockito.Mockito.verify(consent, org.mockito.Mockito.atLeastOnce()).requireVersionObjectCloudConsent();
+
+        // Access is project scoped, even when another account knows the exact object digest.
+        seedMembership(72002L);
+        String auth = java.util.Base64.getEncoder().encodeToString(("test:" + tokenByProject.get(72002L))
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(remoteUrl(remote)
+                + "/awd-objects/" + ref.sha256() + "?size=" + ref.size()))
+                .header("Authorization", "Basic " + auth).GET().build();
+        assertEquals(403, java.net.http.HttpClient.newHttpClient().send(request,
+                java.net.http.HttpResponse.BodyHandlers.discarding()).statusCode());
+    }
+
+    private static ProjectRepoService isolated(Path directory) {
+        var properties = new com.checkba.storage.StorageProperties();
+        properties.getLocal().setRootPath(directory.toString());
+        return new ProjectRepoService(new com.checkba.storage.ProjectStorageResolver(properties, null));
+    }
 }
