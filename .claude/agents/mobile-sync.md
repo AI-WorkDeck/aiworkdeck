@@ -499,3 +499,30 @@ find-or-create，影子项目从 `/api/projects/my` 滤掉）。绑定后两条�
 - `inboxRunning` 保证手动检查与定时取件不并发下载/落同一件。状态不能把 `landAndAck` 的早退当成功：项目不存在、鉴权失败、下载响应不符合裸字节契约均单独记失败。
 - 重名项目核对必须同时看 **完整 deviceId + 项目 key**，项目路径仅做本机辅助。不得按项目名称匹配。手机改变已上传条目的本地归属不会改变中转行：现有 POST /media 按 clientMediaId 幂等返回原行，没有重分配接口；ACK 后原 blob 删除，不可伪装成可移动。
 - 验证：JDK 21 `mvn test -Dtest='MobileReceiveControllerTest,MobileRelayClientHttpTest,MobileRelayClientServiceTest,MobileRelayClientDoorbellTest'`；前端 `npm run test:media`。`frontend/tests/mobile-receive/ui.mjs` 对实际 dev:h5 工作台跑鼠标入口/检查/状态变更/同名编号/无项目态与双主题截图（API 用合成响应，不代表正式 Electron 或线上跨端实测）。
+
+## 大文件历史对象备份（dev-board#1223）
+
+- `MobileVersionObjectService` / `MobileVersionObject` 是独立不可变历史对象账本；不得与仅保留当前文件的
+  `MobileFileBackup` 替换/删除逻辑混用。范围为 `(userId, deviceId, projectKey, objectSha, partIndex)`，
+  每块 32MiB，最后一块按实际长度，`partIndex=-1` 是整体验长与 SHA256 通过后的完成收据。
+- `/api/mobile/backup/version-objects/{sha}` GET 返回 parts/complete；`/parts/{index}` PUT 原始
+  `application/octet-stream`（必须 Content-Length，query: deviceId/projectKey/size/partSha），
+  `/complete` POST 验证所有块后才发布，`/parts/{index}` GET 只允许完整对象下载。
+  同意、有效订阅和账户目录归属对读写/状态均执行，不开放跨用户散列探测。
+- 实际 blob 复用 `MobileRelayBlobStore.putPersistent` 的 `mobile-backup/` 前缀及生命周期护栏；
+  云对象不随下载、当前文件删除或手机 ACK 删除。关闭备份/注销立即禁读并标待删，60秒清理重试。
+  上传失败/事务回滚保留删除收据，待删对象和未完成块仍计入同一持久配额。
+- 桌面 `syncVersionObjectBackups` 使用独立 worker，不占用取件/保存线程；云同意未开启时不枚举或
+  读取本地对象。开启后保守枚举全部本地对象（包含历史和草稿），服务器已收块按 index 跳过；
+  完整对象复核成功才显示 synced。网络失败、旧服务端或空间不足保持 pending，不删除本地对象。
+- `backupConsent()` 增量 `objectBackup: {state,pendingObjects,lastError}` 供状态UI；数据带本地账户 scope，
+  换账号清除旧状态可见性。`requireVersionObjectCloudConsent()` 供协作分流资格检查，失败关闭。
+- 既有 Pro 3GiB 配额不变；大于权益余量的音视频仍可本地保存及版本退回，不能因上传失败回退为 Git blob。
+  案件库的对象传输按项目权限独立实现，不能把个人 relay 对象定位符当作协作公共下载地址。
+- 验证：`MobileVersionObjectServiceTest`（多块/幂等/校验/范围/撤回/失败清理）、
+  `MobileRelayClientHttpTest.versionObject*`（合成随机端口 HTTP、断点重试/同意/配额/旧服务/账户切换）、
+  `CloudStorageQuotaServiceTest` 的版本对象计费；无生产 OSS 或真实私人文件验证。
+- 明确取回使用 `MobileRelayClientService.restoreVersionObject(projectId, ObjectRef)`：本地项目归属校验→
+  当前账户/本设备云项目目录→完整状态→分块下载到临时文件→`importObject` 整体验 hash/长度并原子发布；
+  失败不覆盖现有对象、不更改工作区。没有保存/status自动下载；同名列表入口 GET
+  `/backup/version-objects?deviceId=&projectKey=` 返回本范围完整对象 SHA/size，不能列其他账号。

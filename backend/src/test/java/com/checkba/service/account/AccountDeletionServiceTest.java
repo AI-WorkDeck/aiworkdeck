@@ -201,4 +201,12 @@ class AccountDeletionServiceTest {
         verifyNoInteractions(f.billing());
         verify(f.users()).deleteById(7L);
     }
+
+    @Test void accountDeletionKeepsVersionObjectCleanupReceiptsBeforeRemovingOwner() {
+        Fixture f=fixture(List.of());
+        var objects=mock(com.checkba.service.mobile.MobileVersionObjectService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"versionObjects",objects);
+        f.svc().deleteAccount(7L);
+        InOrder order=inOrder(objects,f.users());order.verify(objects).revoke(7L);order.verify(f.users()).deleteById(7L);
+    }
 }
