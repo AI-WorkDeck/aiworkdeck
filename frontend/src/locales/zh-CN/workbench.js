@@ -2,6 +2,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 工作台（pages/project-overview/project-overview.vue）文案。
 export default {
+  backendHealth: {
+    externalUnavailable: '已有本地服务不可用，请检查启动它的应用',
+    startupFailed: '本地服务启动失败，请重新打开应用',
+    externalUnverified: '已连接旧版服务，暂无法检查健康状态',
+    manualRestarting: '正在重启本地服务…',
+    checking: '正在检查本地服务…',
+    unavailable: '暂无法读取本地服务状态',
+    starting: '本地服务启动中…',
+    healthy: '本地服务正常',
+    degraded: '本地服务响应异常，正在检查…',
+    restarting: '本地服务正在自动恢复…',
+    failed: '本地服务恢复失败',
+    suspended: '本地服务检查已暂停',
+    stopped: '本地服务已停止',
+    recovered: '本地服务已恢复；未保存文稿请重试保存',
+    retry: '重启服务',
+    requesting: '正在请求重启…',
+    restartFailed: '重启未成功，请重试',
+    saveRetryReady: '服务已恢复，文稿尚未保存，请重试保存',
+  },
   looseFiles: '独立文件',
   looseFilesEmpty: '打开一份文件，开始工作',
   looseFilesHint: '直接编辑原文件，也可以打开文件夹作为项目。',

@@ -137,6 +137,12 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
     }
   },
   backend: {
+    getHealth: () => ipcRenderer.invoke('checkba:backend-health'),
+    onHealthChanged: (handler) => {
+      const listener = (_event, health) => handler(health)
+      ipcRenderer.on('checkba:backend-health-changed', listener)
+      return () => ipcRenderer.removeListener('checkba:backend-health-changed', listener)
+    },
     restart: () => ipcRenderer.invoke('checkba:backend-restart'),
     onStatus: (handler) => {
       const listener = (_evt, data) => handler && handler(data)

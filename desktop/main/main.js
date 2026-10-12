@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 const path = require('path')
-const { app, BrowserWindow, BrowserView, ipcMain, shell, desktopCapturer, screen, clipboard, Menu, globalShortcut, nativeTheme } = require('electron')
+const { app, BrowserWindow, BrowserView, ipcMain, shell, desktopCapturer, screen, clipboard, Menu, globalShortcut, nativeTheme, powerMonitor } = require('electron')
 const { createServiceManager } = require('./services/service-manager')
+const { BackendSupervisor } = require('./services/backend-supervisor')
 const { createBackendDescriptor } = require('./services/backend-service')
 const { createPptxDescriptor } = require('./services/pptx-service')
 const { createMineruDescriptor } = require('./services/mineru-service')
@@ -90,6 +91,8 @@ function escapeHtml(s) {
     .replace(/'/g, '&#039;')
 }
 
+let backendSupervisor = null
+let backendStartupFailed = false
 /** @type {BrowserWindow | null} */
 let mainWindow = null
 // mac activate 可能早于异步服务启动完成；首窗统一由启动链创建。
@@ -101,6 +104,29 @@ let updateService = null
 // 这里只剩「等本机服务起来」这一段的兜底；当前没有创建它的路径，保留是为了
 // retireFirstLaunchSplash 的调用点不必跟着分支。
 let firstLaunchSplash = null
+
+// 启动链失败也必须留下可查询的终态；只有拥有 child 的管理器才允许恢复。
+function configureBackendSupervision(startupFailed = false) {
+  backendStartupFailed = startupFailed
+  if (backendSupervisor || !services) return
+  if (startupFailed && (!services.isOwned('backend') || !services.ports.backend)) return
+  backendSupervisor = new BackendSupervisor(services, (health) => {
+    logDesktopEvent('backend-health', health)
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send('checkba:backend-health-changed', health)
+    }
+  })
+  backendSupervisor.bindPowerMonitor(powerMonitor)
+  if (startupFailed) backendSupervisor.publish('failed', 'startup-failed')
+  backendSupervisor.start()
+}
+
+function getBackendHealth() {
+  return backendSupervisor?.getHealth() || {
+    state: backendStartupFailed ? 'failed' : 'starting', ok: false, owned: false, attempts: 0,
+    reason: backendStartupFailed ? 'startup-failed' : '', updatedAt: Date.now()
+  }
+}
 
 // 增量更新（docs/INCREMENTAL_UPDATE_DESIGN.md）：overlay 上下文——三个 seam
 // （backend jar / h5 / zetaoffice 壳层）与 update-service 共用
@@ -1763,6 +1789,7 @@ app.whenReady().then(() => {
           }
         }
       } catch (e) { console.error('[overlay]', e) }
+      configureBackendSupervision(results.backend?.ok === false)
       mainWindowStartupReady = true
       createMainWindow()
       retireFirstLaunchSplash()
@@ -1820,6 +1847,7 @@ app.whenReady().then(() => {
     .catch((err) => {
       // 端口分配/启动链失败也要建出主窗口并提示，避免 app 起来却无窗口无提示（静默失败）
       console.error('[startup] service init failed', err)
+      configureBackendSupervision(true)
       mainWindowStartupReady = true
       try { createMainWindow() } catch (e) { /* ignore */ }
       retireFirstLaunchSplash()
@@ -1837,10 +1865,8 @@ app.on('activate', () => {
   if (mainWindowStartupReady && BrowserWindow.getAllWindows().length === 0) createMainWindow()
 })
 
-// 退出时等服务停干净的总墙钟上限。stopAll 里每个服务各有 3s 的 SIGTERM→SIGKILL 兜底，
-// 并行之后正常就是一次 3s 上下；这里给一个略宽的硬上限，任何一个服务卡在 kill 之外的
-// 地方都不至于让应用「既没有窗口也不退出」（dev-board#602）。
-const QUIT_STOP_TIMEOUT_MS = 4000
+// 后端有 45s 事务/文件退出宽限，再给强杀确认与队列清理留时间。
+const QUIT_STOP_TIMEOUT_MS = 55000
 
 function hideAllWindowsForQuit() {
   try {
@@ -1859,6 +1885,7 @@ app.on('before-quit', async (e) => {
       // ① 先记账：下次再出现「应用自己消失了」，能直接从 desktop.log 读出退出起点与耗时，
       //    不用再去反推 macOS 统一日志（dev-board#602 那次就是这么查的）。
       logDesktopEvent('quit-begin', { pid: process.pid })
+      backendSupervisor?.stop()
       // ② 立刻把窗口藏掉。preventDefault 之后停服务要好几秒，原来这段时间里窗口
       //    完全可用、还能建 SSE 发新请求，然后整个应用在同一瞬间消失——用户看到的
       //    就是「闪退」。先 hide 才是 Mac 应用按 ⌘Q 的正常观感：窗口立刻消失，
@@ -1883,11 +1910,7 @@ app.on('before-quit', async (e) => {
 })
 
 ipcMain.handle('checkba:backend-restart', async () => {
-  if (!services) {
-    services = createServices()
-    await services.allocatePorts()
-  }
-  return services.restart('backend')
+  if (!backendSupervisor) return { ok: false, error: backendStartupFailed ? 'backend startup failed; reopen the application' : 'backend is still starting' }
+  return backendSupervisor.recover()
 })
-
-
+ipcMain.handle('checkba:backend-health', getBackendHealth)
