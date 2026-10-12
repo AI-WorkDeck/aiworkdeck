@@ -100,26 +100,33 @@ test('engine remount disposes vocabulary before detaching its old transport', as
 test('in-place Writer reload destroys the old vocabulary before loading and rebuilds after success', async () => {
   const events = []
   const vm = { file: { id: 22 }, executor: {}, ready: true, saving: false, statusKey: 'ready', docLoadFailed: false,
+    backendFailedUpload: { fileId: 22, recoverySeq: 0 },
     _writingHost: { destroy: () => events.push('destroy') },
-    loadDocument: async () => { assert.equal(vm._writingHost, null); assert.equal(vm._reloading, true); events.push('load'); return true },
+    loadDocument: async () => { assert.equal(vm._writingHost, null); assert.equal(vm._reloading, true); assert.equal(vm.backendFailedUpload, null); events.push('load'); return true },
     initWritingAssistance: () => { assert.equal(vm._reloading, false); events.push('init') },
     appendLog() {}, scheduleAnchorCheck() {}, loadProvenance() {},
   }
+  vm.invalidateBackendSaveHint = editorMethods.invalidateBackendSaveHint.bind(vm)
   assert.equal(await editorMethods.reloadFromBackend.call(vm), true)
   assert.deepEqual(events, ['destroy', 'load', 'init'])
+  assert.equal(vm._backendSaveContext, 1, '重载开始即使旧文稿的恢复保存提示失效')
 })
 
 test('failed or in-flight reload cannot reactivate assistance against old document contents', async () => {
   const vm = { file: { id: 22 }, executor: {}, ready: true, saving: false, statusKey: 'ready', docLoadFailed: false,
+    backendFailedUpload: { fileId: 22, recoverySeq: 0 },
     docKind: 'writer', projectId: 11, _transportSend() {},
     _writingHost: { destroy() {} },
     loadDocument: async () => { editorMethods.initWritingAssistance.call(vm); assert.equal(vm._writingHost, null); throw new Error('download failed') },
     initWritingAssistance: () => editorMethods.initWritingAssistance.call(vm),
     appendLog() {}, scheduleAnchorCheck() {}, loadProvenance() {},
   }
+  vm.invalidateBackendSaveHint = editorMethods.invalidateBackendSaveHint.bind(vm)
   assert.equal(await editorMethods.reloadFromBackend.call(vm), false)
   assert.equal(vm.docLoadFailed, true)
   assert.equal(vm._writingHost, null)
+  assert.equal(vm.backendFailedUpload, null)
+  assert.equal(vm._backendSaveContext, 1, '加载失败也不能恢复旧文稿的保存提示')
 })
 
 test('user preference changes reach all open documents without replacing their current vocabulary', async (t) => {
