@@ -338,6 +338,11 @@ public class ProjectService {
                         "delete from ProjectTaskFile f where f.taskId in (select t.id from ProjectTask t where t.projectId = :pid)")
                 .setParameter("pid", id)
                 .executeUpdate();
+        // Suggestion feedback has no project_id; remove it while the conversation messages still exist.
+        entityManager.createQuery(
+                        "delete from ChatSuggestion s where s.conversationId in (select m.conversationId from ProjectAiMessage m where m.projectId = :pid)")
+                .setParameter("pid", id)
+                .executeUpdate();
         for (String entity : PROJECT_SCOPED_ENTITIES) {
             entityManager.createQuery("delete from " + entity + " e where e.projectId = :pid")
                     .setParameter("pid", id)

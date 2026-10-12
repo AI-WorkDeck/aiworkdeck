@@ -3,6 +3,7 @@
 
 package com.checkba.service;
 
+import com.checkba.model.entity.ChatSuggestion;
 import com.checkba.model.entity.EvidenceLink;
 import com.checkba.model.entity.EvidenceLinkTarget;
 import com.checkba.model.entity.Project;
@@ -16,6 +17,7 @@ import com.checkba.model.entity.ProjectRemote;
 import com.checkba.model.entity.ProjectTask;
 import com.checkba.model.entity.ProjectTaskFile;
 import com.checkba.model.entity.ProjectVariable;
+import com.checkba.repository.ChatSuggestionRepository;
 import com.checkba.repository.EvidenceLinkRepository;
 import com.checkba.repository.EvidenceLinkTargetRepository;
 import com.checkba.repository.ProjectAiMessageRepository;
@@ -80,6 +82,7 @@ class ProjectDeleteCascadeTest {
     @Autowired private ProjectTaskRepository taskRepository;
     @Autowired private ProjectTaskFileRepository taskFileRepository;
     @Autowired private ProjectAiMessageRepository aiMessageRepository;
+    @Autowired private ChatSuggestionRepository chatSuggestionRepository;
     @Autowired private EvidenceLinkRepository evidenceLinkRepository;
     @Autowired private EvidenceLinkTargetRepository evidenceLinkTargetRepository;
     @Autowired private ProjectStorageResolver storageResolver;
@@ -230,6 +233,37 @@ class ProjectDeleteCascadeTest {
         assertTrue(completionEntryRepository.findByScopeKeyOrderByLastUsedAtDescIdDesc("p:" + projectId).isEmpty());
         assertFalse(completionEntryRepository.findByScopeKeyOrderByLastUsedAtDescIdDesc("p:" + otherProjectId).isEmpty());
         assertFalse(completionEntryRepository.findByScopeKeyOrderByLastUsedAtDescIdDesc("u:9000").isEmpty());
+    }
+
+    @Test
+    void deleteProject_clearsItsChatSuggestionsAndPreservesOtherProjects() {
+        Long projectId = seedProject();
+        Long otherProjectId = seedProject();
+        String suggestionId = saveSuggestion(projectId);
+        String otherSuggestionId = saveSuggestion(otherProjectId);
+
+        projectService.deleteProject(projectId);
+
+        assertFalse(chatSuggestionRepository.existsById(suggestionId), "已删项目的建议与修改反馈不应残留");
+        assertTrue(aiMessageRepository.findByProjectIdOrderByCreatedAtAsc(projectId).isEmpty());
+        assertTrue(chatSuggestionRepository.existsById(otherSuggestionId), "其他项目的建议不应被删除");
+        assertFalse(aiMessageRepository.findByProjectIdOrderByCreatedAtAsc(otherProjectId).isEmpty());
+    }
+
+    private String saveSuggestion(Long projectId) {
+        ProjectAiMessage message = aiMessageRepository.findByProjectIdOrderByCreatedAtAsc(projectId).get(0);
+        message.setConversationId("delete-cascade-" + projectId);
+        aiMessageRepository.save(message);
+        ChatSuggestion suggestion = new ChatSuggestion();
+        suggestion.setId(UUID.randomUUID().toString());
+        suggestion.setUserId(message.getUserId());
+        suggestion.setConversationId(message.getConversationId());
+        suggestion.setSourceMessageId(message.getId());
+        suggestion.setText("继续整理本项目材料");
+        suggestion.setOutcome("edited");
+        suggestion.setCorrection("先整理本项目合同材料");
+        suggestion.setCreatedAt(LocalDateTime.now());
+        return chatSuggestionRepository.save(suggestion).getId();
     }
 
     private void saveCompletion(String scopeKey, String text) {
