@@ -21,7 +21,7 @@ function harness(t, override, language) {
   const open = () => doc.querySelector('.awd-ir-open')
   const more = () => doc.querySelector('.awd-ir-more')
   const menu = () => doc.querySelector('.awd-ir-menu')
-  const menuItems = () => [...doc.querySelectorAll('.awd-ir-menu button')]
+  const menuItems = () => [...doc.querySelectorAll('.awd-ir-menu button')].filter(b => !b.hidden)
   const chip = () => doc.querySelector('.awd-ir-chip')
   const dock = () => doc.querySelector('.awd-ir-dock')
   const drag = (from, to) => {
@@ -30,7 +30,7 @@ function harness(t, override, language) {
     dom.window.dispatchEvent(new dom.window.MouseEvent('mouseup'))
   }
   t.after(() => { api.destroy(); dom.window.close() })
-  return { doc, dom, input, canvas, api, calls, messages, state, click, ball, open, more, menu, menuItems, chip, dock, drag, setResult: r => { result = r } }
+  return { doc, dom, input, canvas, api, calls, messages, receive, state, click, ball, open, more, menu, menuItems, chip, dock, drag, setResult: r => { result = r } }
 }
 
 test('正文里只有浮球和行旁标记，不再有可压住正文的大浮窗', async t => {
@@ -243,4 +243,35 @@ test('English ball label is localized', async t => {
   assert.ok(h.open().title.includes('suggestions'), h.open().title)
   h.more().click(); await Promise.resolve()
   assert.deepEqual(h.menuItems().map(b => b.textContent), ['Turn AI review off', 'Run AI review now', 'Collapse to edge'])
+})
+
+
+test('自动补全在共享菜单独立开关，关闭后仍可重开且收起不改变开关', async t => {
+  const h = harness(t); h.state({ ai: false })
+  const writing = patch => h.receive({ __lo: 'lo-relay', type: 'writing-assistance-preferences-state', session: 'writing-current', available: true, enabled: true, ...patch })
+  writing()
+  h.more().click(); await Promise.resolve()
+  const toggle = h.doc.querySelector('.awd-ir-autocomplete-toggle')
+  assert.equal(toggle.textContent, '关闭自动补全')
+  assert.equal(h.doc.querySelector('.awd-ir-autocomplete-state').textContent, '自动补全已开启')
+  toggle.click(); await Promise.resolve()
+  assert.deepEqual(h.messages.at(-1).data, { enabled: false, writingSession: 'writing-current' })
+  assert.equal(h.messages.at(-1).action, 'autocomplete')
+  assert.equal(h.messages.at(-1).session, 'doc1')
+  assert.equal(toggle.textContent, '关闭自动补全', '只有宿主确认才改状态')
+  writing({ enabled: false })
+  assert.equal(toggle.textContent, '开启自动补全')
+  assert.equal(h.ball().hidden, false)
+  assert.equal(h.menuItems()[0].textContent, '开启 AI 审校', '两个开关独立')
+  h.state({ ai: false, hidden: true })
+  assert.equal(h.dock().hidden, false)
+  h.dock().click(); await Promise.resolve()
+  assert.deepEqual(h.messages.at(-1).data, { hidden: false })
+  h.state({ ai: false, hidden: false })
+  h.more().click(); await Promise.resolve(); toggle.click(); await Promise.resolve()
+  assert.deepEqual(h.messages.at(-1).data, { enabled: true, writingSession: 'writing-current' })
+  writing({ enabled: false, error: 'PREFERENCES_SAVE_FAILED' })
+  assert.equal(toggle.textContent, '开启自动补全')
+  assert.equal(h.doc.querySelector('.awd-ir-preference-error').hidden, false)
+  assert.match(h.doc.querySelector('.awd-ir-preference-error').textContent, /未能保存/)
 })

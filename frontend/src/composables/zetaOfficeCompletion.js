@@ -5,14 +5,16 @@ import { extractCompletionEntries, matchCompletionItems } from '../utils/complet
 import { WRITING_ASSISTANCE_CSS, renderCompletionOption } from './writingAssistancePresentation.js'
 
 const LABELS = {
-  zh: { suggestions: '补全建议', manual: '显示补全建议 · Alt+/', noMatch: '没有匹配的本地词条，请继续输入或查看已学词库。', acceptKey: '补全', chooseKey: '选择', dismissKey: '关闭', title: '自动补全', close: '关闭', local: '仅本地补全 · Tab 接受 · Esc 关闭', empty: '暂无本地候选，常用内容会随写作积累。', enabled: '自动弹出候选', learning: '学习我输入的常用内容', hints: '相关资料提示', manage: '已学词库', project: '本项目', user: '我的词库', remove: '删除', clear: '清空此范围的已学记录', confirm: '再次点击确认清空', loading: '正在读取…', stale: '光标或正文已变化，请重新选择后操作。', detail: '查看已有资料', insert: '插入以上内容', lookup: '在线查询（可能产生费用）', query: '查询资料…', otherQueries: '其他查询…', company: '查询机构工商信息', law: '查询法规与条款', case: '查询案例与案号', noDetail: '暂无可插入的资料。可选中文字后右键查询。', source: '来源', date: '查询时间', error: '操作未完成，请稍后重试。', login: '登录', recharge: '去充值', saved: '已插入，可用撤销恢复。', current: '当前文档', refresh: '刷新本地词库', contextHint: '选中文字后右键可查询机构 / 法规 / 案例，点了才联网、才可能扣费。', COMPANY: '机构', PERSON: '人名', LAW: '法规', ARTICLE: '条款', CASE: '案例', WORD: '词语', PHRASE: '表述' },
-  en: { suggestions: 'Suggestions', manual: 'Show suggestions · Alt+/', noMatch: 'No matching local entries. Keep typing or review learned vocabulary.', acceptKey: 'Accept', chooseKey: 'Select', dismissKey: 'Dismiss', title: 'Autocomplete', close: 'Close', local: 'Local suggestions · Tab accept · Esc dismiss', empty: 'No local suggestions yet. Vocabulary grows as you write.', enabled: 'Suggest as I type', learning: 'Learn from my typing', hints: 'Related information', manage: 'Learned vocabulary', project: 'This project', user: 'My vocabulary', remove: 'Delete', clear: 'Clear learned entries in this scope', confirm: 'Click again to confirm', loading: 'Loading…', stale: 'The cursor or document changed. Select the text again.', detail: 'View saved information', insert: 'Insert the content above', lookup: 'Online lookup (charges may apply)', query: 'Look up information…', otherQueries: 'Other lookups…', company: 'Look up company information', law: 'Look up a law or article', case: 'Look up a case', noDetail: 'No insertable information. Select text and right-click to look it up.', source: 'Source', date: 'Retrieved', error: 'The operation failed. Please try again.', login: 'Sign in', recharge: 'Add credits', saved: 'Inserted. Use Undo to revert.', current: 'Current document', refresh: 'Refresh local vocabulary', contextHint: 'Select text and right-click to look up a company, law or case. Nothing goes online — and nothing can be charged — until you click.', COMPANY: 'Company', PERSON: 'Person', LAW: 'Law', ARTICLE: 'Article', CASE: 'Case', WORD: 'Word', PHRASE: 'Phrase' },
+  zh: { suggestions: '补全建议', manual: '显示补全建议 · Alt+/', noMatch: '没有匹配的本地词条，请继续输入或查看已学词库。', acceptKey: '补全', chooseKey: '选择', dismissKey: '关闭', title: '自动补全', close: '关闭', local: '仅本地补全 · Tab 接受 · Esc 关闭', empty: '暂无本地候选，常用内容会随写作积累。', enabled: '自动语义补全', disable: '关闭自动补全', semantic: '建议续写', policy: '停笔后结合前后文判断，有把握且有帮助才提示。自动补全会使用 AI 额度，可随时从审校设置重新开启；Alt+/ 仅手动查看词库。', learning: '学习我输入的常用内容', hints: '相关资料提示', manage: '已学词库', project: '本项目', user: '我的词库', remove: '删除', clear: '清空此范围的已学记录', confirm: '再次点击确认清空', loading: '正在读取…', stale: '光标或正文已变化，请重新选择后操作。', detail: '查看已有资料', insert: '插入以上内容', lookup: '在线查询（可能产生费用）', query: '查询资料…', otherQueries: '其他查询…', company: '查询机构工商信息', law: '查询法规与条款', case: '查询案例与案号', noDetail: '暂无可插入的资料。可选中文字后右键查询。', source: '来源', date: '查询时间', error: '操作未完成，请稍后重试。', login: '登录', recharge: '去充值', saved: '已插入，可用撤销恢复。', current: '当前文档', refresh: '刷新本地词库', contextHint: '选中文字后右键可查询机构 / 法规 / 案例，点了才联网、才可能扣费。', COMPANY: '机构', PERSON: '人名', LAW: '法规', ARTICLE: '条款', CASE: '案例', WORD: '词语', PHRASE: '表述' },
+  en: { suggestions: 'Suggestions', manual: 'Show suggestions · Alt+/', noMatch: 'No matching local entries. Keep typing or review learned vocabulary.', acceptKey: 'Accept', chooseKey: 'Select', dismissKey: 'Dismiss', title: 'Autocomplete', close: 'Close', local: 'Local suggestions · Tab accept · Esc dismiss', empty: 'No local suggestions yet. Vocabulary grows as you write.', enabled: 'Automatic semantic suggestions', disable: 'Turn autocomplete off', semantic: 'Suggested continuation', policy: 'After a pause, AI suggests a useful, grounded continuation. Uses AI credits. Re-enable in review settings; Alt+/ opens vocabulary manually.', learning: 'Learn from my typing', hints: 'Related information', manage: 'Learned vocabulary', project: 'This project', user: 'My vocabulary', remove: 'Delete', clear: 'Clear learned entries in this scope', confirm: 'Click again to confirm', loading: 'Loading…', stale: 'The cursor or document changed. Select the text again.', detail: 'View saved information', insert: 'Insert the content above', lookup: 'Online lookup (charges may apply)', query: 'Look up information…', otherQueries: 'Other lookups…', company: 'Look up company information', law: 'Look up a law or article', case: 'Look up a case', noDetail: 'No insertable information. Select text and right-click to look it up.', source: 'Source', date: 'Retrieved', error: 'The operation failed. Please try again.', login: 'Sign in', recharge: 'Add credits', saved: 'Inserted. Use Undo to revert.', current: 'Current document', refresh: 'Refresh local vocabulary', contextHint: 'Select text and right-click to look up a company, law or case. Nothing goes online — and nothing can be charged — until you click.', COMPANY: 'Company', PERSON: 'Person', LAW: 'Law', ARTICLE: 'Article', CASE: 'Case', WORD: 'Word', PHRASE: 'Phrase' },
 }
 let instanceSeq = 0
 // Longest selection the right-click lookup menu accepts.
 const CONTEXT_MENU_MAX = 160
-const SUGGEST_DELAY = 80
-const REFILTER_DELAY = 35
+const SUGGEST_DELAY = 1800
+const AUTO_INTERVAL = 45000
+const MIN_TYPED = 20
+const DISMISS_PAUSE = 120000
 
 /** Guest-side UI. No network access: all requests travel through the document host. */
 export function attachWritingAssistance({ canvas, input, execute, transport, focus, language = 'zh-CN' }) {
@@ -21,7 +23,9 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   const t = LABELS[language.startsWith('en') ? 'en' : 'zh']
   let config = { enabled: false, learning: false, hints: true, writable: false, session: '', items: [] }
   let items = [], current = null, choices = [], active = 0, generation = 0, timer = 0, learningTimer = 0
-  let refilter = false, preferredText = '', panelPoint
+  let preferredText = '', panelPoint
+  let lastAutomaticAt = -Infinity, quietUntil = 0, typedSinceAttempt = 0, automaticActive = false, pollTimer = 0
+  const dismissed = new Set()
   let ownText = '', mode = '', disposed = false, composing = false, accepting = false, scope = 'project', clearArmed = false
   const pending = new Map()
   const learningWrites = new Set()
@@ -91,7 +95,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     panel.setAttribute('role', kind === 'suggest' ? 'presentation' : 'dialog'); panel.setAttribute('aria-label', title)
     const head = doc.createElement('div'); head.className = 'awd-wa-heading'; panel.appendChild(head)
     const label = doc.createElement('strong'); label.textContent = title; head.appendChild(label)
-    button('×', () => { invalidate(); focus() }, head).setAttribute('aria-label', t.close)
+    button('×', () => { dismiss(); focus() }, head).setAttribute('aria-label', t.close)
     position(point)
   }
   function hide() {
@@ -99,9 +103,24 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     setPanelOpen(false)
   }
   function invalidate({ flush = true } = {}) {
-    generation++; clearTimeout(timer); timer = 0; current = null; accepting = false; refilter = false; preferredText = ''
+    generation++; clearTimeout(timer); clearTimeout(pollTimer); timer = 0; pollTimer = 0; current = null; accepting = false; preferredText = ''
+    if (automaticActive) { automaticActive = false; rpc('semantic-auto-cancel').catch(() => {}) }
     hide()
     if (flush) flushLearning()
+  }
+  function dismiss() {
+    if (mode === 'suggest' && choices.some(item => item.semantic)) {
+      quietUntil = Date.now() + DISMISS_PAUSE
+      for (const item of choices) dismissed.add(item.text)
+      if (dismissed.size > 100) dismissed.delete(dismissed.values().next().value)
+    }
+    invalidate()
+  }
+  async function disableAutocomplete() {
+    config.enabled = false
+    invalidate({ flush: false })
+    try { await rpc('preferences', { enabled: false }) }
+    catch (error) { if (!disposed) { show('notice'); note(error.message || t.error) } }
   }
   function rpc(action, data = {}) {
     if (disposed || !config.session) return Promise.reject(new Error(t.stale))
@@ -119,7 +138,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     if (msg.type === 'writing-config') {
       if (!msg.config || typeof msg.config !== 'object') return
       const changed = typeof msg.config.session === 'string' && msg.config.session !== config.session
-      if (changed) { invalidate(); for (const p of pending.values()) { clearTimeout(p.timeout); p.reject(new Error(t.stale)) }; pending.clear(); items = []; ownText = '' }
+      if (changed) { invalidate(); for (const p of pending.values()) { clearTimeout(p.timeout); p.reject(new Error(t.stale)) }; pending.clear(); items = []; ownText = ''; dismissed.clear(); typedSinceAttempt = 0; quietUntil = 0; lastAutomaticAt = -Infinity }
       const disabled = (config.enabled && msg.config.enabled === false) || (config.writable && msg.config.writable === false)
       config = { ...config, ...msg.config }
       if (Array.isArray(msg.config.items)) items = msg.config.items.map(item => ({ ...item }))
@@ -127,13 +146,14 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
       const nextAvailable = !!config.session && !!config.writable
       if (nextAvailable !== available) { available = nextAvailable; report() }
       if (!config.learning || !config.writable) { ownText = ''; clearTimeout(learningTimer); learningTimer = 0 }
-      if (disabled || !config.writable) invalidate({ flush: false })
+      if (disabled || !config.writable || msg.config.automatic?.state === 'STALE') invalidate({ flush: false })
       if (contextMenuWritable !== !!config.writable) {
         contextMenuWritable = !!config.writable
         execute('set_host_context_menu', { enabled: contextMenuWritable, maxLength: CONTEXT_MENU_MAX }).catch(() => {})
       }
       return
     }
+    if (msg.type === 'semantic-writing-panel' && msg.open) { invalidate(); return }
     // 宿主工具栏的开合指令（dev-board#755）。按下态由上面的 report 回报，宿主不本地乐观翻。
     if (msg.type === 'writing-assistance-panel') {
       if (msg.open) { if (available && !panelOpen) settings() }
@@ -149,7 +169,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   function eligibleItems() {
     return items.filter((x) => x.source !== 'learned' || !['WORD', 'PHRASE'].includes(x.kind) || x.uses >= 2)
   }
-  async function suggest({ manual = false } = {}) {
+  async function suggest({ manual = true } = {}) {
     if (disposed || composing || (!config.enabled && !manual) || !config.writable || accepting) return
     const gen = generation
     let ctx
@@ -177,20 +197,29 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     status.textContent = choices[active]?.text || ''
   }
   function renderChoices() {
-    const saved = choices; show('suggest', t.suggestions); choices = saved
+    const saved = choices; show('suggest', saved[0]?.semantic ? t.semantic : t.suggestions); choices = saved
     const list = doc.createElement('div'); list.id = listId; list.className = 'awd-wa-list'; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', t.suggestions); panel.appendChild(list)
     choices.forEach((item, index) => {
       const b = button('', () => accept(index), list); b.className = 'awd-wa-option'; b.id = listId + '-' + index
       b.setAttribute('role', 'option')
-      renderCompletionOption(doc, b, item, { kindLabel: t[item.kind] || item.kind, sourceLabel: item.source === 'document' ? t.current : t[item.scope] || item.scope })
+      if (item.semantic) { b.dataset.kind = 'SEMANTIC'; b.textContent = item.text; b.style.whiteSpace = 'pre-wrap'; b.style.lineHeight = '1.7' }
+      else renderCompletionOption(doc, b, item, { kindLabel: t[item.kind] || item.kind, sourceLabel: item.source === 'document' ? t.current : t[item.scope] || item.scope })
     })
     const footer = doc.createElement('div'); footer.className = 'awd-wa-footer'; panel.appendChild(footer)
     const keys = doc.createElement('span'); keys.className = 'awd-wa-keys'; footer.appendChild(keys)
-    for (const [key, label] of [['↑↓', t.chooseKey], ['Tab', t.acceptKey], ['Esc', t.dismissKey]]) {
+    for (const [key, label] of [...(choices[0]?.semantic ? [] : [['↑↓', t.chooseKey]]), ['Tab', t.acceptKey], ['Esc', t.dismissKey]]) {
       const group = doc.createElement('span'), badge = doc.createElement('kbd'); badge.textContent = key
       group.append(badge, doc.createTextNode(' ' + label)); keys.appendChild(group)
     }
-    const count = doc.createElement('span'); count.className = 'awd-wa-count'; footer.appendChild(count)
+    if (!choices[0]?.semantic) { const count = doc.createElement('span'); count.className = 'awd-wa-count'; footer.appendChild(count) }
+    if (choices[0]?.semantic) {
+      if (choices[0].explanation) {
+        const detail = doc.createElement('details'); detail.className = 'awd-wa-copy'
+        const summary = doc.createElement('summary'); summary.textContent = t.source; detail.appendChild(summary)
+        note(String(choices[0].explanation).slice(0, 240), detail); panel.appendChild(detail)
+      }
+      button(t.disable, disableAutocomplete, footer)
+    }
     input.setAttribute('aria-controls', listId); input.setAttribute('aria-expanded', 'true')
     position(); syncActiveChoice()
   }
@@ -200,7 +229,14 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   }
   async function accept(index) {
     const item = choices[index], ctx = current
-    if (!item || !ctx || accepting) return
+    if (!item || (!ctx && !item.semantic) || accepting) return
+    if (item.semantic) {
+      const gen = ++generation; accepting = gen; hide()
+      try { await rpc('semantic-auto-accept', { index: 0, composing }); if (gen === generation) automaticActive = false }
+      catch { /* A stale automatic suggestion disappears without interrupting writing. */ }
+      finally { if (accepting === gen) accepting = false; if (!disposed && gen === generation) focus() }
+      return
+    }
     const gen = ++generation, session = config.session; accepting = gen; hide()
     try {
       const result = await execute('accept_completion', { token: ctx.token, prefix: item.prefix, text: item.text })
@@ -287,13 +323,39 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     const entries = extractCompletionEntries(text)
     learn(entries, 'project'); learn(entries, 'user')
   }
+  const semanticPanelOpen = () => doc.querySelector('.awd-semantic-sheet')?.hidden === false
+  async function automaticSuggestion() {
+    if (disposed || composing || !config.enabled || !config.writable || accepting || mode || semanticPanelOpen() || doc.hidden || doc.activeElement !== input) return
+    if (Date.now() < quietUntil || Date.now() - lastAutomaticAt < AUTO_INTERVAL || typedSinceAttempt < MIN_TYPED) return
+    const gen = generation
+    lastAutomaticAt = Date.now(); typedSinceAttempt = 0; automaticActive = true
+    const currentRequest = () => !disposed && gen === generation && config.enabled && config.writable && !composing && !semanticPanelOpen() && !doc.hidden && doc.activeElement === input
+    const render = async result => {
+      if (!currentRequest()) return
+      const view = result?.view || {}
+      if (view.status === 'RUNNING' && Date.now() - lastAutomaticAt < 30000) {
+        pollTimer = setTimeout(async () => {
+          try { await render(await rpc('semantic-auto-poll')) } catch { if (currentRequest()) { quietUntil = Date.now() + DISMISS_PAUSE; invalidate({ flush: false }) } }
+        }, 800)
+        return
+      }
+      if (view.status !== 'READY' || view.advice?.length !== 1 || !view.advice[0]?.text?.trim() || dismissed.has(view.advice[0].text)) {
+        if (view.status === 'FAILED') quietUntil = Date.now() + DISMISS_PAUSE
+        invalidate({ flush: false }); return
+      }
+      choices = [{ ...view.advice[0], semantic: true }]; active = 0
+      renderChoices()
+    }
+    try { await render(await rpc('semantic-auto-generate', { composing })) }
+    catch { if (currentRequest()) { quietUntil = Date.now() + DISMISS_PAUSE; invalidate({ flush: false }) } }
+  }
   function committed(text) {
     if (disposed) return
-    const delay = refilter || mode === 'suggest' ? REFILTER_DELAY : SUGGEST_DELAY
-    generation++; accepting = false; hide(); refilter = false
+    invalidate({ flush: false })
+    typedSinceAttempt = Math.min(4000, typedSinceAttempt + String(text || '').replace(/\s/g, '').length)
     if (config.learning && config.writable) { ownText = (ownText + text).slice(-4000); clearTimeout(learningTimer); learningTimer = setTimeout(flushLearning, 8000) }
     if (/[。！？；\n]/.test(text)) flushLearning()
-    clearTimeout(timer); timer = config.enabled && config.writable ? setTimeout(suggest, delay) : 0
+    timer = config.enabled && config.writable ? setTimeout(automaticSuggestion, SUGGEST_DELAY) : 0
   }
   function keydown(e) {
     if (disposed) return false
@@ -305,24 +367,30 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
       if (!e.shiftKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); active = (active + (e.key === 'ArrowDown' ? 1 : -1) + choices.length) % choices.length; preferredText = choices[active].displayText || choices[active].text; syncActiveChoice(); return true }
       if (!e.shiftKey && (e.key === 'PageDown' || e.key === 'PageUp')) { e.preventDefault(); active = Math.max(0, Math.min(choices.length - 1, active + (e.key === 'PageDown' ? 5 : -5))); preferredText = choices[active].displayText || choices[active].text; syncActiveChoice(); return true }
     }
-    if (e.key === 'Escape' && mode) { e.preventDefault(); invalidate(); return true }
+    if (e.key === 'Escape' && mode) { e.preventDefault(); dismiss(); return true }
     if (e.key.length > 1 || e.metaKey || e.ctrlKey || e.altKey) invalidate()
-    else { refilter = mode === 'suggest'; generation++; accepting = false; hide() }
+    else invalidate({ flush: false })
     return false
   }
   async function settings() {
     invalidate(); show('settings')
     for (const name of ['enabled', 'learning', 'hints']) {
       const label = doc.createElement('label'); const check = doc.createElement('input'); check.type = 'checkbox'; check.checked = config[name]
-      check.onchange = () => {
+      check.onchange = async () => {
         config[name] = check.checked
+        if (name === 'enabled') {
+          generation++; clearTimeout(timer); clearTimeout(pollTimer); timer = 0; pollTimer = 0
+          if (automaticActive) { automaticActive = false; rpc('semantic-auto-cancel').catch(() => {}) }
+        }
         if (name === 'learning' && !check.checked) { ownText = ''; clearTimeout(learningTimer); learningTimer = 0 }
-        rpc('preferences', { [name]: check.checked }).catch(() => {})
+        try { await rpc('preferences', { [name]: check.checked }) }
+        catch (error) { if (!disposed && mode === 'settings') { check.checked = config[name]; note(error.message || t.error) } }
       }
       label.appendChild(check); label.appendChild(doc.createTextNode(' ' + t[name])); panel.appendChild(label)
     }
+    note(t.policy)
     button(t.manual, requestSuggestions); button(t.manage, manage); button(t.refresh, async () => { const gen = generation; await rpc('refreshDocument'); if (!disposed && gen === generation) settings() })
-    // 右键查询不受上面「自动弹出候选」开关影响，也不在这里给开关——它默认开着，
+    // 右键查询不受上面「自动语义补全」开关影响，也不在这里给开关——它默认开着，
     // 而且只有点下去才联网。面板里说一句，免得用户以为关了开关就没有外查这回事。
     const contextHint = doc.createElement('small'); contextHint.className = 'awd-wa-copy'; contextHint.textContent = t.contextHint; panel.appendChild(contextHint)
     position()
@@ -398,11 +466,10 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   const endComposition = () => { composing = false }
   const moved = () => invalidate()
   const cursorMoved = (event) => {
-    // A commit reports its caret before committed(); keep its fast-refilter
-    // intent and active choice until that callback supplies the new text.
+    // committed() invalidates and schedules after the text has reached the engine.
     if (event?.reason === 'commit') return
     invalidate({ flush: false })
-    if (!disposed && !composing && config.enabled && config.writable && doc.activeElement === input) timer = setTimeout(suggest, SUGGEST_DELAY)
+    // Reading and moving the caret never request automatic suggestions.
   }
   // 设置面板不吃失焦：它的入口在宿主工具栏上（dev-board#755），点那颗按钮的同时
   // 客体这边的输入框就失焦了，跨进程的失焦通知与开合指令谁先到没有保证——照旧
@@ -415,7 +482,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     rpc('refresh').catch(() => {})
   }
   const pointer = (e) => { if (!root.contains(e.target)) invalidate() }
-  const panelKeydown = (e) => { if (e.key === 'Escape') { e.preventDefault(); invalidate(); focus() } }
+  const panelKeydown = (e) => { if (e.key === 'Escape') { e.preventDefault(); dismiss(); focus() } }
   const resized = () => {
     if (panel.hidden) return
     position(panelPoint)
@@ -436,7 +503,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   return { committed, keydown, invalidate, cursorMoved,
     destroy() {
       if (disposed) return
-      flushLearning(); disposed = true; clearTimeout(timer); clearTimeout(learningTimer); unsub()
+      invalidate(); disposed = true; clearTimeout(timer); clearTimeout(learningTimer); unsub()
       for (const p of pending.values()) { clearTimeout(p.timeout); p.reject(new Error(t.stale)) }; pending.clear()
       input.removeEventListener('compositionstart', startComposition); input.removeEventListener('compositionend', endComposition); input.removeEventListener('blur', blur)
       input.removeEventListener('focus', refreshOnFocus)

@@ -152,3 +152,20 @@ test('自动 AI 被额度一类的原因停掉时，顶栏说清原因并指向�
   vm.setState(READY({ autoBlocked: 'NOT_A_CODE' }))
   assert.equal(vm.noteText.includes('NOT_A_CODE'), false, '认不出的码不露给用户')
 })
+
+
+test('自动补全开关使用独立权威状态且携带会话，不改审校和浮球状态', () => {
+  const r = recorder()
+  const autocomplete = { session: 'writing-current', available: true, enabled: false }
+  const vm = makeInlineReviewVm(r.executor, { state: READY({ ai: true, hidden: true }), autocomplete })
+  vm.toggleAutocomplete()
+  assert.deepEqual(vm.emitted.at(-1), ['action', { action: 'autocomplete', value: true, session: 'writing-current' }])
+  assert.equal(vm.aiEnabled, true)
+  assert.equal(vm.ballCollapsed, true)
+  assert.equal(autocomplete.enabled, false, '等待宿主确认，不乐观改状态')
+  autocomplete.available = false
+  const count = vm.emitted.length
+  vm.toggleAutocomplete()
+  assert.equal(vm.emitted.length, count)
+  assert.deepEqual(r.calls, [])
+})
