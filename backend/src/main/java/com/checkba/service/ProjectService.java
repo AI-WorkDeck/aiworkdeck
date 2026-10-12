@@ -58,6 +58,9 @@ public class ProjectService {
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.storage.StorageServiceFactory storageServiceFactory;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.version.WorkSessionService workSessions;
+
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProjectService.class);
 
     /**
@@ -286,6 +289,10 @@ public class ProjectService {
      */
     @Transactional
     public void deleteProject(Long id) {
+        workSessions.runProjectDeletion(id, () -> deleteProjectLocked(id));
+    }
+
+    private void deleteProjectLocked(Long id) {
         boolean officialCloud = cloudStorageQuota != null && cloudStorageQuota.isEnabled();
         if (officialCloud) cloudStorageQuota.lockProjectForWrite(id);
         Project project = entityManager.find(Project.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
@@ -315,6 +322,12 @@ public class ProjectService {
             deleteDirectoryStrictly(projectDir);
         }
 
+        try {
+            projectRepoService.objects().deleteProject(id);
+        } catch (IOException e) {
+            throw new IllegalStateException(LangText.of("版本文件未能完整删除，请重试", "Version files could not be fully deleted; please retry"), e);
+        }
+
         // evidence_link_target 没有 project_id 列，只能先按 link id 级联，再删 evidence_link 本身。
         entityManager.createQuery(
                         "delete from EvidenceLinkTarget t where t.linkId in (select l.id from EvidenceLink l where l.projectId = :pid)")
@@ -323,6 +336,11 @@ public class ProjectService {
         // project_task_file（dev-board#895）同理：没有 project_id 列，按所属事项子查询删，必须在删 project_task 之前。
         entityManager.createQuery(
                         "delete from ProjectTaskFile f where f.taskId in (select t.id from ProjectTask t where t.projectId = :pid)")
+                .setParameter("pid", id)
+                .executeUpdate();
+        // Suggestion feedback has no project_id; remove it while the conversation messages still exist.
+        entityManager.createQuery(
+                        "delete from ChatSuggestion s where s.conversationId in (select m.conversationId from ProjectAiMessage m where m.projectId = :pid)")
                 .setParameter("pid", id)
                 .executeUpdate();
         for (String entity : PROJECT_SCOPED_ENTITIES) {

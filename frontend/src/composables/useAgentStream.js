@@ -1775,6 +1775,8 @@ export function useAgentStream() {
         if (evt === 'bubble_end' || evt === 'error' || evt === 'cancelled') {
             isStreaming.value = false
             roundSettled = true
+            // Live terminal event only: history/recovery must not trigger paid suggestion generation.
+            if (evt === 'bubble_end' && agentRunStatus.value === 'FINISHED' && JSON.parse(dataStr).status === 'finished') turnFinishedHandler.value?.()
         }
 
         // heartbeat 与三个后台任务事件已在气泡守卫之前处理（见上）
@@ -2683,6 +2685,7 @@ export function useAgentStream() {
 
     const clientActionHandler = ref(null)
     const titleUpdateHandler = ref(null)
+    const turnFinishedHandler = ref(null)
 
     /**
      * 回退到指定消息（edit-and-resend）
@@ -2784,6 +2787,7 @@ export function useAgentStream() {
         // Background task tracking
         onClientAction: (cb) => { clientActionHandler.value = cb },
         onTitleUpdate: (cb) => { titleUpdateHandler.value = cb },
+        onTurnFinished: (cb) => { turnFinishedHandler.value = cb },
         tokenUsage,
         fileChanges,
         backgroundTasks,

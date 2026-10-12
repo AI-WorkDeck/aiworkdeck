@@ -7,6 +7,14 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## 下一句建议（dev-board#1224，2026-10-12）
+
+- 桌面 `ChatSuggestionControl` / `useChatSuggestions` 默认开启，用户+后端地址独立偏好。仅真实 SSE `bubble_end status=finished` 回调且面板可见、输入空时请求；历史恢复、等待回答/审批、取消、输入中不发起。开关说明披露额外用量，关闭不再发起；不承诺取消已经送出的模型请求。
+- `POST /api/ai/suggestions` 与 `/{id}/feedback` 仅 local-mode 注册，沿现有 loopback/身份保护。`ChatSuggestionService` 校验会话归属与 FINISHED，最近 6 条×2,000 字符，剔除过程/工具/思考，不额外读取文档；`ChatModelFactory.getChatModel(modelId, timeout, cap)` 沿当前供应商、选定模型，15 秒、256 output tokens、无工具/重试。过长或不合形响应丢弃，不让建议失败影响主对话。按用户+会话+源 assistant 消息+模型复用已生成建议，全局一次一个在途生成。
+- 建议只在点击后回填或焦点在空输入框、无修饰/IME/重复键、无 @ 浮层时按 Tab 走现有发送路径；Shift+Tab 正常导航。点击可改写，收到真实 inbox 收执后才记反馈，失败保留草稿和关联供重试。5 分钟、换会话/身份/模型/文档、开始新轮、用户输入、隐藏页面时丢弃未使用建议；历史重载/回退也清理。
+- `chat_suggestion` 是本机业务记录，不接遥测：记录建议 ID、源消息、真实 clientRequestId 与 accepted/edited/dismissed；后端从 inbox 已接收文字判采纳或修改，不信客户端自报。删会话/回退同步清理反馈，每小时清理 30 天前记录，最近 3 条同用户同会话反馈供后续建议调整。反馈不是事实正确性判定、不是自动训练；中英隐私说明与界面一致。Web/Office 暂无该入口。
+- 回归：`ChatSuggestionServiceTest` + `ChatModelFactoryTest`；`node tests/chat-presentation-ui/chat-suggestions.mjs` 使用真正 ChatInterface、SSE 和键盘与合成模型/HTTP，覆盖 Tab/IME、修改、失败重试、迟到/换会话/身份、开关与 320px 双主题。合成响应不能证明真实模型建议质量或正式客户端表现。
+
 ## 试用回合归属（dev-board#1166，2026-10-10）
 
 `launchTurn` 在入执行队列前把当前账户指纹写入 `RunGuard`，收尾原样交给 `TrialTurnMeter`；不得到异步上报时才取当前账户。换账户则放弃旧回合，发送与账户切换共享锁；server 未接 per-user 试用上报前停用机器级计量。接线测试 `AgentOrchestratorTrialHookTest` 验证入队捕获与收尾传递，账户/缓存契约见 licensing-billing。

@@ -122,4 +122,14 @@ class MobileBackupServiceTest {
         for(String name:List.of("file.zip","file.exe","file.doc","file.xls","file.ppt","file.txt","file.md","noextension","file.pdf.zip"))
             assertFalse(MobilePreviewPolicy.supports(name),name);
     }
+
+    @Test void disablingAlsoRevokesHistoricalObjectsAndExposesOutstandingCleanup() {
+        var objects=mock(MobileVersionObjectService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"versionObjects",objects);
+        when(objects.cleanupPending(1L)).thenReturn(true);
+        user.setFileCloudBackupEnabled(true);
+        var state=service.consent(1L,false,MobileBackupService.CONSENT_VERSION);
+        verify(objects).revoke(1L);assertEquals(true,state.get("cleanupPending"));
+        assertEquals(false,state.get("enabled"));
+    }
 }

@@ -929,4 +929,23 @@ class DraftAdoptTest {
         assertEquals(WorkSession.Status.ACTIVE, sessions.get(scene.draftId()).getStatus(),
                 "稿仍为 ACTIVE");
     }
+    @Test
+    void objectBackedMediaSupportsMainDraftAndBothWithoutExposingPointers() throws Exception {
+        db.put(501L, file(501L, "证据.mov"));
+        long draftId = stageAdoptConflict("甲.mp4", "乙.mp3", "证据.mov").draftId();
+        var outcome = svc.resolveAdopt(7L, draftId, Map.of(
+                "甲.mp4", WorkSessionService.Resolution.MAIN,
+                "乙.mp3", WorkSessionService.Resolution.DRAFT,
+                "证据.mov", WorkSessionService.Resolution.BOTH), 1L, "韩泽伟");
+        assertTrue(outcome.success());
+        assertEquals("主线：甲.mp4", read("甲.mp4"));
+        assertEquals("稿：乙.mp3", read("乙.mp3"));
+        assertEquals("主线：证据.mov", read("证据.mov"));
+        assertEquals("稿：证据.mov", read("证据（来自：试验稿）.mov"));
+        assertEquals(4, repoSvc.objectPointersAt(7L, "HEAD", false).size());
+        assertTrue(repoSvc.pendingChanges(7L).isEmpty());
+        ProjectFile copy = db.values().stream().filter(f -> "证据（来自：试验稿）.mov".equals(f.getName())).findFirst().orElseThrow();
+        assertEquals("稿：证据.mov".getBytes(java.nio.charset.StandardCharsets.UTF_8).length, copy.getFileSize());
+    }
+
 }

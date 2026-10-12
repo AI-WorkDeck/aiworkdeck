@@ -271,6 +271,18 @@ public class GitHttpController {
                                              DeviceTokenService.ResolvedToken pusher) {
         rp.setObjectChecker(new ObjectChecker());
         rp.setPreReceiveHook((pack, commands) -> {
+            // All received commits (including historical versions and milestone tags) must be recoverable.
+            for (ReceiveCommand command : commands) {
+                if (command.getType() == ReceiveCommand.Type.DELETE) continue;
+                try {
+                    for (var object : repoService.objectPointersAt(pack.getRepository(), command.getNewId().name(), true))
+                        repoService.objects().verify(projectId, object);
+                } catch (Exception e) {
+                    for (ReceiveCommand rejected : commands) rejected.setResult(
+                            ReceiveCommand.Result.REJECTED_OTHER_REASON, "version objects are unavailable; upload them before submitting");
+                    return;
+                }
+            }
             if (repositoryMergingOrUnknown(projectId)) {
                 for (ReceiveCommand cmd : commands) {
                     cmd.setResult(ReceiveCommand.Result.REJECTED_OTHER_REASON,

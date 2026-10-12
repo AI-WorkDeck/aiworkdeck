@@ -22,6 +22,10 @@ public class CloudStorageQuotaService {
     public static final long PRO_BYTES = 3L * 1024 * 1024 * 1024;
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.repository.MobileFileBackupRepository mobileBackups;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.repository.MobileVersionObjectRepository versionObjects;
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.beans.factory.ObjectProvider<com.checkba.version.objects.LocalVersionObjectStore> localVersionObjects;
     private final MobileBillingService billing;
     private final ProjectFileRepository files;
     private final ProjectRepository projects;
@@ -106,6 +110,14 @@ public class CloudStorageQuotaService {
         }
         if (mobileBackups != null) for (var backup : mobileBackups.findByUserId(userId)) {
             total = Math.addExact(total, backup.getSize());
+        }
+        if (versionObjects != null) for (var object : versionObjects.findByUserId(userId)) {
+            total = Math.addExact(total, object.getSize());
+        }
+        var localObjects = localVersionObjects == null ? null : localVersionObjects.getIfAvailable();
+        if (localObjects != null) for (var project : projects.findByUserIdOrderByCreatedAtDesc(userId)) {
+            try { total = Math.addExact(total, localObjects.usageBytes(project.getId())); }
+            catch (java.io.IOException e) { throw new IllegalStateException("Version object usage unavailable", e); }
         }
         return total;
     }
