@@ -16,7 +16,7 @@ final class AutomaticWritingProfile implements WritingProfile {
     }
     public List<Advice> deterministic(Context context, List<Fact> facts) { return List.of(); }
     public String instructions(Context context, List<Fact> facts) {
-        return "这是普通文书或工作报告。只补全当前思路的自然后续、概括或衔接。理解多条已有信息之间的关系后重新组织语言，不把材料中的句段当成候选直接搬回，也不通过添连接词或机械换词制造新意；只有表达更顺畅但仍重复已述内容时应放弃。不猜测下一项工作，可以概括已知事实间的共同点、差异与并存关系；概括完成即停止，不再重列原文各项。准确保留逻辑关系，多个可选项不等于必须结合使用。不得新增没有依据的计划、成果、承诺、责任或结论。材料记载不是独立核实。没有明确且有用的续写就放弃。";
+        return "这是普通文书或工作报告。只补全当前思路的自然后续、概括或衔接。理解多条已有信息之间的关系后重新组织语言，不把材料中的句段当成候选直接搬回，也不通过添连接词或机械换词制造新意；只有表达更顺畅但仍重复已述内容时应放弃。不猜测下一项工作，可以概括已知事实间的共同点、差异与并存关系；用最短必要的后缀完成当前句，通常8至30字足够，概括完成即停止，不再重列原文各项或添加解释性分句。光标前以‘的’等词结束时，应衔接所需句法成分，不能重起主谓句。准确保留逻辑关系，多个可选项不等于必须结合使用。不得新增没有依据的计划、成果、承诺、责任或结论。材料记载不是独立核实。没有明确且有用的续写就放弃。";
     }
     public List<String> validate(Context context, List<Fact> facts, Advice advice) {
         return grounded(context, facts, advice) ? List.of() : List.of("UNSUPPORTED_AUTOMATIC_ADDITION");
