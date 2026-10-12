@@ -73,6 +73,24 @@ async function scenario(name, run) {
   catch (error) { results.push({ name, passed: false, error: error.message }) }
 }
 try {
+  await scenario('large-file backup pending is visible and keeps local-first explanation', async () => {
+    const f = await fixture({ enabled: true, decided: true,
+      objectBackup: { state: 'pending', pendingObjects: 2, lastError: '云端空间不足，本地版本已保留' } })
+    try {
+      assert.match(await f.page.$eval('.backup-trigger', el => el.textContent), /待同步/)
+      await f.page.click('.backup-trigger')
+      await f.page.waitForSelector('.backup-dialog', { visible: true })
+      const text = await f.page.$eval('.backup-dialog', el => el.textContent)
+      assert.match(text, /大文件和音视频的历史版本/)
+      assert.match(text, /断网或云空间不足不影响本地保存/)
+      assert.match(text, /云端空间不足/)
+      assert.match(text, /保留本机文件和本地版本/)
+      await f.page.screenshot({ path: out + '/large-file-pending-light.png' })
+      await f.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+      await f.page.screenshot({ path: out + '/large-file-pending-dark.png' })
+      assert.deepEqual(f.errors, [])
+    } finally { await f.page.close() }
+  })
   await scenario('first explicit decline persists false and keeps local workbench usable', async () => {
     const f = await fixture()
     try {

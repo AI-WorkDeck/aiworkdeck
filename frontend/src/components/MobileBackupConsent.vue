@@ -2,13 +2,15 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <view class="mobile-backup">
-    <button v-if="state?.available" class="backup-trigger" role="button" tabindex="0" @keydown.enter.prevent="open = true; refresh()" @keydown.space.prevent="open = true; refresh()" @click="open = true; refresh()">{{ $t('workbench.mobileBackup.title') }} · {{ $t('workbench.mobileBackup.' + (state.enabled ? 'enabled' : 'disabled')) }}</button>
+    <button v-if="state?.available" class="backup-trigger" role="button" tabindex="0" @keydown.enter.prevent="open = true; refresh()" @keydown.space.prevent="open = true; refresh()" @click="open = true; refresh()">{{ $t('workbench.mobileBackup.title') }} · {{ $t('workbench.mobileBackup.' + backupLabel) }}</button>
     <Teleport to="body">
       <div v-if="open && state?.available" class="backup-overlay" @keydown.esc.prevent="close" @keydown.tab="trapFocus">
         <section class="backup-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-title" tabindex="-1" ref="dialog">
           <h2 id="backup-title">{{ $t('workbench.mobileBackup.title') }}</h2>
           <p>{{ $t('workbench.mobileBackup.message') }}</p>
           <p v-if="state.enabled || !state.subscriptionActive">{{ $t('workbench.mobileBackup.' + (state.subscriptionActive ? 'pending' : 'subscriptionRequired')) }}</p>
+          <p v-if="state.enabled && state.objectBackup?.state === 'pending'" role="status" class="backup-error">{{ $t('workbench.mobileBackup.objectPending') }} {{ state.objectBackup.lastError }}</p>
+          <p v-else-if="state.enabled && state.objectBackup?.state === 'syncing'" role="status">{{ $t('workbench.mobileBackup.objectSyncing') }}</p>
           <p v-if="state.enabled">{{ $t('workbench.mobileBackup.disableMessage') }}</p>
           <p v-if="error" role="alert" class="backup-error">{{ error }}</p>
           <div class="backup-actions">
@@ -26,6 +28,14 @@ import { getMobileBackupConsent, setMobileBackupConsent } from '@/services/api.j
 import { ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 export default {
   data: () => ({ state: null, open: false, saving: false, error: '', dismissedScope: '', epoch: 0, requestId: 0, stopped: false, timer: null }),
+  computed: {
+    backupLabel() {
+      if (!this.state?.enabled) return 'disabled'
+      if (this.state.objectBackup?.state === 'pending') return 'awaitingSync'
+      if (this.state.objectBackup?.state === 'syncing') return 'syncing'
+      return 'enabled'
+    },
+  },
   watch: { open(value) { if (value) this.$nextTick(() => this.$refs.dialog?.focus()) } },
   mounted() { window.addEventListener(ACCOUNT_CHANGED_EVENT, this.accountChanged); this.refresh() },
   beforeUnmount() { this.stopped = true; this.epoch++; clearTimeout(this.timer); window.removeEventListener(ACCOUNT_CHANGED_EVENT, this.accountChanged) },
