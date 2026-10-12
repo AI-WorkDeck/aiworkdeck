@@ -565,6 +565,8 @@
                  </view>
               </view>
           </view>
+          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" :suggestion="visibleSuggestion"
+            @toggle="chatSuggestions.toggle" @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
           <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask model-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
@@ -821,6 +823,8 @@
           </view>
           <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
+          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" :suggestion="visibleSuggestion"
+            @toggle="chatSuggestions.toggle" @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
        </template>
     </view>
@@ -877,6 +881,8 @@ import { getAuthHeaders, getCurrentUser } from '@/utils/auth.js'
 import { host } from '@/services/host.js'
 import { captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
 import DecisionAssistControl from './DecisionAssistControl.vue'
+import ChatSuggestionControl from './ChatSuggestionControl.vue'
+import { useChatSuggestions } from '@/composables/useChatSuggestions.js'
 import ModelSelectorDropdown from './ModelSelectorDropdown.vue'
 import { createDecisionAssistState, decisionAssistPreferenceKey, decisionAssistUser } from '@/utils/decisionAssistPreference.js'
 import { getAppLanguage } from '@/utils/appLanguage.js'
@@ -921,7 +927,7 @@ import {
 
 export default {
   name: 'ChatInterface',
-  components: { DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, MemoryBrowser, OptionalComponentCard },
+  components: { ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, MemoryBrowser, OptionalComponentCard },
   props: {
     projectId: String,
     projectName: String,
@@ -980,6 +986,7 @@ export default {
       parseAssistantHistory,
       onClientAction,
       onTitleUpdate,
+      onTurnFinished,
       backgroundTasks,
       dismissBackgroundTask,
       upsertPluginJob,
@@ -1161,7 +1168,7 @@ export default {
     }
     const resolveDecisionAssistUser = async () => {
       // 浏览器登录态已有缓存身份时不必再问服务端
-      if (decisionAssistUser(getCurrentUser(), null)) return syncDecisionAssistPreference()
+      if (decisionAssistUser(getCurrentUser(), null)) { chatSuggestions.sync(); return syncDecisionAssistPreference() }
       try {
         const res = await getCurrentUserApi()
         decisionAssistResolvedUser = res && res.code === 0 && res.data ? res.data : null
@@ -1169,6 +1176,7 @@ export default {
         decisionAssistResolvedUser = null
       }
       syncDecisionAssistPreference()
+      chatSuggestions.sync()
     }
     const sendMessage = (options) => sendAgentMessage({
       ...options,
@@ -1176,7 +1184,7 @@ export default {
         ? options.decisionAssistEnabled === true && decisionAssistState.ownerStillCurrent(options.decisionAssistOwner)
         : syncDecisionAssistPreference(),
     })
-    const refreshDecisionAssistPreference = () => syncDecisionAssistPreference(true)
+    const refreshDecisionAssistPreference = () => { syncDecisionAssistPreference(true); chatSuggestions.sync() }
     onMounted(() => {
       window.addEventListener('focus', refreshDecisionAssistPreference)
       window.addEventListener('storage', refreshDecisionAssistPreference)
@@ -2089,6 +2097,7 @@ export default {
         }
 
         // 2. 在前端删除bubbles（目标一起删——与后端同语义，用户接着在输入框里改了重发）
+        chatSuggestions.clear()
         const rolledBackContent = rollbackToMessage(targetIndex)
 
         // 3. 回退：把原文连同那一轮带过的附件标签放回输入框等用户改；
@@ -2262,6 +2271,7 @@ export default {
       // 取消就停在原地，草稿与附件一个都不动；已连接时 requireAccount 走缓存，不多一次请求。
       if (!(await ensureAiAccount())) return
 
+      const suggestionSnapshot = chatSuggestions.capture()
       const prompt = text
       const submissionMode = isStreaming.value && requestedMode === 'queue' ? 'queue' : 'steer'
       const editorHtml = richInput.value ? richInput.value.innerHTML : ''
@@ -2406,6 +2416,8 @@ export default {
         uni.showToast({ title: t('chat.sendFailedDraftKept'), icon: 'none' })
         return
       }
+
+      chatSuggestions.received(suggestionSnapshot, attempt.clientRequestId)
 
       // Receipt is the durability boundary. Only clear the exact draft and attachments that
       // produced it; text/images added while the request was in flight stay for the next send.
@@ -2682,6 +2694,7 @@ export default {
      *   `{ messages, hasMore, nextBefore }` 信封（带 limit 请求时后端回的形状）
      */
     const loadMessages = (conversationId, loaded) => {
+       chatSuggestions.clear()
        dropComponentPending()
        const page = Array.isArray(loaded) ? { messages: loaded, hasMore: false, nextBefore: null } : (loaded || {})
        const loadedMsgs = page.messages || []
@@ -2814,6 +2827,7 @@ export default {
     }
 
     const handleRichInput = (e) => {
+      chatSuggestions.inputChanged()
         inputPrompt.value = e.target.innerText
 
         // Sync inline tags with contextFiles ref
@@ -2940,6 +2954,15 @@ export default {
         document.execCommand('insertText', false, text)
       }
     }
+
+    const chatSuggestions = useChatSuggestions({
+      conversationId: currentConversationId, modelId: currentModelId,
+      projectId: () => props.projectId, activeFileId: () => props.activeTab?.id,
+      input: richInput, inputPrompt, streaming: isStreaming, readOnly: () => props.externalReadOnly,
+      identity: decisionAssistIdentity, onFinished: onTurnFinished,
+    })
+    const suggestionEnabled = chatSuggestions.enabled
+    const visibleSuggestion = computed(() => chatSuggestions.show.value ? chatSuggestions.suggestion.value : null)
 
     // --- Handle Enter Key ---
     const handleEnterKey = (e) => {
@@ -3201,6 +3224,10 @@ export default {
           return
         }
         handleEnterKey(e)
+        return
+      }
+      if (key === 'Tab' && !mentionOpen.value) {
+        chatSuggestions.tab(e, () => handleSubmit(followUpMode.value), mentionOpen.value)
         return
       }
       if (key === 'Tab' && pickerItem) {
@@ -4055,6 +4082,7 @@ export default {
        richInput,
        showMemoryBrowser,
        decisionAssistEnabled, toggleDecisionAssist, isLocalOnlyProvider,
+       chatSuggestions, suggestionEnabled, visibleSuggestion,
        followUpMode,
        toggleFollowUpMode,
        pendingInbox,
