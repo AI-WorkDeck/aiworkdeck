@@ -28,14 +28,14 @@ class WritingSuggestionServiceTest {
     Call call=mock(Call.class);
     ObjectMapper json=new ObjectMapper();
     WritingSuggestionService service;
-    AtomicReference<StreamingResponseHandler<AiMessage>> handler=new AtomicReference<>();
+    AtomicReference<StreamingResponseHandler<AiMessage>> handler=new AtomicReference<>(), proofHandler=new AtomicReference<>();
     Snapshot snapshot;
     @BeforeEach void setup() {
         service=new WritingSuggestionService(contexts,models,usage,json);
         snapshot=snapshot(new LitigationWritingProfile(),"原告：沈望舒\n被告：顾青原","被告：顾","");
         when(contexts.capture(eq(1L),eq(10L),any())).thenAnswer(i -> snapshot);
         when(models.getWritingModel(any())).thenReturn(model); when(models.getAutomaticWritingModel(any(),anyBoolean())).thenReturn(model); when(model.modelName()).thenReturn("synthetic-model");
-        when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {handler.set(i.getArgument(2)); return call;});
+        when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {captureHandler(i.getArgument(1),i.getArgument(2)); return call;});
     }
     @AfterEach void close() { service.close(); }
     Snapshot snapshot(WritingProfile profile,String body,String before,String selection) {
@@ -50,7 +50,8 @@ class WritingSuggestionServiceTest {
     String result(String text,String kind,Fact f) throws Exception {
         return json.writeValueAsString(Map.of("suggestions",List.of(new Advice(text,kind,List.of(f.id()),List.of(f.sourceId()),"材料所载"))));
     }
-    void complete(String raw) { handler.get().onComplete(Response.from(AiMessage.from(raw),new TokenUsage(20,10))); }
+    void captureHandler(int maxTokens,StreamingResponseHandler<AiMessage> h) { if(maxTokens==1024) proofHandler.set(h); else handler.set(h); }
+    void complete(String raw) { (raw.contains("\"correctedText\"") || raw.contains("\"error\"") ? proofHandler : handler).get().onComplete(Response.from(AiMessage.from(raw),new TokenUsage(20,10))); }
     @Test void localCompletionNeverRequestsModelOrRecordsTokens() {
         View v=start("local"); assertEquals("READY",v.status()); assertEquals("青原",v.advice().get(0).text());
         verifyNoInteractions(models,usage);
@@ -433,7 +434,7 @@ class WritingSuggestionServiceTest {
         snapshot=snapshot(new AutomaticWritingProfile(),"线上可以提交资料，现场办理可以当面核对材料。","就两种业务办理方式的区别而言，","");
         AtomicReference<String> reviewPrompt=new AtomicReference<>(),reviewInput=new AtomicReference<>();
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
-            List<ChatMessage> messages=i.getArgument(0); handler.set(i.getArgument(2));
+            List<ChatMessage> messages=i.getArgument(0); captureHandler(i.getArgument(1),i.getArgument(2));
             if((int)i.getArgument(1)==4096) {
                 reviewPrompt.set(((SystemMessage)messages.get(0)).text());
                 reviewInput.set(((UserMessage)messages.get(1)).singleText());
@@ -450,7 +451,7 @@ class WritingSuggestionServiceTest {
         assertEquals(snapshot.facts().get(0).quote(),input.path("facts").get(0).path("quote").asText());
         complete("{\"approve\":false,\"reason\":\"原文仅表示可以，候选改成需要，增强了模态强度\"}");
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
-        verify(model,times(2)).generateCancellable(anyList(),anyInt(),any());
+        verify(model,times(3)).generateCancellable(anyList(),anyInt(),any());
         verify(usage,times(2)).recordUsage(any(),any(),any(),any(),any());
     }
     @Test void independentReviewRejectsUnsupportedCausalConsequence() throws Exception {
@@ -459,7 +460,7 @@ class WritingSuggestionServiceTest {
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
         complete("{\"approve\":false,\"reason\":\"材料分散并未直接说明核对工作量增加\"}");
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
-        verify(model,times(2)).generateCancellable(anyList(),anyInt(),any());
+        verify(model,times(3)).generateCancellable(anyList(),anyInt(),any());
     }
     @Test void reviewSeesUncitedScopedFactsButNeverExcludedRawSource() throws Exception {
         String conclusion="当前材料已明确支持委员按事项查阅并办理相关工作。";
@@ -473,10 +474,10 @@ class WritingSuggestionServiceTest {
         assertEquals(2,snapshot.facts().size());
         AtomicReference<String> reviewInput=new AtomicReference<>();
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
-            handler.set(invocation.getArgument(2));
+            captureHandler(invocation.getArgument(1),invocation.getArgument(2));
             List<ChatMessage> messages=invocation.getArgument(0);
             String input=((UserMessage)messages.get(1)).singleText();
-            if(json.readTree(input).has("candidate")) reviewInput.set(input);
+            if((int)invocation.getArgument(1)==4096 && json.readTree(input).has("candidate")) reviewInput.set(input);
             return call;
         });
         View running=start("autocomplete"); complete(automaticResult(snapshot,"便于委员按事项查阅和办理。"));
@@ -529,6 +530,7 @@ class WritingSuggestionServiceTest {
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
             StreamingResponseHandler<AiMessage> h=i.getArgument(2);
             List<ChatMessage> messages=i.getArgument(0);
+            if((int)i.getArgument(1)==1024) { proofHandler.set(h); return call; }
             if(!json.readTree(((UserMessage)messages.get(1)).singleText()).has("candidate")) {
                 h.onComplete(Response.from(AiMessage.from(automaticResult(snapshot,"便于委员按事项查阅和办理。")),new TokenUsage(20,10)));
                 return generationCall;
@@ -568,7 +570,7 @@ class WritingSuggestionServiceTest {
         complete(generated); var reviewer=handler.get();
         generator.onComplete(Response.from(AiMessage.from(generated),new TokenUsage(20,10)));
         var budgets=org.mockito.ArgumentCaptor.forClass(Duration.class);
-        verify(models,times(2)).getAutomaticWritingModel(budgets.capture(),anyBoolean());
+        verify(models,times(3)).getAutomaticWritingModel(budgets.capture(),anyBoolean());
         assertTrue(budgets.getAllValues().get(0).toMillis()<=30000);
         assertTrue(budgets.getAllValues().get(1).toMillis()<=budgets.getAllValues().get(0).toMillis());
         reviewer.onError(new OpenRouterStreamingChatModel.EmptyResponseException(new TokenUsage(8,4)));
@@ -582,7 +584,7 @@ class WritingSuggestionServiceTest {
         snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
         AtomicReference<List<ChatMessage>> proofMessages=new AtomicReference<>();
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
-            handler.set(i.getArgument(2));
+            captureHandler(i.getArgument(1),i.getArgument(2));
             if((int)i.getArgument(1)==1024) proofMessages.set(i.getArgument(0));
             return call;
         });
@@ -652,26 +654,129 @@ class WritingSuggestionServiceTest {
         snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
         View running=start("autocomplete"); complete(automaticResult(snapshot,candidate));
         complete(approvedReview(snapshot,candidate,"有直接依据"));
-        handler.get().onComplete(Response.from(AiMessage.from(unchangedProofread(snapshot,candidate))));
+        proofHandler.get().onComplete(Response.from(AiMessage.from(unchangedProofread(snapshot,candidate))));
         View done=service.get(1L,10L,running.id()); assertEquals("READY",done.status());
         assertEquals(40,done.inputTokens()); assertEquals(20,done.outputTokens());
         assertEquals("partial_or_unreported",done.usageStatus());
         verify(usage,times(2)).recordUsage(any(),any(),any(),any(),any());
     }
 
+    @Test void parallelReviewNeedsBothApprovalsInEitherCompletionOrder() throws Exception {
+        snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
+        for(boolean grammarFirst:List.of(false,true)) {
+            var s=new WritingSuggestionService(contexts,models,usage,json);
+            try {
+                View running=s.start(1L,10L,new Input("autocomplete",snapshot.request()));
+                complete(automaticResult(snapshot,candidate));
+                var semantic=handler.get(); var grammar=proofHandler.get();
+                assertNotNull(semantic); assertNotNull(grammar);
+                var first=grammarFirst?grammar:semantic; var second=grammarFirst?semantic:grammar;
+                String firstText=grammarFirst?unchangedProofread(snapshot,candidate):approvedReview(snapshot,candidate,"有直接依据");
+                String secondText=grammarFirst?approvedReview(snapshot,candidate,"有直接依据"):unchangedProofread(snapshot,candidate);
+                first.onComplete(Response.from(AiMessage.from(firstText),new TokenUsage(8,4)));
+                assertEquals("RUNNING",s.get(1L,10L,running.id()).status());
+                second.onComplete(Response.from(AiMessage.from(secondText),new TokenUsage(9,5)));
+                View done=s.get(1L,10L,running.id()); assertEquals("READY",done.status());
+                assertEquals(37,done.inputTokens()); assertEquals(19,done.outputTokens());
+                first.onComplete(Response.from(AiMessage.from(firstText),new TokenUsage(8,4)));
+                second.onError(new IllegalStateException("duplicate terminal callback"));
+                assertEquals(37,s.get(1L,10L,running.id()).inputTokens());
+                assertEquals("READY",s.get(1L,10L,running.id()).status());
+            } finally { s.close(); }
+        }
+        verify(usage,times(6)).recordUsage(any(),any(),any(),any(),any());
+    }
+    @Test void rejectingEitherParallelBranchCancelsSiblingButLateUsageIsRecordedOnce() throws Exception {
+        snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
+        for(boolean grammarRejects:List.of(false,true)) {
+            Call semanticCall=mock(Call.class),grammarCall=mock(Call.class);
+            when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
+                captureHandler(i.getArgument(1),i.getArgument(2));
+                return (int)i.getArgument(1)==1024?grammarCall:semanticCall;
+            });
+            var s=new WritingSuggestionService(contexts,models,usage,json);
+            try {
+                View running=s.start(1L,10L,new Input("autocomplete",snapshot.request()));
+                complete(automaticResult(snapshot,candidate));
+                var semantic=handler.get(); var grammar=proofHandler.get();
+                var rejecting=grammarRejects?grammar:semantic; var late=grammarRejects?semantic:grammar;
+                String reject=grammarRejects?json.writeValueAsString(Map.of("correctedText","修正后的完整正文","error","搭配不当")):"{\"approve\":false}";
+                rejecting.onComplete(Response.from(AiMessage.from(reject),new TokenUsage(8,4)));
+                assertEquals("EMPTY",s.get(1L,10L,running.id()).status());
+                verify(grammarRejects?semanticCall:grammarCall).cancel();
+                String lateText=grammarRejects?approvedReview(snapshot,candidate,"有直接依据"):unchangedProofread(snapshot,candidate);
+                late.onComplete(Response.from(AiMessage.from(lateText),new TokenUsage(9,5)));
+                late.onComplete(Response.from(AiMessage.from(lateText),new TokenUsage(9,5)));
+                View done=s.get(1L,10L,running.id()); assertEquals("EMPTY",done.status()); assertTrue(done.advice().isEmpty());
+                assertEquals(37,done.inputTokens()); assertEquals("reported",done.usageStatus());
+            } finally { s.close(); }
+        }
+        verify(usage,times(6)).recordUsage(any(),any(),any(),any(),any());
+    }
+    @Test void siblingRejectedBeforeItsCallReturnsIsCancelledOnRegistration() throws Exception {
+        snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
+        Call grammarCall=mock(Call.class);
+        when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
+            if((int)i.getArgument(1)==1024) {
+                proofHandler.set(i.getArgument(2));
+                handler.get().onComplete(Response.from(AiMessage.from("{\"approve\":false}"),new TokenUsage(8,4)));
+                return grammarCall;
+            }
+            handler.set(i.getArgument(2)); return call;
+        });
+        View running=start("autocomplete"); complete(automaticResult(snapshot,candidate));
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status()); verify(grammarCall).cancel();
+        proofHandler.get().onComplete(Response.from(AiMessage.from(unchangedProofread(snapshot,candidate)),new TokenUsage(9,5)));
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
+        assertEquals(37,service.get(1L,10L,running.id()).inputTokens());
+    }
+    @Test void parallelReviewUsageFailureCancelsSiblingAndCannotRelease() throws Exception {
+        snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
+        View running=start("autocomplete"); complete(automaticResult(snapshot,candidate));
+        doThrow(new IllegalStateException("synthetic usage failure")).when(usage).recordUsage(any(),any(),any(),any(),any());
+        complete(approvedReview(snapshot,candidate,"有直接依据"));
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status()); verify(call).cancel();
+        complete(unchangedProofread(snapshot,candidate));
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
+        assertEquals("reporting_failed",service.get(1L,10L,running.id()).usageStatus());
+    }
+    @Test void secondParallelReviewCannotExceedModelCallAllowance() throws Exception {
+        snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
+        View running=start("autocomplete");
+        @SuppressWarnings("unchecked") var admissions=(Map<Long,Deque<Long>>)org.springframework.test.util.ReflectionTestUtils.getField(service,"admissions");
+        Deque<Long> times=admissions.get(1L); while(times.size()<11) times.addLast(System.currentTimeMillis());
+        complete(automaticResult(snapshot,candidate));
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status()); verify(call).cancel();
+        verify(model,times(2)).generateCancellable(anyList(),anyInt(),any());
+        verify(model,never()).generateCancellable(anyList(),eq(1024),any());
+        assertEquals(12,times.size());
+    }
+    @Test void changedModelForParallelSiblingCancelsPendingReviewWithoutCallingReplacement() throws Exception {
+        snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
+        var replacement=mock(OpenRouterStreamingChatModel.class); when(replacement.modelName()).thenReturn("different-model");
+        when(models.getAutomaticWritingModel(any(),eq(true))).thenReturn(model,replacement);
+        View running=start("autocomplete"); complete(automaticResult(snapshot,candidate));
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status()); verify(call).cancel();
+        verify(replacement,never()).generateCancellable(anyList(),anyInt(),any());
+        complete(approvedReview(snapshot,candidate,"有直接依据"));
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
+        assertEquals(40,service.get(1L,10L,running.id()).inputTokens());
+    }
     @Test void sharedDeadlineCancelsCurrentReviewAndLateApprovalStaysEmpty() throws Exception {
         snapshot=reportSnapshot(); View running=start("autocomplete");
         complete(automaticResult(snapshot,"便于委员按事项查阅和办理。"));
         var reviewer=handler.get();
         var jobs=(Map<?,?>)org.springframework.test.util.ReflectionTestUtils.getField(service,"jobs");
         Object job=jobs.get(running.id());
-        // Run the scheduled deadline action deterministically, without a 20-second test sleep.
+        // Run the shared deadline deterministically, without a 30-second test sleep.
         var deadline=(Runnable)org.springframework.test.util.ReflectionTestUtils.getField(job,"deadline");
         assertNotNull(deadline); deadline.run();
-        assertEquals("EMPTY",service.get(1L,10L,running.id()).status()); verify(call).cancel();
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status()); verify(call,times(2)).cancel();
         reviewer.onComplete(Response.from(AiMessage.from(approvedReview(snapshot,"便于委员按事项查阅和办理。","有直接依据")),new TokenUsage(8,4)));
+        proofHandler.get().onComplete(Response.from(AiMessage.from(unchangedProofread(snapshot,"便于委员按事项查阅和办理。")),new TokenUsage(9,5)));
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
         assertTrue(service.get(1L,10L,running.id()).advice().isEmpty());
+        assertEquals(37,service.get(1L,10L,running.id()).inputTokens());
     }
 
 }

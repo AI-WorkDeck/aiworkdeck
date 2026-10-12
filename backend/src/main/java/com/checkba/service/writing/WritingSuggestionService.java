@@ -52,11 +52,27 @@ public class WritingSuggestionService {
         final Snapshot snapshot; final long started=System.currentTimeMillis();
         String status="RUNNING",error="",modelId="",usageStatus="not_requested";
         Integer inputTokens,outputTokens; List<Advice> advice=List.of(); Call call; int received; long finished;
-        int automaticStage,automaticRequests,automaticUsageReports;
+        // Fixed slots: generation, semantic review, grammar review; siblings never replace each other.
+        final Call[] automaticCalls=new Call[3];
+        boolean semanticApproved,grammarApproved;
+        int automaticRequests,automaticUsageReports;
         boolean automaticMissingUsage;
         ScheduledFuture<?> deadline;
         Job(String mode,Snapshot snapshot) { this.mode=mode; this.snapshot=snapshot; }
-        synchronized void cancel(String state) { if(status.equals("RUNNING") || status.equals("READY")) { status=state; finished=System.currentTimeMillis(); advice=List.of(); automaticStage++; if(deadline!=null)deadline.cancel(false); if(call!=null)call.cancel(); } }
+        void cancel(String state) {
+            List<Call> pending=new ArrayList<>();
+            synchronized(this) {
+                if(!status.equals("RUNNING") && !status.equals("READY")) return;
+                status=state; finished=System.currentTimeMillis(); advice=List.of();
+                if(deadline!=null)deadline.cancel(false);
+                if(call!=null) { pending.add(call); call=null; }
+                for(int i=0;i<automaticCalls.length;i++) {
+                    if(automaticCalls[i]!=null) pending.add(automaticCalls[i]);
+                    automaticCalls[i]=null;
+                }
+            }
+            pending.forEach(Call::cancel);
+        }
         synchronized View view() {
             var p=snapshot.profile();
             return new View(id,status,p==null?"":p.id(),p==null?"未识别":p.label(),snapshot.facts(),snapshot.sources(),advice,
@@ -164,15 +180,19 @@ public class WritingSuggestionService {
     private void startAutomatic(Job j) {
         synchronized(j) {
             if(!j.status.equals("RUNNING")) return;
-            j.deadline=clock.schedule(() -> { synchronized(j) { if(j.status.equals("RUNNING")) j.cancel("EMPTY"); } },
+            j.deadline=clock.schedule(() -> finish(j,List.of()),
                     Math.max(1,30000-(System.currentTimeMillis()-j.started)),TimeUnit.MILLISECONDS);
         }
         try {
-            runAutomaticStage(j,List.of(SystemMessage.from(instructions(j.snapshot,j.mode)),UserMessage.from(payload(j.snapshot,j.mode))),4096,raw -> {
+            runAutomaticStage(j,0,List.of(SystemMessage.from(instructions(j.snapshot,j.mode)),UserMessage.from(payload(j.snapshot,j.mode))),4096,raw -> {
                 try {
                     List<Advice> advice=parse(j.snapshot,raw,j.mode);
                     if(advice.isEmpty()) finish(j,List.of());
-                    else reviewAutomatic(j,advice.get(0));
+                    else {
+                        Advice candidate=advice.get(0);
+                        reviewAutomatic(j,candidate);
+                        proofreadAutomatic(j,candidate,j.snapshot.context().before()+candidate.text()+j.snapshot.context().after());
+                    }
                 } catch(Exception e) { finish(j,List.of()); }
             });
         } catch(Exception e) { finish(j,List.of()); }
@@ -189,11 +209,12 @@ public class WritingSuggestionService {
                 +"存在相容反例或无法确定就counterexamplePossible=true，写明反例或不确定点，approve=false。合理、常见、可能推测不等于原文必然蕴含；不要替候选补充前提以证明它正确。"
                 +"比较或评价须有材料中的比较基线或评价依据；多个处理环节不自动证明工作量增加或效率降低。抽象只能省略细节，不能增加活动、属性、范围或更具体设施。所有并列项都须支持，可以或可能不能变成必须或已经。"
                 +"只有所有判断均被原文支持且无法构造相容反例，才counterexamplePossible=false并将counterexample设为空字符串。还须有实际写作价值：概括共同点、差异或推进当前论述；不能仅复述、机械换词或添加泛化评价。先比对材料和before已经明说的结论：已有结论即使换成更抽象的说法、弱化语气或附加正面评价，也没有新的写作价值，approve=false。reason须分别说明事实依据与新增的关系或比较维度；不能只证明候选为真就批准。"
+                +"材料分别给出多个事实或端点，不等于已经明确表达它们的共同点或差异；有据提炼尚未明说的关系可以有写作价值，不要求创造新事实。"
                 +"approve仅在事实蕴含与写作价值均满足时为true；不要输出置信概率。reviewedText仅原样复制assembledText，不润色或修正原文。";
         String input=json.writeValueAsString(Map.of("before",clean(j.snapshot.context().before()),"candidate",candidate.text(),
                 "after",clean(j.snapshot.context().after()),"facts",facts,"scopedFacts",j.snapshot.facts(),
                 "assembledText",assembled));
-        runAutomaticStage(j,List.of(SystemMessage.from(prompt),UserMessage.from(input)),4096,raw -> {
+        runAutomaticStage(j,1,List.of(SystemMessage.from(prompt),UserMessage.from(input)),4096,raw -> {
             try {
                 if(raw==null || raw.length()>4096) { finish(j,List.of()); return; }
                 JsonNode decision=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
@@ -203,8 +224,7 @@ public class WritingSuggestionService {
                         && decision.path("counterexample").isTextual() && decision.path("counterexample").asText().isEmpty()
                         && decision.path("reviewedText").isTextual() && assembled.equals(decision.path("reviewedText").asText())
                         && !decision.path("reason").asText().isBlank() && decision.path("reason").asText().length()<=240;
-                if(approved && automaticAdvice(j.snapshot,candidate) && valid(j.snapshot,candidate,100)) proofreadAutomatic(j,candidate,assembled);
-                else finish(j,List.of());
+                completeAutomaticReview(j,candidate,true,approved);
             } catch(Exception e) { finish(j,List.of()); }
         });
     }
@@ -213,75 +233,95 @@ public class WritingSuggestionService {
                 +"只检查正文内部的病句、搭配不当、成分残缺或句子结构错误，不判断事实是否有依据，不替作者补充语境或论证。片段首尾可能因上下文窗口截断，不补写或修正截断边界；只检查片段中已完整呈现的结构与连接处。"
                 +"仅输出严格JSON {\"correctedText\":\"语法正确的完整正文\",\"error\":\"发现的语法问题；没有则为空字符串\"}。"
                 +"原文语法正确时逐字照录，error为空；存在问题时给出修正后的完整正文并说明错误。无法确认语法正确时说明不确定处，不批准原文。不要只判断独立分句，必须检查全文连接处。";
-        runAutomaticStage(j,List.of(SystemMessage.from(prompt),UserMessage.from(assembled)),1024,raw -> {
+        runAutomaticStage(j,2,List.of(SystemMessage.from(prompt),UserMessage.from(assembled)),1024,raw -> {
             try {
                 if(raw==null || raw.length()>4096) { finish(j,List.of()); return; }
                 JsonNode decision=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
                 boolean unchanged=decision!=null && decision.isObject() && decision.path("correctedText").isTextual()
                         && assembled.equals(decision.path("correctedText").asText())
                         && decision.path("error").isTextual() && decision.path("error").asText().isEmpty();
-                finish(j,unchanged && automaticAdvice(j.snapshot,candidate) && valid(j.snapshot,candidate,100)?List.of(candidate):List.of());
+                completeAutomaticReview(j,candidate,false,unchanged);
             } catch(Exception e) { finish(j,List.of()); }
         });
     }
-    private void runAutomaticStage(Job j,List<ChatMessage> messages,int maxTokens,java.util.function.Consumer<String> completed) {
+    private void completeAutomaticReview(Job j,Advice candidate,boolean semantic,boolean approved) {
+        if(!approved) { finish(j,List.of()); return; }
+        boolean ready;
+        synchronized(j) {
+            if(!j.status.equals("RUNNING")) return;
+            if(semantic) j.semanticApproved=true; else j.grammarApproved=true;
+            ready=j.semanticApproved && j.grammarApproved;
+        }
+        if(ready) finish(j,automaticAdvice(j.snapshot,candidate) && valid(j.snapshot,candidate,100)?List.of(candidate):List.of());
+    }
+    private void runAutomaticStage(Job j,int stage,List<ChatMessage> messages,int maxTokens,java.util.function.Consumer<String> completed) {
         PlatformAiUserScope.run(j.snapshot.userId(),() -> {
-            final int stage;
             final long remaining;
             synchronized(j) {
                 remaining=30000-(System.currentTimeMillis()-j.started);
                 if(!j.status.equals("RUNNING")) return;
-                if(remaining<=0) { j.cancel("EMPTY"); return; }
-                stage=++j.automaticStage;
-                j.call=null;
             }
-            if(stage>1) synchronized(jobs) {
+            if(remaining<=0) { finish(j,List.of()); return; }
+            boolean admitted=true;
+            if(stage>0) synchronized(jobs) {
                 // Each review or proofreading request shares the existing model-call allowance.
                 long now=System.currentTimeMillis();
                 var times=admissions.computeIfAbsent(j.snapshot.userId(),k -> new ArrayDeque<>());
                 while(!times.isEmpty() && times.peekFirst()<now-3600000) times.removeFirst();
-                if(times.size()>=60 || times.stream().filter(t -> t>now-60000).count()>=12) { finish(j,List.of()); return; }
-                times.addLast(now);
+                admitted=times.size()<60 && times.stream().filter(t -> t>now-60000).count()<12;
+                if(admitted) times.addLast(now);
             }
+            if(!admitted) { finish(j,List.of()); return; }
             try {
-                var model=models.getAutomaticWritingModel(Duration.ofMillis(remaining),stage>1);
+                var model=models.getAutomaticWritingModel(Duration.ofMillis(remaining),stage>0);
                 String modelId=model.modelName();
+                boolean modelChanged;
                 synchronized(j) {
-                    if(!j.status.equals("RUNNING") || stage!=j.automaticStage) return;
+                    if(!j.status.equals("RUNNING")) return;
                     // A settings change between stages must not silently switch the reviewing model.
-                    if(!j.modelId.isEmpty() && !j.modelId.equals(modelId)) { finish(j,List.of()); return; }
-                    j.modelId=modelId; j.automaticRequests++;
-                    j.usageStatus=j.automaticUsageReports>0?"partial_or_unreported":"pending_or_unreported";
+                    modelChanged=!j.modelId.isEmpty() && !j.modelId.equals(modelId);
+                    if(!modelChanged) {
+                        j.modelId=modelId; j.automaticRequests++;
+                        j.usageStatus=j.automaticUsageReports>0?"partial_or_unreported":"pending_or_unreported";
+                    }
                 }
+                if(modelChanged) { finish(j,List.of()); return; }
                 AtomicBoolean settled=new AtomicBoolean();
                 Call call=model.generateCancellable(messages,maxTokens,new StreamingResponseHandler<AiMessage>() {
                     int received;
-                    public void onNext(String token) { synchronized(j) {
-                        if(stage!=j.automaticStage || !j.status.equals("RUNNING")) return;
-                        received+=token.length(); if(received>16000) j.cancel("EMPTY");
-                    } }
+                    public void onNext(String token) {
+                        boolean overflow;
+                        synchronized(j) {
+                            if(settled.get() || !j.status.equals("RUNNING")) return;
+                            received+=token.length(); overflow=received>16000;
+                        }
+                        if(overflow) finish(j,List.of());
+                    }
                     public void onComplete(Response<AiMessage> response) {
                         if(!settled.compareAndSet(false,true)) return;
+                        synchronized(j) { j.automaticCalls[stage]=null; }
                         PlatformAiUserScope.run(j.snapshot.userId(),() -> {
                             if(!recordAutomaticUsage(j,modelId,response==null?null:response.tokenUsage())) return;
-                            synchronized(j) { if(!j.status.equals("RUNNING") || stage!=j.automaticStage) return; }
+                            synchronized(j) { if(!j.status.equals("RUNNING")) return; }
                             if(response==null || response.content()==null) { finish(j,List.of()); return; }
                             try { completed.accept(response.content().text()); } catch(Exception e) { finish(j,List.of()); }
                         });
                     }
                     public void onError(Throwable error) {
                         if(!settled.compareAndSet(false,true)) return;
+                        synchronized(j) { j.automaticCalls[stage]=null; }
                         PlatformAiUserScope.run(j.snapshot.userId(),() -> {
                             recordAutomaticUsage(j,modelId,error instanceof EmptyResponseException empty?empty.tokenUsage():null);
                             finish(j,List.of());
                         });
                     }
                 });
+                boolean cancel;
                 synchronized(j) {
-                    // A synchronous callback may already have installed the next stage call.
-                    if(stage!=j.automaticStage || !j.status.equals("RUNNING")) call.cancel();
-                    else j.call=call;
+                    cancel=settled.get() || !j.status.equals("RUNNING");
+                    if(!cancel) j.automaticCalls[stage]=call;
                 }
+                if(cancel) call.cancel();
             } catch(Exception e) { finish(j,List.of()); }
         });
     }
@@ -307,7 +347,19 @@ public class WritingSuggestionService {
         return true;
     }
     private static View empty(Job j) { finish(j,List.of()); return j.view(); }
-    private static void finish(Job j,List<Advice> advice) { synchronized(j) { if(!j.status.equals("RUNNING"))return; j.advice=List.copyOf(advice); j.status=advice.isEmpty()?"EMPTY":"READY"; j.finished=System.currentTimeMillis(); if(j.deadline!=null)j.deadline.cancel(false); } }
+    private static void finish(Job j,List<Advice> advice) {
+        List<Call> pending=new ArrayList<>();
+        synchronized(j) {
+            if(!j.status.equals("RUNNING"))return;
+            j.advice=List.copyOf(advice); j.status=advice.isEmpty()?"EMPTY":"READY"; j.finished=System.currentTimeMillis();
+            if(j.deadline!=null)j.deadline.cancel(false);
+            for(int i=0;i<j.automaticCalls.length;i++) {
+                if(j.automaticCalls[i]!=null)pending.add(j.automaticCalls[i]);
+                j.automaticCalls[i]=null;
+            }
+        }
+        pending.forEach(Call::cancel);
+    }
     private static void fail(Job j,String error) { synchronized(j) { if(!j.status.equals("RUNNING"))return; j.error=error; j.status="FAILED"; j.finished=System.currentTimeMillis(); } }
     /** Called only under jobs lock; insertion order is request age. Never evict in-flight work. */
     private boolean evictOldest(Long userId) {
