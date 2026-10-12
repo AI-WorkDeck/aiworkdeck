@@ -19,6 +19,8 @@ public class ProjectAiMessageService {
             org.slf4j.LoggerFactory.getLogger(ProjectAiMessageService.class);
 
     private final ProjectAiMessageRepository repository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.repository.ChatSuggestionRepository chatSuggestions;
     private final com.checkba.service.ai.ConversationIssuanceService conversationIssuanceService;
     /** 概览页会话列表的运行状态来源：读表不读 AgentRunStateService 的内存 Map。 */
     private final com.checkba.repository.AgentRunRecordRepository agentRunRecordRepository;
@@ -789,6 +791,7 @@ public class ProjectAiMessageService {
      */
     @org.springframework.transaction.annotation.Transactional
     public void deleteConversation(String conversationId) {
+        if (chatSuggestions != null) chatSuggestions.deleteByConversationId(conversationId);
         repository.deleteByConversationId(conversationId);
     }
 
@@ -846,6 +849,7 @@ public class ProjectAiMessageService {
             throw new IllegalArgumentException("Message does not belong to conversation: " + conversationId);
         }
 
+        if (chatSuggestions != null) chatSuggestions.deleteByConversationId(conversationId);
         repository.deleteFromMessageOnwards(conversationId, message.getCreatedAt(), message.getId());
     }
 

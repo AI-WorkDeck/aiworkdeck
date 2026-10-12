@@ -250,15 +250,24 @@ public class ChatModelFactory {
 
     /** Request-scoped deadline for explicit inline review; never cache or automatically retry it. */
     public ChatLanguageModel getAuxChatModel(java.time.Duration timeout) {
+        return getChatModel(validatedAuxModelId(), timeout);
+    }
+
+    /** Bounded optional request through the user's selected provider, without fallback/retries. */
+    public ChatLanguageModel getChatModel(String modelId, java.time.Duration timeout) {
+        return getChatModel(modelId, timeout, null);
+    }
+
+    public ChatLanguageModel getChatModel(String modelId, java.time.Duration timeout, Integer maxOutputTokens) {
         if (timeout == null || timeout.isZero() || timeout.isNegative()) {
             throw new IllegalArgumentException("Auxiliary request deadline expired");
         }
         long started = System.nanoTime();
-        ResolvedTarget target = resolveTarget(validatedAuxModelId(), true);
+        ResolvedTarget target = resolveTarget(modelId, true);
         recordModelUse(target.channel().name(), target.modelId(), false);
         if (target.channel() == AiModelProperties.Provider.OLLAMA) {
             return OllamaChatModel.builder().baseUrl(resolveOllamaBaseUrl()).modelName(target.modelId())
-                    .temperature(aiModelProperties.getOllama().getTemperature())
+                    .temperature(aiModelProperties.getOllama().getTemperature()).numPredict(maxOutputTokens)
                     .timeout(remainingTimeout(timeout, started)).maxRetries(0).build();
         }
         boolean platform = target.channel() == AiModelProperties.Provider.AWD_CLOUD;
@@ -266,7 +275,7 @@ public class ChatModelFactory {
         String baseUrl = platform ? aiModelProperties.getOpenRouter().getBaseUrl() : resolveOpenRouterBaseUrl();
         return OpenAiChatModel.builder().apiKey(key).baseUrl(baseUrl).modelName(target.modelId())
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0)
-                .logRequests(false).logResponses(false).build();
+                .maxTokens(maxOutputTokens).logRequests(false).logResponses(false).build();
     }
 
     /** One explicit writing request: bounded transport, no cache, no provider fallback. */
