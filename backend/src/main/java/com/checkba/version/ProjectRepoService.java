@@ -32,8 +32,10 @@ import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
+import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
+import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -151,8 +153,7 @@ public class ProjectRepoService {
     /**
      * 版本历史在磁盘上占了多少（gitDir 递归求和；仓库不存在或读不动一律回 0）。
      * 只给 /status 展示用——律师要能看见"留底占了多少地方"才敢放心让它默认开着。
-     * 不做缓存：/status 本身已经在跑两次 {@code git add "."}（见 pendingChanges），
-     * 相比之下走一遍 gitDir 的目录项可以忽略。
+     * 只统计目录项，不读取或压缩文件内容。
      */
     public long repoSizeBytes(long projectId) {
         Path dir = gitDir(projectId);
@@ -1155,33 +1156,61 @@ public class ProjectRepoService {
     }
 
     /**
-     * 工作区相对 HEAD 的未提交变更。只读——add 到暂存区但不提交。
-     *
-     * 合并窗口（MERGING/MERGING_RESOLVED）里**一次 add 都不做**：git add 对一条冲突
-     * 路径的语义是「这个冲突我解决了」，它会把索引里的冲突记录抹掉、仓库从 MERGING
-     * 变 MERGING_RESOLVED（JGit 探针实证）。而版本面板每次挂载都会拉一次 /status、
-     * /status 的 changedCount 正是走这里——律师在三选一弹窗前刷新一下面板，就会让
-     * 随后的裁决校验空转、带 {@code <<<<<<<} 标记的半成品被提交进主线且稿分支被删，
-     * 不可逆。这一档下返回的是「还等着裁决的文件」，changedCount 在冲突窗口里的
-     * 语义就是待裁决文件数，对律师同样说得通。
+     * 工作区相对 HEAD 的未提交变更，绝不写索引或对象库。
+     * 常见状态直接从只读 status 归类；只有暂存与工作区交叠的路径才比较 HEAD，
+     * 避免把「暂存后还原原文」误报成修改，也避免给未跟踪的大文件计算内容哈希。
+     * 合并窗口沿用待裁决文件数语义，不能把查询当作解决冲突的 git add。
      */
     public List<FileChange> pendingChanges(long projectId) {
-        List<FileChange> out = new ArrayList<>();
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            Status st = git.status().call();
             RepositoryState state = repo.getRepositoryState();
             if (state == RepositoryState.MERGING || state == RepositoryState.MERGING_RESOLVED) {
-                for (String p : git.status().call().getConflicting().stream().sorted().toList()) {
-                    out.add(new FileChange(p, FileChange.Type.MODIFY));
-                }
-                return out;
+                return st.getConflicting().stream().sorted()
+                        .map(p -> new FileChange(p, FileChange.Type.MODIFY)).toList();
             }
-            git.add().addFilepattern(".").call();
-            git.add().addFilepattern(".").setUpdate(true).call();
-            Status st = git.status().call();
-            for (String p : st.getAdded()) out.add(new FileChange(p, FileChange.Type.ADD));
-            for (String p : st.getChanged()) out.add(new FileChange(p, FileChange.Type.MODIFY));
-            for (String p : st.getRemoved()) out.add(new FileChange(p, FileChange.Type.DELETE));
-            return out;
+            Map<String, FileChange.Type> changes = new java.util.TreeMap<>();
+            for (String p : st.getUntracked()) changes.put(p, FileChange.Type.ADD);
+            for (String p : st.getAdded()) {
+                if (!st.getMissing().contains(p)) changes.put(p, FileChange.Type.ADD);
+            }
+            for (String p : st.getChanged()) changes.put(p, FileChange.Type.MODIFY);
+            for (String p : st.getModified()) {
+                if (!st.getAdded().contains(p)) changes.put(p, FileChange.Type.MODIFY);
+            }
+            for (String p : st.getMissing()) {
+                if (!st.getAdded().contains(p)) changes.put(p, FileChange.Type.DELETE);
+            }
+            for (String p : st.getRemoved()) changes.put(p, FileChange.Type.DELETE);
+
+            Set<String> mixed = new LinkedHashSet<>(st.getChanged());
+            mixed.retainAll(st.getModified());
+            // rm --cached 后文件可能仍在磁盘，且可能被 ignore，不只看 untracked。
+            for (String p : st.getRemoved()) {
+                if (Files.exists(repo.getWorkTree().toPath().resolve(p), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    mixed.add(p);
+                }
+            }
+            if (!mixed.isEmpty()) {
+                mixed.forEach(changes::remove);
+                try (ObjectReader reader = repo.newObjectReader()) {
+                    CanonicalTreeParser head = new CanonicalTreeParser();
+                    head.reset(reader, repo.resolve("HEAD^{tree}"));
+                    for (DiffEntry entry : git.diff().setOldTree(head)
+                            .setNewTree(new FileTreeIterator(repo))
+                            .setPathFilter(PathFilterGroup.createFromStrings(mixed)).call()) {
+                        boolean deleted = entry.getChangeType() == DiffEntry.ChangeType.DELETE;
+                        changes.put(deleted ? entry.getOldPath() : entry.getNewPath(),
+                                switch (entry.getChangeType()) {
+                                    case ADD, COPY -> FileChange.Type.ADD;
+                                    case DELETE -> FileChange.Type.DELETE;
+                                    default -> FileChange.Type.MODIFY;
+                                });
+                    }
+                }
+            }
+            return changes.entrySet().stream()
+                    .map(e -> new FileChange(e.getKey(), e.getValue())).toList();
         } catch (Exception e) {
             throw new VersionException("读取未提交变更失败: project=" + projectId, e);
         }

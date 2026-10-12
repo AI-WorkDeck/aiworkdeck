@@ -10,8 +10,11 @@
 # 同一网段（办公 wifi、酒店、客户现场）的任何人都能注册账号并直接拿到管理员权限。
 server:
   address: 127.0.0.1
+  shutdown: graceful
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     driver-class-name: org.h2.Driver
     # H2 文件库：~/.aiworkdeck/local.mv.db
@@ -21,6 +24,10 @@ spring:
     url: jdbc:h2:file:${user.home}/.aiworkdeck/local;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE;AUTO_SERVER=TRUE
     username: sa
     password:
+    hikari:
+      # Fail promptly when the pool is exhausted; the desktop supervisor probes the same pool.
+      connection-timeout: 2000
+      validation-timeout: 1000
   jpa:
     hibernate:
       ddl-auto: update

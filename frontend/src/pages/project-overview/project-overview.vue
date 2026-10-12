@@ -2292,6 +2292,7 @@
         <view class="status-dot" :class="collabTone"></view>
         <text>{{ collabStateText }}</text>
       </view>
+      <BackendHealthStatus />
       <MobileBackupConsent v-if="isDesktopApp" />
       <MobileReceiveStatus v-if="isDesktopApp" :project-id="hasNamedProject ? projectId : null" @received="onVersionReloadFiles([])" />
       <view class="status-spacer"></view>
@@ -2508,6 +2509,7 @@ import WelcomePane from '@/components/welcome/WelcomePane.vue'
 import AccountEntry from '@/components/account/AccountEntry.vue'
 import OptionalComponentsDialog from '@/components/OptionalComponentsDialog.vue'
 import MobileReceiveStatus from '@/components/MobileReceiveStatus.vue'
+import BackendHealthStatus from '@/components/BackendHealthStatus.vue'
 import MobileBackupConsent from '@/components/MobileBackupConsent.vue'
 import {
   shouldPromptOptionalComponents,
@@ -2538,6 +2540,7 @@ export default {
     }
   },
   components: {
+    BackendHealthStatus,
     MobileReceiveStatus,
     MobileBackupConsent,
     LibreOfficeEditor,
