@@ -56,3 +56,9 @@
 
 .irp-scope { display: block; margin-top: 8px; font-size: 11px; line-height: 1.6; color: var(--awd-text-2); }
 .irp-scope.warn { color: var(--awd-danger-text); }
+
+.irp-autocomplete { padding: var(--awd-space-2) var(--awd-space-3); border-bottom: 1px solid var(--awd-border); }
+.irp-autocomplete-row { display: flex; align-items: center; justify-content: space-between; gap: var(--awd-space-2); font-size: var(--awd-font-size-body); }
+.irp-autocomplete-row button { margin: 0; padding: var(--awd-space-1) var(--awd-space-2); line-height: var(--awd-line-height-ui); background: transparent; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-md); }
+.irp-autocomplete-row button::after { border: 0; }
+.irp-autocomplete-error { display: block; color: var(--awd-danger-text); font-size: var(--awd-font-size-body); }

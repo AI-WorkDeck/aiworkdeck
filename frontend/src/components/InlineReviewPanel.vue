@@ -20,6 +20,17 @@
       </view>
     </view>
 
+    <view v-if="autocomplete && autocomplete.available" class="irp-autocomplete">
+      <view class="irp-autocomplete-row">
+        <text>{{ $t(autocomplete.enabled ? 'editor.inlineReview.autocompleteOn' : 'editor.inlineReview.autocompleteOff') }}</text>
+        <button type="button" class="irp-act sw" :aria-pressed="autocomplete.enabled" @tap="toggleAutocomplete">
+          {{ $t(autocomplete.enabled ? 'editor.inlineReview.autocompleteDisable' : 'editor.inlineReview.autocompleteEnable') }}
+        </button>
+      </view>
+      <text class="irp-note">{{ $t('editor.inlineReview.autocompleteHint') }}</text>
+      <text v-if="autocomplete.error" class="irp-autocomplete-error" role="status">{{ $t('editor.inlineReview.preferenceFailed') }}</text>
+    </view>
+
     <!-- 分类：计数恒按未筛选的全量算（切分类不变），与审阅标签上的数字同源。 -->
     <view class="irp-tabs">
       <text v-for="b in BUCKETS" :key="b" class="irp-tab" :class="{ on: bucket === b }" @tap="bucket = b">
@@ -105,6 +116,7 @@ export default {
     // 宿主 inlineReviewHost 最近一次 publish 的状态快照。null = 这份文档没有审校
     // （非 Writer / 未就绪 / 没有项目），此时标签与面板都不该出现。
     state: { type: Object, default: null },
+    autocomplete: { type: Object, default: null },
     // LibreOffice executor（executeCommand(action, params)）。
     executor: { type: Object, default: null },
   },
@@ -213,6 +225,10 @@ export default {
     },
     refresh() { if (!this.checking) this.$emit('action', { action: 'refresh' }) },
     runDeep() { if (!this.deepBusy) this.$emit('action', { action: 'deep' }) },
+    toggleAutocomplete() {
+      if (!this.autocomplete?.available) return
+      this.$emit('action', { action: 'autocomplete', value: !this.autocomplete.enabled, session: this.autocomplete.session })
+    },
     toggleAi() { this.$emit('action', { action: 'ai', value: !this.aiEnabled }) },
     toggleBall() { this.$emit('action', { action: 'hidden', value: !this.ballCollapsed }) },
   },

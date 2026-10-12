@@ -113,3 +113,34 @@ test('对外文案两语言都不再有「写作辅助」', () => {
   assert.equal(JSON.stringify(zh).includes('写作辅助'), false)
   assert.equal(JSON.stringify(en).includes('Writing assistance'), false)
 })
+
+
+test('共享菜单只接受当前审校与写作会话，面板也校验写作会话', () => {
+  const { vm, emit } = wire()
+  const calls = []
+  vm._inlineReviewHost = { session: 'review-current', handle: m => calls.push(m) }
+  vm._writingHost = { session: 'writing-current', setEnabled: v => { calls.push(v); return true } }
+  const request = (review, writing, enabled) => emit({ __lo: 'lo-relay', type: 'inline-review-request',
+    session: review, action: 'autocomplete', data: { writingSession: writing, enabled } })
+  request('review-old', 'writing-current', false)
+  request('review-current', 'writing-old', false)
+  request('review-current', 'writing-current', 'false')
+  assert.deepEqual(calls, [])
+  request('review-current', 'writing-current', false)
+  assert.deepEqual(calls, [false])
+  vm.onInlineReviewAction({ action: 'autocomplete', session: 'writing-old', value: true })
+  assert.deepEqual(calls, [false])
+  vm.onInlineReviewAction({ action: 'autocomplete', session: 'writing-current', value: true })
+  assert.deepEqual(calls, [false, true])
+})
+
+test('宿主偏好回报同时更新右侧面板与共享菜单，不借设置面板开合推断', () => {
+  const { vm, sent } = wire()
+  const state = { session: 'writing', available: true, enabled: false, learning: true, hints: true, error: '' }
+  vm.onAutocompleteState(state)
+  assert.deepEqual(vm.writingAssistanceState, state)
+  assert.deepEqual(sent.at(-1), { __lo: 'lo-relay', type: 'writing-assistance-preferences-state', ...state })
+  assert.equal(vm.writingAssistanceOpen, false)
+  vm.initWritingAssistance()
+  assert.equal(vm.writingAssistanceState, null)
+})
