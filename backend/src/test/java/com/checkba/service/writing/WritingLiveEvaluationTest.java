@@ -28,6 +28,7 @@ class WritingLiveEvaluationTest {
     @Test void evaluateFrozenSyntheticCases() throws Exception {
         String key=System.getenv("OPENROUTER_API_KEY"), model=System.getenv("WRITING_EVAL_MODEL");
         String reasoningEffort=System.getenv("WRITING_EVAL_REASONING_EFFORT");
+        String generationReasoningEffort=System.getenv("WRITING_EVAL_GENERATION_REASONING_EFFORT");
         assertNotNull(key); assertNotNull(model);
         var general=new AutomaticWritingProfile(); var lit=new LitigationWritingProfile(); var contract=new ContractWritingProfile(); var diligence=new DiligenceWritingProfile();
         String loan="民事起诉状\n原告：沈望舒\n被告：顾青原\n借款本金：人民币360000元\n原告主张：被告尚欠本金360000元。";
@@ -104,7 +105,7 @@ class WritingLiveEvaluationTest {
                     Map<String,String> phaseResponses=new ConcurrentHashMap<>(), phaseErrors=new ConcurrentHashMap<>();
                     Map<String,Integer> phaseOutputTokens=new ConcurrentHashMap<>();
                     var wire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,reasoningEffort);
-                    var generationWire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35));
+                    var generationWire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,generationReasoningEffort);
                     var observed=mock(OpenRouterStreamingChatModel.class); when(observed.modelName()).thenReturn(model);
                     when(observed.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
                         StreamingResponseHandler<AiMessage> original=invocation.getArgument(2);
@@ -152,7 +153,7 @@ class WritingLiveEvaluationTest {
                         Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("outcome",outcome); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens));
                         synchronized(report) {
                             report.add(row); report.sort(reportOrder);
-                            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("model",model,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"cases",report)));
+                            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"cases",report)));
                         }
                         System.out.println("Writing synthetic eval "+c.name+": "+view.status()+", pass="+passed+", elapsedMs="+view.elapsedMs());
                     }
@@ -172,7 +173,7 @@ class WritingLiveEvaluationTest {
         assertFalse(futures.isEmpty(),"No evaluation cases selected; check WRITING_EVAL_AUTOMATIC");
         synchronized(report) {
             report.sort(reportOrder);
-            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("model",model,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"cases",report)));
+            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"cases",report)));
         }
         assertEquals(futures.size(),report.size(),"Every selected evaluation must produce a report row");
         if ("1".equals(System.getenv("WRITING_EVAL_AUTOMATIC")) && onlyCase.isEmpty())
