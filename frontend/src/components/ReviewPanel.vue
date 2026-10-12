@@ -60,6 +60,7 @@
       v-if="!isMerge && inlineReview"
       v-show="tab === 'chk'"
       :state="inlineReview"
+      :autocomplete="autocomplete"
       :executor="executor"
       @count="inlineReviewCount = $event"
       @changed="$emit('changed')"
@@ -326,6 +327,7 @@ export default {
     // 即时审校的状态快照（inlineReviewHost 的 publish）。null = 这份文档没有审校，
     // 「审校」标签整个不出现。
     inlineReview: { type: Object, default: null },
+    autocomplete: { type: Object, default: null },
   },
   data() {
     return {
