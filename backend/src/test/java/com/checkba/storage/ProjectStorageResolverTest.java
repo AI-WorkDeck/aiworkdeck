@@ -156,6 +156,22 @@ class ProjectStorageResolverTest {
         assertTrue(r.projectSizeLimitMessage().contains("10MB"));
     }
 
+    @Test
+    void standaloneOriginalsUseTheDesktopStorageExemption(@TempDir Path root) {
+        StorageProperties p = props(root);
+        p.setProjectSizeLimit(org.springframework.util.unit.DataSize.ofBytes(10));
+        ProjectRepository repo = mock(ProjectRepository.class);
+        Project loose = new Project(); loose.setId(7L); loose.setProjectType(Project.LOOSE_FILES);
+        when(repo.findById(7L)).thenReturn(Optional.of(loose));
+        ProjectStorageResolver limited = new ProjectStorageResolver(p, repo);
+        assertTrue(limited.exceedsProjectSizeLimit(7L, 20L, 1L));
+        p.setExemptLocalFolderProjects(true);
+        ProjectStorageResolver desktop = new ProjectStorageResolver(p, repo);
+        assertFalse(desktop.hasLocalRoot(7L));
+        assertFalse(desktop.exceedsProjectSizeLimit(7L, 20L, 1L));
+        assertTrue(desktop.exceedsProjectSizeLimit(99L, 20L, 1L));
+    }
+
     /** 配置接线：桌面 profile 开豁免，基础配置 20GB 且 multipart 引用同一个值；云端/案件库不开豁免。 */
     @Test
     void profilesWireTheSizeLimit() throws Exception {

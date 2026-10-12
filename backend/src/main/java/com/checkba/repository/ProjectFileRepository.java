@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> {
+    Optional<ProjectFile> findFirstByProjectIdAndExternalPathAndIsDeletedFalse(Long projectId, String externalPath);
+
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("UPDATE ProjectFile p SET p.uid = :uid WHERE p.id = :id AND ((:previous IS NULL AND p.uid IS NULL) OR p.uid = :previous)")
     int assignCatalogUidIfUnchanged(Long id, String previous, String uid);

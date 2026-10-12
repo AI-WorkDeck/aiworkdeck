@@ -75,15 +75,13 @@ export default {
     if (host.menu && host.menu.onAction) {
       host.menu.onAction(async (data) => {
         if (!data || data.action !== 'open-path' || !data.path) return
-        if (!getSessionId()) {
-          uni.showToast({ title: this.$t('shell.pleaseLoginFirst'), icon: 'none' })
-          return
-        }
         try {
           if (data.isDirectory) await openLocalRootPath(data.path)
           else await openLocalFilePath(data.path)
         } catch (e) {
           uni.showToast({ title: (e && e.message) || this.$t('shell.menuActionFailed'), icon: 'none' })
+        } finally {
+          if (data.requestId) host.menu?.ackOpenPath?.(data.requestId)
         }
       })
     }
@@ -105,7 +103,7 @@ export default {
           e.stopPropagation()
           const path = host.fs.getPathForFile(e.dataTransfer.files[0])
           if (!path) return
-          if (!getSessionId()) {
+          if (!isDesktopHost() && !getSessionId()) {
             uni.showToast({ title: this.$t('shell.pleaseLoginFirst'), icon: 'none' })
             return
           }

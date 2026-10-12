@@ -194,6 +194,17 @@ class DesktopRefHandlerTest {
     }
 
     @Test
+    void standaloneFilesAreNotAvailableThroughMobileReferenceRequests() {
+        Project project = projectRepository.findById(projectId).orElseThrow();
+        project.setProjectType(Project.LOOSE_FILES);
+        projectRepository.save(project);
+        assertThat(entries(handler.handle(req("LIST", Map.of("projectKey", "*"))))).isEmpty();
+        assertThat(handler.handle(req("LIST", Map.of("projectKey", projectId.toString())))).containsEntry("ok", false);
+        assertThat(handler.handle(req("READ", Map.of("projectKey", projectId.toString(), "path", "说明.txt"))))
+                .containsEntry("ok", false);
+    }
+
+    @Test
     @DisplayName("READ：按清单里的同一条路径解析回同一行并抽出文字")
     void readExtractsText() {
         Map<String, Object> out = handler.handle(req("READ",

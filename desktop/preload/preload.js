@@ -232,6 +232,9 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
       ipcRenderer.on('checkba:menu-action', listener)
       return () => ipcRenderer.removeListener('checkba:menu-action', listener)
     },
+    // 工作台挂载并可接文件后 ready；每条成功或已展示错误后 ack，不能提前确认。
+    openPathsReady: () => ipcRenderer.send('checkba:open-paths-ready'),
+    ackOpenPath: (requestId) => ipcRenderer.send('checkba:open-path-ack', requestId),
     setState: (payload) => ipcRenderer.send('checkba:menu-state', payload)
   },
   // 应用语言（zh-CN/en-US）：渲染层是权威源，启动与切换时推给主进程

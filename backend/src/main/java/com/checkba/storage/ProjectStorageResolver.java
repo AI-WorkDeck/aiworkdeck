@@ -37,6 +37,8 @@ public class ProjectStorageResolver {
     private static final Pattern PROJECT_KEY = Pattern.compile("^projects/(\\d+)(?:/(.*))?$");
 
     private final ProjectRepository projectRepository;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.repository.ProjectFileRepository projectFileRepository;
     /**
      * 全局存储根。可在运行期被 {@code StorageLocationService} 改写（用户自选存储位置，PR-C），
      * 故为 volatile：迁移线程写、各业务线程读。
@@ -64,7 +66,7 @@ public class ProjectStorageResolver {
      * 开了 {@code storage.exempt-local-folder-projects} 时，本机文件夹项目永不超限。
      */
     public boolean exceedsProjectSizeLimit(long projectId, Long currentTotal, long incomingBytes) {
-        if (exemptLocalFolderProjects && hasLocalRoot(projectId)) {
+        if (exemptLocalFolderProjects && (hasLocalRoot(projectId) || isLooseFileWorkspace(projectId))) {
             return false;
         }
         return currentTotal != null && currentTotal + incomingBytes > projectSizeLimitBytes;
@@ -142,6 +144,20 @@ public class ProjectStorageResolver {
         return localRoot(projectId).isPresent();
     }
 
+    public boolean isLooseFileWorkspace(long projectId) {
+        return projectRepository != null && projectRepository.findById(projectId)
+                .map(Project::isLooseFileWorkspace).orElse(false);
+    }
+
+    /** Only a registered exact key can reach a loose file. Sibling paths grant no access. */
+    public boolean isExternalFileKey(String storageKey) {
+        if (storageKey == null) return false;
+        Matcher matcher = PROJECT_KEY.matcher(storageKey.replace('\\', '/'));
+        return matcher.matches() && matcher.group(2) != null
+                && matcher.group(2).startsWith("loose/")
+                && isLooseFileWorkspace(Long.parseLong(matcher.group(1)));
+    }
+
     /** localRoot 变更（重新定位/新建）后必须调用，否则解析继续走旧缓存。 */
     public void invalidate(long projectId) {
         localRootCache.remove(projectId);
@@ -157,6 +173,27 @@ public class ProjectStorageResolver {
         }
         String normalized = storageKey.replace('\\', '/');
         Matcher m = PROJECT_KEY.matcher(normalized);
+        if (isExternalFileKey(normalized)) {
+            if (projectFileRepository == null) throw new StorageException("本机文件映射不可用");
+            long projectId = Long.parseLong(normalized.split("/", 3)[1]);
+            var files = projectFileRepository.findByProjectIdAndFilePathAndIsDeletedFalse(projectId, normalized);
+            var file = files.stream().filter(f -> StringUtils.hasText(f.getExternalPath())).findFirst()
+                    .orElseThrow(() -> new StorageException("未登记的本机文件路径"));
+            Path external = Paths.get(file.getExternalPath());
+            if (!external.isAbsolute()) {
+                throw new StorageException("本机文件位置已变化，请重新打开文件");
+            }
+            try {
+                // Check all path components, including a parent directory replaced by a symlink.
+                if (java.nio.file.Files.exists(external, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                        && !external.toRealPath().equals(external)) {
+                    throw new StorageException("本机文件位置已变化，请重新打开文件");
+                }
+            } catch (java.io.IOException e) {
+                throw new StorageException("无法读取原文件，请重新打开文件", e);
+            }
+            return external;
+        }
         Path base;
         String remainder;
         if (m.matches()) {

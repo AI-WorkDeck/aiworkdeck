@@ -11,7 +11,7 @@ export const panelSwitchingMethods = {
       // 无项目态（dev-board#1047）：只有全局面板能开。项目面板不挂载——它们带着
       // projectId=null 空转会打出 /api/projects/null/... 请求。菜单 / 命令面板 / 旧存量值
       // 都可能把一个项目面板的 key 送进来，这里是唯一的闸。
-      if (!this.hasProject && !isPaneAllowedWithoutProject(key)) return
+      if ((!this.hasProject || this.isLooseWorkspace) && !isPaneAllowedWithoutProject(key)) return
       // 埋点：三分支语义分开记（staging 特殊 / 同 key 收展 / 异 key 真切换），
       // 否则「切面板」数会被「折叠侧栏」污染
       track('ui.nav', {

@@ -3,9 +3,20 @@
 // IDE 化「打开文件夹 / 打开文件」共用流程：系统对话框 → open-local API → reLaunch 进项目。
 // newproject 页与应用菜单（App.vue 的 menu-action 处理器）共用，两处只差 busy UI。
 
-import { openLocalProject } from '@/services/api.js'
+import { openLocalProject, openLocalFile } from '@/services/api.js'
 import { host } from '@/services/host.js'
 import { t } from '@/i18n'
+import { createLocalOpenCoordinator } from './localOpenCoordinator.js'
+
+const coordinator = createLocalOpenCoordinator({
+  openFile: openLocalFile,
+  navigate: (url) => new Promise((resolve, reject) => uni.reLaunch({ url, success: resolve, fail: reject })),
+  ready: () => host.menu?.openPathsReady?.(),
+  failedMessage: () => t('common.openProjectFailed'),
+})
+
+export function registerOpenWorkbench(vm) { coordinator.register(vm) }
+export function unregisterOpenWorkbench(vm) { coordinator.unregister(vm) }
 
 export function desktopFsApi() {
   return (host.fs && host.fs.showOpenDialog) ? host.fs : null
@@ -38,9 +49,7 @@ async function launchProject(payload) {
       showCancel: false,
     })
   }
-  const query = `id=${d.projectId}` + (d.openFileId ? `&openFileId=${d.openFileId}` : '')
-  // reLaunch：避免页面栈里堆叠多个 project-overview 实例（全局监听多实例地雷）
-  uni.reLaunch({ url: `/pages/project-overview/project-overview?${query}` })
+  return !!(await coordinator.enter(d.projectId, false))
 }
 
 /** 打开文件夹… 返回 true=已发起导航，false=用户取消。异常上抛由调用方 toast。 */
@@ -53,52 +62,40 @@ export async function openFolderFlow() {
     properties: ['openDirectory', 'createDirectory'],
   })
   if (!res || res.canceled || !res.filePaths || !res.filePaths.length) return false
-  await launchProject({ localRoot: res.filePaths[0] })
-  return true
+  return coordinator.enqueue(() => launchProject({ localRoot: res.filePaths[0] }))
 }
 
-/** 打开文件…（单文件过渡版：以所在文件夹入项目并打开该文件）。 */
+/** 打开文件：仅登记所选文件，多选按顺序追加标签。 */
 export async function openFileFlow() {
   const fs = desktopFsApi()
   if (!fs) return false
   const res = await fs.showOpenDialog({
     title: t('common.openFile'),
     buttonLabel: t('common.open'),
-    properties: ['openFile'],
+    properties: ['openFile', 'multiSelections'],
   })
-  if (!res || res.canceled || !res.filePaths || !res.filePaths.length) return false
-  const filePath = res.filePaths[0]
-  const idx = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'))
-  if (idx <= 0) {
-    throw new Error(t('common.cannotResolveParentFolder'))
+  if (!res || res.canceled || !res.filePaths?.length) return false
+  for (const filePath of res.filePaths) {
+    if (!await openLocalFilePath(filePath)) return false
   }
-  await launchProject({
-    localRoot: filePath.slice(0, idx),
-    openFileName: filePath.slice(idx + 1),
-  })
   return true
 }
 
 /** 把一个绝对路径的文件夹直接作为项目打开（拖放/Dock/Finder 打开方式入口）。 */
 export async function openLocalRootPath(absPath) {
   if (!absPath) return false
-  await launchProject({ localRoot: absPath })
-  return true
+  return coordinator.enqueue(() => launchProject({ localRoot: absPath }))
 }
 
-/** 把一个绝对路径的文件打开（以所在文件夹入项目并打开该文件）。 */
+/** 与系统打开方式共用，原文件保留在原位置。 */
 export async function openLocalFilePath(absPath) {
   if (!absPath) return false
-  const idx = Math.max(absPath.lastIndexOf('/'), absPath.lastIndexOf('\\'))
-  if (idx <= 0) throw new Error(t('common.cannotResolveParentFolder'))
-  await launchProject({ localRoot: absPath.slice(0, idx), openFileName: absPath.slice(idx + 1) })
-  return true
+  return coordinator.open(absPath)
 }
 
 /** 新建项目文件夹…（命名弹窗在 newproject 页里，菜单入口跳过去自动触发）。 */
 export async function createFolderFlow(parentDir, name) {
   const sep = parentDir.includes('\\') && !parentDir.includes('/') ? '\\' : '/'
   const localRoot = parentDir.replace(/[\\/]+$/, '') + sep + name.trim()
-  await launchProject({ localRoot, createFolder: true, name: name.trim() })
-  return true
+  return coordinator.enqueue(() => launchProject({ localRoot, createFolder: true, name: name.trim() }))
 }
