@@ -188,6 +188,59 @@ class WritingModelTransportTest {
             assertFalse(new ObjectMapper().readTree(body.get()).has("reasoning"));
         }
     }
+    @Test void boundedReviewPreservesExplicitLowReasoningForFlash() throws Exception {
+        serve();
+        var review = new OpenRouterStreamingChatModel("synthetic-key", url(), "qwen/qwen3.7-flash",
+                Duration.ofSeconds(2), 5, "low");
+        Collector c = new Collector();
+        review.generateCancellable(List.of(UserMessage.from("synthetic review")), 4096, c); c.await();
+        assertNull(c.error.get());
+        var request = new ObjectMapper().readTree(body.get());
+        assertEquals(4096, request.path("max_tokens").asInt());
+        assertEquals("low", request.path("reasoning").path("effort").asText());
+        assertFalse(request.path("reasoning").has("enabled"));
+    }
+    @Test void absentBudgetPreservesLegacyConstructorRequestBytes() throws Exception {
+        serve();
+        for (String name : List.of("qwen/qwen3.7-flash", "openai/gpt-4o")) {
+            var legacy = model(name, Duration.ofSeconds(2));
+            var explicitNull = new OpenRouterStreamingChatModel("synthetic-key", url(), name,
+                    Duration.ofSeconds(2), OpenRouterStreamingChatModel.DEFAULT_MAX_REQUESTS_PER_HOST, null, null, null);
+            List<ChatMessage> messages = List.of(UserMessage.from("synthetic"));
+            Collector first = new Collector(); legacy.generate(messages, first); first.await();
+            String normalBody = body.get();
+            Collector second = new Collector(); explicitNull.generate(messages, second); second.await();
+            assertEquals(normalBody, body.get());
+            Collector third = new Collector(); legacy.generateCancellable(messages, 512, third); third.await();
+            String writingBody = body.get();
+            Collector fourth = new Collector(); explicitNull.generateCancellable(messages, 512, fourth); fourth.await();
+            assertEquals(writingBody, body.get());
+        }
+    }
+    @Test void explicitReasoningBudgetCannotBeCombinedWithEffort() {
+        assertThrows(IllegalArgumentException.class, () -> new OpenRouterStreamingChatModel("synthetic-key", url(),
+                "qwen/qwen3.7-flash", Duration.ofSeconds(2), 5, "low", null, 256));
+        assertEquals(0, requests.get());
+    }
+    @Test void reviewFactoryUsesByokAndPlatformCredentialPaths() throws Exception {
+        serve();
+        AiModelProperties props = new AiModelProperties();
+        props.getOpenRouter().setBaseUrl(url()); props.getOpenRouter().setApiKey("synthetic-byok");
+        var platform = mock(PlatformAiChannel.class); when(platform.apiKey()).thenReturn("synthetic-platform");
+        for (String provider : List.of("OPENROUTER", "AWD_CLOUD")) {
+            var review = factory(provider, props, platform, provider.equals("OPENROUTER") ? url() : "http://127.0.0.1:1/untrusted")
+                    .getWritingReviewModel(Duration.ofSeconds(2));
+            Collector c = new Collector();
+            review.generateCancellable(List.of(UserMessage.from("synthetic review")), 4096, c); c.await();
+            assertNull(c.error.get());
+            assertEquals(provider.equals("OPENROUTER") ? "Bearer synthetic-byok" : "Bearer synthetic-platform", auth.get());
+            var request = new ObjectMapper().readTree(body.get());
+            assertEquals("qwen/qwen3.7-flash", request.path("model").asText());
+            assertEquals(256, request.path("reasoning").path("max_tokens").asInt());
+            assertFalse(request.path("reasoning").has("effort"));
+            assertFalse(request.path("reasoning").has("enabled"));
+        }
+    }
     @Test void boundedWritingNeverLogsMalformedProviderContent() throws Exception {
         String secret = "SYNTHETIC_PRIVATE_MATERIAL_042";
         server.createContext("/chat/completions", ex -> {

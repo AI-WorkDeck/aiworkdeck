@@ -99,6 +99,8 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
     private final boolean splitVolatile;
     /** 思考强度；null = 请求体不带 reasoning 字段（dev-board#1061）。 */
     private final String reasoningEffort;
+    /** Explicit reasoning budget for bounded review; mutually exclusive with effort. */
+    private final Integer reasoningMaxTokens;
     /** 供应商路由偏好；null = 请求体不带 provider 字段（dev-board#1061）。 */
     private final ProviderRouting providerRouting;
 
@@ -166,7 +168,17 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
     public OpenRouterStreamingChatModel(String apiKey, String baseUrl, String modelName, Duration timeout,
                                         int maxRequestsPerHost, String reasoningEffort,
                                         ProviderRouting providerRouting) {
+        this(apiKey, baseUrl, modelName, timeout, maxRequestsPerHost, reasoningEffort, providerRouting, null);
+    }
+
+    public OpenRouterStreamingChatModel(String apiKey, String baseUrl, String modelName, Duration timeout,
+                                        int maxRequestsPerHost, String reasoningEffort,
+                                        ProviderRouting providerRouting, Integer reasoningMaxTokens) {
         this.reasoningEffort = reasoningEffort == null || reasoningEffort.isBlank() ? null : reasoningEffort.trim();
+        if (reasoningMaxTokens != null && (reasoningMaxTokens <= 0 || this.reasoningEffort != null)) {
+            throw new IllegalArgumentException("Reasoning token budget must be positive and cannot be combined with effort");
+        }
+        this.reasoningMaxTokens = reasoningMaxTokens;
         this.providerRouting = providerRouting;
         this.apiKey = apiKey;
         this.modelName = modelName;
@@ -195,6 +207,10 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
     /** 本实例注入的思考强度；null = 不注入（给工厂接线测试用）。 */
     String reasoningEffort() {
         return reasoningEffort;
+    }
+
+    Integer reasoningMaxTokens() {
+        return reasoningMaxTokens;
     }
 
     /** 本实例的供应商路由偏好；null = 不注入（给工厂接线测试用）。 */
@@ -304,16 +320,22 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         if (explicitPromptCache) {
             body = markSystemForCaching(body);
         }
-        if (reasoningEffort != null) {
+        if (reasoningMaxTokens != null) {
+            try {
+                ObjectNode review = (ObjectNode) LENIENT.readTree(body);
+                review.set("reasoning", LENIENT.createObjectNode().put("max_tokens", reasoningMaxTokens));
+                body = LENIENT.writeValueAsString(review);
+            } catch (IOException e) { throw new IllegalStateException("Cannot encode review reasoning budget", e); }
+        } else if (reasoningEffort != null) {
             body = withReasoningEffort(body, reasoningEffort);
         }
         // 写作通道（maxOutputTokens 非 null）不带路由偏好：那条路是 qwen 单供应商，且不做重发
         if (providerRouting != null && maxOutputTokens == null) {
             body = withProviderRouting(body, providerRouting);
         }
-        // Verified Flash writing must not spend its small output budget on hidden reasoning.
+        // Default Flash writing keeps its small budget for output; explicit review reasoning is preserved.
         // Other Qwen endpoints can require reasoning; leave every unverified model at its default.
-        if (maxOutputTokens != null && "qwen/qwen3.7-flash".equals(modelName)) {
+        if (maxOutputTokens != null && reasoningEffort == null && reasoningMaxTokens == null && "qwen/qwen3.7-flash".equals(modelName)) {
             try {
                 ObjectNode writing = (ObjectNode) LENIENT.readTree(body);
                 writing.set("reasoning", LENIENT.createObjectNode().put("enabled", false));

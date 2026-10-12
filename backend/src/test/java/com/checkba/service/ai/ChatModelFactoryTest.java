@@ -62,6 +62,21 @@ class ChatModelFactoryTest {
     }
 
     @Test
+    void writingReviewUsesSameAuxiliaryModelAndOnlyVerifiedFlashGetsFixedReasoningBudget() {
+        setDbProvider("OPENROUTER");
+        var timeout = java.time.Duration.ofSeconds(2);
+        for (String name : new String[]{"qwen/qwen3.7-flash", "deepseek/deepseek-v4-flash"}) {
+            when(systemSettingService.get(eq("ai.auxModel"), any())).thenReturn(name);
+            var writing = factory.getWritingModel(timeout);
+            var review = factory.getWritingReviewModel(timeout);
+            assertEquals(name, writing.modelName()); assertEquals(name, review.modelName());
+            assertNull(writing.reasoningEffort()); assertNull(writing.reasoningMaxTokens());
+            assertNull(review.reasoningEffort());
+            assertEquals(name.equals("qwen/qwen3.7-flash") ? Integer.valueOf(256) : null, review.reasoningMaxTokens());
+        }
+    }
+
+    @Test
     void desktopNeverUsesLegacyOrEnvironmentKeyForCloudCalls() {
         org.springframework.test.util.ReflectionTestUtils.setField(factory, "localMode", true);
         setDbProvider("OPENROUTER");
