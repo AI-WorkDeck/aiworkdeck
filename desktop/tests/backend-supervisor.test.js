@@ -247,11 +247,11 @@ test('external wizard 200 cannot hide health 503; only explicit 404 is legacy an
 })
 
 // 执行 main.js 出货的失败回调、配置函数和 IPC handler；只替换 Electron 副作用。
-function startupHarness(services) {
+function startupHarness(services, sourceOverride) {
   const fs = require('node:fs')
   const path = require('node:path')
   const vm = require('node:vm')
-  const source = fs.readFileSync(path.join(__dirname, '../main/main.js'), 'utf8')
+  const source = (sourceOverride ?? fs.readFileSync(path.join(__dirname, '../main/main.js'), 'utf8')).replace(/\r\n/g, '\n')
   const helpers = source.slice(source.indexOf('function configureBackendSupervision('), source.indexOf('// 增量更新（docs/INCREMENTAL_UPDATE_DESIGN.md）'))
   const catchStart = source.indexOf(".catch((err) => {\n      // 端口分配/启动链失败")
   assert.ok(catchStart >= 0)
@@ -304,4 +304,24 @@ test('startup catch keeps an owned failed child recoverable through the shipping
   assert.equal((await h.handlers.get('checkba:backend-restart')()).ok, true)
   assert.equal(h.handlers.get('checkba:backend-health')().state, 'healthy')
   assert.equal(h.windowCount(), 1, 'backend recovery must not recreate or reload the editor window')
+})
+
+
+test('startup harness executes the same failure and recovery behavior from CRLF source', async () => {
+  const fs = require('node:fs')
+  const path = require('node:path')
+  const crlf = fs.readFileSync(path.join(__dirname, '../main/main.js'), 'utf8').replace(/\r?\n/g, '\r\n')
+  assert.ok(crlf.includes('.catch((err) => {\r\n'), 'fixture must contain Windows line endings')
+  for (const owned of [false, true]) {
+    const h = startupHarness({ isOwned: () => owned, ports: owned ? { backend: 12345 } : {} }, crlf)
+    h.fail()
+    const health = h.handlers.get('checkba:backend-health')()
+    assert.equal(health.state, 'failed')
+    assert.equal(health.reason, 'startup-failed')
+    assert.equal(health.owned, owned)
+    assert.equal(h.windowCount(), 1)
+    const restart = await h.handlers.get('checkba:backend-restart')()
+    assert.equal(restart.ok, owned)
+    assert.equal(h.handlers.get('checkba:backend-health')().state, owned ? 'healthy' : 'failed')
+  }
 })
