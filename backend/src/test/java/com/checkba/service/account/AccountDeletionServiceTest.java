@@ -31,6 +31,15 @@ import static org.mockito.Mockito.*;
  */
 class AccountDeletionServiceTest {
 
+    @Test
+    void removesLocalSuggestionFeedbackWhenDeletingAccount() {
+        Fixture f = fixture(List.of());
+        var suggestions = mock(com.checkba.repository.ChatSuggestionRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(), "chatSuggestions", suggestions);
+        f.svc().deleteAccount(7L);
+        verify(suggestions).deleteByUserId(7L);
+    }
+
     private record Fixture(AccountDeletionService svc, UserRepository users,
                            MobileMediaInboxRepository inbox, MobileRelayBlobStore blobs,
                            UserSessionRepository sessions, MobileProjectDirRepository dirs,

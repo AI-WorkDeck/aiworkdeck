@@ -55,7 +55,11 @@ public class ProjectObjectController {
         ObjectRef object = new ObjectRef(sha256, size);
         if (request.getContentLengthLong() != ProjectObjectTransferService.partSize(object, part))
             throw new IllegalArgumentException("Invalid part length");
-        locked(projectId, () -> transfers.putPart(projectId, object, part, partSha, request.getInputStream()));
+        transfers.putPart(projectId, object, part, partSha, request.getInputStream(),
+                publish -> sessions.runLocked(projectId, () -> {
+                    authorize(request, projectId, true);
+                    publish.run();
+                }));
         return Map.of("ok", true);
     }
 
@@ -63,7 +67,10 @@ public class ProjectObjectController {
     public Map<String, Object> complete(@PathVariable long projectId, @PathVariable String sha256,
                                        @RequestParam long size, HttpServletRequest request) throws IOException {
         authorize(request, projectId, true);
-        locked(projectId, () -> transfers.complete(projectId, new ObjectRef(sha256, size)));
+        locked(projectId, () -> {
+            authorize(request, projectId, true);
+            transfers.complete(projectId, new ObjectRef(sha256, size));
+        });
         return Map.of("complete", true);
     }
 

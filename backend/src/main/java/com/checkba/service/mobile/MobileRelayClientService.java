@@ -368,7 +368,7 @@ public class MobileRelayClientService {
                     try {response=http.send(request,HttpResponse.BodyHandlers.ofInputStream());}
                     catch(InterruptedException e){Thread.currentThread().interrupt();throw new IOException(e);}
                     long expected=Math.min(MobileVersionObjectService.PART_BYTES,ref.size()-index*MobileVersionObjectService.PART_BYTES);
-                    try(InputStream input=response.body()) {
+                    try(InputStream input=new com.checkba.util.DeadlineInputStream(response.body(), Duration.ofSeconds(90))) {
                         requireCatalogAccountScope(session.scope());
                         if(response.statusCode()!=200 || !response.headers().firstValue("Content-Type").orElse("").startsWith("application/octet-stream")
                                 || response.headers().firstValueAsLong("Content-Length").orElse(-1)!=expected)

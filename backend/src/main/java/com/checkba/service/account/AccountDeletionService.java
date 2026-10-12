@@ -88,6 +88,8 @@ public class AccountDeletionService {
     private com.checkba.repository.MobileFileBackupRepository mobileBackups;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.checkba.service.mobile.MobileVersionObjectService versionObjects;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.ChatSuggestionRepository chatSuggestions;
     private final MobileRelayBlobStore blobStore;
     /** 官网统一账户的内部记账口，注销传导用（dev-board#434）。 */
     private final MobileBillingClient billing;
@@ -142,6 +144,7 @@ public class AccountDeletionService {
             backup.setPendingDeletion(true);mobileBackups.save(backup);
         }
         if (versionObjects != null) versionObjects.revoke(userId);
+        if (chatSuggestions != null) chatSuggestions.deleteByUserId(userId);
         List<MobileMediaInbox> items = inboxRepository.findByUserId(userId);
         for (MobileMediaInbox item : items) {
             if (item.getStoragePath() != null) {

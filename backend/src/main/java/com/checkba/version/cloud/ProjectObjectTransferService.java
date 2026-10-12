@@ -35,7 +35,9 @@ public class ProjectObjectTransferService {
     private Path parts(long projectId, ObjectRef ref) throws IOException {
         Path root = objects.path(projectId, ref.sha256()).getParent().getParent().getParent()
                 .resolve("transfers").resolve(ref.sha256());
-        for (Path p = root; p != null; p = p.getParent()) {
+        // Match the store's boundary: /var may legitimately resolve to /private/var on macOS.
+        Path storageRoot = objects.projectRoot(projectId).getParent().getParent();
+        for (Path p = root; p != null && !p.equals(storageRoot); p = p.getParent()) {
             if (Files.isSymbolicLink(p)) throw new IOException("Invalid transfer directory");
         }
         return root;
@@ -43,8 +45,10 @@ public class ProjectObjectTransferService {
 
     public Map<String, Object> status(long projectId, ObjectRef ref) throws IOException {
         if (Files.exists(objects.path(projectId, ref.sha256()), LinkOption.NOFOLLOW_LINKS)) {
-            objects.verify(projectId, ref);
-            return Map.of("complete", true, "parts", List.of());
+            try {
+                objects.verify(projectId, ref);
+                return Map.of("complete", true, "parts", List.of());
+            } catch (IOException damaged) { /* A verified re-upload can repair a damaged replica. */ }
         }
         Path root = parts(projectId, ref);
         List<Integer> ready = new ArrayList<>();
@@ -62,6 +66,11 @@ public class ProjectObjectTransferService {
 
     /** Stream before acquiring a database connection; only quota reservation and publication hold the lock. */
     public void putPart(long projectId, ObjectRef ref, int part, String sha256, InputStream body) throws IOException {
+        putPart(projectId, ref, part, sha256, body, Runnable::run);
+    }
+
+    public void putPart(long projectId, ObjectRef ref, int part, String sha256, InputStream body,
+                        java.util.function.Consumer<Runnable> publicationLock) throws IOException {
         long size = partSize(ref, part);
         ObjectRef expectedPart = new ObjectRef(sha256, size);
         Path root = parts(projectId, ref);
@@ -80,24 +89,52 @@ public class ProjectObjectTransferService {
             try (InputStream in = Files.newInputStream(temporary)) {
                 if (!LocalVersionObjectStore.fingerprint(in).equals(expectedPart)) throw new IOException("Object part checksum mismatch");
             }
-            Runnable publish = () -> {
-                quota.requireProjectCapacity(projectId, size);
+            publicationLock.accept(() -> {
+                Path replica = objects.path(projectId, ref.sha256());
+                final boolean damagedReplica;
                 try {
-                    Files.createDirectories(root);
-                    try { Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
-                    catch (AtomicMoveNotSupportedException e) { Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING); }
+                    // Hash outside the database transaction, under the caller's project lock.
+                    // A client-supplied size must never turn a valid object into repair credit.
+                    if (Files.exists(replica, LinkOption.NOFOLLOW_LINKS)) {
+                        ObjectRef actual;
+                        try (InputStream in = objects.open(projectId, ref.sha256())) {
+                            actual = LocalVersionObjectStore.fingerprint(in);
+                        }
+                        if (actual.sha256().equals(ref.sha256())) {
+                            if (!actual.equals(ref)) throw new IOException("Object size mismatch");
+                            return;
+                        }
+                        damagedReplica = true;
+                    } else damagedReplica = false;
                 } catch (IOException e) { throw new UncheckedIOException(e); }
-            };
-            if (transactions == null) publish.run();
-            else new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(status -> publish.run());
-        } finally { Files.deleteIfExists(temporary); }
+                Runnable publish = () -> {
+                    quota.lockProjectForWrite(projectId);
+                    try {
+                        // Discard only proven corrupt bytes, so repair does not require two copies
+                        // of the user's quota. Temporary received bytes are not persistent storage.
+                        if (damagedReplica) Files.delete(replica);
+                        long previous = Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)
+                                ? Files.size(destination) : 0;
+                        quota.requireProjectCapacity(projectId, Math.max(0, size - previous));
+                        Files.createDirectories(root);
+                        try { Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
+                        catch (AtomicMoveNotSupportedException e) { Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING); }
+                    } catch (IOException e) { throw new UncheckedIOException(e); }
+                };
+                if (transactions == null) publish.run();
+                else new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(status -> publish.run());
+            });
+        } catch (UncheckedIOException e) { throw e.getCause(); }
+        finally { Files.deleteIfExists(temporary); }
     }
 
     public void complete(long projectId, ObjectRef ref) throws IOException {
         if (Files.exists(objects.path(projectId, ref.sha256()), LinkOption.NOFOLLOW_LINKS)) {
-            objects.verify(projectId, ref);
-            clearParts(projectId, ref);
-            return;
+            try {
+                objects.verify(projectId, ref);
+                clearParts(projectId, ref);
+                return;
+            } catch (IOException damaged) { /* Reassemble and atomically replace only after verification. */ }
         }
         Path root = parts(projectId, ref);
         int count = Math.toIntExact(Math.max(1, (ref.size() - 1) / PART_BYTES + 1));
@@ -116,6 +153,11 @@ public class ProjectObjectTransferService {
             }
         };
         try (InputStream in = new SequenceInputStream(streams)) { objects.importObject(projectId, ref, in); }
+        catch (IOException | UncheckedIOException invalid) {
+            // Do not advertise corrupt same-sized parts as ready forever on every retry.
+            clearParts(projectId, ref);
+            throw invalid;
+        }
         clearParts(projectId, ref);
     }
 
