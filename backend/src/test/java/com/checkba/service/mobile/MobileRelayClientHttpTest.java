@@ -1118,4 +1118,135 @@ class MobileRelayClientHttpTest {
         verify(storageService, never()).load(anyString());
     }
 
+
+    @Test
+    void versionObjectWorkerDoesNotReadLocalBytesWithoutCloudConsent() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":false,\"subscriptionActive\":true}"));
+        var objects=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",objects);
+        client.syncVersionObjectBackups();verifyNoInteractions(objects);
+        assertEquals("disabled",client.backupConsent().path("objectBackup").path("state").asText());
+        assertThrows(com.checkba.version.VersionException.class,client::requireVersionObjectCloudConsent);
+    }
+
+    @Test
+    void versionObjectWorkerResumesPartsAndReportsVerifiedCompletion() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":true,\"subscriptionActive\":true}"));
+        byte[] bytes=new byte[(int)MobileVersionObjectService.PART_BYTES+3];new java.util.Random(8).nextBytes(bytes);
+        String hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        var objects=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        when(objects.list(42L)).thenReturn(List.of(new com.checkba.version.objects.LocalVersionObjectStore.ObjectRef(hash,bytes.length)));
+        when(objects.open(42L,hash)).thenAnswer(inv->new java.io.ByteArrayInputStream(bytes));
+        AtomicInteger attempts=new AtomicInteger();List<Integer> uploaded=new ArrayList<>();AtomicInteger complete=new AtomicInteger();
+        server.createContext("/api/mobile/backup/version-objects/", ex->{
+            String path=ex.getRequestURI().getPath();
+            if(ex.getRequestMethod().equals("GET")) respond(ex,200,"{\"parts\":[0],\"complete\":false}");
+            else if(path.endsWith("/complete")){complete.incrementAndGet();respond(ex,200,"{\"complete\":true,\"sha256\":\""+hash+"\"}");}
+            else {
+                assertTrue(path.endsWith("/parts/1"));byte[] part=ex.getRequestBody().readAllBytes();
+                assertArrayEquals(java.util.Arrays.copyOfRange(bytes,bytes.length-3,bytes.length),part);
+                uploaded.add(1);
+                if(attempts.getAndIncrement()==0) respond(ex,503,"offline");
+                else {
+                    String partHash=java.util.HexFormat.of().formatHex(digest(part));
+                    respond(ex,200,"{\"sha256\":\""+partHash+"\",\"size\":3}");
+                }
+            }
+        });
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",objects);
+        client.syncVersionObjectBackups();assertEquals(0,complete.get());
+        assertEquals("pending",client.backupConsent().path("objectBackup").path("state").asText());
+        client.syncVersionObjectBackups();assertEquals(List.of(1,1),uploaded);assertEquals(1,complete.get());
+        assertEquals("synced",client.backupConsent().path("objectBackup").path("state").asText());
+        verify(objects,never()).importObject(anyLong(),any(),any());
+    }
+
+    private static byte[] digest(byte[] bytes) {
+        try{return java.security.MessageDigest.getInstance("SHA-256").digest(bytes);}
+        catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
+    }
+
+    @Test
+    void versionObjectWorkerKeepsLocalObjectsAndExplainsQuotaOrOldServer() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":true,\"subscriptionActive\":true}"));
+        byte[] bytes={1,2};String hash=java.util.HexFormat.of().formatHex(digest(bytes));
+        var objects=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        when(objects.list(42L)).thenReturn(List.of(new com.checkba.version.objects.LocalVersionObjectStore.ObjectRef(hash,2)));
+        when(objects.open(42L,hash)).thenAnswer(inv->new java.io.ByteArrayInputStream(bytes));
+        AtomicInteger mode=new AtomicInteger();
+        server.createContext("/api/mobile/backup/version-objects/", ex->{
+            if(mode.get()==1) respond(ex,404,"not found");
+            else if(ex.getRequestMethod().equals("GET")) respond(ex,200,"{\"parts\":[],\"complete\":false}");
+            else respond(ex,200,"{\"code\":1,\"message\":\"持久云空间不足\"}");
+        });
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",objects);
+        client.syncVersionObjectBackups();var status=client.backupConsent().path("objectBackup");
+        assertEquals("pending",status.path("state").asText());assertTrue(status.path("lastError").asText().contains("空间不足"));
+        mode.set(1);client.syncVersionObjectBackups();assertTrue(client.backupConsent().path("objectBackup").path("lastError").asText().contains("暂不支持"));
+        verify(objects,never()).importObject(anyLong(),any(),any());
+    }
+
+    @Test
+    void versionObjectAccountChangeBeforeContentRequestStopsUpload() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":true,\"subscriptionActive\":true}"));
+        var objects=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        when(objects.list(42L)).thenReturn(List.of(new com.checkba.version.objects.LocalVersionObjectStore.ObjectRef("a".repeat(64),2)));
+        AtomicInteger uploads=new AtomicInteger();
+        server.createContext("/api/mobile/backup/version-objects/", ex->{
+            if(ex.getRequestMethod().equals("GET")) {when(accountService.accountFingerprintOrNull()).thenReturn("changed");respond(ex,200,"{\"parts\":[]}");}
+            else {uploads.incrementAndGet();respond(ex,200,"{}");}
+        });
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",objects);
+        client.syncVersionObjectBackups();assertEquals(0,uploads.get());verify(objects,never()).open(anyLong(),anyString());
+    }
+
+    @Test
+    void versionObjectRevokedAfterStatusDoesNotOpenOrUploadSnapshot() throws Exception {
+        java.util.concurrent.atomic.AtomicBoolean enabled=new java.util.concurrent.atomic.AtomicBoolean(true);
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":"+enabled.get()+",\"subscriptionActive\":true}"));
+        var objects=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        when(objects.list(42L)).thenReturn(List.of(new com.checkba.version.objects.LocalVersionObjectStore.ObjectRef("a".repeat(64),2)));
+        AtomicInteger uploads=new AtomicInteger();
+        server.createContext("/api/mobile/backup/version-objects/", ex->{
+            if(ex.getRequestMethod().equals("GET")){enabled.set(false);respond(ex,200,"{\"parts\":[]}");}
+            else {uploads.incrementAndGet();respond(ex,200,"{}");}
+        });
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",objects);
+        client.syncVersionObjectBackups();assertEquals(0,uploads.get());verify(objects,never()).open(anyLong(),anyString());
+        assertEquals("disabled",client.backupConsent().path("objectBackup").path("state").asText());
+    }
+
+    @Test
+    void versionObjectBackupRoundTripRestoresVerifiedBytesAndRejectsCorruption() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex,200,"{\"enabled\":true,\"subscriptionActive\":true}"));
+        var resolver=mock(com.checkba.storage.ProjectStorageResolver.class);
+        when(resolver.globalRoot()).thenReturn(stateDir.resolve("version-storage"));
+        var store=new com.checkba.version.objects.LocalVersionObjectStore(resolver);
+        byte[] original="immutable synthetic audio snapshot".getBytes(StandardCharsets.UTF_8);
+        var ref=store.put(42L,new java.io.ByteArrayInputStream(original));
+        java.util.concurrent.atomic.AtomicReference<byte[]> remote=new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicBoolean complete=new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicBoolean corrupt=new java.util.concurrent.atomic.AtomicBoolean();
+        server.createContext("/api/mobile/backup/version-objects/", ex->{
+            String path=ex.getRequestURI().getPath();
+            if(path.endsWith("/parts/0") && ex.getRequestMethod().equals("PUT")) {
+                byte[] bytes=ex.getRequestBody().readAllBytes();remote.set(bytes);
+                respond(ex,200,"{\"sha256\":\""+java.util.HexFormat.of().formatHex(digest(bytes))+"\",\"size\":"+bytes.length+"}");
+            } else if(path.endsWith("/complete")) {
+                complete.set(true);respond(ex,200,"{\"complete\":true,\"sha256\":\""+ref.sha256()+"\"}");
+            } else if(path.endsWith("/parts/0")) {
+                byte[] bytes=remote.get().clone();if(corrupt.get())bytes[0]^=1;
+                ex.getResponseHeaders().add("Content-Type","application/octet-stream");
+                ex.sendResponseHeaders(200,bytes.length);try(var output=ex.getResponseBody()){output.write(bytes);}ex.close();
+            } else respond(ex,200,"{\"parts\":[],\"complete\":"+complete.get()+",\"sha256\":\""+ref.sha256()+"\",\"size\":"+ref.size()+"}");
+        });
+        var client=service();org.springframework.test.util.ReflectionTestUtils.setField(client,"versionObjectStore",store);
+        client.syncVersionObjectBackups();assertArrayEquals(original,remote.get());assertTrue(complete.get());
+        java.nio.file.Files.delete(store.path(42L,ref.sha256()));corrupt.set(true);
+        assertThrows(IOException.class,()->client.restoreVersionObject(42L,ref));
+        assertFalse(java.nio.file.Files.exists(store.path(42L,ref.sha256())));
+        corrupt.set(false);client.restoreVersionObject(42L,ref);
+        try(var input=store.open(42L,ref.sha256())){assertArrayEquals(original,input.readAllBytes());}
+        assertThrows(IllegalArgumentException.class,()->client.restoreVersionObject(999L,ref));
+    }
 }

@@ -118,4 +118,30 @@ class CloudStorageQuotaServiceTest {
         verifyNoInteractions(billing, users);
     }
 
+
+    @Test void historicalObjectsAndPendingDeletionStayInPersistentQuota() {
+        pro(Instant.now().plusSeconds(60));
+        var objects=mock(com.checkba.repository.MobileVersionObjectRepository.class);
+        var current=new com.checkba.model.entity.MobileVersionObject();current.setSize(12);
+        var pending=new com.checkba.model.entity.MobileVersionObject();pending.setSize(23);pending.setPendingDeletion(true);
+        when(objects.findByUserId(7L)).thenReturn(List.of(current,pending));
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"versionObjects",objects);
+        assertEquals(35L,service.usage(7L).get("persistentUsedBytes"));
+        physical(0,CloudStorageQuotaService.PRO_BYTES-35,false);
+        assertThrows(IllegalArgumentException.class,()->service.requirePersistentCapacity(7L,1));
+    }
+
+    @Test void collaborationObjectsAndIncompleteTransfersCountEvenWithoutFileRows() throws Exception {
+        pro(Instant.now().plusSeconds(60));
+        var provider=mock(org.springframework.beans.factory.ObjectProvider.class);
+        var store=mock(com.checkba.version.objects.LocalVersionObjectStore.class);
+        when(provider.getIfAvailable()).thenReturn(store);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"localVersionObjects",provider);
+        Project project=new Project();project.setId(42L);project.setUserId(7L);
+        when(projects.findByUserIdOrderByCreatedAtDesc(7L)).thenReturn(List.of(project));
+        when(store.usageBytes(42L)).thenReturn(CloudStorageQuotaService.PRO_BYTES);
+        assertThrows(IllegalArgumentException.class,()->service.requirePersistentCapacity(7L,1));
+        when(store.usageBytes(42L)).thenThrow(new java.io.IOException("unreadable"));
+        assertThrows(IllegalStateException.class,()->service.requirePersistentCapacity(7L,1));
+    }
 }

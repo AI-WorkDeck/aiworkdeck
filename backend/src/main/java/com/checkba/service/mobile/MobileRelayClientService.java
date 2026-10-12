@@ -86,6 +86,12 @@ public class MobileRelayClientService {
     @Autowired(required = false) private com.checkba.repository.ProjectRemoteRepository projectRemotes;
     @Autowired(required = false) private com.checkba.repository.CloudConnectionRepository cloudConnections;
 
+    @Autowired(required=false) private com.checkba.version.objects.LocalVersionObjectStore versionObjectStore;
+    private final AtomicBoolean versionBackupRunning = new AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicLong versionBackupGeneration = new java.util.concurrent.atomic.AtomicLong();
+    private volatile String versionBackupScope;
+    private volatile Map<String,Object> versionBackupStatus = Map.of("state","idle","pendingObjects",0,"lastError","");
+
     /** Local authenticated proxy; cloud device tokens never enter the renderer. */
     public List<Map<String, Object>> catalog() {
         if (!active()) return List.of();
@@ -256,14 +262,20 @@ public class MobileRelayClientService {
         ObjectNode out = (ObjectNode) result.deepCopy();
         out.put("accountScope", scope);
         out.put("available", true);
+        out.set("objectBackup",mapper.valueToTree(scope.equals(versionBackupScope) ? versionBackupStatus
+                : Map.of("state","idle","pendingObjects",0,"lastError","")));
         return out;
     }
 
     public JsonNode setBackupConsent(boolean enabled, String version, String scope) {
+        if (!enabled) versionBackupGeneration.incrementAndGet();
         CatalogSession session = beginCatalogSession(scope);
         ObjectNode body = mapper.createObjectNode().put("enabled", enabled).put("consentVersion", version);
         JsonNode result = backupJson(session, "PUT", "/api/mobile/backup-consent", body);
-        if (enabled) dispatchNudge("backup", this::syncFileBackups);
+        if (enabled) {
+            dispatchNudge("backup", this::syncFileBackups);
+            dispatchNudge("version-backup", this::syncVersionObjectBackups);
+        }
         return result;
     }
 
@@ -283,7 +295,173 @@ public class MobileRelayClientService {
 
     @Scheduled(initialDelay = 75_000, fixedDelay = 60_000)
     public void scheduleFileBackups() {
-        if (active()) dispatchNudge("backup", this::syncFileBackups);
+        if (active()) {
+            dispatchNudge("backup", this::syncFileBackups);
+            dispatchNudge("version-backup", this::syncVersionObjectBackups);
+        }
+    }
+
+    /** A sharing request may never silently override the account's file backup decision. */
+    public void requireVersionObjectCloudConsent() {
+        try {
+            JsonNode consent=backupConsent();
+            if(!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean())
+                throw new IllegalStateException("consent");
+        } catch(RuntimeException e) {
+            throw com.checkba.version.VersionException.userFacing(LangText.of(
+                    "大文件已保存在本地；请先开启文件云端备份并确认订阅有效，再同步到案件库",
+                    "Large files are saved locally. Enable cloud file backup with an active subscription before sharing"));
+        }
+    }
+
+    private static String versionBackupError(JsonNode response) {
+        String message=response.path("message").asText("");
+        if(message.contains("空间") || message.toLowerCase(java.util.Locale.ROOT).contains("storage is full"))
+            return LangText.of("云端空间不足，本地版本已保留；释放空间后会自动重试",
+                    "Cloud storage is full. Local versions are safe; synchronization will retry after space is available");
+        return LangText.of("大文件版本备份未完成，本地版本已保留，将自动重试",
+                "Large-file backup is incomplete. Local versions are safe; synchronization will retry");
+    }
+
+    private JsonNode versionObjectResponse(HttpResponse<String> response) throws IOException {
+        if(response.statusCode()==404) throw new IOException(LangText.of(
+                "云端暂不支持大文件版本备份，本地版本已保留", "The server does not yet support large-file version backup. Local versions are safe"));
+        if(response.statusCode()!=200) throw new IOException(LangText.of(
+                "云端连接暂不可用，本地版本已保留，将自动重试", "Cloud connection is unavailable. Local versions are safe; synchronization will retry"));
+        JsonNode result=mapper.readTree(response.body());
+        if(!result.isObject() || result.path("code").asInt(0)!=0) throw new IOException(versionBackupError(result));
+        return result;
+    }
+
+    private JsonNode versionObjectJson(CatalogSession session,String method,String path) throws IOException {
+        return versionObjectResponse(catalogExchange(session,method,path,null));
+    }
+
+    private void requireVersionBackupActive(CatalogSession session,long generation) {
+        requireCatalogAccountScope(session.scope());
+        if(generation!=versionBackupGeneration.get()) throw new java.util.concurrent.CancellationException();
+        JsonNode consent=backupJson(session,"GET","/api/mobile/backup-consent",null);
+        if(!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean()
+                || generation!=versionBackupGeneration.get()) throw new java.util.concurrent.CancellationException();
+    }
+
+    /** Explicit recovery only: no downloads from save/status paths; import publishes after whole-object verification. */
+    public void restoreVersionObject(long projectId,com.checkba.version.objects.LocalVersionObjectStore.ObjectRef ref) throws IOException {
+        if(!active() || versionObjectStore==null) throw new IOException(LangText.of("云备份暂不可用","Cloud backup unavailable"));
+        Project project=projectRepository.findById(projectId).orElseThrow(()->new IllegalArgumentException("Project not found"));
+        if(!Objects.equals(project.getUserId(),localIdentityService.localUserId())) throw new IllegalArgumentException("Project not found");
+        CatalogSession session=beginCatalogSession(catalogAccountScope());
+        String query="?deviceId="+queryValue(deviceId())+"&projectKey="+projectId;
+        String base="/api/mobile/backup/version-objects/"+ref.sha256();
+        JsonNode status=versionObjectJson(session,"GET",base+query+"&size="+ref.size());
+        if(!status.path("complete").asBoolean() || !ref.sha256().equals(status.path("sha256").asText())
+                || status.path("size").asLong(-1)!=ref.size()) throw new IOException("Version object backup is incomplete");
+        Path temporary=Files.createTempFile("awd-version-restore-",".part");
+        try {
+            try(OutputStream output=Files.newOutputStream(temporary)) {
+                byte[] buffer=new byte[65536];
+                for(int index=0;index<MobileVersionObjectService.partCount(ref.size());index++) {
+                    requireCatalogAccountScope(session.scope());
+                    HttpRequest request=request(base+"/parts/"+index+query,Duration.ofMinutes(10))
+                            .header("X-Session-Id",session.token()).GET().build();
+                    HttpResponse<InputStream> response;
+                    try {response=http.send(request,HttpResponse.BodyHandlers.ofInputStream());}
+                    catch(InterruptedException e){Thread.currentThread().interrupt();throw new IOException(e);}
+                    long expected=Math.min(MobileVersionObjectService.PART_BYTES,ref.size()-index*MobileVersionObjectService.PART_BYTES);
+                    try(InputStream input=response.body()) {
+                        requireCatalogAccountScope(session.scope());
+                        if(response.statusCode()!=200 || !response.headers().firstValue("Content-Type").orElse("").startsWith("application/octet-stream")
+                                || response.headers().firstValueAsLong("Content-Length").orElse(-1)!=expected)
+                            throw new IOException("Version object download rejected");
+                        long count=0;int n;
+                        while((n=input.read(buffer))!=-1) {
+                            requireCatalogAccountScope(session.scope());
+                            count+=n;if(count>expected) throw new IOException("Version object download length mismatch");
+                            output.write(buffer,0,n);
+                        }
+                        if(count!=expected) throw new IOException("Version object download truncated");
+                    }
+                }
+            }
+            requireCatalogAccountScope(session.scope());
+            try(InputStream input=Files.newInputStream(temporary)){versionObjectStore.importObject(projectId,ref,input);}
+        } finally {Files.deleteIfExists(temporary);}
+    }
+
+    /** Independent worker: immutable bytes are uploaded only after affirmative remote consent. */
+    void syncVersionObjectBackups() {
+        if(!active() || versionObjectStore==null || !versionBackupRunning.compareAndSet(false,true)) return;
+        int pending=0;
+        long generation=versionBackupGeneration.get();
+        try {
+            CatalogSession session=beginCatalogSession(catalogAccountScope());
+            versionBackupScope=session.scope();
+            JsonNode consent=backupJson(session,"GET","/api/mobile/backup-consent",null);
+            if(!consent.path("enabled").asBoolean() || !consent.path("subscriptionActive").asBoolean()) {
+                versionBackupStatus=Map.of("state","disabled","pendingObjects",0,"lastError","");return;
+            }
+            pushDirectory();requireCatalogAccountScope(session.scope());
+            record LocalObject(long projectId,com.checkba.version.objects.LocalVersionObjectStore.ObjectRef ref) {}
+            List<LocalObject> local=new ArrayList<>();
+            for(Project project:projectRepository.findByUserIdOrderByCreatedAtDesc(localIdentityService.localUserId())) {
+                if(project.isLooseFileWorkspace()) continue;
+                for(var ref:versionObjectStore.list(project.getId())) local.add(new LocalObject(project.getId(),ref));
+            }
+            pending=local.size();
+            versionBackupStatus=Map.of("state","syncing","pendingObjects",pending,"lastError","");
+            for(var object:local) {
+                requireCatalogAccountScope(session.scope());
+                var ref=object.ref();
+                String query="?deviceId="+queryValue(deviceId())+"&projectKey="+object.projectId()+"&size="+ref.size();
+                String base="/api/mobile/backup/version-objects/"+ref.sha256();
+                JsonNode remote=versionObjectJson(session,"GET",base+query);
+                if(!remote.path("complete").asBoolean()) {
+                    Set<Integer> uploaded=new java.util.HashSet<>();
+                    for(JsonNode part:remote.path("parts")) uploaded.add(part.asInt());
+                    requireVersionBackupActive(session,generation);
+                    try(InputStream input=versionObjectStore.open(object.projectId(),ref.sha256())) {
+                        for(int index=0;index<MobileVersionObjectService.partCount(ref.size());index++) {
+                            requireVersionBackupActive(session,generation);
+                            int length=(int)Math.min(MobileVersionObjectService.PART_BYTES,
+                                    ref.size()-index*MobileVersionObjectService.PART_BYTES);
+                            if(uploaded.contains(index)) {input.skipNBytes(length);continue;}
+                            byte[] bytes=input.readNBytes(length);
+                            if(bytes.length!=length) throw new IOException("Local version object is incomplete");
+                            String hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+                            requireCatalogAccountScope(session.scope());
+                            if(generation!=versionBackupGeneration.get()) throw new java.util.concurrent.CancellationException();
+                            HttpRequest request=request(base+"/parts/"+index+query+"&partSha="+hash,Duration.ofMinutes(10))
+                                    .header("X-Session-Id",session.token()).header("Content-Type","application/octet-stream")
+                                    .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes)).build();
+                            JsonNode result=versionObjectResponse(http.send(request,HttpResponse.BodyHandlers.ofString()));
+                            requireCatalogAccountScope(session.scope());
+                            if(!hash.equals(result.path("sha256").asText()) || result.path("size").asLong(-1)!=length)
+                                throw new IOException("Version object upload verification failed");
+                        }
+                    }
+                    requireVersionBackupActive(session,generation);
+                    HttpRequest finish=request(base+"/complete"+query,Duration.ofMinutes(10))
+                            .header("X-Session-Id",session.token()).POST(HttpRequest.BodyPublishers.noBody()).build();
+                    JsonNode completed=versionObjectResponse(http.send(finish,HttpResponse.BodyHandlers.ofString()));
+                    requireCatalogAccountScope(session.scope());
+                    if(!completed.path("complete").asBoolean() || !ref.sha256().equals(completed.path("sha256").asText()))
+                        throw new IOException("Version object completion was not confirmed");
+                }
+                versionBackupStatus=Map.of("state","syncing","pendingObjects",--pending,"lastError","");
+            }
+            versionBackupStatus=Map.of("state","synced","pendingObjects",0,"lastError","");
+        } catch(Exception e) {
+            if(e instanceof java.util.concurrent.CancellationException) {
+                versionBackupStatus=Map.of("state","disabled","pendingObjects",Math.max(0,pending),"lastError","");return;
+            }
+            if(e instanceof InterruptedException) Thread.currentThread().interrupt();
+            String message=e instanceof IOException && e.getMessage()!=null
+                    && (e.getMessage().contains("本地版本") || e.getMessage().contains("Local versions")) ? e.getMessage()
+                    : LangText.of("大文件版本同步暂不可用，本地版本已保留，将自动重试",
+                            "Large-file synchronization is unavailable. Local versions are safe; synchronization will retry");
+            versionBackupStatus=Map.of("state","pending","pendingObjects",Math.max(1,pending),"lastError",message);
+            log.warn("Version object backup incomplete; local objects retained ({})",e.getClass().getSimpleName());
+        } finally {versionBackupRunning.set(false);}
     }
 
     /** Separate worker: large backups cannot block the camera inbox or desktop heartbeat. */

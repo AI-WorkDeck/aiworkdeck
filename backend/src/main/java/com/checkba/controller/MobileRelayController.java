@@ -39,10 +39,51 @@ public class MobileRelayController {
 
     private final MobileRelayStoreService store;
     @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.mobile.MobileVersionObjectService versionObjects;
+    @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.mobile.MobileCloudCaptureService cloudCaptures;
 
     public MobileRelayController(MobileRelayStoreService store) {
         this.store = store;
+    }
+
+    @GetMapping("/backup/version-objects")
+    public Map<String,Object> versionObjects(@RequestHeader(value="X-Session-Id",required=false) String session,
+            @RequestParam String deviceId,@RequestParam String projectKey) {
+        return Map.of("objects",versionObjects.list(requireUser(session),deviceId,projectKey));
+    }
+
+    @GetMapping("/backup/version-objects/{sha}")
+    public Map<String,Object> versionObjectStatus(@RequestHeader(value="X-Session-Id",required=false) String session,
+            @PathVariable String sha,@RequestParam String deviceId,@RequestParam String projectKey,@RequestParam long size) {
+        return versionObjects.status(requireUser(session),deviceId,projectKey,sha,size);
+    }
+
+    @PutMapping(value="/backup/version-objects/{sha}/parts/{index}",consumes="application/octet-stream")
+    public Map<String,Object> versionObjectPart(@RequestHeader(value="X-Session-Id",required=false) String session,
+            @PathVariable String sha,@PathVariable int index,@RequestParam String deviceId,@RequestParam String projectKey,
+            @RequestParam long size,@RequestParam String partSha,jakarta.servlet.http.HttpServletRequest request) throws IOException {
+        Long user=requireUser(session);
+        long bytes=request.getContentLengthLong();
+        if(bytes<0 || bytes>com.checkba.service.mobile.MobileVersionObjectService.PART_BYTES)
+            throw new IllegalArgumentException("Invalid version object part length");
+        try(InputStream input=request.getInputStream()) {
+            return versionObjects.put(user,deviceId,projectKey,sha,size,index,partSha,input,bytes);
+        }
+    }
+
+    @PostMapping("/backup/version-objects/{sha}/complete")
+    public Map<String,Object> completeVersionObject(@RequestHeader(value="X-Session-Id",required=false) String session,
+            @PathVariable String sha,@RequestParam String deviceId,@RequestParam String projectKey,@RequestParam long size) throws IOException {
+        return versionObjects.complete(requireUser(session),deviceId,projectKey,sha,size);
+    }
+
+    @GetMapping("/backup/version-objects/{sha}/parts/{index}")
+    public ResponseEntity<InputStreamResource> versionObjectContent(@RequestHeader(value="X-Session-Id",required=false) String session,
+            @PathVariable String sha,@PathVariable int index,@RequestParam String deviceId,@RequestParam String projectKey) throws IOException {
+        var content=versionObjects.content(requireUser(session),deviceId,projectKey,sha,index);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).contentLength(content.size())
+                .body(new InputStreamResource(content.stream()));
     }
 
     @Data

@@ -30,6 +30,7 @@ public class MobileBackupService {
     private final MobileRelayBlobStore blobs;
     private final MobileTransferService transfers;
     private final ObjectMapper mapper;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private MobileVersionObjectService versionObjects;
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
     @org.springframework.beans.factory.annotation.Autowired private org.springframework.transaction.PlatformTransactionManager transactions;
     public MobileBackupService(UserRepository users, MobileFileBackupRepository backups,
@@ -48,7 +49,8 @@ public class MobileBackupService {
         try { out.put("subscriptionActive",quota.persistentQuota(id)>0);out.put("subscriptionAvailable",true); }
         catch (MobileBillingFailureException e) { out.put("subscriptionActive",false);out.put("subscriptionAvailable",false); }
         out.put("consentVersion",CONSENT_VERSION);
-        out.put("cleanupPending",backups.findByUserId(id).stream().anyMatch(MobileFileBackup::isPendingDeletion));
+        out.put("cleanupPending",backups.findByUserId(id).stream().anyMatch(MobileFileBackup::isPendingDeletion)
+                || (versionObjects!=null && versionObjects.cleanupPending(id)));
         return out;
     }
     @Transactional
@@ -59,6 +61,7 @@ public class MobileBackupService {
         u.setFileCloudBackupEnabled(enabled); u.setFileCloudBackupDecidedAt(LocalDateTime.now());
         u.setFileCloudBackupConsentVersion(version); users.save(u);
         if (!enabled) for (MobileFileBackup row:backups.findByUserId(id)) { row.setPendingDeletion(true); backups.save(row); }
+        if (!enabled && versionObjects!=null) versionObjects.revoke(id);
         return consent(id);
     }
     public void requireEligible(Long id) { if (!eligible(id)) throw new IllegalArgumentException(offlineMessage()); }
