@@ -355,7 +355,7 @@ public class WritingSuggestionService {
             +"每条必须有实际支持文字的factIds/sourceIds。来源中出现某数字不代表可移用于另一事项；不得改变主体、义务、时间与否定关系。依据不足返回空数组。不得补充原文未记载的否定事实（如没有书面说明），不得把未取得材料写成该事项不存在。"
             + (mode.equals("rewrite")?"任务是改写selection，只改善表达，不增删事实或改变法律含义；text完整替换选区。":(mode.equals("sentence") || mode.equals("autocomplete"))?"只续写当前句剩余部分，最多160字，必须单行，不另起其他主体字段；不重复before，不改动after。":"续写一个有完整意思的段落，以句号等终止符结束，不能只给姓名或名词片段，最多600字；不重复before，不改动after。")
             +s.profile().instructions(s.context(),s.facts())
-            +(mode.equals("autocomplete")?"自动补全任务覆盖前述段落要求：用户没有主动请求续写。先判断当前思路的自然后续是否明确、是否有实质帮助、是否有直接依据；任何歧义或猜测都应abstain。先把before+候选+after连起来审读：建议应概括已有信息之间的关系、承接当前论述或整合相邻事实，带来实际写作价值，而不是检索并搬回sources中的原句、长片段或已有词条。即使原句有准确引用，照搬也不构成自动补全价值；只能复制、改几个字或加一个连接词时abstain。可用不同表达整合有直接依据的共同点、差异或并存关系，但不得推演来源没有表达的因果、成效、责任或下一步安排。explanation简要说明整合了哪些已有信息、怎样承接当前位置；不要用“来源记载”代替价值判断。输出严格JSON {\"abstain\":false,\"usefulness\":\"completes_current_thought\",\"evidence\":\"direct_support\",\"suggestions\":[上述建议结构]}，无把握时输出{\"abstain\":true,\"suggestions\":[]}。不要输出置信概率。最多一条kind=sentence、8至100字单行插入后缀，不重复before或after，不只拼接姓名机构名，不新增事实、数字、义务、承诺或无依据的评价；不能把存在某原文引用当成支持新结论。":"")
+            +(mode.equals("autocomplete")?"自动补全任务覆盖前述段落要求：用户没有主动请求续写。先判断当前思路的自然后续是否明确、是否有实质帮助、是否有直接依据；任何歧义或猜测都应abstain。先把before+候选+after连起来审读：建议应概括已有信息之间的关系、承接当前论述或整合相邻事实，带来实际写作价值，而不是检索并搬回sources中的原句、长片段或已有词条。即使原句有准确引用，照搬也不构成自动补全价值；只能复制、改几个字或加一个连接词时abstain。可用不同表达整合有直接依据的共同点、差异或并存关系，但不得推演来源没有表达的因果、成效、责任或下一步安排。explanation简要说明整合了哪些已有信息、怎样承接当前位置；不要用“来源记载”代替价值判断。输出严格JSON {\"abstain\":false,\"usefulness\":\"completes_current_thought\",\"evidence\":\"direct_support\",\"suggestions\":[上述建议结构]}，无把握时输出{\"abstain\":true,\"suggestions\":[]}。不要输出置信概率。最多一条kind=sentence、4至100字单行插入后缀，不重复before或after，不只拼接姓名机构名，不新增事实、数字、义务、承诺或无依据的评价；不能把存在某原文引用当成支持新结论。":"")
             +(mode.equals("rewrite")?"本次明确采用选区改写：前述文种指引中有关只补后缀的限制改为仅重述selection，text完整替换该选区，最多2000字，保留全部事实、条件及归属，不重复before/after。":"");
     }
     List<Advice> parse(Snapshot s,String raw,String mode) throws Exception {
@@ -386,7 +386,7 @@ public class WritingSuggestionService {
     private static boolean automaticAdvice(Snapshot s,Advice a) {
         if(a==null || a.text()==null || a.factIds()==null || !"sentence".equals(a.kind())) return false;
         String text=a.text(), before=clean(s.context().before()), after=clean(s.context().after());
-        if(text.length()<8 || text.length()>100 || text.codePoints().anyMatch(Character::isISOControl)
+        if(text.length()<4 || text.length()>100 || text.codePoints().anyMatch(Character::isISOControl)
                 || !text.equals(text.strip()) || before.contains(text) || after.contains(text)) return false;
         // A cited sentence is evidence, not automatically a useful new continuation.
         // Compare the whole proposal, not common short connectives within new prose.

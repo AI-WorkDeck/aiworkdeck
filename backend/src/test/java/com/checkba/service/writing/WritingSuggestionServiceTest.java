@@ -365,6 +365,17 @@ class WritingSuggestionServiceTest {
             assertTrue(service.parse(snapshot,automaticResult(snapshot,text),"autocomplete").isEmpty(),text);
         assertEquals(1,service.parse(snapshot,result(copied,"sentence",fact),"sentence").size(),"手动有据续写的既有行为保留");
     }
+    @Test void conciseSemanticDimensionsStillRequireReviewAndCanBeAccepted() throws Exception {
+        snapshot=snapshot(new AutomaticWritingProfile(),"材料核对检查申请材料是否齐全。\n内容审查核实提交内容是否真实。",
+                "材料核对与内容审查是不同的工作环节。两道程序分别关注申请材料的", "");
+        String text="齐全性和真实性";
+        Advice advice=new Advice(text,"sentence",snapshot.facts().stream().map(Fact::id).toList(),List.of("active-document"),"概括不同审查维度");
+        String raw=json.writeValueAsString(Map.of("abstain",false,"usefulness","completes_current_thought","evidence","direct_support","suggestions",List.of(advice)));
+        View running=start("autocomplete"); complete(raw);
+        assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
+        complete(approvedReview(snapshot,text,"两项概念均由材料支持，接缝通顺"));
+        assertEquals(List.of(advice),service.get(1L,10L,running.id()).advice());
+    }
     @Test void automaticAllowsSemanticIntegrationAndDoesNotRejectSharedShortConnectives() throws Exception {
         snapshot=snapshot(new AutomaticWritingProfile(),
                 "与此同时，资料检索和事项办理集中在同一入口。\n报名申请与活动通知分别使用独立页面。",
