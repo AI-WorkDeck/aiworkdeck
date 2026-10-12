@@ -316,7 +316,7 @@ export default {
     autocompleteOff: '自动补全已关闭',
     autocompleteDisable: '关闭自动补全',
     autocompleteEnable: '开启自动补全',
-    autocompleteHint: 'AI 基于上下文提供建议，会使用 AI 额度；收起浮球不会关闭自动补全。',
+    autocompleteHint: '当前默认模型基于上下文提供建议，会使用 AI 额度；收起浮球不会关闭自动补全。',
     preferenceFailed: '设置未能保存，仍保持原状态，请重试。',
     aiEnable: '开启 AI 审校',
     aiDisable: '关闭 AI 审校',

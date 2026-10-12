@@ -283,27 +283,36 @@ public class ChatModelFactory {
         return createWritingModel(timeout, false);
     }
 
-    public OpenRouterStreamingChatModel getWritingReviewModel(java.time.Duration timeout) {
+    /** Automatic generation and review use the selected main model, never the auxiliary fallback. */
+    public OpenRouterStreamingChatModel getAutomaticWritingModel(java.time.Duration timeout) {
         return createWritingModel(timeout, true);
     }
 
-    private OpenRouterStreamingChatModel createWritingModel(java.time.Duration timeout, boolean review) {
+    private OpenRouterStreamingChatModel createWritingModel(java.time.Duration timeout, boolean automatic) {
         if (timeout == null || timeout.isZero() || timeout.isNegative()) {
             throw new IllegalArgumentException("Writing request deadline expired");
         }
         long started = System.nanoTime();
-        ResolvedTarget target = resolveTarget(validatedAuxModelId(), true);
+        String requestedModel = automatic ? resolveDefaultModel() : validatedAuxModelId();
+        if (automatic && !AllowedModels.isAllowed(requestedModel)) {
+            throw new com.checkba.exception.FeatureNotConfiguredException("ai-default-model",
+                    "当前主模型不在可用模型清单内，请在设置中重新选择；未改用辅助模型");
+        }
+        ResolvedTarget target = resolveTarget(requestedModel, true);
         if (target.channel() == AiModelProperties.Provider.OLLAMA) {
             throw new com.checkba.exception.FeatureNotConfiguredException("writing-model",
                     "当前本地模型通道暂不支持可取消的写作续写；未改用云端模型");
+        }
+        if (automatic && AllowedModels.fromId(requestedModel) != AllowedModels.fromId(target.modelId())) {
+            throw new com.checkba.exception.FeatureNotConfiguredException("ai-default-model",
+                    "当前通道无法使用所选主模型；未改用其他模型");
         }
         boolean platform = target.channel() == AiModelProperties.Provider.AWD_CLOUD;
         String key = platform ? platformApiKey() : resolveOpenRouterApiKey();
         String baseUrl = platform ? aiModelProperties.getOpenRouter().getBaseUrl() : resolveOpenRouterBaseUrl();
         recordModelUse(target.channel().name(), target.modelId(), true);
-        Integer reasoningBudget = review && "qwen/qwen3.7-flash".equals(target.modelId()) ? 256 : null;
         return new OpenRouterStreamingChatModel(key, baseUrl, target.modelId(), remainingTimeout(timeout, started),
-                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), null, null, reasoningBudget);
+                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), automatic ? reasoningEffortFor(target.modelId()) : null);
     }
 
     private static java.time.Duration remainingTimeout(java.time.Duration budget, long started) {
