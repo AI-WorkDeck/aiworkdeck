@@ -161,6 +161,7 @@
         :self-author="selfAuthor"
         :provenance="provenanceForPanel"
         :inline-review="inlineReviewState"
+        :autocomplete="writingAssistanceState"
         @open-history="openProvenanceHistory"
         @close="reviewOpen = false"
         @changed="onReviewChanged"
@@ -292,6 +293,7 @@ export default {
       // 不在本地乐观翻：客体里的「关闭」与 Esc 也走同一条回报，两边才不会漂。
       semanticWritingAvailable: false,
       semanticWritingOpen: false,
+      writingAssistanceState: null,
       writingAssistanceAvailable: false,
       writingAssistanceOpen: false,
       // 当前登录用户名。审阅面板的「我」这一桶按它归类作者（dev-board#377），
@@ -486,7 +488,7 @@ export default {
     // 「依据」窗格开合 → 客体页的光标上报订阅（dev-board#182）
     insightSubscribed() { this.pushInsightSub() },
     // 退到后台的实例停掉即时审校；切回来若正文已变就补一轮（dev-board#724）。
-    active(v) { this._inlineReviewHost?.setActive(!!v) },
+    active(v) { this._inlineReviewHost?.setActive(!!v); this._writingHost?.setActive(!!v) },
     docKind() { this.$emit('menu-state'); this.initWritingAssistance() },
     canWrite() { this.initWritingAssistance() },
     // 宿主 openFile(file, {locator}) 把定位符挂在 tab 对象上；已打开的标签再次被
@@ -762,6 +764,14 @@ export default {
         this._transportSend({ __lo: 'lo-relay', type: 'writing-assistance-panel', open: !this.writingAssistanceOpen })
       } catch (e) { /* 通道没起来：客体就绪后会重新上报可用态 */ }
     },
+    setAutocompleteEnabled(value, session) {
+      if (!this._writingHost || session !== this._writingHost.session) return false
+      return this._writingHost.setEnabled(!!value)
+    },
+    onAutocompleteState(state) {
+      this.writingAssistanceState = state
+      this._transportSend?.({ __lo: 'lo-relay', type: 'writing-assistance-preferences-state', ...state })
+    },
     /** 正文浮球 → 打开右栏审阅面板并落在「AI 审校」页。 */
     openInlineReviewPanel() {
       this.reviewOpen = true
@@ -769,6 +779,10 @@ export default {
     },
     /** 面板上的开关/重查/立即 AI 审校（清单里的定位与采用由面板直接走 executor）。 */
     onInlineReviewAction(payload) {
+      if (payload?.action === 'autocomplete') {
+        this.setAutocompleteEnabled(payload.value, payload.session)
+        return
+      }
       const host = this._inlineReviewHost
       if (!host || !payload) return
       if (payload.action === 'refresh') host.refresh()
@@ -1212,7 +1226,11 @@ export default {
       this._eventUnsub = transport.subscribe((msg) => {
         if (!msg || msg.__lo !== 'lo-relay') return
         if (msg.type === 'inline-review-request') {
-          if (this._inlineReviewHost) this._inlineReviewHost.handle(msg)
+          if (msg.action === 'autocomplete') {
+            if (msg.session === this._inlineReviewHost?.session && typeof msg.data?.enabled === 'boolean') {
+              this.setAutocompleteEnabled(msg.data.enabled, msg.data.writingSession)
+            }
+          } else if (this._inlineReviewHost) this._inlineReviewHost.handle(msg)
         } else if (msg.type === 'semantic-writing-state') {
           // 有据续写面板的可用/开合回报（dev-board#748）。工具栏按钮的显隐与按下态只认它。
           this.semanticWritingAvailable = !!msg.available
@@ -1486,13 +1504,15 @@ export default {
       // 也不能端着上一份文档的可用态（可能根本不是 Writer）。
       this.semanticWritingAvailable = false
       this.semanticWritingOpen = false
+      this.writingAssistanceState = null
       this.writingAssistanceAvailable = false
       this.writingAssistanceOpen = false
       if (!this.ready || this._reloading || this.docLoadFailed || this.docKind !== 'writer' || !this.file?.id || !this.projectId || !this._transportSend) return
       this._writingHost = createWritingAssistanceHost({
         projectId: Number(this.projectId), fileId: this.file.id, userId: (getCurrentUser() || {}).id || 'local',
         execute: (action, params) => this.executor.executeCommand(action, params), send: this._transportSend,
-        writable: this.canWrite,
+        writable: this.canWrite, active: this.active !== false,
+        onState: (state) => this.onAutocompleteState(state),
         semantic: createSemanticWritingHost({
           projectId: Number(this.projectId), fileId: this.file.id, title: this.file.name || this.file.fileName || '', writable: this.canWrite,
           execute: (action, params) => this.executor.executeCommand(action, params), send: this._transportSend,

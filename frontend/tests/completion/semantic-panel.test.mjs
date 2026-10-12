@@ -21,7 +21,7 @@ function fixture(t){
     async open(){emit({__lo:'lo-relay',type:'semantic-writing-panel',open:true});await tick()},
     async close(){emit({__lo:'lo-relay',type:'semantic-writing-panel',open:false});await tick()}}
 }
-test('visible entry opens choices without automatically calling a model',async t=>{const f=fixture(t);await f.open();assert.equal(f.calls.length,1);assert.equal(f.calls[0].action,'semantic-settings');assert.equal(f.doc.querySelectorAll('select option').length,4);assert.ok(f.button('续写一句'));assert.ok(f.button('改写选区'))})
+test('visible entry opens choices without automatically calling a model',async t=>{const f=fixture(t);await f.open();assert.deepEqual(f.calls.map(c=>c.action),['semantic-settings','semantic-context']);assert.equal(f.doc.querySelectorAll('select option').length,4);assert.ok(f.button('续写一句'));assert.ok(f.button('改写选区'))})
 test('materials selection prevents a fifth checked source',async t=>{const f=fixture(t);await f.open();const boxes=[...f.doc.querySelectorAll('input[type=checkbox]')];assert.equal(boxes.length,5);for(const b of boxes.slice(0,4)){b.click()}assert.equal(boxes[4].disabled,true);boxes[0].click();assert.equal(boxes[4].disabled,false)})
 test('composition blocks model trigger',async t=>{const f=fixture(t);await f.open();f.doc.querySelector('textarea[data-semantic-stance]').dispatchEvent(new f.dom.window.CompositionEvent('compositionstart',{bubbles:true}));f.button('续写一句').click();await tick();assert.equal(f.calls.some(c=>c.action==='semantic-generate'),false)})
 test('suggestion preview uses safe text nodes and exact cited quote',async t=>{const f=fixture(t);await f.open();f.button('续写一句').click();await tick();assert.ok(f.doc.body.textContent.includes('相关事项尚待核实。'));assert.ok(f.doc.body.textContent.includes('材料原话：<img src=x onerror=alert(1)>'));assert.equal(f.doc.querySelectorAll('img').length,0);assert.ok(f.button('采用这条'))})
@@ -39,3 +39,12 @@ test('the guest keeps no floating launch button on the canvas',async t=>{const f
 test('the host toolbar message opens and closes the sheet',async t=>{const f=fixture(t);await f.open();assert.equal(f.sheet().hidden,false);assert.ok(f.calls.some(c=>c.action==='semantic-settings'));await f.close();assert.equal(f.sheet().hidden,true);assert.equal(f.root().hidden,true)})
 test('availability and open state are reported back to the host',async t=>{const f=fixture(t);assert.deepEqual(f.states().at(-1),{__lo:'lo-relay',type:'semantic-writing-state',available:true,open:false});await f.open();assert.equal(f.states().at(-1).open,true);f.button('关闭').click();await tick();assert.deepEqual(f.states().at(-1),{__lo:'lo-relay',type:'semantic-writing-state',available:true,open:false});assert.equal(f.sheet().hidden,true)})
 test('a read-only or switched document reports the entry as unavailable',async t=>{const f=fixture(t);await f.open();f.emit({type:'writing-config',config:{session:'session-1',writable:false}});await tick();assert.equal(f.states().at(-1).available,false);assert.equal(f.states().at(-1).open,false);assert.equal(f.sheet().hidden,true);await f.open();assert.equal(f.sheet().hidden,true,'不可用时宿主消息也打不开')})
+
+
+test('selection and profile changes sync the current automatic context without generating',async t=>{
+  const f=fixture(t);await f.open();const box=f.doc.querySelector('input[type=checkbox]')
+  box.click();box.click()
+  const profile=f.doc.querySelector('select');profile.value='contract';profile.dispatchEvent(new f.dom.window.Event('change'))
+  assert.deepEqual(f.calls.filter(c=>c.action==='semantic-context').at(-1).data,{documentType:'contract',sourceFileIds:[]})
+  assert.equal(f.calls.some(c=>c.action==='semantic-generate'),false)
+})

@@ -367,3 +367,40 @@ test('editor login and recharge actions open in-place dialogs without repeating 
   assert.deepEqual(opened, ['login', 'recharge'])
   host.destroy()
 })
+
+
+test('public autocomplete preference preserves an explicit off state, syncs hosts and rolls back failed persistence', async t => {
+  const saved = { enabled: false, learning: true, hints: true }
+  let fail = false
+  const create = fileId => {
+    const states = [], messages = []
+    const host = createWritingAssistanceHost({ projectId: 9001, fileId, userId: 'shared-toggle-test', writable: true,
+      execute: async () => ({ success: false }), send: m => messages.push(m), onState: s => states.push(s),
+      api: { list: async () => ({ items: [] }) },
+      storage: { get: () => saved, set: (key, next) => { if (fail) throw new Error('disk unavailable'); Object.assign(saved, next) } },
+    })
+    t.after(() => host.destroy())
+    return { host, states, messages }
+  }
+  const a = create(1), b = create(2)
+  await Promise.all([a.host.start(), b.host.start()])
+  assert.equal(a.states.at(-1).enabled, false)
+  assert.equal(b.states.at(-1).enabled, false)
+  assert.equal(a.host.setEnabled(true), true)
+  assert.equal(b.states.at(-1).enabled, true)
+  assert.equal(b.states.at(-1).session, b.host.session)
+  assert.equal(Object.hasOwn(b.messages.at(-1).config, 'items'), false)
+  fail = true
+  assert.equal(a.host.setEnabled(false), false)
+  assert.equal(a.states.at(-1).enabled, true)
+  assert.equal(a.states.at(-1).error, 'PREFERENCES_SAVE_FAILED')
+  assert.equal(a.messages.at(-1).config.enabled, true, 'guest tentative off must be corrected')
+  assert.equal(b.states.at(-1).enabled, true)
+  assert.equal(saved.enabled, true)
+  await a.host.handle({ type: 'writing-request', session: a.host.session, id: 9, action: 'preferences', data: { enabled: false } })
+  assert.equal(a.messages.at(-1).error, 'PREFERENCES_SAVE_FAILED')
+  fail = false
+  assert.equal(b.host.setEnabled(false), true)
+  assert.equal(a.states.at(-1).enabled, false)
+  assert.equal(a.states.at(-1).error, '')
+})

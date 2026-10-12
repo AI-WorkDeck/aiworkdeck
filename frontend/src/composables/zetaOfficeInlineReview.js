@@ -12,6 +12,7 @@ const LABELS = {
     title: 'AI 审校', icon: '审', checking: '正在检查', stale: '正文已变化，等待重新检查', error: '检查暂不可用',
     open: '打开 AI 审校清单', count: n => `${n} 条提示`,
     menu: 'AI 审校设置', aiOn: '关闭 AI 审校', aiOff: '开启 AI 审校', runNow: '立即 AI 审校', collapse: '收起到边缘', expand: '展开 AI 审校浮球',
+    autocompleteOn: '自动补全已开启', autocompleteOff: '自动补全已关闭', autocompleteDisable: '关闭自动补全', autocompleteEnable: '开启自动补全', preferenceFailed: '设置未能保存，仍保持原状态，请重试。', autocompleteHint: 'AI 根据上下文建议，会使用 AI 额度。',
     aiBusy: 'AI 审校中', aiOffState: 'AI 审校已关闭（规则检查照常）',
     blocked: { DEEP_QUOTA: 'AI 审校已暂停：账户额度不足', DEEP_RATE_LIMITED: 'AI 审校已暂停：模型服务限流', DEEP_MODEL_UNAVAILABLE: 'AI 审校已暂停：当前辅助模型不可用', DEEP_REGION: 'AI 审校已暂停：服务商按地域拒绝' },
   },
@@ -19,6 +20,7 @@ const LABELS = {
     title: 'AI review', icon: 'R', checking: 'Checking…', stale: 'Text changed. Waiting for a fresh check.', error: 'Checks are unavailable',
     open: 'Open the AI review list', count: n => `${n} suggestions`,
     menu: 'AI review settings', aiOn: 'Turn AI review off', aiOff: 'Turn AI review on', runNow: 'Run AI review now', collapse: 'Collapse to edge', expand: 'Expand the AI review ball',
+    autocompleteOn: 'Autocomplete is on', autocompleteOff: 'Autocomplete is off', autocompleteDisable: 'Turn autocomplete off', autocompleteEnable: 'Turn autocomplete on', preferenceFailed: 'Could not save the setting. The previous state is unchanged; please retry.', autocompleteHint: 'AI uses context and AI credits to suggest a continuation.',
     aiBusy: 'AI review running', aiOffState: 'AI review is off (rule checks still run)',
     blocked: { DEEP_QUOTA: 'AI review paused: the account is out of credit', DEEP_RATE_LIMITED: 'AI review paused: the model service is rate limiting', DEEP_MODEL_UNAVAILABLE: 'AI review paused: the auxiliary model is unavailable', DEEP_REGION: 'AI review paused: the provider rejected this network region' },
   },
@@ -45,6 +47,7 @@ export function attachInlineReview({ canvas, input, execute, transport, language
   const doc = canvas.ownerDocument, view = doc.defaultView
   const english = language.startsWith('en')
   const t = LABELS[english ? 'en' : 'zh']
+  let autocomplete = { session: '', available: false, enabled: false, error: '' }
   let state = { session: '', ai: true, hidden: false, revision: null, status: 'disabled', findings: [], deepStatus: 'idle', autoBlocked: '' }
   let generation = 0, sequence = 0, timer = 0, disposed = false, composing = false, inFlight = false, again = false
   let anchor = null, click = null, context = null
@@ -55,7 +58,7 @@ export function attachInlineReview({ canvas, input, execute, transport, language
   // 的 :root 令牌继承不进来，所以令牌表由 editor.html 自带一份。深浅两套靠
   // html.theme-dark 上的令牌取值切换，这里不再写 .theme-dark 分支。
   const style = doc.createElement('style')
-  style.textContent = `.awd-inline-review{position:fixed;inset:0;z-index:9998;pointer-events:none;font:13px/1.5 system-ui,sans-serif;color:var(--awd-text)}.awd-inline-review button{font:inherit;color:inherit;border:1px solid var(--awd-border);border-radius:6px;background:var(--awd-surface);padding:5px 9px;cursor:pointer}.awd-inline-review button:focus-visible{outline:2px solid var(--awd-accent-text);outline-offset:2px}.awd-ir-ball{pointer-events:auto;position:absolute;left:18px;bottom:64px;display:flex;align-items:center;border:1px solid var(--awd-border);border-radius:999px;background:var(--awd-surface);box-shadow:var(--awd-shadow-md);cursor:pointer;user-select:none}.awd-ir-ball.busy{opacity:.7}.awd-ir-ball.off{opacity:.6}.awd-inline-review .awd-ir-ball button{border:0;background:none;border-radius:999px;padding:6px 9px}.awd-ir-open{display:flex;align-items:center;gap:5px}.awd-ir-more{padding-left:4px!important;opacity:.75}.awd-ir-ball-i{font-weight:600}.awd-ir-ball-n{min-width:17px;padding:0 5px;border-radius:999px;background:var(--awd-accent);color:var(--awd-text-on-accent);font-size:11px;text-align:center}.awd-ir-ball.off .awd-ir-ball-n{background:var(--awd-surface-3);color:var(--awd-text-2)}.awd-ir-menu{pointer-events:auto;position:absolute;display:flex;flex-direction:column;gap:2px;min-width:160px;padding:4px;border:1px solid var(--awd-border);border-radius:8px;background:var(--awd-surface);box-shadow:var(--awd-shadow-md)}.awd-inline-review .awd-ir-menu button{border:0;background:none;text-align:left;white-space:nowrap}.awd-inline-review .awd-ir-menu button:hover{background:var(--awd-surface-2)}.awd-ir-chip{pointer-events:auto;position:absolute;box-shadow:var(--awd-shadow-md);white-space:nowrap}.awd-inline-review .awd-ir-dock{pointer-events:auto;position:absolute;display:flex;align-items:center;justify-content:center;width:${DOCK_WIDTH}px;height:${DOCK_HEIGHT}px;padding:0;border:1px solid var(--awd-border-strong);background:var(--awd-surface);box-shadow:var(--awd-shadow-md);transition:width .12s ease,background-color .12s ease,border-color .12s ease}.awd-inline-review .awd-ir-dock.left{left:0;border-left:0;border-radius:0 12px 12px 0}.awd-inline-review .awd-ir-dock.right{border-right:0;border-radius:12px 0 0 12px}.awd-inline-review .awd-ir-dock:hover{width:${DOCK_WIDTH + 4}px;background:var(--awd-surface-2);border-color:var(--awd-accent-text)}.awd-ir-dock-g{display:block;width:3px;height:20px;border-radius:2px;background:var(--awd-accent-text);transition:height .12s ease}.awd-inline-review .awd-ir-dock:hover .awd-ir-dock-g{height:26px}.awd-ir-dock.has .awd-ir-dock-g{box-shadow:0 0 0 2px var(--awd-accent-soft)}.awd-inline-review [hidden]{display:none!important}`
+  style.textContent = `.awd-inline-review{position:fixed;inset:0;z-index:9998;pointer-events:none;font:13px/1.5 system-ui,sans-serif;color:var(--awd-text)}.awd-inline-review button{font:inherit;color:inherit;border:1px solid var(--awd-border);border-radius:6px;background:var(--awd-surface);padding:5px 9px;cursor:pointer}.awd-inline-review button:focus-visible{outline:2px solid var(--awd-accent-text);outline-offset:2px}.awd-ir-ball{pointer-events:auto;position:absolute;left:18px;bottom:64px;display:flex;align-items:center;border:1px solid var(--awd-border);border-radius:999px;background:var(--awd-surface);box-shadow:var(--awd-shadow-md);cursor:pointer;user-select:none}.awd-ir-ball.busy{opacity:.7}.awd-ir-ball.off{opacity:.6}.awd-inline-review .awd-ir-ball button{border:0;background:none;border-radius:999px;padding:6px 9px}.awd-ir-open{display:flex;align-items:center;gap:5px}.awd-ir-more{padding-left:4px!important;opacity:.75}.awd-ir-ball-i{font-weight:600}.awd-ir-ball-n{min-width:17px;padding:0 5px;border-radius:999px;background:var(--awd-accent);color:var(--awd-text-on-accent);font-size:11px;text-align:center}.awd-ir-ball.off .awd-ir-ball-n{background:var(--awd-surface-3);color:var(--awd-text-2)}.awd-ir-autocomplete-state{padding:7px 9px 2px;color:var(--awd-text-2);font-size:12px;border-top:1px solid var(--awd-border)}.awd-ir-preference-error{max-width:240px;padding:3px 9px;color:var(--awd-danger-text);font-size:12px}.awd-ir-menu{pointer-events:auto;position:absolute;display:flex;flex-direction:column;gap:2px;min-width:160px;padding:4px;border:1px solid var(--awd-border);border-radius:8px;background:var(--awd-surface);box-shadow:var(--awd-shadow-md)}.awd-inline-review .awd-ir-menu button{border:0;background:none;text-align:left;white-space:nowrap}.awd-inline-review .awd-ir-menu button:hover{background:var(--awd-surface-2)}.awd-ir-chip{pointer-events:auto;position:absolute;box-shadow:var(--awd-shadow-md);white-space:nowrap}.awd-inline-review .awd-ir-dock{pointer-events:auto;position:absolute;display:flex;align-items:center;justify-content:center;width:${DOCK_WIDTH}px;height:${DOCK_HEIGHT}px;padding:0;border:1px solid var(--awd-border-strong);background:var(--awd-surface);box-shadow:var(--awd-shadow-md);transition:width .12s ease,background-color .12s ease,border-color .12s ease}.awd-inline-review .awd-ir-dock.left{left:0;border-left:0;border-radius:0 12px 12px 0}.awd-inline-review .awd-ir-dock.right{border-right:0;border-radius:12px 0 0 12px}.awd-inline-review .awd-ir-dock:hover{width:${DOCK_WIDTH + 4}px;background:var(--awd-surface-2);border-color:var(--awd-accent-text)}.awd-ir-dock-g{display:block;width:3px;height:20px;border-radius:2px;background:var(--awd-accent-text);transition:height .12s ease}.awd-inline-review .awd-ir-dock:hover .awd-ir-dock-g{height:26px}.awd-ir-dock.has .awd-ir-dock-g{box-shadow:0 0 0 2px var(--awd-accent-soft)}.awd-inline-review [hidden]{display:none!important}`
   doc.head.appendChild(style); doc.body.appendChild(root)
   function button(label, action, parent) {
     const b = doc.createElement('button'); b.type = 'button'; b.textContent = label
@@ -73,11 +76,18 @@ export function attachInlineReview({ canvas, input, execute, transport, language
   ballMore.setAttribute('aria-haspopup', 'menu'); ballMore.setAttribute('aria-expanded', 'false')
   const menu = doc.createElement('div'); menu.className = 'awd-ir-menu'; menu.hidden = true
   menu.setAttribute('role', 'menu'); root.appendChild(menu)
-  // 三项都是真 <button>：Tab 能走到、Enter/空格能按、Esc 关闭并把焦点还给 ▾。
+  // 各项都是真 <button>：Tab 能走到、Enter/空格能按、Esc 关闭并把焦点还给 ▾。
   const menuAi = button('', () => { request('preferences', { ai: state.ai === false }); closeMenu() }, menu)
   const menuRun = button(t.runNow, () => { request('deep'); closeMenu() }, menu)
+  const autocompleteState = doc.createElement('div'); autocompleteState.className = 'awd-ir-autocomplete-state'; autocompleteState.hidden = true; menu.appendChild(autocompleteState)
+  const menuAutocomplete = button('', () => {
+    if (autocomplete.available) request('autocomplete', { enabled: !autocomplete.enabled, writingSession: autocomplete.session })
+  }, menu)
+  menuAutocomplete.className = 'awd-ir-autocomplete-toggle'; menuAutocomplete.hidden = true
+  const preferenceNotice = doc.createElement('div'); preferenceNotice.className = 'awd-ir-preference-error'; preferenceNotice.hidden = true
+  preferenceNotice.setAttribute('role', 'status'); menu.appendChild(preferenceNotice)
   const menuHide = button(t.collapse, () => { request('preferences', { hidden: true }); closeMenu() }, menu)
-  for (const item of [menuAi, menuRun, menuHide]) item.setAttribute('role', 'menuitem')
+  for (const item of [menuAi, menuRun, menuAutocomplete, menuHide]) item.setAttribute('role', 'menuitem')
   const chip = button('', openPanel, root); chip.className = 'awd-ir-chip'; chip.hidden = true
   // 收起态的把手：一个真 <button>（Tab 走得到、Enter 按得动），点一下展开回原位。
   const dock = button('', () => request('preferences', { hidden: false }), root); dock.className = 'awd-ir-dock left'; dock.hidden = true
@@ -150,6 +160,14 @@ export function attachInlineReview({ canvas, input, execute, transport, language
     ballOpen.title = label; ballOpen.setAttribute('aria-label', label)
     menuAi.textContent = state.ai === false ? t.aiOff : t.aiOn
     menuRun.disabled = state.deepStatus === 'checking' || state.writable === false
+    menuAutocomplete.hidden = !autocomplete.available
+    autocompleteState.hidden = !autocomplete.available
+    autocompleteState.textContent = autocomplete.enabled ? t.autocompleteOn : t.autocompleteOff
+    menuAutocomplete.textContent = autocomplete.enabled ? t.autocompleteDisable : t.autocompleteEnable
+    menuAutocomplete.setAttribute('aria-pressed', String(autocomplete.enabled))
+    menuAutocomplete.title = t.autocompleteHint
+    preferenceNotice.hidden = !autocomplete.available || !autocomplete.error
+    preferenceNotice.textContent = autocomplete.error ? t.preferenceFailed : ''
     placeBall(); placeMenu()
   }
   function clampPosition(pos) {
@@ -222,7 +240,13 @@ export function attachInlineReview({ canvas, input, execute, transport, language
   }
   function schedule() { clearTimeout(timer); timer = setTimeout(refreshContext, 180) }
   const unsubscribe = transport.subscribe(msg => {
-    if (disposed || msg?.__lo !== 'lo-relay' || msg.type !== 'inline-review-state' || !msg.session) return
+    if (disposed || msg?.__lo !== 'lo-relay') return
+    if (msg.type === 'writing-assistance-preferences-state') {
+      autocomplete = { session: msg.session || '', available: !!msg.available, enabled: !!msg.enabled, error: msg.error || '' }
+      renderBall()
+      return
+    }
+    if (msg.type !== 'inline-review-state' || !msg.session) return
     const sameRevision = msg.session === state.session && msg.revision != null && msg.revision === state.revision
     const savedContext = sameRevision ? context : null
     if (msg.session !== state.session) {
@@ -280,7 +304,7 @@ export function attachInlineReview({ canvas, input, execute, transport, language
   const onMenuKey = e => {
     if (e.key === 'Escape') { e.stopPropagation(); closeMenu(true); return }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
-    const items = [menuAi, menuRun, menuHide].filter(b => !b.disabled)
+    const items = [menuAi, menuRun, menuAutocomplete, menuHide].filter(b => !b.disabled && !b.hidden)
     const at = items.indexOf(doc.activeElement)
     const next = e.key === 'ArrowDown' ? at + 1 : at - 1
     items[(next + items.length) % items.length]?.focus()
