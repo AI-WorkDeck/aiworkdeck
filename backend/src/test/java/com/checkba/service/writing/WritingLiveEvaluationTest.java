@@ -53,6 +53,7 @@ class WritingLiveEvaluationTest {
             new Case("auto-review-broken-insertion",general,"服务说明\n居民咨询通过网站或者现场窗口受理。\n企业咨询通过网上平台或者线下服务站受理。", "居民与企业咨询面向不同群体。根据上述受理渠道，两项服务共同提供的办理选择是", "autocomplete",false,""),
             new Case("auto-review-unsupported-efficiency",general,"工作报告\n目前申请通过邮件、电话和现场三种方式提交，登记记录分别保存在三个表格中，项目组需要逐一核对。", "目前申请通过邮件、电话和现场三种方式提交，登记记录分别保存在三个表格中。这意味着，", "autocomplete",false,""),
             new Case("auto-review-repeated-conclusion",general,"工作进展\n线上会议支持远程成员参与，线下会议便于面对面讨论。两种会议方式均在使用。", "线上会议支持远程成员参与，线下会议便于面对面讨论。因此，两种会议方式", "autocomplete",false,""),
+            new Case("auto-review-personal-attendance",general,"工作方式说明\n线上办理支持异地提交材料，无须到场。\n现场办理须携带原件到场核对。", "线上办理无须到场，现场办理须携带原件到场核对。两种方式的区别在于", "autocomplete",false,""),
             new Case("auto-review-supported-increase",general,"流程调整说明\n流程调整前，每项材料核对一次。\n流程调整后，每项材料核对三次。", "按上述流程调整前后的逐项核对要求，", "autocomplete",true,"工作量|效率"),
             new Case("lit-role",lit,loan,"原告：","sentence",true,"顾青原"),
             new Case("lit-attributed",lit,loan,"原告主张：","paragraph",true,"法院认定"),
@@ -81,7 +82,8 @@ class WritingLiveEvaluationTest {
                 "auto-review-broken-insertion","均支持线上与线下两种办理方式。",
                 "auto-review-supported-increase","核对次数有所增加。",
                 "auto-review-unsupported-efficiency","登记信息分散，核对效率较低。",
-                "auto-review-repeated-conclusion","可以并存，发挥各自优势");
+                "auto-review-repeated-conclusion","可以并存，发挥各自优势",
+                "auto-review-personal-attendance","是否需要本人到场以及是否携带原件核对");
         ObjectMapper json=new ObjectMapper().findAndRegisterModules(); List<Map<String,Object>> report=new ArrayList<>();
         String onlyCase=System.getenv().getOrDefault("WRITING_EVAL_CASE","");
         assertTrue(onlyCase.isEmpty() || cases.stream().anyMatch(c -> c.name.equals(onlyCase)),"Unknown evaluation case");
@@ -110,7 +112,7 @@ class WritingLiveEvaluationTest {
                     when(observed.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
                         StreamingResponseHandler<AiMessage> original=invocation.getArgument(2);
                         List<ChatMessage> messages=invocation.getArgument(0);
-                        String phase=(int)invocation.getArgument(1)==2048?"grammar":json.readTree(((UserMessage)messages.get(1)).singleText()).has("candidate")?"semantic":"generation";
+                        String phase=requestPhase(json,messages);
                         if(reviewFixtures.containsKey(c.name) && phase.equals("generation")) {
                             List<String> fixtureFactIds=new ArrayList<>();
                             List<dev.langchain4j.data.message.ChatMessage> prompt=invocation.getArgument(0);
@@ -143,7 +145,7 @@ class WritingLiveEvaluationTest {
                         String outcome=view.status().equals("READY")?"ready":"empty";
                         if(reviewFixtures.containsKey(c.name)) {
                             boolean rejected=explicitReviewRejection(json,phaseResponses,c.before+reviewFixtures.get(c.name));
-                            boolean ready=view.status().equals("READY") && phaseResponses.keySet().containsAll(Set.of("generation","semantic","grammar"))
+                            boolean ready=view.status().equals("READY") && phaseResponses.keySet().containsAll(Set.of("generation","semantic","grammar","value"))
                                     && view.advice().size()==1 && reviewFixtures.get(c.name).equals(view.advice().get(0).text());
                             if(Boolean.TRUE.equals(c.expectAnswer)) passed=passed && (ready || view.status().equals("EMPTY") && rejected);
                             else passed=passed && view.status().equals("EMPTY") && rejected;
@@ -177,7 +179,7 @@ class WritingLiveEvaluationTest {
         }
         assertEquals(futures.size(),report.size(),"Every selected evaluation must produce a report row");
         if ("1".equals(System.getenv("WRITING_EVAL_AUTOMATIC")) && onlyCase.isEmpty())
-            assertEquals(48,report.size(),"Keep all sixteen automatic cases across three fixed repetitions");
+            assertEquals(51,report.size(),"Keep all seventeen automatic cases across three fixed repetitions");
         if ("1".equals(System.getenv("WRITING_EVAL_AUTOMATIC")) && onlyCase.isEmpty())
             assertTrue(report.stream().anyMatch(r -> Boolean.TRUE.equals(r.get("expectedAnswer"))
                     && r.get("evaluationKind").equals("fixed-candidate-real-review")
@@ -209,9 +211,30 @@ class WritingLiveEvaluationTest {
         assertFalse(explicitReviewRejection(json,Map.of("grammar",changedWithoutError),assembled));
         assertFalse(explicitReviewRejection(json,Map.of("semantic",refusal+" {}","grammar","StreamResetException"),assembled));
         assertFalse(explicitReviewRejection(json,Map.of(),assembled));
+        String valueRefusal=json.writeValueAsString(Map.of("approve",false,"reason","候选重复材料已经明说的同一关系","reviewedText",assembled));
+        String valueApproval=json.writeValueAsString(Map.of("approve",true,"reason","候选提炼尚未明确的关系","reviewedText",assembled));
+        assertTrue(explicitReviewRejection(json,Map.of("value",valueRefusal,"semantic",approval,"grammar",grammatical),assembled));
+        assertFalse(explicitReviewRejection(json,Map.of("value",valueApproval),assembled));
+        assertFalse(explicitReviewRejection(json,Map.of("value",valueRefusal.replace("false","\"false\"")),assembled));
+        assertFalse(explicitReviewRejection(json,Map.of("value",valueRefusal.replace("候选重复材料已经明说的同一关系","")),assembled));
+        assertFalse(explicitReviewRejection(json,Map.of("value",valueRefusal.replace(assembled,"改写正文")),assembled));
+        assertFalse(explicitReviewRejection(json,Map.of("value",valueRefusal+" {}"),assembled));
+        for(String phase:List.of("generation","semantic","grammar","value")) {
+            Map<String,Object> input=new HashMap<>();
+            if(!phase.equals("generation")) input.put("candidate","合成续写");
+            if(phase.equals("semantic")) input.put("facts",List.of());
+            if(phase.equals("value")) input.put("scopedFacts",List.of());
+            assertEquals(phase,requestPhase(json,List.of(SystemMessage.from("同一请求预算"),UserMessage.from(json.writeValueAsString(input)))));
+        }
+    }
+    private static String requestPhase(ObjectMapper json,List<ChatMessage> messages) throws Exception {
+        var input=json.readTree(((UserMessage)messages.get(1)).singleText());
+        if(!input.has("candidate")) return "generation";
+        if(input.has("scopedFacts")) return "value";
+        return input.has("facts")?"semantic":"grammar";
     }
     private static boolean explicitReviewRejection(ObjectMapper json,Map<String,String> phases,String assembled) {
-        // Either parallel reviewer may veto; response arrival order and a sibling's cancellation are irrelevant.
+        // Any parallel reviewer may veto; response arrival order and a sibling's cancellation are irrelevant.
         try {
             var review=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                     .readTree(phases.getOrDefault("semantic",""));
@@ -222,6 +245,14 @@ class WritingLiveEvaluationTest {
                     && assembled.equals(review.path("reviewedText").asText())
                     && (review.path("counterexamplePossible").asBoolean()? !review.path("counterexample").asText().isBlank()
                         :review.path("counterexample").asText().isEmpty())) return true;
+        } catch(Exception ignored) { }
+        try {
+            var value=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readTree(phases.getOrDefault("value",""));
+            if(value!=null && value.isObject() && value.path("approve").isBoolean() && !value.path("approve").asBoolean()
+                    && value.path("reason").isTextual() && !value.path("reason").asText().isBlank()
+                    && value.path("reason").asText().length()<=240 && value.path("reviewedText").isTextual()
+                    && assembled.equals(value.path("reviewedText").asText())) return true;
         } catch(Exception ignored) { }
         try {
             var proof=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
