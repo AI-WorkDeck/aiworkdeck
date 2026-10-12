@@ -104,6 +104,7 @@ class ChatModelFactoryTest {
         factory.setReasoningPropertiesForTest(reasoning);
         var timeout = java.time.Duration.ofSeconds(2);
         assertEquals("high", factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        assertNull(factory.getAutomaticWritingModel(timeout, false).reasoningEffort());
         assertNull(factory.getWritingModel(timeout).reasoningEffort());
         reasoning.setModels(java.util.List.of("deepseek/deepseek-v4-flash"));
         for (String effort : java.util.List.of("high", "xhigh", "none")) {

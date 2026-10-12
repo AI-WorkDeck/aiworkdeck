@@ -280,15 +280,19 @@ public class ChatModelFactory {
 
     /** One explicit writing request: bounded transport, no cache, no provider fallback. */
     public OpenRouterStreamingChatModel getWritingModel(java.time.Duration timeout) {
-        return createWritingModel(timeout, false);
+        return createWritingModel(timeout, false, false);
     }
 
     /** Automatic generation and review use the selected main model, never the auxiliary fallback. */
     public OpenRouterStreamingChatModel getAutomaticWritingModel(java.time.Duration timeout) {
-        return createWritingModel(timeout, true);
+        return getAutomaticWritingModel(timeout, true);
     }
 
-    private OpenRouterStreamingChatModel createWritingModel(java.time.Duration timeout, boolean automatic) {
+    public OpenRouterStreamingChatModel getAutomaticWritingModel(java.time.Duration timeout, boolean review) {
+        return createWritingModel(timeout, true, review);
+    }
+
+    private OpenRouterStreamingChatModel createWritingModel(java.time.Duration timeout, boolean automatic, boolean review) {
         if (timeout == null || timeout.isZero() || timeout.isNegative()) {
             throw new IllegalArgumentException("Writing request deadline expired");
         }
@@ -312,7 +316,7 @@ public class ChatModelFactory {
         String baseUrl = platform ? aiModelProperties.getOpenRouter().getBaseUrl() : resolveOpenRouterBaseUrl();
         recordModelUse(target.channel().name(), target.modelId(), true);
         return new OpenRouterStreamingChatModel(key, baseUrl, target.modelId(), remainingTimeout(timeout, started),
-                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), automatic ? automaticWritingReasoningEffortFor(target.modelId()) : null);
+                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), automatic ? (review ? automaticWritingReasoningEffortFor(target.modelId()) : reasoningEffortFor(target.modelId())) : null);
     }
 
     private String automaticWritingReasoningEffortFor(String modelId) {

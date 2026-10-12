@@ -34,7 +34,7 @@ class WritingSuggestionServiceTest {
         service=new WritingSuggestionService(contexts,models,usage,json);
         snapshot=snapshot(new LitigationWritingProfile(),"原告：沈望舒\n被告：顾青原","被告：顾","");
         when(contexts.capture(eq(1L),eq(10L),any())).thenAnswer(i -> snapshot);
-        when(models.getWritingModel(any())).thenReturn(model); when(models.getAutomaticWritingModel(any())).thenReturn(model); when(model.modelName()).thenReturn("synthetic-model");
+        when(models.getWritingModel(any())).thenReturn(model); when(models.getAutomaticWritingModel(any(),anyBoolean())).thenReturn(model); when(model.modelName()).thenReturn("synthetic-model");
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {handler.set(i.getArgument(2)); return call;});
     }
     @AfterEach void close() { service.close(); }
@@ -289,7 +289,7 @@ class WritingSuggestionServiceTest {
         snapshot=new Snapshot(report.projectId(),report.userId(),report.request(),report.settings(),report.context(),null,report.sources(),List.of(),List.of());
         View running=start("autocomplete");
         assertEquals("RUNNING",running.status()); assertEquals("general",running.profile());
-        verify(models).getAutomaticWritingModel(argThat(d -> !d.isNegative() && !d.isZero() && d.toMillis()<=30000));
+        verify(models).getAutomaticWritingModel(argThat(d -> !d.isNegative() && !d.isZero() && d.toMillis()<=30000),eq(false));
         verify(model).generateCancellable(anyList(),eq(4096),any());
         complete(automaticResult(report,"便于委员按事项查阅和办理。"));
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
@@ -461,6 +461,33 @@ class WritingSuggestionServiceTest {
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
         verify(model,times(2)).generateCancellable(anyList(),anyInt(),any());
     }
+    @Test void reviewSeesUncitedScopedFactsButNeverExcludedRawSource() throws Exception {
+        String conclusion="当前材料已明确支持委员按事项查阅并办理相关工作。";
+        Snapshot original=snapshot(new AutomaticWritingProfile(),reportSnapshot().sources().get(0).text()+"\n"+conclusion,
+                "平台集中整理了相关项目材料，","");
+        Source originalSource=original.sources().get(0);
+        Source source=new Source(originalSource.id(),originalSource.fileId(),originalSource.name(),originalSource.version(),
+                originalSource.locator(),originalSource.text()+"\n不应进入模型的旧附件定义：测试代号旧蓝图。");
+        snapshot=new Snapshot(original.projectId(),original.userId(),original.request(),original.settings(),original.context(),
+                original.profile(),List.of(source),original.facts(),original.warnings());
+        assertEquals(2,snapshot.facts().size());
+        AtomicReference<String> reviewInput=new AtomicReference<>();
+        when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
+            handler.set(invocation.getArgument(2));
+            List<ChatMessage> messages=invocation.getArgument(0);
+            String input=((UserMessage)messages.get(1)).singleText();
+            if(json.readTree(input).has("candidate")) reviewInput.set(input);
+            return call;
+        });
+        View running=start("autocomplete"); complete(automaticResult(snapshot,"便于委员按事项查阅和办理。"));
+        assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
+        var input=json.readTree(reviewInput.get());
+        assertEquals(json.valueToTree(List.of(snapshot.facts().get(0))),input.path("facts"));
+        assertEquals(json.valueToTree(snapshot.facts()),input.path("scopedFacts"));
+        assertEquals(conclusion,input.path("scopedFacts").get(1).path("quote").asText());
+        assertFalse(input.has("sources")); assertFalse(reviewInput.get().contains("旧蓝图"));
+        service.cancel(1L,10L,running.id());
+    }
     @Test void malformedReviewAndNonBooleanApprovalCannotReleaseSuggestion() throws Exception {
         snapshot=reportSnapshot(); View running=start("autocomplete");
         complete(automaticResult(snapshot,"便于委员按事项查阅和办理。"));
@@ -541,7 +568,7 @@ class WritingSuggestionServiceTest {
         complete(generated); var reviewer=handler.get();
         generator.onComplete(Response.from(AiMessage.from(generated),new TokenUsage(20,10)));
         var budgets=org.mockito.ArgumentCaptor.forClass(Duration.class);
-        verify(models,times(2)).getAutomaticWritingModel(budgets.capture());
+        verify(models,times(2)).getAutomaticWritingModel(budgets.capture(),anyBoolean());
         assertTrue(budgets.getAllValues().get(0).toMillis()<=30000);
         assertTrue(budgets.getAllValues().get(1).toMillis()<=budgets.getAllValues().get(0).toMillis());
         reviewer.onError(new OpenRouterStreamingChatModel.EmptyResponseException(new TokenUsage(8,4)));
@@ -566,7 +593,9 @@ class WritingSuggestionServiceTest {
         assertEquals(snapshot.context().before()+candidate+snapshot.context().after(),((UserMessage)messages.get(1)).singleText());
         assertTrue(((SystemMessage)messages.get(0)).text().contains("中文语法校对员"));
         var budgets=org.mockito.ArgumentCaptor.forClass(Duration.class);
-        verify(models,times(3)).getAutomaticWritingModel(budgets.capture());
+        var reviewing=org.mockito.ArgumentCaptor.forClass(Boolean.class);
+        verify(models,times(3)).getAutomaticWritingModel(budgets.capture(),reviewing.capture());
+        assertEquals(List.of(false,true,true),reviewing.getAllValues());
         for(int i=0;i<3;i++) {
             assertTrue(budgets.getAllValues().get(i).toMillis()>0 && budgets.getAllValues().get(i).toMillis()<=30000);
             if(i>0) assertTrue(budgets.getAllValues().get(i).compareTo(budgets.getAllValues().get(i-1))<=0);

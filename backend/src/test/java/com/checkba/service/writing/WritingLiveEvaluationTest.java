@@ -51,6 +51,7 @@ class WritingLiveEvaluationTest {
             new Case("auto-review-narrowed-facility",general,"服务说明\n居民咨询通过网站或者现场窗口受理。\n企业咨询通过网上平台或者线下服务站受理。", "居民与企业咨询面向不同群体。根据上述受理渠道，两项服务共同提供的办理选择是", "autocomplete",false,""),
             new Case("auto-review-broken-insertion",general,"服务说明\n居民咨询通过网站或者现场窗口受理。\n企业咨询通过网上平台或者线下服务站受理。", "居民与企业咨询面向不同群体。根据上述受理渠道，两项服务共同提供的办理选择是", "autocomplete",false,""),
             new Case("auto-review-unsupported-efficiency",general,"工作报告\n目前申请通过邮件、电话和现场三种方式提交，登记记录分别保存在三个表格中，项目组需要逐一核对。", "目前申请通过邮件、电话和现场三种方式提交，登记记录分别保存在三个表格中。这意味着，", "autocomplete",false,""),
+            new Case("auto-review-repeated-conclusion",general,"工作进展\n线上会议支持远程成员参与，线下会议便于面对面讨论。两种会议方式均在使用。", "线上会议支持远程成员参与，线下会议便于面对面讨论。因此，两种会议方式", "autocomplete",false,""),
             new Case("auto-review-supported-increase",general,"流程调整说明\n流程调整前，每项材料核对一次。\n流程调整后，每项材料核对三次。", "按上述流程调整前后的逐项核对要求，", "autocomplete",true,"工作量|效率"),
             new Case("lit-role",lit,loan,"原告：","sentence",true,"顾青原"),
             new Case("lit-attributed",lit,loan,"原告主张：","paragraph",true,"法院认定"),
@@ -78,7 +79,8 @@ class WritingLiveEvaluationTest {
                 "auto-review-narrowed-facility","线上受理与线下窗口办理。",
                 "auto-review-broken-insertion","均支持线上与线下两种办理方式。",
                 "auto-review-supported-increase","核对次数有所增加。",
-                "auto-review-unsupported-efficiency","登记信息分散，核对效率较低。");
+                "auto-review-unsupported-efficiency","登记信息分散，核对效率较低。",
+                "auto-review-repeated-conclusion","可以并存，发挥各自优势");
         ObjectMapper json=new ObjectMapper().findAndRegisterModules(); List<Map<String,Object>> report=new ArrayList<>();
         String onlyCase=System.getenv().getOrDefault("WRITING_EVAL_CASE","");
         assertTrue(onlyCase.isEmpty() || cases.stream().anyMatch(c -> c.name.equals(onlyCase)),"Unknown evaluation case");
@@ -100,6 +102,7 @@ class WritingLiveEvaluationTest {
                     AtomicReference<String> raw=new AtomicReference<>(""), transportError=new AtomicReference<>("");
                     List<String> responses=Collections.synchronizedList(new ArrayList<>());
                     var wire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,reasoningEffort);
+                    var generationWire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35));
                     var observed=mock(OpenRouterStreamingChatModel.class); when(observed.modelName()).thenReturn(model);
                     when(observed.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
                         StreamingResponseHandler<AiMessage> original=invocation.getArgument(2);
@@ -114,13 +117,13 @@ class WritingLiveEvaluationTest {
                             responses.add(fixture); original.onComplete(Response.from(AiMessage.from(fixture)));
                             return mock(okhttp3.Call.class);
                         }
-                        return wire.generateCancellable(invocation.getArgument(0),invocation.getArgument(1),new StreamingResponseHandler<AiMessage>() {
+                        return (responses.isEmpty()?generationWire:wire).generateCancellable(invocation.getArgument(0),invocation.getArgument(1),new StreamingResponseHandler<AiMessage>() {
                             public void onNext(String token){original.onNext(token);}
                             public void onComplete(Response<AiMessage> response){raw.set(response==null||response.content()==null?"":response.content().text());responses.add(raw.get());original.onComplete(response);}
                             public void onError(Throwable error){transportError.set(error.getClass().getSimpleName());original.onError(error);}
                         });
                     });
-                    when(models.getWritingModel(any())).thenReturn(observed); when(models.getAutomaticWritingModel(any())).thenReturn(observed);
+                    when(models.getWritingModel(any())).thenReturn(observed); when(models.getAutomaticWritingModel(any(),anyBoolean())).thenReturn(observed);
                     Context context=new Context(c.profile.id(),c.profile.label(),"正文",c.before,"","","");
                     Source source=new Source("active-document",10L,c.profile.label(),"test:1","合成测试材料",c.body);
                     Request request=new Request(10L,"1",c.body,c.before,"",c.selection,c.profile.label(),"正文",c.profile.id(),List.of());
@@ -141,7 +144,7 @@ class WritingLiveEvaluationTest {
                         Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get());
                         synchronized(report) {
                             report.add(row); report.sort(reportOrder);
-                            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("model",model,"reasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"cases",report)));
+                            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("model",model,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"cases",report)));
                         }
                         System.out.println("Writing synthetic eval "+c.name+": "+view.status()+", pass="+passed+", elapsedMs="+view.elapsedMs());
                     }
@@ -161,11 +164,11 @@ class WritingLiveEvaluationTest {
         assertFalse(futures.isEmpty(),"No evaluation cases selected; check WRITING_EVAL_AUTOMATIC");
         synchronized(report) {
             report.sort(reportOrder);
-            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("model",model,"reasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"cases",report)));
+            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("model",model,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"cases",report)));
         }
         assertEquals(futures.size(),report.size(),"Every selected evaluation must produce a report row");
         if ("1".equals(System.getenv("WRITING_EVAL_AUTOMATIC")) && onlyCase.isEmpty())
-            assertEquals(45,report.size(),"Keep all fifteen automatic cases across three fixed repetitions");
+            assertEquals(48,report.size(),"Keep all sixteen automatic cases across three fixed repetitions");
         assertTrue(report.stream().allMatch(r -> Boolean.TRUE.equals(r.get("passed"))),"Inspect synthetic evaluation report and the actual joined text");
         if ("1".equals(System.getenv("WRITING_EVAL_AUTOMATIC")) && onlyCase.isEmpty())
             assertTrue(report.stream().anyMatch(r -> Boolean.TRUE.equals(r.get("expectedAnswer"))
