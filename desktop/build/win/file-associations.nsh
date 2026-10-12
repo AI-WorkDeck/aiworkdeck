@@ -13,7 +13,8 @@
     WriteRegStr HKCU "${AWD_FILE_CAPABILITIES}\FileAssociations" ".${EXT}" "${AWD_FILE_PROGID}"
   !else
     DeleteRegValue HKCU "Software\Classes\.${EXT}\OpenWithProgids" "${AWD_FILE_PROGID}"
-    DeleteRegKey /ifempty HKCU "Software\Classes\.${EXT}\OpenWithProgids"
+    ; This shared key may hold other apps' named values. NSIS 3.0.4.1 /ifempty
+    ; only checks subkeys, so leave the key itself intact (even if now empty).
   !endif
 !macroend
 

@@ -54,7 +54,10 @@ function registryHarness() {
       if (remove) { registry.delete(keyValue(remove[1], remove[2])); continue }
       const tree = line.match(/^DeleteRegKey (\/ifempty )?HKCU "([^"]*)"$/)
       if (tree) {
-        if (!tree[1]) for (const key of registry.keys()) {
+        // Bundled NSIS 3.0.4.1 /ifempty checks subkeys, NOT named values.
+        // OpenWithProgids contains values, so deleting it would erase other apps.
+        const hasSubkeys = [...registry.keys()].some(key => key.startsWith(tree[2] + '\\'))
+        if (!tree[1] || !hasSubkeys) for (const key of registry.keys()) {
           if (key.startsWith(tree[2] + '|') || key.startsWith(tree[2] + '\\')) registry.delete(key)
         }
         continue
@@ -73,6 +76,9 @@ test('install, reinstall and uninstall preserve the previous defaults and other 
   h.write('Software\\RegisteredApplications', 'Other', 'Software\\Other\\Capabilities')
   const previous = new Map(h.registry)
   h.execute('AwdRegisterFileAssociations')
+  // The real NSIS upgrade uninstalls the old version before registering again.
+  h.execute('AwdUnregisterFileAssociations')
+  assert.deepEqual(h.registry, previous)
   h.execute('AwdRegisterFileAssociations')
   for (const [key, value] of previous) assert.equal(h.registry.get(key), value)
   assert.equal(h.read('Software\\Classes\\.docx\\OpenWithProgids', 'com.aiworkdeck.desktop.Document'), '')
