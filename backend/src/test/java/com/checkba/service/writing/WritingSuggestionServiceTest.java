@@ -273,6 +273,10 @@ class WritingSuggestionServiceTest {
         return json.writeValueAsString(Map.of("abstain",false,"usefulness","completes_current_thought","evidence","direct_support",
                 "suggestions",List.of(new Advice(text,"sentence",List.of(fact.id()),List.of(fact.sourceId()),"沿用文中按事项查阅办理的用途"))));
     }
+    String approvedReview(Snapshot s,String candidate,String reason) throws Exception {
+        return json.writeValueAsString(Map.of("approve",true,"reason",reason,
+                "reviewedText",s.context().before()+candidate+s.context().after()));
+    }
     @Test void automaticReportUsesRealModelPathAndGenericFallbackThenExistingAcceptance() throws Exception {
         Snapshot report=reportSnapshot();
         snapshot=new Snapshot(report.projectId(),report.userId(),report.request(),report.settings(),report.context(),null,report.sources(),List.of(),List.of());
@@ -282,8 +286,8 @@ class WritingSuggestionServiceTest {
         verify(model).generateCancellable(anyList(),eq(512),any());
         complete(automaticResult(report,"便于委员按事项查阅和办理。"));
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
-        verify(model).generateCancellable(anyList(),eq(384),any());
-        complete("{\"approve\":true,\"reason\":\"承接材料按事项办理的既有用途，没有增加事实或责任\"}");
+        verify(model).generateCancellable(anyList(),eq(768),any());
+        complete(approvedReview(report,"便于委员按事项查阅和办理。","承接材料按事项办理的既有用途，没有增加事实或责任"));
         View done=service.get(1L,10L,running.id()); assertEquals("READY",done.status()); assertEquals(1,done.advice().size());
         assertEquals("便于委员按事项查阅和办理。",service.accept(1L,10L,running.id(),new Accept(0,"r1")).text());
         verify(usage,times(2)).recordUsage(eq(10L),eq(1L),eq("synthetic-model"),any(),isNull());
@@ -375,7 +379,7 @@ class WritingSuggestionServiceTest {
         assertEquals(List.of(advice),service.parse(snapshot,raw,"autocomplete"));
         View running=start("autocomplete"); complete(raw);
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
-        complete("{\"approve\":true,\"reason\":\"整合两组功能的入口差异，没有增加事实或改变语气\"}");
+        complete(approvedReview(snapshot,text,"整合两组功能的入口差异，没有增加事实或改变语气"));
         View done=service.get(1L,10L,running.id());
         assertEquals("READY",done.status()); assertEquals(List.of(advice),done.advice());
         assertEquals(40,done.inputTokens()); assertEquals(20,done.outputTokens());
@@ -387,7 +391,7 @@ class WritingSuggestionServiceTest {
         AtomicReference<String> reviewPrompt=new AtomicReference<>(),reviewInput=new AtomicReference<>();
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
             List<ChatMessage> messages=i.getArgument(0); handler.set(i.getArgument(2));
-            if((int)i.getArgument(1)==384) {
+            if((int)i.getArgument(1)==768) {
                 reviewPrompt.set(((SystemMessage)messages.get(0)).text());
                 reviewInput.set(((UserMessage)messages.get(1)).singleText());
             }
@@ -417,8 +421,37 @@ class WritingSuggestionServiceTest {
     @Test void malformedReviewAndNonBooleanApprovalCannotReleaseSuggestion() throws Exception {
         snapshot=reportSnapshot(); View running=start("autocomplete");
         complete(automaticResult(snapshot,"便于委员按事项查阅和办理。"));
-        complete("{\"approve\":\"true\",\"reason\":\"看起来可以\"}");
+        complete(json.writeValueAsString(Map.of("approve","true","reason","看起来可以",
+                "reviewedText",snapshot.context().before()+"便于委员按事项查阅和办理。"+snapshot.context().after())));
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
+    }
+    @Test void approvalWithoutReviewedTextCannotReleaseSuggestion() throws Exception {
+        snapshot=reportSnapshot(); View running=start("autocomplete");
+        complete(automaticResult(snapshot,"便于委员按事项查阅和办理。"));
+        complete("{\"approve\":true,\"reason\":\"有直接依据\"}");
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
+    }
+    @Test void approvalThatRewritesTypedPrefixCannotReleaseSuggestion() throws Exception {
+        snapshot=reportSnapshot(); View running=start("autocomplete");
+        String candidate="便于委员按事项查阅和办理。";
+        complete(automaticResult(snapshot,candidate));
+        complete(json.writeValueAsString(Map.of("approve",true,"reason","改写前文后通顺",
+                "reviewedText","平台应该集中整理相关项目材料，"+candidate+snapshot.context().after())));
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
+    }
+    @Test void approvalOfExactAssembledTextReleasesOriginalCandidate() throws Exception {
+        Snapshot base=reportSnapshot(); Context c=base.context(); Request r=base.request();
+        String after="下一节介绍活动安排。";
+        snapshot=new Snapshot(base.projectId(),base.userId(),
+                new Request(r.fileId(),r.revision(),r.documentText(),r.before(),after,r.selection(),r.title(),r.section(),r.documentType(),r.sourceFileIds()),
+                base.settings(),new Context(c.documentType(),c.title(),c.section(),c.before(),after,c.stance(),c.cutoffDate()),
+                base.profile(),base.sources(),base.facts(),base.warnings());
+        View running=start("autocomplete");
+        String candidate="便于委员按事项查阅和办理。";
+        complete(automaticResult(snapshot,candidate));
+        complete(approvedReview(snapshot,candidate,"拼接全文自然，事实和语气保持一致"));
+        View done=service.get(1L,10L,running.id());
+        assertEquals("READY",done.status()); assertEquals(candidate,done.advice().get(0).text());
     }
     @Test void synchronousGenerationDoesNotOverwriteReviewCallAndCancellationBlocksLateApproval() throws Exception {
         snapshot=reportSnapshot(); Call generationCall=mock(Call.class),reviewCall=mock(Call.class);
@@ -433,7 +466,7 @@ class WritingSuggestionServiceTest {
         });
         View running=start("autocomplete"); assertEquals("RUNNING",running.status());
         service.cancel(1L,10L,running.id()); verify(reviewCall).cancel();
-        reviewer.get().onComplete(Response.from(AiMessage.from("{\"approve\":true,\"reason\":\"有直接依据\"}"),new TokenUsage(8,4)));
+        reviewer.get().onComplete(Response.from(AiMessage.from(approvedReview(snapshot,"便于委员按事项查阅和办理。","有直接依据")),new TokenUsage(8,4)));
         View cancelled=service.get(1L,10L,running.id());
         assertEquals("CANCELLED",cancelled.status()); assertTrue(cancelled.advice().isEmpty());
         assertEquals(28,cancelled.inputTokens()); assertEquals(14,cancelled.outputTokens());
@@ -442,7 +475,7 @@ class WritingSuggestionServiceTest {
     @Test void missingReviewUsageRetainsKnownGenerationUsageAsPartialRatherThanZero() throws Exception {
         snapshot=reportSnapshot(); View running=start("autocomplete");
         complete(automaticResult(snapshot,"便于委员按事项查阅和办理。"));
-        handler.get().onComplete(Response.from(AiMessage.from("{\"approve\":true,\"reason\":\"有直接依据\"}")));
+        handler.get().onComplete(Response.from(AiMessage.from(approvedReview(snapshot,"便于委员按事项查阅和办理。","有直接依据"))));
         View done=service.get(1L,10L,running.id()); assertEquals("READY",done.status());
         assertEquals(20,done.inputTokens()); assertEquals(10,done.outputTokens());
         assertEquals("partial_or_unreported",done.usageStatus());
@@ -451,7 +484,7 @@ class WritingSuggestionServiceTest {
     @Test void missingGenerationUsageDoesNotTurnReviewUsageIntoCompleteTotal() throws Exception {
         snapshot=reportSnapshot(); View running=start("autocomplete");
         handler.get().onComplete(Response.from(AiMessage.from(automaticResult(snapshot,"便于委员按事项查阅和办理。"))));
-        complete("{\"approve\":true,\"reason\":\"有直接依据\"}");
+        complete(approvedReview(snapshot,"便于委员按事项查阅和办理。","有直接依据"));
         View done=service.get(1L,10L,running.id()); assertEquals("READY",done.status());
         assertEquals(20,done.inputTokens()); assertEquals(10,done.outputTokens());
         assertEquals("partial_or_unreported",done.usageStatus());
@@ -483,7 +516,7 @@ class WritingSuggestionServiceTest {
         var deadline=(Runnable)org.springframework.test.util.ReflectionTestUtils.getField(job,"deadline");
         assertNotNull(deadline); deadline.run();
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status()); verify(call).cancel();
-        reviewer.onComplete(Response.from(AiMessage.from("{\"approve\":true,\"reason\":\"有直接依据\"}"),new TokenUsage(8,4)));
+        reviewer.onComplete(Response.from(AiMessage.from(approvedReview(snapshot,"便于委员按事项查阅和办理。","有直接依据")),new TokenUsage(8,4)));
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
         assertTrue(service.get(1L,10L,running.id()).advice().isEmpty());
     }
