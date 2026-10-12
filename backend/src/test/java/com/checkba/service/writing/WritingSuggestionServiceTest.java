@@ -307,7 +307,7 @@ class WritingSuggestionServiceTest {
     @Test void automaticQualityChecksRejectUnsupportedNumbersObligationsClaimsAndEchoes() throws Exception {
         snapshot=reportSnapshot();
         for(String text:List.of("便于全部84名委员查阅和办理。","委员必须负责完成全部事项。","项目已经通过全部验收。",
-                "平台集中整理了相关项目材料，便于查阅。","便于查阅。","便于委员查阅。\n并且办理。"))
+                "平台集中整理了相关项目材料，便于查阅。","好。","便于委员查阅。\n并且办理。"))
             assertTrue(service.parse(snapshot,automaticResult(snapshot,text),"autocomplete").isEmpty(),text);
         String valid=automaticResult(snapshot,"便于委员按事项查阅和办理。");
         var tree=json.readTree(valid); ((com.fasterxml.jackson.databind.node.ArrayNode)tree.path("suggestions")).add(tree.path("suggestions").get(0).deepCopy());
@@ -364,6 +364,13 @@ class WritingSuggestionServiceTest {
         for(String text:List.of(copied,"项目组需要，逐一核对！","项目组需要 逐一核对。"))
             assertTrue(service.parse(snapshot,automaticResult(snapshot,text),"autocomplete").isEmpty(),text);
         assertEquals(1,service.parse(snapshot,result(copied,"sentence",fact),"sentence").size(),"手动有据续写的既有行为保留");
+    }
+    @Test void shortGenericFillerIsJudgedBySemanticReviewNotLengthAlone() throws Exception {
+        snapshot=reportSnapshot(); View running=start("autocomplete");
+        complete(automaticResult(snapshot,"便于查阅。"));
+        assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
+        complete("{\"approve\":false,\"reason\":\"只是泛化重复前文，没有实际写作价值\"}");
+        assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
     }
     @Test void conciseSemanticDimensionsStillRequireReviewAndCanBeAccepted() throws Exception {
         snapshot=snapshot(new AutomaticWritingProfile(),"材料核对检查申请材料是否齐全。\n内容审查核实提交内容是否真实。",
