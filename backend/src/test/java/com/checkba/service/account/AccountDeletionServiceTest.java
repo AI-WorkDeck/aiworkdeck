@@ -31,6 +31,15 @@ import static org.mockito.Mockito.*;
  */
 class AccountDeletionServiceTest {
 
+    @Test
+    void removesLocalSuggestionFeedbackWhenDeletingAccount() {
+        Fixture f = fixture(List.of());
+        var suggestions = mock(com.checkba.repository.ChatSuggestionRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(), "chatSuggestions", suggestions);
+        f.svc().deleteAccount(7L);
+        verify(suggestions).deleteByUserId(7L);
+    }
+
     private record Fixture(AccountDeletionService svc, UserRepository users,
                            MobileMediaInboxRepository inbox, MobileRelayBlobStore blobs,
                            UserSessionRepository sessions, MobileProjectDirRepository dirs,
@@ -200,5 +209,13 @@ class AccountDeletionServiceTest {
 
         verifyNoInteractions(f.billing());
         verify(f.users()).deleteById(7L);
+    }
+
+    @Test void accountDeletionKeepsVersionObjectCleanupReceiptsBeforeRemovingOwner() {
+        Fixture f=fixture(List.of());
+        var objects=mock(com.checkba.service.mobile.MobileVersionObjectService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(f.svc(),"versionObjects",objects);
+        f.svc().deleteAccount(7L);
+        InOrder order=inOrder(objects,f.users());order.verify(objects).revoke(7L);order.verify(f.users()).deleteById(7L);
     }
 }

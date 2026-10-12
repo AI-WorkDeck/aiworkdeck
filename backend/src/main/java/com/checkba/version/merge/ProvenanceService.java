@@ -476,6 +476,11 @@ public class ProvenanceService {
                 if (loader.getSize() > ThreeWayAnalyzer.MAX_BYTES) {
                     return null;
                 }
+                if (ProjectRepoService.hasObjectFormat(commit)
+                        && loader.getSize() <= com.checkba.version.objects.VersionObjectPointer.MAX_BYTES
+                        && com.checkba.version.objects.VersionObjectPointer.parse(loader.getBytes()) != null) {
+                    return null; // Large structured files have whole-file history, not paragraph attribution.
+                }
                 ByteArrayOutputStream bos = new ByteArrayOutputStream();
                 loader.copyTo(bos);
                 return parse(bos.toByteArray(), kind);

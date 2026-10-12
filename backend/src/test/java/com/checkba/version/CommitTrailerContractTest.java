@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -27,10 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * （{@code repos/project-N.git}），每一条提交说明的正文里都带着它们，而且是
  * 用户拿 git 客户端 clone 出去之后仍然读得到的历史。读侧
  * （{@code extractTrailer}，时间线区分「自动存档」与「工作段」、显示备注、
- * 显示体积过滤掉的大文件指纹）也按同一批字面量解析。
+ * 识别完整对象版本）也按同一批字面量解析。
  *
  * <p>因此改动任何一个字面量都会破坏兼容：新代码读不出存量仓库里的旧尾注，
- * 时间线会把历史全部退化成无 kind、无备注、无跳过记录。要改必须同时提供迁移
+ * 时间线会把历史全部退化成无 kind、无备注、对象格式不明。要改必须同时提供迁移
  * 或双读，不能只改常量。本用例锁的就是这一点，故意断言在**字面量**上，
  * 而不是引用生产常量（引用常量的话，改名重构会连测试一起改绿）。
  *
@@ -40,7 +42,7 @@ class CommitTrailerContractTest {
 
     private static final String KIND_TRAILER = "X-AWD-Kind: ";
     private static final String NOTE_TRAILER = "X-AWD-Note: ";
-    private static final String SKIPPED_TRAILER = "X-AWD-Skipped-Large-Files: ";
+    private static final String OBJECT_TRAILER = "X-AWD-Object-Format: 1";
     private static final String RESOLUTIONS_TRAILER = "X-AWD-Resolutions: ";
     private static final String MERGE_CONTEXT_TRAILER = "X-AWD-Merge-Context: ";
     private static final String MERGES_TRAILER = "X-AWD-Merges: ";
@@ -70,13 +72,13 @@ class CommitTrailerContractTest {
                 "初始提交说明必须含 \"" + KIND_TRAILER + "session\"，实际：\n" + msg);
     }
 
-    /** commitAll 的三条尾注一次性锁住：kind、备注、体积过滤跳过清单。 */
+    /** commitAll 保留 kind/备注，并声明可恢复的大文件对象格式。 */
     @Test
-    void commitAllCarriesKindNoteAndSkippedTrailers(@TempDir Path root) throws Exception {
+    void commitAllCarriesKindNoteAndRecoverableObjectFormat(@TempDir Path root) throws Exception {
         Files.createDirectories(root.resolve("projects/9"));
         ProjectRepoService s = svc(root);
         s.init(9L, "韩泽伟", "hzw@example.com");
-        // 阈值调到 8 字节，用一个 64 字节的小文件触发体积过滤，不必真造 50MB
+        // 阈值调到 8 字节，用一个 64 字节的小文件触发对象分流，不必真造 50MB
         s.setMaxTrackedFileSizeBytesForTest(8L);
         Files.write(root.resolve("projects/9/大附件.bin"), new byte[64]);
 
@@ -87,8 +89,12 @@ class CommitTrailerContractTest {
                 "缺 \"" + KIND_TRAILER + "\"，实际：\n" + msg);
         assertTrue(msg.contains(NOTE_TRAILER + "开庭前定稿"),
                 "缺 \"" + NOTE_TRAILER + "\"，实际：\n" + msg);
-        assertTrue(msg.contains(SKIPPED_TRAILER),
-                "缺 \"" + SKIPPED_TRAILER + "\"，实际：\n" + msg);
+        assertTrue(msg.contains(OBJECT_TRAILER), "缺对象格式声明：\n" + msg);
+        assertFalse(msg.contains("X-AWD-Skipped-Large-Files:"));
+        assertEquals(1, s.objectPointersAt(9L, "HEAD", false).size());
+        Path restored = root.resolve("projects/9/restored.bin");
+        s.copyBlobAtCommit(9L, "HEAD", "大附件.bin", restored);
+        assertArrayEquals(new byte[64], Files.readAllBytes(restored));
     }
 
     /**

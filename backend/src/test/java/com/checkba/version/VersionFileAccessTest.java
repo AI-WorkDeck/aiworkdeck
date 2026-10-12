@@ -134,16 +134,21 @@ class VersionFileAccessTest {
     }
 
     @Test
-    void fileBytesAtRefReturnsBytesWhenPresent() {
+    void fileBytesAtRefReturnsBytesWhenPresent() throws Exception {
         VersionController controller = newController();
         byte[] content = "hello".getBytes(StandardCharsets.UTF_8);
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             stubMember(auth);
-            when(repoService.readBlobAtCommit(PROJECT_ID, REF, "a.txt")).thenReturn(content);
+            when(repoService.resolveRef(PROJECT_ID, REF + "^{commit}")).thenReturn(REF);
+            when(repoService.blobSizeAtCommit(PROJECT_ID, REF, "a.txt")).thenReturn((long) content.length);
+            when(repoService.openBlobAtCommit(PROJECT_ID, REF, "a.txt")).thenReturn(new java.io.ByteArrayInputStream(content));
 
             var response = controller.fileBytesAtRef(PROJECT_ID, REF, "a.txt", "sess");
 
-            assertArrayEquals(content, response.getBody());
+            var output = new java.io.ByteArrayOutputStream();
+            response.getBody().writeTo(output);
+            assertArrayEquals(content, output.toByteArray());
+            assertEquals(content.length, response.getHeaders().getContentLength());
             assertEquals(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM,
                     response.getHeaders().getContentType());
         }
@@ -154,7 +159,8 @@ class VersionFileAccessTest {
         VersionController controller = newController();
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             stubMember(auth);
-            when(repoService.readBlobAtCommit(PROJECT_ID, REF, "missing.txt")).thenReturn(null);
+            when(repoService.resolveRef(PROJECT_ID, REF + "^{commit}")).thenReturn(REF);
+            when(repoService.blobSizeAtCommit(PROJECT_ID, REF, "missing.txt")).thenReturn(-1L);
 
             VersionException e = assertThrows(VersionException.class,
                     () -> controller.fileBytesAtRef(PROJECT_ID, REF, "missing.txt", "sess"));
@@ -205,4 +211,24 @@ class VersionFileAccessTest {
             assertEquals("这一版里没有这份文件", e.getMessage());
         }
     }
+    @Test
+    void streamingDownloadPinsCommitAndPreflightsOnlyTheRequestedFile() throws Exception {
+        VersionController controller = newController();
+        byte[] content = "original commit".getBytes(StandardCharsets.UTF_8);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            stubMember(auth);
+            when(repoService.resolveRef(PROJECT_ID, "master^{commit}")).thenReturn(REF);
+            when(repoService.blobSizeAtCommit(PROJECT_ID, REF, "a.txt")).thenReturn((long) content.length);
+            when(repoService.openBlobAtCommit(PROJECT_ID, REF, "a.txt"))
+                    .thenAnswer(call -> new java.io.ByteArrayInputStream(content));
+            var response = controller.fileBytesAtRef(PROJECT_ID, "master", "a.txt", "sess");
+            var output = new java.io.ByteArrayOutputStream();
+            response.getBody().writeTo(output);
+            assertArrayEquals(content, output.toByteArray());
+            verify(repoService, times(1)).resolveRef(PROJECT_ID, "master^{commit}");
+            verify(repoService, times(2)).openBlobAtCommit(PROJECT_ID, REF, "a.txt");
+            verify(repoService, never()).requireObjectsAt(anyLong(), anyString());
+        }
+    }
+
 }

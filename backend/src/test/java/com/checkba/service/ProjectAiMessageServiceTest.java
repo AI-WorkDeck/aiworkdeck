@@ -35,6 +35,21 @@ class ProjectAiMessageServiceTest {
 
     private com.checkba.service.ai.ConversationIssuanceService issuanceService;
 
+    @Test
+    void deletingOrRollingBackConversationClearsItsSuggestionEvidence() {
+        var suggestions = mock(com.checkba.repository.ChatSuggestionRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "chatSuggestions", suggestions);
+        service.deleteConversation("c");
+        verify(suggestions).deleteByConversationId("c");
+        var message = new ProjectAiMessage(); message.setId(1L); message.setConversationId("other");
+        message.setCreatedAt(java.time.LocalDateTime.now());
+        when(repository.findById(1L)).thenReturn(Optional.of(message));
+        assertThrows(IllegalArgumentException.class, () -> service.truncateHistory("c", 1L));
+        verifyNoMoreInteractions(suggestions);
+        service.truncateHistory("other", 1L);
+        verify(suggestions).deleteByConversationId("other");
+    }
+
     @BeforeEach
     void setUp() {
         repository = mock(ProjectAiMessageRepository.class);
