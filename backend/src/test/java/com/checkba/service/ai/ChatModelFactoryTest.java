@@ -62,18 +62,37 @@ class ChatModelFactoryTest {
     }
 
     @Test
-    void writingReviewUsesSameAuxiliaryModelAndOnlyVerifiedFlashGetsFixedReasoningBudget() {
+    void automaticWritingUsesDefaultModelWhileManualWritingKeepsAuxiliary() {
         setDbProvider("OPENROUTER");
+        when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");
+        when(systemSettingService.get(eq("ai.auxModel"), any())).thenReturn("qwen/qwen3.7-flash");
         var timeout = java.time.Duration.ofSeconds(2);
-        for (String name : new String[]{"qwen/qwen3.7-flash", "deepseek/deepseek-v4-flash"}) {
-            when(systemSettingService.get(eq("ai.auxModel"), any())).thenReturn(name);
-            var writing = factory.getWritingModel(timeout);
-            var review = factory.getWritingReviewModel(timeout);
-            assertEquals(name, writing.modelName()); assertEquals(name, review.modelName());
-            assertNull(writing.reasoningEffort()); assertNull(writing.reasoningMaxTokens());
-            assertNull(review.reasoningEffort());
-            assertEquals(name.equals("qwen/qwen3.7-flash") ? Integer.valueOf(256) : null, review.reasoningMaxTokens());
+        assertEquals("deepseek/deepseek-v4-flash", factory.getAutomaticWritingModel(timeout).modelName());
+        assertEquals("qwen/qwen3.7-flash", factory.getWritingModel(timeout).modelName());
+        when(systemSettingService.get(eq("ai.auxModel"), any())).thenReturn("vendor/invalid-aux");
+        assertEquals("deepseek/deepseek-v4-flash", factory.getAutomaticWritingModel(timeout).modelName());
+    }
+
+    @Test
+    void automaticWritingRejectsInvalidDefaultWithoutAuxiliaryOrPlatformFallback() {
+        when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("vendor/invalid-main");
+        for (String provider : new String[]{"OPENROUTER", "AWD_CLOUD", "OLLAMA"}) {
+            setDbProvider(provider);
+            assertThrows(com.checkba.exception.FeatureNotConfiguredException.class,
+                    () -> factory.getAutomaticWritingModel(java.time.Duration.ofSeconds(2)));
         }
+        verify(platformAiChannel, never()).apiKey();
+    }
+
+    @Test
+    void automaticWritingRetainsConfiguredMainReasoningEffort() {
+        setDbProvider("OPENROUTER");
+        when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");
+        var reasoning = new com.checkba.config.AiReasoningProperties();
+        reasoning.setModels(java.util.List.of("deepseek/deepseek-v4-flash")); reasoning.setEffortDefault("medium");
+        factory.setReasoningPropertiesForTest(reasoning);
+        assertEquals("medium", factory.getAutomaticWritingModel(java.time.Duration.ofSeconds(2)).reasoningEffort());
+        assertNull(factory.getWritingModel(java.time.Duration.ofSeconds(2)).reasoningEffort());
     }
 
     @Test
@@ -88,6 +107,8 @@ class ChatModelFactoryTest {
         assertThrows(com.checkba.service.account.AccountException.class, () -> factory.getStreamingChatModel(null));
         assertThrows(com.checkba.service.account.AccountException.class,
                 () -> factory.getWritingModel(java.time.Duration.ofSeconds(1)));
+        assertThrows(com.checkba.service.account.AccountException.class,
+                () -> factory.getAutomaticWritingModel(java.time.Duration.ofSeconds(1)));
         assertThrows(com.checkba.service.account.AccountException.class, () -> factory.ensurePaidAccess(1L));
         verify(platformAiChannel, never()).apiKey();
         verifyNoInteractions(usageAccountant);

@@ -165,10 +165,10 @@ public class WritingSuggestionService {
         synchronized(j) {
             if(!j.status.equals("RUNNING")) return;
             j.deadline=clock.schedule(() -> { synchronized(j) { if(j.status.equals("RUNNING")) j.cancel("EMPTY"); } },
-                    Math.max(1,20000-(System.currentTimeMillis()-j.started)),TimeUnit.MILLISECONDS);
+                    Math.max(1,30000-(System.currentTimeMillis()-j.started)),TimeUnit.MILLISECONDS);
         }
         try {
-            runAutomaticStage(j,List.of(SystemMessage.from(instructions(j.snapshot,j.mode)),UserMessage.from(payload(j.snapshot,j.mode))),512,raw -> {
+            runAutomaticStage(j,List.of(SystemMessage.from(instructions(j.snapshot,j.mode)),UserMessage.from(payload(j.snapshot,j.mode))),4096,raw -> {
                 try {
                     List<Advice> advice=parse(j.snapshot,raw,j.mode);
                     if(advice.isEmpty()) finish(j,List.of());
@@ -217,7 +217,7 @@ public class WritingSuggestionService {
             final int stage;
             final long remaining;
             synchronized(j) {
-                remaining=20000-(System.currentTimeMillis()-j.started);
+                remaining=30000-(System.currentTimeMillis()-j.started);
                 if(!j.status.equals("RUNNING")) return;
                 if(remaining<=0) { j.cancel("EMPTY"); return; }
                 stage=++j.automaticStage;
@@ -232,7 +232,7 @@ public class WritingSuggestionService {
                 times.addLast(now);
             }
             try {
-                var model=stage==1?models.getWritingModel(Duration.ofMillis(remaining)):models.getWritingReviewModel(Duration.ofMillis(remaining));
+                var model=models.getAutomaticWritingModel(Duration.ofMillis(remaining));
                 String modelId=model.modelName();
                 synchronized(j) {
                     if(!j.status.equals("RUNNING") || stage!=j.automaticStage) return;

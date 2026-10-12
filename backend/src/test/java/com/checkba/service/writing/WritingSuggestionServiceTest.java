@@ -34,7 +34,7 @@ class WritingSuggestionServiceTest {
         service=new WritingSuggestionService(contexts,models,usage,json);
         snapshot=snapshot(new LitigationWritingProfile(),"原告：沈望舒\n被告：顾青原","被告：顾","");
         when(contexts.capture(eq(1L),eq(10L),any())).thenAnswer(i -> snapshot);
-        when(models.getWritingModel(any())).thenReturn(model); when(models.getWritingReviewModel(any())).thenReturn(model); when(model.modelName()).thenReturn("synthetic-model");
+        when(models.getWritingModel(any())).thenReturn(model); when(models.getAutomaticWritingModel(any())).thenReturn(model); when(model.modelName()).thenReturn("synthetic-model");
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {handler.set(i.getArgument(2)); return call;});
     }
     @AfterEach void close() { service.close(); }
@@ -282,11 +282,11 @@ class WritingSuggestionServiceTest {
         snapshot=new Snapshot(report.projectId(),report.userId(),report.request(),report.settings(),report.context(),null,report.sources(),List.of(),List.of());
         View running=start("autocomplete");
         assertEquals("RUNNING",running.status()); assertEquals("general",running.profile());
-        verify(models).getWritingModel(argThat(d -> !d.isNegative() && !d.isZero() && d.toMillis()<=20000));
-        verify(model).generateCancellable(anyList(),eq(512),any());
+        verify(models).getAutomaticWritingModel(argThat(d -> !d.isNegative() && !d.isZero() && d.toMillis()<=30000));
+        verify(model).generateCancellable(anyList(),eq(4096),any());
         complete(automaticResult(report,"便于委员按事项查阅和办理。"));
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
-        verify(model).generateCancellable(anyList(),eq(4096),any());
+        verify(model,times(2)).generateCancellable(anyList(),eq(4096),any());
         complete(approvedReview(report,"便于委员按事项查阅和办理。","承接材料按事项办理的既有用途，没有增加事实或责任"));
         View done=service.get(1L,10L,running.id()); assertEquals("READY",done.status()); assertEquals(1,done.advice().size());
         assertEquals("便于委员按事项查阅和办理。",service.accept(1L,10L,running.id(),new Accept(0,"r1")).text());
@@ -458,7 +458,8 @@ class WritingSuggestionServiceTest {
         AtomicReference<StreamingResponseHandler<AiMessage>> reviewer=new AtomicReference<>();
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
             StreamingResponseHandler<AiMessage> h=i.getArgument(2);
-            if((int)i.getArgument(1)==512) {
+            List<ChatMessage> messages=i.getArgument(0);
+            if(!json.readTree(((UserMessage)messages.get(1)).singleText()).has("candidate")) {
                 h.onComplete(Response.from(AiMessage.from(automaticResult(snapshot,"便于委员按事项查阅和办理。")),new TokenUsage(20,10)));
                 return generationCall;
             }
@@ -496,9 +497,8 @@ class WritingSuggestionServiceTest {
         complete(generated); var reviewer=handler.get();
         generator.onComplete(Response.from(AiMessage.from(generated),new TokenUsage(20,10)));
         var budgets=org.mockito.ArgumentCaptor.forClass(Duration.class);
-        verify(models).getWritingModel(budgets.capture());
-        verify(models).getWritingReviewModel(budgets.capture());
-        assertTrue(budgets.getAllValues().get(0).toMillis()<=20000);
+        verify(models,times(2)).getAutomaticWritingModel(budgets.capture());
+        assertTrue(budgets.getAllValues().get(0).toMillis()<=30000);
         assertTrue(budgets.getAllValues().get(1).toMillis()<=budgets.getAllValues().get(0).toMillis());
         reviewer.onError(new OpenRouterStreamingChatModel.EmptyResponseException(new TokenUsage(8,4)));
         View done=service.get(1L,10L,running.id()); assertEquals("EMPTY",done.status());

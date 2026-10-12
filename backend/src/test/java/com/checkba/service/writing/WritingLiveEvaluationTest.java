@@ -84,12 +84,11 @@ class WritingLiveEvaluationTest {
             var contexts=mock(WritingContextService.class); var models=mock(ChatModelFactory.class); var usage=mock(TokenUsageService.class);
             AtomicReference<String> raw=new AtomicReference<>(""), transportError=new AtomicReference<>("");
             List<String> responses=Collections.synchronizedList(new ArrayList<>());
-            var wire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(25));
-            var reviewWire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(25),32,null,null,"qwen/qwen3.7-flash".equals(model)?256:null);
+            var wire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35));
             var observed=mock(OpenRouterStreamingChatModel.class); when(observed.modelName()).thenReturn(model);
             when(observed.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
                 StreamingResponseHandler<AiMessage> original=invocation.getArgument(2);
-                if(reviewFixtures.containsKey(c.name) && (int)invocation.getArgument(1)==512) {
+                if(reviewFixtures.containsKey(c.name) && responses.isEmpty()) {
                     List<String> fixtureFactIds=new ArrayList<>();
                     List<dev.langchain4j.data.message.ChatMessage> prompt=invocation.getArgument(0);
                     for(var fact:json.readTree(((dev.langchain4j.data.message.UserMessage)prompt.get(1)).singleText()).path("facts"))
@@ -100,13 +99,13 @@ class WritingLiveEvaluationTest {
                     responses.add(fixture); original.onComplete(Response.from(AiMessage.from(fixture)));
                     return mock(okhttp3.Call.class);
                 }
-                return ((int)invocation.getArgument(1)==4096 && c.mode.equals("autocomplete")?reviewWire:wire).generateCancellable(invocation.getArgument(0),invocation.getArgument(1),new StreamingResponseHandler<AiMessage>() {
+                return wire.generateCancellable(invocation.getArgument(0),invocation.getArgument(1),new StreamingResponseHandler<AiMessage>() {
                     public void onNext(String token){original.onNext(token);}
                     public void onComplete(Response<AiMessage> response){raw.set(response==null||response.content()==null?"":response.content().text());responses.add(raw.get());original.onComplete(response);}
                     public void onError(Throwable error){transportError.set(error.getClass().getSimpleName());original.onError(error);}
                 });
             });
-            when(models.getWritingModel(any())).thenReturn(observed); when(models.getWritingReviewModel(any())).thenReturn(observed);
+            when(models.getWritingModel(any())).thenReturn(observed); when(models.getAutomaticWritingModel(any())).thenReturn(observed);
             Context context=new Context(c.profile.id(),c.profile.label(),"正文",c.before,"","","");
             Source source=new Source("active-document",10L,c.profile.label(),"test:1","合成测试材料",c.body);
             Request request=new Request(10L,"1",c.body,c.before,"",c.selection,c.profile.label(),"正文",c.profile.id(),List.of());
@@ -114,7 +113,7 @@ class WritingLiveEvaluationTest {
             when(contexts.capture(9L,1L,request)).thenReturn(snapshot);
             try(var service=new ServiceResource(new WritingSuggestionService(contexts,models,usage,json))) {
                 var view=service.value.start(9L,1L,new WritingSuggestionService.Input(c.mode,request));
-                long deadline=System.nanoTime()+Duration.ofSeconds(30).toNanos();
+                long deadline=System.nanoTime()+Duration.ofSeconds(35).toNanos();
                 while(view.status().equals("RUNNING") && System.nanoTime()<deadline) {Thread.sleep(100); view=service.value.get(9L,1L,view.id());}
                 boolean nonempty=!view.advice().isEmpty();
                 boolean passed=(c.expectAnswer==null?Set.of("READY","EMPTY").contains(view.status()):c.expectAnswer?(c.mode.equals("autocomplete")?Set.of("READY","EMPTY").contains(view.status()):nonempty && view.status().equals("READY")):!nonempty && view.status().equals("EMPTY")) && (c.forbidden.isEmpty() || view.advice().stream().noneMatch(a -> Arrays.stream(c.forbidden.split("\\|" )).anyMatch(value -> (c.before+a.text()).contains(value))));
