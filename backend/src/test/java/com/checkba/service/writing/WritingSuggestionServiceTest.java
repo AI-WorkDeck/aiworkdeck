@@ -50,7 +50,7 @@ class WritingSuggestionServiceTest {
     String result(String text,String kind,Fact f) throws Exception {
         return json.writeValueAsString(Map.of("suggestions",List.of(new Advice(text,kind,List.of(f.id()),List.of(f.sourceId()),"材料所载"))));
     }
-    void captureHandler(int maxTokens,StreamingResponseHandler<AiMessage> h) { if(maxTokens==1024) proofHandler.set(h); else handler.set(h); }
+    void captureHandler(int maxTokens,StreamingResponseHandler<AiMessage> h) { if(maxTokens==2048) proofHandler.set(h); else handler.set(h); }
     void complete(String raw) { (raw.contains("\"correctedText\"") || raw.contains("\"error\"") ? proofHandler : handler).get().onComplete(Response.from(AiMessage.from(raw),new TokenUsage(20,10))); }
     @Test void localCompletionNeverRequestsModelOrRecordsTokens() {
         View v=start("local"); assertEquals("READY",v.status()); assertEquals("青原",v.advice().get(0).text());
@@ -299,7 +299,7 @@ class WritingSuggestionServiceTest {
         View done=service.get(1L,10L,running.id()); assertEquals("READY",done.status()); assertEquals(1,done.advice().size());
         assertEquals("便于委员按事项查阅和办理。",service.accept(1L,10L,running.id(),new Accept(0,"r1")).text());
         verify(usage,times(3)).recordUsage(eq(10L),eq(1L),eq("synthetic-model"),any(),isNull());
-        verify(model).generateCancellable(anyList(),eq(1024),any());
+        verify(model).generateCancellable(anyList(),eq(2048),any());
         assertEquals(60,done.inputTokens()); assertEquals(30,done.outputTokens()); assertEquals("reported",done.usageStatus());
     }
     @Test void automaticAbstentionAndMissingQualityFieldsAreEmptyWithoutLocalFallback() throws Exception {
@@ -530,7 +530,7 @@ class WritingSuggestionServiceTest {
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
             StreamingResponseHandler<AiMessage> h=i.getArgument(2);
             List<ChatMessage> messages=i.getArgument(0);
-            if((int)i.getArgument(1)==1024) { proofHandler.set(h); return call; }
+            if((int)i.getArgument(1)==2048) { proofHandler.set(h); return call; }
             if(!json.readTree(((UserMessage)messages.get(1)).singleText()).has("candidate")) {
                 h.onComplete(Response.from(AiMessage.from(automaticResult(snapshot,"便于委员按事项查阅和办理。")),new TokenUsage(20,10)));
                 return generationCall;
@@ -580,19 +580,24 @@ class WritingSuggestionServiceTest {
     }
 
 
-    @Test void proofreadingReceivesOnlyOriginalAssembledTextAndUsesRemainingBudget() throws Exception {
+    @Test void proofreadingReceivesInsertionBoundariesWithoutFactsAndUsesRemainingBudget() throws Exception {
         snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
         AtomicReference<List<ChatMessage>> proofMessages=new AtomicReference<>();
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
             captureHandler(i.getArgument(1),i.getArgument(2));
-            if((int)i.getArgument(1)==1024) proofMessages.set(i.getArgument(0));
+            if((int)i.getArgument(1)==2048) proofMessages.set(i.getArgument(0));
             return call;
         });
         View running=start("autocomplete"); complete(automaticResult(snapshot,candidate));
         complete(approvedReview(snapshot,candidate,"有直接依据"));
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
         List<ChatMessage> messages=proofMessages.get(); assertEquals(2,messages.size());
-        assertEquals(snapshot.context().before()+candidate+snapshot.context().after(),((UserMessage)messages.get(1)).singleText());
+        var input=json.readTree(((UserMessage)messages.get(1)).singleText());
+        assertEquals(snapshot.context().before()+candidate+snapshot.context().after(),input.path("assembledText").asText());
+        assertEquals(snapshot.context().before(),input.path("before").asText());
+        assertEquals(candidate,input.path("candidate").asText());
+        assertEquals(snapshot.context().after(),input.path("after").asText());
+        assertFalse(input.has("facts")); assertFalse(input.has("scopedFacts"));
         assertTrue(((SystemMessage)messages.get(0)).text().contains("中文语法校对员"));
         var budgets=org.mockito.ArgumentCaptor.forClass(Duration.class);
         var reviewing=org.mockito.ArgumentCaptor.forClass(Boolean.class);
@@ -626,7 +631,7 @@ class WritingSuggestionServiceTest {
                 assertTrue(s.get(1L,10L,running.id()).advice().isEmpty());
             } finally { s.close(); }
         }
-        verify(model,times(6)).generateCancellable(anyList(),eq(1024),any());
+        verify(model,times(6)).generateCancellable(anyList(),eq(2048),any());
     }
     @Test void synchronousEarlierStagesCannotOverwriteProofreadingCallAndLateResultCannotReviveCancelledJob() throws Exception {
         snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
@@ -692,7 +697,7 @@ class WritingSuggestionServiceTest {
             Call semanticCall=mock(Call.class),grammarCall=mock(Call.class);
             when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
                 captureHandler(i.getArgument(1),i.getArgument(2));
-                return (int)i.getArgument(1)==1024?grammarCall:semanticCall;
+                return (int)i.getArgument(1)==2048?grammarCall:semanticCall;
             });
             var s=new WritingSuggestionService(contexts,models,usage,json);
             try {
@@ -717,7 +722,7 @@ class WritingSuggestionServiceTest {
         snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
         Call grammarCall=mock(Call.class);
         when(model.generateCancellable(anyList(),anyInt(),any())).thenAnswer(i -> {
-            if((int)i.getArgument(1)==1024) {
+            if((int)i.getArgument(1)==2048) {
                 proofHandler.set(i.getArgument(2));
                 handler.get().onComplete(Response.from(AiMessage.from("{\"approve\":false}"),new TokenUsage(8,4)));
                 return grammarCall;
@@ -748,7 +753,7 @@ class WritingSuggestionServiceTest {
         complete(automaticResult(snapshot,candidate));
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status()); verify(call).cancel();
         verify(model,times(2)).generateCancellable(anyList(),anyInt(),any());
-        verify(model,never()).generateCancellable(anyList(),eq(1024),any());
+        verify(model,never()).generateCancellable(anyList(),eq(2048),any());
         assertEquals(12,times.size());
     }
     @Test void changedModelForParallelSiblingCancelsPendingReviewWithoutCallingReplacement() throws Exception {

@@ -109,7 +109,7 @@ class WritingLiveEvaluationTest {
                     when(observed.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
                         StreamingResponseHandler<AiMessage> original=invocation.getArgument(2);
                         List<ChatMessage> messages=invocation.getArgument(0);
-                        String phase=(int)invocation.getArgument(1)==1024?"grammar":json.readTree(((UserMessage)messages.get(1)).singleText()).has("candidate")?"semantic":"generation";
+                        String phase=(int)invocation.getArgument(1)==2048?"grammar":json.readTree(((UserMessage)messages.get(1)).singleText()).has("candidate")?"semantic":"generation";
                         if(reviewFixtures.containsKey(c.name) && phase.equals("generation")) {
                             List<String> fixtureFactIds=new ArrayList<>();
                             List<dev.langchain4j.data.message.ChatMessage> prompt=invocation.getArgument(0);
