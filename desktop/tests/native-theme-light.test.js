@@ -49,8 +49,11 @@ test("applyNativeTheme 原样透传 'system'，不自行解析成 light/dark", (
 })
 
 test('启动时先落浅色，且发生在建主窗口之前', () => {
-  const boot = CODE.indexOf("applyNativeTheme('light')")
-  const call = CODE.search(/(?<!function\s)createMainWindow\(\)/)
+  // open-file 回调也能重建窗口，但受 mainWindowStartupReady 保护。
+  // 检查首次启动链，不把回调声明位置当作执行时序。
+  const startup = CODE.slice(CODE.indexOf('app.whenReady().then(() => {'))
+  const boot = startup.indexOf("applyNativeTheme('light')")
+  const call = startup.search(/(?<!function\s)createMainWindow\(\)/)
   assert.ok(boot >= 0, '启动缺少浅色默认')
   assert.ok(call >= 0, '找不到 createMainWindow() 调用点')
   assert.ok(boot < call,

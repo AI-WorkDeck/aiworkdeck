@@ -1171,6 +1171,16 @@ export function openLocalProject(payload) {
   });
 }
 
+// 单文件仅登记明确选择的文件，不扫描父目录；保存仍写回原文件。
+export function openLocalFile(payload) {
+  return request({
+    url: '/api/projects/open-local-file',
+    method: 'POST',
+    data: payload,
+    header: { 'Content-Type': 'application/json' },
+  });
+}
+
 // 项目物理根目录（「在 Finder 中显示」）
 export function getProjectLocalPath(projectId) {
   return request({

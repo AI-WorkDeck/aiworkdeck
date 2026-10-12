@@ -111,7 +111,7 @@ for (const name of ['leaveWorkbench', 'handleLogout']) {
       const methods = new Function('flushDirtyEditors', 'uni', 'clearSession',
         'return {' + PAGE.slice(from, end) + '}')(
         async () => { if (outcome === 'throws') throw new Error('offline'); return { failed: outcome === 'failed' ? 1 : 0 } },
-        { showToast: () => calls.push('toast'), reLaunch: () => calls.push('navigate') },
+        { showToast: () => calls.push('toast'), reLaunch: ({ success }) => { calls.push('navigate'); success?.() } },
         () => calls.push('clear'))
       await methods[name].call({ $t: k => k }, '/target')
       if (outcome === 'saved') assert.deepEqual(calls, name === 'handleLogout' ? ['clear', 'navigate'] : ['navigate'])
@@ -148,7 +148,7 @@ for (const name of ['leaveWorkbench', 'handleLogout']) {
     const methods = new Function('flushDirtyEditors', 'uni', 'clearSession',
       'return {' + PAGE.slice(from, end) + '}')(
       flushDirtyEditors,
-      { showToast: () => calls.push('toast'), reLaunch: () => calls.push('navigate') },
+      { showToast: () => calls.push('toast'), reLaunch: ({ success }) => { calls.push('navigate'); success?.() } },
       () => calls.push('clear'))
     const text = libre({ dirty: true })
     const vm = { $t: k => k, _plainTextRefs: { left: text } }

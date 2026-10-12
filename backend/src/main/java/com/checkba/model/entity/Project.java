@@ -25,6 +25,11 @@ import java.util.Objects;
 @Table(name = "project")
 public class Project {
 
+    public static final String LOOSE_FILES = "LOOSE_FILES";
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isLooseFileWorkspace() { return LOOSE_FILES.equals(projectType); }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

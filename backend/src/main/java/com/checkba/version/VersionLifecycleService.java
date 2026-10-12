@@ -171,6 +171,7 @@ public class VersionLifecycleService {
                 if (repoService.isInitialized(projectId)) return;
                 Project project = projectRepository.findById(projectId).orElse(null);
                 if (project == null) return;      // 事务还没提交/项目已删：下一个信号再说
+                if (project.isLooseFileWorkspace()) return;
                 if (Boolean.TRUE.equals(project.getVersionOptOut())) return;
                 if (!withinGuardrail(projectId)) return;
                 String author = authorName(userId, userName, project);
@@ -292,6 +293,7 @@ public class VersionLifecycleService {
 
     /** 手动开启时清掉 opt-out：律师自己又要了，就不能再拿旧标记拦住后续的自动开启。 */
     public void clearOptOut(long projectId) {
+        repoService.requireVersionRecordingSupported(projectId);
         setOptOut(projectId, false);
     }
 
