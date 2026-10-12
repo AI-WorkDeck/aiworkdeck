@@ -30,6 +30,10 @@ class ProjectDeleteCloudQuotaTest {
                 mock(com.checkba.version.ProjectRepoService.class), mock(com.checkba.version.memory.MemoryRepoService.class),
                 mock(MemoryRemoteRepository.class), mock(CompletionEntryRepository.class),
                 mock(org.springframework.context.ApplicationEventPublisher.class));
+        var sessions = mock(com.checkba.version.WorkSessionService.class);
+        doAnswer(call -> { call.<Runnable>getArgument(1).run(); return null; })
+                .when(sessions).runProjectDeletion(anyLong(), any());
+        ReflectionTestUtils.setField(service, "workSessions", sessions);
         ReflectionTestUtils.setField(service, "entityManager", entityManager);
         ReflectionTestUtils.setField(service, "cloudStorageQuota", quota);
         ReflectionTestUtils.setField(service, "storageServiceFactory", factory);
