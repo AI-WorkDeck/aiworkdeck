@@ -200,7 +200,7 @@ public class WritingSuggestionService {
         String input=json.writeValueAsString(Map.of("before",clean(j.snapshot.context().before()),"candidate",candidate.text(),
                 "after",clean(j.snapshot.context().after()),"facts",facts,
                 "assembledText",assembled));
-        runAutomaticStage(j,List.of(SystemMessage.from(prompt),UserMessage.from(input)),768,raw -> {
+        runAutomaticStage(j,List.of(SystemMessage.from(prompt),UserMessage.from(input)),4096,raw -> {
             try {
                 if(raw==null || raw.length()>4096) { finish(j,List.of()); return; }
                 JsonNode decision=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
@@ -232,7 +232,7 @@ public class WritingSuggestionService {
                 times.addLast(now);
             }
             try {
-                var model=models.getWritingModel(Duration.ofMillis(remaining));
+                var model=stage==1?models.getWritingModel(Duration.ofMillis(remaining)):models.getWritingReviewModel(Duration.ofMillis(remaining));
                 String modelId=model.modelName();
                 synchronized(j) {
                     if(!j.status.equals("RUNNING") || stage!=j.automaticStage) return;

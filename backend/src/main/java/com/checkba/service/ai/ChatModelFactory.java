@@ -280,6 +280,14 @@ public class ChatModelFactory {
 
     /** One explicit writing request: bounded transport, no cache, no provider fallback. */
     public OpenRouterStreamingChatModel getWritingModel(java.time.Duration timeout) {
+        return createWritingModel(timeout, false);
+    }
+
+    public OpenRouterStreamingChatModel getWritingReviewModel(java.time.Duration timeout) {
+        return createWritingModel(timeout, true);
+    }
+
+    private OpenRouterStreamingChatModel createWritingModel(java.time.Duration timeout, boolean review) {
         if (timeout == null || timeout.isZero() || timeout.isNegative()) {
             throw new IllegalArgumentException("Writing request deadline expired");
         }
@@ -293,8 +301,9 @@ public class ChatModelFactory {
         String key = platform ? platformApiKey() : resolveOpenRouterApiKey();
         String baseUrl = platform ? aiModelProperties.getOpenRouter().getBaseUrl() : resolveOpenRouterBaseUrl();
         recordModelUse(target.channel().name(), target.modelId(), true);
+        Integer reasoningBudget = review && "qwen/qwen3.7-flash".equals(target.modelId()) ? 256 : null;
         return new OpenRouterStreamingChatModel(key, baseUrl, target.modelId(), remainingTimeout(timeout, started),
-                aiModelProperties.getOpenRouter().getMaxRequestsPerHost());
+                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), null, null, reasoningBudget);
     }
 
     private static java.time.Duration remainingTimeout(java.time.Duration budget, long started) {
