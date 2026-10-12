@@ -312,7 +312,7 @@ export default {
     autocompleteOff: 'Autocomplete is off',
     autocompleteDisable: 'Turn autocomplete off',
     autocompleteEnable: 'Turn autocomplete on',
-    autocompleteHint: 'The current default model suggests from context and uses AI credits. Collapsing the ball does not turn autocomplete off.',
+    autocompleteHint: 'The current default model suggests from context and uses AI credits. Manual completion remains available when off. Collapsing the ball does not turn autocomplete off.',
     preferenceFailed: 'Could not save the setting. The previous state is unchanged; please retry.',
     aiEnable: 'Turn AI review on',
     aiDisable: 'Turn AI review off',
