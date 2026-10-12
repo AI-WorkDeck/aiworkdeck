@@ -553,4 +553,6 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
 
 mac 的 `build.mac.fileAssociations` 用 `rank: Alternate`；Windows 在 `build/win/file-associations.nsh` 仅写本应用 ProgID、OpenWithProgids 和 Capabilities。**不要改成 electron-builder 24 的顶层 fileAssociations**：该版本 NSIS 内置宏会写扩展名默认值。安装/升级只登记候选，默认打开程序由用户选择；卸载只移除本应用登记。关联名单须与真实文件预览类型一致。
 
+Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Actions runner 上执行安装→改默认→重装→卸载，验证 17 类候选、已有默认与 UserChoice 保留。electron-builder 24 用 StdUtils 重读 `/D`，带空格路径必须给值加引号。其捆绑 NSIS 3.0.4.1 的 `DeleteRegKey /ifempty` 只检查子键，不检查命名值；**不得用它清理共享 OpenWithProgids 键**，只删本应用的值。该错误由真实重装门发现；模拟器须覆盖卸载后重装，不能把 `/ifempty` 当作无操作。
+
 回归：`desktop/tests/open-paths.test.js`、`file-associations.test.js`。`frontend/tests/desktop-e2e/local-files.mjs` 用全新 home/profile/H2/storage/端口测试源码 Electron 的冷启动队列、同名异目录、原位保存、PDF/Word；先构建 H5/editor/backend 并准备本地 LOWA 资源，`JAVA_HOME=<JDK21> node frontend/tests/desktop-e2e/local-files.mjs`。它注入原生打开事件，不能替代正式安装包的 Finder/Windows 打开方式验收。
