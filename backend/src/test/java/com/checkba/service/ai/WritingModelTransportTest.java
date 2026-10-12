@@ -210,8 +210,11 @@ class WritingModelTransportTest {
         props.getOpenRouter().setDefaultModel("deepseek/deepseek-v4-flash");
         var platform = mock(PlatformAiChannel.class); when(platform.apiKey()).thenReturn("synthetic-platform");
         for (String provider : List.of("OPENROUTER", "AWD_CLOUD")) {
-            var review = factory(provider, props, platform, provider.equals("OPENROUTER") ? url() : "http://127.0.0.1:1/untrusted")
-                    .getAutomaticWritingModel(Duration.ofSeconds(2));
+            var factory = factory(provider, props, platform, provider.equals("OPENROUTER") ? url() : "http://127.0.0.1:1/untrusted");
+            var reasoning = new com.checkba.config.AiReasoningProperties();
+            reasoning.setModels(List.of("moonshotai/kimi-k3"));
+            factory.setReasoningPropertiesForTest(reasoning);
+            var review = factory.getAutomaticWritingModel(Duration.ofSeconds(2));
             Collector c = new Collector();
             review.generateCancellable(List.of(UserMessage.from("synthetic review")), 4096, c); c.await();
             assertNull(c.error.get());
@@ -219,7 +222,7 @@ class WritingModelTransportTest {
             var request = new ObjectMapper().readTree(body.get());
             assertEquals("deepseek/deepseek-v4-flash", request.path("model").asText());
             assertEquals(4096, request.path("max_tokens").asInt());
-            assertFalse(request.has("reasoning"));
+            assertEquals("high", request.path("reasoning").path("effort").asText());
         }
     }
     @Test void boundedWritingNeverLogsMalformedProviderContent() throws Exception {

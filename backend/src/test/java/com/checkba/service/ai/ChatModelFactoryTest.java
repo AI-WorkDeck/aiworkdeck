@@ -96,6 +96,32 @@ class ChatModelFactoryTest {
     }
 
     @Test
+    void automaticFlashReasoningDefaultRespectsExplicitConfigurationAndOptOut() {
+        setDbProvider("OPENROUTER");
+        when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");
+        var reasoning = new com.checkba.config.AiReasoningProperties();
+        reasoning.setModels(java.util.List.of("moonshotai/kimi-k3"));
+        factory.setReasoningPropertiesForTest(reasoning);
+        var timeout = java.time.Duration.ofSeconds(2);
+        assertEquals("high", factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        assertNull(factory.getWritingModel(timeout).reasoningEffort());
+        reasoning.setModels(java.util.List.of("deepseek/deepseek-v4-flash"));
+        for (String effort : java.util.List.of("high", "xhigh", "none")) {
+            reasoning.setEffortDefault(effort);
+            assertEquals(effort, factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        }
+        reasoning.setEffortDefault("invalid");
+        assertNull(factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        reasoning.setModels(java.util.List.of());
+        assertNull(factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        reasoning.setModels(null);
+        assertNull(factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        reasoning.setModels(java.util.List.of("moonshotai/kimi-k3"));
+        when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("qwen/qwen3.7-flash");
+        assertNull(factory.getAutomaticWritingModel(timeout).reasoningEffort());
+    }
+
+    @Test
     void desktopNeverUsesLegacyOrEnvironmentKeyForCloudCalls() {
         org.springframework.test.util.ReflectionTestUtils.setField(factory, "localMode", true);
         setDbProvider("OPENROUTER");
