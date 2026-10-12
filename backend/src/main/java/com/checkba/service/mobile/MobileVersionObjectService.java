@@ -127,16 +127,23 @@ public class MobileVersionObjectService {
             long actual=0;MessageDigest partDigest=digest();
             try(InputStream input=blobs.open(part.getStoragePath())) {
                 int n;while((n=input.read(buffer))!=-1) {
-                    actual+=n;if(actual>part.getSize()) throw new IOException("Version object part size mismatch");
+                    actual+=n;if(actual>part.getSize()) {
+                        quarantine(user,device,project,sha,Map.of(index,part));
+                        throw new IOException("Version object part size mismatch");
+                    }
                     digest.update(buffer,0,n);partDigest.update(buffer,0,n);
                 }
             }
-            if(actual!=part.getSize() || !part.getPartSha().equals(HexFormat.of().formatHex(partDigest.digest())))
+            if(actual!=part.getSize() || !part.getPartSha().equals(HexFormat.of().formatHex(partDigest.digest()))) {
+                quarantine(user,device,project,sha,Map.of(index,part));
                 throw new IOException("Version object part verification failed");
+            }
             total+=actual;
         }
-        if(total!=size || !sha.equals(HexFormat.of().formatHex(digest.digest())))
+        if(total!=size || !sha.equals(HexFormat.of().formatHex(digest.digest()))) {
+            quarantine(user,device,project,sha,parts);
             throw new IllegalArgumentException("Version object verification failed");
+        }
         independent(()->{
             lock(user);authorize(user,device,project);
             List<MobileVersionObject> current=rows(user,device,project,sha);
@@ -154,6 +161,24 @@ public class MobileVersionObjectService {
             if(!published) objects.save(newRow(user,device,project,sha,size,-1));
         });
         return Map.of("sha256",sha,"size",size,"complete",true);
+    }
+    /** Confirmed corruption must become a missing part after cleanup, not an endless resume loop. */
+    private void quarantine(Long user,String device,String project,String sha,Map<Integer,MobileVersionObject> failed) {
+        independent(()->{
+            users.lockStorageOwner(user);
+            List<MobileVersionObject> current=rows(user,device,project,sha);
+            boolean invalidated=false;
+            for(var row:current) {
+                var checked=failed.get(row.getPartIndex());
+                if(checked!=null && Objects.equals(checked.getId(),row.getId())
+                        && Objects.equals(checked.getStoragePath(),row.getStoragePath())) {
+                    row.setPendingDeletion(true);objects.save(row);invalidated=true;
+                }
+            }
+            if(invalidated) for(var row:current) if(row.getPartIndex()==-1) {
+                row.setPendingDeletion(true);objects.save(row);
+            }
+        });
     }
     public ProjectCatalogService.Content content(Long user,String device,String project,String sha,int index) throws IOException {
         authorize(user,device,project);validate(sha,0);

@@ -94,7 +94,8 @@ class MobileVersionObjectServiceTest {
         byte[] bytes={5,6};part(bytes,0);String sha=hash(bytes);
         Path stored=Path.of(rows.get(0).getStoragePath());Files.write(stored,new byte[]{8,9});
         assertThrows(IOException.class,()->service.complete(1L,"device","42",sha,2));
-        Files.write(stored,bytes);service.complete(1L,"device","42",sha,2);Files.delete(stored);
+        assertTrue(service.cleanupPending(1L));service.cleanDeleted();part(bytes,0);
+        stored=Path.of(rows.get(0).getStoragePath());service.complete(1L,"device","42",sha,2);Files.delete(stored);
         assertEquals(false,service.status(1L,"device","42",sha,2).get("complete"));
         part(bytes,0);assertEquals(true,service.complete(1L,"device","42",sha,2).get("complete"));
     }
