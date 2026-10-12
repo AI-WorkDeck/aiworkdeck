@@ -274,7 +274,7 @@ class WritingSuggestionServiceTest {
                 "suggestions",List.of(new Advice(text,"sentence",List.of(fact.id()),List.of(fact.sourceId()),"沿用文中按事项查阅办理的用途"))));
     }
     String approvedReview(Snapshot s,String candidate,String reason) throws Exception {
-        return json.writeValueAsString(Map.of("approve",true,"reason",reason,
+        return json.writeValueAsString(Map.of("approve",true,"counterexamplePossible",false,"counterexample","","reason",reason,
                 "reviewedText",s.context().before()+candidate+s.context().after()));
     }
     @Test void automaticReportUsesRealModelPathAndGenericFallbackThenExistingAcceptance() throws Exception {
@@ -365,6 +365,23 @@ class WritingSuggestionServiceTest {
             assertTrue(service.parse(snapshot,automaticResult(snapshot,text),"autocomplete").isEmpty(),text);
         assertEquals(1,service.parse(snapshot,result(copied,"sentence",fact),"sentence").size(),"手动有据续写的既有行为保留");
     }
+    @Test void approvalCannotOverrideCounterexampleOrMissingCounterexampleVerdict() throws Exception {
+        for(int variant=0;variant<4;variant++) {
+            snapshot=reportSnapshot();
+            var s=new WritingSuggestionService(contexts,models,usage,json);
+            try {
+                View running=s.start(1L,10L,new Input("autocomplete",snapshot.request()));
+                complete(automaticResult(snapshot,"便于委员按事项查阅和办理。"));
+                var review=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(approvedReview(snapshot,"便于委员按事项查阅和办理。","有依据"));
+                if(variant==0) review.put("counterexamplePossible",true);
+                if(variant==1) review.put("counterexample","此前采用同一流程，工作量没有变化");
+                if(variant==2) review.remove("counterexamplePossible");
+                if(variant==3) review.put("counterexamplePossible","false");
+                complete(json.writeValueAsString(review));
+                assertEquals("EMPTY",s.get(1L,10L,running.id()).status());
+            } finally { s.close(); }
+        }
+    }
     @Test void shortGenericFillerIsJudgedBySemanticReviewNotLengthAlone() throws Exception {
         snapshot=reportSnapshot(); View running=start("autocomplete");
         complete(automaticResult(snapshot,"便于查阅。"));
@@ -439,7 +456,7 @@ class WritingSuggestionServiceTest {
     @Test void malformedReviewAndNonBooleanApprovalCannotReleaseSuggestion() throws Exception {
         snapshot=reportSnapshot(); View running=start("autocomplete");
         complete(automaticResult(snapshot,"便于委员按事项查阅和办理。"));
-        complete(json.writeValueAsString(Map.of("approve","true","reason","看起来可以",
+        complete(json.writeValueAsString(Map.of("approve","true","counterexamplePossible",false,"counterexample","","reason","看起来可以",
                 "reviewedText",snapshot.context().before()+"便于委员按事项查阅和办理。"+snapshot.context().after())));
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
     }
@@ -453,7 +470,7 @@ class WritingSuggestionServiceTest {
         snapshot=reportSnapshot(); View running=start("autocomplete");
         String candidate="便于委员按事项查阅和办理。";
         complete(automaticResult(snapshot,candidate));
-        complete(json.writeValueAsString(Map.of("approve",true,"reason","改写前文后通顺",
+        complete(json.writeValueAsString(Map.of("approve",true,"counterexamplePossible",false,"counterexample","","reason","改写前文后通顺",
                 "reviewedText","平台应该集中整理相关项目材料，"+candidate+snapshot.context().after())));
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status());
     }
