@@ -236,3 +236,9 @@
 `MarketSidebarPanel.vue` / `PluginDevPanel.vue` / `PluginWorkspaceSummary.vue` 仅style段：散写字号/普通圆角接入已有token，focus ring使用focus-width与accent-text，辅助说明使用text-2，插件概览侧栏内边距和间距服从panel规范。保留已有主题token、布局/媒体几何，不重做结构。PluginWorkspaceSummary主按钮原有 `var(--awd-text-on-accent, #fff)` 回退保留，防止宿主颜色值尚未到达时失去可读文字；守卫仅豁免该文件/选择器/属性/精确回退，其余新增散色仍阻断。当前守卫覆盖14个表面；独立原生/官网客户端本轮仅规范，不宣称已经同步迁移。
 
 第四批验证：3个组件实际SCSS/CSS编译通过，模板/脚本对HEAD逐字未改；14表面设计守卫通过；设计/SDK回归17项通过（含限定fallback的正/反例）。
+
+### 浏览器工具栏补充（2026-10-12，dev-board#1217）
+
+`BrowserPane.vue` 的工具栏改用共享暖中性表面、32px图标动作与统一SVG，地址框采用6px圆角；移除每颗图标的独立描边和蓝色打开按钮，打开动作置于地址尾部。按真实面板容器宽度换行，480px以下动作另行，360px以下地址独行；粗指针动作48px且可换行。焦点、悬停、选中/禁用和低动效均沿用现有令牌，不改变BrowserView的挂载与实测边界逻辑。
+
+隔离QA工作台入口实测：Chrome明/暗×900/480/320/200px八组无按钮裁切，200px地址输入区域153px；粗指针320/200px全部动作48px、无裁切，触摸打开抽屉通过；Enter/Space抽屉、地址快速输入后Enter/点击打开、前进/后退/刷新通过，焦点圈可见、低动效transition为0s。输入实测发现uni-h5的100ms模型节流竞态，确认与失焦改取事件完整值。代理网页使用合成响应，证据不覆盖外网实际服务、Electron原生BrowserView、屏幕阅读器或用户安装版本；工具栏也尚未加入全文件设计守卫的迁移名单，不能据现有守卫推定其余抽屉样式全部迁移。

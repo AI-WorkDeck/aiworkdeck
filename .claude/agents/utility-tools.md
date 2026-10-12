@@ -11,7 +11,9 @@ description: 辅助小工具领域。任务涉及浏览器面板、截图/OCR、
 
 **浏览器**：`frontend/src/components/BrowserPane.vue`；desktop `desktop/main/browser-views.js`（BrowserView 注册表）+ `desktop/main/main.js`（`makeBrowserView` 建 view 并接事件、window.open 拦截转工作区新 tab → 事件 `checkba:browser-open-new-tab`、全屏/黑屏兜底恢复、IPC handlers）；后端 `controller/BrowserProxyController.java`（GET /api/browser/proxy）。
 
-**工具栏收藏与快捷方式抽屉（dev-board#214）**：BrowserPane 工具栏在 ↵ 之后有两个新按钮——
+**工具栏设计与输入（dev-board#1217）**：沿用共享颜色/尺寸令牌与 `ICONS`，导航、地址、页面动作分组；按面板容器宽度换行（480px 以下动作另行，360px 以下地址独行），不裁掉按钮。粗指针命中区为48px。工具栏仍参与文档流，加载线留在工具栏；原生 BrowserView 的边界仍取 mount 的真实尺寸。uni-h5 对 `v-model` 更新有100ms节流，快速输入后 `confirm` 先到，不能直接把旧 `inputUrl` 作为导航地址：确认读 `$event.detail.value`，失焦也以完整事件值回填，确保点击打开按钮时地址不截断。验收用隔离 QA 的真实工作台入口与合成代理页；Chrome 键盘 Enter/Space、地址快速输入确认/点击、前进后退刷新及明暗/窄栏通过，触摸模拟用真实 touch 事件而非鼠标 click。此证据不代替 Electron 原生 BrowserView 或用户安装版本验收。
+
+**工具栏收藏与快捷方式抽屉（dev-board#214）**：BrowserPane 工具栏在地址框之后有两个按钮——
 「收藏本页」星形（已收藏该 URL 时实心；判定按去尾斜杠的 URL 匹配收藏列表，再点只提示不重复入库，
 删除仍去收藏面板坞位）与「收藏夹/快捷方式」抽屉开关。契约：BrowserPane 新增 prop
 `projectId`（收藏落库目标，缺席即星形禁用）与事件 `favorite-added {id,url,title}`；
