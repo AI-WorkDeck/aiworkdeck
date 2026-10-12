@@ -204,6 +204,8 @@ class WritingLiveEvaluationTest {
         assertTrue(explicitReviewRejection(json,Map.of("grammar",corrected),assembled));
         assertFalse(explicitReviewRejection(json,Map.of("semantic",approval),assembled));
         assertFalse(explicitReviewRejection(json,Map.of("grammar",grammatical),assembled));
+        String changedWithoutError=json.writeValueAsString(Map.of("correctedText",assembled+"。","error",""));
+        assertFalse(explicitReviewRejection(json,Map.of("grammar",changedWithoutError),assembled));
         assertFalse(explicitReviewRejection(json,Map.of("semantic",refusal+" {}","grammar","StreamResetException"),assembled));
         assertFalse(explicitReviewRejection(json,Map.of(),assembled));
     }
@@ -225,7 +227,7 @@ class WritingLiveEvaluationTest {
                     .readTree(phases.getOrDefault("grammar",""));
             return proof!=null && proof.isObject() && proof.path("correctedText").isTextual()
                     && !proof.path("correctedText").asText().isBlank() && proof.path("error").isTextual()
-                    && (!assembled.equals(proof.path("correctedText").asText()) || !proof.path("error").asText().isBlank());
+                    && !proof.path("error").asText().isBlank();
         } catch(Exception e) { return false; }
     }
     private record ServiceResource(WritingSuggestionService value) implements AutoCloseable { public void close(){value.close();} }
