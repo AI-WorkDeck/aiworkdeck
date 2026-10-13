@@ -322,6 +322,30 @@ class WritingSuggestionServiceTest {
         verify(model).generateCancellable(argThat(this::grammarInput),eq(4096),any());
         assertEquals(80,done.inputTokens()); assertEquals(40,done.outputTokens()); assertEquals("reported",done.usageStatus());
     }
+    @Test void automaticReadyOmitsUnreviewedExplanationButKeepsInternalCandidateAndCitations() throws Exception {
+        snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
+        String unreviewed="原文明确证明了这项安排带来的全部成效。";
+        var generation=json.readTree(automaticResult(snapshot,candidate));
+        ((com.fasterxml.jackson.databind.node.ObjectNode)generation.path("suggestions").get(0)).put("explanation",unreviewed);
+        String raw=json.writeValueAsString(generation);
+        Advice internal=service.parse(snapshot,raw,"autocomplete").get(0);
+        assertEquals(unreviewed,internal.explanation(),"Generation parsing must not change the internal candidate");
+        View running=start("autocomplete"); complete(raw);
+        assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
+        completeApprovedThenProofread(snapshot,candidate,"候选正文有直接依据");
+        View done=service.get(1L,10L,running.id()); assertEquals("READY",done.status());
+        assertEquals(1,done.advice().size()); Advice displayed=done.advice().get(0);
+        assertEquals("",displayed.explanation(),"Unreviewed generator explanation must not reach the user");
+        assertEquals(candidate,displayed.text()); assertEquals(internal.kind(),displayed.kind());
+        assertEquals(internal.factIds(),displayed.factIds()); assertEquals(internal.sourceIds(),displayed.sourceIds());
+        verify(model,times(4)).generateCancellable(anyList(),eq(4096),any());
+    }
+    @Test void manualReadyKeepsItsExistingExplanation() throws Exception {
+        View running=start("sentence"); complete(result("青原","sentence",defendant()));
+        View done=service.get(1L,10L,running.id()); assertEquals("READY",done.status());
+        assertEquals("青原",done.advice().get(0).text()); assertEquals("材料所载",done.advice().get(0).explanation());
+        verify(model,times(1)).generateCancellable(anyList(),anyInt(),any());
+    }
     @Test void automaticAbstentionAndMissingQualityFieldsAreEmptyWithoutLocalFallback() throws Exception {
         snapshot=reportSnapshot(); View running=start("autocomplete");
         complete("{\"abstain\":true,\"suggestions\":[]}");
@@ -485,7 +509,7 @@ class WritingSuggestionServiceTest {
         View running=start("autocomplete"); complete(raw);
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
         completeApprovedThenProofread(snapshot,text,"两项概念均由材料支持，接缝通顺");
-        assertEquals(List.of(advice),service.get(1L,10L,running.id()).advice());
+        assertEquals(List.of(new Advice(text,"sentence",advice.factIds(),advice.sourceIds(),"")),service.get(1L,10L,running.id()).advice());
     }
     @Test void automaticAllowsSemanticIntegrationAndDoesNotRejectSharedShortConnectives() throws Exception {
         snapshot=snapshot(new AutomaticWritingProfile(),
@@ -503,7 +527,7 @@ class WritingSuggestionServiceTest {
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
         completeApprovedThenProofread(snapshot,text,"整合两组功能的入口差异，没有增加事实或改变语气");
         View done=service.get(1L,10L,running.id());
-        assertEquals("READY",done.status()); assertEquals(List.of(advice),done.advice());
+        assertEquals("READY",done.status()); assertEquals(List.of(new Advice(text,"sentence",advice.factIds(),advice.sourceIds(),"")),done.advice());
         assertEquals(80,done.inputTokens()); assertEquals(40,done.outputTokens());
     }
 
