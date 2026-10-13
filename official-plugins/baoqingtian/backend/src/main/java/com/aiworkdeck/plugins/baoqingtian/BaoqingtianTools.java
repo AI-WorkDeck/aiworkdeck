@@ -153,7 +153,9 @@ public class BaoqingtianTools implements HostAware {
         return row;
     }
     private Object saveNote(long user, Session s, JsonNode args) {
-        String title = text(args, "title", 200), content = text(args, "content", 50_000);
+        String title = text(args, "title", 200);
+        if (!args.path("content").isTextual() || args.path("content").asText().length() > 50_000) throw fail("invalid_params", "正文须为文字且不超过 50000 字");
+        String content = args.path("content").asText();
         String state = state(args, false);
         confirm(args, state);
         ObjectNode body = object("title", title, "status", state, "isNoteDraft", "N");
@@ -164,10 +166,12 @@ public class BaoqingtianTools implements HostAware {
             JsonNode old = ownedNote(user, s, noteId);
             String type = old.path("type").asText();
             if (!Set.of("TEXT", "IMAGE", "VIDEO").contains(type) || old.path("status").asText().equals("DELETED")) throw fail("not_editable", "此笔记暂不支持编辑");
+            if (type.equals("TEXT") && content.isBlank()) throw fail("invalid_params", "请填写有效的正文");
             body.put("noteId", noteId).put("type", type).put("content", type.equals("TEXT") ? content : media(old.path("content")));
             body.put("description", type.equals("TEXT") ? old.path("description").asText("") : content);
             for (String key : List.of("cover", "topicId", "productId", "hotSpot")) if (old.hasNonNull(key)) body.set(key, old.get(key));
         } else {
+            if (content.isBlank()) throw fail("invalid_params", "请填写有效的正文");
             if (!args.path("confirmed").asBoolean(false)) throw fail("confirmation_required", "创建笔记前请明确确认保存");
             body.put("type", "TEXT").put("content", content).put("businessId", id(args, "businessId")).put("isNoteDraft", "N");
         }
