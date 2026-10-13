@@ -187,6 +187,7 @@ class WritingLiveEvaluationTest {
                         String phase=modelIndex==0?"generation":"review-"+(modelIndex-1);
                         String phaseModel=modelIndex==0?model:reviewModels.get(modelIndex-1);
                         String phaseEffort=modelIndex==0?(automatic?generationReasoningEffort:reasoningEffort):reviewEfforts.get(modelIndex-1);
+                        if("provider-default".equals(phaseEffort)) phaseEffort=null;
                         var wire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",phaseModel,Duration.ofSeconds(35),16,phaseEffort,providerRouting);
                         var observed=mock(OpenRouterStreamingChatModel.class); when(observed.modelName()).thenReturn(phaseModel);
                         when(observed.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
