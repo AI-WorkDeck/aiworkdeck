@@ -29,7 +29,7 @@ window.__mountToolbar = () => {
 await build({ configFile: false, root: temp, logLevel: 'error', define: { 'process.env.NODE_ENV': '"production"', 'process.env': '{}' }, plugins: [vue({ template: { compilerOptions: { isCustomElement: tag => ['view','text','scroll-view'].includes(tag) } } })],
   resolve: { alias: { '@': src, vue: path.resolve('node_modules/vue/dist/vue.esm-bundler.js') } },
   build: { outDir: path.join(temp, 'out'), lib: { entry: path.join(temp,'entry.js'), formats: ['es'], fileName: () => 'fixture.js' } } })
-const fontRoot = process.env.LOWA_FONT_DIR || path.resolve(process.env.LOWA_ENGINE_DIR, '..')
+const fontRoot = process.env.LOWA_FONT_DIR || path.resolve(process.env.LOWA_ENGINE_DIR || 'dist/zetaoffice/lowa', '..')
 const server = await startServer({ extraFiles: {
   '/fixture.js': path.join(temp,'out/fixture.js'), '/fixture.css': path.join(temp,'out',fs.readdirSync(path.join(temp,'out')).find(f=>f.endsWith('.css'))),
   '/office_thread.js': path.resolve('src/zetaoffice/public/office_thread.js'),
@@ -55,11 +55,12 @@ try {
   const read = async () => (await exec('get_document_text')).paragraphs.map(p => p.text)
   const original = await read()
   await page.addStyleTag({ content: 'view,scroll-view{display:block} text{display:inline} #toolbar-fixture{position:fixed;top:0;left:0;right:0;z-index:2000} .etb-scroll{overflow:auto} :root{--awd-surface:#fff;--awd-surface-2:#f3f4f4;--awd-text:#202722;--awd-text-2:#45534c;--awd-text-3:#77847d;--awd-border:#d9dfdc;--awd-accent-text:#2e5a50;--awd-accent-soft:#e3efea;--awd-space-1:4px;--awd-space-2:8px;--awd-font-size-body:13px}' })
-  await page.addStyleTag({ url:'/fixture.css' }); await page.addScriptTag({ type:'module', url:'/fixture.js' })
-  const ready = () => page.waitForFunction(() => window.__toolbarRoot?.$refs.toolbar?.state.view.tabs === true && window.__toolbarRoot.$refs.toolbar.chromeHidden)
+  await page.addStyleTag({ content: fs.readFileSync(path.join(temp,'out',fs.readdirSync(path.join(temp,'out')).find(f=>f.endsWith('.css'))),'utf8') }); await page.addScriptTag({ type:'module', url:'/fixture.js' })
+  const ready = () => page.waitForFunction(() => window.__toolbarRoot?.$refs.toolbar?.viewPrefsReady === true)
   await ready()
+  await page.waitForFunction(() => window.__toolbarRoot.$refs.toolbar.state.view.formattingMarks === true)
   const settle = () => page.waitForFunction(() => !window.__toolbarRoot.$refs.toolbar.viewPrefsBusy)
-  const menu = async () => { await page.$eval('.etb-marks-trigger',el=>el.scrollIntoView({block:'nearest',inline:'nearest'})); await page.screenshot({path:path.join(output,'before-menu.png')}); await page.click('.etb-marks-trigger'); await page.waitForSelector('.etb-marks-menu') }
+  const menu = async () => { await page.$eval('.etb-marks-trigger',el=>el.scrollIntoView({block:'nearest',inline:'nearest'})); await page.click('.etb-marks-trigger'); await page.waitForSelector('.etb-marks-menu') }
   const action = async text => { await page.evaluate(text => [...document.querySelectorAll('.etb-marks-menu button')].find(n => n.textContent === text).click(),text); await settle() }
   await menu(); await page.screenshot({ path:path.join(output,'01-all.png') })
   const keys = ['paragraphMarks','lineBreaks','spaces','tabs']

@@ -219,7 +219,7 @@
         <view class="etb-drop" :class="{ open: menu === 'marks' }">
           <button ref="trig_marks" class="etb-btn etb-marks-trigger" :class="{ on: formattingMarks }"
                   :title="$t('editor.toolbar.specialCharacters')" :aria-label="$t('editor.toolbar.specialCharacters')"
-                  aria-haspopup="true" :aria-expanded="menu === 'marks'" @tap.stop="toggleMenu('marks')">
+                  aria-haspopup="true" :disabled="!viewPrefsReady" :aria-expanded="menu === 'marks'" @tap.stop="toggleMenu('marks')">
             <text class="etb-tx">¶</text><text class="etb-caret">⌄</text>
           </button>
           <view v-if="menu === 'marks'" class="etb-menu w200 etb-marks-menu" :style="popStyle(210, true)" @tap.stop>
@@ -510,7 +510,7 @@ export default {
       state: EMPTY(), styleList: [], fontList: [], menu: '', popPos: null,
       // 视图偏好（格式标记 / 标尺），见 VIEW_PREFS_KEY。按钮高亮以引擎读回为准（get_ui_state
       // 的 view.formattingMarks / view.ruler），这里只是用户想要的目标值。
-      viewPrefs: readViewPrefs(), viewPrefsBusy: false,
+      viewPrefs: readViewPrefs(), viewPrefsBusy: false, viewPrefsReady: false,
       systemFontsOpen: false,
       // BUG-13：主命令区还能不能往左/右滚，驱动两端渐隐遮罩；由 bindToolbarWheel
       // 里的原生 scroll/resize 监听实时更新，不是一次性算好就不变。
@@ -647,6 +647,7 @@ export default {
       catch (e) { return { success: false, message: (e && e.message) || String(e) } }
     },
     async bootstrap() {
+      this.viewPrefsReady = false
       this.state = EMPTY()
       if (!this.executor) return
       await this.refresh()
@@ -657,6 +658,7 @@ export default {
       // 就只给 Writer 渲染；Calc/Impress 没有替代品，藏了会剩一片空白。
       await this.applyChrome(true)
       await this.applyViewPrefs()
+      this.viewPrefsReady = true
     },
     async refresh() {
       const r = await this.call('get_ui_state', {})
