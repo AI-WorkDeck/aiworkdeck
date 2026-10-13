@@ -284,6 +284,7 @@ class WritingSuggestionServiceTest {
     String approvedReview(Snapshot s,String candidate,String reason) throws Exception {
         return json.writeValueAsString(Map.of("reason",reason,"facts","entailed","grammar","valid",
                 "continuation","appropriate","reviewedCandidate",candidate,
+                "correctedText",s.context().before()+candidate+s.context().after(),
                 "evidence",List.of(Map.of("factId",s.facts().get(0).id(),"quote",s.facts().get(0).quote()))));
     }
     void review(int index,String raw) {
@@ -832,6 +833,39 @@ class WritingSuggestionServiceTest {
         View done=start("autocomplete"); assertEquals("EMPTY",done.status()); assertTrue(done.advice().isEmpty());
         verify(model,never()).generateCancellable(anyList(),anyInt(),any()); verify(reviewer0,never()).generateCancellable(anyList(),anyInt(),any());
         verify(reviewer1,never()).generateCancellable(anyList(),anyInt(),any()); verifyNoInteractions(usage);
+    }
+
+    @Test void firstReviewerRequiresUnchangedFullTextEvenWhenPeerApproves() throws Exception {
+        Snapshot base=reportSnapshot(); Context old=base.context(); String after="后续事项另行说明。";
+        snapshot=new Snapshot(base.projectId(),base.userId(),base.request(),base.settings(),
+                new Context(old.documentType(),old.title(),old.section(),old.before(),after,old.stance(),old.cutoffDate()),
+                base.profile(),base.sources(),base.facts(),base.warnings());
+        String candidate="便于委员按事项查阅和办理。";
+        assertAll(java.util.stream.IntStream.range(0,8).mapToObj(variant -> (org.junit.jupiter.api.function.Executable)() -> {
+            var s=new WritingSuggestionService(contexts,models,usage,json);
+            try {
+                View running=s.start(1L,10L,new Input("autocomplete",snapshot.request())); complete(automaticResult(snapshot,candidate));
+                var first=approvedNode(candidate);
+                switch(variant) {
+                    case 0 -> first.remove("correctedText");
+                    case 1 -> first.put("correctedText","");
+                    case 2 -> first.put("correctedText",true);
+                    case 3 -> first.putNull("correctedText");
+                    case 4 -> first.put("correctedText","平台拟集中整理相关项目材料，"+candidate+after);
+                    case 5 -> first.put("correctedText",old.before()+candidate+"后续事项已处理完成。");
+                    case 6 -> first.put("correctedText",old.before()+"委员必须立即办理。"+after);
+                    default -> { /* Exact first-review echo is the positive control. */ }
+                }
+                var second=approvedNode(candidate); second.remove("correctedText");
+                review(1,json.writeValueAsString(second));
+                assertEquals("RUNNING",s.get(1L,10L,running.id()).status(),"Second reviewer needs no correction field and cannot release alone");
+                review(0,json.writeValueAsString(first));
+                View done=s.get(1L,10L,running.id());
+                assertEquals(variant==7?"READY":"EMPTY",done.status(),"First reviewer correction evidence, variant="+variant);
+                if(variant==7) assertEquals(candidate,done.advice().get(0).text());
+                else assertTrue(done.advice().isEmpty(),"Neither a repaired prefix/suffix nor a repaired candidate may be inserted");
+            } finally { s.close(); }
+        }));
     }
 
 }
