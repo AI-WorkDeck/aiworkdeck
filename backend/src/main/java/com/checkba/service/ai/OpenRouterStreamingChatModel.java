@@ -307,8 +307,8 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         if (reasoningEffort != null) {
             body = withReasoningEffort(body, reasoningEffort);
         }
-        // 写作通道（maxOutputTokens 非 null）不带路由偏好：那条路是 qwen 单供应商，且不做重发
-        if (providerRouting != null && maxOutputTokens == null) {
+        // Explicit routing also applies to bounded writing; local provider requeue remains disabled below.
+        if (providerRouting != null) {
             body = withProviderRouting(body, providerRouting);
         }
         // Default Flash writing keeps its small budget for output; explicit model reasoning is preserved.

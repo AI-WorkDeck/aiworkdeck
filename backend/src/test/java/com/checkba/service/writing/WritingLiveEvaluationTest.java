@@ -35,6 +35,9 @@ class WritingLiveEvaluationTest {
         String key=System.getenv("OPENROUTER_API_KEY"), model=System.getenv("WRITING_EVAL_MODEL");
         String reasoningEffort=System.getenv("WRITING_EVAL_REASONING_EFFORT");
         String generationReasoningEffort=System.getenv("WRITING_EVAL_GENERATION_REASONING_EFFORT");
+        String providerSort=System.getenv().getOrDefault("WRITING_EVAL_PROVIDER_SORT","");
+        assertTrue(Set.of("","latency","throughput","price").contains(providerSort),"Unknown provider sort");
+        var providerRouting=providerSort.isEmpty()?null:new OpenRouterStreamingChatModel.ProviderRouting(providerSort,List.of(),true,0);
         assertNotNull(key); assertNotNull(model);
         var general=new AutomaticWritingProfile(); var lit=new LitigationWritingProfile(); var contract=new ContractWritingProfile(); var diligence=new DiligenceWritingProfile();
         String loan="民事起诉状\n原告：沈望舒\n被告：顾青原\n借款本金：人民币360000元\n原告主张：被告尚欠本金360000元。";
@@ -160,8 +163,8 @@ class WritingLiveEvaluationTest {
                     AtomicLong evaluationStartedNanos=new AtomicLong();
                     java.util.function.LongSupplier elapsed=() -> Math.max(1,TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-evaluationStartedNanos.get()));
                     Map<String,Map<String,Long>> phaseTimings=new ConcurrentHashMap<>();
-                    var wire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,reasoningEffort);
-                    var generationWire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,generationReasoningEffort);
+                    var wire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,reasoningEffort,providerRouting);
+                    var generationWire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,generationReasoningEffort,providerRouting);
                     var observed=mock(OpenRouterStreamingChatModel.class); when(observed.modelName()).thenReturn(model);
                     when(observed.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
                         StreamingResponseHandler<AiMessage> original=invocation.getArgument(2);
@@ -254,7 +257,7 @@ class WritingLiveEvaluationTest {
                         Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",components?"target-review-component":reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("targetReviewStage",components?coverageRequirements.get(c.name):""); row.put("targetApprovalObserved",targetApprovalObserved); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseOrigins",Map.copyOf(phaseOrigins)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("phaseRequestFacts",Map.copyOf(phaseFacts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens)); row.put("phaseTimings",Map.copyOf(timingSnapshot)); row.put("phaseTimingsCapturedMs",elapsed.getAsLong());
                         synchronized(report) {
                             report.add(row); report.sort(reportOrder);
-                            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
+                            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("providerSort",providerSort.isEmpty()?"provider-default":providerSort,"dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
                         }
                         System.out.println("Writing synthetic eval "+c.name+": "+view.status()+", pass="+passed+", elapsedMs="+view.elapsedMs());
                     }
@@ -274,7 +277,7 @@ class WritingLiveEvaluationTest {
         assertFalse(futures.isEmpty(),"No evaluation cases selected; check WRITING_EVAL_AUTOMATIC");
         synchronized(report) {
             report.sort(reportOrder);
-            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
+            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("providerSort",providerSort.isEmpty()?"provider-default":providerSort,"dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
         }
         assertEquals(futures.size(),report.size(),"Every selected evaluation must produce a report row");
         if (automatic && onlyCase.isEmpty())

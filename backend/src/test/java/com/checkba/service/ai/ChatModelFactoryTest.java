@@ -96,6 +96,35 @@ class ChatModelFactoryTest {
     }
 
     @Test
+    void automaticWritingHonorsExistingRoutingOnlyWhenConfiguredForMainModel() {
+        setDbProvider("OPENROUTER");
+        when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("moonshotai/kimi-k3");
+        when(systemSettingService.get(eq("ai.auxModel"), any())).thenReturn("moonshotai/kimi-k3");
+        var reasoning = new com.checkba.config.AiReasoningProperties();
+        reasoning.setModels(java.util.List.of("moonshotai/kimi-k3"));
+        factory.setReasoningPropertiesForTest(reasoning);
+        var routing = new com.checkba.config.AiProviderRoutingProperties();
+        routing.setEnabled(true); routing.setSort("throughput");
+        routing.setQuantizations(java.util.List.of("fp8")); routing.setAllowFallbacks(false);
+        factory.setProviderRoutingForTest(routing, 9);
+        var timeout = java.time.Duration.ofSeconds(2);
+        var expected = new OpenRouterStreamingChatModel.ProviderRouting("throughput", java.util.List.of("fp8"), false, 9);
+        for (boolean review : new boolean[]{false, true}) {
+            assertEquals(expected, factory.getAutomaticWritingModel(timeout, review).providerRouting());
+            assertEquals("medium", factory.getAutomaticWritingModel(timeout, review).reasoningEffort());
+        }
+        assertNull(factory.getWritingModel(timeout).providerRouting(), "Manual writing retains its existing route policy");
+        routing.setEnabled(false);
+        assertNull(factory.getAutomaticWritingModel(timeout).providerRouting());
+        routing.setEnabled(true);
+        when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");
+        assertNull(factory.getAutomaticWritingModel(timeout).providerRouting(), "Do not extend the configured model list");
+        assertEquals("high", factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        reasoning.setModels(java.util.List.of());
+        assertNull(factory.getAutomaticWritingModel(timeout).providerRouting());
+    }
+
+    @Test
     void automaticFlashReasoningDefaultRespectsExplicitConfigurationAndOptOut() {
         setDbProvider("OPENROUTER");
         when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");
