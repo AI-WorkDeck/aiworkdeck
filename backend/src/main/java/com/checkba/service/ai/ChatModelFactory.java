@@ -325,8 +325,8 @@ public class ChatModelFactory {
         // An empty model list is an explicit global opt-out; named configurations retain precedence.
         if (configured == null || configured.getModels() == null || configured.getModels().isEmpty()
                 || configured.listed(modelId)) return reasoningEffortFor(modelId);
-        // This automatic semantic task needs reasoning; only this exact endpoint is verified to support high.
-        return "deepseek/deepseek-v4-flash".equals(modelId) ? "high" : reasoningEffortFor(modelId);
+        // Bounded reviews use explicit semantic checks; this exact endpoint permits disabling hidden reasoning.
+        return "deepseek/deepseek-v4-flash".equals(modelId) ? "none" : reasoningEffortFor(modelId);
     }
 
     private static java.time.Duration remainingTimeout(java.time.Duration budget, long started) {
