@@ -2180,6 +2180,14 @@ try {
     if (!j || j.code !== 0) throw new Error('REST 直传失败: ' + JSON.stringify(j))
   }
   const endSessionAt = async (apiFn, projectId, title) => {
+    // Upload completion precedes asynchronous version bookkeeping. Match the UI's
+    // working-state prerequisite before sending the one-shot end request.
+    let status
+    const ready = await pollUntil(async () => {
+      status = await apiFn('/api/projects/' + projectId + '/version/status')
+      return status?.code === 0 && status.data?.enabled === true && status.data?.working === true
+    }, 15000, 200)
+    if (!ready) throw new Error('结束工作前未进入工作中: ' + JSON.stringify(status).slice(0, 300))
     const r = await apiFn('/api/projects/' + projectId + '/version/session/end', { method: 'POST', body: { title } })
     if (!r || r.code !== 0) throw new Error('结束工作失败: ' + JSON.stringify(r).slice(0, 200))
     return r.data
