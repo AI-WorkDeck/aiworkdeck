@@ -213,7 +213,7 @@ public class WritingSuggestionService {
         String input=json.writeValueAsString(Map.of("before",clean(j.snapshot.context().before()),"candidate",candidate.text(),
                 "after",clean(j.snapshot.context().after()),"facts",facts,
                 "assembledText",assembled));
-        runAutomaticStage(j,1,List.of(SystemMessage.from(prompt),UserMessage.from(input)),4096,raw -> {
+        runAutomaticStage(j,1,List.of(SystemMessage.from(prompt),UserMessage.from(input)),8192,raw -> {
             try {
                 if(raw==null || raw.length()>16000) { finish(j,List.of()); return; }
                 JsonNode decision=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
@@ -260,7 +260,7 @@ public class WritingSuggestionService {
                 +"先在error中指出该完整句子的语法或接续问题，再在correctedText中作最小必要修正。即使需要修改before/after才能修好，也应指出并修正，因为这意味着当前候选不能直接插入。保留意思，不改文风，不增加内容；只把无法自然连读或句法关系错误视为必要修正；仅替换介词、更换同义词、调整语序可以更顺口，不等于原句有错。窗口边缘截断、与插入无关的旧错误和风格偏好不构成问题。按现代汉语的实际表达判断：自然的省略、受事主语和无标记被动不要求一律补出施事、宾语或被动标记。不要把语法上可用的结构仅因另有更显式的写法就判错。不判断事实真伪。"
                 +"严格JSON {\"error\":\"具体语法/接续问题，或不确定处；确认自然正确时为空串\",\"correctedText\":\"最小必要修正后的完整片段；正确时逐字复制assembledText\"}。修正版不会写入文档，仅原样无需修正且error为空的候选可能显示。";
         String input=json.writeValueAsString(Map.of("before",j.snapshot.context().before(),"candidate",candidate.text(),"after",j.snapshot.context().after(),"assembledText",assembled));
-        runAutomaticStage(j,2,List.of(SystemMessage.from(prompt),UserMessage.from(input)),4096,raw -> {
+        runAutomaticStage(j,2,List.of(SystemMessage.from(prompt),UserMessage.from(input)),8192,raw -> {
             try {
                 if(raw==null || raw.length()>16000) { finish(j,List.of()); return; }
                 JsonNode decision=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
@@ -280,7 +280,7 @@ public class WritingSuggestionService {
                 +"严格JSON {\"reason\":\"简述当前句的表达意图、候选怎样接续或为何不确定；最多240字\",\"reviewedText\":\"逐字复制assembledText\",\"approve\":true或false}。不要输出置信概率。";
         String input=json.writeValueAsString(Map.of("before",j.snapshot.context().before(),"candidate",candidate.text(),
                 "after",j.snapshot.context().after(),"assembledText",assembled,"scopedFacts",j.snapshot.facts()));
-        runAutomaticStage(j,3,List.of(SystemMessage.from(prompt),UserMessage.from(input)),4096,raw -> {
+        runAutomaticStage(j,3,List.of(SystemMessage.from(prompt),UserMessage.from(input)),8192,raw -> {
             try {
                 if(raw==null || raw.length()>16000) { finish(j,List.of()); return; }
                 JsonNode decision=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
