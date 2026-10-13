@@ -1,0 +1,254 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+package com.aiworkdeck.plugins.baoqingtian;
+
+import com.checkba.plugin.api.*;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.node.*;
+import dev.langchain4j.agent.tool.P;
+import dev.langchain4j.agent.tool.Tool;
+import java.io.*;
+import java.net.URI;
+import java.net.http.*;
+import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.Flow;
+
+/** Fixed official API adapter; remote credentials never leave this backend instance. */
+public class BaoqingtianTools implements HostAware {
+    static final ObjectMapper JSON = new ObjectMapper();
+    static final String BASE = "https://uat.bqt.com";
+    static final int MAX_RESPONSE = 2 * 1024 * 1024;
+    interface Transport { Reply request(String method, String path, String token, JsonNode body) throws Exception; }
+    record Reply(int status, String body) {}
+    private record Session(String token, String lawyerId, String displayName) {}
+    private static final class Failure extends RuntimeException {
+        final String code;
+        Failure(String code, String message) { super(message); this.code = code; }
+    }
+    private final Transport transport;
+    private final Map<Long, Session> sessions = new ConcurrentHashMap<>();
+    private final Map<Long, Object> locks = new ConcurrentHashMap<>();
+    private PluginHost host;
+    public BaoqingtianTools() { this(new NativeTransport()); }
+    BaoqingtianTools(Transport transport) { this.transport = transport; }
+    @Override public void setHost(PluginHost host) { this.host = host; }
+
+    @Tool("包晴天平台案源和本人笔记。action: status/sms/login/logout/cases/case_detail/notes/note_detail/note_save/note_status/business_types。json为参数对象。公开发布或删除必须由用户明确确认并传confirmed:true。短信验证码不得写入笔记。保存结果不确定时不得自动重试。")
+    public String baoqingtian_action(@P("操作") String action, @P("JSON参数对象") String json) {
+        try {
+            ToolCall call = host == null ? null : host.call();
+            if (call == null || call.userId() == null || call.userId() <= 0 || call.projectId() == null || call.projectId() <= 0)
+                throw fail("host_auth", "请先登录 AI WorkDeck 并打开项目");
+            host.files().list(call.projectId(), null, false); // Public SPI membership check, including AI tool calls.
+            if (json != null && json.length() > 100_000) throw fail("invalid_params", "参数过长");
+            JsonNode args;
+            try { args = JSON.readTree(json == null || json.isBlank() ? "{}" : json); }
+            catch (Exception e) { throw fail("invalid_params", "参数必须是 JSON 对象"); }
+            if (args == null || !args.isObject()) throw fail("invalid_params", "参数必须是 JSON 对象");
+            synchronized (locks.computeIfAbsent(call.userId(), ignored -> new Object())) {
+                Object data = execute(call.userId(), action == null ? "" : action, args);
+                return JSON.createObjectNode().put("ok", true).set("data", JSON.valueToTree(data)).toString();
+            }
+        } catch (Failure e) { return JSON.createObjectNode().put("ok", false).put("error", e.getMessage()).put("errorCode", e.code).toString(); }
+        catch (Exception e) { return JSON.createObjectNode().put("ok", false).put("error", "操作未完成，请检查项目权限或稍后重试").put("errorCode", "unavailable").toString(); }
+    }
+    private Object execute(long user, String action, JsonNode args) {
+        if (action.equals("logout")) { sessions.remove(user); return Map.of("connected", false); }
+        if (action.equals("status")) {
+            Session s = sessions.get(user);
+            if (s == null) return Map.of("connected", false, "displayName", "");
+            JsonNode profile = request(user, "GET", "/bqt/unapp/user/info", s.token, null, false);
+            if (!s.lawyerId.equals(id(profile, "id"))) { sessions.remove(user); throw fail("auth_required", "平台身份已变化，请重新登录"); }
+            return Map.of("connected", true, "displayName", s.displayName, "accountId", s.lawyerId);
+        }
+        if (action.equals("sms") || action.equals("login")) {
+            String country = args.path("countryCode").asText("+86");
+            String mobile = text(args, "mobile", 16);
+            if (!(country.equals("+86") && mobile.matches("1[0-9]{10}")) && !(country.equals("+852") && mobile.matches("[0-9]{8}")))
+                throw fail("invalid_params", "请填写有效的中国内地或香港手机号");
+            if (action.equals("sms")) {
+                request(user, "GET", "/bqt/unapp/pagehome/fetchSmsCode/" + mobile + "?countryCode=%2B" + country.substring(1) + "&type=lawyer_login", null, null, true);
+                return Map.of("sent", true);
+            }
+            String code = text(args, "authCode", 10);
+            if (!code.matches("[0-9]{4,8}")) throw fail("invalid_params", "请填写有效的短信验证码");
+            JsonNode logged = request(user, "POST", "/bqt/unapp/pagehome/phoneSmsLogin", null,
+                object("countryCode", country, "mobile", mobile, "authCode", code, "authCodeType", "lawyer_login"), true);
+            String token = text(logged, "token", 8192);
+            JsonNode profile = request(user, "GET", "/bqt/unapp/user/info", token, null, false);
+            String lawyerId = id(profile, "id");
+            if (!profile.path("type").isIntegralNumber() || profile.path("type").asInt(-1) != 1) throw fail("not_lawyer", "请使用包晴天律师账号登录");
+            // This endpoint checks the authenticated LAWYER role on the server. appUserRoleDTO is a subscription, not a role.
+            request(user, "POST", "/bqt/lawyer/note/lawyer/page", token, object("pageNum", 1, "pageSize", 1), false);
+            String name = profile.path("nickName").asText("包晴天律师");
+            sessions.put(user, new Session(token, lawyerId, name));
+            return Map.of("connected", true, "displayName", name, "accountId", lawyerId);
+        }
+        Session s = sessions.get(user);
+        if (s == null) throw fail("auth_required", "请先连接包晴天律师账号；重启后需重新登录");
+        return switch (action) {
+            case "business_types" -> businessTypes(user, s);
+            case "cases" -> cases(user, s, args);
+            case "case_detail" -> caseView(request(user, "POST", "/bqt/lawCase/lawyer/caseInfo", s.token, object("id", id(args, "id")), false));
+            case "notes" -> notes(user, s, args);
+            case "note_detail" -> noteView(ownedNote(user, s, id(args, "id")));
+            case "note_save" -> saveNote(user, s, args);
+            case "note_status" -> changeStatus(user, s, args);
+            default -> throw fail("invalid_params", "不支持的包晴天操作");
+        };
+    }
+    private Object businessTypes(long user, Session s) {
+        JsonNode data = request(user, "GET", "/bqt/sys/lawBusinessType/listEnable", s.token, null, false);
+        if (!data.isArray()) throw fail("invalid_response", "平台业务类型格式已变化");
+        List<Object> items = new ArrayList<>();
+        for (JsonNode row : data) items.add(Map.of("id", id(row, "id"), "name", row.path("name").asText("")));
+        return Map.of("items", items);
+    }
+    private Object cases(long user, Session s, JsonNode args) {
+        int page = page(args);
+        String sort = args.path("sort").asText("newest_release_time");
+        if (!Set.of("newest_release_time", "amount_desc", "amount_asc").contains(sort)) throw fail("invalid_params", "不支持的排序");
+        JsonNode data = request(user, "POST", "/bqt/lawCase/lawyer/listAllCases", s.token, object("page", page, "limit", 20, "sort", sort), false);
+        JsonNode list = data.has("list") ? data : data.path("caseList");
+        return pageView(list, page, false);
+    }
+    private Object notes(long user, Session s, JsonNode args) {
+        int page = page(args);
+        ObjectNode body = object("pageNum", page, "pageSize", 20);
+        if (args.hasNonNull("keyword")) {
+            if (!args.path("keyword").isTextual() || args.path("keyword").asText().length() > 200) throw fail("invalid_params", "笔记搜索词须为文字且不超过 200 字");
+            String keyword = args.path("keyword").asText().trim();
+            if (!keyword.isEmpty()) body.put("keyword", keyword);
+        }
+        JsonNode data = request(user, "POST", "/bqt/lawyer/note/lawyer/page", s.token, body, false);
+        return pageView(data, page, true);
+    }
+    private Object pageView(JsonNode data, int page, boolean notes) {
+        if (!data.path("list").isArray() || !data.path("total").canConvertToLong()) throw fail("invalid_response", "平台列表格式已变化，请稍后重试");
+        List<Object> items = new ArrayList<>();
+        for (JsonNode row : data.path("list")) items.add(notes ? noteView(row) : caseView(row));
+        return Map.of("items", items, "total", data.path("total").asLong(), "hasMore", (long) page * 20 < data.path("total").asLong(), "page", page);
+    }
+    private Object caseView(JsonNode row) {
+        String description = row.path("demand").asText("");
+        return Map.of("id", id(row, "id"), "title", description, "description", description,
+            "category", row.path("topic").path("topicName").asText(""), "region", row.path("cityName").asText(row.path("areaName").asText("")),
+            "budget", row.path("showMoney").asText(""), "createdAt", row.path("createTime").asText(""));
+    }
+    private Object noteView(JsonNode row) {
+        String type = row.path("type").asText("");
+        String media = media(row.path("content"));
+        String status = switch (row.path("status").asText()) { case "DRAFT" -> "draft"; case "PUBLIC" -> "published"; case "PRIVATE" -> "private"; case "DELETED" -> "deleted"; default -> "unknown"; };
+        return Map.of("id", id(row, "id"), "title", row.path("title").asText(""), "content", type.equals("TEXT") ? media : row.path("description").asText(""),
+            "status", status, "updatedAt", row.path("updateTime").asText(row.path("createTime").asText("")), "type", type,
+            "mediaCount", type.equals("TEXT") || media.isBlank() ? 0 : media.split(";").length,
+            "editable", Set.of("TEXT", "IMAGE", "VIDEO").contains(type) && !Set.of("unknown", "deleted").contains(status));
+    }
+    private JsonNode ownedNote(long user, Session s, String noteId) {
+        JsonNode row = request(user, "GET", "/bqt/lawyer/note/detail?id=" + noteId, s.token, null, false);
+        if (!noteId.equals(id(row, "id")) || !s.lawyerId.equals(row.path("lawyerId").asText())) throw fail("not_owner", "只能管理当前律师账号自己的笔记");
+        return row;
+    }
+    private Object saveNote(long user, Session s, JsonNode args) {
+        String title = text(args, "title", 200), content = text(args, "content", 50_000);
+        String state = state(args, false);
+        confirm(args, state);
+        ObjectNode body = object("title", title, "status", state, "isNoteDraft", "N");
+        boolean edit = args.hasNonNull("id") && !args.path("id").asText().isBlank();
+        String noteId = null;
+        if (edit) {
+            noteId = id(args, "id");
+            JsonNode old = ownedNote(user, s, noteId);
+            String type = old.path("type").asText();
+            if (!Set.of("TEXT", "IMAGE", "VIDEO").contains(type) || old.path("status").asText().equals("DELETED")) throw fail("not_editable", "此笔记暂不支持编辑");
+            body.put("noteId", noteId).put("type", type).put("content", type.equals("TEXT") ? content : media(old.path("content")));
+            body.put("description", type.equals("TEXT") ? old.path("description").asText("") : content);
+            for (String key : List.of("cover", "topicId", "productId", "hotSpot")) if (old.hasNonNull(key)) body.set(key, old.get(key));
+        } else {
+            if (!args.path("confirmed").asBoolean(false)) throw fail("confirmation_required", "创建笔记前请明确确认保存");
+            body.put("type", "TEXT").put("content", content).put("businessId", id(args, "businessId")).put("isNoteDraft", "N");
+        }
+        JsonNode response = request(user, "POST", "/bqt/lawyer/note/" + (edit ? "edit" : "add"), s.token, body, true);
+        if (edit && !response.path("isSuccess").isBoolean()) throw fail("outcome_unknown", "平台未明确确认保存，请刷新笔记核对，勿重复提交");
+        if (!edit) {
+            String returnedId = response.path("noteId").asText("");
+            if (!returnedId.matches("[1-9][0-9]{0,18}")) throw fail("outcome_unknown", "平台未返回新笔记标识，请刷新笔记列表核对，勿重复创建");
+            noteId = returnedId;
+        }
+        return Map.of("id", noteId, "saved", true);
+    }
+    private Object changeStatus(long user, Session s, JsonNode args) {
+        String noteId = id(args, "id"), status = state(args, true);
+        confirm(args, status);
+        ownedNote(user, s, noteId);
+        request(user, "POST", "/bqt/lawyer/note/changeStatus", s.token, object("noteId", noteId, "status", status), true);
+        return Map.of("id", noteId, "saved", true);
+    }
+    private JsonNode request(long user, String method, String path, String token, JsonNode body, boolean write) {
+        try {
+            Reply response = transport.request(method, path, token, body);
+            if (response.status == 401) { sessions.remove(user); throw fail("auth_required", "包晴天登录已失效，请重新登录"); }
+            if (response.status != 200) throw fail(write && response.status >= 500 ? "outcome_unknown" : "remote_error", write && response.status >= 500 ? "平台暂未确认操作结果，请先刷新核对，勿重复提交" : "平台暂时无法处理请求，请稍后重试");
+            if (response.body == null || response.body.length() > MAX_RESPONSE) throw fail(write ? "outcome_unknown" : "invalid_response", "平台响应过大或格式异常，请先刷新核对操作结果");
+            JsonNode root = JSON.readTree(response.body);
+            if (root == null || !root.path("code").canConvertToInt()) throw fail(write ? "outcome_unknown" : "invalid_response", "平台响应异常，请先刷新核对操作结果");
+            int code = root.path("code").asInt();
+            if (code != 0) {
+                if (code == 401) { sessions.remove(user); throw fail("auth_required", "包晴天登录已失效，请重新登录"); }
+                if (code == 21025) throw fail("not_registered", "该手机号尚未注册律师端，请先在包晴天 APP 注册");
+                if (code == 21027) throw fail("account_blocked", "该平台账号已被限制，请联系包晴天客服");
+                String msg = root.path("msg").asText("").toLowerCase(Locale.ROOT);
+                if (msg.contains("captcha") || msg.contains("图形") || msg.contains("人机") || msg.contains("滑块")) throw fail("captcha_required", "平台要求安全验证，请到包晴天官方登录页完成验证");
+                throw fail("remote_error", "平台未接受请求，请检查登录状态、验证码或填写内容");
+            }
+            JsonNode data = root.path("data");
+            if ((data.isBoolean() && !data.asBoolean()) || (data.path("success").isBoolean() && !data.path("success").asBoolean()) || (data.path("isSuccess").isBoolean() && !data.path("isSuccess").asBoolean())) throw fail("remote_rejected", "平台未完成此操作，请刷新核对后重试");
+            return data;
+        } catch (Failure e) { throw e; }
+        catch (Exception e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw fail(write ? "outcome_unknown" : "network_error", write ? "未收到平台确认，操作结果尚不确定；请先刷新核对，勿重复提交" : "暂时无法连接包晴天，请稍后重试");
+        }
+    }
+    private static ObjectNode object(Object... pairs) { ObjectNode node = JSON.createObjectNode(); for (int i = 0; i < pairs.length; i += 2) node.set((String) pairs[i], JSON.valueToTree(pairs[i + 1])); return node; }
+    private static Failure fail(String code, String message) { return new Failure(code, message); }
+    private static String text(JsonNode args, String key, int max) { String value = args.path(key).asText(""); if (value.isBlank() || value.length() > max) throw fail("invalid_params", "请填写有效的" + switch(key) { case "title" -> "标题"; case "content" -> "正文"; case "mobile" -> "手机号"; case "authCode" -> "验证码"; default -> "必要信息"; }); return value; }
+    private static String id(JsonNode args, String key) { String value = args.path(key).asText(""); if (!value.matches("[1-9][0-9]{0,18}")) throw fail("invalid_params", "笔记、案源或业务类型标识无效"); return value; }
+    private static int page(JsonNode args) { int p = args.path("page").asInt(1); if (p < 1 || p > 10000) throw fail("invalid_params", "页码无效"); return p; }
+    private static String state(JsonNode args, boolean deleting) { return switch (args.path("status").asText("draft")) { case "draft" -> "DRAFT"; case "published" -> "PUBLIC"; case "private" -> "PRIVATE"; case "deleted" -> { if (!deleting) throw fail("invalid_params", "保存不能执行删除"); yield "DELETED"; } default -> throw fail("invalid_params", "笔记状态无效"); }; }
+    private static void confirm(JsonNode args, String state) { if ((state.equals("PUBLIC") || state.equals("DELETED")) && !args.path("confirmed").asBoolean(false)) throw fail("confirmation_required", "公开发布或删除前请明确确认"); }
+    private static String media(JsonNode value) { if (!value.isArray()) return value.asText(""); List<String> parts = new ArrayList<>(); value.forEach(v -> parts.add(v.asText())); return String.join(";", parts); }
+
+    static final class NativeTransport implements Transport {
+        private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NEVER).build();
+        @Override public Reply request(String method, String path, String token, JsonNode body) throws Exception {
+            if (!path.startsWith("/bqt/") || path.contains("\r") || path.contains("\n")) throw new IOException("Invalid path");
+            HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(BASE + path)).timeout(Duration.ofSeconds(25))
+                .header("User-Origin", "lawyer_pc").header("version", "v2.2.1").header("business", "BQT_LAWYER").header("Accept", "application/json");
+            if (token != null) b.header("appToken", token);
+            if (method.equals("GET")) b.GET(); else b.header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body.toString()));
+            CompletableFuture<HttpResponse<byte[]>> future = client.sendAsync(b.build(), ignored -> new LimitedBody());
+            try { HttpResponse<byte[]> r = future.get(30, TimeUnit.SECONDS); return new Reply(r.statusCode(), new String(r.body(), java.nio.charset.StandardCharsets.UTF_8)); }
+            finally { if (!future.isDone()) future.cancel(true); }
+        }
+    }
+    private static final class LimitedBody implements HttpResponse.BodySubscriber<byte[]> {
+        private final CompletableFuture<byte[]> result = new CompletableFuture<>();
+        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        private Flow.Subscription subscription;
+        public CompletionStage<byte[]> getBody() { return result; }
+        public void onSubscribe(Flow.Subscription s) { subscription = s; s.request(1); }
+        public void onNext(List<ByteBuffer> buffers) {
+            for (ByteBuffer b : buffers) {
+                if (bytes.size() + b.remaining() > MAX_RESPONSE) { subscription.cancel(); result.completeExceptionally(new IOException("Response too large")); return; }
+                byte[] chunk = new byte[b.remaining()]; b.get(chunk); bytes.writeBytes(chunk);
+            }
+            subscription.request(1);
+        }
+        public void onError(Throwable t) { result.completeExceptionally(t); }
+        public void onComplete() { result.complete(bytes.toByteArray()); }
+    }
+}
