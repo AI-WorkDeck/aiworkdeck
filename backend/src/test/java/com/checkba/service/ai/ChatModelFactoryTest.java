@@ -119,7 +119,7 @@ class ChatModelFactoryTest {
         routing.setEnabled(true);
         when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");
         assertNull(factory.getAutomaticWritingModel(timeout).providerRouting(), "Do not extend the configured model list");
-        assertEquals("high", factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        assertEquals("none", factory.getAutomaticWritingModel(timeout).reasoningEffort());
         reasoning.setModels(java.util.List.of());
         assertNull(factory.getAutomaticWritingModel(timeout).providerRouting());
     }
@@ -132,7 +132,7 @@ class ChatModelFactoryTest {
         reasoning.setModels(java.util.List.of("moonshotai/kimi-k3"));
         factory.setReasoningPropertiesForTest(reasoning);
         var timeout = java.time.Duration.ofSeconds(2);
-        assertEquals("high", factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        assertEquals("none", factory.getAutomaticWritingModel(timeout).reasoningEffort());
         assertNull(factory.getAutomaticWritingModel(timeout, false).reasoningEffort());
         assertNull(factory.getWritingModel(timeout).reasoningEffort());
         reasoning.setModels(java.util.List.of("deepseek/deepseek-v4-flash"));

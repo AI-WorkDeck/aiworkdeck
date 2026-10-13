@@ -198,6 +198,18 @@ class WritingModelTransportTest {
             assertFalse(new ObjectMapper().readTree(body.get()).has("reasoning"));
         }
     }
+    @Test void boundedFlashReviewCanDisableReasoningWithoutAnUnsupportedEffort() throws Exception {
+        serve();
+        var review = new OpenRouterStreamingChatModel("synthetic-key", url(), "deepseek/deepseek-v4-flash",
+                Duration.ofSeconds(2), 5, "none");
+        Collector c = new Collector();
+        review.generateCancellable(List.of(UserMessage.from("synthetic review")),8192,c); c.await();
+        assertNull(c.error.get());
+        var request = new ObjectMapper().readTree(body.get());
+        assertEquals(8192,request.path("max_tokens").asInt());
+        assertFalse(request.path("reasoning").path("enabled").asBoolean(true));
+        assertFalse(request.path("reasoning").has("effort"));
+    }
     @Test void boundedReviewPreservesExplicitLowReasoningForFlash() throws Exception {
         serve();
         var review = new OpenRouterStreamingChatModel("synthetic-key", url(), "qwen/qwen3.7-flash",
@@ -229,7 +241,8 @@ class WritingModelTransportTest {
             var request = new ObjectMapper().readTree(body.get());
             assertEquals("deepseek/deepseek-v4-flash", request.path("model").asText());
             assertEquals(4096, request.path("max_tokens").asInt());
-            assertEquals("high", request.path("reasoning").path("effort").asText());
+            assertFalse(request.path("reasoning").path("enabled").asBoolean(true));
+            assertFalse(request.path("reasoning").has("effort"));
         }
     }
     @Test void boundedWritingNeverLogsMalformedProviderContent() throws Exception {

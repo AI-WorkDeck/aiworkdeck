@@ -312,8 +312,9 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
             body = withProviderRouting(body, providerRouting);
         }
         // Default Flash writing keeps its small budget for output; explicit model reasoning is preserved.
-        // Other Qwen endpoints can require reasoning; leave every unverified model at its default.
-        if (maxOutputTokens != null && reasoningEffort == null && "qwen/qwen3.7-flash".equals(modelName)) {
+        // The verified DeepSeek Flash disable control uses enabled=false, not an unsupported effort tier.
+        if (maxOutputTokens != null && (reasoningEffort == null && "qwen/qwen3.7-flash".equals(modelName)
+                || "none".equals(reasoningEffort) && "deepseek/deepseek-v4-flash".equals(modelName))) {
             try {
                 ObjectNode writing = (ObjectNode) LENIENT.readTree(body);
                 writing.set("reasoning", LENIENT.createObjectNode().put("enabled", false));
