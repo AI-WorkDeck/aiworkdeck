@@ -10,12 +10,11 @@ const imports = [...script.matchAll(/^import\s+([\s\S]*?)\s+from\s+'[^']+'\s*;?\
 const body = script.replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '').replace('export default {', 'const toolbar = {') + '\n return { toolbar, hosts: VIEW_PREFS_HOSTS }'
 const keys = ['paragraphMarks', 'lineBreaks', 'spaces', 'tabs']
 function harness(stored = '', { failStorage = false, failEngine = false } = {}) {
-  const emitted = [], calls = [], notices = [], listeners = []
+  const emitted = [], calls = [], notices = []
   let saved = stored
   const uni = {
     getStorageSync: () => saved,
     setStorageSync: (key, value) => { if (failStorage) throw Error('quota'); saved = value },
-    $emit: (name, payload) => { emitted.push(name); listeners.forEach(fn => fn(payload)) },
     showToast: m => notices.push(m),
   }
   const { toolbar, hosts } = new Function('uni', ...imports, body)(uni, ...imports.map(() => () => {}))
@@ -72,7 +71,6 @@ for (const failure of ['failStorage', 'failEngine']) test(`${failure}: 不保存
   assert.equal(h.saved(), old)
   assert.deepEqual(a.viewPrefs, previous)
   assert.equal(a.viewPrefsBusy, false)
-  assert.equal(h.emitted.includes('awd:editor-view-prefs'), false)
   assert.equal(h.notices.length, 1)
 })
 test('正在应用时禁止第二次提交，避免快速点击覆盖已选状态', async () => {
