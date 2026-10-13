@@ -251,4 +251,64 @@ class WritingModelTransportTest {
         } finally { logger.detachAppender(logs); logs.stop(); }
     }
 
+    @Test void automaticWritingSendsConfiguredRoutingForGenerationAndReview() throws Exception {
+        serve();
+        AiModelProperties props = new AiModelProperties();
+        props.getOpenRouter().setBaseUrl(url()); props.getOpenRouter().setApiKey("synthetic-byok");
+        props.getOpenRouter().setDefaultModel("moonshotai/kimi-k3");
+        var platform = mock(PlatformAiChannel.class); when(platform.apiKey()).thenReturn("synthetic-platform");
+        for (String channel : List.of("OPENROUTER", "AWD_CLOUD")) {
+            var factory = factory(channel, props, platform);
+            var reasoning = new com.checkba.config.AiReasoningProperties();
+            reasoning.setModels(List.of("moonshotai/kimi-k3"));
+            factory.setReasoningPropertiesForTest(reasoning);
+            var routing = new com.checkba.config.AiProviderRoutingProperties();
+            routing.setEnabled(true); routing.setSort("throughput");
+            routing.setQuantizations(List.of("fp8")); routing.setAllowFallbacks(false);
+            factory.setProviderRoutingForTest(routing, 1);
+            for (boolean review : new boolean[]{false, true}) {
+                Collector c = new Collector();
+                factory.getAutomaticWritingModel(Duration.ofSeconds(2), review)
+                        .generateCancellable(List.of(UserMessage.from("synthetic")), 4096, c); c.await();
+                assertNull(c.error.get());
+                var request = new ObjectMapper().readTree(body.get());
+                assertEquals("throughput", request.path("provider").path("sort").asText());
+                assertEquals(List.of("fp8"), new ObjectMapper().convertValue(request.path("provider").path("quantizations"), List.class));
+                assertFalse(request.path("provider").path("allow_fallbacks").asBoolean(true));
+                assertEquals("moonshotai/kimi-k3", request.path("model").asText());
+                assertEquals("medium", request.path("reasoning").path("effort").asText());
+                assertEquals(4096, request.path("max_tokens").asInt());
+                assertTrue(request.path("stream_options").path("include_usage").asBoolean());
+                assertEquals(channel.equals("OPENROUTER") ? "Bearer synthetic-byok" : "Bearer synthetic-platform", auth.get());
+            }
+        }
+        assertEquals(4, requests.get());
+    }
+
+    @Test void boundedRoutingDoesNotEnableLocalProviderRequeueOrRetryOnFailure() throws Exception {
+        AtomicBoolean closeBeforeHeaders = new AtomicBoolean();
+        server.createContext("/chat/completions", ex -> {
+            requests.incrementAndGet(); body.set(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            if (!closeBeforeHeaders.get()) ex.sendResponseHeaders(503, -1);
+            ex.close();
+        });
+        class RoutedCollector extends Collector implements ReasoningStreamingHandler {
+            @Override public void bindProviderRequeue(int afterSeconds, java.util.function.BooleanSupplier requeue) {
+                fail("Bounded writing must not bind local provider requeue");
+            }
+        }
+        var route = new OpenRouterStreamingChatModel.ProviderRouting("latency", List.of(), true, 1);
+        var model = new OpenRouterStreamingChatModel("synthetic-key", url(), "moonshotai/kimi-k3",
+                Duration.ofSeconds(2), 5, "medium", route);
+        for (boolean disconnect : new boolean[]{false, true}) {
+            closeBeforeHeaders.set(disconnect); requests.set(0);
+            var c = new RoutedCollector();
+            model.generateCancellable(List.of(UserMessage.from("synthetic")), 512, c); c.await();
+            assertNotNull(c.error.get()); assertEquals(1, c.terminal.get()); assertEquals(1, requests.get());
+            var request = new ObjectMapper().readTree(body.get());
+            assertEquals("latency", request.path("provider").path("sort").asText());
+            assertFalse(request.path("provider").has("ignore"));
+        }
+    }
+
 }

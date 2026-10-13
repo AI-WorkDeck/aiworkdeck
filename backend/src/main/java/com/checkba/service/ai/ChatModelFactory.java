@@ -316,7 +316,8 @@ public class ChatModelFactory {
         String baseUrl = platform ? aiModelProperties.getOpenRouter().getBaseUrl() : resolveOpenRouterBaseUrl();
         recordModelUse(target.channel().name(), target.modelId(), true);
         return new OpenRouterStreamingChatModel(key, baseUrl, target.modelId(), remainingTimeout(timeout, started),
-                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), automatic ? (review ? automaticWritingReasoningEffortFor(target.modelId()) : reasoningEffortFor(target.modelId())) : null);
+                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), automatic ? (review ? automaticWritingReasoningEffortFor(target.modelId()) : reasoningEffortFor(target.modelId())) : null,
+                automatic ? providerRoutingFor(target.modelId()) : null);
     }
 
     private String automaticWritingReasoningEffortFor(String modelId) {
