@@ -9,6 +9,103 @@ import static com.checkba.service.writing.WritingTypes.*;
 class WritingNarrativeSourcesTest {
     private Source source(String id,String text) {return new Source(id,1L,"合成文书","v1","段落",text);}
     private Context contract(String section) {return new Context("contract","合成服务合同",section,"","","甲方","");}
+    @Test void generalKeepsBothCompleteSourceSentencesAndOriginalParagraphIds() {
+        String registration="报名信息通过问卷收集。", attendance="出席信息通过现场签到收集。";
+        var facts=WritingNarrativeSources.append("general",List.of(source("active-document","工作记录\n"+registration+"\n"+attendance)),List.of());
+        assertEquals(List.of("工作记录\n"+registration,attendance),facts.stream().map(Fact::quote).toList());
+        assertEquals(List.of("prose:active-document:1","prose:active-document:3"),facts.stream().map(Fact::id).toList());
+        for(Fact fact:facts) {
+            assertEquals(fact.quote(),fact.value()); assertEquals("SOURCE_TEXT",fact.kind());
+            assertEquals("DOCUMENT_STATES",fact.status()); assertEquals("active-document",fact.sourceId());
+        }
+    }
+    @Test void generalPreservesVeryShortNegationAndLimitsWithoutInventingMinimumLength() {
+        List<String> sentences=List.of("未付。","项目尚未验收。","款项尚未到账。","仅限线上办理。","不包括周末。","“尚未验收。”");
+        var facts=WritingNarrativeSources.append("general",List.of(source("active-document",String.join("\n",sentences))),List.of());
+        assertEquals(sentences,facts.stream().map(Fact::quote).toList());
+        assertTrue(facts.stream().allMatch(f -> f.quote().equals(f.value()) && f.status().equals("DOCUMENT_STATES")));
+    }
+    @Test void generalDoesNotTurnShortHeadingsFragmentsOrPunctuationIntoFacts() {
+        for(String text:List.of(""," \t","工作记录","一、报名情况","材料如下：","仅在材料齐全时，","仅在全部申请材料经过逐项核验并确认齐全时，","尚未验收","。","！？","1."))
+            assertTrue(WritingNarrativeSources.append("general",List.of(source("active-document",text)),List.of()).isEmpty(),text);
+    }
+    @Test void generalJoinsShortAndLongConditionsUntilSentenceEnd() {
+        for(String condition:List.of("仅在材料齐全时，","仅在全部申请材料经过逐项核验并确认齐全时，")) {
+            String complete=condition+"\n工作人员才反馈初审意见。";
+            var facts=WritingNarrativeSources.append("general",List.of(source("active-document",complete+"\n款项尚未到账。")),List.of());
+            assertEquals(List.of(complete,"款项尚未到账。"),facts.stream().map(Fact::quote).toList());
+            assertEquals(List.of("prose:active-document:1","prose:active-document:3"),facts.stream().map(Fact::id).toList());
+        }
+    }
+    @Test void generalColonCommaAndSemicolonNeverDetachTheConsequence() {
+        String complete="适用条件如下：\n材料须齐全；\n缺失项须补正，\n完成后才受理。";
+        var facts=WritingNarrativeSources.append("general",List.of(source("active-document",complete)),List.of());
+        assertEquals(List.of(complete),facts.stream().map(Fact::quote).toList());
+        assertEquals("prose:active-document:1",facts.get(0).id());
+    }
+    @Test void generalPreservesOriginalCrLfAcrossHeadingAndCondition() {
+        String complete="受理说明\r\n仅在材料齐全时，\r\n工作人员才反馈初审意见。";
+        String body=complete+"\r\n款项尚未到账。";
+        var facts=WritingNarrativeSources.append("general",List.of(source("active-document",body)),List.of());
+        assertEquals(List.of(complete,"款项尚未到账。"),facts.stream().map(Fact::quote).toList());
+        assertEquals(List.of("prose:active-document:1","prose:active-document:4"),facts.stream().map(Fact::id).toList());
+        assertTrue(facts.stream().allMatch(f -> body.contains(f.quote()) && f.value().equals(f.quote())));
+    }
+    @Test void oversizedGeneralConditionGroupCannotLeakItsShortTail() {
+        for(String oversized:List.of("仅在"+"条件".repeat(205)+"均满足时，\n工作人员才反馈初审意见。",
+                "仅在"+"条件".repeat(120)+"均满足时，\n且"+"前提".repeat(100)+"均成立时，\n工作人员才反馈初审意见。")) {
+            var facts=WritingNarrativeSources.append("general",List.of(source("active-document",oversized+"\n款项尚未到账。")),List.of());
+            assertEquals(List.of("款项尚未到账。"),facts.stream().map(Fact::quote).toList());
+            assertEquals("prose:active-document:"+(oversized.split("\\R").length+1),facts.get(0).id());
+        }
+    }
+    @Test void groupedGeneralSourceCannotBypassStructuredConflictOnItsTail() {
+        String tail="工作人员才反馈初审意见。";
+        Fact conflict=new Fact("f1","STATUS","初审安排","待核实","","CONFLICT","active-document",tail);
+        String body="仅在材料齐全时，\n"+tail;
+        assertEquals(List.of(conflict),WritingNarrativeSources.append("general",List.of(source("active-document",body)),List.of(conflict)));
+    }
+    @Test void currentUnfinishedSentenceDoesNotHideEarlierCompleteEvidence() {
+        for(String complete:List.of("报名信息通过问卷收集。","仅在材料齐全时，\n工作人员才反馈初审意见。")) {
+            String body=complete+"目前准备进一步说明具体情况";
+            var facts=WritingNarrativeSources.append("general",List.of(source("active-document",body)),List.of());
+            assertEquals(List.of(complete),facts.stream().map(Fact::quote).toList());
+            assertTrue(body.contains(facts.get(0).quote()));
+        }
+        assertTrue(WritingNarrativeSources.append("general",List.of(source("active-document","项目金额为3.5万元，具体情况正在")),List.of()).isEmpty());
+    }
+    @Test void groupingKeepsPartyAssertionsAsClaimsRatherThanEstablishedFacts() {
+        for(String body:List.of("情况说明\n原告称未付。","情况说明\n原告称：\n款项未付。")) {
+            var facts=WritingNarrativeSources.append("general",List.of(source("active-document",body)),List.of());
+            assertEquals(1,facts.size()); assertEquals(body,facts.get(0).quote());
+            assertEquals("CLAIM",facts.get(0).status()); assertEquals("原告",facts.get(0).role());
+        }
+    }
+    @Test void shortSentenceExceptionDoesNotChangeOtherWritingProfiles() {
+        String text="未付。\n报名信息通过问卷收集。\n项目尚未验收。";
+        for(String profile:List.of("litigation","contract","diligence")) {
+            Context context=new Context(profile,"合成文书","正文","","","","");
+            assertTrue(WritingNarrativeSources.append(profile,context,List.of(source("active-document",text)),List.of()).isEmpty(),profile);
+        }
+    }
+    @Test void shortGeneralSourceCannotCreateAlternativeCitationAroundStructuredStatus() {
+        String text="款项尚未到账。";
+        for(String status:List.of("CONFLICT","MISSING")) {
+            Fact structured=new Fact("f1","STATUS","收款状态","待核实","",status,"active-document",text);
+            assertEquals(List.of(structured),WritingNarrativeSources.append("general",List.of(source("active-document",text)),List.of(structured)));
+        }
+    }
+    @Test void appendingShortGeneralSourcesTwiceDoesNotDuplicateTheirCitations() {
+        var sources=List.of(source("active-document","工作记录\n报名信息通过问卷收集。\n未付。"));
+        var facts=WritingNarrativeSources.append("general",sources,List.of());
+        assertEquals(2,facts.size());
+        assertEquals(facts,WritingNarrativeSources.append("general",sources,facts));
+    }
+    @Test void completeShortGeneralSentencesStillRespectWholeParagraphAndTotalBudgets() {
+        String body=String.join("\n",java.util.Collections.nCopies(250,"未付。"));
+        assertEquals(200,WritingNarrativeSources.append("general",List.of(source("active-document",body)),List.of()).size());
+        assertTrue(WritingNarrativeSources.append("general",List.of(source("active-document","条件".repeat(205)+"。")),List.of()).isEmpty());
+    }
     @Test void preservesEntireClaimAndNegationWithoutCertifyingIt() {
         String text="被告称并未收到原告所称借款，对借据的真实性仍有异议。";
         Fact f=WritingNarrativeSources.append("litigation",List.of(source("active-document",text)),List.of()).get(0);
