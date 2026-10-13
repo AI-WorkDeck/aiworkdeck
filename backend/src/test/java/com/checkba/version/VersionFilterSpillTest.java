@@ -23,10 +23,14 @@ class VersionFilterSpillTest {
         Path log = root.resolve("child.log");
         // A regression spins in native skip(), which thread interruption cannot stop.
         // Isolate it in a child JVM so failure cannot strand the test runner.
+        // The full test classpath exceeds Windows' process command-line limit.
+        Path arguments = root.resolve("java-arguments.txt");
+        Files.writeString(arguments, "-cp\n" + quoteArgument(System.getProperty(
+                "surefire.test.class.path", System.getProperty("java.class.path"))) + "\n"
+                + Scenario.class.getName() + "\n" + quoteArgument(root.toString()) + "\n");
         Process child = new ProcessBuilder(
                 Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                "-cp", System.getProperty("surefire.test.class.path", System.getProperty("java.class.path")),
-                Scenario.class.getName(), root.toString())
+                "@" + arguments)
                 .redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {
             assertTrue(child.waitFor(20, TimeUnit.SECONDS),
@@ -39,6 +43,10 @@ class VersionFilterSpillTest {
                 assertTrue(child.waitFor(5, TimeUnit.SECONDS), "Child JVM could not be stopped");
             }
         }
+    }
+
+    private static String quoteArgument(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
     public static class Scenario {
