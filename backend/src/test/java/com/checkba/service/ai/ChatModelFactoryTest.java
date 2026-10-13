@@ -109,31 +109,35 @@ class ChatModelFactoryTest {
         factory.setProviderRoutingForTest(routing, 9);
         var timeout = java.time.Duration.ofSeconds(2);
         var expected = new OpenRouterStreamingChatModel.ProviderRouting("throughput", java.util.List.of("fp8"), false, 9);
-        for (boolean review : new boolean[]{false, true}) {
-            assertEquals(expected, factory.getAutomaticWritingModel(timeout, review).providerRouting());
-            assertEquals("medium", factory.getAutomaticWritingModel(timeout, review).reasoningEffort());
-        }
+        assertEquals(expected, factory.getAutomaticWritingModel(timeout).providerRouting());
+        assertEquals("medium", factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        assertEquals(expected, factory.getAutomaticWritingReviewModel(timeout, 0).providerRouting());
+        assertNull(factory.getAutomaticWritingReviewModel(timeout, 1).providerRouting());
+        reasoning.setModels(java.util.List.of("moonshotai/kimi-k3", "qwen/qwen3.8-max"));
+        assertEquals(expected, factory.getAutomaticWritingReviewModel(timeout, 1).providerRouting());
+        assertEquals("low", factory.getAutomaticWritingReviewModel(timeout, 1).reasoningEffort());
         assertNull(factory.getWritingModel(timeout).providerRouting(), "Manual writing retains its existing route policy");
         routing.setEnabled(false);
         assertNull(factory.getAutomaticWritingModel(timeout).providerRouting());
+        assertNull(factory.getAutomaticWritingReviewModel(timeout, 0).providerRouting());
+        assertNull(factory.getAutomaticWritingReviewModel(timeout, 1).providerRouting());
         routing.setEnabled(true);
         when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");
         assertNull(factory.getAutomaticWritingModel(timeout).providerRouting(), "Do not extend the configured model list");
-        assertEquals("none", factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        assertNull(factory.getAutomaticWritingModel(timeout).reasoningEffort());
         reasoning.setModels(java.util.List.of());
         assertNull(factory.getAutomaticWritingModel(timeout).providerRouting());
     }
 
     @Test
-    void automaticFlashReasoningDefaultRespectsExplicitConfigurationAndOptOut() {
+    void automaticGenerationReasoningRetainsExplicitConfigurationAndDefaults() {
         setDbProvider("OPENROUTER");
         when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");
         var reasoning = new com.checkba.config.AiReasoningProperties();
         reasoning.setModels(java.util.List.of("moonshotai/kimi-k3"));
         factory.setReasoningPropertiesForTest(reasoning);
         var timeout = java.time.Duration.ofSeconds(2);
-        assertEquals("none", factory.getAutomaticWritingModel(timeout).reasoningEffort());
-        assertNull(factory.getAutomaticWritingModel(timeout, false).reasoningEffort());
+        assertNull(factory.getAutomaticWritingModel(timeout).reasoningEffort());
         assertNull(factory.getWritingModel(timeout).reasoningEffort());
         reasoning.setModels(java.util.List.of("deepseek/deepseek-v4-flash"));
         for (String effort : java.util.List.of("high", "xhigh", "none")) {
@@ -152,6 +156,45 @@ class ChatModelFactoryTest {
     }
 
     @Test
+    void automaticReviewersAreFixedIndependentModelsWithExplicitLowReasoning() {
+        setDbProvider("OPENROUTER");
+        when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");
+        var reasoning = new com.checkba.config.AiReasoningProperties();
+        reasoning.setModels(java.util.List.of("deepseek/deepseek-v4-flash", "moonshotai/kimi-k3", "qwen/qwen3.8-max"));
+        reasoning.setEffortDefault("high"); factory.setReasoningPropertiesForTest(reasoning);
+        var timeout = java.time.Duration.ofSeconds(2);
+        for (int reviewer = 0; reviewer < 2; reviewer++) {
+            var model = factory.getAutomaticWritingReviewModel(timeout, reviewer);
+            assertEquals(reviewer == 0 ? AllowedModels.KIMI_K3.getModelId() : AllowedModels.QWEN_3_8_MAX.getModelId(), model.modelName());
+            assertEquals("low", model.reasoningEffort());
+            assertNotSame(model, factory.getAutomaticWritingReviewModel(timeout, reviewer));
+        }
+        assertEquals("high", factory.getAutomaticWritingModel(timeout).reasoningEffort());
+        reasoning.setModels(java.util.List.of());
+        assertEquals("low", factory.getAutomaticWritingReviewModel(timeout, 0).reasoningEffort());
+        assertEquals("low", factory.getAutomaticWritingReviewModel(timeout, 1).reasoningEffort());
+        for (int invalid : new int[]{-1, 2, Integer.MAX_VALUE})
+            assertThrows(IllegalArgumentException.class, () -> factory.getAutomaticWritingReviewModel(timeout, invalid));
+        setDbProvider("OLLAMA");
+        for (int reviewer : new int[]{0, 1}) assertThrows(com.checkba.exception.FeatureNotConfiguredException.class,
+                () -> factory.getAutomaticWritingReviewModel(timeout, reviewer));
+        verify(platformAiChannel, never()).apiKey();
+    }
+
+    @Test
+    void automaticReviewersRejectSubstitutedTargetsBeforeProvisioning() {
+        var guarded = spy(factory);
+        for (int reviewer : new int[]{0, 1}) {
+            String requested = reviewer == 0 ? AllowedModels.KIMI_K3.getModelId() : AllowedModels.QWEN_3_8_MAX.getModelId();
+            doReturn(new ChatModelFactory.ResolvedTarget(AiModelProperties.Provider.AWD_CLOUD,
+                    AllowedModels.QWEN_3_7_FLASH.getModelId())).when(guarded).resolveTarget(requested, true);
+            assertThrows(com.checkba.exception.FeatureNotConfiguredException.class,
+                    () -> guarded.getAutomaticWritingReviewModel(java.time.Duration.ofSeconds(2), reviewer));
+        }
+        verify(platformAiChannel, never()).apiKey();
+    }
+
+    @Test
     void desktopNeverUsesLegacyOrEnvironmentKeyForCloudCalls() {
         org.springframework.test.util.ReflectionTestUtils.setField(factory, "localMode", true);
         setDbProvider("OPENROUTER");
@@ -165,6 +208,8 @@ class ChatModelFactoryTest {
                 () -> factory.getWritingModel(java.time.Duration.ofSeconds(1)));
         assertThrows(com.checkba.service.account.AccountException.class,
                 () -> factory.getAutomaticWritingModel(java.time.Duration.ofSeconds(1)));
+        for (int reviewer : new int[]{0, 1}) assertThrows(com.checkba.service.account.AccountException.class,
+                () -> factory.getAutomaticWritingReviewModel(java.time.Duration.ofSeconds(1), reviewer));
         assertThrows(com.checkba.service.account.AccountException.class, () -> factory.ensurePaidAccess(1L));
         verify(platformAiChannel, never()).apiKey();
         verifyNoInteractions(usageAccountant);

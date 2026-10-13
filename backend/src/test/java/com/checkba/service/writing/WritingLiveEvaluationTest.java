@@ -4,6 +4,7 @@ package com.checkba.service.writing;
 
 import com.checkba.service.ai.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import java.nio.file.*;
@@ -34,6 +35,8 @@ class WritingLiveEvaluationTest {
     @Test void evaluateFrozenSyntheticCases() throws Exception {
         String key=System.getenv("OPENROUTER_API_KEY"), model=System.getenv("WRITING_EVAL_MODEL");
         String reasoningEffort=System.getenv("WRITING_EVAL_REASONING_EFFORT");
+        List<String> reviewModels=reviewSettings("WRITING_EVAL_REVIEW_MODELS","moonshotai/kimi-k3,qwen/qwen3.8-max");
+        List<String> reviewEfforts=reviewSettings("WRITING_EVAL_REVIEW_EFFORTS","low,low");
         String generationReasoningEffort=System.getenv("WRITING_EVAL_GENERATION_REASONING_EFFORT");
         String providerSort=System.getenv().getOrDefault("WRITING_EVAL_PROVIDER_SORT","");
         assertTrue(Set.of("","latency","throughput","price").contains(providerSort),"Unknown provider sort");
@@ -128,7 +131,7 @@ class WritingLiveEvaluationTest {
         if(holdout) cases=readHoldout(json,Path.of(holdoutPath),general);
         Map<String,String> reviewFixtures=holdout?Map.of():developmentFixtures;
         boolean automatic=components || holdout || "1".equals(System.getenv("WRITING_EVAL_AUTOMATIC"));
-        String dataset=components?"target-review-components-natural-v4-scope-constraints":holdout?"synthetic-holdout-natural-v4-scope-constraints":"development-natural-v4-scope-constraints";
+        String dataset=components?"joint-review-components-natural-dual":holdout?"synthetic-holdout-natural-dual":"development-natural-dual";
         String onlyCase=System.getenv().getOrDefault("WRITING_EVAL_CASE","");
         assertTrue(onlyCase.isEmpty() || cases.stream().anyMatch(c -> c.name.equals(onlyCase)),"Unknown evaluation case");
         // Fixed repetitions expose stochastic over-abstention; never retry only failing cases until green.
@@ -159,60 +162,79 @@ class WritingLiveEvaluationTest {
                     List<String> responses=Collections.synchronizedList(new ArrayList<>());
                     Map<String,String> phaseResponses=new ConcurrentHashMap<>(), phaseErrors=new ConcurrentHashMap<>(), phaseAssembledTexts=new ConcurrentHashMap<>(), phaseOrigins=new ConcurrentHashMap<>();
                     Map<String,Integer> phaseOutputTokens=new ConcurrentHashMap<>();
+                    Map<String,Map<String,Integer>> phaseUsage=new ConcurrentHashMap<>();
+                    Map<String,String> phaseCandidates=new ConcurrentHashMap<>();
                     Map<String,List<Fact>> phaseFacts=new ConcurrentHashMap<>();
                     AtomicLong evaluationStartedNanos=new AtomicLong();
                     java.util.function.LongSupplier elapsed=() -> Math.max(1,TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-evaluationStartedNanos.get()));
                     Map<String,Map<String,Long>> phaseTimings=new ConcurrentHashMap<>();
-                    var wire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,reasoningEffort,providerRouting);
-                    var generationWire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,generationReasoningEffort,providerRouting);
-                    var observed=mock(OpenRouterStreamingChatModel.class); when(observed.modelName()).thenReturn(model);
-                    when(observed.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
-                        StreamingResponseHandler<AiMessage> original=invocation.getArgument(2);
-                        List<ChatMessage> messages=invocation.getArgument(0);
-                        String phase=requestPhase(json,messages);
-                        Map<String,Long> timing=new ConcurrentHashMap<>(); timing.put("requestStartedMs",elapsed.getAsLong()); phaseTimings.put(phase,timing);
-                        var phaseInput=json.readTree(((UserMessage)messages.get(1)).singleText());
-                        if(phase.equals("semantic") && phaseInput.path("facts").isArray()) {
-                            List<Fact> requestFacts=new ArrayList<>();
-                            for(var fact:phaseInput.path("facts")) requestFacts.add(json.treeToValue(fact,Fact.class));
-                            phaseFacts.put(phase,List.copyOf(requestFacts));
-                        }
-                        if(!phase.equals("generation") && phaseInput.path("assembledText").isTextual())
-                            phaseAssembledTexts.put(phase,phaseInput.path("assembledText").asText());
-                        if(reviewFixtures.containsKey(c.name) && phase.equals("generation")) {
-                            phaseOrigins.put(phase,"synthetic");
-                            List<String> fixtureFactIds=new ArrayList<>();
-                            List<dev.langchain4j.data.message.ChatMessage> prompt=invocation.getArgument(0);
-                            for(var fact:json.readTree(((dev.langchain4j.data.message.UserMessage)prompt.get(1)).singleText()).path("facts"))
-                                fixtureFactIds.add(fact.path("id").asText());
-                            String fixture=json.writeValueAsString(Map.of("abstain",false,"usefulness","completes_current_thought","evidence","direct_support",
-                                    "suggestions",List.of(Map.of("text",reviewFixtures.get(c.name),"kind","sentence","factIds",fixtureFactIds,
-                                            "sourceIds",List.of("active-document"),"explanation","合成固定候选，仅验证真实审读判断"))));
-                            // Fixed-candidate generation is injected locally, not a provider response.
-                            timing.put("completedMs",elapsed.getAsLong());
-                            responses.add(fixture); phaseResponses.put(phase,fixture); original.onComplete(Response.from(AiMessage.from(fixture)));
-                            return mock(okhttp3.Call.class);
-                        }
-                        if(components && !phase.equals(coverageRequirements.get(c.name))) {
-                            phaseOrigins.put(phase,"synthetic");
-                            Response<AiMessage> approval=syntheticReviewApproval(json,phase,phaseInput.path("assembledText").asText(),phaseFacts.getOrDefault(phase,List.of()));
-                            String text=approval.content().text(); responses.add(text); phaseResponses.put(phase,text);
-                            timing.put("completedMs",elapsed.getAsLong()); original.onComplete(approval);
-                            return mock(okhttp3.Call.class);
-                        }
-                        phaseOrigins.put(phase,"provider");
-                        try { return (phase.equals("generation")?generationWire:wire).generateCancellable(invocation.getArgument(0),invocation.getArgument(1),new StreamingResponseHandler<AiMessage>() {
-                            // onNext observes visible content only, not network first byte, reasoning or keepalive events.
-                            public void onNext(String token){if(token!=null && !token.isEmpty()) timing.putIfAbsent("firstContentTokenMs",elapsed.getAsLong());original.onNext(token);}
-                            public void onComplete(Response<AiMessage> response){timing.putIfAbsent("completedMs",elapsed.getAsLong());if(response!=null && response.tokenUsage()!=null && response.tokenUsage().outputTokenCount()!=null) phaseOutputTokens.put(phase,response.tokenUsage().outputTokenCount());String text=response==null||response.content()==null?"":response.content().text();raw.set(text);responses.add(text);phaseResponses.put(phase,text);original.onComplete(response);}
-                            public void onError(Throwable error){timing.putIfAbsent("errorMs",elapsed.getAsLong());if(error instanceof OpenRouterStreamingChatModel.EmptyResponseException empty && empty.tokenUsage()!=null && empty.tokenUsage().outputTokenCount()!=null) phaseOutputTokens.put(phase,empty.tokenUsage().outputTokenCount());transportError.set(error.getClass().getSimpleName());phaseErrors.put(phase,error.getClass().getSimpleName());original.onError(error);}
-                        }); } catch(RuntimeException error) {
-                            timing.putIfAbsent("errorMs",elapsed.getAsLong());
-                            transportError.set(error.getClass().getSimpleName()); phaseErrors.put(phase,error.getClass().getSimpleName());
-                            throw error;
-                        }
-                    });
-                    when(models.getWritingModel(any())).thenReturn(observed); when(models.getAutomaticWritingModel(any(),anyBoolean())).thenReturn(observed);
+                    List<OpenRouterStreamingChatModel> observedModels=new ArrayList<>();
+                    for(int modelIndex=0;modelIndex<3;modelIndex++) {
+                        String phase=modelIndex==0?"generation":"review-"+(modelIndex-1);
+                        String phaseModel=modelIndex==0?model:reviewModels.get(modelIndex-1);
+                        String phaseEffort=modelIndex==0?(automatic?generationReasoningEffort:reasoningEffort):reviewEfforts.get(modelIndex-1);
+                        var wire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",phaseModel,Duration.ofSeconds(35),16,phaseEffort,providerRouting);
+                        var observed=mock(OpenRouterStreamingChatModel.class); when(observed.modelName()).thenReturn(phaseModel);
+                        when(observed.generateCancellable(anyList(),anyInt(),any())).thenAnswer(invocation -> {
+                            StreamingResponseHandler<AiMessage> original=invocation.getArgument(2);
+                            List<ChatMessage> messages=invocation.getArgument(0);
+                            Map<String,Long> timing=new ConcurrentHashMap<>(); timing.put("requestStartedMs",elapsed.getAsLong()); phaseTimings.put(phase,timing);
+                            var phaseInput=json.readTree(((UserMessage)messages.get(1)).singleText());
+                            if(!phase.equals("generation")) {
+                                List<Fact> requestFacts=new ArrayList<>();
+                                for(var fact:phaseInput.path("facts")) requestFacts.add(json.treeToValue(fact,Fact.class));
+                                phaseFacts.put(phase,List.copyOf(requestFacts));
+                                phaseCandidates.put(phase,phaseInput.path("candidate").asText());
+                                phaseAssembledTexts.put(phase,phaseInput.path("assembledText").asText());
+                            }
+                            if(reviewFixtures.containsKey(c.name) && phase.equals("generation")) {
+                                phaseOrigins.put(phase,"synthetic");
+                                List<String> fixtureFactIds=new ArrayList<>();
+                                for(var fact:phaseInput.path("facts")) fixtureFactIds.add(fact.path("id").asText());
+                                String fixture=json.writeValueAsString(Map.of("abstain",false,"usefulness","completes_current_thought","evidence","direct_support",
+                                        "suggestions",List.of(Map.of("text",reviewFixtures.get(c.name),"kind","sentence","factIds",fixtureFactIds,
+                                                "sourceIds",List.of("active-document"),"explanation","合成固定候选，仅验证真实联合审读"))));
+                                timing.put("completedMs",elapsed.getAsLong());
+                                responses.add(fixture); phaseResponses.put(phase,fixture); original.onComplete(Response.from(AiMessage.from(fixture)));
+                                return mock(okhttp3.Call.class);
+                            }
+                            // Both review channels always reach their real providers, including component evaluation.
+                            phaseOrigins.put(phase,"provider");
+                            try {
+                                okhttp3.Call call=wire.generateCancellable(messages,invocation.getArgument(1),new StreamingResponseHandler<AiMessage>() {
+                                    public void onNext(String token){if(token!=null && !token.isEmpty()) timing.putIfAbsent("firstContentTokenMs",elapsed.getAsLong());original.onNext(token);}
+                                    public void onComplete(Response<AiMessage> response){
+                                        timing.putIfAbsent("completedMs",elapsed.getAsLong());
+                                        if(response!=null) recordPhaseUsage(phase,response.tokenUsage(),phaseUsage,phaseOutputTokens);
+                                        String text=response==null||response.content()==null?"":response.content().text();
+                                        raw.set(text);responses.add(text);phaseResponses.put(phase,text);original.onComplete(response);
+                                    }
+                                    public void onError(Throwable error){
+                                        timing.putIfAbsent("errorMs",elapsed.getAsLong());
+                                        if(error instanceof OpenRouterStreamingChatModel.EmptyResponseException empty)
+                                            recordPhaseUsage(phase,empty.tokenUsage(),phaseUsage,phaseOutputTokens);
+                                        transportError.set(error.getClass().getSimpleName());phaseErrors.put(phase,error.getClass().getSimpleName());original.onError(error);
+                                    }
+                                });
+                                var tracked=mock(okhttp3.Call.class,org.mockito.AdditionalAnswers.delegatesTo(call));
+                                doAnswer(cancel -> {
+                                    timing.putIfAbsent("cancelledMs",elapsed.getAsLong());
+                                    if(!timing.containsKey("completedMs")) phaseErrors.putIfAbsent(phase,"Cancelled");
+                                    call.cancel(); return null;
+                                }).when(tracked).cancel();
+                                return tracked;
+                            } catch(RuntimeException error) {
+                                timing.putIfAbsent("errorMs",elapsed.getAsLong());
+                                transportError.set(error.getClass().getSimpleName()); phaseErrors.put(phase,error.getClass().getSimpleName());
+                                throw error;
+                            }
+                        });
+                        observedModels.add(observed);
+                    }
+                    when(models.getWritingModel(any())).thenReturn(observedModels.get(0));
+                    when(models.getAutomaticWritingModel(any())).thenReturn(observedModels.get(0));
+                    when(models.getAutomaticWritingReviewModel(any(),eq(0))).thenReturn(observedModels.get(1));
+                    when(models.getAutomaticWritingReviewModel(any(),eq(1))).thenReturn(observedModels.get(2));
                     Context context=new Context(c.profile.id(),c.profile.label(),"正文",c.before,c.after,"","");
                     Source source=new Source("active-document",10L,c.profile.label(),"test:1","合成测试材料",c.body);
                     Request request=new Request(10L,"1",c.body,c.before,c.after,c.selection,c.profile.label(),"正文",c.profile.id(),List.of());
@@ -226,19 +248,33 @@ class WritingLiveEvaluationTest {
                         boolean nonempty=!view.advice().isEmpty();
                         boolean passed=(c.expectAnswer==null?Set.of("READY","EMPTY").contains(view.status()):c.expectAnswer?(c.mode.equals("autocomplete")?Set.of("READY","EMPTY").contains(view.status()):nonempty && view.status().equals("READY")):!nonempty && view.status().equals("EMPTY")) && (c.forbidden.isEmpty() || view.advice().stream().noneMatch(a -> Arrays.stream(c.forbidden.split("\\|" )).anyMatch(value -> (c.before+a.text()).contains(value))));
                         String outcome=view.status().equals("READY")?"ready":"empty";
-                        boolean requiredRejectionObserved=false, targetApprovalObserved=false;
+                        boolean requiredRejectionObserved=false, jointApprovalObserved=false;
+                        Map<String,Object> reviewerDecisions=new TreeMap<>();
+                        Map<String,Boolean> individualApprovals=new TreeMap<>();
                         if(c.mode.equals("autocomplete")) {
                             String candidate=reviewFixtures.getOrDefault(c.name,generatedCandidate(json,phaseResponses));
+                            String assembled=c.before+candidate+c.after;
                             String requiredStage=coverageRequirements.get(c.name);
-                            Map<String,String> evidence=groundedSemanticEvidence(json,
-                                    components?providerPhaseResponse(phaseResponses,phaseOrigins,requiredStage):phaseResponses,
-                                    phaseFacts.getOrDefault("semantic",List.of()));
-                            boolean rejected=!candidate.isEmpty() && explicitReviewRejection(json,evidence,c.before+candidate+c.after);
-                            if(Set.of("semantic","grammar").contains(requiredStage==null?"":requiredStage))
-                                requiredRejectionObserved=requiredReviewRejection(json,evidence,phaseAssembledTexts,c.before+candidate+c.after,requiredStage);
-                            if(components) targetApprovalObserved=targetReviewApproval(json,phaseResponses,phaseOrigins,phaseAssembledTexts,c.before+candidate+c.after,requiredStage,phaseFacts.getOrDefault(requiredStage,List.of()));
+                            List<JointReview> reviews=new ArrayList<>();
+                            for(String phase:List.of("review-0","review-1")) {
+                                JointReview decision=jointReview(json,phaseResponses.getOrDefault(phase,""),candidate,
+                                        phaseFacts.getOrDefault(phase,List.of()),"provider".equals(phaseOrigins.get(phase))
+                                        && !phaseErrors.containsKey(phase) && candidate.equals(phaseCandidates.get(phase))
+                                        && assembled.equals(phaseAssembledTexts.get(phase)));
+                                reviews.add(decision); reviewerDecisions.put(phase,decision);
+                                if(!decision.valid() && phaseResponses.containsKey(phase)) phaseErrors.putIfAbsent(phase,"InvalidReview:"+decision.invalidReason());
+                                individualApprovals.put(phase,decision.approved());
+                            }
+                            boolean sameInputs=Objects.equals(phaseFacts.get("review-0"),phaseFacts.get("review-1"))
+                                    && phaseFacts.containsKey("review-0") && phaseFacts.containsKey("review-1");
+                            boolean complete=sameInputs && reviews.stream().allMatch(JointReview::valid);
+                            jointApprovalObserved=complete && reviews.stream().allMatch(JointReview::approved);
+                            boolean rejected=complete && reviews.stream().anyMatch(JointReview::rejected);
+                            if(complete && Set.of("semantic","grammar").contains(requiredStage==null?"":requiredStage))
+                                requiredRejectionObserved=reviews.stream().anyMatch(resultReview -> requiredStage.equals("grammar")
+                                        ?resultReview.grammar().equals("invalid"):resultReview.facts().equals("unsupported"));
                             boolean abstained=!reviewFixtures.containsKey(c.name) && explicitGenerationAbstention(json,phaseResponses);
-                            boolean ready=view.status().equals("READY") && phaseResponses.keySet().containsAll(Set.of("generation","semantic","grammar","value"))
+                            boolean ready=view.status().equals("READY") && jointApprovalObserved
                                     && view.advice().size()==1 && candidate.equals(view.advice().get(0).text());
                             boolean allowedReady=!Boolean.FALSE.equals(c.expectAnswer);
                             passed=passed && (allowedReady && ready || view.status().equals("EMPTY") && (rejected || abstained));
@@ -246,22 +282,28 @@ class WritingLiveEvaluationTest {
                                     :rejected?(Boolean.FALSE.equals(c.expectAnswer)?"review-rejected":"review-abstained")
                                     :abstained?"generation-abstained":"incomplete-or-invalid";
                         }
-                        // Strict passed remains comparable to v1. Safe EMPTY fallbacks do not imply a semantic judgement.
                         boolean behaviorPassed=c.mode.equals("autocomplete")
                                 ? view.status().equals("EMPTY") && !nonempty || view.status().equals("READY") && passed : passed;
                         boolean judged=c.mode.equals("autocomplete") && !outcome.equals("incomplete-or-invalid");
-                        if(components && targetApprovalObserved) {
-                            // A final local guard must not conceal the target reviewer's incorrect approval.
-                            passed=false; behaviorPassed=false; judged=true; outcome="target-review-approved";
+                        if(Boolean.FALSE.equals(c.expectAnswer) && jointApprovalObserved) {
+                            // Evaluate the joint reviewer even if another local guard prevents display.
+                            passed=false; behaviorPassed=false; judged=true; outcome="joint-review-approved";
                         }
                         // Milliseconds since service.start; absent events were not observed by this snapshot.
                         // Copy nested maps so late cancellation callbacks cannot mutate a previously checkpointed row.
                         Map<String,Map<String,Long>> timingSnapshot=new TreeMap<>();
-                        phaseTimings.forEach((phase,timing) -> timingSnapshot.put(phase,Map.copyOf(timing)));
-                        Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",components?"target-review-component":reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("targetReviewStage",components?coverageRequirements.get(c.name):""); row.put("targetApprovalObserved",targetApprovalObserved); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseOrigins",Map.copyOf(phaseOrigins)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("phaseRequestFacts",Map.copyOf(phaseFacts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens)); row.put("phaseTimings",Map.copyOf(timingSnapshot)); row.put("phaseTimingsCapturedMs",elapsed.getAsLong());
+                        phaseTimings.forEach((phase,timing) -> {
+                            Map<String,Long> snapshotTiming=new TreeMap<>(timing);
+                            Long start=snapshotTiming.get("requestStartedMs");
+                            Long end=snapshotTiming.containsKey("completedMs")?snapshotTiming.get("completedMs")
+                                    :snapshotTiming.containsKey("errorMs")?snapshotTiming.get("errorMs"):snapshotTiming.get("cancelledMs");
+                            if(start!=null && end!=null) snapshotTiming.put("elapsedMs",Math.max(0,end-start));
+                            timingSnapshot.put(phase,Map.copyOf(snapshotTiming));
+                        });
+                        Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",components?"joint-real-review-component":reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("requiredRejectionCategory",components?coverageRequirements.get(c.name):""); row.put("jointApprovalObserved",jointApprovalObserved); row.put("individualApprovals",Map.copyOf(individualApprovals)); row.put("reviewerDecisions",Map.copyOf(reviewerDecisions)); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseOrigins",Map.copyOf(phaseOrigins)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("phaseRequestFacts",Map.copyOf(phaseFacts)); row.put("phaseRequestCandidates",Map.copyOf(phaseCandidates)); row.put("phaseUsage",Map.copyOf(phaseUsage)); row.put("phaseModels",phaseModelMetadata(model,generationReasoningEffort,reviewModels,reviewEfforts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens)); row.put("phaseTimings",Map.copyOf(timingSnapshot)); row.put("phaseTimingsCapturedMs",elapsed.getAsLong());
                         synchronized(report) {
                             report.add(row); report.sort(reportOrder);
-                            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("providerSort",providerSort.isEmpty()?"provider-default":providerSort,"dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
+                            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("providerSort",providerSort.isEmpty()?"provider-default":providerSort,"dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewModels",reviewModels,"reviewReasoningEfforts",reviewEfforts,"phaseModels",phaseModelMetadata(model,generationReasoningEffort,reviewModels,reviewEfforts),"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
                         }
                         System.out.println("Writing synthetic eval "+c.name+": "+view.status()+", pass="+passed+", elapsedMs="+view.elapsedMs());
                     }
@@ -281,7 +323,7 @@ class WritingLiveEvaluationTest {
         assertFalse(futures.isEmpty(),"No evaluation cases selected; check WRITING_EVAL_AUTOMATIC");
         synchronized(report) {
             report.sort(reportOrder);
-            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("providerSort",providerSort.isEmpty()?"provider-default":providerSort,"dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
+            Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("providerSort",providerSort.isEmpty()?"provider-default":providerSort,"dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewModels",reviewModels,"reviewReasoningEfforts",reviewEfforts,"phaseModels",phaseModelMetadata(model,generationReasoningEffort,reviewModels,reviewEfforts),"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
         }
         assertEquals(futures.size(),report.size(),"Every selected evaluation must produce a report row");
         if (automatic && onlyCase.isEmpty())
@@ -292,6 +334,94 @@ class WritingLiveEvaluationTest {
         assertTrue(Boolean.TRUE.equals(summary.get("gatePassed")),
                 "Inspect per-case coverage gaps; safe fallback alone is not successful semantic evaluation: "+summary.get("coverageGaps"));
     }
+    private static List<String> reviewSettings(String variable,String defaults) {
+        List<String> values=Arrays.stream(System.getenv().getOrDefault(variable,defaults).split(",",-1)).map(String::strip).toList();
+        if(values.size()!=2 || values.stream().anyMatch(String::isBlank))
+            throw new IllegalArgumentException(variable+" must specify exactly two nonempty values");
+        return values;
+    }
+    private static Map<String,Object> phaseModelMetadata(String generation,String effort,List<String> reviewers,List<String> efforts) {
+        return Map.of("generation",Map.of("model",generation,"reasoningEffort",effort==null?"provider-default":effort),
+                "review-0",Map.of("model",reviewers.get(0),"reasoningEffort",efforts.get(0)),
+                "review-1",Map.of("model",reviewers.get(1),"reasoningEffort",efforts.get(1)));
+    }
+    private static void recordPhaseUsage(String phase,dev.langchain4j.model.output.TokenUsage usage,
+                                         Map<String,Map<String,Integer>> phaseUsage,Map<String,Integer> outputTokens) {
+        if(usage==null) return;
+        Map<String,Integer> tokens=new TreeMap<>();
+        if(usage.inputTokenCount()!=null) tokens.put("inputTokens",usage.inputTokenCount());
+        if(usage.outputTokenCount()!=null) {tokens.put("outputTokens",usage.outputTokenCount());outputTokens.put(phase,usage.outputTokenCount());}
+        if(usage.totalTokenCount()!=null) tokens.put("totalTokens",usage.totalTokenCount());
+        phaseUsage.put(phase,Map.copyOf(tokens));
+    }
+    private record JointReview(boolean valid,boolean approved,boolean rejected,String facts,String grammar,
+                               String continuation,String reason,String reviewedCandidate,JsonNode evidence,String invalidReason) {}
+    private static JointReview jointReview(ObjectMapper json,String raw,String candidate,List<Fact> facts,boolean requestBound) {
+        JsonNode decision=null; String invalid="";
+        try {
+            decision=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
+            if(!requestBound || candidate.isEmpty()) invalid="unbound-or-incomplete-request";
+            else if(decision==null || !decision.isObject()) invalid="not-an-object";
+            else if(!decision.path("reason").isTextual() || decision.path("reason").asText().isBlank()
+                    || decision.path("reason").asText().length()>240
+                    || !decision.path("reviewedCandidate").isTextual() || !candidate.equals(decision.path("reviewedCandidate").asText())
+                    || !decision.path("facts").isTextual() || !Set.of("entailed","unsupported","uncertain").contains(decision.path("facts").asText())
+                    || !decision.path("grammar").isTextual() || !Set.of("valid","invalid","uncertain").contains(decision.path("grammar").asText())
+                    || !decision.path("continuation").isTextual() || !Set.of("appropriate","inappropriate","uncertain").contains(decision.path("continuation").asText())
+                    || !decision.path("evidence").isArray()) invalid="invalid-review-schema-or-candidate";
+            else if(!decision.path("evidence").isEmpty()
+                    && !WritingSuggestionService.reviewEvidenceValid(decision.path("evidence"),facts)) invalid="invalid-request-evidence";
+            else if(decision.path("facts").asText().equals("entailed") && decision.path("grammar").asText().equals("valid")
+                    && decision.path("continuation").asText().equals("appropriate")
+                    && !WritingSuggestionService.reviewApproved(decision,new Advice(candidate,"sentence",facts.stream().map(Fact::id).toList(),facts.stream().map(Fact::sourceId).distinct().toList(),""),facts))
+                invalid="invalid-approval-evidence";
+        } catch(Exception error) {invalid="invalid-json:"+error.getClass().getSimpleName();}
+        if(decision==null) decision=json.createObjectNode();
+        boolean valid=invalid.isEmpty();
+        boolean approved=valid && WritingSuggestionService.reviewApproved(decision,new Advice(candidate,"sentence",facts.stream().map(Fact::id).toList(),facts.stream().map(Fact::sourceId).distinct().toList(),""),facts);
+        boolean rejected=valid && (decision.path("facts").asText().equals("unsupported")
+                || decision.path("grammar").asText().equals("invalid") || decision.path("continuation").asText().equals("inappropriate"));
+        return new JointReview(valid,approved,rejected,decision.path("facts").asText(),decision.path("grammar").asText(),
+                decision.path("continuation").asText(),decision.path("reason").asText(),decision.path("reviewedCandidate").asText(),
+                decision.path("evidence"),invalid);
+    }
+    @Test void dualReviewsBindCandidateAndEvidenceAndKeepUncertaintySeparate() throws Exception {
+        ObjectMapper json=new ObjectMapper(); String candidate="按约提供材料。";
+        List<Fact> facts=List.of(new Fact("F1","SOURCE_TEXT","材料",candidate,"","DOCUMENT_STATES","S1",candidate));
+        var node=json.createObjectNode().put("reason","依据充分，当前句接续自然").put("facts","entailed")
+                .put("grammar","valid").put("continuation","appropriate").put("reviewedCandidate",candidate);
+        node.putArray("evidence").addObject().put("factId","F1").put("quote",candidate);
+        assertTrue(jointReview(json,node.toString(),candidate,facts,true).approved());
+        assertFalse(jointReview(json,node.toString(),candidate,facts,false).valid(),"Synthetic, cancelled or differently bound requests cannot count");
+        assertFalse(jointReview(json,node.toString(),"另一候选",facts,true).valid());
+        assertFalse(jointReview(json,node.toString()+" {}",candidate,facts,true).valid());
+        assertFalse(jointReview(json,node.toString(),candidate,List.of(),true).valid());
+        var noEvidence=node.deepCopy(); noEvidence.putArray("evidence");
+        assertFalse(jointReview(json,noEvidence.toString(),candidate,facts,true).valid(),"Approval needs genuine evidence");
+        noEvidence.put("grammar","invalid");
+        assertTrue(jointReview(json,noEvidence.toString(),candidate,facts,true).rejected(),"A grammar rejection may cite no fact");
+        noEvidence.put("grammar","valid").put("facts","uncertain");
+        var uncertain=jointReview(json,noEvidence.toString(),candidate,facts,true);
+        assertTrue(uncertain.valid()); assertFalse(uncertain.approved()); assertFalse(uncertain.rejected());
+        noEvidence.put("facts","unsupported");
+        assertTrue(jointReview(json,noEvidence.toString(),candidate,facts,true).rejected());
+        var invented=node.deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode)invented.path("evidence").get(0)).put("quote","无此原文");
+        assertFalse(jointReview(json,invented.toString(),candidate,facts,true).valid());
+    }
+    @Test void jointNegativeGateRetainsIndividualApprovalsWithoutTreatingThemAsJointFailure() {
+        Map<String,Object> row=new HashMap<>(); row.put("case","negative"); row.put("repetition",1);
+        row.put("status","EMPTY"); row.put("expectedAnswer",false); row.put("outcome","review-rejected");
+        row.put("passed",true); row.put("behaviorPassed",true); row.put("judged",true); row.put("requiredRejectionObserved",true);
+        row.put("individualApprovals",Map.of("review-0",true,"review-1",false)); row.put("jointApprovalObserved",false);
+        assertEquals(true,evaluationSummary(List.of(row),Map.of("negative","semantic"),List.of("negative"),1).get("gatePassed"));
+        row.put("jointApprovalObserved",true);
+        assertEquals(false,evaluationSummary(List.of(row),Map.of("negative","semantic"),List.of("negative"),1).get("gatePassed"));
+        row.put("jointApprovalObserved",false); row.put("requiredRejectionObserved",false); row.put("judged",false);
+        row.put("outcome","incomplete-or-invalid"); row.put("phaseErrors",Map.of("review-1","Cancelled"));
+        assertEquals(false,evaluationSummary(List.of(row),Map.of("negative","semantic"),List.of("negative"),1).get("gatePassed"));
+    }
+    // Legacy three-stage schema helpers below are regression history, never used by the live dual-review path.
     @Test void parallelEvidenceUsesRequestPhaseAndNeverTreatsCancellationAsRejection() throws Exception {
         ObjectMapper json=new ObjectMapper(); String assembled="合成完整正文。";
         String refusal=json.writeValueAsString(Map.of("approve",false,"counterexamplePossible",true,"counterexample","存在相容反例",
@@ -422,6 +552,31 @@ class WritingLiveEvaluationTest {
         } catch(Exception ignored) { }
         return "";
     }
+    // Historical check-array protocol used only by the retained legacy helper tests.
+    private static boolean legacySupportedFactChecks(JsonNode checks,List<Fact> facts) {
+        if(checks==null || !checks.isArray() || checks.size()<3 || checks.size()>12) return false;
+        Set<String> aspects=new HashSet<>();
+        for(JsonNode check:checks) {
+            String aspect=check.path("aspect").asText("");
+            if(!Set.of("content","scope","relation").contains(aspect)
+                    || !check.path("verdict").isTextual() || !check.path("verdict").asText().equals("supported")
+                    || !check.path("missingPremise").isTextual() || !check.path("missingPremise").asText().isEmpty()) return false;
+            for(String field:List.of("sourceMeaning","joinedMeaning")) {
+                JsonNode meaning=check.path(field);
+                if(!meaning.isTextual() || meaning.asText().isBlank() || meaning.asText().length()>600) return false;
+            }
+            JsonNode evidence=check.path("evidence");
+            if(!evidence.isArray() || evidence.isEmpty() || evidence.size()>8) return false;
+            for(JsonNode reference:evidence) {
+                if(!reference.path("factId").isTextual() || !reference.path("quote").isTextual()
+                        || reference.path("quote").asText().isBlank()) return false;
+                String id=reference.path("factId").asText(), quote=reference.path("quote").asText();
+                if(facts.stream().noneMatch(f -> f.id().equals(id) && f.quote()!=null && f.quote().contains(quote))) return false;
+            }
+            aspects.add(aspect);
+        }
+        return aspects.equals(Set.of("content","scope","relation"));
+    }
     private static Response<AiMessage> syntheticReviewApproval(ObjectMapper json,String stage,String assembled,List<Fact> facts) throws Exception {
         Map<String,Object> result=switch(stage) {
             case "grammar" -> Map.of("correctedText",assembled,"error","");
@@ -453,7 +608,7 @@ class WritingLiveEvaluationTest {
             if(decision==null || !decision.isObject()) return false;
             if(stage.equals("grammar")) return decision.path("error").isTextual() && decision.path("error").asText().isEmpty()
                     && decision.path("correctedText").isTextual() && assembled.equals(decision.path("correctedText").asText());
-            return stage.equals("semantic") && WritingSuggestionService.supportedFactChecks(decision.path("checks"),facts)
+            return stage.equals("semantic") && legacySupportedFactChecks(decision.path("checks"),facts)
                     && decision.path("approve").isBoolean() && decision.path("approve").asBoolean()
                     && decision.path("reason").isTextual() && !decision.path("reason").asText().isBlank() && decision.path("reason").asText().length()<=240
                     && decision.path("reviewedText").isTextual() && assembled.equals(decision.path("reviewedText").asText())
@@ -531,17 +686,20 @@ class WritingLiveEvaluationTest {
         } catch(Exception e) { return false; }
     }
     private static Map<String,Object> evaluationSummary(List<Map<String,Object>> rows,Map<String,String> requirements,List<String> expectedCases,int repetitions) {
-        Map<String,Long> outcomes=new TreeMap<>(), errors=new TreeMap<>();
+        Map<String,Long> outcomes=new TreeMap<>(), errors=new TreeMap<>(), individualFalseApprovals=new TreeMap<>();
         List<Map<String,Object>> gaps=new ArrayList<>(), failures=new ArrayList<>(), unjudged=new ArrayList<>();
         for(var row:rows) {
             outcomes.merge(String.valueOf(row.get("outcome")),1L,Long::sum);
+            if(Boolean.FALSE.equals(row.get("expectedAnswer")) && row.get("individualApprovals") instanceof Map<?,?> approvals)
+                approvals.forEach((phase,approved) -> {if(Boolean.TRUE.equals(approved)) individualFalseApprovals.merge(String.valueOf(phase),1L,Long::sum);});
             Object phaseErrors=row.get("phaseErrors");
             if(phaseErrors instanceof Map<?,?> phases) phases.forEach((phase,error) -> errors.merge(phase+":"+error,1L,Long::sum));
             Map<String,Object> detail=new LinkedHashMap<>();
             for(String field:List.of("case","repetition","status","outcome","result","phaseErrors"))
                 if(row.containsKey(field)) detail.put(field,row.get(field));
             if(!Boolean.TRUE.equals(row.get("behaviorPassed")) || Boolean.TRUE.equals(row.get("targetApprovalObserved"))
-                    || Boolean.FALSE.equals(row.get("expectedAnswer")) && "READY".equals(row.get("status"))) failures.add(detail);
+                    || Boolean.FALSE.equals(row.get("expectedAnswer")) && ("READY".equals(row.get("status"))
+                        || Boolean.TRUE.equals(row.get("jointApprovalObserved")))) failures.add(detail);
             if(!Boolean.TRUE.equals(row.get("judged"))) unjudged.add(detail);
         }
         for(String name:expectedCases) {
@@ -557,8 +715,8 @@ class WritingLiveEvaluationTest {
             if(!covered) gaps.add(Map.of("case",name,"requirement",requirement,"observed",0,"expected",1));
         }
         Map<String,Object> summary=new LinkedHashMap<>();
-        summary.put("gatePolicy","natural-v4-scope-constraints-safe-display-and-per-case-coverage");
-        summary.put("outcomeCounts",outcomes); summary.put("phaseErrorCounts",errors);
+        summary.put("gatePolicy","natural-dual-independent-reviews-local-and-and-per-case-coverage");
+        summary.put("outcomeCounts",outcomes); summary.put("phaseErrorCounts",errors); summary.put("individualFalseApprovalCounts",individualFalseApprovals);
         summary.put("strictPassedCount",rows.stream().filter(row -> Boolean.TRUE.equals(row.get("passed"))).count());
         summary.put("judgedCount",rows.stream().filter(row -> Boolean.TRUE.equals(row.get("judged"))).count());
         summary.put("coverageRequirements",requirements); summary.put("coverageGaps",gaps);
@@ -616,7 +774,7 @@ class WritingLiveEvaluationTest {
             var review=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                     .readTree(evidence.get("semantic"));
             var checks=review==null?null:review.path("checks");
-            if(checks==null || !checks.isArray() || !(WritingSuggestionService.supportedFactChecks(checks,facts)
+            if(checks==null || !checks.isArray() || !(legacySupportedFactChecks(checks,facts)
                     || rejectionChecksConsistent(review))) throw new IllegalArgumentException("Invalid semantic checks");
             // Rejections may contain unsupported/uncertain verdicts, but every quote must still be genuine request evidence.
             for(var check:checks) for(var reference:check.path("evidence"))
