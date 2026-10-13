@@ -280,24 +280,30 @@ public class ChatModelFactory {
 
     /** One explicit writing request: bounded transport, no cache, no provider fallback. */
     public OpenRouterStreamingChatModel getWritingModel(java.time.Duration timeout) {
-        return createWritingModel(timeout, false, false);
+        return createWritingModel(timeout, false, null);
     }
 
-    /** Automatic generation and review use the selected main model, never the auxiliary fallback. */
+    /** Automatic generation retains the selected main model and its configured reasoning. */
     public OpenRouterStreamingChatModel getAutomaticWritingModel(java.time.Duration timeout) {
-        return getAutomaticWritingModel(timeout, true);
+        return createWritingModel(timeout, true, null);
     }
 
-    public OpenRouterStreamingChatModel getAutomaticWritingModel(java.time.Duration timeout, boolean review) {
-        return createWritingModel(timeout, true, review);
+    /** Two independent writing reviewers; their reasoning does not inherit the chat model's setting. */
+    public OpenRouterStreamingChatModel getAutomaticWritingReviewModel(java.time.Duration timeout, int reviewer) {
+        String model = switch (reviewer) {
+            case 0 -> AllowedModels.KIMI_K3.getModelId();
+            case 1 -> AllowedModels.QWEN_3_8_MAX.getModelId();
+            default -> throw new IllegalArgumentException("Unknown automatic writing reviewer");
+        };
+        return createWritingModel(timeout, true, model);
     }
 
-    private OpenRouterStreamingChatModel createWritingModel(java.time.Duration timeout, boolean automatic, boolean review) {
+    private OpenRouterStreamingChatModel createWritingModel(java.time.Duration timeout, boolean automatic, String reviewModel) {
         if (timeout == null || timeout.isZero() || timeout.isNegative()) {
             throw new IllegalArgumentException("Writing request deadline expired");
         }
         long started = System.nanoTime();
-        String requestedModel = automatic ? resolveDefaultModel() : validatedAuxModelId();
+        String requestedModel = reviewModel != null ? reviewModel : automatic ? resolveDefaultModel() : validatedAuxModelId();
         if (automatic && !AllowedModels.isAllowed(requestedModel)) {
             throw new com.checkba.exception.FeatureNotConfiguredException("ai-default-model",
                     "当前主模型不在可用模型清单内，请在设置中重新选择；未改用辅助模型");
@@ -309,24 +315,15 @@ public class ChatModelFactory {
         }
         if (automatic && AllowedModels.fromId(requestedModel) != AllowedModels.fromId(target.modelId())) {
             throw new com.checkba.exception.FeatureNotConfiguredException("ai-default-model",
-                    "当前通道无法使用所选主模型；未改用其他模型");
+                    "当前通道无法使用所选写作模型；未改用其他模型");
         }
         boolean platform = target.channel() == AiModelProperties.Provider.AWD_CLOUD;
         String key = platform ? platformApiKey() : resolveOpenRouterApiKey();
         String baseUrl = platform ? aiModelProperties.getOpenRouter().getBaseUrl() : resolveOpenRouterBaseUrl();
         recordModelUse(target.channel().name(), target.modelId(), true);
         return new OpenRouterStreamingChatModel(key, baseUrl, target.modelId(), remainingTimeout(timeout, started),
-                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), automatic ? (review ? automaticWritingReasoningEffortFor(target.modelId()) : reasoningEffortFor(target.modelId())) : null,
+                aiModelProperties.getOpenRouter().getMaxRequestsPerHost(), reviewModel != null ? "low" : automatic ? reasoningEffortFor(target.modelId()) : null,
                 automatic ? providerRoutingFor(target.modelId()) : null);
-    }
-
-    private String automaticWritingReasoningEffortFor(String modelId) {
-        var configured = reasoningProperties;
-        // An empty model list is an explicit global opt-out; named configurations retain precedence.
-        if (configured == null || configured.getModels() == null || configured.getModels().isEmpty()
-                || configured.listed(modelId)) return reasoningEffortFor(modelId);
-        // Bounded reviews use explicit semantic checks; this exact endpoint permits disabling hidden reasoning.
-        return "deepseek/deepseek-v4-flash".equals(modelId) ? "none" : reasoningEffortFor(modelId);
     }
 
     private static java.time.Duration remainingTimeout(java.time.Duration budget, long started) {
