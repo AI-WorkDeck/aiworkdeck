@@ -46,7 +46,7 @@
     }
     if (error.code === 'outcome_unknown' && noteWrite) {
       outcomeUnknown = true; dirty = true; controls();
-      feedback('保存结果尚未确认，当前笔记已暂停写入，内容仍保留。请刷新本人笔记核对，再打开已保存的笔记继续编辑；确认未保存时，可关闭当前编辑后重新新建。', true);
+      feedback((error.message ? error.message + '。' : '') + '保存结果尚未确认，当前笔记已暂停写入，内容仍保留。请刷新本人笔记核对，再打开已保存的笔记继续编辑；确认未保存时，可关闭当前编辑后重新新建。', true);
       return;
     }
     feedback(error.message || '操作未完成，请重试。', true);

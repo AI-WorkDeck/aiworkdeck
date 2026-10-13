@@ -21,6 +21,21 @@ public class BaoqingtianTools implements HostAware {
     static final ObjectMapper JSON = new ObjectMapper();
     static final String BASE = "https://uat.bqt.com";
     static final int MAX_RESPONSE = 2 * 1024 * 1024;
+    // Exact upstream validation messages only: never echo arbitrary remote text or rejected values.
+    private static final Map<String, String> VALIDATION_MESSAGES = Map.ofEntries(
+        Map.entry("笔记标题不能为空", "平台要求填写笔记标题"),
+        Map.entry("笔记类型不能为空", "平台未识别笔记类型，请检查插件请求"),
+        Map.entry("请选择正确的笔记类型", "平台未接受当前笔记类型，请检查插件请求"),
+        Map.entry("内容不能为空", "平台要求填写笔记正文或提供媒体内容"),
+        Map.entry("笔记状态不能为空", "平台要求指定笔记状态"),
+        Map.entry("请选择正确的笔记状态", "平台未接受当前笔记状态"),
+        Map.entry("请选择正确的草稿标识", "平台未接受当前草稿标识，请检查插件请求"),
+        Map.entry("必须指定业务类型", "平台要求选择业务类型，请刷新后重新选择"),
+        Map.entry("笔记ID不能为空", "平台未识别笔记标识，请刷新列表后重试"),
+        Map.entry("笔记ID不能小于1", "平台未接受笔记标识，请刷新列表后重试"),
+        Map.entry("订单id不能为空", "平台未识别状态变更所需的笔记标识"),
+        Map.entry("状态不能为空", "平台要求指定要变更的状态")
+    );
     interface Transport { Reply request(String method, String path, String token, JsonNode body) throws Exception; }
     record Reply(int status, String body) {}
     private record Session(String token, String lawyerId, String displayName) {}
@@ -174,6 +189,8 @@ public class BaoqingtianTools implements HostAware {
             if (content.isBlank()) throw fail("invalid_params", "请填写有效的正文");
             if (!args.path("confirmed").asBoolean(false)) throw fail("confirmation_required", "创建笔记前请明确确认保存");
             body.put("type", "TEXT").put("content", content).put("businessId", id(args, "businessId")).put("isNoteDraft", "N");
+            JsonNode certification = request(user, "POST", "/bqt/lawyer/cert/status", s.token, object(), false);
+            if (!certification.path("status").asText().equals("cert_succeed")) throw fail("certification_required", "创建笔记前，请在包晴天工作台的资料设置中完成实名认证与律师资格认证；审核通过后再保存");
         }
         JsonNode response = request(user, "POST", "/bqt/lawyer/note/" + (edit ? "edit" : "add"), s.token, body, true);
         if (edit && !response.path("isSuccess").isBoolean()) throw fail("outcome_unknown", "平台未明确确认保存，请刷新笔记核对，勿重复提交");
@@ -195,18 +212,24 @@ public class BaoqingtianTools implements HostAware {
         try {
             Reply response = transport.request(method, path, token, body);
             if (response.status == 401) { sessions.remove(user); throw fail("auth_required", "包晴天登录已失效，请重新登录"); }
-            if (response.status != 200) throw fail(write && response.status >= 500 ? "outcome_unknown" : "remote_error", write && response.status >= 500 ? "平台暂未确认操作结果，请先刷新核对，勿重复提交" : "平台暂时无法处理请求，请稍后重试");
+            if (response.status != 200) throw fail(write ? "outcome_unknown" : "remote_error", (write ? "平台暂未确认操作结果，请先刷新核对，勿重复提交" : "平台暂时无法处理请求，请稍后重试") + "（HTTP " + response.status + "）");
             if (response.body == null || response.body.length() > MAX_RESPONSE) throw fail(write ? "outcome_unknown" : "invalid_response", "平台响应过大或格式异常，请先刷新核对操作结果");
             JsonNode root = JSON.readTree(response.body);
             if (root == null || !root.path("code").canConvertToInt()) throw fail(write ? "outcome_unknown" : "invalid_response", "平台响应异常，请先刷新核对操作结果");
             int code = root.path("code").asInt();
             if (code != 0) {
-                if (code == 401) { sessions.remove(user); throw fail("auth_required", "包晴天登录已失效，请重新登录"); }
+                if (code == 10029 || code == 10003) {
+                    String hint = VALIDATION_MESSAGES.get(root.path("msg").asText(""));
+                    if (hint != null) throw fail("invalid_params", hint + "（平台代码 " + code + "）");
+                }
+                if (code == 401 || code == 21008) { sessions.remove(user); throw fail("auth_required", "包晴天登录已失效，请重新登录（平台代码 " + code + "）"); }
+                if (code == 21055) throw fail("certification_required", "请在包晴天工作台的资料设置中完成实名认证与律师资格认证，并确认账号状态正常（平台代码 21055）");
+                if (code == 21107) throw fail("invalid_business", "该业务类型已失效，请刷新业务类型列表后重新选择（平台代码 21107）");
                 if (code == 21025) throw fail("not_registered", "该手机号尚未注册律师端，请先在包晴天 APP 注册");
                 if (code == 21027) throw fail("account_blocked", "该平台账号已被限制，请联系包晴天客服");
                 String msg = root.path("msg").asText("").toLowerCase(Locale.ROOT);
-                if (msg.contains("captcha") || msg.contains("图形") || msg.contains("人机") || msg.contains("滑块")) throw fail("captcha_required", "平台要求安全验证，请到包晴天官方登录页完成验证");
-                throw fail("remote_error", "平台未接受请求，请检查登录状态、验证码或填写内容");
+                if (path.startsWith("/bqt/unapp/pagehome/") && (msg.contains("captcha") || msg.contains("图形") || msg.contains("人机") || msg.contains("滑块"))) throw fail("captcha_required", "平台要求安全验证，请到包晴天官方登录页完成验证");
+                throw fail(write ? "outcome_unknown" : "remote_error", (write ? "平台未明确确认操作结果，请先刷新核对，勿重复提交" : "平台未接受请求，请检查登录状态或填写内容") + "（平台代码 " + code + "）");
             }
             JsonNode data = root.path("data");
             if ((data.isBoolean() && !data.asBoolean()) || (data.path("success").isBoolean() && !data.path("success").asBoolean()) || (data.path("isSuccess").isBoolean() && !data.path("isSuccess").asBoolean())) throw fail("remote_rejected", "平台未完成此操作，请刷新核对后重试");

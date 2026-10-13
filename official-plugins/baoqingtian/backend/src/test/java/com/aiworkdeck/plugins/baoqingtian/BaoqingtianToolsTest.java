@@ -15,22 +15,24 @@ class BaoqingtianToolsTest {
         List<Call> calls = new ArrayList<>();
         String note = "{\"id\":\"9007199254740993\",\"lawyerId\":\"99\",\"type\":\"TEXT\",\"title\":\"原稿\",\"content\":\"正文\",\"status\":\"DRAFT\"}";
         String list = "{\"list\":[],\"total\":0}";
-        int status = 200;
+        int status = 200, remoteCode;
         boolean timeout, rejected, notLawyer, overrideWrite;
         String writeReply;
+        String certStatus = "cert_succeed";
         public BaoqingtianTools.Reply request(String method, String path, String token, JsonNode body) throws Exception {
             calls.add(new Call(method, path, token, body));
-            if (timeout) throw new java.net.http.HttpTimeoutException("do not leak TOKEN phone");
+            if (timeout && (path.endsWith("/add") || path.endsWith("/edit"))) throw new java.net.http.HttpTimeoutException("do not leak TOKEN phone");
             if (overrideWrite && (path.endsWith("/add") || path.endsWith("/edit"))) return new BaoqingtianTools.Reply(status, writeReply);
             String data = "null";
             if (path.endsWith("phoneSmsLogin")) data = "{\"token\":\"SECRET\"}";
             else if (path.endsWith("user/info")) data = "{\"id\":\"99\",\"nickName\":\"律师\",\"type\":" + (notLawyer ? 0 : 1) + "}";
             else if (path.contains("/detail?")) data = note;
             else if (path.endsWith("lawyer/page") || path.endsWith("listAllCases")) data = list;
+            else if (path.endsWith("/cert/status")) data = "{\"status\":\"" + certStatus + "\"}";
             else if (path.endsWith("/add")) data = "{\"noteId\":\"901\"}";
             else if (path.endsWith("listEnable")) data = "[{\"id\":\"2\",\"name\":\"劳动\"}]";
             else if (path.endsWith("/edit")) data = "{\"isSuccess\":" + !rejected + "}";
-            return new BaoqingtianTools.Reply(status, "{\"code\":0,\"data\":" + data + "}");
+            return new BaoqingtianTools.Reply(path.endsWith("/cert/status") ? 200 : status, "{\"code\":" + remoteCode + ",\"msg\":\"PRIVATE_REMOTE_RESPONSE\",\"data\":" + data + "}");
         }
     }
     static class Fixture {
@@ -107,7 +109,7 @@ class BaoqingtianToolsTest {
         assertEquals("remote_rejected", f.run("note_save", "{\"id\":\"9007199254740993\",\"title\":\"标题\",\"content\":\"正文\"}").path("errorCode").asText());
         f.remote.timeout = true; int count = f.remote.calls.size();
         JsonNode result = f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}");
-        assertEquals("outcome_unknown",result.path("errorCode").asText()); assertEquals(count+1,f.remote.calls.size()); assertFalse(result.toString().contains("TOKEN"));
+        assertEquals("outcome_unknown",result.path("errorCode").asText()); assertEquals(count+2,f.remote.calls.size()); assertFalse(result.toString().contains("TOKEN"));
     }
     @Test void casesSupportBothEnvelopesAndBoundedPagination() throws Exception {
         Fixture f = new Fixture(); f.login();
@@ -143,7 +145,7 @@ class BaoqingtianToolsTest {
             int count = f.remote.calls.size();
             JsonNode result = f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}");
             assertEquals("outcome_unknown", result.path("errorCode").asText());
-            assertFalse(result.path("ok").asBoolean()); assertEquals(count + 1, f.remote.calls.size());
+            assertFalse(result.path("ok").asBoolean()); assertEquals(count + 2, f.remote.calls.size());
         }
     }
     @Test void missingEditAcknowledgementIsUnknownWithoutRetry() throws Exception {
@@ -165,7 +167,7 @@ class BaoqingtianToolsTest {
             int count = f.remote.calls.size();
             JsonNode result = f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}");
             assertEquals("outcome_unknown", result.path("errorCode").asText());
-            assertFalse(result.path("ok").asBoolean()); assertEquals(count + 1, f.remote.calls.size());
+            assertFalse(result.path("ok").asBoolean()); assertEquals(count + 2, f.remote.calls.size());
         }
         f.remote.status = 503;
         assertEquals("outcome_unknown", f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}").path("errorCode").asText());
@@ -200,6 +202,67 @@ class BaoqingtianToolsTest {
                 assertTrue(f.remote.calls.stream().noneMatch(c -> c.path.endsWith("/add") || c.path.endsWith("/edit")));
             }
         }
+    }
+
+    @Test void newNoteChecksCertificationBeforeWriting() throws Exception {
+        for (String status : List.of("not_cert", "cert_reviewing", "uncert", "cert_failed", "")) {
+            Fixture f = new Fixture(); f.login(); f.remote.certStatus = status;
+            JsonNode result = f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}");
+            assertEquals("certification_required", result.path("errorCode").asText());
+            assertTrue(f.remote.calls.stream().noneMatch(c -> c.path.endsWith("/add")));
+            Call c = f.remote.calls.getLast(); assertEquals("/bqt/lawyer/cert/status", c.path); assertEquals("POST", c.method); assertEquals("{}", c.body.toString());
+        }
+    }
+    @Test void knownPreflightRejectionsAreActionableAndUnknownWriteCodesAreUncertain() throws Exception {
+        Fixture f = new Fixture(); f.login(); f.remote.overrideWrite = true;
+        for (int code : List.of(21055, 21107, 99999)) {
+            f.remote.writeReply = "{\"code\":" + code + ",\"msg\":\"SECRET_TOKEN_PRIVATE_MATERIAL\",\"data\":null}";
+            int count = f.remote.calls.size();
+            JsonNode result = f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}");
+            assertEquals(code == 21055 ? "certification_required" : code == 21107 ? "invalid_business" : "outcome_unknown", result.path("errorCode").asText());
+            assertTrue(result.path("error").asText().contains(String.valueOf(code))); assertFalse(result.toString().contains("SECRET_TOKEN_PRIVATE_MATERIAL"));
+            assertEquals(count + 2, f.remote.calls.size());
+        }
+        f.remote.writeReply = "{\"code\":21008,\"msg\":\"PRIVATE\"}";
+        assertEquals("auth_required", f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}").path("errorCode").asText());
+        assertFalse(f.run("status", "{}").path("data").path("connected").asBoolean());
+    }
+
+    @Test void readErrorsExposeOnlyNumericCodeNotRemoteMessage() throws Exception {
+        Fixture f = new Fixture(); f.login(); f.remote.remoteCode = 29999;
+        JsonNode result = f.run("notes", "{}");
+        assertEquals("remote_error", result.path("errorCode").asText()); assertTrue(result.path("error").asText().contains("29999"));
+        assertFalse(result.toString().contains("PRIVATE_REMOTE_RESPONSE"));
+        f.remote.status = 403;
+        assertTrue(f.run("notes", "{}").path("error").asText().contains("HTTP 403"));
+    }
+
+    @Test void fixedValidationMessagesProduceControlledFieldHints() throws Exception {
+        Fixture f = new Fixture(); f.login(); f.remote.overrideWrite = true;
+        Map<String, String> expected = Map.of("笔记标题不能为空", "标题", "笔记类型不能为空", "类型", "内容不能为空", "正文", "笔记状态不能为空", "状态", "请选择正确的草稿标识", "草稿", "必须指定业务类型", "业务类型");
+        for (int code : List.of(10029, 10003)) {
+            for (var entry : expected.entrySet()) {
+                f.remote.writeReply = BaoqingtianTools.JSON.createObjectNode().put("code", code).put("msg", entry.getKey()).put("private", "UNRELATED_SECRET").toString();
+                JsonNode result = f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}");
+                assertEquals("invalid_params", result.path("errorCode").asText());
+                assertTrue(result.path("error").asText().contains(entry.getValue())); assertTrue(result.path("error").asText().contains(String.valueOf(code)));
+                assertFalse(result.toString().contains("UNRELATED_SECRET"));
+            }
+        }
+    }
+    @Test void validationCodeDoesNotAllowPartialMatchesOrSecretMessages() throws Exception {
+        Fixture f = new Fixture(); f.login(); f.remote.overrideWrite = true;
+        for (int code : List.of(10029, 10003, 99999)) {
+            for (String message : List.of("PRIVATE_TOKEN_PHONE", "笔记标题不能为空 PRIVATE_TOKEN_PHONE", "PRIVATE_TOKEN_PHONE内容不能为空", "必须指定业务类型\nPRIVATE_TOKEN_PHONE", " 内容不能为空")) {
+                f.remote.writeReply = BaoqingtianTools.JSON.createObjectNode().put("code", code).put("msg", message).toString();
+                JsonNode result = f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}");
+                assertEquals("outcome_unknown", result.path("errorCode").asText());
+                assertTrue(result.path("error").asText().contains(String.valueOf(code))); assertFalse(result.toString().contains("PRIVATE_TOKEN_PHONE"));
+                assertFalse(result.path("error").asText().contains(message));
+            }
+        }
+        f.remote.writeReply = "{\"code\":99999,\"msg\":\"内容不能为空\"}";
+        assertEquals("outcome_unknown", f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}").path("errorCode").asText());
     }
 
 }
