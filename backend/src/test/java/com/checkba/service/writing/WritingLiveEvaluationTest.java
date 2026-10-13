@@ -258,7 +258,15 @@ class WritingLiveEvaluationTest {
                         evaluationStartedNanos.set(System.nanoTime());
                         var view=service.value.start(9L,1L,new WritingSuggestionService.Input(c.mode,request));
                         long deadline=System.nanoTime()+Duration.ofSeconds(35).toNanos();
-                        while(view.status().equals("RUNNING") && System.nanoTime()<deadline) {Thread.sleep(100); view=service.value.get(9L,1L,view.id());}
+                        boolean serviceExpired=false;
+                        while(view.status().equals("RUNNING") && System.nanoTime()<deadline) {
+                            Thread.sleep(100);
+                            try { view=service.value.get(9L,1L,view.id()); }
+                            catch(IllegalArgumentException expired) {
+                                // Long host suspension can expire a job; retain the failed case instead of losing its row.
+                                phaseErrors.put("service","ExpiredOrUnavailableJob"); serviceExpired=true; break;
+                            }
+                        }
                         boolean nonempty=!view.advice().isEmpty();
                         boolean passed=(c.expectAnswer==null?Set.of("READY","EMPTY").contains(view.status()):c.expectAnswer?(c.mode.equals("autocomplete")?Set.of("READY","EMPTY").contains(view.status()):nonempty && view.status().equals("READY")):!nonempty && view.status().equals("EMPTY")) && (c.forbidden.isEmpty() || view.advice().stream().noneMatch(a -> Arrays.stream(c.forbidden.split("\\|" )).anyMatch(value -> (c.before+a.text()).contains(value))));
                         String outcome=view.status().equals("READY")?"ready":"empty";
@@ -274,14 +282,14 @@ class WritingLiveEvaluationTest {
                                 JointReview decision=jointReview(json,phaseResponses.getOrDefault(phase,""),candidate,
                                         phaseFacts.getOrDefault(phase,List.of()),"provider".equals(phaseOrigins.get(phase))
                                         && !phaseErrors.containsKey(phase) && candidate.equals(phaseCandidates.get(phase))
-                                        && assembled.equals(phaseAssembledTexts.get(phase)));
+                                        && assembled.equals(phaseAssembledTexts.get(phase)),phase.equals("review-0"),assembled);
                                 reviews.add(decision); reviewerDecisions.put(phase,decision);
                                 if(!decision.valid() && phaseResponses.containsKey(phase)) phaseErrors.putIfAbsent(phase,"InvalidReview:"+decision.invalidReason());
                                 individualApprovals.put(phase,decision.approved());
                             }
                             boolean sameInputs=Objects.equals(phaseFacts.get("review-0"),phaseFacts.get("review-1"))
                                     && phaseFacts.containsKey("review-0") && phaseFacts.containsKey("review-1");
-                            boolean complete=sameInputs && reviews.stream().allMatch(JointReview::valid);
+                            boolean complete=!serviceExpired && sameInputs && reviews.stream().allMatch(JointReview::valid);
                             jointApprovalObserved=complete && reviews.stream().allMatch(JointReview::approved);
                             boolean rejected=complete && reviews.stream().anyMatch(JointReview::rejected);
                             if(complete && Set.of("semantic","grammar").contains(requiredStage==null?"":requiredStage))
@@ -371,6 +379,9 @@ class WritingLiveEvaluationTest {
     private record JointReview(boolean valid,boolean approved,boolean rejected,String facts,String grammar,
                                String continuation,String reason,String reviewedCandidate,JsonNode evidence,String invalidReason) {}
     private static JointReview jointReview(ObjectMapper json,String raw,String candidate,List<Fact> facts,boolean requestBound) {
+        return jointReview(json,raw,candidate,facts,requestBound,false,"");
+    }
+    private static JointReview jointReview(ObjectMapper json,String raw,String candidate,List<Fact> facts,boolean requestBound,boolean correctionRequired,String assembled) {
         JsonNode decision=null; String invalid="";
         try {
             decision=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
@@ -383,6 +394,8 @@ class WritingLiveEvaluationTest {
                     || !decision.path("grammar").isTextual() || !Set.of("valid","invalid","uncertain").contains(decision.path("grammar").asText())
                     || !decision.path("continuation").isTextual() || !Set.of("appropriate","inappropriate","uncertain").contains(decision.path("continuation").asText())
                     || !decision.path("evidence").isArray()) invalid="invalid-review-schema-or-candidate";
+            else if(correctionRequired && (!decision.path("correctedText").isTextual()
+                    || decision.path("correctedText").asText().isBlank())) invalid="missing-correction-evidence";
             else if(decision.path("facts").asText().equals("unsupported") && decision.path("evidence").isEmpty())
                 invalid="ungrounded-factual-rejection";
             else if(!decision.path("evidence").isEmpty()
@@ -394,8 +407,9 @@ class WritingLiveEvaluationTest {
         } catch(Exception error) {invalid="invalid-json:"+error.getClass().getSimpleName();}
         if(decision==null) decision=json.createObjectNode();
         boolean valid=invalid.isEmpty();
-        boolean approved=valid && WritingSuggestionService.reviewApproved(decision,new Advice(candidate,"sentence",facts.stream().map(Fact::id).toList(),facts.stream().map(Fact::sourceId).distinct().toList(),""),facts);
-        boolean rejected=valid && (decision.path("facts").asText().equals("unsupported")
+        boolean unchanged=!correctionRequired || WritingSuggestionService.correctionUnchanged(decision,assembled);
+        boolean approved=valid && unchanged && WritingSuggestionService.reviewApproved(decision,new Advice(candidate,"sentence",facts.stream().map(Fact::id).toList(),facts.stream().map(Fact::sourceId).distinct().toList(),""),facts);
+        boolean rejected=valid && (!unchanged || decision.path("facts").asText().equals("unsupported")
                 || decision.path("grammar").asText().equals("invalid") || decision.path("continuation").asText().equals("inappropriate"));
         return new JointReview(valid,approved,rejected,decision.path("facts").asText(),decision.path("grammar").asText(),
                 decision.path("continuation").asText(),decision.path("reason").asText(),decision.path("reviewedCandidate").asText(),
@@ -407,6 +421,11 @@ class WritingLiveEvaluationTest {
         var node=json.createObjectNode().put("reason","依据充分，当前句接续自然").put("facts","entailed")
                 .put("grammar","valid").put("continuation","appropriate").put("reviewedCandidate",candidate);
         node.putArray("evidence").addObject().put("factId","F1").put("quote",candidate);
+        assertFalse(jointReview(json,node.toString(),candidate,facts,true,true,"因此，"+candidate).valid());
+        node.put("correctedText","因此，"+candidate);
+        assertTrue(jointReview(json,node.toString(),candidate,facts,true,true,"因此，"+candidate).approved());
+        node.put("correctedText","据此，"+candidate);
+        assertFalse(jointReview(json,node.toString(),candidate,facts,true,true,"因此，"+candidate).approved());
         assertTrue(jointReview(json,node.toString(),candidate,facts,true).approved());
         assertFalse(jointReview(json,node.toString(),candidate,facts,false).valid(),"Synthetic, cancelled or differently bound requests cannot count");
         assertFalse(jointReview(json,node.toString(),"另一候选",facts,true).valid());
