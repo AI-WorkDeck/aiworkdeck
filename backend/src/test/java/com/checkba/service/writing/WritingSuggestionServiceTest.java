@@ -286,9 +286,49 @@ class WritingSuggestionServiceTest {
                 "suggestions",List.of(new Advice(text,"sentence",List.of(fact.id()),List.of(fact.sourceId()),"沿用文中按事项查阅办理的用途"))));
     }
     String approvedReview(Snapshot s,String candidate,String reason) throws Exception {
-        return json.writeValueAsString(Map.of("approve",true,"counterexamplePossible",false,"counterexample","","reason",reason,
-                "reviewedText",s.context().before()+candidate+s.context().after(),
-                "supportedText",s.context().before()+candidate+s.context().after()));
+        var result=new java.util.LinkedHashMap<String,Object>();
+        result.put("checks",List.of("content","scope","relation").stream().map(aspect -> Map.of(
+                "aspect",aspect,"sourceMeaning","材料描述按事项查阅和办理","joinedMeaning","当前句自然延续该用途",
+                "evidence",List.of(Map.of("factId",s.facts().get(0).id(),"quote",s.facts().get(0).quote())),
+                "verdict","supported","missingPremise","")).toList());
+        result.put("approve",true); result.put("counterexamplePossible",false); result.put("counterexample","");
+        result.put("reason",reason); result.put("reviewedText",s.context().before()+candidate+s.context().after());
+        result.put("supportedText",s.context().before()+candidate+s.context().after());
+        return json.writeValueAsString(result);
+    }
+    @Test void factApprovalRequiresGroundedContentScopeAndRelationChecks() throws Exception {
+        for(int variant=0;variant<12;variant++) {
+            snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
+            if(variant==11) {
+                Fact first=snapshot.facts().get(0);
+                var other=new Fact("unquoted-fact",first.kind(),first.label(),first.value(),first.role(),first.status(),first.sourceId(),first.quote());
+                snapshot=new Snapshot(snapshot.projectId(),snapshot.userId(),snapshot.request(),snapshot.settings(),snapshot.context(),
+                        snapshot.profile(),snapshot.sources(),List.of(first,other),snapshot.warnings());
+            }
+            var s=new WritingSuggestionService(contexts,models,usage,json);
+            try {
+                View running=s.start(1L,10L,new Input("autocomplete",snapshot.request()));
+                complete(automaticResult(snapshot,candidate));
+                var review=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(approvedReview(snapshot,candidate,"材料有据"));
+                var checks=(com.fasterxml.jackson.databind.node.ArrayNode)review.path("checks");
+                var check=(com.fasterxml.jackson.databind.node.ObjectNode)checks.get(2);
+                if(variant==0) review.remove("checks");
+                if(variant==1) checks.remove(2);
+                if(variant==2) check.put("verdict","uncertain");
+                if(variant==3) check.put("verdict","unsupported");
+                if(variant==4) check.put("missingPremise","缺少导致该结果的依据");
+                if(variant==5) ((com.fasterxml.jackson.databind.node.ObjectNode)check.path("evidence").get(0)).put("quote","材料没有记载的证据");
+                if(variant==6) ((com.fasterxml.jackson.databind.node.ObjectNode)check.path("evidence").get(0)).put("factId","其他未引用的事实");
+                if(variant==7) check.put("sourceMeaning","");
+                if(variant==8) check.put("joinedMeaning",true);
+                if(variant==9) check.putArray("evidence");
+                if(variant==10) check.put("aspect","content");
+                if(variant==11) ((com.fasterxml.jackson.databind.node.ObjectNode)check.path("evidence").get(0)).put("factId","unquoted-fact");
+                complete(json.writeValueAsString(review));
+                assertEquals("EMPTY",s.get(1L,10L,running.id()).status(),"总批准不能覆盖缺项、无依据引用或不确定，variant="+variant);
+                assertTrue(s.get(1L,10L,running.id()).advice().isEmpty());
+            } finally { s.close(); }
+        }
     }
     String approvedValue(Snapshot s,String candidate) throws Exception {
         return json.writeValueAsString(Map.of("approve",true,"reason","有依据地自然补完当前句，不要求新观点",

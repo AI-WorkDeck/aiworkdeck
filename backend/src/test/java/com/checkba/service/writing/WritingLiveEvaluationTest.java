@@ -156,6 +156,7 @@ class WritingLiveEvaluationTest {
                     List<String> responses=Collections.synchronizedList(new ArrayList<>());
                     Map<String,String> phaseResponses=new ConcurrentHashMap<>(), phaseErrors=new ConcurrentHashMap<>(), phaseAssembledTexts=new ConcurrentHashMap<>(), phaseOrigins=new ConcurrentHashMap<>();
                     Map<String,Integer> phaseOutputTokens=new ConcurrentHashMap<>();
+                    Map<String,List<Fact>> phaseFacts=new ConcurrentHashMap<>();
                     AtomicLong evaluationStartedNanos=new AtomicLong();
                     java.util.function.LongSupplier elapsed=() -> Math.max(1,TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-evaluationStartedNanos.get()));
                     Map<String,Map<String,Long>> phaseTimings=new ConcurrentHashMap<>();
@@ -168,6 +169,11 @@ class WritingLiveEvaluationTest {
                         String phase=requestPhase(json,messages);
                         Map<String,Long> timing=new ConcurrentHashMap<>(); timing.put("requestStartedMs",elapsed.getAsLong()); phaseTimings.put(phase,timing);
                         var phaseInput=json.readTree(((UserMessage)messages.get(1)).singleText());
+                        if(phase.equals("semantic") && phaseInput.path("facts").isArray()) {
+                            List<Fact> requestFacts=new ArrayList<>();
+                            for(var fact:phaseInput.path("facts")) requestFacts.add(json.treeToValue(fact,Fact.class));
+                            phaseFacts.put(phase,List.copyOf(requestFacts));
+                        }
                         if(!phase.equals("generation") && phaseInput.path("assembledText").isTextual())
                             phaseAssembledTexts.put(phase,phaseInput.path("assembledText").asText());
                         if(reviewFixtures.containsKey(c.name) && phase.equals("generation")) {
@@ -186,7 +192,7 @@ class WritingLiveEvaluationTest {
                         }
                         if(components && !phase.equals(coverageRequirements.get(c.name))) {
                             phaseOrigins.put(phase,"synthetic");
-                            Response<AiMessage> approval=syntheticReviewApproval(json,phase,phaseInput.path("assembledText").asText());
+                            Response<AiMessage> approval=syntheticReviewApproval(json,phase,phaseInput.path("assembledText").asText(),phaseFacts.getOrDefault(phase,List.of()));
                             String text=approval.content().text(); responses.add(text); phaseResponses.put(phase,text);
                             timing.put("completedMs",elapsed.getAsLong()); original.onComplete(approval);
                             return mock(okhttp3.Call.class);
@@ -217,11 +223,13 @@ class WritingLiveEvaluationTest {
                         if(c.mode.equals("autocomplete")) {
                             String candidate=reviewFixtures.getOrDefault(c.name,generatedCandidate(json,phaseResponses));
                             String requiredStage=coverageRequirements.get(c.name);
-                            Map<String,String> evidence=components?providerPhaseResponse(phaseResponses,phaseOrigins,requiredStage):phaseResponses;
+                            Map<String,String> evidence=groundedSemanticEvidence(json,
+                                    components?providerPhaseResponse(phaseResponses,phaseOrigins,requiredStage):phaseResponses,
+                                    phaseFacts.getOrDefault("semantic",List.of()));
                             boolean rejected=!candidate.isEmpty() && explicitReviewRejection(json,evidence,c.before+candidate+c.after);
                             if(Set.of("semantic","grammar").contains(requiredStage==null?"":requiredStage))
                                 requiredRejectionObserved=requiredReviewRejection(json,evidence,phaseAssembledTexts,c.before+candidate+c.after,requiredStage);
-                            if(components) targetApprovalObserved=targetReviewApproval(json,phaseResponses,phaseOrigins,phaseAssembledTexts,c.before+candidate+c.after,requiredStage);
+                            if(components) targetApprovalObserved=targetReviewApproval(json,phaseResponses,phaseOrigins,phaseAssembledTexts,c.before+candidate+c.after,requiredStage,phaseFacts.getOrDefault(requiredStage,List.of()));
                             boolean abstained=!reviewFixtures.containsKey(c.name) && explicitGenerationAbstention(json,phaseResponses);
                             boolean ready=view.status().equals("READY") && phaseResponses.keySet().containsAll(Set.of("generation","semantic","grammar","value"))
                                     && view.advice().size()==1 && candidate.equals(view.advice().get(0).text());
@@ -243,7 +251,7 @@ class WritingLiveEvaluationTest {
                         // Copy nested maps so late cancellation callbacks cannot mutate a previously checkpointed row.
                         Map<String,Map<String,Long>> timingSnapshot=new TreeMap<>();
                         phaseTimings.forEach((phase,timing) -> timingSnapshot.put(phase,Map.copyOf(timing)));
-                        Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",components?"target-review-component":reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("targetReviewStage",components?coverageRequirements.get(c.name):""); row.put("targetApprovalObserved",targetApprovalObserved); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseOrigins",Map.copyOf(phaseOrigins)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens)); row.put("phaseTimings",Map.copyOf(timingSnapshot)); row.put("phaseTimingsCapturedMs",elapsed.getAsLong());
+                        Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",components?"target-review-component":reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("targetReviewStage",components?coverageRequirements.get(c.name):""); row.put("targetApprovalObserved",targetApprovalObserved); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseOrigins",Map.copyOf(phaseOrigins)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("phaseRequestFacts",Map.copyOf(phaseFacts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens)); row.put("phaseTimings",Map.copyOf(timingSnapshot)); row.put("phaseTimingsCapturedMs",elapsed.getAsLong());
                         synchronized(report) {
                             report.add(row); report.sort(reportOrder);
                             Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
@@ -407,11 +415,18 @@ class WritingLiveEvaluationTest {
         } catch(Exception ignored) { }
         return "";
     }
-    private static Response<AiMessage> syntheticReviewApproval(ObjectMapper json,String stage,String assembled) throws Exception {
+    private static Response<AiMessage> syntheticReviewApproval(ObjectMapper json,String stage,String assembled,List<Fact> facts) throws Exception {
         Map<String,Object> result=switch(stage) {
             case "grammar" -> Map.of("correctedText",assembled,"error","");
-            case "semantic" -> Map.of("approve",true,"counterexamplePossible",false,"counterexample","",
-                    "reason","组件隔离合成批准，不代表实际审读","reviewedText",assembled,"supportedText",assembled);
+            case "semantic" -> {
+                if(facts.isEmpty()) throw new IllegalArgumentException("Synthetic semantic approval needs actual request facts");
+                Fact cited=facts.get(0);
+                var checks=List.of("content","scope","relation").stream().map(aspect -> Map.of(
+                        "aspect",aspect,"sourceMeaning",cited.quote(),"joinedMeaning","组件隔离合成检查，不代表实际语义审读",
+                        "evidence",List.of(Map.of("factId",cited.id(),"quote",cited.quote())),"verdict","supported","missingPremise","")).toList();
+                yield Map.of("checks",checks,"approve",true,"counterexamplePossible",false,"counterexample","",
+                        "reason","组件隔离合成批准，不代表实际审读","reviewedText",assembled,"supportedText",assembled);
+            }
             case "value" -> Map.of("approve",true,"reason","组件隔离合成批准，不代表实际审读","reviewedText",assembled);
             default -> throw new IllegalArgumentException("Unknown synthetic review stage: "+stage);
         };
@@ -423,7 +438,7 @@ class WritingLiveEvaluationTest {
                 ?Map.of(stage,responses.get(stage)):Map.of();
     }
     private static boolean targetReviewApproval(ObjectMapper json,Map<String,String> responses,Map<String,String> origins,
-                                                Map<String,String> requestTexts,String assembled,String stage) {
+                                                Map<String,String> requestTexts,String assembled,String stage,List<Fact> facts) {
         Map<String,String> target=providerPhaseResponse(responses,origins,stage);
         if(target.isEmpty() || !assembled.equals(requestTexts.get(stage))) return false;
         try {
@@ -431,7 +446,8 @@ class WritingLiveEvaluationTest {
             if(decision==null || !decision.isObject()) return false;
             if(stage.equals("grammar")) return decision.path("error").isTextual() && decision.path("error").asText().isEmpty()
                     && decision.path("correctedText").isTextual() && assembled.equals(decision.path("correctedText").asText());
-            return stage.equals("semantic") && decision.path("approve").isBoolean() && decision.path("approve").asBoolean()
+            return stage.equals("semantic") && WritingSuggestionService.supportedFactChecks(decision.path("checks"),facts)
+                    && decision.path("approve").isBoolean() && decision.path("approve").asBoolean()
                     && decision.path("reason").isTextual() && !decision.path("reason").asText().isBlank() && decision.path("reason").asText().length()<=240
                     && decision.path("reviewedText").isTextual() && assembled.equals(decision.path("reviewedText").asText())
                     && decision.path("supportedText").isTextual() && assembled.equals(decision.path("supportedText").asText())
@@ -441,17 +457,18 @@ class WritingLiveEvaluationTest {
     }
     @Test void componentEvidenceRequiresRealTargetAndSyntheticApprovalsHaveNoUsage() throws Exception {
         ObjectMapper json=new ObjectMapper(); String assembled="合成完整正文。";
+        List<Fact> facts=List.of(new Fact("source-fact","SOURCE_TEXT","材料段落",assembled,"","DOCUMENT_STATES","active-document",assembled));
         assertEquals(9,COMPONENT_NEGATIVE_CASES.size());
         assertEquals(1,COMPONENT_NEGATIVE_CASES.stream().filter(name -> name.equals("auto-review-broken-insertion")).count());
         for(String stage:List.of("semantic","grammar","value")) {
-            var stub=syntheticReviewApproval(json,stage,assembled); assertNull(stub.tokenUsage());
+            var stub=syntheticReviewApproval(json,stage,assembled,facts); assertNull(stub.tokenUsage());
             Map<String,String> responses=Map.of(stage,stub.content().text()), request=Map.of(stage,assembled);
-            assertFalse(targetReviewApproval(json,responses,Map.of(stage,"synthetic"),request,assembled,stage));
+            assertFalse(targetReviewApproval(json,responses,Map.of(stage,"synthetic"),request,assembled,stage,facts));
             assertFalse(explicitReviewRejection(json,providerPhaseResponse(responses,Map.of(stage,"synthetic"),stage),assembled));
             if(stage.equals("value")) continue;
-            assertTrue(targetReviewApproval(json,responses,Map.of(stage,"provider"),request,assembled,stage));
-            assertFalse(targetReviewApproval(json,responses,Map.of(stage,"provider"),Map.of(stage,"其他正文"),assembled,stage));
-            assertFalse(targetReviewApproval(json,Map.of(stage,stub.content().text()+" {}"),Map.of(stage,"provider"),request,assembled,stage));
+            assertTrue(targetReviewApproval(json,responses,Map.of(stage,"provider"),request,assembled,stage,facts));
+            assertFalse(targetReviewApproval(json,responses,Map.of(stage,"provider"),Map.of(stage,"其他正文"),assembled,stage,facts));
+            assertFalse(targetReviewApproval(json,Map.of(stage,stub.content().text()+" {}"),Map.of(stage,"provider"),request,assembled,stage,facts));
         }
         String refusal=json.writeValueAsString(Map.of("approve",false,"counterexamplePossible",true,"counterexample","存在未经支持的限定",
                 "reason","依据不支持该限定","reviewedText",assembled,"supportedText",""));
@@ -459,12 +476,43 @@ class WritingLiveEvaluationTest {
                 Map.of("semantic",assembled),assembled,"semantic"));
         assertFalse(requiredReviewRejection(json,providerPhaseResponse(Map.of("semantic",refusal),Map.of("semantic","synthetic"),"semantic"),
                 Map.of("semantic",assembled),assembled,"semantic"));
-        assertFalse(targetReviewApproval(json,Map.of("semantic","{\"approve\":true}"),Map.of("semantic","provider"),Map.of("semantic",assembled),assembled,"semantic"));
+        assertFalse(targetReviewApproval(json,Map.of("semantic","{\"approve\":true}"),Map.of("semantic","provider"),Map.of("semantic",assembled),assembled,"semantic",facts));
         Map<String,Object> masked=new HashMap<>(); masked.put("case","component"); masked.put("repetition",1);
         masked.put("status","EMPTY"); masked.put("expectedAnswer",false); masked.put("outcome","target-review-approved");
         masked.put("behaviorPassed",true); masked.put("targetApprovalObserved",true); masked.put("requiredRejectionObserved",true);
         assertEquals(false,evaluationSummary(List.of(masked),Map.of("component","semantic"),List.of("component"),1).get("gatePassed"),
                 "Final local EMPTY must never hide a target review approval");
+    }
+    @Test void semanticComponentApprovalRequiresChecksBoundToActualRequestFacts() throws Exception {
+        ObjectMapper json=new ObjectMapper(); String assembled="合成完整正文。";
+        List<Fact> facts=List.of(new Fact("source-fact","SOURCE_TEXT","材料段落",assembled,"","DOCUMENT_STATES","active-document",assembled));
+        var approved=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(syntheticReviewApproval(json,"semantic",assembled,facts).content().text());
+        Map<String,String> origins=Map.of("semantic","provider"), request=Map.of("semantic",assembled);
+        assertTrue(targetReviewApproval(json,Map.of("semantic",approved.toString()),origins,request,assembled,"semantic",facts));
+        var missing=approved.deepCopy(); missing.remove("checks");
+        assertFalse(targetReviewApproval(json,Map.of("semantic",missing.toString()),origins,request,assembled,"semantic",facts));
+        var invented=approved.deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode)invented.path("checks").get(0).path("evidence").get(0)).put("quote","原材料没有这句话。");
+        assertFalse(targetReviewApproval(json,Map.of("semantic",invented.toString()),origins,request,assembled,"semantic",facts));
+        assertFalse(targetReviewApproval(json,Map.of("semantic",approved.toString()),origins,request,assembled,"semantic",List.of()),
+                "Facts outside this request cannot authorize a target approval");
+        var missingAspect=approved.deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode)missingAspect.path("checks").get(2)).put("aspect","scope");
+        assertFalse(targetReviewApproval(json,Map.of("semantic",missingAspect.toString()),origins,request,assembled,"semantic",facts));
+
+        var refusal=approved.deepCopy(); refusal.put("approve",false).put("counterexamplePossible",true)
+                .put("counterexample","来源没有该限定，候选却加入该限定。").put("supportedText","");
+        assertFalse(explicitReviewRejection(json,Map.of("semantic",refusal.toString()),assembled),
+                "All-supported checks contradict an explicit counterexample and cannot count as rejection coverage");
+        var scope=(com.fasterxml.jackson.databind.node.ObjectNode)refusal.path("checks").get(1);
+        scope.put("verdict","unsupported").put("missingPremise","来源未规定该限定");
+        assertTrue(explicitReviewRejection(json,Map.of("semantic",refusal.toString()),assembled),
+                "A supportedFactChecks failure is expected for a genuine explicit rejection");
+        refusal.remove("checks");
+        assertTrue(explicitReviewRejection(json,Map.of("semantic",refusal.toString()),assembled),
+                "The complete legacy refusal schema with a genuine counterexample remains rejection evidence");
+        refusal.put("checks","invalid");
+        assertFalse(explicitReviewRejection(json,Map.of("semantic",refusal.toString()),assembled));
     }
     private static boolean requiredReviewRejection(ObjectMapper json,Map<String,String> phases,Map<String,String> requestTexts,String assembled,String stage) {
         if(!assembled.equals(requestTexts.get(stage)) || !phases.containsKey(stage)
@@ -554,6 +602,65 @@ class WritingLiveEvaluationTest {
         if(input.has("scopedFacts")) return "value";
         return input.has("facts")?"semantic":"grammar";
     }
+    private static Map<String,String> groundedSemanticEvidence(ObjectMapper json,Map<String,String> phases,List<Fact> facts) {
+        Map<String,String> evidence=new HashMap<>(phases);
+        if(!evidence.containsKey("semantic")) return evidence;
+        try {
+            var review=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readTree(evidence.get("semantic"));
+            var checks=review==null?null:review.path("checks");
+            if(checks==null || !checks.isArray() || !(WritingSuggestionService.supportedFactChecks(checks,facts)
+                    || rejectionChecksConsistent(review))) throw new IllegalArgumentException("Invalid semantic checks");
+            // Rejections may contain unsupported/uncertain verdicts, but every quote must still be genuine request evidence.
+            for(var check:checks) for(var reference:check.path("evidence"))
+                if(facts.stream().noneMatch(f -> f.id().equals(reference.path("factId").asText()) && f.quote()!=null
+                        && f.quote().contains(reference.path("quote").asText())))
+                    throw new IllegalArgumentException("Semantic evidence outside request facts");
+        } catch(Exception invalid) { evidence.remove("semantic"); }
+        return evidence;
+    }
+    @Test void currentSemanticEvidenceRequiresStructuredChecksAndActualRequestQuotes() throws Exception {
+        ObjectMapper json=new ObjectMapper(); String assembled="合成完整正文。";
+        List<Fact> facts=List.of(new Fact("source-fact","SOURCE_TEXT","材料段落",assembled,"","DOCUMENT_STATES","active-document",assembled));
+        var refusal=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(syntheticReviewApproval(json,"semantic",assembled,facts).content().text());
+        refusal.put("approve",false).put("counterexamplePossible",true).put("counterexample","材料未限定主体本人。").put("supportedText","");
+        ((com.fasterxml.jackson.databind.node.ObjectNode)refusal.path("checks").get(1)).put("verdict","unsupported").put("missingPremise","本人限定");
+        Map<String,String> phases=Map.of("semantic",refusal.toString(),"grammar","untouched");
+        assertTrue(requiredReviewRejection(json,groundedSemanticEvidence(json,phases,facts),Map.of("semantic",assembled),assembled,"semantic"));
+        for(String invalid:List.of("missing","quote","factId")) {
+            var changed=refusal.deepCopy();
+            if(invalid.equals("missing")) changed.remove("checks");
+            else ((com.fasterxml.jackson.databind.node.ObjectNode)changed.path("checks").get(0).path("evidence").get(0))
+                    .put(invalid,invalid.equals("quote")?"原材料没有这句话。":"unknown-fact");
+            Map<String,String> raw=new HashMap<>(phases); raw.put("semantic",changed.toString());
+            var filtered=groundedSemanticEvidence(json,raw,facts);
+            assertFalse(filtered.containsKey("semantic"),invalid);
+            assertEquals("untouched",filtered.get("grammar"));
+            assertEquals(changed.toString(),raw.get("semantic"),"Raw report evidence must remain intact");
+            assertFalse(requiredReviewRejection(json,filtered,Map.of("semantic",assembled),assembled,"semantic"));
+        }
+    }
+    private static boolean rejectionChecksConsistent(com.fasterxml.jackson.databind.JsonNode review) {
+        // Legacy-shaped explicit counterexamples remain evidence; a new checks declaration must not contradict them.
+        if(!review.has("checks")) return true;
+        var checks=review.path("checks");
+        if(!checks.isArray() || checks.size()<3 || checks.size()>12) return false;
+        Set<String> aspects=new HashSet<>(); boolean problem=false;
+        for(var check:checks) {
+            String aspect=check.path("aspect").asText();
+            if(!check.isObject() || !Set.of("content","scope","relation").contains(aspect)
+                    || !check.path("sourceMeaning").isTextual() || check.path("sourceMeaning").asText().isBlank() || check.path("sourceMeaning").asText().length()>600
+                    || !check.path("joinedMeaning").isTextual() || check.path("joinedMeaning").asText().isBlank() || check.path("joinedMeaning").asText().length()>600
+                    || !check.path("verdict").isTextual() || !Set.of("supported","unsupported","uncertain").contains(check.path("verdict").asText())
+                    || !check.path("missingPremise").isTextual() || !check.path("evidence").isArray()
+                    || check.path("evidence").isEmpty() || check.path("evidence").size()>8) return false;
+            for(var evidence:check.path("evidence")) if(!evidence.path("factId").isTextual() || evidence.path("factId").asText().isBlank()
+                    || !evidence.path("quote").isTextual() || evidence.path("quote").asText().isBlank()) return false;
+            aspects.add(aspect);
+            if(!check.path("verdict").asText().equals("supported") || !check.path("missingPremise").asText().isEmpty()) problem=true;
+        }
+        return aspects.size()==3 && problem;
+    }
     private static boolean explicitReviewRejection(ObjectMapper json,Map<String,String> phases,String assembled) {
         // Any parallel reviewer may veto; response arrival order and a sibling's cancellation are irrelevant.
         try {
@@ -565,7 +672,7 @@ class WritingLiveEvaluationTest {
                     && review.path("supportedText").isTextual()
                     && review.path("reason").isTextual() && !review.path("reason").asText().isBlank()
                     && review.path("reason").asText().length()<=240 && review.path("reviewedText").isTextual()
-                    && assembled.equals(review.path("reviewedText").asText())) return true;
+                    && assembled.equals(review.path("reviewedText").asText()) && rejectionChecksConsistent(review)) return true;
         } catch(Exception ignored) { }
         try {
             var value=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
