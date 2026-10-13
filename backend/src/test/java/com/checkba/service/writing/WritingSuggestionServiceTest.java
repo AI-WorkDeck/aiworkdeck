@@ -354,12 +354,13 @@ class WritingSuggestionServiceTest {
         verify(model).generateCancellable(anyList(),eq(4096),any());
         complete(automaticResult(report,"便于委员按事项查阅和办理。"));
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
-        verify(model,times(4)).generateCancellable(anyList(),eq(4096),any());
+        verify(model).generateCancellable(anyList(),eq(4096),any());
+        verify(model,times(3)).generateCancellable(anyList(),eq(8192),any());
         completeApprovedThenProofread(report,"便于委员按事项查阅和办理。","承接材料按事项办理的既有用途，没有增加事实或责任");
         View done=service.get(1L,10L,running.id()); assertEquals("READY",done.status()); assertEquals(1,done.advice().size());
         assertEquals("便于委员按事项查阅和办理。",service.accept(1L,10L,running.id(),new Accept(0,"r1")).text());
         verify(usage,times(4)).recordUsage(eq(10L),eq(1L),eq("synthetic-model"),any(),isNull());
-        verify(model).generateCancellable(argThat(this::grammarInput),eq(4096),any());
+        verify(model).generateCancellable(argThat(this::grammarInput),eq(8192),any());
         assertEquals(80,done.inputTokens()); assertEquals(40,done.outputTokens()); assertEquals("reported",done.usageStatus());
     }
     @Test void automaticReadyOmitsUnreviewedExplanationButKeepsInternalCandidateAndCitations() throws Exception {
@@ -378,7 +379,8 @@ class WritingSuggestionServiceTest {
         assertEquals("",displayed.explanation(),"Unreviewed generator explanation must not reach the user");
         assertEquals(candidate,displayed.text()); assertEquals(internal.kind(),displayed.kind());
         assertEquals(internal.factIds(),displayed.factIds()); assertEquals(internal.sourceIds(),displayed.sourceIds());
-        verify(model,times(4)).generateCancellable(anyList(),eq(4096),any());
+        verify(model).generateCancellable(anyList(),eq(4096),any());
+        verify(model,times(3)).generateCancellable(anyList(),eq(8192),any());
     }
     @Test void manualReadyKeepsItsExistingExplanation() throws Exception {
         View running=start("sentence"); complete(result("青原","sentence",defendant()));
@@ -778,7 +780,7 @@ class WritingSuggestionServiceTest {
                 assertTrue(s.get(1L,10L,running.id()).advice().isEmpty());
             } finally { s.close(); }
         }
-        verify(model,times(6)).generateCancellable(argThat(this::grammarInput),eq(4096),any());
+        verify(model,times(6)).generateCancellable(argThat(this::grammarInput),eq(8192),any());
     }
     @Test void synchronousEarlierStagesCannotOverwriteProofreadingCallAndLateResultCannotReviveCancelledJob() throws Exception {
         snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
