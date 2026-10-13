@@ -193,13 +193,18 @@ export default {
       this.refresh()
     },
   },
-  mounted() {
-    this.refresh()
+  async mounted() {
+    const seq = this.refreshSeq + 1
+    await this.refresh()
+    if (!shouldAcceptResponse(seq, this.refreshSeq)) return
     // 静默探活一次案件库连通性（会真的 fetch 远端，不同于 refresh() 里 getCloudStatus
     // 读的本地快照）；失败不打断——状态行里的「暂时连不上案件库」已经覆盖了这种情况。
     checkCloud(this.projectId).then((res) => {
-      this.cloud = (res && res.data) || null
+      if (shouldAcceptResponse(seq, this.refreshSeq)) this.cloud = (res && res.data) || null
     }).catch(() => {})
+  },
+  beforeUnmount() {
+    this.refreshSeq += 1
   },
   methods: {
     // refresh() 的触发源很多（mounted/collabRefreshToken watcher/onReload，onReload 又被
@@ -211,7 +216,19 @@ export default {
       const seq = ++this.refreshSeq
       this.loading = true
       try {
-        const res = await getVersionStatus(this.projectId)
+        let res
+        // A cloud fetch may hold the repository lock. Retry only this transient read failure;
+        // never wait for the lock on a server thread or replay a write operation.
+        for (let attempt = 0; attempt < 10; attempt++) {
+          if (!shouldAcceptResponse(seq, this.refreshSeq)) return
+          try {
+            res = await getVersionStatus(this.projectId)
+            break
+          } catch (e) {
+            if (e.kind !== 'VERSION_BUSY' || attempt === 9) throw e
+            await new Promise((resolve) => setTimeout(resolve, 500))
+          }
+        }
         if (!shouldAcceptResponse(seq, this.refreshSeq)) return
         const d = (res && res.data) || {}
         this.enabled = !!d.enabled
