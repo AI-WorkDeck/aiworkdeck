@@ -121,6 +121,11 @@
     if (file.source) card.append(node('p', '项目文件引用 · 发送时版本', 'hint'));
     card.append(node('p', file.clientVisible ? '客户可见' : '内部文件 · 客户需单独授权', 'hint'));
     const actions = node('div', null, 'file-actions'); const imported = state.imports.get(key);
+    actions.append(button('下载', async () => {
+      const result = await awd.call('im.downloadAttachment', { conversationId: s.id, attachmentId: file.id });
+      if (current(s) && result.started) notice('已发起下载，请在保存对话框或浏览器下载列表中确认结果。');
+    }));
+    if (state.active.role === 'CLIENT') { card.append(node('p', '可下载已开放或本人上传的文件。', 'hint'), actions); return card; }
     if (!imported) {
       actions.append(button('存入项目', async () => {
         if (!await confirmAction('文件将保存到当前项目，项目成员可读取，并可随 Git 同步。继续存入？')) return;

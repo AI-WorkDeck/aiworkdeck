@@ -70,6 +70,7 @@
  *
  * v2.11 / SDK 1.5.0 (host 0.61.0+):
  *   im.request { action, params } -> object; requires im. Fixed messaging actions only.
+ *   im.downloadAttachment { conversationId, attachmentId } -> { started, name }; authorized download via host.
  *   chat.addFile { path } -> {}; requires file_read. Adds material without sending an AI message.
  *   files.prepareDrag { path } -> validated file descriptor plus dragToken, dragType, expiresAt.
  *   files.endDrag {} -> {}; invalidates this iframe's prepared drag. Both require file_read.

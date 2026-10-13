@@ -164,3 +164,15 @@ test('local upload and message share one idempotency key; a fresh identical file
   assert.equal(uploads[1].params.clientMessageId, sends[1].params.clientMessageId);
   assert.notEqual(uploads[0].params.clientMessageId, uploads[1].params.clientMessageId);
 });
+test('client downloads a readable attachment without importing or needing project-write operations', async (t) => {
+  const p = await panel({ call: ({ method }) => method === 'im.downloadAttachment' ? { started: true, name: '合成合同.docx' } : undefined }); close(t, p);
+  await p.select(1); assert.equal([...p.$('messages').querySelectorAll('button')].some((b) => b.textContent === '存入项目'), false);
+  await p.named('下载'); const downloads = p.calls.filter((c) => c.method === 'im.downloadAttachment');
+  assert.equal(downloads.length, 1); assert.equal(downloads[0].conversationId, c2.id); assert.equal(downloads[0].attachmentId, msg.attachment.id);
+  assert.equal(p.calls.some((c) => ['import', 'upload', 'export'].includes(c.action)), false);
+  assert.match(p.$('notice').textContent, /已发起下载/); assert.doesNotMatch(p.$('notice').textContent, /已保存/);
+});
+test('revoked attachment download displays server refusal and unavailable cards offer no download', async (t) => {
+  const p = await panel({ call: ({ method }) => { if (method === 'im.downloadAttachment') throw Error('抱歉文件还在准备中，请联系您的律师。'); } }); close(t, p);
+  await p.select(1); await p.named('下载'); assert.equal(p.$('notice').textContent, '抱歉文件还在准备中，请联系您的律师。'); assert.equal(p.$('notice').dataset.error, 'true');
+});

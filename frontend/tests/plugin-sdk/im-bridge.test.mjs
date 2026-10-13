@@ -16,12 +16,12 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 
 function harness(deps = {}) {
   const sent = [], events = [], listeners = new Map()
-  const win = { addEventListener() {}, removeEventListener() {} }
+  const win = { addEventListener() {}, removeEventListener() {}, ...deps.window }
   const uni = { $on: (key, fn) => listeners.set(key, fn), $off: key => listeners.delete(key), $emit: (...args) => events.push(args) }
   const options = new Function('getProjectFiles', 'requestPluginIm', 'preparePluginImDrag', 'endPluginImDrag',
-    'ACCOUNT_CHANGED_EVENT', 'APP_THEME_EVENT', 'window', 'uni', body)(deps.getProjectFiles || (async () => files),
+    'ACCOUNT_CHANGED_EVENT', 'APP_THEME_EVENT', 'window', 'uni', 'setTimeout', body)(deps.getProjectFiles || (async () => files),
     deps.requestPluginIm || (async () => ({ code: 0, data: { conversations: [] } })), preparePluginImDrag, endPluginImDrag,
-    'awd:account-changed', 'theme', win, uni)
+    'awd:account-changed', 'theme', win, uni, deps.setTimeout || setTimeout)
   const vm = { ...options.data(), projectId: 5, pluginId: 'project-im', url: '/api/plugin-web/project-im/index.html',
     permissions: ['im', 'file_read'], addFileToAi: deps.addFileToAi || (async value => { events.push(['addFile', value]) }),
     $refs: { pluginFrame: { contentWindow: { postMessage: message => sent.push(message) } } },
@@ -52,7 +52,7 @@ test('IM bridge binds host project/plugin and unwraps data; failures are visible
 test('permission denied never calls network or adds files', async () => {
   const h = harness({ getProjectFiles: () => { throw new Error('must not read') }, requestPluginIm: () => { throw new Error('must not call') } })
   h.vm.permissions = []
-  for (const method of ['im.request', 'chat.addFile', 'files.prepareDrag', 'files.endDrag']) {
+  for (const method of ['im.request', 'im.downloadAttachment', 'chat.addFile', 'files.prepareDrag', 'files.endDrag']) {
     assert.equal((await h.vm.handleCall(method, { action: 'list', path })).error.code, 'permission_denied')
   }
   assert.deepEqual(h.events, [])
@@ -167,4 +167,58 @@ test('drag receipts expire and clear on focus loss without writing global file f
     Date.now = () => fresh.expiresAt + 1
     assert.equal(consumePluginImDrag(dataTransfer(fresh), 5).file, null)
   } finally { Date.now = now; endPluginImDrag() }
+})
+
+function downloadHarness(options = {}) {
+  const downloads = [], blobs = [], revoked = [], timers = [], calls = []
+  const window = {
+    atob: (value) => atob(value), Blob,
+    URL: { createObjectURL: (blob) => { blobs.push(blob); return 'blob:synthetic-authorized' }, revokeObjectURL: (url) => revoked.push(url) },
+    document: { body: { appendChild() {} }, createElement: () => ({ click() { downloads.push({ href: this.href, name: this.download }) }, remove() {} }) }
+  }
+  const h = harness({ window, setTimeout: (cb, ms) => timers.push({ cb, ms }), requestPluginIm: async (...args) => {
+    calls.push(args)
+    return options.request ? options.request(...args) : { code: 0, data: { id: 'attachment-1', name: '../../合成\\合同?.txt', base64: btoa('synthetic bytes') } }
+  } })
+  h.vm.permissions = ['im']
+  return { ...h, downloads, blobs, revoked, timers, calls }
+}
+const downloadParams = { conversationId: 'conversation-1', attachmentId: 'attachment-1' }
+test('attachment download requires only IM and sends IDs, never plugin paths/URLs or project writes', async () => {
+  const h = downloadHarness()
+  const result = await h.vm.handleCall('im.downloadAttachment', { ...downloadParams, path: '/private/secret', url: 'https://attacker.invalid/file', projectId: 999 })
+  assert.equal(result.ok, true); assert.equal(result.result.started, true)
+  assert.deepEqual(h.calls, [['project-im', 5, 'download', downloadParams]])
+  assert.equal(h.downloads.length, 1); assert.equal(h.downloads[0].href, 'blob:synthetic-authorized')
+  assert.doesNotMatch(h.downloads[0].name, /[/\\?]/); assert.ok(!h.downloads[0].name.startsWith('.'))
+  assert.equal(await h.blobs[0].text(), 'synthetic bytes'); assert.deepEqual(h.events, [])
+  assert.equal(h.timers[0].ms, 60000); h.timers[0].cb(); assert.deepEqual(h.revoked, ['blob:synthetic-authorized'])
+})
+test('download rejects missing IDs, unauthorized response, mismatched bytes and oversized data before saving', async () => {
+  const h = downloadHarness()
+  assert.equal((await h.vm.handleCall('im.downloadAttachment', { url: 'https://example.invalid' })).error.code, 'invalid_params')
+  assert.equal(h.calls.length, 0)
+  for (const response of [
+    { code: 403, message: '抱歉文件还在准备中，请联系您的律师。' },
+    { code: 0, data: { id: 'another-file', base64: 'YQ==' } },
+    { code: 0, data: { id: 'attachment-1', base64: '@@@@' } },
+    { code: 0, data: { id: 'attachment-1', base64: 'A'.repeat(Math.ceil(8 * 1024 * 1024 / 3) * 4 + 4) } }
+  ]) {
+    const denied = downloadHarness({ request: async () => response })
+    assert.equal((await denied.vm.handleCall('im.downloadAttachment', downloadParams)).ok, false)
+    assert.equal(denied.downloads.length, 0); assert.equal(denied.blobs.length, 0)
+  }
+})
+test('a late authorized download after account or project switch never reaches the save mechanism', async () => {
+  const wait = deferred(), h = downloadHarness({ request: () => wait.promise })
+  const pending = h.vm.handleCall('im.downloadAttachment', downloadParams)
+  h.vm.sessionGeneration++
+  wait.resolve({ code: 0, data: { id: 'attachment-1', name: 'file.txt', base64: 'YQ==' } })
+  assert.equal((await pending).ok, false); assert.equal(h.downloads.length, 0)
+})
+
+test('conversation-authorized download also works without a current project', async () => {
+  const h = downloadHarness(); h.vm.projectId = null
+  assert.equal((await h.vm.handleCall('im.downloadAttachment', downloadParams)).ok, true)
+  assert.equal(h.calls[0][1], null); assert.equal(h.downloads.length, 1)
 })
