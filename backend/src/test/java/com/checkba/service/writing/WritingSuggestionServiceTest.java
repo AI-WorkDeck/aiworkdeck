@@ -383,6 +383,21 @@ class WritingSuggestionServiceTest {
     }
 
 
+    @Test void shortCompleteSourceSentencesReachAutomaticModelContext() throws Exception {
+        snapshot=snapshot(new AutomaticWritingProfile(),"工作记录\n报名信息通过问卷收集。\n出席信息通过现场签到收集。",
+                "报名与出席信息均有记录，这两类信息的收集方式分别是", "");
+        AtomicReference<String> prompt=new AtomicReference<>();
+        doAnswer(invocation -> {
+            List<ChatMessage> messages=invocation.getArgument(0);
+            prompt.set(((UserMessage)messages.get(1)).singleText());
+            captureHandler(messages,invocation.getArgument(2)); return call;
+        }).when(model).generateCancellable(anyList(),anyInt(),any());
+        assertEquals("RUNNING",start("autocomplete").status());
+        var input=json.readTree(prompt.get());
+        assertEquals(2,input.path("facts").size());
+        assertTrue(input.path("facts").get(0).path("quote").asText().endsWith("报名信息通过问卷收集。"));
+        assertTrue(input.path("sources").get(0).path("text").asText().contains("报名信息通过问卷收集。"));
+    }
     @Test void automaticCanNaturallyCompleteTheSentenceWithExistingSourceWording() throws Exception {
         snapshot=snapshot(new AutomaticWritingProfile(),"申报材料包括申请表和说明文件。","依照现有材料清单，本次需要提交的文件包括", "");
         String candidate="申请表和说明文件。";
