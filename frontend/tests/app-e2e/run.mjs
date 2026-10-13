@@ -1673,6 +1673,12 @@ try {
     await waitText('当前没有进行中的工作')
   })
 
+  // 工作段空闲先于子时间线异步加载完成；点击前等本次命名节点真正可见。
+  const waitVersionTitle = (title) => page.waitForFunction((expected) =>
+    [...document.querySelectorAll('.timeline-node .node-title')].some((node) =>
+      node.innerText.trim() === expected && node.getClientRects().length > 0),
+    { timeout: 15000 }, title)
+
   // 一段完整工作：上传一个文件、进入工作中、结束并命名、回到空闲态。
   const runWorkSession = async (file, uploadLabel, title) => {
     await mouseClickSel('[title="资源管理器"]')
@@ -1700,6 +1706,7 @@ try {
     // brief 原断言是 waitText('主线')；实际空闲态文案是"当前没有进行中的工作"
     // （见上一步同样的改动理由），以实际组件模板为准。
     await waitText('当前没有进行中的工作')
+    await waitVersionTitle(title)
   }
 
   await step('第一段工作：落一个文件并命名结束', () =>
@@ -1811,6 +1818,7 @@ try {
     await sleep(300)
     await mouseClickText('完成')
     await waitText('当前没有进行中的工作')
+    await waitVersionTitle('端到端测试稿四')
   })
 
   // ============ J9 追加 2/3：对比入口 ============
