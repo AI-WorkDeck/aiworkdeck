@@ -50,6 +50,8 @@ jobs:
         run: mvn -B -q -f backend/plugin-api/pom.xml install
       - name: Build and test Tencent Meeting marketplace plugin
         run: ./official-plugins/tencent-meeting/build.sh
+      - name: Build and test Baoqingtian marketplace plugin
+        run: ./official-plugins/baoqingtian/build.sh
       - name: Test
         working-directory: backend
         # forkNode 走 TCP 而不是默认的 stdout 管道：套件里有测试进程往 native stdout
@@ -90,6 +92,8 @@ jobs:
         run: npm ci
       - name: Test Tencent Meeting plugin panel
         run: node --test official-plugins/tencent-meeting/tests/web-*.mjs
+      - name: Test Baoqingtian plugin workspace
+        run: NODE_PATH=frontend/node_modules node --test official-plugins/baoqingtian/tests/web-*.mjs
       - name: Test built-in Tencent Meeting request and UI contracts
         run: node --test frontend/tests/tmeet/*.test.mjs
       - name: Check emit/binding contracts

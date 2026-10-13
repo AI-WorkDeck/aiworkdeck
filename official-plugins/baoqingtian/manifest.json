@@ -1,0 +1,27 @@
+{
+  "id": "baoqingtian",
+  "name": "包晴天 · 案源与笔记",
+  "version": "1.0.0",
+  "description": "连接包晴天律师账号，在独立工作区浏览案源广场、管理平台图文笔记和草稿。先打开一个项目再使用。",
+  "author": "AI WorkDeck",
+  "homepage": "https://www.aiworkdeck.com/zh/marketplace/plugins",
+  "minHostVersion": "0.60.0",
+  "permissions": [
+    "file_read",
+    "network"
+  ],
+  "frontendEntry": "web/index.html",
+  "backendJars": [
+    "baoqingtian-1.0.0.jar"
+  ],
+  "tools": [
+    {
+      "name": "baoqingtian_action",
+      "description": "包晴天案源和平台笔记工作区。",
+      "permissions": [
+        "file_read",
+        "network"
+      ]
+    }
+  ]
+}

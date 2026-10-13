@@ -181,3 +181,9 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 源码在 `official-plugins/tencent-meeting/`：公开 PluginHost JAR + sandbox Web 面板 + `tencent-meeting-market` 技能。`build.sh` 输出真实 ZIP；由官网 `publish-plugin.mts` 受理、扫描、审核、签名上架，再同步北京已签名文件与目录至新加坡。目录更新无需客户端发版或网站部署。不要把旧内置 `tencent-meeting` 技能上架当作独立插件：旧客户端没有它依赖的宿主实现。
 
 新插件依赖本机官方 `tmeet` CLI；同步由用户主动触发，先取元数据，打开会议再读正文。长操作使用公开 Jobs SPI，Web 每 3 秒轮询；不可降至 1 秒（插件 SPI 配额）。AI 入口先归档到项目，再以短文件引用触发独立技能；不向聊天塞入整份逐字稿。登录账号由操作系统用户共享，缓存按 WorkDeck 用户/项目区分，二者不是同一种隔离。
+
+## 包晴天独立插件（dev-board#1249）
+
+源码在 `official-plugins/baoqingtian/`，Java 公开 SPI + sandbox Web 工作区，最低宿主 0.60.0。复用动态 rail 与 `plugin` 标签，不新增静态入口。连接包晴天官方 PC 认证和律师业务 API；上游仓只读，不复制其实现。用户确认笔记指平台律师图文笔记，非本地私人笔记。会话按宿主用户保留于后端内存；不使用插件 localStorage 储存认证信息。
+
+接口地雷：新增 `/note/add` 与更新 `/note/edit` 分开；编辑用 `noteId`。本人列表用 `/note/lawyer/page`；每次写入前再次校验笔记归属。`status:DRAFT` 才是草稿，`isNoteDraft:Y` 是媒体上传中标识，不能混淆。图文 `content` 是媒体引用、`description` 才是正文，编辑时必须保留媒体、类型及关联字段。构建/单测入口见插件 README；上架仍须按本页真实受理、签名、双站同步与实际工作台安装路径验收，不能把存在目录当成已交付。
