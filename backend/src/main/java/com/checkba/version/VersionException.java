@@ -14,26 +14,36 @@ package com.checkba.version;
 public class VersionException extends RuntimeException {
 
     private final boolean userFacing;
+    private final String kind;
 
     public VersionException(String message, Throwable cause) {
         super(message, cause);
         this.userFacing = false;
+        this.kind = null;
     }
 
     public VersionException(String message) {
         super(message);
         this.userFacing = false;
+        this.kind = null;
     }
 
-    private VersionException(String message, boolean userFacing) {
+    private VersionException(String message, boolean userFacing, String kind) {
         super(message);
         this.userFacing = userFacing;
+        this.kind = kind;
     }
 
     /** 业务性错误：message 本身就是写给律师看的话术，可以原样回显给前端。 */
     public static VersionException userFacing(String message) {
-        return new VersionException(message, true);
+        return new VersionException(message, true, null);
     }
+
+    public static VersionException busy(String message) {
+        return new VersionException(message, true, "VERSION_BUSY");
+    }
+
+    public String getKind() { return kind; }
 
     public boolean isUserFacing() {
         return userFacing;

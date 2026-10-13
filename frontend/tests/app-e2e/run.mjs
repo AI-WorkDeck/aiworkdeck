@@ -1673,6 +1673,12 @@ try {
     await waitText('当前没有进行中的工作')
   })
 
+  // 工作段空闲先于子时间线异步加载完成；点击前等本次命名节点真正可见。
+  const waitVersionTitle = (title) => page.waitForFunction((expected) =>
+    [...document.querySelectorAll('.timeline-node .node-title')].some((node) =>
+      node.innerText.trim() === expected && node.getClientRects().length > 0),
+    { timeout: 15000 }, title)
+
   // 一段完整工作：上传一个文件、进入工作中、结束并命名、回到空闲态。
   const runWorkSession = async (file, uploadLabel, title) => {
     await mouseClickSel('[title="资源管理器"]')
@@ -1700,6 +1706,7 @@ try {
     // brief 原断言是 waitText('主线')；实际空闲态文案是"当前没有进行中的工作"
     // （见上一步同样的改动理由），以实际组件模板为准。
     await waitText('当前没有进行中的工作')
+    await waitVersionTitle(title)
   }
 
   await step('第一段工作：落一个文件并命名结束', () =>
@@ -1811,6 +1818,7 @@ try {
     await sleep(300)
     await mouseClickText('完成')
     await waitText('当前没有进行中的工作')
+    await waitVersionTitle('端到端测试稿四')
   })
 
   // ============ J9 追加 2/3：对比入口 ============
@@ -2180,6 +2188,14 @@ try {
     if (!j || j.code !== 0) throw new Error('REST 直传失败: ' + JSON.stringify(j))
   }
   const endSessionAt = async (apiFn, projectId, title) => {
+    // Upload completion precedes asynchronous version bookkeeping. Match the UI's
+    // working-state prerequisite before sending the one-shot end request.
+    let status
+    const ready = await pollUntil(async () => {
+      status = await apiFn('/api/projects/' + projectId + '/version/status')
+      return status?.code === 0 && status.data?.enabled === true && status.data?.working === true
+    }, 15000, 200)
+    if (!ready) throw new Error('结束工作前未进入工作中: ' + JSON.stringify(status).slice(0, 300))
     const r = await apiFn('/api/projects/' + projectId + '/version/session/end', { method: 'POST', body: { title } })
     if (!r || r.code !== 0) throw new Error('结束工作失败: ' + JSON.stringify(r).slice(0, 200))
     return r.data
@@ -2826,10 +2842,14 @@ try {
     // 文件字节一并复原。
     await step('J11-引导：手头有活 + 案件库领先时点「交稿」，先摆一张三步清单', async () => {
       await restOverwrite('qa-J11协作文件.txt', 'QA J11 交稿引导：改了但没结束工作\n')
-      const before = await api('/api/projects/' + QA.projectId + '/version/status')
-      if (!(before && before.data && before.data.working)) {
+      let before
+      const working = await pollUntil(async () => {
+        before = await api('/api/projects/' + QA.projectId + '/version/status')
+        return before?.code === 0 && before.data?.enabled === true && before.data?.working === true
+      }, 15000, 200)
+      if (!working) {
         throw new Error('裸 REST 改文件之后 A 没有进入「工作中」，引导的前提不成立: '
-          + JSON.stringify(before && before.data).slice(0, 300))
+          + JSON.stringify(before).slice(0, 300))
       }
 
       await clickHistoryBtn('交稿')
