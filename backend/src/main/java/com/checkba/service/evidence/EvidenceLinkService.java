@@ -13,6 +13,7 @@ import com.checkba.repository.FileTagRepository;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectFileAccessService;
 import com.checkba.service.evidence.EvidenceLinkViews.AnchorReport;
 import com.checkba.service.evidence.EvidenceLinkViews.AnchorReportResult;
 import com.checkba.service.evidence.EvidenceLinkViews.FileBrief;
@@ -74,6 +75,7 @@ public class EvidenceLinkService {
     private final FileTagRepository fileTags;
     private final ProjectMemberService members;
     private final ObjectMapper om;
+    private final ProjectFileAccessService fileAccess;
 
     // ---------------------------------------------------------------- write
 
@@ -446,12 +448,16 @@ public class EvidenceLinkService {
     }
 
     private void requireRead(Long projectId, Long userId) {
+        // Derived results may contain excerpts from multiple private source files.
+        if (fileAccess.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         if (userId == null || projectId == null || !members.hasReadPermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权限访问该项目", "No access to this project"));
         }
     }
 
     private void requireWrite(Long projectId, Long userId) {
+        // Derived results may contain excerpts from multiple private source files.
+        if (fileAccess.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         if (userId == null || projectId == null || !members.hasWritePermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权限修改该项目", "No write access to this project"));
         }

@@ -4358,3 +4358,25 @@ export function getMobileBackupConsent() {
 export function setMobileBackupConsent(data) {
   return request({ url: '/api/mobile-receive/backup-consent', method: 'PUT', data })
 }
+
+export function requestPluginIm(pluginId, projectId, action, params) {
+  return request({
+    url: `/api/plugins/${encodeURIComponent(pluginId)}/im`,
+    method: 'POST', data: { projectId, action, params }, timeout: 120000
+  })
+}
+
+
+export function getProjectFileAccess(projectId, fileId) {
+  return request({
+    url: `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/access`,
+    method: 'GET'
+  }).then(unwrapEnvelope)
+}
+
+export function updateProjectFileAccess(projectId, fileId, clientVisible) {
+  return request({
+    url: `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/access`,
+    method: 'PUT', data: { clientVisible }
+  }).then(unwrapEnvelope)
+}

@@ -44,7 +44,7 @@
 // v2.7 实验 API：x- 前缀方法只对本机 dev 免签直装的插件开放（devInstalled prop），
 // 广场装的插件调用一律 experimental_not_allowed——运行时闸是真保证，受理扫描只是辅助。
 import {
-  getProjectFiles, getFileText, invokePluginTool, pluginAiComplete, getPluginSettings,
+  getProjectFiles, getFileText, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm,
   createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks
 } from '@/services/api.js'
 import { PLUGIN_DOC_ACTIONS } from '@/config/pluginDocActions.js'
@@ -53,6 +53,8 @@ import { getResolvedTheme, collectThemeTokens, APP_THEME_EVENT } from '@/utils/a
 import { resolveAnchor, toPluginLink, toTargetInputs } from '@/utils/pluginEvidence.js'
 import { createEvidenceLinkForSelection } from '@/pages/project-overview/evidenceLinkCore.js'
 import { WPS_INTERNAL_HTTP_LINK_BASE } from '@/config/workbenchActions.js'
+import { preparePluginImDrag, endPluginImDrag } from '@/utils/pluginImDrag.js'
+import { ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 
 /** 桥协议版本 */
 const PROTOCOL = 1
@@ -77,6 +79,7 @@ const PLUGIN_EVENTS = {
   'files.changed': { permission: 'file_read', throttleMs: 500 },
   'selection.changed': { permission: 'editor', throttleMs: 300 },
   'project.switched': { permission: null, throttleMs: 0 },
+  'account.changed': { permission: null, throttleMs: 0 },
   // v2.9：宿主设置表单保存后推送（只推给设置所属的插件，见 mounted 里的过滤）
   'settings.changed': { permission: null, throttleMs: 0 }
 }
@@ -98,7 +101,7 @@ export default {
   name: 'PluginPane',
   // chat.send 与 PluginGuidePane 的快捷按钮走同一条 kickoff 路：
   // prompt 作为可见的用户消息进入 AI 对话，用户随时可停，不存在静默注入
-  emits: ['kickoff'],
+  emits: ['kickoff', 'files-changed'],
   props: {
     url: {
       type: String,
@@ -128,6 +131,11 @@ export default {
       type: Function,
       default: null
     },
+    /** Add a verified project file to the visible AI composer without sending. */
+    addFileToAi: {
+      type: Function,
+      default: null
+    },
     /** 是否本机 dev 免签直装（后端按 .awd-dev 标记判定）：实验 API（x- 前缀方法）只对它开放 */
     devInstalled: {
       type: Boolean,
@@ -146,15 +154,19 @@ export default {
   watch: {
     url() {
       this.sessionGeneration++
+      this.clearPreparedDrag()
       this.resetEventChannel()
     },
     pluginId() {
       this.sessionGeneration++
+      this.clearPreparedDrag()
       this.resetEventChannel()
     },
     // 当前架构下切项目走 uni.reLaunch 整页重建，本 watch 极少触发；
     // 语义为未来面板持久化预留（规范 v2.7 事件表），触发了就如实推送
     projectId(val) {
+      this.sessionGeneration++
+      this.clearPreparedDrag()
       this.forwardEvent('project.switched', { projectId: val == null ? '' : String(val) })
     }
   },
@@ -188,16 +200,28 @@ export default {
     uni.$on('awd:files-changed', this._onFilesChanged)
     uni.$on('awd:selection-changed', this._onSelectionChanged)
     uni.$on('awd:plugin-settings-changed', this._onPluginSettingsChanged)
+    this._onAccountChanged = () => {
+      this.sessionGeneration++
+      this.clearPreparedDrag()
+      this.forwardEvent('account.changed', {})
+    }
+    uni.$on(ACCOUNT_CHANGED_EVENT, this._onAccountChanged)
   },
   beforeUnmount() {
+    this.sessionGeneration++
+    this.clearPreparedDrag()
     window.removeEventListener('message', this.onMessage)
     if (this._onThemeChanged) { uni.$off(APP_THEME_EVENT, this._onThemeChanged); this._onThemeChanged = null }
     if (this._onFilesChanged) { uni.$off('awd:files-changed', this._onFilesChanged); this._onFilesChanged = null }
     if (this._onSelectionChanged) { uni.$off('awd:selection-changed', this._onSelectionChanged); this._onSelectionChanged = null }
     if (this._onPluginSettingsChanged) { uni.$off('awd:plugin-settings-changed', this._onPluginSettingsChanged); this._onPluginSettingsChanged = null }
+    if (this._onAccountChanged) { uni.$off(ACCOUNT_CHANGED_EVENT, this._onAccountChanged); this._onAccountChanged = null }
     this.resetEventChannel()
   },
   methods: {
+    clearPreparedDrag() {
+      endPluginImDrag(this)
+    },
     onFrameLoad() {
       if (!this.isWebPlugin) return
       const frame = this.$refs.pluginFrame
@@ -285,6 +309,53 @@ export default {
         }
       }
       switch (method) {
+        case 'im.request': {
+          if (!this.hasPermission('im')) return this.denied('im')
+          const action = typeof params.action === 'string' ? params.action.trim() : ''
+          if (!action || !this.projectId || (params.params != null
+              && (typeof params.params !== 'object' || Array.isArray(params.params)))) {
+            return { ok: false, error: { code: 'invalid_params', message: '缺少项目、action 或有效 params' } }
+          }
+          const generation = this.sessionGeneration
+          try {
+            const res = await requestPluginIm(this.pluginId, this.projectId, action, params.params || {})
+            if (generation !== this.sessionGeneration) return this.staleContext()
+            if (!res || res.code !== 0) return { ok: false, error: { code: 'invoke_failed', message: res?.message || '沟通服务请求失败' } }
+            if (['import', 'export', 'sendFile', 'binding'].includes(action)) this.$emit('files-changed')
+            return { ok: true, result: res.data }
+          } catch (e) {
+            return { ok: false, error: { code: 'invoke_failed', message: e?.message || '沟通服务暂不可用，请重试' } }
+          }
+        }
+
+        case 'chat.addFile':
+        case 'files.prepareDrag': {
+          if (!this.hasPermission('file_read')) return this.denied('file_read')
+          const path = typeof params.path === 'string' ? params.path : ''
+          if (!path) return { ok: false, error: { code: 'invalid_params', message: '缺少项目文件路径 path' } }
+          const generation = this.sessionGeneration
+          const projectId = this.projectId
+          const isCurrent = () => generation === this.sessionGeneration && String(projectId) === String(this.projectId)
+          try {
+            const hit = (await this.listProjectFiles()).find(f => f.path === path)
+            if (!isCurrent()) return this.staleContext()
+            if (!hit) return { ok: false, error: { code: 'not_found', message: '文件不存在：' + path } }
+            if (method === 'files.prepareDrag') {
+              return { ok: true, result: preparePluginImDrag(this, hit, projectId, window, { frame: this.$refs.pluginFrame, rect: params.rect }) }
+            }
+            if (!this.addFileToAi) return { ok: false, error: { code: 'unavailable', message: '当前工作台无法打开 AI 对话' } }
+            await this.addFileToAi({ projectId, file: { id: hit.id, name: hit.name, fileType: hit.fileType, isDir: false }, isCurrent })
+            return isCurrent() ? { ok: true, result: {} } : this.staleContext()
+          } catch (e) {
+            return { ok: false, error: { code: 'invoke_failed', message: e?.message || '文件操作失败，请重试' } }
+          }
+        }
+
+        case 'files.endDrag':
+          if (!this.hasPermission('file_read')) return this.denied('file_read')
+          this.clearPreparedDrag()
+          return { ok: true, result: {} }
+
         case 'context.get':
           return { ok: true, result: this.buildContext() }
 
@@ -354,7 +425,9 @@ export default {
         case 'ui.openFile': {
           if (!this.hasPermission('file_read')) return this.denied('file_read')
           const path = String(params.path == null ? '' : params.path)
+          const generation = this.sessionGeneration
           const hit = (await this.listProjectFiles()).find(f => f.path === path)
+          if (generation !== this.sessionGeneration) return this.staleContext()
           if (!hit) return { ok: false, error: { code: 'not_found', message: '文件不存在：' + path } }
           // 与 evidence.locate 打开底稿同一条路：工作台监听后走 openFileLinkTarget
           uni.$emit('awd:open-evidence-target', { fileId: hit.id, locator: null, linkKey: null })
@@ -633,6 +706,10 @@ export default {
 
     // ==== 项目文件 ====
 
+    staleContext() {
+      return { ok: false, error: { code: 'stale_context', message: '项目或账户已切换，请重试' } }
+    },
+
     // 后端返回的是一份扁平全树（每条带 parentId），这里就地拼出项目内相对路径——
     // 插件拿到的 path 必须是人看得懂、且能原样喂回 files.read 的东西，不是数据库 id。
     async listProjectFiles() {
@@ -653,7 +730,8 @@ export default {
       }
       return rows
         .filter(r => r && !r.isFolder)
-        .map(r => ({ id: r.id, path: pathOf(r), name: r.name || '', size: r.fileSize || 0 }))
+        .map(r => ({ id: r.id, path: pathOf(r), name: r.name || '', size: r.fileSize || 0,
+          fileType: r.fileType || extOf(r.name) }))
     },
 
     async readProjectFile(path) {

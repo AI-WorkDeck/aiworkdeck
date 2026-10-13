@@ -9,6 +9,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ProjectRepository extends JpaRepository<Project, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("SELECT p FROM Project p WHERE p.id = :id")
+    java.util.Optional<Project> lockForImWrite(Long id);
+
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("UPDATE Project p SET p.uid = :uid WHERE p.id = :id AND ((:previous IS NULL AND p.uid IS NULL) OR p.uid = :previous)")
     int assignCatalogUidIfUnchanged(Long id, String previous, String uid);

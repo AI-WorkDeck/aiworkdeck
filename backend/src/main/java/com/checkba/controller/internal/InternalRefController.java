@@ -74,7 +74,7 @@ public class InternalRefController {
 
     private static final Pattern IPV4_LOOPBACK = Pattern.compile("^127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$");
 
-    static final String NO_ACCESS = "在案件库里找不到这份文件，或你没有这份案卷的读取权限。";
+    static final String NO_ACCESS = com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE;
 
     /** 本实例是否对外提供这条内部口。只有 case profile 打开（application-case.yml）。 */
     private final boolean serve;
@@ -84,6 +84,7 @@ public class InternalRefController {
     private final ProjectMemberService members;
     private final ProjectRepoService repoService;
     private final ProjectFileTextExtractor extractor;
+    private final com.checkba.service.ProjectFileAccessService fileAccess;
 
     public InternalRefController(@Value("${ref.internal.serve:false}") boolean serve,
                                  @Value("${ref.internal.secret:}") String secret,
@@ -91,7 +92,8 @@ public class InternalRefController {
                                  ProjectService projectService,
                                  ProjectMemberService members,
                                  ProjectRepoService repoService,
-                                 ProjectFileTextExtractor extractor) {
+                                 ProjectFileTextExtractor extractor,
+                                 com.checkba.service.ProjectFileAccessService fileAccess) {
         this.serve = serve;
         this.secret = secret == null ? "" : secret.trim();
         this.bindings = bindings;
@@ -99,6 +101,7 @@ public class InternalRefController {
         this.members = members;
         this.repoService = repoService;
         this.extractor = extractor;
+        this.fileAccess = fileAccess;
     }
 
     /** body {@code {externalAccountId, keyword?}} → {@code {code:0, entries:[{remoteProjectId, projectName, path, name}]}}。 */
@@ -131,7 +134,7 @@ public class InternalRefController {
         if (userId == null || projectId == null || path == null || path.isBlank()
                 || path.startsWith(MANIFEST_PREFIX)
                 || !members.hasReadPermission(projectId, userId)
-                || members.isClient(projectId, userId)) {
+                || members.isClient(projectId, userId) || fileAccess.isClient(projectId, userId)) {
             return ResponseEntity.ok(fail(NO_ACCESS));
         }
         byte[] bytes;
@@ -209,7 +212,7 @@ public class InternalRefController {
         String needle = keyword == null || keyword.isBlank() ? null : keyword.trim().toLowerCase(Locale.ROOT);
         List<Map<String, Object>> out = new ArrayList<>();
         for (Project p : projectService.getUserProjects(userId)) {
-            if (p == null || p.getId() == null || members.isClient(p.getId(), userId)) {
+            if (p == null || p.getId() == null || members.isClient(p.getId(), userId) || fileAccess.isClient(p.getId(), userId)) {
                 continue;
             }
             if (out.size() >= MAX_ENTRIES) {

@@ -100,6 +100,13 @@ public class ProjectFile {
     @Column(nullable = false)
     private Long userId;
 
+    /** Explicit customer access; old rows with null remain private. */
+    @Column(columnDefinition = "boolean default false")
+    private Boolean clientVisible = false;
+
+    public Boolean getClientVisible() { return Boolean.TRUE.equals(clientVisible); }
+    public void setClientVisible(Boolean clientVisible) { this.clientVisible = clientVisible; }
+
     /**
      * 创建时间
      */

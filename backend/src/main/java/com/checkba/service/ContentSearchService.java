@@ -53,6 +53,7 @@ public class ContentSearchService {
     private final DocumentTextService documentTextService;
     /** 抽取结果的跨重启缓存；单测传 null 即退化成「每次重抽」。 */
     private final ProjectFileTextCacheService textCache;
+    private final ProjectFileAccessService fileAccess;
 
     /**
      * 抽取与匹配的有界线程池，所有搜索请求共用。
@@ -90,6 +91,12 @@ public class ContentSearchService {
      * 在项目中搜索内容
      */
     public SearchResult searchContent(Long projectId, SearchRequest request) {
+        var context = com.checkba.service.ai.tools.ToolContextHolder.get();
+        return searchContent(projectId, request, context == null ? null : context.userId());
+    }
+
+    public SearchResult searchContent(Long projectId, SearchRequest request, Long userId) {
+        if (userId == null) throw new IllegalArgumentException("请先登录");
         String query = request.getQuery() != null ? request.getQuery().trim() : "";
         boolean hasQuery = !query.isEmpty();
         boolean isTagOnlySearch = !hasQuery && request.getTagIds() != null && !request.getTagIds().isEmpty();
@@ -142,6 +149,7 @@ public class ContentSearchService {
         // 如果是纯标签搜索，不过滤文件类型（允许搜索所有已被打标签的文件，包括图片等）
         List<ProjectFile> files = projectFileRepository.findByProjectIdAndIsDeletedFalseOrderBySortOrderAsc(projectId)
             .stream()
+            .filter(f -> fileAccess.canRead(f, userId))
             .filter(f -> !"folder".equals(f.getFileType()))
             .filter(f -> isTagOnlySearch || isSearchableType(f.getFileType()))
             .filter(f -> isTagOnlySearch || matchesTypeFilter(f, request.getFileTypes()))

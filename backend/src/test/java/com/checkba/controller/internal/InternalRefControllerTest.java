@@ -64,6 +64,7 @@ class InternalRefControllerTest {
     private ProjectMemberService members;
     private ProjectRepoService repo;
     private ProjectFileTextExtractor extractor;
+    private com.checkba.service.ProjectFileAccessService fileAccess = mock(com.checkba.service.ProjectFileAccessService.class);
     private Path root;
 
     @BeforeEach
@@ -85,7 +86,7 @@ class InternalRefControllerTest {
 
     private MockMvc mvc(boolean serve, String secret) {
         return MockMvcBuilders
-                .standaloneSetup(new InternalRefController(serve, secret, bindings, projects, members, repo, extractor))
+                .standaloneSetup(new InternalRefController(serve, secret, bindings, projects, members, repo, extractor, fileAccess))
                 .build();
     }
 
@@ -320,7 +321,7 @@ class InternalRefControllerTest {
                         .content("{\"externalAccountId\":\"acc-1\",\"remoteProjectId\":3,\"path\":\"资料/说明.txt\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("没有")))
+                .andExpect(jsonPath("$.message").value(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE))
                 .andExpect(jsonPath("$.text").doesNotExist());
     }
 
@@ -383,4 +384,25 @@ class InternalRefControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1));
     }
+
+    @Test void globalClientCannotListOrReadRepositoryBlobsViaInternalAccountBridge() throws Exception {
+        boundTo("acc-1", 7L);
+        seed(3L, "资料/内部.txt", "PRIVATE_CONTENT");
+        when(projects.getUserProjects(7L)).thenReturn(List.of(project(3L, "合成案卷")));
+        when(members.hasReadPermission(3L, 7L)).thenReturn(true);
+        var users = mock(com.checkba.repository.UserRepository.class);
+        var customer = new com.checkba.model.entity.User(); customer.setRole("CLIENT");
+        when(users.findById(7L)).thenReturn(Optional.of(customer));
+        fileAccess = new com.checkba.service.ProjectFileAccessService(members, users, mock(com.checkba.repository.ProjectFileRepository.class));
+        mvc().perform(post("/api/internal/ref/list").header("X-Internal-Secret", SECRET)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"externalAccountId\":\"acc-1\"}"))
+                .andExpect(jsonPath("$.entries.length()").value(0));
+        mvc().perform(post("/api/internal/ref/read").header("X-Internal-Secret", SECRET)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"externalAccountId\":\"acc-1\",\"remoteProjectId\":3,\"path\":\"资料/内部.txt\"}"))
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.message").value(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE))
+                .andExpect(jsonPath("$.text").doesNotExist());
+    }
+
 }

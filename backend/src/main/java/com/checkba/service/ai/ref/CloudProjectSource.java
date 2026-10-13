@@ -29,12 +29,14 @@ public class CloudProjectSource implements RefSource {
     private final ProjectFileService fileService;
     private final ProjectMemberService members;
     private final ProjectFileTextExtractor extractor;
+    private final com.checkba.service.ProjectFileAccessService fileAccess;
 
     public CloudProjectSource(ProjectFileService fileService, ProjectMemberService members,
-                              ProjectFileTextExtractor extractor) {
+                              ProjectFileTextExtractor extractor, com.checkba.service.ProjectFileAccessService fileAccess) {
         this.fileService = fileService;
         this.members = members;
         this.extractor = extractor;
+        this.fileAccess = fileAccess;
     }
 
     @Override
@@ -52,6 +54,7 @@ public class CloudProjectSource implements RefSource {
         for (Map.Entry<String, ProjectFile> e :
                 fileService.listRelativePaths(q.projectId(), keyword, ReferenceSourceService.MAX_ENTRIES)) {
             ProjectFile pf = e.getValue();
+            if (!fileAccess.canRead(pf, q.userId())) continue;
             out.add(new RefEntry("cloud:" + pf.getId(), "cloud", pf.getName(), e.getKey(), null,
                     pf.getUpdatedAt() == null ? null : pf.getUpdatedAt().toString(), null));
         }
@@ -86,6 +89,9 @@ public class CloudProjectSource implements RefSource {
         if (pf == null || Boolean.TRUE.equals(pf.getIsDeleted()) || pf.getProjectId() == null
                 || q.userId() == null || !members.hasReadPermission(pf.getProjectId(), q.userId())) {
             throw new RefSourceException(NOT_FOUND);
+        }
+        if (!fileAccess.canRead(pf, q.userId())) {
+            throw new RefSourceException(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE);
         }
         return pf;
     }
