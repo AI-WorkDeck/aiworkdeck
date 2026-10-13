@@ -278,7 +278,7 @@ class WritingModelTransportTest {
                 assertEquals(stage < 0 ? "deepseek/deepseek-v4-flash" : stage == 0 ? AllowedModels.KIMI_K3.getModelId()
                         : AllowedModels.QWEN_3_8_MAX.getModelId(),request.path("model").asText());
                 assertEquals(4096,request.path("max_tokens").asInt());
-                assertEquals(stage < 0 ? "high" : "low",request.path("reasoning").path("effort").asText());
+                assertEquals(stage <= 0 ? "high" : "low",request.path("reasoning").path("effort").asText());
                 assertFalse(request.path("reasoning").has("enabled"));
             }
         }
@@ -336,7 +336,7 @@ class WritingModelTransportTest {
                 assertEquals(List.of("fp8"), new ObjectMapper().convertValue(request.path("provider").path("quantizations"), List.class));
                 assertFalse(request.path("provider").path("allow_fallbacks").asBoolean(true));
                 assertEquals("moonshotai/kimi-k3", request.path("model").asText());
-                assertEquals(review ? "low" : "medium", request.path("reasoning").path("effort").asText());
+                assertEquals(review ? "high" : "medium", request.path("reasoning").path("effort").asText());
                 assertEquals(4096, request.path("max_tokens").asInt());
                 assertTrue(request.path("stream_options").path("include_usage").asBoolean());
                 assertEquals(channel.equals("OPENROUTER") ? "Bearer synthetic-byok" : "Bearer synthetic-platform", auth.get());
