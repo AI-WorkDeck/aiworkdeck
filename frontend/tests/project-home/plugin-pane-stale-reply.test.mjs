@@ -9,6 +9,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { endPluginImDrag } from '../../src/utils/pluginImDrag.js'
 
 const SRC = readFileSync(
   new URL('../../src/components/PluginPane.vue', import.meta.url), 'utf8')
@@ -18,8 +19,8 @@ function loadOptions(deps) {
     .replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export\s+default/, 'return')
   const factory = new Function(
-    'getProjectFiles', 'getFileText', 'getAppLanguage', 'uni', body)
-  return factory(deps.getProjectFiles, deps.getFileText, () => 'zh-CN', deps.uni || {})
+    'getProjectFiles', 'getFileText', 'getAppLanguage', 'uni', 'endPluginImDrag', body)
+  return factory(deps.getProjectFiles, deps.getFileText, () => 'zh-CN', deps.uni || {}, endPluginImDrag)
 }
 
 function makeVm(options, props) {

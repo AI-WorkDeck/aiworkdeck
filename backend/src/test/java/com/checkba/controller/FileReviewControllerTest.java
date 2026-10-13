@@ -50,6 +50,7 @@ class FileReviewControllerTest {
     @Mock FileReviewService svc;
     @Mock ProjectFileService projectFileService;
     @Mock ProjectMemberService projectMemberService;
+    @Mock com.checkba.service.ProjectFileAccessService fileAccess;
     @InjectMocks FileReviewController controller;
 
     private MockedStatic<AuthController> auth;
@@ -228,4 +229,13 @@ class FileReviewControllerTest {
                 .andExpect(jsonPath("$.code").value(GlobalExceptionHandler.CODE_UNAUTHENTICATED));
         verify(svc, never()).current(any());
     }
+
+    @Test void globalClientCannotUseReviewEndpointsAsFileTextBypass() throws Exception {
+        when(projectMemberService.isClient(1L, 5L)).thenReturn(false);
+        when(fileAccess.isClient(1L, 5L)).thenReturn(true);
+        mvc.perform(get(BASE).header("X-Session-Id", "s"))
+                .andExpect(jsonPath("$.message").value(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE));
+        org.mockito.Mockito.verifyNoInteractions(svc);
+    }
+
 }

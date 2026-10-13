@@ -130,6 +130,7 @@ class DocInsightServiceTest {
 
     InsightProperties props = new InsightProperties();
     DocInsightService svc;
+    com.checkba.service.ProjectFileAccessService fileAccess = mock(com.checkba.service.ProjectFileAccessService.class);
 
     @BeforeEach
     void setUp() throws Exception {
@@ -278,7 +279,7 @@ class DocInsightServiceTest {
     private DocInsightService newService() {
         return new DocInsightService(runs, entityRepo, findingRepo, files, members, docText,
                 chatModelFactory, auxModelResolver, tokenUsageService, qichacha, mcp, pkulaw, providerResolver, gateway, props,
-                new ObjectMapper());
+                new ObjectMapper(), fileAccess);
     }
 
     private static ProjectFile doc() {
@@ -1584,4 +1585,23 @@ class DocInsightServiceTest {
         when(mcp.callTool(eq(DocInsightService.PKULAW_KEYWORD), anyString(), anyMap()))
                 .thenReturn("Error: MCP call failed: 401 checking remaining points");
     }
+
+    @Test void globalClientCannotReadStoredEntitiesOrStartDerivedAnalysis() throws Exception {
+        var users = mock(com.checkba.repository.UserRepository.class);
+        var customer = new com.checkba.model.entity.User(); customer.setRole("CLIENT");
+        when(users.findById(UID)).thenReturn(Optional.of(customer));
+        fileAccess = new com.checkba.service.ProjectFileAccessService(members, users, files);
+        svc = newService();
+        for (Runnable action : List.<Runnable>of(
+                () -> svc.latest(UID, PID, DOC),
+                () -> svc.entityDetail(UID, PID, 22L),
+                () -> svc.refreshEntity(UID, PID, 22L),
+                () -> svc.startParse(UID, PID, DOC))) {
+            assertEquals(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE,
+                    assertThrows(IllegalArgumentException.class, action::run).getMessage());
+        }
+        verify(entityRepo, never()).findById(anyLong());
+        verify(docText, never()).extractText(any());
+    }
+
 }

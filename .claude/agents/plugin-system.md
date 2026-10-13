@@ -403,3 +403,11 @@ CSS 在弹窗期间把 `.pane-content` 里的 `iframe`/`webview` 置 `visibility
 用户截图对应旧内置TencentMeetingPanel，并非动态market插件。认证POST `/api/tmeet/auth/login-start`，状态字段为loggedIn/userName/cliAvailable；不存在`/auth/login`，错误请求会落到NoResourceFoundException。退出data=false不表示断开。同步POST `/sync` 的projectId/force在query（Controller @RequestParam）；两个AI材料端点minutes-prompt/todos-prompt为POST，取data.prompt字符串。失败不能伪造提示词或成功状态。
 
 面板统一消费awd语义token，搜索宽度100%/控件高度32px、触控至少48px，未知连接组件状态不启用连接。连接组件缺失、配置/列表读取失败有本地可操作说明；公共开关/选择器具可访问名称。验证见frontend/tests/tmeet/tmeet-panel-contract.test.mjs。QA隔离后端实读status/config/list通过；QA未装CLI，未声称完成供应商OAuth与真实同步。
+
+### 项目沟通（dev-board#1250，源码 SDK 1.5.0 / 宿主 0.61.0+）
+
+独立纯 Web 插件在 `official-plugins/project-im/`，构建脚本仅从规范 SDK 复制进 zip，不内置到宿主、不自动上架。固定 `im` 权限和桥入口由 `PluginImController` 验证，`service/im/ImService` 持久化会话/成员/消息/附件；本地通过 `ImGatewayService` 官方账户连接转云端，无密钥下发。`ImProjectFiles` 负责主动归档、附件导入和项目文件快照引用，Git只接收显式写入的普通项目文件及标识 JSON，聊天不自动进Git。
+
+文件权限由 `ProjectFileAccessService` 统一：内部成员默认可读，客户（项目或全局CLIENT）仅自己上传/明确开放文件可读。FileTree单文件“客户访问权限”调用 `/files/{id}/access`。IM快照独立 `fileAccess`；客户无权时返回固定待准备提示并剔除附件元数据。详细契约在 `docs/PLUGIN_SPEC.md §16`。客户不可调用拥有整个项目读能力的律师AI/跨文档分析工具。
+
+回归：`mvn test -Dtest='Im*Test,ProjectFileAccess*Test'`；`node --test official-plugins/project-im/tests/*.mjs frontend/tests/plugin-sdk/im-*.test.mjs frontend/tests/project-home/file-tree-client-access.test.mjs`；`official-plugins/project-im/build.sh`。sandbox 无 allow-modals，应使用插件内 HTML dialog；close() 必须在移除 open 属性前执行。进入 iframe 的父窗口 blur 不代表整个文档失焦，不应清除准备的拖拽票据。

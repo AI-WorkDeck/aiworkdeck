@@ -44,6 +44,8 @@ class FileControllerAuthTest {
     @Mock
     private com.checkba.storage.ProjectStorageResolver storageResolver;
 
+    @Mock private com.checkba.service.ProjectFileAccessService fileAccess;
+
     @InjectMocks
     private FileController controller;
 
@@ -57,7 +59,7 @@ class FileControllerAuthTest {
 
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(7L);
-            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(false);
+            when(fileAccess.canRead(pf, 7L)).thenReturn(false);
 
             ResponseEntity<Resource> resp = controller.downloadFile("5", "sess", null);
             assertEquals(403, resp.getStatusCode().value());
