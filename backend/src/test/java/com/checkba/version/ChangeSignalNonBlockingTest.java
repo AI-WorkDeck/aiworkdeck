@@ -179,6 +179,7 @@ class ChangeSignalNonBlockingTest {
                 var failure = executor.submit(() -> assertThrows(VersionException.class,
                         () -> service.pendingChangesLocked(7L))).get(500, TimeUnit.MILLISECONDS);
                 assertTrue(failure.isUserFacing());
+                assertEquals("VERSION_BUSY", failure.getKind());
                 verifyNoInteractions(repos, sessions);
             } finally {
                 lock.unlock();

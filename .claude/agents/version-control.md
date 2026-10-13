@@ -23,7 +23,7 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
   - `gc()`（:366）：只重打包 + 清理不可达对象，不碰可达历史。
   - `ensureExcludes()`（dev-board#463，私有）：幂等把 `~$*` 写进 `$GIT_DIR/info/exclude`，`init()`（在那笔 `add(".")` 之前）与 `open()` 两处各调一次。见下方「忽略规则只有两处」。
   - `repoSizeBytes()`/`deleteRepository()`（dev-board#438）：前者 walk gitDir 求和（缺失回 0，不读取文件正文、不写索引或对象库），后者删掉整个 gitDir、**绝不碰工作区**（这是「历史永不重写」唯一的例外口子：删的是整座仓库而不是改写其中某段历史）。
-  - `pendingChanges()`（dev-board#1216/#1218）：只读 `git.status` 分类工作区相对 HEAD 的增删改；暂存与工作区交叠时仅对相关路径做 HEAD→工作区 diff，识别暂存后恢复原文。未跟踪文件不读取内容，不允许为状态查询执行 `git add`；MERGING/MERGING_RESOLVED 仍只返回待裁决路径。`pendingChangesLocked()` 仓库忙时立即返回可见提示，不能阻塞 HTTP 请求与数据库连接；待恢复的远端 ingest 仅派发去重后台任务，不在查询线程物化工作区，原工作段收尾重试仍保留。
+  - `pendingChanges()`（dev-board#1216/#1218）：只读 `git.status` 分类工作区相对 HEAD 的增删改；暂存与工作区交叠时仅对相关路径做 HEAD→工作区 diff，识别暂存后恢复原文。未跟踪文件不读取内容，不允许为状态查询执行 `git add`；MERGING/MERGING_RESOLVED 仍只返回待裁决路径。`pendingChangesLocked()` 仓库忙时立即返回 `kind=VERSION_BUSY`，不能阻塞 HTTP 请求与数据库连接；`VersionPanel` 仅对此类状态读取失败按 500ms 间隔最多尝试 10 次，代次变化/卸载停止后续重试，真实错误或耗尽仍显示错误。首次挂载先完成状态读取再探测案件库，避免自身 `/check` 的远端 fetch 抢占仓库锁；待恢复的远端 ingest 仅派发去重后台任务，不在查询线程物化工作区，原工作段收尾重试仍保留。
 - `WorkSessionService.java` —— 工作段/稿生命周期业务逻辑，唯一认识「工作段」「稿」业务语义的类。
   - `onChangeSignal()`：外部改动信号入口，事务内调用只注册 afterCommit，回调只入后台队列，不沿用事务连接读写数据库；非事务入口 tryLock，仓库忙时按项目合并信号异步重试，绝不让保存请求持连接等待仓库锁。分支判定、开段、署名与定时器同锁，结束/丢弃/切线时 cancelPending 也清理未处理信号，避免迟到信号重开工作段。非稿分支才隐式开工作段 + 武装空闲定时器；防抖（默认 2 分钟，`setDebounceMillis` 测试用）调度自动存档两种分支都照排。`onDraftBranch()`（:131）/`awaitingAdoptResolution()`（:149）两道守卫，查询失败一律按「否」处理（版本记录是保险，不能自己查询失败反而阻断主流程）。
   - `ensureSession()`（:298）：没有 ACTIVE 工作段则建分支 `work/{currentTimeMillis}` 并切过去，同时武装空闲定时器（唯一真正建段的入口）。
