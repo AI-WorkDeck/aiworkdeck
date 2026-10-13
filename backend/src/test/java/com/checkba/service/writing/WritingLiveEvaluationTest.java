@@ -201,12 +201,16 @@ class WritingLiveEvaluationTest {
                             return mock(okhttp3.Call.class);
                         }
                         phaseOrigins.put(phase,"provider");
-                        return (phase.equals("generation")?generationWire:wire).generateCancellable(invocation.getArgument(0),invocation.getArgument(1),new StreamingResponseHandler<AiMessage>() {
+                        try { return (phase.equals("generation")?generationWire:wire).generateCancellable(invocation.getArgument(0),invocation.getArgument(1),new StreamingResponseHandler<AiMessage>() {
                             // onNext observes visible content only, not network first byte, reasoning or keepalive events.
                             public void onNext(String token){if(token!=null && !token.isEmpty()) timing.putIfAbsent("firstContentTokenMs",elapsed.getAsLong());original.onNext(token);}
                             public void onComplete(Response<AiMessage> response){timing.putIfAbsent("completedMs",elapsed.getAsLong());if(response!=null && response.tokenUsage()!=null && response.tokenUsage().outputTokenCount()!=null) phaseOutputTokens.put(phase,response.tokenUsage().outputTokenCount());String text=response==null||response.content()==null?"":response.content().text();raw.set(text);responses.add(text);phaseResponses.put(phase,text);original.onComplete(response);}
                             public void onError(Throwable error){timing.putIfAbsent("errorMs",elapsed.getAsLong());if(error instanceof OpenRouterStreamingChatModel.EmptyResponseException empty && empty.tokenUsage()!=null && empty.tokenUsage().outputTokenCount()!=null) phaseOutputTokens.put(phase,empty.tokenUsage().outputTokenCount());transportError.set(error.getClass().getSimpleName());phaseErrors.put(phase,error.getClass().getSimpleName());original.onError(error);}
-                        });
+                        }); } catch(RuntimeException error) {
+                            timing.putIfAbsent("errorMs",elapsed.getAsLong());
+                            transportError.set(error.getClass().getSimpleName()); phaseErrors.put(phase,error.getClass().getSimpleName());
+                            throw error;
+                        }
                     });
                     when(models.getWritingModel(any())).thenReturn(observed); when(models.getAutomaticWritingModel(any(),anyBoolean())).thenReturn(observed);
                     Context context=new Context(c.profile.id(),c.profile.label(),"正文",c.before,c.after,"","");

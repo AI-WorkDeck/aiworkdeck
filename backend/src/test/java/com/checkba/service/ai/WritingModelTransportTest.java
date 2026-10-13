@@ -77,9 +77,16 @@ class WritingModelTransportTest {
         assertEquals(baseline, body.get());
         assertTrue(new ObjectMapper().readTree(body.get()).path("tools").isArray());
     }
+    @Test void structuredReviewBudgetReachesTheRealHttpTransport() throws Exception {
+        serve(); Collector c=new Collector();
+        model("deepseek/deepseek-v4-flash",Duration.ofSeconds(3)).generateCancellable(
+                List.of(UserMessage.from("synthetic structured review")),8192,c);
+        c.await(); assertNull(c.error.get()); assertEquals(1,requests.get());
+        assertEquals(8192,new ObjectMapper().readTree(body.get()).path("max_tokens").asInt());
+    }
     @Test void invalidCapIsRejectedBeforeAnyHttp() {
         serve(); var m = model("openai/gpt-4o", Duration.ofSeconds(3));
-        for (int cap : new int[]{-1, 0, 255, 4097}) assertThrows(IllegalArgumentException.class,
+        for (int cap : new int[]{-1, 0, 255, 8193}) assertThrows(IllegalArgumentException.class,
                 () -> m.generateCancellable(List.of(UserMessage.from("synthetic")), cap, new Collector()));
         assertEquals(0, requests.get());
     }

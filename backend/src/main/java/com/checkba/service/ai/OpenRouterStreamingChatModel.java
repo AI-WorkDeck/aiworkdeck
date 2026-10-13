@@ -204,8 +204,8 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
 
     public Call generateCancellable(List<ChatMessage> messages, int maxOutputTokens,
                                     StreamingResponseHandler<AiMessage> handler) {
-        if (maxOutputTokens < 256 || maxOutputTokens > 4096) {
-            throw new IllegalArgumentException("Writing output limit must be between 256 and 4096 tokens");
+        if (maxOutputTokens < 256 || maxOutputTokens > 8192) {
+            throw new IllegalArgumentException("Writing output limit must be between 256 and 8192 tokens");
         }
         return send(messages, null, maxOutputTokens, handler).firstCall;
     }
