@@ -36,7 +36,7 @@ class WritingLiveEvaluationTest {
         String key=System.getenv("OPENROUTER_API_KEY"), model=System.getenv("WRITING_EVAL_MODEL");
         String reasoningEffort=System.getenv("WRITING_EVAL_REASONING_EFFORT");
         List<String> reviewModels=reviewSettings("WRITING_EVAL_REVIEW_MODELS","moonshotai/kimi-k3,qwen/qwen3.8-max");
-        List<String> reviewEfforts=reviewSettings("WRITING_EVAL_REVIEW_EFFORTS","low,low");
+        List<String> reviewEfforts=reviewSettings("WRITING_EVAL_REVIEW_EFFORTS","high,low");
         String generationReasoningEffort=System.getenv("WRITING_EVAL_GENERATION_REASONING_EFFORT");
         String providerSort=System.getenv().getOrDefault("WRITING_EVAL_PROVIDER_SORT","");
         assertTrue(Set.of("","latency","throughput","price").contains(providerSort),"Unknown provider sort");

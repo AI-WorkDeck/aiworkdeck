@@ -166,12 +166,12 @@ class ChatModelFactoryTest {
         for (int reviewer = 0; reviewer < 2; reviewer++) {
             var model = factory.getAutomaticWritingReviewModel(timeout, reviewer);
             assertEquals(reviewer == 0 ? AllowedModels.KIMI_K3.getModelId() : AllowedModels.QWEN_3_8_MAX.getModelId(), model.modelName());
-            assertEquals("low", model.reasoningEffort());
+            assertEquals(reviewer == 0 ? "high" : "low", model.reasoningEffort());
             assertNotSame(model, factory.getAutomaticWritingReviewModel(timeout, reviewer));
         }
         assertEquals("high", factory.getAutomaticWritingModel(timeout).reasoningEffort());
         reasoning.setModels(java.util.List.of());
-        assertEquals("low", factory.getAutomaticWritingReviewModel(timeout, 0).reasoningEffort());
+        assertEquals("high", factory.getAutomaticWritingReviewModel(timeout, 0).reasoningEffort());
         assertEquals("low", factory.getAutomaticWritingReviewModel(timeout, 1).reasoningEffort());
         for (int invalid : new int[]{-1, 2, Integer.MAX_VALUE})
             assertThrows(IllegalArgumentException.class, () -> factory.getAutomaticWritingReviewModel(timeout, invalid));
