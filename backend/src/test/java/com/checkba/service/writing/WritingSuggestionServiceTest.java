@@ -56,6 +56,12 @@ class WritingSuggestionServiceTest {
         else if(input.has("candidate") && !input.has("facts")) proofHandler.set(h);
         else handler.set(h);
     }
+    boolean grammarInput(List<ChatMessage> messages) {
+        try {
+            var input=json.readTree(((UserMessage)messages.get(1)).singleText());
+            return input.has("candidate") && !input.has("facts") && !input.has("scopedFacts");
+        } catch(Exception e) { throw new AssertionError(e); }
+    }
     void complete(String raw) { (raw.contains("\"correctedText\"") || raw.contains("\"error\"") ? proofHandler : handler).get().onComplete(Response.from(AiMessage.from(raw),new TokenUsage(20,10))); }
     @Test void localCompletionNeverRequestsModelOrRecordsTokens() {
         View v=start("local"); assertEquals("READY",v.status()); assertEquals("青原",v.advice().get(0).text());
@@ -281,10 +287,11 @@ class WritingSuggestionServiceTest {
     }
     String approvedReview(Snapshot s,String candidate,String reason) throws Exception {
         return json.writeValueAsString(Map.of("approve",true,"counterexamplePossible",false,"counterexample","","reason",reason,
-                "reviewedText",s.context().before()+candidate+s.context().after()));
+                "reviewedText",s.context().before()+candidate+s.context().after(),
+                "supportedText",s.context().before()+candidate+s.context().after()));
     }
     String approvedValue(Snapshot s,String candidate) throws Exception {
-        return json.writeValueAsString(Map.of("approve",true,"reason","提炼尚未明说的跨事实关系",
+        return json.writeValueAsString(Map.of("approve",true,"reason","有依据地自然补完当前句，不要求新观点",
                 "reviewedText",s.context().before()+candidate+s.context().after()));
     }
     void completeValue(Snapshot s,String candidate) throws Exception {
@@ -307,12 +314,12 @@ class WritingSuggestionServiceTest {
         verify(model).generateCancellable(anyList(),eq(4096),any());
         complete(automaticResult(report,"便于委员按事项查阅和办理。"));
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
-        verify(model,times(3)).generateCancellable(anyList(),eq(4096),any());
+        verify(model,times(4)).generateCancellable(anyList(),eq(4096),any());
         completeApprovedThenProofread(report,"便于委员按事项查阅和办理。","承接材料按事项办理的既有用途，没有增加事实或责任");
         View done=service.get(1L,10L,running.id()); assertEquals("READY",done.status()); assertEquals(1,done.advice().size());
         assertEquals("便于委员按事项查阅和办理。",service.accept(1L,10L,running.id(),new Accept(0,"r1")).text());
         verify(usage,times(4)).recordUsage(eq(10L),eq(1L),eq("synthetic-model"),any(),isNull());
-        verify(model).generateCancellable(anyList(),eq(2048),any());
+        verify(model).generateCancellable(argThat(this::grammarInput),eq(4096),any());
         assertEquals(80,done.inputTokens()); assertEquals(40,done.outputTokens()); assertEquals("reported",done.usageStatus());
     }
     @Test void automaticAbstentionAndMissingQualityFieldsAreEmptyWithoutLocalFallback() throws Exception {
@@ -376,16 +383,59 @@ class WritingSuggestionServiceTest {
     }
 
 
-    @Test void automaticRejectsSourceSentenceCopiesEvenAwayFromTheCurrentPrefix() throws Exception {
-        snapshot=snapshot(new AutomaticWritingProfile(),"成员信息来源不一，项目组需要逐一核对。","从目前的信息管理情况来看，","");
-        Fact fact=snapshot.facts().get(0);
-        String copied="项目组需要逐一核对。";
-        assertFalse(snapshot.context().before().contains(copied));
-        assertTrue(valid(snapshot,new Advice(copied,"sentence",List.of(fact.id()),List.of(fact.sourceId()),"来源记载"),100),
-                "原文引用本身有效，但不能仅因此成为有价值的自动建议");
-        for(String text:List.of(copied,"项目组需要，逐一核对！","项目组需要 逐一核对。"))
-            assertTrue(service.parse(snapshot,automaticResult(snapshot,text),"autocomplete").isEmpty(),text);
-        assertEquals(1,service.parse(snapshot,result(copied,"sentence",fact),"sentence").size(),"手动有据续写的既有行为保留");
+    @Test void automaticCanNaturallyCompleteTheSentenceWithExistingSourceWording() throws Exception {
+        snapshot=snapshot(new AutomaticWritingProfile(),"申报材料包括申请表和说明文件。","依照现有材料清单，本次需要提交的文件包括", "");
+        String candidate="申请表和说明文件。";
+        assertTrue(snapshot.sources().get(0).text().contains(candidate));
+        assertEquals(1,service.parse(snapshot,automaticResult(snapshot,candidate),"autocomplete").size(),
+                "材料已写明不等于光标处没有补全价值；保留事实及自然度审读");
+        View running=start("autocomplete"); complete(automaticResult(snapshot,candidate));
+        assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
+        completeApprovedThenProofread(snapshot,candidate,"既有清单直接支持当前句的宾语");
+        assertEquals("READY",service.get(1L,10L,running.id()).status());
+    }
+    @Test void nonAdjacentFollowingPhraseCanBeTheNaturalCompletion() throws Exception {
+        Snapshot base=snapshot(new AutomaticWritingProfile(),"甲类申请的处理结果为待补充材料。乙类申请的处理结果也为待补充材料。",
+                "当前甲类申请的处理结果为", "");
+        Context c=new Context("general",base.context().title(),base.context().section(),base.context().before(),
+                "，乙类申请的处理结果也为待补充材料。","","");
+        snapshot=new Snapshot(base.projectId(),base.userId(),base.request(),base.settings(),c,base.profile(),base.sources(),base.facts(),List.of());
+        String candidate="待补充材料";
+        assertEquals(1,service.parse(snapshot,automaticResult(snapshot,candidate),"autocomplete").size());
+        View running=start("autocomplete"); complete(automaticResult(snapshot,candidate));
+        completeApprovedThenProofread(snapshot,candidate,"两类分别陈述同一结果，非相邻重复有必要");
+        assertEquals("READY",service.get(1L,10L,running.id()).status());
+    }
+    @Test void completeReviewsAcceptLegalLongContextWithoutResponseLengthCollision() throws Exception {
+        Snapshot base=reportSnapshot();
+        String before="这是已经存在的背景文字。".repeat(155)+base.context().before();
+        String after="\n"+"这是另一段既有背景文字。".repeat(155);
+        assertTrue(before.length()<=2000 && after.length()<=2000);
+        Context c=new Context("general",base.context().title(),base.context().section(),before,after,"","");
+        snapshot=new Snapshot(base.projectId(),base.userId(),base.request(),base.settings(),c,base.profile(),base.sources(),base.facts(),List.of());
+        String candidate="便于委员按事项查阅和办理。";
+        assertTrue(approvedReview(snapshot,candidate,"当前候选有直接依据").length()>4096);
+        View running=start("autocomplete"); complete(automaticResult(snapshot,candidate));
+        completeApprovedThenProofread(snapshot,candidate,"当前候选有直接依据");
+        assertEquals("READY",service.get(1L,10L,running.id()).status());
+    }
+    @Test void factEditorsCorrectionsOrMissingEditedTextNeverReachTheDocument() throws Exception {
+        for(int variant=0;variant<4;variant++) {
+            snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
+            var s=new WritingSuggestionService(contexts,models,usage,json);
+            try {
+                View running=s.start(1L,10L,new Input("autocomplete",snapshot.request()));
+                complete(automaticResult(snapshot,candidate));
+                var review=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(approvedReview(snapshot,candidate,"核对依据"));
+                if(variant==0) review.put("supportedText",snapshot.context().before()+"可查阅材料。");
+                if(variant==1) review.remove("supportedText");
+                if(variant==2) review.put("supportedText",true);
+                if(variant==3) review.put("supportedText","");
+                complete(json.writeValueAsString(review));
+                assertEquals("EMPTY",s.get(1L,10L,running.id()).status());
+                assertTrue(s.get(1L,10L,running.id()).advice().isEmpty(),"修正版不能绕过生成或自动插入");
+            } finally { s.close(); }
+        }
     }
     @Test void approvalCannotOverrideCounterexampleOrMissingCounterexampleVerdict() throws Exception {
         for(int variant=0;variant<4;variant++) {
@@ -445,18 +495,16 @@ class WritingSuggestionServiceTest {
 
     @Test void independentReviewRejectsChangedModalityWithoutRetry() throws Exception {
         snapshot=snapshot(new AutomaticWritingProfile(),"线上可以提交资料，现场办理可以当面核对材料。","就两种业务办理方式的区别而言，","");
-        AtomicReference<String> reviewPrompt=new AtomicReference<>(),reviewInput=new AtomicReference<>();
+        AtomicReference<String> reviewInput=new AtomicReference<>();
         doAnswer(i -> {
             List<ChatMessage> messages=i.getArgument(0); captureHandler(i.getArgument(0),i.getArgument(2));
             if(json.readTree(((UserMessage)messages.get(1)).singleText()).has("candidate") && json.readTree(((UserMessage)messages.get(1)).singleText()).has("facts")) {
-                reviewPrompt.set(((SystemMessage)messages.get(0)).text());
                 reviewInput.set(((UserMessage)messages.get(1)).singleText());
             }
             return call;
         }).when(model).generateCancellable(anyList(),anyInt(),any());
         View running=start("autocomplete"); complete(automaticResult(snapshot,"后者需要当面核对材料。"));
         assertEquals("RUNNING",service.get(1L,10L,running.id()).status());
-        assertTrue(reviewPrompt.get().contains("模态强度")); assertTrue(reviewPrompt.get().contains("工作量增加"));
         var input=json.readTree(reviewInput.get());
         assertEquals(snapshot.context().before(),input.path("before").asText());
         assertEquals("后者需要当面核对材料。",input.path("candidate").asText());
@@ -547,7 +595,7 @@ class WritingSuggestionServiceTest {
         doAnswer(i -> {
             StreamingResponseHandler<AiMessage> h=i.getArgument(2);
             List<ChatMessage> messages=i.getArgument(0);
-            if((int)i.getArgument(1)==2048) { proofHandler.set(h); return call; }
+            if(grammarInput(i.getArgument(0))) { proofHandler.set(h); return call; }
             if(!json.readTree(((UserMessage)messages.get(1)).singleText()).has("candidate")) {
                 h.onComplete(Response.from(AiMessage.from(automaticResult(snapshot,"便于委员按事项查阅和办理。")),new TokenUsage(20,10)));
                 return generationCall;
@@ -604,7 +652,7 @@ class WritingSuggestionServiceTest {
         AtomicReference<List<ChatMessage>> proofMessages=new AtomicReference<>();
         doAnswer(i -> {
             captureHandler(i.getArgument(0),i.getArgument(2));
-            if((int)i.getArgument(1)==2048) proofMessages.set(i.getArgument(0));
+            if(grammarInput(i.getArgument(0))) proofMessages.set(i.getArgument(0));
             return call;
         }).when(model).generateCancellable(anyList(),anyInt(),any());
         View running=start("autocomplete"); complete(automaticResult(snapshot,candidate));
@@ -651,7 +699,7 @@ class WritingSuggestionServiceTest {
                 assertTrue(s.get(1L,10L,running.id()).advice().isEmpty());
             } finally { s.close(); }
         }
-        verify(model,times(6)).generateCancellable(anyList(),eq(2048),any());
+        verify(model,times(6)).generateCancellable(argThat(this::grammarInput),eq(4096),any());
     }
     @Test void synchronousEarlierStagesCannotOverwriteProofreadingCallAndLateResultCannotReviveCancelledJob() throws Exception {
         snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
@@ -787,7 +835,7 @@ class WritingSuggestionServiceTest {
         snapshot=reportSnapshot(); String candidate="便于委员按事项查阅和办理。";
         Call grammarCall=mock(Call.class);
         doAnswer(i -> {
-            if((int)i.getArgument(1)==2048) {
+            if(grammarInput(i.getArgument(0))) {
                 proofHandler.set(i.getArgument(2));
                 handler.get().onComplete(Response.from(AiMessage.from("{\"approve\":false}"),new TokenUsage(8,4)));
                 return grammarCall;
@@ -834,7 +882,7 @@ class WritingSuggestionServiceTest {
         complete(automaticResult(snapshot,candidate));
         assertEquals("EMPTY",service.get(1L,10L,running.id()).status()); verify(call).cancel();
         verify(model,times(2)).generateCancellable(anyList(),anyInt(),any());
-        verify(model,never()).generateCancellable(anyList(),eq(2048),any());
+        verify(model,never()).generateCancellable(argThat(this::grammarInput),anyInt(),any());
         assertEquals(12,times.size());
     }
     @Test void thirdParallelReviewCannotExceedModelCallAllowance() throws Exception {
