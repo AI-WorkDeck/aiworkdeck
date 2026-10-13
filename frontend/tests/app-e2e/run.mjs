@@ -2842,10 +2842,14 @@ try {
     // 文件字节一并复原。
     await step('J11-引导：手头有活 + 案件库领先时点「交稿」，先摆一张三步清单', async () => {
       await restOverwrite('qa-J11协作文件.txt', 'QA J11 交稿引导：改了但没结束工作\n')
-      const before = await api('/api/projects/' + QA.projectId + '/version/status')
-      if (!(before && before.data && before.data.working)) {
+      let before
+      const working = await pollUntil(async () => {
+        before = await api('/api/projects/' + QA.projectId + '/version/status')
+        return before?.code === 0 && before.data?.enabled === true && before.data?.working === true
+      }, 15000, 200)
+      if (!working) {
         throw new Error('裸 REST 改文件之后 A 没有进入「工作中」，引导的前提不成立: '
-          + JSON.stringify(before && before.data).slice(0, 300))
+          + JSON.stringify(before).slice(0, 300))
       }
 
       await clickHistoryBtn('交稿')
