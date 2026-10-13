@@ -309,6 +309,53 @@ export default {
         }
       }
       switch (method) {
+        case 'im.downloadAttachment': {
+          if (!this.hasPermission('im')) return this.denied('im')
+          const conversationId = typeof params.conversationId === 'string' ? params.conversationId.trim() : ''
+          const attachmentId = typeof params.attachmentId === 'string' ? params.attachmentId.trim() : ''
+          if (!conversationId || !attachmentId || conversationId.length > 128 || attachmentId.length > 128) {
+            return { ok: false, error: { code: 'invalid_params', message: '缺少有效的会话或附件标识' } }
+          }
+          const generation = this.sessionGeneration
+          const projectId = this.projectId
+          const current = () => generation === this.sessionGeneration && String(projectId) === String(this.projectId)
+          try {
+            const res = await requestPluginIm(this.pluginId, projectId, 'download', { conversationId, attachmentId })
+            if (!current()) return this.staleContext()
+            if (!res || res.code !== 0) return { ok: false, error: { code: 'invoke_failed', message: res?.message || '文件下载失败' } }
+            const data = res.data
+            const maxBytes = 8 * 1024 * 1024
+            if (!data || String(data.id) !== attachmentId || typeof data.base64 !== 'string'
+                || data.base64.length > Math.ceil(maxBytes / 3) * 4
+                || data.base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data.base64)) {
+              throw new Error('附件数据无效或超过 8 MB，未开始下载。')
+            }
+            const raw = window.atob(data.base64)
+            if (raw.length > maxBytes) throw new Error('附件超过 8 MB，未开始下载。')
+            const bytes = new Uint8Array(raw.length)
+            for (let index = 0; index < raw.length; index++) bytes[index] = raw.charCodeAt(index)
+            let name = String(data.name || 'attachment.bin').replace(/[\\/:*?"<>|\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '_').replace(/^[. ]+|[. ]+$/g, '').trim().slice(0, 200)
+            if (!name || name === '.') name = 'attachment.bin'
+            if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) name = '_' + name
+            if (!current()) return this.staleContext()
+            // Same Blob download path as editor Save Copy As; Electron owns the save dialog.
+            const url = window.URL.createObjectURL(new window.Blob([bytes], { type: 'application/octet-stream' }))
+            const link = window.document.createElement('a')
+            try {
+              link.href = url
+              link.download = name
+              window.document.body.appendChild(link)
+              link.click()
+            } finally {
+              link.remove()
+              setTimeout(() => window.URL.revokeObjectURL(url), 60000)
+            }
+            return { ok: true, result: { started: true, name } }
+          } catch (e) {
+            return { ok: false, error: { code: 'invoke_failed', message: e?.message || '文件下载失败，请重试' } }
+          }
+        }
+
         case 'im.request': {
           if (!this.hasPermission('im')) return this.denied('im')
           const action = typeof params.action === 'string' ? params.action.trim() : ''

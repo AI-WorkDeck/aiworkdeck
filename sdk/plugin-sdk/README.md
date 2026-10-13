@@ -69,3 +69,5 @@ iframe 里，是 opaque origin，拿不到宿主的真实 origin。来源校验�
 - `account.changed`：无正文的账户变更事件；清除缓存、草稿和在途结果后重新读取身份。
 
 旧宿主返回 `unknown_method`，应提示升级；不得用插件本机 KV 冒充跨用户聊天存储。
+
+`awd.call('im.downloadAttachment', {conversationId, attachmentId})` 直接下载服务端已授权附件，仅需 `im`，不写入项目。成功返回 `{started:true,name}` 表示已发起下载；用户可以取消另存为。
