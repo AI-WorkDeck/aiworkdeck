@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicLong;
 import dev.langchain4j.data.message.*;
 import dev.langchain4j.model.StreamingResponseHandler;
 import dev.langchain4j.model.output.Response;
@@ -66,6 +67,12 @@ class WritingLiveEvaluationTest {
             // Keep the earlier contrast case and historical expectations unchanged; these are new regression cases.
             new Case("auto-review-joined-cause-unsupported",general,"工作进展\n线上会议支持远程成员参与，线下会议便于面对面讨论。两种会议方式均在使用。", "线上会议支持远程成员参与，线下会议便于面对面讨论。因此，两种会议方式", "autocomplete",false,""),
             new Case("auto-review-joined-cause-supported",general,"工作进展\n线上会议支持远程成员参与，线下会议便于面对面讨论。为发挥上述两种便利，实际采用了这两种会议方式，目前均在使用。", "线上会议支持远程成员参与，线下会议便于面对面讨论。因此，两种会议方式", "autocomplete",true,""),
+            // Scope pairs keep the same insertion and vary only whether the source supports the narrower constraint.
+            new Case("auto-review-personal-attendance-supported",general,"工作方式说明\n线上办理支持异地提交材料，无须到场。\n现场办理须由申请人本人携带原件到场核对。", "线上办理无须到场，现场办理须携带原件到场核对。两种方式的区别在于", "autocomplete",true,""),
+            new Case("auto-review-training-location-unsupported",general,"培训安排\n线上学员可通过会议链接参加。\n选择线下方式的学员须到指定培训场地参加培训。", "根据培训安排，选择线下方式的学员须", "autocomplete",false,""),
+            new Case("auto-review-training-location-supported",general,"培训安排\n线上学员可通过会议链接参加。\n选择线下方式的学员须到总部会议室参加培训。", "根据培训安排，选择线下方式的学员须", "autocomplete",true,""),
+            new Case("auto-review-repair-condition-unsupported",general,"送修说明\n维修站受理设备送修，接收后登记故障情况。", "根据维修站的受理说明，提交设备送修时，", "autocomplete",false,""),
+            new Case("auto-review-repair-condition-supported",general,"送修说明\n提交设备送修时，须同时提供购买发票，维修站接收后登记故障情况。", "根据维修站的受理说明，提交设备送修时，", "autocomplete",true,""),
             new Case("lit-role",lit,loan,"原告：","sentence",true,"顾青原"),
             new Case("lit-attributed",lit,loan,"原告主张：","paragraph",true,"法院认定"),
             new Case("lit-unsupported",lit,loan,"法院认定：","sentence",false,""),
@@ -86,17 +93,22 @@ class WritingLiveEvaluationTest {
             new Case("diligence-no-source",diligence,"法律意见书","本项目交易金额为","sentence",false,"")
         );
         // Frozen correct and incorrect generation outputs exercise the real reviewer, separately from end-to-end cases.
-        Map<String,String> developmentFixtures=Map.of(
-                "auto-review-unsupported-cause","增加了人工核对的工作量。",
-                "auto-review-management-overreach","不同的信息采集渠道与管理方式。",
-                "auto-review-narrowed-facility","线上受理与线下窗口办理。",
-                "auto-review-broken-insertion","均支持线上与线下两种办理方式。",
-                "auto-review-supported-increase","核对次数有所增加。",
-                "auto-review-unsupported-efficiency","登记信息分散，核对效率较低。",
-                "auto-review-repeated-conclusion","可以并存，发挥各自优势",
-                "auto-review-personal-attendance","是否需要本人到场以及是否携带原件核对",
-                "auto-review-joined-cause-unsupported","均在使用",
-                "auto-review-joined-cause-supported","均在使用");
+        Map<String,String> developmentFixtures=Map.ofEntries(
+                Map.entry("auto-review-unsupported-cause","增加了人工核对的工作量。"),
+                Map.entry("auto-review-management-overreach","不同的信息采集渠道与管理方式。"),
+                Map.entry("auto-review-narrowed-facility","线上受理与线下窗口办理。"),
+                Map.entry("auto-review-broken-insertion","均支持线上与线下两种办理方式。"),
+                Map.entry("auto-review-supported-increase","核对次数有所增加。"),
+                Map.entry("auto-review-unsupported-efficiency","登记信息分散，核对效率较低。"),
+                Map.entry("auto-review-repeated-conclusion","可以并存，发挥各自优势"),
+                Map.entry("auto-review-personal-attendance","是否需要本人到场以及是否携带原件核对"),
+                Map.entry("auto-review-joined-cause-unsupported","均在使用"),
+                Map.entry("auto-review-joined-cause-supported","均在使用"),
+                Map.entry("auto-review-personal-attendance-supported","是否需要本人到场以及是否携带原件核对"),
+                Map.entry("auto-review-training-location-unsupported","到总部会议室参加培训。"),
+                Map.entry("auto-review-training-location-supported","到总部会议室参加培训。"),
+                Map.entry("auto-review-repair-condition-unsupported","须同时提供购买发票。"),
+                Map.entry("auto-review-repair-condition-supported","须同时提供购买发票。"));
         ObjectMapper json=new ObjectMapper().findAndRegisterModules(); List<Map<String,Object>> report=new ArrayList<>();
         String holdoutPath=System.getenv().getOrDefault("WRITING_EVAL_HOLDOUT","");
         boolean holdout=!holdoutPath.isBlank();
@@ -104,7 +116,7 @@ class WritingLiveEvaluationTest {
         if(holdout) cases=readHoldout(json,Path.of(holdoutPath),general);
         Map<String,String> reviewFixtures=holdout?Map.of():developmentFixtures;
         boolean automatic=holdout || "1".equals(System.getenv("WRITING_EVAL_AUTOMATIC"));
-        String dataset=holdout?"synthetic-holdout-natural-v3-joined-relations":"development-natural-v3-joined-relations";
+        String dataset=holdout?"synthetic-holdout-natural-v4-scope-constraints":"development-natural-v4-scope-constraints";
         String onlyCase=System.getenv().getOrDefault("WRITING_EVAL_CASE","");
         assertTrue(onlyCase.isEmpty() || cases.stream().anyMatch(c -> c.name.equals(onlyCase)),"Unknown evaluation case");
         // Fixed repetitions expose stochastic over-abstention; never retry only failing cases until green.
@@ -134,6 +146,9 @@ class WritingLiveEvaluationTest {
                     List<String> responses=Collections.synchronizedList(new ArrayList<>());
                     Map<String,String> phaseResponses=new ConcurrentHashMap<>(), phaseErrors=new ConcurrentHashMap<>(), phaseAssembledTexts=new ConcurrentHashMap<>();
                     Map<String,Integer> phaseOutputTokens=new ConcurrentHashMap<>();
+                    AtomicLong evaluationStartedNanos=new AtomicLong();
+                    java.util.function.LongSupplier elapsed=() -> Math.max(1,TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-evaluationStartedNanos.get()));
+                    Map<String,Map<String,Long>> phaseTimings=new ConcurrentHashMap<>();
                     var wire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,reasoningEffort);
                     var generationWire=new OpenRouterStreamingChatModel(key,"https://openrouter.ai/api/v1",model,Duration.ofSeconds(35),16,generationReasoningEffort);
                     var observed=mock(OpenRouterStreamingChatModel.class); when(observed.modelName()).thenReturn(model);
@@ -141,6 +156,7 @@ class WritingLiveEvaluationTest {
                         StreamingResponseHandler<AiMessage> original=invocation.getArgument(2);
                         List<ChatMessage> messages=invocation.getArgument(0);
                         String phase=requestPhase(json,messages);
+                        Map<String,Long> timing=new ConcurrentHashMap<>(); timing.put("requestStartedMs",elapsed.getAsLong()); phaseTimings.put(phase,timing);
                         var phaseInput=json.readTree(((UserMessage)messages.get(1)).singleText());
                         if(!phase.equals("generation") && phaseInput.path("assembledText").isTextual())
                             phaseAssembledTexts.put(phase,phaseInput.path("assembledText").asText());
@@ -152,13 +168,16 @@ class WritingLiveEvaluationTest {
                             String fixture=json.writeValueAsString(Map.of("abstain",false,"usefulness","completes_current_thought","evidence","direct_support",
                                     "suggestions",List.of(Map.of("text",reviewFixtures.get(c.name),"kind","sentence","factIds",fixtureFactIds,
                                             "sourceIds",List.of("active-document"),"explanation","合成固定候选，仅验证真实审读判断"))));
+                            // Fixed-candidate generation is injected locally, not a provider response.
+                            timing.put("completedMs",elapsed.getAsLong());
                             responses.add(fixture); phaseResponses.put(phase,fixture); original.onComplete(Response.from(AiMessage.from(fixture)));
                             return mock(okhttp3.Call.class);
                         }
                         return (phase.equals("generation")?generationWire:wire).generateCancellable(invocation.getArgument(0),invocation.getArgument(1),new StreamingResponseHandler<AiMessage>() {
-                            public void onNext(String token){original.onNext(token);}
-                            public void onComplete(Response<AiMessage> response){if(response!=null && response.tokenUsage()!=null && response.tokenUsage().outputTokenCount()!=null) phaseOutputTokens.put(phase,response.tokenUsage().outputTokenCount());String text=response==null||response.content()==null?"":response.content().text();raw.set(text);responses.add(text);phaseResponses.put(phase,text);original.onComplete(response);}
-                            public void onError(Throwable error){if(error instanceof OpenRouterStreamingChatModel.EmptyResponseException empty && empty.tokenUsage()!=null && empty.tokenUsage().outputTokenCount()!=null) phaseOutputTokens.put(phase,empty.tokenUsage().outputTokenCount());transportError.set(error.getClass().getSimpleName());phaseErrors.put(phase,error.getClass().getSimpleName());original.onError(error);}
+                            // onNext observes visible content only, not network first byte, reasoning or keepalive events.
+                            public void onNext(String token){if(token!=null && !token.isEmpty()) timing.putIfAbsent("firstContentTokenMs",elapsed.getAsLong());original.onNext(token);}
+                            public void onComplete(Response<AiMessage> response){timing.putIfAbsent("completedMs",elapsed.getAsLong());if(response!=null && response.tokenUsage()!=null && response.tokenUsage().outputTokenCount()!=null) phaseOutputTokens.put(phase,response.tokenUsage().outputTokenCount());String text=response==null||response.content()==null?"":response.content().text();raw.set(text);responses.add(text);phaseResponses.put(phase,text);original.onComplete(response);}
+                            public void onError(Throwable error){timing.putIfAbsent("errorMs",elapsed.getAsLong());if(error instanceof OpenRouterStreamingChatModel.EmptyResponseException empty && empty.tokenUsage()!=null && empty.tokenUsage().outputTokenCount()!=null) phaseOutputTokens.put(phase,empty.tokenUsage().outputTokenCount());transportError.set(error.getClass().getSimpleName());phaseErrors.put(phase,error.getClass().getSimpleName());original.onError(error);}
                         });
                     });
                     when(models.getWritingModel(any())).thenReturn(observed); when(models.getAutomaticWritingModel(any(),anyBoolean())).thenReturn(observed);
@@ -168,6 +187,7 @@ class WritingLiveEvaluationTest {
                     Snapshot snapshot=new Snapshot(1L,9L,request,new Settings("","",List.of()),context,c.profile,List.of(source),WritingNarrativeSources.append(c.profile.id(),context,List.of(source),c.profile.facts(context,List.of(source))),List.of());
                     when(contexts.capture(9L,1L,request)).thenReturn(snapshot);
                     try(var service=new ServiceResource(new WritingSuggestionService(contexts,models,usage,json))) {
+                        evaluationStartedNanos.set(System.nanoTime());
                         var view=service.value.start(9L,1L,new WritingSuggestionService.Input(c.mode,request));
                         long deadline=System.nanoTime()+Duration.ofSeconds(35).toNanos();
                         while(view.status().equals("RUNNING") && System.nanoTime()<deadline) {Thread.sleep(100); view=service.value.get(9L,1L,view.id());}
@@ -194,7 +214,11 @@ class WritingLiveEvaluationTest {
                         boolean behaviorPassed=c.mode.equals("autocomplete")
                                 ? view.status().equals("EMPTY") && !nonempty || view.status().equals("READY") && passed : passed;
                         boolean judged=c.mode.equals("autocomplete") && !outcome.equals("incomplete-or-invalid");
-                        Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens));
+                        // Milliseconds since service.start; absent events were not observed by this snapshot.
+                        // Copy nested maps so late cancellation callbacks cannot mutate a previously checkpointed row.
+                        Map<String,Map<String,Long>> timingSnapshot=new TreeMap<>();
+                        phaseTimings.forEach((phase,timing) -> timingSnapshot.put(phase,Map.copyOf(timing)));
+                        Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens)); row.put("phaseTimings",Map.copyOf(timingSnapshot)); row.put("phaseTimingsCapturedMs",elapsed.getAsLong());
                         synchronized(report) {
                             report.add(row); report.sort(reportOrder);
                             Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
@@ -221,7 +245,7 @@ class WritingLiveEvaluationTest {
         }
         assertEquals(futures.size(),report.size(),"Every selected evaluation must produce a report row");
         if (automatic && onlyCase.isEmpty())
-            assertEquals(holdout?cases.size()*3:69,report.size(),"Keep all 21 existing cases plus 2 paired joined-cause cases, or the complete separate holdout, across three fixed repetitions");
+            assertEquals(holdout?cases.size()*3:84,report.size(),"Keep all 23 existing cases plus 5 scope-constraint cases, or the complete separate holdout, across three fixed repetitions");
         Map<String,Object> summary=evaluationSummary(report,coverageRequirements,expectedCases,repetitions);
         assertTrue(report.stream().allMatch(r -> Boolean.TRUE.equals(r.get("behaviorPassed"))),
                 "Any unsafe display or nonterminal result fails every round; inspect actual joined text");
@@ -394,7 +418,7 @@ class WritingLiveEvaluationTest {
             if(!covered) gaps.add(Map.of("case",name,"requirement",requirement,"observed",0,"expected",1));
         }
         Map<String,Object> summary=new LinkedHashMap<>();
-        summary.put("gatePolicy","natural-v3-joined-relations-safe-display-and-per-case-coverage");
+        summary.put("gatePolicy","natural-v4-scope-constraints-safe-display-and-per-case-coverage");
         summary.put("outcomeCounts",outcomes); summary.put("phaseErrorCounts",errors);
         summary.put("strictPassedCount",rows.stream().filter(row -> Boolean.TRUE.equals(row.get("passed"))).count());
         summary.put("judgedCount",rows.stream().filter(row -> Boolean.TRUE.equals(row.get("judged"))).count());
