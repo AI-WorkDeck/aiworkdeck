@@ -4639,6 +4639,9 @@ const EXEC = {
     // 格式标记 / 标尺的真实读回（set_view_options 写的就是这两个 ViewSettings 属性），
     // 工具栏按引擎状态高亮，不再本地记一份猜测（旧实现用 .uno:ControlCodes 切换语义）。
     try { view.formattingMarks = !!ctrl.getViewSettings().getPropertyValue('ShowNonprintingCharacters'); } catch (e) {}
+    for (const [key, property] of Object.entries({ paragraphMarks: 'ShowParaBreaks', lineBreaks: 'ShowBreaks', spaces: 'ShowSpaces', tabs: 'ShowTabstops' })) {
+      try { view[key] = !!ctrl.getViewSettings().getPropertyValue(property); } catch (e) {}
+    }
     try { view.ruler = !!ctrl.getViewSettings().getPropertyValue('ShowHoriRuler'); } catch (e) {}
     try { view.recordChanges = !!xModel.getPropertyValue('RecordChanges'); } catch (e) {}
     // 修订显示三态（dev-board#368）。工具栏的当前态读的就是这里——真实读回引擎，
@@ -4787,12 +4790,18 @@ const EXEC = {
   // 直写 ViewSettings 而不是派发 .uno:ControlCodes / .uno:Ruler：后两者是切换语义，
   // 宿主想设成确定状态就得先读再判，而 load_document 换文档后视图设置会回到引擎
   // 默认值，宿主要能无条件「设成 X」。不改一个字节的内容。
-  // {formattingMarks?, ruler?, textBoundaries?}；都不带 = 只读回。
+  // {formattingMarks?, paragraphMarks?, lineBreaks?, spaces?, tabs?, ruler?, textBoundaries?}；都不带 = 只读回。
   // ruler 同时管横竖两条（ShowRulers 是总闸）；textBoundaries 是辅助线，不是文档边框。
   set_view_options(p) {
     const req = p || {};
     let vs = null;
     try { vs = ctrl.getViewSettings(); } catch (e) { return { success: false, message: 'no view settings: ' + errStr(e) }; }
+    const marks = { paragraphMarks: 'ShowParaBreaks', lineBreaks: 'ShowBreaks', spaces: 'ShowSpaces', tabs: 'ShowTabstops' };
+    for (const [key, property] of Object.entries(marks)) {
+      if (req[key] == null) continue;
+      try { vs.setPropertyValue(property, !!req[key]); }
+      catch (e) { return { success: false, message: property + ': ' + errStr(e) }; }
+    }
     if (req.formattingMarks != null) {
       try { vs.setPropertyValue('ShowNonprintingCharacters', !!req.formattingMarks); } catch (e) {}
     }
@@ -4805,7 +4814,12 @@ const EXEC = {
       }
     }
     const out = { success: true };
+    for (const [key, property] of Object.entries(marks)) {
+      try { out[key] = !!vs.getPropertyValue(property); } catch (e) {}
+      if (req[key] != null && out[key] !== !!req[key]) return { success: false, message: property + ': value not applied' };
+    }
     try { out.formattingMarks = !!vs.getPropertyValue('ShowNonprintingCharacters'); } catch (e) {}
+    if (req.formattingMarks != null && out.formattingMarks !== !!req.formattingMarks) return { success: false, message: 'ShowNonprintingCharacters: value not applied' };
     try { out.textBoundaries = !!vs.getPropertyValue('ShowTextBoundaries'); } catch (e) {}
     try { out.ruler = !!vs.getPropertyValue('ShowHoriRuler'); } catch (e) {}
     try { out.verticalRuler = !!vs.getPropertyValue('ShowVertRuler'); } catch (e) {}

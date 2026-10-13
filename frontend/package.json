@@ -50,6 +50,7 @@
     "test:lowa-comment-batch": "node tests/lowa-e2e/comment-batch.mjs",
     "test:lowa-paragraph-performance": "node tests/lowa-e2e/paragraph-edit-performance.mjs",
     "test:lowa-paste-large": "node tests/lowa-e2e/paste-large.mjs",
+    "test:lowa-special-characters": "node tests/lowa-e2e/special-characters.mjs",
     "test:lowa-view-boundaries": "node tests/lowa-e2e/view-boundaries.mjs",
     "test:lowa-open-revisions": "node tests/lowa-e2e/open-revisions.mjs",
     "test:lowa-review-list-performance": "node tests/lowa-e2e/review-list-performance.mjs",

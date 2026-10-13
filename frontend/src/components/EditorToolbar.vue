@@ -216,8 +216,24 @@
           </view>
         </view>
 
-        <view class="etb-btn" :class="{ on: formattingMarks }" :title="$t('editor.toolbar.formattingMarks')" @tap.stop="toggleMarks">
-          <text class="etb-tx">¶</text>
+        <view class="etb-drop" :class="{ open: menu === 'marks' }">
+          <button ref="trig_marks" class="etb-btn etb-marks-trigger" :class="{ on: formattingMarks }"
+                  :title="$t('editor.toolbar.specialCharacters')" :aria-label="$t('editor.toolbar.specialCharacters')"
+                  aria-haspopup="true" :disabled="!viewPrefsReady" :aria-expanded="menu === 'marks'" @tap.stop="toggleMenu('marks')">
+            <text class="etb-tx">¶</text><text class="etb-caret">⌄</text>
+          </button>
+          <view v-if="menu === 'marks'" class="etb-menu w200 etb-marks-menu" :style="popStyle(210, true)" @tap.stop>
+            <text class="etb-form-t">{{ $t('editor.toolbar.specialCharacters') }}</text>
+            <button class="etb-item" :disabled="viewPrefsBusy" @tap.stop="setAllMarks(true)">{{ $t('editor.toolbar.showAllMarks') }}</button>
+            <button class="etb-item" :disabled="viewPrefsBusy" @tap.stop="setAllMarks(false)">{{ $t('editor.toolbar.hideAllMarks') }}</button>
+            <view class="etb-menu-sep"></view>
+            <button v-for="option in MARK_OPTIONS" :key="option.key" class="etb-item" role="checkbox"
+                    :data-mark="option.key" :aria-checked="markVisible(option.key)" :disabled="viewPrefsBusy"
+                    @tap.stop="setMark(option.key, !markVisible(option.key))">
+              <text>{{ $t('editor.toolbar.' + option.label) }}</text>
+              <text aria-hidden="true">{{ markVisible(option.key) ? '☑' : '☐' }}</text>
+            </button>
+          </view>
         </view>
         <view class="etb-btn" :class="{ on: rulerOn }" :title="$t('editor.toolbar.ruler')" @tap.stop="toggleRuler">
           <svg class="etb-ico" viewBox="0 0 24 24" fill="none"><path v-for="(d,i) in ICONS.ruler" :key="i" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -443,11 +459,19 @@ const REVISION_VIEWS = [
   { k: 'final', t: 'revisionViewFinal' },
 ]
 const SIZES = PT_FONT_SIZES
-// 视图偏好（格式标记 / 标尺）：用户级、跨文档，默认都开（维护者要求：标尺与换行符等
-// 格式标记默认显示，给开关）。引擎换文档后视图设置回到默认值，所以每次 bootstrap /
-// reapplyChrome 都按这份偏好重设一遍。
+// 沿用原总开关偏好；未保存分类时四类均开启，升级不会擅自覆盖旧选择。
+// 引擎换文档后会重置视图，因此 bootstrap / reapplyChrome 都重新应用。
+const MARK_OPTIONS = [
+  { key: 'paragraphMarks', label: 'paragraphMarks' },
+  { key: 'lineBreaks', label: 'lineBreaks' },
+  { key: 'spaces', label: 'spaces' },
+  { key: 'tabs', label: 'tabs' },
+]
+const MARK_DEFAULTS = Object.fromEntries(MARK_OPTIONS.map(o => [o.key, true]))
 const VIEW_PREFS_KEY = 'awd_editor_view_prefs'
-const VIEW_PREFS_DEFAULT = { formattingMarks: true, ruler: true }
+const VIEW_PREFS_HOSTS = new Set()
+let viewPrefsUpdate = Promise.resolve()
+const VIEW_PREFS_DEFAULT = { formattingMarks: true, ruler: true, ...MARK_DEFAULTS }
 function readViewPrefs() {
   try {
     const v = uni.getStorageSync(VIEW_PREFS_KEY)
@@ -455,7 +479,7 @@ function readViewPrefs() {
     return Object.assign({}, VIEW_PREFS_DEFAULT, o)
   } catch (e) { return Object.assign({}, VIEW_PREFS_DEFAULT) }
 }
-function writeViewPrefs(p) { try { uni.setStorageSync(VIEW_PREFS_KEY, JSON.stringify(p)) } catch (e) { /* 存不下就只在本次会话生效 */ } }
+function writeViewPrefs(p) { uni.setStorageSync(VIEW_PREFS_KEY, JSON.stringify(p)) }
 // 插入表格的网格选择器：8 行 × 8 列够覆盖手工建表的绝大多数情形，再大的表
 // 律师是从 Excel 粘过来或让 AI 生成的，不是在这里点出来的。
 const GRID_R = 8, GRID_C = 8
@@ -486,7 +510,7 @@ export default {
       state: EMPTY(), styleList: [], fontList: [], menu: '', popPos: null,
       // 视图偏好（格式标记 / 标尺），见 VIEW_PREFS_KEY。按钮高亮以引擎读回为准（get_ui_state
       // 的 view.formattingMarks / view.ruler），这里只是用户想要的目标值。
-      viewPrefs: readViewPrefs(),
+      viewPrefs: readViewPrefs(), viewPrefsBusy: false, viewPrefsReady: false,
       systemFontsOpen: false,
       // BUG-13：主命令区还能不能往左/右滚，驱动两端渐隐遮罩；由 bindToolbarWheel
       // 里的原生 scroll/resize 监听实时更新，不是一次性算好就不变。
@@ -505,7 +529,7 @@ export default {
   computed: {
     ICONS: () => ICONS, ALIGNS: () => ALIGNS,
     TEXT_COLORS: () => TEXT_COLORS, HL_COLORS: () => HL_COLORS, GRID_CELLS: () => GRID_CELLS,
-    TEXT_FORMS: () => TEXT_FORMS,
+    TEXT_FORMS: () => TEXT_FORMS, MARK_OPTIONS: () => MARK_OPTIONS,
     CN_FONT_SIZES: () => CN_FONT_SIZES, PT_FONT_SIZES: () => PT_FONT_SIZES,
     showCnSizes: () => !isEnglish(),
     systemFontsSupported: () => !!(host.systemFonts && typeof host.systemFonts.list === 'function'),
@@ -603,6 +627,7 @@ export default {
     // 文档（真机插进了分页符）。工作台里所有布局变化都经 triggerWorkbenchResize
     // 派发 window resize，收口挂在这里。
     window.addEventListener('resize', this.closeMenus)
+    VIEW_PREFS_HOSTS.add(this)
   },
 
   beforeUnmount() {
@@ -612,6 +637,7 @@ export default {
     document.removeEventListener('keydown', this.onDocKeydown, true)
     window.removeEventListener('blur', this.closeMenus)
     window.removeEventListener('resize', this.closeMenus)
+    VIEW_PREFS_HOSTS.delete(this)
   },
 
   methods: {
@@ -621,6 +647,7 @@ export default {
       catch (e) { return { success: false, message: (e && e.message) || String(e) } }
     },
     async bootstrap() {
+      this.viewPrefsReady = false
       this.state = EMPTY()
       if (!this.executor) return
       await this.refresh()
@@ -631,6 +658,7 @@ export default {
       // 就只给 Writer 渲染；Calc/Impress 没有替代品，藏了会剩一片空白。
       await this.applyChrome(true)
       await this.applyViewPrefs()
+      this.viewPrefsReady = true
     },
     async refresh() {
       const r = await this.call('get_ui_state', {})
@@ -930,19 +958,56 @@ export default {
     },
     // 按用户偏好把格式标记 / 标尺设成确定态（set_view_options 直写 ViewSettings）。
     // changed=false：纯视图，不能标脏触发自动保存。
-    async applyViewPrefs() {
+    async applyViewPrefs(prefs = this.viewPrefs) {
       const r = await this.call('set_view_options', {
-        formattingMarks: !!this.viewPrefs.formattingMarks, ruler: !!this.viewPrefs.ruler,
+        ...prefs, formattingMarks: !!prefs.formattingMarks, ruler: !!prefs.ruler,
         // Writer 开格式标记时会把文本边界画成整页矩形；只隐藏辅助线，保留 ¶ 和标尺偏好。
         textBoundaries: false,
       })
       if (r && r.success) await this.refresh()
       return r
     },
-    setViewPref(key, value) {
-      this.viewPrefs = Object.assign({}, this.viewPrefs, { [key]: !!value })
-      writeViewPrefs(this.viewPrefs)
-      return this.applyViewPrefs()
+    async updateViewPrefs(patch) {
+      if (this.viewPrefsBusy) return
+      this.viewPrefsBusy = true
+      // 所有文档共享一个偏好：串行完成写入和广播，排队后再读取最新值。
+      const update = viewPrefsUpdate.then(async () => {
+        const previous = readViewPrefs()
+        const next = { ...previous, ...(typeof patch === 'function' ? patch(previous) : patch) }
+        try {
+          const r = await this.applyViewPrefs(next)
+          if (!r || !r.success) throw new Error(this.$t('editor.toolbar.viewPrefsFailed'))
+          writeViewPrefs(next)
+          this.viewPrefs = next
+        } catch (e) {
+          this.viewPrefs = previous
+          await this.applyViewPrefs(previous)
+          uni.showToast({ title: this.$t('editor.toolbar.viewPrefsFailed'), icon: 'none' })
+          return
+        }
+        await Promise.all([...VIEW_PREFS_HOSTS].filter(host => host !== this).map(async host => {
+          host.viewPrefs = { ...next }
+          await host.applyViewPrefs()
+        }))
+      })
+      viewPrefsUpdate = update.catch(() => {})
+      try { await update } finally { this.viewPrefsBusy = false }
+    },
+    setViewPref(key, value) { return this.updateViewPrefs({ [key]: !!value }) },
+    markVisible(key) {
+      if (!this.formattingMarks) return false
+      return this.state.view[key] != null ? !!this.state.view[key] : this.viewPrefs[key] !== false
+    },
+    setMark(key, value) {
+      return this.updateViewPrefs(prefs => {
+        // 总闸关闭时单独勾选一类，只打开这一类。
+        const marks = Object.fromEntries(MARK_OPTIONS.map(o => [o.key, prefs.formattingMarks && prefs[o.key] !== false]))
+        marks[key] = !!value
+        return { ...marks, formattingMarks: Object.values(marks).some(Boolean) }
+      })
+    },
+    setAllMarks(value) {
+      return this.updateViewPrefs({ ...Object.fromEntries(MARK_OPTIONS.map(o => [o.key, !!value])), formattingMarks: !!value })
     },
 
     // ---- 查找替换 ----
@@ -998,7 +1063,6 @@ export default {
       await this.after(res)
     },
     // 格式标记 / 标尺：纯视图开关，按引擎读回的当前态取反，写进用户偏好。
-    toggleMarks() { return this.setViewPref('formattingMarks', !this.formattingMarks) },
     toggleRuler() { return this.setViewPref('ruler', !this.rulerOn) },
 
     // ---- 段落格式面板 ----
@@ -1101,6 +1165,15 @@ export default {
 .etb-btn:hover { background: var(--awd-surface-2); }
 .etb-btn.on { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .etb-btn.off { color: var(--awd-text-3); }
+.etb-marks-trigger { margin: 0; padding: 0 var(--awd-space-1); gap: var(--awd-space-1); border: 0; background: transparent; }
+.etb-marks-trigger::after, .etb-marks-menu button::after { border: 0; }
+.etb-marks-trigger:focus-visible, .etb-marks-menu button:focus-visible { outline: 2px solid var(--awd-accent-text); outline-offset: 1px; }
+.etb-marks-menu { box-sizing: border-box; }
+.etb-marks-menu .etb-form-t { display: block; padding: var(--awd-space-1) var(--awd-space-2); }
+.etb-marks-menu .etb-item { width: 100%; box-sizing: border-box; margin: 0; border: 0; background: transparent;
+  color: var(--awd-text); font-size: var(--awd-font-size-body); line-height: 1.5; text-align: left; cursor: pointer; }
+.etb-marks-menu .etb-item:hover { background: var(--awd-surface-2); }
+.etb-marks-menu button:disabled { color: var(--awd-text-3); cursor: wait; }
 .etb-btn.wide { padding: 0 9px; }
 .etb-ico { width: 16px; height: 16px; display: block; }
 .etb-tx { font-size: 14px; line-height: 1; }
