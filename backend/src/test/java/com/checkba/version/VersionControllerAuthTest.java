@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
@@ -387,6 +388,7 @@ class VersionControllerAuthTest {
 
         assertEquals(1, response.getBody().get("code"));
         assertEquals("版本记录操作失败，请重试", response.getBody().get("message"));
+        assertNull(response.getBody().get("kind"));
     }
 
     @Test
@@ -397,5 +399,14 @@ class VersionControllerAuthTest {
 
         assertEquals(1, response.getBody().get("code"));
         assertEquals("当前没有进行中的工作", response.getBody().get("message"));
+        assertNull(response.getBody().get("kind"));
     }
+    @Test
+    void busyVersionStatusHasMachineReadableRetryKind() {
+        var response = controller.onVersionError(VersionException.busy("正在整理版本，请稍后重试"));
+        assertEquals(1, response.getBody().get("code"));
+        assertEquals("VERSION_BUSY", response.getBody().get("kind"));
+        assertEquals("正在整理版本，请稍后重试", response.getBody().get("message"));
+    }
+
 }

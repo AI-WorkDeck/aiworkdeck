@@ -707,7 +707,7 @@ public class WorkSessionService {
     /** /status 不等待耗时提交，避免查询请求与数据库连接排队耗尽。 */
     public List<FileChange> pendingChangesLocked(long projectId) {
         ReentrantLock lock = repoLock(projectId);
-        if (!lock.tryLock()) throw VersionException.userFacing(LangText.of(
+        if (!lock.tryLock()) throw VersionException.busy(LangText.of(
                 "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
         try {
             schedulePendingIngest(projectId);

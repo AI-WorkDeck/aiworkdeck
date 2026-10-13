@@ -1209,7 +1209,9 @@ public class VersionController {
         log.warn("版本记录操作失败", e);
         telemetryService.record("version.op", Map.of("op", "error", "ok", false));
         String message = e.isUserFacing() ? e.getMessage() : LangText.of("版本记录操作失败，请重试", "Version history operation failed — please try again");
-        return ResponseEntity.ok(Map.of("code", 1, "message", message));
+        Map<String, Object> body = new java.util.LinkedHashMap<>(Map.of("code", 1, "message", message));
+        if (e.getKind() != null) body.put("kind", e.getKind());
+        return ResponseEntity.ok(body);
     }
 
     /** 校验并返回当前用户 id。非成员或 CLIENT 一律拒绝。 */
