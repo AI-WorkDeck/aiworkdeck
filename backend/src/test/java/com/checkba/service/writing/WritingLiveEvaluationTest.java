@@ -23,6 +23,10 @@ import static com.checkba.service.writing.WritingTypes.*;
 /** Explicit paid, fully synthetic evaluation. Never reads customer documents or local application DB. */
 @EnabledIfEnvironmentVariable(named="WRITING_LIVE_EVAL", matches="1")
 class WritingLiveEvaluationTest {
+    private static final Set<String> COMPONENT_NEGATIVE_CASES=Set.of(
+            "auto-review-unsupported-cause","auto-review-management-overreach","auto-review-narrowed-facility",
+            "auto-review-broken-insertion","auto-review-unsupported-efficiency","auto-review-personal-attendance",
+            "auto-review-joined-cause-unsupported","auto-review-training-location-unsupported","auto-review-repair-condition-unsupported");
     record Case(String name,WritingProfile profile,String body,String before,String mode,Boolean expectAnswer,String forbidden,String selection,String after) {
         Case(String name,WritingProfile profile,String body,String before,String mode,Boolean expectAnswer,String forbidden,String selection) {this(name,profile,body,before,mode,expectAnswer,forbidden,selection,"");}
         Case(String name,WritingProfile profile,String body,String before,String mode,Boolean expectAnswer,String forbidden) {this(name,profile,body,before,mode,expectAnswer,forbidden,"");}
@@ -112,17 +116,23 @@ class WritingLiveEvaluationTest {
         ObjectMapper json=new ObjectMapper().findAndRegisterModules(); List<Map<String,Object>> report=new ArrayList<>();
         String holdoutPath=System.getenv().getOrDefault("WRITING_EVAL_HOLDOUT","");
         boolean holdout=!holdoutPath.isBlank();
+        boolean components="1".equals(System.getenv("WRITING_EVAL_COMPONENTS"));
+        assertFalse(components && holdout,"Component isolation and synthetic holdout must run separately");
+        Set<String> fixedNegatives=new HashSet<>();
+        cases.stream().filter(c -> developmentFixtures.containsKey(c.name) && Boolean.FALSE.equals(c.expectAnswer)).forEach(c -> fixedNegatives.add(c.name));
+        assertEquals(COMPONENT_NEGATIVE_CASES,fixedNegatives,"Keep all nine fixed negative component cases");
         // Read only explicitly supplied synthetic cases; never mix a holdout run with development cases or frozen outputs.
         if(holdout) cases=readHoldout(json,Path.of(holdoutPath),general);
         Map<String,String> reviewFixtures=holdout?Map.of():developmentFixtures;
-        boolean automatic=holdout || "1".equals(System.getenv("WRITING_EVAL_AUTOMATIC"));
-        String dataset=holdout?"synthetic-holdout-natural-v4-scope-constraints":"development-natural-v4-scope-constraints";
+        boolean automatic=components || holdout || "1".equals(System.getenv("WRITING_EVAL_AUTOMATIC"));
+        String dataset=components?"target-review-components-natural-v4-scope-constraints":holdout?"synthetic-holdout-natural-v4-scope-constraints":"development-natural-v4-scope-constraints";
         String onlyCase=System.getenv().getOrDefault("WRITING_EVAL_CASE","");
         assertTrue(onlyCase.isEmpty() || cases.stream().anyMatch(c -> c.name.equals(onlyCase)),"Unknown evaluation case");
         // Fixed repetitions expose stochastic over-abstention; never retry only failing cases until green.
         int repetitions=automatic?3:1;
         List<Case> selectedCases=cases.stream().filter(c -> (onlyCase.isEmpty() || c.name.equals(onlyCase))
-                && automatic==c.mode.equals("autocomplete")).toList();
+                && automatic==c.mode.equals("autocomplete")
+                && (!components || reviewFixtures.containsKey(c.name) && Boolean.FALSE.equals(c.expectAnswer))).toList();
         Map<String,String> coverageRequirements=new TreeMap<>();
         for(Case c:selectedCases) {
             if(automatic && Boolean.TRUE.equals(c.expectAnswer) && (holdout || c.name.startsWith("auto-natural-")
@@ -144,7 +154,7 @@ class WritingLiveEvaluationTest {
                     var contexts=mock(WritingContextService.class); var models=mock(ChatModelFactory.class); var usage=mock(TokenUsageService.class);
                     AtomicReference<String> raw=new AtomicReference<>(""), transportError=new AtomicReference<>("");
                     List<String> responses=Collections.synchronizedList(new ArrayList<>());
-                    Map<String,String> phaseResponses=new ConcurrentHashMap<>(), phaseErrors=new ConcurrentHashMap<>(), phaseAssembledTexts=new ConcurrentHashMap<>();
+                    Map<String,String> phaseResponses=new ConcurrentHashMap<>(), phaseErrors=new ConcurrentHashMap<>(), phaseAssembledTexts=new ConcurrentHashMap<>(), phaseOrigins=new ConcurrentHashMap<>();
                     Map<String,Integer> phaseOutputTokens=new ConcurrentHashMap<>();
                     AtomicLong evaluationStartedNanos=new AtomicLong();
                     java.util.function.LongSupplier elapsed=() -> Math.max(1,TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-evaluationStartedNanos.get()));
@@ -161,6 +171,7 @@ class WritingLiveEvaluationTest {
                         if(!phase.equals("generation") && phaseInput.path("assembledText").isTextual())
                             phaseAssembledTexts.put(phase,phaseInput.path("assembledText").asText());
                         if(reviewFixtures.containsKey(c.name) && phase.equals("generation")) {
+                            phaseOrigins.put(phase,"synthetic");
                             List<String> fixtureFactIds=new ArrayList<>();
                             List<dev.langchain4j.data.message.ChatMessage> prompt=invocation.getArgument(0);
                             for(var fact:json.readTree(((dev.langchain4j.data.message.UserMessage)prompt.get(1)).singleText()).path("facts"))
@@ -173,6 +184,14 @@ class WritingLiveEvaluationTest {
                             responses.add(fixture); phaseResponses.put(phase,fixture); original.onComplete(Response.from(AiMessage.from(fixture)));
                             return mock(okhttp3.Call.class);
                         }
+                        if(components && !phase.equals(coverageRequirements.get(c.name))) {
+                            phaseOrigins.put(phase,"synthetic");
+                            Response<AiMessage> approval=syntheticReviewApproval(json,phase,phaseInput.path("assembledText").asText());
+                            String text=approval.content().text(); responses.add(text); phaseResponses.put(phase,text);
+                            timing.put("completedMs",elapsed.getAsLong()); original.onComplete(approval);
+                            return mock(okhttp3.Call.class);
+                        }
+                        phaseOrigins.put(phase,"provider");
                         return (phase.equals("generation")?generationWire:wire).generateCancellable(invocation.getArgument(0),invocation.getArgument(1),new StreamingResponseHandler<AiMessage>() {
                             // onNext observes visible content only, not network first byte, reasoning or keepalive events.
                             public void onNext(String token){if(token!=null && !token.isEmpty()) timing.putIfAbsent("firstContentTokenMs",elapsed.getAsLong());original.onNext(token);}
@@ -194,13 +213,15 @@ class WritingLiveEvaluationTest {
                         boolean nonempty=!view.advice().isEmpty();
                         boolean passed=(c.expectAnswer==null?Set.of("READY","EMPTY").contains(view.status()):c.expectAnswer?(c.mode.equals("autocomplete")?Set.of("READY","EMPTY").contains(view.status()):nonempty && view.status().equals("READY")):!nonempty && view.status().equals("EMPTY")) && (c.forbidden.isEmpty() || view.advice().stream().noneMatch(a -> Arrays.stream(c.forbidden.split("\\|" )).anyMatch(value -> (c.before+a.text()).contains(value))));
                         String outcome=view.status().equals("READY")?"ready":"empty";
-                        boolean requiredRejectionObserved=false;
+                        boolean requiredRejectionObserved=false, targetApprovalObserved=false;
                         if(c.mode.equals("autocomplete")) {
                             String candidate=reviewFixtures.getOrDefault(c.name,generatedCandidate(json,phaseResponses));
-                            boolean rejected=!candidate.isEmpty() && explicitReviewRejection(json,phaseResponses,c.before+candidate+c.after);
                             String requiredStage=coverageRequirements.get(c.name);
+                            Map<String,String> evidence=components?providerPhaseResponse(phaseResponses,phaseOrigins,requiredStage):phaseResponses;
+                            boolean rejected=!candidate.isEmpty() && explicitReviewRejection(json,evidence,c.before+candidate+c.after);
                             if(Set.of("semantic","grammar").contains(requiredStage==null?"":requiredStage))
-                                requiredRejectionObserved=requiredReviewRejection(json,phaseResponses,phaseAssembledTexts,c.before+candidate+c.after,requiredStage);
+                                requiredRejectionObserved=requiredReviewRejection(json,evidence,phaseAssembledTexts,c.before+candidate+c.after,requiredStage);
+                            if(components) targetApprovalObserved=targetReviewApproval(json,phaseResponses,phaseOrigins,phaseAssembledTexts,c.before+candidate+c.after,requiredStage);
                             boolean abstained=!reviewFixtures.containsKey(c.name) && explicitGenerationAbstention(json,phaseResponses);
                             boolean ready=view.status().equals("READY") && phaseResponses.keySet().containsAll(Set.of("generation","semantic","grammar","value"))
                                     && view.advice().size()==1 && candidate.equals(view.advice().get(0).text());
@@ -214,11 +235,15 @@ class WritingLiveEvaluationTest {
                         boolean behaviorPassed=c.mode.equals("autocomplete")
                                 ? view.status().equals("EMPTY") && !nonempty || view.status().equals("READY") && passed : passed;
                         boolean judged=c.mode.equals("autocomplete") && !outcome.equals("incomplete-or-invalid");
+                        if(components && targetApprovalObserved) {
+                            // A final local guard must not conceal the target reviewer's incorrect approval.
+                            passed=false; behaviorPassed=false; judged=true; outcome="target-review-approved";
+                        }
                         // Milliseconds since service.start; absent events were not observed by this snapshot.
                         // Copy nested maps so late cancellation callbacks cannot mutate a previously checkpointed row.
                         Map<String,Map<String,Long>> timingSnapshot=new TreeMap<>();
                         phaseTimings.forEach((phase,timing) -> timingSnapshot.put(phase,Map.copyOf(timing)));
-                        Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens)); row.put("phaseTimings",Map.copyOf(timingSnapshot)); row.put("phaseTimingsCapturedMs",elapsed.getAsLong());
+                        Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",components?"target-review-component":reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("targetReviewStage",components?coverageRequirements.get(c.name):""); row.put("targetApprovalObserved",targetApprovalObserved); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseOrigins",Map.copyOf(phaseOrigins)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens)); row.put("phaseTimings",Map.copyOf(timingSnapshot)); row.put("phaseTimingsCapturedMs",elapsed.getAsLong());
                         synchronized(report) {
                             report.add(row); report.sort(reportOrder);
                             Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewReasoningEffort",reasoningEffort==null?"provider-default":reasoningEffort,"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
@@ -245,7 +270,7 @@ class WritingLiveEvaluationTest {
         }
         assertEquals(futures.size(),report.size(),"Every selected evaluation must produce a report row");
         if (automatic && onlyCase.isEmpty())
-            assertEquals(holdout?cases.size()*3:84,report.size(),"Keep all 23 existing cases plus 5 scope-constraint cases, or the complete separate holdout, across three fixed repetitions");
+            assertEquals(components?27:holdout?cases.size()*3:84,report.size(),"Keep all 28 full cases, nine fixed negative component cases, or the complete separate holdout, across three fixed repetitions");
         Map<String,Object> summary=evaluationSummary(report,coverageRequirements,expectedCases,repetitions);
         assertTrue(report.stream().allMatch(r -> Boolean.TRUE.equals(r.get("behaviorPassed"))),
                 "Any unsafe display or nonterminal result fails every round; inspect actual joined text");
@@ -382,6 +407,65 @@ class WritingLiveEvaluationTest {
         } catch(Exception ignored) { }
         return "";
     }
+    private static Response<AiMessage> syntheticReviewApproval(ObjectMapper json,String stage,String assembled) throws Exception {
+        Map<String,Object> result=switch(stage) {
+            case "grammar" -> Map.of("correctedText",assembled,"error","");
+            case "semantic" -> Map.of("approve",true,"counterexamplePossible",false,"counterexample","",
+                    "reason","组件隔离合成批准，不代表实际审读","reviewedText",assembled,"supportedText",assembled);
+            case "value" -> Map.of("approve",true,"reason","组件隔离合成批准，不代表实际审读","reviewedText",assembled);
+            default -> throw new IllegalArgumentException("Unknown synthetic review stage: "+stage);
+        };
+        // No synthetic token usage: only the target provider response can report billable usage.
+        return Response.from(AiMessage.from(json.writeValueAsString(result)));
+    }
+    private static Map<String,String> providerPhaseResponse(Map<String,String> responses,Map<String,String> origins,String stage) {
+        return stage!=null && "provider".equals(origins.get(stage)) && responses.containsKey(stage)
+                ?Map.of(stage,responses.get(stage)):Map.of();
+    }
+    private static boolean targetReviewApproval(ObjectMapper json,Map<String,String> responses,Map<String,String> origins,
+                                                Map<String,String> requestTexts,String assembled,String stage) {
+        Map<String,String> target=providerPhaseResponse(responses,origins,stage);
+        if(target.isEmpty() || !assembled.equals(requestTexts.get(stage))) return false;
+        try {
+            var decision=json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(target.get(stage));
+            if(decision==null || !decision.isObject()) return false;
+            if(stage.equals("grammar")) return decision.path("error").isTextual() && decision.path("error").asText().isEmpty()
+                    && decision.path("correctedText").isTextual() && assembled.equals(decision.path("correctedText").asText());
+            return stage.equals("semantic") && decision.path("approve").isBoolean() && decision.path("approve").asBoolean()
+                    && decision.path("reason").isTextual() && !decision.path("reason").asText().isBlank() && decision.path("reason").asText().length()<=240
+                    && decision.path("reviewedText").isTextual() && assembled.equals(decision.path("reviewedText").asText())
+                    && decision.path("supportedText").isTextual() && assembled.equals(decision.path("supportedText").asText())
+                    && decision.path("counterexamplePossible").isBoolean() && !decision.path("counterexamplePossible").asBoolean()
+                    && decision.path("counterexample").isTextual() && decision.path("counterexample").asText().isEmpty();
+        } catch(Exception e) { return false; }
+    }
+    @Test void componentEvidenceRequiresRealTargetAndSyntheticApprovalsHaveNoUsage() throws Exception {
+        ObjectMapper json=new ObjectMapper(); String assembled="合成完整正文。";
+        assertEquals(9,COMPONENT_NEGATIVE_CASES.size());
+        assertEquals(1,COMPONENT_NEGATIVE_CASES.stream().filter(name -> name.equals("auto-review-broken-insertion")).count());
+        for(String stage:List.of("semantic","grammar","value")) {
+            var stub=syntheticReviewApproval(json,stage,assembled); assertNull(stub.tokenUsage());
+            Map<String,String> responses=Map.of(stage,stub.content().text()), request=Map.of(stage,assembled);
+            assertFalse(targetReviewApproval(json,responses,Map.of(stage,"synthetic"),request,assembled,stage));
+            assertFalse(explicitReviewRejection(json,providerPhaseResponse(responses,Map.of(stage,"synthetic"),stage),assembled));
+            if(stage.equals("value")) continue;
+            assertTrue(targetReviewApproval(json,responses,Map.of(stage,"provider"),request,assembled,stage));
+            assertFalse(targetReviewApproval(json,responses,Map.of(stage,"provider"),Map.of(stage,"其他正文"),assembled,stage));
+            assertFalse(targetReviewApproval(json,Map.of(stage,stub.content().text()+" {}"),Map.of(stage,"provider"),request,assembled,stage));
+        }
+        String refusal=json.writeValueAsString(Map.of("approve",false,"counterexamplePossible",true,"counterexample","存在未经支持的限定",
+                "reason","依据不支持该限定","reviewedText",assembled,"supportedText",""));
+        assertTrue(requiredReviewRejection(json,providerPhaseResponse(Map.of("semantic",refusal),Map.of("semantic","provider"),"semantic"),
+                Map.of("semantic",assembled),assembled,"semantic"));
+        assertFalse(requiredReviewRejection(json,providerPhaseResponse(Map.of("semantic",refusal),Map.of("semantic","synthetic"),"semantic"),
+                Map.of("semantic",assembled),assembled,"semantic"));
+        assertFalse(targetReviewApproval(json,Map.of("semantic","{\"approve\":true}"),Map.of("semantic","provider"),Map.of("semantic",assembled),assembled,"semantic"));
+        Map<String,Object> masked=new HashMap<>(); masked.put("case","component"); masked.put("repetition",1);
+        masked.put("status","EMPTY"); masked.put("expectedAnswer",false); masked.put("outcome","target-review-approved");
+        masked.put("behaviorPassed",true); masked.put("targetApprovalObserved",true); masked.put("requiredRejectionObserved",true);
+        assertEquals(false,evaluationSummary(List.of(masked),Map.of("component","semantic"),List.of("component"),1).get("gatePassed"),
+                "Final local EMPTY must never hide a target review approval");
+    }
     private static boolean requiredReviewRejection(ObjectMapper json,Map<String,String> phases,Map<String,String> requestTexts,String assembled,String stage) {
         if(!assembled.equals(requestTexts.get(stage)) || !phases.containsKey(stage)
                 || !explicitReviewRejection(json,Map.of(stage,phases.get(stage)),assembled)) return false;
@@ -401,7 +485,7 @@ class WritingLiveEvaluationTest {
             Map<String,Object> detail=new LinkedHashMap<>();
             for(String field:List.of("case","repetition","status","outcome","result","phaseErrors"))
                 if(row.containsKey(field)) detail.put(field,row.get(field));
-            if(!Boolean.TRUE.equals(row.get("behaviorPassed"))
+            if(!Boolean.TRUE.equals(row.get("behaviorPassed")) || Boolean.TRUE.equals(row.get("targetApprovalObserved"))
                     || Boolean.FALSE.equals(row.get("expectedAnswer")) && "READY".equals(row.get("status"))) failures.add(detail);
             if(!Boolean.TRUE.equals(row.get("judged"))) unjudged.add(detail);
         }
