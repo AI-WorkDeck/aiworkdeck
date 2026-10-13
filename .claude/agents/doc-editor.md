@@ -13,6 +13,8 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 Writer 的 `ShowTextBoundaries` 与格式标记联动：打开 ¶ 时会把文本范围画成整页矩形。`EditorToolbar.applyViewPrefs` 显式传 `textBoundaries:false`，保留既有 ¶ 和标尺偏好；`set_view_options` 无参依旧只读，返回原生真实状态。不要改页边距、段落边框或使用 toggle。`test:lowa-view-boundaries` 用 r5 有头引擎核对矩形前后截图、格式标记/标尺、页尺寸与边距、干净/已脏状态及重载。
 
+语义补全事实审读须检查 before/after 与候选组成的完整判断：光标前已经写出的因果、比较或范围框架也需依据，不因候选后缀逐字见于材料就放行。普通文书合并跨行依据时，独立的当事人主张标记（有无冒号均可）仍保留 CLAIM，引用段号仅涵盖实际保留的非空起始段至完整句末段。开发集增加同一后缀的有据／无据因果配对回归。
+
 ## 自动补全开关（dev-board#1226）
 
 本地候选卡可直接「关闭自动补全」，审校浮球菜单和右侧审校面板均显示权威开关状态并可重新开启。沿用 `awd_writing_preferences_${userId}` 的 enabled 和原默认值；关闭只停止自动弹出，Alt+/ 手动补全、有据续写、AI 审校及浮球收起相互独立。写入成功后才同步同用户各文档状态，失败回报并保留原偏好；切文档用写作会话校验，浮球请求还须审校会话一致。独立开关提交 #1226 本身不引入自动模型请求；合入语义分支后，自动模式仍使用该分支的模型链，不代表自动语义补全的质量已经验收。新增样式引用 App.vue 的语义令牌；客体 editor.html 尚未注入间距/字号令牌，新增菜单样式的 var fallback 与现有 space-1/space-2/font-size-body 保持 4px/8px/13px 一致，不另建主题通道。

@@ -81,6 +81,25 @@ class WritingNarrativeSourcesTest {
             assertEquals("CLAIM",facts.get(0).status()); assertEquals("原告",facts.get(0).role());
         }
     }
+    @Test void standaloneAttributionMarkersRemainClaimsAcrossLines() {
+        for(String marker:List.of("原告主张","原告主张：","被告辩称","第三人认为")) {
+            String body="情况说明\n"+marker+"\n款项尚未到账。";
+            Fact fact=WritingNarrativeSources.append("general",List.of(source("active-document",body)),List.of()).get(0);
+            assertEquals("CLAIM",fact.status(),marker);
+            assertEquals(marker.startsWith("第三人")?"第三人":marker.substring(0,2),fact.role());
+            assertEquals(body,fact.quote());
+        }
+    }
+    @Test void citationRangeContainsOnlyRetainedNonemptyParagraphs() {
+        String body="\n  \r\n材料说明\r\n款项尚未到账。\r\n下一步准备";
+        Fact fact=WritingNarrativeSources.append("general",List.of(source("active-document",body)),List.of()).get(0);
+        assertEquals("prose:active-document:3",fact.id());
+        assertEquals("材料第3至4段",fact.label());
+        assertEquals("材料说明\r\n款项尚未到账。",fact.quote());
+        Fact prefix=WritingNarrativeSources.append("general",List.of(source("active-document","材料说明\n款项尚未到账。目前准备\n继续核实")),List.of()).get(0);
+        assertEquals("材料第1至2段",prefix.label());
+        assertEquals("材料说明\n款项尚未到账。",prefix.quote());
+    }
     @Test void shortSentenceExceptionDoesNotChangeOtherWritingProfiles() {
         String text="未付。\n报名信息通过问卷收集。\n项目尚未验收。";
         for(String profile:List.of("litigation","contract","diligence")) {

@@ -62,6 +62,10 @@ class WritingLiveEvaluationTest {
             new Case("auto-natural-qualified-completion",general,"材料受理说明\n材料齐全时，工作人员可以在三个工作日内反馈初审意见；材料不齐全时，需要补充材料。", "如材料齐全，工作人员可以在", "autocomplete",true,"必须|保证|一定|审批通过|一个工作日"),
             new Case("auto-natural-reference-completion",general,"活动记录说明\n报名表记录报名意愿。\n签到表记录活动当天实际到场情况。", "报名表和签到表分别记录报名意愿和实际到场情况。后者记录的是", "autocomplete",true,"审核结果|身份核验结果"),
             new Case("auto-natural-after-punctuation",general,"登记说明\n确认邮件包含登记编号和提交时间。申请人可以保留确认邮件备查。", "确认邮件中列明登记编号和", "autocomplete",true,"审核结果|批准时间","","。\n申请人可以保留确认邮件备查。"),
+            // Paired fixed continuations audit the causal relation created by before + candidate, not just suffix facts.
+            // Keep the earlier contrast case and historical expectations unchanged; these are new regression cases.
+            new Case("auto-review-joined-cause-unsupported",general,"工作进展\n线上会议支持远程成员参与，线下会议便于面对面讨论。两种会议方式均在使用。", "线上会议支持远程成员参与，线下会议便于面对面讨论。因此，两种会议方式", "autocomplete",false,""),
+            new Case("auto-review-joined-cause-supported",general,"工作进展\n线上会议支持远程成员参与，线下会议便于面对面讨论。为发挥上述两种便利，实际采用了这两种会议方式，目前均在使用。", "线上会议支持远程成员参与，线下会议便于面对面讨论。因此，两种会议方式", "autocomplete",true,""),
             new Case("lit-role",lit,loan,"原告：","sentence",true,"顾青原"),
             new Case("lit-attributed",lit,loan,"原告主张：","paragraph",true,"法院认定"),
             new Case("lit-unsupported",lit,loan,"法院认定：","sentence",false,""),
@@ -90,7 +94,9 @@ class WritingLiveEvaluationTest {
                 "auto-review-supported-increase","核对次数有所增加。",
                 "auto-review-unsupported-efficiency","登记信息分散，核对效率较低。",
                 "auto-review-repeated-conclusion","可以并存，发挥各自优势",
-                "auto-review-personal-attendance","是否需要本人到场以及是否携带原件核对");
+                "auto-review-personal-attendance","是否需要本人到场以及是否携带原件核对",
+                "auto-review-joined-cause-unsupported","均在使用",
+                "auto-review-joined-cause-supported","均在使用");
         ObjectMapper json=new ObjectMapper().findAndRegisterModules(); List<Map<String,Object>> report=new ArrayList<>();
         String holdoutPath=System.getenv().getOrDefault("WRITING_EVAL_HOLDOUT","");
         boolean holdout=!holdoutPath.isBlank();
@@ -98,7 +104,7 @@ class WritingLiveEvaluationTest {
         if(holdout) cases=readHoldout(json,Path.of(holdoutPath),general);
         Map<String,String> reviewFixtures=holdout?Map.of():developmentFixtures;
         boolean automatic=holdout || "1".equals(System.getenv("WRITING_EVAL_AUTOMATIC"));
-        String dataset=holdout?"synthetic-holdout-natural-v2":"development-natural-continuation-v2";
+        String dataset=holdout?"synthetic-holdout-natural-v3-joined-relations":"development-natural-v3-joined-relations";
         String onlyCase=System.getenv().getOrDefault("WRITING_EVAL_CASE","");
         assertTrue(onlyCase.isEmpty() || cases.stream().anyMatch(c -> c.name.equals(onlyCase)),"Unknown evaluation case");
         // Fixed repetitions expose stochastic over-abstention; never retry only failing cases until green.
@@ -108,7 +114,7 @@ class WritingLiveEvaluationTest {
         Map<String,String> coverageRequirements=new TreeMap<>();
         for(Case c:selectedCases) {
             if(automatic && Boolean.TRUE.equals(c.expectAnswer) && (holdout || c.name.startsWith("auto-natural-")
-                    || c.name.equals("auto-review-supported-increase"))) coverageRequirements.put(c.name,"ready");
+                    || reviewFixtures.containsKey(c.name))) coverageRequirements.put(c.name,"ready");
             if(!holdout && reviewFixtures.containsKey(c.name) && Boolean.FALSE.equals(c.expectAnswer))
                 coverageRequirements.put(c.name,c.name.equals("auto-review-broken-insertion")?"grammar":"semantic");
         }
@@ -215,7 +221,7 @@ class WritingLiveEvaluationTest {
         }
         assertEquals(futures.size(),report.size(),"Every selected evaluation must produce a report row");
         if (automatic && onlyCase.isEmpty())
-            assertEquals(holdout?cases.size()*3:63,report.size(),"Keep all 17 historical plus 4 natural cases, or the complete separate holdout, across three fixed repetitions");
+            assertEquals(holdout?cases.size()*3:69,report.size(),"Keep all 21 existing cases plus 2 paired joined-cause cases, or the complete separate holdout, across three fixed repetitions");
         Map<String,Object> summary=evaluationSummary(report,coverageRequirements,expectedCases,repetitions);
         assertTrue(report.stream().allMatch(r -> Boolean.TRUE.equals(r.get("behaviorPassed"))),
                 "Any unsafe display or nonterminal result fails every round; inspect actual joined text");
@@ -388,7 +394,7 @@ class WritingLiveEvaluationTest {
             if(!covered) gaps.add(Map.of("case",name,"requirement",requirement,"observed",0,"expected",1));
         }
         Map<String,Object> summary=new LinkedHashMap<>();
-        summary.put("gatePolicy","natural-v2-safe-display-and-per-case-coverage");
+        summary.put("gatePolicy","natural-v3-joined-relations-safe-display-and-per-case-coverage");
         summary.put("outcomeCounts",outcomes); summary.put("phaseErrorCounts",errors);
         summary.put("strictPassedCount",rows.stream().filter(row -> Boolean.TRUE.equals(row.get("passed"))).count());
         summary.put("judgedCount",rows.stream().filter(row -> Boolean.TRUE.equals(row.get("judged"))).count());
