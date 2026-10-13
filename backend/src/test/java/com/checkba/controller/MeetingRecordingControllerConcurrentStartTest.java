@@ -70,6 +70,7 @@ class MeetingRecordingControllerConcurrentStartTest {
         AuthController.registerUserSessionService(userSessionService);
 
         when(projectMemberService.hasReadPermission(eq(1L), anyLong())).thenReturn(true);
+        when(projectMemberService.hasWritePermission(eq(1L), anyLong())).thenReturn(true);
 
         // 可控闸门：第一次调用停在"临界区里"，直到测试主动放行——把"两个请求确实在
         // 同时进行"这件事做成确定性的，不靠 sleep 撞运气（同 VerificationCodeStoreTest 的写法）。
@@ -89,7 +90,8 @@ class MeetingRecordingControllerConcurrentStartTest {
         });
 
         MeetingRecordingController controller =
-                new MeetingRecordingController(meetingService, transcriptionService, projectMemberService);
+                new MeetingRecordingController(meetingService, transcriptionService, projectMemberService,
+                        mock(com.checkba.repository.ProjectFileRepository.class), mock(com.checkba.service.ProjectFileAccessService.class));
 
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
@@ -121,6 +123,7 @@ class MeetingRecordingControllerConcurrentStartTest {
         when(userSessionService.resolveUserId("sess-b")).thenReturn(8L);
         AuthController.registerUserSessionService(userSessionService);
         when(projectMemberService.hasReadPermission(anyLong(), anyLong())).thenReturn(true);
+        when(projectMemberService.hasWritePermission(anyLong(), anyLong())).thenReturn(true);
 
         CountDownLatch project1Entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -134,7 +137,8 @@ class MeetingRecordingControllerConcurrentStartTest {
         when(meetingService.create(eq(2L), anyLong())).thenReturn(new MeetingRecording());
 
         MeetingRecordingController controller =
-                new MeetingRecordingController(meetingService, transcriptionService, projectMemberService);
+                new MeetingRecordingController(meetingService, transcriptionService, projectMemberService,
+                        mock(com.checkba.repository.ProjectFileRepository.class), mock(com.checkba.service.ProjectFileAccessService.class));
 
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {

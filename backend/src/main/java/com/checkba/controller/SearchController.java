@@ -42,7 +42,7 @@ public class SearchController {
             throw new IllegalArgumentException(LangText.of("无权访问该项目", "You don't have permission to access this project"));
         }
         
-        return contentSearchService.searchContent(projectId, request);
+        return contentSearchService.searchContent(projectId, request, userId);
     }
 
     private Long getUserIdFromSession(String sessionId) {

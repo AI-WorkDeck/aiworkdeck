@@ -7,7 +7,8 @@ import com.checkba.model.entity.FileVariable;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.FileVariableService;
-import com.checkba.service.LangText;
+import com.checkba.service.ProjectFileAccessService;
+import org.springframework.http.ResponseEntity;
 import com.checkba.service.ProjectMemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -24,23 +25,29 @@ public class FileVariableController {
     private final FileVariableService fileVariableService;
     private final ProjectMemberService projectMemberService;
     private final ProjectFileRepository projectFileRepository;
+    private final ProjectFileAccessService fileAccess;
 
-    // 越权校验：文件变量接口此前完全无鉴权。fileId → 所属 projectId → 成员资格。
-    private void requireFileMember(String sessionId, Long fileId) {
+    private void requireFileAccess(String sessionId, Long fileId, boolean write) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) throw new IllegalArgumentException("未登录");
-        Long projectId = fileId == null ? null
-                : projectFileRepository.findById(fileId).map(ProjectFile::getProjectId).orElse(null);
-        if (projectId == null || !projectMemberService.hasReadPermission(projectId, userId)) {
-            throw new IllegalArgumentException(LangText.of("无权访问该资源", "You don't have permission to access this resource"));
+        ProjectFile file = fileId == null ? null : projectFileRepository.findById(fileId).orElse(null);
+        fileAccess.requireRead(file, userId);
+        if (write && (fileAccess.isClient(file.getProjectId(), userId)
+                || !projectMemberService.hasWritePermission(file.getProjectId(), userId))) {
+            throw new ProjectFileAccessService.FileAccessDeniedException();
         }
+    }
+
+    @ExceptionHandler(ProjectFileAccessService.FileAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> onFileAccessDenied(ProjectFileAccessService.FileAccessDeniedException e) {
+        return ResponseEntity.status(403).body(Map.of("code", 403, "message", e.getMessage()));
     }
 
     @GetMapping
     public Map<String, Object> getVariables(
             @RequestParam Long fileId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireFileMember(sessionId, fileId);
+        requireFileAccess(sessionId, fileId, false);
         List<FileVariable> variables = fileVariableService.getVariables(fileId);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
@@ -52,7 +59,12 @@ public class FileVariableController {
     public Map<String, Object> createOrUpdateVariable(
             @RequestBody FileVariable variable,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireFileMember(sessionId, variable.getFileId());
+        requireFileAccess(sessionId, variable.getFileId(), true);
+        // A supplied entity ID must not retarget a variable belonging to another file.
+        if (variable.getId() != null && !java.util.Objects.equals(variable.getFileId(),
+                fileVariableService.getFileIdById(variable.getId()))) {
+            throw new ProjectFileAccessService.FileAccessDeniedException();
+        }
         FileVariable saved = fileVariableService.createOrUpdateVariable(variable);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
@@ -64,7 +76,7 @@ public class FileVariableController {
     public Map<String, Object> deleteVariable(
             @PathVariable Long id,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireFileMember(sessionId, fileVariableService.getFileIdById(id));
+        requireFileAccess(sessionId, fileVariableService.getFileIdById(id), true);
         fileVariableService.deleteVariable(id);
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);

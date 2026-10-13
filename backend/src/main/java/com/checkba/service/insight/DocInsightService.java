@@ -15,6 +15,7 @@ import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.DocumentTextService;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectFileAccessService;
 import com.checkba.service.QichachaService;
 import com.checkba.service.ai.AuxModelResolver;
 import com.checkba.service.ai.ChatModelFactory;
@@ -167,6 +168,7 @@ public class DocInsightService {
     private final PlatformGatewayClient platformGatewayClient;
     private final InsightProperties props;
     private final ObjectMapper om;
+    private final ProjectFileAccessService fileAccess;
 
     /** 同一份文档同时只跑一个解析。DB 里的 RUNNING 行是跨重启的兜底，这个集合是同进程的原子闸。 */
     private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
@@ -1760,12 +1762,16 @@ public class DocInsightService {
     // ---------------------------------------------------------------- 鉴权
 
     private void requireRead(Long projectId, Long userId) {
+        // Derived results may contain excerpts from multiple private source files.
+        if (fileAccess.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         if (userId == null || projectId == null || !members.hasReadPermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权限访问该项目", "No access to this project"));
         }
     }
 
     private void requireWrite(Long projectId, Long userId) {
+        // Derived results may contain excerpts from multiple private source files.
+        if (fileAccess.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         if (userId == null || projectId == null || !members.hasWritePermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权限修改该项目", "No write access to this project"));
         }

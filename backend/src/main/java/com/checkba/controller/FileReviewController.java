@@ -41,6 +41,7 @@ public class FileReviewController {
     private final FileReviewService fileReviewService;
     private final ProjectFileService projectFileService;
     private final ProjectMemberService projectMemberService;
+    private final com.checkba.service.ProjectFileAccessService fileAccess;
 
     @PostMapping
     public Map<String, Object> open(
@@ -191,8 +192,8 @@ public class FileReviewController {
         if (!projectMemberService.hasReadPermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权访问该项目", "You do not have access to this project"));
         }
-        if (projectMemberService.isClient(projectId, userId)) {
-            throw new IllegalArgumentException(LangText.of("客户无权访问资源管理器", "Clients do not have access to the Explorer"));
+        if (projectMemberService.isClient(projectId, userId) || fileAccess.isClient(projectId, userId)) {
+            throw new com.checkba.service.ProjectFileAccessService.FileAccessDeniedException();
         }
     }
 

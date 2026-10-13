@@ -33,6 +33,8 @@ class ProjectFileControllerIdorTest {
     @Mock
     private com.checkba.service.quota.StageQuotaService stageQuotaService;
 
+    @Mock private com.checkba.service.ProjectFileAccessService fileAccess;
+
     @InjectMocks
     private ProjectFileController controller;
 
@@ -46,7 +48,7 @@ class ProjectFileControllerIdorTest {
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
             when(projectMemberService.hasReadPermission(1L, 1L)).thenReturn(true);
-            when(projectMemberService.isClient(1L, 1L)).thenReturn(false);
+            when(fileAccess.isClient(1L, 1L)).thenReturn(false);
             // 目标文件夹属于项目 999
             ProjectFile foreign = new ProjectFile();
             foreign.setId(777L);
@@ -64,7 +66,7 @@ class ProjectFileControllerIdorTest {
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
             when(projectMemberService.hasReadPermission(1L, 1L)).thenReturn(true);
-            when(projectMemberService.isClient(1L, 1L)).thenReturn(false);
+            when(fileAccess.isClient(1L, 1L)).thenReturn(false);
             ProjectFile own = new ProjectFile();
             own.setId(100L);
             own.setProjectId(1L);
@@ -81,7 +83,7 @@ class ProjectFileControllerIdorTest {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
             // 用户是项目 1 的合法成员
             when(projectMemberService.hasReadPermission(1L, 1L)).thenReturn(true);
-            when(projectMemberService.isClient(1L, 1L)).thenReturn(false);
+            when(fileAccess.isClient(1L, 1L)).thenReturn(false);
             when(projectMemberService.hasWritePermission(1L, 1L)).thenReturn(true);
             // 但目标文件属于项目 999
             ProjectFile foreign = new ProjectFile();
@@ -104,7 +106,7 @@ class ProjectFileControllerIdorTest {
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
             when(projectMemberService.hasReadPermission(1L, 1L)).thenReturn(true);
-            when(projectMemberService.isClient(1L, 1L)).thenReturn(false);
+            when(fileAccess.isClient(1L, 1L)).thenReturn(false);
             when(projectMemberService.hasWritePermission(1L, 1L)).thenReturn(true);
             ProjectFile own = new ProjectFile();
             own.setId(50L);

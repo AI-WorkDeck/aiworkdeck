@@ -6,6 +6,7 @@ package com.checkba.controller;
 import com.checkba.model.entity.PluginJob;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectFileAccessService;
 import com.checkba.service.plugin.PluginJobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +22,7 @@ import java.util.Map;
 
 /**
  * 插件后台任务 REST（插件规范 v2.4 §11 Jobs）。
- * 鉴权：登录 + 项目成员（读）；取消要写权限（CLIENT 角色只能看）。
+ * 鉴权：登录 + 项目成员（读）；取消要写权限；客户不开放含内部文件派生内容的任务结果。
  * 没有 projectId 的任务（插件在无项目上下文下起的）只有 admin 能看，这里不开放。
  */
 @RestController
@@ -42,6 +43,8 @@ public class PluginJobController {
         if (projectId == null || !projectMemberService.hasReadPermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权访问该资源", "You don't have permission to access this resource"));
         }
+        // resultJson, progress and errors may contain excerpts from private project files.
+        if (projectMemberService.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
     }
 
     @GetMapping
@@ -67,7 +70,8 @@ public class PluginJobController {
         Long u = uid(sessionId);
         PluginJob j = jobs.get(id);
         if (j == null) throw new IllegalArgumentException(LangText.of("任务不存在: ", "Job not found: ") + id);
-        if (j.getProjectId() == null || !projectMemberService.hasWritePermission(j.getProjectId(), u)) {
+        requireRead(j.getProjectId(), u);
+        if (!projectMemberService.hasWritePermission(j.getProjectId(), u)) {
             throw new IllegalArgumentException(LangText.of("无权访问该资源", "You don't have permission to access this resource"));
         }
         jobs.cancel(id);

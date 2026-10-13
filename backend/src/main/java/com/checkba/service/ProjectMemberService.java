@@ -514,6 +514,8 @@ public class ProjectMemberService {
     }
     
     public boolean hasWritePermission(Long projectId, Long userId) {
+        if (userId != null && userRepository.findById(userId)
+                .map(user -> "CLIENT".equalsIgnoreCase(user.getRole())).orElse(false)) return false;
         Project project = projectRepository.findById(projectId).orElse(null);
         if (project == null) return false;
         if (project.getUserId().equals(userId)) return true;
@@ -526,6 +528,9 @@ public class ProjectMemberService {
     }
 
     public boolean isClient(Long projectId, Long userId) {
+        // Account-level clients cannot become staff merely through an owner/default project role.
+        if (userId != null && userRepository.findById(userId)
+                .map(user -> "CLIENT".equalsIgnoreCase(user.getRole())).orElse(false)) return true;
         Project project = projectRepository.findById(projectId).orElse(null);
         if (project != null && project.getUserId().equals(userId)) return false; // Owner is not client
 

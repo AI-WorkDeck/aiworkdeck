@@ -2,6 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // File tree (FileTree.vue): context menu, batch actions, confirm dialogs, drag hints, local import
 export default {
+  clientAccessTitle: "Client file access",
+  clientAccessExplain: "Files are internal by default and must be shared individually. Clients can always read their own uploads.",
+  clientAccessCurrent: "Current access: {state}.",
+  clientAccessVisible: "Visible to clients",
+  clientAccessInternal: "Internal file",
+  clientAccessRevokeNote: "Making this internal blocks future reads. Copies already saved by clients cannot be recalled.",
+  clientAccessGrantNote: "Clients in this project will be able to read this file.",
+  clientAccessReadOnly: "You can view these permissions but cannot change them.",
+  clientAccessRevoke: "Make internal",
+  clientAccessGrant: "Share with clients",
+  clientAccessOk: "Got it",
+  clientAccessGranted: "Shared with project clients",
+  clientAccessRevoked: "File is now internal",
+  clientAccessFailed: "Could not update file access. Please retry.",
+
   // Delete confirmation dialog
   hardDeleteTitle: 'Delete Permanently',
   softDeleteTitle: 'Move to Recycle Bin',

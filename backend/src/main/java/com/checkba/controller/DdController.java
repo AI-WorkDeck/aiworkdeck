@@ -27,6 +27,7 @@ public class DdController {
 
     private final DdService ddService;
     private final ProjectMemberService projectMemberService;
+    private final com.checkba.service.ProjectFileAccessService fileAccess;
 
     // ==================== 越权校验 ====================
     // 此前各端点仅校验"是否登录"、从不校验项目成员，且读端点完全无鉴权，
@@ -68,6 +69,12 @@ public class DdController {
                 .body(Map.of("code", 403, "message", e.getMessage()));
     }
 
+    @ExceptionHandler(com.checkba.service.ProjectFileAccessService.FileAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> onFileAccessDenied(
+            com.checkba.service.ProjectFileAccessService.FileAccessDeniedException e) {
+        return ResponseEntity.status(403).body(Map.of("code", 403, "message", e.getMessage()));
+    }
+
     /** 审核状态流转不合法（未上传就通过、驳回不带理由、重复下同一结论、已通过还要再传）→ 真 HTTP 400。 */
     @ExceptionHandler(DdService.IllegalTransitionException.class)
     public ResponseEntity<Map<String, Object>> onIllegalTransition(DdService.IllegalTransitionException e) {
@@ -77,7 +84,7 @@ public class DdController {
 
     private Long requireStaffByProject(String sessionId, Long projectId) {
         Long userId = requireMemberByProject(sessionId, projectId);
-        if (projectMemberService.isClient(projectId, userId)) throw new ClientForbiddenException();
+        if (fileAccess.isClient(projectId, userId)) throw new ClientForbiddenException();
         return userId;
     }
 
@@ -223,8 +230,9 @@ public class DdController {
             @PathVariable Long itemId,
             @RequestParam(value = "token", required = false) String token,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireMemberByItem(sessionId != null ? sessionId : token, itemId);
+        Long userId = requireMemberByItem(org.springframework.util.StringUtils.hasText(sessionId) ? sessionId : token, itemId);
         com.checkba.model.entity.ProjectFile file = ddService.getUploadedFile(itemId);
+        fileAccess.requireRead(file, userId);
         org.springframework.core.io.Resource resource = ddService.loadStored(file);
         String name = file.getName() == null ? "file" : file.getName();
         org.springframework.http.MediaType type = org.springframework.http.MediaTypeFactory.getMediaType(name)
