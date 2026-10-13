@@ -171,4 +171,35 @@ class BaoqingtianToolsTest {
         assertEquals("outcome_unknown", f.run("note_save", "{\"title\":\"标题\",\"content\":\"正文\",\"businessId\":\"2\",\"confirmed\":true}").path("errorCode").asText());
     }
 
+    @Test void imageAndVideoTitleOnlyEditsAllowEmptyDescriptionAndKeepMedia() throws Exception {
+        for (String type : List.of("IMAGE", "VIDEO")) {
+            Fixture f = new Fixture(); f.login();
+            String media = type.equals("IMAGE") ? "https://example/a;https://example/b" : "https://example/video.mp4";
+            f.remote.note = BaoqingtianTools.JSON.createObjectNode().put("id", "9007199254740993").put("lawyerId", "99")
+                .put("type", type).put("title", "旧标题").put("content", media).put("description", "").put("cover", "cover").put("status", "PRIVATE").toString();
+            JsonNode result = f.run("note_save", "{\"id\":\"9007199254740993\",\"title\":\"新标题\",\"content\":\"\",\"status\":\"private\"}");
+            assertTrue(result.path("ok").asBoolean(), result.toString());
+            Call c = f.remote.calls.getLast(); assertEquals("/bqt/lawyer/note/edit", c.path);
+            assertEquals(type, c.body.path("type").asText()); assertEquals(media, c.body.path("content").asText());
+            assertEquals("", c.body.path("description").asText()); assertEquals("新标题", c.body.path("title").asText());
+            assertEquals("cover", c.body.path("cover").asText());
+            int count = f.remote.calls.size();
+            String oversized = BaoqingtianTools.JSON.createObjectNode().put("id", "9007199254740993").put("title", "新标题").put("content", "x".repeat(50_001)).put("status", "private").toString();
+            assertEquals("invalid_params", f.run("note_save", oversized).path("errorCode").asText()); assertEquals(count, f.remote.calls.size());
+        }
+    }
+    @Test void newAndExistingTextNotesStillRejectEmptyOrWhitespaceBody() throws Exception {
+        Fixture f = new Fixture(); f.login();
+        for (boolean edit : List.of(false, true)) {
+            for (String content : List.of("", "   ")) {
+                var args = BaoqingtianTools.JSON.createObjectNode().put("title", "标题").put("content", content).put("businessId", "2").put("confirmed", true);
+                if (edit) args.put("id", "9007199254740993");
+                int count = f.remote.calls.size();
+                assertEquals("invalid_params", f.run("note_save", args.toString()).path("errorCode").asText());
+                assertEquals(count + (edit ? 1 : 0), f.remote.calls.size());
+                assertTrue(f.remote.calls.stream().noneMatch(c -> c.path.endsWith("/add") || c.path.endsWith("/edit")));
+            }
+        }
+    }
+
 }

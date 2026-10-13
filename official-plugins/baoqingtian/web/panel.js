@@ -139,6 +139,7 @@
     selected = note; dirty = false; outcomeUnknown = false; $('editor').hidden = false; $('detail').hidden = true;
     $('editor-heading').textContent = note.id ? '编辑笔记' : '新建笔记';
     $('note-title').value = text(note.title); $('note-content').value = text(note.content);
+    document.querySelector('label[for="note-content"]').textContent = note.id && ['IMAGE', 'VIDEO'].includes(note.type) ? '正文（可选）' : '正文';
     $('note-state').textContent = note.id ? (note.status === 'published' ? '公开发布' : note.status === 'private' ? '仅自己可见' : '草稿') : '尚未保存';
     $('note-visibility').value = note.status === 'private' ? 'private' : 'published';
     $('publish-note').textContent = note.status === 'published' || note.status === 'private' ? '保存发布修改' : '发布笔记';
@@ -162,7 +163,8 @@
   async function saveNote(status) {
     if (saving || !connected || !selected || outcomeUnknown) return;
     const title = $('note-title').value.trim(), content = $('note-content').value;
-    if (!title || !content.trim()) { feedback('请填写标题和正文后再保存。', true); return; }
+    const optionalBody = selected.id && ['IMAGE', 'VIDEO'].includes(selected.type);
+    if (!title || (!optionalBody && !content.trim())) { feedback(optionalBody ? '请填写标题后再保存。' : '请填写标题和正文后再保存。', true); return; }
     const token = generation;
     if (!selected.id && !$('note-business').value) { feedback('请先选择业务类别，类别加载失败时可重新新建笔记重试。', true); return; }
     const args = { ...(selected.id ? { id: selected.id } : { businessId: $('note-business').value }), title, content, status, confirmed: true };

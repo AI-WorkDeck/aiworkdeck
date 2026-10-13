@@ -193,3 +193,22 @@ test('note keyword searches the service globally but status filters the returned
   p.$('status-filter').value = 'private'; p.$('status-filter').dispatchEvent(new p.dom.window.Event('change')); await tick();
   assert.equal(p.$('list').children.length, 0); assert.match(p.$('empty').textContent, /当前页/);
 });
+for (const type of ['IMAGE', 'VIDEO']) {
+  test(`existing ${type} note can change only its title while retaining an empty description`, async t => {
+    const p = await panel({ invoke: ({ action }) => action === 'note_detail' ? { ...fixtures.note_detail, type, content: '', mediaCount: 1 } : undefined });
+    t.after(() => p.dom.window.close()); await p.click('nav-notes'); await p.select();
+    assert.match(p.dom.window.document.querySelector('label[for="note-content"]').textContent, /可选/);
+    p.input('note-title', '仅修改标题'); await p.click('save-draft');
+    const saved = p.calls.find(call => call.action === 'note_save'); assert.ok(saved);
+    assert.equal(saved.args.title, '仅修改标题'); assert.equal(saved.args.content, '');
+    assert.equal('media' in saved.args, false); assert.equal('type' in saved.args, false);
+    assert.match(p.$('note-state').textContent, /已保存/);
+  });
+}
+test('existing TEXT and new notes still require a nonblank body', async t => {
+  const p = await panel({ invoke: ({ action }) => action === 'note_detail' ? { ...fixtures.note_detail, type: 'TEXT', content: '' } : undefined });
+  t.after(() => p.dom.window.close()); await p.click('nav-notes'); await p.select(); p.input('note-title', '标题'); await p.click('save-draft');
+  assert.equal(p.calls.some(call => call.action === 'note_save'), false); assert.match(p.$('feedback').textContent, /标题和正文/);
+  await p.click('new-note'); await p.click('accept-confirm'); p.$('note-business').value = 'biz-one'; p.input('note-title', '新标题'); p.input('note-content', '  '); await p.click('save-draft');
+  assert.equal(p.calls.some(call => call.action === 'note_save'), false); assert.match(p.$('feedback').textContent, /标题和正文/);
+});
