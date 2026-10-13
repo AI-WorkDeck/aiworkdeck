@@ -91,6 +91,8 @@ export const WRITING_ASSISTANCE_CSS = `
   display:grid; place-items:center; border:1px solid var(--wa-border); border-radius:5px;
   background:var(--wa-badge); color:var(--wa-accent); font-size:11px; font-weight:600; line-height:1;
 }
+.awd-writing-assistance .awd-wa-panel[data-mode="suggest"] .awd-wa-option[data-kind="SEMANTIC"] { padding-left:14px; min-height:48px; }
+.awd-writing-assistance .awd-wa-option[data-kind="SEMANTIC"]::before { content:none; }
 .awd-writing-assistance .awd-wa-option[data-kind="COMPANY"]::before { content:"企"; }
 .awd-writing-assistance .awd-wa-option[data-kind="PERSON"]::before { content:"人"; }
 .awd-writing-assistance .awd-wa-option[data-kind="LAW"]::before { content:"法"; }

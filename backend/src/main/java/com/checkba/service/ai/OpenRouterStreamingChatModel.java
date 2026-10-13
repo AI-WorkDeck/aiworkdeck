@@ -204,8 +204,8 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
 
     public Call generateCancellable(List<ChatMessage> messages, int maxOutputTokens,
                                     StreamingResponseHandler<AiMessage> handler) {
-        if (maxOutputTokens < 256 || maxOutputTokens > 4096) {
-            throw new IllegalArgumentException("Writing output limit must be between 256 and 4096 tokens");
+        if (maxOutputTokens < 256 || maxOutputTokens > 8192) {
+            throw new IllegalArgumentException("Writing output limit must be between 256 and 8192 tokens");
         }
         return send(messages, null, maxOutputTokens, handler).firstCall;
     }
@@ -307,13 +307,14 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         if (reasoningEffort != null) {
             body = withReasoningEffort(body, reasoningEffort);
         }
-        // 写作通道（maxOutputTokens 非 null）不带路由偏好：那条路是 qwen 单供应商，且不做重发
-        if (providerRouting != null && maxOutputTokens == null) {
+        // Explicit routing also applies to bounded writing; local provider requeue remains disabled below.
+        if (providerRouting != null) {
             body = withProviderRouting(body, providerRouting);
         }
-        // Verified Flash writing must not spend its small output budget on hidden reasoning.
-        // Other Qwen endpoints can require reasoning; leave every unverified model at its default.
-        if (maxOutputTokens != null && "qwen/qwen3.7-flash".equals(modelName)) {
+        // Default Flash writing keeps its small budget for output; explicit model reasoning is preserved.
+        // The verified DeepSeek Flash disable control uses enabled=false, not an unsupported effort tier.
+        if (maxOutputTokens != null && (reasoningEffort == null && "qwen/qwen3.7-flash".equals(modelName)
+                || "none".equals(reasoningEffort) && "deepseek/deepseek-v4-flash".equals(modelName))) {
             try {
                 ObjectNode writing = (ObjectNode) LENIENT.readTree(body);
                 writing.set("reasoning", LENIENT.createObjectNode().put("enabled", false));

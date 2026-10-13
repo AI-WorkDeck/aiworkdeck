@@ -7,7 +7,7 @@ import { completionDetails } from '../utils/completionDetails.js'
 const preferenceListeners = new Map()
 
 /** Host-scoped vocabulary and explicit lookup. Dependencies stay injectable for isolation tests. */
-export function createWritingAssistanceHost({ projectId, fileId, userId, execute, send, api, storage, writable, language,
+export function createWritingAssistanceHost({ projectId, fileId, userId, execute, send, api, storage, writable, language, active = true,
   openSettings = null, openAccount = null, openRecharge = null, semantic = null, onState = null,
   timers = { set: (fn, ms) => setTimeout(fn, ms), clear: id => clearTimeout(id) } }) {
   const session = `${projectId}:${fileId}:${Date.now()}:${Math.random().toString(36).slice(2)}`
@@ -21,9 +21,12 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
   const reportState = (error = '') => {
     try { onState?.({ session, available: !disposed && !!writable, ...preferences, error }) } catch { /* UI state is optional. */ }
   }
+  semantic?.setActive?.(active)
+  semantic?.setAutomaticEnabled?.(preferences.enabled && !!writable)
   const receivePreferences = (next) => {
     if (disposed) return
     preferences = { ...next }
+    semantic?.setAutomaticEnabled?.(preferences.enabled && !!writable)
     // Only flags change: retain this guest's vocabulary, including recent typing.
     send({ __lo: 'lo-relay', type: 'writing-config', config: { ...preferences, session } })
     reportState()
@@ -160,6 +163,10 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
   }
   return {
     session,
+    setActive(next) {
+      active = !!next; semantic?.setActive?.(active)
+      if (!active && !disposed) send({ __lo: 'lo-relay', type: 'writing-invalidate' })
+    },
     setEnabled(next) { return writePreferences({ enabled: !!next }) },
     async start() {
       publish()

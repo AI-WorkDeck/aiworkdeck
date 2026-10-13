@@ -488,7 +488,7 @@ export default {
     // 「依据」窗格开合 → 客体页的光标上报订阅（dev-board#182）
     insightSubscribed() { this.pushInsightSub() },
     // 退到后台的实例停掉即时审校；切回来若正文已变就补一轮（dev-board#724）。
-    active(v) { this._inlineReviewHost?.setActive(!!v) },
+    active(v) { this._inlineReviewHost?.setActive(!!v); this._writingHost?.setActive(!!v) },
     docKind() { this.$emit('menu-state'); this.initWritingAssistance() },
     canWrite() { this.initWritingAssistance() },
     // 宿主 openFile(file, {locator}) 把定位符挂在 tab 对象上；已打开的标签再次被
@@ -1511,7 +1511,7 @@ export default {
       this._writingHost = createWritingAssistanceHost({
         projectId: Number(this.projectId), fileId: this.file.id, userId: (getCurrentUser() || {}).id || 'local',
         execute: (action, params) => this.executor.executeCommand(action, params), send: this._transportSend,
-        writable: this.canWrite,
+        writable: this.canWrite, active: this.active !== false,
         onState: (state) => this.onAutocompleteState(state),
         semantic: createSemanticWritingHost({
           projectId: Number(this.projectId), fileId: this.file.id, title: this.file.name || this.file.fileName || '', writable: this.canWrite,

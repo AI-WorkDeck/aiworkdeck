@@ -1,6 +1,6 @@
 # AI WorkDeck 隐私说明
 
-更新日期：2026-10-12
+更新日期：2026-10-13
 
 本说明描述 AI WorkDeck 桌面应用的两件事：
 
@@ -26,6 +26,8 @@
 **下一句建议（桌面端，可关闭）。** 默认开启；仅当当前可见对话正常结束且输入框为空时，用你当前选择的模型生成一条下一步指令建议，会增加少量模型用量。请求只使用本机已有的最近 6 条会话消息的有限正文（每条至多 2,000 字符，剔除工具过程和思考），不另外读取附件或文档，最多等待 15 秒；使用本地模型时不改走云端。建议不是自动执行：你可以点击后修改，或在空输入框内按 Tab 发送。输入区的「下一句建议」开关按本机、服务器和用户保存；关闭后不再发起新的建议请求，已发出的模型请求可能仍完成。
 
 建议及采纳、修改、忽略结果只在本机保留 30 天；删除或回退会话时同步清除该会话的建议记录。采纳或修改必须关联后端已接收的那条用户消息；发送失败不记为采纳。生成同一会话的后续建议时，最近 3 条反馈（包括建议文字及用户最终发送文字的前 500 字符）会随上下文发送给当前模型，用于调整建议；不会自动训练模型，也不进入匿名使用统计或另行回传给 AI WorkDeck。建议请求使用与原对话相同的模型供应商数据流。
+
+**文档自动补全（桌面端，可关闭）。** 开启后，停笔时使用当前默认主模型生成短建议，再把同一候选、光标附近原文和候选引用的依据交给 Kimi K3、Qwen3.8 Max 分别审读。生成使用有界的当前文档上下文及你明确选择的参考材料，不自动扫描项目；审读仅接收该候选所引用的依据，不另行读取附件。三次调用均通过现有 OpenRouter 平台额度或自备密钥通道计费，共享30秒期限；本地模型通道不转发云端。正文与候选不写入该建议服务的日志或数据库，也不用于自动训练。模型审读不能保证正确，建议仅在你接受后插入，接受前还会核对文档版本和光标位置。可在自动补全设置或 AI 审校面板关闭并重新开启；关闭会取消在途任务，已发生的用量仍可能结算。手动本地词库不受影响。
 
 **智能决策辅助（实验性，可选）。** 对话输入框下方显示开启/关闭状态，默认关闭，偏好按本机的登录用户和服务器分别保存。开启后，本次输入及可用工具的类目、工具名会经当前 OpenRouter 通道发送给 **TypeSafe Jev**，仅用于预选工具类目，尝试减少提供给主模型的工具说明 token 和总费用；它不更换你选定的主模型。Jev 调用本身会产生少量费用，按当前平台额度或自带密钥结算，回复可能稍慢；单次判断最多等待 2.5 秒，低置信度、超时或不可用时沿用原流程，不保证每次更快或更省。
 
@@ -179,7 +181,7 @@
 
 # AI WorkDeck Privacy Note
 
-Last updated: 2026-10-12
+Last updated: 2026-10-13
 
 ## Part 1 — Platform services
 
@@ -188,6 +190,8 @@ Last updated: 2026-10-12
 **Next-message suggestions (desktop, optional).** On by default. Only after the visible conversation finishes normally, while its input is empty, your selected model proposes one next message, adding a small amount of model usage. A request uses bounded text from up to six existing local messages (at most 2,000 characters each, excluding tool-process markup and reasoning), without separately reading attachments or documents, and waits at most 15 seconds. Local models never fall back to cloud providers. Nothing executes automatically: click a suggestion to edit it, or press Tab in the empty input to send it. The “Next message” switch is stored per user and server on this device. Turning it off stops new requests; an already submitted model request may still finish.
 
 Suggestions and acceptance, editing or dismissal feedback are stored only on this device for 30 days and cleared when the conversation is deleted or rolled back. Acceptance or editing must reference a user message durably received by the backend; failed sends are not counted as acceptance. Up to three recent feedback examples from the same conversation, including the proposal and the first 500 characters of the message actually sent, accompany later suggestion requests to your current model. They do not automatically train a model, enter anonymous usage statistics, or get separately reported to AI WorkDeck. Suggestion requests follow the same provider data flow as the original conversation.
+
+**Document autocomplete (desktop, optional).** When enabled, a pause in typing may send bounded document context and references you explicitly selected to your default main model for a short suggestion; it does not scan the project. Kimi K3 and Qwen3.8 Max then independently receive the same candidate, text around the cursor and only the evidence cited by that candidate, without separately reading attachments. All three calls use your existing OpenRouter platform credits or own key and share a 30-second deadline. The local-model channel does not switch to cloud providers. This suggestion service does not log or store document/candidate text in its database or use it for automatic training. Review is not a correctness guarantee: nothing is inserted until you accept, after another document-version and cursor check. Turn autocomplete off or back on in autocomplete settings or the AI review panel. Disabling cancels pending work, but usage already incurred may still be billed. Manual local vocabulary remains available.
 
 **Decision assistance (experimental, optional).** An on/off control below the chat input is off by default. Its preference is stored separately for each signed-in user and server on this device. When enabled, your current input and the available tool categories and names are sent to **TypeSafe Jev** through your current OpenRouter channel, solely to preselect tool categories. It tries to reduce tool-description tokens and total cost without changing your chosen main model. The Jev call itself adds a small charge, billed through your platform credits or your own key, and replies may be slightly slower. Each decision waits at most 2.5 seconds; low confidence, timeouts or unavailability keep the original workflow. Faster or cheaper replies are not guaranteed.
 
