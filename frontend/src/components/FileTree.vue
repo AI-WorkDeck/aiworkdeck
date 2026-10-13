@@ -202,6 +202,15 @@
           </view>
           <text class="context-menu-text">{{ $t('fileTree.manageTags') }}</text>
         </view>
+        <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder && !contextMenu.targetItem.readOnly && viewMode !== 'recycle'" class="context-menu-item" @tap="handleFileClientAccess(contextMenu.targetItem)">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="5" y="10" width="14" height="11" rx="2"/>
+              <path d="M8 10V6a4 4 0 0 1 8 0v4" stroke-linecap="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.clientAccessTitle') }}</text>
+        </view>
         <!-- 事项（dev-board#900）：「添加事项…」交给宿主开工作台唯一的 TaskDialog（预置关联这份文件）；
              这份文件有未完成事项时多一项「查看事项 (N)」，宿主打开 rail 日程面板并按文件过滤 -->
         <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder" class="context-menu-item" @tap="$emit('add-task', contextMenu.targetItem); closeContextMenu()">
@@ -676,7 +685,7 @@
 </template>
 
 <script>
-import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile } from '@/services/api.js'
+import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess } from '@/services/api.js'
 import { host } from '@/services/host.js'
 import { showDialog } from '@/utils/dialog.js'
 import { findTopmostDeletedAncestor, summarizeDeleteResults, collapseToTopmostSelected, computeDisplayFiles } from '@/utils/fileTreeRecycle.js'
@@ -753,6 +762,8 @@ export default {
   data() {
     return {
       files: [],
+      fileAccessRequest: 0,
+      fileAccessBusy: false,
       loading: false,
       selectedFileId: null,
       showRenameDialog: false,
@@ -1049,6 +1060,8 @@ export default {
     projectId: {
       immediate: true,
       handler() {
+        this.fileAccessRequest++
+        this.fileAccessBusy = false
         // 「展开更多」的渲染上限与引用角标都是按项目的，换项目必须归零
         this.revealCounts = {}
         this.refCounts = {}
@@ -1101,12 +1114,45 @@ export default {
     if (typeof window !== 'undefined') window.addEventListener('keydown', this._onTagDialogKeydown, true)
   },
   beforeUnmount() {
+    this.fileAccessRequest++
     if (this._marqueeRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._marqueeRaf)
     uni.$off('file-drag-start', this._onDragStart)
     uni.$off('file-drag-end', this._onDragEnd)
     if (typeof window !== 'undefined') window.removeEventListener('keydown', this._onTagDialogKeydown, true)
   },
   methods: {
+    async handleFileClientAccess(item) {
+      this.closeContextMenu()
+      if (!item || item.isFolder || item.readOnly || this.viewMode === 'recycle' || this.fileAccessBusy) return
+      const projectId = this.projectId
+      const requestId = ++this.fileAccessRequest
+      const current = () => requestId === this.fileAccessRequest && String(projectId) === String(this.projectId)
+      this.fileAccessBusy = true
+      try {
+        const access = await getProjectFileAccess(projectId, item.id)
+        if (!current()) return
+        const visible = access.clientVisible === true
+        const canManage = access.canManageAccess === true
+        const explanation = this.$t('fileTree.clientAccessExplain')
+        const result = await showDialog({
+          title: this.$t('fileTree.clientAccessTitle'),
+          content: `${item.name}\n${this.$t('fileTree.clientAccessCurrent', { state: visible ? this.$t('fileTree.clientAccessVisible') : this.$t('fileTree.clientAccessInternal') })}\n${explanation}\n${canManage ? (visible ? this.$t('fileTree.clientAccessRevokeNote') : this.$t('fileTree.clientAccessGrantNote')) : this.$t('fileTree.clientAccessReadOnly')}`,
+          showCancel: canManage,
+          confirmText: canManage ? (visible ? this.$t('fileTree.clientAccessRevoke') : this.$t('fileTree.clientAccessGrant')) : this.$t('fileTree.clientAccessOk'),
+          cancelText: this.$t('fileTree.cancel'),
+        })
+        if (!current() || !canManage || !result?.confirm) return
+        const saved = await updateProjectFileAccess(projectId, item.id, !visible)
+        if (!current()) return
+        item.clientVisible = saved.clientVisible === true
+        uni.showToast({ title: item.clientVisible ? this.$t('fileTree.clientAccessGranted') : this.$t('fileTree.clientAccessRevoked'), icon: 'none' })
+        await this.loadFiles()
+      } catch (error) {
+        if (current()) this.showErrorModal(error.message || this.$t('fileTree.clientAccessFailed'), this.$t('fileTree.clientAccessTitle'))
+      } finally {
+        if (current()) this.fileAccessBusy = false
+      }
+    },
     // BUG-40：Plan 模式落盘的根目录物理名是英文 "AI Assistant Files"（后端契约，
     // ProjectOverviewService.AI_ARTIFACT_FOLDER_NAME，改物理名要动落盘路径/统计条剔除
     // 逻辑等多处后端代码，风险不小）。这里只在文件树的展示层加一个中文别名，

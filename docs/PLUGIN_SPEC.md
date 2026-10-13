@@ -897,3 +897,23 @@ manifest 摘要、档位、权限、文件数、目标槽、`canAutoInstall`、�
 AI 工具 `capability_install(url)` 内部只做 `plan`；模型必须用 `<question>` 停机把计划
 念给用户听，确认后才调 `capability_apply(planId)`。**工具的登录 + admin 闸写在代码里**，
 不靠 skill 的 `allowed_tools`（那份白名单只裁可见性、不拦分发）。
+
+## 16. 项目沟通与项目文件材料（v2.11，宿主 0.61.0+）
+
+SDK 1.5.0 新增可选权限 `im`。`im.request {action,params}` 经 `/api/plugins/{id}/im` 的启用、封禁、权限及身份校验，转到固定协作服务 `/api/im/action`。支持 `self/list/create/invite/join/members/removeMember/leave/messages/send/read/upload/download/fileAccess`；`import/binding/export/sendFile` 在本机执行项目权限校验与文件操作。任意 URL、数据库路径、账户密钥都不进入插件界面。
+
+聊天 ACL 独立于团队/律所和项目 ACL。加入会话不授予项目库权限。邀请为24小时有效的一次性码，私聊最多2人、群聊最多100人，发送使用 clientMessageId 幂等；单附件8 MiB、每会话100 MiB，JSON请求12 MiB。主动存入项目的文件和归档通过普通项目文件链路参与Git；会话关联保存原项目UUID、会话UUID，附件来源保存附件UUID/文件UUID/SHA-256。数据库数字ID不充当跨设备身份，默认不自动归档聊天。项目操作需相应 file_read/file_write 和当前项目权限；sendFile声明两种文件权限，以便首次引用时保存跨Git项目标识。首次引用自动关联须内部写成员，其余成员待关联后才可引用。
+
+`chat.addFile {path}`（file_read）把当前项目真实文件加入AI材料，不自动发送；`files.prepareDrag {path}`（file_read）返回真实文件描述和短时单次 `dragToken/dragType/expiresAt`。插件传入按钮局部 `rect`（left/top/width/height），宿主在该iframe边界内提供原生拖柄，避免opaque iframe无法跨源拖出的浏览器限制；返回 `hostHandle:true`。宿主 dragstart 同步写随机MIME，drop消费票据并再次校验项目；dragend清理。无rect时只能准备票据，不能承诺跨iframe原生拖拽。禁用、卸载、项目/账户变化、失焦与过期清理票据。不得放松sandbox，不信iframe自报的文件ID。
+
+`account.changed` 事件只通知身份改变，不带个人数据；插件必须丢弃缓存及在途结果。SDK源、两份仓内副本及官网模板保持一致。旧宿主返回unknown_method，插件应说明最低版本，不能用localStorage模拟多人通信。
+
+单文件客户权限是服务端统一规则（`ProjectFileAccessService`）：当前项目成员中的内部角色默认可读；项目 CLIENT 或全局 CLIENT 只读自己上传的文件及明确 `clientVisible=true` 的文件。旧 NULL 视为 false。非成员仍不能访问；文件权限不因加入聊天或 Git 克隆扩大。`GET/PUT /api/projects/{projectId}/files/{fileId}/access` 读取或设置客户可见性，写入需非客户项目写权限。拒绝正文固定为“抱歉文件还在准备中，请联系您的律师。”。下载、文本、搜索、移动端文件源共用此规则；拥有整个项目工具能力的律师 AI 工作台及跨文件派生分析暂不向客户开放。
+
+项目文件引用是发送时快照，携带 `source.projectUid/fileUid`，不含本机路径；引用前检查原文件可读。快照权限独立：默认内部可见，上传者本人仍可读，只有会话的非客户 OWNER 或上传者可通过 `fileAccess` 为会话内客户开放/收回。不可读附件消息仅返回 `{id,available:false,message}`，不泄露名称、摘要或来源；下载同样鉴权。权限收回禁止后续读取，但不能撤回对方已保存的副本。每次可见态轮询刷新最近页的附件权限，显式刷新覆盖全部已加载历史。
+
+上传 `clientMessageId` 与发送相同，仅同一发送重试复用附件；同键异内容/来源拒绝，缺键每次新建，新发送不会继承旧附件公开权限。归档同时受10000条和16 MiB限制，超限回滚，不生成部分成品。项目写入用项目行锁串行化，回滚清理本次新增物理文件。
+
+`im.downloadAttachment {conversationId,attachmentId}`（im）在服务端再次校验附件可读后，由宿主 Blob 下载链路触发另存为，不要求项目写权限、不创建项目文件。返回 `{started:true,name}` 只表示发起下载，不表示用户已保存；文件名清洗、8 MiB边界及账户/项目迟到校验均在宿主完成。客户可直接下载自己的或已开放附件，不必先存入项目。
+
+文件变量、音频转写/纪要读取沿用来源文件ACL；股东核查、诉讼图表、内部插件任务结果等可混合私有材料的模块禁止客户读取。`ProjectMemberService.isClient` 与写权限同时检查全局客户身份，防默认成员/owner角色绕过Git与云端内部成员限制。

@@ -39,6 +39,7 @@ public class AiAgentController {
     private final com.checkba.service.ai.subagent.SubAgentService subAgentService;
     private final com.checkba.service.ai.AgentInboxService agentInboxService;
     private final com.checkba.service.ai.ChatModelFactory chatModelFactory;
+    private final com.checkba.service.ProjectFileAccessService fileAccess;
 
     @org.springframework.beans.factory.annotation.Autowired
     public AiAgentController(SseEmitterService sseEmitterService,
@@ -52,7 +53,8 @@ public class AiAgentController {
                             com.checkba.service.ai.ClientCapabilityService clientCapabilityService,
                             com.checkba.service.ai.subagent.SubAgentService subAgentService,
                             com.checkba.service.ai.AgentInboxService agentInboxService,
-                            com.checkba.service.ai.ChatModelFactory chatModelFactory) {
+                            com.checkba.service.ai.ChatModelFactory chatModelFactory,
+                            com.checkba.service.ProjectFileAccessService fileAccess) {
         this.sseEmitterService = sseEmitterService;
         this.agentOrchestrator = agentOrchestrator;
         this.messageService = messageService;
@@ -65,6 +67,7 @@ public class AiAgentController {
         this.subAgentService = subAgentService;
         this.agentInboxService = agentInboxService;
         this.chatModelFactory = chatModelFactory;
+        this.fileAccess = fileAccess;
     }
 
     /**
@@ -162,6 +165,11 @@ public class AiAgentController {
         }
         if (request.getProjectId() == null || !projectMemberService.hasReadPermission(request.getProjectId(), userId)) {
             return chatError(403, LangText.of("无权访问该项目", "You do not have access to this project"));
+        }
+        // The full workbench includes project-wide disk and Python tools. Customers use the
+        // DD/IM file access paths; a file-level grant does not grant this staff tool workspace.
+        if (fileAccess.isClient(request.getProjectId(), userId)) {
+            return chatError(403, com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE);
         }
         if (!canUseConversation(request.getConversationId(), userId)) {
             return chatError(403, LangText.of("无权操作该会话", "You do not have permission for this conversation"));
@@ -382,7 +390,8 @@ public class AiAgentController {
         if (userId == null) {
             return ResponseEntity.status(401).body("{\"status\":\"error\", \"message\":\"请先登录\"}");
         }
-        if (request.getProjectId() == null || !projectMemberService.hasWritePermission(request.getProjectId(), userId)) {
+        if (request.getProjectId() == null || !projectMemberService.hasWritePermission(request.getProjectId(), userId)
+                || fileAccess.isClient(request.getProjectId(), userId)) {
             return ResponseEntity.status(403).body("{\"status\":\"error\", \"message\":\"" +
                     LangText.of("无权写入该项目", "You do not have write access to this project") + "\"}");
         }

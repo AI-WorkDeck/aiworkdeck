@@ -26,6 +26,7 @@ public class SensitiveController {
     private final StorageServiceFactory storageServiceFactory;
     private final ProjectFileService projectFileService;
     private final ProjectMemberService projectMemberService;
+    private final ProjectFileAccessService fileAccess;
 
     public record Request(Long fileId, List<String> strategies, String mode, @com.fasterxml.jackson.annotation.JsonAlias("customWords") List<String> customTerms,
                           List<String> excludedTerms, String password, String recoveryKit) {
@@ -68,6 +69,7 @@ public class SensitiveController {
         if (request.fileId() == null) return response(400, Map.of("error", "fileId is required"));
         try {
             ProjectFile source = projectFileService.getFile(request.fileId());
+            fileAccess.requireRead(source, userId);
             if (!projectMemberService.hasReadPermission(source.getProjectId(), userId)
                     || (!action.equals("preview") && !projectMemberService.hasWritePermission(source.getProjectId(), userId))) {
                 return response(403, Map.of("error", "无权读取文件或在该项目生成文件"));
@@ -84,6 +86,8 @@ public class SensitiveController {
             if (action.equals("desensitize") && request.mode() == null) return response(200, saved);
             return response(200, Map.of("file", saved, "recoveryKit", result.recoveryKit(),
                     "counts", result.counts(), "suspects", result.suspects(), "warnings", result.warnings()));
+        } catch (ProjectFileAccessService.FileAccessDeniedException e) {
+            return response(403, Map.of("error", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return response(400, Map.of("error", e.getMessage() == null ? "请求无效" : e.getMessage()));
         } catch (Exception e) {

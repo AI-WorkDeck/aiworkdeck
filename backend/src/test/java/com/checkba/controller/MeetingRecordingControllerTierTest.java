@@ -47,7 +47,8 @@ class MeetingRecordingControllerTierTest {
         when(transcriptionService.tierValue()).thenReturn("byok");
 
         Map<String, Object> res = new MeetingRecordingController(
-                meetingService, transcriptionService, projectMemberService).list(1L, "sess");
+                meetingService, transcriptionService, projectMemberService,
+                        mock(com.checkba.repository.ProjectFileRepository.class), mock(com.checkba.service.ProjectFileAccessService.class)).list(1L, "sess");
 
         assertEquals("byok", res.get("tier"));
     }

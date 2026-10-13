@@ -43,7 +43,7 @@ public class PluginService {
 
     /** manifest 已定义的权限值（v1 四项 + v2.7 的 ai），未知值仅告警不拒绝（向前兼容） */
     private static final Set<String> KNOWN_PERMISSIONS =
-            Set.of("file_read", "file_write", "network", "editor", "ai");
+            Set.of("file_read", "file_write", "network", "editor", "ai", "im");
 
     /** manifest.packs 里的 pack id 规则，与 NativePackService / PluginMarketService 同一套 */
     private static final java.util.regex.Pattern PACK_ID =

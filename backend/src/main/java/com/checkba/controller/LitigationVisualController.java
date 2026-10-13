@@ -6,6 +6,7 @@ package com.checkba.controller;
 import com.checkba.service.LangText;
 import com.checkba.service.LitigationVisualPanelService;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectFileAccessService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -24,10 +25,13 @@ public class LitigationVisualController {
 
     private final LitigationVisualPanelService panelService;
     private final ProjectMemberService projectMemberService;
+    private final ProjectFileAccessService fileAccess;
 
     private void requireMember(String sessionId, Long projectId) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) throw new IllegalArgumentException("未登录");
+        // The gallery and restyle combine private semantic maps and generated case materials.
+        if (fileAccess.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         if (projectId == null || !projectMemberService.hasReadPermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权访问该资源", "You don't have permission to access this resource"));
         }
@@ -37,6 +41,8 @@ public class LitigationVisualController {
     private void requireWriter(String sessionId, Long projectId) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) throw new IllegalArgumentException("未登录");
+        // The gallery and restyle combine private semantic maps and generated case materials.
+        if (fileAccess.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         if (projectId == null || !projectMemberService.hasWritePermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权修改该项目的文件", "You don't have permission to modify files in this project"));
         }

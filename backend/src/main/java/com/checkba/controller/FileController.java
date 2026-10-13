@@ -75,6 +75,9 @@ public class FileController {
     @Autowired
     private com.checkba.service.DocumentTextService documentTextService;
 
+    @Autowired
+    private com.checkba.service.ProjectFileAccessService fileAccess;
+
     /**
      * 文件的物理磁盘路径（「在 Finder 中显示」用）。
      */
@@ -87,8 +90,8 @@ public class FileController {
             return ResponseEntity.ok(Map.of("code", 1, "message", com.checkba.service.LangText.of("文件不存在", "File not found")));
         }
         ProjectFile pf = pfOpt.get();
-        if (!isAuthorizedForProject(null, sessionHeader, pf.getProjectId())) {
-            return ResponseEntity.status(403).body(Map.of("code", 1, "message", com.checkba.service.LangText.of("无权访问该文件", "You do not have access to this file")));
+        if (!isAuthorizedForFile(null, sessionHeader, pf)) {
+            return ResponseEntity.status(403).body(Map.of("code", 1, "message", com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE));
         }
         if (!org.springframework.util.StringUtils.hasText(pf.getFilePath())) {
             return ResponseEntity.ok(Map.of("code", 1, "message", com.checkba.service.LangText.of("该文件没有物理路径", "This file has no physical path")));
@@ -108,18 +111,18 @@ public class FileController {
      * 浏览器 &lt;a&gt; 下载无法设请求头，只能用 ?token=&lt;sessionId&gt;；fetch/XHR 走 X-Session-Id 头。
      * 两者取其一解析出 userId 后校验项目成员资格。此前这些接口完全无鉴权，可按数字 id 遍历下载他人文件。
      */
-    private boolean isAuthorizedForProject(String token, String sessionHeader, Long projectId) {
-        if (projectId == null) {
+    private boolean isAuthorizedForFile(String token, String sessionHeader, ProjectFile file) {
+        if (file == null) {
             return false;
         }
         String sid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
         Long userId = AuthController.getUserIdFromSession(sid);
-        return userId != null && projectMemberService.hasReadPermission(projectId, userId);
+        return fileAccess.canRead(file, userId);
     }
 
     /**
      * 写权限校验：只有 owner/ADMIN/PARTICIPANT 可改写项目文件字节，
-     * READ_ONLY 成员与客户虽然读得到（isAuthorizedForProject 为真）但不得覆盖。
+     * READ_ONLY 成员与客户虽然读得到（文件可见）但不得覆盖。
      */
     private boolean isAuthorizedForWrite(String token, String sessionHeader, Long projectId) {
         if (projectId == null) {
@@ -127,7 +130,8 @@ public class FileController {
         }
         String sid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
         Long userId = AuthController.getUserIdFromSession(sid);
-        return userId != null && projectMemberService.hasWritePermission(projectId, userId);
+        return userId != null && projectMemberService.hasWritePermission(projectId, userId)
+                && !fileAccess.isClient(projectId, userId);
     }
 
     /**
@@ -166,9 +170,13 @@ public class FileController {
             if (projectFileOpt.isPresent()) {
                 ProjectFile pf = projectFileOpt.get();
                 // 鉴权：只有该文件所属项目的成员可下载（浏览器下载用 ?token=，其它用 X-Session-Id 头）
-                if (!isAuthorizedForProject(token, sessionHeader, pf.getProjectId())) {
+                if (!isAuthorizedForFile(token, sessionHeader, pf)) {
                     log.warn("[FileDownload] 拒绝越权下载: fileId={}, projectId={}", fileId, pf.getProjectId());
-                    return ResponseEntity.status(403).build();
+                    return ResponseEntity.status(403)
+                            .contentType(new MediaType("text", "plain", java.nio.charset.StandardCharsets.UTF_8))
+                            .body(new org.springframework.core.io.ByteArrayResource(
+                                    com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE
+                                            .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
                 }
                 log.info("[FileDownload] 找到文件记录: id={}, name={}, filePath={}, wpsFileId={}",
                     pf.getId(), pf.getName(), pf.getFilePath(), pf.getWpsFileId());
@@ -602,8 +610,8 @@ public class FileController {
             if (fileOpt.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("code", -1, "message", com.checkba.service.LangText.of("文件不存在", "File not found")));
             }
-            if (!isAuthorizedForProject(token, sessionHeader, fileOpt.get().getProjectId())) {
-                return ResponseEntity.status(403).body(Map.of("code", -1, "message", com.checkba.service.LangText.of("无权访问该文件", "You do not have access to this file")));
+            if (!isAuthorizedForFile(token, sessionHeader, fileOpt.get())) {
+                return ResponseEntity.status(403).body(Map.of("code", -1, "message", com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE));
             }
 
             String text = extractDocumentText(fileOpt.get());
@@ -653,9 +661,9 @@ public class FileController {
             ProjectFile targetFile = targetOpt.get();
 
             // 鉴权：两个文档所属项目都需当前用户有权访问
-            if (!isAuthorizedForProject(token, sessionHeader, sourceFile.getProjectId())
-                    || !isAuthorizedForProject(token, sessionHeader, targetFile.getProjectId())) {
-                return ResponseEntity.status(403).body(Map.of("code", -1, "message", com.checkba.service.LangText.of("无权访问该文件", "You do not have access to this file")));
+            if (!isAuthorizedForFile(token, sessionHeader, sourceFile)
+                    || !isAuthorizedForFile(token, sessionHeader, targetFile)) {
+                return ResponseEntity.status(403).body(Map.of("code", -1, "message", com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE));
             }
 
             // 3. 检查文件类型（只支持 doc/docx）

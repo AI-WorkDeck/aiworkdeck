@@ -118,3 +118,9 @@ manifest 建议：用到 v2.7 能力（doc.*/events/ai.request）时声明 `"min
 - 每轮改动控制在一个可测试的增量，装完就请用户实测，不要闷头堆一大版。
 - 校验错误、桥的报错都如实告诉用户你在修什么，不要含糊其辞。
 - 插件想被同事使用时，指引用户走官网插件广场的提交流程（登录官网提交，Web 插件人工审核后签名上架）；开发安装只在本机生效。
+
+### 项目沟通与文件材料（宿主 0.61.0+）
+
+`im.request {action,params}` 需声明 `im` 权限，调用固定 IM 动作，不接受任意 URL，不返回凭据。项目文件导入、归档、绑定还需 `file_write`；发送项目文件需 `file_read`；服务端分别检查会话成员及项目权限。聊天参与不等于项目授权。可用动作与限制见 `official-plugins/project-im/README.md`。
+
+`chat.addFile {path}` 需 `file_read`，只添加当前项目文件材料，不自动向 AI 发送。`files.prepareDrag {path}` 返回短时一次性拖拽票据，需在真正 dragstart 之前准备，并在 dragstart 同步写入返回的随机 `dragType/dragToken` MIME；dragend 用 `files.endDrag {}` 清理。账户变更的 `account.changed` 与项目变更都应清缓存、作废在途结果。旧宿主返回 unknown_method，明确提示需要兼容宿主，不降级为本地假聊天。

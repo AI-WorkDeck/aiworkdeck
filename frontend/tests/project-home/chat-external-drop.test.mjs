@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { nativeDataTransfer, captureDroppedFiles, isExternalFileDrag, importDroppedFile } from '../../src/utils/fileTreeExternalDrop.js'
+import { consumePluginImDrag } from '../../src/utils/pluginImDrag.js'
 const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
 const overview = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
 
@@ -28,8 +29,8 @@ function makeChat({ failure = false } = {}) {
   )
   const handler = overview.slice(overview.indexOf('    handleAiDrop(e) {'), overview.indexOf('    /** 把一份项目文件挂进 AI 上下文'))
   let pending
-  const handleAiDrop = new Function('nativeDataTransfer', 'captureDroppedFiles', 'isExternalFileDrag', 'host', 'uni', 'return ({' + handler + '}).handleAiDrop')(
-    nativeDataTransfer, captureDroppedFiles, isExternalFileDrag, host, { showToast: o => toasts.push(o.title) },
+  const handleAiDrop = new Function('nativeDataTransfer', 'captureDroppedFiles', 'isExternalFileDrag', 'host', 'uni', 'consumePluginImDrag', 'return ({' + handler + '}).handleAiDrop')(
+    nativeDataTransfer, captureDroppedFiles, isExternalFileDrag, host, { showToast: o => toasts.push(o.title) }, consumePluginImDrag,
   )
   const vm = { $t: key => key, droppedEntriesHaveDirectory: () => false, $refs: { chatInterface: {
     uploadLocalFilesAndAddContext: files => { pending = api.uploadLocalFilesAndAddContext(files) },
