@@ -168,6 +168,20 @@ class WritingLiveEvaluationTest {
                     AtomicLong evaluationStartedNanos=new AtomicLong();
                     java.util.function.LongSupplier elapsed=() -> Math.max(1,TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-evaluationStartedNanos.get()));
                     Map<String,Map<String,Long>> phaseTimings=new ConcurrentHashMap<>();
+                    // Component-only barrier observes both real decisions before product short-circuiting.
+                    // The product deadline and underlying cancellation remain active; A/C deliver immediately.
+                    Map<String,Runnable> terminalCallbacks=new ConcurrentHashMap<>();
+                    java.util.concurrent.atomic.AtomicBoolean delivered=new java.util.concurrent.atomic.AtomicBoolean();
+                    java.util.function.BiConsumer<String,Runnable> deliver=(phase,callback) -> {
+                        if(!components || phase.equals("generation")) { callback.run(); return; }
+                        terminalCallbacks.put(phase,callback);
+                        if(terminalCallbacks.size()==2 && delivered.compareAndSet(false,true)) {
+                            for(String terminalPhase:List.of("review-0","review-1")) {
+                                phaseTimings.get(terminalPhase).put("deliveredMs",elapsed.getAsLong());
+                                terminalCallbacks.get(terminalPhase).run();
+                            }
+                        }
+                    };
                     List<OpenRouterStreamingChatModel> observedModels=new ArrayList<>();
                     for(int modelIndex=0;modelIndex<3;modelIndex++) {
                         String phase=modelIndex==0?"generation":"review-"+(modelIndex-1);
@@ -207,13 +221,13 @@ class WritingLiveEvaluationTest {
                                         timing.putIfAbsent("completedMs",elapsed.getAsLong());
                                         if(response!=null) recordPhaseUsage(phase,response.tokenUsage(),phaseUsage,phaseOutputTokens);
                                         String text=response==null||response.content()==null?"":response.content().text();
-                                        raw.set(text);responses.add(text);phaseResponses.put(phase,text);original.onComplete(response);
+                                        raw.set(text);responses.add(text);phaseResponses.put(phase,text);deliver.accept(phase,() -> original.onComplete(response));
                                     }
                                     public void onError(Throwable error){
                                         timing.putIfAbsent("errorMs",elapsed.getAsLong());
                                         if(error instanceof OpenRouterStreamingChatModel.EmptyResponseException empty)
                                             recordPhaseUsage(phase,empty.tokenUsage(),phaseUsage,phaseOutputTokens);
-                                        transportError.set(error.getClass().getSimpleName());phaseErrors.put(phase,error.getClass().getSimpleName());original.onError(error);
+                                        transportError.set(error.getClass().getSimpleName());phaseErrors.put(phase,error.getClass().getSimpleName());deliver.accept(phase,() -> original.onError(error));
                                     }
                                 });
                                 var tracked=mock(okhttp3.Call.class,org.mockito.AdditionalAnswers.delegatesTo(call));
@@ -300,7 +314,7 @@ class WritingLiveEvaluationTest {
                             if(start!=null && end!=null) snapshotTiming.put("elapsedMs",Math.max(0,end-start));
                             timingSnapshot.put(phase,Map.copyOf(snapshotTiming));
                         });
-                        Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",components?"joint-real-review-component":reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("requiredRejectionCategory",components?coverageRequirements.get(c.name):""); row.put("jointApprovalObserved",jointApprovalObserved); row.put("individualApprovals",Map.copyOf(individualApprovals)); row.put("reviewerDecisions",Map.copyOf(reviewerDecisions)); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseOrigins",Map.copyOf(phaseOrigins)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("phaseRequestFacts",Map.copyOf(phaseFacts)); row.put("phaseRequestCandidates",Map.copyOf(phaseCandidates)); row.put("phaseUsage",Map.copyOf(phaseUsage)); row.put("phaseModels",phaseModelMetadata(model,generationReasoningEffort,reviewModels,reviewEfforts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens)); row.put("phaseTimings",Map.copyOf(timingSnapshot)); row.put("phaseTimingsCapturedMs",elapsed.getAsLong());
+                        Map<String,Object> row=new LinkedHashMap<>(); row.put("case",c.name); row.put("repetition",round); row.put("evaluationKind",components?"joint-real-review-component-terminal-barrier":reviewFixtures.containsKey(c.name)?"fixed-candidate-real-review":"real-generation-and-review"); row.put("expectedAnswer",c.expectAnswer); row.put("passed",passed); row.put("behaviorPassed",behaviorPassed); row.put("judged",judged); row.put("requiredRejectionObserved",requiredRejectionObserved); row.put("requiredRejectionCategory",components?coverageRequirements.get(c.name):""); row.put("jointApprovalObserved",jointApprovalObserved); row.put("individualApprovals",Map.copyOf(individualApprovals)); row.put("reviewerDecisions",Map.copyOf(reviewerDecisions)); row.put("status",view.status()); row.put("result",view); row.put("syntheticRawResponse",raw.get()); row.put("syntheticResponses",List.copyOf(responses)); row.put("transportError",transportError.get()); row.put("phaseResponses",Map.copyOf(phaseResponses)); row.put("phaseOrigins",Map.copyOf(phaseOrigins)); row.put("phaseErrors",Map.copyOf(phaseErrors)); row.put("phaseRequestAssembledTexts",Map.copyOf(phaseAssembledTexts)); row.put("phaseRequestFacts",Map.copyOf(phaseFacts)); row.put("phaseRequestCandidates",Map.copyOf(phaseCandidates)); row.put("phaseUsage",Map.copyOf(phaseUsage)); row.put("phaseModels",phaseModelMetadata(model,generationReasoningEffort,reviewModels,reviewEfforts)); row.put("outcome",outcome); row.put("syntheticBefore",c.before); row.put("syntheticAfter",c.after); row.put("syntheticBody",c.body); row.put("phaseOutputTokens",Map.copyOf(phaseOutputTokens)); row.put("phaseTimings",Map.copyOf(timingSnapshot)); row.put("phaseTimingsCapturedMs",elapsed.getAsLong());
                         synchronized(report) {
                             report.add(row); report.sort(reportOrder);
                             Files.writeString(out,json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("providerSort",providerSort.isEmpty()?"provider-default":providerSort,"dataset",dataset,"model",model,"generationReasoningEffort",generationReasoningEffort==null?"provider-default":generationReasoningEffort,"reviewModels",reviewModels,"reviewReasoningEfforts",reviewEfforts,"phaseModels",phaseModelMetadata(model,generationReasoningEffort,reviewModels,reviewEfforts),"evaluationSummary",evaluationSummary(report,coverageRequirements,expectedCases,repetitions),"cases",report)));
@@ -369,6 +383,8 @@ class WritingLiveEvaluationTest {
                     || !decision.path("grammar").isTextual() || !Set.of("valid","invalid","uncertain").contains(decision.path("grammar").asText())
                     || !decision.path("continuation").isTextual() || !Set.of("appropriate","inappropriate","uncertain").contains(decision.path("continuation").asText())
                     || !decision.path("evidence").isArray()) invalid="invalid-review-schema-or-candidate";
+            else if(decision.path("facts").asText().equals("unsupported") && decision.path("evidence").isEmpty())
+                invalid="ungrounded-factual-rejection";
             else if(!decision.path("evidence").isEmpty()
                     && !WritingSuggestionService.reviewEvidenceValid(decision.path("evidence"),facts)) invalid="invalid-request-evidence";
             else if(decision.path("facts").asText().equals("entailed") && decision.path("grammar").asText().equals("valid")
@@ -404,7 +420,7 @@ class WritingLiveEvaluationTest {
         var uncertain=jointReview(json,noEvidence.toString(),candidate,facts,true);
         assertTrue(uncertain.valid()); assertFalse(uncertain.approved()); assertFalse(uncertain.rejected());
         noEvidence.put("facts","unsupported");
-        assertTrue(jointReview(json,noEvidence.toString(),candidate,facts,true).rejected());
+        assertFalse(jointReview(json,noEvidence.toString(),candidate,facts,true).valid(),"A factual rejection without a source quote cannot count as grounded coverage");
         var invented=node.deepCopy();
         ((com.fasterxml.jackson.databind.node.ObjectNode)invented.path("evidence").get(0)).put("quote","无此原文");
         assertFalse(jointReview(json,invented.toString(),candidate,facts,true).valid());
