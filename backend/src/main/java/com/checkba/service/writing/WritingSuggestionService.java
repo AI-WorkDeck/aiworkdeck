@@ -217,6 +217,7 @@ public class WritingSuggestionService {
                 +"语法按实际拼接后的完整句子判断，不能暗中改字或重排把它读顺；必须修改before或after才能通顺也应判invalid。自然省略、窗口边缘截断、无关旧错误或仅有风格偏好不算错误。连读正确为valid，必要修正为invalid，拿不准为uncertain。"
                 +"接续应理解当前句的表达意图，准确自然地完成它；重述、总结和过渡都可以，不要求新关系。猜测作者未明示的方向、转移话题、重复紧邻已完整表达的意思或无意义套话为inappropriate，合适为appropriate，拿不准为uncertain。"
                 +"先用reason简述具体判断依据，再填写三项结论。严格JSON，不用Markdown围栏：{\"reason\":\"具体理由，最多240字\",\"facts\":\"entailed|unsupported|uncertain\",\"grammar\":\"valid|invalid|uncertain\",\"continuation\":\"appropriate|inappropriate|uncertain\",\"reviewedCandidate\":\"逐字复制candidate\",\"evidence\":[{\"factId\":\"来源ID\",\"quote\":\"该fact.quote的连续原文\"}]}。枚举选择单个值；引用1至8段，不得用改述冒充原文。全部认可才可能显示，仅原候选可插入，不输出修正版或概率。";
+        if(reviewer==1) prompt+="本路首先独立判断来源是否足以确定完整判断成立，暂不考虑它是否顺口或符合作者意图。区分句中已有依据的部分与额外作出的承诺：是否存在一种符合全部来源、符合正常句义的情况，使该承诺不成立？存在则facts=unsupported；不能确定则uncertain。反例不得违背来源、偷换原句或把待证判断解释得更强。没有找到反例也不能直接批准，仍须指出来源如何支持完整判断。只有来源成立即可确定完整判断成立时才是entailed，而不是自然推论、可能成立或通常成立。事实结论确定后，再独立检查实际拼接的语法与接续，表达自然不能补足事实依据。在reason中优先说明决定性依据或缺失前提。";
         String input=json.writeValueAsString(Map.of("before",j.snapshot.context().before(),"candidate",candidate.text(),
                 "after",j.snapshot.context().after(),"facts",facts,"candidateCitations",candidate.factIds(),"assembledText",assembled));
         runAutomaticStage(j,reviewer+1,List.of(SystemMessage.from(prompt),UserMessage.from(input)),8192,raw -> {
