@@ -75,10 +75,11 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
     for (const file of result.files || []) {
       const row = element('label', null, files, 'awd-semantic-file'); const box = element('input', null, row); box.type = 'checkbox'; box.value = String(file.id); box.checked = selected.has(file.id)
       element('span', file.name, row)
-      box.addEventListener('change', () => { if (box.checked) selected.add(file.id); else selected.delete(file.id); updateChecks(); invalidate(true) })
+      box.addEventListener('change', () => { if (box.checked) selected.add(file.id); else selected.delete(file.id); updateChecks(); invalidate(true); syncContext() })
     }
-    updateChecks(); if (!active) status('选择参考材料后，生成当前位置的建议。')
+    updateChecks(); syncContext(); if (!active) status('选择参考材料后，生成当前位置的建议。')
   }
+  function syncContext() { rpc('semantic-context', { documentType: profile.value, sourceFileIds: [...selected] }).catch(e => status(e.message)) }
   function updateChecks() { for (const box of files.querySelectorAll('input')) box.disabled = !box.checked && selected.size >= 4 }
   function sourceDetails(parent, view, advice) {
     const chosen = (view.facts || []).filter(f => advice.factIds?.includes(f.id))
@@ -161,7 +162,7 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
   const beginComposition = () => { composing = true; if (active) invalidate(true) }, endComposition = () => { composing = false }
   doc.addEventListener('compositionstart', beginComposition, true); doc.addEventListener('compositionend', endComposition, true)
   sheet.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape') closePanel(true) })
-  profile.addEventListener('change', () => invalidate(true)); stance.addEventListener('input', () => invalidate(true)); cutoff.addEventListener('change', () => invalidate(true))
+  profile.addEventListener('change', () => { invalidate(true); syncContext() }); stance.addEventListener('input', () => invalidate(true)); cutoff.addEventListener('change', () => invalidate(true))
   return {
     isComposing() { return composing },
     cursorMoved() { if (!accepting && active) invalidate(true) },

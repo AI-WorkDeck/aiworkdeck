@@ -57,6 +57,7 @@
     "test:lowa-native-caret": "node tests/lowa-e2e/native-caret-dpi.mjs",
     "test:completion": "node --test tests/completion/*.test.mjs",
     "test:writing-ui": "node tests/lowa-e2e/writing-ui.mjs",
+    "test:automatic-writing-ui": "node tests/lowa-e2e/automatic-writing-ui.mjs",
     "test:semantic-writing": "node tests/lowa-e2e/semantic-writing.mjs",
     "test:writing-caret": "node tests/lowa-e2e/writing-caret.mjs",
     "test:lowa-link-preview": "node tests/lowa-e2e/link-preview.mjs",

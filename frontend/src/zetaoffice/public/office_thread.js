@@ -3594,20 +3594,21 @@ function writingSectionOf(range) {
     return withParaIndex(function (ix) {
       const index = locator.paraKey;
       if (index >= ix.total) return null;
-      let appendix = '', heading = '';
+      let appendix = '', heading = '', appendixSource = null, headingSource = null;
       for (let i = 0; i <= index; i++) {
-        const paragraph = ix.ranges[i], text = String(paragraph.getString() || '').trim();
+        const paragraph = ix.ranges[i], rawText = String(paragraph.getString() || ''), text = rawText.trim();
         const marker = text.match(/^(第[一二三四五六七八九十百零〇0-9]+[条节章]|附件[一二三四五六七八九十零〇0-9]+).{0,100}$/);
         if (marker) {
-          if (marker[1].indexOf('附件') === 0) { appendix = marker[1]; heading = ''; }
-          else heading = marker[1];
+          if (marker[1].indexOf('附件') === 0) { appendix = marker[1]; heading = ''; appendixSource = { index: i, text: rawText }; headingSource = null; }
+          else { heading = marker[1]; headingSource = { index: i, text: rawText }; }
         } else {
           let level = 0; try { level = Number(paragraph.getPropertyValue('OutlineLevel')) || 0; } catch (e) {}
-          if (level > 0 && level <= 6 && text.length <= 100) heading = text;
+          if (level > 0 && level <= 6 && text.length <= 100) { heading = text; headingSource = text ? { index: i, text: rawText } : null; }
         }
       }
       const path = [appendix, heading].filter(Boolean);
-      return { paragraphIndex: index, sectionPath: path, sectionTitle: path.length ? path.join(' / ') : '正文', scopeKnown: true };
+      return { paragraphIndex: index, sectionPath: path, sectionTitle: path.length ? path.join(' / ') : '正文',
+        scopeHeadings: [appendixSource, headingSource].filter(Boolean), scopeKnown: true };
     });
   } catch (e) { return null; }
 }

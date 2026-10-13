@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Real LOWA and production hosts, synthetic local vocabulary. No paid models or user documents.
+// Real LOWA manual local candidates and shared controls; synthetic vocabulary, no model calls.
+// Automatic semantic off/on is covered separately by automatic-writing-ui.mjs.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -28,7 +29,7 @@ try {
       import('/src/composables/writingAssistanceHost.js'), import('/src/composables/inlineReviewHost.js'),
     ])
     const banner = document.createElement('div')
-    banner.textContent = '隔离合成测试 · 真实 LOWA 与宿主 · 本地词库开关，未调用模型'
+    banner.textContent = '隔离合成测试 · 真实 LOWA 与宿主 · 手动候选及开关，未调用模型'
     Object.assign(banner.style, { position: 'fixed', left: '12px', top: '8px', zIndex: '2147482700',
       padding: '8px 12px', background: '#fff0ba', color: '#5d4916', font: '13px sans-serif' })
     document.body.append(banner)
@@ -84,10 +85,12 @@ try {
     if (await page.$eval('.awd-ir-menu', node => node.hidden)) await page.click('.awd-ir-more')
     await page.waitForFunction(() => !document.querySelector('.awd-ir-menu').hidden)
   }
-  await reset(); await ime('北京当红')
+  await reset(); await ime('北京当红'); await pause(2100)
+  assert.equal(await page.$('[role=option]'), null, 'short input must not automatically show vocabulary')
+  await page.keyboard.down('Alt'); await page.keyboard.press('Slash'); await page.keyboard.up('Alt')
   await page.waitForSelector('[role=option]', { timeout: 10000 })
   assert.equal(await read(), '北京当红')
-  await screenshot('01-local-candidate')
+  await screenshot('01-manual-local-candidate')
   await clickText('.awd-wa-footer button', '关闭自动补全')
   await page.waitForFunction(() => window.__controlsState.enabled === false && document.querySelector('.awd-wa-panel').hidden)
   assert.equal(await page.evaluate(() => window.__reviewState.ai), false)
@@ -111,14 +114,16 @@ try {
   await page.waitForFunction(() => window.__controlsState.enabled === true)
   assert.equal(await page.evaluate(() => window.__reviewState.ai), false, 'reenabling autocomplete does not enable AI review')
   await screenshot('05-reenabled')
-  await page.click('.awd-ir-more'); await reset(); await ime('北京当红')
+  await page.click('.awd-ir-more'); await reset(); await ime('北京当红'); await pause(2100)
+  assert.equal(await page.$('[role=option]'), null, 'reenabling must not restore automatic vocabulary matching')
+  await page.keyboard.down('Alt'); await page.keyboard.press('Slash'); await page.keyboard.up('Alt')
   await page.waitForSelector('[role=option]', { timeout: 10000 })
   assert.equal(await read(), '北京当红')
-  await screenshot('06-automatic-restored')
+  await screenshot('06-manual-after-reenable')
   const trace = await page.evaluate(() => ({ state: window.__controlsState, review: window.__reviewState, actions: window.__controlsActions }))
   assert.equal(trace.actions.some(action => action.startsWith('semantic-') || action === 'lookup'), false)
   fs.writeFileSync(path.join(output, 'trace.json'), JSON.stringify(trace, null, 2))
-  console.log('PASS: real LOWA local candidates -> direct off -> disappear -> persisted off -> manual Tab/Undo -> shared-menu on -> candidates restored; collapsed recovery and AI review remain independent. No model calls. ' + output)
+  console.log('PASS: real LOWA Alt+/ manual candidate -> direct off -> disappear -> persisted off -> manual Tab/Undo -> shared-menu on -> Alt+/ manual candidate; short input never automatically shows vocabulary; collapsed recovery and AI review remain independent. No model calls. ' + output)
 } catch (error) {
   if (page) await page.screenshot({ path: path.join(output, 'failure.png') }).catch(() => {})
   throw error
