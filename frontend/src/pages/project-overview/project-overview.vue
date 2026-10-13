@@ -756,6 +756,7 @@
             :project-id="projectId"
             :file-filter="versionFileFilter"
             :collab-refresh-token="collabRefreshToken"
+            :document-merge-state="documentMergeState"
             @compare-file="onVersionCompareFile"
             @clear-file-filter="versionFileFilter = null"
             @reload-files="onVersionReloadFiles"

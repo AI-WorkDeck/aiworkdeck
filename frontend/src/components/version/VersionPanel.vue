@@ -69,7 +69,7 @@
            互斥挂载（后端保证命中前两者中任一个时第三个必为 null，前端按同序取。含崩溃后
            重开面板的场景。 -->
       <AdoptConflictDialog
-        v-if="sessionEndConflict"
+        v-if="sessionEndConflict && mergePresentation.show"
         mode="session-end"
         :project-id="projectId"
         :session-id="sessionEndConflict.sessionId"
@@ -77,7 +77,7 @@
         :conflicting-paths="sessionEndConflict.conflictingPaths"
         :mainline-tip="sessionEndConflict.mainlineTip"
         :draft-tip="sessionEndConflict.sessionTip"
-        :document-merges="sessionEndConflict.documentMerges || []"
+        :document-merges="mergePresentation.rows"
         :sides="sessionEndConflict.sides || {}"
         :merge-base="sessionEndConflict.mergeBase"
         @resolved="onReload"
@@ -87,13 +87,13 @@
         @retry-merge="$emit('retry-merge', $event)"
       />
       <AdoptConflictDialog
-        v-else-if="cloudConflict"
+        v-else-if="!sessionEndConflict && cloudConflict && mergePresentation.show"
         mode="cloud"
         :project-id="projectId"
         :conflicting-paths="cloudConflict.conflictingPaths"
         :mainline-tip="cloudConflict.mainlineTip"
         :draft-tip="cloudConflict.cloudTip"
-        :document-merges="cloudConflict.documentMerges || []"
+        :document-merges="mergePresentation.rows"
         :sides="cloudConflict.sides || {}"
         :merge-base="cloudConflict.mergeBase"
         @resolved="onReload"
@@ -103,14 +103,14 @@
         @retry-merge="$emit('retry-merge', $event)"
       />
       <AdoptConflictDialog
-        v-else-if="adoptConflict"
+        v-else-if="!sessionEndConflict && !cloudConflict && adoptConflict && mergePresentation.show"
         :project-id="projectId"
         :draft-id="adoptConflict.draftId"
         :draft-name="adoptConflict.draftName"
         :conflicting-paths="adoptConflict.conflictingPaths"
         :mainline-tip="adoptConflict.mainlineTip"
         :draft-tip="adoptConflict.draftTip"
-        :document-merges="adoptConflict.documentMerges || []"
+        :document-merges="mergePresentation.rows"
         :sides="adoptConflict.sides || {}"
         :merge-base="adoptConflict.mergeBase"
         @resolved="onReload"
@@ -129,6 +129,7 @@ import {
   getCloudStatus, checkCloud, listCloudConnections, getOfficialCloud,
 } from '@/services/api.js'
 import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
+import { documentMergePresentation } from '@/composables/useDocumentMerge.js'
 import WorkSessionBar from './WorkSessionBar.vue'
 import VersionTimeline from './VersionTimeline.vue'
 import DraftList from './DraftList.vue'
@@ -141,6 +142,7 @@ export default {
   props: {
     projectId: { type: [String, Number], required: true },
     fileFilter: { type: Object, default: null },
+    documentMergeState: { type: Object, default: null },
     // 页面上的协作抽屉做完动作（交稿/取回/放进案件库/连案件库）后自增一次，
     // 本面板据此重拉状态——否则侧栏这行状态会停在动作之前的样子。
     collabRefreshToken: { type: Number, default: 0 },
@@ -178,6 +180,11 @@ export default {
     }
   },
   computed: {
+    mergePresentation() {
+      const conflict = this.sessionEndConflict || this.cloudConflict || this.adoptConflict
+      const ctx = this.sessionEndConflict ? 'session-end' : this.cloudConflict ? 'cloud' : 'adopt'
+      return documentMergePresentation(conflict, ctx, this.documentMergeState)
+    },
     // 仓里没有公共的字节格式化工具（FilePreview/FileStagingArea/MarketPane 各写各的），
     // 这里照 FileStagingArea.formatSize 的口径写一份，不为一处新造公共模块。
     repoSizeText() {

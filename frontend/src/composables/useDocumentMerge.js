@@ -15,7 +15,7 @@
 //
 // 三条必须守住的不变式，各有一个用例（tests/version-merge/useDocumentMerge.test.mjs）：
 //   ① 有任何一份不是 MERGED 就不收尾——律师还没被问过，收尾等于替他做了决定；
-//   ② 幂等：/status 120 秒一轮、面板每次刷新也会再调一次，按 (另一侧 tip, path) 记账，
+//   ② 幂等：/status 120 秒一轮、面板每次刷新也会再调一次，按 (冲突身份, path) 记账，
 //      同一份文件不重放、同一次冲突不重复收尾；
 //   ③ 引擎回 success:false（尤其 stage:'align'，段落对不上）时**一个字节都不写回去**：
 //      那份导出件的段落是错位的，写回去比不合更糟。
@@ -34,6 +34,28 @@ function otherRefOf(conflict, ctx) {
   return conflict.draftTip || conflict.cloudTip || conflict.sessionTip || null
 }
 
+// 呈现状态只属于这一次冲突；面板可能先收到 /status，编排器随后才开始。
+function conflictKey(conflict, ctx) {
+  return JSON.stringify([ctx, conflict.mainlineTip, otherRefOf(conflict, ctx), conflict.sessionId, conflict.draftId])
+}
+
+function needsOverview(conflict, rows) {
+  const paths = conflict.conflictingPaths || rows.map((row) => row.path)
+  return !paths.length || paths.some((path) => {
+    const row = rows.find((item) => item.path === path)
+    return !row || (row.state !== 'MERGED' && (row.failed || row.decision !== 'AUTO'))
+  })
+}
+
+export function documentMergePresentation(conflict, ctx, state) {
+  if (!conflict) return { show: false, rows: [] }
+  if (state && state.conflictKey === conflictKey(conflict, ctx)) {
+    return { show: state.overviewRequired, rows: state.rows }
+  }
+  const rows = conflict.documentMerges || []
+  return { show: needsOverview(conflict, rows), rows }
+}
+
 function baseNameOf(path) {
   return String(path || '').split('/').pop() || String(path || '')
 }
@@ -42,6 +64,8 @@ export function useDocumentMerge(deps) {
   const state = Object.assign(deps.state || {}, {
     // 当前这次冲突的每份文件一行（mergeRows.js 的输入）
     rows: [],
+    conflictKey: null,
+    overviewRequired: false,
     // 有没有文件正在自动合并中（顶栏协作 chip 据此显示「正在合并同事的改动…」）
     running: false,
     startedAt: 0,
@@ -50,12 +74,10 @@ export function useDocumentMerge(deps) {
     // 两侧的称呼与喂给引擎的那两个署名（resolveMergeSideNames 的出参）
     sideNames: {},
   })
-  // 幂等记账：键是 `${另一侧 tip}|${path}`，值是这份文件这一轮已经处理过了。
-  // 用 tip 而不是 projectId 做前缀，是因为中止一次合并后重新撞车时 MERGE_HEAD 会变，
-  // 那时应该重新跑；同一次冲突里则永远只跑一次。
+  // 幂等记账与呈现使用同一冲突身份，主线或语境变化后必须重新合并。
   const handled = new Set()
   const inflight = new Set()
-  // 已经收过尾的冲突（同样按另一侧 tip 记），防止两次 /status 各收一次尾
+  // 已经收过尾的冲突，防止两次 /status 各收一次尾
   const finalized = new Set()
 
   const isDesktop = () => (typeof deps.isDesktop === 'function' ? !!deps.isDesktop() : !!deps.isDesktop)
@@ -144,7 +166,7 @@ export function useDocumentMerge(deps) {
     }
   }
 
-  async function finalize(conflict, ctx, otherRef) {
+  async function finalize(conflict, ctx) {
     const paths = (conflict.conflictingPaths || []).length
       ? conflict.conflictingPaths
       : state.rows.map((r) => r.path)
@@ -154,10 +176,11 @@ export function useDocumentMerge(deps) {
       return row && String(row.state || '').toUpperCase() === 'MERGED'
     })
     if (!allMerged) {
+      state.overviewRequired = true
       if (typeof deps.openOverview === 'function') deps.openOverview()
       return
     }
-    const key = String(otherRef || '') + '|__finalize__'
+    const key = conflictKey(conflict, ctx) + '|__finalize__'
     if (finalized.has(key)) return
     finalized.add(key)
     const resolutions = {}
@@ -168,6 +191,7 @@ export function useDocumentMerge(deps) {
       else if (ctx === 'session-end') res = await deps.api.resolveSessionEnd(deps.projectId, conflict.sessionId, resolutions)
       else res = await deps.api.resolveAdopt(deps.projectId, conflict.draftId, resolutions)
       const data = (res && res.data) || {}
+      state.overviewRequired = false
       if (typeof deps.toast === 'function') {
         deps.toast(t('version.mergeAutoDone', { count: paths.length }))
       }
@@ -177,6 +201,7 @@ export function useDocumentMerge(deps) {
       // 这次没走完——把人带到总览，那里还能手动「确认选择」。
       console.warn('[DocumentMerge] 自动收尾失败', e)
       finalized.delete(key)
+      state.overviewRequired = true
       if (typeof deps.toast === 'function') deps.toast((e && e.message) || t('version.mergeAutoFinalizeFailed'))
       if (typeof deps.openOverview === 'function') deps.openOverview()
     }
@@ -199,6 +224,8 @@ export function useDocumentMerge(deps) {
   async function runConflictStatus(conflict, ctx) {
     if (!conflict) {
       state.rows = []
+      state.conflictKey = null
+      state.overviewRequired = false
       state.running = false
       state.ctx = null
       state.sides = {}
@@ -206,6 +233,16 @@ export function useDocumentMerge(deps) {
       return
     }
     const otherRef = otherRefOf(conflict, ctx)
+    const nextKey = conflictKey(conflict, ctx)
+    if (state.conflictKey !== nextKey) {
+      state.rows = []
+      // 清空状态后同一未完成冲突再次出现，应重新尝试，不能留下无结果的已处理标记。
+      for (const key of handled) {
+        if (key.startsWith(nextKey + '|')) handled.delete(key)
+      }
+      state.overviewRequired = needsOverview(conflict, conflict.documentMerges || [])
+      state.conflictKey = nextKey
+    }
     state.ctx = ctx
     state.sides = conflict.sides || {}
     state.sideNames = resolveMergeSideNames(t, state.sides,
@@ -228,6 +265,12 @@ export function useDocumentMerge(deps) {
         : { ...r }
     })
 
+    // null 状态之后仍可能到达较早的冲突快照；已成功收尾的不重新弹窗或写入。
+    if (finalized.has(nextKey + '|__finalize__')) {
+      state.overviewRequired = false
+      return
+    }
+
     const refs = { mergeBase: conflict.mergeBase, mainRef: conflict.mainlineTip, otherRef }
     const pending = state.rows.filter((row) => {
       if (String(row.state || '').toUpperCase() === 'MERGED') return false
@@ -235,17 +278,19 @@ export function useDocumentMerge(deps) {
       if (row.failed) return false
       const kind = String(row.kind || '').toUpperCase()
       if (kind === 'DOCX' && !isDesktop()) return false
-      const key = String(otherRef || '') + '|' + row.path
+      const key = state.conflictKey + '|' + row.path
       if (handled.has(key) || inflight.has(key)) return false
       return true
     })
 
-    if (pending.length) {
-      state.running = true
-      state.startedAt = Date.now()
-      try {
+    // 自动收尾仍在写入版本，期间保持 chip，不让已合并的旧快照闪回裁决窗。
+    state.running = pending.length > 0 || (!needsOverview(conflict, state.rows)
+      && !finalized.has(state.conflictKey + '|__finalize__'))
+    if (state.running) state.startedAt = Date.now()
+    try {
+      if (pending.length) {
         for (const row of pending) {
-          const key = String(otherRef || '') + '|' + row.path
+          const key = state.conflictKey + '|' + row.path
           inflight.add(key)
           try {
             const kind = String(row.kind || '').toUpperCase()
@@ -260,12 +305,11 @@ export function useDocumentMerge(deps) {
             inflight.delete(key)
           }
         }
-      } finally {
-        state.running = false
       }
+      await finalize(conflict, ctx)
+    } finally {
+      state.running = false
     }
-
-    await finalize(conflict, ctx, otherRef)
   }
 
   // 「重试自动合并」：清掉这份文件的失败记账与幂等锁，下一轮 /status 会重新跑它。
