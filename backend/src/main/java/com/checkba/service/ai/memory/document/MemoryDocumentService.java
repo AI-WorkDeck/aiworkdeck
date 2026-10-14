@@ -87,6 +87,12 @@ public class MemoryDocumentService {
             if (!projectMembers.hasReadPermission(projectId, userId)) {
                 throw denied("无权访问该项目的记忆");
             }
+            // Project memory may contain extracts from private staff files. Keep personal
+            // memory available without disclosing the project's space id or real label.
+            if (projectMembers.isClient(projectId, userId)) {
+                result.add(MemorySpaceView.unavailable("project", "项目记忆", "无权访问该项目的记忆"));
+                return result;
+            }
             Project project = projects.findById(projectId)
                     .orElseThrow(() -> bad("项目不存在"));
             MemoryDocumentSpace projectSpace = ensureSpace("project", String.valueOf(projectId),
@@ -365,8 +371,9 @@ public class MemoryDocumentService {
             writable = readable;
         } else if ("project".equals(space.getScope())) {
             Long projectId = parseLong(space.getOwnerKey());
-            readable = projectId != null && projectMembers.hasReadPermission(projectId, userId);
-            writable = projectId != null && projectMembers.hasWritePermission(projectId, userId);
+            readable = projectId != null && projectMembers.hasReadPermission(projectId, userId)
+                    && !projectMembers.isClient(projectId, userId);
+            writable = readable && projectMembers.hasWritePermission(projectId, userId);
         } else {
             throw denied("无权访问这个记忆空间");
         }

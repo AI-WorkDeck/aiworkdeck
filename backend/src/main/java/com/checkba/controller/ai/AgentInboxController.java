@@ -43,6 +43,12 @@ public class AgentInboxController {
         if (denied != null) return denied;
         if (request.expectedRevision == null) return error(400, "expectedRevision is required");
         try {
+            boolean sendNow = request.submissionMode != null
+                    && AgentInboxService.STEER.equals(AgentInboxService.normalizeMode(request.submissionMode));
+            if (sendNow) {
+                orchestrator.requireInboxExecutionAccess(conversationId, messageId,
+                        AuthController.getUserIdFromSession(sessionId));
+            }
             AgentInboxService.ItemView edited = inbox.edit(conversationId, messageId, request.message,
                     request.submissionMode, request.position, request.expectedRevision);
             // 显式「立即发送」一律通知编排器：空闲时启动消费者；已有轮次时仍需立刻取消其
@@ -54,13 +60,13 @@ public class AgentInboxController {
             // 收尾（这几种按设计都不 drain 队列），这条 steer 就永久卡在 pending 里——界面上只剩
             // 编辑 / 上移 / 下移 / 删除，没有任何办法把它发出去，而它看着像还会被处理。
             //
-            boolean sendNow = request.submissionMode != null
-                    && AgentInboxService.STEER.equals(AgentInboxService.normalizeMode(request.submissionMode));
             if (sendNow) {
                 orchestrator.acceptInboxSubmission(messageId);
                 edited = inbox.view(messageId);
             }
             return ResponseEntity.ok(edited);
+        } catch (SecurityException e) {
+            return error(403, e.getMessage());
         } catch (AgentInboxService.RevisionConflict e) {
             return error(409, e.getMessage());
         } catch (NoSuchElementException e) {
