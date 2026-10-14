@@ -30,7 +30,11 @@ export default {
   loading: 'Loading…',
   clientEmptyHint: 'After your lawyer shares a case file with you, it will appear here.',
   newProject: 'New Project',
-  emptyHint: 'No matters yet. Start below: open an existing folder, or create one.',
+  emptyTitle: 'No projects yet',
+  localEmptyTitle: 'No local projects yet',
+  clientEmptyTitle: 'No shared case files yet',
+  emptyHint: 'Create a project or open an existing folder using the buttons above.',
+  webEmptyHint: 'Create a project using the button above to start organizing your work.',
   // project-list.vue: view toggle and list-view column headers
   gridView: 'Grid view',
   listView: 'List view',
