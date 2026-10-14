@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.Flow;
+import java.util.concurrent.locks.ReentrantLock;
 
 /** Fixed official API adapter; remote credentials never leave this backend instance. */
 public class BaoqingtianTools implements HostAware {
@@ -39,36 +40,66 @@ public class BaoqingtianTools implements HostAware {
     interface Transport { Reply request(String method, String path, String token, JsonNode body) throws Exception; }
     record Reply(int status, String body) {}
     private record Session(String token, String lawyerId, String displayName) {}
-    private static final class Failure extends RuntimeException {
+    static final class Failure extends RuntimeException {
         final String code;
         Failure(String code, String message) { super(message); this.code = code; }
     }
     private final Transport transport;
+    private final NoteUploads uploads;
+    private final SecureEnvelope secureEnvelope = new SecureEnvelope();
     private final Map<Long, Session> sessions = new ConcurrentHashMap<>();
-    private final Map<Long, Object> locks = new ConcurrentHashMap<>();
+    private final Map<Long, ReentrantLock> locks = new ConcurrentHashMap<>();
     private PluginHost host;
     public BaoqingtianTools() { this(new NativeTransport()); }
-    BaoqingtianTools(Transport transport) { this.transport = transport; }
+    BaoqingtianTools(Transport transport) { this(transport, new NoteUploads.NativeCos()); }
+    BaoqingtianTools(Transport transport, NoteUploads.CosTransport cos) { this.transport = transport; this.uploads = new NoteUploads(cos); }
     @Override public void setHost(PluginHost host) { this.host = host; }
 
-    @Tool("包晴天平台案源和本人笔记。action: status/sms/login/logout/cases/case_detail/notes/note_detail/note_save/note_status/business_types。json为参数对象。公开发布或删除必须由用户明确确认并传confirmed:true。短信验证码不得写入笔记。保存结果不确定时不得自动重试。")
-    public String baoqingtian_action(@P("操作") String action, @P("JSON参数对象") String json) {
+    @Tool("包晴天插件私密传输入口，仅供加密工作区页面调用。AI 请引导用户打开包晴天插件，不能构造明文请求。仅支持 transport_key 获取临时公钥与 secure 接收加密信封；不得在工具参数中放明文手机号、验证码、媒体或笔记。")
+    public String baoqingtian_action(@P("transport_key 或 secure") String action, @P("JSON 加密信封") String json) {
+        if ("transport_key".equals(action)) {
+            try { identity(); return success(secureEnvelope.publicKey()).toString(); }
+            catch (Exception e) { return failureResult(e).toString(); }
+        }
+        if (!"secure".equals(action)) return failureResult(fail("secure_required", "请通过包晴天插件面板的安全连接操作")).toString();
+        SecureEnvelope.Request request;
         try {
-            ToolCall call = host == null ? null : host.call();
-            if (call == null || call.userId() == null || call.userId() <= 0 || call.projectId() == null || call.projectId() <= 0)
-                throw fail("host_auth", "请先登录 AI WorkDeck 并打开项目");
-            host.files().list(call.projectId(), null, false); // Public SPI membership check, including AI tool calls.
-            if (json != null && json.length() > 100_000) throw fail("invalid_params", "参数过长");
-            JsonNode args;
-            try { args = JSON.readTree(json == null || json.isBlank() ? "{}" : json); }
-            catch (Exception e) { throw fail("invalid_params", "参数必须是 JSON 对象"); }
-            if (args == null || !args.isObject()) throw fail("invalid_params", "参数必须是 JSON 对象");
-            synchronized (locks.computeIfAbsent(call.userId(), ignored -> new Object())) {
-                Object data = execute(call.userId(), action == null ? "" : action, args);
-                return JSON.createObjectNode().put("ok", true).set("data", JSON.valueToTree(data)).toString();
-            }
-        } catch (Failure e) { return JSON.createObjectNode().put("ok", false).put("error", e.getMessage()).put("errorCode", e.code).toString(); }
-        catch (Exception e) { return JSON.createObjectNode().put("ok", false).put("error", "操作未完成，请检查项目权限或稍后重试").put("errorCode", "unavailable").toString(); }
+            if (json == null || json.length() > 9 * 1024 * 1024) throw new IllegalArgumentException();
+            request = secureEnvelope.open(JSON.readTree(json));
+        } catch (Exception e) { return failureResult(fail("secure_invalid", "安全请求无法验证，请重新打开插件后重试")).toString(); }
+        ObjectNode result;
+        try (CallDeadline deadline = CallDeadline.open()) {
+            ToolCall call = identity();
+            String innerAction = request.action();
+            JsonNode args = request.args();
+            if (Set.of("secure", "transport_key").contains(innerAction)) throw fail("invalid_params", "不支持嵌套安全请求");
+            if (args == null || !args.isObject() || args.toString().length() > ("media_upload".equals(innerAction) ? 6 * 1024 * 1024 : 100_000))
+                throw fail("invalid_params", "操作参数无效或过长");
+            ReentrantLock lock = locks.computeIfAbsent(call.userId(), ignored -> new ReentrantLock());
+            if (!lock.tryLock(CallDeadline.remainingMillis(50_000), TimeUnit.MILLISECONDS))
+                throw fail("request_not_sent", "前一操作仍在处理，请稍后继续原操作核对结果");
+            try {
+                CallDeadline.remainingMillis(50_000);
+                result = success(execute(call.userId(), innerAction, args));
+            } finally { lock.unlock(); }
+        } catch (Exception e) { result = failureResult(e); }
+        try { return success(secureEnvelope.seal(request, result)).toString(); }
+        catch (Exception e) { return failureResult(fail("secure_invalid", "安全响应无法生成，请先核对操作结果，勿重复提交")).toString(); }
+    }
+    private ToolCall identity() {
+        ToolCall call = host == null ? null : host.call();
+        if (call == null || call.userId() == null || call.userId() <= 0 || call.projectId() == null || call.projectId() <= 0)
+            throw fail("host_auth", "请先登录 AI WorkDeck 并打开项目");
+        host.files().list(call.projectId(), null, false);
+        return call;
+    }
+    private static ObjectNode success(Object data) {
+        return JSON.createObjectNode().put("ok", true).set("data", JSON.valueToTree(data));
+    }
+    private static ObjectNode failureResult(Exception error) {
+        if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+        if (error instanceof Failure f) return JSON.createObjectNode().put("ok", false).put("error", f.getMessage()).put("errorCode", f.code);
+        return JSON.createObjectNode().put("ok", false).put("error", "操作未完成，请检查项目权限或稍后重试").put("errorCode", "unavailable");
     }
     private Object execute(long user, String action, JsonNode args) {
         if (action.equals("logout")) { sessions.remove(user); return Map.of("connected", false); }
@@ -110,6 +141,7 @@ public class BaoqingtianTools implements HostAware {
             case "case_detail" -> caseView(request(user, "POST", "/bqt/lawCase/lawyer/caseInfo", s.token, object("id", id(args, "id")), false));
             case "notes" -> notes(user, s, args);
             case "note_detail" -> noteView(ownedNote(user, s, id(args, "id")));
+            case "note_begin", "media_upload", "note_finish" -> uploads.execute(user, s.lawyerId, action, args, (method, path, body, write) -> request(user, method, path, s.token, body, write));
             case "note_save" -> saveNote(user, s, args);
             case "note_status" -> changeStatus(user, s, args);
             default -> throw fail("invalid_params", "不支持的包晴天操作");
@@ -186,19 +218,10 @@ public class BaoqingtianTools implements HostAware {
             body.put("description", type.equals("TEXT") ? old.path("description").asText("") : content);
             for (String key : List.of("cover", "topicId", "productId", "hotSpot")) if (old.hasNonNull(key)) body.set(key, old.get(key));
         } else {
-            if (content.isBlank()) throw fail("invalid_params", "请填写有效的正文");
-            if (!args.path("confirmed").asBoolean(false)) throw fail("confirmation_required", "创建笔记前请明确确认保存");
-            body.put("type", "TEXT").put("content", content).put("businessId", id(args, "businessId")).put("isNoteDraft", "N");
-            JsonNode certification = request(user, "POST", "/bqt/lawyer/cert/status", s.token, object(), false);
-            if (!certification.path("status").asText().equals("cert_succeed")) throw fail("certification_required", "创建笔记前，请在包晴天工作台的资料设置中完成实名认证与律师资格认证；审核通过后再保存");
+            throw fail("media_required", "新建笔记请先选择图片，或视频及独立封面，再完成媒体上传");
         }
-        JsonNode response = request(user, "POST", "/bqt/lawyer/note/" + (edit ? "edit" : "add"), s.token, body, true);
-        if (edit && !response.path("isSuccess").isBoolean()) throw fail("outcome_unknown", "平台未明确确认保存，请刷新笔记核对，勿重复提交");
-        if (!edit) {
-            String returnedId = response.path("noteId").asText("");
-            if (!returnedId.matches("[1-9][0-9]{0,18}")) throw fail("outcome_unknown", "平台未返回新笔记标识，请刷新笔记列表核对，勿重复创建");
-            noteId = returnedId;
-        }
+        JsonNode response = request(user, "POST", "/bqt/lawyer/note/edit", s.token, body, true);
+        if (!response.path("isSuccess").isBoolean()) throw fail("outcome_unknown", "平台未明确确认保存，请刷新笔记核对，勿重复提交");
         return Map.of("id", noteId, "saved", true);
     }
     private Object changeStatus(long user, Session s, JsonNode args) {
@@ -209,6 +232,7 @@ public class BaoqingtianTools implements HostAware {
         return Map.of("id", noteId, "saved", true);
     }
     private JsonNode request(long user, String method, String path, String token, JsonNode body, boolean write) {
+        CallDeadline.remainingMillis(50_000); // Before transport: certainly not sent when the budget is exhausted.
         try {
             Reply response = transport.request(method, path, token, body);
             if (response.status == 401) { sessions.remove(user); throw fail("auth_required", "包晴天登录已失效，请重新登录"); }
@@ -240,29 +264,30 @@ public class BaoqingtianTools implements HostAware {
             throw fail(write ? "outcome_unknown" : "network_error", write ? "未收到平台确认，操作结果尚不确定；请先刷新核对，勿重复提交" : "暂时无法连接包晴天，请稍后重试");
         }
     }
-    private static ObjectNode object(Object... pairs) { ObjectNode node = JSON.createObjectNode(); for (int i = 0; i < pairs.length; i += 2) node.set((String) pairs[i], JSON.valueToTree(pairs[i + 1])); return node; }
-    private static Failure fail(String code, String message) { return new Failure(code, message); }
-    private static String text(JsonNode args, String key, int max) { String value = args.path(key).asText(""); if (value.isBlank() || value.length() > max) throw fail("invalid_params", "请填写有效的" + switch(key) { case "title" -> "标题"; case "content" -> "正文"; case "mobile" -> "手机号"; case "authCode" -> "验证码"; default -> "必要信息"; }); return value; }
-    private static String id(JsonNode args, String key) { String value = args.path(key).asText(""); if (!value.matches("[1-9][0-9]{0,18}")) throw fail("invalid_params", "笔记、案源或业务类型标识无效"); return value; }
+    static ObjectNode object(Object... pairs) { ObjectNode node = JSON.createObjectNode(); for (int i = 0; i < pairs.length; i += 2) node.set((String) pairs[i], JSON.valueToTree(pairs[i + 1])); return node; }
+    static Failure fail(String code, String message) { return new Failure(code, message); }
+    static String text(JsonNode args, String key, int max) { String value = args.path(key).asText(""); if (value.isBlank() || value.length() > max) throw fail("invalid_params", "请填写有效的" + switch(key) { case "title" -> "标题"; case "content" -> "正文"; case "mobile" -> "手机号"; case "authCode" -> "验证码"; default -> "必要信息"; }); return value; }
+    static String id(JsonNode args, String key) { String value = args.path(key).asText(""); if (!value.matches("[1-9][0-9]{0,18}")) throw fail("invalid_params", "笔记、案源或业务类型标识无效"); return value; }
     private static int page(JsonNode args) { int p = args.path("page").asInt(1); if (p < 1 || p > 10000) throw fail("invalid_params", "页码无效"); return p; }
-    private static String state(JsonNode args, boolean deleting) { return switch (args.path("status").asText("draft")) { case "draft" -> "DRAFT"; case "published" -> "PUBLIC"; case "private" -> "PRIVATE"; case "deleted" -> { if (!deleting) throw fail("invalid_params", "保存不能执行删除"); yield "DELETED"; } default -> throw fail("invalid_params", "笔记状态无效"); }; }
+    static String state(JsonNode args, boolean deleting) { return switch (args.path("status").asText("draft")) { case "draft" -> "DRAFT"; case "published" -> "PUBLIC"; case "private" -> "PRIVATE"; case "deleted" -> { if (!deleting) throw fail("invalid_params", "保存不能执行删除"); yield "DELETED"; } default -> throw fail("invalid_params", "笔记状态无效"); }; }
     private static void confirm(JsonNode args, String state) { if ((state.equals("PUBLIC") || state.equals("DELETED")) && !args.path("confirmed").asBoolean(false)) throw fail("confirmation_required", "公开发布或删除前请明确确认"); }
-    private static String media(JsonNode value) { if (!value.isArray()) return value.asText(""); List<String> parts = new ArrayList<>(); value.forEach(v -> parts.add(v.asText())); return String.join(";", parts); }
+    static String media(JsonNode value) { if (!value.isArray()) return value.asText(""); List<String> parts = new ArrayList<>(); value.forEach(v -> parts.add(v.asText())); return String.join(";", parts); }
 
     static final class NativeTransport implements Transport {
         private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NEVER).build();
         @Override public Reply request(String method, String path, String token, JsonNode body) throws Exception {
             if (!path.startsWith("/bqt/") || path.contains("\r") || path.contains("\n")) throw new IOException("Invalid path");
-            HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(BASE + path)).timeout(Duration.ofSeconds(25))
+            HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(BASE + path)).timeout(Duration.ofMillis(CallDeadline.remainingMillis(25_000)))
                 .header("User-Origin", "lawyer_pc").header("version", "v2.2.1").header("business", "BQT_LAWYER").header("Accept", "application/json");
             if (token != null) b.header("appToken", token);
             if (method.equals("GET")) b.GET(); else b.header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body.toString()));
+            long waitMillis = CallDeadline.remainingMillis(30_000);
             CompletableFuture<HttpResponse<byte[]>> future = client.sendAsync(b.build(), ignored -> new LimitedBody());
-            try { HttpResponse<byte[]> r = future.get(30, TimeUnit.SECONDS); return new Reply(r.statusCode(), new String(r.body(), java.nio.charset.StandardCharsets.UTF_8)); }
+            try { HttpResponse<byte[]> r = future.get(waitMillis, TimeUnit.MILLISECONDS); return new Reply(r.statusCode(), new String(r.body(), java.nio.charset.StandardCharsets.UTF_8)); }
             finally { if (!future.isDone()) future.cancel(true); }
         }
     }
-    private static final class LimitedBody implements HttpResponse.BodySubscriber<byte[]> {
+    static final class LimitedBody implements HttpResponse.BodySubscriber<byte[]> {
         private final CompletableFuture<byte[]> result = new CompletableFuture<>();
         private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         private Flow.Subscription subscription;

@@ -187,3 +187,5 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 源码在 `official-plugins/baoqingtian/`，Java 公开 SPI + sandbox Web 工作区，最低宿主 0.60.0。复用动态 rail 与 `plugin` 标签，不新增静态入口。连接包晴天官方 PC 认证和律师业务 API；上游仓只读，不复制其实现。用户确认笔记指平台律师图文笔记，非本地私人笔记。会话按宿主用户保留于后端内存；不使用插件 localStorage 储存认证信息。
 
 接口地雷：新增 `/note/add` 与更新 `/note/edit` 分开；编辑用 `noteId`。本人列表用 `/note/lawyer/page`；每次写入前再次校验笔记归属。`status:DRAFT` 才是草稿，`isNoteDraft:Y` 是媒体上传中标识，不能混淆。图文 `content` 是媒体引用、`description` 才是正文，编辑时必须保留媒体、类型及关联字段。构建/单测入口见插件 README；上架仍须按本页真实受理、签名、双站同步与实际工作台安装路径验收，不能把存在目录当成已交付。
+
+**媒体上传补齐（#1249，2026-10-14）**：新建遵循当前APP的暂存→COS上传→`updateAfterUploadSuccess`链路，不能仅依赖DTO有TEXT枚举就开放纯文字新增。`description`是正文，图片`content`用分号连接，视频必须独立封面。客户端分片通过工具桥传到插件后端，不把平台签名交给页面。保存结果未知不得重新add；续传必须绑定原记录和原账号。只有回填响应与读回验证完成才显示保存成功。实际账户及Marketplace实测结果以台账为准。

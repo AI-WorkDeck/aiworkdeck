@@ -10,3 +10,5 @@
 .legal-details{margin-top:12px;font-size:13px}.legal-details summary{cursor:pointer;color:var(--accent)}.legal-details label{display:block;margin:12px 0 8px}.legal-details input{display:block;width:100%;margin-top:4px}.legal-details button{font-size:12px}
 
 .filter-scope{margin:-8px 0 20px}
+
+#media-picker{border:1px solid var(--border);border-radius:var(--small-radius);padding:16px;margin:16px 0}#media-picker legend{color:var(--accent);padding:0 8px}#media-file-list{padding-left:20px;overflow-wrap:anywhere;font-size:13px}#media-validation[data-error=true]{color:var(--danger)}#upload-progress{margin-top:12px;color:var(--accent)}#resume-upload{margin-top:12px}
