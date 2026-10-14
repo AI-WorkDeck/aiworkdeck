@@ -483,7 +483,13 @@ export default {
     },
     // 菜单栏读勾选/置灰的三个信号。合并在这个 watch 里而不是另起一块——
     // 选项对象里两个同名 key，后写的会把先写的整个覆盖掉。
-    reviewOpen() { this.$emit('menu-state') },
+    reviewOpen(v) {
+      this.$emit('menu-state')
+      if (v && this._provRowsPending && this.provLoaded) {
+        this._provRowsPending = false
+        this.alignProvenanceRows(this._provSeq)
+      }
+    },
     ready(v) { this.$emit('menu-state'); if (v) { this.consumeLocator(); this.pushInsightSub(); this.pushTheme(); this.loadProvenance() } },
     // 「依据」窗格开合 → 客体页的光标上报订阅（dev-board#182）
     insightSubscribed() { this.pushInsightSub() },
@@ -1300,7 +1306,7 @@ export default {
         this._lastCmdAt = 0
         const innerExec = this.executor.executeCommand.bind(this.executor)
         this.executor.executeCommand = async (action, params, callOpts) => {
-          if (action === 'export_document') return innerExec(action, params, callOpts) // 保存自身不算「活跃编辑」
+          if (action === 'export_document' || (callOpts && callOpts.background)) return innerExec(action, params, callOpts) // 保存自身与后台只读溯源不算「活跃编辑」
           this._cmdBusy++
           this._lastCmdAt = Date.now()
           try { return await innerExec(action, params, callOpts) }
@@ -2164,7 +2170,7 @@ export default {
     async provRun(action, params) {
       if (!this.executor) return null
       try {
-        const r = await this.executor.executeCommand(action, params || {})
+        const r = await this.executor.executeCommand(action, params || {}, { background: true })
         return (r && r.success === false) ? null : r
       } catch (e) { return null }
     },
@@ -2192,6 +2198,11 @@ export default {
         this.provUnits = Array.isArray(d.units) ? d.units : []
         this.provTruncated = !!d.truncated
         this.provLoaded = true
+        if (this.reviewOpen === false) {
+          this._provRowsPending = true
+          return
+        }
+        this._provRowsPending = false
         await this.alignProvenanceRows(seq)
       } catch (e) {
         if (seq !== this._provSeq) return

@@ -294,4 +294,25 @@ class EditorBridgeServiceTest {
                 .get("error").asText().contains("未返回具体错误"));
     }
 
+    @Test
+    @DisplayName("轮次收尾 cleanupAfterRun 清理会话级状态表并取消残留等待")
+    void cleanupAfterRunClearsPerConversationState() {
+        EditorBridgeService b = bridge();
+        b.setCurrentConversationId("conv-clean");
+        b.noteActiveDocument("conv-clean", 88L);
+        b.setStreamingMode("conv-clean", true);
+        b.noteStreamContent("conv-clean", "第一条");
+        b.noteGenerated("docx|root|report.docx", 88L);
+        b.duplicateInsertRejection("conv-clean", "insert_at_cursor", Map.of("text", longText("待清理长文本")));
+
+        b.cleanupAfterRun("conv-clean");
+
+        assertEquals(false, b.isStreamingMode("conv-clean"));
+        assertEquals(false, b.hasStreamedContent("conv-clean"));
+        assertNull(b.generatedInRun("docx|root|report.docx"));
+        assertNull(b.duplicateInsertRejection("conv-clean", "insert_at_cursor", Map.of("text", longText("待清理长文本"))),
+                "cleanupAfterRun 后旧轮次的去重记录应被回收");
+        b.clearCurrentConversationId();
+    }
+
 }

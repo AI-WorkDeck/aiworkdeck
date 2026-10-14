@@ -46,6 +46,10 @@ spring:
     url: jdbc:postgresql://localhost:5432/aiworkdeck_case
     username: aiworkdeck_case
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:30}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 30000
   jpa:
     hibernate:
       ddl-auto: update
@@ -87,6 +91,8 @@ storage:
     template-path: /data/aiworkdeck-case/store/template.docx
 
 ai:
+  subagent:
+    max-parallel: ${AI_SUBAGENT_MAX_PARALLEL:8}
   packs:
     # 案件库不跑 AI，也就不需要原生资源包。关掉总开关 = 安装、自动补下载、
     # 封禁表同步全部旁路，这台机器不会为了 pack 去连官网。

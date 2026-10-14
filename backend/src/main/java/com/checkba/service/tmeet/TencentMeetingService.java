@@ -84,8 +84,9 @@ public class TencentMeetingService {
 
     /**
      * 同步腾讯会议：拉取用户有权限的已结束会议与云录制，保存逐字稿与智能纪要。
+     * 不挂方法级 @Transactional：外部 CLI 子进程拉取列表与逐字稿耗时长，持事务会占住连接池，
+     * 且异常抛出会把 catch 块回写的 FAILED 状态一并回滚。单条 save 由 Repository 短事务独立提交。
      */
-    @Transactional
     public SyncSummary syncMeetings(Long userId, Long projectId, boolean force) {
         TmeetAuthStatus auth = tmeetCliService.getAuthStatus();
         if (!auth.isLoggedIn()) {

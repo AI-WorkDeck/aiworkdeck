@@ -90,4 +90,12 @@ class TencentMeetingServiceTest {
         assertTrue(todosPrompt.contains("task_create"));
         assertTrue(todosPrompt.contains("recordId=88"));
     }
+
+    @Test
+    void testSyncMeetings_NotAnnotatedWithMethodLevelTransactional() throws Exception {
+        java.lang.reflect.Method m = TencentMeetingService.class.getMethod(
+                "syncMeetings", Long.class, Long.class, boolean.class);
+        assertFalse(m.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class),
+                "syncMeetings 包含外部 CLI 子进程循环，不得挂方法级 @Transactional 占住连接池");
+    }
 }

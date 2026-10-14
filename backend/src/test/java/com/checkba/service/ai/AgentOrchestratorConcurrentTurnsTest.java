@@ -567,4 +567,77 @@ class AgentOrchestratorConcurrentTurnsTest {
         }
         return sb.toString();
     }
+
+    @Test
+    @DisplayName("OkHttp 回调线程触发 onComplete 时切回 turnExecutor 执行工具，不占住 OkHttp Dispatcher 槽位")
+    void okHttpCallbackThreadHopsOntoTurnExecutorForToolExecution() throws Exception {
+        java.util.concurrent.atomic.AtomicReference<String> toolThreadName = new java.util.concurrent.atomic.AtomicReference<>();
+        CountDownLatch finished = new CountDownLatch(1);
+        orchestrator.setTurnExecutor(task -> {
+            Thread t = new Thread(task, "taskExecutor-worker-1");
+            t.start();
+        });
+
+        ToolExecutionRequest toolReq = ToolExecutionRequest.builder()
+                .id("call-1")
+                .name("read_document")
+                .arguments("{}")
+                .build();
+        when(toolRegistry.execute(org.mockito.ArgumentMatchers.eq("read_document"), any(), any())).thenAnswer(inv -> {
+            toolThreadName.set(Thread.currentThread().getName());
+            return new ToolRegistry.ToolResult("doc content", null, true);
+        });
+
+        StreamingChatLanguageModel okHttpSimModel = new StreamingChatLanguageModel() {
+            int step = 0;
+            @Override
+            public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                generate(messages, List.of(), handler);
+            }
+            @Override
+            public void generate(List<ChatMessage> messages, List<ToolSpecification> toolSpecs,
+                                 StreamingResponseHandler<AiMessage> handler) {
+                int s = step++;
+                Thread okHttpThread = new Thread(() -> {
+                    if (s == 0) {
+                        handler.onComplete(Response.from(AiMessage.from(toolReq)));
+                    } else {
+                        handler.onNext("<final>完成</final>");
+                        handler.onComplete(Response.from(AiMessage.from("<final>完成</final>")));
+                        finished.countDown();
+                    }
+                }, "OkHttp http://127.0.0.1/...");
+                okHttpThread.start();
+            }
+        };
+        when(chatModelFactory.getStreamingChatModel(MODEL)).thenReturn(okHttpSimModel);
+
+        orchestrator.handleUserMessage(request("读一下文档"), 7L);
+        assertTrue(finished.await(10, TimeUnit.SECONDS), "轮次应在 10 秒内完成");
+        assertEquals("taskExecutor-worker-1", toolThreadName.get(),
+                "工具执行必须从 OkHttp 回调线程切回 turnExecutor，不能占住 OkHttp 线程");
+    }
+
+    @Test
+    @DisplayName("流式回调内抛出 LinkageError/AssertionError 等 Error 子类时，仍能收敛终态并清理 activeRuns")
+    void errorThrownDuringTurnStillCleansUpActiveRuns() throws Exception {
+        StreamingChatLanguageModel oomModel = new StreamingChatLanguageModel() {
+            @Override
+            public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                generate(messages, List.of(), handler);
+            }
+            @Override
+            public void generate(List<ChatMessage> messages, List<ToolSpecification> toolSpecs,
+                                 StreamingResponseHandler<AiMessage> handler) {
+                throw new AssertionError("synthetic linkage/assertion failure");
+            }
+        };
+        when(chatModelFactory.getStreamingChatModel(MODEL)).thenReturn(oomModel);
+
+        orchestrator.handleUserMessage(request("触发 Error"), 7L);
+
+        assertEquals(AgentRunStateService.RunStatus.ERROR, runState.get(CONV).status(),
+                "抛出 Error 时轮次状态必须收敛为 ERROR，不能永久挂在 RUNNING");
+        org.mockito.Mockito.verify(editorBridge, org.mockito.Mockito.atLeastOnce()).cleanupAfterRun(CONV);
+    }
 }

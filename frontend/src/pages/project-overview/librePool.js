@@ -235,6 +235,12 @@ export const librePoolMethods = {
         this._libreSpareSeq = (this._libreSpareSeq || 0) + 1
         const sp = { key: this._libreSpareSeq, file: null, hidden: true, executor: null }
         this.libreSpares.push(sp)
+        // 低内存机器上拉起三方合并隐藏实例时，把隐藏实例计入驻留预算并先淘汰后台非活动实例
+        if (useConservativeLibrePool() && Array.isArray(this.libreLruKeys)) {
+            for (const k of this.libreLruKeys.slice()) {
+                if (this.exceedsLibreInstanceBudget(k)) this.evictLibreInstance(k)
+            }
+        }
         const deadline = Date.now() + timeoutMs
         // 引擎冷启动实测 90 秒级（WASM 编译 + 排版），180 秒是留了余量的上限；
         // 轮询而不是等事件，是因为 onLibreSpareReady 是模板上的回调，拿不到 Promise。
@@ -300,9 +306,10 @@ export const librePoolMethods = {
         const active = (k) => k === 'left:' + this.activeFileIdLeft || (this.splitMode && k === 'right:' + this.activeFileIdRight)
         if (active(key)) return false
         const activeCount = residentKeys.filter(active).length
+        const hiddenCount = Array.isArray(this.libreSpares) ? this.libreSpares.filter(sp => sp && sp.hidden).length : 0
         const inactive = residentKeys.filter(k => !active(k))
         const index = inactive.indexOf(key)
-        return index >= Math.max(0, LOW_MEMORY_INSTANCE_BUDGET - activeCount)
+        return index >= Math.max(0, LOW_MEMORY_INSTANCE_BUDGET - activeCount - hiddenCount)
     },
     // key 对应实例的体积权重：从已挂载的 _libreRefs 反查 file.fileSize；拿不到
     // （未挂载/无体积信息）按最小权重 1 处理。
@@ -317,14 +324,48 @@ export const librePoolMethods = {
         const list = pane === 'right' ? this.rightFiles : this.leftFiles
         return list.some(f => String(f.id) === fileId && this.useLibreEditor(f))
     },
+    scheduleLibreEvictRetry(key) {
+        if (!this._libreEvictRetryCounts) this._libreEvictRetryCounts = {}
+        if (!this._libreEvictRetryTimers) this._libreEvictRetryTimers = {}
+        const count = (this._libreEvictRetryCounts[key] || 0) + 1
+        if (count > 3) return
+        this._libreEvictRetryCounts[key] = count
+        if (this._libreEvictRetryTimers[key]) clearTimeout(this._libreEvictRetryTimers[key])
+        const timer = setTimeout(() => {
+            if (this._libreEvictRetryTimers) delete this._libreEvictRetryTimers[key]
+            if (Array.isArray(this.libreLruKeys) && this.libreLruKeys.includes(key)) {
+                this.evictLibreInstance(key)
+            }
+        }, 5000 * count)
+        if (timer && typeof timer.unref === 'function') timer.unref()
+        this._libreEvictRetryTimers[key] = timer
+    },
+    clearLibreEvictRetry(key) {
+        if (this._libreEvictRetryTimers && this._libreEvictRetryTimers[key]) {
+            clearTimeout(this._libreEvictRetryTimers[key])
+            delete this._libreEvictRetryTimers[key]
+        }
+        if (this._libreEvictRetryCounts) delete this._libreEvictRetryCounts[key]
+    },
     // LRU 淘汰：先自动保存再出池（出池即卸载，走组件自身的 dispose 流程）。
     async evictLibreInstance(key) {
         const inst = (this._libreRefs || {})[key]
         // 未就绪/加载失败的实例跳过保存——画布上是空白原型，保存会覆盖真文件。
         // flushSave：等在途自动保存结束，仍有脏改动才再存（没改动就不空传）。
         if (inst && inst.ready && !inst.docLoadFailed && inst.file) {
-            try { if ((await inst.flushSave({ timeoutMs: 10000 })) === false) return } catch (e) { console.warn('[ProjectOverview] evict auto-save failed:', e); return }
+            const timeoutMs = Math.max(10000, Math.min(30000, this.libreWeightOf(key) * 10000))
+            try {
+                if ((await inst.flushSave({ timeoutMs })) === false) {
+                    this.scheduleLibreEvictRetry(key)
+                    return
+                }
+            } catch (e) {
+                console.warn('[ProjectOverview] evict auto-save failed:', e)
+                this.scheduleLibreEvictRetry(key)
+                return
+            }
         }
+        this.clearLibreEvictRetry(key)
         // 保存耗时期间可能又被激活/关闭：按此刻的名次重新核验，累计权重仍在预算内
         // 或已是活动文件则不淘汰（与旧版"idx < LIBRE_KEEPALIVE_MAX"同一防线，只是
         // 判据从"名次前 N"换成"从最近使用往回累计权重不超预算"）。
@@ -375,14 +416,17 @@ export const librePoolMethods = {
         }
     },
 
-    // 后端就地改了某文件的内容（版本退回 / 检查点恢复），而该文件正显示在某个
+    // 后端就地改了某文件的内容（版本退回 / 检查点恢复 / AI 后端工具修改），而该文件正显示在某个
     // 窗格里：这个实例逐不出保活池（活动文件必进池），也不会因文件信息变化重
     // 挂载，必须显式命令它就地重载。非活动实例走上面的 unloadInactiveLibreInstances。
     // 绝不能走 closeFile：它在关闭脏文档前 flushSave，会把编辑器里还端着的
     // 改前字节写回后端，正好冲掉刚做的退回/恢复。
+    // opts.onlyClean=true 时（普通 AI 后端改文件）：若实例有未保存本地改动（dirty/saving），
+    // 拒绝强刷覆盖并回 false，让调用方提示重载未生效而不是误弹"文件已更新"；若无本地改动则就地重载。
     // 返回 false 表示有活动实例没能换成新内容（画布上还是旧的，该实例已自己
     // 落下保存闸），调用方据此把提示改成告警而不是"已更新"。
-    async reloadActiveLibreInstances(fileId) {
+    async reloadActiveLibreInstances(fileId, opts = {}) {
+        const onlyClean = !!(opts && opts.onlyClean)
         const refs = this._libreRefs || {}
         let allOk = true
         for (const pane of ['left', 'right']) {
@@ -395,6 +439,11 @@ export const librePoolMethods = {
             // 正常到不了这里；这条是硬判据，防止将来备胎/接力体换了记账方式后
             // 把重载打在没绑文件的实例上（那会"成功"，真文档纹丝不动）。
             if (!inst.file || String(inst.file.id) !== String(fileId)) continue
+            if (onlyClean && (inst.dirty || inst.docDirty || inst.saving || inst._saving)) {
+                allOk = false
+                console.warn('[ProjectOverview] 活动实例存在未保存改动，跳过非强制重载(' + pane + ':' + fileId + ')')
+                continue
+            }
             try {
                 const ok = await inst.reloadFromBackend()
                 if (!ok) allOk = false
