@@ -11,6 +11,8 @@ export default {
   subscriptionFallbackOn: "Wallet spending beyond allowance: enabled",
   subscriptionFallbackOff: "Stops at the allowance; wallet spending is disabled",
   subscriptionManage: "Manage allowance and wallet spending",
+  subscriptionInactiveNote: "No active Personal Pro subscription. Subscribe to get recurring allowance and 3GB cloud file backup storage.",
+  subscriptionSubscribeBtn: "Subscribe on website",
 
   // Sidebar navigation
   navCardTitle: 'Settings',
