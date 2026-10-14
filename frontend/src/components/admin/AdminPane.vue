@@ -369,14 +369,18 @@
                 </view>
             </SettingsSection>
 
-            <SettingsSection v-if="subscription && subscription.active" :title="$t('admin.subscriptionTitle')" :description="$t('admin.subscriptionSeparate')">
-              <view class="provider-card">
+            <SettingsSection v-if="subscription" :title="$t('admin.subscriptionTitle')" :description="$t('admin.subscriptionSeparate')">
+              <view v-if="subscription.active" class="provider-card">
                 <text class="provider-name">{{ $t('admin.subscriptionMonth', { used: subscriptionCredits(subscription.monthlyUsedCents), limit: subscriptionCredits(subscription.monthlyLimitCents) }) }}</text>
                 <text class="account-note">{{ $t('admin.subscriptionWeek', { used: subscriptionCredits(subscription.weeklyUsedCents), limit: subscriptionCredits(subscription.weeklyLimitCents) }) }}</text>
                 <text class="account-note">{{ $t('admin.subscriptionReset', { date: formatUsageTime(subscription.weeklyEnd) }) }}</text>
                 <text class="account-note">{{ $t('admin.subscriptionEnds', { date: formatUsageTime(subscription.periodEnd) }) }}</text>
                 <text class="account-note">{{ $t(subscription.walletFallbackEnabled ? 'admin.subscriptionFallbackOn' : 'admin.subscriptionFallbackOff') }}</text>
                 <button class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionManage') }}</button>
+              </view>
+              <view v-else class="provider-card">
+                <text class="account-note">{{ $t('admin.subscriptionInactiveNote') }}</text>
+                <button class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionSubscribeBtn') }}</button>
               </view>
             </SettingsSection>
 
@@ -1580,7 +1584,24 @@ export default {
     async handleUpdateCheck() {
       try {
         const s = await host.update.check()
-        if (s) this.update = { ...this.update, ...s }
+        if (s) {
+          this.update = { ...this.update, ...s }
+          if (s.phase === 'error') {
+            uni.showToast({ title: s.error || this.$t('admin.updateCheckToastFailed'), icon: 'none' })
+          } else if (s.majorAvailable) {
+            uni.showToast({
+              title: this.$t('admin.majorReleased', { version: s.majorAvailable.major }),
+              icon: 'none',
+            })
+          } else if (s.phase === 'ready' && s.available) {
+            uni.showToast({
+              title: this.$t('admin.updateReady', { version: s.available.version }),
+              icon: 'none',
+            })
+          } else if (s.phase === 'idle') {
+            uni.showToast({ title: this.$t('admin.upToDate'), icon: 'none' })
+          }
+        }
       } catch (e) {
         uni.showToast({ title: this.$t('admin.updateCheckToastFailed'), icon: 'none' })
       }

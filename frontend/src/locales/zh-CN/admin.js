@@ -11,6 +11,8 @@ export default {
   subscriptionFallbackOn: "超额后使用充值余额：已开启",
   subscriptionFallbackOff: "超额后暂停，不自动使用充值余额",
   subscriptionManage: "管理订阅与超额设置",
+  subscriptionInactiveNote: "当前未开通个人 Pro 订阅。开通后可使用周期订阅额度与 3GB 文件云端备份空间。",
+  subscriptionSubscribeBtn: "前往官网开通订阅",
 
   // 左侧导航
   navCardTitle: '设置',
