@@ -13,7 +13,7 @@ test('bundled SDK remains byte-identical; page requests no remote font or script
   assert.doesNotMatch(read('panel.css'), /@import|@font-face|url\(\s*["']?https?:/);
   assert.doesNotMatch(read('index.html'), /<script[^>]+src=["']https?:/);
 });
-test('real SDK completes handshake, unwraps tool output, and follows authenticated theme events', async t => {
+test('real SDK with secure-transport stub completes handshake, unwraps output, and follows authenticated theme events', async t => {
   const dom = new JSDOM(read('index.html'), { runScripts: 'outside-only', url: 'https://plugin.invalid' }); t.after(() => dom.window.close());
   const calls = [];
   const context = { projectId: 7, pluginId: 'baoqingtian', theme: 'light', themeTokens: { '--awd-surface': '#ffffff' } };
@@ -27,6 +27,8 @@ test('real SDK completes handshake, unwraps tool output, and follows authenticat
   } };
   Object.defineProperty(dom.window, 'parent', { value: parent });
   function push(data, source = parent) { dom.window.dispatchEvent(new dom.window.MessageEvent('message', { source, data })); }
+  // This test verifies SDK lifecycle; secure.js has separate cryptographic tests.
+  dom.window.bqtSecure = { invoke: (action, args) => dom.window.awd.tools.invoke('baoqingtian_action', { action, json: JSON.stringify(args) }), reset() {} };
   for (const name of ['awd-plugin-sdk.js', 'model.js', 'panel.js']) dom.window.eval(read(name));
   push({ awd: 1, type: 'init', context }, {}); await tick(); assert.equal(calls.length, 0);
   push({ awd: 1, type: 'init', context }); await tick();
