@@ -235,4 +235,22 @@ class OpenRouterStreamingChatModelTest {
         assertEquals(502, ((OpenAiHttpException) c.error.get()).code());
         assertEquals(LlmErrorClassifier.Kind.TRANSIENT, LlmErrorClassifier.classify(c.error.get()));
     }
+
+    @Test
+    @DisplayName("多个模型实例共享同一 OkHttp ConnectionPool 与 Dispatcher，避免高并发下每个实例自建连接池")
+    void multipleModelInstancesShareConnectionPoolAndDispatcher() {
+        OpenRouterStreamingChatModel m1 = new OpenRouterStreamingChatModel(
+                "sk-1", baseUrl(), "deepseek/deepseek-v4-flash", Duration.ofSeconds(5));
+        OpenRouterStreamingChatModel m2 = new OpenRouterStreamingChatModel(
+                "sk-2", baseUrl(), "moonshotai/kimi-k3", Duration.ofSeconds(10));
+
+        org.junit.jupiter.api.Assertions.assertSame(
+                m1.httpClient().connectionPool(),
+                m2.httpClient().connectionPool(),
+                "不同模型实例应复用同一个 OkHttp ConnectionPool");
+        org.junit.jupiter.api.Assertions.assertSame(
+                m1.httpClient().dispatcher(),
+                m2.httpClient().dispatcher(),
+                "不同模型实例应复用同一个 OkHttp Dispatcher");
+    }
 }

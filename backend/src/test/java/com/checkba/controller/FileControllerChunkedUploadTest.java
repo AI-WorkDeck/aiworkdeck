@@ -235,4 +235,15 @@ class FileControllerChunkedUploadTest {
         verify(storageService, never()).save(any(), any());
         verify(storageService, never()).append(any(), any());
     }
+
+    @Test
+    void uploadFileIsNotAnnotatedWithMethodLevelTransactional() {
+        for (java.lang.reflect.Method m : FileController.class.getDeclaredMethods()) {
+            if ("uploadFile".equals(m.getName())) {
+                org.junit.jupiter.api.Assertions.assertFalse(
+                        m.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class),
+                        "uploadFile 含网络流式写盘，不得在控制器方法层挂 @Transactional 占住数据库连接");
+            }
+        }
+    }
 }
