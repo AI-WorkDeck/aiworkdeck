@@ -83,6 +83,27 @@ class AiAgentControllerTest {
     }
 
     @Test
+    void revokedAccessBetweenSubmissionAndExecutionReturnsForbidden() {
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L);
+        req.setConversationId("conv-1");
+        req.setMessage("Queued request");
+        var item = new com.checkba.model.entity.AgentInboxItem();
+        item.setId("inbox-revoked");
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            when(inboxService.submit(req, 7L)).thenReturn(item);
+            when(agentOrchestrator.acceptInboxSubmission("inbox-revoked", false))
+                    .thenThrow(new SecurityException("无权访问该项目"));
+
+            assertEquals(403, controller.startSession(req, "s", null).getStatusCode().value());
+            verify(inboxService, never()).receipt(any(), any());
+        }
+    }
+
+    @Test
     void unpaidChatDoesNotEnterInboxOrStartWork() {
         var req = new AiAgentController.AgentChatRequest();
         req.setProjectId(42L);
