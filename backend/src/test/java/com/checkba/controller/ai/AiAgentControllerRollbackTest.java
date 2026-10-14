@@ -63,7 +63,8 @@ class AiAgentControllerRollbackTest {
                 mock(ClientCapabilityService.class),
                 mock(SubAgentService.class),
                 mock(com.checkba.service.ai.AgentInboxService.class),
-                mock(com.checkba.service.ai.ChatModelFactory.class));
+                mock(com.checkba.service.ai.ChatModelFactory.class),
+                mock(com.checkba.service.ProjectFileAccessService.class));
     }
 
     private AiAgentController.RollbackRequest req(String conv, String messageId, String clientRequestId) {

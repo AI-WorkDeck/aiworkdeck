@@ -6,6 +6,7 @@ package com.checkba.controller;
 import com.checkba.model.entity.ShareholderMeetingCheck;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectFileAccessService;
 import com.checkba.service.ShareholderMeetingService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,8 @@ public class ShareholderMeetingController {
         if (projectId == null || !projectMemberService.hasReadPermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权访问该资源", "You don't have permission to access this resource"));
         }
+        // Starting a check copies source materials and exposes derived internal work product.
+        if (projectMemberService.isClient(projectId, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
         return userId;
     }
 

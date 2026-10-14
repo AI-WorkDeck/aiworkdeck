@@ -32,6 +32,7 @@ public class ProjectFileController {
 
     private final ProjectFileService projectFileService;
     private final ProjectMemberService projectMemberService;
+    private final com.checkba.service.ProjectFileAccessService fileAccess;
     private final FileTagService fileTagService;
     private final com.checkba.service.quota.StageQuotaService stageQuotaService;
     /** 导入本机文件后的后置钩子，与 FileController.uploadFile 上传完成时同源。 */
@@ -133,11 +134,44 @@ public class ProjectFileController {
         return files;
     }
     
+    @ExceptionHandler(com.checkba.service.ProjectFileAccessService.FileAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> onFileAccessDenied(
+            com.checkba.service.ProjectFileAccessService.FileAccessDeniedException e) {
+        return ResponseEntity.status(403).body(Map.of("code", 403, "message", e.getMessage()));
+    }
+
+    @GetMapping("/{fileId}/access")
+    public Map<String, Object> getFileAccess(@PathVariable Long projectId, @PathVariable Long fileId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new UnauthorizedException("请先登录");
+        checkFileInProject(fileId, projectId);
+        ProjectFile file = projectFileService.getFile(fileId);
+        fileAccess.requireRead(file, userId);
+        return Map.of("code", 0, "data", Map.of("fileId", fileId, "clientVisible", file.getClientVisible(),
+                "canManageAccess", fileAccess.canManageAccess(file, userId)));
+    }
+
+    @PutMapping("/{fileId}/access")
+    public ResponseEntity<Map<String, Object>> updateFileAccess(@PathVariable Long projectId,
+            @PathVariable Long fileId, @RequestBody Map<String, Object> request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new UnauthorizedException("请先登录");
+        checkFileInProject(fileId, projectId);
+        if (!(request.get("clientVisible") instanceof Boolean visible)) {
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "clientVisible 必须为布尔值"));
+        }
+        ProjectFile file = fileAccess.setClientVisible(projectFileService.getFile(fileId), userId, visible);
+        return ResponseEntity.ok(Map.of("code", 0, "data", Map.of("fileId", fileId,
+                "clientVisible", file.getClientVisible(), "canManageAccess", fileAccess.canManageAccess(file, userId))));
+    }
+
     private void checkFileTreeAccess(Long projectId, Long userId) {
          if (!projectMemberService.hasReadPermission(projectId, userId)) {
               throw new IllegalArgumentException(com.checkba.service.LangText.of("无权访问该项目", "You do not have access to this project"));
          }
-         if (projectMemberService.isClient(projectId, userId)) {
+         if (fileAccess.isClient(projectId, userId)) {
              throw new IllegalArgumentException(com.checkba.service.LangText.of("客户无权访问资源管理器", "Clients do not have access to the Explorer"));
          }
     }

@@ -747,6 +747,31 @@ class PluginServiceTest {
         assertNull(service.resolveWebFile(null, "index.html"));
     }
 
+    @Test
+    void projectImArtifactLoadsWithDeclaredPermissionsAndCanBeDisabled() throws IOException {
+        Path source = Path.of("..", "official-plugins", "project-im");
+        Path dest = pluginsDir.resolve("project-im");
+        Files.createDirectories(dest.resolve("web"));
+        Files.copy(source.resolve("manifest.json"), dest.resolve("manifest.json"));
+        try (var walk = Files.list(source.resolve("web"))) {
+            for (Path file : walk.toList()) Files.copy(file, dest.resolve("web").resolve(file.getFileName()));
+        }
+        Files.copy(Path.of("..", "sdk", "plugin-sdk", "awd-plugin-sdk.js"),dest.resolve("web/awd-plugin-sdk.js"));
+        service.init();
+        var plugin = service.getPlugin("project-im");
+        assertNotNull(plugin);
+        assertEquals(List.of("im","file_read","file_write"),plugin.getPermissions());
+        assertEquals("web/index.html",plugin.getFrontendEntry());
+        assertTrue(service.hasWebEntry("project-im"));
+        assertNotNull(service.resolveWebFile(dest.toFile(),"awd-plugin-sdk.js"));
+        service.setEnabled("project-im",true);
+        assertTrue(service.isEnabled("project-im"));
+        service.setEnabled("project-im",false);
+        assertFalse(service.isEnabled("project-im"));
+        service.rescan();
+        assertFalse(service.isEnabled("project-im"));
+    }
+
     // ==== 规范 v2.3：packs ====
 
     @Test

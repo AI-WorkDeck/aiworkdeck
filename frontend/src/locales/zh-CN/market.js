@@ -94,6 +94,7 @@ export default {
   // ---- 权限 ----
   permFileRead: '读取文件',
   permFileWrite: '写入文件',
+  permIm: '聊天、会话成员与聊天附件',
   permNetwork: '网络访问',
   permEditor: '编辑器',
   listSeparator: '、',

@@ -52,6 +52,7 @@ class AiAgentControllerTest {
     private AgentOrchestrator agentOrchestrator;
     private com.checkba.service.ai.AgentInboxService inboxService;
     private AiAgentController controller;
+    private com.checkba.service.ProjectFileAccessService fileAccess;
     private SseEmitterService sse;
     private com.checkba.service.ai.ChatModelFactory chatModelFactory;
 
@@ -66,6 +67,7 @@ class AiAgentControllerTest {
         inboxService = mock(com.checkba.service.ai.AgentInboxService.class);
         sse = mock(SseEmitterService.class);
         chatModelFactory = mock(com.checkba.service.ai.ChatModelFactory.class);
+        fileAccess = mock(com.checkba.service.ProjectFileAccessService.class);
         controller = new AiAgentController(
                 sse,
                 agentOrchestrator,
@@ -77,7 +79,7 @@ class AiAgentControllerTest {
                 projectMemberService,
                 mock(ClientCapabilityService.class),
                 subAgentService,
-                inboxService, chatModelFactory);
+                inboxService, chatModelFactory, fileAccess);
     }
 
     @Test
@@ -313,4 +315,19 @@ class AiAgentControllerTest {
             verify(agentOrchestrator).acceptInboxSubmission("message-1", false);
         }
     }
+    @Test void clientCannotEnterProjectWideAiToolsEvenWithMembership() {
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L); req.setConversationId("client-conv"); req.setMessage("Read private files");
+        when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+        when(fileAccess.isClient(42L, 7L)).thenReturn(true);
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            var response = controller.startSession(req, "s", null);
+            org.junit.jupiter.api.Assertions.assertEquals(403, response.getStatusCode().value());
+            org.junit.jupiter.api.Assertions.assertTrue(response.getBody().toString()
+                    .contains(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE));
+            org.mockito.Mockito.verifyNoInteractions(agentOrchestrator, inboxService, chatModelFactory);
+        }
+    }
+
 }

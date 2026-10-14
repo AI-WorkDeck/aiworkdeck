@@ -60,3 +60,14 @@ iframe 里，是 opaque origin，拿不到宿主的真实 origin。来源校验�
 
 完整规范见 [docs/PLUGIN_SPEC.md](../../docs/PLUGIN_SPEC.md) §9，
 最小可跑示例见 [examples/hello-web-plugin/](../../examples/hello-web-plugin/)。
+
+## 项目沟通与文件材料（SDK 1.5.0，宿主 0.61.0+）
+
+- `awd.im.request(action, params)`：声明 `im` 权限后调用固定聊天动作。会话成员权限由服务端检查，项目文件导入/关联/归档另需 `file_write` 和项目写权限；发送项目文件需 `file_read/file_write` 与原文件读权限，首次保存项目标识另需内部项目写权限。不会向插件返回账号密钥。
+- `awd.chat.addFile(path)`：将当前项目文件加入 AI 材料，不自动发送消息。
+- `awd.files.prepareDrag(path, rect)`：预备一次拖拽，返回经宿主验证的文件描述及 `dragToken/dragType/expiresAt`。在 hover/focus 预备，传按钮局部矩形 `{left,top,width,height}`；宿主将原生拖柄限制在该 iframe 内，返回 `hostHandle:true` 后使用宿主拖柄完成跨 iframe 拖拽。不要放宽 sandbox。取消时可调 `awd.files.endDrag()`。仅当前项目、短时有效、使用一次，切换身份/项目立即失效。
+- `account.changed`：无正文的账户变更事件；清除缓存、草稿和在途结果后重新读取身份。
+
+旧宿主返回 `unknown_method`，应提示升级；不得用插件本机 KV 冒充跨用户聊天存储。
+
+`awd.call('im.downloadAttachment', {conversationId, attachmentId})` 直接下载服务端已授权附件，仅需 `im`，不写入项目。成功返回 `{started:true,name}` 表示已发起下载；用户可以取消另存为。

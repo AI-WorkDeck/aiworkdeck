@@ -48,7 +48,13 @@ class MeetingRecordingControllerByFileTest {
         UserSessionService userSessionService = mock(UserSessionService.class);
         when(userSessionService.resolveUserId("sess")).thenReturn(7L);
         AuthController.registerUserSessionService(userSessionService);
-        controller = new MeetingRecordingController(meetingService, transcriptionService, projectMemberService);
+        var files = mock(com.checkba.repository.ProjectFileRepository.class);
+        when(files.findById(anyLong())).thenAnswer(i -> {
+            var file = new com.checkba.model.entity.ProjectFile(); file.setId(i.getArgument(0)); file.setProjectId(1L);
+            return Optional.of(file);
+        });
+        controller = new MeetingRecordingController(meetingService, transcriptionService, projectMemberService,
+                        files, mock(com.checkba.service.ProjectFileAccessService.class));
     }
 
     @Test

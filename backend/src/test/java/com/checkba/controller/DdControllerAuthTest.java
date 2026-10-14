@@ -29,6 +29,8 @@ class DdControllerAuthTest {
     @Mock
     private ProjectMemberService projectMemberService;
 
+    @Mock private com.checkba.service.ProjectFileAccessService fileAccess;
+
     @InjectMocks
     private DdController controller;
 

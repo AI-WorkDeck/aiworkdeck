@@ -42,6 +42,8 @@ class ProjectFileControllerImportLocalTest {
     @Mock private com.checkba.service.ai.ProjectRagService projectRagService;
     @Mock private com.checkba.service.ai.AutoTaggingService autoTaggingService;
 
+    @Mock private com.checkba.service.ProjectFileAccessService fileAccess;
+
     @InjectMocks
     private ProjectFileController controller;
 
@@ -54,7 +56,7 @@ class ProjectFileControllerImportLocalTest {
 
     private void allowMember() {
         when(projectMemberService.hasReadPermission(1L, 1L)).thenReturn(true);
-        when(projectMemberService.isClient(1L, 1L)).thenReturn(false);
+        when(fileAccess.isClient(1L, 1L)).thenReturn(false);
         when(projectMemberService.hasWritePermission(1L, 1L)).thenReturn(true);
     }
 
@@ -93,7 +95,7 @@ class ProjectFileControllerImportLocalTest {
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
             when(projectMemberService.hasReadPermission(1L, 1L)).thenReturn(true);
-            when(projectMemberService.isClient(1L, 1L)).thenReturn(false);
+            when(fileAccess.isClient(1L, 1L)).thenReturn(false);
             when(projectMemberService.hasWritePermission(1L, 1L)).thenReturn(false);
 
             assertThrows(IllegalArgumentException.class,
