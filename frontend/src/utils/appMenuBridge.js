@@ -149,9 +149,39 @@ async function runAppCommand(verb, arg) {
       toast(t('shell.menuCheckingUpdate'))
       const r = await host.update.check()
       const phase = r && r.phase
-      if (phase === 'error') toast((r && r.error) || t('shell.menuUpdateFailed'))
-      else if (phase === 'idle' || phase === 'up-to-date') toast(t('shell.menuUpToDate'))
-      // 其余阶段（下载中/待重启）由更新器自己的 UI 接管，别在这里抢话
+      if (phase === 'error') {
+        toast((r && r.error) || t('shell.menuUpdateFailed'))
+      } else if (r && r.majorAvailable) {
+        uni.showModal({
+          title: t('admin.majorReleased', { version: r.majorAvailable.major }),
+          content: t('admin.majorNote'),
+          confirmText: t('admin.goDownloadButton'),
+          cancelText: t('common.close'),
+          success: (res) => {
+            if (res && res.confirm && host.shell && host.shell.openExternal) {
+              host.shell.openExternal(r.majorAvailable.page || 'https://www.aiworkdeck.com')
+            }
+          },
+        })
+      } else if (phase === 'ready' && r && r.available) {
+        uni.showModal({
+          title: t('admin.restartAppTitle'),
+          content: t('admin.restartAppContent', {
+            version: r.available.version || t('admin.newVersionFallback'),
+          }),
+          confirmText: t('admin.restartNowButton'),
+          cancelText: t('common.close'),
+          success: (res) => {
+            if (res && res.confirm && host.update && host.update.restart) {
+              host.update.restart()
+            }
+          },
+        })
+      } else if (phase === 'downloading') {
+        toast(t('admin.downloadingPatch'))
+      } else if (phase === 'idle' || phase === 'up-to-date') {
+        toast(t('shell.menuUpToDate'))
+      }
       return
     }
     case 'setLang':
