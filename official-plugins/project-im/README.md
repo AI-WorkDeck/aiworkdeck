@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # 项目沟通
 
-纯 Web IM 插件，需具备 `im.request`、`chat.addFile`、`files.prepareDrag` 的 AI WorkDeck 0.61.0 或更新宿主。本目录为开发交付，不表示客户端已经发版、插件已经签名或云服务已经部署。
+纯 Web IM 插件，需具备 `im.request`、`chat.addFile`、`files.prepareDrag` 的 AI WorkDeck 0.61.0 或更新宿主。当前使用中国大陆站 AI WorkDeck 账号，连接 `case.aiworkdeck.com` 官方协作服务；国际站账号暂不支持。源码、宿主和云服务分别发布，实际可用状态以插件广场及正式版本为准。
 
 在插件工作区创建群聊或两人私聊，负责人生成带角色的邀请码，其他用户凭码加入。邀请码持有人能读取历史消息；文件另按访问权限开放。邀请码应只交给预期成员。角色分为负责人、成员、客户。消息使用当前登录账号身份，跨团队/律所的沟通以会话成员资格授权。
 
