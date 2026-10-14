@@ -65,6 +65,46 @@ public class DocumentCheckpointService {
 
     private record Checkpoint(Long fileId, String checkpointKey, long createdAt) {}
 
+    /** 快照最长保留时长：最后一轮会话的检查点在 clearForNewRun 不会被清，靠 TTL 兜底回收。 */
+    static final long CHECKPOINT_TTL_MS = 24 * 60 * 60 * 1000L;
+
+    /**
+     * 清理过期快照：某 conversationId 下所有快照都已超过 TTL（或已为空）时，
+     * 原子移除该会话条目并删除底层存储 blob。返回删除的快照文件数。
+     */
+    public int cleanupExpiredCheckpoints(long nowMillis) {
+        int deleted = 0;
+        for (Map.Entry<String, Map<Long, Checkpoint>> entry : checkpoints.entrySet()) {
+            String conversationId = entry.getKey();
+            Map<Long, Checkpoint> perFile = entry.getValue();
+            boolean allExpired = perFile.isEmpty() || perFile.values().stream()
+                    .allMatch(cp -> nowMillis - cp.createdAt() >= CHECKPOINT_TTL_MS);
+            if (!allExpired) continue;
+            // 原子移除：只有真正摘掉条目的线程才负责删 blob，并发调用不会重复删
+            Map<Long, Checkpoint> removed = checkpoints.remove(conversationId);
+            if (removed == null || removed.isEmpty()) {
+                if (removed != null) checkpoints.putIfAbsent(conversationId, removed);
+                continue;
+            }
+            StorageService storage = storageServiceFactory.getStorageService();
+            for (Checkpoint cp : removed.values()) {
+                try {
+                    storage.delete(cp.checkpointKey());
+                    deleted++;
+                } catch (Exception e) {
+                    log.warn("Failed to delete expired document checkpoint blob: conv={}, fileId={}, key={}",
+                            conversationId, cp.fileId(), cp.checkpointKey(), e);
+                }
+            }
+        }
+        return deleted;
+    }
+
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 3600_000L)
+    void scheduledCleanup() {
+        cleanupExpiredCheckpoints(System.currentTimeMillis());
+    }
+
     /**
      * 为指定文件创建本轮快照（幂等：同一会话同一文件已有快照则跳过；不同文件各自独立）。
      * 任何失败只记日志、不阻断工具执行——快照是保险，不是主流程。

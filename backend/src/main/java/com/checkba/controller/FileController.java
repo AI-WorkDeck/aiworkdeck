@@ -78,6 +78,25 @@ public class FileController {
     @Autowired
     private com.checkba.service.ProjectFileAccessService fileAccess;
 
+    @Autowired(required = false)
+    @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
+    private java.util.concurrent.Executor taskExecutor;
+
+    private static final java.util.concurrent.ExecutorService FALLBACK_UPLOAD_EXECUTOR =
+            new java.util.concurrent.ThreadPoolExecutor(
+                    2, 8, 60L, java.util.concurrent.TimeUnit.SECONDS,
+                    new java.util.concurrent.LinkedBlockingQueue<>(256),
+                    r -> {
+                        Thread t = new Thread(r, "file-upload-postproc");
+                        t.setDaemon(true);
+                        return t;
+                    },
+                    new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+
+    private java.util.concurrent.Executor asyncExecutor() {
+        return taskExecutor != null ? taskExecutor : FALLBACK_UPLOAD_EXECUTOR;
+    }
+
     /**
      * 文件的物理磁盘路径（「在 Finder 中显示」用）。
      */
@@ -374,9 +393,9 @@ public class FileController {
 
     /**
      * 上传接口
-     * ...
+     * 不在控制器方法层挂 @Transactional：流式读取客户端上传流并写盘（save/append）耗时与网络/文件大小成正比，
+     * 全程持事务会把数据库连接占满；配额校验与元数据落库由各自 Service/Repository 的短事务独立完成。
      */
-    @org.springframework.transaction.annotation.Transactional
     @PostMapping("/{fileId}/upload")
     public ResponseEntity<Map<String, Object>> uploadFile(
             @PathVariable("fileId") String fileId,
@@ -514,7 +533,7 @@ public class FileController {
                     if (uploadComplete) {
                          if (projectFileOpt.isPresent()) {
                              Long pid = projectFileOpt.get().getProjectId();
-                             // Async execution to prevent blocking 408 Timeout
+                             // Async execution on bounded executor to prevent blocking 408 Timeout or exhausting ForkJoinPool.commonPool
                              java.util.concurrent.CompletableFuture.runAsync(() -> {
                                  try {
                                      log.info("触发异步RAG索引: projectId={}, file={}", pid, savedPath);
@@ -529,7 +548,7 @@ public class FileController {
                                  } catch (Exception e) {
                                      log.error("Async RAG indexing failed for file: " + savedPath, e);
                                  }
-                             });
+                             }, asyncExecutor());
                          }
                     }
                 } catch (Exception e) {
@@ -552,7 +571,7 @@ public class FileController {
                          } catch (Exception e) {
                               log.error("Async RAG (Legacy) failed", e);
                          }
-                     });
+                     }, asyncExecutor());
                 }
             }
 

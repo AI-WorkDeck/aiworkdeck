@@ -105,3 +105,23 @@ test('卸载不误伤 id 以它结尾的别的文件', () => {
 
   assert.deepEqual(inst.libreLruKeys, ['left:1501'])
 })
+
+test('非强制 reload：活动实例无未保存改动时就地重载，防旧画布覆盖新后端文件（#1269 E-1）', async () => {
+  const { inst, calls } = page({ activeFileIdLeft: DOC.id, spareHoldsDoc: false })
+
+  const ok = await inst.handleEditorReloadFile({ fileId: DOC.id })
+
+  assert.equal(ok, true)
+  assert.deepEqual(calls.reloaded, [DOC.id])
+})
+
+test('非强制 reload：活动实例有未保存改动时跳过强刷并返回 false，不误报「文件已更新」（#1269 E-1）', async () => {
+  const { inst, calls } = page({ activeFileIdLeft: DOC.id, spareHoldsDoc: false })
+  inst._libreRefs['left:' + DOC.id].dirty = true
+
+  const ok = await inst.handleEditorReloadFile({ fileId: DOC.id })
+
+  assert.equal(ok, false)
+  assert.deepEqual(calls.reloaded, [])
+})
+
