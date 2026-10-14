@@ -193,7 +193,7 @@ check('project-list-pane.scss 保留统一紧凑列表所需的样式块', () =>
     '.cloud-accept-entry', '.projects-stats-row', '.stat-card',
     '.project-table', '.ptable-head', '.ptable-row', '.ptable-item', '.ptable-name', '.ptable-sub',
     '.project-list-toolbar', '.project-search-input', '.project-sort', '.action-btn-icon',
-    '.member-avatar-new', '.add-member-btn-new', '.empty-state-dashed', '.dashed-icon',
+    '.member-avatar-new', '.add-member-btn-new', '.project-empty-state', '.project-empty-description',
     '.project-role-badge', '.role-owner', '.role-text',
     '.manager-avatar-wrapper',
     '.act-glyph', '.badge-glyph',
