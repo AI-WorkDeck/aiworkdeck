@@ -30,7 +30,11 @@ export default {
   loading: '加载中...',
   clientEmptyHint: '律师把案卷分享给你之后，会出现在这里',
   newProject: '新建项目',
-  emptyHint: '还没有案卷。从下面开始：打开一个已有的文件夹，或者新建一个。',
+  emptyTitle: '暂无项目',
+  localEmptyTitle: '暂无本机项目',
+  clientEmptyTitle: '暂无共享案卷',
+  emptyHint: '从上方新建项目，或打开已有文件夹。',
+  webEmptyHint: '从上方新建项目，开始整理工作资料。',
   // project-list.vue：视图切换与列表视图列名
   gridView: '方块视图',
   listView: '列表视图',

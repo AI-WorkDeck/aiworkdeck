@@ -103,30 +103,28 @@
           <view v-else-if="projects.length === 0">
             <!-- CLIENT 没有建项目/取案卷的入口，空态只作说明 -->
             <template v-if="isClientUser">
-              <view class="empty-state-dashed client-empty">
-                <view class="dashed-content">
-                  <text class="dashed-text">{{ $t('projects.clientEmptyHint') }}</text>
-                </view>
+              <view class="project-empty-state">
+                <text class="project-empty-title">{{ $t('projects.clientEmptyTitle') }}</text>
+                <text class="project-empty-description">{{ $t('projects.clientEmptyHint') }}</text>
               </view>
             </template>
             <template v-else>
-              <view class="empty-state-dashed">
-                <view class="dashed-content">
-                  <text class="dashed-text">{{ $t('projects.emptyHint') }}</text>
-                </view>
+              <view class="project-empty-state">
+                <text class="project-empty-title">{{ $t(isDesktop ? 'projects.localEmptyTitle' : 'projects.emptyTitle') }}</text>
+                <text class="project-empty-description">{{ $t(isDesktop ? 'projects.emptyHint' : 'projects.webEmptyHint') }}</text>
               </view>
-              <!-- 协作的唯一入口，暂时收起（同上）。CollabDialog 的邀请话术写死指向
-                   这里，方法与组件别删 -->
-              <view v-if="SHOW_CLOUD_ACCEPT" class="cloud-accept-entry" @tap="openCloudAccept">
+              <!-- 保留被邀请同事取回案卷的入口。 -->
+              <view v-if="SHOW_CLOUD_ACCEPT" class="cloud-accept-entry" role="button" tabindex="0" @tap="openCloudAccept" @keydown.enter.prevent="openCloudAccept" @keydown.space.prevent="openCloudAccept">
+                <svg class="cloud-accept-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path v-for="(d, gi) in ICONS.download" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
                 <text class="cloud-accept-entry-text">{{ $t('projects.pullFromTeamLibrary') }}</text>
               </view>
             </template>
           </view>
 
-          <view v-else-if="visibleProjects.length === 0" class="empty-state-dashed search-empty">
-            <view class="dashed-content">
-              <text class="dashed-text">{{ $t('projects.noMatch') }}</text>
-            </view>
+          <view v-else-if="visibleProjects.length === 0" class="project-empty-state search-empty">
+            <text class="project-empty-description">{{ $t('projects.noMatch') }}</text>
           </view>
 
           <!-- 项目侧栏统一紧凑列表；旧网格偏好不再改变此处布局。 -->
