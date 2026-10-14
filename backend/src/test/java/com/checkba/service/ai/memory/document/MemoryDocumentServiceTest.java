@@ -69,6 +69,99 @@ class MemoryDocumentServiceTest {
     }
 
     @Test
+    void clientsCannotReadProjectMemoryEvenWithAdminWritePermission() {
+        Project project = project(31L, "内部材料项目");
+        when(projectMembers.hasReadPermission(project.getId(), 31L)).thenReturn(true);
+        when(projectMembers.hasWritePermission(project.getId(), 31L)).thenReturn(true);
+        String projectSpace = space(service.listSpaces(31L, project.getId()), "project").id();
+        MemoryFileView secret = service.write(31L, projectSpace, "private-extract.md",
+                "# 私有材料摘录\n\nPRIVATE-MEMORY-CANARY", 0);
+
+        for (long clientId : List.of(32L, 33L)) {
+            when(projectMembers.hasReadPermission(project.getId(), clientId)).thenReturn(true);
+            // The second case models global CLIENT + project ADMIN/OWNER: the unified
+            // isClient predicate must win even if another caller reports write permission.
+            when(projectMembers.hasWritePermission(project.getId(), clientId)).thenReturn(clientId == 33L);
+            when(projectMembers.isClient(project.getId(), clientId)).thenReturn(true);
+            String personalSpace = space(service.listSpaces(clientId, null), "user").id();
+            service.write(clientId, personalSpace, "client-preferences.md", "个人偏好", 0);
+            MemorySpaceView hidden = space(service.listSpaces(clientId, project.getId()), "project");
+            assertNull(hidden.id());
+            assertEquals("项目记忆", hidden.label());
+            assertFalse(hidden.readable());
+            assertFalse(hidden.writable());
+            assertFalse(hidden.available());
+            // Personal memory stays available to tools that list all spaces in a project context.
+            assertEquals(personalSpace, space(service.listSpaces(clientId, project.getId()), "user").id());
+            String indexes = service.contextIndexes(clientId, project.getId(), 16_000);
+            assertTrue(indexes.contains("client-preferences.md"));
+            assertFalse(indexes.contains("private-extract.md"));
+            assertFalse(indexes.contains("内部材料项目"));
+            assertFalse(indexes.contains(projectSpace));
+            assertFalse(indexes.contains("PRIVATE-MEMORY-CANARY"));
+            assertProjectMemoryDenied(clientId, projectSpace, secret);
+        }
+        assertEquals("# 私有材料摘录\n\nPRIVATE-MEMORY-CANARY",
+                service.read(31L, projectSpace, secret.path()).content());
+    }
+
+    @Test
+    void projectMemoryReadAccessIsRecheckedAfterRemovalAndAllowsReadOnlyStaff() {
+        Project project = project(41L, "权限撤销项目");
+        when(projectMembers.hasReadPermission(project.getId(), 41L)).thenReturn(true);
+        when(projectMembers.hasWritePermission(project.getId(), 41L)).thenReturn(true);
+        String projectSpace = space(service.listSpaces(41L, project.getId()), "project").id();
+        MemoryFileView secret = service.write(41L, projectSpace, "facts.md", "STAFF-CANARY", 0);
+        long readerId = 42L;
+        when(projectMembers.hasReadPermission(project.getId(), readerId)).thenReturn(true);
+        when(projectMembers.hasWritePermission(project.getId(), readerId)).thenReturn(false);
+
+        assertTrue(space(service.listSpaces(readerId, project.getId()), "project").readable());
+        assertFalse(space(service.listSpaces(readerId, project.getId()), "project").writable());
+        assertEquals(secret.content(), service.download(readerId, projectSpace, secret.path()));
+        assertEquals(secret.path(), service.search(readerId, projectSpace, "STAFF-CANARY", 5).get(0).path());
+        assertTrue(service.contextIndexes(readerId, project.getId(), 16_000).contains("facts.md"));
+        assertDenied(() -> service.write(readerId, projectSpace, secret.path(), "cannot overwrite", secret.revision()));
+
+        // A previously known space id is not a capability after membership is revoked.
+        when(projectMembers.hasReadPermission(project.getId(), readerId)).thenReturn(false);
+        assertDenied(() -> service.listSpaces(readerId, project.getId()));
+        assertDenied(() -> service.contextIndexes(readerId, project.getId(), 16_000));
+        assertProjectMemoryDenied(readerId, projectSpace, secret);
+    }
+
+    @Test
+    void clientPersonalMemoryRemainsOwnerOnly() {
+        long clientId = 51L;
+        when(projectMembers.isClient(anyLong(), eq(clientId))).thenReturn(true);
+        String ownSpace = space(service.listSpaces(clientId, null), "user").id();
+        MemoryFileView note = service.write(clientId, ownSpace, "preferences.md", "PERSONAL-CANARY", 0);
+        assertEquals(note.content(), service.download(clientId, ownSpace, note.path()));
+        assertEquals(note.path(), service.search(clientId, ownSpace, "PERSONAL-CANARY", 5).get(0).path());
+        assertTrue(service.contextIndexes(clientId, null, 16_000).contains("preferences.md"));
+        assertAll(
+                () -> assertDenied(() -> service.listFiles(52L, ownSpace)),
+                () -> assertDenied(() -> service.read(52L, ownSpace, note.path())),
+                () -> assertDenied(() -> service.download(52L, ownSpace, note.path())),
+                () -> assertDenied(() -> service.search(52L, ownSpace, "PERSONAL-CANARY", 5)),
+                () -> assertDenied(() -> service.write(52L, ownSpace, note.path(), "overwrite", note.revision())));
+    }
+
+    private void assertProjectMemoryDenied(Long userId, String spaceId, MemoryFileView secret) {
+        assertAll(
+                () -> assertDenied(() -> service.listFiles(userId, spaceId)),
+                () -> assertDenied(() -> service.read(userId, spaceId, secret.path())),
+                () -> assertDenied(() -> service.download(userId, spaceId, secret.path())),
+                () -> assertDenied(() -> service.search(userId, spaceId, "CANARY", 5)),
+                () -> assertDenied(() -> service.write(userId, spaceId, secret.path(), "overwrite", secret.revision())),
+                () -> assertDenied(() -> service.delete(userId, spaceId, secret.path(), secret.revision())));
+    }
+
+    private static void assertDenied(org.junit.jupiter.api.function.Executable action) {
+        assertEquals(403, assertThrows(MemoryDocumentException.class, action).status());
+    }
+
+    @Test
     void topicLinksResolveAndDeleteKeepsIndexValid() {
         Project project = project(7L, "尽调项目");
         when(projectMembers.hasReadPermission(project.getId(), 7L)).thenReturn(true);

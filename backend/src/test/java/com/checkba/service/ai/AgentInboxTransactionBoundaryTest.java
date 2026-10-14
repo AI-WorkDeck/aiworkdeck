@@ -43,6 +43,93 @@ class AgentInboxTransactionBoundaryTest {
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired EntityManager entityManager;
     @Autowired EntityManagerFactory entityManagerFactory;
+    @Autowired com.checkba.repository.ProjectRepository projects;
+    @Autowired com.checkba.repository.ProjectMemberRepository members;
+    @Autowired com.checkba.repository.UserRepository users;
+    @Autowired com.checkba.repository.ProjectInvitationRepository invitations;
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"client", "global-client", "removed"})
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void restoredDurableInputUsesCurrentMembershipAndRechecksTheExecutor(String change) {
+        var owner = saveUser();
+        var user = saveUser();
+        var project = new com.checkba.model.entity.Project();
+        project.setName("synthetic inbox permission fixture");
+        project.setProjectType("TEST");
+        project.setListedCompanyName("");
+        project.setTargetCompanyName("");
+        project.setUserId(owner.getId());
+        project = projects.saveAndFlush(project);
+        var member = new com.checkba.model.entity.ProjectMember();
+        member.setProjectId(project.getId());
+        member.setUserId(user.getId());
+        member.setRole("ADMIN");
+        member = members.saveAndFlush(member);
+        var access = new com.checkba.service.ProjectMemberService(members, users, projects, invitations);
+        SseEmitterService sse = mock(SseEmitterService.class);
+        AgentRunStateService state = mock(AgentRunStateService.class);
+        AgentInboxService original = durableInbox(sse, state);
+        var request = request();
+        request.setProjectId(project.getId());
+        request.setConversationId("restored-" + java.util.UUID.randomUUID());
+        AgentInboxItem saved = original.submit(request, user.getId());
+
+        // Restore from committed H2 rows through a new service, with real project-role repositories.
+        AgentInboxService restored = durableInbox(sse, state);
+        var tasks = new java.util.ArrayList<Runnable>();
+        var orchestrator = mock(AgentOrchestrator.class, CALLS_REAL_METHODS);
+        var modelFactory = mock(ChatModelFactory.class);
+        var assembler = mock(ContextAssemblerService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "activeRuns", new java.util.concurrent.ConcurrentHashMap<>());
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "projectMemberService", access);
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "sseEmitterService", sse);
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "agentRunStateService", state);
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "skillRouter", mock(com.checkba.service.ai.skill.SkillRouter.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "chatModelFactory", modelFactory);
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "contextAssemblerService", assembler);
+        orchestrator.setInboxService(restored);
+        orchestrator.setTurnExecutor(tasks::add);
+        if ("removed".equals(change)) members.delete(member);
+        else if ("global-client".equals(change)) {
+            user.setRole("CLIENT"); users.saveAndFlush(user);
+        } else {
+            member.setRole("CLIENT"); members.saveAndFlush(member);
+        }
+        assertThrows(SecurityException.class, () -> orchestrator.acceptInboxSubmission(saved.getId()));
+        assertTrue(tasks.isEmpty());
+        assertEquals(AgentInboxService.PENDING, repository.findById(saved.getId()).orElseThrow().getState());
+        verifyNoInteractions(modelFactory, assembler);
+
+        // Positive control: restoring staff membership admits this exact persisted item once.
+        user.setRole("USER"); users.saveAndFlush(user);
+        if ("removed".equals(change)) member.setId(null);
+        member.setRole("ADMIN"); member = members.saveAndFlush(member);
+        assertNotNull(orchestrator.acceptInboxSubmission(saved.getId()));
+        assertEquals(1, tasks.size());
+        assertEquals(AgentInboxService.APPLIED, repository.findById(saved.getId()).orElseThrow().getState());
+        // Revocation after admission, before the executor runs, must also be authoritative.
+        member.setRole("CLIENT"); members.saveAndFlush(member);
+        tasks.get(0).run();
+        assertEquals(AgentInboxService.INTERRUPTED, repository.findById(saved.getId()).orElseThrow().getState());
+        assertNull(orchestrator.activeRunId(request.getConversationId()));
+        verifyNoInteractions(modelFactory, assembler);
+    }
+
+    private com.checkba.model.entity.User saveUser() {
+        var user = new com.checkba.model.entity.User();
+        user.setUsername("inbox-" + java.util.UUID.randomUUID());
+        user.setDisplayName("Synthetic inbox user");
+        user.setPassword("not-a-login-hash");
+        return users.saveAndFlush(user);
+    }
+
+    private AgentInboxService durableInbox(SseEmitterService sse, AgentRunStateService state) {
+        var service = new AgentInboxService(repository, sse, state);
+        service.setTransactionManager(transactionManager);
+        service.setEntityManager(entityManager);
+        return service;
+    }
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)

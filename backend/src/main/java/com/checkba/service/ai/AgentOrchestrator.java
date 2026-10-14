@@ -130,6 +130,7 @@ public class AgentOrchestrator {
         /** 本轮 ASSISTANT 消息的行 ID：本轮内的增量/最终保存更新同一行，跨轮次互不覆盖。 */
         private volatile Long assistantMessageId;
         private volatile String clientRequestId;
+        private String inboxItemId;
         private FileChangeTurn fileChangeTurn = new FileChangeTurn();
         /** 本轮的取消标志。只有 {@link AgentOrchestrator#setCancelled} 解析到的那一轮会被置位。 */
         private final java.util.concurrent.atomic.AtomicBoolean cancelled =
@@ -401,6 +402,9 @@ public class AgentOrchestrator {
     private volatile AgentInboxService inboxService;
 
     @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.ProjectMemberService projectMemberService;
+
+    @org.springframework.beans.factory.annotation.Autowired
     void setInboxService(AgentInboxService inboxService) {
         this.inboxService = inboxService;
     }
@@ -468,7 +472,17 @@ public class AgentOrchestrator {
             guard.abandonDecision();
             activeRuns.remove(guard.conversationId, guard);
             skillRouter.clearRun(guard.runId);
-            next.ifPresent(item -> acceptInboxSubmission(item.getId()));
+            try {
+                next.ifPresent(item -> acceptInboxSubmission(item.getId()));
+            } catch (SecurityException denied) {
+                // The finished turn remains finished; leave the rejected follow-up pending.
+                // No new guard was created. Only report to the still-current connection.
+                if (activeRunId(guard.conversationId) == null
+                        && sseEmitterService.currentEpoch(guard.conversationId) == guard.connectionEpoch) {
+                    sseEmitterService.send(guard.conversationId, "error", denied.getMessage());
+                    sseEmitterService.close(guard.conversationId, guard.connectionEpoch);
+                }
+            }
         }
     }
 
@@ -780,9 +794,26 @@ public class AgentOrchestrator {
                                          StringBuilder executionLog) {
         AgentInboxService inbox = this.inboxService;
         if (inbox == null || !inbox.hasPendingSteering(guard.conversationId)) return false;
+        requireInboxProjectAccess(Long.valueOf(projectId), userId);
         java.util.List<com.checkba.model.entity.AgentInboxItem> inputs =
                 inbox.claimPendingSteering(guard.conversationId, guard.runId);
         if (inputs.isEmpty()) return false;
+        try {
+            // Old/malformed mixed-project input must not survive as "applied" after rejection.
+            // Validate the whole claimed batch before saving or assembling any of its text.
+            for (com.checkba.model.entity.AgentInboxItem input : inputs) {
+                requireInboxProjectAccess(input.getProjectId(), input.getUserId());
+                if (!java.util.Objects.equals(input.getProjectId(), Long.valueOf(projectId))
+                        || !java.util.Objects.equals(input.getUserId(), userId)) {
+                    throw new SecurityException(LangText.of("待处理消息与当前项目或用户不一致",
+                            "The pending message belongs to a different project or user"));
+                }
+            }
+        } catch (SecurityException denied) {
+            inbox.interruptRun(guard.runId);
+            inbox.emitSnapshot(guard.conversationId);
+            throw denied;
+        }
 
         // A new submission has its own consent. Do not classify or narrow it using the old input.
         guard.abandonDecision();
@@ -1374,6 +1405,26 @@ public class AgentOrchestrator {
         return acceptInboxSubmission(itemId, true);
     }
 
+    /** Execution admission is separate from historical conversation ownership. */
+    public void requireInboxExecutionAccess(String conversationId, String itemId, Long userId) {
+        com.checkba.model.entity.AgentInboxItem item = inboxService.fresh(itemId);
+        if (!java.util.Objects.equals(conversationId, item.getConversationId())
+                || !java.util.Objects.equals(userId, item.getUserId())) {
+            throw new SecurityException(LangText.of("无权操作该会话", "You do not have permission for this conversation"));
+        }
+        requireInboxProjectAccess(item.getProjectId(), userId);
+    }
+
+    private void requireInboxProjectAccess(Long projectId, Long userId) {
+        // Same staff-workspace admission as POST /chat, using the durable project's identity.
+        if (projectId == null || userId == null || !projectMemberService.hasReadPermission(projectId, userId)) {
+            throw new SecurityException(LangText.of("无权访问该项目", "You do not have access to this project"));
+        }
+        if (projectMemberService.isClient(projectId, userId)) {
+            throw new SecurityException(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE);
+        }
+    }
+
     /** emitApplied=false is used by the originating POST; its receipt already represents the bubble. */
     public String acceptInboxSubmission(String itemId, boolean emitApplied) {
         AgentInboxService inbox = this.inboxService;
@@ -1387,6 +1438,7 @@ public class AgentOrchestrator {
             if (!AgentInboxService.PENDING.equals(item.getState())) {
                 return item.getRunId() != null ? item.getRunId() : activeRunId(item.getConversationId());
             }
+            requireInboxProjectAccess(item.getProjectId(), item.getUserId());
             RunGuard current = activeRuns.get(item.getConversationId());
             if (current != null) {
                 if (AgentInboxService.STEER.equals(item.getSubmissionMode())) current.abandonDecision();
@@ -1394,6 +1446,7 @@ public class AgentOrchestrator {
             }
 
             guard = beginRun(item.getConversationId());
+            guard.inboxItemId = itemId;
             claimed = inbox.claim(itemId, guard.runId, emitApplied);
             if (!AgentInboxService.APPLIED.equals(claimed.getState())
                     || !guard.runId.equals(claimed.getRunId())) {
@@ -1446,6 +1499,21 @@ public class AgentOrchestrator {
 
     private void handleUserMessageInScope(AiAgentController.AgentChatRequest request, Long userId,
                                           RunGuard guard) {
+        // Admission can precede actual execution by an arbitrarily long executor wait.
+        // Recheck before reading context, saving user text, selecting a model or running tools.
+        if (guard.inboxItemId != null) {
+            try {
+                requireInboxExecutionAccess(guard.conversationId, guard.inboxItemId, userId);
+            } catch (SecurityException denied) {
+                inboxService.interruptRun(guard.runId);
+                markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+                sendRunEvent(guard, "error", denied.getMessage());
+                inboxService.emitSnapshot(guard.conversationId);
+                closeSse(guard);
+                endRun(guard);
+                return;
+            }
+        }
         String conversationId = request.getConversationId();
         guard.clientRequestId = request.getClientRequestId();
         String projectId = String.valueOf(request.getProjectId());

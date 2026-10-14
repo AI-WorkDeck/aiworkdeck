@@ -47,6 +47,10 @@ class AgentOrchestratorInboxTest {
     private ContextAssemblerService assembler;
     private ProjectAiMessageService messageService;
     private XmlToolCallParser xml;
+    private com.checkba.service.ProjectMemberService members;
+    private SseEmitterService sse;
+    private AgentRunStateService runState;
+    private AgentInboxItemRepository repository;
 
     @BeforeEach
     void setUp() {
@@ -54,7 +58,8 @@ class AgentOrchestratorInboxTest {
         modelRequests.clear();
         sseEvents.clear();
         AgentInboxItemRepository repo = inMemoryRepository();
-        SseEmitterService sse = mock(SseEmitterService.class);
+        repository = repo;
+        sse = mock(SseEmitterService.class);
         doAnswer(inv -> {
             Object payload = inv.getArgument(2);
             sseEvents.add(inv.getArgument(1, String.class) + ":" + String.valueOf(payload));
@@ -66,7 +71,7 @@ class AgentOrchestratorInboxTest {
             sseEvents.add("close:" + inv.getArgument(0, String.class));
             return null;
         }).when(sse).close(any(), anyLong());
-        AgentRunStateService runState = mock(AgentRunStateService.class);
+        runState = mock(AgentRunStateService.class);
         inbox = new AgentInboxService(repo, sse, runState);
 
         modelFactory = mock(ChatModelFactory.class);
@@ -108,6 +113,148 @@ class AgentOrchestratorInboxTest {
                 mock(com.checkba.service.telemetry.TelemetryTurnTracker.class),
                 mock(com.checkba.service.telemetry.MatterClassifierService.class), new OfficePassStateStore());
         orchestrator.setInboxService(inbox);
+        members = mock(com.checkba.service.ProjectMemberService.class);
+        when(members.hasReadPermission(42L, 7L)).thenReturn(true);
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "projectMemberService", members);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"client,queue", "client,steer", "removed,queue", "removed,steer"})
+    void permissionPatchSteerRejectsOldOwnerBeforeEditing(String change, String mode) {
+        var item = inbox.submit(request("old instruction", "old", mode), 7L);
+        revokeExecution(change);
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(AiMessage.from("must not run")));
+        when(messageService.canUseConversation(CONV, 7L)).thenReturn(true);
+        var controller = new com.checkba.controller.ai.AgentInboxController(inbox, messageService, orchestrator);
+        try (var auth = mockStatic(com.checkba.controller.AuthController.class)) {
+            auth.when(() -> com.checkba.controller.AuthController.getUserIdFromSession("owner")).thenReturn(7L);
+            var edit = new com.checkba.controller.ai.AgentInboxController.EditRequest();
+            edit.submissionMode = "steer";
+            edit.expectedRevision = item.getRevision();
+            assertEquals(403, controller.edit(CONV, item.getId(), edit, "owner").getStatusCode().value());
+            assertEquals(1L, item.getRevision());
+            assertEquals(mode, item.getSubmissionMode());
+            assertEquals(AgentInboxService.PENDING, item.getState());
+            assertTrue(modelRequests.isEmpty());
+            verifyNoInteractions(assembler);
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"client", "removed"})
+    void permissionRestoredPendingInboxRechecksBeforeClaim(String change) {
+        var item = inbox.submit(request("restored old instruction", "restored", "steer"), 7L);
+        // New service instance, same durable repository: no old in-memory admission survives.
+        inbox = new AgentInboxService(repository, sse, runState);
+        orchestrator.setInboxService(inbox);
+        revokeExecution(change);
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(AiMessage.from("must not run")));
+        assertThrows(SecurityException.class, () -> orchestrator.acceptInboxSubmission(item.getId()));
+        assertEquals(AgentInboxService.PENDING, item.getState());
+        assertNull(orchestrator.activeRunId(CONV));
+        assertTrue(modelRequests.isEmpty());
+        verifyNoInteractions(assembler);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"client", "removed"})
+    void permissionExecutorRechecksAfterAdmissionBeforeAnyContextOrModel(String change) {
+        var tasks = new ArrayList<Runnable>();
+        orchestrator.setTurnExecutor(tasks::add);
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(AiMessage.from("must not run")));
+        var item = inbox.submit(request("waiting for executor", "executor", "steer"), 7L);
+        orchestrator.acceptInboxSubmission(item.getId());
+        assertEquals(1, tasks.size());
+        revokeExecution(change);
+        tasks.get(0).run();
+        assertTrue(modelRequests.isEmpty());
+        verifyNoInteractions(assembler);
+        assertEquals(AgentInboxService.INTERRUPTED, item.getState());
+        assertNull(orchestrator.activeRunId(CONV));
+        assertTrue(sseEvents.stream().anyMatch(e -> e.startsWith("error:")));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"client,queue", "removed,queue", "client,steer", "removed,steer"})
+    void permissionQueueDrainAndSteeringRecheckAtExecutionBoundary(String change, String mode) throws Exception {
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        when(tools.execute(eq("read"), any(), any())).thenAnswer(inv -> {
+            entered.countDown();
+            assertTrue(release.await(5, TimeUnit.SECONDS));
+            return new ToolRegistry.ToolResult("done", null, true);
+        });
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(
+                "steer".equals(mode) ? AiMessage.from(List.of(tool("read", "r1"))) : AiMessage.from("done"),
+                AiMessage.from("unauthorized follow-up")));
+        if ("queue".equals(mode)) {
+            doAnswer(inv -> { entered.countDown(); await(release); return null; })
+                    .when(runState).mark(eq(CONV), eq(AgentRunStateService.RunStatus.FINISHED));
+        }
+        var first = inbox.submit(request("initial authorized turn", "first-permission", "steer"), 7L);
+        Thread run = new Thread(() -> orchestrator.acceptInboxSubmission(first.getId()));
+        run.start();
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        var pending = inbox.submit(request("old follow-up", "pending-permission", mode), 7L);
+        revokeExecution(change);
+        release.countDown();
+        run.join(5000);
+        assertFalse(run.isAlive());
+        assertEquals(1, modelRequests.size(), "revoked pending input must not reach another model call");
+        assertEquals(AgentInboxService.PENDING, pending.getState());
+        verify(messageService, never()).saveMessage(any(), any(), eq(CONV), eq("USER"), eq("old follow-up"), any(), any());
+        assertNull(orchestrator.activeRunId(CONV));
+    }
+
+    @Test
+    void permissionRestoredAuthorizedMemberStillRunsAndProjectlessInputStaysDenied() {
+        var item = inbox.submit(request("allowed after restore", "allowed", "steer"), 7L);
+        inbox = new AgentInboxService(repository, sse, runState);
+        orchestrator.setInboxService(inbox);
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(AiMessage.from("done")));
+        orchestrator.acceptInboxSubmission(item.getId());
+        assertEquals(1, modelRequests.size());
+        var personal = request("no project", "personal", "steer");
+        personal.setProjectId(null);
+        var noProject = inbox.submit(personal, 7L);
+        assertThrows(SecurityException.class, () -> orchestrator.acceptInboxSubmission(noProject.getId()));
+        assertEquals(1, modelRequests.size());
+        assertEquals(AgentInboxService.PENDING, noProject.getState());
+    }
+
+    private void revokeExecution(String change) {
+        if ("client".equals(change)) when(members.isClient(42L, 7L)).thenReturn(true);
+        else when(members.hasReadPermission(42L, 7L)).thenReturn(false);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"other-user", "other-project"})
+    void permissionMixedSteeringBatchIsInterruptedBeforeItsTextIsApplied(String kind) throws Exception {
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        when(tools.execute(eq("read"), any(), any())).thenAnswer(inv -> {
+            entered.countDown();
+            assertTrue(release.await(5, TimeUnit.SECONDS));
+            return new ToolRegistry.ToolResult("done", null, true);
+        });
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(
+                AiMessage.from(List.of(tool("read", "mixed-read"))), AiMessage.from("must not run")));
+        var first = inbox.submit(request("initial authorized turn", "mixed-first", "steer"), 7L);
+        Thread run = new Thread(() -> orchestrator.acceptInboxSubmission(first.getId()));
+        run.start();
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        var next = request("mismatched durable instruction", "mixed-pending", "steer");
+        if ("other-project".equals(kind)) next.setProjectId(99L);
+        // Both identities/projects are individually staff-authorized: they still cannot be
+        // silently executed in the original run's project/user scope.
+        when(members.hasReadPermission(99L, 7L)).thenReturn(true);
+        when(members.hasReadPermission(42L, 8L)).thenReturn(true);
+        var mixed = inbox.submit(next, "other-user".equals(kind) ? 8L : 7L);
+        release.countDown(); run.join(5000);
+        assertFalse(run.isAlive());
+        assertEquals(1, modelRequests.size());
+        assertEquals(AgentInboxService.INTERRUPTED, mixed.getState());
+        assertEquals(AgentInboxService.INTERRUPTED, first.getState());
+        verify(messageService, never()).saveMessage(any(), any(), eq(CONV), eq("USER"), eq(next.getMessage()), any(), any());
+        assertNull(orchestrator.activeRunId(CONV));
     }
 
     @Test
@@ -568,7 +715,9 @@ class AgentOrchestratorInboxTest {
                         Objects.equals(i.getConversationId(), inv.getArgument(0))
                                 && Objects.equals(i.getUserId(), inv.getArgument(1))
                                 && Objects.equals(i.getClientRequestId(), inv.getArgument(2))).findFirst());
-        when(repo.findByRunIdAndState(anyString(), anyString())).thenReturn(List.of());
+        when(repo.findByRunIdAndState(anyString(), anyString())).thenAnswer(inv -> rows.values().stream()
+                .filter(row -> Objects.equals(row.getRunId(), inv.getArgument(0))
+                        && Objects.equals(row.getState(), inv.getArgument(1))).toList());
         return repo;
     }
 

@@ -204,6 +204,8 @@ public class AiAgentController {
             // item to avoid a duplicate user bubble; later steering/auto-drain claims do emit it.
             String activeRunId = agentOrchestrator.acceptInboxSubmission(item.getId(), false);
             return ResponseEntity.ok(agentInboxService.receipt(item, activeRunId));
+        } catch (SecurityException e) {
+            return chatError(403, e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("status", "error", "message", e.getMessage()));
         }
