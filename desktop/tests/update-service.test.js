@@ -207,7 +207,32 @@ test('大版本：latestMajor 更高时给出全量下载引导，不下补丁',
   const state = await svc.check()
   assert.deepStrictEqual(state.majorAvailable, { major: '0.12', page: 'https://www.aiworkdeck.com/download' })
   assert.ok(events.includes('major-available'))
+  assert.ok(!events.includes('up-to-date'), '存在新大版本时不应再广播 up-to-date')
   assert.strictEqual(overlay.readCurrent(ctx), null)
+})
+
+test('大版本：latestMajor 频道含具体补丁版本时展示具体版本号（如 0.61.2）且不发 up-to-date', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'upd-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const ctx = { packaged: true, dataDir: root, appVersion: '0.60.0' }
+  const { server, origin } = await serve(signedManifestRoutes({
+    schema: 1,
+    latestMajor: '0.61',
+    majorDownloadPage: 'https://www.aiworkdeck.com',
+    channels: {
+      '0.60': { latest: '0.60.0', components: [] },
+      '0.61': { latest: '0.61.2', components: [] },
+    }
+  }))
+  t.after(() => server.close())
+  testEnv(t, origin, pubPem)
+
+  const events = []
+  const svc = createUpdateService(ctx, { extractTar, onEvent: (e) => events.push(e.type) })
+  const state = await svc.check()
+  assert.deepStrictEqual(state.majorAvailable, { major: '0.61.2', page: 'https://www.aiworkdeck.com' })
+  assert.ok(events.includes('major-available'))
+  assert.ok(!events.includes('up-to-date'))
 })
 
 test('多镜像回退：组件首个 URL 失败时 fetchFirst 落到第二个 URL，流程仍走完', async (t) => {

@@ -241,7 +241,9 @@ function createUpdateService(ctx, hooks = {}) {
 
         // 大版本：manifest.latestMajor 比本机新 → 引导全量下载（§7）
         if (manifest.latestMajor && overlay.compareVersions(manifest.latestMajor + '.0', myMajor + '.0') > 0) {
-          state.majorAvailable = { major: manifest.latestMajor, page: manifest.majorDownloadPage || 'https://www.aiworkdeck.com' }
+          const majorChannel = manifest.channels && manifest.channels[manifest.latestMajor]
+          const majorVersion = (majorChannel && majorChannel.latest) || manifest.latestMajor
+          state.majorAvailable = { major: majorVersion, page: manifest.majorDownloadPage || 'https://www.aiworkdeck.com' }
           emit('major-available', state.majorAvailable)
         } else {
           state.majorAvailable = null
@@ -256,7 +258,9 @@ function createUpdateService(ctx, hooks = {}) {
           await downloadPatch(channel)
         } else if (state.phase !== 'ready') {
           state.phase = 'idle'
-          emit('up-to-date')
+          if (!state.majorAvailable) {
+            emit('up-to-date')
+          }
         }
         return snapshot()
       } catch (e) {
