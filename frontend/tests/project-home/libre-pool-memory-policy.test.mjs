@@ -225,3 +225,35 @@ test('closing the sole Office pane restores prewarming beside a non-Office left 
   assert.equal(vm.libreSpares.length, 1)
   assert.equal(vm.libreSpares[0].file, null)
 })
+
+test('acquiring a hidden merge instance under 8 GiB evicts inactive background instances first (#1269 E-3)', async () => {
+  const vm = vmFor(8 * GiB)
+  add(vm, 'left', 1)
+  add(vm, 'left', 2)
+  await settle()
+  assert.deepEqual(vm.libreLruKeys, ['left:2', 'left:1'])
+  const pending = vm.acquireLibreHiddenInstance({ timeoutMs: 500 })
+  await settle()
+  assert.deepEqual(vm.libreLruKeys, ['left:2'], 'inactive background instance should be evicted to free WASM memory before merge')
+  const sp = vm.libreSpares.find(s => s.hidden)
+  vm.onLibreSpareReady(sp, { executeCommand: async () => ({ success: true }) })
+  const handle = await pending
+  vm.releaseLibreHiddenInstance(handle)
+})
+
+test('failed eviction schedules a bounded retry that evicts once save succeeds (#1269 E-2)', async () => {
+  const vm = vmFor(8 * GiB)
+  let allowSave = false
+  add(vm, 'left', 1, async () => allowSave)
+  add(vm, 'left', 2)
+  add(vm, 'left', 3)
+  await settle()
+  assert.ok(vm.libreLruKeys.includes('left:1'), 'retained while save fails')
+  assert.equal(vm._libreEvictRetryCounts['left:1'], 1, 'retry scheduled')
+  clearTimeout(vm._libreEvictRetryTimers['left:1'])
+  allowSave = true
+  await vm.evictLibreInstance('left:1')
+  assert.ok(!vm.libreLruKeys.includes('left:1'), 'evicted once subsequent save succeeds')
+  assert.equal(vm._libreEvictRetryCounts['left:1'], undefined, 'retry state cleared')
+})
+

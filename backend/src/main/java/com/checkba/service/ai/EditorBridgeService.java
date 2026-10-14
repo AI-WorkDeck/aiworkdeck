@@ -257,6 +257,20 @@ public class EditorBridgeService {
         componentWaits.remove(conversationId);
     }
 
+    /**
+     * 轮次终态收尾（dev-board#1270 [A-2 / P2-1]）：释放可能残留的挂起编辑器请求，
+     * 并回收会话级临时状态（{@code activeDocKeys} / {@code streamingModes} / {@code streamWroteContent}
+     * 与本轮去重登记），避免长期运行后按 conversationId 无限累积。
+     */
+    public void cleanupAfterRun(String conversationId) {
+        if (conversationId == null) return;
+        cancelPendingActions(conversationId);
+        clearForNewRun(conversationId);
+        activeDocKeys.remove(conversationId);
+        streamingModes.remove(conversationId);
+        streamWroteContent.remove(conversationId);
+    }
+
     // ==================== 本轮生成物登记（dev-board#1017） ====================
 
     /**

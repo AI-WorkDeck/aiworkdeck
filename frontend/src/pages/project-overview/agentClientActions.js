@@ -531,14 +531,11 @@ export const agentClientActionMethods = {
                 this.unloadInactiveLibreInstances(file.id)
                 // 当前正显示的实例逐不掉（保活池"活动文件必进池"），而它既不
                 // watch file 也不以 wpsFileId 为模板 key——上面 Object.assign 进
-                // pane 列表对它毫无作用，画布上还是改前的内容。律师接着编辑，
-                // autosave 就会把「旧内容 + 新编辑」写回去，把版本退回冲掉。所以
-                // 退回路径显式命令活动实例就地重载（换文档前它自己会取消在飞的
-                // 自动保存并清脏，见 reloadFromBackend）。普通 AI 后端改文件路径不做这件事，
-                // 理由见方法头 opts.forceActive 的注释。
-                if (forceActive) {
-                    reloadOk = await this.reloadActiveLibreInstances(file.id)
-                }
+                // pane 列表对它毫无作用，画布上还是改前的内容。
+                // - forceActive=true（版本退回）：无条件就地重载；
+                // - forceActive=false（AI 后端改文件）：仅在活动实例无未保存改动时就地重载，
+                //   若有未保存改动则保留用户内容并返回 false（不误报"文件已更新"）。
+                reloadOk = await this.reloadActiveLibreInstances(file.id, { onlyClean: !forceActive })
             }
 
             // 如果文件不在任何窗格中打开，则打开它

@@ -21,7 +21,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /** Persistent, revisioned inbox for Agent input. */
@@ -52,7 +51,15 @@ public class AgentInboxService {
     private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    private final Map<String, Object> locks = new ConcurrentHashMap<>();
+    // 固定条带锁：按 conversationId 哈希取槽位，避免为每个历史会话永久保留一个锁对象
+    private static final int LOCK_STRIPES = 256;
+    private final Object[] locks = createStripes();
+
+    private static Object[] createStripes() {
+        Object[] stripes = new Object[LOCK_STRIPES];
+        for (int i = 0; i < LOCK_STRIPES; i++) stripes[i] = new Object();
+        return stripes;
+    }
     private volatile TransactionTemplate transactions;
     private volatile EntityManager entityManager;
 
@@ -77,7 +84,8 @@ public class AgentInboxService {
     }
 
     public Object conversationLock(String conversationId) {
-        return locks.computeIfAbsent(conversationId, ignored -> new Object());
+        if (conversationId == null) return locks[0];
+        return locks[Math.floorMod(Objects.hashCode(conversationId), LOCK_STRIPES)];
     }
 
     /** Persist before returning. A duplicate clientRequestId resolves to the original row. */

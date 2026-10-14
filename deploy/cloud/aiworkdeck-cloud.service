@@ -13,7 +13,8 @@ Group=aiworkdeck
 WorkingDirectory=/opt/aiworkdeck/cloud
 # 密钥全走 EnvironmentFile（0600，root:aiworkdeck 属主），不进 unit 文件
 EnvironmentFile=/opt/aiworkdeck/cloud/env
-ExecStart=/usr/bin/java -Xms256m -Xmx1536m -jar /opt/aiworkdeck/cloud/backend.jar --spring.profiles.active=cloud
+LimitNOFILE=65535
+ExecStart=/usr/bin/java -Xms256m -Xmx1536m -XX:+ExitOnOutOfMemoryError -jar /opt/aiworkdeck/cloud/backend.jar --spring.profiles.active=cloud
 Restart=always
 RestartSec=5
 # 共享 4c8G 机器上的资源护栏

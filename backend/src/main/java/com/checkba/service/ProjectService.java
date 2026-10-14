@@ -357,10 +357,24 @@ public class ProjectService {
 
         // 磁盘清理失败不回滚：库里已经删干净了，剩下的目录是可再清的垃圾，
         // 为它报错反而会让用户以为项目没删掉。
-        if (!officialCloud) deleteDirectoryQuietly(projectDir);
-        deleteDirectoryQuietly(gitDir);
-        deleteDirectoryQuietly(memoryGitDir);
-        deleteDirectoryQuietly(memoryWorkTree);
+        // 若当前在事务同步上下文中，放到 afterCommit 同步回调里执行，先把 Project/User 的悲观锁与数据库连接释放掉。
+        Runnable cleanupDirs = () -> {
+            if (!officialCloud) deleteDirectoryQuietly(projectDir);
+            deleteDirectoryQuietly(gitDir);
+            deleteDirectoryQuietly(memoryGitDir);
+            deleteDirectoryQuietly(memoryWorkTree);
+        };
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            cleanupDirs.run();
+                        }
+                    });
+        } else {
+            cleanupDirs.run();
+        }
     }
 
     private void deleteDirectoryStrictly(Path dir) {

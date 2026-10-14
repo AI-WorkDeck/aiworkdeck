@@ -205,3 +205,29 @@ test('loadProvenance 把文件级两个字段落进 data，computing 那条路�
   assert.equal(ctx.provDirty, false)
   assert.equal(ctx.provFileVersion.title, '核对注册资本')
 })
+
+test('reviewOpen=false 时 loadProvenance 不拉全量段落，打开审阅面板时补齐对齐（#1269 E-4）', async () => {
+  const reply = {
+    data: {
+      units: [{ key: 'p0', textHash: 'h' }], truncated: false, computing: false,
+      versioned: true, dirty: false, fileVersion: named(),
+    },
+  }
+  const ed = editorWith({ getProvenance: () => Promise.resolve(reply) })
+  let aligned = 0
+  const ctx = {
+    ready: true, file: { id: 5 }, projectId: 1, docLoadFailed: false,
+    reviewOpen: false,
+    provLoading: false, provLoaded: false, provUnits: [], provTruncated: false,
+    provVersioned: false, provDirty: false, provFileVersion: null,
+    $emit: () => {},
+    alignProvenanceRows: async () => { aligned++ },
+  }
+  await ed.methods.loadProvenance.call(ctx)
+  assert.equal(aligned, 0, '审阅面板关闭时不调用 alignProvenanceRows 刷全量段落')
+  assert.equal(ctx._provRowsPending, true)
+  ed.watch.reviewOpen.call(ctx, true)
+  assert.equal(aligned, 1, '打开审阅面板时立即补跑段落对齐')
+  assert.equal(ctx._provRowsPending, false)
+})
+

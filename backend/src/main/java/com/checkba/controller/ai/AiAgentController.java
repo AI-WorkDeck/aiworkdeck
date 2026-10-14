@@ -41,6 +41,25 @@ public class AiAgentController {
     private final com.checkba.service.ai.ChatModelFactory chatModelFactory;
     private final com.checkba.service.ProjectFileAccessService fileAccess;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
+    private java.util.concurrent.Executor taskExecutor;
+
+    private static final java.util.concurrent.ExecutorService FALLBACK_PPT_EXECUTOR =
+            new java.util.concurrent.ThreadPoolExecutor(
+                    1, 4, 60L, java.util.concurrent.TimeUnit.SECONDS,
+                    new java.util.concurrent.LinkedBlockingQueue<>(64),
+                    r -> {
+                        Thread t = new Thread(r, "ppt-gen-worker");
+                        t.setDaemon(true);
+                        return t;
+                    },
+                    new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+
+    private java.util.concurrent.Executor pptExecutor() {
+        return taskExecutor != null ? taskExecutor : FALLBACK_PPT_EXECUTOR;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired
     public AiAgentController(SseEmitterService sseEmitterService,
                             AgentOrchestrator agentOrchestrator,
@@ -430,7 +449,7 @@ public class AiAgentController {
                                 cn.hutool.json.JSONUtil.toJsonStr(com.checkba.service.account.AccountRequired.envelope(e)));
                     }
                 }
-            }));
+            }), pptExecutor());
 
         return ResponseEntity.ok().body("{\"status\":\"ok\", \"message\":\"PPT generation started\"}");
     }

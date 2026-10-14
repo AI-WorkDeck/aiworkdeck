@@ -83,6 +83,16 @@ public class AgentOrchestrator {
                 t.setDaemon(true);
                 return t;
             });
+    private static final java.util.concurrent.ExecutorService TITLE_EXECUTOR =
+            new java.util.concurrent.ThreadPoolExecutor(
+                    1, 4, 60L, java.util.concurrent.TimeUnit.SECONDS,
+                    new java.util.concurrent.LinkedBlockingQueue<>(128),
+                    r -> {
+                        Thread t = new Thread(r, "awd-title-gen");
+                        t.setDaemon(true);
+                        return t;
+                    },
+                    new java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy());
 
     private static final class FileChangeTurn {
         String clientRequestId;
@@ -443,11 +453,14 @@ public class AgentOrchestrator {
         return guard != null && activeRuns.get(guard.conversationId) == guard;
     }
 
-    /** 轮次收尾：把自己从当前轮次登记里摘掉（若已被取代则什么都不做），并释放 skill 的轮次记录。 */
+    /** 轮次收尾：把自己从当前轮次登记里摘掉（若已被取代则什么都不做），并释放 skill 与桥接层的轮次记录。 */
     private void endRun(RunGuard guard) {
         if (guard == null) return;
         guard.abandonDecision();
-        activeRuns.remove(guard.conversationId, guard);
+        boolean wasCurrent = activeRuns.remove(guard.conversationId, guard);
+        if (wasCurrent && editorBridgeService != null) {
+            editorBridgeService.cleanupAfterRun(guard.conversationId);
+        }
         skillRouter.clearRun(guard.runId);
     }
 
@@ -470,7 +483,10 @@ public class AgentOrchestrator {
             // 必须在摘掉本轮登记之前判断：closeSse 只对当前轮次生效。
             if (next.isEmpty()) closeSse(guard);
             guard.abandonDecision();
-            activeRuns.remove(guard.conversationId, guard);
+            boolean wasCurrent = activeRuns.remove(guard.conversationId, guard);
+            if (wasCurrent && editorBridgeService != null) {
+                editorBridgeService.cleanupAfterRun(guard.conversationId);
+            }
             skillRouter.clearRun(guard.runId);
             try {
                 next.ifPresent(item -> acceptInboxSubmission(item.getId()));
@@ -1602,7 +1618,7 @@ public class AgentOrchestrator {
                     } catch (Exception e) {
                         log.warn("Failed to generate conversation title for {}", convId, e);
                     }
-                }));
+                }), TITLE_EXECUTOR);
             }
             
             // 1.2 Skill 激活（Phase 3B）：手动选择 ∪ 触发词自动命中；一个都不生效时行为与现状一致。
@@ -1733,23 +1749,29 @@ public class AgentOrchestrator {
             // 账户/额度类失败不是「内部错误」，而是用户可自行处理的状态
             // （如「请先在官网账户页分配 AI 额度」）。原样透出中文文案，不加英文前缀，
             // 也不打 ERROR 级日志——这条路径在未分配额度时每发一条消息都会走到
-            log.info("平台通道不可用 [{}]，会话 {}: {}", e.getKind(), conversationId, e.getMessage());
-            markRunState(guard, AgentRunStateService.RunStatus.ERROR);
-            sendRunEvent(guard, "error", accountErrorPayload(e));
-            // 用户消息在本方法开头已落库：这里不补一条 ASSISTANT，刷新页面后这一轮就只剩用户
-            // 自己的问题，看起来像 AI 完全没回应。落的正是推给用户的那句文案（不加前缀）。
-            saveAssistantMessageQuietly(guard, projectId, userId, e.getMessage());
-            closeSse(guard);
-            endRun(guard);
-        } catch (Exception e) {
-            log.error("Agent Loop Error for conversation: " + conversationId, e);
-            String errorText = "Internal Error: " + e.getMessage();
-            markRunState(guard, AgentRunStateService.RunStatus.ERROR);
-            sendRunEvent(guard, "error", errorText);
-            // 同上：历史里必须留下这一轮出过错的痕迹，且与 SSE 推出去的是同一串文本
-            saveAssistantMessageQuietly(guard, projectId, userId, errorText);
-            closeSse(guard);
-            endRun(guard);
+            try {
+                log.info("平台通道不可用 [{}]，会话 {}: {}", e.getKind(), conversationId, e.getMessage());
+                markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+                sendRunEvent(guard, "error", accountErrorPayload(e));
+                // 用户消息在本方法开头已落库：这里不补一条 ASSISTANT，刷新页面后这一轮就只剩用户
+                // 自己的问题，看起来像 AI 完全没回应。落的正是推给用户的那句文案（不加前缀）。
+                saveAssistantMessageQuietly(guard, projectId, userId, e.getMessage());
+            } finally {
+                closeSse(guard);
+                endRun(guard);
+            }
+        } catch (Throwable e) {
+            try {
+                log.error("Agent Loop Error for conversation: " + conversationId, e);
+                String errorText = "Internal Error: " + e.getMessage();
+                markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+                sendRunEvent(guard, "error", errorText);
+                // 同上：历史里必须留下这一轮出过错的痕迹，且与 SSE 推出去的是同一串文本
+                saveAssistantMessageQuietly(guard, projectId, userId, errorText);
+            } finally {
+                closeSse(guard);
+                endRun(guard);
+            }
         }
     }
 
@@ -1828,7 +1850,11 @@ public class AgentOrchestrator {
         // 本回调里同步做的这些事都要取 per-user 平台密钥：工具分发、自动 compaction（摘要模型）、
         // 递归下一轮 generate、故障转移换模型——缺身份会被 PlatformAiChannel 判成
         // 「本次 AI 调用未携带用户身份」，在编排器这层看起来就是「平台通道不可用」整轮终止。
-        handler.setOnComplete(response -> PlatformAiUserScope.run(userId, () -> {
+        // 当来自 OkHttp 回调线程且 turnExecutor 已注入时，立刻切到 turnExecutor 执行（dev-board#1270 [A-1]），
+        // 释放 OkHttp Dispatcher 的 maxRequestsPerHost 并发槽位，避免阻塞型工具（编辑器桥最长 180s、
+        // dispatch_subtask 630s）与多轮递归长期占死全局 LLM 并发槽。
+        handler.setOnComplete(response -> dispatchContinuation(() -> PlatformAiUserScope.run(userId,
+                () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
           try {
             // 埋点 ai.turn 的 promptTokensFirstRound（dev-board#729 ⑥）：首轮 prompt 有多大，
             // 是判断「工具 schema / 固定前缀是否过肥」的唯一在线证据（本机实测约 5 万，其中 2/3 是工具）。
@@ -2495,8 +2521,8 @@ public class AgentOrchestrator {
             sendRunEvent(guard, "bubble_end", bubbleEndPayload(guard, "finished"));
             // 清理本轮登记；队列跑空才关流（见 endRunAndDrain）
             endRunAndDrain(guard);
-          } catch (Exception e) {
-            // 确保异常时也能正确结束 bubble，避免前端一直显示加载状态。
+          } catch (Throwable e) {
+            // 确保异常/Error 时也能正确结束 bubble，避免前端一直显示加载状态且 activeRuns 永久残留。
             //
             // 走 finishWithError 而不是只发一个 SSE：原来这里不落库，于是异常终止的那一轮
             // 在历史里一个字都没有——用户当时看到过工具在跑、看到过半截回复，刷新后全没了
@@ -2510,14 +2536,16 @@ public class AgentOrchestrator {
             // 流式回调运行在可复用线程池线程上，用完清理 ThreadLocal，防止会话串号
             editorBridgeService.clearCurrentConversationId();
           }
-        }));
+        })), userId, guard, projectId, executionLog));
 
         // 流式出错处置（零 token 流出才允许重放，否则用户会看到重复内容）：
         // 1. 限流/瞬时错误 → 按类型退避重试本轮（限流 30/60s，瞬时 8/16/32s）
         // 2. 重试预算耗尽或模型下线（404）→ 换备选模型继续，SSE 明说切了哪个
         // 3. 其余 → 终态清理（关 emitter + 复位状态，避免 SSE 挂到超时、前端永久加载）
         // 同 onComplete：错误回调也在 HTTP 线程上，换模型要取平台密钥，身份必须重建
-        handler.setOnError(err -> PlatformAiUserScope.run(userId, () -> {
+        handler.setOnError(err -> PlatformAiUserScope.run(userId,
+                () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
+          try {
             if (guard.isCancelled()) {
                 // 我们自己掐断在途请求换来的那个 IOException 不是故障（计划 K4 ①）：
                 // 按错误处置会打 ERROR 状态点、发 error 事件、还可能白白切一次模型，
@@ -2538,11 +2566,14 @@ public class AgentOrchestrator {
                         "no_credits");
             }
             if (accountError != null) {
-                markRunState(guard, AgentRunStateService.RunStatus.ERROR);
-                sendRunEvent(guard, "error", accountErrorPayload(accountError));
-                saveAssistantMessageQuietly(guard, projectId, userId, accountError.getMessage());
-                closeSse(guard);
-                endRun(guard);
+                try {
+                    markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+                    sendRunEvent(guard, "error", accountErrorPayload(accountError));
+                    saveAssistantMessageQuietly(guard, projectId, userId, accountError.getMessage());
+                } finally {
+                    closeSse(guard);
+                    endRun(guard);
+                }
                 return;
             }
             boolean replayable = !handler.hasStreamedTokens();
@@ -2578,7 +2609,7 @@ public class AgentOrchestrator {
                         // 同 depth 重放本轮：messages 只在 onComplete 里被追加，失败轮未污染上下文
                         runLoop(model, messages, conversationId, projectId, userId, modelId,
                                 depth, executionLog, agentMode, guard);
-                    } catch (Exception retryEx) {
+                    } catch (Throwable retryEx) {
                         log.error("Retry runLoop failed for {}", conversationId, retryEx);
                         handleStreamErrorTerminal(guard, projectId, userId, retryEx, null, executionLog);
                     }
@@ -2602,7 +2633,7 @@ public class AgentOrchestrator {
                     try {
                         runLoop(model, messages, conversationId, projectId, userId, modelId,
                                 depth, executionLog, agentMode, guard);
-                    } catch (Exception retryEx) {
+                    } catch (Throwable retryEx) {
                         log.error("Post-compaction retry failed for {}", conversationId, retryEx);
                         handleStreamErrorTerminal(guard, projectId, userId, retryEx, null, executionLog);
                     }
@@ -2635,7 +2666,13 @@ public class AgentOrchestrator {
                 }
             }
             handleStreamErrorTerminal(guard, projectId, userId, err, kind, executionLog);
-        }));
+          } catch (Throwable t) {
+            log.error("Unhandled error in onError callback for conversation: " + conversationId, t);
+            finishWithError(guard, projectId, userId,
+                    LlmErrorClassifier.INTERNAL_ERROR_MARKER + ": Error Callback Failure: " + t.getMessage(),
+                    executionLog);
+          }
+        })));
 
         // 先完成本地压缩和工具准备，再计模型请求的首字等待时间。
         TurnTimings roundTimings = TurnTimings.start(log, "round", conversationId);
@@ -2926,6 +2963,36 @@ public class AgentOrchestrator {
     }
 
     /**
+     * 当流式完成回调运行在 OkHttp 回调线程且 {@link #turnExecutor} 已注入时，
+     * 立刻把重工具执行与递归循环切回编排线程池（dev-board#1270 [A-1]），
+     * 让 OkHttp {@code onResponse} 立即返回并释放 {@code Dispatcher.runningAsyncCalls} 槽位。
+     * 测试中直接用同步脚本模型或未注入 {@code turnExecutor} 时保持原地同步执行。
+     */
+    private void dispatchContinuation(Runnable task, Long userId, RunGuard guard,
+                                      String projectId, StringBuilder executionLog) {
+        java.util.concurrent.Executor executor = this.turnExecutor;
+        if (executor != null && isHttpCallbackThread()) {
+            try {
+                executor.execute(task);
+                return;
+            } catch (Throwable rejected) {
+                log.error("Failed to dispatch continuation to turnExecutor for conversation: "
+                        + guard.conversationId, rejected);
+                PlatformAiUserScope.run(userId, () -> finishWithError(guard, projectId, userId,
+                        LlmErrorClassifier.INTERNAL_ERROR_MARKER + ": Callback Error: " + rejected.getMessage(),
+                        executionLog));
+                return;
+            }
+        }
+        task.run();
+    }
+
+    static boolean isHttpCallbackThread() {
+        String name = Thread.currentThread().getName();
+        return name != null && name.startsWith("OkHttp");
+    }
+
+    /**
      * Synchronous scripted models call the next completion callback on the same Java stack. Break
      * that stack every 64 productive rounds; real asynchronous providers also use this harmless
      * boundary, so fixed turn caps are not replaced by StackOverflowError.
@@ -2946,13 +3013,13 @@ public class AgentOrchestrator {
                 try {
                     runLoop(model, messages, conversationId, projectId, userId, modelId,
                             depth, executionLog, agentMode, guard);
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     finishWithError(guard, projectId, userId,
                             LlmErrorClassifier.INTERNAL_ERROR_MARKER + ": Continuation Error: " + e.getMessage(),
                             executionLog);
                 }
             }));
-        } catch (RuntimeException e) {
+        } catch (Throwable e) {
             finishWithError(guard, projectId, userId,
                     LlmErrorClassifier.INTERNAL_ERROR_MARKER + ": Continuation rejected: " + e.getMessage(),
                     executionLog);
@@ -3076,11 +3143,14 @@ public class AgentOrchestrator {
         try {
             nextModel = chatModelFactory.getStreamingChatModel(nextModelId);
         } catch (com.checkba.service.account.AccountException ae) {
-            log.info("故障转移中止，平台通道不可用 [{}]，会话 {}: {}", ae.getKind(), conversationId, ae.getMessage());
-            markRunState(guard, AgentRunStateService.RunStatus.ERROR);
-            sendRunEvent(guard, "error", accountErrorPayload(ae));
-            closeSse(guard);
-            endRun(guard);
+            try {
+                log.info("故障转移中止，平台通道不可用 [{}]，会话 {}: {}", ae.getKind(), conversationId, ae.getMessage());
+                markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+                sendRunEvent(guard, "error", accountErrorPayload(ae));
+            } finally {
+                closeSse(guard);
+                endRun(guard);
+            }
             return true;
         } catch (Exception e) {
             log.error("Failed to create failover model {} for {}", nextModelId, conversationId, e);
@@ -3100,7 +3170,7 @@ public class AgentOrchestrator {
         try {
             runLoop(nextModel, messages, conversationId, projectId, userId, nextModelId,
                     depth, executionLog, agentMode, guard);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.error("Failover runLoop failed for {}", conversationId, e);
             handleStreamErrorTerminal(guard, projectId, userId, e, null, executionLog);
         }
@@ -3145,27 +3215,30 @@ public class AgentOrchestrator {
     private void finishWithError(RunGuard guard, String projectId, Long userId,
                                  String ssePayload, StringBuilder executionLog) {
         String conversationId = guard.conversationId;
-        sendRunEvent(guard, "error", ssePayload);
-        markRunState(guard, AgentRunStateService.RunStatus.ERROR);
-        boolean wasStreamingOnError = editorBridgeService.isStreamingMode(conversationId);
-        boolean streamWroteOnError = editorBridgeService.hasStreamedContent(conversationId);
-        editorBridgeService.setStreamingMode(conversationId, false);
-        // 出错也要让 worker 收尾（否则 markdown 状态机残留半行/半张表），须在 close 之前发
-        if (wasStreamingOnError) {
-            sendRunEvent(guard, "doc_stream_end",
-                    java.util.Map.of("status", "error", "wrote", streamWroteOnError));
+        try {
+            sendRunEvent(guard, "error", ssePayload);
+            markRunState(guard, AgentRunStateService.RunStatus.ERROR);
+            boolean wasStreamingOnError = editorBridgeService.isStreamingMode(conversationId);
+            boolean streamWroteOnError = editorBridgeService.hasStreamedContent(conversationId);
+            editorBridgeService.setStreamingMode(conversationId, false);
+            // 出错也要让 worker 收尾（否则 markdown 状态机残留半行/半张表），须在 close 之前发
+            if (wasStreamingOnError) {
+                sendRunEvent(guard, "doc_stream_end",
+                        java.util.Map.of("status", "error", "wrote", streamWroteOnError));
+            }
+            // 保存已生成的部分内容，避免"当时看到了回复、历史里却没有"
+            String partialContent = guard.streamSnapshot();
+            String logText = executionLog != null ? executionLog.toString() : "";
+            if (!partialContent.isEmpty() || !logText.isEmpty()) {
+                saveAssistantMessageQuietly(guard, projectId, userId,
+                        logText + partialContent
+                                + LangText.of("\n\n[生成出错，已中断]", "\n\n[Generation error, interrupted]"));
+            }
+        } finally {
+            closeSse(guard);
+            endRun(guard);
+            editorBridgeService.clearCurrentConversationId();
         }
-        // 保存已生成的部分内容，避免"当时看到了回复、历史里却没有"
-        String partialContent = guard.streamSnapshot();
-        String logText = executionLog != null ? executionLog.toString() : "";
-        if (!partialContent.isEmpty() || !logText.isEmpty()) {
-            saveAssistantMessage(guard, projectId, userId,
-                    logText + partialContent
-                            + LangText.of("\n\n[生成出错，已中断]", "\n\n[Generation error, interrupted]"));
-        }
-        closeSse(guard);
-        endRun(guard);
-        editorBridgeService.clearCurrentConversationId();
     }
 
     /**

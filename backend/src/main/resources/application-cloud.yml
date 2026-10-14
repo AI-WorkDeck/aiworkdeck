@@ -25,6 +25,10 @@ spring:
     url: jdbc:postgresql://localhost:5432/aiworkdeck_cloud
     username: aiworkdeck_cloud
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:30}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 30000
   jpa:
     hibernate:
       ddl-auto: update
@@ -59,6 +63,8 @@ security:
 ai:
   model:
     provider: awd-cloud
+  subagent:
+    max-parallel: ${AI_SUBAGENT_MAX_PARALLEL:8}
 
 storage:
   subscription-quota:
