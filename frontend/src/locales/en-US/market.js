@@ -92,6 +92,7 @@ export default {
   // ---- Permissions ----
   permFileRead: 'Read Files',
   permFileWrite: 'Write Files',
+  permIm: 'Chats, conversation members and attachments',
   permNetwork: 'Network Access',
   permEditor: 'Editor',
   listSeparator: ', ',

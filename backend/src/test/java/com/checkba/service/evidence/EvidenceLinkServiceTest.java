@@ -72,6 +72,7 @@ class EvidenceLinkServiceTest {
     FileTagRepository fileTags = mock(FileTagRepository.class);
     ProjectMemberService members = mock(ProjectMemberService.class);
     EvidenceLinkService svc;
+    com.checkba.service.ProjectFileAccessService fileAccess = mock(com.checkba.service.ProjectFileAccessService.class);
 
     /** 所有 targets.save 过的对象，供 view() 回读。 */
     List<EvidenceLinkTarget> savedTargets = new ArrayList<>();
@@ -79,7 +80,7 @@ class EvidenceLinkServiceTest {
 
     @BeforeEach
     void setUp() {
-        svc = new EvidenceLinkService(links, targets, files, fileTags, members, new ObjectMapper());
+        svc = new EvidenceLinkService(links, targets, files, fileTags, members, new ObjectMapper(), fileAccess);
         when(members.hasReadPermission(1L, 9L)).thenReturn(true);
         when(members.hasWritePermission(1L, 9L)).thenReturn(true);
         when(links.save(any())).thenAnswer(inv -> {
@@ -592,4 +593,23 @@ class EvidenceLinkServiceTest {
         assertThrows(IllegalArgumentException.class, () -> EvidenceLinkService.locatorHash("42"));
         assertThrows(IllegalArgumentException.class, () -> EvidenceLinkService.locatorHash("null"));
     }
+
+    @Test void globalClientCannotReadDerivedEvidenceExcerptsThroughAnyReadView() {
+        var users = mock(com.checkba.repository.UserRepository.class);
+        var customer = new com.checkba.model.entity.User(); customer.setRole("CLIENT");
+        when(users.findById(9L)).thenReturn(Optional.of(customer));
+        fileAccess = new com.checkba.service.ProjectFileAccessService(members, users, files);
+        svc = new EvidenceLinkService(links, targets, files, fileTags, members, new ObjectMapper(), fileAccess);
+        for (Runnable read : List.<Runnable>of(
+                () -> svc.getByKey(9L, 1L, "private-anchor"),
+                () -> svc.listByDoc(9L, 1L, 10L, null, null),
+                () -> svc.listByFile(9L, 1L, 10L),
+                () -> svc.listByParty(9L, 1L, 10L, 20L))) {
+            assertEquals(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE,
+                    assertThrows(IllegalArgumentException.class, read::run).getMessage());
+        }
+        verify(links, never()).findByProjectIdAndLinkKey(anyLong(), any());
+        verify(targets, never()).findByFileId(anyLong());
+    }
+
 }

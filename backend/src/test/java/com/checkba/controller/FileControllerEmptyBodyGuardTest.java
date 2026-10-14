@@ -62,6 +62,8 @@ class FileControllerEmptyBodyGuardTest {
     @Mock
     private com.checkba.storage.ProjectStorageResolver storageResolver;
 
+    @Mock private com.checkba.service.ProjectFileAccessService fileAccess;
+
     @InjectMocks
     private FileController controller;
 

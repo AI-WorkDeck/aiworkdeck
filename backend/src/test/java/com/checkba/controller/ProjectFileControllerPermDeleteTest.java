@@ -35,12 +35,14 @@ class ProjectFileControllerPermDeleteTest {
     @Mock private FileTagService fileTagService;
     @Mock private com.checkba.service.quota.StageQuotaService stageQuotaService;
 
+    @Mock private com.checkba.service.ProjectFileAccessService fileAccess;
+
     @InjectMocks private ProjectFileController controller;
 
     private void member(MockedStatic<AuthController> auth) {
         auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(1L);
         when(projectMemberService.hasReadPermission(1L, 1L)).thenReturn(true);
-        when(projectMemberService.isClient(1L, 1L)).thenReturn(false);
+        when(fileAccess.isClient(1L, 1L)).thenReturn(false);
         when(projectMemberService.hasWritePermission(1L, 1L)).thenReturn(true);
     }
 

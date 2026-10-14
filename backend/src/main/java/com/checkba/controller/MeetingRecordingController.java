@@ -6,6 +6,9 @@ package com.checkba.controller;
 import com.checkba.model.entity.MeetingRecording;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectFileAccessService;
+import com.checkba.repository.ProjectFileRepository;
+import org.springframework.http.ResponseEntity;
 import com.checkba.service.meeting.MeetingRecordingService;
 import com.checkba.service.meeting.MeetingTranscriptionService;
 import lombok.Data;
@@ -28,6 +31,8 @@ public class MeetingRecordingController {
     private final MeetingRecordingService meetingService;
     private final MeetingTranscriptionService transcriptionService;
     private final ProjectMemberService projectMemberService;
+    private final ProjectFileRepository files;
+    private final ProjectFileAccessService fileAccess;
 
     // 并发「开始录音」竞态防护：前端 isRecordingActive() 只是同一个 JS 运行时里的
     // 内存标记（utils/meetingRecorder.js 的模块级单例），管不到"同一账号在桌面端 +
@@ -61,8 +66,35 @@ public class MeetingRecordingController {
         return userId;
     }
 
+    private boolean canReadMeeting(MeetingRecording meeting, Long userId) {
+        var source = meeting.getAudioFileId() == null ? java.util.Optional.<com.checkba.model.entity.ProjectFile>empty()
+                : files.findById(meeting.getAudioFileId());
+        if (source.isEmpty()) return !fileAccess.isClient(meeting.getProjectId(), userId);
+        return java.util.Objects.equals(meeting.getProjectId(), source.get().getProjectId())
+                && fileAccess.canRead(source.get(), userId);
+    }
+
     private Long requireMemberByMeeting(String sessionId, Long meetingId) {
-        return requireMemberByProject(sessionId, meetingService.getProjectId(meetingId));
+        MeetingRecording meeting = meetingService.get(meetingId);
+        Long userId = requireMemberByProject(sessionId, meeting.getProjectId());
+        if (!canReadMeeting(meeting, userId)) throw new ProjectFileAccessService.FileAccessDeniedException();
+        return userId;
+    }
+
+    private Long requireWriterByProject(String sessionId, Long projectId) {
+        Long userId = requireMemberByProject(sessionId, projectId);
+        if (fileAccess.isClient(projectId, userId) || !projectMemberService.hasWritePermission(projectId, userId))
+            throw new ProjectFileAccessService.FileAccessDeniedException();
+        return userId;
+    }
+
+    private Long requireWriterByMeeting(String sessionId, Long meetingId) {
+        return requireWriterByProject(sessionId, meetingService.getProjectId(meetingId));
+    }
+
+    @ExceptionHandler(ProjectFileAccessService.FileAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> onFileAccessDenied(ProjectFileAccessService.FileAccessDeniedException e) {
+        return ResponseEntity.status(403).body(Map.of("code", 403, "message", e.getMessage()));
     }
 
     /** 开始录音：建会议 + 音频文件占位，前端拿 audioFileId 走分片上传。 */
@@ -70,7 +102,7 @@ public class MeetingRecordingController {
     public Map<String, Object> create(
             @PathVariable Long projectId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        Long userId = requireMemberByProject(sessionId, projectId);
+        Long userId = requireWriterByProject(sessionId, projectId);
         MeetingRecording meeting;
         synchronized (startRecordingLock(projectId)) {
             meeting = meetingService.create(projectId, userId);
@@ -85,8 +117,9 @@ public class MeetingRecordingController {
     public Map<String, Object> list(
             @PathVariable Long projectId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireMemberByProject(sessionId, projectId);
-        List<MeetingRecording> meetings = meetingService.list(projectId);
+        Long userId = requireMemberByProject(sessionId, projectId);
+        List<MeetingRecording> meetings = meetingService.list(projectId).stream()
+                .filter(meeting -> canReadMeeting(meeting, userId)).toList();
         // 「转写中」的行带上进度提示（阶段/已用时/预计时长），面板卡片就渲染这份列表
         transcriptionService.attachProgress(meetings);
         Map<String, Object> result = new HashMap<>();
@@ -106,7 +139,11 @@ public class MeetingRecordingController {
             @PathVariable Long projectId,
             @PathVariable Long fileId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireMemberByProject(sessionId, projectId);
+        Long userId = requireMemberByProject(sessionId, projectId);
+        var source = files.findById(fileId).orElse(null);
+        fileAccess.requireRead(source, userId);
+        if (!java.util.Objects.equals(projectId, source.getProjectId()))
+            throw new ProjectFileAccessService.FileAccessDeniedException();
         MeetingRecording meeting = meetingService.findByAudioFile(projectId, fileId)
                 .map(transcriptionService::attachProgress)
                 .orElse(null);
@@ -131,7 +168,7 @@ public class MeetingRecordingController {
             @PathVariable Long meetingId,
             @RequestBody(required = false) FinishDto dto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireMemberByMeeting(sessionId, meetingId);
+        requireWriterByMeeting(sessionId, meetingId);
         MeetingRecording meeting = meetingService.finish(meetingId, dto == null ? null : dto.getDurationMs());
         boolean autoTranscribe = dto == null || !Boolean.FALSE.equals(dto.getTranscribe());
         // 平台档欠着告知就不自动提交：**这一下才是录音真正离开本机的时刻**，
@@ -157,7 +194,7 @@ public class MeetingRecordingController {
             @PathVariable Long projectId,
             @RequestBody RegisterFileDto dto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        Long userId = requireMemberByProject(sessionId, projectId);
+        Long userId = requireWriterByProject(sessionId, projectId);
         if (dto == null || dto.getFileId() == null) {
             throw new IllegalArgumentException(LangText.of("缺少文件标识", "Missing file id"));
         }
@@ -183,7 +220,7 @@ public class MeetingRecordingController {
     public MeetingRecording transcribe(
             @PathVariable Long meetingId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireMemberByMeeting(sessionId, meetingId);
+        requireWriterByMeeting(sessionId, meetingId);
         return transcriptionService.startTranscription(meetingId);
     }
 
@@ -193,7 +230,7 @@ public class MeetingRecordingController {
             @PathVariable Long meetingId,
             @RequestBody UpdateDto dto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireMemberByMeeting(sessionId, meetingId);
+        requireWriterByMeeting(sessionId, meetingId);
         MeetingRecording meeting = meetingService.get(meetingId);
         if (dto.getTitle() != null) {
             meeting = meetingService.rename(meetingId, dto.getTitle());
@@ -215,7 +252,7 @@ public class MeetingRecordingController {
     public MeetingRecordingService.ExportResult export(
             @PathVariable Long meetingId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        Long userId = requireMemberByMeeting(sessionId, meetingId);
+        Long userId = requireWriterByMeeting(sessionId, meetingId);
         return meetingService.exportTranscript(meetingId, userId);
     }
 
@@ -238,7 +275,7 @@ public class MeetingRecordingController {
     public void delete(
             @PathVariable Long meetingId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        Long userId = requireMemberByMeeting(sessionId, meetingId);
+        Long userId = requireWriterByMeeting(sessionId, meetingId);
         meetingService.delete(meetingId, userId);
     }
 

@@ -1158,6 +1158,8 @@
                       :permissions="entry.plugin.permissions || []"
                       :project-id="projectId"
                       :get-active-editor="getPluginActiveEditor"
+                      :add-file-to-ai="onPluginAddFileToAi"
+                      @files-changed="onArchiveExtracted"
                       :dev-installed="!!entry.plugin.devInstalled"
                       @kickoff="onPluginQuickAction"
                     />
@@ -1410,6 +1412,8 @@
                       :permissions="entry.plugin.permissions || []"
                       :project-id="projectId"
                       :get-active-editor="getPluginActiveEditor"
+                      :add-file-to-ai="onPluginAddFileToAi"
+                      @files-changed="onArchiveExtracted"
                       :dev-installed="!!entry.plugin.devInstalled"
                       @kickoff="onPluginQuickAction"
                     />
@@ -2322,6 +2326,8 @@ import { flushActiveDocument } from './flushActiveDocument.js'
 import { isTabVisibleInPane } from './tabVisibility.js'
 import { pickActiveContextTab, isContextEligibleTab } from './activeTabContext.js'
 import { nativeDataTransfer, captureDroppedFiles, isExternalFileDrag } from '@/utils/fileTreeExternalDrop.js'
+import { consumePluginImDrag } from '@/utils/pluginImDrag.js'
+import { addPluginImFileToAi } from '@/utils/pluginImAi.js'
 import { AI_CONTEXT_FOLDER_FILE_LIMIT, countDescendantFiles } from '@/utils/aiContextFiles.js'
 import { saveSensitiveInput } from './sensitiveWorkflow.js'
 import LibreOfficeEditor from '@/components/LibreOfficeEditor.vue'
@@ -7071,6 +7077,9 @@ export default {
         uni.showToast({ title: e.message || this.$t('workbench.replaceFailed'), icon: 'none' })
       }
     },
+    onPluginAddFileToAi(request) {
+      return addPluginImFileToAi(this, request)
+    },
     // --- AI Context Drag & Drop ---
     handleAiDragOver(e) {
         if (e && e.preventDefault) e.preventDefault()
@@ -7090,6 +7099,19 @@ export default {
         // rail 排序 / 面板停靠的拖拽松在对话区属于误落，静默忽略——
         // 否则会被当成「拖文件进对话」而弹「未获取到拖拽数据」（dev-board#220）
         if (this.draggingRailKey || this.draggingPanelKey) return
+
+        // Plugin iframe drags use a one-use host receipt. Recover the native event
+        // before uni's wrapper drops dataTransfer; never trust plugin-supplied ids.
+        const pluginDrop = consumePluginImDrag(nativeDataTransfer(e), this.projectId)
+        if (pluginDrop.handled) {
+             if (!pluginDrop.file) {
+                  uni.showToast({ title: '拖拽已过期，请从文件卡片重新拖入', icon: 'none' })
+                  return
+             }
+             this.onPluginAddFileToAi({ projectId: this.projectId, file: pluginDrop.file, isCurrent: pluginDrop.isCurrent })
+                  .catch(err => uni.showToast({ title: err.message || '无法加入 AI 对话，请重试', icon: 'none' }))
+             return
+        }
 
         // 0. 编辑器标签页拖过来（dev-board#779 K6 ②）。标签拖拽起手写的是 this.draggingTab
         //    与 dataTransfer 的 application/json，与下面三种文件树格式全对不上，原来一路

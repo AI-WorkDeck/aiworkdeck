@@ -37,7 +37,12 @@ class CloudProjectSourceTest {
     private final ProjectFileService fileService = mock(ProjectFileService.class);
     private final ProjectMemberService members = mock(ProjectMemberService.class);
     private final ProjectFileTextExtractor extractor = mock(ProjectFileTextExtractor.class);
-    private final CloudProjectSource src = new CloudProjectSource(fileService, members, extractor);
+    private final com.checkba.service.ProjectFileAccessService access = mock(com.checkba.service.ProjectFileAccessService.class);
+    private final CloudProjectSource src = new CloudProjectSource(fileService, members, extractor, access);
+
+    @org.junit.jupiter.api.BeforeEach void allowVisibleFiles() {
+        when(access.canRead(any(ProjectFile.class), org.mockito.ArgumentMatchers.eq(7L))).thenReturn(true);
+    }
     private final RefQuery q = new RefQuery(7L, 11L, "conv-a", null);
 
     private static ProjectFile file(long id, Long projectId, String name) {
@@ -149,4 +154,16 @@ class CloudProjectSourceTest {
                 .isInstanceOf(RefSourceException.class)
                 .hasMessageContaining("没有打开");
     }
+    @Test void hiddenFileCannotBeListedOrExtractedEvenForProjectMember() throws Exception {
+        ProjectFile hidden = file(5L, 11L, "私密.docx");
+        when(members.hasReadPermission(11L, 7L)).thenReturn(true);
+        when(fileService.getFile(5L)).thenReturn(hidden);
+        when(fileService.listRelativePaths(11L, null, 100)).thenReturn(List.of(Map.entry("私密.docx", hidden)));
+        when(access.canRead(hidden, 7L)).thenReturn(false);
+        assertThat(src.list(q)).isEmpty();
+        assertThatThrownBy(() -> src.read(q, "5", null)).isInstanceOf(RefSourceException.class)
+                .hasMessage(com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE);
+        verify(extractor, never()).extract(any());
+    }
+
 }

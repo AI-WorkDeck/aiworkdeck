@@ -1,0 +1,39 @@
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>项目沟通 · AI WorkDeck</title>
+  <link rel="stylesheet" href="panel.css">
+  <script src="awd-plugin-sdk.js"></script><script src="panel.js" defer></script>
+</head>
+<body>
+  <div id="notice" role="status" aria-live="polite">正在连接项目沟通…</div>
+  <main id="workspace">
+    <aside id="sidebar" aria-label="会话列表">
+      <div class="list-tools"><button id="new-chat">新建会话</button><button id="join-chat">邀请码加入</button></div>
+      <label class="search"><span class="sr-only">搜索会话</span><input id="search" type="search" placeholder="搜索会话" autocomplete="off"></label>
+      <div id="conversations"></div><p id="empty-list" class="hint">暂无会话。创建会话，邀请同事或客户加入。</p>
+      <button id="refresh">刷新会话</button>
+    </aside>
+    <section id="chat" aria-label="当前会话">
+      <div id="welcome"><span class="welcome-icon" aria-hidden="true">聊</span><p>把讨论和材料留在项目里</p><p class="hint">选择一个会话，或用邀请码建立连接。</p></div>
+      <div id="active-chat" hidden>
+        <header class="chat-header"><button id="back" aria-label="返回会话列表">返回</button><div class="chat-heading"><strong id="chat-title"></strong><span id="chat-subtitle" class="hint"></span></div><button id="members-button">成员</button></header>
+        <div id="project-bar"><span id="binding" class="hint"></span><button id="bind">关联当前项目</button><button id="export">归档聊天</button></div>
+        <div id="message-scroll"><button id="older" hidden>加载更早消息</button><div id="messages" role="log" aria-label="聊天消息" aria-live="polite"></div><p id="empty-messages" class="hint">还没有消息，打个招呼吧。</p></div>
+        <form id="composer">
+          <div class="composer-tools"><button type="button" id="local-file">发送本机文件</button><button type="button" id="project-file">引用项目文件</button><span class="hint">单文件不超过 8 MB</span></div>
+          <input type="file" id="file-input" hidden>
+          <div id="attachment" hidden><span id="attachment-name"></span><button type="button" id="clear-file">移除</button></div>
+          <label class="sr-only" for="draft">输入消息</label><textarea id="draft" rows="3" maxlength="8000" placeholder="输入消息…"></textarea>
+          <div class="send-row"><span class="hint">Enter 发送 · Shift+Enter 换行</span><button class="primary" id="send" type="submit">发送</button></div>
+        </form>
+      </div>
+    </section>
+  </main>
+  <dialog id="dialog" aria-labelledby="dialog-title"><form id="dialog-form"><header><strong id="dialog-title"></strong><button type="button" id="close-dialog" aria-label="关闭">关闭</button></header><div id="dialog-body"></div><p id="dialog-error" role="alert"></p><button id="dialog-submit" class="primary" type="submit">确定</button></form></dialog>
+  <dialog id="confirmation" aria-labelledby="confirmation-title"><strong id="confirmation-title">确认操作</strong><p id="confirmation-text"></p><div class="dialog-actions"><button id="confirmation-cancel" type="button">取消</button><button id="confirmation-ok" type="button" class="primary">继续</button></div></dialog>
+</body>
+</html>

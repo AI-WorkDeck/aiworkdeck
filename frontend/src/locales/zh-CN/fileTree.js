@@ -2,6 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 文件树（FileTree.vue）：右键菜单/批量操作/确认弹窗/拖拽提示/本机文件导入
 export default {
+  clientAccessTitle: "客户访问权限",
+  clientAccessExplain: "文件默认仅内部成员可读，需逐个开放给客户。客户本人上传的文件始终可以自行读取。",
+  clientAccessCurrent: "当前：{state}。",
+  clientAccessVisible: "客户可见",
+  clientAccessInternal: "内部文件",
+  clientAccessRevokeNote: "设为内部后将阻止后续读取，客户已经保存的副本无法收回。",
+  clientAccessGrantNote: "开放后，项目客户可读取此文件。",
+  clientAccessReadOnly: "当前账号只能查看权限，不能修改。",
+  clientAccessRevoke: "设为内部",
+  clientAccessGrant: "向客户开放",
+  clientAccessOk: "知道了",
+  clientAccessGranted: "已向项目客户开放",
+  clientAccessRevoked: "已设为内部文件",
+  clientAccessFailed: "文件权限设置失败，请重试。",
+
   // 删除确认弹窗
   hardDeleteTitle: '彻底删除',
   softDeleteTitle: '移入回收站',

@@ -1,0 +1,13 @@
+{
+  "id": "project-im",
+  "name": "项目沟通",
+  "version": "0.1.0",
+  "description": "律师、同事与客户的项目会话：群聊、私聊、文件归档、工作区打开与 AI 引用。目前仅支持中国大陆站账号，国际站暂未开通。",
+  "author": "AI WorkDeck",
+  "minHostVersion": "0.61.0",
+  "permissions": ["im", "file_read", "file_write"],
+  "frontendEntry": "web/index.html",
+  "backendJars": [],
+  "tools": [],
+  "skills": []
+}

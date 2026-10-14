@@ -42,6 +42,7 @@ class DdControllerClientWhitelistTest {
 
     private DdService ddService;
     private ProjectMemberService pms;
+    private com.checkba.service.ProjectFileAccessService fileAccess;
     private DdController controller;
     private MockedStatic<AuthController> auth;
 
@@ -49,11 +50,12 @@ class DdControllerClientWhitelistTest {
     void setUp() {
         ddService = mock(DdService.class);
         pms = mock(ProjectMemberService.class);
-        controller = new DdController(ddService, pms);
+        fileAccess = mock(com.checkba.service.ProjectFileAccessService.class);
+        controller = new DdController(ddService, pms, fileAccess);
         when(ddService.getProjectIdByRequestId(REQUEST)).thenReturn(PROJECT);
         when(ddService.getProjectIdByItemId(ITEM)).thenReturn(PROJECT);
         when(pms.hasReadPermission(PROJECT, CLIENT)).thenReturn(true);
-        when(pms.isClient(PROJECT, CLIENT)).thenReturn(true);
+        when(fileAccess.isClient(PROJECT, CLIENT)).thenReturn(true);
         auth = mockStatic(AuthController.class);
         auth.when(() -> AuthController.getUserIdFromSession("c")).thenReturn(CLIENT);
     }
@@ -118,7 +120,7 @@ class DdControllerClientWhitelistTest {
     @Test
     @DisplayName("律师（非客户）的写端点照常")
     void staffStillWrites() {
-        when(pms.isClient(PROJECT, CLIENT)).thenReturn(false);
+        when(fileAccess.isClient(PROJECT, CLIENT)).thenReturn(false);
         assertDoesNotThrow(() -> controller.deleteRequest(REQUEST, "c"));
         verify(ddService).deleteRequest(REQUEST, CLIENT);
     }
@@ -126,7 +128,7 @@ class DdControllerClientWhitelistTest {
     @Test
     @DisplayName("律师审核：带理由与操作人交给业务层；非法流转映射成真 400")
     void staffReviewPassesReasonAndMaps400() {
-        when(pms.isClient(PROJECT, CLIENT)).thenReturn(false);
+        when(fileAccess.isClient(PROJECT, CLIENT)).thenReturn(false);
         DdController.UpdateStatusDto dto = new DdController.UpdateStatusDto();
         dto.setStatus("REJECTED");
         dto.setReason("扫描件不清晰");

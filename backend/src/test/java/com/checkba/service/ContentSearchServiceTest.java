@@ -47,11 +47,13 @@ class ContentSearchServiceTest {
     private TagRepository tagRepository;
     private StorageService storageService;
     private ContentSearchService service;
+    private final ProjectFileAccessService fileAccess = mock(ProjectFileAccessService.class);
 
     private static final long PROJECT_ID = 1L;
 
     @BeforeEach
     void setUp() {
+        when(fileAccess.canRead(any(), eq(9L))).thenReturn(true);
         projectFileRepository = mock(ProjectFileRepository.class);
         fileTagRepository = mock(FileTagRepository.class);
         tagRepository = mock(TagRepository.class);
@@ -61,7 +63,7 @@ class ContentSearchServiceTest {
         when(storageServiceFactory.getStorageService()).thenReturn(storageService);
 
         DocumentTextService documentTextService = new DocumentTextService(storageServiceFactory);
-        service = new ContentSearchService(projectFileRepository, fileTagRepository, tagRepository, documentTextService, null);
+        service = new ContentSearchService(projectFileRepository, fileTagRepository, tagRepository, documentTextService, null, fileAccess);
     }
 
     private static ProjectFile file(long id, String name, String fileType, String filePath) {
@@ -118,7 +120,7 @@ class ContentSearchServiceTest {
         when(storageService.load("projects/1/contract.pdf"))
                 .thenReturn(new ByteArrayResource(pdfBytes("Shareholders Meeting Notice 2026")));
 
-        SearchResult result = service.searchContent(PROJECT_ID, query("Shareholders"));
+        SearchResult result = service.searchContent(PROJECT_ID, query("Shareholders"), 9L);
 
         assertEquals(1, result.getTotalFiles(), "应命中该 PDF");
         assertEquals(1, result.getResults().get(0).getMatchCount());
@@ -134,7 +136,7 @@ class ContentSearchServiceTest {
         when(storageService.load("projects/1/diligence.docx"))
                 .thenReturn(new ByteArrayResource(docxBytes("尽职调查报告初稿")));
 
-        SearchResult result = service.searchContent(PROJECT_ID, query("尽职调查"));
+        SearchResult result = service.searchContent(PROJECT_ID, query("尽职调查"), 9L);
 
         assertEquals(1, result.getTotalFiles(), "应命中该 docx");
         assertEquals(1, result.getResults().get(0).getMatchCount());
@@ -156,7 +158,7 @@ class ContentSearchServiceTest {
         when(storageService.load(eq("projects/1/notice.pdf")))
                 .thenReturn(new ByteArrayResource(pdfBytes("Board Resolution Notice")));
 
-        SearchResult result = assertDoesNotThrow(() -> service.searchContent(PROJECT_ID, query("Resolution")));
+        SearchResult result = assertDoesNotThrow(() -> service.searchContent(PROJECT_ID, query("Resolution"), 9L));
 
         assertEquals(1, result.getTotalFiles(), "损坏文件应被跳过，只有健康文件命中");
         assertEquals("notice.pdf", result.getResults().get(0).getFileName());
