@@ -302,7 +302,7 @@
               <path
                 v-for="(path, idx) in p.svgPaths"
                 :key="idx"
-                :d="path.d"
+                :d="typeof path === 'string' ? path : path.d"
                 stroke="currentColor"
                 stroke-width="2"
                 stroke-linecap="round"
@@ -865,6 +865,7 @@
           <PluginWorkspaceSummary
             v-else-if="activeDynamicPlugin"
             :plugin="activeDynamicPlugin"
+            :project-id="projectId"
             @open="openPluginTab(activeDynamicPlugin.pluginId)"
           />
           <view v-else class="sidebar-plugin-placeholder">
@@ -3601,6 +3602,10 @@ export default {
       uni.$off('awd:open-settings', this._onOpenSettings)
       this._onOpenSettings = null
     }
+    if (this._onOpenLawFirmPlugin) {
+      uni.$off('awd:open-lawfirm-plugin', this._onOpenLawFirmPlugin)
+      this._onOpenLawFirmPlugin = null
+    }
     if (this._onFilesChangedSyncTabs) {
       uni.$off('awd:files-changed', this._onFilesChangedSyncTabs)
       this._onFilesChangedSyncTabs = null
@@ -4020,6 +4025,11 @@ export default {
       this.openSettingsTab(opts || {})
     }
     uni.$on('awd:open-settings', this._onOpenSettings)
+    this._onOpenLawFirmPlugin = (opts) => {
+      if (!this.isActiveOverviewInstance()) return
+      this.handleOpenLawFirmPlugin(opts || {})
+    }
+    uni.$on('awd:open-lawfirm-plugin', this._onOpenLawFirmPlugin)
     // 外部改名（Finder 里改已打开的文档，BUG-14 / v0.49.0 C4-03）：后端对账原地改了那一行
     // 的名字（id 不变），但这条路不经过应用内的 file-renamed 广播。文件树每次重载（聚焦兜底、
     // SSE refresh_files、用户增删改）都经 awd:files-changed 汇聚，重载完按 id 把已开标签、
@@ -7405,6 +7415,9 @@ export default {
           // 请求世代防止安装时的旧响应在禁用/卸载后迟到，把入口重新加回来。
           this.dynamicPlugins = list.filter(p => p && p.enabled === true && !p.revokedReason && !p.incompatibleReason).map(p => {
             const frontendEntry = resolvePluginEntryUrl(p.id, p.frontendEntry)
+            const iconKey = p.id === 'lawfirm-management' ? 'lawfirm' : (p.id === 'enterprise-im' ? 'im' : (p.id === 'baoqingtian' ? 'baoqingtian' : 'plugin'))
+            const rawPaths = GLYPHS[iconKey] || GLYPHS.plugin || []
+            const svgPaths = rawPaths.map(d => (typeof d === 'string' ? { d } : d))
             return {
               key: `plugin-${p.id}`,
               // 左栏面板 key 是 plugin-<id>，桥要的是原始 id（握手上下文 + KV 分区键），
@@ -7416,6 +7429,7 @@ export default {
               // 纯工具/skill 插件不给位图，改由 rail 用统一的 SVG 兜底（见模板 svgFallback）。
               icon: null,
               activeIcon: null,
+              svgPaths,
               isDynamic: true,
               // 有真正的前端入口才走 iframe（PluginPane）；纯工具/skill 插件走宿主渲染的
               // 启动面板（PluginGuidePane）——否则点开只有一句「未配置入口地址」。
@@ -7441,6 +7455,21 @@ export default {
         }
       } catch (e) {
         console.error('Failed to load dynamic plugins:', e)
+      }
+    },
+
+    async handleOpenLawFirmPlugin(opts = {}) {
+      await this.loadDynamicPlugins()
+      if (this.hasProject) {
+        this.openPluginTab('lawfirm-management')
+      } else {
+        this.leftPaneKey = 'plugin-lawfirm-management'
+        this.sidebarCollapsed = false
+      }
+      if (opts && opts.tab) {
+        setTimeout(() => {
+          uni.$emit('awd:lawfirm-tab', opts.tab)
+        }, 120)
       }
     },
 
