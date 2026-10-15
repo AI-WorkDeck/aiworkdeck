@@ -49,7 +49,7 @@ const currentTodo = computed(() => props.todos.find(t => t.status === 'in_progre
 .todo-progress-card {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   margin: 0 0 6px 0;
   overflow: hidden;
 }
@@ -71,13 +71,13 @@ const currentTodo = computed(() => props.todos.find(t => t.status === 'in_progre
 }
 
 .todo-title {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-accent-text); /* Forest Green */
 }
 
 .todo-counter {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-accent-text);
   background: var(--awd-accent-soft); /* Mint Lightest */
@@ -93,7 +93,7 @@ const currentTodo = computed(() => props.todos.find(t => t.status === 'in_progre
 }
 
 .todo-current-hint {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   white-space: nowrap;
   overflow: hidden;
@@ -158,7 +158,7 @@ const currentTodo = computed(() => props.todos.find(t => t.status === 'in_progre
 }
 
 .todo-text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.45;
   color: var(--awd-text);
 }

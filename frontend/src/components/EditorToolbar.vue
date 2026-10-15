@@ -1117,14 +1117,14 @@ export default {
 .etb-find-layer { position: absolute; top: 100%; left: 0; width: max-content; max-width: 100%; z-index: 40; }
 .etb-find { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 8px; flex-shrink: 0;
   background: var(--awd-surface); border: 1px solid var(--awd-border); border-top: none;
-  border-radius: 0 0 8px 0; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); }
+  border-radius: 0 0 var(--awd-radius-dialog) 0; box-shadow: var(--awd-shadow-sm); }
 .etb-input.fi { width: 148px; height: 26px; flex-shrink: 0; }
-.etb-find-n { min-width: 62px; font-size: 11px; color: var(--awd-text-2); }
-.etb-find-b { padding: 3px 9px; border: 1px solid var(--awd-border); border-radius: 5px; font-size: 12px;
+.etb-find-n { min-width: 62px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
+.etb-find-b { padding: 3px 9px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); font-size: var(--awd-panel-fs);
   color: var(--awd-text-2); flex-shrink: 0; }
 .etb-find-b:hover { border-color: var(--awd-border-strong); }
 .etb-find-b.on { background: var(--awd-accent-soft); border-color: var(--awd-mint); color: var(--awd-accent-text); }
-.etb-find-x { margin-left: auto; padding: 3px 9px; font-size: 12px; color: var(--awd-text-2); flex-shrink: 0; }
+.etb-find-x { margin-left: auto; padding: 3px 9px; font-size: var(--awd-panel-fs); color: var(--awd-text-2); flex-shrink: 0; }
 .etb-err.bar { margin: 0; border-radius: 0; padding: 4px 10px; }
 /* 4px 悬浮细滑轨：样式本体在 .awd-hairline-scroll（App.vue 全局），这里只处理
    它占的那 4px 高度。滑轨是从内容盒里扣掉的，不补偿的话主命令区会长到 26+4=30px，
@@ -1153,15 +1153,15 @@ export default {
    挡点击。z 高于 .etb-menu/.etb-palette 的 40，避免自己的渐隐把弹层的边角盖花，
    但依然低于 popStyle 用的 fixed 弹层（900）——两者本来就不在同一层叠上下文里。 */
 .etb-fade { position: absolute; top: 0; bottom: 4px; width: 16px; pointer-events: none; z-index: 41; }
-.etb-fade-l { left: 0; background: linear-gradient(to right, var(--awd-bg), rgba(0,0,0,0)); }
-.etb-fade-r { right: 0; background: linear-gradient(to left, var(--awd-bg), rgba(0,0,0,0)); }
+.etb-fade-l { left: 0; background: linear-gradient(to right, var(--awd-bg), transparent); }
+.etb-fade-r { right: 0; background: linear-gradient(to left, var(--awd-bg), transparent); }
 .etb-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; padding-left: 6px;
   border-left: 1px solid var(--awd-border); }
-.etb-group-t { flex-shrink: 0; padding: 0 4px; font-size: 11px; color: var(--awd-text-3); }
+.etb-group-t { flex-shrink: 0; padding: 0 4px; font-size: var(--awd-panel-fs-sec); color: var(--awd-text-3); }
 .etb-sep { width: 1px; height: 18px; background: var(--awd-surface-3); margin: 0 5px; flex-shrink: 0; }
 
 .etb-btn { position: relative; display: flex; align-items: center; justify-content: center; gap: 3px;
-  min-width: 26px; height: 26px; padding: 0 5px; border-radius: 5px; color: var(--awd-text-2); flex-shrink: 0; }
+  min-width: 26px; height: 26px; padding: 0 5px; border-radius: var(--awd-radius-sm); color: var(--awd-text-2); flex-shrink: 0; }
 .etb-btn:hover { background: var(--awd-surface-2); }
 .etb-btn.on { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .etb-btn.off { color: var(--awd-text-3); }
@@ -1176,30 +1176,30 @@ export default {
 .etb-marks-menu button:disabled { color: var(--awd-text-3); cursor: wait; }
 .etb-btn.wide { padding: 0 9px; }
 .etb-ico { width: 16px; height: 16px; display: block; }
-.etb-tx { font-size: 14px; line-height: 1; }
-.etb-tx.sm { font-size: 12px; }
+.etb-tx { font-size: var(--awd-font-size-reading); line-height: 1; }
+.etb-tx.sm { font-size: var(--awd-panel-fs); }
 .etb-tx.b { font-weight: 700; }
 .etb-tx.i { font-style: italic; font-family: Georgia, serif; }
 .etb-tx.u { text-decoration: underline; }
 .etb-tx.s { text-decoration: line-through; }
-.etb-swatch { position: absolute; left: 4px; right: 4px; bottom: 3px; height: 3px; border-radius: 2px;
-  border: 1px solid rgba(0, 0, 0, 0.08); }
+.etb-swatch { position: absolute; left: 4px; right: 4px; bottom: 3px; height: 3px; border-radius: var(--awd-radius-sm);
+  border: 1px solid var(--awd-border); }
 
 /* box-sizing:border-box：没有它，1px 边框会让边框盒变成 28px，.etb-row 跟着变 28，
    26px 的按钮在里面一居中就比右侧常驻区低 1px（dev-board#543 走查实测）。 */
 .etb-field { display: flex; align-items: center; justify-content: space-between; gap: 4px; height: 26px;
   box-sizing: border-box;
-  padding: 0 6px; border: 1px solid var(--awd-border); border-radius: 5px; background: var(--awd-surface); }
+  padding: 0 6px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-surface); }
 .etb-field:hover { border-color: var(--awd-border-strong); }
-.etb-field-t { font-size: 12px; color: var(--awd-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.etb-caret { font-size: 11px; color: var(--awd-text-3); }
+.etb-field-t { font-size: var(--awd-panel-fs); color: var(--awd-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etb-caret { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
 .w110 { width: 110px; }
 .w96 { width: 96px; }
 
 .etb-drop { position: relative; flex-shrink: 0; }
 .etb-menu { position: absolute; top: 30px; left: 0; z-index: 40; max-height: 280px;
-  padding: 4px; background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12); }
+  padding: 4px; background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md); }
 .w150 { width: 150px; }
 .w160 { width: 160px; }
 .w180 { width: 180px; }
@@ -1207,38 +1207,38 @@ export default {
 .w120 { width: 120px; }
 .w320 { width: 320px; box-sizing: border-box; }
 .etb-menu-sep { height: 1px; margin: 4px 2px; background: var(--awd-border); }
-.etb-item-manage { border-bottom: 1px solid var(--awd-border); border-radius: 5px 5px 0 0; margin-bottom: 3px; }
+.etb-item-manage { border-bottom: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm) var(--awd-radius-sm) 0 0; margin-bottom: 3px; }
 .etb-item-manage .etb-item-t { color: var(--awd-accent-text); }
 .etb-step-v.pick { cursor: pointer; }
 .etb-step-v.pick:hover { background: var(--awd-surface-2); }
 .w72 { width: 72px; }
 .etb-menu.pad { padding: 6px; }
 .etb-item { display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
-  padding: 5px 8px; border-radius: 5px; }
+  padding: 5px 8px; border-radius: var(--awd-radius-sm); }
 .etb-item:hover { background: var(--awd-surface-2); }
 .etb-item.on { background: var(--awd-accent-soft); }
 .etb-item.dim .etb-item-t { color: var(--awd-text-3); }
-.etb-item-t { font-size: 12px; color: var(--awd-text); }
-.etb-hint { font-size: 10px; color: var(--awd-text-3); }
+.etb-item-t { font-size: var(--awd-panel-fs); color: var(--awd-text); }
+.etb-hint { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
 
 .etb-form { display: flex; flex-direction: column; gap: 7px; padding: 3px 4px 1px; }
-.etb-form-t { font-size: 12px; color: var(--awd-text-2); }
+.etb-form-t { font-size: var(--awd-panel-fs); color: var(--awd-text-2); }
 .etb-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
-.etb-cell { height: 15px; border: 1px solid var(--awd-border); border-radius: 2px; background: var(--awd-surface); }
+.etb-cell { height: 15px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-surface); }
 .etb-cell.hot { background: var(--awd-accent-soft); border-color: var(--awd-mint); }
-.etb-input { width: 100%; height: 28px; padding: 0 7px; box-sizing: border-box; font-size: 12px;
-  color: var(--awd-text); border: 1px solid var(--awd-border); border-radius: 5px; background: var(--awd-surface); }
+.etb-input { width: 100%; height: 28px; padding: 0 7px; box-sizing: border-box; font-size: var(--awd-panel-fs);
+  color: var(--awd-text); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-surface); }
 .etb-input.ta { height: 58px; padding: 5px 7px; line-height: 1.45; }
 .etb-form-acts { display: flex; justify-content: flex-end; gap: 6px; }
-.etb-form-b { padding: 3px 11px; border: 1px solid var(--awd-border); border-radius: 5px; font-size: 12px; color: var(--awd-text-2); }
+.etb-form-b { padding: 3px 11px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); font-size: var(--awd-panel-fs); color: var(--awd-text-2); }
 .etb-form-b.ok { border-color: var(--awd-mint); color: var(--awd-accent-text); background: var(--awd-accent-soft); }
-.etb-err { display: block; margin-top: 6px; padding: 4px 7px; border-radius: 5px;
-  background: var(--awd-danger-soft); color: var(--awd-danger-text); font-size: 11px; line-height: 1.4; }
+.etb-err { display: block; margin-top: 6px; padding: 4px 7px; border-radius: var(--awd-radius-sm);
+  background: var(--awd-danger-soft); color: var(--awd-danger-text); font-size: var(--awd-panel-fs-meta); line-height: 1.4; }
 
 .etb-palette { position: absolute; top: 30px; left: 0; z-index: 40; display: flex; flex-wrap: wrap; gap: 5px;
-  width: 128px; padding: 7px; background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12); }
-.etb-chip { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, 0.12); }
+  width: 128px; padding: 7px; background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md); }
+.etb-chip { width: 18px; height: 18px; border-radius: var(--awd-radius-sm); border: 1px solid var(--awd-border); }
 .etb-chip.none { position: relative; }
 .etb-chip.none::after { content: ''; position: absolute; left: 1px; right: 1px; top: 8px; height: 1px;
   background: var(--awd-danger); transform: rotate(-45deg); }
@@ -1246,10 +1246,10 @@ export default {
 /* box-sizing 同 .etb-field：26px + 1px 边框 = 28px 的边框盒会成为 .etb-row 里最高的
    一件，把整行连同 26px 的按钮顶低 1px（dev-board#543 走查实测的那 1px）。 */
 .etb-stepper { display: flex; align-items: center; height: 26px; box-sizing: border-box;
-  border: 1px solid var(--awd-border); border-radius: 5px;
+  border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm);
   background: var(--awd-surface); flex-shrink: 0; }
-.etb-step-b { width: 20px; text-align: center; font-size: 14px; color: var(--awd-text-2); line-height: 24px; }
+.etb-step-b { width: 20px; text-align: center; font-size: var(--awd-font-size-reading); color: var(--awd-text-2); line-height: 24px; }
 .etb-step-b:hover { color: var(--awd-accent-text); background: var(--awd-surface-2); }
-.etb-step-v { min-width: 34px; text-align: center; font-size: 12px; color: var(--awd-text); }
+.etb-step-v { min-width: 34px; text-align: center; font-size: var(--awd-panel-fs); color: var(--awd-text); }
 .etb-step-v.z { min-width: 42px; }
 </style>

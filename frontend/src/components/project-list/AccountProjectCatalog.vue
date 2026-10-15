@@ -173,14 +173,14 @@ export default {
 }
 </script>
 <style scoped>
-.account-catalog { margin: var(--awd-space-2) 0; border-top: 1px solid var(--awd-panel-border); color: var(--awd-panel-text); }
+.account-catalog { margin: var(--awd-panel-gap, 8px) 0; border-top: 1px solid var(--awd-panel-border); color: var(--awd-panel-text); }
 .catalog-heading,.catalog-file { display: flex; align-items: center; justify-content: space-between; gap: var(--awd-space-2); }
-.catalog-heading { min-height: var(--awd-control-height); font-size: var(--awd-panel-fs-sec); color: var(--awd-panel-text-2); }
+.catalog-heading { min-height: var(--awd-panel-sec-h, 26px); font-size: var(--awd-panel-fs-sec); color: var(--awd-panel-text-2); }
 .catalog-note { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-2); line-height: var(--awd-line-height-ui); overflow-wrap: anywhere; }
 .catalog-project-entry { display: flex; align-items: center; }
 .catalog-other-locations { font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-accent); }
 .catalog-project { min-width: 0; border-bottom: 1px solid var(--awd-panel-border); }
-.catalog-project-name,.catalog-action { margin: 0; min-height: var(--awd-control-height); border: 0; border-radius: var(--awd-radius-sm); background: transparent; font-size: var(--awd-font-size-body); color: var(--awd-panel-text); text-align: left; padding: var(--awd-space-1) var(--awd-space-2); line-height: var(--awd-line-height-ui); cursor: pointer; }
+.catalog-project-name,.catalog-action { margin: 0; min-height: var(--awd-panel-row-h, 28px); border: 0; border-radius: var(--awd-radius-sm); background: transparent; font-size: var(--awd-panel-fs); color: var(--awd-panel-text); text-align: left; padding: var(--awd-space-1) var(--awd-space-2); line-height: var(--awd-line-height-ui); cursor: pointer; }
 .catalog-project-name::after,.catalog-action::after { border: 0; }
 .catalog-project-name { display: flex; align-items: center; gap: var(--awd-space-1); flex: 1; min-width: 0; width: 100%; font-weight: 500; white-space: normal; overflow-wrap: anywhere; }
 .catalog-project-name:hover,.catalog-action:hover { background: var(--awd-panel-hover); }
@@ -190,9 +190,9 @@ export default {
 .catalog-action:disabled { cursor: default; opacity: 0.5; }
 .catalog-project-title { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .catalog-location { flex-shrink: 0; white-space: nowrap; font-weight: 400; }
-.catalog-other-locations { width: var(--awd-control-height); padding: 0; text-align: center; }
+.catalog-other-locations { width: var(--awd-panel-row-h, 28px); padding: 0; text-align: center; }
 .catalog-files { padding: 0 var(--awd-space-2) var(--awd-space-2); border-top: 1px solid var(--awd-panel-border); }
-.catalog-file { padding: var(--awd-space-1) 0; font-size: var(--awd-font-size-body); overflow-wrap: anywhere; }
+.catalog-file { padding: var(--awd-space-1) 0; font-size: var(--awd-panel-fs); overflow-wrap: anywhere; }
 .catalog-file > view { min-width: 0; }
-.catalog-destination { width: 100%; min-height: var(--awd-control-height); margin: var(--awd-space-2) 0; border: 1px solid var(--awd-panel-border); border-radius: var(--awd-radius-sm); background: var(--awd-surface); color: var(--awd-panel-text); font-size: var(--awd-font-size-body); }
+.catalog-destination { width: 100%; min-height: var(--awd-panel-row-h, 28px); margin: var(--awd-space-1) 0; border: 1px solid var(--awd-panel-border); border-radius: var(--awd-radius-sm); background: var(--awd-surface); color: var(--awd-panel-text); font-size: var(--awd-panel-fs); }
 </style>

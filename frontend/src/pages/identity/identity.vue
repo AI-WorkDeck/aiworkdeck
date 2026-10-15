@@ -103,6 +103,10 @@ export default {
 
 <style lang="scss" scoped>
 .identity-page {
+  --awd-identity-card-radius: 14px;
+  --awd-identity-item-radius: 10px;
+  --awd-identity-title-fs: 17px;
+  --awd-identity-name-fs: 14px;
   width: 100vw;
   height: 100vh;
   background: var(--awd-bg);
@@ -117,7 +121,7 @@ export default {
   padding: 36px 32px 30px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 14px;
+  border-radius: var(--awd-identity-card-radius);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -129,14 +133,14 @@ export default {
 }
 
 .identity-title {
-  font-size: 17px;
+  font-size: var(--awd-identity-title-fs);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .identity-subtitle {
   margin-top: 10px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 19px;
   color: var(--awd-text-2);
   text-align: center;
@@ -151,7 +155,7 @@ export default {
 }
 
 .identity-hint-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
 }
 
@@ -168,7 +172,7 @@ export default {
 .identity-item {
   padding: 12px 14px;
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-identity-item-radius);
   background: var(--awd-surface);
   cursor: pointer;
 
@@ -190,20 +194,20 @@ export default {
 }
 
 .identity-name {
-  font-size: 14px;
+  font-size: var(--awd-identity-name-fs);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .identity-username {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
 }
 
 .identity-meta {
   display: block;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -212,11 +216,11 @@ export default {
   height: 38px;
   line-height: 36px;
   margin-top: 20px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-on-accent);
   background: var(--awd-accent);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   cursor: pointer;
 
   &:hover {
@@ -233,17 +237,17 @@ export default {
   height: 34px;
   line-height: 32px;
   padding: 0 24px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-accent-text);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border-strong);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   cursor: pointer;
 }
 
 .identity-error {
   margin-top: 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-danger-text);
   text-align: center;

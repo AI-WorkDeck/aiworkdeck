@@ -247,11 +247,11 @@ export default {
   display: flex;
   flex-direction: column;
   background: var(--awd-surface);
-  border-radius: 12px;
+  border-radius: var(--awd-radius-dialog);
   width: 400px;
   max-width: 90vw;
   max-height: calc(100vh - 32px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--awd-shadow-lg);
   overflow: hidden;
 }
 
@@ -266,13 +266,13 @@ export default {
 }
 
 .dialog-title {
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .dialog-close {
-  font-size: 24px;
+  font-size: var(--awd-font-size-title);
   color: var(--awd-text-3);
   cursor: pointer;
   line-height: 1;
@@ -291,7 +291,7 @@ export default {
 
 .dialog-desc {
   display: block;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   margin-bottom: 20px;
   line-height: 1.5;
@@ -306,7 +306,7 @@ export default {
 .doc-item {
   background: var(--awd-bg);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   padding: 14px;
 }
 
@@ -325,7 +325,7 @@ export default {
 }
 
 .label-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   color: var(--awd-text);
 }
@@ -343,7 +343,7 @@ export default {
   padding: 10px 12px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -393,7 +393,7 @@ export default {
 }
 
 .option-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   flex: 1;
   overflow: hidden;
@@ -411,12 +411,12 @@ export default {
   align-items: center;
   gap: 2px;
   color: var(--awd-text-3);
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   padding: 4px 0;
 }
 
 .arrow-label {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 
@@ -446,13 +446,13 @@ export default {
 }
 
 .progress-stage {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   color: var(--awd-text);
 }
 
 .progress-elapsed {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -460,7 +460,7 @@ export default {
 
 .progress-track {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-border);
   overflow: hidden;
   position: relative;
@@ -471,7 +471,7 @@ export default {
   top: 0;
   bottom: 0;
   width: 30%;
-  border-radius: 2px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-info);
   animation: compare-progress-indeterminate 1.4s ease-in-out infinite;
 }
@@ -499,8 +499,8 @@ export default {
   margin-top: 12px;
   padding: 10px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-panel-fs);
   line-height: 1.5;
   color: var(--awd-text);
 }
@@ -508,18 +508,18 @@ export default {
 .btn-continue {
   margin: 8px 0 0;
   padding: 4px 12px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   background: var(--awd-surface);
   color: var(--awd-text);
   border: 1px solid var(--awd-border-strong);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
 }
 
 .progress-hint {
   display: block;
   margin-top: 10px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   line-height: 1.5;
 }
@@ -529,11 +529,16 @@ export default {
 }
 
 .btn-cancel {
-  padding: 8px 20px;
+  height: var(--awd-control-height);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border-strong);
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   cursor: pointer;
   transition: all 0.15s;
@@ -541,15 +546,20 @@ export default {
 
 .btn-cancel:hover {
   background: var(--awd-bg);
-  border-color: #9ca3af;
+  border-color: var(--awd-border-strong);
 }
 
 .btn-confirm {
-  padding: 8px 20px;
+  height: var(--awd-control-height);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
   background: linear-gradient(135deg, var(--awd-info) 0%, var(--awd-info) 100%);
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-on-accent);
   cursor: pointer;
   transition: all 0.15s;

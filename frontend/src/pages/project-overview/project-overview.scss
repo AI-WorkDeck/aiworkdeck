@@ -107,8 +107,9 @@ $color-accent: var(--awd-mint); // Mint Green
 .project-info {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  justify-content: center;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
 }
 
 .project-title-row {
@@ -320,11 +321,11 @@ $color-accent: var(--awd-mint); // Mint Green
   flex-shrink: 0;
   background-color: var(--awd-accent-soft);
   border: 1px solid transparent; // Cleaner look
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   padding: 1px 6px;
 
   .status-text {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-sec);
     font-weight: 500;
     color: var(--awd-accent-text); // Dark green text on light green bg
   }
@@ -336,15 +337,20 @@ $color-accent: var(--awd-mint); // Mint Green
 .project-meta {
   display: flex;
   align-items: center;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-2);
-  margin-top: 2px;
+  margin-top: 0;
   gap: 6px;
+  white-space: nowrap;
+}
+
+.compact-mode .project-meta {
+  display: none;
 }
 
 .meta-divider {
-  color: var(--awd-text-on-accent);
-  font-size: 10px;
+  color: var(--awd-border);
+  font-size: var(--awd-panel-fs-sec);
 }
 
 /* 负责人一行按条件隐藏后（单人本机项目），首个分隔符就成了打头的「|」 */
@@ -1060,7 +1066,7 @@ $color-accent: var(--awd-mint); // Mint Green
 .tools-search-input:focus {
   background: var(--awd-surface);
   border-color: var(--awd-info); /* 聚焦蓝框 */
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-focus-ring, var(--awd-accent-soft));
 }
 .tools-search-clear {
   position: absolute;
@@ -1463,7 +1469,7 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .batch-menu-item:hover {
-  background: rgba(148, 163, 184, 0.14);
+  background: var(--awd-surface-hover, var(--awd-surface-2));
 }
 
 .batch-menu-item.danger {
@@ -1986,7 +1992,7 @@ $color-accent: var(--awd-mint); // Mint Green
   border: 1px solid var(--awd-border);
   cursor: pointer;
   color: var(--awd-text-2);
-  background: rgba(15, 23, 42, 0.02);
+  background: var(--awd-surface);
   transition: all 0.18s ease;
 
   &:hover {
@@ -2166,7 +2172,7 @@ $color-accent: var(--awd-mint); // Mint Green
 .handle-label-container {
   position: absolute;
   right: 36px; /* 距离把手左侧一点 */
-  background: #333;
+  background: var(--awd-text);
   color: var(--awd-text-on-accent);
   font-size: 12px;
   padding: 6px 10px;
@@ -2183,7 +2189,7 @@ $color-accent: var(--awd-mint); // Mint Green
     right: -4px;
     top: 50%;
     transform: translateY(-50%);
-    border-left: 4px solid #333;
+    border-left: 4px solid var(--awd-text);
     border-top: 4px solid transparent;
     border-bottom: 4px solid transparent;
   }
@@ -2334,7 +2340,7 @@ $color-accent: var(--awd-mint); // Mint Green
   height: 24px;
   border-radius: 999px;
   border: 1px solid var(--awd-border);
-  background: rgba(15, 23, 42, 0.02);
+  background: var(--awd-surface);
   font-size: 12px;
   color: var(--awd-accent-text);
   display: flex;
@@ -2426,7 +2432,7 @@ $color-accent: var(--awd-mint); // Mint Green
 
 .tools-search-input:focus {
   border-color: var(--awd-info);
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.1);
+  box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-focus-ring, var(--awd-accent-soft));
 }
 
 .context-snippet.placeholder {
@@ -3039,7 +3045,7 @@ $color-accent: var(--awd-mint); // Mint Green
   line-height: 28px;
   padding: 0 10px;
   border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid var(--awd-border);
   background: var(--awd-surface);
   font-size: 12px;
   color: var(--awd-text);
@@ -3142,8 +3148,8 @@ $color-accent: var(--awd-mint); // Mint Green
   height: 120px;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.18);
-  border: 1px solid rgba(37, 99, 235, 0.25);
+  box-shadow: var(--awd-shadow-lg);
+  border: 1px solid var(--awd-accent);
   pointer-events: none; /* 不挡鼠标 hit-test */
   opacity: 0.82;
 }
@@ -4240,7 +4246,7 @@ $color-accent: var(--awd-mint); // Mint Green
   opacity: 0;
   transition: opacity 0.25s ease, transform 0.25s ease;
   z-index: 9999;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--awd-shadow-md);
   display: flex;
   align-items: center;
   gap: 8px;

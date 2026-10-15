@@ -118,8 +118,8 @@ export default {
   z-index: 60;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(18, 52, 77, 0.14);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   overflow: hidden;
 }
 
@@ -137,7 +137,7 @@ export default {
   line-height: 18px;
   border-radius: 50%;
   text-align: center;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-accent-text);
   background: var(--awd-accent-soft);
@@ -153,13 +153,13 @@ export default {
 }
 
 .mp-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   color: var(--awd-text-2);
 }
 
 .mp-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -189,7 +189,7 @@ export default {
 }
 
 .mp-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   white-space: nowrap;
   overflow: hidden;
@@ -197,7 +197,7 @@ export default {
 }
 
 .mp-path {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -208,7 +208,7 @@ export default {
 
 .mp-empty {
   padding: 14px 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   text-align: center;
 }

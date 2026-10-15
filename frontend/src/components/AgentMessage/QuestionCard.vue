@@ -243,13 +243,13 @@ function submit() {
 }
 
 .q-title {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-accent-text);
 }
 
 .q-badge {
-  font-size: 9px;
+  font-size: var(--awd-panel-fs-meta);
   background: var(--awd-accent-soft);
   color: var(--awd-accent-text);
   padding: 2px 6px;
@@ -283,7 +283,7 @@ function submit() {
 
 /* ---- ask_user（dev-board#868）---- */
 .q-chip {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 16px;
   padding: 0 6px;
   border-radius: var(--awd-radius-sm);
@@ -379,7 +379,7 @@ function submit() {
 }
 
 .q-mark.is-check {
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
 }
 
 .q-choice.is-chosen .q-mark {
