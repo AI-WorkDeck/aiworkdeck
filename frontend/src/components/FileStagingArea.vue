@@ -73,40 +73,42 @@
               class="staging-item"
               :class="{ selected: selectedIds.includes(file.id) }"
               :data-id="file.id"
-              ref="fileItems"
-              draggable="true" 
-              @dragstart.stop="onDragStart(file, $event)"
-              @dragend="onDragEnd"
-              @tap.stop="onItemClick(file, $event)"
-              @dblclick.stop="handleDoubleClick(file)"
-           >
-              <view class="checkbox-wrapper" @tap.stop="toggleCheck(file.id)">
-                <view class="custom-checkbox" :class="{ checked: selectedIds.includes(file.id) }">
-                  <text v-if="selectedIds.includes(file.id)" class="check-mark">√</text>
-                </view>
-              </view>
-              <!-- 与资源管理器文件行同一个图标组件（dev-board#973） -->
-              <view class="file-icon"><FileTypeIcon :type="file.fileType" /></view>
-              <text class="file-name" :title="file.name">{{ file.name }}</text>
-              <text class="remove-btn" @tap.stop="$emit('remove', file.id)">×</text>
-           </view>
-       </scroll-view>
-      
-    </view>
+               ref="fileItems"
+               draggable="true"
+               @mouseenter="onItemPrimeDrag(file)"
+               @mousedown="onItemPrimeDrag(file)"
+               @dragstart.stop="onDragStart(file, $event)"
+               @dragend="onDragEnd"
+               @tap.stop="onItemClick(file, $event)"
+               @dblclick.stop="handleDoubleClick(file)"
+            >
+               <view class="checkbox-wrapper" @tap.stop="toggleCheck(file.id)">
+                 <view class="custom-checkbox" :class="{ checked: selectedIds.includes(file.id) }">
+                   <text v-if="selectedIds.includes(file.id)" class="check-mark">√</text>
+                 </view>
+               </view>
+               <!-- 与资源管理器文件行同一个图标组件（dev-board#973） -->
+               <view class="file-icon"><FileTypeIcon :type="file.fileType" /></view>
+               <text class="file-name" :title="file.name">{{ file.name }}</text>
+               <text class="remove-btn" @tap.stop="$emit('remove', file.id)">×</text>
+            </view>
+        </scroll-view>
 
-    <!-- Drop Overlay (Only visible when dragging over THIS component) -->
-    <view 
-      v-if="isDragOver"
-      class="drop-overlay"
-      @dragenter.prevent
-      @dragover.prevent
-      @dragleave.prevent="onDragLeave"
-      @drop.prevent="onDrop"
-    >
-      <text>{{ $t('files.dropToStage') }}</text>
-    </view>
-    
-  </view>
+     </view>
+
+     <!-- Drop Overlay (Only visible when dragging over THIS component) -->
+     <view
+       v-if="isDragOver"
+       class="drop-overlay"
+       @dragenter.prevent
+       @dragover.prevent
+       @dragleave.prevent="onDragLeave"
+       @drop.prevent="onDrop"
+     >
+       <text>{{ $t('files.dropToStage') }}</text>
+     </view>
+
+   </view>
 </template>
 
 <script>
@@ -115,7 +117,10 @@ import { warmDragImage, applyDragImage } from '@/utils/dragImage.js'
 import UnlockHint from '@/components/UnlockHint.vue'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
 import { host } from '@/services/host.js'
-import { captureDroppedFiles, isExternalFileDrag } from '@/utils/fileTreeExternalDrop.js'
+import { getFileLocalPath, getApiBaseUrl } from '@/services/api.js'
+import { getAuthHeaders } from '@/utils/auth.js'
+import { nativeEvent, nativeDataTransfer, captureDroppedFiles, isExternalFileDrag } from '@/utils/fileTreeExternalDrop.js'
+import { prefetchLocalFilePath, startExternalFileDrag } from '@/utils/fileLocalDrag.js'
 export default {
   name: 'FileStagingArea',
   components: { UnlockHint, FileTypeIcon },
@@ -232,32 +237,14 @@ export default {
         this.$emit('compare', selectedFiles)
     },
     
-    // Handling Drag Out (Staging -> Editor/Tree)
-    // Handling Drag Out (Staging -> Editor/Tree)
+    // Handling Drag Out (Staging -> Editor/Tree/WeChat)
+    onItemPrimeDrag(file) {
+      if (!file || !file.id || file.fileType === 'folder') return
+      if (!host.fs || typeof host.fs.startDrag !== 'function') return
+      prefetchLocalFilePath(file.id, getFileLocalPath)
+    },
     onDragStart(file, event) {
-      // Standard data format for internal file drag
-      if (event.dataTransfer) {
-          event.dataTransfer.effectAllowed = 'copy'
-          // 小徽标拖拽影像：不设的话是整行元素快照（含 × 删除钮）浮在正文上
-          applyDragImage(event)
-          // Use the same format as FileTree to handle drop in editors
-          event.dataTransfer.setData('application/json', JSON.stringify(file))
-          // Also text/plain for general use
-          event.dataTransfer.setData('text/plain', file.name)
-          
-          // Internal custom format
-          try {
-             const fileData = JSON.stringify({
-                 fileId: file.id,
-                 name: file.name,
-                 fileType: file.fileType || 'file',
-                 wpsFileId: file.wpsFileId
-             })
-             event.dataTransfer.setData('application/x-checkba-file', fileData)
-          } catch(err) {}
-      }
-      
-      // Global fallback for all envs
+      // Global fallback for all envs (set before emit and startExternalFileDrag)
       if (typeof document !== 'undefined') {
          document.__checkbaDraggedFile = {
              fileId: file.id,
@@ -267,6 +254,41 @@ export default {
          }
       }
       uni.$emit('file-drag-start')
+
+      const nativeEv = nativeEvent(event)
+      const dt = nativeDataTransfer(event)
+      // Standard data format for internal file drag
+      if (dt) {
+          dt.effectAllowed = 'copy'
+          // 小徽标拖拽影像：不设的话是整行元素快照（含 × 删除钮）浮在正文上
+          applyDragImage(nativeEv || event)
+          // Use the same format as FileTree to handle drop in editors
+          try {
+             dt.setData('application/json', JSON.stringify(file))
+             // Also text/plain for general use
+             dt.setData('text/plain', file.name)
+             const fileData = JSON.stringify({
+                 fileId: file.id,
+                 name: file.name,
+                 fileType: file.fileType || 'file',
+                 wpsFileId: file.wpsFileId
+             })
+             dt.setData('application/x-checkba-file', fileData)
+          } catch(err) {}
+      }
+
+      if (file && file.id && file.fileType !== 'folder') {
+        startExternalFileDrag(file, {
+          fs: host.fs,
+          baseUrl: getApiBaseUrl(),
+          headers: getAuthHeaders(),
+          onCleanup: () => {
+            if (typeof document !== 'undefined' && document.__checkbaDraggedFile) {
+              this.onDragEnd()
+            }
+          }
+        })
+      }
     },
     onDragEnd() {
       // 拖拽被取消（拖出窗口 / Esc / 落空）时全局兜底没人消费，留着会被下一次

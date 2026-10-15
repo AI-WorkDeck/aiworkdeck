@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-const { ipcMain, dialog, shell, BrowserWindow, ShareMenu } = require('electron');
+const { ipcMain, dialog, shell, BrowserWindow, ShareMenu, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
@@ -35,6 +35,15 @@ function initLocalFileService() {
         if (!fs.existsSync(filePath)) return { ok: false, reason: 'not-found' };
         const win = BrowserWindow.fromWebContents(event.sender);
         return shareFile(process.platform, filePath, win);
+    });
+
+    // Handler: 把资源管理器/暂存区的文件直接拖出窗口（如拖到微信聊天、Finder/资源管理器，dev-board#1288）。
+    // 同步/异步双注册：dragstart 期间 send 更快进入原生拖拽，invoke 便于回执与单测。
+    ipcMain.on('fs:startDrag', (event, { path: filePath } = {}) => {
+        startFileDrag(event && event.sender, filePath);
+    });
+    ipcMain.handle('fs:startDrag', async (event, { path: filePath } = {}) => {
+        return startFileDrag(event && event.sender, filePath);
     });
 
     // Handler: 回收站「彻底删除」把磁盘上的文件送进系统废纸篓（dev-board#1051）。
@@ -168,9 +177,60 @@ async function launchWeChatWindows() {
     return false;
 }
 
+// 32x32 简洁文档图标 PNG（Electron webContents.startDrag 在 macOS/Windows 上必须提供非空 icon，否则抛异常）。
+const DRAG_FILE_ICON_PNG_BASE64 =
+    'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAZ0lEQVR4nGNgGAWDFVg3fXtNDqaqA/7///+BFExVR5DrABg9oA6giiModQDFjqCGAyhyBCWJkCq5gxwH4HPYqAModkDC0l93SMHDLwRGHTCaBkYdMJoGRh0w6oABcQA1MckOGAX0AgCkHQcm9HXZLQAAAABJRU5ErkJggg==';
+
+let cachedDragFileIcon = null;
+function createDragFileIcon(nativeImageMod = nativeImage) {
+    if (cachedDragFileIcon && nativeImageMod === nativeImage) return cachedDragFileIcon;
+    if (!nativeImageMod || typeof nativeImageMod.createFromDataURL !== 'function') return null;
+    const icon = nativeImageMod.createFromDataURL('data:image/png;base64,' + DRAG_FILE_ICON_PNG_BASE64);
+    if (nativeImageMod === nativeImage) cachedDragFileIcon = icon;
+    return icon;
+}
+
+/**
+ * 启动系统级原生文件拖出（webContents.startDrag，dev-board#1288）。
+ * 只接受磁盘上已存在的绝对文件路径（不接受目录或相对路径），供微信/Finder/资源管理器直接接收文件。
+ */
+function startFileDrag(sender, filePath, deps = {}) {
+    const fsMod = deps.fs || fs;
+    const nativeImageMod = deps.nativeImage || nativeImage;
+    if (!sender || typeof sender.startDrag !== 'function') return { ok: false, reason: 'no-sender' };
+    if (typeof filePath !== 'string' || !filePath || !path.isAbsolute(filePath)) {
+        return { ok: false, reason: 'bad-path' };
+    }
+    const resolved = path.resolve(filePath);
+    if (filePath.replace(/[\\/]+$/, '') !== resolved) {
+        return { ok: false, reason: 'not-normalized' };
+    }
+    let stat = null;
+    try {
+        stat = fsMod.statSync(resolved);
+    } catch (e) {
+        return { ok: false, reason: 'not-found' };
+    }
+    if (!stat || (typeof stat.isDirectory === 'function' && stat.isDirectory())) {
+        return { ok: false, reason: 'not-file' };
+    }
+    const icon = deps.icon || createDragFileIcon(nativeImageMod);
+    if (!icon || (typeof icon.isEmpty === 'function' && icon.isEmpty())) {
+        return { ok: false, reason: 'no-icon' };
+    }
+    try {
+        sender.startDrag({ file: resolved, icon });
+        return { ok: true, path: resolved };
+    } catch (e) {
+        return { ok: false, reason: 'start-drag-failed', message: String((e && e.message) || e) };
+    }
+}
+
 module.exports = {
     initLocalFileService,
     shareFile,
+    startFileDrag,
+    createDragFileIcon,
     trashItems,
     psQuote,
     windowsClipboardCommand,

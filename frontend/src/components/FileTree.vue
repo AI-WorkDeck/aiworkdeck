@@ -353,6 +353,8 @@
             }"
           :data-file-id="item.id"
           :draggable="viewMode !== 'recycle'"
+          @mouseenter="onItemPrimeDrag(item)"
+          @mousedown="onItemPrimeDrag(item)"
           @tap="handleItemClick(item, $event)"
           @contextmenu.prevent="handleContextMenu(item, $event)"
           @dragstart="handleDragStart($event, item, index)"
@@ -685,7 +687,8 @@
 </template>
 
 <script>
-import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess } from '@/services/api.js'
+import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess, getFileLocalPath, getApiBaseUrl } from '@/services/api.js'
+import { getAuthHeaders } from '@/utils/auth.js'
 import { host } from '@/services/host.js'
 import { showDialog } from '@/utils/dialog.js'
 import { findTopmostDeletedAncestor, summarizeDeleteResults, collapseToTopmostSelected, computeDisplayFiles } from '@/utils/fileTreeRecycle.js'
@@ -693,7 +696,8 @@ import { groupByParent, buildTreeFromGroups } from '@/utils/fileTreeBuild.js'
 import { evidenceRefCounts } from '@/services/api.js'
 import { createRefCountsFetcher } from '@/utils/fileTreeRefCounts.js'
 import { warmDragImage, applyDragImage } from '@/utils/dragImage.js'
-import { nativeDataTransfer, isExternalFileDrag, claimExternalDrop, captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
+import { nativeEvent, nativeDataTransfer, isExternalFileDrag, compatibleDropEffect, claimExternalDrop, captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
+import { prefetchLocalFilePath, startExternalFileDrag } from '@/utils/fileLocalDrag.js'
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
 import TagChip from '@/components/TagChip.vue'
@@ -2636,11 +2640,33 @@ export default {
       return 'F'
     },
     // #ifdef H5
+    onItemPrimeDrag(item) {
+      if (!item || item.isFolder || !item.id || this.viewMode === 'recycle') return
+      if (!host.fs || typeof host.fs.startDrag !== 'function') return
+      prefetchLocalFilePath(item.id, getFileLocalPath)
+    },
     handleDragStart(e, item, index) {
       console.log('拖拽开始:', index)
       this.draggedIndex = index
       this.draggedFileId = (item && item.id != null) ? item.id : null
       this.recordDragStartPoint(e)
+
+      // Fallback: Global variable for environments where dataTransfer is cleared
+      // 先在 emit 与 startExternalFileDrag 之前写入，供 LibreOfficeEditor 快照与
+      // isExternalFileDrag 识别「这是应用内发起的拖拽」（dev-board#1288）。
+      if (typeof document !== 'undefined') {
+        try {
+          if (item && item.id) {
+            document.__checkbaDraggedFile = {
+              fileId: item.id,
+              name: item.name,
+              fileType: item.isFolder ? 'folder' : item.fileType,
+              wpsFileId: item.wpsFileId
+            }
+          }
+        } catch (err) {}
+      }
+
       uni.$emit('file-drag-start')
       // 向外部暴露“拖拽文件开始”（用于 WPS 文档建立关联）
       try {
@@ -2650,19 +2676,21 @@ export default {
       } catch (e) {
         // ignore
       }
-      // 检查 dataTransfer 是否存在（在某些环境中可能不存在）
-      if (e.dataTransfer) {
+      // uni-h5 重建的 <view> 事件不带 dataTransfer，从原生事件回退读取
+      const nativeEv = nativeEvent(e)
+      const dt = nativeDataTransfer(e)
+      if (dt) {
         // 允许 copy/link/move
-        e.dataTransfer.effectAllowed = 'all'
+        dt.effectAllowed = 'all'
 
         // 自定义拖拽影像：预加载好的小徽标（见 utils/dragImage.js——现场 new Image
         // 来不及加载，Chromium 会回退成整行元素快照，操作图标一起浮在正文上）
-        applyDragImage(e)
+        applyDragImage(nativeEv || e)
 
         // 设置拖拽数据
         try {
           // 1. 基础索引，用于列表内排序
-          e.dataTransfer.setData('text/plain', index.toString())
+          dt.setData('text/plain', index.toString())
 
           // 2. 完整文件信息，用于跨组件拖拽（如拖到 WPS）
           if (item && item.id) {
@@ -2673,9 +2701,9 @@ export default {
               wpsFileId: item.wpsFileId
             })
             // 标准自定义类型
-            e.dataTransfer.setData('application/x-checkba-file', fileData)
+            dt.setData('application/x-checkba-file', fileData)
             // 兜底
-            e.dataTransfer.setData('text/checkba-file-json', fileData)
+            dt.setData('text/checkba-file-json', fileData)
           }
         } catch (err) {
           // 某些环境可能不支持 setData，静默失败
@@ -2683,26 +2711,26 @@ export default {
         }
       }
 
-      // Fallback: Global variable for environments where dataTransfer is cleared
-      if (typeof document !== 'undefined') {
-          try {
-             if (item && item.id) {
-                document.__checkbaDraggedFile = {
-                   fileId: item.id,
-                   name: item.name,
-                   fileType: item.isFolder ? 'folder' : item.fileType,
-                   wpsFileId: item.wpsFileId
-                }
-             }
-          } catch(e) {}
+      // 桌面端原生文件拖出（dev-board#1288）：让微信聊天窗口 / Finder / 资源管理器能直接接收文件
+      if (item && item.id && !item.isFolder && this.viewMode !== 'recycle') {
+        startExternalFileDrag(item, {
+          fs: host.fs,
+          baseUrl: getApiBaseUrl(),
+          headers: getAuthHeaders(),
+          onCleanup: () => {
+            if (this.draggedIndex !== -1 || (typeof document !== 'undefined' && document.__checkbaDraggedFile)) {
+              this.handleDragEnd()
+            }
+          }
+        })
       }
     },
     // #endif
     handleDragOver(e, index) {
       e.preventDefault()
-      // 检查 dataTransfer 是否存在（在某些环境中可能不存在）
-      if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = 'move'
+      const dt = nativeDataTransfer(e)
+      if (dt) {
+        try { dt.dropEffect = compatibleDropEffect(dt, 'move') } catch (err) { /* ignore */ }
       }
       if (this.dragOverIndex !== index) {
         this.dragOverIndex = index
@@ -2988,7 +3016,7 @@ export default {
         if (this.isStagingFileDrag()) {
           if (this.viewMode !== 'recycle') this.stagingDragOver = true
           if (e.preventDefault) e.preventDefault()
-          try { dt.dropEffect = 'move' } catch (err) { /* ignore */ }
+          try { dt.dropEffect = compatibleDropEffect(dt, 'move') } catch (err) { /* ignore */ }
         } else if (this.draggedIndex !== -1 && this.viewMode !== 'recycle') {
           // 树内拖拽经过空白区 = 放到项目根（dev-board#989，同 VS Code / Finder）。
           // 经过节点时节点自己的 dragOverIndex 在亮，容器不亮。
@@ -2999,7 +3027,7 @@ export default {
           this.stagingDragOver = true
           this.dragOverIndex = -1
           if (e.preventDefault) e.preventDefault()
-          try { dt.dropEffect = 'move' } catch (err) { /* ignore */ }
+          try { dt.dropEffect = compatibleDropEffect(dt, 'move') } catch (err) { /* ignore */ }
         }
         return
       }

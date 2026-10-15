@@ -79,12 +79,21 @@ test('接受/拒绝当前能经过真实 executor 白名单到达 worker port', 
   assert.equal(sent.length, 2, '未知动作仍然在客户端拦截')
 })
 
-test('当前修订命中兼容反向原生端点、折叠光标与无关选区', () => {
+test('当前修订命中兼容反向原生端点、光标往后首个修订默认定位与末尾无修订', () => {
   const source = WORKER.slice(WORKER.indexOf('function revisionIndexAtCursor()'), WORKER.indexOf('function selectionTouchesDeletion('))
   const locate = new Function('ctrl', 'xModel', source + '; return revisionIndexAtCursor()')
   const text = { compareRegionStarts: (a, b) => Math.sign(b - a) }
   const ranges = [[4, 2], [10, 12]]
-  for (const [start, end, expected] of [[1, 1, -1], [2, 2, 0], [3, 3, 0], [4, 4, 0], [5, 9, -1], [3, 11, 0], [11, 11, 1]]) {
+  for (const [start, end, expected] of [
+    [1, 1, 0],
+    [2, 2, 0],
+    [3, 3, 0],
+    [4, 4, 0],
+    [5, 9, 1],
+    [3, 11, 0],
+    [11, 11, 1],
+    [13, 13, -1],
+  ]) {
     const ctrl = { getViewCursor: () => ({ getText: () => text, getStart: () => start, getEnd: () => end }) }
     const xModel = { getRedlines: () => ({ createEnumeration: () => {
       let next = 0
@@ -95,4 +104,24 @@ test('当前修订命中兼容反向原生端点、折叠光标与无关选区',
     } }) }
     assert.equal(locate(ctrl, xModel), expected, `selection [${start}, ${end}]`)
   }
+  // 跨 story（正文光标 → 表格单元格内修订）：回退按表格锚点与正文光标顺序命中
+  const crossCtrl = { getViewCursor: () => ({ getText: () => ({ compareRegionStarts() { throw new Error('cross-story') } }), getStart: () => 2, getEnd: () => 2 }) }
+  const crossModel = {
+    getText: () => text,
+    getRedlines: () => ({ createEnumeration: () => {
+      let done = false
+      return {
+        hasMoreElements: () => !done,
+        nextElement: () => {
+          done = true
+          return {
+            getPropertyValue: name => name === 'RedlineStart'
+              ? { getPropertyValue: prop => prop === 'TextTable' ? { getAnchor: () => ({ getStart: () => 5, getEnd: () => 8 }) } : null }
+              : 8,
+          }
+        },
+      }
+    } }),
+  }
+  assert.equal(locate(crossCtrl, crossModel), 0, 'cross-story table revision after body cursor')
 })
