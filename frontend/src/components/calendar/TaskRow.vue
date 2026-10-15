@@ -181,7 +181,7 @@ export default {
   align-items: flex-start;
   gap: 8px;
   padding: 8px 10px 8px 8px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: background 0.12s ease, opacity 0.15s ease;
 
@@ -204,7 +204,7 @@ export default {
   padding: 5px 8px 5px 6px;
 
   .tr-title {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
   }
 
   .tr-meta {
@@ -262,7 +262,7 @@ export default {
   flex: none;
   align-self: stretch;
   width: 3px;
-  border-radius: 2px;
+  border-radius: var(--awd-radius-sm);
 }
 
 .tr-type-icon {
@@ -298,7 +298,7 @@ export default {
 }
 
 .tr-title {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 18px;
   color: var(--awd-text);
   overflow: hidden;
@@ -321,9 +321,9 @@ export default {
   max-width: 180px;
   height: 18px;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface-2);
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 18px;
   color: var(--awd-text-2);
   box-sizing: border-box;
@@ -380,7 +380,7 @@ export default {
   line-height: 14px;
   border-radius: 50%;
   text-align: center;
-  font-size: 9px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-accent-text);
   background: var(--awd-accent-soft);
@@ -402,10 +402,10 @@ export default {
 }
 
 .tr-due {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 16px;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   white-space: nowrap;
   color: var(--awd-text-2);
   background: var(--awd-surface-2);
@@ -450,7 +450,7 @@ export default {
 .tr-action {
   width: 22px;
   height: 22px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;

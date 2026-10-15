@@ -253,10 +253,12 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* 品牌配色变量 - AI WorkDeck Palette */
-$brand-dark: #221F1A;    /* Dark BG */
-
 .page-new-project {
+  --awd-radius-lg: 16px;
+  --awd-radius-card: 12px;
+  --awd-font-size-avatar: 32px;
+  --awd-font-size-hero: 24px;
+  --awd-font-size-lg: 18px;
   min-height: 100vh;
   /* Subtle Gradient Background */
   background: linear-gradient(135deg, var(--awd-bg) 0%, var(--awd-accent-soft) 100%);
@@ -296,12 +298,12 @@ $brand-dark: #221F1A;    /* Dark BG */
 
 .user-card {
   background: var(--awd-surface);
-  border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(18, 52, 77, 0.05);
+  border-radius: var(--awd-radius-lg);
+  box-shadow: var(--awd-shadow-md);
   overflow: hidden;
   position: relative;
   padding-bottom: 24px;
-  border: 1px solid rgba(0,0,0,0.02);
+  border: 1px solid var(--awd-border-subtle);
 }
 
 .card-gold-accent {
@@ -325,7 +327,7 @@ $brand-dark: #221F1A;    /* Dark BG */
   overflow: hidden;
   margin-bottom: 16px;
   background-color: var(--awd-bg);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .user-avatar {
@@ -336,20 +338,20 @@ $brand-dark: #221F1A;    /* Dark BG */
 .user-avatar-placeholder {
   width: 100%;
   height: 100%;
-  background: $brand-dark;
+  background: var(--awd-accent);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .avatar-text {
-  font-size: 32px;
-  color: #EDE9DF;
+  font-size: var(--awd-font-size-avatar);
+  color: var(--awd-text-on-accent);
   font-weight: 500;
 }
 
 .user-name {
-  font-size: 20px;
+  font-size: var(--awd-font-size-hero);
   font-weight: 600;
   color: var(--awd-text);
   /* 12px 原本由 @username 那一行的下边距提供，那行随「用户名不当名字显示」去掉了 */
@@ -359,12 +361,12 @@ $brand-dark: #221F1A;    /* Dark BG */
 .user-role-tag {
   background: var(--awd-accent-soft); /* Forest Light */
   padding: 4px 12px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-accent-soft);
 }
 
 .role-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-accent-text);
   font-weight: 500;
 }
@@ -387,12 +389,12 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 .action-text {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
 .action-arrow {
-  font-size: 18px;
+  font-size: var(--awd-font-size-lg);
   color: var(--awd-text-3);
   font-family: monospace;
 }
@@ -411,22 +413,22 @@ $brand-dark: #221F1A;    /* Dark BG */
 
 .content-title {
     display: block;
-    font-size: 24px;
+    font-size: var(--awd-font-size-hero);
     font-weight: 600;
     color: var(--awd-text);
     margin-bottom: 8px;
 }
 
 .content-subtitle {
-    font-size: 14px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text-2);
 }
 
 .project-form-card {
   background: var(--awd-surface);
-  border-radius: 16px;
+  border-radius: var(--awd-radius-lg);
   padding: 24px;
-  box-shadow: 0 4px 20px rgba(18, 52, 77, 0.04);
+  box-shadow: var(--awd-shadow-md);
 }
 
 /* IDE 化动作行 */
@@ -436,7 +438,7 @@ $brand-dark: #221F1A;    /* Dark BG */
   justify-content: space-between;
   padding: 20px;
   border: 1px solid var(--awd-border);
-  border-radius: 12px;
+  border-radius: var(--awd-radius-card);
   cursor: pointer;
   transition: all 0.2s;
 
@@ -448,7 +450,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     border-color: var(--awd-accent);
     background: var(--awd-accent-wash);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(46, 90, 80, 0.08);
+    box-shadow: var(--awd-shadow-sm);
   }
 
   &.is-busy {
@@ -465,18 +467,18 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 .ide-action-title {
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .ide-action-desc {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
 .ide-action-arrow {
-  font-size: 22px;
+  font-size: var(--awd-font-size-lg);
   color: var(--awd-text-3);
   font-family: monospace;
   margin-left: 16px;
@@ -485,13 +487,13 @@ $brand-dark: #221F1A;    /* Dark BG */
 .ide-busy-hint {
   margin-top: 16px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
 .ide-web-hint {
   margin-top: 16px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
 }
 
@@ -512,7 +514,7 @@ $brand-dark: #221F1A;    /* Dark BG */
   display: flex;
   align-items: center;
   margin-bottom: 10px;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   color: var(--awd-text);
 }
@@ -520,7 +522,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 .required-mark {
   color: var(--awd-danger-text);
   margin-left: 4px;
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
 }
 
 .form-field {
@@ -529,12 +531,12 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 .input {
-  height: 48px;
+  height: var(--awd-control-height-touch);
   background-color: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   padding: 0 16px;
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
   transition: all 0.2s;
   box-sizing: border-box;
@@ -547,7 +549,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 
 .input:focus {
   border-color: var(--awd-accent);
-  box-shadow: 0 0 0 3px rgba(46, 90, 80, 0.1);
+  box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-accent-soft);
   outline: none;
 }
 
@@ -561,12 +563,12 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 .btn {
-  height: 48px;
+  height: var(--awd-control-height-touch);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  font-size: 15px;
+  border-radius: var(--awd-radius-dialog);
+  font-size: var(--awd-font-size-reading);
   font-weight: 500;
   cursor: pointer;
   border: none;
@@ -588,11 +590,11 @@ $brand-dark: #221F1A;    /* Dark BG */
   background-color: var(--awd-accent);
   color: var(--awd-text-on-accent);
   flex: 2;
-  box-shadow: 0 4px 12px rgba(46, 90, 80, 0.2);
+  box-shadow: var(--awd-shadow-sm);
 
   &:hover {
     background-color: var(--awd-accent-hover);
-    box-shadow: 0 6px 16px rgba(46, 90, 80, 0.3);
+    box-shadow: var(--awd-shadow-md);
     transform: translateY(-1px);
   }
 
@@ -624,22 +626,22 @@ $brand-dark: #221F1A;    /* Dark BG */
   width: 420px;
   max-width: calc(100vw - 48px);
   background: var(--awd-surface);
-  border-radius: 12px;
+  border-radius: var(--awd-radius-card);
   padding: 24px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--awd-shadow-lg);
   display: flex;
   flex-direction: column;
 }
 
 .naming-title {
-  font-size: 17px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
   margin-bottom: 8px;
 }
 
 .naming-location {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   margin-bottom: 16px;
   word-break: break-all;

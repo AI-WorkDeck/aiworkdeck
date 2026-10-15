@@ -170,7 +170,7 @@ defineExpose({ liveSeconds, longWaitKey })
   gap: 8px;
   flex-wrap: wrap;
   padding: 0 12px 6px 30px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.5;
   color: var(--awd-text-3);
 }
@@ -179,9 +179,9 @@ defineExpose({ liveSeconds, longWaitKey })
   border: 1px solid var(--awd-border);
   background: transparent;
   color: var(--awd-text-2);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 1px 8px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   cursor: pointer;
 }
@@ -192,7 +192,7 @@ defineExpose({ liveSeconds, longWaitKey })
   margin-bottom: 12px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 12px;
+  border-radius: var(--awd-radius-dialog);
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: transparent;
@@ -310,12 +310,12 @@ defineExpose({ liveSeconds, longWaitKey })
 }
 
 .icon {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   z-index: 1;
 }
 
 .title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   color: var(--awd-text-2); /* Gray-Medium */
   font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
@@ -349,7 +349,7 @@ defineExpose({ liveSeconds, longWaitKey })
 
 .content {
   padding: 8px 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.5;
   color: var(--awd-text-2); /* Gray-Dark */
 }
@@ -383,7 +383,7 @@ defineExpose({ liveSeconds, longWaitKey })
     text-align: left;
     margin: 0;
     padding: 0;
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     line-height: 1.5;
     color: var(--awd-text-2);
 }
@@ -415,7 +415,7 @@ defineExpose({ liveSeconds, longWaitKey })
 .thinking-card.ghost :deep(.markdown-body h3) {
     margin-top: 6px !important;
     margin-bottom: 2px !important;
-    font-size: 13px !important;
+    font-size: var(--awd-font-size-body) !important;
     color: var(--awd-text-2);
 }
 
@@ -424,7 +424,7 @@ defineExpose({ liveSeconds, longWaitKey })
     padding: 8px !important;
     background: var(--awd-bg);
     border: 1px solid var(--awd-border);
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
 }
 
 .thinking-card.ghost :deep(.markdown-body table) {
@@ -438,7 +438,7 @@ defineExpose({ liveSeconds, longWaitKey })
 
 /* Inline Variant Styles */
 .thinking-inline {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-2);
     margin: 4px 0;
     background: transparent; /* Fix white background issue */
@@ -454,7 +454,7 @@ defineExpose({ liveSeconds, longWaitKey })
     color: var(--awd-text-2);
 }
 .h-wrap .icon {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
 }
 .h-wrap .icon.spin {
     animation: spin 3s linear infinite;
@@ -494,7 +494,7 @@ defineExpose({ liveSeconds, longWaitKey })
 }
 
 .thinking-inline :deep(.markdown-body) {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     line-height: 1.45;
     color: var(--awd-text-2);
     margin: 0;
@@ -528,14 +528,14 @@ defineExpose({ liveSeconds, longWaitKey })
 .thinking-inline :deep(.markdown-body h3) {
     margin-top: 4px !important;
     margin-bottom: 2px !important;
-    font-size: 12px !important;
+    font-size: var(--awd-panel-fs) !important;
     font-weight: 600;
 }
 
 .thinking-inline :deep(.markdown-body pre) {
     margin: 2px 0 !important;
     padding: 6px !important;
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
     background: var(--awd-bg);
     border: 1px solid var(--awd-border);
 }
@@ -547,7 +547,7 @@ defineExpose({ liveSeconds, longWaitKey })
 .thinking-inline :deep(.markdown-body th),
 .thinking-inline :deep(.markdown-body td) {
     padding: 2px 6px !important;
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
 }
 
 /* Enter/Leave Transitions */
@@ -569,5 +569,5 @@ defineExpose({ liveSeconds, longWaitKey })
 @keyframes thinking-breathe { 50% { opacity: .5; } }
 @media (prefers-reduced-motion: reduce) { .thinking-card.is-working .title { animation: none; } }
 .thinking-card.ghost .body { margin-top: 8px; padding-left: 14px; border-left: 1px solid var(--awd-border); }
-.thinking-card.ghost :deep(.markdown-body) { font-size: 12px; line-height: 1.65; }
+.thinking-card.ghost :deep(.markdown-body) { font-size: var(--awd-panel-fs); line-height: 1.65; }
 </style>

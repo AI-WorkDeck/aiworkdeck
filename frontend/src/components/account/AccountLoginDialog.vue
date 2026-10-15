@@ -759,7 +759,7 @@ export default {
   padding: 24px 16px;
   box-sizing: border-box;
   overflow-y: auto;
-  background: var(--awd-overlay, rgba(35, 32, 26, 0.38));
+  background: var(--awd-overlay);
   backdrop-filter: blur(3px);
   font-family: var(--awd-font-sans, inherit);
 }
@@ -771,7 +771,7 @@ export default {
 .unlock-card.is-dialog {
   position: relative;
   margin: auto;
-  box-shadow: 0 24px 64px rgba(35, 32, 26, 0.28);
+  box-shadow: var(--awd-shadow-lg);
   animation: awd-login-in 160ms ease-out;
 }
 
@@ -796,8 +796,8 @@ export default {
   height: 28px;
   line-height: 28px;
   text-align: center;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--awd-radius-dialog);
+  font-size: var(--awd-login-close-fs);
   color: var(--awd-text-3);
   cursor: pointer;
 
@@ -810,10 +810,10 @@ export default {
 .awd-login-reason {
   margin-top: 18px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--awd-login-item-radius);
   background: var(--awd-accent-soft);
   color: var(--awd-text);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
 }
 
@@ -836,12 +836,17 @@ export default {
 }
 
 .unlock-card {
+  --awd-login-card-radius: 18px;
+  --awd-login-item-radius: 10px;
+  --awd-login-btn-radius: 11px;
+  --awd-login-title-fs: 20px;
+  --awd-login-close-fs: 14px;
   width: 400px;
   max-width: calc(100vw - 48px);
   box-sizing: border-box;
   background: var(--awd-surface);
   border: 1px solid var(--awd-glass-border);
-  border-radius: 18px;
+  border-radius: var(--awd-login-card-radius);
   box-shadow: var(--awd-shadow-sm), var(--awd-shadow-lg);
   padding: 36px 40px 28px;
   display: flex;
@@ -860,7 +865,7 @@ export default {
   padding: 3px;
   margin: 26px 0 22px;
   background: var(--awd-surface-2);
-  border-radius: 10px;
+  border-radius: var(--awd-login-item-radius);
 
   &.is-disabled .unlock-site-seg-item {
     cursor: default;
@@ -879,12 +884,12 @@ export default {
   flex: 1;
   text-align: center;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   line-height: 30px;
   color: var(--awd-text-2);
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 
@@ -908,7 +913,7 @@ export default {
 }
 
 .unlock-title {
-  font-size: 20px;
+  font-size: var(--awd-login-title-fs);
   line-height: 1.3;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -917,7 +922,7 @@ export default {
 }
 
 .unlock-desc {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
   color: var(--awd-text-2);
   margin-bottom: 22px;
@@ -925,7 +930,7 @@ export default {
 
 .unlock-promo {
   margin: -12px 0 18px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   color: var(--awd-gold-text);
 }
@@ -944,7 +949,7 @@ export default {
   align-items: center;
   gap: 10px;
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-login-item-radius);
   background: var(--awd-surface);
   transition: border-color 0.15s, box-shadow 0.15s;
 
@@ -958,7 +963,7 @@ export default {
   flex-shrink: 0;
   padding-right: 10px;
   border-right: 1px solid var(--awd-border);
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 500;
   color: var(--awd-text-2);
 }
@@ -970,7 +975,7 @@ export default {
   padding: 0;
   border: 0;
   outline: none;
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-family: inherit;
   color: var(--awd-text);
   background: transparent;
@@ -1000,8 +1005,8 @@ export default {
   background: var(--awd-surface);
   color: var(--awd-accent-text);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
-  font-size: 13px;
+  border-radius: var(--awd-login-item-radius);
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
@@ -1024,10 +1029,10 @@ export default {
   box-sizing: border-box;
   padding: 12px 14px;
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-login-item-radius);
   outline: none;
   resize: none;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
   color: var(--awd-text);
   background: var(--awd-surface);
@@ -1052,7 +1057,7 @@ export default {
 
 .unlock-error {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   color: var(--awd-danger-text);
 }
@@ -1066,8 +1071,8 @@ export default {
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
   border: none;
-  border-radius: 11px;
-  font-size: 15px;
+  border-radius: var(--awd-login-btn-radius);
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   font-family: inherit;
   letter-spacing: 0.02em;
@@ -1104,7 +1109,7 @@ export default {
   margin-top: 2px;
   box-sizing: border-box;
   border: 1.5px solid var(--awd-border-strong);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
   transition: background 0.15s, border-color 0.15s;
 
@@ -1115,13 +1120,13 @@ export default {
 }
 
 .consent-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.55;
   color: var(--awd-text-2);
 }
 
 .unlock-link {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-accent-text);
   cursor: pointer;
 
@@ -1137,7 +1142,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1;
   color: var(--awd-text-3);
 }

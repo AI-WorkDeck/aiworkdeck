@@ -817,17 +817,15 @@ export default {
 <style lang="scss" scoped>
 @import '@/components/settings/settings.scss';
 
-$brand-dark: #221F1A;
-$text-secondary: var(--awd-text-2);
-
 .panel-settings {
+  --awd-font-size-avatar: 20px;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
 }
 
 .form-value {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   font-weight: 500;
 }
@@ -836,12 +834,12 @@ $text-secondary: var(--awd-text-2);
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: $brand-dark;
+  background: var(--awd-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #EDE9DF;
-  font-size: 20px;
+  color: var(--awd-text-on-accent);
+  font-size: var(--awd-font-size-avatar);
   overflow: hidden;
   flex-shrink: 0;
 
@@ -857,7 +855,7 @@ $text-secondary: var(--awd-text-2);
 .form-error {
   display: block;
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-danger-text);
 }
 
@@ -866,13 +864,13 @@ $text-secondary: var(--awd-text-2);
   margin-bottom: 12px;
   padding: 8px 12px;
   border: 1px solid var(--awd-accent-soft);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent-wash);
   cursor: pointer;
 }
 
 .name-nudge-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-text);
 }
@@ -922,14 +920,14 @@ $text-secondary: var(--awd-text-2);
 }
 
 .lang-label {
-    font-size: 14px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text);
 }
 
 /* 手机号 / 邮箱 / 认证器绑定 */
 .bind-link {
     color: var(--awd-accent-text);
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     margin-left: 12px;
     cursor: pointer;
 }
@@ -940,23 +938,23 @@ $text-secondary: var(--awd-text-2);
 }
 .bind-input {
     flex: 1;
-    height: 36px;
+    height: var(--awd-control-height);
     border: 1px solid var(--awd-border);
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     padding: 0 10px;
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     background: var(--awd-surface);
 }
 .btn-send-code {
-    height: 36px;
-    line-height: 34px;
+    height: var(--awd-control-height);
+    line-height: calc(var(--awd-control-height) - 2px);
     margin-left: 8px;
     padding: 0 12px;
     border: 1px solid var(--awd-border);
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     background: var(--awd-surface);
     color: var(--awd-text);
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     cursor: pointer;
 
     &[disabled] {
@@ -970,24 +968,24 @@ $text-secondary: var(--awd-text-2);
     margin-top: 10px;
 }
 .btn-bind-confirm {
-    height: 36px;
-    line-height: 36px;
+    height: var(--awd-control-height);
+    line-height: var(--awd-control-height);
     padding: 0 18px;
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     background: var(--awd-accent);
     color: var(--awd-text-on-accent);
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     cursor: pointer;
 }
 .bind-tip {
     display: block;
     margin-top: 8px;
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-2);
 }
 .token-meta {
     margin-top: 2px;
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-2);
 }
 .totp-qr {
@@ -995,12 +993,12 @@ $text-secondary: var(--awd-text-2);
     margin: 10px 0;
     background: var(--awd-surface);
     border: 1px solid var(--awd-border);
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
 }
 .totp-secret {
     flex: 1;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     letter-spacing: 1px;
     color: var(--awd-text);
     word-break: break-all;

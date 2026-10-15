@@ -147,11 +147,11 @@ export default {
 
 .file-picker-dialog {
   background: var(--awd-surface);
-  border-radius: 12px;
+  border-radius: var(--awd-radius-dialog);
   width: 500px;
   max-width: 90vw;
   height: 600px; /* Fixed height for tree scrolling */
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--awd-shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -168,13 +168,13 @@ export default {
 }
 
 .dialog-title {
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .dialog-close {
-  font-size: 24px;
+  font-size: var(--awd-font-size-title);
   color: var(--awd-text-3);
   cursor: pointer;
   line-height: 1;
@@ -210,12 +210,12 @@ export default {
 }
 
 .info-label {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text-2);
 }
 
 .info-name {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     font-weight: 500;
     color: var(--awd-text);
 }
@@ -231,11 +231,16 @@ export default {
 }
 
 .btn-cancel {
-  padding: 8px 20px;
+  height: var(--awd-control-height);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border-strong);
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   cursor: pointer;
   transition: all 0.15s;
@@ -243,15 +248,20 @@ export default {
 
 .btn-cancel:hover {
   background: var(--awd-bg);
-  border-color: #9ca3af;
+  border-color: var(--awd-border-strong);
 }
 
 .btn-confirm {
-  padding: 8px 20px;
+  height: var(--awd-control-height);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
   background: linear-gradient(135deg, var(--awd-accent) 0%, var(--awd-accent-hover) 100%); /* AI WorkDeck Green */
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-on-accent);
   cursor: pointer;
   transition: all 0.15s;

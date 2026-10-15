@@ -423,7 +423,7 @@ export default {
   background: var(--awd-panel-accent);
   cursor: pointer;
 }
-.lv-pack-retry text { font-size: 10px; color: var(--awd-text-on-accent); font-weight: 600; }
+.lv-pack-retry text { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-on-accent); font-weight: 600; }
 .lv-pack-retry.disabled { opacity: .5; pointer-events: none; }
 
 /* 分组头：与插件广场同形（26px / 11px-700 / 计数徽章 / 右侧动作） */
@@ -442,7 +442,7 @@ export default {
   color: var(--awd-panel-text-2);
 }
 .lv-sec-count {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-panel-text-3);
   background: var(--awd-panel-hover);
   border-radius: 999px;
@@ -453,7 +453,7 @@ export default {
 .lv-sec-spacer { flex: 1; }
 .lv-sec-action {
   width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
-  color: var(--awd-panel-text-3); cursor: pointer; border-radius: 4px;
+  color: var(--awd-panel-text-3); cursor: pointer; border-radius: var(--awd-radius-sm);
 }
 .lv-sec-action:hover { background: var(--awd-panel-hover); color: var(--awd-panel-text); }
 .lv-sec-action svg { width: 13px; height: 13px; }
@@ -484,11 +484,11 @@ export default {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .lv-field-value.placeholder { color: var(--awd-panel-text-4); }
-.lv-field-caret { flex-shrink: 0; font-size: 14px; color: var(--awd-panel-text-4); line-height: 1; }
+.lv-field-caret { flex-shrink: 0; font-size: var(--awd-font-size-body); color: var(--awd-panel-text-4); line-height: 1; }
 
 .lv-kinds { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
 .lv-kind {
-  padding: 3px 8px; font-size: var(--awd-panel-fs-meta); border-radius: 4px; cursor: pointer;
+  padding: 3px 8px; font-size: var(--awd-panel-fs-meta); border-radius: var(--awd-radius-sm); cursor: pointer;
   border: 1px solid var(--awd-panel-border); color: var(--awd-panel-text-2); background: var(--awd-surface);
 }
 .lv-kind:hover { border-color: var(--awd-border-strong); }
@@ -496,7 +496,7 @@ export default {
   border-color: var(--awd-panel-accent); color: var(--awd-panel-accent); background: var(--awd-accent-wash);
 }
 .lv-tip {
-  display: block; font-size: 10px; color: var(--awd-panel-text-4);
+  display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-4);
   line-height: 1.5; margin-bottom: var(--awd-panel-gap);
 }
 
@@ -522,11 +522,11 @@ export default {
   line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .lv-row-meta {
-  display: block; font-size: 10px; color: var(--awd-panel-text-4); line-height: 1.5;
+  display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-4); line-height: 1.5;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .lv-badge {
-  flex-shrink: 0; padding: 0 5px; font-size: 10px; line-height: 15px; border-radius: 3px;
+  flex-shrink: 0; padding: 0 5px; font-size: var(--awd-panel-fs-meta); line-height: 15px; border-radius: var(--awd-radius-sm);
 }
 .lv-badge.edited { color: var(--awd-panel-accent); background: var(--awd-accent-soft); }
 .lv-badge.draft { color: var(--awd-warning-text); background: var(--awd-warning-soft); }
@@ -537,13 +537,13 @@ export default {
 }
 .lv-row:hover .lv-row-actions { opacity: 1; }
 .lv-link {
-  font-size: 10px; color: var(--awd-panel-accent); cursor: pointer; margin-right: 4px;
+  font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-accent); cursor: pointer; margin-right: 4px;
 }
 .lv-link:hover { text-decoration: underline; }
-.lv-restyle-label { font-size: 10px; color: var(--awd-panel-text-4); }
-.lv-modes { display: flex; gap: 0; border: 1px solid var(--awd-panel-border); border-radius: 4px; overflow: hidden; }
+.lv-restyle-label { font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-4); }
+.lv-modes { display: flex; gap: 0; border: 1px solid var(--awd-panel-border); border-radius: var(--awd-radius-sm); overflow: hidden; }
 .lv-mode {
-  padding: 1px 6px; font-size: 10px; color: var(--awd-panel-text-2); background: var(--awd-surface); cursor: pointer;
+  padding: 1px 6px; font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-2); background: var(--awd-surface); cursor: pointer;
   border-right: 1px solid var(--awd-panel-border);
 }
 .lv-mode:last-child { border-right: none; }
@@ -552,5 +552,5 @@ export default {
 .lv-mode.disabled { opacity: .5; pointer-events: none; }
 
 .lv-credit { padding: var(--awd-panel-gap-lg) var(--awd-panel-pad-x); }
-.lv-credit-text { display: block; font-size: 10px; color: var(--awd-text-3); text-align: center; line-height: 1.5; }
+.lv-credit-text { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); text-align: center; line-height: 1.5; }
 </style>

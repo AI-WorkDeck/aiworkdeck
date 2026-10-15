@@ -128,9 +128,16 @@
             <div v-if="fileChanges.length" class="turn-files">
               <button v-for="file in fileChanges" :key="String(file.fileId || file.fileName)"
                 type="button" class="turn-file" @click="$emit('open-file', file)">
+                <svg class="turn-file-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
                 <span class="turn-file-name">{{ file.fileName }}</span>
-                <span class="turn-file-kind">{{ $t(file.changeType === 'ADDED' ? 'chat.fileCreated' : 'chat.fileModified') }}</span>
-                <span aria-hidden="true">↗</span>
+                <span class="turn-file-kind" :class="{ added: file.changeType === 'ADDED' }">{{ $t(file.changeType === 'ADDED' ? 'chat.fileCreated' : 'chat.fileModified') }}</span>
+                <svg class="turn-file-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="7" y1="17" x2="17" y2="7"></line>
+                  <polyline points="7 7 17 7 17 17"></polyline>
+                </svg>
               </button>
             </div>
 
@@ -284,11 +291,15 @@ function isApprovalPending(art) {
 
 <style scoped>
 .turn-files { display: grid; gap: var(--awd-space-1); margin-top: var(--awd-space-3); }
-.turn-file { display: flex; align-items: center; gap: var(--awd-space-2); width: 100%; min-width: 0; min-height: var(--awd-control-height); margin: 0; padding: var(--awd-space-2); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); cursor: pointer; font: inherit; text-align: left; }
-.turn-file:hover { background: var(--awd-surface-2); }
+.turn-file { display: flex; align-items: center; gap: var(--awd-space-2); width: 100%; min-width: 0; min-height: var(--awd-control-height); margin: 0; padding: var(--awd-space-2) var(--awd-space-3); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); cursor: pointer; font: inherit; text-align: left; transition: background 0.15s, border-color 0.15s; }
+.turn-file:hover { background: var(--awd-surface-2); border-color: var(--awd-border); }
 .turn-file:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent); outline-offset: var(--awd-focus-offset); }
-.turn-file-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.turn-file-kind { flex-shrink: 0; color: var(--awd-text-2); font-size: var(--awd-font-size-body); }
+.turn-file-icon { width: 14px; height: 14px; flex-shrink: 0; color: var(--awd-text-3); }
+.turn-file-name { flex: 1; min-width: 0; font-size: var(--awd-panel-fs); line-height: 1.4; overflow-wrap: anywhere; }
+.turn-file-kind { flex-shrink: 0; font-size: var(--awd-panel-fs-meta); font-weight: 600; line-height: 1.6; padding: 1px 6px; border-radius: var(--awd-radius-sm); background: var(--awd-bg); color: var(--awd-text-2); }
+.turn-file-kind.added { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
+.turn-file-open { width: 12px; height: 12px; flex-shrink: 0; color: var(--awd-text-3); transition: color 0.15s; }
+.turn-file:hover .turn-file-open { color: var(--awd-accent-text); }
 
 .root-bubble-wrapper {
     width: 100%;
@@ -325,9 +336,9 @@ function isApprovalPending(art) {
   border-bottom: none;
   margin: 10px 12px 12px;
   border: 1.5px solid var(--awd-mint); /* Mint Green */
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(46, 90, 80, 0.10);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 /* 顶部色条：森林绿→薄荷绿，视觉上先声夺人 */
@@ -355,14 +366,14 @@ function isApprovalPending(art) {
 }
 
 .approval-flag-text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 700;
   color: var(--awd-accent-text); /* Forest Green */
   letter-spacing: 0.3px;
 }
 
 .stop-notice {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   padding: 2px 4px 0;
   margin-bottom: 14px;
@@ -370,7 +381,7 @@ function isApprovalPending(art) {
 
 .main-content {
   padding: 0;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.7;
   color: var(--awd-text); /* Gray-Dark */
 }
@@ -394,9 +405,9 @@ function isApprovalPending(art) {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   padding: 3px 10px;
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-border);
   color: var(--awd-text-2);
   background: var(--awd-surface);
@@ -417,18 +428,18 @@ function isApprovalPending(art) {
   bottom: calc(100% - 2px);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
   padding: 4px;
   z-index: 99;
   min-width: 140px;
 }
 
 .msg-act-item {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   padding: 6px 10px;
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -445,18 +456,18 @@ function isApprovalPending(art) {
   background: transparent;
 }
 
-.stream-title { color: var(--awd-text-2); font-size: 13px; }
+.stream-title { color: var(--awd-text-2); font-size: var(--awd-font-size-body); }
 .activity-summary {
   display: flex; align-items: center; gap: 8px; max-width: 100%;
   border: 0; background: transparent; padding: 0; margin: 0;
-  color: var(--awd-text-2); font: inherit; font-size: 12px; line-height: 1.6;
+  color: var(--awd-text-2); font: inherit; font-size: var(--awd-panel-fs); line-height: 1.6;
   text-align: left; cursor: pointer; overflow-wrap: anywhere;
 }
 .activity-summary::after { border: 0; }
 .activity-summary:hover { color: var(--awd-text); }
-.activity-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 4px; border-radius: 3px; }
+.activity-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 4px; border-radius: var(--awd-radius-sm); }
 .activity-summary.has-error { color: var(--awd-danger); }
-.activity-chevron { display: inline-block; transition: transform .18s; font-size: 18px; }
+.activity-chevron { display: inline-block; transition: transform .18s; font-size: var(--awd-font-size-title); }
 .activity-chevron.open { transform: rotate(90deg); }
 .activity-summary.is-working > span:first-child { animation: activity-breathe 1.8s ease-in-out infinite; }
 @keyframes activity-breathe { 50% { opacity: .5; } }
@@ -485,7 +496,7 @@ function isApprovalPending(art) {
 .main-content:deep(code) {
   background: var(--awd-accent-soft); /* Subtle Mint Green Tint */
   padding: 2px 5px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   font-size: 85%;
   color: var(--awd-accent-text); /* Forest Green */
   font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
@@ -495,10 +506,10 @@ function isApprovalPending(art) {
 .main-content:deep(pre) {
   background: var(--awd-bg); /* Gray-Pale */
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   overflow-x: auto;
   border: 1px solid var(--awd-border);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   margin: 12px 0;
 }
 
@@ -519,7 +530,7 @@ function isApprovalPending(art) {
 }
 
 .main-content :deep(.markdown-body) {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.7;
   margin: 0;
   padding: 0;
@@ -540,7 +551,7 @@ function isApprovalPending(art) {
    样式留在本文件：带 data-chat-attention 的两处（审批卡外壳、QuestionCard 根节点）
    都由本组件模板渲染，父组件的 scoped 选择器匹配不到它们。 */
 .chat-attention-flash {
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   box-shadow: 0 0 0 2px var(--awd-warning);
   animation: awd-attention-flash 1.4s ease-out;
 }

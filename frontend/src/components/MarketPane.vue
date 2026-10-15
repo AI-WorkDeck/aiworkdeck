@@ -882,6 +882,18 @@ $gray-light: var(--awd-surface-3);
 
 /* 组件根：占满宿主（整页壳或 workbench 窗格），滚动收在内部 scroll-view */
 .market-pane {
+  --awd-font-size-watermark: 220px;
+  --awd-font-size-hero: 38px;
+  --awd-font-size-hero-sm: 30px;
+  --awd-font-size-stat: 24px;
+  --awd-font-size-kpi: 22px;
+  --awd-font-size-card-title: 19px;
+  --awd-font-size-section: 17px;
+  --awd-hero-watermark-color: var(--awd-hero-watermark-color);
+  --awd-hero-sep-color: var(--awd-hero-sep-color);
+  --awd-hero-ghost-border: var(--awd-hero-ghost-border);
+  --awd-hero-ghost-hover-border: var(--awd-hero-ghost-hover-border);
+  --awd-hero-ghost-hover-bg: var(--awd-hero-ghost-hover-bg);
   height: 100%;
   min-height: 0;
   background: var(--awd-bg);
@@ -918,10 +930,10 @@ $gray-light: var(--awd-surface-3);
   position: absolute;
   right: 24px;
   bottom: -56px;
-  font-size: 220px;
+  font-size: var(--awd-font-size-watermark);
   font-weight: 900;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.035);
+  color: var(--awd-hero-watermark-color);
   pointer-events: none;
   user-select: none;
 }
@@ -962,7 +974,7 @@ $gray-light: var(--awd-surface-3);
 }
 
 .eyebrow-text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--awd-accent-text);
@@ -970,7 +982,7 @@ $gray-light: var(--awd-surface-3);
 
 .hero-title {
   @include display-serif;
-  font-size: 38px;
+  font-size: var(--awd-font-size-hero);
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -979,7 +991,7 @@ $gray-light: var(--awd-surface-3);
 }
 
 .hero-sub {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.7;
   color: var(--awd-text-on-accent);
   max-width: 560px;
@@ -1002,20 +1014,20 @@ $gray-light: var(--awd-surface-3);
 
 .stat-num {
   @include display-serif;
-  font-size: 24px;
+  font-size: var(--awd-font-size-stat);
   font-weight: 700;
   color: var(--awd-text-on-accent);
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-on-accent);
 }
 
 .stat-sep {
   width: 1px;
   height: 18px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--awd-hero-sep-color);
 }
 
 .hero-actions {
@@ -1039,10 +1051,10 @@ $gray-light: var(--awd-surface-3);
   flex-direction: row;
   align-items: center;
   gap: 7px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -1050,12 +1062,12 @@ $gray-light: var(--awd-surface-3);
 
 .btn-ghost {
   color: var(--awd-text-on-accent);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid var(--awd-hero-ghost-border);
 
   &:hover {
     color: var(--awd-text-on-accent);
-    border-color: rgba(255, 255, 255, 0.45);
-    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--awd-hero-ghost-hover-border);
+    background: var(--awd-hero-ghost-hover-bg);
   }
 }
 
@@ -1098,7 +1110,7 @@ $gray-light: var(--awd-surface-3);
   flex-direction: row;
   align-items: baseline;
   gap: 6px;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   padding: 14px 0;
   margin-bottom: -1px;
@@ -1118,7 +1130,7 @@ $gray-light: var(--awd-surface-3);
 
 .tab-count {
   @include mono;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   opacity: 0.6;
 }
 
@@ -1161,7 +1173,7 @@ $gray-light: var(--awd-surface-3);
   flex-direction: row;
   align-items: baseline;
   gap: 5px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   padding: 8px 0 11px;
   margin-bottom: -1px;
@@ -1181,7 +1193,7 @@ $gray-light: var(--awd-surface-3);
 
 .cat-num {
   @include mono;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   opacity: 0.6;
 }
 
@@ -1194,7 +1206,7 @@ $gray-light: var(--awd-surface-3);
   width: 240px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 7px 12px;
   margin-bottom: 8px;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -1215,7 +1227,7 @@ $gray-light: var(--awd-surface-3);
 }
 
 .search-input {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   flex: 1;
   min-width: 0;
@@ -1236,13 +1248,13 @@ $gray-light: var(--awd-surface-3);
 
 .section-title {
   @include display-serif;
-  font-size: 22px;
+  font-size: var(--awd-font-size-kpi);
   font-weight: 700;
   color: var(--awd-text);
 }
 
 .section-sub {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
@@ -1260,7 +1272,7 @@ $gray-light: var(--awd-surface-3);
   overflow: hidden;
   box-sizing: border-box;
   padding: 22px;
-  border-radius: 12px;
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-surface);
   backdrop-filter: blur(20px);
   border: 1px solid var(--awd-border);
@@ -1282,7 +1294,7 @@ $gray-light: var(--awd-surface-3);
   &:hover {
     transform: translateY(-4px);
     border-color: var(--awd-accent-soft);
-    box-shadow: 0 18px 40px -18px rgba(18, 58, 38, 0.25);
+    box-shadow: var(--awd-shadow-lg);
 
     &::before { opacity: 1; }
   }
@@ -1323,7 +1335,7 @@ $gray-light: var(--awd-surface-3);
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   letter-spacing: 0.14em;
   color: var(--awd-text-2);
 }
@@ -1354,14 +1366,14 @@ $gray-light: var(--awd-surface-3);
 .card-blocked {
   display: block;
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.5;
-  color: var(--awd-danger, #b3261e);
+  color: var(--awd-danger);
 }
 
 .card-title {
   @include display-serif;
-  font-size: 19px;
+  font-size: var(--awd-font-size-card-title);
   font-weight: 700;
   line-height: 1.35;
   color: var(--awd-text);
@@ -1372,7 +1384,7 @@ $gray-light: var(--awd-surface-3);
 
 .card-id {
   @include mono;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-2);
   margin-top: 4px;
   overflow: hidden;
@@ -1382,7 +1394,7 @@ $gray-light: var(--awd-surface-3);
 
 /* 中文说明句：与 card-id 同位同色，但不用等宽 */
 .card-note {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   margin-top: 4px;
   overflow: hidden;
@@ -1399,13 +1411,13 @@ $gray-light: var(--awd-surface-3);
 }
 
 .act-primary {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   text-align: center;
   color: var(--awd-text-on-accent);
   background: var(--awd-accent);
   border: 1px solid var(--awd-accent);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 5px 16px;
   cursor: pointer;
   transition: background 0.2s;
@@ -1419,11 +1431,11 @@ $gray-light: var(--awd-surface-3);
 }
 
 .act-remove {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   text-align: center;
   color: var(--awd-text-2);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 5px 16px;
   cursor: pointer;
   transition: all 0.2s;
@@ -1435,7 +1447,7 @@ $gray-light: var(--awd-surface-3);
 }
 
 .card-desc {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.7;
   color: var(--awd-text-2);
   display: -webkit-box;
@@ -1447,7 +1459,7 @@ $gray-light: var(--awd-surface-3);
 
 /* 触发词：中文「引号」排版，不用满屏 pill */
 .card-triggers {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.7;
   color: var(--awd-accent-text);
   display: -webkit-box;
@@ -1459,7 +1471,7 @@ $gray-light: var(--awd-surface-3);
 
 /* 工具数与声明能力：一行正文，敏感能力靠文案而非配色喊话 */
 .card-caps {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   color: var(--awd-text-2);
   margin-bottom: 18px;
@@ -1474,7 +1486,7 @@ $gray-light: var(--awd-surface-3);
   margin-top: auto;
   padding-top: 14px;
   border-top: 1px solid var(--awd-border);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -1527,13 +1539,13 @@ $gray-light: var(--awd-surface-3);
 
 .tool-name {
   @include mono;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-accent-text);
   flex-shrink: 0;
 }
 
 .tool-desc {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1559,13 +1571,13 @@ $gray-light: var(--awd-surface-3);
 
 .empty-title {
   @include display-serif;
-  font-size: 17px;
+  font-size: var(--awd-font-size-section);
   font-weight: 700;
   color: var(--awd-text);
 }
 
 .empty-hint {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.7;
   color: var(--awd-text-2);
   max-width: 460px;
@@ -1591,7 +1603,7 @@ $gray-light: var(--awd-surface-3);
 }
 
 .note-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.8;
   color: var(--awd-text-2);
   max-width: 760px;
@@ -1611,7 +1623,7 @@ $gray-light: var(--awd-surface-3);
     flex-direction: column;
   }
 
-  .hero-title { font-size: 30px; }
+  .hero-title { font-size: var(--awd-font-size-hero-sm); }
   .hero-watermark { display: none; }
 
   .filter-bar {
@@ -1656,14 +1668,14 @@ $gray-light: var(--awd-surface-3);
 
 .market-pane.is-embedded .hero-title {
   font-family: inherit;
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
   margin-bottom: 4px;
 }
 
 .market-pane.is-embedded .hero-sub {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   max-width: none;
 }
@@ -1675,7 +1687,7 @@ $gray-light: var(--awd-surface-3);
 
 .market-pane.is-embedded .stat-num {
   font-family: inherit;
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
 }
@@ -1709,7 +1721,7 @@ $gray-light: var(--awd-surface-3);
 /* 「已安装」子页签内的区块标题：22px 展示衬线收成与 admin 分区小标题同级 */
 .market-pane.is-embedded .section-title {
   font-family: inherit;
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
 }
