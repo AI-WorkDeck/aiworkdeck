@@ -512,12 +512,19 @@ export async function postAccountLoginSendEmailCode({ serverUrl }, email, captch
  * credentials 整体透传给后端，与官网 /api/auth/exchange-key 的三种凭据形状一一对应。
  *
  * @param credentials {phone, code} / {email, code} / {account, password}
- * @returns awdt_ 令牌字符串
+ * @returns awdt_ 令牌字符串，或首次验证的 passwordSetupRequired 受限挑战（不可保存为登录态）
  */
 export async function postAccountLogin({ serverUrl }, credentials) {
   const data = await postAnonymous(serverUrl, '/api/auth/account-login', credentials || {})
+  if (data?.data?.passwordSetupRequired) return data.data
   if (data && data.data && data.data.token) return data.data.token
   throw new Error(t('apiAccountVerifyFailed'))
+}
+
+export async function postAccountPasswordOperation({ serverUrl }, operation, payload) {
+  if (!['setup', 'reset/send-code', 'reset'].includes(operation)) throw new Error('Unknown password operation')
+  const response = await postAnonymous(serverUrl, `/api/auth/account-login/password/${operation}`, payload)
+  return response.data
 }
 
 /**

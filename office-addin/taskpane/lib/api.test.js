@@ -18,6 +18,7 @@ import assert from 'node:assert/strict'
 import {
   getAccountLoginCaptchaConfig,
   postAccountLogin,
+  postAccountPasswordOperation,
   postAccountLoginSendCode,
   postAccountLoginSendEmailCode,
   fetchMobileDevices,
@@ -341,4 +342,26 @@ test('sendPaneBye：fetch 兜底失败也不抛（关窗路径上没人接得住
     f.restore()
     restoreNav()
   }
+})
+
+
+test('verified first-time code returns a restricted challenge, not a token', async () => {
+  const challenge = { passwordSetupRequired: true, setupToken: 'restricted-ticket', account: 'test@example.com', expiresAt: 1 }
+  const f = stubFetch(() => jsonReply({ code: 0, data: challenge }))
+  try {
+    assert.deepEqual(await postAccountLogin({ serverUrl: 'https://test.example.com' }, { email: 'test@example.com', code: '123456' }), challenge)
+  } finally { f.restore() }
+})
+
+test('password lifecycle has distinct paths and does not trim the password', async () => {
+  const f = stubFetch(() => jsonReply({ code: 0, data: { ok: true } }))
+  try {
+    const connection = { serverUrl: 'https://test.example.com' }
+    await postAccountPasswordOperation(connection, 'setup', { setupToken: 'ticket', password: ' password ' })
+    await postAccountPasswordOperation(connection, 'reset/send-code', { email: 'test@example.com', captchaToken: 'captcha' })
+    assert.ok(f.calls[0].url.endsWith('/account-login/password/setup'))
+    assert.equal(JSON.parse(f.calls[0].options.body).password, ' password ')
+    assert.ok(f.calls[1].url.endsWith('/password/reset/send-code'))
+    await assert.rejects(postAccountPasswordOperation(connection, '../exchange-key', {}))
+  } finally { f.restore() }
 })

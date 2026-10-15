@@ -209,6 +209,7 @@ public class AccountController {
         // 邮箱那条不是可选项——intl 的验证码注册建出来的账号没有口令，
         // 少了它新用户在官网注册完就连不上桌面端。
         Map<String, Object> status;
+        try {
         if (phone != null && !phone.isBlank()) {
             status = accountService.loginWithPhone(phone, code);
         } else if (email != null && !email.isBlank()) {
@@ -218,6 +219,9 @@ public class AccountController {
                     body == null ? null : body.get("account"),
                     body == null ? null : body.get("password"));
         }
+        } catch (com.checkba.service.account.PasswordSetupRequired pending) {
+            return ok(pending.challenge());
+        }
         // 与 /connect 同一条：换账户后旧账户的权益、平台密钥、余额判定与用量基线立刻作废
         boolean switched = accountSwitchCleanup.afterConnect();
         // 与 /connect 对齐（登录后置 §5.5）：登录之后立刻把官网的展示名/头像刷到本机行，
@@ -225,6 +229,27 @@ public class AccountController {
         // 里就该是新账户的名字
         identitySync.refreshQuietly();
         return ok(withSwitchFlag(status, switched));
+    }
+
+    @PostMapping("/password/setup")
+    public Map<String, Object> password_setup(@RequestBody(required = false) Map<String, String> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireUser(sessionId);
+        return ok(accountService.passwordOperation("setup", body));
+    }
+
+    @PostMapping("/password/reset/send-code")
+    public Map<String, Object> password_reset_send_code(@RequestBody(required = false) Map<String, String> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireUser(sessionId);
+        return ok(accountService.passwordOperation("reset/send-code", body));
+    }
+
+    @PostMapping("/password/reset")
+    public Map<String, Object> password_reset(@RequestBody(required = false) Map<String, String> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireUser(sessionId);
+        return ok(accountService.passwordOperation("reset", body));
     }
 
     @PostMapping("/disconnect")

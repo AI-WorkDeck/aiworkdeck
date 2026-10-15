@@ -1412,10 +1412,8 @@ export function getAccountCaptchaConfig() {
   return request({ url: '/api/account/captcha-config', method: 'GET' }).then(unwrapEnvelope);
 }
 
-// 账户登录（验证码即登录，未注册的号码/邮箱由官网自动建账户）：
-//   { phone, code }（大陆站，短信验证码）或 { email, code }（国际站，邮箱验证码）；
-//   { account, password } 只剩两站存量口令账号在用，解锁页已不再提供这个入口。
-// 成功后本机已连接账户，返回体同 getAccountStatus 再加 isNewUser / mustBindPhone。
+// Daily sign-in: { account, password }. First-time { phone|email, code } returns only
+// a passwordSetupRequired challenge. Only a completed password sign-in connects the account.
 export function loginAccount(payload) {
   return request({
     url: '/api/account/login',
@@ -1426,6 +1424,14 @@ export function loginAccount(payload) {
       'Content-Type': 'application/json',
     },
   }).then(unwrapEnvelope).then(cloudAccountChanged);
+}
+
+// Password lifecycle calls never imply a connected account.
+export function accountPasswordOperation(operation, payload) {
+  if (!['setup', 'reset/send-code', 'reset'].includes(operation)) throw new Error('Unknown password operation')
+  return request({ url: `/api/account/password/${operation}`, accountPrompt: false,
+    method: 'POST', data: payload, header: { 'Content-Type': 'application/json' },
+  }).then(unwrapEnvelope)
 }
 
 // 断开账户连接：清除本机保存的账户 Key

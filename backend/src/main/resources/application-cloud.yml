@@ -36,6 +36,8 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
 security:
+  # Official identity is shared with the website; old clients must upgrade.
+  official-password-login-required: true
   # server 模式（多租户）：local-mode 的免登/回环闸整套不生效
   local-mode: false
   # 浏览器登录会话滑动过期保持 7 天（已上线契约，见 deploy/cloud/README.md）。

@@ -5,6 +5,25 @@ description: 手机端同步领域。任务涉及手机端项目目录镜像、�
 
 # 手机端同步（项目目录镜像 + 现场影像/录音云中转）
 
+## 手机密码登录桥与历史身份（dev-board#1299，2026-10-15）
+
+手机日常认证迁到 `POST /api/auth/account-login {account,password}`，官网为密码权威；
+成功 data 保留 token/userId/username/displayName/tokenId，并新增 sessionId=token、真实
+user快照（与 `/auth/me` 同源，avatarUrl无头像为空串）。后续仍经 X-Session-Id 带 awdt_。
+移动首次使用/忘记密码由系统浏览器打开本站官网受保护注册/重置流程，完成后回手机密码登录。
+客户端不得用受限 setupToken 当作sessionId。OpenAPI真源仍为 `backend/src/main/resources/openapi/mobile-v1.yaml`。
+
+`AwdkLoginService` 首次建 account_binding 时先以官网已验证 phone/verifiedEmail 找历史
+移动User，保留 userId及项目/目录归属；不按username猜测。同一个身份映射到冲突用户或已
+绑定另一官网账户时拒绝，不悄悄转移数据；既有account_binding仍是权威。
+正式 cloud profile 启用 `security.official-password-login-required`，普通旧sms/mail/wx免密
+入口返回明确升级/官网设密提示；既有ReviewAccountGate精确审核例外保留，自建默认不变。
+
+验证：`AwdkLoginServiceTest` 历史phone/email继承及冲突拒绝、`AuthControllerOfficialPasswordTest`
+旧入口封闭、`MobileApiContractTest`桥成功/受限challenge形状。生产旧版本需要配合官网先发版、
+客户端升级顺序；源码测试不代表真机/生产密码重置撤销所有设备令牌已经完成。
+
+
 手机端（独立仓 `1-3 aiworkdeck_mobile`：iOS Swift + 微信小程序）拍现场影像与录音，归档到
 桌面端项目的「现场影像/YYYY-MM-DD/」（image/video）或「现场录音/YYYY-MM-DD/」（audio，
 dev-board#228）。**旧设备镜像协议**以桌面项目为来源；2026-10-11 的账户统一目录见下节，云端统一项目/文件身份，字节仍分布存储。既有中转协议做两件事：
