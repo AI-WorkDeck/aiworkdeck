@@ -46,7 +46,8 @@
 import {
   getProjectFiles, getFileText, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm,
   requestPluginLawFirm,
-  createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks
+  createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks,
+  getTeam, getProjectMembers, getCurrentUser
 } from '@/services/api.js'
 import { PLUGIN_DOC_ACTIONS } from '@/config/pluginDocActions.js'
 import { getAppLanguage } from '@/utils/appLanguage.js'
@@ -56,6 +57,7 @@ import { createEvidenceLinkForSelection } from '@/pages/project-overview/evidenc
 import { WPS_INTERNAL_HTTP_LINK_BASE } from '@/config/workbenchActions.js'
 import { preparePluginImDrag, endPluginImDrag } from '@/utils/pluginImDrag.js'
 import { ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { loadImDirectory, addImFriend, removeImFriend } from '@/utils/imDirectory.js'
 
 /** 桥协议版本 */
 const PROTOCOL = 1
@@ -83,7 +85,9 @@ const PLUGIN_EVENTS = {
   'account.changed': { permission: null, throttleMs: 0 },
   // v2.9：宿主设置表单保存后推送（只推给设置所属的插件，见 mounted 里的过滤）
   'settings.changed': { permission: null, throttleMs: 0 },
-  'lawfirm.navigate': { permission: null, throttleMs: 0 }
+  'lawfirm.navigate': { permission: null, throttleMs: 0 },
+  // 宿主左栏（PluginWorkspaceSummary）与中栏插件标签联动指令（如切换会话、发起私聊、打开对话框、切换视图）
+  'sidebar.command': { permission: null, throttleMs: 0 }
 }
 
 // files.read 允许读取的扩展名。后端 /api/files/{id}/text 会对 docx/pdf 这类做文本抽取，
@@ -186,6 +190,7 @@ export default {
     // 事件通道状态（v2.7）：刻意不进 data——不驱动渲染，Set/定时器也不适合响应式代理
     this._subscribedEvents = new Set()
     this._eventTimers = {}
+    this._pendingSidebarCommand = null
   },
   mounted() {
     window.addEventListener('message', this.onMessage)
@@ -198,6 +203,14 @@ export default {
     // v2.9：设置变更只推给设置所属的插件——别的插件订阅了也收不到别人的
     this._onPluginSettingsChanged = (e) => {
       if (e && e.pluginId === this.pluginId) this.forwardEvent('settings.changed', {})
+    }
+    this._onSidebarCommand = (e) => {
+      if (!e || (e.pluginId && e.pluginId !== this.pluginId)) return
+      if (this._subscribedEvents && this._subscribedEvents.has('sidebar.command')) {
+        this.forwardEvent('sidebar.command', e)
+      } else {
+        this._pendingSidebarCommand = e
+      }
     }
     uni.$on('awd:files-changed', this._onFilesChanged)
     uni.$on('awd:selection-changed', this._onSelectionChanged)
@@ -213,12 +226,21 @@ export default {
       }
     }
     uni.$on('awd:lawfirm-tab', this._onLawfirmTab)
+    uni.$on('awd:plugin-sidebar-command', this._onSidebarCommand)
     this._onAccountChanged = () => {
       this.sessionGeneration++
       this.clearPreparedDrag()
       this.forwardEvent('account.changed', {})
     }
     uni.$on(ACCOUNT_CHANGED_EVENT, this._onAccountChanged)
+    // 团队 / 律所切换（utils/orgContext.js 的 ORG_CHANGED_EVENT；此处写字面量，
+    // 测试夹具会剥掉 import）：只让插件重拉通讯录，不清会话——项目沟通会话按会话成员身份保留。
+    this._onOrgChanged = (e) => {
+      // 未订阅的插件下次初始化会自己拉新数据，不占用 _pendingSidebarCommand（那是留给用户点击的）
+      if (!this._subscribedEvents || !this._subscribedEvents.has('sidebar.command')) return
+      this.forwardEvent('sidebar.command', { pluginId: this.pluginId, command: 'refresh-directory', reason: (e && e.reason) || 'org-changed' })
+    }
+    uni.$on('awd:org-changed', this._onOrgChanged)
   },
   beforeUnmount() {
     this.sessionGeneration++
@@ -229,7 +251,9 @@ export default {
     if (this._onSelectionChanged) { uni.$off('awd:selection-changed', this._onSelectionChanged); this._onSelectionChanged = null }
     if (this._onPluginSettingsChanged) { uni.$off('awd:plugin-settings-changed', this._onPluginSettingsChanged); this._onPluginSettingsChanged = null }
     if (this._onLawfirmTab) { uni.$off('awd:lawfirm-tab', this._onLawfirmTab); this._onLawfirmTab = null }
+    if (this._onSidebarCommand) { uni.$off('awd:plugin-sidebar-command', this._onSidebarCommand); this._onSidebarCommand = null }
     if (this._onAccountChanged) { uni.$off(ACCOUNT_CHANGED_EVENT, this._onAccountChanged); this._onAccountChanged = null }
+    if (this._onOrgChanged) { uni.$off('awd:org-changed', this._onOrgChanged); this._onOrgChanged = null }
     this.resetEventChannel()
   },
   methods: {
@@ -559,7 +583,23 @@ export default {
             this._pendingLawfirmTab = ''
             setTimeout(() => this.forwardEvent('lawfirm.navigate', { tab: pending }), 0)
           }
+          if (method === 'events.subscribe' && this._subscribedEvents.has('sidebar.command') && this._pendingSidebarCommand) {
+            const pending = this._pendingSidebarCommand
+            this._pendingSidebarCommand = null
+            setTimeout(() => this.forwardEvent('sidebar.command', pending), 0)
+          }
           return { ok: true, result: { subscribed: Array.from(this._subscribedEvents) } }
+        }
+
+        case 'im.directory': {
+          return await this.handleImDirectory(params || {})
+        }
+
+        case 'sidebar.sync': {
+          try {
+            uni.$emit('awd:plugin-state-synced', Object.assign({ pluginId: this.pluginId }, params || {}))
+          } catch (e) { /* ignore */ }
+          return { ok: true, result: {} }
         }
 
         case 'settings.get': {
@@ -867,6 +907,44 @@ export default {
         window.localStorage.setItem(this.storageKey(), serialized)
       } catch (e) {
         console.warn('[PluginPane] 写入插件存储失败:', e)
+      }
+    },
+
+    // ==== 项目沟通 · 通讯录（组织 / 律所 / 朋友）与宿主左栏同步 ====
+
+    async handleImDirectory(params = {}) {
+      // 通讯录数据统一由 utils/imDirectory.js 提供（只用真实数据）。测试夹具会剥掉 import，故先判函数存在。
+      if (typeof loadImDirectory !== 'function') {
+        return { ok: false, error: { code: 'unknown_method', message: '通讯录不可用' } }
+      }
+      const action = String(params.action || 'get')
+      const deps = {
+        getTeam: typeof getTeam === 'function' ? getTeam : null,
+        getProjectMembers: typeof getProjectMembers === 'function' ? getProjectMembers : null,
+        getCurrentUser: typeof getCurrentUser === 'function' ? getCurrentUser : null
+      }
+      try {
+        if (action === 'openOrgSettings') {
+          // 切换团队 / 律所只在宿主「设置 › 团队」完成：插件无权替用户退出团队或律所
+          uni.$emit('awd:open-settings', { nav: 'team' })
+          return { ok: true, result: { opened: true } }
+        }
+        if (action === 'addFriend' || action === 'removeFriend') {
+          const dir = await loadImDirectory({ projectId: null, deps })
+          if (action === 'addFriend') {
+            const input = params.friend && typeof params.friend === 'object' ? params.friend : params
+            addImFriend(dir.accountKey, input)
+          } else {
+            removeImFriend(dir.accountKey, String(params.id || ''))
+          }
+          uni.$emit('awd:im-directory-changed', {})
+        } else if (action !== 'get') {
+          return { ok: false, error: { code: 'invalid_params', message: '未知的通讯录操作：' + action } }
+        }
+        const result = await loadImDirectory({ projectId: this.projectId, deps })
+        return { ok: true, result }
+      } catch (e) {
+        return { ok: false, error: { code: (e && e.code) || 'internal_error', message: (e && e.message) || '通讯录读取失败' } }
       }
     }
   }

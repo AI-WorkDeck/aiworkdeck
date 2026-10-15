@@ -4,6 +4,7 @@
   'use strict';
   const $ = (id) => document.getElementById(id);
   const state = { epoch: 0, selection: 0, context: null, self: null, conversations: [], active: null,
+    directory: null, expandedGroups: { org: true, firm: true, friends: true },
     messages: [], drafts: new Map(), pending: new Map(), imports: new Map(), timer: null, loading: false };
   const roles = { OWNER: '负责人', MEMBER: '成员', CLIENT: '客户' };
   const request = (action, params = {}) => awd.call('im.request', { action, params });
@@ -22,6 +23,180 @@
     if (error?.code === 'unknown_method') return '当前客户端不支持项目沟通，请升级至 0.61.0 或更新版本。';
     return typeof error?.message === 'string' && error.message.trim() ? error.message.slice(0, 500) : '操作未完成，请检查连接后重试。草稿仍保留在当前会话。';
   }
+  function syncHostSidebar() {
+    if (!state.context?.projectId) return;
+    awd.call('sidebar.sync', {
+      activeConversationId: state.active?.id || '',
+      conversations: state.conversations,
+      directory: state.directory,
+    }).catch(() => {});
+  }
+  // 通讯录只展示宿主给的真实数据（im.directory）；拿不到就显示空态与去设置的入口，绝不编造联系人。
+  function normalizeDirectory(raw) {
+    const r = raw && typeof raw === 'object' ? raw : {};
+    const list = (v) => (Array.isArray(v) ? v : []);
+    return {
+      organization: r.organization && typeof r.organization === 'object' ? { ...r.organization, members: list(r.organization.members) } : null,
+      firm: r.firm && typeof r.firm === 'object' ? { ...r.firm, teams: list(r.firm.teams) } : null,
+      projectColleagues: list(r.projectColleagues),
+      friends: list(r.friends),
+      capabilities: r.capabilities && typeof r.capabilities === 'object' ? r.capabilities : {},
+      errors: list(r.errors),
+    };
+  }
+  async function loadDirectory(epoch = state.epoch) {
+    if (!state.context?.projectId) return;
+    try {
+      const res = await awd.call('im.directory', { action: 'get' });
+      if (epoch !== state.epoch) return;
+      state.directory = normalizeDirectory(res);
+    } catch {
+      if (epoch !== state.epoch) return;
+      state.directory = normalizeDirectory(null);
+      state.directory.errors = ['directory'];
+    }
+    renderDirectory();
+  }
+  function openOrgSettings() { return awd.call('im.directory', { action: 'openOrgSettings' }); }
+  // 新建会话后，负责人需把邀请码交给对方才算真正连上——这里如实引导到成员与邀请码，不假装已送达。
+  async function createAndInvite(title, type, label) {
+    const s = scope();
+    const created = await request('create', { title, type });
+    if (s.epoch !== state.epoch) return;
+    await refreshList(s.epoch);
+    if (s.epoch !== state.epoch) return;
+    const target = state.conversations.find((c) => c.id === created.id) || created;
+    await select(target);
+    if (state.active?.id !== target.id) return;
+    notice(`已创建${label}「${title}」。请生成邀请码交给对方，对方加入后即可开始沟通。`);
+    if (state.active.role === 'OWNER') await membersDialog();
+  }
+  async function startDirectChat(contact) {
+    if (!state.context?.projectId || !contact) return;
+    const targetName = String(contact.name || '').trim();
+    if (!targetName) return;
+    const existing = state.conversations.find((c) => c.type === 'DIRECT' && c.title === targetName);
+    if (existing) { await select(existing); return; }
+    await createAndInvite(targetName, 'DIRECT', '私聊');
+  }
+  async function startGroupChat(groupTitle) {
+    if (!state.context?.projectId) return;
+    const titleText = String(groupTitle || '').trim().slice(0, 120);
+    if (!titleText) return;
+    const existing = state.conversations.find((c) => c.type === 'GROUP' && c.title === titleText);
+    if (existing) { await select(existing); return; }
+    await createAndInvite(titleText, 'GROUP', '群聊');
+  }
+  function matches(query, ...parts) { return !query || parts.filter(Boolean).join(' ').toLowerCase().includes(query); }
+  // 顶部组织身份卡（飞书式租户切换入口）：当前团队 · 律所；切换在宿主「设置 › 团队」完成。
+  function renderOrgSwitcher() {
+    const el = $('org-switcher'); if (!el) return;
+    el.replaceChildren();
+    const dir = state.directory;
+    if (!dir) return;
+    const org = dir.organization, firm = dir.firm, cap = dir.capabilities || {};
+    const card = node('div', null, 'org-card');
+    const text = node('div', null, 'org-card-text');
+    text.append(node('strong', org ? (org.name || '未命名团队') : '尚未加入团队'));
+    const parts = [];
+    if (org && org.myRoleLabel) parts.push(org.myRoleLabel);
+    parts.push(firm ? `律所：${firm.name || '未命名律所'}${firm.isHead ? '（总部团队）' : ''}` : (org ? '未并入律所' : '加入团队后可看到同事'));
+    text.append(node('small', parts.join(' · ')));
+    card.append(node('span', org ? (org.name || '团').slice(0, 1) : '无', 'org-card-avatar'), text,
+      button('切换组织', () => openOrgSettings(), 'org-switch-btn'));
+    el.append(card);
+    let hint = '';
+    if (!org) hint = '在「设置 › 团队」创建团队或用邀请码加入。';
+    else if (cap.isTeamOwner && !firm) hint = '你是团队负责人，可在「设置 › 团队」创建律所或用律所邀请码并入。';
+    else if (cap.isTeamOwner && firm && firm.isHead) hint = '总部团队不能退出律所；团队负责人不能切换到其他团队。';
+    else if (cap.isTeamOwner) hint = '团队负责人不能切换团队；可在「设置 › 团队」把本团队切换到其他律所。';
+    else hint = '一个账户同一时间只属于一个团队。切换团队会退出当前团队，已有会话按会话成员身份保留。';
+    el.append(node('p', hint, 'hint org-hint'));
+    if ((dir.errors || []).includes('team') || (dir.errors || []).includes('directory')) el.append(node('p', '团队信息暂时取不到，稍后点「刷新会话」重试。', 'hint org-hint'));
+  }
+  function directoryGroups(dir) {
+    const org = dir.organization, firm = dir.firm;
+    return [
+      { key: 'org', tag: '组', label: '我的组织', sub: org ? org.name : '尚未加入团队',
+        empty: org ? '团队里暂时只有你。' : '尚未加入团队。',
+        emptyAction: org ? null : ['去创建或加入', openOrgSettings],
+        rows: (org ? org.members : []).filter((m) => !m.isMe).map((m) => ({ name: m.name, meta: m.roleLabel, contact: m })),
+        group: org && org.name ? `${org.name} · 团队群` : '' },
+      { key: 'firm', tag: '所', label: '我的律所', sub: firm ? firm.name : (org ? '本团队未并入律所' : '加入团队后可并入律所'),
+        empty: firm ? '律所下暂无其他团队。' : '本团队尚未并入律所。',
+        emptyAction: firm || !org ? null : ['去设置', openOrgSettings],
+        rows: (firm ? firm.teams : []).map((t) => ({ name: t.name, meta: [t.isHead ? '总部团队' : '成员团队', t.isMine ? '本团队' : '', t.memberCount != null ? `${t.memberCount} 人` : ''].filter(Boolean).join(' · '), team: t })),
+        group: firm && firm.name ? `${firm.name} · 律所协作群` : '' },
+      { key: 'friends', tag: '友', label: '我的朋友', sub: '个人通讯录与项目客户',
+        empty: '还没有朋友。添加外部律师、客户或专家后可一键发起私聊。',
+        emptyAction: ['添加朋友', () => addFriendDialog()],
+        rows: dir.friends.map((f) => ({ name: f.name, meta: [f.roleLabel, f.org].filter(Boolean).join(' · ') || (f.source === 'project' ? '当前项目客户' : ''), contact: f })),
+        group: '' },
+    ];
+  }
+  function renderDirectory() {
+    renderOrgSwitcher();
+    const dir = state.directory || normalizeDirectory(null);
+    const query = ($('search')?.value || '').trim().toLowerCase();
+    const groupsEl = $('directory-groups');
+    const groups = directoryGroups(dir);
+    if (groupsEl) {
+      groupsEl.replaceChildren();
+      for (const g of groups) {
+        const rows = g.rows.filter((r) => matches(query, r.name, r.meta));
+        const expanded = query ? rows.length > 0 : !!state.expandedGroups[g.key];
+        const wrap = node('div', null, 'dir-group' + (expanded ? ' is-open' : ''));
+        const toggle = node('button', null, 'dir-group-toggle'); toggle.type = 'button';
+        toggle.setAttribute('aria-expanded', String(expanded));
+        toggle.append(node('span', g.tag, `dir-badge dir-badge--${g.key}`), node('span', g.label, 'dir-group-name'), node('span', String(rows.length), 'dir-group-count'));
+        toggle.addEventListener('click', () => { state.expandedGroups[g.key] = !state.expandedGroups[g.key]; renderDirectory(); });
+        wrap.append(toggle);
+        if (expanded) {
+          const body = node('div', null, 'dir-group-body');
+          body.append(node('small', g.sub || '', 'dir-group-sub'));
+          for (const r of rows) {
+            const row = node('div', null, 'dir-member');
+            const info = node('div', null, 'dir-member-info'); info.append(node('strong', r.name), node('small', r.meta || ''));
+            row.append(node('span', r.name.slice(0, 1), `dir-member-avatar is-${g.key}`), info);
+            if (r.contact) row.append(button('发消息', () => startDirectChat(r.contact), 'dir-chat-btn'));
+            else if (r.team) row.append(button('发起群聊', () => startGroupChat(`${r.team.name} · 协作群`), 'dir-chat-btn'));
+            body.append(row);
+          }
+          if (!g.rows.length) {
+            body.append(node('p', g.empty, 'hint'));
+            if (g.emptyAction) body.append(button(g.emptyAction[0], g.emptyAction[1], 'dir-group-action'));
+          } else if (g.group && g.key === 'org') body.append(button('发起群聊', () => startGroupChat(g.group), 'dir-group-action'));
+          wrap.append(body);
+        }
+        groupsEl.append(wrap);
+      }
+    }
+    const welcomeDir = $('welcome-directory');
+    if (welcomeDir) {
+      welcomeDir.replaceChildren();
+      for (const g of groups) {
+        const cardEl = node('section', null, `welcome-card welcome-card--${g.key}`);
+        const head = node('header', null, 'welcome-card-head');
+        const headText = node('div', null, 'welcome-card-title');
+        headText.append(node('span', g.label.slice(2), `dir-pill dir-pill--${g.key}`), node('strong', g.label), node('small', g.sub || ''));
+        head.append(headText);
+        if (g.key === 'friends') head.append(button('添加朋友', () => addFriendDialog(), 'welcome-card-btn'));
+        else if (g.key === 'org' || (g.key === 'firm' && dir.organization)) head.append(button('切换组织', () => openOrgSettings(), 'welcome-card-btn'));
+        cardEl.append(head);
+        const list = node('div', null, 'welcome-member-list');
+        for (const r of g.rows.slice(0, 4)) {
+          const item = node('div', null, 'welcome-member');
+          const meta = node('div', null, 'welcome-member-meta'); meta.append(node('strong', r.name), node('small', r.meta || ''));
+          item.append(node('span', r.name.slice(0, 1), `dir-member-avatar is-${g.key}`), meta);
+          if (r.contact) item.append(button('发消息', () => startDirectChat(r.contact), 'dir-chat-btn'));
+          list.append(item);
+        }
+        if (!g.rows.length) list.append(node('p', g.empty, 'hint'));
+        cardEl.append(list);
+        welcomeDir.append(cardEl);
+      }
+    }
+  }
   function draft() {
     const id = state.active?.id;
     if (!state.drafts.has(id)) state.drafts.set(id, { text: '', file: null });
@@ -32,11 +207,13 @@
     $('attachment-name').textContent = d.file?.name || '';
   }
   function renderList() {
+    renderDirectory();
     $('conversations').replaceChildren();
     const query = $('search').value.trim().toLowerCase();
     const items = state.conversations.filter((c) => c.title.toLowerCase().includes(query));
+    if ($('conv-count')) $('conv-count').textContent = String(items.length);
     $('empty-list').hidden = !!items.length;
-    $('empty-list').textContent = query ? '没有匹配的会话。' : '暂无会话。创建会话，邀请同事或客户加入。';
+    $('empty-list').textContent = query ? '没有匹配的会话。' : '暂无会话。点击上方联系人发起私聊，或新建群聊邀请同事与客户。';
     for (const c of items) {
       const el = button('', () => select(c), 'conversation'); el.setAttribute('aria-pressed', String(c.id === state.active?.id));
       el.append(node('span', c.type === 'DIRECT' ? '私' : '群', 'avatar'));
@@ -51,18 +228,23 @@
     if (state.active && !state.conversations.some((c) => c.id === state.active.id)) clearChat();
     else if (state.active) state.active = state.conversations.find((c) => c.id === state.active.id);
     renderList();
+    syncHostSidebar();
   }
   function clearChat() {
     state.selection++; state.active = null; state.messages = []; state.loading = false;
     $('active-chat').hidden = true; $('welcome').hidden = false; $('workspace').classList.remove('chat-open');
     $('messages').replaceChildren(); closeDialog(); finishConfirmation(false);
+    renderList();
+    syncHostSidebar();
   }
   async function select(c) {
     state.selection++; state.active = c; state.messages = []; state.loading = false;
     $('workspace').classList.add('chat-open'); $('welcome').hidden = true; $('active-chat').hidden = false;
     $('chat-title').textContent = c.title; $('chat-subtitle').textContent = `${c.type === 'DIRECT' ? '私聊' : '群聊'} · ${roles[c.role] || '成员'}`;
     $('binding').textContent = '会话 ID：' + c.id; $('older').hidden = true;
-    showDraft(); renderList(); renderMessages(); closeDialog(); await loadMessages('initial');
+    showDraft(); renderList(); renderMessages(); closeDialog();
+    syncHostSidebar();
+    await loadMessages('initial');
   }
   async function loadMessages(mode = 'new') {
     if (!state.active || state.loading) return;
@@ -247,6 +429,25 @@
       closeDialog(); await refreshList(s.epoch); if (!current(s)) return; await select(c);
     }); code = field('邀请码'); code.required = true; code.autocomplete = 'off'; code.maxLength = 100; code.focus();
   }
+  function addFriendDialog() {
+    let nameInput, roleInput, orgInput;
+    dialog('添加朋友', '保存到通讯录', async () => {
+      const name = nameInput.value.trim();
+      if (!name) throw new Error('请输入联系人姓名。');
+      const s = scope();
+      const res = await awd.call('im.directory', { action: 'addFriend', name, roleLabel: roleInput.value.trim(), org: orgInput.value.trim() });
+      if (!current(s)) return;
+      state.directory = normalizeDirectory(res);
+      state.expandedGroups.friends = true;
+      closeDialog(); renderDirectory(); syncHostSidebar();
+      notice(`已将「${name}」添加到我的朋友。`);
+    });
+    nameInput = field('姓名 / 称呼'); nameInput.maxLength = 64; nameInput.required = true;
+    roleInput = field('角色（选填）'); roleInput.maxLength = 32; roleInput.placeholder = '如：外部合作律师 / 客户 / 行业专家';
+    orgInput = field('所属单位（选填）'); orgInput.maxLength = 80;
+    $('dialog-body').append(node('p', '朋友是你的个人通讯录，只保存在本机当前账户下；切换团队或律所不影响。', 'hint'));
+    nameInput.focus();
+  }
   async function membersDialog() {
     const s = scope(); const result = await request('members', { conversationId: s.id }); if (!current(s)) return;
     dialog('会话成员', '', null);
@@ -288,19 +489,21 @@
     if (!input.options.length) { $('dialog-body').append(node('p', '项目内还没有可发送的文件。', 'hint')); $('dialog-submit').disabled = true; }
     $('dialog-body').append(node('p', '发送的是受控版本快照；源文件后续更改不会自动替换。文件默认供内部成员读取，客户需单独授权；客户本人上传的文件可自行读取。', 'hint'));
   }
+  const controlIds = ['new-chat', 'join-chat', 'refresh', 'add-friend', 'welcome-new-chat', 'welcome-join-chat', 'welcome-add-friend', 'directory-home'];
   async function reload() {
     const epoch = ++state.epoch; clearTimeout(state.timer); clearChat();
-    state.drafts.clear(); state.pending.clear(); state.imports.clear(); state.conversations = []; state.self = null; renderList();
-    for (const id of ['new-chat', 'join-chat', 'refresh']) $(id).disabled = true;
+    state.drafts.clear(); state.pending.clear(); state.imports.clear(); state.conversations = []; state.self = null; state.directory = null; renderList();
+    for (const id of controlIds) if ($(id)) $(id).disabled = true;
     try {
       const context = await awd.call('context.get', {}); if (epoch !== state.epoch) return; state.context = context;
       if (!context.projectId) { notice('请先选择一个项目，再使用项目沟通。'); return; }
       const self = await request('self'); if (epoch !== state.epoch) return; state.self = self;
+      await loadDirectory(epoch); if (epoch !== state.epoch) return;
       await refreshList(epoch); if (epoch !== state.epoch) return; notice();
     } catch (error) { if (epoch === state.epoch) notice(failure(error), true); }
     finally {
       if (epoch === state.epoch && state.context?.projectId) {
-        for (const id of ['new-chat', 'join-chat', 'refresh']) $(id).disabled = false;
+        for (const id of controlIds) if ($(id)) $(id).disabled = false;
         schedule(epoch);
       }
     }
@@ -319,12 +522,56 @@
       finally { if (epoch === state.epoch) schedule(epoch); }
     }, 3000);
   }
+  async function handleSidebarCommand(payload = {}) {
+    const cmd = payload?.command;
+    if (!cmd) return;
+    if (cmd === 'select-conversation') {
+      const targetId = payload.conversationId;
+      let target = state.conversations.find((c) => String(c.id) === String(targetId));
+      if (!target && state.context?.projectId) {
+        await refreshList();
+        target = state.conversations.find((c) => String(c.id) === String(targetId));
+      }
+      if (target) await select(target);
+      return;
+    }
+    if (cmd === 'open-new-chat') { createDialog(); return; }
+    if (cmd === 'open-join-chat') { joinDialog(); return; }
+    if (cmd === 'open-add-friend') { addFriendDialog(); return; }
+    if (cmd === 'focus-directory') {
+      if (payload.group && Object.prototype.hasOwnProperty.call(state.expandedGroups, payload.group)) {
+        state.expandedGroups[payload.group] = true;
+      }
+      clearChat();
+      return;
+    }
+    if (cmd === 'refresh-directory') {
+      await loadDirectory();
+      if (state.context?.projectId) await refreshList();
+      // 团队 / 律所切换只换通讯录；会话按会话成员身份保留，不清空当前聊天与草稿
+      if (payload.reason && payload.reason !== 'manual') notice('团队或律所已变更，通讯录已更新。已有会话按会话成员身份保留。');
+      return;
+    }
+    if (cmd === 'open-org-settings') { await openOrgSettings(); return; }
+    if (cmd === 'start-direct-chat' && payload.contact) {
+      await startDirectChat(payload.contact);
+      return;
+    }
+    if (cmd === 'start-group-chat') {
+      await startGroupChat(payload.title);
+    }
+  }
   $('search').addEventListener('input', renderList);
   $('draft').addEventListener('input', () => { if (state.active) draft().text = $('draft').value; });
   $('draft').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); run($('send'), send); } });
   $('composer').addEventListener('submit', (e) => { e.preventDefault(); run($('send'), send); });
   $('new-chat').addEventListener('click', createDialog); $('join-chat').addEventListener('click', joinDialog);
-  $('refresh').addEventListener('click', () => run($('refresh'), async () => { if (!state.self) return reload(); await refreshList(); await refreshLoadedMessages(); notice(); }));
+  if ($('add-friend')) $('add-friend').addEventListener('click', addFriendDialog);
+  if ($('welcome-new-chat')) $('welcome-new-chat').addEventListener('click', createDialog);
+  if ($('welcome-join-chat')) $('welcome-join-chat').addEventListener('click', joinDialog);
+  if ($('welcome-add-friend')) $('welcome-add-friend').addEventListener('click', addFriendDialog);
+  if ($('directory-home')) $('directory-home').addEventListener('click', () => clearChat());
+  $('refresh').addEventListener('click', () => run($('refresh'), async () => { if (!state.self) return reload(); await loadDirectory(); await refreshList(); await refreshLoadedMessages(); notice(); }));
   $('back').addEventListener('click', () => $('workspace').classList.remove('chat-open'));
   $('older').addEventListener('click', () => run($('older'), () => loadMessages('older')));
   $('members-button').addEventListener('click', () => run($('members-button'), membersDialog));
@@ -344,6 +591,9 @@
   window.addEventListener('pagehide', () => { state.epoch++; clearTimeout(state.timer); });
   awd.ready().then(() => {
     for (const event of ['project.switched', 'account.changed']) awd.events.on(event, reload);
+    awd.events.on('sidebar.command', (payload) => {
+      handleSidebarCommand(payload).catch((error) => notice(failure(error), true));
+    });
     return reload();
   }).catch((error) => notice(failure(error), true));
 }());

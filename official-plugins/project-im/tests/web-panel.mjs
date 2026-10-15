@@ -176,3 +176,28 @@ test('revoked attachment download displays server refusal and unavailable cards 
   const p = await panel({ call: ({ method }) => { if (method === 'im.downloadAttachment') throw Error('抱歉文件还在准备中，请联系您的律师。'); } }); close(t, p);
   await p.select(1); await p.named('下载'); assert.equal(p.$('notice').textContent, '抱歉文件还在准备中，请联系您的律师。'); assert.equal(p.$('notice').dataset.error, 'true');
 });
+test('directory shows only host-provided org data; no team gives an empty state that opens host team settings', async (t) => {
+  const p = await panel({ call: ({ method, action }) => method === 'im.directory' && action === 'get' ? { organization: null, firm: null, friends: [], capabilities: {} } : undefined }); close(t, p); await tick();
+  assert.match(p.$('org-switcher').textContent, /尚未加入团队/);
+  assert.doesNotMatch(p.$('directory-groups').textContent, /张维|陈远航|民商事/);
+  await p.named('切换组织');
+  assert.ok(p.calls.some((c) => c.method === 'im.directory' && c.action === 'openOrgSettings'));
+});
+test('team / firm switch refreshes the directory without dropping the open chat or its draft', async (t) => {
+  let org = { id: 't1', name: '旧团队', myRoleLabel: '成员', members: [{ id: 'a', name: '旧同事', roleLabel: '成员' }] };
+  const p = await panel({ call: ({ method, action }) => method === 'im.directory' && action === 'get'
+    ? { organization: org, firm: null, friends: [], capabilities: { hasTeam: true, canSwitchTeam: true } } : undefined }); close(t, p); await tick();
+  assert.match(p.$('directory-groups').textContent, /旧同事/);
+  await p.select(); p.write('切换前的草稿');
+  org = { id: 't2', name: '新团队', myRoleLabel: '成员', members: [{ id: 'b', name: '新同事', roleLabel: '成员' }] };
+  await p.events['sidebar.command']({ command: 'refresh-directory', reason: 'switchTeam' }); await tick(); await tick();
+  assert.match(p.$('org-switcher').textContent, /新团队/);
+  assert.match(p.$('directory-groups').textContent, /新同事/); assert.doesNotMatch(p.$('directory-groups').textContent, /旧同事/);
+  assert.equal(p.$('active-chat').hidden, false); assert.equal(p.$('draft').value, '切换前的草稿');
+  assert.match(p.$('notice').textContent, /已有会话按会话成员身份保留/);
+});
+test('team owner sees why switching team is blocked', async (t) => {
+  const p = await panel({ call: ({ method, action }) => method === 'im.directory' && action === 'get'
+    ? { organization: { name: '我的团队', myRoleLabel: '负责人', members: [] }, firm: { name: '合成所', isHead: true, teams: [] }, friends: [], capabilities: { hasTeam: true, isTeamOwner: true } } : undefined }); close(t, p); await tick();
+  assert.match(p.$('org-switcher').textContent, /总部团队不能退出律所/);
+});
