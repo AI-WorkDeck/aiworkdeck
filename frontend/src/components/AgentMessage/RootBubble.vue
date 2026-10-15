@@ -296,7 +296,7 @@ function isApprovalPending(art) {
 .turn-file:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent); outline-offset: var(--awd-focus-offset); }
 .turn-file-icon { width: 14px; height: 14px; flex-shrink: 0; color: var(--awd-text-3); }
 .turn-file-name { flex: 1; min-width: 0; font-size: var(--awd-panel-fs); line-height: 1.4; overflow-wrap: anywhere; }
-.turn-file-kind { flex-shrink: 0; font-size: 10px; font-weight: 600; line-height: 1.6; padding: 1px 6px; border-radius: 4px; background: var(--awd-bg); color: var(--awd-text-2); }
+.turn-file-kind { flex-shrink: 0; font-size: var(--awd-panel-fs-meta); font-weight: 600; line-height: 1.6; padding: 1px 6px; border-radius: var(--awd-radius-sm); background: var(--awd-bg); color: var(--awd-text-2); }
 .turn-file-kind.added { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .turn-file-open { width: 12px; height: 12px; flex-shrink: 0; color: var(--awd-text-3); transition: color 0.15s; }
 .turn-file:hover .turn-file-open { color: var(--awd-accent-text); }
