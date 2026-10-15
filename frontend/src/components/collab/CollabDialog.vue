@@ -497,8 +497,10 @@ export default {
           this.$emit('conflict')
         } else if (d.status === 'OFFLINE') {
           uni.showToast({ title: this.$t('version.libraryOffline'), icon: 'none' })
-        } else {
+        } else if (d.status === 'UP_TO_DATE') {
           uni.showToast({ title: this.$t('version.alreadyLatest'), icon: 'none' })
+        } else {
+          uni.showToast({ title: d.message || this.$t('version.pullFailed'), icon: 'none' })
         }
         this.$emit('changed')
       } catch (e) {
