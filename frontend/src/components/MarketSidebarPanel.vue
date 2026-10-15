@@ -49,8 +49,9 @@
           class="msb-row"
           @tap="openDetail(row)"
         >
-          <view class="msb-row-glyph" :class="{ 'is-plugin': row.kind === 'plugin' || row.panel }">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <view class="msb-row-glyph" :class="{ 'is-plugin': row.kind === 'plugin' || row.panel, 'has-avatar': !!row.avatarUrl }">
+            <image v-if="row.avatarUrl" :src="row.avatarUrl" class="msb-row-avatar" mode="aspectFill" />
+            <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in row.glyph" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </view>
@@ -140,8 +141,9 @@
             class="msb-row"
             @tap="openDetail(row)"
           >
-            <view class="msb-row-glyph is-plugin">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <view class="msb-row-glyph is-plugin" :class="{ 'has-avatar': !!row.avatarUrl }">
+              <image v-if="row.avatarUrl" :src="row.avatarUrl" class="msb-row-avatar" mode="aspectFill" />
+              <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path v-for="(d, gi) in row.glyph" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </view>
@@ -178,6 +180,7 @@
 // 数据与安装链路复用 MarketPane 同一组 services/api.js 封装。
 import { getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
 import { ICONS } from '@/config/icons.js'
+import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { isPanelSkill, isVoiceGroupMember, buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
 import { canInstall, paidState, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
@@ -317,7 +320,8 @@ export default {
           id: p.id,
           name: p.name || p.id,
           desc: p.description || '',
-          glyph: ICONS.blocks,
+          avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(p.id) : null,
+          glyph: typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(p.id) : ICONS.blocks,
           meta: p.version ? ('v' + p.version) : '',
           stateLabel: p.enabled ? this.$t('market.enabledTag') : this.$t('market.disabledTag'),
           stateClass: p.enabled ? 'ok' : 'off',
@@ -396,7 +400,8 @@ export default {
           id: m.id,
           name: m.name || m.id,
           desc: m.description || '',
-          glyph: ICONS.blocks,
+          avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(m.id) : null,
+          glyph: typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(m.id) : ICONS.blocks,
           meta: metaParts.join(' · ') || this.$t('market.pluginLabel'),
           installed: installedIds.has(m.id) || !!m.installed,
           paidState: state,
@@ -789,6 +794,7 @@ export default {
   align-items: center;
   justify-content: center;
   color: var(--awd-accent-text);
+  overflow: hidden;
 
   svg {
     width: 14px;
@@ -800,6 +806,20 @@ export default {
     background: var(--awd-accent-hover);
     color: var(--awd-text-on-accent);
   }
+
+  &.has-avatar {
+    background: var(--awd-surface);
+    border: 1px solid var(--awd-border);
+    border-radius: 50%;
+    padding: 0;
+  }
+}
+
+.msb-row-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: block;
 }
 
 .msb-row-main {

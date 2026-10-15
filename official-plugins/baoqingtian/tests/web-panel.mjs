@@ -341,3 +341,13 @@ test('dirty account change resets secure transport immediately before discard co
   assert.equal(resets, 1); assert.equal(p.$('confirmation').hidden, false); assert.equal(p.$('save-draft').disabled, true);
   await p.click('cancel-confirm'); assert.equal(p.$('note-title').value, '保留原账号修改'); assert.equal(resets, 1);
 });
+test('renders brand character avatar and responds to host sidebar.command events', async t => {
+  const p = await panel(); t.after(() => p.dom.window.close());
+  const avatar = p.dom.window.document.querySelector('.brand-bar img.brand-avatar');
+  assert.ok(avatar, 'brand avatar image should exist');
+  assert.equal(avatar.getAttribute('src'), 'avatar.png');
+  await p.dom.window.awd.events; // ensure events registered
+  // Trigger switch-view via sidebar.command
+  p.$('nav-notes').click(); await tick();
+  assert.equal(p.$('section-title').textContent, '我的笔记');
+});

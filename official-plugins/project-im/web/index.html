@@ -11,18 +11,57 @@
 <body>
   <div id="notice" role="status" aria-live="polite">正在连接项目沟通…</div>
   <main id="workspace">
-    <aside id="sidebar" aria-label="会话列表">
-      <div class="list-tools"><button id="new-chat">新建会话</button><button id="join-chat">邀请码加入</button></div>
-      <label class="search"><span class="sr-only">搜索会话</span><input id="search" type="search" placeholder="搜索会话" autocomplete="off"></label>
-      <div id="conversations"></div><p id="empty-list" class="hint">暂无会话。创建会话，邀请同事或客户加入。</p>
-      <button id="refresh">刷新会话</button>
+    <aside id="sidebar" aria-label="通讯录与会话列表">
+      <div id="org-switcher" aria-label="当前组织"></div>
+      <div class="list-tools">
+        <button id="new-chat" type="button">新建会话</button>
+        <button id="join-chat" type="button">邀请码加入</button>
+        <button id="add-friend" type="button">添加朋友</button>
+      </div>
+      <label class="search"><span class="sr-only">搜索通讯录与会话</span><input id="search" type="search" placeholder="搜索组织、律所、朋友或会话" autocomplete="off"></label>
+
+      <section id="directory" aria-label="通讯录">
+        <div class="section-heading">
+          <strong>通讯录</strong>
+          <span class="hint">组织 · 律所 · 朋友</span>
+        </div>
+        <div id="directory-groups"></div>
+      </section>
+
+      <section class="conv-section" aria-label="对话列表">
+        <div class="section-heading">
+          <strong>对话列表</strong>
+          <button id="refresh" type="button" class="link-btn">刷新会话</button>
+        </div>
+        <div id="conversations"></div>
+        <p id="empty-list" class="hint">暂无会话。点击上方通讯录发起对话，或新建会话邀请同事与客户。</p>
+      </section>
     </aside>
     <section id="chat" aria-label="当前会话">
-      <div id="welcome"><span class="welcome-icon" aria-hidden="true">聊</span><p>把讨论和材料留在项目里</p><p class="hint">选择一个会话，或用邀请码建立连接。</p></div>
+      <div id="welcome">
+        <div class="welcome-hero">
+          <span class="welcome-icon" aria-hidden="true">聊</span>
+          <div class="welcome-hero-text">
+            <p class="welcome-title">把讨论和材料留在项目里</p>
+            <p class="hint">先从通讯录（我的组织、我的律所、我的朋友）发起联系，或选择一个会话、用邀请码建立连接。</p>
+          </div>
+          <div class="welcome-hero-actions">
+            <button type="button" id="welcome-new-chat" class="primary">新建会话</button>
+            <button type="button" id="welcome-join-chat">邀请码加入</button>
+            <button type="button" id="welcome-add-friend">添加朋友</button>
+          </div>
+        </div>
+        <div id="welcome-directory" aria-label="通讯录总览"></div>
+      </div>
       <div id="active-chat" hidden>
-        <header class="chat-header"><button id="back" aria-label="返回会话列表">返回</button><div class="chat-heading"><strong id="chat-title"></strong><span id="chat-subtitle" class="hint"></span></div><button id="members-button">成员</button></header>
-        <div id="project-bar"><span id="binding" class="hint"></span><button id="bind">关联当前项目</button><button id="export">归档聊天</button></div>
-        <div id="message-scroll"><button id="older" hidden>加载更早消息</button><div id="messages" role="log" aria-label="聊天消息" aria-live="polite"></div><p id="empty-messages" class="hint">还没有消息，打个招呼吧。</p></div>
+        <header class="chat-header">
+          <button id="back" type="button" aria-label="返回会话列表">返回</button>
+          <button id="directory-home" type="button" title="回到通讯录总览">通讯录</button>
+          <div class="chat-heading"><strong id="chat-title"></strong><span id="chat-subtitle" class="hint"></span></div>
+          <button id="members-button" type="button">成员</button>
+        </header>
+        <div id="project-bar"><span id="binding" class="hint"></span><button id="bind" type="button">关联当前项目</button><button id="export" type="button">归档聊天</button></div>
+        <div id="message-scroll"><button id="older" type="button" hidden>加载更早消息</button><div id="messages" role="log" aria-label="聊天消息" aria-live="polite"></div><p id="empty-messages" class="hint">还没有消息，打个招呼吧。</p></div>
         <form id="composer">
           <div class="composer-tools"><button type="button" id="local-file">发送本机文件</button><button type="button" id="project-file">引用项目文件</button><span class="hint">单文件不超过 8 MB</span></div>
           <input type="file" id="file-input" hidden>

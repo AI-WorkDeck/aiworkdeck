@@ -297,7 +297,10 @@
           @dragend="onRailDragEnd"
           @contextmenu="openDockMenu(p.key, $event)"
         >
-          <view v-if="p.svgPaths" class="rail-icon-wrapper">
+          <view v-if="p.avatarUrl" class="rail-icon-wrapper rail-avatar-wrapper">
+            <image :src="p.avatarUrl" class="rail-plugin-avatar" mode="aspectFill" />
+          </view>
+          <view v-else-if="p.svgPaths" class="rail-icon-wrapper">
             <svg class="rail-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
                 v-for="(path, idx) in p.svgPaths"
@@ -861,11 +864,13 @@
             @open-settings="openSettingsTab($event || {})"
             @open-doc-file="openInsightDocFile($event)"
           />
-          <!-- 动态插件左栏保留概要，主要操作界面在工作区标签。 -->
+          <!-- 动态插件左栏工作区：飞书式双栏导航（通讯录/对话列表/阶段切换/快捷动作），与中栏工作区标签联动 -->
           <PluginWorkspaceSummary
             v-else-if="activeDynamicPlugin"
             :plugin="activeDynamicPlugin"
+            :project-id="projectId"
             @open="openPluginTab(activeDynamicPlugin.pluginId)"
+            @quick-action="onPluginQuickAction"
           />
           <view v-else class="sidebar-plugin-placeholder">
             <text class="placeholder-title">{{ leftPaneTitle }}</text>
@@ -934,8 +939,9 @@
                       @drop.prevent="onTabDropOnItem($event, file, 'left')"
                       @dragend="onTabDragEnd"
                     >
-                      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path v-for="(d, gi) in getFileIconPaths(file.fileType, file.tabType)" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                      <image v-if="getTabAvatarUrl(file)" :src="getTabAvatarUrl(file)" class="tab-plugin-avatar" mode="aspectFill" />
+                      <svg v-else class="tab-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path v-for="(d, gi) in getFileIconPaths(file.fileType, file.tabType, file.pluginId || (file.marketSpec && file.marketSpec.id))" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
                       <text class="tab-name">{{ file.name }}</text>
                       <text class="tab-close" @tap.stop="closeFile(file.id, 'left')">×</text>
@@ -976,8 +982,9 @@
                       @drop.prevent="onTabDropOnItem($event, file, 'right')"
                       @dragend="onTabDragEnd"
                     >
-                      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path v-for="(d, gi) in getFileIconPaths(file.fileType, file.tabType)" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                      <image v-if="getTabAvatarUrl(file)" :src="getTabAvatarUrl(file)" class="tab-plugin-avatar" mode="aspectFill" />
+                      <svg v-else class="tab-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path v-for="(d, gi) in getFileIconPaths(file.fileType, file.tabType, file.pluginId || (file.marketSpec && file.marketSpec.id))" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
                       <text class="tab-name">{{ file.name }}</text>
                       <text class="tab-close" @tap.stop="closeFile(file.id, 'right')">×</text>
@@ -2475,6 +2482,7 @@ import {
 import { activityTracker } from '@/utils/activityTracker.js'
 
 import { ICONS as GLYPHS } from '@/config/icons.js'
+import { getPluginAvatarUrl, getPluginRailSvgPaths } from '@/config/pluginIcons.js'
 import { readLocalMode } from '@/services/accountProfile.js'
 import { resolveTrack, TRACK } from '@/utils/memberLookup.js'
 import { isSoloLocalProject } from '@/utils/soloLocalProject.js'
@@ -7416,6 +7424,8 @@ export default {
               // 纯工具/skill 插件不给位图，改由 rail 用统一的 SVG 兜底（见模板 svgFallback）。
               icon: null,
               activeIcon: null,
+              avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(p.id) : null,
+              svgPaths: typeof getPluginRailSvgPaths === 'function' ? getPluginRailSvgPaths(p.id) : null,
               isDynamic: true,
               // 有真正的前端入口才走 iframe（PluginPane）；纯工具/skill 插件走宿主渲染的
               // 启动面板（PluginGuidePane）——否则点开只有一句「未配置入口地址」。
@@ -7441,6 +7451,26 @@ export default {
         }
       } catch (e) {
         console.error('Failed to load dynamic plugins:', e)
+      }
+    },
+
+    onPluginQuickAction(payload = {}) {
+      if (payload.pluginId) {
+        this.openPluginTab(payload.pluginId)
+      }
+      if (payload.command) {
+        setTimeout(() => {
+          uni.$emit('awd:plugin-sidebar-command', payload)
+        }, 80)
+      }
+      if (payload.aiPrompt) {
+        this.showAiPanel = true
+        this.aiPanelMounted = true
+        this.$nextTick(() => {
+          if (this.$refs.chatInterface && typeof this.$refs.chatInterface.setInputText === 'function') {
+            this.$refs.chatInterface.setInputText(payload.aiPrompt)
+          }
+        })
       }
     },
 
