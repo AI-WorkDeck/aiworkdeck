@@ -128,9 +128,16 @@
             <div v-if="fileChanges.length" class="turn-files">
               <button v-for="file in fileChanges" :key="String(file.fileId || file.fileName)"
                 type="button" class="turn-file" @click="$emit('open-file', file)">
+                <svg class="turn-file-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
                 <span class="turn-file-name">{{ file.fileName }}</span>
-                <span class="turn-file-kind">{{ $t(file.changeType === 'ADDED' ? 'chat.fileCreated' : 'chat.fileModified') }}</span>
-                <span aria-hidden="true">↗</span>
+                <span class="turn-file-kind" :class="{ added: file.changeType === 'ADDED' }">{{ $t(file.changeType === 'ADDED' ? 'chat.fileCreated' : 'chat.fileModified') }}</span>
+                <svg class="turn-file-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="7" y1="17" x2="17" y2="7"></line>
+                  <polyline points="7 7 17 7 17 17"></polyline>
+                </svg>
               </button>
             </div>
 
@@ -284,11 +291,15 @@ function isApprovalPending(art) {
 
 <style scoped>
 .turn-files { display: grid; gap: var(--awd-space-1); margin-top: var(--awd-space-3); }
-.turn-file { display: flex; align-items: center; gap: var(--awd-space-2); width: 100%; min-width: 0; min-height: var(--awd-control-height); margin: 0; padding: var(--awd-space-2); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); cursor: pointer; font: inherit; text-align: left; }
-.turn-file:hover { background: var(--awd-surface-2); }
+.turn-file { display: flex; align-items: center; gap: var(--awd-space-2); width: 100%; min-width: 0; min-height: var(--awd-control-height); margin: 0; padding: var(--awd-space-2) var(--awd-space-3); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); cursor: pointer; font: inherit; text-align: left; transition: background 0.15s, border-color 0.15s; }
+.turn-file:hover { background: var(--awd-surface-2); border-color: var(--awd-border); }
 .turn-file:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent); outline-offset: var(--awd-focus-offset); }
-.turn-file-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.turn-file-kind { flex-shrink: 0; color: var(--awd-text-2); font-size: var(--awd-font-size-body); }
+.turn-file-icon { width: 14px; height: 14px; flex-shrink: 0; color: var(--awd-text-3); }
+.turn-file-name { flex: 1; min-width: 0; font-size: var(--awd-panel-fs); line-height: 1.4; overflow-wrap: anywhere; }
+.turn-file-kind { flex-shrink: 0; font-size: 10px; font-weight: 600; line-height: 1.6; padding: 1px 6px; border-radius: 4px; background: var(--awd-bg); color: var(--awd-text-2); }
+.turn-file-kind.added { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
+.turn-file-open { width: 12px; height: 12px; flex-shrink: 0; color: var(--awd-text-3); transition: color 0.15s; }
+.turn-file:hover .turn-file-open { color: var(--awd-accent-text); }
 
 .root-bubble-wrapper {
     width: 100%;
