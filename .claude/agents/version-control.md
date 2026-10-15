@@ -11,6 +11,15 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 
 本地对象过滤启用后，普通文件超过 JGit 的 1 MiB 临时缓冲阈值也会落临时文件；旧 6.9 的 `WorkingTreeIterator.computeLength` 使用 `FileInputStream.skip`，在 Unix 上可越过 EOF 持续循环，使初始化/重新开启版本记录卡住。依赖升级到 `7.7.1.202607240634-r`，含上游 `d0ebb2a70e44` 的 `Files.newInputStream` 修复；不能靠加长请求超时解决。`VersionFilterSpillTest` 用可强制回收的子 JVM 覆盖普通文件与媒体对象、提交/恢复/删除历史后重开，防止回归挂死整轮测试。
 
+## 双机回归修复契约（dev-board#1296）
+
+- 首次取回先读 `/projects/my` 的角色快照，只有 OWNER/ADMIN/PARTICIPANT 调用会写远端的 `prepare-remote`。READ_ONLY 直接尝试 Git 读取，仍要求 v2 清单；CLIENT/未知角色跳过准备不代表获得读取权限，Git 服务端独立鉴权，失败补偿清理本地半成品。列表角色过期时，准备接口仍拒绝已降权的写请求。
+- `frontend/src/utils/cloudConnectivity.js` 只记明确的远端连接观察，避免纯本地 `/cloud/status` 清掉已知失败。`REMOTE_AHEAD` 可由本地合并前置检查返回，普通异常也可能来自本地验证，两者都不是联网成功/失败证据。OFFLINE 仍无法区分撤权与断网，不能借此声称精确诊断已完成。
+- 工作台传 `collabCloud` 给 VersionPanel 作为共同快照；独立面板保留自身查询。面板动作的 `status-changed` 必须同时刷新工作状态和父云状态；保留 VERSION_BUSY 有限重试及卸载失效护栏。
+- WHOLE/BINARY 也包括 TXT/Markdown 等未支持逐处合并的格式；提示说明整份版本选择，不把文件误报为 PDF/图片。
+- NOT_IN_ORG 指引先说明同团队/同律所条件，无团队可受邀，已有团队请负责人核对律所归属；不得一概要求加入第二个团队。现有切换团队/律所入口仍受 OWNER/总部等原有约束，本修复不改变资格或自动迁移组织。
+- 回归入口：`CloudCloneReadOnlyTest`、`ProjectMemberLookupTest`，前端 `test:version-history`、`test:version-merge`、`test:member-invite`；自动化桩验证不替代实际安装版双机验收。
+
 ## 关键文件地图
 
 **后端 `backend/src/main/java/com/checkba/version/`（12 个类）**
