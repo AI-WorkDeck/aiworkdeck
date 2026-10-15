@@ -249,8 +249,10 @@ export default {
 
 <style lang="scss" scoped>
 .panel-todos {
+  --awd-radius-lg: 10px;
+  --awd-font-size-lg: var(--awd-font-size-title);
   background: var(--awd-surface);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-lg);
   border: 1px solid var(--awd-border);
   padding: 14px;
   box-sizing: border-box;
@@ -280,14 +282,14 @@ export default {
 }
 
 .pt-title {
-  font-size: 14px;
+  font-size: var(--awd-font-size-lg);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .pt-count,
 .pt-group-count {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   line-height: 18px;
   padding: 0 7px;
   border-radius: 999px;
@@ -298,7 +300,7 @@ export default {
 .pt-subtitle {
   display: block;
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
   color: var(--awd-text-2);
 }
@@ -315,10 +317,10 @@ export default {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-accent-text);
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
 
   &:hover {
@@ -335,12 +337,12 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 32px;
+  height: var(--awd-control-height);
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   cursor: pointer;
 
@@ -360,7 +362,7 @@ export default {
 }
 
 .pt-state-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
 }
 
@@ -390,7 +392,7 @@ export default {
 }
 
 .pt-empty-title {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
 }
@@ -398,7 +400,7 @@ export default {
 .pt-empty-desc {
   margin-top: 8px;
   max-width: 440px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.7;
   color: var(--awd-text-2);
 }
@@ -415,7 +417,7 @@ export default {
 }
 
 .pt-group-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text-2);
 
@@ -432,22 +434,6 @@ export default {
   display: flex;
   flex-direction: column;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 .pt-done-toggle {
   display: flex;
@@ -469,7 +455,7 @@ export default {
 }
 
 .pt-done-toggle-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 

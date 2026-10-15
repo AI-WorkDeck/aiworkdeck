@@ -48,7 +48,6 @@
           <text v-if="busy" class="create-busy-hint">{{ busyText }}</text>
         </view>
 
-        <AccountProjectCatalog v-if="isDesktop && !isClientUser" :local-projects="projects" :current-project-id="currentProjectId" @imported="onCatalogImported" @open-project="goToProject" />
         <view class="panel-projects">
           <!-- 事项概览条（dev-board#898，spec 2026-09-25-task-calendar-redesign E2）：取代原来那张
                「N 全部项目」大统计卡。后三格可点，进日程页并滚到对应分组。
@@ -200,6 +199,7 @@
             </view>
           </view>
         </view>
+        <AccountProjectCatalog v-if="isDesktop && !isClientUser" :local-projects="projects" :current-project-id="currentProjectId" @imported="onCatalogImported" @open-project="goToProject" />
       </view>
     </view>
 

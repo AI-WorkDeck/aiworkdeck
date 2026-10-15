@@ -364,34 +364,35 @@ export default {
 
 <style lang="scss" scoped>
 .version-panel { display: flex; flex-direction: column; height: 100%; }
-.version-empty { padding: 24rpx; color: var(--awd-text-3); font-size: 26rpx; }
-.version-intro { padding: 32rpx 24rpx; }
-.version-intro-title { font-size: 30rpx; font-weight: 600; margin-bottom: 12rpx; }
-.version-intro-desc { font-size: 26rpx; color: var(--awd-text-2); line-height: 1.6; margin-bottom: 24rpx; }
-.version-error { padding: 32rpx 24rpx; }
-.version-error-desc { font-size: 26rpx; color: var(--awd-danger-text); line-height: 1.6; margin-bottom: 24rpx; }
+.version-empty { padding: 12px var(--awd-panel-pad-x); color: var(--awd-text-3); font-size: var(--awd-font-size-body); }
+.version-intro { padding: 16px var(--awd-panel-pad-x); }
+.version-intro-title { font-size: var(--awd-font-size-title); font-weight: 600; margin-bottom: 6px; }
+.version-intro-desc { font-size: var(--awd-font-size-body); color: var(--awd-text-2); line-height: 1.6; margin-bottom: 12px; }
+.version-error { padding: 16px var(--awd-panel-pad-x); }
+.version-error-desc { font-size: var(--awd-font-size-body); color: var(--awd-danger-text); line-height: 1.6; margin-bottom: 12px; }
 .version-file-filter {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12rpx 24rpx; background: var(--awd-accent-soft); border-bottom: 1px solid var(--awd-border);
-  font-size: 24rpx; color: var(--awd-text-2);
+  padding: 6px var(--awd-panel-pad-x); background: var(--awd-accent-soft); border-bottom: 1px solid var(--awd-border);
+  font-size: var(--awd-panel-fs); color: var(--awd-text-2);
 }
 .version-file-filter-clear { color: var(--awd-text); text-decoration: underline; }
 .version-history-row {
   display: flex; justify-content: flex-end;
-  padding: 8rpx 24rpx; border-bottom: 1px solid var(--awd-border);
+  padding: 4px var(--awd-panel-pad-x); border-bottom: 1px solid var(--awd-border);
 }
-.version-history-link { font-size: 23rpx; color: var(--awd-text); text-decoration: underline; }
+.version-history-link { font-size: var(--awd-panel-fs-meta); color: var(--awd-text); text-decoration: underline; }
 .version-footer {
-  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8rpx;
-  padding: 12rpx 24rpx; border-top: 1px solid var(--awd-border);
-  font-size: 22rpx; color: var(--awd-text-3);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;
+  padding: 6px var(--awd-panel-pad-x); border-top: 1px solid var(--awd-border);
+  font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3);
 }
 .version-footer-off { color: var(--awd-text-3); text-decoration: underline; flex-shrink: 0; }
 
 /* awd-* 没有集中定义，各组件 scoped 内各自定义 */
 .awd-btn {
-  display: inline-block; padding: 14rpx 28rpx; border-radius: 8rpx;
-  font-size: 26rpx; text-align: center;
+  display: inline-flex; align-items: center; justify-content: center; height: var(--awd-control-height);
+  padding: 0 14px; border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body); text-align: center;
 }
 .awd-btn-primary { background: var(--awd-info); color: var(--awd-text-on-accent); }
 </style>

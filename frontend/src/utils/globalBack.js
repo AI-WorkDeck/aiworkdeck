@@ -28,6 +28,8 @@ const SELF_NAV_ROUTES = new Set([
   'pages/project-home/project-home',
   // 日程页页头第一个元素就是「返回」（dev-board#897）
   'pages/calendar/calendar',
+  // 登录页顶栏左侧已内联渲染返回按钮，避免与 body 级全局浮层返回键重叠
+  'pages/login/login',
 ])
 
 let el = null

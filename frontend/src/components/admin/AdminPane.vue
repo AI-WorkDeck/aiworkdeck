@@ -1022,6 +1022,18 @@ function cachedIsAdmin() {
   return u.isAdmin === true || u.username === 'admin'
 }
 
+export function resolveAdminNavKey(key) {
+  if (!key) return ''
+  const k = String(key).trim()
+  const map = {
+    worklog: 'work_log',
+    work_log: 'work_log',
+    security: 'personal_settings',
+    personal_settings: 'personal_settings',
+  }
+  return map[k] || k
+}
+
 export default {
   name: 'AdminPane',
   components: {
@@ -1437,13 +1449,14 @@ export default {
      * 会停在用户上次看的那个面板上——「点了没反应」。
      */
     initialNav(v) {
-      if (v && this.visibleNavItems.some((n) => n.key === v)) this.onNavTap({ key: v })
+      const target = resolveAdminNavKey(v)
+      if (target && this.visibleNavItems.some((n) => n.key === target)) this.onNavTap({ key: target })
     },
   },
   mounted() {
     this.loadUserInfo()
     // 深链定位面板（顶栏「已连接账户」chip → ?nav=account）；只认当前可见的本页面板
-    const nav = this.initialNav
+    const nav = resolveAdminNavKey(this.initialNav)
     if (nav && this.visibleNavItems.some((n) => n.key === nav)) {
       this.onNavTap({ key: nav })
     }
@@ -1516,6 +1529,9 @@ export default {
     }
   },
   methods: {
+    resolveAdminNavKey(key) {
+      return resolveAdminNavKey(key)
+    },
     /** 「关于」区块的外链。与页内其他外链同一条出口：桌面端走系统浏览器。 */
     openLegalLink(url) {
       openExternalUrl(url)
@@ -2699,6 +2715,9 @@ $brand-mint: var(--awd-mint);
 $brand-accent: $brand-mint;
 
 .page-admin {
+  --awd-font-size-avatar: 14px;
+  --awd-font-size-kpi: 22px;
+  --awd-font-size-balance: 28px;
   min-height: 100vh;
   /* AI WorkDeck Palette Background */
   background: linear-gradient(135deg, var(--awd-bg) 0%, var(--awd-halo-page) 100%);
@@ -2776,7 +2795,7 @@ $brand-accent: $brand-mint;
 }
 
 .avatar-text {
-    font-size: 14px;
+    font-size: var(--awd-font-size-avatar);
     color: var(--awd-text-on-accent);
     font-weight: 500;
 }
@@ -2790,7 +2809,7 @@ $brand-accent: $brand-mint;
 }
 
 .user-name {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     font-weight: 600;
     color: var(--awd-text);
     white-space: nowrap;
@@ -2806,7 +2825,7 @@ $brand-accent: $brand-mint;
 }
 
 .role-text {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-2);
     font-weight: 500;
 }
@@ -2816,7 +2835,7 @@ $brand-accent: $brand-mint;
 .legal-notice {
   margin-top: 12px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   border: 1px solid var(--awd-border);
   background: var(--awd-surface);
   display: flex;
@@ -2825,7 +2844,7 @@ $brand-accent: $brand-mint;
 }
 
 .legal-line {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.6;
   color: var(--awd-text-3);
   word-break: break-all;
@@ -2847,7 +2866,7 @@ $brand-accent: $brand-mint;
 
 .nav-card {
   background: var(--awd-surface);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   border: 1px solid var(--awd-border);
   overflow: hidden;
   padding: 4px 0 8px;
@@ -2863,7 +2882,7 @@ $brand-accent: $brand-mint;
 .nav-group-title {
     display: block;
     padding: 8px 14px 4px;
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-sec);
     font-weight: 700;
     color: var(--awd-text-3);
     letter-spacing: 0.04em;
@@ -2879,7 +2898,7 @@ $brand-accent: $brand-mint;
   height: 28px;
   padding: 0 10px 0 12px;
   border-left: 2px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   transition: background-color 0.15s ease;
   cursor: pointer;
   display: flex;
@@ -2897,7 +2916,7 @@ $brand-accent: $brand-mint;
 }
 
 .nav-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   font-weight: 500;
 }
@@ -2920,7 +2939,7 @@ $brand-accent: $brand-mint;
 
 .provider-card {
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 12px;
   margin-bottom: 10px;
   background-color: var(--awd-bg);
@@ -2931,7 +2950,7 @@ $brand-accent: $brand-mint;
 }
 
 .provider-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
@@ -2940,9 +2959,9 @@ $brand-accent: $brand-mint;
   flex: 1;
   height: 30px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   border: 1px solid var(--awd-border);
-  font-size: 12.5px;
+  font-size: var(--awd-panel-fs);
   background-color: var(--awd-surface);
   transition: border-color 0.2s;
   
@@ -2955,7 +2974,7 @@ $brand-accent: $brand-mint;
 /* 字段旁的说明行：模型/区域这几项的取舍必须写清楚，否则用户只能靠猜 */
 .field-note {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   line-height: 1.7;
   margin: -4px 0 12px;
@@ -2991,7 +3010,7 @@ $brand-accent: $brand-mint;
   display: flex;
   align-items: center;
   padding: 6px 16px;
-  border-radius: 20px;
+  border-radius: 999px;
   border: 1px solid var(--awd-border);
   background: var(--awd-surface);
   cursor: pointer;
@@ -3025,7 +3044,7 @@ $brand-accent: $brand-mint;
     margin-bottom: 8px;
 }
 .section-title-sm {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     font-weight: 600;
     color: var(--awd-text);
 }
@@ -3038,13 +3057,13 @@ $brand-accent: $brand-mint;
 
 .btn-primary {
     height: 28px;
-    font-size: 12.5px;
+    font-size: var(--awd-panel-fs);
     font-weight: 500;
     background: var(--awd-accent);
     color: var(--awd-text-on-accent);
     border: none;
     padding: 0 14px;
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
     line-height: 28px;
      &:after { border: none; }
 }
@@ -3055,7 +3074,7 @@ $brand-accent: $brand-mint;
 }
 
 .radio-label {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
 }
 
@@ -3071,8 +3090,8 @@ $brand-accent: $brand-mint;
   line-height: 28px;
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
-  border-radius: 6px;
-  font-size: 12.5px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   border: none;
   cursor: pointer;
@@ -3095,7 +3114,7 @@ $brand-accent: $brand-mint;
 
 .loading-text,
 .empty-text {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
@@ -3125,14 +3144,14 @@ $brand-accent: $brand-mint;
 
 .comp-name {
   display: block;
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
 }
 
 .comp-sub {
   display: block;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -3143,14 +3162,14 @@ $brand-accent: $brand-mint;
 .comp-progress {
   margin-top: 8px;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface-3);
   overflow: hidden;
 }
 
 .comp-progress-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-accent);
   transition: width 0.3s ease;
 }
@@ -3164,9 +3183,9 @@ $brand-accent: $brand-mint;
 .comp-btn {
   height: 28px;
   line-height: 26px;
-  font-size: 12.5px;
+  font-size: var(--awd-panel-fs);
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   border: 1px solid var(--awd-border);
   background: var(--awd-surface);
   color: var(--awd-text);
@@ -3186,7 +3205,7 @@ $brand-accent: $brand-mint;
 
 /* 候选只有一个时不给个假装能选的下拉，直接摆当前实现名（dev-board#497） */
 .comp-readonly {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1;
   padding: 8px 14px;
   color: var(--awd-text-2);
@@ -3206,17 +3225,17 @@ $brand-accent: $brand-mint;
   min-width: 180px;
   height: 32px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   background: var(--awd-bg);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
 }
 
 .cap-hint {
   display: block;
   margin-top: 10px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   color: var(--awd-text-2);
 }
@@ -3233,7 +3252,7 @@ $brand-accent: $brand-mint;
 /* 当前站点 */
 .site-name {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
@@ -3242,7 +3261,7 @@ $brand-accent: $brand-mint;
 .account-intro {
   display: block;
   margin-bottom: 14px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 21px;
   color: var(--awd-text-2);
 }
@@ -3273,7 +3292,7 @@ $brand-accent: $brand-mint;
 .account-advanced-toggle {
   display: inline-block;
   margin-top: 14px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
 
@@ -3303,7 +3322,7 @@ $brand-accent: $brand-mint;
   margin-top: 2px;
   box-sizing: border-box;
   border: 1.5px solid var(--awd-border-strong);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
 
   &.checked {
@@ -3313,7 +3332,7 @@ $brand-accent: $brand-mint;
 }
 
 .account-consent-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.55;
   color: var(--awd-text-2);
 }
@@ -3337,7 +3356,7 @@ $brand-accent: $brand-mint;
 }
 
 .account-avatar-text {
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text-on-accent);
 }
@@ -3358,7 +3377,7 @@ $brand-accent: $brand-mint;
 }
 
 .account-sub {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -3367,13 +3386,13 @@ $brand-accent: $brand-mint;
   margin-bottom: 12px;
   padding: 8px 12px;
   border: 1px solid var(--awd-accent-soft);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent-wash);
   cursor: pointer;
 }
 
 .account-name-nudge-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-text);
 }
@@ -3389,14 +3408,14 @@ $brand-accent: $brand-mint;
 
 .account-team-text {
   flex: 1;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 /* 只靠强调色的一小段文字看不出能点（走查 C 第 10 条）：加下划线，
    offset 2px 免得压住中文字的下缘。 */
 .account-team-link {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-accent-text);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -3406,7 +3425,7 @@ $brand-accent: $brand-mint;
 .account-hint {
   display: block;
   margin-top: 10px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -3427,12 +3446,12 @@ $brand-accent: $brand-mint;
 }
 
 .wallet-balance-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .wallet-balance-value {
-  font-size: 28px;
+  font-size: var(--awd-font-size-balance);
   font-weight: 700;
   color: var(--awd-accent-text);
   font-variant-numeric: tabular-nums;
@@ -3451,7 +3470,7 @@ $brand-accent: $brand-mint;
   gap: 8px;
   padding: 12px 14px;
   border: 1px solid var(--awd-border-subtle);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-bg);
 }
 
@@ -3462,39 +3481,39 @@ $brand-accent: $brand-mint;
 }
 
 .wallet-tier-badge {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text-on-accent);
   background: var(--awd-accent);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   padding: 2px 8px;
 }
 
 .wallet-growth {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
 }
 
 .wallet-progress-bar {
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface-3);
   overflow: hidden;
 }
 
 .wallet-progress-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-accent);
 }
 
 .wallet-progress-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .wallet-bonus {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
 }
 
@@ -3511,14 +3530,14 @@ $brand-accent: $brand-mint;
 }
 
 .wallet-rules-toggle {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   color: var(--awd-accent-text);
   cursor: pointer;
 }
 
 .wallet-rules-link {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
   text-decoration: underline;
@@ -3527,7 +3546,7 @@ $brand-accent: $brand-mint;
 .wallet-tier-table {
   margin-top: 10px;
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   overflow: hidden;
 }
 
@@ -3556,14 +3575,14 @@ $brand-accent: $brand-mint;
 .wallet-tier-td {
   flex: 1;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .account-note {
   display: block;
   margin-top: 14px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-text-2);
 }
@@ -3578,7 +3597,7 @@ $brand-accent: $brand-mint;
 .storage-path {
   flex: 1;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-text);
   word-break: break-all;
@@ -3588,10 +3607,10 @@ $brand-accent: $brand-mint;
   display: block;
   margin-top: 10px;
   padding: 6px 10px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-bg);
   border: 1px solid var(--awd-warning);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-warning-text);
 }
@@ -3617,7 +3636,7 @@ $brand-accent: $brand-mint;
 }
 
 .usage-model {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3625,7 +3644,7 @@ $brand-accent: $brand-mint;
 }
 
 .usage-time {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -3638,19 +3657,19 @@ $brand-accent: $brand-mint;
 }
 
 .usage-tokens {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .usage-cost {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
 }
 
 /* 平台服务（P5 配置面收敛） */
 .platform-link {
   align-self: flex-start;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-accent-text);
   cursor: pointer;
 
@@ -3674,14 +3693,14 @@ $brand-accent: $brand-mint;
 }
 
 .platform-row-desc {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   line-height: 1.5;
 }
 
 /* 本月消耗：一句附注而不是一个数字块——它是参考值，不该抢档位的位置 */
 .platform-usage {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-2);
   white-space: nowrap;
 }
@@ -3708,7 +3727,7 @@ $brand-accent: $brand-mint;
 }
 
 .telemetry-switch-desc {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   line-height: 1.5;
 }
@@ -3717,20 +3736,20 @@ $brand-accent: $brand-mint;
   margin-top: 12px;
   padding: 12px 14px;
   background: var(--awd-accent-soft);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 .telemetry-privacy-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-accent-text);
 }
 
 .telemetry-privacy-line {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   line-height: 1.6;
 }
@@ -3742,9 +3761,9 @@ $brand-accent: $brand-mint;
 }
 
 .telemetry-days-btn {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   padding: 4px 12px;
-  border-radius: 14px;
+  border-radius: 999px;
   border: 1px solid var(--awd-border);
   color: var(--awd-text-2);
   cursor: pointer;
@@ -3769,7 +3788,7 @@ $brand-accent: $brand-mint;
   padding: 14px 16px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-accent-soft);
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -3777,13 +3796,13 @@ $brand-accent: $brand-mint;
 }
 
 .telemetry-kpi-num {
-  font-size: 22px;
+  font-size: var(--awd-font-size-kpi);
   font-weight: 700;
   color: var(--awd-accent-text);
 }
 
 .telemetry-kpi-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -3809,7 +3828,7 @@ $brand-accent: $brand-mint;
 }
 
 .telemetry-list-title {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   margin-bottom: 4px;
 }
@@ -3822,17 +3841,17 @@ $brand-accent: $brand-mint;
 }
 
 .telemetry-list-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 
 .telemetry-list-count {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-accent-text);
 }
 
 .telemetry-empty {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
@@ -3852,19 +3871,19 @@ $brand-accent: $brand-mint;
 }
 
 .fb-status-label {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-2);
 }
 
 .fb-status-value {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
 }
 
 /* cron 表达式在正文衬线字体下星号会飘起来，读不出「0 0 9 * * *」的结构 */
 .fb-status-value.mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
 }
 
 .fb-actions {
@@ -3875,9 +3894,9 @@ $brand-accent: $brand-mint;
 
 .fb-btn {
   border: 1px solid var(--awd-border);
-  border-radius: 7px;
+  border-radius: var(--awd-radius-md);
   padding: 6px 14px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   cursor: pointer;
 }
@@ -3896,13 +3915,13 @@ $brand-accent: $brand-mint;
 .fb-report {
   display: block;
   margin-top: 10px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .fb-item {
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   padding: 10px 12px;
   margin-bottom: 8px;
   cursor: pointer;
@@ -3920,9 +3939,9 @@ $brand-accent: $brand-mint;
 }
 
 .fb-chip {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   padding: 1px 8px;
-  border-radius: 9px;
+  border-radius: 999px;
   background: var(--awd-bg);
   color: var(--awd-text-2);
 }
@@ -3933,13 +3952,13 @@ $brand-accent: $brand-mint;
 .fb-chip-failed { background: var(--awd-danger-soft); color: var(--awd-danger-text); }
 
 .fb-item-title {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .fb-item-meta {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-2);
   margin-left: auto;
 }
@@ -3947,7 +3966,7 @@ $brand-accent: $brand-mint;
 .fb-item-text {
   display: block;
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
   color: var(--awd-text);
 }
@@ -3960,10 +3979,10 @@ $brand-accent: $brand-mint;
 }
 
 .fb-item-tag {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-2);
   background: var(--awd-bg);
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   padding: 1px 7px;
 }
 
@@ -3991,13 +4010,13 @@ $brand-accent: $brand-mint;
   width: 132px;
   height: 88px;
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-bg);
 }
 
 .fb-detail-line {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.7;
   color: var(--awd-text);
 }
@@ -4009,7 +4028,7 @@ $brand-accent: $brand-mint;
 .fb-detail-label {
   display: block;
   margin-top: 8px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-2);
 }
 
@@ -4019,8 +4038,8 @@ $brand-accent: $brand-mint;
   padding: 8px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
-  font-size: 11px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-panel-fs-sec);
   line-height: 1.6;
   color: var(--awd-text-2);
   white-space: pre-wrap;
@@ -4032,25 +4051,25 @@ $brand-accent: $brand-mint;
 /* 跨境单独同意（个保法第三十九条）。刻意做得可读而不刺眼：
    它不该吓退用户，但必须在做决定时看得见、看得懂。 */
 .consent-row {
-  margin-top: 12rpx;
+  margin-top: var(--awd-space-3);
 }
 .consent-box {
-  border: 1rpx solid var(--awd-border);
-  border-left: 4rpx solid var(--awd-accent);
-  border-radius: 8rpx;
-  padding: 20rpx 24rpx;
+  border: 1px solid var(--awd-border);
+  border-left: 4px solid var(--awd-accent);
+  border-radius: var(--awd-radius-sm);
+  padding: var(--awd-space-3) var(--awd-space-4);
   background: var(--awd-surface);
 }
 .consent-title {
   display: block;
-  font-size: 26rpx;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
-  margin-bottom: 10rpx;
+  margin-bottom: var(--awd-space-2);
 }
 .consent-body {
   display: block;
-  font-size: 24rpx;
+  font-size: var(--awd-panel-fs);
   line-height: 1.7;
   color: var(--awd-text-2);
 }
@@ -4061,17 +4080,17 @@ $brand-accent: $brand-mint;
 .consent-check {
   display: flex;
   align-items: flex-start;
-  gap: 12rpx;
-  margin-top: 18rpx;
+  gap: var(--awd-space-2);
+  margin-top: var(--awd-space-3);
   cursor: pointer;
 }
 .consent-box-mark {
-  width: 28rpx;
-  height: 28rpx;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
-  margin-top: 4rpx;
-  border: 2rpx solid var(--awd-border-strong);
-  border-radius: 4rpx;
+  margin-top: 2px;
+  border: 1px solid var(--awd-border-strong);
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
   transition: all 0.15s;
 }
@@ -4080,20 +4099,20 @@ $brand-accent: $brand-mint;
   border-color: var(--awd-accent);
 }
 .consent-check-label {
-  font-size: 24rpx;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   color: var(--awd-text);
 }
 .consent-meta {
   display: block;
-  margin-top: 10rpx;
-  font-size: 22rpx;
+  margin-top: var(--awd-space-2);
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 .consent-link {
   display: inline-block;
-  margin-top: 10rpx;
-  font-size: 22rpx;
+  margin-top: var(--awd-space-2);
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   text-decoration: underline;
 }

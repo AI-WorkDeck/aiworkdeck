@@ -166,7 +166,7 @@ export default {
   min-height: 0;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   overflow: hidden;
 }
 
@@ -181,13 +181,13 @@ export default {
 }
 
 .agenda-title {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .agenda-stats {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   white-space: nowrap;
 
@@ -205,13 +205,13 @@ export default {
 .agenda-nomatch {
   padding: 32px 12px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
 }
 
 .agenda-group {
   padding-top: 8px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   transition: background 0.3s ease;
 
   &.is-flash { background: var(--awd-accent-wash); }
@@ -225,20 +225,20 @@ export default {
 
   &.is-toggle {
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
 
     &:hover { background: var(--awd-bg); }
   }
 }
 
 .agenda-group-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text-2);
 }
 
 .agenda-group-count {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 
@@ -263,7 +263,7 @@ export default {
 }
 
 .guide-title {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
   margin-bottom: 4px;
@@ -275,7 +275,7 @@ export default {
   gap: 10px;
   padding: 12px;
   border: 1px dashed var(--awd-gold-line);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-bg);
 }
 
@@ -301,7 +301,7 @@ export default {
 }
 
 .guide-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-text-2);
 }

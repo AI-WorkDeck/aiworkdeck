@@ -13,7 +13,7 @@
         <!-- 无项目态（dev-board#1047）：顶栏只有应用名，没有项目切换器 / 协作 chip / 负责人一行 -->
         <view v-if="!hasNamedProject" class="project-info no-project-info">
           <view class="project-title-row">
-            <text class="project-name no-project-title">{{ isLooseWorkspace ? $t('workbench.looseFiles') : $t('onboarding.unlock.brand.brand') }}</text>
+            <text v-if="isLooseWorkspace" class="project-name no-project-title">{{ $t('workbench.looseFiles') }}</text>
           </view>
         </view>
         <view v-else class="project-info">
@@ -1896,7 +1896,7 @@
                             <text class="conv-action danger" @tap.stop="confirmDeleteConversation(chat)">{{ $t('workbench.conversationDelete') }}</text>
                         </view>
                         <view style="display:flex; flex-direction:column; align-items:flex-end; margin-left:8px; flex-shrink:0;">
-                            <text class="item-time" style="font-size:10px; color:var(--awd-text-3);">{{ formatTime(chat.updatedAt) }}</text>
+                            <text class="item-time" style="font-size:var(--awd-panel-fs-sec); color:var(--awd-text-3);">{{ formatTime(chat.updatedAt) }}</text>
                             <text v-if="convStatusLabel(chat)" class="conv-status-label" :class="convDotClass(chat)">{{ convStatusLabel(chat) }}</text>
                         </view>
                     </view>

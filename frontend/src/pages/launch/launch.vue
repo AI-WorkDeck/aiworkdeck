@@ -171,7 +171,7 @@ export default {
 }
 
 .launch-status {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
 }
 
@@ -184,12 +184,12 @@ export default {
 }
 
 .launch-error-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
 .launch-error-detail {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
 }
 
@@ -197,11 +197,11 @@ export default {
   height: 36px;
   line-height: 34px;
   padding: 0 28px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-accent-text);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border-strong);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   cursor: pointer;
 
   &:hover {

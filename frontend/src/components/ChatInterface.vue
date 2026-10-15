@@ -4370,9 +4370,9 @@ export default {
   align-self: center;
   white-space: nowrap;
   padding: 4px 7px;
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-text-2);
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   cursor: pointer;
 }
 .memory-header-btn:hover { background: var(--awd-surface); color: var(--awd-accent-text); }
@@ -4387,7 +4387,7 @@ export default {
 .icon-btn {
   cursor: pointer;
   padding: 6px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   color: var(--awd-text-2);
   display: flex;
   align-items: center;
@@ -4416,7 +4416,7 @@ export default {
 /* Prevent layout shift when active */
 .icon-btn.active {
   background: var(--awd-accent-soft);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
 }
 .icon-btn.active .btn-icon.default {
   display: none;
@@ -4449,7 +4449,7 @@ export default {
 /* File add button with border */
 .icon-btn.file-add-btn {
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 3px;
 }
 .icon-btn.file-add-btn:hover {
@@ -4508,12 +4508,12 @@ export default {
   margin: 0;
   min-width: 0;
   border: 1px solid var(--awd-border);
-  border-radius: 20px;
+  border-radius: var(--awd-radius-dialog);
   padding: 5px 14px;
   color: var(--awd-accent-text);
   background: var(--awd-surface);
   box-shadow: var(--awd-shadow-sm);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   white-space: nowrap;
   overflow: hidden;
@@ -4544,10 +4544,10 @@ export default {
 .user-bubble {
   background: var(--awd-accent-soft); /* AI WorkDeck品牌色 Lightest */
   padding: 8px 12px;
-  border-radius: 6px 6px 0 6px;
+  border-radius: var(--awd-radius-md) var(--awd-radius-md) 0 var(--awd-radius-md);
   max-width: 80%;
   color: var(--awd-text); /* Gray-Dark for text */
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.5;
   box-shadow: none;
   border: 1px solid var(--awd-border);
@@ -4570,7 +4570,7 @@ export default {
 }
 
 .bubble-timestamp {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   /* margin-top: 4px; */
 }
@@ -4584,7 +4584,7 @@ export default {
 }
 .bubble-receipt {
   margin-right: 8px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
 }
@@ -4641,7 +4641,7 @@ export default {
 }
 
 .welcome-text {
-  font-size: 24px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
   margin-bottom: 8px;
@@ -4649,7 +4649,7 @@ export default {
 }
 
 .welcome-subtitle {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 400;
   color: var(--awd-text-2);
   display: block;
@@ -4658,11 +4658,11 @@ export default {
 .input-card {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 12px;
+  border-radius: var(--awd-radius-dialog);
   padding: 16px;
   width: 100%;
   box-sizing: border-box;
-  box-shadow: 0 1px 2px rgba(18, 52, 77, 0.04), 0 4px 16px rgba(18, 52, 77, 0.06);
+  box-shadow: var(--awd-shadow-md);
   position: relative;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -4676,12 +4676,12 @@ export default {
 /* 输入区获得焦点时整卡亮起：品牌绿描边 + mint 光晕（浅色，不做深色 chrome） */
 .input-card:focus-within {
   border-color: var(--awd-accent);
-  box-shadow: 0 0 0 3px rgba(137, 168, 160, 0.16), 0 1px 2px rgba(18, 52, 77, 0.04), 0 4px 16px rgba(18, 52, 77, 0.06);
+  box-shadow: 0 0 0 3px var(--awd-accent-soft), var(--awd-shadow-md);
 }
 
 /* Recent History Section - 紧凑专业样式 */
 .recent-history-header {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   color: var(--awd-text-3);
   margin-bottom: 8px;
@@ -4694,7 +4694,7 @@ export default {
   flex-direction: column;
   gap: 0; /* 无间距 */
   border: 1px solid var(--awd-border);
-  border-radius: 4px; /* 减小圆角 */
+  border-radius: var(--awd-radius-sm); /* 减小圆角 */
   overflow: hidden;
   background: var(--awd-surface);
 }
@@ -4748,7 +4748,7 @@ export default {
 }
 
 .history-title {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   flex: 1;
   overflow: hidden;
@@ -4759,7 +4759,7 @@ export default {
 }
 
 .history-time {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   margin-left: 12px;
   flex-shrink: 0;
@@ -4768,14 +4768,14 @@ export default {
 }
 
 .history-empty-placeholder {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
   text-align: center;
   padding: 24px 0;
 }
 
 .history-disclaimer {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   text-align: center;
   padding: 16px 0 0;
@@ -4788,7 +4788,7 @@ export default {
   max-height: 200px;
   overflow-y: auto;
   outline: none;
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   line-height: 1.5;
   color: var(--awd-text);
 }
@@ -4821,7 +4821,7 @@ export default {
 }
 
 .model-selector {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   cursor: pointer;
   /* 定位基准挪给 .input-card（见 .model-dropdown 注释）——AI 面板最窄 240px，
@@ -4835,7 +4835,7 @@ export default {
   box-sizing: border-box;
   padding: 0 6px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   transition: background 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
   flex: 1 1 100px;
@@ -4856,7 +4856,7 @@ export default {
 
 .dropdown-arrow {
   flex-shrink: 0;
-  font-size: 8px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   transition: color 0.15s ease;
 }
@@ -4868,7 +4868,7 @@ export default {
 
 /* ============= Mode Selector (Agent/Ask/Plan) ============= */
 .mode-selector {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   cursor: pointer;
   /* 同 .model-selector：定位基准挪给 .input-card。实测在 240px 最窄面板下，
@@ -4882,7 +4882,7 @@ export default {
   height: 24px;
   box-sizing: border-box;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent-wash);
   border: 1px solid var(--awd-accent-soft);
   transition: all 0.15s ease;
@@ -4896,7 +4896,7 @@ export default {
 }
 
 .mode-icon {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
 }
 
 .mode-name {
@@ -4912,8 +4912,8 @@ export default {
   right: 0;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   z-index: 1001;
   min-width: 0;
   padding: 6px 0;
@@ -4947,7 +4947,7 @@ export default {
 }
 
 .mode-option-icon {
-  font-size: 18px;
+  font-size: var(--awd-font-size-title);
 }
 
 .mode-option-text {
@@ -4957,13 +4957,13 @@ export default {
 }
 
 .mode-option-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 500;
   color: var(--awd-text);
 }
 
 .mode-option-desc {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 
@@ -4972,7 +4972,7 @@ export default {
   border-top: 1px solid var(--awd-border-subtle);
   margin-top: 4px;
   padding: 6px 14px 2px;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   line-height: 1.5;
   max-width: 200px;
@@ -4984,8 +4984,8 @@ export default {
   right: 0;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   z-index: 1000;
   min-width: 240px;
   padding: 8px 0;
@@ -5005,7 +5005,7 @@ export default {
 
 .menu-label {
   padding: 6px 12px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text-2);
   background: var(--awd-bg);
@@ -5018,7 +5018,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   transition: all 0.15s ease;
   border-bottom: 1px solid var(--awd-border-subtle);
@@ -5081,10 +5081,10 @@ export default {
   flex-shrink: 0;
 }
 .composer-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; max-width: 100%; }
-.follow-mode,.alternate-send { padding: 4px 6px; border-radius: 5px; color: var(--awd-text-2); font-size: 10px; cursor: pointer; }
+.follow-mode,.alternate-send { padding: 4px 6px; border-radius: var(--awd-radius-sm); color: var(--awd-text-2); font-size: var(--awd-panel-fs-meta); cursor: pointer; }
 .follow-mode { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .alternate-send:hover { background: var(--awd-surface-2); }
-.stop-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--awd-danger); color: white; font-size: 11px; cursor: pointer; }
+.stop-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--awd-danger); color: var(--awd-text-on-accent); font-size: var(--awd-panel-fs-meta); cursor: pointer; }
 .send-btn:hover {
   background: var(--awd-accent-hover);
 }
@@ -5103,7 +5103,7 @@ export default {
   background: var(--awd-danger);
 }
 .send-icon {
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: bold;
   display: inline-block;
 }
@@ -5128,22 +5128,22 @@ export default {
   padding: 10px 12px;
   background: var(--awd-accent-wash);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 .readonly-text {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-text-2);
 }
 .readonly-fork-btn {
   flex-shrink: 0;
   padding: 5px 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-on-accent);
   background: var(--awd-accent);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
 }
 .readonly-fork-btn:hover {
@@ -5166,14 +5166,14 @@ export default {
   gap: 4px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-info);
-  border-radius: 14px;
+  border-radius: var(--awd-radius-dialog);
   padding: 4px 8px 4px 6px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-info-text);
 }
 
 .context-file-icon {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
 }
 
 .context-file-name {
@@ -5187,7 +5187,7 @@ export default {
   margin-left: 4px;
   color: var(--awd-text-3);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   line-height: 1;
 }
 
@@ -5211,13 +5211,13 @@ export default {
 .carried-attachment-hint {
   display: block;
   padding: 2px 2px 0;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
   color: var(--awd-text-3);
 }
 .input-images-note {
   flex-basis: 100%;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
   color: var(--awd-text-3);
   /* 从缩略图块里挪到输入卡片底部常驻（K21 ⑨）：拖进来的项目图片也要覆盖，
@@ -5235,10 +5235,10 @@ export default {
   max-width: 100%;
   margin: 0 0 4px;
   padding: 2px 6px 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px dashed var(--awd-border);
-  background: var(--awd-bg-2);
-  font-size: 11px;
+  background: var(--awd-surface-2);
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.6;
   color: var(--awd-text-2);
 }
@@ -5250,17 +5250,17 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--awd-text-1);
+  color: var(--awd-text);
 }
 .active-doc-remove {
   flex-shrink: 0;
   padding: 0 2px;
   color: var(--awd-text-3);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1;
 }
-.active-doc-remove:hover { color: var(--awd-text-1); }
+.active-doc-remove:hover { color: var(--awd-text); }
 
 /* 历史里那一轮带过的附件（K14 ④）：只在历史气泡上出现——
    手打输入那条路的附件是正文里的内联标签，再挂一排就是显示两遍。 */
@@ -5271,10 +5271,10 @@ export default {
   margin-top: 6px;
 }
 .bubble-attachment {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.6;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-border);
   color: var(--awd-text-2);
   max-width: 100%;
@@ -5292,7 +5292,7 @@ export default {
   margin-top: 4px;
 }
 .context-notice {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
   color: var(--awd-text-3);
   text-align: left;
@@ -5302,9 +5302,9 @@ export default {
   position: relative;
   width: 48px;
   height: 48px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   overflow: hidden;
-  box-shadow: 0 2px 6px rgba(46, 90, 80, 0.15);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .preview-thumb {
@@ -5322,11 +5322,11 @@ export default {
   background: linear-gradient(135deg, var(--awd-accent) 0%, var(--awd-accent-hover) 100%);
   color: var(--awd-text-on-accent);
   border-radius: 50%;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   text-align: center;
   line-height: 18px;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(46, 90, 80, 0.3);
+  box-shadow: var(--awd-shadow-sm);
   transition: all 0.15s ease;
 }
 
@@ -5346,9 +5346,9 @@ export default {
    background: transparent;
    color: var(--awd-accent-text);
    padding: 3px 22px 3px 8px; /* 右侧给常显的 × 留位 */
-   border-radius: 4px;
+   border-radius: var(--awd-radius-sm);
    margin: 0 4px 2px 0;
-   font-size: 12px;
+   font-size: var(--awd-panel-fs);
    font-weight: 500;
    vertical-align: middle;
    user-select: none;
@@ -5384,7 +5384,7 @@ export default {
    width: 14px;
    height: 14px;
    flex-shrink: 0;
-   border-radius: 2px;
+   border-radius: var(--awd-radius-sm);
    filter: brightness(0.3);
  }
 
@@ -5415,7 +5415,7 @@ export default {
    border-radius: 50%;
    align-items: center;
    justify-content: center;
-   font-size: 10px;
+   font-size: var(--awd-panel-fs-meta);
    cursor: pointer;
    transition: all 0.1s ease;
  }
@@ -5436,9 +5436,9 @@ export default {
   background: transparent;
   color: var(--awd-accent-text);
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   margin: 0 4px 2px 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   vertical-align: middle;
   user-select: none;
@@ -5451,7 +5451,7 @@ export default {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-  border-radius: 2px;
+  border-radius: var(--awd-radius-sm);
   /* Ensure icon is visible on light background */
   filter: brightness(0.2);
 }
@@ -5491,9 +5491,9 @@ export default {
 .bubble-image-thumb {
   width: 80px;
   height: 80px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   object-fit: cover;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 /* Improve user bubble content display for inline tags */
@@ -5501,7 +5501,7 @@ export default {
   line-height: 1.5;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   white-space: pre-wrap; /* Preserve newlines and spaces */
 }
 
@@ -5531,7 +5531,7 @@ export default {
   flex-shrink: 0;
   height: 20px;
   padding: 0 7px;
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-accent-soft);
   border: 1px solid var(--awd-accent-soft);
 }
@@ -5543,14 +5543,14 @@ export default {
 }
 
 .skill-chip-name {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   line-height: 1;
   white-space: nowrap;
 }
 
 .skill-chip-remove {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1;
   color: var(--awd-accent-text);
   cursor: pointer;
@@ -5572,7 +5572,7 @@ export default {
   50% {
     background: var(--awd-accent-soft);
     border-color: var(--awd-mint);
-    box-shadow: 0 0 0 2px rgba(137, 168, 160, 0.18);
+    box-shadow: 0 0 0 2px var(--awd-accent-soft);
   }
 }
 
@@ -5588,7 +5588,7 @@ export default {
   min-width: 24px;
   height: 24px;
   padding: 0 3px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   transition: background 0.15s ease;
   flex-shrink: 0;
 }
@@ -5609,7 +5609,7 @@ export default {
 }
 
 .skill-count {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1;
   color: var(--awd-accent-text);
   font-weight: 600;
@@ -5631,8 +5631,8 @@ export default {
   right: 0;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
   z-index: 1001;
   min-width: 230px;
   max-height: 280px;
@@ -5653,12 +5653,12 @@ export default {
   row-gap: 2px;
 }
 .skill-dropdown-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   font-weight: 500;
 }
 .skill-dropdown-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: normal;
 }
@@ -5686,14 +5686,14 @@ export default {
 .skill-check {
   width: 12px;
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 18px;
   color: var(--awd-accent-text);
 }
 
 .skill-empty {
   padding: 7px 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
 }
 
@@ -5705,7 +5705,7 @@ export default {
 }
 
 .skill-option-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
 }
 .skill-option.active .skill-option-name {
@@ -5714,7 +5714,7 @@ export default {
 }
 
 .skill-option-desc {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5730,7 +5730,7 @@ export default {
 
 .skill-manage {
   padding: 7px 12px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
   transition: background 0.15s ease;
@@ -5772,8 +5772,8 @@ export default {
   width: 618px; /* Golden Ratio-ish Width */
   max-width: 90vw;
   background-color: var(--awd-surface);
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   overflow: hidden;
   animation: awd-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
@@ -5823,11 +5823,11 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-accent-text);
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   transition: background 0.15s ease;
 }
 
@@ -5836,13 +5836,13 @@ export default {
 }
 
 .new-folder-btn .btn-plus {
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: bold;
   line-height: 1;
 }
 
 .awd-dialog-title {
-  font-size: 20px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-accent-text); /* Forest Green */
   line-height: 1.4;
@@ -5851,7 +5851,7 @@ export default {
 
 .awd-dialog-subtitle {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   line-height: 1.5;
   display: block;
@@ -5888,9 +5888,9 @@ export default {
   justify-content: center;
   height: 44px;
   padding: 0 32px;
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   cursor: pointer;
   transition: all 0.2s;
   min-width: 100px;
@@ -5940,8 +5940,8 @@ export default {
 }
 .pick-tab {
   padding: 5px 12px;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   cursor: pointer;
 }
@@ -5956,9 +5956,9 @@ export default {
   height: 34px;
   padding: 0 10px;
   box-sizing: border-box;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   color: var(--awd-text);
 }
 .pick-list {
@@ -5970,21 +5970,21 @@ export default {
   align-items: center;
   gap: 8px;
   padding: 7px 8px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
 }
 .pick-row:hover { background: var(--awd-surface-2); }
 .pick-row.picked { cursor: default; opacity: 0.65; }
 .pick-icon { width: 14px; height: 14px; flex-shrink: 0; }
 .pick-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .pick-path {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -5993,20 +5993,20 @@ export default {
 }
 .pick-done {
   margin-left: auto;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   white-space: nowrap;
 }
 .pick-empty {
   padding: 22px 8px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
 }
 
 .form-label {
   display: block;
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 500;
   color: var(--awd-text);
   margin-bottom: 8px;
@@ -6015,7 +6015,7 @@ export default {
 .awd-field {
   background-color: var(--awd-bg);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -6040,12 +6040,12 @@ export default {
 }
 
 .awd-field .field-value {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
 }
 
 .awd-field .field-placeholder {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text-3);
 }
 
@@ -6056,10 +6056,10 @@ export default {
 }
 
 .selected-file-tag {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   background: var(--awd-surface);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-border);
   color: var(--awd-text);
   max-width: 150px;
@@ -6074,7 +6074,7 @@ export default {
   align-items: center;
   padding: 10px 12px;
   margin-bottom: 2px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -6118,14 +6118,14 @@ export default {
 
 .folder-name {
   margin-left: 8px;
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
 }
 
 .empty-tip {
   text-align: center;
   color: var(--awd-text-3);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   padding: 20px 0;
 }
 /* Token Usage Bar */
@@ -6137,7 +6137,7 @@ export default {
   padding: 4px 12px;
   margin-bottom: 8px; /* Maintain margin */
   background: linear-gradient(135deg, var(--awd-accent-wash) 0%, var(--awd-accent-wash) 100%);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   border: 1px solid var(--awd-accent-soft);
   width: 100%; /* Fix: Full width */
   box-sizing: border-box; /* Fix: Include padding in width */
@@ -6145,7 +6145,7 @@ export default {
 }
 
 .token-usage-bar .token-label {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-accent-text);
   text-transform: uppercase;
@@ -6153,7 +6153,7 @@ export default {
 }
 
 .token-usage-bar .token-value {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-mint);
   flex: 1; /* Allow value to take space if needed */
@@ -6161,7 +6161,7 @@ export default {
 }
 
 .token-usage-bar .token-detail {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 
@@ -6176,21 +6176,21 @@ export default {
   padding: 6px 12px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-warning);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 
 .continue-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-warning-text);
 }
 
 .continue-btn {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text-on-accent);
   background: var(--awd-accent);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 4px 14px;
   cursor: pointer;
   transition: background 0.2s;
@@ -6208,11 +6208,11 @@ export default {
   padding: 6px 12px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-warning);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 
 .link-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-warning-text);
 }
 
@@ -6226,12 +6226,12 @@ export default {
   padding: 6px 12px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-warning);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 
 .audio-transcribe-hint {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-warning-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6240,11 +6240,11 @@ export default {
 
 .audio-transcribe-btn {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 3px 12px;
   cursor: pointer;
   transition: all 0.15s;
@@ -6272,11 +6272,11 @@ export default {
   padding: 5px 12px;
   background: var(--awd-bg);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
 }
 
 .task-control-name {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text);
   flex-shrink: 0;
@@ -6284,7 +6284,7 @@ export default {
 
 .task-control-msg {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6293,11 +6293,11 @@ export default {
 
 .task-control-btn {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 3px 12px;
   cursor: pointer;
   transition: all 0.15s;
@@ -6328,7 +6328,7 @@ export default {
   /* 与下方输入卡对齐（卡自带描边），行距走 8 栅格 */
   padding: 0 2px 8px;
   background-color: transparent;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   z-index: 10;
   width: 100%;
   box-sizing: border-box;
@@ -6348,7 +6348,7 @@ export default {
   align-items: center;
   gap: 4px;
   opacity: 0.6;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
 }
 
 /* 本轮用量是一句说明，不是要盯着看的数字面板：去掉等宽加粗，与左侧改动/新增同重 */
@@ -6372,10 +6372,10 @@ export default {
   display: flex;
   align-items: center;
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background-color: var(--awd-surface);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text-2); /* Gray-Medium */
   border: 1px solid var(--awd-border); /* Gray-Light */
@@ -6425,8 +6425,8 @@ export default {
   margin-bottom: 8px; /* Gap */
   width: 200px;
   background: var(--awd-surface);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
   padding: 4px 0;
   z-index: 100;
   border: 1px solid var(--awd-border);
@@ -6454,7 +6454,7 @@ export default {
 }
 
 .file-name-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6481,7 +6481,7 @@ export default {
   font-weight: 600;
 }
 .token-detail {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 
@@ -6563,11 +6563,11 @@ export default {
 
 /* .rollback-btn:hover .rollback-icon-svg,
 .rollback-btn:hover .rollback-text {
-  color: white;
+  color: var(--awd-text-on-accent);
 } */
 
 .rollback-text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   font-weight: 600;
 }
@@ -6586,7 +6586,7 @@ export default {
 }
 
 .warning-text {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
   margin-bottom: 12px;
   display: block;
@@ -6595,7 +6595,7 @@ export default {
 .doc-tip-box {
   background-color: var(--awd-surface);
   border: 1px solid var(--awd-info);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 10px;
   display: flex;
   flex-direction: row;
@@ -6611,7 +6611,7 @@ export default {
 }
 
 .doc-tip-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-info-text);
   display: flex;
   flex-direction: column;
@@ -6625,18 +6625,18 @@ export default {
 .rollback-preview {
   background-color: var(--awd-surface-2);
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border-left: 3px solid var(--awd-border-strong);
 }
 
 .preview-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   margin-right: 4px;
 }
 
 .preview-content {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   font-style: italic;
 }
@@ -6656,7 +6656,7 @@ export default {
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text-2);
   margin-bottom: 12px;
   display: block;
@@ -6664,7 +6664,7 @@ export default {
 
 .ppt-option-card {
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   padding: 16px;
   margin-bottom: 12px;
   cursor: pointer;
@@ -6680,7 +6680,7 @@ export default {
 .ppt-option-card.active {
   border-color: var(--awd-info);
   background-color: var(--awd-info-soft);
-  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .option-header {
@@ -6698,7 +6698,7 @@ export default {
 }
 
 .option-name {
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
   flex: 1;
@@ -6707,11 +6707,11 @@ export default {
 .check-mark {
   color: var(--awd-info-text);
   font-weight: bold;
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
 }
 
 .option-desc {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   line-height: 1.5;
   padding-left: 32px; /* align with text start */
@@ -6728,7 +6728,7 @@ export default {
 .rollback-archive-note {
   color: var(--awd-text-2);
   font-weight: 400;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 
 .highlight-text {
@@ -6757,11 +6757,11 @@ export default {
     padding: 8px 12px;
     background: var(--awd-surface);
     border: 1px solid var(--awd-border);
-    border-radius: 10px;
+    border-radius: var(--awd-radius-dialog);
 }
 
 .ccr-text {
-    font-size: 13px;
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text);
 }
 
@@ -6786,21 +6786,21 @@ export default {
     max-width: 88%;
     background: var(--awd-surface);
     border: 1px solid var(--awd-border);
-    border-radius: 12px;
+    border-radius: var(--awd-radius-dialog);
     box-shadow: var(--awd-shadow-lg);
     padding: 18px;
 }
 
 .cg-title {
     display: block;
-    font-size: 15px;
+    font-size: var(--awd-font-size-reading);
     font-weight: 600;
     color: var(--awd-text);
     margin-bottom: 10px;
 }
 
 .cg-installing-text {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text-2);
 }
 
@@ -6813,8 +6813,8 @@ export default {
 .cg-btn {
     padding: 7px 14px;
     border: 1px solid var(--awd-border-strong);
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: var(--awd-radius-dialog);
+    font-size: var(--awd-font-size-body);
     color: var(--awd-text);
     cursor: pointer;
 }

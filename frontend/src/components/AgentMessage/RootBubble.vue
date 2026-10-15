@@ -325,9 +325,9 @@ function isApprovalPending(art) {
   border-bottom: none;
   margin: 10px 12px 12px;
   border: 1.5px solid var(--awd-mint); /* Mint Green */
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(46, 90, 80, 0.10);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 /* 顶部色条：森林绿→薄荷绿，视觉上先声夺人 */
@@ -355,14 +355,14 @@ function isApprovalPending(art) {
 }
 
 .approval-flag-text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 700;
   color: var(--awd-accent-text); /* Forest Green */
   letter-spacing: 0.3px;
 }
 
 .stop-notice {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   padding: 2px 4px 0;
   margin-bottom: 14px;
@@ -370,7 +370,7 @@ function isApprovalPending(art) {
 
 .main-content {
   padding: 0;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.7;
   color: var(--awd-text); /* Gray-Dark */
 }
@@ -394,9 +394,9 @@ function isApprovalPending(art) {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   padding: 3px 10px;
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-border);
   color: var(--awd-text-2);
   background: var(--awd-surface);
@@ -417,18 +417,18 @@ function isApprovalPending(art) {
   bottom: calc(100% - 2px);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
   padding: 4px;
   z-index: 99;
   min-width: 140px;
 }
 
 .msg-act-item {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   padding: 6px 10px;
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -445,18 +445,18 @@ function isApprovalPending(art) {
   background: transparent;
 }
 
-.stream-title { color: var(--awd-text-2); font-size: 13px; }
+.stream-title { color: var(--awd-text-2); font-size: var(--awd-font-size-body); }
 .activity-summary {
   display: flex; align-items: center; gap: 8px; max-width: 100%;
   border: 0; background: transparent; padding: 0; margin: 0;
-  color: var(--awd-text-2); font: inherit; font-size: 12px; line-height: 1.6;
+  color: var(--awd-text-2); font: inherit; font-size: var(--awd-panel-fs); line-height: 1.6;
   text-align: left; cursor: pointer; overflow-wrap: anywhere;
 }
 .activity-summary::after { border: 0; }
 .activity-summary:hover { color: var(--awd-text); }
-.activity-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 4px; border-radius: 3px; }
+.activity-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 4px; border-radius: var(--awd-radius-sm); }
 .activity-summary.has-error { color: var(--awd-danger); }
-.activity-chevron { display: inline-block; transition: transform .18s; font-size: 18px; }
+.activity-chevron { display: inline-block; transition: transform .18s; font-size: var(--awd-font-size-title); }
 .activity-chevron.open { transform: rotate(90deg); }
 .activity-summary.is-working > span:first-child { animation: activity-breathe 1.8s ease-in-out infinite; }
 @keyframes activity-breathe { 50% { opacity: .5; } }
@@ -485,7 +485,7 @@ function isApprovalPending(art) {
 .main-content:deep(code) {
   background: var(--awd-accent-soft); /* Subtle Mint Green Tint */
   padding: 2px 5px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   font-size: 85%;
   color: var(--awd-accent-text); /* Forest Green */
   font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
@@ -495,10 +495,10 @@ function isApprovalPending(art) {
 .main-content:deep(pre) {
   background: var(--awd-bg); /* Gray-Pale */
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   overflow-x: auto;
   border: 1px solid var(--awd-border);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   margin: 12px 0;
 }
 
@@ -519,7 +519,7 @@ function isApprovalPending(art) {
 }
 
 .main-content :deep(.markdown-body) {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.7;
   margin: 0;
   padding: 0;
@@ -540,7 +540,7 @@ function isApprovalPending(art) {
    样式留在本文件：带 data-chat-attention 的两处（审批卡外壳、QuestionCard 根节点）
    都由本组件模板渲染，父组件的 scoped 选择器匹配不到它们。 */
 .chat-attention-flash {
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   box-shadow: 0 0 0 2px var(--awd-warning);
   animation: awd-attention-flash 1.4s ease-out;
 }

@@ -967,6 +967,9 @@ export default {
 <style lang="scss" scoped>
 /* VS Code 扩展详情页结构 + 产品浅色编辑排版（衬线标题按官网 DESIGN.md 只用于展示位） */
 .mdp {
+  --awd-glyph-radius: 14px;
+  --awd-font-size-kpi: 22px;
+  --awd-font-size-badge: 10px;
   width: 100%;
   height: 100%;
   background: var(--awd-surface);
@@ -987,7 +990,7 @@ export default {
   width: 72px;
   height: 72px;
   flex-shrink: 0;
-  border-radius: 14px;
+  border-radius: var(--awd-glyph-radius);
   background: var(--awd-accent-soft);
   display: flex;
   align-items: center;
@@ -1020,37 +1023,37 @@ export default {
 
 .mdp-title {
   font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
-  font-size: 22px;
+  font-size: var(--awd-font-size-kpi);
   font-weight: 700;
   color: var(--awd-text);
   line-height: 1.25;
 }
 
 .mdp-kind-badge {
-  font-size: 10px;
+  font-size: var(--awd-font-size-badge);
   font-weight: 600;
   color: var(--awd-accent-text);
   background: var(--awd-accent-soft);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   padding: 1px 6px;
 }
 
 .mdp-installed-badge {
-  font-size: 10px;
+  font-size: var(--awd-font-size-badge);
   font-weight: 600;
   color: var(--awd-text-on-accent);
   background: var(--awd-accent);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   padding: 1px 6px;
 }
 
 /* 价格徽章：免费用中性灰，付费用暖色（与「试用版」chip 同族），不做成促销红 */
 .mdp-price-badge {
-  font-size: 10px;
+  font-size: var(--awd-font-size-badge);
   font-weight: 600;
   color: var(--awd-text-2);
   background: var(--awd-surface-2);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   padding: 1px 6px;
 
   &.paid {
@@ -1062,7 +1065,7 @@ export default {
 .mdp-purchase-hint {
   display: block;
   margin-top: 8px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   line-height: 17px;
   color: var(--awd-warning-text);
 }
@@ -1076,7 +1079,7 @@ export default {
 }
 
 .mdp-byline-item {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 
   & + .mdp-byline-item::before {
@@ -1094,7 +1097,7 @@ export default {
 .mdp-kind-note {
   display: block;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   line-height: 16px;
   color: var(--awd-text-2);
 }
@@ -1102,7 +1105,7 @@ export default {
 .mdp-summary {
   display: block;
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 20px;
   color: var(--awd-text);
 }
@@ -1113,7 +1116,7 @@ export default {
 
 .mdp-scenario-lead {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   margin-bottom: 6px;
 }
@@ -1130,13 +1133,13 @@ export default {
   height: 28px;
   line-height: 26px;
   padding: 0 14px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   border: 1px solid var(--awd-border-strong);
   background: var(--awd-surface);
   cursor: pointer;
 
   text {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     font-weight: 600;
     color: var(--awd-text);
   }
@@ -1187,18 +1190,18 @@ export default {
 }
 
 .mdp-switch-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .mdp-action-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-3);
 }
 
 /* 原生资源包状态：下架标红、下载中用中性进度条、失败态错误文案 + 重试按钮 */
 .mdp-pack-revoked {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-danger-text);
 }
@@ -1207,19 +1210,19 @@ export default {
   height: 28px;
   line-height: 28px;
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface-2);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .mdp-pack-error {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-danger-text);
 }
 
 .mdp-pack-update {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -1231,7 +1234,7 @@ export default {
 
 .mdp-loading {
   padding: 24px 0;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
@@ -1241,7 +1244,7 @@ export default {
 
 .mdp-sec-title {
   display: block;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 700;
   color: var(--awd-text);
   margin-bottom: 8px;
@@ -1249,7 +1252,7 @@ export default {
 
 .mdp-sec-body {
   display: block;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 20px;
   color: var(--awd-text);
 }
@@ -1269,15 +1272,15 @@ export default {
   justify-content: space-between;
 }
 .mdp-set-label {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
 .mdp-set-input {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   padding: 6px 10px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface);
   color: var(--awd-text);
 }
@@ -1287,7 +1290,7 @@ export default {
   gap: 6px;
 }
 .mdp-set-opt {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   padding: 4px 12px;
   border: 1px solid var(--awd-border-strong);
   border-radius: 999px;
@@ -1307,7 +1310,7 @@ export default {
 .mdp-sec-note {
   display: block;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   line-height: 17px;
   color: var(--awd-text-3);
 }
@@ -1319,7 +1322,7 @@ export default {
 }
 
 .mdp-trigger {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-accent-text);
 }
 
@@ -1337,12 +1340,12 @@ export default {
 .mdp-k {
   width: 56px;
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
 .mdp-v {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   word-break: break-all;
 

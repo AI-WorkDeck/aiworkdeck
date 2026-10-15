@@ -329,7 +329,7 @@ export default {
     text-align: center;
     background: var(--awd-surface);
     border: 1px solid var(--awd-panel-border);
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-2);
     cursor: pointer;
@@ -359,7 +359,7 @@ export default {
     height: 14px;
     flex-shrink: 0;
     border: 1px solid var(--awd-border-strong);
-    border-radius: 3px;
+    border-radius: var(--awd-radius-sm);
     margin-right: 6px;
     display: flex;
     align-items: center;
@@ -372,7 +372,7 @@ export default {
 }
 .check-mark {
     color: var(--awd-text-on-accent);
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
 }
 
 .strategy-label {
@@ -400,11 +400,11 @@ export default {
     cursor: not-allowed;
 }
 
-.help-text { display: block; color: var(--awd-text-2); font-size: 12px; line-height: 1.6; margin: 8px 0; }
+.help-text { display: block; color: var(--awd-text-2); font-size: var(--awd-panel-fs); line-height: 1.6; margin: 8px 0; }
 .suspect-text { color: var(--awd-warning-text); }
-.text-input { width: 100%; box-sizing: border-box; min-height: 64px; height: 76px; border: 1px solid var(--awd-border); border-radius: 4px; padding: 8px; color: var(--awd-text); background: var(--awd-surface); font-size: 12px; }
+.text-input { width: 100%; box-sizing: border-box; min-height: 64px; height: 76px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); padding: 8px; color: var(--awd-text); background: var(--awd-surface); font-size: var(--awd-panel-fs); }
 .password-input { min-height: 36px; height: 36px; margin-bottom: 12px; }
-.preview-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; padding: 8px; margin: 8px 0; border: 1px solid var(--awd-border); font-size: 12px; line-height: 1.7; user-select: text; }
+.preview-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; padding: 8px; margin: 8px 0; border: 1px solid var(--awd-border); font-size: var(--awd-panel-fs); line-height: 1.7; user-select: text; }
 .mini-btn.active { color: var(--awd-accent-text); border-color: currentColor; }
 button.mini-btn { min-height: 28px; height: auto; padding: 4px 6px; line-height: 1.5; margin: 0; white-space: normal; }
 .workdeck-btn-primary { border-color: var(--awd-accent); background: var(--awd-accent); color: var(--awd-text-on-accent); }
