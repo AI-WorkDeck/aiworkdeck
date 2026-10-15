@@ -70,6 +70,7 @@
  *
  * v2.11 / SDK 1.5.0 (host 0.61.0+):
  *   im.request { action, params } -> object; requires im. Fixed messaging actions only.
+ *   lawfirm.request { action, params } -> object; requires lawfirm. Law firm intake, conflict check, finance and dashboard actions.
  *   im.downloadAttachment { conversationId, attachmentId } -> { started, name }; authorized download via host.
  *   chat.addFile { path } -> {}; requires file_read. Adds material without sending an AI message.
  *   files.prepareDrag { path } -> validated file descriptor plus dragToken, dragType, expiresAt.
@@ -225,6 +226,9 @@
     },
     im: {
       request: function (action, params) { return call('im.request', { action: action, params: params || {} }); }
+    },
+    lawfirm: {
+      request: function (action, params) { return call('lawfirm.request', { action: action, params: params || {} }); }
     },
     storage: {
       /** -> 存过的值，没有则 null */

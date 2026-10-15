@@ -574,6 +574,23 @@ $color-accent: var(--awd-mint); // Mint Green
   transition: stroke 0.2s ease;
 }
 
+.rail-plugin-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: block;
+  box-sizing: border-box;
+  border: 1.5px solid var(--awd-border-strong, var(--awd-border));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.rail-btn:hover .rail-plugin-avatar,
+.rail-btn.active .rail-plugin-avatar {
+  border-color: var(--awd-accent);
+  transform: scale(1.05);
+}
+
 /* rail 计数徽标（dev-board#899，目前只有「日程」用：逾期 + 今天）。
    rail 上此前没有任何计数徽标，按 16px 高小圆角数字标新做；有逾期时转朱砂红。 */
 .left-rail .rail-btn {
@@ -1866,6 +1883,16 @@ $color-accent: var(--awd-mint); // Mint Green
     color: var(--awd-tab-kind, inherit);
   }
 
+  .tab-plugin-avatar {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: block;
+    opacity: 0.85;
+    transition: opacity 0.15s ease;
+  }
+
   .tab-name {
     flex: 1;
     min-width: 0;
@@ -1900,6 +1927,7 @@ $color-accent: var(--awd-mint); // Mint Green
     background: var(--awd-surface);
 
     .tab-icon { opacity: 1; color: var(--awd-tab-kind, var(--awd-accent-text)); }
+    .tab-plugin-avatar { opacity: 1; }
     .tab-name { color: var(--awd-text); font-weight: 500; }
     .tab-close { color: var(--awd-text-2); }
 
