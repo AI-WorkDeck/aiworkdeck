@@ -1398,3 +1398,9 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 工作台 mounted + restoreTabSnapshot 完成后注册打开接收器；只在 unload/销毁注销，不能在最小化的 onHide 注销。切工作区先等 `leaveWorkbench` 保存和导航回执，失败留原页；目标就绪超时从导航完成后计算，不把旧文档保存时间算进去。
 
 后端 `LocalProjectService.openLocalFile` 只登记明确选中的真实文件，`ProjectFile.externalPath` 不出 JSON。`ProjectStorageResolver` 按精确 key 映射外部文件，不授予父目录/兄弟文件访问；原文件保存先完整写同目录临时文件再替换，缺失或符号链接重绑失败，不重建原件。独立文件不启用 Git 项目版本，也不参与自动手机目录/备份；结构改动（删除/移动/改名）由 Finder/资源管理器处理。后端回归 `LooseFileWorkspaceTest`，前端 `loose-files-workspace.test.mjs`、`local-open-coordinator.test.mjs`。
+
+## 资源管理器右键转 PDF 与多选合并为 PDF（dev-board#1291，2026-10-15）
+
+- 前端 `FileTree.vue` 与 `utils/fileTreePdfActions.js`：单选可转 PDF 文件（`doc/docx/ppt/pptx/xls/xlsx` 及图片）右键菜单显示「转为 PDF」；多选（含已有 `pdf`）2 个及以上文件时右键菜单显示「合并为 PDF」。
+- 后端 `ProjectFileController`（`POST /api/projects/{projectId}/files/{fileId}/convert-pdf`、`POST /api/projects/{projectId}/files/batch/merge-pdf`）与 `ProjectFilePdfService`：Office 文档优先调本机 LibreOffice，不可用时走内置 POI + PDFBox 中文字体渲染兜底，在原目录生成同名（自动递增序号）PDF 并刷新文件树。回归：`ProjectFilePdfServiceTest`、`fileTreePdfActions.test.mjs`。
+

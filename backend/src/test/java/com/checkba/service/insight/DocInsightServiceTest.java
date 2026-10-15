@@ -1604,4 +1604,62 @@ class DocInsightServiceTest {
         verify(docText, never()).extractText(any());
     }
 
+    @Test
+    @DisplayName("法规拆名支持无书名号、带款项条号与单独条号（dev-board#1289）")
+    void splitLawNameSupportsUnbracketedSubclauseAndBareArticle() {
+        assertArrayEquals(new String[]{"中华人民共和国民法典", "第五百零九条"},
+                DocInsightService.splitLawName("《中华人民共和国民法典》第五百零九条第一款"));
+        assertArrayEquals(new String[]{"劳动合同法", "第五十条"},
+                DocInsightService.splitLawName("劳动合同法第五十条"));
+        assertArrayEquals(new String[]{"", "第五十条"},
+                DocInsightService.splitLawName("第五十条"));
+    }
+
+    @Test
+    @DisplayName("北大法宝 get_article 返回空壳对象时不误判为成功，自动回退 search_article（dev-board#1289）")
+    void lookupLawFallsBackToSearchArticleWhenGetArticleReturnsEmptyShell() throws Exception {
+        when(mcp.callTool(eq(DocInsightService.PKULAW_SEMANTIC), eq("get_article"), anyMap()))
+                .thenReturn("{\"title\":null,\"timeliness\":null,\"issue_date\":null,\"implement_date\":null,\"url\":null,\"article\":\"\"}");
+        when(mcp.callTool(eq(DocInsightService.PKULAW_SEMANTIC), eq("search_article"), anyMap()))
+                .thenReturn("[{\"title\":\"中华人民共和国劳动合同法\",\"timeliness\":\"现行有效\","
+                        + "\"article\":\"第五十条　用人单位应当在解除或者终止劳动合同时出具解除或者终止劳动合同的证明。\"}]");
+
+        EntityView result = svc.lookupSelection(UID, PID, "LAW", "《中华人民共和国劳动合同法》第五十条");
+        assertEquals("OK", result.retrievalStatus());
+        assertNotNull(result.detail());
+        assertTrue(result.detail().toString().contains("用人单位应当在解除或者终止劳动合同时"));
+        verify(mcp).callTool(eq(DocInsightService.PKULAW_SEMANTIC), eq("get_article"), anyMap());
+        verify(mcp).callTool(eq(DocInsightService.PKULAW_SEMANTIC), eq("search_article"), anyMap());
+    }
+
+    @Test
+    @DisplayName("企业工商精准未命中但模糊命中近似全称时，返回命中详情并附带模糊匹配纠错提示（dev-board#1290）")
+    void lookupCompanyFuzzyMatchesApproximateNameAndAddsWarningNote() throws Exception {
+        String queried = "成都包晴天科技有限公司";
+        String matched = "成都包晴天智能科技有限公司";
+        String matchedJson = """
+                {"Name":"成都包晴天智能科技有限公司","CreditCode":"91510100MA6EXAMPLE","OperName":"李四",
+                 "RegistCapi":"500万元","Status":"存续","Scope":"人工智能应用软件开发"}
+                """;
+        when(qichacha.queryEciInfoJson(queried)).thenThrow(new RuntimeException("未查询到相关企业信息"));
+        when(qichacha.queryEciInfoJson(matched)).thenReturn(matchedJson);
+        when(mcp.callTool(eq(DocInsightService.QICHACHA_MCP_SERVER), anyString(), anyMap()))
+                .thenReturn("[{\"Name\":\"成都包晴天智能科技有限公司\"},{\"Name\":\"成都其它科技有限公司\"}]");
+
+        EntityView result = svc.lookupSelection(UID, PID, "COMPANY", queried);
+        assertEquals("OK", result.retrievalStatus());
+        assertNotNull(result.retrievalNote());
+        assertTrue(result.retrievalNote().contains("模糊匹配提示"));
+        assertTrue(result.retrievalNote().contains(queried));
+        assertTrue(result.retrievalNote().contains(matched));
+        assertTrue(result.detail().get("fuzzyMatched").asBoolean());
+        assertEquals(queried, result.detail().get("queriedName").asText());
+        assertEquals(matched, result.detail().get("matchedName").asText());
+    }
+
+    private static void assertArrayEquals(String[] expected, String[] actual) {
+        org.junit.jupiter.api.Assertions.assertArrayEquals(expected, actual);
+    }
+
 }
+

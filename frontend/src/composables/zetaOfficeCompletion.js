@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { classifySelectionLookup } from '../utils/selectionLookup.js'
+import { classifySelectionLookup, resolveSelectionLookupText } from '../utils/selectionLookup.js'
 import { extractCompletionEntries, matchCompletionItems } from '../utils/completionLexicon.js'
 import { WRITING_ASSISTANCE_CSS, renderCompletionOption } from './writingAssistancePresentation.js'
 
@@ -433,14 +433,16 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     // Escape usable without reporting a document-caret movement on mouseup.
     focus()
     show('context', ctx.selectedText, point)
-    const known = items.find((x) => x.text === ctx.selectedText)
+    const recommended = classifySelectionLookup(ctx.selectedText)
+    const resolvedLawText = resolveSelectionLookupText(ctx.selectedText, ctx.before, 'LAW')
+    const known = items.find((x) => x.text === ctx.selectedText || (recommended === 'LAW' && x.text === resolvedLawText))
     if (known?.entityId || known?.hasDetail) button(t.detail, () => detailRequest('detail', { entityId: known.entityId, id: known.id }, ctx.token))
     // Only a complete selection is classified. Unknown or mixed text keeps a
     // compact manual route; opening it never issues a lookup request.
-    const recommended = classifySelectionLookup(ctx.selectedText)
     const queries = [['COMPANY', 'company'], ['LAW', 'law'], ['CASE', 'case']]
     const addQuery = ([kind, label], parent = panel) => {
-      const action = button(t[label], () => detailRequest('lookup', { kind, text: ctx.selectedText }, ctx.token), parent)
+      const lookupText = kind === 'LAW' ? resolvedLawText : ctx.selectedText
+      const action = button(t[label], () => detailRequest('lookup', { kind, text: lookupText }, ctx.token), parent)
       action.className = 'awd-wa-query'
       if (kind === recommended) action.classList.add('awd-wa-query-primary')
     }

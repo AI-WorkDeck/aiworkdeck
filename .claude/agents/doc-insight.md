@@ -515,3 +515,9 @@ cd backend && mvn clean test                      # 全量（跨类常量内联�
 - `startParse` 投递异步任务前、`review(deep=true)` 调模型前调用 `ChatModelFactory.ensurePaidAccess(userId)`；账户错误保留结构化响应，不降级成“部分完成”。异步解析每个抽取块重新经模型工厂检查账户与余额；中途账户失败停止后续块及外部检索，不按普通坏输出跳过后继续收费。`deep=false` 仍纯本地，不要求账户或余额。
 - `lookupSelection` 在参数与项目权限校验后、读取检索凭证前检查平台账户；非 DOC 的 `refreshEntity` 同样检查。显式查询遇到 NOT_CONNECTED / UNAUTHORIZED / NO_CREDITS 必须向 HTTP 层抛出，让前端显示登录或充值框，不能只落一条“未配置 Key”说明。批量解析的实体失败仍保留逐条结果。
 - `ExternalProviderResolver` 在官方桌面运行时把付费服务固定到平台网关，防止历史 BYOK 或非法 LOCAL 档绕过账户；仅本地 ASR 保留 LOCAL。TTS、本地审校、DOC 项目内文件匹配不产生平台费用，不受此限制。
+
+## 法条选区查询与企查查模糊匹配提示（dev-board#1289/#1290，2026-10-15）
+
+- **北大法宝返回形状与选区拆分（#1289）**：`get_article`/`search_article` 将条号与条文正文合并在 `article` 字段（无独立 `content` 字段），`get_law_list` 返回挂在大写 `Data` 键下；前端 `insightDetail.js` 与 `completionDetails.js` 兼容 `article`/`Data`/`Title`/`TimelinessDic` 字段解析。后端 `DocInsightService` 拒绝把 `{"title":null,"article":""}` 空壳对象判为 `OK`，在 `get_article` 返回空壳时继续回退 `search_article`；支持无书名号法条、条号附带款/项后缀归一化及结合上下文自动关联最近法规名。
+- **企查查模糊匹配与名称纠错提示（#1290）**：精确查询未命中时走企查查模糊检索（兼容自备 Key 与平台网关），择优匹配候选企业；当登记全称与原查询词不一致时，保留并透传模糊匹配提示（指明未精确命中原词、已模糊匹配至工商登记全称、提醒核对正文企业名称是否缺漏字），在选区查询资料卡与依据窗格顶部显著展示。
+
