@@ -35,9 +35,10 @@ components:
         usage: { type: object, additionalProperties: true, description: "code=4003（额度已满）附带的用量明细" }
         gatewayKind: { type: string, description: "code=1（平台网关失败）附带" }
         canUseOwnKey: { type: boolean, description: "code=1（平台网关失败）附带，是否可用自备 Key 绕过" }
+        reason: { type: string, description: 账户密码操作的机器错误码 }
         kind:
           type: string
-          enum: [DISABLED, UNAVAILABLE, NOT_CONNECTED, NOT_FOUND, REJECTED, REVIEW_ACCOUNT, ALREADY_PAID, IDEMPOTENCY_CONFLICT]
+          enum: [DISABLED, UNAVAILABLE, NOT_CONNECTED, NOT_FOUND, REJECTED, REVIEW_ACCOUNT, ALREADY_PAID, IDEMPOTENCY_CONFLICT, password_login_required]
           description: |
             code=1 时 /api/mobile/billing/* 附带的**机器可读判别位**（dev-board#425）。
             **四端一律按它分支，禁止匹配 message 措辞**——message 经服务端 LangText 在英文部署下
@@ -227,6 +228,52 @@ components:
         avatarUrl: { type: string, description: 无头像时为空串 }
         role: { type: string }
         subscriptionType: { type: string, nullable: true }
+    AccountBridgeUser:
+      type: object
+      required: [id, username, displayName, avatarUrl, role]
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string }
+        displayName: { type: string }
+        avatarUrl: { type: string }
+        role: { type: string }
+        subscriptionType: { type: string }
+        isAdmin: { type: boolean }
+        smsAuthEnabled: { type: boolean }
+        phoneMasked: { type: string }
+        mailAuthEnabled: { type: boolean }
+        emailMasked: { type: string }
+        totpEnabled: { type: boolean }
+    AccountBridgeData:
+      type: object
+      required: [token, sessionId, userId, username, displayName, user]
+      properties:
+        token: { type: string, description: awdt_设备令牌 }
+        sessionId: { type: string, description: token同值别名，后续请求放入X-Session-Id }
+        tokenId: { type: integer, format: int64 }
+        userId: { type: integer, format: int64 }
+        username: { type: string }
+        displayName: { type: string }
+        user: { $ref: '#/components/schemas/AccountBridgeUser' }
+    PasswordSetupChallenge:
+      type: object
+      required: [passwordSetupRequired, setupToken, expiresAt, account]
+      properties:
+        passwordSetupRequired: { type: boolean, enum: [true] }
+        setupToken: { type: string, description: 仅用于创建密码的一次性凭证，不是登录令牌 }
+        expiresAt: { type: integer, format: int64, description: Unix毫秒 }
+        account: { type: string, description: 规范化手机号或邮箱 }
+    AccountBridgeEnvelope:
+      type: object
+      required: [code]
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        reason: { type: string }
+        data:
+          oneOf:
+            - { $ref: '#/components/schemas/AccountBridgeData' }
+            - { $ref: '#/components/schemas/PasswordSetupChallenge' }
     LoginData:
       type: object
       required: [sessionId, isNewUser, user]
@@ -244,6 +291,7 @@ components:
       properties:
         code: { type: integer }
         message: { type: string, nullable: true }
+        kind: { type: string }
         data: { $ref: '#/components/schemas/LoginData' }
     BillingBalance:
       type: object
@@ -507,9 +555,119 @@ paths:
               schema: { type: string, format: binary }
             application/json:
               schema: { $ref: '#/components/schemas/Envelope' }
+  /api/auth/account-login:
+    post:
+      summary: 官网统一账号密码登录，桥接到同一云用户
+      description: |
+        日常提交account/password。首次提交phone/code或email/code仅返回PasswordSetupChallenge，
+        不签发token；完成password/setup后再用密码登录。移动端注册与重置在官网受保护流程完成。
+        历史已验证手机号/邮箱用户保留原userId，不凭用户名猜测身份。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                account: { type: string }
+                password: { type: string }
+                phone: { type: string }
+                email: { type: string }
+                code: { type: string }
+      responses:
+        "200":
+          description: code 0为登录成功或必须设密；code 1为失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountBridgeEnvelope' }
+  /api/auth/account-login/captcha-config:
+    get:
+      summary: 公开人机验证配置，发验证码前使用
+      responses:
+        "200":
+          description: code 0，data内含provider及accountIdentity
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/auth/account-login/send-code:
+    post:
+      summary: 首次注册或存量无密码账号验证码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+                email: { type: string }
+                captchaToken: { type: string }
+      responses:
+        "200":
+          description: code 0成功但不表示已登录；code 1失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/auth/account-login/password/setup:
+    post:
+      summary: 消费一次性设密凭证创建密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                setupToken: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: code 0成功但不表示已登录；code 1失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/auth/account-login/password/reset/send-code:
+    post:
+      summary: 重置密码专用验证码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+                email: { type: string }
+                captchaToken: { type: string }
+      responses:
+        "200":
+          description: code 0成功但不表示已登录；code 1失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+  /api/auth/account-login/password/reset:
+    post:
+      summary: 验证重置码并更新密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+                email: { type: string }
+                code: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: code 0成功但不表示已登录；code 1失败
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
   /api/auth/sms-login/send-code:
     post:
-      summary: 发送短信验证码
+      summary: 旧短信入口（官方已关闭，审核账号精确例外保留）
       requestBody:
         required: true
         content:
@@ -526,7 +684,7 @@ paths:
               schema: { $ref: '#/components/schemas/Envelope' }
   /api/auth/sms-login/verify:
     post:
-      summary: 校验验证码并签发会话
+      summary: 旧验证码登录（官方普通账号须升级使用密码登录）
       requestBody:
         required: true
         content:

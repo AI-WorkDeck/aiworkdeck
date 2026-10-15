@@ -5,6 +5,30 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
 
 # 授权与计费 领域地图
 
+## 统一密码登录（dev-board#1299，2026-10-15）
+
+此节取代下文历史条目的「验证码即登录」「桌面无密码入口」。官网是唯一密码权威；桌面
+`AccountLoginDialog.vue` 默认手机号（cn）/邮箱（intl）+ 密码，首次使用/存量无密码用户走
+验证码→创建并确认密码→密码登录。忘记密码走独立 reset 场景；密码保留首尾空白，8–72 字符。
+未设置密码时官网 exchange-key 只返回 `{passwordSetupRequired:true,setupToken,expiresAt,account}`，
+Java `PasswordSetupRequired` 将它作为 code=0/data 受限挑战返回，不执行 connect、账户缓存清理、
+identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchange-key/password 登录。
+
+桌面端点：`POST /api/account/password/{setup,reset/send-code,reset}`，受既有机器账户权限闸；
+插件/移动匿名桥：`POST /api/auth/account-login/password/{setup,reset/send-code,reset}`，沿用桥接
+开关与 IP 限速。它们仅代理官网同名 `/api/auth/password/*`；不在 Java 库保存官网密码。
+`AccountLoginExchange` 将 password_login_required/password_setup_required 等业务态保留 reason；
+不将它们计为错误密码导致锁定。setup/reset 本身只返回 ok，不能当作登录成功。
+
+桌面与插件切模式/站点清空密码、确认密码、验证码及 setupToken；验证码控件节点保持挂载，
+仅首次验证/重置表单显示。两份密码输入都不得 trim。已有 TOTP 与自建服务器 `/api/auth/login`
+二次验证链不变。官网重置失效范围不能冒充已撤销所有 Java awdt_；旧设备令牌撤销仍属独立机制。
+
+验证：`AccountServiceTest`、`AccountControllerLoginSyncTest`、`AuthControllerHardeningTest`、
+`MobileApiContractTest`；前端 `tests/account/password-{login,desktop}-ui.mjs` 用实际路由及合成API，
+截图在显式配置的临时目录。浏览器 UI 不等于正式 Electron、Word/WPS 或生产短信实测。
+
+
 职责边界：**谁被允许用、用多少、钱怎么记**。包括桌面解锁门、账户连接、entitlement 框架、
 本地 SKU 的免费额度执行、平台 AI 通道的取 key 与对账、广场付费项闸门、单机免登的身份解析与准入闸。
 不含：广场的页面形态与安装链路本身（plugin-marketplace）、AI 编排与供应商路由的其余部分（ai-chat）、

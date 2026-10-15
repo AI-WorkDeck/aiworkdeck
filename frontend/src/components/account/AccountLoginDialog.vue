@@ -56,7 +56,7 @@
            人机验证控件挂在这块里，切到 Key 模式再切回来时 DOM 不能被销毁重建 -->
       <div v-show="mode !== 'code'" class="unlock-main">
         <div class="unlock-title">{{ $t('onboarding.unlock.title') }}</div>
-        <div class="unlock-desc">{{ isPhoneSite ? $t('onboarding.unlock.descPhone') : $t('onboarding.unlock.descEmail') }}</div>
+        <div class="unlock-desc">{{ $t(authFlow === 'setup' ? 'accountPassword.setupHint' : authFlow === 'reset' ? 'accountPassword.resetHint' : 'accountPassword.intro') }}</div>
         <div v-if="promoActive" class="unlock-promo">{{ $t('onboarding.unlock.promoLine', { amount: promoAmount }) }}</div>
 
         <div class="unlock-form">
@@ -69,6 +69,7 @@
               type="tel"
               inputmode="numeric"
               autocomplete="tel"
+              :disabled="authFlow === 'setup' || submitBusy"
               :value="phone"
               :placeholder="$t('onboarding.unlock.phonePlaceholder')"
               @input="phone = $event.target.value"
@@ -81,13 +82,14 @@
               class="unlock-field"
               type="email"
               autocomplete="email"
+              :disabled="authFlow === 'setup' || submitBusy"
               :value="email"
               :placeholder="$t('onboarding.unlock.emailPlaceholder')"
               @input="email = $event.target.value"
               @keydown.enter="handlePrimary"
             />
           </div>
-          <div class="unlock-code-row">
+          <div v-if="authFlow === 'register' || authFlow === 'reset'" class="unlock-code-row">
             <div class="unlock-field-box unlock-field-inline">
               <component
                 :is="'input'"
@@ -109,10 +111,26 @@
               @click="handleSendCode"
             >{{ codeBtnLabel }}</component>
           </div>
+          <div v-if="authFlow !== 'register'" class="unlock-field-box">
+            <component :is="'input'" class="unlock-field" type="password"
+              :autocomplete="authFlow === 'password' ? 'current-password' : 'new-password'"
+              :value="password" :placeholder="$t('accountPassword.password')"
+              @input="password = $event.target.value" @keydown.enter="handlePrimary" />
+          </div>
+          <div v-if="authFlow === 'setup' || authFlow === 'reset'" class="unlock-field-box">
+            <component :is="'input'" class="unlock-field" type="password" autocomplete="new-password"
+              :value="confirmPassword" :placeholder="$t('accountPassword.confirm')"
+              @input="confirmPassword = $event.target.value" @keydown.enter="handlePrimary" />
+          </div>
+          <div v-if="authFlow === 'setup' || authFlow === 'reset'" class="unlock-desc">{{ $t('accountPassword.passwordHint') }}</div>
+          <div class="unlock-code-links">
+            <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow(authFlow === 'password' ? 'register' : 'password')">{{ $t(authFlow === 'password' ? 'accountPassword.register' : 'accountPassword.back') }}</component>
+            <component v-if="authFlow === 'password'" :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow('reset')">{{ $t('accountPassword.reset') }}</component>
+          </div>
           <!-- 人机验证控件挂点。阿里云（大陆站）点了才弹拼图，平时不占版面；
                Turnstile（国际站）走官网托管页，is-embed 给它留位置。未启用时整块不渲染。 -->
           <div
-            v-show="captcha"
+            v-show="captcha && (authFlow === 'register' || authFlow === 'reset')"
             class="unlock-captcha-holder"
             :class="{ 'is-embed': captcha && captcha.provider === 'turnstile' }"
           >
@@ -191,7 +209,7 @@
 </template>
 
 <script>
-import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig } from '@/services/api.js'
+import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, accountPasswordOperation } from '@/services/api.js'
 import { setupCaptcha, teardownCaptcha } from '@/utils/captcha.js'
 import { captchaFailureNotice, toCaptchaFailure } from '@/utils/captchaFailure.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
@@ -237,6 +255,11 @@ export default {
       licenseMode: '',
       licenseAccountConnected: false,
       mode: 'login',
+      authFlow: 'password',
+      password: '',
+      confirmPassword: '',
+      setupToken: '',
+      setupAccount: '',
       phone: '',
       email: '',
       smsCode: '',
@@ -308,7 +331,7 @@ export default {
       if (this.mode === 'code') {
         return this.unlocking ? this.$t('onboarding.unlock.unlocking') : this.$t('onboarding.unlock.unlock')
       }
-      return this.loggingIn ? this.$t('onboarding.unlock.loggingIn') : this.$t('onboarding.unlock.continue')
+      return this.loggingIn ? this.$t('onboarding.unlock.loggingIn') : this.$t({password:'accountPassword.signIn', register:'accountPassword.verify', setup:'accountPassword.setup', reset:'accountPassword.resetTitle'}[this.authFlow])
     },
     submitBusy() {
       return this.loggingIn || this.unlocking
@@ -326,6 +349,8 @@ export default {
     }
   },
   beforeUnmount() {
+    this.done = true
+    this.clearLoginSecrets()
     if (this.cooldownTimer) clearInterval(this.cooldownTimer)
     // 托管页 iframe 的 message 监听挂在 window 上，走了也要摘
     teardownCaptcha()
@@ -334,9 +359,17 @@ export default {
     onEsc() {
       if (this.variant === 'dialog') this.cancel()
     },
+    clearLoginSecrets() {
+      this.password = ''
+      this.confirmPassword = ''
+      this.smsCode = ''
+      this.setupToken = ''
+      this.setupAccount = ''
+    },
     cancel() {
-      if (this.done) return
+      if (this.done || this.submitBusy) return
       this.done = true
+      this.clearLoginSecrets()
       this.$emit('cancel')
     },
     async bootstrapSite() {
@@ -453,8 +486,19 @@ export default {
         // 拿不到就当单站，站点入口不渲染
       }
     },
+    switchAuthFlow(next) {
+      if (this.submitBusy || this.sendingCode) return
+      this.authFlow = next
+      this.password = ''
+      this.confirmPassword = ''
+      this.smsCode = ''
+      this.setupToken = ''
+      this.setupAccount = ''
+      this.errorMsg = ''
+    },
     switchMode(next) {
       if (this.mode === next) return
+      this.switchAuthFlow('password')
       this.mode = next
       this.errorMsg = ''
     },
@@ -483,7 +527,11 @@ export default {
           return
         }
         const captchaToken = got.token
-        await sendAccountLoginCode(identifier, captchaToken, this.isPhoneSite)
+        if (this.authFlow === 'reset') {
+          await accountPasswordOperation('reset/send-code', { [this.isPhoneSite ? 'phone' : 'email']: identifier, captchaToken })
+        } else {
+          await sendAccountLoginCode(identifier, captchaToken, this.isPhoneSite)
+        }
         uni.showToast({ title: this.$t('onboarding.unlock.codeSent'), icon: 'none', duration: 1600 })
         this.startCooldown(60)
       } catch (e) {
@@ -549,21 +597,58 @@ export default {
           : this.$t('onboarding.unlock.emailFirst')
         return
       }
-      if (!smsCode) {
-        this.errorMsg = this.isPhoneSite
-          ? this.$t('onboarding.unlock.smsCodeFirst')
-          : this.$t('onboarding.unlock.emailCodeFirst')
+      if ((this.authFlow === 'register' || this.authFlow === 'reset') && !smsCode) {
+        this.errorMsg = this.$t('onboarding.unlock.smsCodeFirst')
         return
       }
-      const payload = this.isPhoneSite
-        ? { phone: identifier, code: smsCode }
-        : { email: identifier, code: smsCode }
+      if (this.authFlow !== 'register' && !this.password) {
+        this.errorMsg = this.$t('accountPassword.required')
+        return
+      }
+      if (this.authFlow === 'setup' || this.authFlow === 'reset') {
+        if (this.password.length < 8 || this.password.length > 72) {
+          this.errorMsg = this.$t('accountPassword.invalid'); return
+        }
+        if (this.password !== this.confirmPassword) {
+          this.errorMsg = this.$t('accountPassword.mismatch'); return
+        }
+      }
+      const payload = this.authFlow === 'password'
+        ? { account: identifier, password: this.password }
+        : { [this.isPhoneSite ? 'phone' : 'email']: identifier, code: smsCode }
       this.errorMsg = ''
       this.loggingIn = true
       try {
         // 同意落在连接之前：连上账户就是内容开始能出境的时点（accountConsent.js 文件头）
         await recordAccountConsents()
-        const res = await loginAccount(payload)
+        if (this.done) return
+        if (this.authFlow === 'reset') {
+          await accountPasswordOperation('reset', { ...payload, password: this.password })
+          this.loggingIn = false
+          this.switchAuthFlow('password')
+          this.errorMsg = this.$t('accountPassword.resetDone')
+          return
+        }
+        let res
+        if (this.authFlow === 'setup') {
+          await accountPasswordOperation('setup', { setupToken: this.setupToken, password: this.password })
+          if (this.done) return
+          // The setup ticket is consumed. If sign-in fails, retry using the saved password form.
+          this.setupToken = ''
+          this.authFlow = 'password'
+          res = await loginAccount({ account: this.setupAccount || identifier, password: this.password })
+        } else res = await loginAccount(payload)
+        if (res && res.passwordSetupRequired) {
+          this.authFlow = 'setup'
+          this.setupToken = res.setupToken
+          this.setupAccount = res.account || identifier
+          this.smsCode = ''
+          this.password = ''
+          this.confirmPassword = ''
+          return
+        }
+        this.password = ''
+        this.confirmPassword = ''
         await this.finishLogin(res, {
           title: res && res.isNewUser
             ? this.$t('onboarding.unlock.registered')
@@ -650,7 +735,7 @@ export default {
     },
     onSiteSegTap(site) {
       if (!site || site.id === this.siteStatus.current) return
-      if (this.siteStatus.pinned || this.siteBusy || this.rescueBusy) return
+      if (this.siteStatus.pinned || this.siteBusy || this.rescueBusy || this.submitBusy || this.sendingCode) return
       if (this.needsSwitchConfirm) this.confirmSwitchSite(site)
       else this.switchSite(site)
     },
@@ -680,6 +765,7 @@ export default {
         this.siteBusy = false
       }
       // 验证码只对发给的那个手机号/邮箱有效，换了站就是换了收件目标
+      this.switchAuthFlow('password')
       this.smsCode = ''
       this.stopCooldown()
       // 先切语言再装配：国际站托管页的语言随 URL 参数定
@@ -745,6 +831,20 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.unlock-auth-link {
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 2px 0;
+  font: inherit;
+  font-size: var(--awd-panel-fs);
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.unlock-auth-link:disabled { opacity: .55; cursor: default; }
+
 /* ---------- 弹层形态：遮罩 + 居中卡片 ----------
    z-index 9990：低于 AwdDialog 宿主（10000）——卡片里弹的「跨境说明」「换了账户」要盖在它上面；
    高于工作台自家的 .awd-mask（9999 以下的业务浮层），并且 requireAccount.js 持有全局浮层让

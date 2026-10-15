@@ -80,10 +80,11 @@ final class AccountLoginExchange {
         // 而这两件对一个凭据本来就正确的用户都是错的。
         AccountException.Kind kind =
                 ("phone_binding_required".equals(code) || "captcha_failed".equals(code)
-                        || "too_many_requests".equals(code))
+                        || "too_many_requests".equals(code) || "password_login_required".equals(code)
+                        || "password_setup_required".equals(code) || "invalid_password".equals(code))
                         ? AccountException.Kind.CONFLICT
                         : AccountException.Kind.UNAUTHORIZED;
-        throw new AccountException(kind, message);
+        throw new AccountException(kind, message, code);
     }
 
     /** 官网没给 message 时的兜底文案（按 error code 分，别一律「操作失败」）。 */
@@ -96,6 +97,10 @@ final class AccountLoginExchange {
             return LangText.of("登录失败，请稍后重试", "Sign-in failed, please retry shortly");
         }
         return switch (code) {
+            case "password_login_required" -> LangText.of("此账户已设置密码，请使用密码登录；忘记密码可重置", "This account has a password. Sign in with it or reset a forgotten password");
+            case "password_setup_required" -> LangText.of("请先验证手机号或邮箱并创建密码", "Verify your phone number or email and create a password first");
+            case "invalid_password" -> LangText.of("密码需为8–72个字符", "Use a password with 8–72 characters");
+            case "invalid_setup_token" -> LangText.of("验证已过期，请重新验证手机号或邮箱", "Verification expired. Verify your phone number or email again");
             case "invalid_code" -> LangText.of("验证码错误或已过期", "Incorrect or expired verification code");
             case "invalid_credentials" -> LangText.of("账号或密码不正确", "Incorrect account or password");
             case "sms_not_supported_on_site" -> LangText.of("当前站点不支持手机号方式，请改用邮箱",

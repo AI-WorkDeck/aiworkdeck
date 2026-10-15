@@ -3,7 +3,7 @@
 <template>
   <div class="settings">
     <section class="card">
-      <h2>{{ t('connectionTitle') }}</h2>
+      <h2>{{ mode === 'setup' ? t('savePassword') : resetMode ? t('resetPassword') : t('connectionTitle') }}</h2>
 
       <p v-if="token.trim()" class="summary">
         {{ t('connectedTo', { url: displayServerUrl }) }}
@@ -14,18 +14,19 @@
       </p>
 
       <!--
-        手机号是大陆站主路径，邮箱验证码是国际站主路径——两个站各只认一种账号本体，
+        首次验证/重置时，手机号用于大陆站，邮箱用于国际站——两个站各只认一种账号本体，
         由云后端的 captcha-config 带回 accountIdentity 告诉我们是哪一种（dev-board#766）。
         只剩一种时整行不渲染：给用户一个点不出别的东西的单选按钮没有意义；而把不支持的
         那个也画出来，就是把他往「填完号、等完一次发码往返、才被告知本站不支持」引——
         那正是这张卡的起因。拿不到配置（旧后端/网络不通）时两个都给，与改造前一致。
       -->
-      <div v-if="codeTabs.length > 1" class="tabs">
+      <div v-if="mode !== 'password' && mode !== 'setup' && codeTabs.length > 1" class="tabs">
         <button
           v-for="tab in codeTabs"
           :key="tab"
           class="tab"
           :class="{ 'is-active': mode === tab }"
+          :disabled="connecting || sendingCode"
           @click="switchMode(tab)"
         >{{ tab === 'phone' ? t('tabPhone') : t('tabEmail') }}</button>
       </div>
@@ -48,7 +49,7 @@
         </div>
       </template>
 
-      <!-- 邮箱 tab 的主路径同样是验证码：国际站邮箱验证码注册出来的账号根本没有口令 -->
+      <!-- International first-time verification or password recovery. -->
       <template v-else-if="mode === 'email'">
         <label class="field">
           <span class="label">{{ t('emailLabel') }}</span>
@@ -66,10 +67,10 @@
         </div>
       </template>
 
-      <template v-else>
+      <template v-else-if="mode === 'password'">
         <label class="field">
-          <span class="label">{{ t('emailLabel') }}</span>
-          <input v-model="account" type="email" :placeholder="t('emailPlaceholder')" spellcheck="false" autocomplete="username" />
+          <span class="label">{{ t('accountLabel') }}</span>
+          <input v-model="account" type="text" :placeholder="t('accountPlaceholder')" spellcheck="false" autocomplete="username" />
         </label>
 
         <label class="field">
@@ -78,15 +79,27 @@
         </label>
       </template>
 
+      <template v-if="mode === 'setup' || resetMode">
+        <p class="hint">{{ mode === 'setup' ? t('passwordSetupHint') : t('passwordResetHint') }} {{ t('newPasswordHint') }}</p>
+        <label class="field">
+          <span class="label">{{ t('passwordLabel') }}</span>
+          <input v-model="password" type="password" :placeholder="t('newPasswordHint')" autocomplete="new-password" />
+        </label>
+        <label class="field">
+          <span class="label">{{ t('confirmPassword') }}</span>
+          <input v-model="confirmPassword" type="password" :placeholder="t('confirmPassword')" autocomplete="new-password" />
+        </label>
+      </template>
       <!--
         口令那条路**不随站点隐藏**：站点只决定验证码走手机号还是邮箱，口令是两站存量账号
         共用的第三条路。所以这行链子常驻在表单下方，而不是像改造前那样挂在邮箱 tab 里面
         ——大陆站隐掉邮箱 tab 时，那样会把存量口令用户的入口一起埋掉。
       -->
-      <div class="field">
-        <button class="linklike" @click="togglePasswordMode">
-          {{ mode === 'password' ? t('useCodeInstead') : t('usePasswordInstead') }}
+      <div class="field login-method-links">
+        <button class="linklike" :disabled="connecting || sendingCode" @click="togglePasswordMode">
+          {{ mode === 'password' ? t('createPassword') : t('usePasswordInstead') }}
         </button>
+        <button v-if="mode === 'password'" class="linklike" :disabled="connecting || sendingCode" @click="startReset">{{ t('forgotPassword') }}</button>
       </div>
 
       <!--
@@ -98,12 +111,12 @@
         持有它们。放进某个分支里，用户切一次 tab 节点就被 Vue 拆掉，SDK 攥着的是一个
         已经不在文档里的元素——弹不出滑块，也取不到 token，而且一声不响。
       -->
-      <div id="login-captcha" class="captcha-holder"></div>
+      <div id="login-captcha" class="captcha-holder" :class="{ 'captcha-inactive': mode === 'password' || mode === 'setup' }"></div>
       <button id="login-captcha-trigger" type="button" class="captcha-trigger" aria-hidden="true" tabindex="-1"></button>
 
       <div class="actions">
         <button class="btn primary" :disabled="connecting" @click="connectWithAccount">
-          {{ connecting ? t('connecting') : t('loginAndConnect') }}
+          {{ connecting ? t('connecting') : mode === 'setup' ? t('savePassword') : resetMode ? t('resetPassword') : mode === 'password' ? t('loginAndConnect') : t('verifyAndContinue') }}
         </button>
       </div>
 
@@ -115,9 +128,9 @@
         口令模式只能登录不能注册，第二行不显示。非官方后端（私有部署）没有官网，整块不渲染。
       -->
       <div v-if="signUpHref" class="signup">
-        <p class="signup-line">{{ t('noAccountYet') }}<button class="linklike strong" @click="openExternal(signUpHref)">{{ t('signUpFree') }}</button></p>
-        <p v-if="mode === 'email'" class="signup-line">{{ t('signUpByEmailCode') }}</p>
-        <p v-else-if="mode === 'phone'" class="signup-line">{{ t('signUpByPhoneCode') }}</p>
+        <p class="signup-line">{{ t('noAccountYet') }}<button class="linklike strong" :disabled="connecting || sendingCode" @click="switchMode(defaultMode(identity))">{{ t('signUpFree') }}</button></p>
+        <p v-if="mode === 'email' && !resetMode" class="signup-line">{{ t('signUpByEmailCode') }}</p>
+        <p v-else-if="mode === 'phone' && !resetMode" class="signup-line">{{ t('signUpByPhoneCode') }}</p>
         <p class="signup-line agree">{{ t('agreePrefix') }}<button class="linklike" @click="openExternal(termsHref)">{{ t('termsOfService') }}</button>{{ t('agreeMiddle') }}<button class="linklike" @click="openExternal(privacyHref)">{{ t('privacyPolicy') }}</button>{{ t('agreeSuffix') }}</p>
       </div>
 
@@ -132,6 +145,7 @@
           <span class="label">{{ t('serverUrlLabel') }}</span>
           <input
             v-model="serverUrl"
+            :disabled="connecting || sendingCode"
             type="text"
             :placeholder="t('serverUrlPlaceholder')"
             spellcheck="false"
@@ -182,11 +196,12 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, watch, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   fetchMyProjects,
   getAccountLoginCaptchaConfig,
   postAccountLogin,
+  postAccountPasswordOperation,
   postAccountLoginSendCode,
   postAccountLoginSendEmailCode,
   postAwdkLogin
@@ -213,11 +228,15 @@ const connecting = ref(false)
 const keyStatus = ref('')
 const keyStatusKind = ref('ok')
 
-// 账户登录（主路径）。mode 是表单形态：phone / email 两条验证码路 + password
-// （两站存量账号共用的第三条路，不随站点隐藏，见 lib/loginTabs.js）。
+// Password is the default. phone/email verify first-time ownership; setup is a restricted stage.
+// resetMode reuses the identity form with a separate reset-code purpose.
 // identity 是本服务器桥到的站点以什么为账号本体，由 captcha-config 带回；
 // 空串 = 未知（旧后端/配置取不到），此时两个验证码 tab 都给，与改造前一致。
-const mode = ref('phone')
+const mode = ref('password')
+const resetMode = ref(false)
+const setupToken = ref('')
+const setupAccount = ref('')
+const confirmPassword = ref('')
 const identity = ref('')
 const phone = ref('')
 const smsCode = ref('')
@@ -229,6 +248,15 @@ const sendingCode = ref(false)
 const cooldown = ref(0)
 const loginStatus = ref('')
 const loginStatusKind = ref('ok')
+
+watch(serverUrl, () => {
+  setupToken.value = ''
+  setupAccount.value = ''
+  password.value = ''
+  confirmPassword.value = ''
+  mode.value = 'password'
+  resetMode.value = false
+})
 
 let cooldownTimer = null
 
@@ -288,7 +316,7 @@ async function ensureCaptcha() {
  */
 function applyIdentity(next) {
   identity.value = next
-  if (!isModeAvailable(mode.value, next)) mode.value = defaultMode(next)
+  if (mode.value !== 'setup' && !isModeAvailable(mode.value, next)) mode.value = defaultMode(next)
 }
 
 function stopCooldown() {
@@ -308,8 +336,21 @@ function startCooldown() {
 }
 
 function switchMode(next) {
+  if (connecting.value || sendingCode.value) return
+  resetMode.value = false
+  setupToken.value = ''
+  setupAccount.value = ''
+  password.value = ''
+  confirmPassword.value = ''
+  smsCode.value = ''
+  emailCode.value = ''
   mode.value = next
   loginStatus.value = ''
+}
+
+function startReset() {
+  switchMode(defaultMode(identity.value))
+  resetMode.value = true
 }
 
 /** 验证码 ⇄ 口令。回来时落到本站点支持的那条验证码路上 */
@@ -344,7 +385,9 @@ async function sendCode(channel) {
         return
       }
     }
-    if (channel === 'email') {
+    if (resetMode.value) {
+      await postAccountPasswordOperation({ serverUrl: serverUrl.value }, 'reset/send-code', { [channel]: (channel === 'email' ? email.value : phone.value).trim(), captchaToken })
+    } else if (channel === 'email') {
       await postAccountLoginSendEmailCode({ serverUrl: serverUrl.value }, email.value, captchaToken)
     } else {
       await postAccountLoginSendCode({ serverUrl: serverUrl.value }, phone.value, captchaToken)
@@ -365,6 +408,7 @@ async function sendCode(channel) {
  * 一并给出「填齐了没有」与没填齐时该说哪句话——三条分支的判定写在一处才不会漂。
  */
 function currentCredentials() {
+  if (mode.value === 'setup') return {credentials: {}, filled: true, hint: 'passwordSetupHint'}
   if (mode.value === 'phone') {
     const credentials = { phone: phone.value.trim(), code: smsCode.value.trim() }
     return { credentials, filled: !!(credentials.phone && credentials.code), hint: 'fillPhoneAndCode' }
@@ -394,9 +438,42 @@ async function connectWithAccount() {
     loginStatus.value = t(hint)
     return
   }
+  if (mode.value === 'setup' || resetMode.value) {
+    if (password.value.length < 8 || password.value.length > 72 || password.value !== confirmPassword.value) {
+      loginStatusKind.value = 'error'
+      loginStatus.value = t(password.value !== confirmPassword.value ? 'passwordMismatch' : 'newPasswordHint')
+      return
+    }
+  }
   connecting.value = true
   try {
-    const awdtToken = await postAccountLogin({ serverUrl: serverUrl.value }, credentials)
+    const connection = { serverUrl: serverUrl.value }
+    if (resetMode.value) {
+      await postAccountPasswordOperation(connection, 'reset', {...credentials, password: password.value})
+      connecting.value = false
+      switchMode('password')
+      loginStatusKind.value = 'ok'
+      loginStatus.value = t('passwordResetDone')
+      return
+    }
+    let awdtToken
+    if (mode.value === 'setup') {
+      await postAccountPasswordOperation(connection, 'setup', { setupToken: setupToken.value, password: password.value })
+      setupToken.value = ''
+      mode.value = 'password'
+      account.value = setupAccount.value
+      awdtToken = await postAccountLogin(connection, { account: setupAccount.value, password: password.value })
+    } else awdtToken = await postAccountLogin(connection, credentials)
+    if (awdtToken?.passwordSetupRequired) {
+      setupToken.value = awdtToken.setupToken
+      setupAccount.value = awdtToken.account || credentials.phone || credentials.email
+      mode.value = 'setup'
+      password.value = ''
+      confirmPassword.value = ''
+      smsCode.value = ''
+      emailCode.value = ''
+      return
+    }
     smsCode.value = ''
     emailCode.value = ''
     password.value = ''
@@ -482,6 +559,9 @@ function save() {
 </script>
 
 <style scoped>
+.field.login-method-links { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+
+.captcha-inactive { display: none !important; }
 .settings {
   padding: 12px;
   overflow-y: auto;
