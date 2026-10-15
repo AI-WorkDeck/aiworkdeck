@@ -655,6 +655,65 @@ class AwdkLoginServiceTest {
     }
 
     @Test
+    @DisplayName("大陆旧邮箱双验证迁移：密码桥复用原 ID/用户名并补手机号，不建空用户")
+    void passwordBridgeMigratesEmailOnlyUserAfterWebsiteDualVerification() {
+        User legacy = userService.findOrCreateByEmail("legacy@example.test").user();
+        Long originalId = legacy.getId();
+        String originalUsername = legacy.getUsername();
+        assertNull(legacy.getPhone());
+        // 官网已用密码会话 + 独立邮箱 OTP 完成双验证；本测试只验证 Java 消费该契约。
+        String verifiedAccount = ME_WITH_PHONE.replace("\"plan\":\"paid\"",
+                "\"plan\":\"paid\",\"verifiedEmail\":\"legacy@example.test\"");
+        transport.enqueue(200, "{\"key\":\"" + KEY + "\"}").enqueue(200, verifiedAccount);
+
+        AwdkLoginService.BridgeSession session = service(true)
+                .loginWithPassword("legacy@example.test", "synthetic-password");
+
+        assertEquals(originalId, session.userId());
+        assertEquals(originalUsername, session.username(), "用户名决定的既有数据路径也必须保留");
+        assertEquals(originalId, deviceTokenService.resolveUserId(session.token()));
+        assertSame(legacy, usersById.get(originalId));
+        assertEquals("18610211590", legacy.getPhone());
+        assertEquals("legacy@example.test", legacy.getVerifiedEmail());
+        assertEquals(originalId, bindingsByAccountId.get("acc_9f3a").getUserId());
+        assertEquals(1, usersById.size());
+        assertEquals(1, usersByName.size());
+        assertEquals(1, bindingsByAccountId.size());
+        assertTrue(transport.bodies.get(0).contains("legacy@example.test"));
+    }
+
+    @Test
+    @DisplayName("大陆旧邮箱已绑另一官网账户：双验证迁移也不能覆盖绑定或认领手机号")
+    void passwordBridgeCannotReplaceExistingLegacyEmailBinding() {
+        User legacy = userService.findOrCreateByEmail("legacy@example.test").user();
+        String originalUsername = legacy.getUsername();
+        String emailOnlyAccount = ME_OK.replace("acc_9f3a", "acc_original")
+                .replace("\"plan\":\"paid\"",
+                        "\"plan\":\"paid\",\"verifiedEmail\":\"legacy@example.test\"");
+        transport.enqueue(200, emailOnlyAccount);
+        service(true).login(KEY);
+        int issuedBefore = tokensByHash.size();
+        String originalDisplayName = legacy.getDisplayName();
+        String incomingAccount = ME_WITH_PHONE.replace("\"plan\":\"paid\"",
+                "\"plan\":\"paid\",\"verifiedEmail\":\"legacy@example.test\"");
+        transport.enqueue(200, "{\"key\":\"" + KEY + "\"}").enqueue(200, incomingAccount);
+
+        AccountException failure = assertThrows(AccountException.class, () -> service(true)
+                .loginWithPassword("legacy@example.test", "synthetic-password"));
+
+        assertEquals(AccountException.Kind.CONFLICT, failure.getKind());
+        assertEquals(issuedBefore, tokensByHash.size());
+        assertNull(legacy.getPhone(), "冲突必须在 claimPhoneFromWebsite 前拒绝");
+        assertEquals(originalUsername, legacy.getUsername());
+        assertEquals(originalDisplayName, legacy.getDisplayName());
+        assertEquals("legacy@example.test", legacy.getVerifiedEmail());
+        assertEquals(legacy.getId(), bindingsByAccountId.get("acc_original").getUserId());
+        assertFalse(bindingsByAccountId.containsKey("acc_9f3a"));
+        assertEquals(1, bindingsByAccountId.size());
+        assertEquals(1, usersById.size());
+    }
+
+    @Test
     void unverifiedWebsiteEmailCannotClaimLocalUser() {
         User old = userService.findOrCreateByEmail("legacy@example.test").user();
         transport.enqueue(200, ME_OK.replace("\"plan\":\"paid\"",
