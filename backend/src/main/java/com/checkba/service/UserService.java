@@ -225,6 +225,18 @@ public class UserService {
         }
     }
 
+    /** Only website-verified identifiers may be used to retain a legacy mobile identity. */
+    public Optional<User> findByVerifiedWebsitePhone(String phone) {
+        return phone != null && phone.matches("^1\\d{10}$")
+                ? userRepository.findByPhone(phone) : Optional.empty();
+    }
+
+    public Optional<User> findByVerifiedWebsiteEmail(String email) {
+        return StringUtils.hasText(email)
+                ? userRepository.findByVerifiedEmail(email.trim().toLowerCase(java.util.Locale.ROOT))
+                : Optional.empty();
+    }
+
     /** 随机短用户名，撞了重试。10 次都撞说明随机源坏了，宁可报错也不静默降级。 */
     private String allocatePhoneUsername() {
         for (int i = 0; i < 10; i++) {

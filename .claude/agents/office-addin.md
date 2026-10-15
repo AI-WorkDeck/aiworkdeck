@@ -5,6 +5,28 @@ description: Microsoft Office 与 WPS 插件领域。任务涉及 Word/Excel/PPT
 
 # Office 插件 领域地图
 
+## 默认密码登录与首次设密（dev-board#1299，2026-10-15）
+
+此节取代下文历史「验证码是主路径」：`SettingsView` 默认 password，手机号/邮箱共用文本
+账号输入，日常无验证码。首次使用/注册在窗格内验证手机号（cn）或邮箱（intl），得到一次性
+setupToken 后输入密码与确认密码；成功设密后单独密码登录才保存 awdt_。忘记密码走独立
+`/api/auth/account-login/password/reset/send-code` 与 `/reset`，完成后返回密码表单。
+验证码场景仍按 `loginTabs.js` 的站点能力选择；初始配置到达不能把 password 或 setup 踢回
+验证码模式。密码不 trim，8–72 字符；模式/后端地址切换清空敏感表单与受限票据。
+
+`postAccountLogin` 只在真正登录返回 token 字符串；受限阶段返回 challenge 对象，调用方
+必须判断 passwordSetupRequired，不能写入localStorage。`postAccountPasswordOperation`
+只允许 setup/reset/send-code/reset 三个固定路径。人机验证挂点仍在分支外保持 DOM，日常
+password/setup不展示控件。AppSource注册、条款、隐私入口及高级Key路径仍保留。
+
+官方旧 `/sms-login`、`/mail-login`、`/wx-phone-login` 通过
+`security.official-password-login-required=true` 禁止普通账号绕过密码；仅既有精确审核账号
+例外保留，自建服务器默认 false。官方桥成功额外返回 sessionId（token同值）和真实user
+快照供移动端；旧 token/userId/username/displayName/tokenId 字段兼容保留。
+验证：Office/WPS共用Vite双入口构建；`npm test`；`frontend/tests/account/password-login-ui.mjs`
+真实任务窗格网页合成API旅程。未在Word/WPS宿主内验收，不能声称已升级已安装插件。
+
+
 职责边界：`office-addin/` 目录下的 Office Add-in（任务窗格 UI、Office.js 文档访问、与后端的连接/对话链路、office_command 执行器）。总 spec 见 `docs/superpowers/specs/2026-08-06-office-addin-and-memory-sync.md`（Phase B 脚手架、Phase C 工具桥+会话能力过滤、收尾包 Excel/PPT 宿主+SSE 重连+awdk 直连+部署脚本已落地；Phase D 云后端生产化已于 2026-08-07 部署：官方托管实例 addin.aiworkdeck.com，profile=`application-cloud.yml`，部署材料与实录见 `deploy/cloud/README.md`，配置口径见 licensing-billing.md）。SSE/编排契约本体属 ai-chat 领域；office_* 后端桥（OfficeBridgeService/OfficeEditTools/能力过滤）详见 ai-doc-bridge 领域文档「第二条桥」一节。
 
 ## 关键文件

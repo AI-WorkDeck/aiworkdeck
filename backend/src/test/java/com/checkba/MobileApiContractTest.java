@@ -84,6 +84,31 @@ class MobileApiContractTest {
     @Autowired private com.checkba.service.mobile.MobileBillingService mobileBillingService;
     @Autowired private com.checkba.repository.MobileFileBackupRepository backupRepository;
 
+    @MockBean private com.checkba.service.account.AwdkLoginService accountBridge;
+
+    @Test
+    void passwordBridgeAndRestrictedChallengeMatchSpec() throws Exception {
+        String sid = register("password_bridge_" + System.nanoTime());
+        Long userId = com.checkba.controller.AuthController.getUserIdFromSession(sid);
+        when(accountBridge.loginWithPassword("13800138000", "password-fixture"))
+                .thenReturn(new com.checkba.service.account.AwdkLoginService.BridgeSession(
+                        "awdt_contract_fixture", userId, "fixture", "Fixture", 1L));
+        mvc.perform(post("/api/auth/account-login").contentType(APPLICATION_JSON)
+                        .content("{\"account\":\"13800138000\",\"password\":\"password-fixture\"}"))
+                .andExpect(status().isOk()).andExpect(openApi().isValid(validator))
+                .andExpect(jsonPath("$.data.sessionId").value("awdt_contract_fixture"))
+                .andExpect(jsonPath("$.data.user.id").value(userId));
+        when(accountBridge.loginWithPhone("13800138000", "123456"))
+                .thenThrow(new com.checkba.service.account.PasswordSetupRequired(Map.of(
+                        "passwordSetupRequired", true, "setupToken", "restricted-contract-fixture",
+                        "account", "13800138000", "expiresAt", 123456789L)));
+        mvc.perform(post("/api/auth/account-login").contentType(APPLICATION_JSON)
+                        .content("{\"phone\":\"13800138000\",\"code\":\"123456\"}"))
+                .andExpect(status().isOk()).andExpect(openApi().isValid(validator))
+                .andExpect(jsonPath("$.data.passwordSetupRequired").value(true))
+                .andExpect(jsonPath("$.data.token").doesNotExist());
+    }
+
     @BeforeAll
     static void loadSpec() throws Exception {
         String spec = new String(

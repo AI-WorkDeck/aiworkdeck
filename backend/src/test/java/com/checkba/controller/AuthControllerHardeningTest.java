@@ -214,9 +214,26 @@ class AuthControllerHardeningTest {
 
     /** phoneLoginGuard 传 null：手机号补绑闸只管密码/邮箱那三条入口，账户登录不走它。 */
     private static AuthController controller(AwdkLoginService awdkLoginService, AuthAbuseGuard guard) {
+        UserService users = mock(UserService.class);
+        when(users.getUserById(anyLong())).thenAnswer(invocation -> user(invocation.getArgument(0), "fixture-user"));
         return new AuthController(
-                null, null, null, null, guard, awdkLoginService, null, null, null, sessions(), false, null,
+                users, null, mock(com.checkba.service.AdminAccessService.class), null, guard, awdkLoginService, null, null, null, sessions(), false, null,
                 mock(com.checkba.service.account.AccountDeletionService.class), null);
+    }
+
+    @Test
+    void firstVerificationReturnsChallengeWithoutSession() {
+        AwdkLoginService service = mock(AwdkLoginService.class);
+        when(service.loginWithPhone("13800138000", "123456"))
+                .thenThrow(new com.checkba.service.account.PasswordSetupRequired(Map.of(
+                        "passwordSetupRequired", true, "setupToken", "restricted-ticket")));
+        Map<String, Object> response = controller(service, serverGuard("open"))
+                .accountLogin(Map.of("phone", "13800138000", "code", "123456"), http());
+        assertEquals(0, response.get("code"));
+        Map<?, ?> data = (Map<?, ?>) response.get("data");
+        assertEquals(true, data.get("passwordSetupRequired"));
+        assertFalse(data.containsKey("token"));
+        assertFalse(data.containsKey("sessionId"));
     }
 
     @Test
@@ -234,6 +251,8 @@ class AuthControllerHardeningTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) result.get("data");
         assertEquals("awdt_x", data.get("token"));
+        assertEquals("awdt_x", data.get("sessionId"));
+        assertEquals(7L, ((Map<?, ?>) data.get("user")).get("id"));
         assertEquals(7L, data.get("userId"));
         assertEquals("awd_hanzewei", data.get("username"));
         verify(awdkLoginService, never()).loginWithPassword(any(), any());
