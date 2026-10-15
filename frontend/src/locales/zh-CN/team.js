@@ -175,6 +175,27 @@ export default {
   // ---- 空态 ----
   emptyData: '还没有统计数据。成员打开数据共享开关后，次日可以看到。',
 
+  // ---- 律所决策者看板（TeamPanel.vue） ----
+  lawfirmDashboardTitle: '律所决策者与管委会看板',
+  lawfirmDashboardDesc: '业务部门、团队负责人、最小作战单元三维创收与风控汇总，支持穿透至律所管理工作台。',
+  lawfirmSeedDemoBtn: '填充五芳斋演示数据',
+  lawfirmOpenPluginBtn: '打开律所管理工作台',
+  lawfirmKpiActiveMatters: '在办案件数',
+  lawfirmKpiPendingClearances: '待处理利冲/审批',
+  lawfirmKpiContracted: '总签约合同额',
+  lawfirmKpiBilled: '累计开票额',
+  lawfirmKpiCollected: '累计实收到账',
+  lawfirmKpiCollectionRate: '全所综合回款率',
+  lawfirmDimDepartments: '按业务部门',
+  lawfirmDimTeamLeads: '按团队负责人',
+  lawfirmDimUnits: '按最小作战单元',
+  lawfirmColName: '组织/单元名称',
+  lawfirmColHead: '负责人/核心成员',
+  lawfirmColMatters: '在办案件',
+  lawfirmColContracted: '签约额',
+  lawfirmColCollected: '已到账',
+  lawfirmColRate: '回款率',
+
   // ---- 切换团队 / 律所（一人一队、一队一所；切换为两步非原子操作）----
   switchTeamTitle: '切换团队',
   switchTeamDesc: '当前团队：{team}。一个账户同一时间只属于一个团队，切换会先退出当前团队，再用邀请码加入新团队。',

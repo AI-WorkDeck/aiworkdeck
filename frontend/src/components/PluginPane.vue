@@ -45,6 +45,7 @@
 // 广场装的插件调用一律 experimental_not_allowed——运行时闸是真保证，受理扫描只是辅助。
 import {
   getProjectFiles, getFileText, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm,
+  requestPluginLawFirm,
   createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks,
   getTeam, getProjectMembers, getCurrentUser
 } from '@/services/api.js'
@@ -84,6 +85,7 @@ const PLUGIN_EVENTS = {
   'account.changed': { permission: null, throttleMs: 0 },
   // v2.9：宿主设置表单保存后推送（只推给设置所属的插件，见 mounted 里的过滤）
   'settings.changed': { permission: null, throttleMs: 0 },
+  'lawfirm.navigate': { permission: null, throttleMs: 0 },
   // 宿主左栏（PluginWorkspaceSummary）与中栏插件标签联动指令（如切换会话、发起私聊、打开对话框、切换视图）
   'sidebar.command': { permission: null, throttleMs: 0 }
 }
@@ -213,6 +215,17 @@ export default {
     uni.$on('awd:files-changed', this._onFilesChanged)
     uni.$on('awd:selection-changed', this._onSelectionChanged)
     uni.$on('awd:plugin-settings-changed', this._onPluginSettingsChanged)
+    this._onLawfirmTab = (payload) => {
+      if (this.pluginId && this.pluginId !== 'lawfirm-management') return
+      const tab = typeof payload === 'string' ? payload : (payload && payload.tab) || ''
+      if (!tab) return
+      if (this._subscribedEvents && this._subscribedEvents.has('lawfirm.navigate')) {
+        this.forwardEvent('lawfirm.navigate', { tab })
+      } else {
+        this._pendingLawfirmTab = tab
+      }
+    }
+    uni.$on('awd:lawfirm-tab', this._onLawfirmTab)
     uni.$on('awd:plugin-sidebar-command', this._onSidebarCommand)
     this._onAccountChanged = () => {
       this.sessionGeneration++
@@ -237,6 +250,7 @@ export default {
     if (this._onFilesChanged) { uni.$off('awd:files-changed', this._onFilesChanged); this._onFilesChanged = null }
     if (this._onSelectionChanged) { uni.$off('awd:selection-changed', this._onSelectionChanged); this._onSelectionChanged = null }
     if (this._onPluginSettingsChanged) { uni.$off('awd:plugin-settings-changed', this._onPluginSettingsChanged); this._onPluginSettingsChanged = null }
+    if (this._onLawfirmTab) { uni.$off('awd:lawfirm-tab', this._onLawfirmTab); this._onLawfirmTab = null }
     if (this._onSidebarCommand) { uni.$off('awd:plugin-sidebar-command', this._onSidebarCommand); this._onSidebarCommand = null }
     if (this._onAccountChanged) { uni.$off(ACCOUNT_CHANGED_EVENT, this._onAccountChanged); this._onAccountChanged = null }
     if (this._onOrgChanged) { uni.$off('awd:org-changed', this._onOrgChanged); this._onOrgChanged = null }
@@ -399,6 +413,26 @@ export default {
           }
         }
 
+        case 'lawfirm.request': {
+          if (!this.hasPermission('lawfirm')) return this.denied('lawfirm')
+          const action = typeof params.action === 'string' ? params.action.trim() : ''
+          if (!action || (params.params != null
+              && (typeof params.params !== 'object' || Array.isArray(params.params)))) {
+            return { ok: false, error: { code: 'invalid_params', message: '缺少 action 或有效 params' } }
+          }
+          const generation = this.sessionGeneration
+          try {
+            const res = await requestPluginLawFirm(this.pluginId, this.projectId, action, params.params || {})
+            if (generation !== this.sessionGeneration) return this.staleContext()
+            if (!res || res.code !== 0) {
+              return { ok: false, error: { code: 'invoke_failed', message: res?.message || '律所管理服务请求失败' } }
+            }
+            return { ok: true, result: res.data }
+          } catch (e) {
+            return { ok: false, error: { code: 'invoke_failed', message: e?.message || '律所管理服务请求失败' } }
+          }
+        }
+
         case 'chat.addFile':
         case 'files.prepareDrag': {
           if (!this.hasPermission('file_read')) return this.denied('file_read')
@@ -544,6 +578,11 @@ export default {
             if (method === 'events.subscribe') this._subscribedEvents.add(name)
             else this._subscribedEvents.delete(name)
           })
+          if (method === 'events.subscribe' && this._pendingLawfirmTab && this._subscribedEvents.has('lawfirm.navigate')) {
+            const pending = this._pendingLawfirmTab
+            this._pendingLawfirmTab = ''
+            setTimeout(() => this.forwardEvent('lawfirm.navigate', { tab: pending }), 0)
+          }
           if (method === 'events.subscribe' && this._subscribedEvents.has('sidebar.command') && this._pendingSidebarCommand) {
             const pending = this._pendingSidebarCommand
             this._pendingSidebarCommand = null
