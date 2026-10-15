@@ -120,7 +120,7 @@ export default {
   height: 16px;
   flex-shrink: 0;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
 }
 .oc-check.checked { background: var(--awd-accent); border-color: var(--awd-accent); }
 .oc-title { font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-text); flex: 1; }
@@ -138,7 +138,7 @@ export default {
 .oc-progress {
   height: 6px;
   background: var(--awd-surface-3);
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   overflow: hidden;
   margin-top: 8px;
 }
@@ -147,7 +147,7 @@ export default {
 .oc-btn {
   padding: 4px 10px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text);
   cursor: pointer;

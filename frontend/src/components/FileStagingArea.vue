@@ -395,7 +395,7 @@ export default {
   
   background: var(--awd-surface);
   border-top: 1px solid var(--awd-border);
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--awd-shadow-sm);
   transition: all 0.2s ease;
 }
 
@@ -405,7 +405,7 @@ export default {
 }
 
 .staging-header {
-    height: 32px;
+    height: var(--awd-control-height);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -421,7 +421,7 @@ export default {
 }
 
 .staging-title {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     font-weight: 600;
     color: var(--awd-text-2);
 }
@@ -434,7 +434,7 @@ export default {
     justify-content: center;
     cursor: pointer;
     color: var(--awd-text-3);
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
 }
 
 .collapse-btn:hover {
@@ -444,12 +444,12 @@ export default {
 
 .collapse-icon {
     font-family: "Material Icons"; /* Assuming material icons are available or use text */
-    font-size: 16px;
+    font-size: var(--awd-font-size-title);
     line-height: 1;
 }
 
 .clear-btn {
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-3);
     cursor: pointer;
 }
@@ -470,7 +470,7 @@ export default {
 .quota-bar {
     flex: 1;
     height: 3px;
-    border-radius: 2px;
+    border-radius: var(--awd-radius-sm);
     background: var(--awd-surface-3);
     overflow: hidden;
 }
@@ -478,12 +478,12 @@ export default {
 .quota-fill {
     height: 100%;
     background: var(--awd-surface-3);
-    border-radius: 2px;
+    border-radius: var(--awd-radius-sm);
     transition: width 0.2s ease, background 0.2s ease;
 }
 
 .quota-text {
-    font-size: 11px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-3);
     flex-shrink: 0;
 }
@@ -506,10 +506,10 @@ export default {
     align-items: center;
     justify-content: center;
     color: var(--awd-text-3);
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     border: 2px dashed var(--awd-border);
     margin: 8px;
-    border-radius: 6px;
+    border-radius: var(--awd-radius-md);
 }
 
 .staging-list-container {
@@ -531,10 +531,10 @@ export default {
     display: flex;
     align-items: center;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     cursor: pointer;
     margin-bottom: 2px;
-    background: white;
+    background: var(--awd-surface);
     border: 1px solid transparent;
     user-select: none; /* Prevent text selection */
 }
@@ -549,7 +549,7 @@ export default {
     width: 14px;
     height: 14px;
     border: 1px solid var(--awd-border-strong);
-    border-radius: 3px;
+    border-radius: var(--awd-radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -564,7 +564,7 @@ export default {
 
 .check-mark {
     color: var(--awd-text-on-accent);
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: bold;
     line-height: 1;
 }
@@ -589,7 +589,7 @@ export default {
 }
 
 .file-name {
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     color: var(--awd-text);
     flex: 1;
     white-space: nowrap;
@@ -601,7 +601,7 @@ export default {
     margin-left: 8px;
     color: var(--awd-text-3);
     cursor: pointer;
-    font-size: 16px;
+    font-size: var(--awd-font-size-title);
     line-height: 1;
     padding: 4px;
 }
@@ -618,20 +618,20 @@ export default {
 }
 
 .btn-compare {
-    background: var(--awd-info);
-    color: white;
+    background: var(--awd-accent);
+    color: var(--awd-text-on-accent);
     border: none;
-    border-radius: 4px;
+    border-radius: var(--awd-radius-sm);
     padding: 4px 12px;
-    font-size: 12px;
+    font-size: var(--awd-panel-fs);
     display: flex;
     align-items: center;
     gap: 4px;
     cursor: pointer;
-    line-height: 1.5;
+    line-height: var(--awd-line-height-ui);
 }
 .btn-compare:hover {
-    background: var(--awd-info);
+    background: var(--awd-accent-hover);
 }
 
 .drop-overlay {
@@ -640,12 +640,12 @@ export default {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(59, 130, 246, 0.1);
-    border: 2px dashed var(--awd-info);
+    background: var(--awd-accent-wash);
+    border: 2px dashed var(--awd-accent);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--awd-info-text);
+    color: var(--awd-accent-text);
     font-weight: 600;
     pointer-events: none; /* Let drag events pass through to layer below if needed, but here overlay is top */
     z-index: 101;
@@ -659,8 +659,8 @@ export default {
 
 .marquee-box {
     position: absolute;
-    background: rgba(59, 130, 246, 0.2);
-    border: 1px solid var(--awd-info);
+    background: var(--awd-accent-soft);
+    border: 1px solid var(--awd-accent);
     pointer-events: none;
     z-index: 1000;
 }

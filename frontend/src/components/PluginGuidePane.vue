@@ -186,7 +186,7 @@ export default {
 }
 .pg-action-caret {
   color: var(--awd-panel-accent);
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   flex-shrink: 0;
 }
 .pg-actions-tip {
@@ -218,7 +218,7 @@ export default {
   border-radius: 50%;
   background: var(--awd-panel-accent);
   color: var(--awd-text-on-accent);
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 700;
   margin-top: 1px;
 }

@@ -668,7 +668,7 @@ function pickAudioMime() {
   position: fixed;
   inset: 0;
   z-index: 99999;
-  background: rgba(18, 52, 77, 0.14);
+  background: var(--awd-overlay);
 }
 
 .awdfb-panel {
@@ -686,8 +686,8 @@ function pickAudioMime() {
   flex-direction: column;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 12px;
-  box-shadow: 0 16px 44px rgba(18, 52, 77, 0.2);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   overflow: hidden;
 }
 
@@ -704,7 +704,7 @@ function pickAudioMime() {
 }
 
 .awdfb-title {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-accent-text);
 }
@@ -717,7 +717,7 @@ function pickAudioMime() {
 
 .awdfb-link {
   color: var(--awd-text-2);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   cursor: pointer;
   user-select: none;
 }
@@ -728,7 +728,7 @@ function pickAudioMime() {
 
 .awdfb-x {
   color: var(--awd-text-2);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
   padding: 2px 4px;
   user-select: none;
@@ -747,7 +747,7 @@ function pickAudioMime() {
 .awdfb-kinds {
   display: inline-flex;
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-md);
   overflow: hidden;
   margin-bottom: 10px;
 }
@@ -755,7 +755,7 @@ function pickAudioMime() {
 .awdfb-kind {
   background: var(--awd-surface);
   color: var(--awd-text-2);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   padding: 5px 16px;
   cursor: pointer;
   user-select: none;
@@ -773,8 +773,8 @@ function pickAudioMime() {
   resize: vertical;
   padding: 9px 10px;
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
   color: var(--awd-text);
   outline: none;
@@ -796,9 +796,9 @@ function pickAudioMime() {
 .awdfb-tool {
   border: 1px solid var(--awd-border);
   background: var(--awd-bg);
-  border-radius: 7px;
+  border-radius: var(--awd-radius-md);
   padding: 5px 11px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   cursor: pointer;
   user-select: none;
@@ -831,7 +831,7 @@ function pickAudioMime() {
   width: 76px;
   height: 56px;
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   overflow: hidden;
   background: var(--awd-bg);
 }
@@ -849,10 +849,10 @@ function pickAudioMime() {
   right: 2px;
   width: 16px;
   height: 16px;
-  border-radius: 8px;
+  border-radius: 50%;
   background: var(--awd-info);
   color: var(--awd-text-on-accent);
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 16px;
   text-align: center;
   cursor: pointer;
@@ -867,14 +867,14 @@ function pickAudioMime() {
 }
 
 .awdfb-audio-label {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   white-space: nowrap;
 }
 
 .awdfb-hint {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 
@@ -884,7 +884,7 @@ function pickAudioMime() {
 
 .awdfb-ctx-toggle {
   margin-top: 12px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   cursor: pointer;
   user-select: none;
@@ -900,9 +900,9 @@ function pickAudioMime() {
   overflow: auto;
   background: var(--awd-bg);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 8px;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
   color: var(--awd-text-2);
   white-space: pre-wrap;
@@ -915,7 +915,7 @@ function pickAudioMime() {
 }
 
 .awdfb-result-msg {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   line-height: 1.6;
 }
@@ -938,7 +938,7 @@ function pickAudioMime() {
 
 .awdfb-mine-item {
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-md);
   padding: 9px 11px;
 }
 
@@ -949,13 +949,13 @@ function pickAudioMime() {
 }
 
 .awdfb-mine-time {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 
 .awdfb-mine-text {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.5;
   color: var(--awd-text);
   word-break: break-all;
@@ -966,7 +966,7 @@ function pickAudioMime() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 
@@ -982,9 +982,9 @@ function pickAudioMime() {
 
 .awdfb-badge {
   display: inline-block;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   padding: 2px 7px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
 }
 
@@ -1009,7 +1009,7 @@ function pickAudioMime() {
 }
 
 .awdfb-status {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   flex: 1;
   min-width: 0;
@@ -1021,10 +1021,10 @@ function pickAudioMime() {
 }
 
 .awdfb-submit {
-  border-radius: 8px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   padding: 7px 20px;
   cursor: pointer;
   user-select: none;
@@ -1032,7 +1032,8 @@ function pickAudioMime() {
 }
 
 .awdfb-submit.disabled {
-  background: #B9C6C0;
+  background: var(--awd-surface-3);
+  color: var(--awd-text-3);
   cursor: default;
 }
 </style>

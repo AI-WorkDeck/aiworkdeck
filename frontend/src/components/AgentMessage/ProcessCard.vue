@@ -367,7 +367,7 @@ const renderItems = computed(() => {
 .process-divider { width: 100%; border-bottom: 1px solid var(--awd-border-subtle); margin-top: var(--awd-space-1); }
 .process-card {
   background: var(--awd-surface);
-  border-radius: 12px 12px 0 0;
+  border-radius: var(--awd-radius-dialog) var(--awd-radius-dialog) 0 0;
   /* border-bottom: 1px solid var(--awd-accent); */
   /* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1); */
   /* margin-bottom: 12px; */
@@ -421,7 +421,7 @@ const renderItems = computed(() => {
 }
 
 .status-badge {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   padding: 1px 7px;
   border-radius: var(--awd-radius-sm);
@@ -564,7 +564,7 @@ const renderItems = computed(() => {
   justify-content: space-between;
   padding: 3px 8px;
   background: var(--awd-bg);
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   margin-left: 0;
 }
 
@@ -647,7 +647,7 @@ const renderItems = computed(() => {
     padding: 4px 8px;
     border-top: 1px solid var(--awd-border-subtle);
     background: var(--awd-bg);
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     color: var(--awd-text-2);
 }
 
@@ -668,7 +668,7 @@ const renderItems = computed(() => {
 }
 
 .tool-status {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-meta);
     font-weight: 500;
     flex-shrink: 0;
 }

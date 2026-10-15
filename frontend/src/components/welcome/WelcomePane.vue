@@ -355,19 +355,19 @@ export default {
 }
 
 .welcome-brand {
-  font-size: 30px;
+  font-size: var(--awd-font-size-title);
   font-weight: 600;
   letter-spacing: 0.2px;
   color: var(--awd-text);
 }
 
 .welcome-tagline {
-  font-size: 18px;
+  font-size: var(--awd-font-size-title);
   color: var(--awd-accent-text);
 }
 
 .welcome-lead {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   line-height: 1.6;
   max-width: 560px;
@@ -395,7 +395,7 @@ export default {
 }
 
 .welcome-section-title {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
   margin-bottom: 10px;
@@ -422,11 +422,11 @@ export default {
 }
 
 .welcome-action-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 
 .welcome-muted {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
   line-height: 1.6;
 }
@@ -464,7 +464,7 @@ export default {
 }
 
 .welcome-recent-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-accent-text);
   white-space: nowrap;
   overflow: hidden;
@@ -473,7 +473,7 @@ export default {
 }
 
 .welcome-recent-meta {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   white-space: nowrap;
   flex-shrink: 0;
@@ -481,14 +481,14 @@ export default {
 
 .welcome-more {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 
 .welcome-guide-card {
   padding: 12px 14px;
   margin-bottom: 10px;
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-bg);
   cursor: pointer;
   display: flex;
@@ -502,13 +502,13 @@ export default {
 }
 
 .welcome-guide-title {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .welcome-guide-desc {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   line-height: 1.5;
 }
@@ -536,7 +536,7 @@ export default {
   width: 14px;
   height: 14px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -555,7 +555,7 @@ export default {
 }
 
 .welcome-startup-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
 }
 
@@ -568,11 +568,11 @@ export default {
 }
 
 .welcome-telemetry-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
 }
 
 .welcome-telemetry-close {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   line-height: 14px;
   color: var(--awd-text-3);
   cursor: pointer;
@@ -587,7 +587,7 @@ export default {
   position: fixed;
   inset: 0;
   z-index: 3000;
-  background: rgba(18, 52, 77, 0.28);
+  background: var(--awd-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -598,7 +598,7 @@ export default {
   max-width: calc(100vw - 32px);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-radius-dialog);
   box-shadow: var(--awd-shadow-lg);
   padding: 18px 20px 20px;
   box-sizing: border-box;
@@ -613,20 +613,20 @@ export default {
 }
 
 .welcome-dialog-title {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .welcome-dialog-close {
-  font-size: 18px;
+  font-size: var(--awd-font-size-title);
   color: var(--awd-text-3);
   cursor: pointer;
 }
 
 .welcome-dialog-hint {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   line-height: 1.6;
   margin-bottom: 14px;
