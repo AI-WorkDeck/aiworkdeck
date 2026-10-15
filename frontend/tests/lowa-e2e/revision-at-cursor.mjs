@@ -76,14 +76,16 @@ try {
     assert.equal(reopened.revisions[0].type, other.type)
     assert.equal(reopened.revisions[0].text, other.text)
     await ok('set_revision_view', { mode })
-    // A cursor outside the remaining revision must fail, never resolve all.
-    await ok('select_paragraph', { index: 0 })
-    await ok('collapse_selection', { to: 'start' })
+    // A cursor after all remaining revisions must fail, never resolve earlier ones.
+    await ok('select_paragraph', { index: 1 })
+    await ok('collapse_selection', { to: 'end' })
     const miss = await command('resolve_revision_at_cursor', { action })
-    assert.equal(miss.success, false, label + ': no-hit must fail')
+    assert.equal(miss.success, false, label + ': cursor after all revisions must fail')
     assert.doesNotMatch(miss.message || '', /Unknown action/)
     assert.equal((await revisions()).count, 1)
-    await ok('goto_revision', { index: 0 })
+    // A cursor before the remaining revision defaults to the first revision after the cursor (#1287).
+    await ok('select_paragraph', { index: 0 })
+    await ok('collapse_selection', { to: 'start' })
     await ok('resolve_revision_at_cursor', { action: 'reject' })
     assert.equal((await revisions()).count, 0)
     const finalText = firstText + '\n乙方应当交付。'
@@ -91,7 +93,7 @@ try {
     await ok('load_document', { name: 'resolved-cursor.docx', bytes: await exportBytes() })
     assert.equal(await text(), finalText, label + ': final DOCX roundtrip')
     assert.equal((await revisions()).count, 0)
-    console.log('PASS ' + label + ': selected only, unrelated revision retained, no-hit rejected, DOCX roundtrip')
+    console.log('PASS ' + label + ': selected only, forward revision resolved from earlier cursor, post-revision no-hit rejected, DOCX roundtrip')
   }
 } finally {
   await browser.close()

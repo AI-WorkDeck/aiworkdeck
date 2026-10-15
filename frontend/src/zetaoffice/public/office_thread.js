@@ -3055,7 +3055,9 @@ let contextMenuInterceptor = null;
 // 光标（或选区）落在哪一条 redline 上——工具条「接受/拒绝当前」用。与
 // selectionTouchesDeletion 同口径的区间相交：compareRegionStarts(A,B)>0 表示 A 在 B 前，
 // ==0 表示重合。零宽删除（页边态塌到一点）靠端点相等也能命中。
+// 若光标未直接命中修订，默认取光标位置往后的第一个修订（#1287）。
 function revisionIndexAtCursor() {
+  let firstAfter = -1;
   try {
     const vc = ctrl.getViewCursor();
     const text = vc.getText(), start = vc.getStart(), end = vc.getEnd();
@@ -3070,11 +3072,24 @@ function revisionIndexAtCursor() {
         if (text.compareRegionStarts(rs, re) < 0) { const tmp = rs; rs = re; re = tmp; }
         // 相交：start 不在 re 之后，且 rs 不在 end 之后（含端点贴合）。
         if (text.compareRegionStarts(start, re) >= 0 && text.compareRegionStarts(rs, end) >= 0) return index;
-      } catch (ignored) {}
+        if (firstAfter < 0 && text.compareRegionStarts(end, rs) > 0) firstAfter = index;
+      } catch (crossStory) {
+        if (firstAfter < 0) {
+          try {
+            const body = xModel.getText();
+            const vcTable = vc.getPropertyValue && vc.getPropertyValue('TextTable');
+            const rs = r.getPropertyValue('RedlineStart');
+            const rTable = rs && rs.getPropertyValue && rs.getPropertyValue('TextTable');
+            const vcAnchor = vcTable ? vcTable.getAnchor().getEnd() : end;
+            const rAnchor = rTable ? rTable.getAnchor().getStart() : rs;
+            if (rAnchor && body.compareRegionStarts(vcAnchor, rAnchor) >= 0) firstAfter = index;
+          } catch (ignored) {}
+        }
+      }
       index++;
     }
   } catch (e) {}
-  return -1;
+  return firstAfter;
 }
 function selectionTouchesDeletion(vc) {
   const text = vc.getText(), start = vc.getStart(), end = vc.getEnd();
@@ -3210,9 +3225,13 @@ function resumeModifyListener() {
 // **这条通道只覆盖「选区」类变化**：真机实测扩选/全选/选中段落每次都触发，但
 // **纯光标移动（塌陷选区左右挪）基本不触发**。所以编辑器页还会在画布 mouseup
 // 和覆盖层转发控制键之后各补一发——两路合起来才盖得住用户的实际操作。
+let suppressSelectionEvent = false;
 function installSelectionListener(controller) {
   const listener = zetajs.unoObject([css.view.XSelectionChangeListener], {
-    selectionChanged() { try { post('sel_changed'); } catch (e) { /* ignore */ } },
+    selectionChanged() {
+      if (suppressSelectionEvent) return;
+      try { post('sel_changed'); } catch (e) { /* ignore */ }
+    },
     disposing() {},
   });
   controller.addSelectionChangeListener(listener);
@@ -3528,6 +3547,51 @@ function readNativeCaretRect(frame, live, charHeightPt) {
     height: (Number(charHeightPt) || 12) * dpi / 72 * values[2] / 100,
     frameWidth: container.Width, frameHeight: container.Height,
     viewport: { x: x, y: y, width: width, height: height } };
+}
+
+let stashedDragSelection = null;
+function readSelectionCaretRects(frame, vc, charHeightPt) {
+  if (!vc) return null;
+  let selText = '';
+  try { selText = vc.getString() || ''; } catch (e) { return null; }
+  if (!selText || selText.length > 2000) return null;
+  let text = null, s = null, e = null, curPos = null;
+  try {
+    text = vc.getText();
+    s = text.createTextCursorByRange(vc.getStart());
+    e = text.createTextCursorByRange(vc.getEnd());
+    curPos = vc.getPosition();
+  } catch (err) {
+    return null;
+  }
+  let startRect = null, endRect = null, sPos = null, ePos = null;
+  suppressSelectionEvent = true;
+  try {
+    vc.gotoRange(s, false);
+    try { sPos = vc.getPosition(); } catch (err) {}
+    startRect = readNativeCaretRect(frame, ctrl.getViewData(), charHeightPt);
+    vc.gotoRange(e, false);
+    try { ePos = vc.getPosition(); } catch (err) {}
+    endRect = readNativeCaretRect(frame, ctrl.getViewData(), charHeightPt);
+  } catch (err) {
+    startRect = null;
+    endRect = null;
+  } finally {
+    try {
+      const backward = curPos && sPos && ePos
+        && Math.hypot(curPos.X - sPos.X, curPos.Y - sPos.Y) < Math.hypot(curPos.X - ePos.X, curPos.Y - ePos.Y);
+      if (backward) {
+        vc.gotoRange(e, false);
+        vc.gotoRange(s, true);
+      } else {
+        vc.gotoRange(s, false);
+        vc.gotoRange(e, true);
+      }
+    } catch (err) {}
+    suppressSelectionEvent = false;
+  }
+  if (!startRect || !endRect) return null;
+  return { start: startRect, end: endRect };
 }
 
 function completionUnavailable(reason) {
@@ -4914,7 +4978,127 @@ const EXEC = {
     } catch (e) { out.viewDataErr = errStr(e); }
     try { out.nativeCaret = readNativeCaretRect(ctrl.getFrame(), ctrl.getViewData(), out.charHeightPt); }
     catch (e) { /* Older engines retain the click-calibrated fallback. */ }
+    if (vc && out.collapsed === false) {
+      try {
+        const sr = readSelectionCaretRects(ctrl.getFrame(), vc, out.charHeightPt);
+        if (sr) out.selectionRects = sr;
+      } catch (e) {}
+    }
     return out;
+  },
+  // 选中文字鼠标点击拖拽移动（dev-board#1286）：
+  // Qt5-WASM 的 QDrag 模态循环在浏览器沙箱内不工作，画布内在已选中文本上按下并
+  // 拖动鼠标会被引擎当成从按下点重新拉选区，而不是把原选区搬到松手处。
+  // 客体页在检测到拖离原选区松手时：
+  //   1. 先调 stash_selection_for_drag 暂存原选区起止锚点与 XTransferable（保富格式）；
+  //   2. 向画布派发合成单击，交由 Qt 原生命中测试把视图光标挪到松手字符；
+  //   3. 调 complete_selection_drag，在同一撤销组内删除原选区并在落点插入（支持修订与非修订态），
+  //      并在新位置重新选中被移动的文字（Word 语义）。
+  stash_selection_for_drag() {
+    if (!isWriterDoc()) return bmFail('not-writer');
+    if (!isReviewWritable()) return bmFail('readonly');
+    try {
+      const vc = ctrl.getViewCursor();
+      const selText = vc ? (vc.getString() || '') : '';
+      if (!selText) {
+        stashedDragSelection = null;
+        return { success: false, empty: true, error: 'empty-selection', message: '未选中文字' };
+      }
+      const text = vc.getText();
+      const srcStart = text.createTextCursorByRange(vc.getStart());
+      const srcEnd = text.createTextCursorByRange(vc.getEnd());
+      try { dropAiAnchors(); } catch (e) {}
+      let transferable = null;
+      try {
+        if (typeof ctrl.getTransferable === 'function') transferable = ctrl.getTransferable();
+      } catch (e) {}
+      stashedDragSelection = {
+        model: xModel,
+        text: text,
+        srcStart: srcStart,
+        srcEnd: srcEnd,
+        selText: selText,
+        transferable: transferable,
+        at: Date.now(),
+      };
+      return { success: true, text: selText };
+    } catch (e) {
+      stashedDragSelection = null;
+      return bmFail('stash_selection_for_drag failed: ' + errStr(e));
+    }
+  },
+  complete_selection_drag(p) {
+    if (p && p.cancel) {
+      stashedDragSelection = null;
+      return { success: true, cancelled: true };
+    }
+    const stash = stashedDragSelection;
+    if (!stash || stash.model !== xModel || !isWriterDoc()) {
+      stashedDragSelection = null;
+      return bmFail('no-stashed-selection');
+    }
+    if (!isReviewWritable()) {
+      stashedDragSelection = null;
+      return bmFail('readonly');
+    }
+    try {
+      const vc = ctrl.getViewCursor();
+      const curSel = vc ? (vc.getString() || '') : '';
+      if (curSel.length > 0 && !(p && p.force)) {
+        return { success: true, pendingClick: true };
+      }
+      stashedDragSelection = null;
+      const dstText = vc.getText();
+      const dstPos = vc.getStart();
+      let insideSource = false;
+      try {
+        const afterStart = stash.text.compareRegionStarts(stash.srcStart, dstPos) >= 0;
+        const beforeEnd = stash.text.compareRegionStarts(dstPos, stash.srcEnd) >= 0;
+        if (afterStart && beforeEnd) insideSource = true;
+      } catch (e) {
+        insideSource = false;
+      }
+      if (insideSource) {
+        try {
+          vc.gotoRange(stash.srcStart, false);
+          vc.gotoRange(stash.srcEnd, true);
+        } catch (e) {}
+        return { success: true, moved: false, reason: 'inside-source', text: stash.selText };
+      }
+      const dstCur = dstText.createTextCursorByRange(dstPos);
+      const srcCur = stash.text.createTextCursorByRange(stash.srcStart);
+      srcCur.gotoRange(stash.srcEnd, true);
+      let um = null;
+      try { um = xModel.getUndoManager(); um.enterUndoContext('移动文字'); } catch (e) { um = null; }
+      lockModel();
+      try {
+        srcCur.setString('');
+        vc.gotoRange(dstCur, false);
+        let insertedViaTransferable = false;
+        if (stash.transferable && typeof ctrl.insertTransferable === 'function') {
+          try {
+            ctrl.insertTransferable(stash.transferable);
+            insertedViaTransferable = true;
+          } catch (e) {}
+        }
+        if (!insertedViaTransferable) {
+          insertTextAtCursor(vc, stash.selText);
+        }
+        vc.collapseToEnd();
+        const stepCount = stash.selText.replace(/\r\n/g, '\n').length;
+        if (stepCount > 0) {
+          try { vc.goLeft(stepCount, true); } catch (e) {}
+        }
+      } finally {
+        unlockModel();
+        if (um) { try { um.leaveUndoContext(); } catch (e) {} }
+      }
+      invalidateParaIndex();
+      return Object.assign({ success: true, moved: true, text: stash.selText }, verifySnapshot());
+    } catch (e) {
+      stashedDragSelection = null;
+      return bmFail('complete_selection_drag failed: ' + errStr(e));
+    }
   },
   // [spike] probe 4b: LOAD performance of a 50-page docx (#56 余项). The existing
   // testPerf times GENERATION; this times the docx IMPORT path: generate N pages,
@@ -9427,6 +9611,7 @@ const FINAL_TEXT_READ_ACTIONS = new Set([
   'get_review_context', 'get_review_layout', 'get_completion_context', 'capture_writing_context',
   'get_context_menu_context', 'find_text_locations', 'table_read', 'check_link_anchors',
   'list_styles', 'list_fonts', 'list_revisions', 'list_comments', 'var_list', 'debug_revisions', 'probe_modules',
+  'stash_selection_for_drag',
 ]);
 const AGENT_VIEW_EXEMPT = { set_revision_view: 1, export_document: 1, load_document: 1 };
 let agentViewPending = null;
