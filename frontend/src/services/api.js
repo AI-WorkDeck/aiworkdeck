@@ -10,6 +10,21 @@ import { getAuthHeaders, getSessionId, clearSession } from '@/utils/auth.js'
 import { host, isDesktopHost } from '@/services/host.js'
 import { t } from '@/i18n'
 import { accountRequiredError, isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
+import { createCloudConnectivity } from '@/utils/cloudConnectivity.js'
+
+// Desktop account changes do not replace the local session. Invalidate only on
+// successful identity mutations, never on account-status polling.
+let cloudAccountGeneration = 0
+export function getCloudAccountGeneration() {
+  return cloudAccountGeneration
+}
+function cloudAccountChanged(result) {
+  cloudAccountGeneration++
+  return result
+}
+// Only in-memory identity scoping; never persist or log the session value.
+const observeCloudConnectivity = createCloudConnectivity(() =>
+  JSON.stringify([getApiBaseUrl(), getSessionId(), getCloudAccountGeneration()]))
 
 /**
  * 功能未配置时的统一引导（#18 T7）。
@@ -1228,7 +1243,7 @@ export function activateLicense(code) {
     header: {
       'Content-Type': 'application/json',
     },
-  });
+  }).then(cloudAccountChanged);
 }
 
 // 当前站点与可选站点（双主站）。
@@ -1252,7 +1267,7 @@ export function selectSite(site) {
     header: {
       'Content-Type': 'application/json',
     },
-  });
+  }).then(cloudAccountChanged);
 }
 
 // 解除授权：回到未解锁状态
@@ -1260,7 +1275,7 @@ export function deactivateLicense() {
   return request({
     url: '/api/license/deactivate',
     method: 'POST',
-  });
+  }).then(cloudAccountChanged);
 }
 
 // ===================== 插件访问令牌（awdt_ 设备令牌）相关 API =====================
@@ -1367,7 +1382,7 @@ export function connectAccount(key) {
     header: {
       'Content-Type': 'application/json',
     },
-  }).then(unwrapEnvelope);
+  }).then(unwrapEnvelope).then(cloudAccountChanged);
 }
 
 // 账户登录：给手机号发验证码（本机后端转发官网）。
@@ -1410,7 +1425,7 @@ export function loginAccount(payload) {
     header: {
       'Content-Type': 'application/json',
     },
-  }).then(unwrapEnvelope);
+  }).then(unwrapEnvelope).then(cloudAccountChanged);
 }
 
 // 断开账户连接：清除本机保存的账户 Key
@@ -1418,7 +1433,7 @@ export function disconnectAccount() {
   return request({
     url: '/api/account/disconnect',
     method: 'POST',
-  }).then(unwrapEnvelope);
+  }).then(unwrapEnvelope).then(cloudAccountChanged);
 }
 
 // ---------- 账户资料：展示名与头像（Spec §5，dev-board#564–#567） ----------
@@ -4039,19 +4054,23 @@ export function acceptCloudProject(connectionId, remoteProjectId, localRoot) {
 }
 
 export function getCloudStatus(projectId) {
-  return request({ url: `/api/cloud/projects/${projectId}/status`, method: 'GET' })
+  return observeCloudConnectivity(projectId, 'status', () =>
+    request({ url: `/api/cloud/projects/${projectId}/status`, method: 'GET' }))
 }
 
 export function checkCloud(projectId) {
-  return request({ url: `/api/cloud/projects/${projectId}/check`, method: 'POST' })
+  return observeCloudConnectivity(projectId, 'check', () =>
+    request({ url: `/api/cloud/projects/${projectId}/check`, method: 'POST' }))
 }
 
 export function uploadToCloud(projectId) {
-  return request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' })
+  return observeCloudConnectivity(projectId, 'upload', () =>
+    request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' }))
 }
 
 export function updateFromCloud(projectId) {
-  return request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST' })
+  return observeCloudConnectivity(projectId, 'update', () =>
+    request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST' }))
 }
 
 // resolutions: { [path]: 'MAIN' | 'DRAFT' | 'BOTH' }（语境映射见 AdoptConflictDialog）

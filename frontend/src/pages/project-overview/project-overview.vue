@@ -759,12 +759,13 @@
             :project-id="projectId"
             :file-filter="versionFileFilter"
             :collab-refresh-token="collabRefreshToken"
+            :cloud-snapshot="collabCloud"
             :document-merge-state="documentMergeState"
             @compare-file="onVersionCompareFile"
             @clear-file-filter="versionFileFilter = null"
             @reload-files="onVersionReloadFiles"
             @adopt-conflict="adoptConflictPending = $event"
-            @status-changed="checkAdoptConflict"
+            @status-changed="onVersionPanelStatusChanged"
             @version-landed="refreshLibreProvenance"
             @open-collab="openCollab"
             @open-history="openCommitHistoryTab({})"
@@ -2430,6 +2431,7 @@ import {
   getLicenseStatus, // 试用版/正式版标识（含 accountConnected 组合口径）
   getTrialBalance, // 试用余额（试用计量 v0.1.1，权威在账户站）
   getAccountBalance, // Credits 余额 chip（dev-board#187，后端带 TTL 缓存的轻端点）
+  getCloudAccountGeneration,
   getCloudStatus, // 协作 chip：这份案卷有没有放进团队案件库、状态如何
   checkCloud, // 协作 chip 的联网刷新（cloudStatus 是不联网的本地快照）
   getCloudMembers, // 成员堆栈：案卷放进案件库后，同事在库那边的名单本机 /members 里没有
@@ -2449,7 +2451,7 @@ import { signOut } from '@/utils/signOut.js'
 import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { loadSiteLinks, siteBaseUrl, siteLinks } from '@/utils/siteLinks.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
-import { getCurrentUser } from '@/utils/auth.js'
+import { getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { mergeMembers } from '@/utils/mergeMembers.js'
 import { remoteAheadText } from '@/utils/collabWording.js'
 import { getInitial } from '@/utils/textInitial.js'
@@ -3583,7 +3585,7 @@ export default {
     this.unregisterMenuCommands()
     // 后台任务状态轮询清理
     if (this.convStatusPollTimer) { clearInterval(this.convStatusPollTimer); this.convStatusPollTimer = null }
-    this.stopCollabPolling()
+    this.stopCollabPolling({ dispose: true })
     // 广场变更订阅必须摘掉：本页是 navigateTo 打开的，页面栈里会存在多个实例，
     // 不退订就每回来一次多一份订阅，同一个事件被处理 N 次（剪贴板那次事故的同款）
     if (this._onMarketChanged) {
@@ -3745,6 +3747,7 @@ export default {
     // Cleanup manual event listener removed
   },
   onLoad(query) {
+    this._collabDisposed = false
     this.pageEnterTime = Date.now()
     this.loadLicenseMode()
     this.loadWalletBalance()
@@ -3941,6 +3944,7 @@ export default {
     }
   },
   onUnload() {
+    this.stopCollabPolling({ dispose: true })
     this._openWorkbenchMounted = false
     unregisterOpenWorkbench(this)
     this.closeDocumentLinkPreview()
@@ -4006,7 +4010,9 @@ export default {
     // 账户连上 / 断开（登录弹层成功、utils/signOut.js，dev-board#1046）：rail 账户入口的头像、余额抬头、
     // 宽限提示都读本页的授权状态与余额，就地重拉，不刷新页面。刻意不加 isActiveOverviewInstance 守卫：
     // 每个实例只刷自己的数据，栈里被压着的那个回来时也该是新状态（同 awd:wallet-refresh）。
-    this._onAccountChanged = () => this.refreshAccountState()
+    this._onAccountChanged = () => Promise.all([
+      this.onCollabAccountChanged(), this.refreshAccountState(),
+    ])
     uni.$on(ACCOUNT_CHANGED_EVENT, this._onAccountChanged)
     // SKU 解锁成功（UnlockHint 广播）：暂存区用量条的 limited 是后端算的，重拉一次
     // 才会摘掉「立即解锁」横幅（与剪贴板同病，dev-board#201）
@@ -4857,27 +4863,62 @@ export default {
     // 才前移。进页面拉一次它（便宜、立刻有结果），随后再走一次联网的 checkCloud，
     // 之后靠定时器保鲜——不刷新的话，同事交了新稿本机可能几小时都显示「和大家的稿
     // 一致」，那是比不显示更糟的假绿灯。
+    async onCollabAccountChanged() {
+      this.stopCollabPolling()
+      this.collabCloud = null
+      const lifecycle = this._collabStateLifecycle
+      const projectId = this.projectId
+      const accountGeneration = getCloudAccountGeneration()
+      await this.fetchCollabState({ online: true })
+      if (lifecycle === this._collabStateLifecycle && projectId === this.projectId
+          && accountGeneration === getCloudAccountGeneration()
+          && this.projectInfoLoaded && this.hasNamedProject && (!this.collabCloud || this.collabLinked)) {
+        this.startCollabPolling()
+      }
+    },
+    // Refresh the shared snapshot after panel actions without a token/refresh loop.
+    async onVersionPanelStatusChanged() {
+      await Promise.all([this.checkAdoptConflict(), this.fetchCollabState()])
+    },
     async fetchCollabState({ online = false } = {}) {
-      if (!this.projectInfoLoaded || !this.hasNamedProject) return
+      if (this._collabDisposed || !this.projectInfoLoaded || !this.hasNamedProject) return
+      const seq = this._collabStateSeq = (this._collabStateSeq || 0) + 1
+      const projectId = this.projectId
+      const sessionId = getSessionId()
+      const accountGeneration = getCloudAccountGeneration()
+      const lifecycle = this._collabStateLifecycle || 0
       try {
-        const res = online ? await checkCloud(this.projectId) : await getCloudStatus(this.projectId)
+        const res = online ? await checkCloud(projectId) : await getCloudStatus(projectId)
+        if (this._collabDisposed || projectId !== this.projectId || lifecycle !== (this._collabStateLifecycle || 0)
+            || sessionId !== getSessionId() || accountGeneration !== getCloudAccountGeneration()) return
+        if (seq !== this._collabStateSeq) {
+          // A newer cached read cannot erase a completed network observation.
+          // Reproject it once; this local read never starts another online check.
+          if (online) await this.fetchCollabState()
+          return
+        }
         this.collabCloud = (res && res.data) || null
       } catch (e) {
-        console.warn('[Collab] 读取协作状态失败', e)
+        if (!e.aborted) console.warn('[Collab] 读取协作状态失败', e)
       }
     },
     // 定时保鲜。三道守卫缺一不可：只在活跃实例上跑（页面栈多实例地雷，PR#148/#151）、
     // 窗口不可见时不打网络、没放进案件库就整个不起定时器。
     startCollabPolling() {
-      if (this._collabPollTimer) return
+      if (this._collabDisposed || this._collabPollTimer) return
       this._collabPollTimer = setInterval(() => {
-        if (!this.isActiveOverviewInstance()) return
+        if (this._collabDisposed || !this.isActiveOverviewInstance()) return
         if (typeof document !== 'undefined' && document.hidden) return
-        if (!this.collabLinked) return
+        // Unknown after an account change still needs a retry; only an explicit
+        // unlinked snapshot proves that there is no remote project to poll.
+        if (this.collabCloud && !this.collabLinked) return
         this.fetchCollabState({ online: true })
       }, 120000)
     },
-    stopCollabPolling() {
+    stopCollabPolling({ dispose = false } = {}) {
+      if (dispose) this._collabDisposed = true
+      this._collabStateLifecycle = (this._collabStateLifecycle || 0) + 1
+      this._collabStateSeq = (this._collabStateSeq || 0) + 1
       if (this._collabPollTimer) { clearInterval(this._collabPollTimer); this._collabPollTimer = null }
     },
     openCollab(tab) {
@@ -4908,7 +4949,9 @@ export default {
     // 同事再交多少稿也不会刷新——假绿灯比不显示更糟（口径见 fetchCollabState 的注释）。
     // startCollabPolling 自带 _collabPollTimer 幂等守卫，每次动作后都调一遍是安全的。
     onCollabChanged() {
+      const lifecycle = this._collabStateLifecycle || 0
       this.fetchCollabState().then(() => {
+        if (this._collabDisposed || lifecycle !== (this._collabStateLifecycle || 0)) return
         if (this.collabLinked) this.startCollabPolling()
       })
       this.checkAdoptConflict()
@@ -5975,8 +6018,10 @@ export default {
     },
     // --- 导航与初始化 ---
     async loadProjectInfo() {
+      const projectId = this.projectId
       try {
-        const data = await getProject(this.projectId)
+        const data = await getProject(projectId)
+        if (this._collabDisposed || projectId !== this.projectId) return
         if (data) {
           this.project = data
         }
@@ -5994,7 +6039,9 @@ export default {
         syncRecentToMenuFetching()
         this.checkAdoptConflict()
         loadProjectTasks(this.projectId).catch((e) => console.warn('[project-overview] 读取事项失败', e))
+        const lifecycle = this._collabStateLifecycle || 0
         this.fetchCollabState().then(() => {
+          if (this._collabDisposed || lifecycle !== (this._collabStateLifecycle || 0)) return
           // 先确认是否已关联案件库，否则首次加载会只留下本机成员。
           this.loadProjectMembers()
           if (!this.collabLinked) return

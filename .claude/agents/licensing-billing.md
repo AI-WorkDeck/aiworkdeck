@@ -90,6 +90,7 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
   给个默认返回值会让「桩根本没接这条路」在测试里表现成一次成功的上传。
 - `service/account/AccountEndpoint.java` — 授权服务器地址的协议校验（https，回环 http 例外），`LicenseService` 与 `AccountService` 共用。
 - `service/account/AccountException.java` — `Kind`：NETWORK / UNAUTHORIZED / CONFLICT / NOT_CONNECTED / MALFORMED。
+- 团队端点（精确 `/api/account/team` 或其子路径）的 HTTP 403 + `forbidden` 是角色权限拒绝，归 REJECTED，保留有效会话；401、invalid_key、key_revoked 与其他账户端点的 forbidden 仍走原凭据失败分类。护栏 `AccountTeamPermissionTest`（dev-board#1252/#1296），不能全局放宽 403。
 - `backend/src/main/java/com/checkba/controller/AccountController.java` — `/api/account/{status,connect,disconnect,usage}`
   以及个人档案 `/api/account/profile`（GET/PUT）与 `/api/account/avatar`（POST multipart/DELETE）。
 - `service/account/AccountSwitchCleanup.java` — **换账户后作废动作的唯一出口**（`afterConnect` / `afterDisconnect`）：
