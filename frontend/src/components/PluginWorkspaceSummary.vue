@@ -829,12 +829,12 @@ export default {
 .lawfirm-summary-card { display: flex; flex-direction: column; gap: 10px; margin: 10px 8px 6px; padding: 10px; border-radius: var(--awd-radius-md); background: var(--awd-surface-2); border: 1px solid var(--awd-border-subtle); }
 .lawfirm-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .lawfirm-stat-item { padding: 8px; border-radius: var(--awd-radius-sm); background: var(--awd-surface); border: 1px solid var(--awd-border-subtle); }
-.lawfirm-stat-label { display: block; font-size: 11px; color: var(--awd-text-2); }
-.lawfirm-stat-val { display: block; margin-top: 2px; font-size: 14px; font-weight: 600; color: var(--awd-text); font-variant-numeric: tabular-nums; }
+.lawfirm-stat-label { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
+.lawfirm-stat-val { display: block; margin-top: 2px; font-size: var(--awd-font-size-reading); font-weight: 600; color: var(--awd-text); font-variant-numeric: tabular-nums; }
 .lawfirm-stat-val.warn { color: var(--awd-warning); }
 .lawfirm-stat-val.accent { color: var(--awd-accent); }
 .lawfirm-quick-jumps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.lawfirm-jump-btn { min-height: 30px; line-height: 28px; padding: 0 8px; margin: 0; font-size: 12px; color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); }
+.lawfirm-jump-btn { min-height: 30px; line-height: 28px; padding: 0 8px; margin: 0; font-size: var(--awd-panel-fs); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); }
 
 .pws-root {
   display: flex;
@@ -843,13 +843,13 @@ export default {
   min-height: 0;
   background: var(--awd-bg);
   color: var(--awd-text);
-  font-size: var(--awd-panel-fs, 12px);
+  font-size: var(--awd-panel-fs);
 }
 
 .pws-org-card {
   margin: 8px 10px 4px;
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface);
   overflow: hidden;
 }
@@ -865,18 +865,18 @@ export default {
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  border-radius: 7px;
+  border-radius: var(--awd-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--awd-accent);
-  color: var(--awd-text-on-accent, #fff);
+  color: var(--awd-text-on-accent);
   font-weight: 700;
 }
 .pws-org-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pws-org-name, .pws-org-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pws-org-name { font-weight: 600; font-size: 13px; }
-.pws-org-sub { font-size: 11px; color: var(--awd-text-2); }
+.pws-org-name { font-weight: 600; font-size: var(--awd-font-size-body); }
+.pws-org-sub { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
 .pws-org-menu {
   border-top: 1px solid var(--awd-border);
   padding: 8px;
@@ -885,14 +885,14 @@ export default {
   gap: 6px;
   background: var(--awd-bg);
 }
-.pws-org-hint { font-size: 11px; line-height: 1.5; color: var(--awd-text-2); }
-.pws-org-team { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 4px 6px; border-radius: 5px; }
+.pws-org-hint { font-size: var(--awd-panel-fs-meta); line-height: 1.5; color: var(--awd-text-2); }
+.pws-org-team { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 4px 6px; border-radius: var(--awd-radius-sm); }
 .pws-org-team.mine { background: var(--awd-accent-wash); }
-.pws-org-team-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.pws-org-team-tag { font-size: 10px; color: var(--awd-text-2); flex-shrink: 0; }
+.pws-org-team-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--awd-panel-fs); }
+.pws-org-team-tag { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); flex-shrink: 0; }
 .pws-org-actions { display: flex; }
 .pws-dir-empty { display: flex; flex-direction: column; gap: 4px; }
-.pws-dir-empty-text { display: block; padding: 4px 8px; font-size: 11px; line-height: 1.5; color: var(--awd-text-2); }
+.pws-dir-empty-text { display: block; padding: 4px 8px; font-size: var(--awd-panel-fs-meta); line-height: 1.5; color: var(--awd-text-2); }
 
 .pws-im-top {
   padding: 10px 10px 8px;
@@ -907,7 +907,7 @@ export default {
   gap: 6px;
   height: 28px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-bg);
   border: 1px solid var(--awd-border);
 }
@@ -922,14 +922,14 @@ export default {
 .pws-search-input {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   background: transparent;
   border: 0;
 }
 
 .pws-search-clear {
-  font-size: 14px;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text-3);
   cursor: pointer;
   padding: 0 2px;
@@ -945,7 +945,7 @@ export default {
 .pws-quick-btn {
   flex: 1;
   height: 25px;
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-border);
   background: var(--awd-surface);
   display: flex;
@@ -958,7 +958,7 @@ export default {
 }
 
 .pws-quick-btn text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 500;
   color: var(--awd-text);
 }
@@ -974,14 +974,14 @@ export default {
 }
 
 .pws-quick-btn.primary text {
-  color: var(--awd-text-on-accent, #fff);
+  color: var(--awd-text-on-accent);
   font-weight: 600;
 }
 
 .pws-friend-form {
   margin-top: 8px;
   padding: 8px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-bg);
   border: 1px solid var(--awd-border);
   display: flex;
@@ -990,7 +990,7 @@ export default {
 }
 
 .pws-form-title {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text-2);
 }
@@ -998,8 +998,8 @@ export default {
 .pws-form-input {
   height: 26px;
   padding: 0 8px;
-  font-size: 12px;
-  border-radius: 4px;
+  font-size: var(--awd-panel-fs);
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   color: var(--awd-text);
@@ -1020,7 +1020,7 @@ export default {
 }
 
 .pws-form-tag text {
-  font-size: 10.5px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 
@@ -1059,14 +1059,14 @@ export default {
 }
 
 .pws-sec-label {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   font-weight: 700;
   color: var(--awd-text-2);
   letter-spacing: 0.4px;
 }
 
 .pws-sec-sub {
-  font-size: 10.5px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 
@@ -1077,7 +1077,7 @@ export default {
 }
 
 .pws-sec-count {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   font-variant-numeric: tabular-nums;
 }
@@ -1085,7 +1085,7 @@ export default {
 .pws-icon-action {
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1105,7 +1105,7 @@ export default {
 
 .pws-dir-group {
   margin: 0 6px 4px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border-subtle, var(--awd-border));
   overflow: hidden;
@@ -1125,7 +1125,7 @@ export default {
 }
 
 .pws-chevron {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
   width: 10px;
   text-align: center;
@@ -1139,7 +1139,7 @@ export default {
 .pws-dir-icon {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1152,18 +1152,18 @@ export default {
 }
 
 .pws-dir-icon.org {
-  background: rgba(66, 109, 80, 0.12);
+  background: var(--awd-accent-soft);
   color: var(--awd-accent-text);
 }
 
 .pws-dir-icon.firm {
-  background: rgba(62, 124, 177, 0.12);
-  color: var(--awd-info-text, #2b6cb0);
+  background: var(--awd-info-soft);
+  color: var(--awd-info-text);
 }
 
 .pws-dir-icon.friends {
-  background: rgba(200, 148, 70, 0.14);
-  color: var(--awd-warning-text, #975a16);
+  background: var(--awd-warning-soft);
+  color: var(--awd-warning-text);
 }
 
 .pws-dir-title-wrap {
@@ -1174,14 +1174,14 @@ export default {
 }
 
 .pws-dir-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text);
   line-height: 1.25;
 }
 
 .pws-dir-subtitle {
-  font-size: 10.5px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -1189,7 +1189,7 @@ export default {
 }
 
 .pws-dir-count {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text-3);
   padding: 1px 6px;
@@ -1223,7 +1223,7 @@ export default {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
 }
 
@@ -1233,14 +1233,14 @@ export default {
 }
 
 .pws-contact-avatar.firm {
-  background: rgba(62, 124, 177, 0.14);
-  color: var(--awd-info-text, #2b6cb0);
-  border-radius: 6px;
+  background: var(--awd-info-soft);
+  color: var(--awd-info-text);
+  border-radius: var(--awd-radius-sm);
 }
 
 .pws-contact-avatar.friend {
-  background: rgba(200, 148, 70, 0.16);
-  color: var(--awd-warning-text, #975a16);
+  background: var(--awd-warning-soft);
+  color: var(--awd-warning-text);
 }
 
 .pws-contact-main {
@@ -1257,7 +1257,7 @@ export default {
 }
 
 .pws-contact-name {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   color: var(--awd-text);
   white-space: nowrap;
@@ -1266,9 +1266,9 @@ export default {
 }
 
 .pws-contact-badge {
-  font-size: 9.5px;
+  font-size: var(--awd-panel-fs-meta);
   padding: 0 5px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   color: var(--awd-text-2);
@@ -1276,7 +1276,7 @@ export default {
 }
 
 .pws-contact-meta {
-  font-size: 10.5px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -1286,14 +1286,14 @@ export default {
 .pws-contact-action {
   flex-shrink: 0;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   opacity: 0.88;
 }
 
 .pws-contact-action text {
-  font-size: 10.5px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   font-weight: 600;
 }
@@ -1307,14 +1307,14 @@ export default {
 .pws-dir-foot-btn {
   margin: 4px 8px 2px 14px;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   border: 1px dashed var(--awd-border);
   text-align: center;
   cursor: pointer;
 }
 
 .pws-dir-foot-btn text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   font-weight: 500;
 }
@@ -1346,7 +1346,7 @@ export default {
 }
 
 .pws-filter-pill text {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 
@@ -1363,7 +1363,7 @@ export default {
 .pws-conv-empty {
   margin: 4px 10px;
   padding: 12px 10px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   display: flex;
@@ -1372,13 +1372,13 @@ export default {
 }
 
 .pws-conv-empty-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .pws-conv-empty-desc {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
   color: var(--awd-text-2);
 }
@@ -1401,7 +1401,7 @@ export default {
   align-items: center;
   gap: 8px;
   padding: 7px 8px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-sm);
   cursor: pointer;
 }
 
@@ -1416,19 +1416,19 @@ export default {
 .pws-conv-avatar {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 700;
 }
 
 .pws-conv-avatar.group {
   background: var(--awd-accent-soft);
   color: var(--awd-accent-text);
-  border: 1px solid rgba(66, 109, 80, 0.22);
+  border: 1px solid var(--awd-border);
 }
 
 .pws-conv-avatar.direct {
@@ -1453,7 +1453,7 @@ export default {
 }
 
 .pws-conv-title {
-  font-size: 12.5px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text);
   white-space: nowrap;
@@ -1463,8 +1463,8 @@ export default {
 
 .pws-conv-unread {
   background: var(--awd-accent);
-  color: var(--awd-text-on-accent, #fff);
-  font-size: 10px;
+  color: var(--awd-text-on-accent);
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   padding: 0 5px;
   border-radius: 999px;
@@ -1473,7 +1473,7 @@ export default {
 }
 
 .pws-conv-sub {
-  font-size: 10.5px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 
@@ -1498,7 +1498,7 @@ export default {
 .pws-brand-glyph {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-accent-soft);
   color: var(--awd-accent-text);
   display: flex;
@@ -1521,13 +1521,13 @@ export default {
 }
 
 .pws-brand-name {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .pws-brand-desc {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.4;
   color: var(--awd-text-2);
 }
@@ -1544,7 +1544,7 @@ export default {
   align-items: flex-start;
   gap: 8px;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   cursor: pointer;
@@ -1574,7 +1574,7 @@ export default {
   border-radius: 50%;
   background: var(--awd-accent-soft);
   color: var(--awd-accent-text);
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -1592,13 +1592,13 @@ export default {
 }
 
 .pws-nav-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .pws-nav-sub {
-  font-size: 10.5px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.4;
   color: var(--awd-text-2);
 }
@@ -1612,7 +1612,7 @@ export default {
 
 .pws-action-row {
   padding: 7px 10px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-border);
   background: var(--awd-surface);
   cursor: pointer;
@@ -1620,7 +1620,7 @@ export default {
 }
 
 .pws-action-row text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 500;
   color: var(--awd-text);
 }
@@ -1636,7 +1636,7 @@ export default {
 }
 
 .pws-action-row.primary text {
-  color: var(--awd-text-on-accent, #fff);
+  color: var(--awd-text-on-accent);
   font-weight: 600;
 }
 </style>
