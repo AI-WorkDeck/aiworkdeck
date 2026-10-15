@@ -338,6 +338,22 @@
             <view v-if="canLeaveFirm" class="firm-leave-row">
               <view class="team-btn small danger" @tap="onLeaveFirm">{{ $t('team.leaveFirm') }}</view>
             </view>
+
+            <!-- 切换律所：本团队退出当前律所 + 用律所码并入另一家，两步非原子。
+                 总部团队不能退出律所；非负责人无权操作——都直接说明原因。 -->
+            <text class="sub-title">{{ $t('team.switchFirmTitle') }}</text>
+            <view v-if="canLeaveFirm" class="team-row">
+              <input
+                v-model="switchFirmCode"
+                class="team-input"
+                :placeholder="$t('team.firmCodePlaceholder')"
+              />
+              <view class="team-btn" :class="{ 'is-busy': busy }" @tap="onSwitchFirm">
+                {{ $t('team.switchFirmButton') }}
+              </view>
+            </view>
+            <text v-else-if="firm.isHead" class="empty-line">{{ $t('team.switchFirmHeadBlocked') }}</text>
+            <text v-else class="empty-line">{{ $t('team.firmOwnerOnly') }}</text>
           </template>
         </view>
       </view>
@@ -488,6 +504,30 @@
         </view>
       </view>
 
+      <!-- 切换团队：官网一人一队，切换 = 退出当前团队 + 用邀请码加入新团队，两步非原子。
+           负责人不能退出，因此也不能切换——直接说清楚，不给一个必然被拒的按钮。 -->
+      <view class="section-card">
+        <view class="section-header">
+          <text class="section-title">{{ $t('team.switchTeamTitle') }}</text>
+          <text class="section-subtitle">{{ $t('team.switchTeamDesc', { team: team.name || '' }) }}</text>
+        </view>
+        <view class="section-body">
+          <template v-if="canLeave">
+            <view class="team-row">
+              <input
+                v-model="switchTeamCode"
+                class="team-input"
+                :placeholder="$t('team.joinCodePlaceholder')"
+              />
+              <view class="team-btn" :class="{ 'is-busy': busy }" @tap="onSwitchTeam">
+                {{ $t('team.switchTeamButton') }}
+              </view>
+            </view>
+          </template>
+          <text v-else class="empty-line">{{ $t('team.switchTeamOwnerBlocked') }}</text>
+        </view>
+      </view>
+
       <view v-if="canLeave" class="section-card">
         <view class="section-body">
           <text class="link-action danger" @tap="onLeaveTeam">{{ $t('team.leaveTeam') }}</text>
@@ -514,6 +554,7 @@ import {
   createFirm, joinFirm, updateFirm, regenerateFirmJoinCode, removeFirmTeam,
 } from '@/services/api.js'
 import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { notifyOrgChanged } from '@/utils/orgContext.js'
 
 const ROLE_KEYS = ['ADMIN', 'MEMBER']
 
@@ -561,6 +602,9 @@ export default {
       invitePhone: '',
       inviteRoleIndex: 1,
       renameDraft: '',
+      // 切换团队 / 律所用的邀请码输入，与「无团队时加入」那个输入框分开，避免串值
+      switchTeamCode: '',
+      switchFirmCode: '',
     }
   },
   computed: {
@@ -798,7 +842,7 @@ export default {
       this.run(async () => {
         await createTeam(name)
         this.newTeamName = ''
-        await this.reload()
+        await this.afterOrgChange('createTeam')
       })
     },
     onJoinTeam() {
@@ -810,13 +854,13 @@ export default {
       this.run(async () => {
         await joinTeam(code)
         this.joinCodeInput = ''
-        await this.reload()
+        await this.afterOrgChange('joinTeam')
       })
     },
     onAcceptInvite(invite) {
       this.run(async () => {
         await acceptTeamInvite(invite.id)
-        await this.reload()
+        await this.afterOrgChange('acceptTeamInvite')
       })
     },
     // ---- 邀请码：复制 / 重置 ----
@@ -855,7 +899,7 @@ export default {
       this.run(async () => {
         await createFirm(name)
         this.newFirmName = ''
-        await this.reload()
+        await this.afterOrgChange('createFirm')
       })
     },
     onJoinFirm() {
@@ -867,7 +911,7 @@ export default {
       this.run(async () => {
         await joinFirm(code)
         this.firmCodeInput = ''
-        await this.reload()
+        await this.afterOrgChange('joinFirm')
       })
     },
     onRenameFirm() {
@@ -878,7 +922,7 @@ export default {
       }
       this.run(async () => {
         await updateFirm(name)
-        await this.reload()
+        await this.afterOrgChange('updateFirm')
       })
     },
     onResetFirmCode() {
@@ -902,7 +946,7 @@ export default {
           if (!res.confirm) return
           this.run(async () => {
             await removeFirmTeam(t.id)
-            await this.reload()
+            await this.afterOrgChange('removeFirmTeam')
           })
         },
       })
@@ -922,7 +966,7 @@ export default {
           if (!res.confirm) return
           this.run(async () => {
             await removeFirmTeam(teamId)
-            await this.reload()
+            await this.afterOrgChange('removeFirmTeam')
           })
         },
       })
@@ -983,7 +1027,7 @@ export default {
           if (!res.confirm) return
           this.run(async () => {
             await removeTeamMember(member.accountId)
-            await this.reload()
+            await this.afterOrgChange('removeTeamMember')
           })
         },
       })
@@ -996,7 +1040,7 @@ export default {
           if (!res.confirm) return
           this.run(async () => {
             await removeTeamMember(this.myAccountId)
-            await this.reload()
+            await this.afterOrgChange('removeTeamMember')
           })
         },
       })
@@ -1009,7 +1053,84 @@ export default {
       }
       this.run(async () => {
         await updateTeam({ name })
-        await this.reload()
+        await this.afterOrgChange('updateTeam')
+      })
+    },
+    // 组织结构变了：先刷新本面板，再广播给插件通讯录 / 侧栏，让它们丢掉旧组织的成员。
+    async afterOrgChange(reason) {
+      await this.reload()
+      notifyOrgChanged(reason)
+    },
+    // 切换团队 = 退出当前团队 + 用邀请码加入新团队。官网没有原子接口，所以：
+    // 1) 动手前把后果讲清楚；2) 第二步失败时如实说「已退出、未加入」，不假装回滚。
+    onSwitchTeam() {
+      const code = (this.switchTeamCode || '').trim()
+      if (!code) {
+        this.toast(this.$t('team.joinCodeEmpty'))
+        return
+      }
+      if (!this.canLeave) {
+        this.toast(this.$t('team.switchTeamOwnerBlocked'))
+        return
+      }
+      const fromName = (this.team && this.team.name) || ''
+      uni.showModal({
+        title: this.$t('team.switchTeamTitle'),
+        content: this.$t('team.confirmSwitchTeam', { team: fromName }),
+        success: (res) => {
+          if (!res.confirm) return
+          this.run(async () => {
+            await removeTeamMember(this.myAccountId)
+            try {
+              await joinTeam(code)
+            } catch (e) {
+              await this.afterOrgChange('switchTeam:left')
+              const reason = (e && e.message) || this.$t('team.loadFailed')
+              // 半途失败要让人看完整原因，toast 会截断，改用必须点掉的提示框
+              uni.showModal({ title: this.$t('team.switchTeamTitle'), content: this.$t('team.switchTeamHalfDone', { team: fromName, reason }), showCancel: false })
+              return
+            }
+            this.switchTeamCode = ''
+            await this.afterOrgChange('switchTeam')
+            this.toast(this.$t('team.switchTeamDone'))
+          })
+        },
+      })
+    },
+    // 切换律所 = 本团队退出当前律所 + 用律所码并入另一家。只有子团队负责人可做；总部团队不可退出。
+    onSwitchFirm() {
+      const code = (this.switchFirmCode || '').trim()
+      const teamId = this.team && this.team.id
+      if (!code) {
+        this.toast(this.$t('team.joinCodeEmpty'))
+        return
+      }
+      if (!this.canLeaveFirm || !teamId) {
+        this.toast(this.firm && this.firm.isHead ? this.$t('team.switchFirmHeadBlocked') : this.$t('team.firmOwnerOnly'))
+        return
+      }
+      const fromName = (this.firm && this.firm.name) || ''
+      uni.showModal({
+        title: this.$t('team.switchFirmTitle'),
+        content: this.$t('team.confirmSwitchFirm', { firm: fromName }),
+        success: (res) => {
+          if (!res.confirm) return
+          this.run(async () => {
+            await removeFirmTeam(teamId)
+            try {
+              await joinFirm(code)
+            } catch (e) {
+              await this.afterOrgChange('switchFirm:left')
+              const reason = (e && e.message) || this.$t('team.loadFailed')
+              // 半途失败要让人看完整原因，toast 会截断，改用必须点掉的提示框
+              uni.showModal({ title: this.$t('team.switchFirmTitle'), content: this.$t('team.switchFirmHalfDone', { firm: fromName, reason }), showCancel: false })
+              return
+            }
+            this.switchFirmCode = ''
+            await this.afterOrgChange('switchFirm')
+            this.toast(this.$t('team.switchFirmDone'))
+          })
+        },
       })
     },
     onToggleShareNames(next) {
