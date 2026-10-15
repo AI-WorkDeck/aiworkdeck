@@ -356,7 +356,7 @@ public class CloudSyncService {
     }
 
     /**
-     * 从云端接入一个项目：prepare-remote（若云端还是 v1 清单，服务端顺带落一笔升级提交）→
+     * 从云端接入一个项目：有编辑权限时 prepare-remote（升级旧清单），只读参与人跳过远端写操作 →
      * 本地建一个新项目行 → 整仓克隆 → 读 HEAD 清单落库。清单必须是 v2——v1 清单里的节点
      * 没有跨机器一致的 uid，v2 是本机制的立身之本，旧格式一律拒绝、指引律师先在云端更新一次。
      */
@@ -386,23 +386,27 @@ public class CloudSyncService {
             return existing;
         }
 
-        JSONObject prep = JSONUtil.parseObj(httpPost(
-                conn.getServerUrl() + "/api/projects/" + remoteProjectId + "/version/prepare-remote",
-                "{}", conn.getDeviceToken()));
-        if (prep.getInt("code", 1) != 0) {
-            throw VersionException.userFacing(LangText.of(
-                    "没能取到本机：" + prep.getStr("message", "请重试"),
-                    "Couldn't pull this to your machine: " + prep.getStr("message", "please try again")));
-        }
-
-        String remoteName = listRemoteProjects(connectionId, localUserId).stream()
+        Map<String, Object> remoteProject = listRemoteProjects(connectionId, localUserId).stream()
                 .filter(m -> m.get("id") != null)
                 .filter(m -> remoteProjectId == ((Number) m.get("id")).longValue())
-                .map(m -> (String) m.get("name"))
-                .findFirst()
-                .orElse(LangText.of("案件库里的案卷", "A case file in the library"));
+                .findFirst().orElse(Map.of());
+        // prepare-remote 可建仓、重置空仓或提交旧清单升级，只能由明确的写角色尝试。
+        // 列表只是快照；服务端仍校验当前写权限。未知角色不尝试写操作，Git 读取仍独立鉴权。
+        Object role = remoteProject.get("myRole");
+        if ("OWNER".equals(role) || "ADMIN".equals(role) || "PARTICIPANT".equals(role)) {
+            JSONObject prep = JSONUtil.parseObj(httpPost(
+                    conn.getServerUrl() + "/api/projects/" + remoteProjectId + "/version/prepare-remote",
+                    "{}", conn.getDeviceToken()));
+            if (prep.getInt("code", 1) != 0) {
+                throw VersionException.userFacing(LangText.of(
+                        "没能取到本机：" + prep.getStr("message", "请重试"),
+                        "Couldn't pull this to your machine: " + prep.getStr("message", "please try again")));
+            }
+        }
+        String remoteName = (String) remoteProject.get("name");
+        if (remoteName == null) remoteName = LangText.of("案件库里的案卷", "A case file in the library");
 
-        // 目标文件夹放在 prepare-remote 之后才落盘：前面任何一步失败都不该在用户磁盘上留下空目录
+        // 列表读取与可选 prepare-remote 完成后才创建目标文件夹；后续失败统一补偿清理。
         com.checkba.service.LocalProjectService.CloneTarget target = null;
         if (localRoot != null && !localRoot.isBlank()) {
             var lps = localProjectService();

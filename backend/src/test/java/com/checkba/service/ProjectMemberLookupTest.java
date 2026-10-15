@@ -238,6 +238,32 @@ class ProjectMemberLookupTest {
     }
 
     @Test
+    @DisplayName("已有团队的协作者得到组织归属指引，不被要求直接加入第二个团队")
+    void existingTeamGetsAffiliationGuidanceInBothLanguages() {
+        injectAdmission(new DirectoryReply(true,
+                new DirectoryAccount("acc-9f", "lisi", "李思", "13800138000"),
+                new OrgMembership("team-a", "firm-1"),
+                new OrgMembership("team-b", "firm-2")), null);
+        AppLanguageService language = mock(AppLanguageService.class);
+        LangText.register(language);
+        try {
+            for (boolean english : new boolean[]{false, true}) {
+                when(language.isEnglish()).thenReturn(english);
+                var result = service.lookupMember(PROJECT, "13800138000", OWNER);
+                assertFalse(result.found());
+                assertEquals(Denial.NOT_IN_ORG.name(), result.reason());
+                assertTrue(result.message().contains(english ? "same team or law firm" : "同一团队或同一律所"));
+                assertTrue(result.message().contains(english ? "If they have no team" : "尚未加入团队时"));
+                assertTrue(result.message().contains(english ? "both team owners" : "双方团队负责人"));
+                assertNull(result.displayName());
+            }
+            verify(awdkLoginService, never()).ensureBridgedUser(any(), any(), any(), any());
+        } finally {
+            LangText.reset();
+        }
+    }
+
+    @Test
     @DisplayName("自己还没加入团队：reason=REQUESTER_NO_TEAM，文案落到「你还没有加入团队」")
     void requesterWithoutATeamGetsTheirOwnReason() {
         injectAdmission(new DirectoryReply(true,

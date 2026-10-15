@@ -867,7 +867,7 @@ public class AccountService {
         if (reply.networkFailure()) {
             throw networkError();
         }
-        return handle(reply);
+        return handle(reply, "/api/account/team/usage");
     }
 
     /**
@@ -888,7 +888,7 @@ public class AccountService {
         if (reply.networkFailure()) {
             throw networkError();
         }
-        return handle(reply);
+        return handle(reply, path);
     }
 
     /**
@@ -1037,12 +1037,12 @@ public class AccountService {
         if (reply.networkFailure()) {
             throw networkError();
         }
-        return handle(reply);
+        return handle(reply, path);
     }
 
     /**
      * 状态码分类。5xx 归入 NETWORK（服务器故障不等于凭据失效，不能据此清除本地连接），
-     * 401/403 才是明确的鉴权失败——与 PR-A LicenseService 的判定同源。
+     * 401 与非团队权限拒绝的 403 才按凭据失效处理。
      */
     /** 官网鉴权层的机器码：这些仍按凭据失效处理。 */
     private static final java.util.Set<String> AUTH_ERROR_CODES = java.util.Set.of("unauthorized", "forbidden", "invalid_key", "key_revoked");
@@ -1073,6 +1073,7 @@ public class AccountService {
             case "phone_required" -> LangText.of("当前连接的账户没有绑定手机号，不能创建或加入团队。到官网账户页绑定即可；如果这个手机号已经注册过另一个账户，请断开当前账户，改用手机号验证码重新连接", "The connected account has no phone number bound, so it cannot create or join a team. Bind one on the website account page; if that phone number already belongs to another account, disconnect and reconnect with a phone verification code instead");
             case "trial_exhausted" -> LangText.of("试用的 AI 调用次数已用完，具体以协议为准", "Your trial AI turns are used up. Subject to the agreement");
             case "trial_expired" -> LangText.of("试用期已结束，具体以协议为准", "Your trial period has ended. Subject to the agreement");
+            case "forbidden" -> LangText.of("当前账户没有执行此团队操作的权限，请刷新团队信息后重试", "Your account does not have permission for this team action. Refresh the team information and try again");
             case "already_in_team" -> LangText.of("这个账户已经在一个团队里了", "This account already belongs to a team");
             case "already_in_firm" -> LangText.of("这个团队已经在一家律所里了", "This team already belongs to a firm");
             case "bad_code" -> LangText.of("邀请码不存在或已失效", "That invite code does not exist or has expired");
@@ -1096,13 +1097,21 @@ public class AccountService {
     }
 
     private Map<String, Object> handle(AccountTransport.Reply reply) {
+        return handle(reply, "");
+    }
+
+    private Map<String, Object> handle(AccountTransport.Reply reply, String path) {
         int status = reply.status();
         if (status == 401) {
             throw new AccountException(AccountException.Kind.UNAUTHORIZED, unauthorizedMessage());
         }
         if (status == 403 || status == 404 || status == 409 || status == 400 || status == 413 || status == 429) {
             String code = businessErrorCode(reply.body());
-            if (code != null && !AUTH_ERROR_CODES.contains(code)) {
+            // 官网 team.ts 的 forbidden 是成员角色不足；鉴权失败另回 unauthorized。
+            // 只按团队端点解释该码，保留其他账户接口原有的凭据失效判定。
+            boolean teamForbidden = status == 403 && "forbidden".equals(code)
+                    && ("/api/account/team".equals(path) || path.startsWith("/api/account/team/"));
+            if (code != null && (teamForbidden || !AUTH_ERROR_CODES.contains(code))) {
                 // 团队等业务端点：凭据没问题，是规则不许（dev-board#496 裁决 4 的 phone_required 等）。
                 // 折叠成「Key 无效」会让用户去官网重生成一把好 Key，还把真正的原因吞掉。
                 throw new AccountException(AccountException.Kind.REJECTED, rejectedMessage(code), code);

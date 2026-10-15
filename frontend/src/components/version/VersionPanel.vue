@@ -35,7 +35,7 @@
         @draft-abandoned="onReload"
       />
       <CloudSyncBar
-        :cloud="cloud"
+        :cloud="displayCloud"
         :has-connection="hasConnection"
         :conflict-pending="!!(sessionEndConflict || cloudConflict || adoptConflict)"
         :working="working"
@@ -146,6 +146,9 @@ export default {
     // 页面上的协作抽屉做完动作（交稿/取回/放进案件库/连案件库）后自增一次，
     // 本面板据此重拉状态——否则侧栏这行状态会停在动作之前的样子。
     collabRefreshToken: { type: Number, default: 0 },
+    // Parent owns the network snapshot. Undefined keeps standalone usage working;
+    // explicit null means the parent has not read this project's status yet.
+    cloudSnapshot: { type: Object, default: undefined },
   },
   // adopt-conflict：把「有没有采纳等待处理」同步给页面。本面板一关（切去资源管理器
   // 等），三选一弹窗随组件卸载消失，而后端仍停在待裁决状态、版本捕获整体关闭——
@@ -180,6 +183,9 @@ export default {
     }
   },
   computed: {
+    displayCloud() {
+      return this.cloudSnapshot === undefined ? this.cloud : this.cloudSnapshot
+    },
     mergePresentation() {
       const conflict = this.sessionEndConflict || this.cloudConflict || this.adoptConflict
       const ctx = this.sessionEndConflict ? 'session-end' : this.cloudConflict ? 'cloud' : 'adopt'
@@ -204,6 +210,7 @@ export default {
     const seq = this.refreshSeq + 1
     await this.refresh()
     if (!shouldAcceptResponse(seq, this.refreshSeq)) return
+    if (this.cloudSnapshot !== undefined) return
     // 静默探活一次案件库连通性（会真的 fetch 远端，不同于 refresh() 里 getCloudStatus
     // 读的本地快照）；失败不打断——状态行里的「暂时连不上案件库」已经覆盖了这种情况。
     checkCloud(this.projectId).then((res) => {
@@ -282,12 +289,14 @@ export default {
     // 与「设不设得出共享按钮」。两者互相独立失败，各自吞错误置默认，不拖累 refresh()
     // 主流程（离线时版本记录本地功能照常可用）。
     async fetchCloudState() {
-      try {
-        const res = await getCloudStatus(this.projectId)
-        this.cloud = (res && res.data) || null
-      } catch (e) {
-        console.warn('[Version] 读取云端状态失败', e)
-        this.cloud = null
+      if (this.cloudSnapshot === undefined) {
+        try {
+          const res = await getCloudStatus(this.projectId)
+          this.cloud = (res && res.data) || null
+        } catch (e) {
+          console.warn('[Version] 读取云端状态失败', e)
+          this.cloud = null
+        }
       }
       try {
         const res = await listCloudConnections()
