@@ -195,4 +195,19 @@ export default {
   lawfirmColContracted: '签约额',
   lawfirmColCollected: '已到账',
   lawfirmColRate: '回款率',
+
+  // ---- 切换团队 / 律所（一人一队、一队一所；切换为两步非原子操作）----
+  switchTeamTitle: '切换团队',
+  switchTeamDesc: '当前团队：{team}。一个账户同一时间只属于一个团队，切换会先退出当前团队，再用邀请码加入新团队。',
+  switchTeamButton: '退出并加入新团队',
+  switchTeamOwnerBlocked: '你是本团队负责人，负责人不能退出团队，因此暂不能切换到其他团队。',
+  confirmSwitchTeam: '将先退出「{team}」，再用邀请码加入新团队。退出后看不到原团队统计与通讯录；项目沟通中的已有会话按会话成员身份保留。若加入失败，需要原团队重新邀请。继续？',
+  switchTeamHalfDone: '已退出「{team}」，但加入新团队未完成：{reason}。可核对邀请码后重新加入，或请原团队负责人重新邀请。',
+  switchTeamDone: '已切换到新团队',
+  switchFirmTitle: '切换律所',
+  switchFirmButton: '退出并并入新律所',
+  switchFirmHeadBlocked: '本团队是律所总部团队，总部团队不能退出律所，因此不能切换律所。',
+  confirmSwitchFirm: '将让本团队先退出「{firm}」，再用律所邀请码并入新律所。退出后看不到原律所汇总与律所通讯录。若并入失败，本团队将暂不属于任何律所。继续？',
+  switchFirmHalfDone: '本团队已退出「{firm}」，但并入新律所未完成：{reason}。可核对律所邀请码后重新并入。',
+  switchFirmDone: '已切换到新律所',
 }

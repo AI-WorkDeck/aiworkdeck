@@ -5,8 +5,9 @@
     <view class="mdp-inner">
       <!-- 头部：图标 + 名称 + 元信息 + 动作（VS Code 扩展详情页结构） -->
       <view class="mdp-head">
-        <view class="mdp-glyph" :class="{ 'is-plugin': spec.kind === 'plugin' }">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <view class="mdp-glyph" :class="{ 'is-plugin': spec.kind === 'plugin', 'has-avatar': !!headAvatarUrl }">
+          <image v-if="headAvatarUrl" :src="headAvatarUrl" class="mdp-avatar" mode="aspectFill" />
+          <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path v-for="(d, gi) in headGlyph" :key="gi" :d="d" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </view>
@@ -269,6 +270,7 @@
 // 装/卸/启停后通过 uni.$emit('awd:market-changed') 通知左栏刷新。
 import { getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile } from '@/services/api.js'
 import { ICONS } from '@/config/icons.js'
+import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { isPanelSkill, buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
 import { formatPrice, isPaid, paidState, priceCentsOf, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
@@ -392,8 +394,14 @@ export default {
       }
       return this.$t('market.buyHint')
     },
+    headAvatarUrl() {
+      if (this.spec.kind !== 'plugin') return null
+      return typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(this.spec.id) : null
+    },
     headGlyph() {
-      if (this.spec.kind === 'plugin') return ICONS.blocks
+      if (this.spec.kind === 'plugin') {
+        return typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(this.spec.id) : ICONS.blocks
+      }
       const cat = (this.marketInfo?.category || this.installedInfo?.category) || 'other'
       return CATEGORY_GLYPHS[cat] || CATEGORY_GLYPHS.other
     },
@@ -993,6 +1001,7 @@ export default {
   align-items: center;
   justify-content: center;
   color: var(--awd-accent-text);
+  overflow: hidden;
 
   svg {
     width: 34px;
@@ -1004,6 +1013,20 @@ export default {
     background: var(--awd-accent-hover);
     color: var(--awd-text-on-accent);
   }
+
+  &.has-avatar {
+    background: var(--awd-surface);
+    border: 1.5px solid var(--awd-border);
+    border-radius: 50%;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.mdp-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: block;
 }
 
 .mdp-head-main {
