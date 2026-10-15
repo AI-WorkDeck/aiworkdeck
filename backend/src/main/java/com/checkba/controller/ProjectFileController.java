@@ -39,6 +39,13 @@ public class ProjectFileController {
     private final com.checkba.service.ai.ProjectRagService projectRagService;
     private final com.checkba.service.ai.AutoTaggingService autoTaggingService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ProjectFilePdfService projectFilePdfService;
+
+    void setProjectFilePdfServiceForTest(com.checkba.service.ProjectFilePdfService projectFilePdfService) {
+        this.projectFilePdfService = projectFilePdfService;
+    }
+
     /**
      * 单机模式判别位。import-local 让调用方指名服务器磁盘上的绝对路径，
      * 只有「服务器就是用户这台电脑」时才成立，故仅 desktop profile 打开。
@@ -521,6 +528,74 @@ public class ProjectFileController {
         data.put("files", created);
         result.put("data", data);
         return result;
+    }
+
+    /**
+     * 将单个文件（Word/PPT/Excel/图片）转为 PDF 并存入同一目录（dev-board#1291）。
+     * POST /api/projects/{projectId}/files/{fileId}/convert-pdf
+     */
+    @PostMapping("/{fileId}/convert-pdf")
+    public Map<String, Object> convertToPdf(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new UnauthorizedException("请先登录");
+        }
+        checkFileWriteAccess(projectId, userId);
+        checkFileInProject(fileId, projectId);
+        ProjectFile created = projectFilePdfService.convertFileToPdf(projectId, fileId, userId);
+        triggerPostFileCreationHooks(projectId, created, userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", com.checkba.service.LangText.of("已转为 PDF", "Converted to PDF"));
+        result.put("data", created);
+        return result;
+    }
+
+    /**
+     * 将多个文件分别转为 PDF 后按顺序合并为一个 PDF（dev-board#1291）。
+     * POST /api/projects/{projectId}/files/batch/merge-pdf
+     */
+    @PostMapping("/batch/merge-pdf")
+    public Map<String, Object> mergeToPdf(
+            @PathVariable Long projectId,
+            @RequestBody ProjectFileBatchRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new UnauthorizedException("请先登录");
+        }
+        checkFileWriteAccess(projectId, userId);
+        List<Long> fileIds = request == null ? null : request.getFileIds();
+        ProjectFile created = projectFilePdfService.mergeFilesToPdf(projectId, fileIds, userId);
+        triggerPostFileCreationHooks(projectId, created, userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", com.checkba.service.LangText.of("已合并为 PDF", "Merged into PDF"));
+        result.put("data", created);
+        return result;
+    }
+
+    private void triggerPostFileCreationHooks(Long projectId, ProjectFile created, Long userId) {
+        if (created == null || (projectRagService == null && autoTaggingService == null)) return;
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            if (projectRagService != null) {
+                try {
+                    projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(projectId), created.getFilePath());
+                } catch (Exception e) {
+                    log.warn("生成 PDF 后 RAG 索引失败 fileId={}", created.getId(), e);
+                }
+            }
+            if (autoTaggingService != null) {
+                try {
+                    autoTaggingService.autoTagFile(projectId, created.getId(), created.getFilePath(), userId);
+                } catch (Exception e) {
+                    log.warn("生成 PDF 后自动标签失败 fileId={}", created.getId(), e);
+                }
+            }
+        });
     }
 
     /**

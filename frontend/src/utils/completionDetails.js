@@ -28,7 +28,11 @@ function pick(record, keys) {
   if (!record || typeof record !== 'object') return ''
   for (const key of keys) {
     const value = record[key]
-    if (value != null && typeof value !== 'object' && String(value).trim()) return String(value)
+    if (value != null && typeof value !== 'object' && String(value).trim()) {
+      const s = String(value).trim()
+      const mdLink = /^\[[^\]]*\]\((https?:\/\/[^)\s]+)\)$/u.exec(s)
+      return mdLink ? mdLink[1] : s
+    }
   }
   return ''
 }
@@ -52,8 +56,8 @@ function recordDetails(detail) {
 }
 
 function lawVariants(detail, source, date, fallbackTitle) {
-  const records = recordDetails(detail)
-  if (!records.length) {
+  const rawRecords = recordDetails(detail)
+  if (!rawRecords.length) {
     const law = lawArticle(detail)
     if (!law.content) return []
     const title = [law.title, law.article].filter(Boolean).join(' ') || fallbackTitle
@@ -62,9 +66,13 @@ function lawVariants(detail, source, date, fallbackTitle) {
       text: citationText([law.title || fallbackTitle, law.article], law.content, source, date),
     }]
   }
+  const activeIdx = rawRecords.findIndex((r) => lawArticle({ result: r }).timeliness.includes('现行有效'))
+  const records = activeIdx > 0
+    ? [rawRecords[activeIdx], ...rawRecords.slice(0, activeIdx), ...rawRecords.slice(activeIdx + 1)]
+    : rawRecords
   return records.map((record) => {
     const law = lawArticle({ result: record })
-    const url = pick(record, ['url', 'link', '链接'])
+    const url = pick(record, ['url', 'Url', 'link', '链接'])
     const title = [law.title, law.article].filter(Boolean).join(' ') || law.title || law.article
     return {
       title,
@@ -98,7 +106,7 @@ function caseVariants(detail, source, date, fallbackTitle) {
   return records.map((record) => {
     const item = caseRecord({ result: record })
     const content = item.sections.map((section) => section.text).filter(Boolean).join('\n\n')
-    const url = pick(record, ['url', 'link', '链接'])
+    const url = pick(record, ['url', 'Url', 'link', '链接'])
     return {
       title: item.title || item.caseNumber,
       ...(content ? { text: citationText([
@@ -148,7 +156,27 @@ export function completionDetails(entityView) {
   if (entity.kind === 'COMPANY') {
     if (!failed) {
       const rows = companyRows(detail)
-      if (rows.length) base.variants.push({ title: base.title, rows: rows.map(({ label, value }) => [label, value]) })
+      const matchedName = String(detail.matchedName || detail.basic?.['企业名称'] || '').trim()
+      const queriedName = String(detail.queriedName || base.title || '').trim()
+      const fuzzy = Boolean(
+        detail.fuzzyMatched ||
+        (source === 'qichacha+mcp' && matchedName && queriedName && matchedName !== queriedName)
+      )
+      if (fuzzy && matchedName && !base.note) {
+        base.note = `模糊匹配提示：未精准命中「${queriedName}」，已为您匹配「${matchedName}」，正文中的企业名称可能书写有误，请核对。`
+      }
+      if (rows.length) {
+        base.variants.push({
+          title: fuzzy && matchedName ? `${matchedName}（工商信息表）` : base.title,
+          rows: rows.map(({ label, value }) => [label, value]),
+        })
+      }
+      if (fuzzy && matchedName) {
+        base.variants.push({
+          title: `仅替换为正确全称：${matchedName}`,
+          text: matchedName,
+        })
+      }
     }
   } else if (entity.kind === 'LAW' || entity.kind === 'ARTICLE') {
     if (!failed) {

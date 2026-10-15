@@ -160,3 +160,59 @@ test('配置类检索失败把结构化原因码带给卡片，说明只用后�
   assert.equal(view.note, '未配置北大法宝账号（检索通道的账号凭据被拒）')
   assert.deepEqual(view.variants, [])
 })
+
+test('北大法宝 article 合并字段与 Markdown 链接在右键查询卡片中正常生成可插入正文（dev-board#1289）', () => {
+  const view = completionDetails({
+    name: '《中华人民共和国劳动合同法》第五十条',
+    kind: 'LAW',
+    retrievalStatus: 'OK',
+    retrievalSource: 'pkulaw-semantic/search_article',
+    fetchedAt: '2026-10-15',
+    detail: {
+      result: [
+        {
+          title: '中华人民共和国劳动合同法',
+          timeliness: '已修改',
+          url: '[https://www.pkulaw.com/chl/old.html](https://www.pkulaw.com/chl/old.html)',
+          article: '第五十条　旧版正文。',
+        },
+        {
+          title: '中华人民共和国劳动合同法(2012修正)',
+          timeliness: '现行有效',
+          url: '[https://www.pkulaw.com/chl/new.html](https://www.pkulaw.com/chl/new.html)',
+          article: '第五十条　用人单位应当在解除或者终止劳动合同时出具解除或者终止劳动合同的证明。',
+        },
+      ],
+    },
+  })
+  assert.equal(view.variants.length, 2)
+  assert.equal(view.variants[0].title, '中华人民共和国劳动合同法(2012修正) 第五十条')
+  assert.match(view.variants[0].text, /URL：https:\/\/www\.pkulaw\.com\/chl\/new\.html/)
+  assert.match(view.variants[0].text, /用人单位应当在解除或者终止劳动合同时出具解除或者终止劳动合同的证明。/)
+})
+
+test('企业工商模糊匹配时展示名称纠错提示并提供仅替换正确全称的候选（dev-board#1290）', () => {
+  const view = completionDetails({
+    name: '成都包晴天科技有限公司',
+    kind: 'COMPANY',
+    retrievalStatus: 'OK',
+    retrievalSource: 'qichacha+mcp',
+    detail: {
+      fuzzyMatched: true,
+      queriedName: '成都包晴天科技有限公司',
+      matchedName: '成都包晴天智能科技有限公司',
+      basic: {
+        企业名称: '成都包晴天智能科技有限公司',
+        统一社会信用代码: '91510100MA6EXAMPLE',
+      },
+    },
+  })
+  assert.match(view.note, /模糊匹配提示/)
+  assert.match(view.note, /成都包晴天科技有限公司/)
+  assert.match(view.note, /成都包晴天智能科技有限公司/)
+  assert.equal(view.variants.length, 2)
+  assert.equal(view.variants[0].rows[0][1], '成都包晴天智能科技有限公司')
+  assert.equal(view.variants[1].title, '仅替换为正确全称：成都包晴天智能科技有限公司')
+  assert.equal(view.variants[1].text, '成都包晴天智能科技有限公司')
+})
+

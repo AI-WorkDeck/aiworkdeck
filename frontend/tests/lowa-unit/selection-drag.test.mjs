@@ -146,3 +146,43 @@ test('attachSelectionDrag: synthetic LOWA resize heartbeats with unchanged viewp
   assert.equal(canvasClicks.length, 0, 'mousedown inside selection still intercepted after unchanged resize heartbeat')
 })
 
+test('attachSelectionDrag: consecutive drops within 16px emit a reset click at drag origin to prevent Qt5-WASM timestamp=0 double-click word selection', async (t) => {
+  const dom = new JSDOM('<div><canvas id="qtcanvas"></canvas></div>', { pretendToBeVisual: true })
+  const { window } = dom
+  const canvas = window.document.getElementById('qtcanvas')
+  canvas.getBoundingClientRect = () => surface
+
+  const canvasClicks = []
+  canvas.addEventListener('mousedown', (e) => canvasClicks.push({ x: e.clientX, y: e.clientY }))
+
+  const drag = attachSelectionDrag({
+    canvas,
+    execute: async (action) => {
+      if (action === 'stash_selection_for_drag') return { success: true, text: '应当' }
+      if (action === 'complete_selection_drag') return { success: true, moved: true, text: '应当' }
+      return singleLineRaw
+    },
+  })
+  t.after(() => { drag.destroy(); window.close() })
+
+  // First drag from (195, 225) to (280, 225)
+  drag.updateFromCursorRaw(singleLineRaw)
+  canvas.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: 195, clientY: 225, button: 0, buttons: 1, detail: 1 }))
+  canvas.dispatchEvent(new window.MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: 280, clientY: 225, button: 0, buttons: 1 }))
+  canvas.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true, cancelable: true, clientX: 280, clientY: 225, button: 0, buttons: 0, detail: 1 }))
+  await new Promise((r) => setTimeout(r, 90))
+  assert.deepEqual(canvasClicks, [{ x: 280, y: 225 }])
+
+  // Second drag from (195, 225) to the same (280, 225)
+  drag.updateFromCursorRaw(singleLineRaw)
+  canvas.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: 195, clientY: 225, button: 0, buttons: 1, detail: 1 }))
+  canvas.dispatchEvent(new window.MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: 280, clientY: 225, button: 0, buttons: 1 }))
+  canvas.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true, cancelable: true, clientX: 280, clientY: 225, button: 0, buttons: 0, detail: 1 }))
+  await new Promise((r) => setTimeout(r, 90))
+  assert.deepEqual(canvasClicks, [
+    { x: 280, y: 225 },
+    { x: 195, y: 225 },
+    { x: 280, y: 225 },
+  ])
+})
+

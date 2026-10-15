@@ -191,12 +191,14 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
     if (!dragState) hideIndicator()
   }
 
-  function dispatchCanvasClick(clientX, clientY) {
+  let lastCanvasClick = null
+
+  function emitRawClick(x, y) {
     const down = new win.MouseEvent('mousedown', {
       bubbles: true,
       cancelable: true,
-      clientX,
-      clientY,
+      clientX: x,
+      clientY: y,
       button: 0,
       buttons: 1,
       detail: 1,
@@ -205,8 +207,8 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
     const up = new win.MouseEvent('mouseup', {
       bubbles: true,
       cancelable: true,
-      clientX,
-      clientY,
+      clientX: x,
+      clientY: y,
       button: 0,
       buttons: 0,
       detail: 1,
@@ -216,6 +218,25 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
     forwarded.add(up)
     canvas.dispatchEvent(down)
     canvas.dispatchEvent(up)
+    lastCanvasClick = { x, y }
+  }
+
+  function dispatchCanvasClick(clientX, clientY, downX, downY) {
+    // Qt5-WASM passes timestamp=0 to QWindowSystemInterface::handleMouseEvent,
+    // so two consecutive mousedown events seen by Qt within double-click distance
+    // are always treated as a double-click (word selection) regardless of elapsed
+    // wall-clock time. Because we intercept mousedown at (downX, downY), Qt only
+    // sees the drop clicks; if the previous canvas click seen by Qt was near
+    // (clientX, clientY), first click at (downX, downY) (or a distant margin X)
+    // after stashing so Qt resets mnClickCount to 1 for the drop click.
+    if (lastCanvasClick && Math.hypot(clientX - lastCanvasClick.x, clientY - lastCanvasClick.y) < 16) {
+      const hasFarOrigin = Number.isFinite(downX) && Number.isFinite(downY)
+        && Math.hypot(clientX - downX, clientY - downY) >= 16
+      const resetX = hasFarOrigin ? downX : (clientX > 100 ? 2 : 180)
+      const resetY = hasFarOrigin ? downY : clientY
+      emitRawClick(resetX, resetY)
+    }
+    emitRawClick(clientX, clientY)
   }
 
   function onMouseDown(ev) {
@@ -225,11 +246,13 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
     refreshTimer = 0
     if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey || ev.detail > 1) {
       cachedSelectionBoxes = []
+      lastCanvasClick = { x: ev.clientX, y: ev.clientY }
       return
     }
     if (!hitSelectionRects(ev.clientX, ev.clientY, cachedSelectionBoxes)) {
       cachedSelectionBoxes = []
       if (canvas.style.cursor === 'default') canvas.style.cursor = ''
+      lastCanvasClick = { x: ev.clientX, y: ev.clientY }
       return
     }
     ev.preventDefault()
@@ -299,7 +322,7 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
 
     if (!state.dragging) {
       cachedSelectionBoxes = []
-      dispatchCanvasClick(upX, upY)
+      dispatchCanvasClick(upX, upY, state.downX, state.downY)
       return
     }
 
@@ -315,10 +338,10 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
       try {
         const stashed = await execute('stash_selection_for_drag', {})
         if (!stashed || !stashed.success) {
-          dispatchCanvasClick(upX, upY)
+          dispatchCanvasClick(upX, upY, state.downX, state.downY)
           return
         }
-        dispatchCanvasClick(upX, upY)
+        dispatchCanvasClick(upX, upY, state.downX, state.downY)
         await new Promise((r) => setTimeout(r, 35))
         let res = null
         for (let attempt = 0; attempt < 5; attempt++) {
