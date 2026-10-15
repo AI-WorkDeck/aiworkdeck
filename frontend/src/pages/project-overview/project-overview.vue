@@ -7422,9 +7422,6 @@ export default {
           // 请求世代防止安装时的旧响应在禁用/卸载后迟到，把入口重新加回来。
           this.dynamicPlugins = list.filter(p => p && p.enabled === true && !p.revokedReason && !p.incompatibleReason).map(p => {
             const frontendEntry = resolvePluginEntryUrl(p.id, p.frontendEntry)
-            const iconKey = p.id === 'lawfirm-management' ? 'lawfirm' : (p.id === 'enterprise-im' ? 'im' : (p.id === 'baoqingtian' ? 'baoqingtian' : 'plugin'))
-            const rawPaths = GLYPHS[iconKey] || GLYPHS.plugin || []
-            const svgPaths = rawPaths.map(d => (typeof d === 'string' ? { d } : d))
             return {
               key: `plugin-${p.id}`,
               // 左栏面板 key 是 plugin-<id>，桥要的是原始 id（握手上下文 + KV 分区键），
@@ -7437,7 +7434,7 @@ export default {
               icon: null,
               activeIcon: null,
               avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(p.id) : null,
-              svgPaths: typeof getPluginRailSvgPaths === 'function' ? getPluginRailSvgPaths(p.id) : svgPaths,
+              svgPaths: typeof getPluginRailSvgPaths === 'function' ? getPluginRailSvgPaths(p.id) : null,
               isDynamic: true,
               // 有真正的前端入口才走 iframe（PluginPane）；纯工具/skill 插件走宿主渲染的
               // 启动面板（PluginGuidePane）——否则点开只有一句「未配置入口地址」。
