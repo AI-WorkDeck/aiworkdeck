@@ -120,7 +120,7 @@ export default {
   position: fixed;
   inset: 0;
   z-index: 3000;
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--awd-overlay);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -131,8 +131,8 @@ export default {
   width: 560px;
   max-width: calc(100vw - 48px);
   background: var(--awd-surface);
-  border-radius: 10px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -141,7 +141,7 @@ export default {
 .qo-input {
   height: 48px;
   padding: 0 16px;
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   border-bottom: 1px solid var(--awd-border);
   box-sizing: border-box;
   width: 100%;
@@ -164,7 +164,7 @@ export default {
 }
 
 .qo-item-name {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   white-space: nowrap;
   overflow: hidden;
@@ -172,7 +172,7 @@ export default {
 }
 
 .qo-item-path {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -182,7 +182,7 @@ export default {
 
 .qo-empty {
   padding: 20px 16px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   text-align: center;
 }

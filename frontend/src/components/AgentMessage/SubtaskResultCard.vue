@@ -106,7 +106,7 @@ const subtaskId = computed(() => {
 .subtask-result {
   border: 1px solid var(--awd-border); /* Gray-Light */
   border-left: 2px solid var(--awd-mint); /* Mint Green */
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface);
   overflow: hidden;
 }
@@ -124,13 +124,13 @@ const subtaskId = computed(() => {
 }
 
 .sr-title {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-accent-text); /* Forest Green */
 }
 
 .sr-badge {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   padding: 0 6px;
   border-radius: 99px;
@@ -149,7 +149,7 @@ const subtaskId = computed(() => {
 /* 正文可能很长（子 Agent 摘录了合同段落），自己滚，不撑爆气泡 */
 .sr-body {
   padding: 7px 8px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.55;
   color: var(--awd-text); /* Gray-Dark */
   white-space: pre-wrap;
@@ -175,7 +175,7 @@ const subtaskId = computed(() => {
 }
 
 .sr-meta-label {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2); /* Gray-Medium */
   flex-shrink: 0;
   width: 52px;
@@ -183,7 +183,7 @@ const subtaskId = computed(() => {
 }
 
 .sr-meta-value {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text);
   line-height: 16px;
   word-break: break-all;
@@ -195,7 +195,7 @@ const subtaskId = computed(() => {
 
 .sr-meta-value.is-mono {
   font-family: 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
 }
 
@@ -206,10 +206,10 @@ const subtaskId = computed(() => {
 }
 
 .sr-chip {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   background: var(--awd-accent-soft);
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   padding: 1px 5px;
   line-height: 14px;
 }

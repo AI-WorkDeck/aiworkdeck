@@ -228,9 +228,9 @@ export default {
   min-height: 36px;
   padding: 8px 12px;
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-surface);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 18px;
   font-family: inherit;
   color: var(--awd-text);

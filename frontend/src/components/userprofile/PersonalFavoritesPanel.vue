@@ -216,8 +216,10 @@ export default {
 
 <style lang="scss" scoped>
 .panel-favorites {
+  --awd-radius-lg: 10px;
+  --awd-font-size-lg: var(--awd-font-size-title);
   background: var(--awd-surface);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-lg);
   border: 1px solid var(--awd-border);
   padding: 14px;
   box-sizing: border-box;
@@ -247,14 +249,14 @@ export default {
 }
 
 .pf-title {
-  font-size: 14px;
+  font-size: var(--awd-font-size-lg);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .pf-count,
 .pf-group-count {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   line-height: 18px;
   padding: 0 7px;
   border-radius: 999px;
@@ -265,7 +267,7 @@ export default {
 .pf-subtitle {
   display: block;
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.6;
   color: var(--awd-text-2);
 }
@@ -275,10 +277,10 @@ export default {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
+  height: var(--awd-control-height);
   padding: 0 10px;
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-bg);
   box-sizing: border-box;
 
@@ -298,8 +300,8 @@ export default {
 .pf-search-input {
   flex: 1;
   min-width: 0;
-  height: 32px;
-  font-size: 13px;
+  height: var(--awd-control-height);
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
 }
 
@@ -309,7 +311,7 @@ export default {
 }
 
 .pf-state-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-3);
 }
 
@@ -339,7 +341,7 @@ export default {
 }
 
 .pf-empty-title {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
 }
@@ -347,7 +349,7 @@ export default {
 .pf-empty-desc {
   margin-top: 8px;
   max-width: 440px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 1.7;
   color: var(--awd-text-2);
 }
@@ -371,7 +373,7 @@ export default {
 }
 
 .pf-group-name {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
   overflow: hidden;
@@ -389,10 +391,10 @@ export default {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-accent-text);
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
 
   &:hover {
@@ -417,7 +419,7 @@ export default {
   min-width: 0;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 10px;
+  border-radius: var(--awd-radius-lg);
   padding: 10px 12px 12px;
   transition: border-color 0.15s, box-shadow 0.15s;
 
@@ -435,11 +437,11 @@ export default {
 }
 
 .pf-badge {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   font-weight: 600;
   line-height: 18px;
   padding: 0 7px;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   flex-shrink: 0;
 
   &.kind-web { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
@@ -448,7 +450,7 @@ export default {
 }
 
 .pf-date {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-3);
   font-family: var(--awd-font-mono);
 }
@@ -459,7 +461,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   color: var(--awd-text-3);
   cursor: pointer;
   flex-shrink: 0;
@@ -494,7 +496,7 @@ export default {
   padding: 10px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   box-shadow: var(--awd-shadow-md);
   display: flex;
   flex-direction: column;
@@ -502,7 +504,7 @@ export default {
 }
 
 .pf-pop-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   text-align: center;
 }
@@ -514,10 +516,10 @@ export default {
 
 .pf-pop-btn {
   flex: 1;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   padding: 4px 0;
   text-align: center;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   background: var(--awd-bg);
   color: var(--awd-text-2);
@@ -536,7 +538,7 @@ export default {
 .pf-cover {
   margin-top: 8px;
   height: 120px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   overflow: hidden;
   background: var(--awd-surface-2);
   border: 1px solid var(--awd-border-subtle);
@@ -551,13 +553,13 @@ export default {
 .pf-preview {
   margin-top: 8px;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   background: var(--awd-bg);
   border-left: 3px solid var(--awd-border-strong);
 }
 
 .pf-preview-text {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.6;
   color: var(--awd-text-2);
   display: -webkit-box;
@@ -575,7 +577,7 @@ export default {
 
 .pf-card-title {
   display: block;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
   overflow: hidden;
@@ -586,7 +588,7 @@ export default {
 .pf-host {
   display: block;
   margin-top: 2px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-3);
   overflow: hidden;
   text-overflow: ellipsis;

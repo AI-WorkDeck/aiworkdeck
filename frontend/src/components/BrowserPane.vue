@@ -1054,7 +1054,7 @@ export default {
 .shelf-section + .shelf-section {
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  border-top: 1px solid var(--awd-border-subtle);
 }
 
 .shelf-head {
@@ -1065,7 +1065,7 @@ export default {
 }
 
 .shelf-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text-2);
   letter-spacing: 0.02em;
@@ -1079,7 +1079,7 @@ export default {
   border: 1px solid var(--awd-accent);
   border-radius: 999px;
   color: var(--awd-accent-text);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   cursor: pointer;
   background: var(--awd-surface);
 }
@@ -1101,7 +1101,7 @@ export default {
 }
 
 .shelf-empty {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   padding: 6px 2px;
 }
@@ -1118,16 +1118,16 @@ export default {
   gap: 6px;
   width: 190px;
   padding: 7px 9px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 8px;
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-surface);
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--awd-shadow-sm);
 }
 
 .shelf-card:hover {
   border-color: var(--awd-accent);
-  box-shadow: 0 1px 4px rgba(46, 90, 80, 0.12);
+  box-shadow: var(--awd-shadow-md);
 }
 
 .shelf-card-main {
@@ -1139,7 +1139,7 @@ export default {
 }
 
 .shelf-card-title {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
   white-space: nowrap;
   overflow: hidden;
@@ -1147,7 +1147,7 @@ export default {
 }
 
 .shelf-card-host {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -1158,12 +1158,12 @@ export default {
   flex-shrink: 0;
   width: 18px;
   height: 18px;
-  border-radius: 5px;
+  border-radius: var(--awd-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--awd-text-3);
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   visibility: hidden;
 }
 
@@ -1172,7 +1172,7 @@ export default {
 }
 
 .shelf-card-x:hover {
-  background: rgba(148, 163, 184, 0.18);
+  background: var(--awd-surface-2);
   color: var(--awd-text-2);
 }
 
@@ -1217,12 +1217,12 @@ export default {
 }
 
 .bce-text {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 
 .bce-detail {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   word-break: break-all;
   max-width: 420px;
@@ -1232,10 +1232,10 @@ export default {
   margin-top: 4px;
   padding: 7px 18px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-surface);
   color: var(--awd-accent-text);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
 }
 
@@ -1258,19 +1258,19 @@ export default {
 }
 
 .ble-title {
-  font-size: 15px;
+  font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
 }
 
 .ble-reason {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   max-width: 420px;
 }
 
 .ble-detail {
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   word-break: break-all;
   max-width: 420px;
@@ -1280,10 +1280,10 @@ export default {
   margin-top: 4px;
   padding: 7px 18px;
   border: 1px solid var(--awd-border-strong);
-  border-radius: 8px;
+  border-radius: var(--awd-radius-dialog);
   background: var(--awd-surface);
   color: var(--awd-accent-text);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   cursor: pointer;
 }
 

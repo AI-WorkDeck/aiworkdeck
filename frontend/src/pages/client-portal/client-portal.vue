@@ -111,6 +111,9 @@ export default {
 
 <style scoped>
 .portal-page {
+  --awd-portal-card-radius: 12px;
+  --awd-portal-title-fs: 20px;
+  --awd-portal-lead-fs: 14px;
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -129,31 +132,31 @@ export default {
   box-sizing: border-box;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 12px;
+  border-radius: var(--awd-portal-card-radius);
 }
 .portal-head { display: flex; align-items: center; gap: 10px; }
 .portal-logo { height: 28px; }
-.portal-brand { font-size: 16px; font-weight: 600; color: var(--awd-text); }
-.portal-title { font-size: 20px; font-weight: 600; color: var(--awd-text); margin-top: 8px; }
-.portal-lead { font-size: 14px; line-height: 1.6; color: var(--awd-text-2); }
-.portal-label { font-size: 13px; color: var(--awd-text-2); margin-top: 8px; }
+.portal-brand { font-size: var(--awd-font-size-title); font-weight: 600; color: var(--awd-text); }
+.portal-title { font-size: var(--awd-portal-title-fs); font-weight: 600; color: var(--awd-text); margin-top: 8px; }
+.portal-lead { font-size: var(--awd-portal-lead-fs); line-height: 1.6; color: var(--awd-text-2); }
+.portal-label { font-size: var(--awd-font-size-body); color: var(--awd-text-2); margin-top: 8px; }
 .portal-input {
   height: 40px;
   padding: 0 12px;
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  font-size: 15px;
+  border-radius: var(--awd-radius-dialog);
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text);
   background: var(--awd-surface);
 }
-.portal-error { font-size: 13px; color: var(--awd-danger-text); }
+.portal-error { font-size: var(--awd-font-size-body); color: var(--awd-danger-text); }
 .portal-btn {
   margin-top: 8px;
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
-  border-radius: 8px;
-  font-size: 15px;
+  border-radius: var(--awd-radius-dialog);
+  font-size: var(--awd-font-size-reading);
 }
-.portal-notice { font-size: 12px; line-height: 1.6; color: var(--awd-text-3); margin-top: 16px; }
+.portal-notice { font-size: var(--awd-panel-fs); line-height: 1.6; color: var(--awd-text-3); margin-top: 16px; }
 .portal-notice-link { color: var(--awd-accent-text); cursor: pointer; word-break: break-all; }
 </style>

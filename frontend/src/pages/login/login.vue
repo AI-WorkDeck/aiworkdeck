@@ -7,9 +7,13 @@
     <view class="bg-mesh"></view>
 
     <!-- Top Navigation -->
-    <view class="top-nav">
+    <view class="top-nav top-bar">
       <view class="nav-left">
-        <image class="nav-logo awd-brand-logo" src="/static/logo_full_v2.png" mode="heightFix" />
+        <view v-if="canGoBack" class="back-btn back-float-btn" role="button" tabindex="0" @tap="goBack">
+          <text class="back-arrow">‹</text>
+          <text>{{ $t('shell.back') || '返回' }}</text>
+        </view>
+        <image class="nav-logo brand-mark awd-brand-logo" src="/static/logo_full_v2.png" mode="heightFix" />
       </view>
       <view class="nav-right">
         <text class="nav-item">{{ $t('account.guideNav') }}</text>
@@ -160,6 +164,13 @@ export default {
     if (this.smsCountdownTimer) clearInterval(this.smsCountdownTimer)
   },
   computed: {
+    canGoBack() {
+      try {
+        return typeof getCurrentPages === 'function' && getCurrentPages().length > 1;
+      } catch (e) {
+        return false;
+      }
+    },
     // 二次验证的方式由后端定（TOTP > 邮箱 > 短信），前端只负责说人话
     secondFactorLabel() {
       if (this.smsMethod === 'totp') return this.$t('account.totpVerificationLabel');
@@ -175,6 +186,9 @@ export default {
     }
   },
   methods: {
+    goBack() {
+      uni.navigateBack({ delta: 1 });
+    },
     // IDE 化启动直达：会话有效 → 直进上次项目（像 VS Code 打开即回到上个工作区）；
     // 会话失效/网络异常 → 静默停留登录页。CLIENT 账号视图受限，落项目列表页——
     // getUserProjects 把成员身份的项目也算进去，客户在那里看得见律师分享给他的案卷；
@@ -358,19 +372,21 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* Color Config */
-// 毛玻璃走令牌：深色下要变成半透明深底，写死白色在深色页面上会糊成一块灰
-$glass-white: var(--awd-glass);
-$glass-border: var(--awd-glass-border);
-
 .login-page {
+  --awd-radius-lg: 16px;
+  --awd-font-size-hero: 24px;
   width: 100vw;
   height: 100vh;
   position: relative;
   overflow: hidden;
-  background-color: var(--awd-bg);
+  background-color: var(--awd-canvas);
   display: flex;
   flex-direction: column;
+
+  :deep(#awd-global-back),
+  :deep(.awd-global-back) {
+    display: none !important;
+  }
 }
 
 .bg-gradient {
@@ -391,16 +407,46 @@ $glass-border: var(--awd-glass-border);
   z-index: 0;
 }
 
-.top-nav {
+.top-nav,
+.top-bar {
   position: relative;
   z-index: 10;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 48px;
+  padding: var(--awd-space-5) var(--awd-space-8);
 }
 
-.nav-logo {
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: var(--awd-space-3);
+}
+
+.back-btn,
+.back-float-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--awd-space-1);
+  height: var(--awd-control-height);
+  padding: 0 var(--awd-space-3);
+  font-size: var(--awd-font-size-body);
+  color: var(--awd-text-2);
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-sm);
+  cursor: pointer;
+  transition: all var(--awd-motion-fast);
+
+  &:hover {
+    color: var(--awd-accent-text);
+    border-color: var(--awd-accent-text);
+    background: var(--awd-surface-2);
+  }
+}
+
+.nav-logo,
+.brand-mark {
   height: 32px;
   width: auto;
 }
@@ -410,7 +456,7 @@ $glass-border: var(--awd-glass-border);
   gap: 32px;
 }
 .nav-item {
-  font-size: 14px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   cursor: pointer;
   transition: color 0.3s;
@@ -446,15 +492,13 @@ $glass-border: var(--awd-glass-border);
 
 .glass-card {
   width: 440px;
-  background: $glass-white;
+  background: var(--awd-glass);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid $glass-border;
-  border-radius: 20px;
-  padding: 40px;
-  box-shadow: 
-    0 16px 48px rgba(46, 90, 80, 0.1),
-    0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid var(--awd-glass-border);
+  border-radius: var(--awd-radius-lg);
+  padding: var(--awd-space-8);
+  box-shadow: var(--awd-shadow-lg);
   display: flex;
   flex-direction: column;
 }
@@ -474,13 +518,13 @@ $glass-border: var(--awd-glass-border);
   flex-direction: column;
 }
 .product-name {
-  font-size: 24px;
+  font-size: var(--awd-font-size-hero);
   font-weight: 700;
   color: var(--awd-accent-text);
   letter-spacing: -0.5px;
 }
 .product-subtitle {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   letter-spacing: 0.5px;
 }
@@ -489,13 +533,13 @@ $glass-border: var(--awd-glass-border);
   display: flex;
   position: relative;
   border-bottom: 2px solid var(--awd-border-subtle);
-  margin-bottom: 28px;
+  margin-bottom: var(--awd-space-7);
 }
 .tab-btn {
   flex: 1;
   text-align: center;
-  padding: 12px 0;
-  font-size: 15px;
+  padding: var(--awd-space-3) 0;
+  font-size: var(--awd-font-size-reading);
   color: var(--awd-text-2);
   cursor: pointer;
   &.active {
@@ -519,22 +563,23 @@ $glass-border: var(--awd-glass-border);
   gap: 8px;
 }
 .label {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text);
   font-weight: 500;
 }
 .glass-input {
-  height: 48px;
+  height: var(--awd-control-height-touch);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: 8px;
-  padding: 0 16px;
-  font-size: 15px;
+  border-radius: var(--awd-radius-dialog);
+  padding: 0 var(--awd-space-4);
+  font-size: var(--awd-font-size-reading);
+  color: var(--awd-text);
   transition: all 0.2s;
   &:focus {
     background: var(--awd-surface);
     border-color: var(--awd-mint);
-    box-shadow: 0 0 0 3px rgba(137, 168, 160, 0.2);
+    box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-accent-soft);
   }
 }
 .placeholder-style {
@@ -546,7 +591,7 @@ $glass-border: var(--awd-glass-border);
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
 }
 .remember-me {
@@ -565,18 +610,18 @@ $glass-border: var(--awd-glass-border);
 
 .sms-hint {
   display: block;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   margin-bottom: 6px;
 }
 
 .action-btn {
   width: 100%;
-  height: 50px;
+  height: var(--awd-control-height-touch);
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: var(--awd-radius-dialog);
+  font-size: var(--awd-font-size-title);
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -593,7 +638,7 @@ $glass-border: var(--awd-glass-border);
 .card-footer {
   margin-top: 32px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
 }
 

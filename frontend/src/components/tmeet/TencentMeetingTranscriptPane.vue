@@ -386,7 +386,7 @@ export default {
   display: flex;
   flex-wrap: wrap;
   gap: var(--awd-panel-pad-x);
-  margin-bottom: 14px;
+  margin-bottom: var(--awd-panel-gap-lg);
 }
 
 .tmeet-meta-chip {
@@ -555,7 +555,7 @@ export default {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-md);
-  padding: var(--awd-panel-pad-x) 14px;
+  padding: var(--awd-panel-pad-x) var(--awd-panel-gap-lg);
   display: inline-block;
   max-width: 100%;
 }
