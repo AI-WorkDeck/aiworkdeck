@@ -261,6 +261,26 @@
           </view>
           <text class="context-menu-text">{{ $t('fileTree.sendFile') }}</text>
         </view>
+        <view v-if="canConvertContextToPdf()" class="context-menu-item" @tap="handleContextConvertToPdf">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-linecap="round" stroke-linejoin="round"/>
+              <polyline points="14 2 14 8 20 8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M9 15h6" stroke-linecap="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.convertToPdf') }}</text>
+        </view>
+        <view v-if="canMergeContextToPdf()" class="context-menu-item" @tap="handleContextMergeToPdf">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="4" y="2" width="12" height="16" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M8 10h4M10 8v4" stroke-linecap="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.mergeToPdf') }}</text>
+        </view>
         <view v-if="contextMenu.targetItem" class="context-menu-item" @tap="handleContextDuplicate">
           <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -685,7 +705,7 @@
 </template>
 
 <script>
-import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess } from '@/services/api.js'
+import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess, convertFileToPdf, mergeFilesToPdf } from '@/services/api.js'
 import { host } from '@/services/host.js'
 import { showDialog } from '@/utils/dialog.js'
 import { findTopmostDeletedAncestor, summarizeDeleteResults, collapseToTopmostSelected, computeDisplayFiles } from '@/utils/fileTreeRecycle.js'
@@ -695,6 +715,7 @@ import { createRefCountsFetcher } from '@/utils/fileTreeRefCounts.js'
 import { warmDragImage, applyDragImage } from '@/utils/dragImage.js'
 import { nativeDataTransfer, isExternalFileDrag, claimExternalDrop, captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
+import { canConvertItemToPdf, canMergeItemsToPdf } from '@/utils/fileTreePdfActions.js'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
 import TagChip from '@/components/TagChip.vue'
 import TagSelector from '@/components/TagSelector.vue'
@@ -2369,6 +2390,86 @@ export default {
       const items = this.contextTargetItems()
       this.closeContextMenu()
       await this.handleDuplicate(items)
+    },
+
+    canConvertContextToPdf() {
+      if (this.isContextMulti()) return false
+      const item = this.contextMenu && this.contextMenu.targetItem
+      return canConvertItemToPdf(item, this.viewMode)
+    },
+
+    canMergeContextToPdf() {
+      if (!this.isContextMulti()) return false
+      return canMergeItemsToPdf(this.contextTargetItems(), this.viewMode)
+    },
+
+    async handleContextConvertToPdf() {
+      const item = this.contextMenu && this.contextMenu.targetItem
+      this.closeContextMenu()
+      if (!item || !this.projectId) return
+      const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+      if (typeof uni !== 'undefined' && typeof uni.showLoading === 'function') {
+        uni.showLoading({ title: this.$t('fileTree.convertingToPdf') })
+      }
+      try {
+        const res = await convertFileToPdf(projectId, item.id)
+        const created = res && (res.data || res)
+        await this.loadFiles()
+        this.$emit('files-changed')
+        if (created && created.id != null) {
+          this.revealFile(created.id)
+        }
+        uni.showToast({
+          title: this.$t('fileTree.convertToPdfSuccess', { name: (created && created.name) || 'PDF' }),
+          icon: 'none'
+        })
+      } catch (e) {
+        console.error('转 PDF 失败:', e)
+        uni.showToast({
+          title: (e && e.message) || this.$t('fileTree.convertToPdfFailed'),
+          icon: 'none',
+          duration: 3000
+        })
+      } finally {
+        if (typeof uni !== 'undefined' && typeof uni.hideLoading === 'function') {
+          uni.hideLoading()
+        }
+      }
+    },
+
+    async handleContextMergeToPdf() {
+      const items = this.contextTargetItems()
+      this.closeContextMenu()
+      if (!Array.isArray(items) || items.length < 2 || !this.projectId) return
+      const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+      const fileIds = items.map(f => f.id)
+      if (typeof uni !== 'undefined' && typeof uni.showLoading === 'function') {
+        uni.showLoading({ title: this.$t('fileTree.mergingToPdf') })
+      }
+      try {
+        const res = await mergeFilesToPdf(projectId, fileIds)
+        const created = res && (res.data || res)
+        await this.loadFiles()
+        this.$emit('files-changed')
+        if (created && created.id != null) {
+          this.revealFile(created.id)
+        }
+        uni.showToast({
+          title: this.$t('fileTree.mergeToPdfSuccess', { name: (created && created.name) || 'PDF' }),
+          icon: 'none'
+        })
+      } catch (e) {
+        console.error('合并为 PDF 失败:', e)
+        uni.showToast({
+          title: (e && e.message) || this.$t('fileTree.mergeToPdfFailed'),
+          icon: 'none',
+          duration: 3000
+        })
+      } finally {
+        if (typeof uni !== 'undefined' && typeof uni.hideLoading === 'function') {
+          uni.hideLoading()
+        }
+      }
     },
 
     async handleContextDelete() {
