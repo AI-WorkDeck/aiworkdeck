@@ -204,6 +204,13 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
     // 「发送…」：macOS 唤起系统分享面板（微信/邮件/隔空投送），Windows 退化为剪贴板粘贴
     // （dev-board#382）。返回 { ok, mode: 'share-sheet' | 'clipboard', reason? }。
     shareFile: (path) => ipcRenderer.invoke('fs:shareFile', { path }),
+    // 原生文件拖出（dev-board#1288）：在 dragstart 中把本机物理路径交给 webContents.startDrag，
+    // 拖到微信聊天窗口 / Finder / 资源管理器可直接发出或落盘。
+    startDrag: (path) => {
+      if (typeof path !== 'string' || !path) return { ok: false, reason: 'bad-path' }
+      ipcRenderer.send('fs:startDrag', { path })
+      return { ok: true }
+    },
     // 回收站「彻底删除」把后端报回的物理路径送进系统废纸篓（dev-board#1051）。
     // 返回 { ok, results: [{ path, ok, missing?, reason? }] }；ok 为假时渲染层不清行。
     trashItems: (paths) => ipcRenderer.invoke('fs:trashItems', { paths }),
