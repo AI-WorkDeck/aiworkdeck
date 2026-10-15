@@ -1398,3 +1398,12 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 工作台 mounted + restoreTabSnapshot 完成后注册打开接收器；只在 unload/销毁注销，不能在最小化的 onHide 注销。切工作区先等 `leaveWorkbench` 保存和导航回执，失败留原页；目标就绪超时从导航完成后计算，不把旧文档保存时间算进去。
 
 后端 `LocalProjectService.openLocalFile` 只登记明确选中的真实文件，`ProjectFile.externalPath` 不出 JSON。`ProjectStorageResolver` 按精确 key 映射外部文件，不授予父目录/兄弟文件访问；原文件保存先完整写同目录临时文件再替换，缺失或符号链接重绑失败，不重建原件。独立文件不启用 Git 项目版本，也不参与自动手机目录/备份；结构改动（删除/移动/改名）由 Finder/资源管理器处理。后端回归 `LooseFileWorkspaceTest`，前端 `loose-files-workspace.test.mjs`、`local-open-coordinator.test.mjs`。
+
+## 资源管理器与暂存区文件向外拖拽（dev-board#1288）
+
+`FileTree` 与 `FileStagingArea` 支持将文件直接拖到软件窗口外部（如微信聊天、Finder/资源管理器）。微信等外部桌面应用只认 OS 级文件拖拽（macOS `NSFilenamesPboardType` / Windows `CF_HDROP`），不认 Chromium HTML5 `dataTransfer`。
+
+- 桌面主进程 `desktop/main/file-service.js` 注册 `fs:startDrag`（`ipcMain.on` + `ipcMain.handle`），校验路径为已存在的本地文件后调 `event.sender.startDrag({ file, icon })`（内置非空 32×32 PNG `nativeImage` 图标），preload 暴露 `host.fs.startDrag(path)`。
+- 前端 `utils/fileLocalDrag.js` 在行悬停/按下时通过 `prefetchLocalFilePath(file)` 调 `/files/{id}/local-path` 预取并缓存本地绝对路径（`file.localPath` 已有时直接复用），`dragstart` 同步解析路径并在写入应用内 `dataTransfer` 后调 `startExternalFileDrag`。
+- `webContents.startDrag` 会向 `dataTransfer.types` 注入 `'Files'`、将 `effectAllowed` 锁为 `'copy'`，且拖到软件外松手时可能吞掉 DOM `dragend`：① `isExternalFileDrag(dt)` 在 `document.__checkbaDraggedFile` 存在时返回 `false`，避免应用内文件树把自己拖出的文件误判为外部上传；② 内部树移动/暂存区拖回/编辑器建链统一走 `compatibleDropEffect(dt, preferred)`，当 `effectAllowed === 'copy'` 时返回 `'copy'` 防止目标区拒绝落点；③ `installExternalDragCleanup` 监听窗口级 `mousemove (buttons === 0)` / `mousedown` / `dragend` / `drop`，兜底清理 `document.__checkbaDraggedFile` 与拖拽残留态。
+- 回归：`desktop/tests/file-drag.test.js`、`frontend/tests/project-home/file-tree-external-drop.test.mjs`。

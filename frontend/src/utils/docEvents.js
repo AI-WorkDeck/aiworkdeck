@@ -31,6 +31,7 @@ export const DOC_READONLY_ACTIONS = new Set([
   // 只动视图光标 / 只动锚点书签，不改正文，也不产生修订与批注
   'find_text_locations', 'find_navigate', 'goto', 'goto_revision', 'goto_comment', 'goto_bookmark',
   'select_paragraph', 'set_selection', 'collapse_selection', 'move_cursor', 'clear_anchors',
+  'stash_selection_for_drag',
   // 显示 / 外观 / 宿主自发的存取，都不改内容
   'export_document', 'load_document', 'set_zoom', 'set_app_theme', 'set_chrome',
   'set_track_changes', 'set_revision_view', 'set_view_options',

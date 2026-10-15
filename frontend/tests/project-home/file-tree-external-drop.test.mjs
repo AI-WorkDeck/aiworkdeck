@@ -20,10 +20,17 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
+  nativeEvent,
   nativeDataTransfer,
   isExternalFileDrag,
+  compatibleDropEffect,
   claimExternalDrop, captureDroppedFiles, importDroppedFile,
 } from '../../src/utils/fileTreeExternalDrop.js'
+import {
+  prefetchLocalFilePath,
+  startExternalFileDrag,
+  clearLocalPathCache,
+} from '../../src/utils/fileLocalDrag.js'
 
 const SRC = readFileSync(new URL('../../src/components/FileTree.vue', import.meta.url), 'utf8')
 
@@ -31,14 +38,16 @@ const SRC = readFileSync(new URL('../../src/components/FileTree.vue', import.met
 // 被引用的符号全部由 new Function 的形参喂桩。
 const IMPORT_NAMES = [
   'getProjectFiles', 'createFolder', 'createFile', 'renameFile', 'deleteFile', 'deleteFilePerm',
-  'restoreFileApi', 'getRecycleBinFiles', 'moveFile', 'batchDeleteFiles', 'batchMoveFiles',
+  'getFilePermDiskPaths', 'restoreFileApi', 'getRecycleBinFiles', 'moveFile', 'batchDeleteFiles', 'batchMoveFiles',
   'batchCopyFiles', 'getApiBaseUrl', 'getContributedTemplates', 'createFileFromContributedTemplate',
-  'getSessionId', 'host', 'findTopmostDeletedAncestor', 'summarizeDeleteResults',
+  'getSessionId', 'getAuthHeaders', 'getFileLocalPath', 'host', 'findTopmostDeletedAncestor', 'summarizeDeleteResults',
+  'collapseToTopmostSelected', 'computeDisplayFiles',
   'groupByParent', 'buildTreeFromGroups', 'evidenceRefCounts', 'createRefCountsFetcher',
   'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagSelector',
   'TagManager', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
-  'createTag', 'createTask', 'importLocalFile',
-  'nativeDataTransfer', 'isExternalFileDrag', 'claimExternalDrop', 'captureDroppedFiles', 'importDroppedFile',
+  'createTag', 'createTask', 'importLocalFile', 'getProjectFileAccess', 'updateProjectFileAccess',
+  'nativeEvent', 'nativeDataTransfer', 'isExternalFileDrag', 'compatibleDropEffect', 'claimExternalDrop', 'captureDroppedFiles', 'importDroppedFile',
+  'prefetchLocalFilePath', 'startExternalFileDrag',
 ]
 
 function loadOptions(stubs) {
@@ -52,12 +61,15 @@ function loadOptions(stubs) {
 
 // desktopPaths: File 对象 → 本机绝对路径的映射（桌面壳 host.fs.getPathForFile 的桩）。
 // 不传 = 浏览器态，host.fs 整个缺席，一条都导不进去。
-function makeVm({ moveFile, createFolder, desktopPaths, desktopFs, importLocalFails } = {}) {
+function makeVm({ moveFile, createFolder, desktopPaths, desktopFs, importLocalFails, getFileLocalPath } = {}) {
   const calls = { moveFile: [], importLocal: [], loadFiles: 0, emits: [], toasts: [] }
   const stubs = {
     moveFile: async (...a) => { calls.moveFile.push(a); return { parentId: a[2] } },
     createFolder: createFolder || (async () => ({ id: 999 })),
     ICONS: {},
+    getApiBaseUrl: () => 'http://127.0.0.1:5269',
+    getAuthHeaders: () => ({ 'X-Session-Id': 's-test' }),
+    getFileLocalPath: getFileLocalPath || (async (id) => ({ data: { path: `/Users/me/proj/${id}.docx`, exists: true } })),
     host: desktopFs ? { fs: desktopFs } : desktopPaths
       ? { fs: { getPathForFile: (f) => desktopPaths.get(f) || '' } }
       : {},
@@ -66,7 +78,8 @@ function makeVm({ moveFile, createFolder, desktopPaths, desktopFs, importLocalFa
       if (importLocalFails) throw new Error('boom')
       return { id: 100 + calls.importLocal.length }
     },
-    nativeDataTransfer, isExternalFileDrag, claimExternalDrop, captureDroppedFiles, importDroppedFile,
+    nativeEvent, nativeDataTransfer, isExternalFileDrag, compatibleDropEffect, claimExternalDrop, captureDroppedFiles, importDroppedFile,
+    prefetchLocalFilePath, startExternalFileDrag,
   }
   if (moveFile) stubs.moveFile = moveFile
   const options = loadOptions(stubs)
@@ -419,4 +432,76 @@ test('#1182 无本机路径的 File 先按字节暂存，再原子导入并释�
     assert.deepEqual(vm.calls.toasts, ['fileTree.importSuccessCount'])
     assert.equal(vm.calls.loadFiles, 1)
   } finally { restore() }
+})
+
+test('#1288 从资源管理器拖拽文件向软件外（微信聊天 / Finder）：预取本机路径并在 dragstart 启动系统级 startDrag，同时不破坏树内移动', async () => {
+  const restore = installGlobals()
+  clearLocalPathCache()
+  try {
+    const started = []
+    const listeners = new Map()
+    globalThis.window.addEventListener = (type, fn) => { listeners.set(type, fn) }
+    globalThis.window.removeEventListener = (type, fn) => {
+      if (listeners.get(type) === fn) listeners.delete(type)
+    }
+
+    const vm = makeVm({
+      desktopFs: {
+        startDrag(p) {
+          started.push(p)
+          return { ok: true }
+        },
+      },
+      getFileLocalPath: async (id) => ({
+        data: { path: `/Users/me/Documents/案件/${id}-起诉状.docx`, exists: true },
+      }),
+    })
+    vm.windowedDisplayFiles = [doc, folder]
+    vm.displayFiles = [doc, folder]
+
+    // 1. 鼠标移入/按下时预取本机路径
+    vm.onItemPrimeDrag(doc)
+    await new Promise((r) => setTimeout(r, 10))
+
+    // 2. uni-h5 <view> 的 dragstart 事件没有 dataTransfer，靠 window.event 兜底，并启动原生 startDrag
+    const setDataCalls = []
+    const nativeDt = {
+      effectAllowed: 'uninitialized',
+      dropEffect: 'none',
+      types: ['Files'], // startDrag 激活后 OS 会给拖拽会话挂上 Files
+      files: [],
+      setData(k, v) { setDataCalls.push([k, v]) },
+      getData: () => '',
+    }
+    globalThis.window.event = { dataTransfer: nativeDt, clientX: 10, clientY: 10 }
+    vm.handleDragStart(wrappedEvent(), doc, 0)
+
+    assert.deepEqual(started, ['/Users/me/Documents/案件/1-起诉状.docx'], '应调用 host.fs.startDrag 把真实文件路径交给系统拖拽（微信可直接接收）')
+    assert.ok(setDataCalls.some(([k]) => k === 'application/x-checkba-file'), '通过 nativeDataTransfer 写入内部自定义载荷')
+    assert.equal(document.__checkbaDraggedFile.fileId, 1)
+
+    // 3. startDrag 把 effectAllowed 锁成 copy 且 types 带 Files 时，树内移动仍走 moveFile 而非外部导入
+    nativeDt.effectAllowed = 'copy'
+    assert.equal(isExternalFileDrag(nativeDt), false, '内部拖拽在途时不应误判为外部文件拖入')
+    vm.handleDragOver(wrappedEvent(), 1)
+    assert.equal(nativeDt.dropEffect, 'copy', 'effectAllowed=copy 时兼容设置为 copy，避免禁止光标')
+
+    globalThis.window.event = { dataTransfer: nativeDt, clientX: 40, clientY: 60 }
+    await vm.handleDrop(wrappedEvent(), 1)
+    assert.deepEqual(vm.calls.moveFile, [[42, 1, 7, 0]], '树内拖到文件夹仍正常移动')
+    assert.deepEqual(vm.calls.importLocal, [], '绝不误走外部导入')
+
+    // 4. 若拖到软件外（如微信窗口）松手后未触发 DOM dragend，鼠标移回窗口（buttons=0）自动清理拖拽态
+    vm.handleDragStart(wrappedEvent(), doc, 0)
+    assert.equal(vm.draggedIndex, 0)
+    assert.ok(document.__checkbaDraggedFile)
+    const onMove = listeners.get('mousemove')
+    assert.equal(typeof onMove, 'function')
+    onMove({ buttons: 0 })
+    assert.equal(vm.draggedIndex, -1, '外部松手后移回窗口应自动复位 draggedIndex')
+    assert.equal(document.__checkbaDraggedFile, null, '外部松手后应清理全局拖拽兜底')
+  } finally {
+    clearLocalPathCache()
+    restore()
+  }
 })

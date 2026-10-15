@@ -508,7 +508,12 @@ export default {
   },
   async mounted() {
     this.watchBackendHealth()
-    this._onEvidenceDragStart = () => { this.evidenceDropArmed = true }
+    this._onEvidenceDragStart = () => {
+      this.evidenceDropArmed = true
+      this._draggedFileSnapshot = (typeof document !== 'undefined' && document.__checkbaDraggedFile)
+        ? { ...document.__checkbaDraggedFile }
+        : null
+    }
     // _dragEndedAt：客体代收的 drop 经 IPC 转发到达时，dragend 往往已经先一步把
     // armed 翻回 false（drop 与 dragend 之间只差几百毫秒，IPC 又要过一跳）。
     // 记下拖拽结束时刻，给转发的 drop 留一个宽限窗（见 onGuestEvidenceDrop）。
@@ -644,12 +649,17 @@ export default {
     // ---- EvidenceLink：拖放接收层 ----
     onEvidenceDragOver(e) {
       this.evidenceDropOver = true
-      try { if (e && e.dataTransfer) e.dataTransfer.dropEffect = 'link' } catch (err) { /* ignore */ }
+      try {
+        if (e && e.dataTransfer) {
+          e.dataTransfer.dropEffect = e.dataTransfer.effectAllowed === 'copy' ? 'copy' : 'link'
+        }
+      } catch (err) { /* ignore */ }
     },
     onEvidenceDragLeave() {
       this.evidenceDropOver = false
     },
     onEvidenceDrop(e) {
+      const wasArmed = this.evidenceDropArmed || (Date.now() - (this._dragEndedAt || 0) < 2000)
       this.evidenceDropOver = false
       this.evidenceDropArmed = false
       let file = null
@@ -668,6 +678,12 @@ export default {
         file = { ...document.__checkbaDraggedFile }
         document.__checkbaDraggedFile = null // 消费即清，免得下一次落空的 drop 捡到陈文件
       }
+      // 桌面端启动 webContents.startDrag 后自定义 MIME 可能为空，且 dragend 可能先于客体 IPC
+      // 清掉 document.__checkbaDraggedFile：在 2s 宽限窗内用 dragstart 时拍下的快照兜底（dev-board#1288）。
+      if (!file && wasArmed && this._draggedFileSnapshot) {
+        file = { ...this._draggedFileSnapshot }
+      }
+      this._draggedFileSnapshot = null
       if (!file || file.fileType === 'folder' || file.isFolder) return
       const id = file.id != null ? file.id : file.fileId
       if (!id) return
