@@ -1,0 +1,13 @@
+{
+  "id": "lawfirm-management",
+  "name": "律所管理",
+  "version": "0.1.0",
+  "description": "律所收案立项、法规级利益冲突检索与站内信协同放行、发票与财务收费台账（支持手动核销与金蝶/用友对接）、团队负荷与管理决策看板。",
+  "author": "AI WorkDeck",
+  "minHostVersion": "0.61.0",
+  "permissions": ["lawfirm", "im", "file_read", "file_write"],
+  "frontendEntry": "web/index.html",
+  "backendJars": [],
+  "tools": [],
+  "skills": []
+}
