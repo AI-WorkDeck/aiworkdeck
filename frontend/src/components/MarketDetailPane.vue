@@ -1021,7 +1021,7 @@ export default {
     background: var(--awd-surface);
     border: 1.5px solid var(--awd-border);
     border-radius: 50%;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--awd-shadow-md);
   }
 }
 

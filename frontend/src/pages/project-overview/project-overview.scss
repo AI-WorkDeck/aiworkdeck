@@ -3054,8 +3054,8 @@ $color-accent: var(--awd-mint); // Mint Green
 .ocr-selection {
   position: fixed;
   border: 2px solid var(--awd-info);
-  /* 选区叠在冻结帧上，必须半透明 */
-  background: var(--awd-accent-soft);
+  /* 选区叠在冻结帧上，必须半透明；--awd-info-soft 浅色下是不透明 #EFF6FF，会把框住的内容整块盖掉（dev-board#474） */
+  background: rgba(37, 99, 235, 0.12);
   border-radius: 6px;
   pointer-events: none;
 }
