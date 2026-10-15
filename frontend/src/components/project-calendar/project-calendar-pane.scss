@@ -56,7 +56,7 @@
   width: 20px;
   height: 20px;
   border-radius: var(--awd-panel-radius);
-  font-size: 14px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-panel-text-2);
   cursor: pointer;
 
@@ -89,7 +89,7 @@
 .pcp-all-btn {
   flex: none;
   padding: 1px 8px;
-  border-radius: 10px;
+  border-radius: 999px;
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-panel-text-2);
   border: 1px solid var(--awd-panel-border);
@@ -135,8 +135,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  font-size: 14px;
+  border-radius: var(--awd-radius-sm);
+  font-size: var(--awd-panel-fs);
   color: var(--awd-panel-text-2);
   cursor: pointer;
 
@@ -213,7 +213,7 @@
 .pcp-caret {
   display: inline-block;
   width: 10px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-panel-text-3);
   transition: transform 0.15s ease;
 

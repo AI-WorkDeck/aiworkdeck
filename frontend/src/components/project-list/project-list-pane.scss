@@ -81,7 +81,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 
 .btn-secondary-small {
     background: var(--awd-surface);
-    color: var(--awd-text-3);
+    color: var(--awd-text-2);
     font-size: var(--awd-font-size-body);
     font-weight: 500;
     padding: 6px 12px;
@@ -252,7 +252,7 @@ $brand-dark: #221F1A;    /* Dark BG */
   padding: 0 5px;
   box-sizing: border-box;
   border-radius: var(--awd-radius-md);
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-sec);
   font-weight: 600;
   line-height: 16px;
   text-align: center;
@@ -326,7 +326,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     border-radius: 50%;
     background: var(--awd-bg);
     color: var(--awd-text-2);
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-sec);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -342,7 +342,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     background: var(--awd-danger);
     color: white;
     border-radius: 50%;
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-sec);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -397,7 +397,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     margin-left: 8px;
     padding: 1px 7px;
     border-radius: var(--awd-radius-sm);
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-sec);
     font-weight: 500;
 }
 .role-owner {
@@ -448,14 +448,14 @@ $brand-dark: #221F1A;    /* Dark BG */
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-sec);
     font-weight: bold;
 }
 .manager-badge-icon {
     position: absolute;
     bottom: -4px;
     right: -4px;
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-sec);
     line-height: 1;
 }
 .members-divider {
@@ -495,7 +495,7 @@ $brand-dark: #221F1A;    /* Dark BG */
 }
 
 .client-group-label {
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-sec);
     color: var(--awd-text-3);
     margin-right: 4px;
     font-weight: 500;
@@ -845,7 +845,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     padding: 1px 6px;
     border: 1px solid var(--awd-border);
     border-radius: 999px;
-    font-size: 10px;
+    font-size: var(--awd-panel-fs-sec);
     line-height: 1.6;
     color: var(--awd-text-3);
 }
@@ -946,8 +946,105 @@ $brand-dark: #221F1A;    /* Dark BG */
         flex: 0 0 52px;
     }
 
+    .content-header {
+        margin-bottom: var(--awd-panel-gap, 8px);
+        width: 100%;
+
+        .header-actions {
+            width: 100%;
+
+            .btn-secondary-small {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                min-height: var(--awd-control-height, 32px);
+                padding: 0 10px;
+                box-sizing: border-box;
+                border-radius: var(--awd-radius-md);
+                font-size: var(--awd-font-size-body);
+                color: var(--awd-text);
+                background: var(--awd-surface);
+                border: 1px solid var(--awd-border);
+                margin: 0;
+
+                &:hover {
+                    border-color: var(--awd-accent-text);
+                    color: var(--awd-accent-text);
+                }
+            }
+        }
+    }
+
+    .create-section {
+        margin-bottom: var(--awd-panel-gap-lg, 14px);
+    }
+
+    .create-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: var(--awd-panel-gap, 8px);
+        width: 100%;
+    }
+
+    .create-card {
+        min-width: 0;
+        width: 100%;
+        min-height: var(--awd-control-height, 32px);
+        height: auto;
+        padding: 6px 10px;
+        box-sizing: border-box;
+        justify-content: flex-start;
+    }
+
+    .create-title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     .projects-stats-row {
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+    }
+
+    .stat-card,
+    .ov-cell {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: var(--awd-space-2);
+        padding: 6px 10px;
+        background: var(--awd-surface);
+        border: 1px solid var(--awd-border-subtle);
+        border-radius: var(--awd-radius-sm);
+        box-shadow: var(--awd-shadow-sm);
+        min-width: 0;
+        box-sizing: border-box;
+
+        & + .ov-cell::before {
+            display: none !important;
+        }
+    }
+
+    .ov-spacer {
+        display: none;
+    }
+
+    .ov-link {
+        grid-column: 1 / -1;
+        justify-content: center;
+        margin-right: 0;
+        background: var(--awd-surface);
+        border: 1px solid var(--awd-border-subtle);
+        border-radius: var(--awd-radius-sm);
+        padding: 6px 10px;
     }
 
     .project-list-toolbar {
@@ -962,22 +1059,43 @@ $brand-dark: #221F1A;    /* Dark BG */
     .project-sort {
         margin-left: 0;
     }
+}
 
+@container project-list-pane (max-width: 380px) {
     .create-row {
-        flex-wrap: nowrap;
+        display: flex;
+        flex-direction: column;
+        gap: var(--awd-panel-gap, 8px);
+        width: 100%;
     }
 
     .create-card {
-        flex: 1 1 0;
-        min-width: 0;
-        min-height: var(--awd-control-height);
+        width: 100%;
+        flex: none;
+        justify-content: flex-start;
+        min-height: var(--awd-control-height, 32px);
         padding: 0 10px;
-        justify-content: center;
+        box-sizing: border-box;
     }
 
     .create-title {
-        overflow: hidden;
-        text-overflow: ellipsis;
+        overflow: visible;
+        text-overflow: clip;
+        white-space: nowrap;
+    }
+
+    .stat-card,
+    .ov-cell {
+        padding: 4px 6px;
+        gap: 4px;
+    }
+
+    .ov-value {
+        font-size: 16px;
+    }
+
+    .ov-label {
+        font-size: var(--awd-panel-fs-meta, 11px);
     }
 }
 

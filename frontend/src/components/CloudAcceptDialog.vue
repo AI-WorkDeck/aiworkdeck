@@ -183,37 +183,54 @@ export default {
   position: fixed; inset: 0; background: var(--awd-overlay);
   display: flex; align-items: center; justify-content: center; z-index: 999;
 }
-.awd-dialog { width: 600rpx; max-height: 74vh; display: flex; flex-direction: column; background: var(--awd-surface); border-radius: 12rpx; overflow: hidden; }
-.awd-header { padding: 24rpx; border-bottom: 1px solid var(--awd-border); }
-.awd-title { font-size: 30rpx; font-weight: 600; }
-.awd-body { padding: 24rpx; overflow-y: auto; flex: 1; }
-.awd-footer {
-  display: flex; justify-content: flex-end; gap: 16rpx;
-  padding: 20rpx 24rpx; border-top: 1px solid var(--awd-border);
+.awd-dialog {
+  width: 500px; max-width: 90vw; max-height: 74vh;
+  display: flex; flex-direction: column;
+  background: var(--awd-surface);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-lg);
+  overflow: hidden;
 }
-.awd-btn { padding: 12rpx 24rpx; border-radius: 6rpx; font-size: 25rpx; }
-.awd-btn-primary { background: var(--awd-info); color: var(--awd-text-on-accent); }
-.awd-btn-secondary { background: var(--awd-bg); color: var(--awd-text); }
+.awd-header { padding: 16px 20px; border-bottom: 1px solid var(--awd-border); }
+.awd-title { font-size: var(--awd-font-size-title); font-weight: 600; color: var(--awd-text); }
+.awd-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+.awd-footer {
+  display: flex; justify-content: flex-end; gap: 12px;
+  padding: 16px 20px; border-top: 1px solid var(--awd-border);
+}
+.awd-btn {
+  height: var(--awd-control-height);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body);
+  cursor: pointer;
+}
+.awd-btn-primary { background: var(--awd-accent); color: var(--awd-text-on-accent); }
+.awd-btn-secondary { background: var(--awd-bg); color: var(--awd-text); border: 1px solid var(--awd-border); }
 .awd-btn-disabled { opacity: .4; pointer-events: none; }
 
-.cloud-accept-hint { font-size: 26rpx; color: var(--awd-text-2); line-height: 1.6; }
-.cloud-accept-empty { display: flex; flex-direction: column; gap: 12rpx; align-items: flex-start; }
+.cloud-accept-hint { font-size: var(--awd-font-size-body); color: var(--awd-text-2); line-height: 1.6; }
+.cloud-accept-empty { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .cloud-project-list {}
 .cloud-project-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16rpx 0; border-bottom: 1px solid var(--awd-border-subtle);
+  padding: 12px 0; border-bottom: 1px solid var(--awd-border-subtle);
 }
 .cloud-project-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.cloud-project-role { font-size: 12px; color: var(--awd-text-3); }
-.cloud-project-name { font-size: 26rpx; color: var(--awd-text); word-break: break-all; }
+.cloud-project-role { font-size: var(--awd-panel-fs); color: var(--awd-text-3); }
+.cloud-project-name { font-size: var(--awd-font-size-body); color: var(--awd-text); word-break: break-all; }
 .cloud-accept-location {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px;
-  padding-bottom: 16rpx; margin-bottom: 8rpx; border-bottom: 1px solid var(--awd-border);
+  padding-bottom: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--awd-border);
 }
 .cloud-accept-location-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.cloud-accept-location-label { font-size: 12px; color: var(--awd-text-3); }
-.cloud-accept-location-path { font-size: 24rpx; color: var(--awd-text); word-break: break-all; }
+.cloud-accept-location-label { font-size: var(--awd-panel-fs); color: var(--awd-text-3); }
+.cloud-accept-location-path { font-size: var(--awd-panel-fs); color: var(--awd-text); word-break: break-all; }
 .cloud-accept-location-actions { display: flex; gap: 12px; flex-shrink: 0; }
-.cloud-accept-location-hint { width: 100%; font-size: 12px; color: var(--awd-text-3); }
-.cloud-accept-link { font-size: 24rpx; color: var(--awd-accent-text); cursor: pointer; }
+.cloud-accept-location-hint { width: 100%; font-size: var(--awd-panel-fs); color: var(--awd-text-3); }
+.cloud-accept-link { font-size: var(--awd-panel-fs); color: var(--awd-accent-text); cursor: pointer; }
 </style>

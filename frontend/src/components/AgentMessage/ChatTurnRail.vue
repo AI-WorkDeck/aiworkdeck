@@ -157,7 +157,7 @@ watch(open, (isOpen) => {
   outline: none;
   cursor: pointer;
 }
-.chat-turn-rail:focus-visible { outline: 1px solid var(--awd-accent); outline-offset: -2px; border-radius: 3px; }
+.chat-turn-rail:focus-visible { outline: 1px solid var(--awd-accent); outline-offset: -2px; border-radius: var(--awd-radius-sm); }
 
 .rail-ticks {
   flex: 1;
@@ -183,7 +183,7 @@ watch(open, (isOpen) => {
   width: 8px;
   height: 3px;
   max-height: 70%;
-  border-radius: 2px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-text-3);
   transition: background .15s ease, width .15s ease, height .15s ease;
 }
@@ -212,7 +212,7 @@ watch(open, (isOpen) => {
   box-sizing: border-box;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border-subtle);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   box-shadow: var(--awd-shadow-md);
   z-index: 6; /* 盖住 .return-to-latest 的 5 */
 }
@@ -225,10 +225,10 @@ watch(open, (isOpen) => {
   margin: 0;
   padding: 5px 7px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--awd-radius-sm);
   background: transparent;
   text-align: left;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   line-height: 1.5;
   color: var(--awd-text-2);
   cursor: pointer;
@@ -249,7 +249,7 @@ watch(open, (isOpen) => {
 .rail-index {
   flex-shrink: 0;
   min-width: 16px;
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 .rail-label {

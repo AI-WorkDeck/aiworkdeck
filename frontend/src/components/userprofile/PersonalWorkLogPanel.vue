@@ -12,7 +12,7 @@
 <template>
   <SettingsSection class="panel-work-log" :title="$t('account.tabWorkLog')" :description="$t('account.workLogSubtitle')">
       <template #actions>
-        <view class="log-filter-bar">
+        <view class="log-filter-bar header-actions">
           <input class="filter-input" v-model="activityFilter.date" :placeholder="$t('account.filterDatePlaceholder')" />
           <AwdSelect
             class="filter-project-select"
@@ -297,36 +297,45 @@ export default {
 .log-filter-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--awd-space-2);
   flex-wrap: wrap;
 }
 
 .filter-input {
   flex: 1;
   min-width: 0;
-  height: 30px;
+  height: var(--awd-control-height);
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   padding: 0 10px;
-  font-size: 12.5px;
+  font-size: var(--awd-panel-fs);
   background: var(--awd-surface);
+  color: var(--awd-text);
+  box-sizing: border-box;
 }
 
 .filter-project-select {
   flex: 1;
   min-width: 0;
+  height: var(--awd-control-height);
 }
 
 .btn-export {
   @extend .awd-set-btn-secondary;
   flex-shrink: 0;
+  height: var(--awd-control-height);
+  line-height: calc(var(--awd-control-height) - 2px);
+  padding: 0 var(--awd-space-3);
+  font-size: var(--awd-panel-fs);
+  border-radius: var(--awd-radius-md);
+  box-sizing: border-box;
 }
 
 /* 表格用固定列宽（含末列），配合 overflow-x 横向滚动——容器比列宽总和窄时
    横向滚动，而不是把最后一列挤到逐字竖排换行（dev-board#892 走查）。 */
 .log-table-container {
   border: 1px solid var(--awd-border);
-  border-radius: 6px;
+  border-radius: var(--awd-radius-md);
   /* 容器比列宽总和窄时整块横向滚动（表头与行一起动），而不是把末列挤到
      逐字竖排换行（dev-board#892 走查）。 */
   overflow-x: auto;
@@ -343,7 +352,7 @@ export default {
 .log-table-header {
   background: var(--awd-bg);
   border-bottom: 1px solid var(--awd-border);
-  height: 32px;
+  height: var(--awd-control-height);
   align-items: center;
 }
 
@@ -351,7 +360,7 @@ export default {
   flex-shrink: 0;
   box-sizing: border-box;
   padding: 0 12px;
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   font-weight: 600;
   color: var(--awd-text-2);
   white-space: nowrap;
@@ -372,10 +381,10 @@ export default {
 }
 
 .log-table-row {
-  height: 32px;
+  height: var(--awd-control-height);
   align-items: center;
   border-bottom: 1px solid var(--awd-border-subtle);
-  font-size: 12.5px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text);
 
   &:last-child {
@@ -410,7 +419,7 @@ export default {
   border-radius: 999px;
   background: var(--awd-surface-2);
   color: var(--awd-text);
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-sec);
   font-weight: 500;
 }
 .td-action { width: 96px; font-weight: 500; }
@@ -425,7 +434,7 @@ export default {
 .td-start, .td-end {
   width: 150px;
   color: var(--awd-text-2);
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-variant-numeric: tabular-nums;
 }
 .td-duration {
@@ -440,6 +449,6 @@ export default {
   padding: 40px;
   text-align: center;
   color: var(--awd-text-3);
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
 }
 </style>
