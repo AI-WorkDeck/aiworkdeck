@@ -97,7 +97,8 @@ function makeVm({ moveFile, createFolder, desktopPaths, desktopFs, importLocalFa
 }
 
 function installGlobals() {
-  const prior = { uni: globalThis.uni, window: globalThis.window, document: globalThis.document }
+  const prior = { uni: globalThis.uni, window: globalThis.window, document: globalThis.document, log: console.log }
+  console.log = () => {}
   globalThis.uni = {
     showToast(o) { if (globalThis.__awdToasts) globalThis.__awdToasts.push(o && o.title) },
     $emit() {}, $on() {}, $off() {},
@@ -105,6 +106,7 @@ function installGlobals() {
   globalThis.window = { event: null }
   globalThis.document = {}
   return () => {
+    console.log = prior.log
     globalThis.uni = prior.uni
     globalThis.window = prior.window
     globalThis.document = prior.document

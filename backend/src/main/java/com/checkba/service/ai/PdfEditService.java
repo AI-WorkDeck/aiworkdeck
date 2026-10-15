@@ -1060,7 +1060,7 @@ public class PdfEditService {
      * 所以这里不自己 close，而是把它交回给调用方的 finally——
      * {@code ttcOut[0]} 只在确实打开了集合时被写入。
      */
-    private PDFont loadEmbeddedCjkFont(PDDocument doc, File fontFile, TrueTypeCollection[] ttcOut)
+    public PDFont loadEmbeddedCjkFont(PDDocument doc, File fontFile, TrueTypeCollection[] ttcOut)
             throws IOException {
         if (!fontFile.getName().toLowerCase().endsWith(".ttc")) {
             return PDType0Font.load(doc, fontFile);
@@ -1081,7 +1081,7 @@ public class PdfEditService {
      * CJK 字体探测：配置覆盖 → 仓内字体（dev 态）→ 操作系统字体。
      * 找不到返回 null（调用方给出配置指引）。
      */
-    File resolveCjkFontFile() {
+    public File resolveCjkFontFile() {
         List<String> candidates = new ArrayList<>();
         if (configuredCjkFontPath != null && !configuredCjkFontPath.isBlank()) {
             candidates.add(configuredCjkFontPath);

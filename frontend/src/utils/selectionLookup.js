@@ -40,3 +40,28 @@ export function classifySelectionLookup(text) {
   if (!value.includes('与') && COMPANY.test(value) && (value.match(COMPANY_ENDINGS) || []).length === 1) return 'COMPANY'
   return null
 }
+
+/**
+ * When the user selects only a bare article number (e.g. "第五十条") right after a bracketed
+ * law title in the surrounding paragraph (e.g. "依据《中华人民共和国劳动合同法》第五十条"),
+ * combine the nearest preceding 《…》 law title with the selected article so PKULaw can look
+ * up the exact statute instead of a bare article number (dev-board#1289).
+ */
+export function resolveSelectionLookupText(selectedText, beforeText, kind = 'LAW') {
+  const raw = typeof selectedText === 'string' ? selectedText.trim() : ''
+  if (!raw || kind !== 'LAW') return raw
+  const compact = raw.normalize('NFKC').replace(/\s+/gu, '')
+  if (!ARTICLE_ONLY.test(compact)) return raw
+  const before = typeof beforeText === 'string' ? beforeText : ''
+  if (!before) return raw
+  const matches = [...before.matchAll(/《([^《》\r\n]{2,60})》/gu)]
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const candidate = matches[i][1].trim()
+    const candCompact = candidate.normalize('NFKC').replace(/\s+/gu, '')
+    const candBase = candCompact.replace(/(?:实施条例|实施细则)$/u, '')
+    if (COMMON_LAWS.has(candBase) || LAW_TITLE.test(candCompact) || OFFICIAL_TITLE.test(candCompact)) {
+      return `《${candidate}》${compact}`
+    }
+  }
+  return raw
+}

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { classifySelectionLookup } from '../../src/utils/selectionLookup.js'
+import { classifySelectionLookup, resolveSelectionLookupText } from '../../src/utils/selectionLookup.js'
 
 test('完整企业名、合伙企业和分公司推荐工商查询', () => {
   for (const text of [
@@ -47,3 +47,19 @@ test('普通文字、人名、机构、书名与混合选区不猜查询类型',
     null, undefined, 123, '甲'.repeat(201),
   ]) assert.equal(classifySelectionLookup(text), null, String(text))
 })
+
+test('单独选中条号时从前文自动补全最近引用的法规名称（dev-board#1289）', () => {
+  assert.equal(
+    resolveSelectionLookupText('第五十条', '依据《中华人民共和国劳动合同法》第四十七条及', 'LAW'),
+    '《中华人民共和国劳动合同法》第五十条',
+  )
+  assert.equal(
+    resolveSelectionLookupText('第五百五十八条', '根据《中华人民共和国民法典》第五百五十七条、', 'LAW'),
+    '《中华人民共和国民法典》第五百五十八条',
+  )
+  assert.equal(
+    resolveSelectionLookupText('《中华人民共和国公司法》第二十条', '依据《中华人民共和国民法典》', 'LAW'),
+    '《中华人民共和国公司法》第二十条',
+  )
+})
+

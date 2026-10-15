@@ -129,6 +129,49 @@ test('LAW：上游只给了一段纯文本时落 content', () => {
   assert.equal(a.title, '')
 })
 
+test('LAW：北大法宝把条号与条文合在 article 字段时自动拆出条号与正文，并优先选现行有效记录（dev-board#1289）', () => {
+  const a = lawArticle({
+    result: [
+      {
+        title: '中华人民共和国劳动合同法',
+        timeliness: '已修改',
+        article: '第五十条　旧版条文内容。',
+      },
+      {
+        title: '中华人民共和国劳动合同法(2012修正)',
+        timeliness: '现行有效',
+        article: '第五十条　用人单位应当在解除或者终止劳动合同时出具解除或者终止劳动合同的证明，并在十五日内为劳动者办理档案和社会保险关系转移手续。',
+      },
+    ],
+  })
+  assert.equal(a.title, '中华人民共和国劳动合同法(2012修正)')
+  assert.equal(a.article, '第五十条')
+  assert.equal(a.timeliness, '现行有效')
+  assert.match(a.content, /^用人单位应当在解除或者终止劳动合同时/)
+})
+
+test('LAW：get_law_list 返回 Data 数组且无正文时合成元数据摘要（dev-board#1289）', () => {
+  const a = lawArticle({
+    result: {
+      Data: [
+        {
+          Title: '中华人民共和国民法典',
+          TimelinessDic: '现行有效',
+          DocumentNO: '主席令第四十五号',
+          IssueDepartment: ['全国人民代表大会'],
+          IssueDate: '2020.05.28',
+          ImplementDate: '2021.01.01',
+          Url: '[https://www.pkulaw.com/chl/123.html](https://www.pkulaw.com/chl/123.html)',
+        },
+      ],
+    },
+  })
+  assert.equal(a.title, '中华人民共和国民法典')
+  assert.equal(a.timeliness, '现行有效')
+  assert.match(a.content, /发文字号：主席令第四十五号/)
+  assert.match(a.content, /发布部门：全国人民代表大会/)
+})
+
 // —————————————————————————— CASE ——————————————————————————
 
 test('CASE：判决书首条展开成分段，其余只列标题', () => {

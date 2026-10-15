@@ -2150,6 +2150,33 @@ export function batchCopyFiles(projectId, fileIds, targetParentId) {
   });
 }
 
+// 单个文件（Word/PPT/Excel/图片）转为 PDF（dev-board#1291）
+export function convertFileToPdf(projectId, fileId) {
+  return request({
+    url: `/api/projects/${projectId}/files/${fileId}/convert-pdf`,
+    method: 'POST',
+    timeout: 120000,
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 多个文件分别转 PDF 后合并为一个 PDF（dev-board#1291）
+export function mergeFilesToPdf(projectId, fileIds) {
+  return request({
+    url: `/api/projects/${projectId}/files/batch/merge-pdf`,
+    method: 'POST',
+    timeout: 180000,
+    data: {
+      fileIds,
+    },
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 
 // ===================== 脱敏处理 API =====================
 // ===================== 脱敏处理 API =====================
