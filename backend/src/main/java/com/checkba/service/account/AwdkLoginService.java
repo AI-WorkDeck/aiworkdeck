@@ -46,7 +46,7 @@ import java.util.Optional;
  *       缺失时按 MALFORMED 拒绝，<b>不回落 username</b>——username 可改名，
  *       以它为键会在改名后凭空生出第二个 server 用户；</li>
  *   <li>绝不把官网用户名直接绑到本服务器已有的同名账号上（等于账户接管），
- *       首登一律新建 {@code awd_} 前缀用户；</li>
+ *       仅经官网验证的手机号/邮箱可复用原移动用户，否则新建 {@code awd_} 用户；</li>
  *   <li>失败文案不含「登录」「未授权」「请先」子串（licensing 领域地雷 1）。</li>
  * </ul>
  *
@@ -132,7 +132,8 @@ public class AwdkLoginService {
                             "The website account information is missing the accountId field; this server cannot complete account bridging yet"));
         }
 
-        User user = resolveUser(accountId, str(me.get("username")), str(me.get("displayName")));
+        User user = resolveUser(accountId, str(me.get("username")), str(me.get("displayName")),
+                str(me.get("phone")), str(me.get("verifiedEmail")));
         // 手机端账号归一（dev-board#30）：官网账户带手机号时认领到桥接用户名下，
         // 此后手机端 sms-login 解析到同一账号。方法自吞异常，不影响桥接。
         userService.claimPhoneFromWebsite(user, str(me.get("phone")));
@@ -167,7 +168,7 @@ public class AwdkLoginService {
                     LangText.of("账户信息缺少 accountId 字段，无法在本服务器建立协作身份",
                             "The account information is missing the accountId field; this server cannot create a collaboration identity"));
         }
-        User user = resolveUser(accountId, username, displayName);
+        User user = resolveUser(accountId, username, displayName, phone, null);
         // 与桥接登录同款：官网账户带手机号时认领到这行名下，此后对方自己登录解析到同一账号。
         userService.claimPhoneFromWebsite(user, phone);
         return user;
@@ -319,6 +320,9 @@ public class AwdkLoginService {
         credentials.put("deviceName", baseUrl.contains("workdeck.ai") ? "Office Add-in" : "Office 插件");
         Map<String, Object> payload =
                 AccountLoginExchange.post(transport, objectMapper, baseUrl, "/api/auth/exchange-key", credentials);
+        if (Boolean.TRUE.equals(payload.get("passwordSetupRequired"))) {
+            throw new PasswordSetupRequired(payload);
+        }
         String key = str(payload.get("key"));
         // 前缀在 login() 里还会再验一遍，但那句文案是写给「手工粘 Key」的用户看的
         // （教他去官网重新生成）。走到这里的用户从头到尾没见过 Key，得说是官网的问题。
@@ -328,6 +332,17 @@ public class AwdkLoginService {
                             "The website did not return a usable account credential, please retry shortly"));
         }
         return login(key);
+    }
+
+    /** Restricted credential lifecycle operations; the website remains the only password authority. */
+    public Map<String, Object> passwordOperation(String operation, Map<String, String> body) {
+        if (!java.util.Set.of("setup", "reset/send-code", "reset").contains(operation)) {
+            throw new IllegalArgumentException("Unknown password operation");
+        }
+        requireEnabled();
+        Map<String, Object> credentials = new HashMap<>();
+        if (body != null) credentials.putAll(body);
+        return AccountLoginExchange.post(transport, objectMapper, baseUrl, "/api/auth/password/" + operation, credentials);
     }
 
     // ==================== 内部 ====================
@@ -368,10 +383,22 @@ public class AwdkLoginService {
         }
     }
 
-    private User resolveUser(String accountId, String externalUsername, String displayName) {
+    private User resolveUser(String accountId, String externalUsername, String displayName,
+                             String verifiedPhone, String verifiedEmail) {
+        Optional<User> phoneUser = userService.findByVerifiedWebsitePhone(verifiedPhone);
+        Optional<User> emailUser = userService.findByVerifiedWebsiteEmail(verifiedEmail);
+        if (phoneUser.isPresent() && emailUser.isPresent()
+                && !phoneUser.get().getId().equals(emailUser.get().getId())) throw identityConflict();
+        User legacy = phoneUser.orElseGet(() -> emailUser.orElse(null));
+        if (legacy != null) {
+            Optional<AccountBinding> claimed = bindingRepository.findByUserId(legacy.getId());
+            if (claimed.isPresent() && !accountId.equals(claimed.get().getExternalAccountId()))
+                throw identityConflict();
+        }
         Optional<AccountBinding> existing = bindingRepository.findByExternalAccountId(accountId);
         if (existing.isPresent()) {
             AccountBinding binding = existing.get();
+            if (legacy != null && !legacy.getId().equals(binding.getUserId())) throw identityConflict();
             try {
                 User user = userService.getUserById(binding.getUserId());
                 // 展示名以官网为唯一权威源（spec 2026-09-10 §4）：桥接那一刻抄一份、
@@ -391,7 +418,9 @@ public class AwdkLoginService {
                 return user;
             }
         }
-        User user = createExternalUser(accountId, externalUsername, displayName);
+        // Keep the original primary key: project ownership, uploads and account balances reference it.
+        User user = legacy != null ? userService.refreshDisplayNameFromWebsite(legacy, displayName)
+                : createExternalUser(accountId, externalUsername, displayName);
         AccountBinding binding = new AccountBinding();
         binding.setExternalAccountId(accountId);
         binding.setUserId(user.getId());
@@ -401,6 +430,12 @@ public class AwdkLoginService {
         log.info("awdk 桥接首登建号: accountId={} -> userId={} username={}",
                 accountId, user.getId(), user.getUsername());
         return user;
+    }
+
+    private static AccountException identityConflict() {
+        return new AccountException(AccountException.Kind.CONFLICT,
+                LangText.of("账户关联存在冲突，请联系支持人员处理，原数据未变更",
+                        "Account identities conflict. Contact support; existing data has not been changed."));
     }
 
     private User createExternalUser(String accountId, String externalUsername, String displayName) {

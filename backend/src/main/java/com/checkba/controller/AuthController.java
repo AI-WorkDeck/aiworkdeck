@@ -143,6 +143,20 @@ public class AuthController {
         staticUserService = userService;
     }
 
+    @org.springframework.beans.factory.annotation.Value("${security.official-password-login-required:false}")
+    private boolean officialPasswordLoginRequired;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.config.ReviewAccountGate reviewAccountGate = com.checkba.config.ReviewAccountGate.disabled();
+
+    /** Official clients use the website password authority; self-hosted OTP stays configurable. */
+    private Map<String, Object> legacyOtpRefusal(String identity) {
+        if (!officialPasswordLoginRequired || reviewAccountGate.matches(identity)) return null;
+        return Map.of("code", 1, "kind", "password_login_required",
+                "message", LangText.of("请更新客户端并使用密码登录；首次使用或忘记密码可在官网完成验证和设置",
+                        "Update the app and sign in with a password. Complete first-time setup or password recovery on the website."));
+    }
+
     /** 本次登录的手机号闸判定；未接线（null）一律放行，不把既有链路连坐。 */
     private PhoneLoginGuard.PhoneGate phoneGate(User user) {
         return phoneLoginGuard == null ? PhoneLoginGuard.PhoneGate.OK : phoneLoginGuard.gateFor(user);
@@ -418,6 +432,51 @@ public class AuthController {
         return result;
     }
 
+    @PostMapping("/account-login/password/setup")
+    public Map<String, Object> accountPassword_setup(@RequestBody(required = false) Map<String, String> body,
+            jakarta.servlet.http.HttpServletRequest http) {
+        return accountPasswordOperation("setup", body, http);
+    }
+
+    @PostMapping("/account-login/password/reset/send-code")
+    public Map<String, Object> accountPassword_reset_send_code(@RequestBody(required = false) Map<String, String> body,
+            jakarta.servlet.http.HttpServletRequest http) {
+        return accountPasswordOperation("reset/send-code", body, http);
+    }
+
+    @PostMapping("/account-login/password/reset")
+    public Map<String, Object> accountPassword_reset(@RequestBody(required = false) Map<String, String> body,
+            jakarta.servlet.http.HttpServletRequest http) {
+        return accountPasswordOperation("reset", body, http);
+    }
+
+    private Map<String, Object> accountPasswordOperation(String operation, Map<String, String> body,
+            jakarta.servlet.http.HttpServletRequest http) {
+        String ip = http.getRemoteAddr();
+        Map<String, Object> result = new HashMap<>();
+        try {
+            if ("reset/send-code".equals(operation)) {
+                authAbuseGuard.checkCodeSendRate(ip);
+                authAbuseGuard.recordCodeSend(ip);
+            } else {
+                authAbuseGuard.checkLoginAttempt(ip, ACCOUNT_LOGIN_RATE_KEY);
+            }
+            result.put("data", awdkLoginService.passwordOperation(operation, body));
+            result.put("code", 0);
+        } catch (com.checkba.service.account.AccountException e) {
+            if (e.getKind() == com.checkba.service.account.AccountException.Kind.UNAUTHORIZED) {
+                authAbuseGuard.recordLoginFailure(ip, ACCOUNT_LOGIN_RATE_KEY);
+            }
+            result.put("code", 1);
+            result.put("reason", e.getReason() == null ? "password_operation_failed" : e.getReason());
+            result.put("message", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            result.put("code", 1);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
     /** 取一个请求体字段并去掉首尾空白；缺字段/整个 body 为空时给空串（便于 isEmpty 判定）。 */
     private static String trimmedField(Map<String, String> body, String key) {
         if (body == null) return "";
@@ -471,12 +530,18 @@ public class AuthController {
             // 缺失时要**整个不下发**，回落成 0 会让调用方存下一个不存在的令牌行 id。
             Map<String, Object> data = new HashMap<>();
             data.put("token", session.token());
+            data.put("sessionId", session.token());
+            User bridgedUser = userService.getUserById(session.userId());
+            if (bridgedUser != null) data.put("user", publicUser(bridgedUser));
             data.put("userId", session.userId());
             data.put("username", session.username());
             data.put("displayName",
                     session.displayName() == null ? session.username() : session.displayName());
             if (session.tokenId() != null) data.put("tokenId", session.tokenId());
             result.put("data", data);
+        } catch (com.checkba.service.account.PasswordSetupRequired pending) {
+            result.put("code", 0);
+            result.put("data", pending.challenge());
         } catch (com.checkba.service.account.AccountException e) {
             // 只有官网明确拒绝凭据（验证码错/口令错）才计失败。网络不可达不该消耗尝试次数；
             // CONFLICT（补绑期已过）也不该——那个用户的凭据本来就是对的，锁他没有意义。
@@ -485,6 +550,7 @@ public class AuthController {
             }
             result.put("code", 1);
             result.put("message", e.getMessage());
+            if (e.getReason() != null) result.put("reason", e.getReason());
         } catch (IllegalArgumentException e) {
             // 开关关闭等业务态
             result.put("code", 1);
@@ -743,6 +809,8 @@ public class AuthController {
     @PostMapping("/mail-login/send-code")
     public Map<String, Object> mailLoginSendCode(@RequestBody MailLoginRequest request,
                                                  jakarta.servlet.http.HttpServletRequest http) {
+        Map<String, Object> legacyRefusal = legacyOtpRefusal(request.getEmail());
+        if (legacyRefusal != null) return legacyRefusal;
         String ip = http.getRemoteAddr();
         Map<String, Object> result = new HashMap<>();
         try {
@@ -767,6 +835,8 @@ public class AuthController {
     @PostMapping("/mail-login/verify")
     public Map<String, Object> mailLoginVerify(@RequestBody MailLoginRequest request,
                                                jakarta.servlet.http.HttpServletRequest http) {
+        Map<String, Object> legacyRefusal = legacyOtpRefusal(request.getEmail());
+        if (legacyRefusal != null) return legacyRefusal;
         String ip = http.getRemoteAddr();
         Map<String, Object> result = new HashMap<>();
         String lockKey = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
@@ -817,6 +887,8 @@ public class AuthController {
     @PostMapping("/sms-login/send-code")
     public Map<String, Object> smsLoginSendCode(@RequestBody SmsLoginRequest request,
                                                 jakarta.servlet.http.HttpServletRequest http) {
+        Map<String, Object> legacyRefusal = legacyOtpRefusal(request.getPhone());
+        if (legacyRefusal != null) return legacyRefusal;
         String ip = http.getRemoteAddr();
         Map<String, Object> result = new HashMap<>();
         try {
@@ -841,6 +913,8 @@ public class AuthController {
     @PostMapping("/sms-login/verify")
     public Map<String, Object> smsLoginVerify(@RequestBody SmsLoginRequest request,
                                               jakarta.servlet.http.HttpServletRequest http) {
+        Map<String, Object> legacyRefusal = legacyOtpRefusal(request.getPhone());
+        if (legacyRefusal != null) return legacyRefusal;
         String ip = http.getRemoteAddr();
         Map<String, Object> result = new HashMap<>();
         String lockKey = request.getPhone() == null ? "" : request.getPhone().trim();
@@ -898,6 +972,8 @@ public class AuthController {
     @PostMapping("/wx-phone-login")
     public Map<String, Object> wxPhoneLogin(@RequestBody WxPhoneLoginRequest request,
                                             jakarta.servlet.http.HttpServletRequest http) {
+        Map<String, Object> legacyRefusal = legacyOtpRefusal(null);
+        if (legacyRefusal != null) return legacyRefusal;
         String ip = http.getRemoteAddr();
         Map<String, Object> result = new HashMap<>();
         try {
@@ -1028,7 +1104,12 @@ public class AuthController {
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
         // Map.of 最多 10 对，这里已经 12 项——用 ofEntries，加字段时不会突然编译不过
-        result.put("data", Map.ofEntries(
+        result.put("data", publicUser(user));
+        return result;
+    }
+
+    private Map<String, Object> publicUser(User user) {
+        return Map.ofEntries(
                 Map.entry("id", user.getId()),
                 Map.entry("username", user.getUsername()),
                 // local-mode 免登下 displayName 可能是库里的中文哨兵值（LocalIdentityService.
@@ -1046,8 +1127,7 @@ public class AuthController {
                 Map.entry("mailAuthEnabled", mailAuthService != null && mailAuthService.active()),
                 Map.entry("emailMasked", com.checkba.service.mail.MailAuthService.maskEmail(user.getVerifiedEmail())),
                 Map.entry("totpEnabled", user.isTotpEnabled())
-        ));
-        return result;
+        );
     }
 
     /**

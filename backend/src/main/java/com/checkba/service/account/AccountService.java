@@ -1006,6 +1006,9 @@ public class AccountService {
     private Map<String, Object> exchangeAndConnect(Map<String, Object> credentials) {
         credentials.put("deviceName", deviceName());
         Map<String, Object> payload = postLogin("/api/auth/exchange-key", credentials);
+        if (Boolean.TRUE.equals(payload.get("passwordSetupRequired"))) {
+            throw new PasswordSetupRequired(payload);
+        }
         String key = str(payload.get("key"));
         if (key == null || key.isBlank()) {
             throw new AccountException(AccountException.Kind.MALFORMED,
@@ -1028,6 +1031,16 @@ public class AccountService {
      * <p>与 {@link #handle} 分开的原因：那个是给「带 Key 的业务请求」用的，401 一律解释成
      * 「Key 无效或已被吊销」。登录阶段还没有 Key，401 的真实含义是验证码错/口令错。
      */
+    /** Restricted credential lifecycle operations; the website remains the only password authority. */
+    public Map<String, Object> passwordOperation(String operation, Map<String, String> body) {
+        if (!java.util.Set.of("setup", "reset/send-code", "reset").contains(operation)) {
+            throw new IllegalArgumentException("Unknown password operation");
+        }
+        Map<String, Object> credentials = new HashMap<>();
+        if (body != null) credentials.putAll(body);
+        return postLogin("/api/auth/password/" + operation, credentials);
+    }
+
     private Map<String, Object> postLogin(String path, Map<String, Object> body) {
         return AccountLoginExchange.post(transport, objectMapper, baseUrl(), path, body);
     }

@@ -100,6 +100,31 @@ class AccountServiceTest {
     private static final String ME = "{\"username\":\"hanzewei\",\"displayName\":\"韩泽伟\"}";
 
     @Test
+    void verifiedCodeRequiresPasswordWithoutConnecting() {
+        transport = new StubTransport().enqueue(200,
+                "{\"passwordSetupRequired\":true,\"setupToken\":\"restricted-ticket\",\"account\":\"13800138000\",\"expiresAt\":99}");
+        AccountService service = service();
+        PasswordSetupRequired stage = assertThrows(PasswordSetupRequired.class,
+                () -> service.loginWithPhone("13800138000", "123456"));
+        assertEquals("restricted-ticket", stage.challenge().get("setupToken"));
+        assertNull(service.currentKeyOrNull());
+        assertEquals(1, transport.calls.size(), "must not fetch account profile or connect");
+    }
+
+    @Test
+    void passwordSetupAndResetUseSeparatePathsAndPreserveWhitespace() {
+        transport = new StubTransport().enqueue(200, "{\"ok\":true}").enqueue(200, "{\"ok\":true}");
+        AccountService service = service();
+        service.passwordOperation("setup", Map.of("setupToken", "ticket", "password", " password "));
+        service.passwordOperation("reset", Map.of("phone", "13800138000", "code", "123456", "password", " new-pass "));
+        assertTrue(transport.calls.get(0).endsWith("/api/auth/password/setup"));
+        assertTrue(transport.calls.get(1).endsWith("/api/auth/password/reset"));
+        assertTrue(transport.bodies.get(0).contains(" password "));
+        assertNull(service.currentKeyOrNull());
+        assertThrows(IllegalArgumentException.class, () -> service.passwordOperation("../exchange-key", Map.of()));
+    }
+
+    @Test
     @DisplayName("发验证码：转发到官网 sms-login/send-code，且不带 Bearer（登录阶段还没有 Key）")
     void loginSendCodeForwards() {
         transport = new StubTransport().enqueue(200, "{\"ok\":true}");
