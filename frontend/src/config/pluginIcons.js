@@ -14,6 +14,8 @@ export const PLUGIN_AVATAR_URLS = Object.freeze({
 })
 
 export const PLUGIN_GLYPH_MAP = Object.freeze({
+  'lawfirm-management': ICONS.lawfirm,
+  lawfirm: ICONS.lawfirm,
   'project-im': ICONS.projectIm,
   'due-diligence': ICONS.dueDiligence,
   'tencent-meeting': ICONS.tmeet,

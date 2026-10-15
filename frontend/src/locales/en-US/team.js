@@ -162,6 +162,27 @@ export default {
 
   emptyData: 'No stats yet. They appear the day after members turn sharing on.',
 
+  // ---- Law Firm Decision-Maker Dashboard (TeamPanel.vue) ----
+  lawfirmDashboardTitle: 'Law Firm Executive & Management Committee Dashboard',
+  lawfirmDashboardDesc: '3D revenue, billing and conflict governance across Practice Departments, Team Leads, and Minimal Combat Units.',
+  lawfirmSeedDemoBtn: 'Seed Wufangzhai Demo',
+  lawfirmOpenPluginBtn: 'Open Law Firm Workbench',
+  lawfirmKpiActiveMatters: 'Active Matters',
+  lawfirmKpiPendingClearances: 'Pending Conflicts / Reviews',
+  lawfirmKpiContracted: 'Total Contracted',
+  lawfirmKpiBilled: 'Total Billed',
+  lawfirmKpiCollected: 'Total Collected',
+  lawfirmKpiCollectionRate: 'Firm Collection Rate',
+  lawfirmDimDepartments: 'By Practice Dept',
+  lawfirmDimTeamLeads: 'By Team Lead',
+  lawfirmDimUnits: 'By Combat Unit',
+  lawfirmColName: 'Unit / Dept Name',
+  lawfirmColHead: 'Lead / Members',
+  lawfirmColMatters: 'Matters',
+  lawfirmColContracted: 'Contracted',
+  lawfirmColCollected: 'Collected',
+  lawfirmColRate: 'Collection Rate',
+
   // ---- Switch team / firm (one team per account, one firm per team; two non-atomic steps) ----
   switchTeamTitle: 'Switch team',
   switchTeamDesc: 'Current team: {team}. An account belongs to one team at a time; switching leaves the current team, then joins a new one with its code.',

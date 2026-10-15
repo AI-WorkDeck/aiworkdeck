@@ -305,7 +305,7 @@
               <path
                 v-for="(path, idx) in p.svgPaths"
                 :key="idx"
-                :d="path.d"
+                :d="typeof path === 'string' ? path : path.d"
                 stroke="currentColor"
                 stroke-width="2"
                 stroke-linecap="round"
@@ -3609,6 +3609,10 @@ export default {
       uni.$off('awd:open-settings', this._onOpenSettings)
       this._onOpenSettings = null
     }
+    if (this._onOpenLawFirmPlugin) {
+      uni.$off('awd:open-lawfirm-plugin', this._onOpenLawFirmPlugin)
+      this._onOpenLawFirmPlugin = null
+    }
     if (this._onFilesChangedSyncTabs) {
       uni.$off('awd:files-changed', this._onFilesChangedSyncTabs)
       this._onFilesChangedSyncTabs = null
@@ -4028,6 +4032,11 @@ export default {
       this.openSettingsTab(opts || {})
     }
     uni.$on('awd:open-settings', this._onOpenSettings)
+    this._onOpenLawFirmPlugin = (opts) => {
+      if (!this.isActiveOverviewInstance()) return
+      this.handleOpenLawFirmPlugin(opts || {})
+    }
+    uni.$on('awd:open-lawfirm-plugin', this._onOpenLawFirmPlugin)
     // 外部改名（Finder 里改已打开的文档，BUG-14 / v0.49.0 C4-03）：后端对账原地改了那一行
     // 的名字（id 不变），但这条路不经过应用内的 file-renamed 广播。文件树每次重载（聚焦兜底、
     // SSE refresh_files、用户增删改）都经 awd:files-changed 汇聚，重载完按 id 把已开标签、
@@ -7451,6 +7460,21 @@ export default {
         }
       } catch (e) {
         console.error('Failed to load dynamic plugins:', e)
+      }
+    },
+
+    async handleOpenLawFirmPlugin(opts = {}) {
+      await this.loadDynamicPlugins()
+      if (this.hasProject) {
+        this.openPluginTab('lawfirm-management')
+      } else {
+        this.leftPaneKey = 'plugin-lawfirm-management'
+        this.sidebarCollapsed = false
+      }
+      if (opts && opts.tab) {
+        setTimeout(() => {
+          uni.$emit('awd:lawfirm-tab', opts.tab)
+        }, 120)
       }
     },
 

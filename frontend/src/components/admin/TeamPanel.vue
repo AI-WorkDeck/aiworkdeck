@@ -37,6 +37,87 @@
       </view>
     </view>
 
+    <!-- 律所决策者与管委会看板（连接本机 lawfirm-management 引擎，无需云端团队前置） -->
+    <SettingsSection
+      :title="$t('team.lawfirmDashboardTitle')"
+      :description="$t('team.lawfirmDashboardDesc')"
+    >
+      <template #actions>
+        <view class="lf-header-actions">
+          <view class="team-btn small" :class="{ 'is-busy': lawfirmBusy }" @tap="onSeedLawFirmDemo">
+            {{ $t('team.lawfirmSeedDemoBtn') }}
+          </view>
+          <view class="team-btn small primary" :class="{ 'is-busy': lawfirmBusy }" @tap="onOpenLawFirmPlugin('dashboard')">
+            {{ $t('team.lawfirmOpenPluginBtn') }}
+          </view>
+        </view>
+      </template>
+
+      <view class="lf-kpi-grid">
+        <view class="lf-kpi-card" @tap="onOpenLawFirmPlugin('intake')">
+          <text class="lf-kpi-label">{{ $t('team.lawfirmKpiActiveMatters') }}</text>
+          <text class="lf-kpi-value">{{ lawfirmKpis.activeMatters }}</text>
+        </view>
+        <view class="lf-kpi-card" @tap="onOpenLawFirmPlugin('conflict')">
+          <text class="lf-kpi-label">{{ $t('team.lawfirmKpiPendingClearances') }}</text>
+          <text class="lf-kpi-value warn">{{ lawfirmKpis.pendingClearances }}</text>
+        </view>
+        <view class="lf-kpi-card" @tap="onOpenLawFirmPlugin('finance')">
+          <text class="lf-kpi-label">{{ $t('team.lawfirmKpiContracted') }}</text>
+          <text class="lf-kpi-value">{{ lawfirmKpis.totalContractedText }}</text>
+        </view>
+        <view class="lf-kpi-card" @tap="onOpenLawFirmPlugin('finance')">
+          <text class="lf-kpi-label">{{ $t('team.lawfirmKpiBilled') }}</text>
+          <text class="lf-kpi-value">{{ lawfirmKpis.totalBilledText }}</text>
+        </view>
+        <view class="lf-kpi-card" @tap="onOpenLawFirmPlugin('finance')">
+          <text class="lf-kpi-label">{{ $t('team.lawfirmKpiCollected') }}</text>
+          <text class="lf-kpi-value accent">{{ lawfirmKpis.totalCollectedText }}</text>
+        </view>
+        <view class="lf-kpi-card" @tap="onOpenLawFirmPlugin('dashboard')">
+          <text class="lf-kpi-label">{{ $t('team.lawfirmKpiCollectionRate') }}</text>
+          <text class="lf-kpi-value">{{ lawfirmKpis.collectionRate }}</text>
+        </view>
+      </view>
+
+      <view class="lf-dim-toolbar">
+        <view class="scope-tabs">
+          <view
+            v-for="tab in lawfirmDimTabs"
+            :key="tab.key"
+            class="scope-tab"
+            :class="{ active: lawfirmDimension === tab.key }"
+            @tap="lawfirmDimension = tab.key"
+          >
+            {{ tab.label }}
+          </view>
+        </view>
+      </view>
+
+      <view v-if="lawfirmActiveRows.length" class="team-table lf-dim-table">
+        <view class="team-table-head">
+          <text class="col col-name">{{ $t('team.lawfirmColName') }}</text>
+          <text class="col">{{ $t('team.lawfirmColHead') }}</text>
+          <text class="col">{{ $t('team.lawfirmColMatters') }}</text>
+          <text class="col">{{ $t('team.lawfirmColContracted') }}</text>
+          <text class="col">{{ $t('team.lawfirmColCollected') }}</text>
+          <text class="col">{{ $t('team.lawfirmColRate') }}</text>
+        </view>
+        <view
+          v-for="(row, idx) in lawfirmActiveRows"
+          :key="row.id || row.name || idx"
+          class="team-table-row"
+        >
+          <text class="col col-name">{{ row.name || row.departmentName || row.leadName || row.userName || row.unitName || row.leadLawyer || '-' }}</text>
+          <text class="col">{{ row.headLawyerName || row.headLawyer || row.leadLawyer || row.departmentName || row.department || row.role || (Array.isArray(row.members) ? row.members.join(' / ') : '-') }}</text>
+          <text class="col">{{ row.matterCount ?? row.activeMatterCount ?? row.activeCaseCount ?? row.leadMatterCount ?? row.caseCount ?? row.activeMatters ?? 0 }}</text>
+          <text class="col">{{ formatLawFirmWan(row.contractedCents, row.contractedWan ?? row.totalContractedWan) }}</text>
+          <text class="col">{{ formatLawFirmWan(row.collectedCents, row.collectedWan ?? row.totalCollectedWan) }}</text>
+          <text class="col">{{ formatLawFirmRate(row.collectionRate ?? row.collectionRatePercent ?? row.billedCollectionRatePercent) }}</text>
+        </view>
+      </view>
+    </SettingsSection>
+
     <!-- 态 1：未连接账户 -->
     <view v-if="!connected" class="section-card">
       <view class="section-header">
@@ -552,6 +633,9 @@ import {
   getTeamProjectNameNotice, setTeamProjectNameConsent,
   joinTeam, regenerateTeamJoinCode,
   createFirm, joinFirm, updateFirm, regenerateFirmJoinCode, removeFirmTeam,
+  getLawFirmOverview,
+  requestLawFirmAction,
+  ensureLawFirmPlugin,
 } from '@/services/api.js'
 import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { notifyOrgChanged } from '@/utils/orgContext.js'
@@ -602,12 +686,52 @@ export default {
       invitePhone: '',
       inviteRoleIndex: 1,
       renameDraft: '',
+      lawfirmBusy: false,
+      lawfirmOverview: null,
+      lawfirmDimension: 'departments',
       // 切换团队 / 律所用的邀请码输入，与「无团队时加入」那个输入框分开，避免串值
       switchTeamCode: '',
       switchFirmCode: '',
     }
   },
   computed: {
+    lawfirmDimTabs() {
+      return [
+        { key: 'departments', label: this.$t('team.lawfirmDimDepartments') },
+        { key: 'teamLeads', label: this.$t('team.lawfirmDimTeamLeads') },
+        { key: 'units', label: this.$t('team.lawfirmDimUnits') },
+      ]
+    },
+    lawfirmKpis() {
+      const ov = this.lawfirmOverview || {}
+      const d = ov.kpi || ov.kpis || (ov.dashboard && (ov.dashboard.kpi || ov.dashboard.kpis)) || ov.dashboard || {}
+      const matters = Array.isArray(ov.intakes) ? ov.intakes : (Array.isArray(ov.matters) ? ov.matters : [])
+      const clearances = Array.isArray(ov.clearances) ? ov.clearances : []
+      const activeMatters = d.activeMatterCount ?? d.activeCases ?? d.activeMatters ?? matters.length
+      const pendingClearances = d.pendingClearances ?? clearances.filter((c) => c.decision === 'PENDING' || c.status === 'PENDING').length
+      const contractedCents = d.totalContractedCents ?? d.contractedCents
+      const billedCents = d.totalBilledCents ?? d.billedCents
+      const collectedCents = d.totalCollectedCents ?? d.collectedCents
+      const totalContractedWan = d.totalContractedWan ?? (contractedCents != null ? (Number(contractedCents) / 1000000).toFixed(2) : '0.00')
+      const totalBilledWan = d.totalBilledWan ?? (billedCents != null ? (Number(billedCents) / 1000000).toFixed(2) : '0.00')
+      const totalCollectedWan = d.totalCollectedWan ?? (collectedCents != null ? (Number(collectedCents) / 1000000).toFixed(2) : '0.00')
+      const rawRate = d.collectionRatePercent ?? d.billedCollectionRatePercent ?? d.collectionRate ?? 0
+      const collectionRate = typeof rawRate === 'string' && rawRate.includes('%') ? rawRate : `${rawRate}%`
+      return {
+        activeMatters,
+        pendingClearances,
+        totalContractedText: `${totalContractedWan} 万`,
+        totalBilledText: `${totalBilledWan} 万`,
+        totalCollectedText: `${totalCollectedWan} 万`,
+        collectionRate,
+      }
+    },
+    lawfirmActiveRows() {
+      const ov = this.lawfirmOverview || {}
+      const d = ov.dashboard || {}
+      const list = d[this.lawfirmDimension] || ov[this.lawfirmDimension]
+      return Array.isArray(list) ? list : []
+    },
     canManage() {
       return this.myRole === 'OWNER' || this.myRole === 'ADMIN'
     },
@@ -707,6 +831,7 @@ export default {
   },
   mounted() {
     this.reload()
+    this.loadLawFirmDashboard()
     // 在别处登录 / 退出登录之后（登录弹层、顶栏退出），团队态跟着刷新
     uni.$on(ACCOUNT_CHANGED_EVENT, this.reload)
   },
@@ -714,6 +839,60 @@ export default {
     uni.$off(ACCOUNT_CHANGED_EVENT, this.reload)
   },
   methods: {
+    unwrapLawFirmData(res) {
+      if (!res) return null
+      if (res.data && typeof res.data === 'object' && ('intakes' in res.data || 'matters' in res.data || 'dashboard' in res.data || 'overview' in res.data || 'kpi' in res.data)) {
+        return res.data
+      }
+      return res
+    },
+    formatLawFirmWan(cents, wan) {
+      if (wan != null && wan !== '') return `${Number(wan).toFixed(2)} 万`
+      const c = Number(cents || 0)
+      return `${(c / 1000000).toFixed(2)} 万`
+    },
+    formatLawFirmRate(rate) {
+      if (rate == null || rate === '') return '-'
+      return typeof rate === 'number' ? `${rate}%` : String(rate)
+    },
+    async loadLawFirmDashboard() {
+      try {
+        const res = await getLawFirmOverview()
+        const data = this.unwrapLawFirmData(res)
+        if (data) {
+          this.lawfirmOverview = data.overview || data
+        }
+      } catch (e) {
+        // 本机尚未初始化插件时不阻塞原团队面板
+      }
+    },
+    async onSeedLawFirmDemo() {
+      this.lawfirmBusy = true
+      try {
+        const res = await requestLawFirmAction('seedDemoData', {})
+        const data = this.unwrapLawFirmData(res)
+        if (data && (data.overview || data.intakes || data.dashboard)) this.lawfirmOverview = data.overview || data
+        else await this.loadLawFirmDashboard()
+        this.toast(this.$t('account.caseDemoSeededToast'))
+      } catch (e) {
+        this.toast(e?.message || '操作失败')
+      } finally {
+        this.lawfirmBusy = false
+      }
+    },
+    async onOpenLawFirmPlugin(tab = 'dashboard') {
+      this.lawfirmBusy = true
+      try {
+        await ensureLawFirmPlugin()
+        uni.$emit('awd:market-changed')
+        uni.$emit('awd:open-lawfirm-plugin', { tab })
+        this.toast(this.$t('account.casePluginOpenedToast'))
+      } catch (e) {
+        this.toast(e?.message || '打开工作台失败')
+      } finally {
+        this.lawfirmBusy = false
+      }
+    },
     hoursLabel(minutes) {
       const n = Number(minutes || 0)
       return this.$t('team.hours', { hours: (n / 60).toFixed(1) })
@@ -1683,5 +1862,64 @@ export default {
   font-size: 12px;
   color: var(--awd-text-3);
   line-height: 18px;
+}
+
+.lf-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lf-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lf-kpi-card {
+  padding: 10px 12px;
+  background: var(--awd-surface-2);
+  border: 1px solid var(--awd-border-subtle);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.lf-kpi-card:hover {
+  border-color: var(--awd-accent);
+}
+
+.lf-kpi-label {
+  display: block;
+  font-size: 11px;
+  color: var(--awd-text-2);
+}
+
+.lf-kpi-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--awd-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.lf-kpi-value.accent {
+  color: var(--awd-accent);
+}
+
+.lf-kpi-value.warn {
+  color: var(--awd-warning);
+}
+
+.lf-dim-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.lf-dim-table {
+  margin-top: 4px;
 }
 </style>

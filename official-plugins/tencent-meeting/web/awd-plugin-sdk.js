@@ -68,6 +68,18 @@
  *                                        未声明的键 not_found
  *   事件 settings.changed：宿主设置表单保存后推送（只推给设置所属的插件），收到后重新 get
  *
+ * v2.11 / SDK 1.5.0 (host 0.61.0+):
+ *   im.request { action, params } -> object; requires im. Fixed messaging actions only.
+ *   lawfirm.request { action, params } -> object; requires lawfirm. Law firm intake, conflict check, finance and dashboard actions.
+ *   im.downloadAttachment { conversationId, attachmentId } -> { started, name }; authorized download via host.
+ *   chat.addFile { path } -> {}; requires file_read. Adds material without sending an AI message.
+ *   files.prepareDrag { path } -> validated file descriptor plus dragToken, dragType, expiresAt.
+ *   files.endDrag {} -> {}; invalidates this iframe's prepared drag. Both require file_read.
+ *   Prepare before dragstart; synchronously put dragType/dragToken into dataTransfer on dragstart.
+ *   Drag tickets expire, are consumed once, and are cleared on project/account change or frame removal.
+ *   account.changed is a data-free event: discard cached identity, messages and pending work.
+ *   Older hosts return unknown_method; do not emulate IM with localStorage.
+ *
  * 错误码：permission_denied（manifest 未声明所需权限）、unknown_method（宿主不认识的方法）、
  *   anchor_ambiguous（引文 0 或多处命中 / anchor 形状不对）、no_selection（要求选区但当前没有）、
  *   not_found（链接或文件不存在）、no_active_document（当前没有打开的 Word 文档）、
@@ -177,7 +189,7 @@
 
   var awd = {
     /** SDK 版本，与桥协议版本无关 */
-    version: '1.4.0',
+    version: '1.5.0',
     /** 握手拿到的上下文；ready() 之前为 null */
     context: null,
     /** 等待宿主握手，resolve 值即 awd.context */
@@ -190,7 +202,9 @@
         return call('files.list', {}).then(function (r) { return (r && r.files) || []; });
       },
       /** -> { path, content, truncated } */
-      read: function (path) { return call('files.read', { path: path }); }
+      read: function (path) { return call('files.read', { path: path }); },
+      prepareDrag: function (path, rect) { return call('files.prepareDrag', { path: path, rect: rect }); },
+      endDrag: function () { return call('files.endDrag', {}); }
     },
     ui: {
       toast: function (message) { return call('ui.toast', { message: message }); },
@@ -207,7 +221,14 @@
     },
     chat: {
       /** 把 prompt 作为可见用户消息发进 AI 对话（起草类动作走这条，不直调工具） */
-      send: function (prompt) { return call('chat.send', { prompt: prompt }); }
+      send: function (prompt) { return call('chat.send', { prompt: prompt }); },
+      addFile: function (path) { return call('chat.addFile', { path: path }); }
+    },
+    im: {
+      request: function (action, params) { return call('im.request', { action: action, params: params || {} }); }
+    },
+    lawfirm: {
+      request: function (action, params) { return call('lawfirm.request', { action: action, params: params || {} }); }
     },
     storage: {
       /** -> 存过的值，没有则 null */

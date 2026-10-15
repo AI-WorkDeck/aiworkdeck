@@ -367,6 +367,28 @@
     </profiles>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- 律所管理官方 Web 插件随包内置（dev-board#1282）：源头仍在 official-plugins/，
+                 这里只是打进 app.jar 的 bundled-plugins/，由 LawFirmBundledPluginInstaller 落盘。 -->
+            <resource>
+                <directory>../official-plugins/lawfirm-management</directory>
+                <targetPath>bundled-plugins/lawfirm-management</targetPath>
+                <includes>
+                    <include>manifest.json</include>
+                    <include>web/**</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>../sdk/plugin-sdk</directory>
+                <targetPath>bundled-plugins/lawfirm-management/web</targetPath>
+                <includes>
+                    <include>awd-plugin-sdk.js</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
 
             <plugin>
