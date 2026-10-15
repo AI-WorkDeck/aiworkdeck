@@ -7,6 +7,7 @@
 import { getProjectFiles, fetchProjectFileBytes, createComparisonFile } from '@/services/api.js'
 import { activityTracker } from '@/utils/activityTracker.js'
 import { ICONS as GLYPHS, fileGlyph } from '@/config/icons.js'
+import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { fileKindClass } from './fileKind.js'
 import { findChatFile, isCurrentDocSentinel, matchesActiveTab } from '@/utils/chatFileChange.js'
 import { isDocxDoc, runDocxComparison } from '@/utils/docxComparison.js'
@@ -430,10 +431,24 @@ export const fileOpenTabsMethods = {
       }
     },
 
+    /** 插件/广场详情标签若有品牌形象头像（如包晴天），优先渲染头像而非线性 SVG */
+    getTabAvatarUrl(file) {
+      if (!file) return null
+      const pid = file.pluginId || (file.marketSpec && file.marketSpec.kind === 'plugin' ? file.marketSpec.id : null)
+      if (!pid) return null
+      return typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(pid) : null
+    },
+
     /** 标签页图标的 SVG path 集合（界面禁用 emoji，图标一律 stroke 线性 SVG） */
-    getFileIconPaths(type, tabType) {
+    getFileIconPaths(type, tabType, pluginId) {
       if (tabType === 'web') return GLYPHS.web
-      if (tabType === 'market-detail' || tabType === 'plugin') return GLYPHS.blocks
+      if (tabType === 'plugin') {
+        return typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(pluginId) : GLYPHS.blocks
+      }
+      if (tabType === 'market-detail') {
+        if (pluginId && typeof getPluginGlyphPaths === 'function') return getPluginGlyphPaths(pluginId)
+        return GLYPHS.blocks
+      }
       // 项目概览 2026-08-19 起在左栏展示，不再有 project-home 标签
       // 个人中心 2026-08-20 并进了「设置」标签，不再有 user-profile 标签
       if (tabType === 'admin-settings') return GLYPHS.settings
