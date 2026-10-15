@@ -862,6 +862,9 @@
         <scroll-view v-else-if="activeNav === 'work_log'" scroll-y class="config-scroll">
           <PersonalWorkLogPanel />
         </scroll-view>
+        <scroll-view v-else-if="activeNav === 'case_intake'" scroll-y class="config-scroll">
+          <PersonalCaseIntakePanel :project-id="projectId" />
+        </scroll-view>
         <scroll-view v-else-if="activeNav === 'favorites'" scroll-y class="config-scroll">
           <PersonalFavoritesPanel />
         </scroll-view>
@@ -1000,6 +1003,7 @@ import RechargeDialog from '@/components/RechargeDialog.vue'
 import AwdSelect from '@/components/AwdSelect.vue'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 import PersonalWorkLogPanel from '@/components/userprofile/PersonalWorkLogPanel.vue'
+import PersonalCaseIntakePanel from '@/components/userprofile/PersonalCaseIntakePanel.vue'
 import PersonalFavoritesPanel from '@/components/userprofile/PersonalFavoritesPanel.vue'
 import PersonalTodosPanel from '@/components/userprofile/PersonalTodosPanel.vue'
 import PersonalSettingsPanel from '@/components/userprofile/PersonalSettingsPanel.vue'
@@ -1038,7 +1042,7 @@ export default {
   name: 'AdminPane',
   components: {
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
-    PersonalWorkLogPanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
+    PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
     TeamPanel, OptionalComponentCard, MemoryBrowser,
     SettingsSection, SettingsRow,
   },
@@ -1085,6 +1089,7 @@ export default {
         // 「个人」组：2026-08-20 从个人中心搬来的四栏。key 刻意避开 'account'
         //（系统组的「账户与用量」已经占了这个 key）。
         { key: 'work_log', label: this.$t('account.tabWorkLog'), group: 'personal' },
+        { key: 'case_intake', label: this.$t('account.tabCaseIntake'), group: 'personal' },
         { key: 'favorites', label: this.$t('account.tabFavorites'), group: 'personal' },
         { key: 'todos', label: this.$t('account.tabTodos'), group: 'personal' },
         { key: 'personal_settings', label: this.$t('admin.navPersonalSettings'), group: 'personal' },

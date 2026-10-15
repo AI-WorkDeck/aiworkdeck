@@ -78,6 +78,8 @@
     $('list').replaceChildren(); $('detail').hidden = true; clearEditor();
     $('result-count').textContent = ''; $('empty').hidden = false; controls();
   }
+  // 把当前视图与笔记状态同步给宿主左栏（宿主不支持时静默忽略）
+  function syncSidebar() { try { const p = awd.call?.('sidebar.sync', { view, status: $('status-filter').value }); p?.catch?.(() => {}); } catch { /* old host */ } }
   function switchView(next) {
     generation++; view = next; page = 1; clearContent(); feedback();
     $('keyword').value = ''; $('status-filter').value = '';
@@ -88,7 +90,7 @@
     $('keyword').placeholder = view === 'cases' ? '筛选本页案源标题或内容' : '搜索我的全部笔记标题或正文';
     $('search-submit').textContent = view === 'cases' ? '筛选本页' : '搜索';
     $('filter-scope').textContent = view === 'cases' ? '关键词仅筛选当前页案源；可翻页继续查找。' : '关键词搜索全部本人笔记的标题或文字正文；状态仅筛选当前页。';
-    loadList();
+    loadList(); syncSidebar();
   }
   function meta(item) { return [text(item.category), text(item.region), text(view === 'cases' ? item.createdAt : item.updatedAt)].filter(Boolean).join(' · '); }
   function renderList(data) {
@@ -334,7 +336,7 @@
     if (view === 'cases' && pageData) { renderList(pageData); feedback(); controls(); }
     else { page = 1; loadList(); }
   };
-  $('status-filter').onchange = () => { if (pageData) { renderList(pageData); feedback(); controls(); } };
+  $('status-filter').onchange = () => { if (pageData) { renderList(pageData); feedback(); controls(); } syncSidebar(); };
   $('reload').onclick = () => loadList();
   $('verify-save').onclick = async () => { if (await loadList()) feedback(selected?.uploadId ? '请核对列表。尚未完成时，点击「继续上传同一篇笔记」，使用原上传记录继续。' : '请核对列表中的笔记，打开已保存的笔记继续编辑。当前编辑仍暂停写入；确认未保存后，可关闭它再新建。'); };
   $('previous').onclick = () => { page--; loadList(); }; $('next').onclick = () => { page++; loadList(); };
@@ -402,6 +404,32 @@
     awd.events?.on('project.switched', async () => {
       generation++; window.bqtSecure?.reset(); statusRequest++; saving = false; connected = false; account = ''; clearContent(); closeConfirmation(); $('mobile').value = ''; $('auth-code').value = ''; $('agreement').checked = false;
       context = await awd.call('context.get'); await checkAccount();
+    });
+    awd.events?.on('sidebar.command', payload => {
+      const cmd = payload?.command;
+      if (!cmd || saving) return;
+      if (cmd === 'switch-view' && (payload.view === 'cases' || payload.view === 'notes')) {
+        withDraftGuard(() => switchView(payload.view));
+        return;
+      }
+      if (cmd === 'filter-status') {
+        withDraftGuard(() => {
+          if (view !== 'notes') switchView('notes');
+          $('status-filter').value = payload.status || '';
+          if (pageData) renderList(pageData); else loadList();
+        });
+        return;
+      }
+      if (cmd === 'new-note') {
+        withDraftGuard(() => {
+          if (view !== 'notes') switchView('notes');
+          if (connected && context.projectId) editNote();
+        });
+        return;
+      }
+      if (cmd === 'refresh') {
+        withDraftGuard(() => { page = 1; loadList(); });
+      }
     });
     await checkAccount();
   }).catch(error => { $('account-status').textContent = '工作台连接未完成'; failure(error); });

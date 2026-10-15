@@ -1,0 +1,438 @@
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>律所管理 · AI WorkDeck</title>
+  <link rel="stylesheet" href="panel.css">
+  <script src="awd-plugin-sdk.js"></script>
+  <script src="panel.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-row">
+      <div class="brand-title-wrap">
+        <span class="brand-glyph" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 3v14M4 17h12M5 6h10M5 6l-2.5 5h5L5 6zm10 0l-2.5 5h5L15 6z"/>
+          </svg>
+        </span>
+        <div>
+          <strong class="brand-title">律所业务与决策管理中心</strong>
+          <span id="self-badge" class="self-badge">正在加载身份与部门…</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="seed-demo">加载典型律所样板数据</button>
+        <button type="button" id="refresh-data">刷新数据</button>
+      </div>
+    </div>
+    <nav class="tabbar" role="tablist" aria-label="律所管理主导航">
+      <button type="button" id="tab-intake" role="tab" data-tab="intake" aria-selected="true" aria-controls="panel-intake" class="tab-btn">
+        <span>收案与立项</span>
+        <span id="badge-intake-count" class="tab-count">0</span>
+      </button>
+      <button type="button" id="tab-conflict" role="tab" data-tab="conflict" aria-selected="false" aria-controls="panel-conflict" class="tab-btn">
+        <span>利冲审查中心</span>
+        <span id="badge-conflict-count" class="tab-count">0</span>
+      </button>
+      <button type="button" id="tab-finance" role="tab" data-tab="finance" aria-selected="false" aria-controls="panel-finance" class="tab-btn">
+        <span>发票与财务收费</span>
+        <span id="badge-finance-count" class="tab-count">0</span>
+      </button>
+      <button type="button" id="tab-dashboard" role="tab" data-tab="dashboard" aria-selected="false" aria-controls="panel-dashboard" class="tab-btn">
+        <span>决策与团队看板</span>
+      </button>
+    </nav>
+  </header>
+
+  <div id="notice" role="status" aria-live="polite">正在连接律所管理引擎…</div>
+
+  <main id="workspace">
+    <!-- Tab 1: 收案与立项 -->
+    <section id="panel-intake" role="tabpanel" aria-labelledby="tab-intake" class="tab-panel">
+      <div class="split-grid">
+        <article class="card">
+          <header class="card-header">
+            <div>
+              <h2>新建收案与利冲申请</h2>
+              <p class="hint">依据《律师法》第39、50条及《全国律协执业行为规范》第50–56条自动检索全所在办、历史及关联主体冲突</p>
+            </div>
+          </header>
+          <form id="intake-form" class="form-grid" novalidate>
+            <label class="field-span-2">
+              <span>案件 / 专项名称</span>
+              <input id="intake-title" name="title" type="text" placeholder="例如：华星半导体与蓝海光电专利侵权及商业秘密纠纷案" required>
+            </label>
+            <label>
+              <span>业务领域</span>
+              <select id="intake-practice-area" name="practiceArea">
+                <option value="COMMERCIAL_LITIGATION">民商事诉讼与仲裁</option>
+                <option value="CAPITAL_MARKET">资本市场与证券</option>
+                <option value="CORPORATE_MA">公司并购与投融资</option>
+                <option value="IP_TECH">知识产权与数据合规</option>
+                <option value="CRIMINAL">刑事辩护与代理</option>
+                <option value="ADMINISTRATIVE">行政复议与诉讼</option>
+                <option value="MARRIAGE_FAMILY">婚姻家事与财富传承</option>
+                <option value="RETAINER">常年法律顾问</option>
+                <option value="BANKRUPTCY">破产重整与清收</option>
+              </select>
+            </label>
+            <label>
+              <span>所属业务部门</span>
+              <input id="intake-department" name="departmentName" type="text" value="争议解决部" placeholder="例如：争议解决部 / 资本市场部">
+            </label>
+            <label>
+              <span>拟任主办负责人</span>
+              <input id="intake-lead-lawyer" name="leadLawyerName" type="text" placeholder="主办合伙人/律师姓名">
+            </label>
+            <label>
+              <span>收费方式</span>
+              <select id="intake-fee-mode" name="feeMode">
+                <option value="FIXED">固定收费（FIXED）</option>
+                <option value="PROPORTIONAL">按标的额比例收费（PROPORTIONAL）</option>
+                <option value="CONTINGENCY">风险代理收费（CONTINGENCY）</option>
+                <option value="HOURLY">计时收费（HOURLY）</option>
+                <option value="RETAINER">常年法律顾问（RETAINER）</option>
+              </select>
+            </label>
+            <label>
+              <span>委托人 / 客户名称</span>
+              <input id="intake-client-name" name="clientName" type="text" placeholder="客户法定全称或自然人姓名" required>
+            </label>
+            <label>
+              <span>客户统一社会信用代码</span>
+              <input id="intake-client-code" name="clientCreditCode" type="text" placeholder="选填，18位信用代码">
+            </label>
+            <label>
+              <span>对方当事人名称</span>
+              <input id="intake-counterparty-name" name="counterpartyName" type="text" placeholder="对方当事人全称，无对抗方填无">
+            </label>
+            <label>
+              <span>对方统一社会信用代码</span>
+              <input id="intake-counterparty-code" name="counterpartyCreditCode" type="text" placeholder="选填，18位信用代码">
+            </label>
+            <label>
+              <span>关联方 / 控股股东 / 一致行动人</span>
+              <input id="intake-related-name" name="relatedPartyName" type="text" placeholder="选填，集团母公司、实控人或担保方名称">
+            </label>
+            <label>
+              <span>关联方身份关系</span>
+              <select id="intake-related-role" name="relatedPartyRole">
+                <option value="CONTROLLING_SHAREHOLDER">控股股东 / 实际控制人</option>
+                <option value="AFFILIATE">集团关联公司 / 母子公司</option>
+                <option value="CONCERTED_ACTOR">一致行动人</option>
+                <option value="GUARANTOR">担保人 / 连带债务人</option>
+              </select>
+            </label>
+            <label>
+              <span>签约合同额（万元）</span>
+              <input id="intake-contract-amount" name="contractAmountWan" type="number" min="0" step="0.01" value="60">
+            </label>
+            <label>
+              <span>风险代理提成比例（%）</span>
+              <input id="intake-contingency-rate" name="contingencyRatePercent" type="number" min="0" max="100" step="0.5" value="0">
+            </label>
+            <div class="form-actions field-span-2">
+              <button type="button" id="btn-preview-conflict">实时利冲与合规预检</button>
+              <button type="button" id="btn-submit-intake" class="primary">提交收案申请并启动利冲流</button>
+            </div>
+          </form>
+
+          <div id="conflict-preview-card" class="preview-box" hidden></div>
+        </article>
+
+        <article class="card">
+          <header class="card-header">
+            <div>
+              <h2>我的收案申请与利冲五步进展</h2>
+              <p class="hint">实时同步个人中心「收案与利冲」分栏，追踪从申请、自动检索、站内信放行到委员终审立案全流程</p>
+            </div>
+          </header>
+          <div id="intake-list" class="stack-list"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Tab 2: 利冲审查中心 -->
+    <section id="panel-conflict" role="tabpanel" aria-labelledby="tab-conflict" class="tab-panel" hidden>
+      <div class="split-grid">
+        <article class="card">
+          <header class="card-header">
+            <div>
+              <h2>待我放行的利冲征询（关联案件承办律师）</h2>
+              <p class="hint">命中潜在利益冲突时，系统已自动建立站内信（IM）协同会话。请核实保密边界后作出放行或拒绝决定</p>
+            </div>
+          </header>
+          <div id="pending-clearances" class="stack-list"></div>
+        </article>
+
+        <article class="card">
+          <header class="card-header">
+            <div>
+              <h2>全所利冲审查队列与委员会终审</h2>
+              <p class="hint">利冲委员核验关联律师放行结论、信息隔离墙（Ethical Wall）承诺及当事人书面豁免函后，终审通过并正式立案</p>
+            </div>
+          </header>
+          <div id="committee-queue" class="stack-list"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Tab 3: 发票与财务收费 -->
+    <section id="panel-finance" role="tabpanel" aria-labelledby="tab-finance" class="tab-panel" hidden>
+      <div class="split-grid">
+        <article class="card">
+          <header class="card-header">
+            <div>
+              <h2>提交发票申请（数电专票 / 普票）</h2>
+              <p class="hint">自动核算不含税金额与增值税税额，支持关联已立案项目或收案台账</p>
+            </div>
+          </header>
+          <form id="invoice-form" class="form-grid" novalidate>
+            <label class="field-span-2">
+              <span>关联案件立项</span>
+              <select id="invoice-intake-id" name="intakeId"></select>
+            </label>
+            <label>
+              <span>发票类型</span>
+              <select id="invoice-type" name="invoiceType">
+                <option value="DIGITAL_SPECIAL">数电增值税专用发票</option>
+                <option value="DIGITAL_NORMAL">数电普通发票</option>
+                <option value="VAT_SPECIAL">增值税专用发票</option>
+                <option value="VAT_NORMAL">增值税普通发票</option>
+              </select>
+            </label>
+            <label>
+              <span>税率 / 征收率</span>
+              <select id="invoice-tax-rate" name="taxRateBps">
+                <option value="600">6%（现代服务 · 法律鉴证咨询）</option>
+                <option value="300">3%（小规模纳税人征收率）</option>
+                <option value="100">1%（阶段性减按征收率）</option>
+              </select>
+            </label>
+            <label>
+              <span>申请开票含税金额（元）</span>
+              <input id="invoice-amount-yuan" name="amountYuan" type="number" min="0" step="0.01" value="300000" required>
+            </label>
+            <label>
+              <span>购买方名称（客户抬头）</span>
+              <input id="invoice-buyer-name" name="buyerName" type="text" placeholder="购买方法定全称" required>
+            </label>
+            <label>
+              <span>购买方纳税人识别号</span>
+              <input id="invoice-buyer-tax-id" name="buyerTaxId" type="text" placeholder="18位统一社会信用代码">
+            </label>
+            <label>
+              <span>购买方开户行及账号</span>
+              <input id="invoice-buyer-bank" name="buyerBankAccount" type="text" placeholder="选填，专票备查开户行及账号">
+            </label>
+            <label class="field-span-2">
+              <span>数电票交付邮箱</span>
+              <input id="invoice-recipient-email" name="recipientEmail" type="email" placeholder="finance@client-corp.cn">
+            </label>
+            <div class="form-actions field-span-2">
+              <button type="button" id="btn-submit-invoice" class="primary">提交发票申请</button>
+            </div>
+          </form>
+        </article>
+
+        <article class="card">
+          <header class="card-header">
+            <div>
+              <h2>手动登记收费 / 到账核销</h2>
+              <p class="hint">在未直连外部财务软件前，支持手动录入银行到账流水并与发票及案件合同额自动核销</p>
+            </div>
+          </header>
+          <form id="collection-form" class="form-grid" novalidate>
+            <label>
+              <span>关联案件立项</span>
+              <select id="collection-intake-id" name="intakeId"></select>
+            </label>
+            <label>
+              <span>核销关联发票（可选）</span>
+              <select id="collection-invoice-id" name="invoiceId">
+                <option value="">不绑定特定发票（先款后票/预收款）</option>
+              </select>
+            </label>
+            <label>
+              <span>付款方名称</span>
+              <input id="collection-payer-name" name="payerName" type="text" placeholder="实际打款主体名称" required>
+            </label>
+            <label>
+              <span>本次到账实收金额（元）</span>
+              <input id="collection-amount-yuan" name="amountYuan" type="number" min="0" step="0.01" value="300000" required>
+            </label>
+            <label>
+              <span>收款方式</span>
+              <select id="collection-payment-method" name="paymentMethod">
+                <option value="BANK_TRANSFER">对公银行转账</option>
+                <option value="ESCROW">提存 / 监管账户划转</option>
+                <option value="CHECK">银行本票 / 支票</option>
+                <option value="OFFLINE">其他合规收款</option>
+              </select>
+            </label>
+            <label>
+              <span>银行流水号 / 凭证号</span>
+              <input id="collection-voucher-no" name="bankVoucherNo" type="text" placeholder="例如：BK-20261015-8801">
+            </label>
+            <label class="field-span-2">
+              <span>到账日期</span>
+              <input id="collection-received-date" name="receivedDate" type="date" value="2026-10-15">
+            </label>
+            <div class="form-actions field-span-2">
+              <button type="button" id="btn-record-collection" class="primary">登记收费并核销</button>
+            </div>
+          </form>
+        </article>
+      </div>
+
+      <article class="card">
+        <header class="card-header">
+          <div>
+            <h2>发票与财务收费台账（支持金蝶 / 用友对接）</h2>
+            <p class="hint">实时计算每案开票率、账单回收率与合同回款率；支持一键同步用友/金蝶财务凭证或导出标准台账</p>
+          </div>
+          <div class="header-actions">
+            <button type="button" id="btn-sync-erp">与财务系统同步核销（金蝶/用友）</button>
+            <button type="button" id="btn-export-ledger">导出标准财务台账</button>
+          </div>
+        </header>
+        <div id="erp-sync-banner" class="preview-box" hidden></div>
+
+        <h3 class="sub-heading">发票申请与开票核销明细</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>申请单号 / 发票号</th>
+                <th>关联案件与部门</th>
+                <th>发票类型</th>
+                <th>购买方与税号</th>
+                <th>含税金额 / 税额</th>
+                <th>已核销回款</th>
+                <th>开票与回款状态</th>
+                <th>财务ERP同步</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="invoice-list"></tbody>
+          </table>
+        </div>
+
+        <h3 class="sub-heading">到账实收与核销流水明细</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>收款单号</th>
+                <th>关联案件</th>
+                <th>核销发票号</th>
+                <th>付款方名称</th>
+                <th>实收金额</th>
+                <th>收款方式</th>
+                <th>银行流水凭证号</th>
+                <th>到账日期</th>
+                <th>核销状态</th>
+              </tr>
+            </thead>
+            <tbody id="collection-list"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <!-- Tab 4: 决策与团队看板 -->
+    <section id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard" class="tab-panel" hidden>
+      <div id="dashboard-kpis" class="kpi-grid"></div>
+
+      <article class="card">
+        <header class="card-header">
+          <div>
+            <h2>各业务部门表现对比（忙闲负荷 · 创收 · 开票 · 回收率）</h2>
+            <p class="hint">打通工作台在办项目与财务台账，横向对比各业务部案件饱和度、签约创收、已开票、实收回款与回收率</p>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>业务部门</th>
+                <th>部门负责人</th>
+                <th>活跃律师单元（Unit）</th>
+                <th>在办案件数</th>
+                <th>部门平均负荷与忙闲状态</th>
+                <th>签约合同总额</th>
+                <th>已开票金额</th>
+                <th>已到账实收</th>
+                <th>账单回收率 / 合同回款率</th>
+                <th>待收账款（AR）</th>
+              </tr>
+            </thead>
+            <tbody id="dept-table"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card-header">
+          <div>
+            <h2>团队负责人（合伙人）表现画像</h2>
+            <p class="hint">聚合各合伙人/团队负责人主办案件规模、团队负荷均值、实收创收、回收率、利冲一次通过率与立案效率</p>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>团队负责人</th>
+                <th>所属业务部门</th>
+                <th>团队人数</th>
+                <th>主办案件数</th>
+                <th>团队负荷均值</th>
+                <th>签约合同总额</th>
+                <th>已开票金额</th>
+                <th>实收回款额</th>
+                <th>账单回收率</th>
+                <th>利冲通过率</th>
+                <th>平均立案周期</th>
+              </tr>
+            </thead>
+            <tbody id="lead-table"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card-header">
+          <div>
+            <h2>桌面端律师单元（Unit）Workload 忙闲雷达与创收明细</h2>
+            <p class="hint">按主办案件、协办案件、待办/逾期任务与近30日工作台活跃时长综合计算个体负荷指数（空闲 / 适中 / 饱和 / 超负荷）</p>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>律师姓名</th>
+                <th>执业角色</th>
+                <th>所属部门</th>
+                <th>主办案件</th>
+                <th>协办案件</th>
+                <th>待办 / 临期逾期事项</th>
+                <th>近30日工作台活跃</th>
+                <th>Workload 负荷指数与忙闲状态</th>
+                <th>个人签约 / 实收</th>
+                <th>个人回收率</th>
+              </tr>
+            </thead>
+            <tbody id="unit-table"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

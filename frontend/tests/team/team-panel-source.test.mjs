@@ -381,3 +381,17 @@ test('「前往团队」看得出是可点的：带下划线，不是一段普�
   assert.match(link, /text-decoration: underline/)
   assert.match(link, /text-underline-offset: 2px/)
 })
+
+// ==================== 切换团队 / 律所（两步非原子操作） ====================
+
+test('切换团队与切换律所：确认前置、半途失败弹模态框、负责人/总部团队限制如实说明，并广播 awd:org-changed', () => {
+  assert.match(teamPanel, /onSwitchTeam\(\)/)
+  assert.match(teamPanel, /onSwitchFirm\(\)/)
+  assert.match(teamPanel, /team\.confirmSwitchTeam/)
+  assert.match(teamPanel, /team\.confirmSwitchFirm/)
+  assert.match(teamPanel, /team\.switchTeamHalfDone[\s\S]{0,80}showCancel:\s*false/)
+  assert.match(teamPanel, /team\.switchFirmHalfDone[\s\S]{0,80}showCancel:\s*false/)
+  assert.match(teamPanel, /team\.switchTeamOwnerBlocked/)
+  assert.match(teamPanel, /team\.switchFirmHeadBlocked/)
+  assert.match(teamPanel, /notifyOrgChanged\(/)
+})

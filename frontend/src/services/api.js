@@ -4366,6 +4366,33 @@ export function requestPluginIm(pluginId, projectId, action, params) {
   })
 }
 
+export const requestPluginLawFirm = (pluginId, projectId, action, params = {}) => request({
+  url: `/api/plugins/${encodeURIComponent(pluginId)}/lawfirm`,
+  method: 'POST',
+  data: { projectId, action, params }
+})
+
+export const getLawFirmOverview = (params = {}) => request({
+  url: '/api/lawfirm/overview',
+  method: 'GET',
+  data: params
+})
+
+export const requestLawFirmAction = (action, params = {}, projectId = null) => request({
+  url: '/api/lawfirm/action',
+  method: 'POST',
+  data: { projectId, action, params }
+})
+
+export const ensureLawFirmPlugin = () => request({
+  url: '/api/lawfirm/ensure-plugin',
+  method: 'POST',
+  data: {}
+})
+
+export const getLawFirmFinanceCsvUrl = () => `${getApiBaseUrl()}/api/lawfirm/finance/export-csv`
+
+
 
 export function getProjectFileAccess(projectId, fileId) {
   return request({
