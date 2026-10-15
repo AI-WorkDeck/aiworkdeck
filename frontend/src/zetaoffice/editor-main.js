@@ -23,6 +23,7 @@ let reviewHover = null
 
 import { startEditorEndpoint } from '../composables/zetaOfficeEditorEndpoint.js'
 import { attachDocumentLinkClicks } from '../composables/zetaOfficeLinkClick.js'
+import { attachSelectionDrag } from '../composables/zetaOfficeSelectionDrag.js'
 import { attachImeOverlay } from '../composables/zetaOfficeImeOverlay.js'
 import { attachWritingAssistance } from '../composables/zetaOfficeCompletion.js'
 import { attachSemanticWritingPanel } from '../composables/semanticWritingPanel.js'
@@ -205,7 +206,11 @@ try {
 try {
   document.addEventListener('dragover', (e) => {
     e.preventDefault()
-    try { if (e.dataTransfer) e.dataTransfer.dropEffect = 'link' } catch (err) { /* ignore */ }
+    try {
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = e.dataTransfer.effectAllowed === 'copy' ? 'copy' : 'link'
+      }
+    } catch (err) { /* ignore */ }
   }, true)
   document.addEventListener('drop', (e) => {
     e.preventDefault()
@@ -223,6 +228,7 @@ try {
 // AI command — see installModifyListener in office_thread.js). The host only
 // needs an edge to debounce-save on, so throttle the relay to 1/500ms.
 let inlineReview = null
+let selectionDrag = null
 let lastModifiedRelay = 0
 function relayCommentRequest(documentSeq) {
   try {
@@ -238,7 +244,7 @@ function relayModified(d) {
     try { hostTransport.send({ __lo: 'lo-relay', type: 'export-pdf-request', source: d.source || '' }) } catch (e) { /* ignore */ }
     return
   }
-  if (d.cmd === 'sel_changed') { relaySelection(); return }
+  if (d.cmd === 'sel_changed') { selectionDrag?.refreshSelection(); relaySelection(); return }
   if (d.cmd !== 'modified') return
   reviewBalloons?.documentChanged()
   reviewHover?.documentChanged()
@@ -392,10 +398,21 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
   endpoint.executor.executeCommand = async (action, params, callOpts) => {
     if (['capture_writing_context', 'accept_writing_suggestion'].includes(action) && semanticWriting?.isComposing())
       return { success: false, available: false, reason: 'composing', error: 'composing', message: '请先完成当前输入，再生成或采用建议。' }
-    if (/^(get_|list_)/.test(action) || action === 'capture_writing_context' || action === 'set_review_balloons' || (action === 'set_revision_view' && !params?.mode)) return executeWithReview(action, params, callOpts)
+    if (action === 'get_cursor_rect') {
+      const r = await executeWithReview(action, params, callOpts)
+      selectionDrag?.updateFromCursorRaw(r)
+      return r
+    }
+    if (/^(get_|list_)/.test(action) || action === 'stash_selection_for_drag' || action === 'capture_writing_context' || action === 'set_review_balloons' || (action === 'set_revision_view' && !params?.mode)) return executeWithReview(action, params, callOpts)
     reviewBalloons.suspend(action)
     reviewHover.suspend()
-    try { return await executeWithReview(action, params, callOpts) }
+    try {
+      const res = await executeWithReview(action, params, callOpts)
+      if (action === 'set_selection' || action === 'select_paragraph' || action === 'find_navigate') {
+        selectionDrag?.refreshSelection(20)
+      }
+      return res
+    }
     finally { reviewBalloons.resume(); reviewHover.resume() }
   }
 
@@ -403,6 +420,18 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
   insightExecutor = endpoint.executor
   themeExecutor = endpoint.executor
   applyTheme(currentTheme)
+  let overlay = null
+  let writingAssistance = null
+  selectionDrag = attachSelectionDrag({
+    canvas: document.getElementById('qtcanvas'),
+    execute: (action, params) => endpoint.executor.executeCommand(action, params),
+    onAfterDrop: () => {
+      overlay?.focus()
+      overlay?.reposition()
+      relaySelection()
+    },
+    onLog: (m) => { console.log('[zeta-editor]', m); if (VERIFY) vlog(m) },
+  })
   attachDocumentLinkClicks({
     canvas: document.getElementById('qtcanvas'),
     execute: (action, params) => endpoint.executor.executeCommand(action, params),
@@ -418,8 +447,6 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
   // in the document (Qt5-WASM gives the canvas no IME). Commits at the LO cursor
   // via the same verified path as agent commands. Attached in BOTH webview and
   // verify modes — local typing is a real-user need, not just a verification one.
-  let overlay = null
-  let writingAssistance = null
   try {
     overlay = attachImeOverlay({
       canvas: document.getElementById('qtcanvas'),
@@ -427,7 +454,10 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
       // 在原位置落字）。不带这个标记的 insert_at_cursor 仍是「塌到选区末尾追加」——
       // AI 与插件管线依赖那条语义（先 select 再 insert_at_cursor 表示「插在后面」）。
       commit: (text) => endpoint.executor.executeCommand('insert_at_cursor', { text, replaceSelection: true }),
-      getCursorRaw: () => endpoint.executor.executeCommand('get_cursor_rect', {}),
+      getCursorRaw: () => endpoint.executor.executeCommand('get_cursor_rect', {}).then((r) => {
+        selectionDrag?.updateFromCursorRaw(r)
+        return r
+      }),
       // Control keys: the overlay swallows keystrokes (it IS the focused input),
       // so Enter/Backspace/arrows must be forwarded to the worker explicitly.
       // The worker actions (insert_paragraph/delete_backward/move_cursor) have
@@ -451,7 +481,7 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
       transport: hostTransport, focus: overlay.focus })
     inlineReview = attachInlineReview({ canvas: document.getElementById('qtcanvas'), input: overlay.element,
       execute: (action, params) => endpoint.executor.executeCommand(action, params), transport: hostTransport, language: q.get('uilang') || 'zh-CN' })
-    window.addEventListener('pagehide', () => { writingAssistance.destroy(); semanticWriting.destroy(); inlineReview.destroy(); reviewBalloons?.destroy(); reviewHover?.destroy() }, { once: true })
+    window.addEventListener('pagehide', () => { selectionDrag?.destroy(); writingAssistance.destroy(); semanticWriting.destroy(); inlineReview.destroy(); reviewBalloons?.destroy(); reviewHover?.destroy() }, { once: true })
   } catch (e) { console.error('[zeta-editor] IME overlay failed:', e); if (VERIFY) vlog('IME overlay failed: ' + (e && e.message || e)) }
   // 触控板捏合缩放。Chromium 把捏合报成 ctrlKey + wheel；**不拦下来**浏览器就去
   // 缩放整个 webview 页面——LO 自己的工具栏跟着一起放大、画布重采样发糊，而且

@@ -1404,3 +1404,12 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - 前端 `FileTree.vue` 与 `utils/fileTreePdfActions.js`：单选可转 PDF 文件（`doc/docx/ppt/pptx/xls/xlsx` 及图片）右键菜单显示「转为 PDF」；多选（含已有 `pdf`）2 个及以上文件时右键菜单显示「合并为 PDF」。
 - 后端 `ProjectFileController`（`POST /api/projects/{projectId}/files/{fileId}/convert-pdf`、`POST /api/projects/{projectId}/files/batch/merge-pdf`）与 `ProjectFilePdfService`：Office 文档优先调本机 LibreOffice，不可用时走内置 POI + PDFBox 中文字体渲染兜底，在原目录生成同名（自动递增序号）PDF 并刷新文件树。回归：`ProjectFilePdfServiceTest`、`fileTreePdfActions.test.mjs`。
 
+## 资源管理器与暂存区文件向外拖拽（dev-board#1288）
+
+`FileTree` 与 `FileStagingArea` 支持将文件直接拖到软件窗口外部（如微信聊天、Finder/资源管理器）。微信等外部桌面应用只认 OS 级文件拖拽（macOS `NSFilenamesPboardType` / Windows `CF_HDROP`），不认 Chromium HTML5 `dataTransfer`。
+
+- 桌面主进程 `desktop/main/file-service.js` 注册 `fs:startDrag`（`ipcMain.on` + `ipcMain.handle`），校验路径为已存在的本地文件后调 `event.sender.startDrag({ file, icon })`（内置非空 32×32 PNG `nativeImage` 图标），preload 暴露 `host.fs.startDrag(path)`。
+- 前端 `utils/fileLocalDrag.js` 在行悬停/按下时通过 `prefetchLocalFilePath(file)` 调 `/files/{id}/local-path` 预取并缓存本地绝对路径（`file.localPath` 已有时直接复用），`dragstart` 同步解析路径并在写入应用内 `dataTransfer` 后调 `startExternalFileDrag`。
+- `webContents.startDrag` 会向 `dataTransfer.types` 注入 `'Files'`、将 `effectAllowed` 锁为 `'copy'`，且拖到软件外松手时可能吞掉 DOM `dragend`：① `isExternalFileDrag(dt)` 在 `document.__checkbaDraggedFile` 存在时返回 `false`，避免应用内文件树把自己拖出的文件误判为外部上传；② 内部树移动/暂存区拖回/编辑器建链统一走 `compatibleDropEffect(dt, preferred)`，当 `effectAllowed === 'copy'` 时返回 `'copy'` 防止目标区拒绝落点；③ `installExternalDragCleanup` 监听窗口级 `mousemove (buttons === 0)` / `mousedown` / `dragend` / `drop`，兜底清理 `document.__checkbaDraggedFile` 与拖拽残留态。
+- 回归：`desktop/tests/file-drag.test.js`、`frontend/tests/project-home/file-tree-external-drop.test.mjs`。
+
