@@ -27,7 +27,9 @@ Writer 的 `ShowTextBoundaries` 与格式标记联动：打开 ¶ 时会把文�
 
 工具栏「版面检查」由用户选连续 1–6 页、确认耗时和用量后才导出当前编辑器 PDF；`documentVisualReview.mjs` 在导出前后及返回结果时核对 revision 和当前编辑器，变化则丢弃旧结果。后端 `DocumentVisualReviewService` 校验项目权限和文档归属，用 PDFBox 将选页转成图片，调用支持视觉的辅助模型一次；不支持视觉即提示，不暗中降级 OCR。每次 PDF 上限 12MB，报告说明实际页码和是否覆盖全文。它不自动运行、不自动改文档，也不能把文本读取检查称为视觉验收。
 
-当前位置接受/拒绝要完整经过宿主和客体两侧 `EDITOR_ACTIONS`。旧 0.56.0 安装包的客体 bundle 缺 `resolve_revision_at_cursor` 会报 Unknown action；源码白名单已有修复，还须重建客体产物。r5 的 RedlineStart/RedlineEnd 可能倒置，命中比较前排序区间；不要为规避命中问题调用接受全部。`revision-toolbar-route.test.mjs` 与真实引擎 `revision-at-cursor.mjs` 覆盖路由及插入/删除、行内/气泡、接受/拒绝、保留其他修订和导出重开。
+当前位置接受/拒绝要完整经过宿主和客体两侧 `EDITOR_ACTIONS`。旧 0.56.0 安装包的客体 bundle 缺 `resolve_revision_at_cursor` 会报 Unknown action；源码白名单已有修复，还须重建客体产物。r5 的 RedlineStart/RedlineEnd 可能倒置，命中比较前排序区间；光标未直接处于修订上时，`revisionIndexAtCursor` 默认定位光标位置往后的第一个修订（`firstAfter`，含表格锚点跨 story 兜底，dev-board#1287）；不要为规避命中问题调用接受全部。`revision-toolbar-route.test.mjs`、`revision-resolve-toolbar.test.mjs` 与真实引擎 `revision-at-cursor.mjs` 覆盖路由及插入/删除、行内/气泡、光标在修订前默认向后、接受/拒绝、保留其他修订和导出重开。
+
+选中文字鼠标拖拽移动（dev-board#1286）：LOWA Emscripten/VCL 画布未接入平台原生 DnD，左键在非空选区内按下会立即把选区清掉。`get_cursor_rect` 在 `collapsed === false` 时经 `readSelectionCaretRects`（`suppressSelectionEvent` 屏蔽临时游标移动的 `sel_changed`）返回 `selectionRects: { start, end }`；`zetaOfficeSelectionDrag.js` 在 `#canvas` capture 阶段命中选区包络盒时拦截 `mousedown`，调 `stash_selection_for_drag`（属 `FINAL_TEXT_READ_ACTIONS` / `DOC_READONLY_ACTIONS`，先清理临时 `__ai_anchor_*` 书签再保存源 TextRange 与 `getTransferable()`）；移动 <5px 松开则补发合成点击正常落光标，≥5px 进入拖拽则放行 `mousemove` 让原生光标跟随落点，松开时调 `complete_selection_drag` 在单次 `UndoContext('移动文字')` 内对比源/落点、删源插目标（保留富文本格式与修订开启时的删+插 redline）并重选新位置文字。`editor-main.js` 存在 1Hz 合成 `window.resize` 心跳，几何缓存失效须比对真实视口与 canvas 尺寸。回归：`tests/lowa-unit/selection-drag.test.mjs`、`tests/lowa-e2e/selected-text-drag-move.mjs`。
 
 ## AI 逐段修订与显示切换（dev-board#1131/#1132，2026-10-07）
 

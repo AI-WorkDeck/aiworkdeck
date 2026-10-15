@@ -24,14 +24,33 @@ export function nativeDataTransfer(e) {
 }
 
 // dragover / dragenter 阶段 files 恒为空（浏览器只在 drop 时才给内容），只能看 types
-// 里有没有 'Files'；应用内拖拽（text/plain + application/x-checkba-file）永远没有它。
+// 里有没有 'Files'；应用内拖拽（text/plain + application/x-checkba-file）原本没有它，
+// 但桌面端为支持拖出到微信/Finder 调了 webContents.startDrag 后，OS 会往同一次拖拽里补上
+// 'Files' 与 effectAllowed='copy'（dev-board#1288）。因此只要 document.__checkbaDraggedFile
+// 仍在（说明是应用内 FileTree / 暂存区自己发起的拖拽），就绝不能当成外部文件导入。
 export function isExternalFileDrag(dt) {
   if (!dt) return false
+  if (typeof document !== 'undefined' && document.__checkbaDraggedFile) return false
   if (dt.files && dt.files.length > 0) return true
   if (Array.from(dt.items || []).some(item => item && item.kind === 'file')) return true
   const types = dt.types
   if (!types) return false
   return Array.from(types).some(type => type === 'Files' || type === 'text/uri-list')
+}
+
+// webContents.startDrag 会把原生拖拽会话的 effectAllowed 锁成 'copy'；此时若内部
+// dragover 强设 dropEffect='move' 或 'link'，浏览器会因不兼容而显示禁止光标并吞掉 drop。
+export function compatibleDropEffect(dt, preferred = 'move') {
+  const allowed = dt && typeof dt.effectAllowed === 'string' ? dt.effectAllowed : ''
+  if (!allowed || allowed === 'all' || allowed === 'uninitialized') return preferred
+  const low = allowed.toLowerCase()
+  if (preferred === 'move' && (low === 'move' || low.includes('move'))) return 'move'
+  if (preferred === 'link' && (low === 'link' || low.includes('link'))) return 'link'
+  if (preferred === 'copy' && (low === 'copy' || low.includes('copy'))) return 'copy'
+  if (low.includes('copy')) return 'copy'
+  if (low.includes('move')) return 'move'
+  if (low.includes('link')) return 'link'
+  return preferred
 }
 
 // 同一个原生 drop 事件会先后到达节点与容器两个监听器（uni 的 stopPropagation 只是转发，
