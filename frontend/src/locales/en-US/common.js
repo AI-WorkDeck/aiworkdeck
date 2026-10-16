@@ -35,6 +35,9 @@ export default {
   readVersionFileFailed: 'Failed to read version file',
   // ---- utils/ideOpen.js ----
   openProjectFailed: 'Failed to open the project. Please try again later',
+  nestedFolderTitle: 'Open nested folder',
+  nestedFolderContent: 'The selected folder contains or is inside the folder of “{names}”. You can continue opening it as a project. Overlapping files are the same originals: edits, deletions and version restores in either project affect the other.',
+  nestedFolderContinue: 'Open anyway',
   folderImportTruncatedTitle: 'Import truncated',
   folderImportTruncated: 'This import was truncated, about {count} item(s) were not included: the folder exceeds 30,000 items, please split the project',
   folderImportTruncatedCapped: 'This import was truncated, more than {count} items were not included: the folder exceeds 30,000 items, please split the project',
