@@ -80,6 +80,27 @@ class ChangeSignalNonBlockingTest {
     }
 
     @Test
+    void lockClassificationFailuresKeepTheLatestActorAndAllowBackgroundRetry() {
+        when(repos.hasLocalRoot(7L))
+                .thenThrow(new IllegalStateException("first lookup failed"))
+                .thenThrow(new IllegalStateException("second lookup failed"))
+                .thenThrow(new IllegalStateException("background lookup failed"))
+                .thenReturn(true);
+
+        assertDoesNotThrow(() -> service.onChangeSignal(7L, 1L, "first"));
+        assertDoesNotThrow(() -> service.onChangeSignal(7L, 2L, "latest"));
+        assertEquals(1, scheduled.size(), "Failed classification still coalesces queued signals");
+        verifyNoInteractions(sessions);
+        assertDoesNotThrow(() -> scheduled.get(0).run());
+        assertEquals(2, scheduled.size(), "Failed background classification releases the queue slot and retries");
+        verifyNoInteractions(sessions);
+        scheduled.get(1).run();
+        verify(sessions).save(argThat(s -> Long.valueOf(2L).equals(s.getUserId())));
+        verify(repos).createBranch(eq(7L), startsWith("work/"), eq("HEAD"));
+        verify(repos, times(4)).hasLocalRoot(7L);
+    }
+
+    @Test
     void transactionOnlyQueuesAfterCommitWithoutUsingItsConnection() {
         TransactionSynchronizationManager.initSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(true);

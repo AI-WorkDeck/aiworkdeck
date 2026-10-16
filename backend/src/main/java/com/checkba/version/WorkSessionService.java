@@ -500,7 +500,14 @@ public class WorkSessionService {
             });
             return;
         }
-        ReentrantLock lock = repoLock(projectId);
+        ReentrantLock lock;
+        try {
+            lock = repoLock(projectId);
+        } catch (RuntimeException e) {
+            log.warn("版本锁所属项目暂不可用，延后处理变更: project={}", projectId, e);
+            deferSignal(projectId, actor);
+            return;
+        }
         if (!lock.tryLock()) {
             deferSignal(projectId, actor);
             return;
@@ -527,20 +534,26 @@ public class WorkSessionService {
         if (!signalTasks.add(projectId)) return;
         try {
             taskScheduler.schedule(() -> {
-                ReentrantLock lock = repoLock(projectId);
-                if (lock.tryLock()) {
-                    PendingActor actor = deferredSignals.remove(projectId);
-                    try {
-                        if (actor != null) applyChangeSignal(projectId, actor);
-                    } catch (Exception e) {
-                        if (actor != null) deferredSignals.putIfAbsent(projectId, actor);
-                        log.warn("处理版本变更信号失败，将重试: project={}", projectId, e);
-                    } finally {
-                        lock.unlock();
+                try {
+                    ReentrantLock lock = repoLock(projectId);
+                    if (lock.tryLock()) {
+                        PendingActor actor = deferredSignals.remove(projectId);
+                        try {
+                            if (actor != null) applyChangeSignal(projectId, actor);
+                        } catch (Exception e) {
+                            if (actor != null) deferredSignals.putIfAbsent(projectId, actor);
+                            log.warn("处理版本变更信号失败，将重试: project={}", projectId, e);
+                        } finally {
+                            lock.unlock();
+                        }
                     }
+                } catch (RuntimeException e) {
+                    // Classification failed before taking the actor out of deferredSignals.
+                    log.warn("版本锁所属项目暂不可用，将重试: project={}", projectId, e);
+                } finally {
+                    signalTasks.remove(projectId);
+                    if (deferredSignals.containsKey(projectId)) scheduleSignal(projectId, 1000);
                 }
-                signalTasks.remove(projectId);
-                if (deferredSignals.containsKey(projectId)) scheduleSignal(projectId, 1000);
             }, Instant.now().plusMillis(delayMillis));
         } catch (RuntimeException e) {
             signalTasks.remove(projectId);

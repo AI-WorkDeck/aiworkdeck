@@ -24,8 +24,8 @@ class NestedProjectVersionTest {
         when(storage.globalRoot()).thenReturn(temp.resolve("data"));
         when(storage.projectRoot(7L)).thenReturn(parent);
         when(storage.projectRoot(8L)).thenReturn(parent.resolve("child"));
-        when(storage.hasLocalRoot(7L)).thenReturn(true);
-        when(storage.hasLocalRoot(8L)).thenReturn(true);
+        when(storage.hasLocalRootForVersionLock(7L)).thenReturn(true);
+        when(storage.hasLocalRootForVersionLock(8L)).thenReturn(true);
         return new ProjectRepoService(storage);
     }
 
@@ -116,6 +116,36 @@ class NestedProjectVersionTest {
             }).get(5, java.util.concurrent.TimeUnit.SECONDS);
             assertTrue(managedAcquired, "Managed projects keep independent locks");
         } finally { parentLock.unlock(); }
+    }
+
+    @Test
+    void unresolvedLockClassificationRetriesAndThenSharesTheLocalFolderLock() {
+        for (boolean databaseFailure : List.of(true, false)) {
+            var projects = mock(com.checkba.repository.ProjectRepository.class);
+            var parent = new com.checkba.model.entity.Project();
+            parent.setId(7L);
+            parent.setLocalRoot(temp.resolve("parent").toString());
+            var child = new com.checkba.model.entity.Project();
+            child.setId(8L);
+            child.setLocalRoot(temp.resolve("parent/child").toString());
+            if (databaseFailure) {
+                when(projects.findById(7L)).thenThrow(new IllegalStateException("database unavailable"))
+                        .thenReturn(java.util.Optional.of(parent));
+            } else {
+                when(projects.findById(7L)).thenReturn(java.util.Optional.empty(), java.util.Optional.of(parent));
+            }
+            when(projects.findById(8L)).thenReturn(java.util.Optional.of(child));
+            var props = new com.checkba.storage.StorageProperties();
+            props.getLocal().setRootPath(temp.resolve("data").toString());
+            var resolver = new ProjectStorageResolver(props, projects);
+            var sessions = new WorkSessionService(new ProjectRepoService(resolver), null, null, null, null, null);
+
+            assertThrows(RuntimeException.class, () -> sessions.repoLock(7L));
+            var retried = sessions.repoLock(7L);
+            assertSame(sessions.repoLock(8L), retried, "A failed lookup must not cache a separate managed lock");
+            assertSame(retried, sessions.repoLock(7L));
+            verify(projects, times(2)).findById(7L);
+        }
     }
 
 }
