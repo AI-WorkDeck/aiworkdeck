@@ -1,7 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view class="file-tree" tabindex="0" @keydown="handleKeyDown" @mousedown="focusTree">
+  <view class="file-tree" tabindex="0" @keydown="handleKeyDown" @mousedown="focusTree" @click="focusTree">
 
     <!-- AI WorkDeck Style Modals System -->
     <!-- 删除确认（单个/批量、软删/硬删）走应用内对话框 AwdDialog（showDeleteConfirmDialog
@@ -120,6 +120,7 @@
             <view v-if="renamingId === folder.id" class="rename-input-wrapper dialog-rename" @tap.stop>
               <input
                 class="rename-input"
+                :confirm-hold="true"
                 :ignore-composition-event="false"
                 v-model="tempRenameValue"
                 :focus="true"
@@ -434,6 +435,7 @@
             <view v-if="renamingId === item.id" class="rename-input-wrapper" @tap.stop @mousedown.stop>
               <input
                 class="rename-input"
+                :confirm-hold="true"
                 :ignore-composition-event="false"
                 v-model="tempRenameValue"
                 @confirm="handleRenameConfirm"
@@ -565,6 +567,7 @@
             <view v-if="renamingId === item.id" class="rename-input-wrapper" @tap.stop @mousedown.stop>
               <input
                 class="rename-input"
+                :confirm-hold="true"
                 :ignore-composition-event="false"
                 v-model="tempRenameValue"
                 @confirm="handleRenameConfirm"
@@ -1216,7 +1219,9 @@ export default {
       return !!target?.closest?.('input, textarea, select, button, a, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="button"], [role="dialog"], .awd-dialog-mask, .dialog-overlay, .context-menu, .tree-footer')
     },
     focusTree(event) {
-      const e = this.treeInputEvent(event, 'mousedown')
+      // A row's default mousedown can move focus back to body after our handler.
+      // Refocus on click too, without cancelling mousedown/native drag initiation.
+      const e = this.treeInputEvent(event, event?.type === 'click' ? 'click' : 'mousedown')
       if (e && this.isTreeControlTarget(e.target)) return
       try {
         const el = this.$el
@@ -1514,6 +1519,9 @@ export default {
       }
     },
     handleRenameConfirm(event) {
+      // uni-h5 emits confirm on keyup. The Enter that opens rename would otherwise
+      // reach the newly mounted input and immediately submit it again.
+      if (typeof window !== 'undefined' && window.event?.type === 'keyup') return
       const e = this.treeInputEvent(event, 'keydown')
       if (this.renameComposing || e?.isComposing || e?.keyCode === 229) return
       return this.commitRename(e || event)

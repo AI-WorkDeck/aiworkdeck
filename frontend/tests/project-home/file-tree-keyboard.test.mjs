@@ -261,3 +261,17 @@ test('a vanished member rejects the entire selected drag rather than silently ex
   vm.handleDragEnd()
   assert.equal(vm.rootDropActive || vm.externalDragActive || vm.stagingDragOver || vm.isAnyDragging, false)
 })
+
+test('the keyup confirm from Enter opening rename does not immediately close the input', async () => {
+  const vm = makeVm(); rows(vm); vm.selectedFileId = 1; vm.multiSelectedIds = [1]
+  await vm.handleKeyDown(event('Enter'))
+  const previousWindow = globalThis.window
+  globalThis.window = { event: { type: 'keyup', key: 'Enter' } }
+  try {
+    await vm.handleRenameConfirm({ detail: { value: '1.txt' } })
+    assert.equal(vm.renamingId, 1)
+    assert.equal(vm.calls.renames.length, 0)
+  } finally { globalThis.window = previousWindow }
+  await vm.handleRenameKeydown(event('Enter', { target: { value: 'renamed.txt' } }))
+  assert.equal(vm.calls.renames.length, 1)
+})

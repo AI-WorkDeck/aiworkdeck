@@ -1422,7 +1422,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 ## 资源管理器基本键盘操作与多选外拖（dev-board#1306/#1307/#1308）
 
-`FileTree.handleKeyDown` 只在当前树获得焦点且不在输入/对话框/菜单中处理按键。上下按 `displayFiles` 选择，不调用 `handleItemClick` 打开文件或改变复选框；左右展开/收起文件夹和进入子项/回到父项。超过每目录 100 项渲染窗口时先补 `revealCounts` 再滚动。Delete 与 Mac Backspace（含 Cmd+Delete）复用原删除确认和回收站逻辑；Enter 仅单选时重命名；重命名 Enter 提交原生输入值，Esc 取消，IME 组合期不提交。焦点用本实例 `$el`，不可全局找第一棵树。
+`FileTree.handleKeyDown` 只在当前树获得焦点且不在输入/对话框/菜单中处理按键。上下按 `displayFiles` 选择，不调用 `handleItemClick` 打开文件或改变复选框；左右展开/收起文件夹和进入子项/回到父项。超过每目录 100 项渲染窗口时先补 `revealCounts` 再滚动。Delete 与 Mac Backspace（含 Cmd+Delete）复用原删除确认和回收站逻辑；Enter 仅单选时重命名；重命名 Enter 提交原生输入值，Esc 取消，IME 组合期不提交。焦点用本实例 `$el`，不可全局找第一棵树；行 click 后补焦点以覆盖浏览器 mousedown 默认行为。uni-h5 Input 的 Enter keyup 会触发 confirm 并 blur，所以重命名显式 `confirm-hold`、忽略 keyup confirm，仅 keydown 提交，避免打开重命名的同一次 Enter 立即把输入框关闭。
 
 外拖以 `externalDragItems` 取当前有效选区：起拖项在选区则传整组，否则只传起拖项。`fileLocalDrag` 整组解析/去重，不允许漏掉缺路径的一项后部分拖出。preload `fs.startDrag` 接受字符串或字符串数组，主进程校验所有路径后以 `webContents.startDrag({files,icon})` 交给系统。文件夹混选或路径不可用提示失败；不自动发送微信消息。
 
