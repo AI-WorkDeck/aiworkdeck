@@ -569,7 +569,7 @@ class ContextAssemblerServiceTest {
                 null, null, "88", AgentMode.AGENT, 1L, null);
         String systemText = ((SystemMessage) messages.get(0)).text();
 
-        assertTrue(systemText.contains("[TRUNCATED - Inline content too long]"), "超限应带截断标记");
+        assertTrue(systemText.contains("[TRUNCATED -"), "超限应带截断标记");
         assertFalse(systemText.contains("甲".repeat(200_001)), "不应完整注入超限正文");
     }
 
@@ -710,18 +710,64 @@ class ContextAssemblerServiceTest {
     }
 
     @Test
-    @DisplayName("只带哈希但未命中（文档已改/缓存已驱逐）：降级为无正文，不报错也不回落 read_document")
-    void hashMissDegradesToNoInlineBody() {
+    @DisplayName("只带哈希但未命中明确失败，不把缺失正文交给模型")
+    void hashMissRequiresFullContentRetry() {
         capabilityService.record("conv-1", "office");
-        String body = "第一条 试用期为三个月……";
-        assembleSystemText(officeDoc(body));
-
-        String systemText = assembleSystemText(officeDocByHash(InlineContentCache.sha256Hex("文档已被改动")));
-
-        assertFalse(systemText.contains(body), "哈希对不上不应复用旧正文");
-        assertTrue(systemText.contains("[正文暂不可读，可用 office_get_text 直接读取]"),
-                "未命中应走既有「正文暂不可读」文案，模型改用读取类工具");
+        assembleSystemText(officeDoc("第一条 试用期为三个月……"));
+        org.junit.jupiter.api.Assertions.assertThrows(InlineContentCache.CacheMiss.class,
+                () -> assembleSystemText(officeDocByHash(InlineContentCache.sha256Hex("文档已被改动"))));
         org.mockito.Mockito.verify(legalTools, org.mockito.Mockito.never()).read_document(anyString());
+    }
+
+    @Test
+    void exactClientCapIsMarkedAndWholeHashIsPreserved() {
+        AiContextProperties props = (AiContextProperties) org.springframework.test.util.ReflectionTestUtils
+                .getField(assembler, "contextProperties");
+        props.setMaxContextTokens(1_000_000);
+        for (int length : new int[] {199_999, 200_000, 200_001}) {
+            String body = "甲".repeat(length);
+            ImageNoticeSink sink = new ImageNoticeSink();
+            var assembled = assembler.assemble("conv-1", "run-1", "审查", null, officeDoc(body),
+                    null, null, "88", AgentMode.AGENT, 1L, null, sink);
+            String text = ((SystemMessage) assembled.get(0)).text();
+            assertEquals(length >= 200_000, text.contains("[TRUNCATED -"));
+            String userText = ((dev.langchain4j.data.message.UserMessage) assembled.get(assembled.size() - 1)).singleText();
+            assertEquals(length >= 200_000, userText.contains("不能据此认定全文完整"));
+            assertEquals(length >= 200_000, sink.has(ContextTurnSink.TRUNCATED, "office-current-document"));
+            if (length <= 200_000) assertEquals(body, inlineContentCache.get("conv-1", InlineContentCache.sha256Hex(body)));
+            else org.junit.jupiter.api.Assertions.assertNull(inlineContentCache.contentOf("conv-1"));
+        }
+    }
+
+    @Test
+    void chineseBodyUsesSelectedModelBudgetAfterHistoryAndKeepsFullCache() {
+        AiContextProperties props = (AiContextProperties) org.springframework.test.util.ReflectionTestUtils
+                .getField(assembler, "contextProperties");
+        props.setModelTokenBudgets(java.util.Map.of("small-test", 140_000, "large-test", 600_000));
+        String body = "甲".repeat(199_999);
+        ProjectAiMessageService messageService = (ProjectAiMessageService) org.springframework.test.util.ReflectionTestUtils
+                .getField(assembler, "messageService");
+        when(messageService.listHistoryForAssembly(anyString())).thenReturn(List.of(
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine("USER", "乙".repeat(5_000))));
+        ImageNoticeSink sink = new ImageNoticeSink();
+        var small = assembler.assemble("conv-1", "run-1", "审查", null, officeDoc(body),
+                null, null, "88", AgentMode.AGENT, 1L, "small-test", sink);
+        String smallSystem = ((SystemMessage) small.get(0)).text();
+        assertTrue(smallSystem.contains("TRUNCATED - Model context budget"));
+        assertTrue(sink.has(ContextTurnSink.TRUNCATED, "office-current-document"));
+        long injected = smallSystem.chars().filter(c -> c == '甲').count();
+        assertTrue(injected > 0 && injected < 29_000, "140k minus tools/system, 10k history and 13k reserves must bound Chinese text");
+        assertEquals(body, inlineContentCache.get("conv-1", InlineContentCache.sha256Hex(body)),
+                "model budget prefix must never replace full-text hash/cache");
+        when(messageService.listHistoryForAssembly(anyString())).thenReturn(List.of());
+        var noHistory = assembler.assemble("conv-1", "run-empty-history", "审查", null, officeDoc(body),
+                null, null, "88", AgentMode.AGENT, 1L, "small-test");
+        long withoutHistory = ((SystemMessage) noHistory.get(0)).text().chars().filter(c -> c == '甲').count();
+        assertEquals(5_000, withoutHistory - injected,
+                "removing 5k Chinese history characters must restore exactly 5k document characters");
+        var large = assembler.assemble("conv-1", "run-2", "审查", null,
+                officeDocByHash(InlineContentCache.sha256Hex(body)), null, null, "88", AgentMode.AGENT, 1L, "large-test");
+        assertTrue(((SystemMessage) large.get(0)).text().contains(body));
     }
 
     // ==== 末位提醒按会话客户端能力切换（Phase C）====

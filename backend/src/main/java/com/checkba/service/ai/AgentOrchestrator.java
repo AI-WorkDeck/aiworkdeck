@@ -410,6 +410,8 @@ public class AgentOrchestrator {
     // 整篇分段过卷的游标状态（dev-board#422）：编排器只读它算本轮步数预算，取消时顺手清掉
     private final OfficePassStateStore officePassStateStore;
     private volatile AgentInboxService inboxService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ClientCapabilityService clientCapabilities;
 
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.ProjectMemberService projectMemberService;
@@ -1461,6 +1463,15 @@ public class AgentOrchestrator {
                 return current.runId;
             }
 
+            try {
+                // Resolve transient bodies before claiming: a cache miss has not executed any
+                // tool, so the same idempotency key must remain eligible for a full-body retry.
+                request = inbox.requestOf(item);
+            } catch (AgentInboxService.InlineContentUnavailable e) {
+                sseEmitterService.send(conversationId, "error", "{\"code\":\"INLINE_CONTENT_CACHE_MISS\","
+                        + "\"retryWithInlineContent\":true,\"message\":\"文档正文缓存已失效，请重新发送文档正文。 / Resend the document text.\"}");
+                throw e;
+            }
             guard = beginRun(item.getConversationId());
             guard.inboxItemId = itemId;
             claimed = inbox.claim(itemId, guard.runId, emitApplied);
@@ -1469,7 +1480,7 @@ public class AgentOrchestrator {
                 endRun(guard);
                 return claimed.getRunId();
             }
-            request = inbox.requestOf(claimed);
+
         }
         // Do not hold the inbox monitor while the turn runs. The guard is already visible, so new
         // submissions queue safely, while completion can reacquire the same monitor to drain once.
@@ -1484,6 +1495,11 @@ public class AgentOrchestrator {
     }
 
     private void launchTurn(AiAgentController.AgentChatRequest request, Long userId, RunGuard guard) {
+        // Inbox replay after restart does not traverse POST /chat's capability registration.
+        if (clientCapabilities != null) {
+            clientCapabilities.record(request.getConversationId(), request.getClientCapability(),
+                    request.getOfficeHost(), request.getOfficeFamily());
+        }
         // 平台通道按用户计费（server 模式多租户）：整轮循环——含其中同步调用的上下文组装、
         // 记忆检索、子 Agent、故障转移换模型——都在这个身份作用域内取 key。
         // 身份作用域必须建在**执行线程**上：提交线程（控制器线程）设了也不跟着走。
@@ -2153,7 +2169,7 @@ public class AgentOrchestrator {
                         return;
                     }
                     String code = call.rawCode();
-                    log.info("Parsed Tool Code: {}", code);
+                    log.info("Parsed XML tool: {}", call.toolName());
 
                     String result;
                     boolean xmlToolSuccess;

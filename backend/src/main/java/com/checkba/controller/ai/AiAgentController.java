@@ -41,6 +41,9 @@ public class AiAgentController {
     private final com.checkba.service.ai.ChatModelFactory chatModelFactory;
     private final com.checkba.service.ProjectFileAccessService fileAccess;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.ai.InlineContentCache inlineContentCache;
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
     private java.util.concurrent.Executor taskExecutor;
@@ -207,10 +210,21 @@ public class AiAgentController {
             return chatError(400, LangText.of("消息内容不能为空", "Message cannot be empty"));
         }
 
+        // Resolve before inbox persistence or model execution. A retry must not duplicate a turn.
+        try {
+            if (request.getContextItems() != null) {
+                for (ContextItem item : request.getContextItems()) {
+                    restoreInlineContent(request.getConversationId(), item, false);
+                }
+            }
+            restoreInlineContent(request.getConversationId(), request.getActiveContext(), true);
+        } catch (com.checkba.service.ai.InlineContentCache.CacheMiss e) {
+            return inlineContentCacheMiss();
+        }
         chatModelFactory.ensurePaidAccess(userId);
 
-        log.info("Received Agent Chat Request: project={}, conversation={}, mode={}, msg={}",
-                request.getProjectId(), request.getConversationId(), request.getAgentMode(), request.getMessage());
+        log.info("Received Agent Chat Request: project={}, conversation={}, mode={}, messageChars={}",
+                request.getProjectId(), request.getConversationId(), request.getAgentMode(), request.getMessage().length());
 
         // 会话级客户端能力登记（Phase C）：lowa（默认，主前端）/ office（Office 插件）/ none（纯对话）；
         // office 会话再按宿主细分（word / excel / powerpoint，缺省 word），工具可见性按宿主过滤
@@ -223,11 +237,33 @@ public class AiAgentController {
             // item to avoid a duplicate user bubble; later steering/auto-drain claims do emit it.
             String activeRunId = agentOrchestrator.acceptInboxSubmission(item.getId(), false);
             return ResponseEntity.ok(agentInboxService.receipt(item, activeRunId));
+        } catch (com.checkba.service.ai.AgentInboxService.InlineContentUnavailable e) {
+            return inlineContentCacheMiss();
         } catch (SecurityException e) {
             return chatError(403, e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("status", "error", "message", e.getMessage()));
         }
+    }
+
+    private static ResponseEntity<?> inlineContentCacheMiss() {
+        return ResponseEntity.status(409).body(java.util.Map.of(
+                "status", "error", "code", "INLINE_CONTENT_CACHE_MISS", "retryWithInlineContent", true,
+                "message", LangText.of("文档正文缓存已失效，请重新发送全文", "Document content expired; resend the full content")));
+    }
+
+    private void restoreInlineContent(String conversationId, ContextItem item, boolean active) {
+        if (item == null) return;
+        String body = item.getInlineContent();
+        String key = active ? null : "attachment:" + java.util.Objects.toString(item.getId(), "");
+        if ((body == null || body.isEmpty()) && item.getInlineContentHash() != null
+                && !item.getInlineContentHash().isBlank()) {
+            body = inlineContentCache.get(conversationId, key, item.getInlineContentHash());
+            if (body == null) throw new com.checkba.service.ai.InlineContentCache.CacheMiss();
+            item.setInlineContent(body);
+        }
+        // Preserve whole content and its server-computed hash, never a model-budget prefix.
+        if (body != null && !body.isEmpty()) inlineContentCache.put(conversationId, key, body);
     }
 
     private static ResponseEntity<?> chatError(int status, String message) {

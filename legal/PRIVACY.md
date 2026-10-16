@@ -1,8 +1,8 @@
 # AI WorkDeck 隐私说明
 
-更新日期：2026-10-13
+更新日期：2026-10-16
 
-本说明描述 AI WorkDeck 桌面应用的两件事：
+本说明描述 AI WorkDeck 桌面应用及 Office/WPS 插件的两件事：
 
 - **第一部分 · 平台服务**：哪些数据会经过我们的服务器、存放多久、何时删除；
 - **第二部分 · 使用统计**：采集什么、不采集什么、如何关闭。
@@ -58,12 +58,16 @@
 
 **跨文件参考与修改（Office/WPS 插件）。** Office/WPS 任务窗格里的 AI 连的是我们托管的插件云后端（addin.aiworkdeck.com / addin.workdeck.ai）。它可以读你指定的其他文件、改你另一个打开着的文档，因此下列内容会经过我们的服务器：
 
-- **另一个打开着的文档**：你在 A 文档的窗格里要求 AI 参考或修改 B 文档时，B 的正文与要写入的改动经云后端在**你同一账号**的两个窗格之间转发，只在内存中停留，不存储。只有当时开着 AI WorkDeck 窗格的文档才改得了，其余文件一律只读。
-- **桌面端项目里的文件**：AI 需要参考你桌面端项目里的文件时，由桌面端在你本机抽出该文件的文字，经云后端转发给 AI，只在内存中停留，不存储，不收费。桌面端为此与**既有的**插件云后端多保持一条连接，不新增其他服务器。
+- **另一个打开着的文档**：你在 A 文档的窗格里要求 AI 参考或修改 B 文档时，B 的正文与要写入的改动经云后端在**你同一账号**的两个窗格之间转发，原始转发载荷仅在内存中暂存。只有当时开着 AI WorkDeck 窗格的文档才改得了，其余文件一律只读。
+- **桌面端项目里的文件**：AI 需要参考你桌面端项目里的文件时，由桌面端在你本机抽出该文件的文字，经云后端转发给 AI，原始转发载荷仅在内存中暂存，参考读取不收费。桌面端为此与**既有的**插件云后端多保持一条连接，不新增其他服务器。
 - **云端项目与官方案件库里的文件**：这些文件本来就存放在我们这里，AI 按你已有的项目/案卷读取权限取用其文字，只读不改，不另外留存副本。
 - **你关联的 GitHub / Gitee 仓库**：你在插件里关联仓库后，云后端会使用你提供的访问令牌读取该仓库的文件列表与你要求参考的文件（出站访问 api.github.com 或 gitee.com），**只读、不提交、不推送**；令牌加密保存、不回显、不写进日志，可随时在插件里解除关联。
 
-以上参考材料的文字**不写日志、不入库、不用于任何模型训练**，也不产生 Credits 扣费（整份文件的跨设备传输仍按原有口径计费）。
+**插件的正文与会话留存。** 当前文档的内联正文和参考工具的原始参数、读取结果只用于本轮处理及短期内存缓存，不写入请求队列或会话历史；插件不自动生成持久化的会话摘要。排队输入的正文内存副本最长保留 30 分钟，容量不足或服务重启会提前失效，届时要求重新上传。用户发送的消息、AI 回复及其思考记录作为会话记录保存，**保留至用户删除该会话，没有另设自动到期日**；其中由用户粘贴或 AI 引用的文档文字也随会话保存。删除会话同步删除消息、队列请求与派生摘要，并清除正文缓存；计费用量记录不随会话删除。已同步到桌面项目的副本按该项目规则管理，删除云端会话不反向删除桌面副本。
+
+参考材料的原始转发载荷不写应用日志，我们不将这些材料用于模型训练。参考读取本身不产生 Credits 扣费，AI 推理和整份文件的跨设备传输仍按各自规则计费。历史版本曾将内联正文存入请求队列、将工具片段存入会话并生成摘要；本次更新清理在线数据库中的这些冗余副本。运维备份与已发送给第三方的内容不等于在线数据库，不能据此承诺追溯删除全部副本。
+
+**插件 AI 的接收方。** 官方插件的请求先到 AI WorkDeck 云后端，再经 **OpenRouter** 转发给所选模型的实际推理供应商。可选模型的开发方包括 DeepSeek、智谱/Z.ai、月之暗面/Moonshot AI、阿里巴巴/Qwen、Anthropic、Google、OpenAI 和 xAI；模型开发方与实际承载推理的供应商可能不同，具体取决于模型和路由。发送内容包括本次提问、必要的历史会话、当前文档及用户指定的参考内容。OpenRouter 与各推理供应商的留存、训练和处理地点适用各自政策，不能将我们的内存处理规则理解为第三方零留存承诺；供应商信息见 [OpenRouter 供应商列表](https://openrouter.ai/providers/)，其处理规则见 [OpenRouter 隐私政策](https://openrouter.ai/privacy/)。
 
 **包晴天插件（可选）。** 安装并启用后，插件在你登录、浏览案源或管理笔记时，由本机直接访问包晴天服务（uat.bqt.com）。发送验证码和登录会向包晴天提交你填写的手机号、区号和验证码；新增、修改、发布或删除笔记会向包晴天提交对应内容或状态。新建图文或视频笔记时，你主动选择的图片、视频和独立封面会经本机插件上传到包晴天指定的腾讯云 COS 存储；上传签名和分片缓存仅在本机后端内存中暂存，不写入插件配置。会话仅保留在本机后端内存，按 AI WorkDeck 用户隔离，退出插件登录或重启后端即清除。笔记保存在包晴天平台，受其用户协议与隐私政策约束；本插件不上传项目文件正文，也不向 Marketplace 回传笔记或案源。工作区页面操作不主动调用模型；本插件的工具桥仅供页面加密调用，不开放 AI 对话中的明文业务调用。公开发布与删除由你明确操作；关闭未保存的编辑页可能丢失本页草稿。
 
@@ -187,7 +191,7 @@
 
 # AI WorkDeck Privacy Note
 
-Last updated: 2026-10-13
+Last updated: 2026-10-16
 
 ## Part 1 — Platform services
 
@@ -218,7 +222,11 @@ This decision **does not separately include attachments, chat history or documen
 
 **Optional-component models come from public model hubs, not from our servers.** The models for the optional components (document parsing, speech synthesis, on-device transcription) are not shipped in the installer. Only when you choose to download one does your machine fetch it directly from ModelScope (modelscope.cn); if that cannot be reached it falls back to a HuggingFace mirror (hf-mirror.com), where larger files may be served by HuggingFace's own CDN. The requests carry only the model and file names being fetched; no documents, conversations, or other user data are uploaded.
 
-**Cross-file reference and editing (Office/WPS add-in).** The AI in the Office/WPS task pane talks to our hosted add-in backend (addin.aiworkdeck.com / addin.workdeck.ai). It can read other files you point it at and edit another document you have open, so the following passes through our servers. **Another open document:** when you ask the AI in document A's pane to use or edit document B, B's text and the edits to be applied are relayed by the cloud backend between two panes **of your own account**, held in memory only and never stored; only a document that currently has the AI WorkDeck pane open can be edited, everything else is read-only. **A file in a desktop project:** the desktop app extracts that file's text on your own machine and the cloud backend relays it to the AI, in memory only, not stored and not charged; for this the desktop app keeps one extra connection to the **existing** add-in backend and adds no other server. **A file in a cloud project or in the official case library:** those files already live with us and are read under the project or matter permissions you already have, read-only, with no extra copy kept. **A GitHub or Gitee repository you link:** once you link one in the add-in, the cloud backend uses the access token you supplied to read that repository's file list and the file you asked for (outbound calls to api.github.com or gitee.com), **read-only, never committing and never pushing**; the token is stored encrypted, never echoed back, never logged, and the link can be removed at any time. In all four cases the reference text is not logged, not stored, and not used to train any model, and reading it is not charged (transferring a whole file across devices is still billed as before).
+**Cross-file reference and editing (Office/WPS add-in).** The AI in the Office/WPS task pane talks to our hosted add-in backend (addin.aiworkdeck.com / addin.workdeck.ai). It can read other files you point it at and edit another document you have open, so the following passes through our servers. **Another open document:** when you ask the AI in document A's pane to use or edit document B, B's text and the edits to be applied are relayed by the cloud backend between two panes **of your own account**, with raw relay payloads held temporarily in memory; only a document that currently has the AI WorkDeck pane open can be edited, everything else is read-only. **A file in a desktop project:** the desktop app extracts that file's text on your own machine and the cloud backend relays it to the AI, with raw relay payloads held temporarily in memory and reference reading not charged; for this the desktop app keeps one extra connection to the **existing** add-in backend and adds no other server. **A file in a cloud project or in the official case library:** those files already live with us and are read under the project or matter permissions you already have, read-only, with no extra copy kept. **A GitHub or Gitee repository you link:** once you link one in the add-in, the cloud backend uses the access token you supplied to read that repository's file list and the file you asked for (outbound calls to api.github.com or gitee.com), **read-only, never committing and never pushing**; the token is stored encrypted, never echoed back, never logged, and the link can be removed at any time. Raw reference relay payloads are not written to application logs and we do not use them for model training. Reading references itself is not charged; AI inference and whole-file transfers follow their respective billing rules.
+
+**Add-in document and conversation retention.** Inline document bodies and raw tool arguments/results are used for the current turn and transient memory caches, not stored in the request queue or conversation history. The add-in does not automatically create durable conversation summaries. Queued input bodies expire after at most 30 minutes and may be evicted earlier or lost on restart; a new upload is then required. User messages, AI replies and reasoning remain as conversation history **until the user deletes the conversation, with no separate automatic expiry**. This includes document text pasted by the user or quoted by the AI. Conversation deletion also removes queue requests and derived summaries and clears document caches; billing usage records remain. Copies already mirrored to a desktop project follow that project's rules and are not remotely erased by deleting the cloud conversation. Earlier versions stored inline bodies in the queue and tool excerpts and summaries in conversation storage; this update removes those redundant copies from the live database. Operational backups and material already sent to third parties are separate; this is not a promise of retrospective erasure of every copy.
+
+**Recipients of add-in AI requests.** Official add-in requests reach the AI WorkDeck cloud backend, then **OpenRouter**, then the inference provider serving the selected model. Available model developers include DeepSeek, Z.ai, Moonshot AI, Alibaba/Qwen, Anthropic, Google, OpenAI and xAI. A model's developer and its inference host can differ depending on routing. Requests include the current question, necessary conversation history, the current document and references the user selects. OpenRouter and each inference provider have their own retention, training and processing-location policies; our transient processing rule does not promise third-party zero retention. See the [OpenRouter provider list](https://openrouter.ai/providers/) and [OpenRouter privacy policy](https://openrouter.ai/privacy/).
 
 **Baoqingtian plugin (optional).** When you sign in, browse case leads or manage notes, the plugin connects directly from your device to Baoqingtian (uat.bqt.com). Requesting a verification code and signing in sends your entered phone number, country code and verification code to that service. Creating, editing, publishing or deleting a note sends the corresponding content or status. When creating an image or video note, the images, video and separate cover you select are uploaded by the local plugin to Baoqingtian’s designated Tencent Cloud COS storage. Upload signatures and buffered file chunks remain temporarily in local backend memory and are not written to plugin settings. Sessions remain only in the local backend memory, separated by AI WorkDeck user, and are cleared on plugin sign-out or backend restart. Notes are stored by Baoqingtian under its terms and privacy policy. The plugin does not upload project document contents or send notes or leads to the Marketplace. Workspace actions do not initiate model requests. The plugin tool bridge is reserved for encrypted workspace calls and does not accept plaintext business actions from AI chat. Publishing and deletion require your explicit action; closing an unsaved editor may discard its local edits.
 

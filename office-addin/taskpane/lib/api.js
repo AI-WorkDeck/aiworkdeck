@@ -715,6 +715,12 @@ export async function postChat({ serverUrl, token }, payload) {
   if (!resp.ok) {
     const err = new Error(t('apiChatFailedHttp', { status: resp.status }))
     err.status = resp.status
+    let detail = null
+    try { detail = await resp.json() } catch (_) { /* Non-JSON failures keep the HTTP fallback. */ }
+    if (detail && detail.code === 'INLINE_CONTENT_CACHE_MISS') {
+      err.code = detail.code
+      err.retryWithInlineContent = detail.retryWithInlineContent === true
+    }
     throw err
   }
 }

@@ -20,4 +20,8 @@ public interface AgentInboxItemRepository extends JpaRepository<AgentInboxItem, 
     Optional<AgentInboxItem> findByConversationIdAndUserIdAndClientRequestId(
             String conversationId, Long userId, String clientRequestId);
     List<AgentInboxItem> findByRunIdAndState(String runId, String state);
+    void deleteByConversationId(String conversationId);
+
+    @Query("select i.id from AgentInboxItem i where i.id > :cursor order by i.id")
+    List<String> findIdsAfter(@Param("cursor") String cursor, org.springframework.data.domain.Pageable pageable);
 }
