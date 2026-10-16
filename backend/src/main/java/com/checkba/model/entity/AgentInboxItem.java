@@ -50,7 +50,7 @@ public class AgentInboxItem {
     @Column(name = "display_text", columnDefinition = "TEXT")
     private String displayText;
 
-    /** Complete request, including attachment/context metadata, for durable restart/drain. */
+    /** Request metadata for restart/drain; inline document bodies remain only in expiring memory. */
     @Column(name = "request_json", columnDefinition = "TEXT", nullable = false)
     private String requestJson;
 

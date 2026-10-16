@@ -102,12 +102,12 @@ class OfficeBridgeServiceTest {
     }
 
     @Test
-    @DisplayName("分级超时：批量改写留够时间，其余命令仍是 30 秒（对齐 EditorBridgeService，dev-board#419）")
+    @DisplayName("分级超时：批量改写和内容读取留够时间，其余命令仍是 30 秒（对齐 EditorBridgeService，dev-board#419）")
     void batchCommandGetsLongerTimeout() {
         // 平超时是「后端先放弃、模型重发一次造成双改」的成因（EditorBridgeService
         // 早在 dev-board#108 就按 action 分级）。批量原语必然跑得久，不分级等于自造重复写入。
         assertEquals(30, OfficeBridgeService.timeoutSecondsFor("replace_text"));
-        assertEquals(30, OfficeBridgeService.timeoutSecondsFor("get_text"));
+        assertEquals(120, OfficeBridgeService.timeoutSecondsFor("get_text"));
         assertEquals(30, OfficeBridgeService.timeoutSecondsFor(null), "Map.of 对 null 键抛 NPE，必须有兜底");
         assertTrue(OfficeBridgeService.timeoutSecondsFor("replace_batch") >= 120,
                 "批量改写要留够时间");

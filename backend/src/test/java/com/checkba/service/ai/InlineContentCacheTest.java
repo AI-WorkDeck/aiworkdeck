@@ -15,6 +15,19 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class InlineContentCacheTest {
 
     @Test
+    void oversizedBodiesNeverStoreTruncatedHashesAndDeleteEvictsAllDocuments() {
+        InlineContentCache cache = new InlineContentCache();
+        cache.put("conv-a", "甲".repeat(200_000));
+        cache.put("conv-a", "甲".repeat(200_001));
+        assertNull(cache.contentOf("conv-a"));
+        cache.put("conv-a", "doc-1", "附件一");
+        cache.put("conv-a", "正文");
+        cache.evict("conv-a");
+        assertNull(cache.get("conv-a", "doc-1", InlineContentCache.sha256Hex("附件一")));
+        assertNull(cache.contentOf("conv-a"));
+    }
+
+    @Test
     @DisplayName("存取按会话隔离：哈希一致才取得到，跨会话取不到")
     void getRequiresMatchingHashAndConversation() {
         InlineContentCache cache = new InlineContentCache();

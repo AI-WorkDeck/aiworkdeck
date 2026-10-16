@@ -43,6 +43,10 @@ public interface ConversationSummaryRepository extends JpaRepository<Conversatio
      */
     void deleteByConversationId(String conversationId);
 
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("delete from ConversationSummary s where not exists (select m.id from ProjectAiMessage m where m.conversationId = s.conversationId)")
+    int deleteOrphanedSummaries();
+
     /**
      * 检查对话是否有摘要
      */

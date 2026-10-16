@@ -781,6 +781,10 @@ public class ContextAssemblerService {
         // 直送不了才 OCR 并明示降级。null = 活跃文档不是图片；true = 模型能看到图像本身；
         // false = 模型手上只有 OCR 转写。末位提醒据此选文案。
         Boolean activeImageVisible = null;
+        int activeBodyStart = -1;
+        int activeBodyEnd = -1;
+        String activeBody = null;
+        boolean activeBodyTruncated = false;
         if (activeContext != null && activeContext.getId() != null && !activeContext.getId().isEmpty()) {
             log.info("[Context] Injecting active document: id={}, name={}, inline={}",
                      activeContext.getId(), activeContext.getName(),
@@ -919,23 +923,18 @@ public class ContextAssemblerService {
             // 别注入一段空 CDATA 让模型以为文档本身是空的。
             // 工具返回的错误/警告文案同样不是正文（dev-board#779 K8）——见 isToolFailureText。
             if (!isToolFailureText(content) && content != null && !content.isBlank()) {
-                // 截断上限与普通附件解耦（审查 E-10）：附件是「顺手带一份参考」，
-                // 活跃文档是「用户此刻正在看的那一份」，按 5 万砍会把「通篇审一下」
-                // 变成只审前三分之一却说得像通篇审过
                 int maxChars = contextProperties.getFiles().getMaxCharsActiveDocument();
-                if (content.length() > maxChars) {
-                    // 内联路径已经截过并留了自己的标记时不再截第二刀（会把那个标记切掉），
-                    // 但提示照发——对用户来说「只读了前 N 字」是同一件事
-                    if (!content.endsWith(INLINE_TRUNCATION_MARKER)) {
-                        content = truncateAtCharBoundary(content, maxChars) + "\n... [TRUNCATED - File too long]";
-                    }
-                    ledger.notice(ContextTurnSink.TRUNCATED, activeContext.getId(),
-                            activeContext.getName(), String.valueOf(maxChars));
-                }
-
+                // Older clients cap locally at exactly 200k without reporting truncation.
+                // At that boundary completeness is unknown: label the supplied prefix explicitly.
+                boolean inlineBoundary = (activeContext.getInlineContent() != null
+                        || activeContext.getInlineContentHash() != null) && content.length() >= 200_000;
+                activeBodyTruncated = content.length() > maxChars || inlineBoundary;
+                activeBody = truncateAtCharBoundary(content, Math.min(content.length(), Math.max(0, maxChars)));
                 systemText.append("<active_document id=\"").append(activeContext.getId())
                           .append("\" name=\"").append(attrSafe(activeContext.getName())).append("\"><![CDATA[\n");
-                systemText.append(fenceSafe(content));
+                activeBodyStart = systemText.length();
+                systemText.append(fenceSafe(activeBody));
+                activeBodyEnd = systemText.length();
                 systemText.append("\n]]></active_document>\n");
             } else {
                 // 正文暂时读不到也要保留文档标识，模型仍可用读取类工具（按会话能力）直接读
@@ -1154,6 +1153,40 @@ public class ContextAssemblerService {
                 + templateProfileFact(activeContext, clientCapabilityService.capabilityOf(conversationId), projectId)
                 + clarificationReminder(agentMode, userPrompt, english)
                 + questionPresentationReminder(agentMode, english);
+
+        // Limit the actual active-document injection after history compression. The reserve
+        // covers tools added by the orchestrator; this is a conservative estimate, not a
+        // provider-tokenizer guarantee. Keep the full body in the in-memory cache.
+        if (activeBodyStart >= 0) {
+            String withoutBody = systemText.substring(0, activeBodyStart) + systemText.substring(activeBodyEnd);
+            long fixedTokens = (long) contextProperties.getSystemPromptReserve() + conservativeTokens(withoutBody);
+            long historyTokens = 0;
+            for (dev.langchain4j.data.message.ChatMessage history : historyMessages) {
+                if (history instanceof dev.langchain4j.data.message.UserMessage u) historyTokens += conservativeTokens(u.singleText());
+                else if (history instanceof dev.langchain4j.data.message.AiMessage a) historyTokens += conservativeTokens(a.text());
+            }
+            long remaining = Math.max(0L, (long) contextProperties.maxContextTokensFor(modelKey)
+                    - fixedTokens - historyTokens - conservativeTokens(userText)
+                    - contextProperties.getMemoryReserve() - contextProperties.getResponseReserve()
+                    - (long) visionAttachments.size() * contextProperties.getVision().getTokenEstimatePerImage() - 256L);
+            int allowedChars = prefixCharsForTokens(activeBody, remaining);
+            boolean budgetTruncated = allowedChars < activeBody.length();
+            if (activeBodyTruncated || budgetTruncated) {
+                String prefix = truncateAtCharBoundary(activeBody, allowedChars);
+                String marker = budgetTruncated
+                        ? "\n... [TRUNCATED - Model context budget; only the prefix above was supplied. Read remaining sections before claiming complete review.]"
+                        : INLINE_TRUNCATION_MARKER;
+                systemText.replace(activeBodyStart, activeBodyEnd, fenceSafe(prefix + marker));
+                messages.set(0, dev.langchain4j.data.message.SystemMessage.from(systemText.toString()));
+                ledger.notice(ContextTurnSink.TRUNCATED, activeContext.getId(),
+                        activeContext.getName(), String.valueOf(prefix.length()));
+                userText += english
+                        ? "\n[System reminder] Only the first " + prefix.length()
+                            + " characters of the active document were supplied; completeness is not guaranteed. Read the remaining sections before claiming a full-document review."
+                        : "\n[系统提醒] 本轮仅提供活跃文档前 " + prefix.length()
+                            + " 个字符，不能据此认定全文完整。如需作全文审查结论，须先分段读取其余正文。";
+            }
+        }
 
         if (visionAttachments.isEmpty()) {
             // 没有图片时**保持旧构造**。语义上「只含一个 TextContent 的 list」与纯文本等价
@@ -1872,19 +1905,17 @@ public class ContextAssemblerService {
     }
 
     /**
-     * 内联正文被截断时留下的尾巴。**注入处据它判「这段已经截过了」**，
-     * 不然会被按活跃文档上限再截一刀，把这个更具体的标记本身切掉、换成通用的那个
-     *（客户端上传的正文太长 vs 文件本身太长，对用户是两件事）。
+     * 包括旧插件恰好截至 200k 的边界：只能确认收到此前缀，不能保证全文完整。
+     * 模型预算可能进一步缩短前缀；缓存始终保存上传的原文而非这个标记。
      */
-    private static final String INLINE_TRUNCATION_MARKER = "\n... [TRUNCATED - Inline content too long]";
+    private static final String INLINE_TRUNCATION_MARKER = "\n... [TRUNCATED - Inline content too long] Only the supplied prefix is available; completeness is not guaranteed. Read remaining sections before claiming complete review.";
 
     /**
      * 活跃文档正文来源三选一：
      * 1) 请求随带的内联正文（Office 插件等场景——文档在客户端本地，后端没有可读的 fileId）优先，
      *    同时按会话存入 InlineContentCache 供后续「省传」轮次取用；
      * 2) 只带内联正文哈希（文档自上一轮起没变，客户端省掉了整篇正文的上行）：凭哈希查缓存，
-     *    命中即复用；未命中（缓存已被 LRU 驱逐、或哈希对不上说明文档已改）返回 null，
-     *    由调用方按「正文暂不可读」现状处理——模型可改用读取类工具，不报错；
+     *    命中即复用；未命中明确失败要求重传，不能让模型当作无正文继续；
      * 3) 两者都没有时走既有 read_document(fileId) 路径。
      * 三条路径产出同格式正文，后续统一由调用方做 CDATA 包裹与 maxCharsPerFile 截断。
      */
@@ -1893,14 +1924,6 @@ public class ContextAssemblerService {
             String conversationId) {
         String inline = activeContext.getInlineContent();
         if (inline != null && !inline.isEmpty()) {
-            // 上限与「活跃文档正文上限」是同一个概念，走同一个配置项（dev-board#793 K14 ⑥）。
-            // 两处各写一个数的后果就是 E-10 那条：这里按 20 万截、注入处再按 5 万砍一刀，
-            // 实际生效的是小的那个，而插件每轮上传的正文有一大半是白传的。
-            int inlineMax = contextProperties.getFiles().getMaxCharsActiveDocument();
-            if (inline.length() > inlineMax) {
-                // 超限正文不入缓存：缓存的内存上界按每条上限字符估算
-                return truncateAtCharBoundary(inline, inlineMax) + INLINE_TRUNCATION_MARKER;
-            }
             inlineContentCache.put(conversationId, inline);
             return inline;
         }
@@ -1908,12 +1931,45 @@ public class ContextAssemblerService {
         if (hash != null && !hash.isBlank()) {
             String cached = inlineContentCache.get(conversationId, hash);
             if (cached == null) {
-                log.info("[Context] Inline content hash miss for conversation {}, falling back to no inline body",
-                        conversationId);
+                throw new InlineContentCache.CacheMiss();
             }
             return cached;
         }
         return legalTools.read_document(activeContext.getId());
+    }
+
+    // Chinese and other non-ASCII text can consume substantially more than chars/2.
+    // Use two tokens per Unicode code point, and the configured ratio only for ASCII.
+    private double estimatedCodePointTokens(int codePoint) {
+        return codePoint > 127 ? 2.0 : 1.0 / Math.max(0.1, contextProperties.getCharsPerToken());
+    }
+
+    private long conservativeTokens(String text) {
+        if (text == null) return 0;
+        double tokens = 0;
+        for (int i = 0; i < text.length();) {
+            int cp = text.codePointAt(i);
+            tokens += estimatedCodePointTokens(cp);
+            i += Character.charCount(cp);
+        }
+        return (long) Math.ceil(tokens);
+    }
+
+    private int prefixCharsForTokens(String text, long budget) {
+        double tokens = 0;
+        int i = 0;
+        while (i < text.length()) {
+            int cp = text.codePointAt(i);
+            double cost = estimatedCodePointTokens(cp);
+            // fenceSafe expands the CDATA terminator from three ASCII characters to six.
+            if (cp == '>' && i >= 2 && text.charAt(i - 1) == ']' && text.charAt(i - 2) == ']') {
+                cost += 3 * estimatedCodePointTokens('a');
+            }
+            if (tokens + cost > budget) break;
+            tokens += cost;
+            i += Character.charCount(cp);
+        }
+        return i;
     }
 
     /**

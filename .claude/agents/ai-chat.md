@@ -7,6 +7,14 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## Office会话隐私（2026-10-16，dev-board#1316–1318）
+
+OfficeConversationPrivacy在ProjectAiMessageService保存助手消息前移除tool_code/tool_output
+原始载荷（含中断未闭合片段）；模型当前轮内存仍可消费完整工具结果，最终回复和用户主动输入照常保存。
+MemoryPipelineService对OFFICE跳过自动摘要及后台同步，避免将SystemMessage活跃正文和ToolResult
+另行转成长期记忆。用户显式写入的项目记忆仍是独立功能。删会话同步清Inbox/摘要/正文缓存；
+启动迁移与hash缺失重传契约见office-addin.md。不要把清历史在线行称为擦除运维备份。
+
 ## 下一句建议（dev-board#1224，2026-10-12）
 
 - 桌面 `ChatSuggestionControl` / `useChatSuggestions` 默认开启，用户+后端地址独立偏好。仅真实 SSE `bubble_end status=finished` 回调且面板可见、输入空时请求；历史恢复、等待回答/审批、取消、输入中不发起。开关说明披露额外用量，关闭不再发起；不承诺取消已经送出的模型请求。

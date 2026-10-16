@@ -25,7 +25,7 @@ import java.util.function.Supplier;
 
 /** Persistent, revisioned inbox for Agent input. */
 @Service
-public class AgentInboxService {
+public class AgentInboxService implements org.springframework.boot.ApplicationRunner {
     public static final String PENDING = "pending";
     public static final String APPLIED = "applied";
     public static final String INTERRUPTED = "interrupted";
@@ -45,9 +45,21 @@ public class AgentInboxService {
         public RevisionConflict(String message) { super(message); }
     }
 
+    public static final class InlineContentUnavailable extends IllegalStateException {
+        public static final String CODE = "INLINE_CONTENT_CACHE_MISS";
+        public InlineContentUnavailable() {
+            super("文档正文缓存已过期或服务已重启，请重新发送文档正文。 / Document content is no longer cached; resend the document text.");
+        }
+    }
+
     private final AgentInboxItemRepository repository;
     private final SseEmitterService sseEmitterService;
     private final AgentRunStateService runStateService;
+    private final InboxInlineContentStore inlineBodies = new InboxInlineContentStore();
+    @Autowired(required = false)
+    private com.checkba.repository.ConversationSummaryRepository conversationSummaries;
+    @Autowired(required = false)
+    private com.checkba.repository.ProjectAiMessageRepository conversationMessages;
     private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -96,7 +108,10 @@ public class AgentInboxService {
             if (key != null) {
                 Optional<AgentInboxItem> existing = repository
                         .findByConversationIdAndUserIdAndClientRequestId(conv, userId, key);
-                if (existing.isPresent()) return existing.get();
+                if (existing.isPresent()) {
+                    restoreRetryBodies(existing.get(), request);
+                    return existing.get();
+                }
             }
 
             AgentInboxItem row = new AgentInboxItem();
@@ -112,12 +127,14 @@ public class AgentInboxService {
             row.setMessage(request.getMessage());
             row.setDisplayText(blankToNull(request.getDisplayText()));
             row.setRequestJson(writeRequest(request));
+            inlineBodies.put(row.getId(), conv, collectInlineBodies(request));
             LocalDateTime now = LocalDateTime.now();
             row.setCreatedAt(now);
             row.setUpdatedAt(now);
             try {
                 row = repository.saveAndFlush(row);
             } catch (DataIntegrityViolationException race) {
+                inlineBodies.remove(row.getId());
                 if (key == null) throw race;
                 row = repository.findByConversationIdAndUserIdAndClientRequestId(conv, userId, key)
                         .orElseThrow(() -> race);
@@ -137,11 +154,22 @@ public class AgentInboxService {
     }
 
     public AiAgentController.AgentChatRequest requestOf(AgentInboxItem row) {
+        AiAgentController.AgentChatRequest request;
         try {
-            return mapper.readValue(row.getRequestJson(), AiAgentController.AgentChatRequest.class);
+            request = mapper.readValue(row.getRequestJson(), AiAgentController.AgentChatRequest.class);
         } catch (Exception e) {
-            throw new IllegalStateException("Stored inbox request is unreadable: " + row.getId(), e);
+            // Jackson exception messages may contain snippets of the original request.
+            throw new IllegalStateException("Stored inbox request is unreadable: " + row.getId());
         }
+        for (AiAgentController.ContextItem item : contextItems(request)) {
+            if (item.getInlineContent() != null && !item.getInlineContent().isEmpty()) continue;
+            String hash = item.getInlineContentHash();
+            if (hash == null || hash.isBlank() || item.isStaleBody()) continue;
+            String body = inlineBodies.get(row.getId(), hash);
+            if (body == null) throw new InlineContentUnavailable();
+            item.setInlineContent(body);
+        }
+        return request;
     }
 
     /** Server-owned continuation metadata in the existing durable request snapshot. */
@@ -317,12 +345,14 @@ public class AgentInboxService {
                 AgentInboxItem row = requireOwned(conversationId, id);
                 assertMutable(row, expectedRevision);
                 row.setState(DELETED);
+                clearDeletedContent(row);
                 row.setRevision(row.getRevision() + 1);
                 row.setUpdatedAt(LocalDateTime.now());
                 repository.saveAndFlush(row);
                 compactPendingPositions(conversationId);
                 return snapshot(conversationId);
             });
+            inlineBodies.remove(id);
             emitSnapshot(snapshot, conversationId);
             return snapshot;
         }
@@ -441,9 +471,137 @@ public class AgentInboxService {
 
     private String writeRequest(AiAgentController.AgentChatRequest request) {
         try {
-            return mapper.writeValueAsString(request);
+            var json = mapper.valueToTree(request);
+            stripInlineContent(json);
+            return mapper.writeValueAsString(json);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Request metadata cannot be stored", e);
+            throw new IllegalArgumentException("Request metadata cannot be stored");
+        }
+    }
+
+    private static List<AiAgentController.ContextItem> contextItems(AiAgentController.AgentChatRequest request) {
+        List<AiAgentController.ContextItem> items = new ArrayList<>();
+        if (request.getActiveContext() != null) items.add(request.getActiveContext());
+        if (request.getContextItems() != null) request.getContextItems().stream().filter(Objects::nonNull).forEach(items::add);
+        return items;
+    }
+
+    private static Map<String, String> collectInlineBodies(AiAgentController.AgentChatRequest request) {
+        Map<String, String> bodies = new HashMap<>();
+        for (AiAgentController.ContextItem item : contextItems(request)) {
+            String body = item.getInlineContent();
+            if (body != null && !body.isEmpty()) bodies.put(InlineContentCache.sha256Hex(body), body);
+        }
+        return bodies;
+    }
+
+    private void restoreRetryBodies(AgentInboxItem row, AiAgentController.AgentChatRequest retry) {
+        if (!PENDING.equals(row.getState())) return;
+        Map<String, String> incoming = collectInlineBodies(retry);
+        if (incoming.isEmpty()) return;
+        AiAgentController.AgentChatRequest original;
+        try {
+            original = mapper.readValue(row.getRequestJson(), AiAgentController.AgentChatRequest.class);
+        } catch (Exception unreadable) {
+            throw new IllegalStateException("Stored inbox request is unreadable: " + row.getId());
+        }
+        Map<String, String> restored = new HashMap<>();
+        for (AiAgentController.ContextItem item : contextItems(original)) {
+            String hash = item.getInlineContentHash();
+            if (hash == null || hash.isBlank()) continue;
+            String body = inlineBodies.get(row.getId(), hash);
+            if (body == null) body = incoming.get(hash);
+            if (body != null) restored.put(hash, body);
+        }
+        // The idempotency key cannot replace a queued document with a different version.
+        if (!restored.isEmpty()) inlineBodies.put(row.getId(), row.getConversationId(), restored);
+    }
+
+    private static void stripInlineContent(com.fasterxml.jackson.databind.JsonNode node) {
+        if (node instanceof com.fasterxml.jackson.databind.node.ObjectNode object) {
+            var body = object.remove("inlineContent");
+            if (body != null && body.isTextual() && !body.asText().isEmpty()) {
+                object.put("inlineContentHash", InlineContentCache.sha256Hex(body.asText()));
+            }
+        }
+        node.elements().forEachRemaining(AgentInboxService::stripInlineContent);
+    }
+
+    private static void clearDeletedContent(AgentInboxItem row) {
+        row.setMessage("");
+        row.setDisplayText(null);
+        row.setRequestJson("{}");
+    }
+
+    /** Called within the conversation deletion transaction, preserving its atomicity. */
+    @Transactional
+    public void deleteConversation(String conversationId) {
+        synchronized (conversationLock(conversationId)) {
+            repository.deleteByConversationId(conversationId);
+            inlineBodies.removeConversation(conversationId);
+        }
+    }
+
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 60_000)
+    public void purgeExpiredInlineBodies() { inlineBodies.purgeExpired(); }
+
+    /** Runs before readiness; bounded batches scrub legacy bodies without logging their contents. */
+    @Override
+    public void run(org.springframework.boot.ApplicationArguments args) {
+        if (conversationSummaries != null) inTransaction(() -> conversationSummaries.deleteOrphanedSummaries());
+        Set<String> cleanedOfficeConversations = new HashSet<>();
+        String cursor = "";
+        while (true) {
+            List<String> ids = repository.findIdsAfter(cursor, org.springframework.data.domain.PageRequest.of(0, 100));
+            if (ids.isEmpty()) return;
+            inTransaction(() -> {
+                for (String id : ids) {
+                    AgentInboxItem row = require(id);
+                    String before = row.getRequestJson();
+                    com.fasterxml.jackson.databind.JsonNode json;
+                    String sanitized;
+                    try {
+                        json = mapper.readTree(before);
+                        stripInlineContent(json);
+                        sanitized = mapper.writeValueAsString(json);
+                    } catch (Exception unreadable) {
+                        // Unreadable legacy payloads cannot safely be replayed or retained.
+                        row.setRequestJson("{}");
+                        if (DELETED.equals(row.getState())) clearDeletedContent(row);
+                        else row.setState(INTERRUPTED);
+                        repository.save(row);
+                        continue;
+                    }
+                    if ("office".equalsIgnoreCase(json.path("clientCapability").asText())
+                            && cleanedOfficeConversations.add(row.getConversationId())) {
+                        scrubOfficeHistory(row.getConversationId());
+                    }
+                    if (DELETED.equals(row.getState())) {
+                        clearDeletedContent(row);
+                        repository.save(row);
+                    } else if (!Objects.equals(before, sanitized)) {
+                        row.setRequestJson(sanitized);
+                        repository.save(row);
+                    }
+                }
+                return null;
+            });
+            cursor = ids.get(ids.size() - 1);
+        }
+    }
+
+    private void scrubOfficeHistory(String conversationId) {
+        if (conversationSummaries != null) conversationSummaries.deleteByConversationId(conversationId);
+        if (conversationMessages == null) return;
+        for (var message : conversationMessages.findByConversationIdOrderByCreatedAtAsc(conversationId)) {
+            if (!"ASSISTANT".equalsIgnoreCase(message.getRole())) continue;
+            String content = OfficeConversationPrivacy.forStorage(message.getContent());
+            String display = OfficeConversationPrivacy.forStorage(message.getDisplayContent());
+            if (!Objects.equals(content, message.getContent()) || !Objects.equals(display, message.getDisplayContent())) {
+                message.setContent(content);
+                message.setDisplayContent(display);
+                conversationMessages.save(message);
+            }
         }
     }
 

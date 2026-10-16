@@ -20,6 +20,15 @@ public class ProjectAiMessageService {
 
     private final ProjectAiMessageRepository repository;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.ClientCapabilityService clientCapabilities;
+
+    private String assistantStorage(String conversationId, String content) {
+        return clientCapabilities != null && clientCapabilities.capabilityOf(conversationId)
+                == com.checkba.service.ai.ClientCapabilityService.Capability.OFFICE
+                ? com.checkba.service.ai.OfficeConversationPrivacy.forStorage(content) : content;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.repository.ChatSuggestionRepository chatSuggestions;
     private final com.checkba.service.ai.ConversationIssuanceService conversationIssuanceService;
     /** 概览页会话列表的运行状态来源：读表不读 AgentRunStateService 的内存 Map。 */
@@ -43,6 +52,13 @@ public class ProjectAiMessageService {
      */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.repository.ProjectAiMessageAttachmentRepository attachmentRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.AgentInboxService agentInboxService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.InlineContentCache inlineContentCache;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.repository.ConversationSummaryRepository conversationSummaries;
 
     void setAttachmentRepositoryForTest(com.checkba.repository.ProjectAiMessageAttachmentRepository repo) {
         this.attachmentRepository = repo;
@@ -181,8 +197,9 @@ public class ProjectAiMessageService {
         msg.setProjectId(projectId);
         msg.setUserId(userId);
         msg.setRole(role.toUpperCase());
-        msg.setContent(content);
-        msg.setDisplayContent(displayContent == null || displayContent.isBlank() ? null : displayContent);
+        msg.setContent("ASSISTANT".equalsIgnoreCase(role) ? assistantStorage(conversationId, content) : content);
+        msg.setDisplayContent(displayContent == null || displayContent.isBlank() ? null
+                : "ASSISTANT".equalsIgnoreCase(role) ? assistantStorage(conversationId, displayContent) : displayContent);
         msg.setClientRequestId(clientRequestId == null || clientRequestId.isBlank() ? null : clientRequestId.trim());
         msg.setConversationId(conversationId);
         msg.setCreatedAt(java.time.LocalDateTime.now());
@@ -211,6 +228,7 @@ public class ProjectAiMessageService {
      */
     public Long upsertAssistantMessage(String projectIdStr, Long userId, String conversationId, Long existingMessageId,
                                        String content, String reasoning) {
+        content = assistantStorage(conversationId, content);
         if (projectIdStr == null) {
             return null;
         }
@@ -786,12 +804,15 @@ public class ProjectAiMessageService {
     }
 
     /**
-     * 整会话删除（dev-board#148，Office 插件历史面板）。只删消息本体；
+     * 整会话删除，同时清除待处理输入、派生摘要与短期正文缓存；
      * token 用量记录是计费对账凭证、文件变动清单挂在自己的服务上，均不随删。
      */
     @org.springframework.transaction.annotation.Transactional
     public void deleteConversation(String conversationId) {
         if (chatSuggestions != null) chatSuggestions.deleteByConversationId(conversationId);
+        if (agentInboxService != null) agentInboxService.deleteConversation(conversationId);
+        if (conversationSummaries != null) conversationSummaries.deleteByConversationId(conversationId);
+        if (inlineContentCache != null) inlineContentCache.evict(conversationId);
         repository.deleteByConversationId(conversationId);
     }
 
