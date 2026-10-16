@@ -131,7 +131,7 @@ public class ProjectRepoService {
     }
 
     boolean hasLocalRoot(long projectId) {
-        return storageResolver.hasLocalRoot(projectId);
+        return storageResolver.hasLocalRootForVersionLock(projectId);
     }
 
     public void requireVersionRecordingSupported(long projectId) {
