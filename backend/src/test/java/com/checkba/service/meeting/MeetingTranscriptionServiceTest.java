@@ -449,10 +449,11 @@ class MeetingTranscriptionServiceTest {
     }
 
     @Test
-    @DisplayName("needsAudioExtraction：视频容器（大小写不敏感）为真，音频（含 webm）为假")
-    void needsAudioExtractionForVideoOnly() {
+    @DisplayName("needsAudioExtraction：视频和 QTA 必须先转换，普通音频（含 webm）可回退")
+    void needsAudioExtractionForVideoAndQta() {
         assertTrue(MeetingTranscriptionService.needsAudioExtraction("庭审.mp4"));
         assertTrue(MeetingTranscriptionService.needsAudioExtraction("CLIP.MOV"));
+        assertTrue(MeetingTranscriptionService.needsAudioExtraction("空间录音.QTA"));
         assertFalse(MeetingTranscriptionService.needsAudioExtraction("rec.mp3"));
         assertFalse(MeetingTranscriptionService.needsAudioExtraction("meeting.webm"));
         assertFalse(MeetingTranscriptionService.needsAudioExtraction("noext"));
