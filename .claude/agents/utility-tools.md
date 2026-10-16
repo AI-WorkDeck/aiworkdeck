@@ -247,6 +247,18 @@ mtime+size 指纹没变，缓存里那句「请先转写」会永久生效且不
 `ChatInterface` 的未转写提示条共用它。`meeting_get_transcript` / `meeting_list_recordings`
 是模型**主动**读会议的入口（按 meetingId），与这条「附件自动注入」互不替代。
 
+**QTA 转写（dev-board#1310）**：前后端音频判据含 `.qta`（大小写不敏感），可右键转写，
+但听悟官方格式清单未列 QTA，**三档均不得将转码失败回退的 QTA 原件上传或送 ASR**。
+`MeetingAudioTranscoder` 先探测音轨：单轨须可解码；多轨只接受唯一 AAC 加其余均为 `apac` 的空间辅助轨。
+多条 AAC 或其他不明确的多轨可能是分层录音，直接失败并提示在语音备忘录中分离录音层、分别导出 M4A，不能静默只取一层。
+转码在本机生成 16kHz 单声道 MP3，原文件不改；损坏/缺少解码器/空音轨都会在出站调用前落失败。
+真实 APAC 仍未实测，不承诺全部 Apple QTA 变体。回归 `MeetingAudioTranscoderQtaTest`、
+`MeetingQtaTranscriptionTest` 使用合成 QuickTime 多音轨和本机原生库，云端协作者全 mock；
+夹具来源与限制在 `backend/src/test/resources/fixtures/media/two-track-audio.md`。
+依据：[Apple QTA/AAC/APAC](https://developer.apple.com/videos/play/wwdc2025/251/)、
+[Apple 分层录音](https://support.apple.com/en-ie/guide/ipad/ipadb372d34f/27/ipados/27)、
+[听悟功能说明](https://help.aliyun.com/zh/tingwu/features)。
+
 **会议录音实测回归（dev-board#478/#483/#487）**：麦克风面板每次初开优先浏览器
 `deviceId='default'`，不再恢复历史 `awd_meeting_mic_device_id`；设备变化按当前选中的
 **设备 ID** 保留选择，离线才回默认，重新出现不能抢回来。两个改名输入框走 uni-input 的

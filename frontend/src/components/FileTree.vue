@@ -1,7 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view class="file-tree" tabindex="0" @keydown="handleKeyDown" @mousedown="focusTree">
+  <view class="file-tree" tabindex="0" @keydown="handleKeyDown" @mousedown="focusTree" @click="focusTree">
 
     <!-- AI WorkDeck Style Modals System -->
     <!-- 删除确认（单个/批量、软删/硬删）走应用内对话框 AwdDialog（showDeleteConfirmDialog
@@ -120,11 +120,15 @@
             <view v-if="renamingId === folder.id" class="rename-input-wrapper dialog-rename" @tap.stop>
               <input
                 class="rename-input"
+                :confirm-hold="true"
+                :ignore-composition-event="false"
                 v-model="tempRenameValue"
                 :focus="true"
-                @confirm="commitRename"
+                @confirm="handleRenameConfirm"
                 @blur="commitRename"
-                @keydown.esc="renamingId = null"
+                @keydown.esc="!renameComposing && (renamingId = null)"
+                @compositionstart="renameComposing = true"
+                @compositionend="renameComposing = false"
               />
             </view>
             <text v-else class="folder-name">{{ folder.name }}</text>
@@ -431,11 +435,15 @@
             <view v-if="renamingId === item.id" class="rename-input-wrapper" @tap.stop @mousedown.stop>
               <input
                 class="rename-input"
+                :confirm-hold="true"
+                :ignore-composition-event="false"
                 v-model="tempRenameValue"
-                @confirm="commitRename"
+                @confirm="handleRenameConfirm"
                 @blur="commitRename"
                 :focus="true"
                 @keydown.stop="handleRenameKeydown"
+                @compositionstart="renameComposing = true"
+                @compositionend="renameComposing = false"
               />
             </view>
             <text v-else class="tree-item-name">
@@ -559,11 +567,15 @@
             <view v-if="renamingId === item.id" class="rename-input-wrapper" @tap.stop @mousedown.stop>
               <input
                 class="rename-input"
+                :confirm-hold="true"
+                :ignore-composition-event="false"
                 v-model="tempRenameValue"
-                @confirm="commitRename"
+                @confirm="handleRenameConfirm"
                 @blur="commitRename"
                 :focus="true"
                 @keydown.stop="handleRenameKeydown"
+                @compositionstart="renameComposing = true"
+                @compositionend="renameComposing = false"
               />
             </view>
             <text v-else class="tree-item-name">
@@ -855,6 +867,8 @@ export default {
       showRecycleBin: false,
       viewMode: 'files', // 'files' | 'recycle'
       renamingId: null,
+      renameComposing: false,
+      keyboardDeletePending: false,
       tempRenameValue: '',
 
       // Sort
@@ -1130,7 +1144,7 @@ export default {
     // 暂存区的 dragstart 只经 uni 的 file-drag-start 通知本树：$emit 是同步的，此刻
     // window.event 就是那次原生 dragstart，起点从它上面取。
     this._onDragStart = () => { this.isAnyDragging = true; this.recordDragStartPoint() }
-    this._onDragEnd = () => { this.isAnyDragging = false; this.stagingDragOver = false; this.dragStartPoint = null }
+    this._onDragEnd = () => { this.isAnyDragging = false; this.stagingDragOver = false; this.rootDropActive = false; this.externalDragActive = false; this.dragStartPoint = null }
     uni.$on('file-drag-start', this._onDragStart)
     uni.$on('file-drag-end', this._onDragEnd)
     // 「管理标签」「标签管理」两个内联弹窗的 Esc（v0.49.0 BUG-74）：它们是 awd-dialog-mask，
@@ -1194,13 +1208,25 @@ export default {
       return item ? item.name : ''
     },
     // 让文件树容器可聚焦，接收键盘事件（H5）
-    focusTree() {
+    // uni-h5 keeps key/code but drops DOM targets and keyboard flags. Resolve the
+    // currently dispatching event by type; an unrelated window.event is never reused.
+    treeInputEvent(event, type) {
+      if (!event) return event
+      const native = typeof window !== 'undefined' ? window.event : null
+      return native?.type === type ? native : event
+    },
+    isTreeControlTarget(target) {
+      return !!target?.closest?.('input, textarea, select, button, a, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="button"], [role="dialog"], .awd-dialog-mask, .dialog-overlay, .context-menu, .tree-footer')
+    },
+    focusTree(event) {
+      // A row's default mousedown can move focus back to body after our handler.
+      // Refocus on click too, without cancelling mousedown/native drag initiation.
+      const e = this.treeInputEvent(event, event?.type === 'click' ? 'click' : 'mousedown')
+      if (e && this.isTreeControlTarget(e.target)) return
       try {
-        const el = typeof document !== 'undefined' ? document.querySelector('.file-tree') : null
-        if (el && el.focus) el.focus()
-      } catch (e) {
-        // ignore
-      }
+        const el = this.$el
+        if (el?.focus) el.focus({ preventScroll: true })
+      } catch (e) { /* A native-only surface may have no DOM. */ }
     },
     toggleSortMenu() {
       this.showSortMenu = !this.showSortMenu
@@ -1492,10 +1518,27 @@ export default {
         this.showErrorModal(error.message || this.$t('fileTree.createFileFailedRetry'), this.$t('fileTree.createFailed'))
       }
     },
-    handleRenameKeydown(e) {
-      if (e.key === 'Enter' || e.key === 'Escape') {
-        this.commitRename()
+    handleRenameConfirm(event) {
+      // uni-h5 emits confirm on keyup. The Enter that opens rename would otherwise
+      // reach the newly mounted input and immediately submit it again.
+      if (typeof window !== 'undefined' && window.event?.type === 'keyup') return
+      const e = this.treeInputEvent(event, 'keydown')
+      if (this.renameComposing || e?.isComposing || e?.keyCode === 229) return
+      return this.commitRename(e || event)
+    },
+    async handleRenameKeydown(event) {
+      const e = this.treeInputEvent(event, 'keydown')
+      if (!e) return
+      if (this.renameComposing || e.isComposing || e.keyCode === 229) return
+      if (e.key !== 'Enter' && e.key !== 'Escape') return
+      e.preventDefault?.()
+      if (e.key === 'Escape') {
+        this.renamingId = null
+        this.tempRenameValue = ''
+      } else {
+        await this.commitRename(e)
       }
+      this.$nextTick(() => this.focusTree())
     },
     // 右键「创建副本」：在原位置建「【副本】xxx」。资源管理器没有文件粘贴，所以不写剪贴板——
     // 以前这里叫「复制」还调 uni.setClipboardData，它自带一条「Content copied」toast，
@@ -1524,12 +1567,16 @@ export default {
        }
     },
     handleRename(item) {
+      this.renameComposing = false
       this.renamingId = item.id
       this.tempRenameValue = item.name
       // this.showRenameDialog = true
     },
-    async commitRename() {
-      if (!this.renamingId) return
+    async commitRename(e) {
+      const native = this.treeInputEvent(e, e?.type === 'keydown' || e?.key ? 'keydown' : 'blur')
+      if (!this.renamingId || this.renameComposing || native?.isComposing || native?.keyCode === 229) return
+      const inputValue = native?.target?.value ?? e?.detail?.value ?? e?.target?.value
+      if (typeof inputValue === 'string') this.tempRenameValue = inputValue
 
       const fileId = this.renamingId
       const newName = (this.tempRenameValue || '').trim()
@@ -2596,31 +2643,77 @@ export default {
       return true
     },
 
-    handleKeyDown(e) {
-      if (!e) return
+    selectKeyboardItem(item) {
+      if (!item) return
+      this.selectedFileId = item.id
+      if (!this.selectionMode) {
+        this.multiSelectedIds = [item.id]
+        this.$emit('multi-select-change', this.multiSelectedIds)
+      }
+      this.activeFolderId = item.isFolder ? item.id : item.parentId
+      this.lastClickItemId = null
+      this.lastClickTime = 0
+      // Reveal a row beyond the per-folder rendering limit before scrolling to it.
+      const siblings = this.displayFiles.filter(f => String(f.parentId) === String(item.parentId))
+      const needed = siblings.findIndex(f => String(f.id) === String(item.id)) + 1
+      const key = this.windowParentKey(item.parentId)
+      if (needed > (this.revealCounts[key] || 100)) this.revealCounts[key] = needed
+      this.$nextTick(() => {
+        const rows = this.$el?.querySelectorAll?.('.tree-item[data-file-id]') || []
+        const row = Array.from(rows).find(el => el.getAttribute('data-file-id') === String(item.id))
+        row?.scrollIntoView?.({ block: 'nearest' })
+      })
+    },
+    async handleKeyDown(event) {
+      const e = this.treeInputEvent(event, 'keydown')
+      if (!e || e.defaultPrevented || e.isComposing || e.keyCode === 229 || this.renamingId != null) return
+      if (this.isTreeControlTarget(e.target) || this.showFolderSelector || this.showTagEditDialog || this.showTagManager || this.showRenameDialog || this.contextMenu.visible) return
+      if (this.keyboardDeletePending || e.altKey || e.shiftKey) return
       const key = e.key
-      const idx = this.files.findIndex(f => f.id === this.selectedFileId)
-      const curIndex = idx >= 0 ? idx : 0
-
-      if (key === 'ArrowDown') {
-        e.preventDefault()
-        const next = this.files[Math.min(this.files.length - 1, curIndex + 1)]
-        if (next) this.handleItemClick(next)
-      } else if (key === 'ArrowUp') {
-        e.preventDefault()
-        const prev = this.files[Math.max(0, curIndex - 1)]
-        if (prev) this.handleItemClick(prev)
-      } else if (key === 'ArrowLeft') {
-        e.preventDefault()
-        const cur = this.files[curIndex]
-        if (cur && cur.isFolder && this.expandedFolders.has(cur.id)) {
-          this.toggleFolder(cur.id)
+      const deleting = key === 'Delete' || key === 'Backspace'
+      if ((e.metaKey || e.ctrlKey) && !deleting && !key?.startsWith('Arrow')) return
+      if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter', 'Delete', 'Backspace'].includes(key)) return
+      const list = this.displayFiles
+      if (!list.length) return
+      e.preventDefault?.()
+      e.stopPropagation?.()
+      const idx = list.findIndex(f => String(f.id) === String(this.selectedFileId))
+      const cur = idx < 0 ? null : list[idx]
+      if (key === 'ArrowDown' || key === 'ArrowUp') {
+        const next = idx < 0 ? 0 : Math.max(0, Math.min(list.length - 1, idx + (key === 'ArrowDown' ? 1 : -1)))
+        this.selectKeyboardItem(list[next])
+      } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
+        if (!cur) { this.selectKeyboardItem(list[0]); return }
+        if (this.viewMode === 'recycle') return
+        if (key === 'ArrowLeft') {
+          if (cur.isFolder && this.expandedFolders.has(cur.id)) this.toggleFolder(cur.id)
+          else this.selectKeyboardItem(list.find(f => String(f.id) === String(cur.parentId)))
+        } else if (cur.isFolder) {
+          if (!this.expandedFolders.has(cur.id)) this.toggleFolder(cur.id)
+          else this.selectKeyboardItem(list.find(f => String(f.parentId) === String(cur.id)))
         }
-      } else if (key === 'ArrowRight') {
-        e.preventDefault()
-        const cur = this.files[curIndex]
-        if (cur && cur.isFolder && !this.expandedFolders.has(cur.id)) {
-          this.toggleFolder(cur.id)
+      } else {
+        if (e.repeat) return
+        const selected = this.currentSelectedIds()
+        const nodes = this.checkTreeNodes()
+        const ids = selected.filter(id => (this.selectionMode ? nodes : list).some(f => String(f.id) === String(id)))
+        if (key === 'Enter') {
+          if (ids.length !== 1 || this.viewMode === 'recycle') return
+          const item = nodes.find(f => String(f.id) === String(ids[0]))
+          if (item && !item.readOnly) this.handleRename(item)
+        } else if (ids.length) {
+          if (ids.some(id => nodes.find(f => String(f.id) === String(id))?.readOnly)) return
+          this.keyboardDeletePending = true
+          try {
+            this.deleteMode = this.viewMode === 'recycle' ? 'hard' : 'soft'
+            this.deleteIsBatch = ids.length > 1
+            this.deleteBatchIds = this.selectionMode ? this.normalizedCheckedIds() : ids
+            this.deleteTargetItem = nodes.find(f => String(f.id) === String(ids[0]))
+            await this.showDeleteConfirmDialog()
+          } finally {
+            this.keyboardDeletePending = false
+            this.$nextTick(() => this.focusTree())
+          }
         }
       }
     },
@@ -2741,10 +2834,19 @@ export default {
       return 'F'
     },
     // #ifdef H5
+    externalDragItems(item) {
+      const ids = this.currentSelectedIds()
+      if (!ids.some(id => String(id) === String(item.id))) return [item]
+      const nodes = this.checkTreeNodes()
+      // Keep missing members so native drag rejects the whole stale selection.
+      return ids.map(id => nodes.find(f => String(f.id) === String(id)))
+    },
     onItemPrimeDrag(item) {
       if (!item || item.isFolder || !item.id || this.viewMode === 'recycle') return
       if (!host.fs || typeof host.fs.startDrag !== 'function') return
-      prefetchLocalFilePath(item.id, getFileLocalPath)
+      for (const file of this.externalDragItems(item)) {
+        if (file && !file.isFolder) prefetchLocalFilePath(file.id, getFileLocalPath)
+      }
     },
     handleDragStart(e, item, index) {
       console.log('拖拽开始:', index)
@@ -2814,16 +2916,16 @@ export default {
 
       // 桌面端原生文件拖出（dev-board#1288）：让微信聊天窗口 / Finder / 资源管理器能直接接收文件
       if (item && item.id && !item.isFolder && this.viewMode !== 'recycle') {
-        startExternalFileDrag(item, {
+        const items = this.externalDragItems(item)
+        const result = startExternalFileDrag(items.length === 1 ? items[0] : items, {
           fs: host.fs,
           baseUrl: getApiBaseUrl(),
           headers: getAuthHeaders(),
-          onCleanup: () => {
-            if (this.draggedIndex !== -1 || (typeof document !== 'undefined' && document.__checkbaDraggedFile)) {
-              this.handleDragEnd()
-            }
-          }
+          onCleanup: () => this.handleDragEnd()
         })
+        if (host.fs?.startDrag && result?.ok === false && result.reason !== 'unsupported') {
+          uni.showToast({ title: this.$t('fileTree.externalDragFailed'), icon: 'none' })
+        }
       }
     },
     // #endif
@@ -2994,6 +3096,10 @@ export default {
       this.draggedFileId = null
       this.dragOverIndex = -1
       this.dragStartPoint = null
+      this.rootDropActive = false
+      this.externalDragActive = false
+      this.stagingDragOver = false
+      this.isAnyDragging = false
       // 同 FileStagingArea.onDragEnd：取消的拖拽不许留下全局兜底残留（dev-board#974）
       if (typeof document !== 'undefined') document.__checkbaDraggedFile = null
       this.$emit('file-drag-end')

@@ -144,6 +144,24 @@ public class ProjectStorageResolver {
         return localRoot(projectId).isPresent();
     }
 
+    /**
+     * Version locks must not permanently classify an unresolved local project as managed.
+     * Unlike ordinary file resolution, lookup failures and absent rows remain failures here;
+     * computeIfAbsent callers can retry without retaining an incorrectly isolated lock.
+     */
+    public boolean hasLocalRootForVersionLock(long projectId) {
+        Optional<Path> cached = localRootCache.get(projectId);
+        if (cached != null) return cached.isPresent();
+        // Explicit no-database test mode, also used by localRoot(). Production injects the repository.
+        if (projectRepository == null) return false;
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new StorageException("无法确定版本锁所属项目: " + projectId));
+        Optional<Path> root = Optional.ofNullable(project.getLocalRoot())
+                .filter(StringUtils::hasText).map(value -> Paths.get(value).normalize());
+        localRootCache.put(projectId, root);
+        return root.isPresent();
+    }
+
     public boolean isLooseFileWorkspace(long projectId) {
         return projectRepository != null && projectRepository.findById(projectId)
                 .map(Project::isLooseFileWorkspace).orElse(false);

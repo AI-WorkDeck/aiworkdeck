@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 文件树（FileTree.vue）：右键菜单/批量操作/确认弹窗/拖拽提示/本机文件导入
 export default {
+  externalDragFailed: '所选内容无法拖出，请确认选中的是本机现有文件后再试。',
   clientAccessTitle: "客户访问权限",
   clientAccessExplain: "文件默认仅内部成员可读，需逐个开放给客户。客户本人上传的文件始终可以自行读取。",
   clientAccessCurrent: "当前：{state}。",

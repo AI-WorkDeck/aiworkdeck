@@ -6852,10 +6852,20 @@ const EXEC = {
             it.contiguous = rangeStartsEqual(prevEnd, rs, locate ? locatorCache.body : null);
             let spanLength = null;
             if (!it.text) {
-              const rc = locate && locatorCache.currentParaKey >= 0
-                ? reviewBodyCursorAt(locatorCache, rs) : rs.getText().createTextCursorByRange(rs);
-              rc.gotoRange(re, true);
-              it.text = String(rc.getString() || '');
+              try {
+                const rc = locate && locatorCache.currentParaKey >= 0
+                  ? reviewBodyCursorAt(locatorCache, rs) : rs.getText().createTextCursorByRange(rs);
+                rc.gotoRange(re, true);
+                it.text = String(rc.getString() || '');
+              } catch (e) {
+                // A table boundary can compare inside the body while its range
+                // belongs to a cell. Do not turn a failed body locator into an
+                // empty revision: snapshots must read the same text as balloons.
+                locatorCache.currentParaKey = -1;
+                const rc = rs.getText().createTextCursorByRange(rs);
+                rc.gotoRange(re, true);
+                it.text = String(rc.getString() || '');
+              }
               spanLength = it.text.length; // Only the body span, never hidden deletion text.
             }
             if (locate) {

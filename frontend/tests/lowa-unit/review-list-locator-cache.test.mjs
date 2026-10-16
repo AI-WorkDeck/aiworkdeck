@@ -8,20 +8,21 @@ const locators = source.slice(source.indexOf('function paraKeyOf('), source.inde
 const compareRanges = new Function(source.slice(source.indexOf('function rangeStartsEqual('), source.indexOf('// ---- 批注↔修订')) + ';return rangeStartsEqual')()
 const listing = source.slice(source.indexOf('  list_revisions(p) {'), source.indexOf('  goto_revision(p) {'))
 
-function harness({ extended = false } = {}) {
+function harness({ extended = false, overlappingForeign = false } = {}) {
   const counts = { paragraphReads: 0, spanReads: 0, comparisons: 0, bodyCursors: 0, foreignCursors: 0 }
   const makeStory = (text, foreign = false) => {
     const parts = text.split('\n'), starts = []; let offset = 0
     for (const part of parts) { starts.push(offset); offset += part.length + 1 }
     const story = { text,
-      compareRegionStarts(a, b) { counts.comparisons++; if (a.story !== story || b.story !== story) throw Error('foreign story'); return Math.sign(b.a - a.a) },
-      compareRegionEnds(a, b) { counts.comparisons++; if (a.story !== story || b.story !== story) throw Error('foreign story'); return Math.sign(b.b - a.b) },
+      compareRegionStarts(a, b) { counts.comparisons++; if ((a.story !== story || b.story !== story) && !(overlappingForeign && story === body)) throw Error('foreign story'); return Math.sign(b.a - a.a) },
+      compareRegionEnds(a, b) { counts.comparisons++; if ((a.story !== story || b.story !== story) && !(overlappingForeign && story === body)) throw Error('foreign story'); return Math.sign(b.b - a.b) },
       createTextCursorByRange(r) {
         counts[story === body ? 'bodyCursors' : 'foreignCursors']++;
+        if (overlappingForeign && r.story !== story) throw Error('cannot create body cursor in cell')
         let a = r.a, b = r.a, paragraph = false
         const current = () => Math.max(0, starts.findLastIndex(start => start <= a))
         return {
-          gotoRange(end, expand) { if (!expand) a = end.a; b = end.a; paragraph = false },
+          gotoRange(end, expand) { if (overlappingForeign && end.story !== story) throw Error('cannot move body cursor into cell'); if (!expand) a = end.a; b = end.a; paragraph = false },
           gotoStartOfParagraph(expand) { const start = starts[current()]; if (expand) b = start; else a = b = start },
           gotoEndOfParagraph() { const i = current(); b = starts[i] + parts[i].length; paragraph = true },
           getString() { counts[paragraph ? 'paragraphReads' : 'spanReads']++; return story.text.slice(Math.min(a,b), Math.max(a,b)) },
@@ -159,4 +160,18 @@ test('contiguous comparisons reuse the body and preserve foreign-story fallback'
   assert.equal(ownComparisons,3)
   assert.equal(compareRanges(range(3),range(3)),true,'callers without a cache retain the original path')
   assert.equal(textReads,4)
+})
+
+
+test('a cell boundary comparable with body positions still reads its own text when the body cursor rejects it', () => {
+  const h = harness({ overlappingForeign: true })
+  const withoutLocation = h.read({ limit: 500, locate: false }).revisions[6]
+  const withLocation = h.read({ limit: 500, locate: true }).revisions[6]
+  assert.equal(withoutLocation.text, 'ore')
+  for (const field of ['identifier', 'type', 'text', 'author', 'timestamp']) {
+    assert.equal(withLocation[field], withoutLocation[field], `${field}: review card and resolution fence must agree`)
+  }
+  assert.equal(withLocation.paraKey, -1)
+  assert.equal(withLocation.paragraph, 'foreign-context')
+  assert.equal(withLocation.inTable, true)
 })

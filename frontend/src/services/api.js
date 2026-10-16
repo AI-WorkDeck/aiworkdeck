@@ -1181,7 +1181,8 @@ export function createProject(payload) {
 }
 
 // IDE 化本地文件夹项目：打开/新建本地文件夹作为项目
-// payload: { localRoot, createFolder, name, openFileName }
+// payload: { localRoot, createFolder, name, openFileName, allowNested }
+// Before opening nested folders, data may request requiresNestedConfirmation with overlappingProjectNames.
 // 返回 { code: 0, data: { projectId, name, reused, openFileId, importedCount, truncated, truncatedCount } }
 export function openLocalProject(payload) {
   return request({

@@ -93,6 +93,9 @@ public class WorkSessionService {
      * 装箱的 Long 相同数值不保证是同一对象，拿它当锁语义不可靠。
      */
     private final Map<Long, ReentrantLock> repoLocks = new ConcurrentHashMap<>();
+    // Local folders may overlap. Use one stable lock even if the parent is opened after a child,
+    // so a checkout cannot race another project's snapshot of the same physical files.
+    private final ReentrantLock localFolderRepoLock = new ReentrantLock();
     private final Set<Long> deletedProjects = ConcurrentHashMap.newKeySet();
 
     /**
@@ -118,7 +121,8 @@ public class WorkSessionService {
     public record AutoEnableRequest(long projectId, Long userId, String userName) {}
 
     ReentrantLock repoLock(long projectId) {
-        return repoLocks.computeIfAbsent(projectId, id -> new ReentrantLock());
+        return repoLocks.computeIfAbsent(projectId,
+                id -> repoService.hasLocalRoot(id) ? localFolderRepoLock : new ReentrantLock());
     }
 
     /** Acquire the repository lock before deletion takes DB locks, and keep it through commit. */
@@ -496,7 +500,14 @@ public class WorkSessionService {
             });
             return;
         }
-        ReentrantLock lock = repoLock(projectId);
+        ReentrantLock lock;
+        try {
+            lock = repoLock(projectId);
+        } catch (RuntimeException e) {
+            log.warn("版本锁所属项目暂不可用，延后处理变更: project={}", projectId, e);
+            deferSignal(projectId, actor);
+            return;
+        }
         if (!lock.tryLock()) {
             deferSignal(projectId, actor);
             return;
@@ -523,20 +534,26 @@ public class WorkSessionService {
         if (!signalTasks.add(projectId)) return;
         try {
             taskScheduler.schedule(() -> {
-                ReentrantLock lock = repoLock(projectId);
-                if (lock.tryLock()) {
-                    PendingActor actor = deferredSignals.remove(projectId);
-                    try {
-                        if (actor != null) applyChangeSignal(projectId, actor);
-                    } catch (Exception e) {
-                        if (actor != null) deferredSignals.putIfAbsent(projectId, actor);
-                        log.warn("处理版本变更信号失败，将重试: project={}", projectId, e);
-                    } finally {
-                        lock.unlock();
+                try {
+                    ReentrantLock lock = repoLock(projectId);
+                    if (lock.tryLock()) {
+                        PendingActor actor = deferredSignals.remove(projectId);
+                        try {
+                            if (actor != null) applyChangeSignal(projectId, actor);
+                        } catch (Exception e) {
+                            if (actor != null) deferredSignals.putIfAbsent(projectId, actor);
+                            log.warn("处理版本变更信号失败，将重试: project={}", projectId, e);
+                        } finally {
+                            lock.unlock();
+                        }
                     }
+                } catch (RuntimeException e) {
+                    // Classification failed before taking the actor out of deferredSignals.
+                    log.warn("版本锁所属项目暂不可用，将重试: project={}", projectId, e);
+                } finally {
+                    signalTasks.remove(projectId);
+                    if (deferredSignals.containsKey(projectId)) scheduleSignal(projectId, 1000);
                 }
-                signalTasks.remove(projectId);
-                if (deferredSignals.containsKey(projectId)) scheduleSignal(projectId, 1000);
             }, Instant.now().plusMillis(delayMillis));
         } catch (RuntimeException e) {
             signalTasks.remove(projectId);

@@ -30,11 +30,11 @@ async function mount(t, options = {}) {
     const { attachReviewBalloons } = await import(url)
     window.model = { name: 'A', revision: 1, writable: options.writable !== false, notes: true, nativeWidth: options.nativeWidth || 0 }
     if (options.insertOnly) window.reviewItems = [{key:'r0',kind:'revision',data:{index:0,identifier:'insert-1',type:'Insert',text:'Inserted body text'},x:3000,y:1500,page:1}]
-    window.commands = []; window.resizes = 0
+    window.commands = []; window.resizes = 0; window.sent = []
     // Count the component's explicit canvas resize, excluding browser setup.
     window.addEventListener('resize', e => { if (!e.isTrusted) window.resizes++ })
     window.balloons = attachReviewBalloons({
-      canvas: document.querySelector('canvas'), locale: 'en', transport: { send() {} },
+      canvas: document.querySelector('canvas'), locale: 'en', transport: { send(message) { window.sent.push(message) } },
       execute: async (action, params) => {
         window.commands.push({ action, params, document: window.model.name })
         if (action === 'set_review_balloons') {
@@ -46,6 +46,7 @@ async function mount(t, options = {}) {
           }
           return { success: true }
         }
+        if (action === 'resolve_revisions' && window.resolveFailure) return window.resolveFailure
         if (action !== 'get_review_layout') return { success: true }
         const m = window.model
         const top = (window.viewTop || 0) * 15, left = (window.viewLeft || 0) * 15, zoom = window.zoom || 1
@@ -86,7 +87,7 @@ test('loading a document cancels the old draft even when comment IDs and origina
     hidden: document.querySelector('.awd-review-balloons').hidden,
   })), { drafts: 0, cards: 0, hidden: true })
   await page.evaluate(() => window.balloons.resume())
-  await page.waitForFunction(() => document.querySelector('[data-key="c0"] .awd-rb-meta')?.textContent === 'CommentB')
+  await page.waitForFunction(() => document.querySelector('[data-key="c0"] .awd-rb-meta')?.textContent === 'CommentB' && !document.querySelector('.awd-review-balloons').hidden)
   assert.equal(await page.evaluate(() => document.querySelector('.awd-review-balloons').hidden), false)
   assert.equal(await page.evaluate(() => window.commands.filter(c => c.action === 'update_comment').length), 0)
   await commentButton(page, 'Edit')
@@ -372,4 +373,41 @@ test('comment navigation carries the document fence and mutations carry captured
       assert.equal(command.params.expectedComment.content,'Same original comment',command.action)
     }
   }
+})
+
+
+test('revision actions keep readable worker failures visible after refresh without dropping target fences', async t => {
+  const page = await mount(t)
+  await page.waitForSelector('[data-key="g:revision-A"]', { visible: true })
+  for (const [label, failure, expected] of [
+    ['Accept', { success: false, error: '修订已变化，请刷新后重试' }, '修订已变化，请刷新后重试'],
+    ['Reject', { success: false, message: '文档为只读状态' }, '文档为只读状态'],
+    ['Accept', { success: true, results: [{ success: false, error: '无法选择这条修订\n    at internal.js:42' }] }, '无法选择这条修订'],
+    ['Reject', { success: false, error: { stack: 'internal details' } }, 'Could not update review. Try again.'],
+    ['Accept', { success: true, results: [{ success: false }] }, 'Could not update review. Try again.'],
+    ['Reject', { success: false, error: 'at internal.js:42' }, 'Could not update review. Try again.'],
+    ['Accept', { success: false, error: 'x'.repeat(301) }, 'Could not update review. Try again.'],
+  ]) {
+    const reads = await page.evaluate(() => window.commands.filter(c => c.action === 'get_review_layout').length)
+    await page.evaluate((label, failure) => {
+      window.resolveFailure = failure
+      const card = document.querySelector('[data-key="g:revision-A"]')
+      ;[...card.querySelectorAll('button')].find(b => b.textContent === label).click()
+    }, label, failure)
+    await page.waitForFunction(reads => window.commands.filter(c => c.action === 'get_review_layout').length > reads, {}, reads)
+    assert.deepEqual(await page.$eval('.awd-rb-notice', n => ({ text: n.textContent, hidden: n.hidden })), { text: expected, hidden: false })
+    assert.equal(await page.$$eval('[data-key="g:revision-A"] button:disabled', nodes => nodes.length), 0)
+  }
+  const mutations = await page.evaluate(() => window.commands.filter(c => c.action === 'resolve_revisions'))
+  assert.equal(mutations.length, 7, 'one attempt per click; never retry a failed mutation')
+  assert.deepEqual(mutations.map(c => c.params.action), ['accept', 'reject', 'accept', 'reject', 'accept', 'reject', 'accept'])
+  for (const { params } of mutations) {
+    assert.equal(params.revision, 1)
+    assert.equal(params.documentSeq, 1)
+    assert.equal(params.expectedRevisions[0].identifier, 'revision-A')
+  }
+  assert.equal(await page.evaluate(() => window.sent.filter(m => m.type === 'modified').length), 0)
+  await page.evaluate(() => { window.balloons.suspend('load_document'); window.balloons.resume() })
+  await page.waitForSelector('[data-key="g:revision-A"]')
+  assert.equal(await page.$eval('.awd-rb-notice', n => n.hidden), true, 'failure does not follow into a reopened document')
 })

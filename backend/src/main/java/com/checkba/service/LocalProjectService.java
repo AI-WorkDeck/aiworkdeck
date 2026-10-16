@@ -197,9 +197,17 @@ public class LocalProjectService {
      */
     public OpenLocalResult openLocalFolder(String localRootRaw, boolean createFolder,
                                            String name, String openFileName, Long userId) {
+        return openLocalFolder(localRootRaw, createFolder, name, openFileName, userId, false);
+    }
+
+    public OpenLocalResult openLocalFolder(String localRootRaw, boolean createFolder,
+                                           String name, String openFileName, Long userId, boolean allowNested) {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
+        // Check before creating a directory or registering rows: Cancel must leave no project behind.
+        Path candidate = normalizeLocalRoot(localRootRaw);
+        checkNestedOpen(candidate, userId, allowNested);
         Path root = validateLocalRoot(localRootRaw, createFolder);
         String canonical = root.toString();
 
@@ -237,7 +245,6 @@ public class LocalProjectService {
             }
             return new ProjectResolution(project, true);
         }
-        rejectNestedRoot(root);
         Project project = new Project();
         project.setName(StringUtils.hasText(name) ? name.trim() : folderDisplayName(root));
         project.setProjectType("BLANK");
@@ -464,6 +471,37 @@ public class LocalProjectService {
             throw new IllegalArgumentException(LangText.of("该位置是软件内部数据目录，请选择其他文件夹", "This location is the application's internal data directory; please choose another folder"));
         }
         return p;
+    }
+
+    /** A normal user decision, returned by the controller without creating/importing anything. */
+    public static class NestedFolderConfirmationRequired extends IllegalArgumentException {
+        private final List<String> projectNames;
+
+        public NestedFolderConfirmationRequired(List<String> projectNames) {
+            super("Nested folder confirmation required");
+            this.projectNames = List.copyOf(projectNames);
+        }
+
+        public List<String> projectNames() { return projectNames; }
+    }
+
+    private void checkNestedOpen(Path root, Long userId, boolean allowNested) {
+        // Reopening the exact folder keeps its existing permission check and never prompts again.
+        if (projectRepository.findByLocalRoot(root.toString()).isPresent()) return;
+        java.util.ArrayList<String> names = new java.util.ArrayList<>();
+        for (Project other : projectRepository.findByLocalRootIsNotNull()) {
+            if (!StringUtils.hasText(other.getLocalRoot())) continue;
+            Path otherRoot = Paths.get(other.getLocalRoot());
+            if (!root.startsWith(otherRoot) && !otherRoot.startsWith(root)) continue;
+            // Parent access also exposes every child file. Confirmation cannot grant account access.
+            if (!java.util.Objects.equals(other.getUserId(), userId)) {
+                throw new IllegalArgumentException(LangText.of(
+                        "该文件夹与其他账号的项目文件夹重叠，请使用该项目所属账号打开",
+                        "This folder overlaps with another account's project. Open it with that project's account."));
+            }
+            names.add(other.getName());
+        }
+        if (!allowNested && !names.isEmpty()) throw new NestedFolderConfirmationRequired(names);
     }
 
     /** 拒绝与已有本地文件夹项目互相嵌套（父子重叠会让两边的文件树互相踩踏）。 */

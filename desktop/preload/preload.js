@@ -207,8 +207,9 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
     // 原生文件拖出（dev-board#1288）：在 dragstart 中把本机物理路径交给 webContents.startDrag，
     // 拖到微信聊天窗口 / Finder / 资源管理器可直接发出或落盘。
     startDrag: (path) => {
-      if (typeof path !== 'string' || !path) return { ok: false, reason: 'bad-path' }
-      ipcRenderer.send('fs:startDrag', { path })
+      const paths = Array.isArray(path) ? path : [path]
+      if (!paths.length || paths.some(p => typeof p !== 'string' || !p)) return { ok: false, reason: 'bad-path' }
+      ipcRenderer.send('fs:startDrag', { paths })
       return { ok: true }
     },
     // 回收站「彻底删除」把后端报回的物理路径送进系统废纸篓（dev-board#1051）。
