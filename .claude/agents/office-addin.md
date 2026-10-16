@@ -5,6 +5,33 @@ description: Microsoft Office 与 WPS 插件领域。任务涉及 Word/Excel/PPT
 
 # Office 插件 领域地图
 
+## 插件后端隐私与正文可靠性（dev-board#1316–1324，2026-10-16）
+
+此节取代后文历史「内联全文一字不动」「缓存未命中静默兜底」口径。
+`POST /api/agent/chat` 鉴权后、入队前按会话+文档标识校验正文哈希；未命中返回
+HTTP 409 `{status:"error",code:"INLINE_CONTENT_CACHE_MISS",retryWithInlineContent:true,message:...}`。
+任务窗格用本次读取快照只补传一次，同一消息保持原 clientRequestId，不重复添加用户气泡。
+缓存保留上传原文及其真实SHA256，模型注入按模型预算进一步取前缀，不能拿注入前缀替代缓存哈希。
+恰好200,000字符也按可能被客户端截断处理，模型和context_notice明确完整性限制。
+模型预算使用现有model-token-budgets，扣除历史、系统、工具预留和输出预算，属于保守估算，
+不是每个供应商tokenizer的绝对保证；超长任务仍须分段读取后才可声称完整审阅。
+
+`AgentInboxService` 持久请求去除inlineContent，只留hash；每个输入独立内存副本最多30分钟，
+128条/640万字符总上限。进程重启或驱逐会明确中断缺正文的任务，禁止按裸提问继续。
+删输入清message/displayText/requestJson但留幂等墓碑；删会话清消息/Inbox/摘要及正文缓存。
+启动分批清历史inline正文，并对可由Inbox识别的Office会话清原始工具载荷与派生摘要；
+更早无来源元数据的历史不能猜测归属。Office消息保存前移除tool_code/tool_output载荷，
+保留过程状态、用户消息、模型回复及思考；Office不再自动写长期摘要。用户粘贴或AI引用文字
+仍随会话保留至删除。不是备份/磁盘物理擦除承诺，完整用户口径见legal/PRIVACY.md。
+
+Word文本改写六工具支持可选reason：replace_text、insert_text、table_set_cell、
+edit_header_footer、insert_footnote、insert_endnote；replace_batch/pass_step的editsJson支持
+逐项reason。桥下发args.reason或args.items[i].reason；成功对象回执追加requestedReason或
+requestedEditReasons[{index:1,reason:...}]（pass_step位于applied内）。这是请求理由元数据，
+不能据此认定逐项成功，也不是Word原生revision ID。插件修订卡须按实际执行位置映射；
+batchEdits.normalizeBatchItems当前会丢弃reason，卡片对接方需补留。后端契约回归通过不等于
+Word/WPS原生修订卡已完成真机验收。
+
 ## 默认密码登录与首次设密（dev-board#1299，2026-10-15）
 
 此节取代下文历史「验证码是主路径」：`SettingsView` 默认 password，手机号/邮箱共用文本

@@ -24,12 +24,10 @@ import java.util.Map;
  * 契约要点：
  * - 哈希一律由**后端**对收到的正文自算（SHA-256），客户端上送的哈希只当作「省传」信号，
  *   不作为缓存键的可信来源——否则客户端可以拿任意哈希取走别人的正文。
- * - 未命中不报错：调用方按「本轮没有内联正文」处理（提示词里已有对应文案，
- *   模型可改用 office_get_text 等读取类工具）。
- * - 进程内存态、不落库、不做主动清理；生命周期与 ClientCapabilityService 同款（按会话）。
+ * - 未命中须拒绝本轮并要求客户端重传全文，不把缺失正文交给模型。
+ * - 进程内存态、不落库；删除会话时主动清理，另有 LRU 内存上限。
  *
- * 内存上界：单条正文 ≤ 200k 字符（ContextAssemblerService 的 MAX_INLINE_CONTENT_CHARS，
- * 超限的不入缓存），条目上限 32，即 32 × 200k char ≈ 13MB（Java char 双字节）。
+ * 内存上界：单条正文 ≤ 200k 字符（插件上传上限，超限的不入缓存），条目上限 32，即 32 × 200k char ≈ 13MB（Java char 双字节）。
  * 超出后按访问顺序 LRU 驱逐最久未用的会话。
  */
 @Service
@@ -38,14 +36,17 @@ public class InlineContentCache {
 
     /** 条目上限：32 × 200k 字符 ≈ 13MB */
     static final int MAX_ENTRIES = 32;
+    static final int MAX_CONTENT_CHARS = 200_000;
+
+    private record CacheKey(String conversationId, String documentId) { }
 
     private record CachedBody(String hash, String content) { }
 
     /** accessOrder=true 的 LinkedHashMap 即 LRU；并发访问全部走 synchronized 包装 */
-    private final Map<String, CachedBody> byConversation = Collections.synchronizedMap(
+    private final Map<CacheKey, CachedBody> byConversation = Collections.synchronizedMap(
             new LinkedHashMap<>(16, 0.75f, true) {
                 @Override
-                protected boolean removeEldestEntry(Map.Entry<String, CachedBody> eldest) {
+                protected boolean removeEldestEntry(Map.Entry<CacheKey, CachedBody> eldest) {
                     return size() > MAX_ENTRIES;
                 }
             });
@@ -54,22 +55,35 @@ public class InlineContentCache {
      * 记下本会话这一轮实际使用的内联正文。哈希由本方法自算，不接受外部传入。
      */
     public void put(String conversationId, String content) {
+        put(conversationId, null, content);
+    }
+
+    public void put(String conversationId, String documentId, String content) {
         if (conversationId == null || conversationId.isBlank() || content == null || content.isEmpty()) {
             return;
         }
-        byConversation.put(conversationId, new CachedBody(sha256Hex(content), content));
+        CacheKey key = new CacheKey(conversationId, documentId);
+        if (content.length() > MAX_CONTENT_CHARS) {
+            byConversation.remove(key);
+            return;
+        }
+        byConversation.put(key, new CachedBody(sha256Hex(content), content));
     }
 
     /**
      * 按客户端上送的哈希取回本会话上一次的正文。
      * 会话没有缓存、或哈希与缓存内容不一致（文档已被改动）时返回 null——
-     * 调用方按「没有内联正文」处理，不报错。
+     * 调用方必须明确要求重传全文。
      */
     public String get(String conversationId, String hash) {
+        return get(conversationId, null, hash);
+    }
+
+    public String get(String conversationId, String documentId, String hash) {
         if (conversationId == null || conversationId.isBlank() || hash == null || hash.isBlank()) {
             return null;
         }
-        CachedBody entry = byConversation.get(conversationId);
+        CachedBody entry = byConversation.get(new CacheKey(conversationId, documentId));
         if (entry == null) {
             return null;
         }
@@ -79,15 +93,15 @@ public class InlineContentCache {
     /**
      * 本会话这一轮实际使用的内联正文（不带哈希校验，直接取）。
      *
-     * <p>供 office_pass_step 切块用：切的必须是<b>模型看到的那一份字节</b>，
-     * 段落序号才能和模型上下文里的正文对得上。没有缓存（首轮之前、已被 LRU 驱逐、
+     * <p>供 office_pass_step 切块用：切的是<b>本轮上传的原始正文</b>；模型上下文可能只含预算内前缀，
+     * 后续块由工具逐块提供，段落序号仍按同一份原文计算。没有缓存（首轮之前、已被 LRU 驱逐、
      * 正文超 20 万字符没入缓存）时返回 null，调用方按「没有内联正文」报错。
      */
     public String contentOf(String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return null;
         }
-        CachedBody entry = byConversation.get(conversationId);
+        CachedBody entry = byConversation.get(new CacheKey(conversationId, null));
         return entry == null ? null : entry.content();
     }
 
@@ -99,8 +113,20 @@ public class InlineContentCache {
         if (conversationId == null || conversationId.isBlank()) {
             return null;
         }
-        CachedBody entry = byConversation.get(conversationId);
+        CachedBody entry = byConversation.get(new CacheKey(conversationId, null));
         return entry == null ? null : entry.hash();
+    }
+
+    public void evict(String conversationId) {
+        synchronized (byConversation) {
+            byConversation.keySet().removeIf(key -> key.conversationId().equals(conversationId));
+        }
+    }
+
+    public static final class CacheMiss extends IllegalStateException {
+        public CacheMiss() {
+            super("INLINE_CONTENT_CACHE_MISS: document content expired; resend full inline content");
+        }
     }
 
     /** SHA-256 十六进制小写，口径与插件端 crypto.subtle.digest('SHA-256') 一致。 */

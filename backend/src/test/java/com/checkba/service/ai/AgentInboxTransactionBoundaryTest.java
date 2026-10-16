@@ -47,6 +47,46 @@ class AgentInboxTransactionBoundaryTest {
     @Autowired com.checkba.repository.ProjectMemberRepository members;
     @Autowired com.checkba.repository.UserRepository users;
     @Autowired com.checkba.repository.ProjectInvitationRepository invitations;
+    @Autowired com.checkba.repository.ConversationSummaryRepository summaries;
+    @Autowired com.checkba.repository.ProjectAiMessageRepository messages;
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void startupPrivacyScrubRemovesLegacyBodiesAndOfficeDerivedContentFromDatabase() {
+        var inbox = durableInbox(mock(SseEmitterService.class), mock(AgentRunStateService.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(inbox, "conversationSummaries", summaries);
+        org.springframework.test.util.ReflectionTestUtils.setField(inbox, "conversationMessages", messages);
+        var request = request(); request.setConversationId("privacy-migration");
+        var row = inbox.submit(request, 7L);
+        row.setRequestJson("{\"clientCapability\":\"office\",\"activeContext\":{\"inlineContent\":\"synthetic original document\"}}");
+        repository.saveAndFlush(row);
+        var summary = new com.checkba.model.entity.ConversationSummary();
+        summary.setConversationId("privacy-migration"); summary.setSummaryText("synthetic derived summary");
+        summaries.saveAndFlush(summary);
+        var orphan = new com.checkba.model.entity.ConversationSummary();
+        orphan.setConversationId("privacy-orphan"); orphan.setSummaryText("synthetic orphan summary");
+        summaries.saveAndFlush(orphan);
+        var assistant = new com.checkba.model.entity.ProjectAiMessage();
+        assistant.setProjectId(42L); assistant.setUserId(7L); assistant.setConversationId("privacy-migration");
+        assistant.setRole("ASSISTANT"); assistant.setCreatedAt(java.time.LocalDateTime.now());
+        assistant.setContent("<tool_output>synthetic raw reading</tool_output><final>keep this answer</final>");
+        assistant.setDisplayContent("<tool_code>synthetic raw arguments</tool_code>");
+        assistant = messages.saveAndFlush(assistant);
+
+        inbox.run(null);
+        var durable = repository.findById(row.getId()).orElseThrow();
+        assertFalse(durable.getRequestJson().contains("synthetic original document"));
+        assertTrue(durable.getRequestJson().contains("inlineContentHash"));
+        assertThrows(AgentInboxService.InlineContentUnavailable.class, () -> inbox.requestOf(durable));
+        var savedMessage = messages.findById(assistant.getId()).orElseThrow();
+        assertFalse(savedMessage.getContent().contains("synthetic raw reading"));
+        assertTrue(savedMessage.getContent().contains("keep this answer"));
+        assertFalse(savedMessage.getDisplayContent().contains("synthetic raw arguments"));
+        assertFalse(summaries.existsByConversationId("privacy-migration"));
+        assertFalse(summaries.existsByConversationId("privacy-orphan"));
+        inbox.run(null);
+        assertEquals(durable.getRequestJson(), repository.findById(row.getId()).orElseThrow().getRequestJson());
+    }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"client", "global-client", "removed"})

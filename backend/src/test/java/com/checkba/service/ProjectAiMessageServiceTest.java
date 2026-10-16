@@ -36,6 +36,47 @@ class ProjectAiMessageServiceTest {
     private com.checkba.service.ai.ConversationIssuanceService issuanceService;
 
     @Test
+    void officeToolPayloadsNeverReachInsertOrUpdateButFinalAnswerRemains() {
+        var caps = new com.checkba.service.ai.ClientCapabilityService();
+        caps.record("office", "office");
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "clientCapabilities", caps);
+        String payload = "<process name=\"读取\"><tool_code>office_read_content(secret)</tool_code>"
+                + "<tool_output status=\"SUCCESS\">PRIVATE DOCUMENT</tool_output></process><final>结论</final>";
+        Long id = service.upsertAssistantMessage("1", 2L, "office", null, payload);
+        assertFalse(savedRows.get(0).getContent().contains("PRIVATE DOCUMENT"));
+        assertFalse(savedRows.get(0).getContent().contains("secret"));
+        assertTrue(savedRows.get(0).getContent().contains("status=\"SUCCESS\""));
+        assertTrue(savedRows.get(0).getContent().contains("<final>结论</final>"));
+        service.upsertAssistantMessage("1", 2L, "office", id, "<tool_output>PARTIAL PRIVATE");
+        assertFalse(savedRows.get(0).getContent().contains("PARTIAL PRIVATE"));
+        service.saveMessage("1", 2L, "office", "ASSISTANT", payload);
+        assertFalse(savedRows.get(1).getContent().contains("PRIVATE DOCUMENT"));
+        service.saveMessage("1", 2L, "office", "USER", "用户主动引用 PRIVATE DOCUMENT");
+        assertTrue(savedRows.get(2).getContent().contains("PRIVATE DOCUMENT"));
+        service.upsertAssistantMessage("1", 2L, "office", id,
+                "<code>office_replace_text(searchText=\"PRIVATE ALIAS\")</code><final>done</final>");
+        assertFalse(savedRows.get(0).getContent().contains("PRIVATE ALIAS"));
+        assertTrue(savedRows.get(0).getContent().contains("<final>done</final>"));
+        service.upsertAssistantMessage("1", 2L, "desktop", null, payload);
+        assertEquals(payload, savedRows.get(3).getContent());
+    }
+
+    @Test
+    void deletingConversationClearsInboxSummaryAndTransientDocumentBody() {
+        var inbox = mock(com.checkba.service.ai.AgentInboxService.class);
+        var cache = mock(com.checkba.service.ai.InlineContentCache.class);
+        var summaries = mock(com.checkba.repository.ConversationSummaryRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "agentInboxService", inbox);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "inlineContentCache", cache);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "conversationSummaries", summaries);
+        service.deleteConversation("private-conversation");
+        verify(inbox).deleteConversation("private-conversation");
+        verify(cache).evict("private-conversation");
+        verify(summaries).deleteByConversationId("private-conversation");
+        verify(repository).deleteByConversationId("private-conversation");
+    }
+
+    @Test
     void deletingOrRollingBackConversationClearsItsSuggestionEvidence() {
         var suggestions = mock(com.checkba.repository.ChatSuggestionRepository.class);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "chatSuggestions", suggestions);

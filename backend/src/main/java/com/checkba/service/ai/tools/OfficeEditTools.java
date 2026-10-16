@@ -292,7 +292,8 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("要查找的原文（须与文档精确一致）") String searchText,
             @P("替换后的新文本") String replaceText,
-            @P("是否替换所有匹配（false=仅第一处）") Boolean replaceAll
+            @P("是否替换所有匹配（false=仅第一处）") Boolean replaceAll,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_replace_text called, search={}, replaceAll={}", searchText, replaceAll);
         if (searchText == null || searchText.isBlank()) {
@@ -308,6 +309,7 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("searchText", searchText);
         args.put("replaceText", replaceText);
         args.put("replaceAll", replaceAll != null && replaceAll);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "replace_text", args);
     }
 
@@ -315,7 +317,7 @@ public class OfficeEditTools implements AgentToolComponent {
     private static final int MAX_BATCH_EDITS = 50;
 
     @Tool("在当前 Word 文档中一次完成多处查找替换，全部以 Word 原生修订（Track Changes）形式呈现。" +
-          "editsJson 是 JSON 数组，每个元素形如 {\"searchText\":\"原文\",\"replaceText\":\"新文\"}，一批最多 " + MAX_BATCH_EDITS + " 处。" +
+          "editsJson 是 JSON 数组，每个元素形如 {\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}，一批最多 " + MAX_BATCH_EDITS + " 处。" +
           "【整篇校对、整篇润色、批量改称谓这类要改很多处的任务，必须用本工具成批提交，不要逐处调用 office_replace_text】" +
           "——逐处调用每处都要占一整个执行步（单轮上限 30 步），一份合同改不完就会中途暂停。" +
           "每条的 searchText 须与文档精确一致、不得跨段落、不超 255 字；各条之间不得重复、也不得互相包含（会把同一段文字改两遍）；" +
@@ -324,7 +326,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "批量替换（修订）", category = "office", fileEffect = "MODIFIED")
     public String office_replace_batch(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("修改清单，JSON 数组：[{\"searchText\":\"原文\",\"replaceText\":\"新文\"}, ...]") String editsJson
+            @P("修改清单，JSON 数组：[{\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}, ...]") String editsJson
     ) {
         log.info("Tool: office_replace_batch called");
         BatchEdits parsed = parseBatchEdits(editsJson, false);
@@ -402,6 +404,11 @@ public class OfficeEditTools implements AgentToolComponent {
             java.util.Map<String, Object> normalized = new HashMap<>();
             normalized.put("searchText", searchText);
             normalized.put("replaceText", String.valueOf(replace));
+            Object reason = item.get("reason");
+            if (reason != null && !(reason instanceof String)) {
+                return BatchEdits.fail("Error: 第 " + index + " 条的 reason 须为字符串");
+            }
+            if (reason instanceof String text && !text.isBlank()) normalized.put("reason", text.trim());
             items.add(normalized);
         }
         // 一条 searchText 是另一条的子串时两处命中必然重叠，各自落笔＝同一段文字被改两遍
@@ -428,7 +435,7 @@ public class OfficeEditTools implements AgentToolComponent {
           "不要试图一轮列全整篇的修改。】单处、几处或选区内的修改仍用 office_replace_text / office_replace_batch。" +
           "用法：首次调用 editsJson 传 [] 拿第一块；看完这一块后把该块的修改清单传给下一次调用，同时拿到下一块；" +
           "本块不需要改就传 []；想提前结束传 stop=true。" +
-          "editsJson 的格式与校验口径与 office_replace_batch 完全一致（每条 {\"searchText\":\"原文\",\"replaceText\":\"新文\"}，" +
+          "editsJson 的格式与校验口径与 office_replace_batch 完全一致（每条 {\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}，" +
           "一批最多 " + MAX_BATCH_EDITS + " 处，searchText 须与文档精确一致、不跨段落、不超 255 字，各条之间不得重复或互相包含）。" +
           "清单按【全文查找】落笔而不限于当前块——处理某一块时发现别处需要连带修改，可以一并写进同一份清单。" +
           "返回值里 pass 是进度（chunk/total/done），applied 是上一份清单的落笔结果，paragraphs 是本块正文（带段落号）。" +
@@ -436,7 +443,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "分段过卷", category = "office", fileEffect = "MODIFIED")
     public String office_pass_step(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("对上一块（或任意位置）的修改清单，JSON 数组：[{\"searchText\":\"原文\",\"replaceText\":\"新文\"}, ...]；"
+            @P("对上一块（或任意位置）的修改清单，JSON 数组：[{\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}, ...]；"
                     + "首次调用与本块无需修改时传 []") String editsJson,
             @P("提前结束过卷（true=落笔后返回汇总并结束；缺省 false）") Boolean stop
     ) {
@@ -480,6 +487,9 @@ public class OfficeEditTools implements AgentToolComponent {
             applied.put("replaced", replaced);
             applied.put("requested", node.path("requested").asInt(parsed.items().size()));
             applied.put("failed", failed);
+            if (node.has("requestedEditReasons")) {
+                applied.put("requestedEditReasons", node.get("requestedEditReasons"));
+            }
         }
 
         boolean stopping = Boolean.TRUE.equals(stop);
@@ -626,7 +636,8 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("要插入的文本") String text,
             @P("定位锚点文本（可选；为空则在当前光标/选区处插入）") String anchorText,
-            @P("相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）") String position
+            @P("相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）") String position,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_insert_text called, anchor={}, position={}", anchorText, position);
         if (text == null || text.isEmpty()) {
@@ -643,6 +654,7 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("text", text);
         args.put("anchorText", anchorText == null ? "" : anchorText);
         args.put("position", pos);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "insert_text", args);
     }
 
@@ -1018,7 +1030,8 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("表格序号（0 开始，缺省 0）") Integer tableIndex,
             @P("单元格坐标，如 B2（列字母 + 行号，行号 1 开始）") String cell,
-            @P("该单元格的新文本") String text
+            @P("该单元格的新文本") String text,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_table_set_cell called, index={}, cell={}", tableIndex, cell);
         int index = tableIndex == null ? 0 : tableIndex;
@@ -1032,6 +1045,7 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("tableIndex", index);
         args.put("cell", cell.trim());
         args.put("text", text == null ? "" : text);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "table_set_cell", args);
     }
 
@@ -1199,7 +1213,8 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("header（页眉）或 footer（页脚）") String part,
             @P("要写入的文本，覆盖原有内容（空字符串等于清空）") String text,
-            @P("对齐方式：left/center/right/justify（不改则不传）") String alignment
+            @P("对齐方式：left/center/right/justify（不改则不传）") String alignment,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_edit_header_footer called, part={}", part);
         String partValue;
@@ -1217,6 +1232,7 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("part", partValue);
         args.put("text", text == null ? "" : text);
         if (alignmentValue != null) args.put("alignment", alignmentValue);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "edit_header_footer", args);
     }
 
@@ -2737,7 +2753,8 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_insert_footnote(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("插入脚注标记的目标文本（须与文档精确一致）") String anchorText,
-            @P("脚注正文内容") String text
+            @P("脚注正文内容") String text,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_insert_footnote called, anchor={}", anchorText);
         if (anchorText == null || anchorText.isBlank()) {
@@ -2752,6 +2769,7 @@ public class OfficeEditTools implements AgentToolComponent {
         Map<String, Object> args = new HashMap<>();
         args.put("anchorText", anchorText);
         args.put("text", text);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "insert_footnote", args);
     }
 
@@ -2761,7 +2779,8 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_insert_endnote(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("插入尾注标记的目标文本（须与文档精确一致）") String anchorText,
-            @P("尾注正文内容") String text
+            @P("尾注正文内容") String text,
+            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_insert_endnote called, anchor={}", anchorText);
         if (anchorText == null || anchorText.isBlank()) {
@@ -2776,6 +2795,7 @@ public class OfficeEditTools implements AgentToolComponent {
         Map<String, Object> args = new HashMap<>();
         args.put("anchorText", anchorText);
         args.put("text", text);
+        if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "insert_endnote", args);
     }
 
