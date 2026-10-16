@@ -429,19 +429,7 @@ public class ProjectRepoService {
         VersionObjectFilters.staging(() -> {
             git.add().addFilepattern(".").call();
             git.add().addFilepattern(".").setUpdate(true).call();
-            // Ignore rules do not remove previously tracked paths, and a user .gitignore can
-            // override info/exclude. Never stage another project's private manifest.
-            var staged = repo.lockDirCache();
-            try {
-                var editor = staged.editor();
-                for (int i = 0; i < staged.getEntryCount(); i++) {
-                    String path = staged.getEntry(i).getPathString();
-                    if (isNestedProjectMetadata(path)) {
-                        editor.add(new org.eclipse.jgit.dircache.DirCacheEditor.DeletePath(path));
-                    }
-                }
-                editor.commit();
-            } finally { staged.unlock(); }
+            removeNestedMetadataFromIndex(repo);
             return null;
         });
     }
@@ -1429,6 +1417,76 @@ public class ProjectRepoService {
         }
     }
 
+    /** Remove only application metadata from the index; never touch the working files. */
+    private void removeNestedMetadataFromIndex(Repository repo) throws IOException {
+        var index = repo.lockDirCache();
+        try {
+            var editor = index.editor();
+            for (int i = 0; i < index.getEntryCount(); i++) {
+                String path = index.getEntry(i).getPathString();
+                if (isNestedProjectMetadata(path)) {
+                    editor.add(new org.eclipse.jgit.dircache.DirCacheEditor.DeletePath(path));
+                }
+            }
+            editor.commit();
+        } finally { index.unlock(); }
+    }
+
+    /**
+     * Append a metadata-only migration to a local branch before checkout. Merely excluding
+     * paths on the next commit is too late: opening a work session first checks out a branch.
+     * Old commits remain intact, and no child metadata is ever removed from the working tree.
+     */
+    private void migrateNestedMetadataBranch(Repository repo, String name) throws IOException {
+        Ref ref = repo.findRef(name);
+        if (ref == null || ref.getObjectId() == null) return;
+        ref = ref.getLeaf();
+        if (!ref.getName().startsWith(Constants.R_HEADS)) return;
+        boolean current = ref.getName().equals(repo.getFullBranch());
+        try (RevWalk walk = new RevWalk(repo); TreeWalk tree = new TreeWalk(repo)) {
+            RevCommit previous = walk.parseCommit(ref.getObjectId());
+            tree.addTree(previous.getTree());
+            tree.setRecursive(true);
+            var filtered = org.eclipse.jgit.dircache.DirCache.newInCore();
+            var builder = filtered.builder();
+            boolean removed = false;
+            while (tree.next()) {
+                if (isNestedProjectMetadata(tree.getPathString())) {
+                    removed = true;
+                    continue;
+                }
+                var entry = new org.eclipse.jgit.dircache.DirCacheEntry(tree.getPathString());
+                entry.setFileMode(tree.getFileMode(0));
+                entry.setObjectId(tree.getObjectId(0));
+                builder.add(entry);
+            }
+            builder.finish();
+            if (removed) {
+                try (var inserter = repo.newObjectInserter()) {
+                    var commit = new org.eclipse.jgit.lib.CommitBuilder();
+                    commit.setTreeId(filtered.writeTree(inserter));
+                    commit.setParentId(previous);
+                    var author = new org.eclipse.jgit.lib.PersonIdent("AI WorkDeck", "system@aiworkdeck.local");
+                    commit.setAuthor(author);
+                    commit.setCommitter(author);
+                    commit.setMessage("整理项目记录\n\nX-AWD-Kind: auto\n"
+                            + (hasObjectFormat(previous) ? OBJECT_FORMAT_TRAILER : ""));
+                    ObjectId migrated = inserter.insert(commit);
+                    inserter.flush();
+                    var update = repo.updateRef(ref.getName());
+                    update.setExpectedOldObjectId(previous);
+                    update.setNewObjectId(migrated);
+                    var result = update.update();
+                    if (result != org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD
+                            && result != org.eclipse.jgit.lib.RefUpdate.Result.NO_CHANGE) {
+                        throw new IOException("Cannot migrate nested project metadata: " + result);
+                    }
+                }
+            }
+            if (current) removeNestedMetadataFromIndex(repo);
+        }
+    }
+
     static boolean isNestedProjectMetadata(String path) {
         return path.contains("/.awd/") || path.endsWith("/.awd");
     }
@@ -1509,6 +1567,7 @@ public class ProjectRepoService {
 
     public void createBranch(long projectId, String name, String startPointRef) {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            migrateNestedMetadataBranch(repo, startPointRef);
             git.branchCreate()
                .setName(name)
                .setStartPoint(startPointRef)
@@ -1521,6 +1580,8 @@ public class ProjectRepoService {
 
     public void checkoutBranch(long projectId, String name) {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            migrateNestedMetadataBranch(repo, "HEAD");
+            migrateNestedMetadataBranch(repo, name);
             requireObjectsAt(repo, "HEAD");
             requireObjectsAt(repo, name);
             VersionObjectFilters.materializing(repo, pointerPathsAt(repo, name),
@@ -1631,6 +1692,8 @@ public class ProjectRepoService {
                                    String authorName, String authorEmail,
                                    boolean resetOnConflict, boolean commitOnClean) {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            migrateNestedMetadataBranch(repo, "HEAD");
+            migrateNestedMetadataBranch(repo, branchName);
             ObjectId target = repo.resolve(branchName);
             if (target == null) throw new VersionException("分支不存在: " + branchName);
 

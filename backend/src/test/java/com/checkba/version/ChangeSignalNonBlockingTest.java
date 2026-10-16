@@ -54,6 +54,10 @@ class ChangeSignalNonBlockingTest {
     @Test
     void busyRepositoryDoesNotBlockSaveAndCoalescesLatestActor() throws Exception {
         var lock = service.repoLock(7L);
+        // Lock initialization resolves local-folder ownership once; only the busy
+        // request below must avoid repository/database work.
+        verify(repos).hasLocalRoot(7L);
+        clearInvocations(repos);
         lock.lock();
         var executor = Executors.newSingleThreadExecutor();
         try {
@@ -172,6 +176,8 @@ class ChangeSignalNonBlockingTest {
     @Test
     void statusFailsPromptlyWhenRepositoryIsBusy() throws Exception {
         var lock = service.repoLock(7L);
+        verify(repos).hasLocalRoot(7L);
+        clearInvocations(repos);
         lock.lock();
         var executor = Executors.newSingleThreadExecutor();
         try {

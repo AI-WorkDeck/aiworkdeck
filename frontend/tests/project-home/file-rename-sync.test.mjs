@@ -202,7 +202,7 @@ test('refresh_files：文件树还没挂上 ref 时不报错、也不调用同�
 
 test('FileTree.commitRename（右键重命名，唯一可达的入口）成功后广播 file-renamed', () => {
   const src = stripComments(read('components/FileTree.vue'))
-  const body = extractBlock(src, 'async commitRename()')
+  const body = extractBlock(src, 'async commitRename(e)')
   assert.match(body, /await this\.loadFiles\(\)/, '必须先落库刷新完树')
   assert.match(body, /\$emit\(\s*'file-renamed'\s*,\s*\{\s*id:\s*fileId\s*,\s*name:\s*finalName\s*\}\s*\)/,
     '重命名成功后要把新名连同 fileId 广播出去，工作台才能同步标签/标题/AI 上下文')
