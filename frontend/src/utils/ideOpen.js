@@ -36,7 +36,21 @@ function shouldWarnTruncatedOnce(projectId) {
 }
 
 async function launchProject(payload) {
-  const r = await openLocalProject(payload)
+  let r = await openLocalProject(payload)
+  if (r?.data?.requiresNestedConfirmation) {
+    const confirmed = await new Promise((resolve) => uni.showModal({
+      title: t('common.nestedFolderTitle'),
+      content: t('common.nestedFolderContent', {
+        names: (r.data.overlappingProjectNames || []).join('、'),
+      }),
+      confirmText: t('common.nestedFolderContinue'),
+      cancelText: t('common.cancel'),
+      success: (result) => resolve(!!result.confirm),
+      fail: () => resolve(false),
+    }))
+    if (!confirmed) return false
+    r = await openLocalProject({ ...payload, allowNested: true })
+  }
   const d = (r && r.data) || {}
   if (!d.projectId) {
     throw new Error(t('common.openProjectFailed'))

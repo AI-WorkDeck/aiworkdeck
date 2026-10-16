@@ -151,12 +151,18 @@ public class ProjectController {
         if (!localFolderProjectsEnabled) {
             throw new IllegalArgumentException(com.checkba.service.LangText.of("当前部署未开放「打开本机文件夹」功能", "This deployment does not support opening a local folder"));
         }
-        LocalProjectService.OpenLocalResult r = localProjectService.openLocalFolder(
-                (String) body.get("localRoot"),
-                Boolean.TRUE.equals(body.get("createFolder")),
-                (String) body.get("name"),
-                (String) body.get("openFileName"),
-                userId);
+        LocalProjectService.OpenLocalResult r;
+        try {
+            r = localProjectService.openLocalFolder(
+                    (String) body.get("localRoot"),
+                    Boolean.TRUE.equals(body.get("createFolder")),
+                    (String) body.get("name"),
+                    (String) body.get("openFileName"),
+                    userId, Boolean.TRUE.equals(body.get("allowNested")));
+        } catch (LocalProjectService.NestedFolderConfirmationRequired e) {
+            return Map.of("code", 0, "data", Map.of(
+                    "requiresNestedConfirmation", true, "overlappingProjectNames", e.projectNames()));
+        }
         Map<String, Object> data = new HashMap<>();
         data.put("projectId", r.project().getId());
         data.put("name", r.project().getName());

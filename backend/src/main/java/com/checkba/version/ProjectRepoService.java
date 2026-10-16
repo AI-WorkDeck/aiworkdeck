@@ -130,6 +130,10 @@ public class ProjectRepoService {
         return storageResolver.projectRoot(projectId);
     }
 
+    boolean hasLocalRoot(long projectId) {
+        return storageResolver.hasLocalRoot(projectId);
+    }
+
     public void requireVersionRecordingSupported(long projectId) {
         if (storageResolver.isLooseFileWorkspace(projectId)) throw VersionException.userFacing(
                 com.checkba.service.LangText.of("独立文件不启用项目版本记录，请先打开项目文件夹",
@@ -213,6 +217,7 @@ public class ProjectRepoService {
 
     /** Office（Word/WPS）打开文档时落在同目录的锁文件，绝不该进版本历史（dev-board#463）。 */
     private static final String EXCLUDE_RULE_OFFICE_LOCK = "~$*";
+    private static final String EXCLUDE_RULE_NESTED_METADATA = "/*/**/.awd/";
 
     /**
      * 幂等地把排除规则写进 {@code $GIT_DIR/info/exclude}（dev-board#463）。
@@ -229,7 +234,8 @@ public class ProjectRepoService {
      * 只有它能覆盖已经存在的老仓库与另外两条建仓路径。init 里额外调一次是因为
      * 它自己不走 open，规则必须早于那笔 {@code add(".")}。
      *
-     * <p>只补这一条规则，不动文件里已有的其它行；写失败只记日志——版本记录是保险，
+     * <p>同时排除任意层级子文件夹的 .awd，保留当前根的清单。只追加缺失规则，不动已有行；
+     * 写失败只记日志——版本记录是保险，
      * 不能因为一条排除规则写不下去就让开仓/提交整个失败。
      */
     private void ensureExcludes(long projectId) {
@@ -237,20 +243,18 @@ public class ProjectRepoService {
         if (!Files.isDirectory(gitDir)) return; // 仓库还不存在，交给调用方原本的错误路径
         Path exclude = gitDir.resolve("info").resolve("exclude");
         try {
-            if (Files.exists(exclude)) {
-                String current = Files.readString(exclude);
-                boolean present = current.lines()
-                        .anyMatch(l -> l.trim().equals(EXCLUDE_RULE_OFFICE_LOCK));
-                if (present) return;
-                String sep = current.isEmpty() || current.endsWith("\n") ? "" : "\n";
-                Files.writeString(exclude, sep + EXCLUDE_RULE_OFFICE_LOCK + "\n",
-                        java.nio.file.StandardOpenOption.APPEND);
-            } else {
-                Files.createDirectories(exclude.getParent());
-                Files.writeString(exclude,
-                        "# AI WorkDeck: Office 打开文档时的锁文件不进版本记录\n"
-                                + EXCLUDE_RULE_OFFICE_LOCK + "\n");
+            String current = Files.exists(exclude) ? Files.readString(exclude) : "";
+            StringBuilder missing = new StringBuilder();
+            for (String rule : List.of(EXCLUDE_RULE_OFFICE_LOCK, EXCLUDE_RULE_NESTED_METADATA)) {
+                if (current.lines().noneMatch(line -> line.trim().equals(rule))) {
+                    missing.append(rule).append("\n");
+                }
             }
+            if (missing.isEmpty()) return;
+            Files.createDirectories(exclude.getParent());
+            String sep = current.isEmpty() || current.endsWith("\n") ? "" : "\n";
+            Files.writeString(exclude, sep + missing,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
         } catch (IOException e) {
             log.warn("写入版本库排除规则失败: project={} ({})", projectId, e.getMessage());
         }
@@ -351,7 +355,15 @@ public class ProjectRepoService {
         clearStaleIndexLock(projectId);
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
             Status pre = git.status().call();
-            if (pre.isClean()) return null;
+            boolean trackedNestedMetadata = false;
+            var index = repo.readDirCache();
+            for (int i = 0; i < index.getEntryCount(); i++) {
+                if (isNestedProjectMetadata(index.getEntry(i).getPathString())) {
+                    trackedNestedMetadata = true;
+                    break;
+                }
+            }
+            if (pre.isClean() && !trackedNestedMetadata) return null;
             stageAll(git);
             StringBuilder msg = new StringBuilder(message).append("\n\n")
                     .append(KIND_TRAILER).append(kind).append('\n').append(OBJECT_FORMAT_TRAILER);
@@ -417,6 +429,19 @@ public class ProjectRepoService {
         VersionObjectFilters.staging(() -> {
             git.add().addFilepattern(".").call();
             git.add().addFilepattern(".").setUpdate(true).call();
+            // Ignore rules do not remove previously tracked paths, and a user .gitignore can
+            // override info/exclude. Never stage another project's private manifest.
+            var staged = repo.lockDirCache();
+            try {
+                var editor = staged.editor();
+                for (int i = 0; i < staged.getEntryCount(); i++) {
+                    String path = staged.getEntry(i).getPathString();
+                    if (isNestedProjectMetadata(path)) {
+                        editor.add(new org.eclipse.jgit.dircache.DirCacheEditor.DeletePath(path));
+                    }
+                }
+                editor.commit();
+            } finally { staged.unlock(); }
             return null;
         });
     }
@@ -1309,6 +1334,7 @@ public class ProjectRepoService {
         Path work = workTree(projectId).toAbsolutePath().normalize();
         Path normalized = target.toAbsolutePath().normalize();
         if (!normalized.startsWith(work) || normalized.equals(work)) throw new VersionException("非法路径");
+        if (isNestedProjectMetadata(work.relativize(normalized).toString().replace('\\', '/'))) return;
         try {
             for (Path parent = normalized.getParent(); parent != null && !parent.equals(work); parent = parent.getParent()) {
                 if (Files.isSymbolicLink(parent)) throw new IOException("Restore directory is a symbolic link");
@@ -1403,9 +1429,31 @@ public class ProjectRepoService {
         }
     }
 
-    /** Explicit restore only: recover missing cached objects before any worktree mutation. */
+    static boolean isNestedProjectMetadata(String path) {
+        return path.contains("/.awd/") || path.endsWith("/.awd");
+    }
+
+    /** Explicit restore only: validate old manifests and recover objects before worktree mutation. */
     public void requireObjectsAt(Repository repo, String ref) {
         try {
+            // Older versions may have tracked a child project's metadata before nesting was
+            // supported. Keep that history readable, but do not let checkout overwrite it.
+            try (RevWalk walk = new RevWalk(repo)) {
+                ObjectId id = repo.resolve(ref);
+                if (id != null) {
+                    try (TreeWalk tree = new TreeWalk(repo)) {
+                        tree.addTree(walk.parseCommit(id).getTree());
+                        tree.setRecursive(true);
+                        while (tree.next()) {
+                            if (isNestedProjectMetadata(tree.getPathString())) {
+                                throw VersionException.userFacing(com.checkba.service.LangText.of(
+                                        "这份旧版本包含子文件夹的项目记录，无法直接恢复；请从版本记录中打开所需文件另存",
+                                        "This older version contains a nested folder's project metadata. Open the needed files from version history and save a copy instead"));
+                            }
+                        }
+                    }
+                }
+            }
             for (var object : objectPointersAt(repo, ref, false)) requireLocalObject(projectIdOf(repo), object);
         } catch (IOException e) {
             throw VersionException.userFacing(com.checkba.service.LangText.of(
@@ -1473,9 +1521,12 @@ public class ProjectRepoService {
 
     public void checkoutBranch(long projectId, String name) {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            requireObjectsAt(repo, "HEAD");
             requireObjectsAt(repo, name);
             VersionObjectFilters.materializing(repo, pointerPathsAt(repo, name),
                     () -> git.checkout().setName(name).call());
+        } catch (VersionException e) {
+            throw e;
         } catch (Exception e) {
             throw new VersionException("切换分支失败: " + name, e);
         }
@@ -2018,6 +2069,7 @@ public class ProjectRepoService {
         try (Repository repo = open(projectId); Git git = new Git(repo)) {
             var target = repo.resolve(targetRef);
             if (target == null) throw new VersionException("目标版本不存在: " + targetRef);
+            requireObjectsAt(repo, "HEAD");
             requireObjectsAt(repo, targetRef);
             var result = VersionObjectFilters.materializing(repo, pointerPathsAt(repo, targetRef), () -> git.merge()
                     .include(target)

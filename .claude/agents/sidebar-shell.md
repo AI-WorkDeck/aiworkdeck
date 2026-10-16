@@ -1413,3 +1413,9 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - `webContents.startDrag` 会向 `dataTransfer.types` 注入 `'Files'`、将 `effectAllowed` 锁为 `'copy'`，且拖到软件外松手时可能吞掉 DOM `dragend`：① `isExternalFileDrag(dt)` 在 `document.__checkbaDraggedFile` 存在时返回 `false`，避免应用内文件树把自己拖出的文件误判为外部上传；② 内部树移动/暂存区拖回/编辑器建链统一走 `compatibleDropEffect(dt, preferred)`，当 `effectAllowed === 'copy'` 时返回 `'copy'` 防止目标区拒绝落点；③ `installExternalDragCleanup` 监听窗口级 `mousemove (buttons === 0)` / `mousedown` / `dragend` / `drop`，兜底清理 `document.__checkbaDraggedFile` 与拖拽残留态。
 - 回归：`desktop/tests/file-drag.test.js`、`frontend/tests/project-home/file-tree-external-drop.test.mjs`。
 
+
+## 嵌套文件夹打开（dev-board#1305）
+
+`LocalProjectService.openLocalFolder` 在新项目与已有同账号项目有父子目录关系时，先抛 `NestedFolderConfirmationRequired`；`ProjectController` 返回 `code:0`、`data.requiresNestedConfirmation` 与 `overlappingProjectNames`，此时没有创建目录、项目或导入文件。共用入口 `ideOpen.launchProject` 展示「继续打开 / 取消」，确认后带 `allowNested:true` 重试同一路径，创建/打开所选目录的独立项目。已登记的相同目录照常复用，不重复提示；跨账号重叠仍拒绝且不泄漏项目名；案件库 clone 的非空与嵌套限制未放开。
+
+父子项目引用同一批真实文件，编辑、删除、退回版本彼此可见；数据库文件行和根 `.awd` 清单分别属于各项目。版本层排除子目录 `.awd` 并保护旧历史，详见 version-control.md。验证覆盖取消不落盘、两个方向、重开幂等、各项目独立索引与对账、前端系统打开/新建/菜单共用流程。
