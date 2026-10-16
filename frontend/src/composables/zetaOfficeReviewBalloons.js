@@ -53,7 +53,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
   root.append(svg, list, notice); doc.head.append(style); doc.body.append(root)
   let suspended = 0, generation = 0
   let disposed = false, timer = null, inFlight = false, again = false, snapshot = null
-  let viewportTimer = null
+  let viewportTimer = null, actionFailure = ''
   // Typing must never wait for review metadata (several UNO round trips per
   // item on the office thread). Edits refresh positions from cached metadata;
   // metadata is re-read once the document has been quiet for FRESH_DELAY.
@@ -64,6 +64,15 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
   let lastWantGutter = false
   const pageLayers = new Map()
   function showNotice(text) { notice.textContent = text; notice.hidden = !text }
+  function showActionFailure(result) {
+    const failed = result?.results?.find(x => !x.success)
+    const reason = [failed?.error, failed?.message, result?.error, result?.message]
+      .find(value => typeof value === 'string' && value.trim())
+    // Only display a bounded message line, never serialize objects or a stack.
+    const message = reason?.trim().split(/[\r\n]/, 1)[0].trim()
+    actionFailure = message && message.length <= 300 && !/^(at\s|wasm-function\[)/.test(message) ? message : labels.failed
+    showNotice(actionFailure)
+  }
   function makeCard(item) {
     const node = doc.createElement('article'); node.className = 'awd-rb-card'
     node.dataset.key = item.key; node.tabIndex = 0
@@ -93,6 +102,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       b.onclick = async e => {
         const r = item.data
         e.stopPropagation(); if (busy) return
+        actionFailure = ''; showNotice('')
         if (action === 'edit') {
           if (node.querySelector('textarea')) return
           const input = doc.createElement('textarea'); input.className = 'awd-rb-editor'; input.value = r.content || ''; input.setAttribute('aria-label', labels.edit)
@@ -123,9 +133,9 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
           const result = await execute(item.kind === 'comment' ? (action === 'remove' ? 'delete_comment' : 'set_comment_resolved') : 'resolve_revisions', item.kind === 'comment'
             ? { id: r.id, index: r.index, resolved: action === 'resolve', revision: item.revision, documentSeq: item.documentSeq, expectedComment: r }
             : { indices: r.items.map(x => x.index).sort((a, b) => b - a), action, revision: item.revision, documentSeq: item.documentSeq, expectedRevisions: r.items })
-          if (!result?.success || result.results?.some(x => !x.success)) throw new Error()
+          if (!result?.success || result.results?.some(x => !x.success)) { showActionFailure(result); return }
           transport.send({ __lo: 'lo-relay', type: 'modified' })
-        } catch { showNotice(labels.failed) }
+        } catch { showActionFailure(null) }
         finally { busy = false; root.querySelectorAll('.awd-rb-actions button').forEach(b => { b.disabled = false }); refreshNow() }
       }
       actions.append(b)
@@ -170,7 +180,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       if (card.key === editingKey) { editingKey = ''; busy = false }
       card.node.remove()
     })
-    showNotice(data.truncated ? labels.more : '')
+    showNotice(actionFailure || (data.truncated ? labels.more : ''))
   }
   function pageLayer(page) {
     let layer = pageLayers.get(page.number)
@@ -364,7 +374,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
     suspend(action) {
       suspended++; generation++; clearTimeout(timer); lastAction = action
       if (action === 'load_document') {
-        busy = false; editingKey = ''; pointerDown = false; snapshot = null; cards = []; focusKey = ''; enabled = false; lastWantGutter = false
+        actionFailure = ''; busy = false; editingKey = ''; pointerDown = false; snapshot = null; cards = []; focusKey = ''; enabled = false; lastWantGutter = false
         list.replaceChildren(); pageLayers.clear(); svg.replaceChildren(); root.hidden = true
       }
     },

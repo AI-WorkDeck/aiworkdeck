@@ -19,7 +19,7 @@ Writer 的 `ShowTextBoundaries` 与格式标记联动：打开 ¶ 时会把文�
 
 `list_revisions` 的定位优化不能改变修订正文。Writer 的单元格边界可能与正文段落位置可比较，但正文 `XTextCursor` 不能进入该单元格；用缓存正文游标读取失败时，须退回 `RedlineStart.getText()` 自己的游标，并把 `paraKey` 降为 -1，继续返回真实文字和表格元数据。否则 `locate:false` 气泡清单读到占位字符、`locate:true` 身份围栏读成空串，同一条未变化的修订也会被永远拒为过期。不得通过取消 `expectedRevisions` 身份/文字校验或改成接受全部绕过。
 
-回归 `tests/lowa-unit/review-list-locator-cache.test.mjs` 覆盖可比较但不可跨入的单元格；`tests/lowa-e2e/revision-empty-content.mjs` 用合成段落符号、空段落和空单元格占位字符删除，核对内联/气泡、接受/拒绝、实际气泡按钮、保留其他修订及 DOCX 导出重开。共用启动器支持 `LOWA_DIST_DIR` 指向独立编辑器构建，`LOWA_ENGINE_DIR` 仍只读外部引擎。该用例不读取客户原稿。
+回归 `tests/lowa-unit/review-list-locator-cache.test.mjs` 覆盖可比较但不可跨入的单元格；`tests/lowa-e2e/revision-empty-content.mjs` 用合成段落符号、空段落和空单元格占位字符删除，核对内联/气泡、接受/拒绝、实际气泡按钮、保留其他修订及 DOCX 导出重开。共用启动器支持 `LOWA_DIST_DIR` 指向独立编辑器构建，`LOWA_ENGINE_DIR` 仍只读外部引擎。该用例不读取客户原稿。 气泡接受/拒绝失败时保留 worker 返回的可读 error/message（仅有界首行，非字符串和堆栈用现有中英文兜底）；动作失败提示不能被紧随其后的布局刷新清掉，下一次动作或加载文档时清除。`tests/revision-view/word-review-lifecycle.mjs` 覆盖两按钮、逐项失败、错误展示和原身份围栏。
 
 ## 自动补全开关（dev-board#1226）
 
