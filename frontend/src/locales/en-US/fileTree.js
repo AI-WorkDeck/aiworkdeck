@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // File tree (FileTree.vue): context menu, batch actions, confirm dialogs, drag hints, local import
 export default {
+  externalDragFailed: 'Could not drag the selection out. Make sure all selected items are existing local files and try again.',
   clientAccessTitle: "Client file access",
   clientAccessExplain: "Files are internal by default and must be shared individually. Clients can always read their own uploads.",
   clientAccessCurrent: "Current access: {state}.",

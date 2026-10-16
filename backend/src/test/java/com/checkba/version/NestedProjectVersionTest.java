@@ -69,7 +69,7 @@ class NestedProjectVersionTest {
     }
 
     @Test
-    void legacyNestedMetadataIsUntrackedWithoutDeletingItAndUnsafeHistoryCannotBeCheckedOut() throws Exception {
+    void legacyNestedMetadataIsUntrackedAndNamedBranchesMigrateWithoutTouchingFiles() throws Exception {
         Path parent = temp.resolve("parent");
         write(parent, ".awd/tree.json", "parent");
         write(parent, "child/contract.txt", "content");
@@ -88,7 +88,10 @@ class NestedProjectVersionTest {
         assertFalse(service.listPaths(7L, "HEAD").contains("child/.awd/tree.json"));
         assertEquals("legacy child manifest", Files.readString(parent.resolve("child/.awd/tree.json")));
         write(parent, "child/.awd/tree.json", "current child manifest");
-        VersionException rejected = assertThrows(VersionException.class, () -> service.checkoutBranch(7L, "legacy"));
+        service.checkoutBranch(7L, "legacy");
+        assertFalse(service.listPaths(7L, "HEAD").contains("child/.awd/tree.json"));
+        assertTrue(service.isAncestor(7L, legacy, "HEAD"), "Migration appends a commit without rewriting history");
+        VersionException rejected = assertThrows(VersionException.class, () -> service.requireObjectsAt(7L, legacy));
         assertTrue(rejected.isUserFacing());
         assertEquals("current child manifest", Files.readString(parent.resolve("child/.awd/tree.json")));
         assertEquals("legacy child manifest", new String(service.readBlobAtCommit(7L, legacy, "child/.awd/tree.json")), "History remains readable");
