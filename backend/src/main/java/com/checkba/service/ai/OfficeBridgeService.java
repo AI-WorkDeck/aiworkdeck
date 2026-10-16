@@ -63,11 +63,26 @@ public class OfficeBridgeService {
      * 在那条用例的「判断档」里逐条列了理由。在它之前这张表只有前两条，
      * insert_table / excel_set_values / ppt_add_table 这些明显的批量原语全在 30 秒上吊着。
      *
-     * <p><b>读取类刻意不进表</b>：LOWA 桥把读取类抬到 120 秒是 dev-board#729 ③ 拿真机
-     * telemetry 换来的（86 次超时里 79 次是读命令），插件桥这边没有同等证据；
-     * 而读取超时只是白等一轮，不会造成双写。等有真机数据再说，不跟着抄。
+     * <p>读取大文档同样可能超过 30 秒，内容读取、搜索及跨文档参考读取统一给
+     * 120 秒（dev-board#1320），瞬时选择等交互仍使用默认预算。
      */
     static final Map<String, Integer> ACTION_TIMEOUT_SECONDS = Map.ofEntries(
+            // 大文档读取 / 检索；read_for_reference 来自 OpenDocSource 的跨窗格读取。
+            Map.entry("get_text", 120),
+            Map.entry("get_selection", 120),
+            Map.entry("search", 120),
+            Map.entry("get_formatting", 120),
+            Map.entry("table_read", 120),
+            Map.entry("get_comments", 120),
+            Map.entry("get_revisions", 120),
+            Map.entry("excel_get_range", 120),
+            Map.entry("excel_search", 120),
+            Map.entry("excel_get_overview", 120),
+            Map.entry("excel_get_comments", 120),
+            Map.entry("ppt_get_slides", 120),
+            Map.entry("ppt_get_slide_details", 120),
+            Map.entry("ppt_table_read", 120),
+            Map.entry("read_for_reference", 120),
             // ===== Word 面 =====
             // 一个 Word.run 里定位并落笔最多 50 处
             Map.entry("replace_batch", 120),
@@ -200,7 +215,7 @@ public class OfficeBridgeService {
 
             OfficeActionResult result = future.get(timeoutSeconds, TimeUnit.SECONDS);
             if (result.ok()) {
-                return objectMapper.writeValueAsString(result.data());
+                return resultJson(result.data(), args);
             }
             String error = result.error() != null && !result.error().isBlank()
                     ? result.error() : "插件执行失败（未提供错误信息）";
@@ -224,6 +239,27 @@ public class OfficeBridgeService {
         } finally {
             pendingRequests.remove(requestId);
         }
+    }
+
+    /** 请求理由作为操作元数据回传；不是 Office 原生修订字段，也不证明某批次条目已执行。 */
+    private String resultJson(Object data, Map<String, Object> args) throws com.fasterxml.jackson.core.JsonProcessingException {
+        com.fasterxml.jackson.databind.JsonNode node = objectMapper.valueToTree(data);
+        if (node instanceof com.fasterxml.jackson.databind.node.ObjectNode result && args != null) {
+            if (args.get("reason") instanceof String reason && !reason.isBlank()) {
+                result.put("requestedReason", reason);
+            }
+            if (args.get("items") instanceof java.util.List<?> items) {
+                var reasons = objectMapper.createArrayNode();
+                for (int i = 0; i < items.size(); i++) {
+                    if (items.get(i) instanceof Map<?, ?> item
+                            && item.get("reason") instanceof String reason && !reason.isBlank()) {
+                        reasons.addObject().put("index", i + 1).put("reason", reason);
+                    }
+                }
+                if (!reasons.isEmpty()) result.set("requestedEditReasons", reasons);
+            }
+        }
+        return objectMapper.writeValueAsString(node);
     }
 
     /**

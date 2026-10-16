@@ -140,6 +140,48 @@ class AgentOrchestratorInboxTest {
         }
     }
 
+    @Test
+    void restoredOfficeInboxReRegistersCapabilityBeforeLaunching() {
+        var caps = new ClientCapabilityService();
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "clientCapabilities", caps);
+        var input = request("resume office", "restored-office", "steer");
+        input.setClientCapability("office");
+        input.setOfficeHost("excel");
+        var item = inbox.submit(input, 7L);
+        inbox = new AgentInboxService(repository, sse, runState);
+        orchestrator.setInboxService(inbox);
+        var tasks = new ArrayList<Runnable>();
+        orchestrator.setTurnExecutor(tasks::add);
+        orchestrator.acceptInboxSubmission(item.getId());
+        assertEquals(ClientCapabilityService.Capability.OFFICE, caps.capabilityOf(CONV));
+        assertEquals(ClientCapabilityService.OfficeHost.EXCEL, caps.officeHostOf(CONV));
+        assertEquals(1, tasks.size());
+    }
+
+    @Test
+    void missingTransientBodyCannotLeaveAnActiveRunOrCallModel() {
+        var input = request("review", "body-missing", "steer");
+        var context = new AiAgentController.ContextItem();
+        context.setInlineContent("PRIVATE BODY");
+        input.setActiveContext(context);
+        var item = inbox.submit(input, 7L);
+        inbox = new AgentInboxService(repository, sse, runState);
+        orchestrator.setInboxService(inbox);
+        assertThrows(AgentInboxService.InlineContentUnavailable.class,
+                () -> orchestrator.acceptInboxSubmission(item.getId()));
+        assertNull(orchestrator.activeRunId(CONV));
+        assertEquals(AgentInboxService.PENDING, item.getState());
+        verifyNoInteractions(assembler);
+        assertTrue(modelRequests.isEmpty());
+        var queued = new ArrayList<Runnable>();
+        orchestrator.setTurnExecutor(queued::add);
+        var retried = inbox.submit(input, 7L);
+        assertEquals(item.getId(), retried.getId());
+        assertNotNull(orchestrator.acceptInboxSubmission(retried.getId()));
+        assertEquals(1, queued.size(), "full-body retry of the same unexecuted input must launch once");
+        assertEquals(AgentInboxService.APPLIED, retried.getState());
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"client", "removed"})
     void permissionRestoredPendingInboxRechecksBeforeClaim(String change) {
