@@ -1659,8 +1659,13 @@ class ContextAssemblerServiceTest {
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(4);
         try {
             String parallel = assembleWith(memory, messages, docs, pool);
-            assertEquals(serial, parallel,
-                    "并行只改变等待方式，不改变任何一个字——拼接顺序与文本必须完全一致");
+            // Real clock injection may cross a second between the two assemblies.
+            String clockLine = "(?m)^- [*][*]Current System Time[*][*]:.*$";
+            assertTrue(serial.contains("Current System Time"));
+            assertTrue(parallel.contains("Current System Time"));
+            assertEquals(serial.replaceAll(clockLine, "[current clock]"),
+                    parallel.replaceAll(clockLine, "[current clock]"),
+                    "除实时钟以外，并行只改变等待方式；拼接顺序与文本必须完全一致");
         } finally {
             pool.shutdownNow();
         }
