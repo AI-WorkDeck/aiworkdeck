@@ -54,6 +54,10 @@ class ChangeSignalNonBlockingTest {
     @Test
     void busyRepositoryDoesNotBlockSaveAndCoalescesLatestActor() throws Exception {
         var lock = service.repoLock(7L);
+        // Lock initialization resolves local-folder ownership once; only the busy
+        // request below must avoid repository/database work.
+        verify(repos).hasLocalRoot(7L);
+        clearInvocations(repos);
         lock.lock();
         var executor = Executors.newSingleThreadExecutor();
         try {
@@ -73,6 +77,27 @@ class ChangeSignalNonBlockingTest {
         scheduled.get(0).run();
         verify(sessions).save(argThat(s -> Long.valueOf(2L).equals(s.getUserId())));
         verify(repos).createBranch(eq(7L), startsWith("work/"), eq("HEAD"));
+    }
+
+    @Test
+    void lockClassificationFailuresKeepTheLatestActorAndAllowBackgroundRetry() {
+        when(repos.hasLocalRoot(7L))
+                .thenThrow(new IllegalStateException("first lookup failed"))
+                .thenThrow(new IllegalStateException("second lookup failed"))
+                .thenThrow(new IllegalStateException("background lookup failed"))
+                .thenReturn(true);
+
+        assertDoesNotThrow(() -> service.onChangeSignal(7L, 1L, "first"));
+        assertDoesNotThrow(() -> service.onChangeSignal(7L, 2L, "latest"));
+        assertEquals(1, scheduled.size(), "Failed classification still coalesces queued signals");
+        verifyNoInteractions(sessions);
+        assertDoesNotThrow(() -> scheduled.get(0).run());
+        assertEquals(2, scheduled.size(), "Failed background classification releases the queue slot and retries");
+        verifyNoInteractions(sessions);
+        scheduled.get(1).run();
+        verify(sessions).save(argThat(s -> Long.valueOf(2L).equals(s.getUserId())));
+        verify(repos).createBranch(eq(7L), startsWith("work/"), eq("HEAD"));
+        verify(repos, times(4)).hasLocalRoot(7L);
     }
 
     @Test
@@ -172,6 +197,8 @@ class ChangeSignalNonBlockingTest {
     @Test
     void statusFailsPromptlyWhenRepositoryIsBusy() throws Exception {
         var lock = service.repoLock(7L);
+        verify(repos).hasLocalRoot(7L);
+        clearInvocations(repos);
         lock.lock();
         var executor = Executors.newSingleThreadExecutor();
         try {

@@ -488,12 +488,12 @@ public class MeetingTranscriptionService {
     }
 
     /**
-     * 源文件是视频容器、必须先抽音轨（dev-board#1024）。三档提交本来就都过 {@link #transcodeWithTimeout}，
-     * 区别在转码失败时：音频可以回退原文件「宁可试一次」，视频不行——把几百 MB 的 mp4 原样
-     * 送去听悟/网关/本机识别，要么被拒、要么白花上传与计费，所以视频转码失败直接落 FAILED。
+     * 视频与 QTA 必须先抽音轨转为 mp3（dev-board#1024、#1310）。三档提交都过
+     * {@link #transcodeWithTimeout}；转换失败直接落 FAILED，避免上传不支持的容器或产生计费。
      */
     static boolean needsAudioExtraction(String fileName) {
-        return MeetingRecordingService.isVideoFileName(fileName);
+        return MeetingRecordingService.isVideoFileName(fileName)
+                || MeetingAudioTranscoder.isQuickTimeAudio(fileName);
     }
 
     /** 音频本体的定位与非空校验，两档共用。 */
@@ -531,8 +531,14 @@ public class MeetingTranscriptionService {
         try {
             File prepared = worker.submit(() -> transcoder.toMp3(input, workDir))
                     .get(transcodeTimeout.toMillis(), TimeUnit.MILLISECONDS);
-            // 视频：转码器失败会回退原文件，这里拦下，保证送出去的一定是 mp3 产物
-            if (needsAudioExtraction(input.getName()) && !"mp3".equals(audioFormat(prepared))) {
+            // 转码器失败会回退原文件；视频和 QTA 只有真实、非空的 mp3 产物才能继续。
+            if (needsAudioExtraction(input.getName()) && (prepared == null || prepared.equals(input)
+                    || !"mp3".equals(audioFormat(prepared)) || prepared.length() == 0)) {
+                if (MeetingAudioTranscoder.isQuickTimeAudio(input.getName())) {
+                    throw new IllegalStateException(LangText.of(
+                            "无法转换这份 QTA 录音：可能包含不支持的多层音轨、缺少可读取的兼容音轨或文件已损坏。请导出为 M4A 或 WAV 后重试；分层录音可在语音备忘录中分离录音层后分别导出 M4A。原文件未改动。",
+                            "Could not convert this QTA recording: it may contain unsupported layered tracks, lack a readable compatible track, or be damaged. Export as M4A or WAV and retry. For layered recordings, separate the layers in Voice Memos and export each as M4A. The original file is unchanged."));
+                }
                 throw new IllegalStateException(LangText.of(
                         "无法从视频中提取音轨（文件可能损坏或没有声音）",
                         "Could not extract the audio track from the video (the file may be damaged or silent)"));

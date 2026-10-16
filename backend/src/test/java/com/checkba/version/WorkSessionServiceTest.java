@@ -141,6 +141,61 @@ class WorkSessionServiceTest {
                 sessions.values().iterator().next().getStatus());
     }
 
+    private String addLegacyNestedMetadata() throws Exception {
+        Path childMetadata = root.resolve("projects/7/child/.awd/tree.json");
+        Files.createDirectories(childMetadata.getParent());
+        Files.writeString(childMetadata, "legacy child manifest");
+        try (var repo = repoSvc.open(7L); var git = new org.eclipse.jgit.api.Git(repo)) {
+            Files.writeString(repoSvc.gitDir(7L).resolve("info/exclude"), "");
+            git.add().addFilepattern(".").call();
+            return git.commit().setMessage("old parent snapshot")
+                    .setAuthor("author", "a@example.com").call().name();
+        }
+    }
+
+    @Test
+    void legacyMasterCanStartAutosaveAndEndWorkWithoutTouchingChildMetadata() throws Exception {
+        String legacy = addLegacyNestedMetadata();
+        Path childMetadata = root.resolve("projects/7/child/.awd/tree.json");
+        Files.writeString(childMetadata, "current child manifest");
+        Files.writeString(root.resolve("projects/7/合同.txt"), "修改正文");
+
+        assertNotNull(svc.commitNow(7L, 1L, "韩泽伟", "自动存档"));
+        assertEquals(1, sessions.size(), "Migration must not leave orphan work sessions");
+        assertNotNull(svc.endSession(7L, 1L, "韩泽伟", "完成修改").sha());
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(List.of(repoSvc.mainBranch()), repoSvc.listBranches(7L));
+        assertEquals("修改正文", Files.readString(root.resolve("projects/7/合同.txt")));
+        assertEquals("current child manifest", Files.readString(childMetadata));
+        assertTrue(repoSvc.isAncestor(7L, legacy, "HEAD"));
+        assertFalse(repoSvc.listPaths(7L, "HEAD").contains("child/.awd/tree.json"));
+    }
+
+    @Test
+    void existingLegacyActiveSessionCanReturnToOldMasterAndEnd() throws Exception {
+        svc.onChangeSignal(7L, 1L, "韩泽伟");
+        String legacy = addLegacyNestedMetadata();
+        // Both branches were already present in the old application; only the session branch
+        // will lose nested metadata in commitNow, leaving an old master to return to.
+        try (var repo = repoSvc.open(7L)) {
+            var update = repo.updateRef("refs/heads/" + repoSvc.mainBranch());
+            update.setNewObjectId(org.eclipse.jgit.lib.ObjectId.fromString(legacy));
+            assertEquals(org.eclipse.jgit.lib.RefUpdate.Result.FAST_FORWARD, update.update());
+        }
+        Path childMetadata = root.resolve("projects/7/child/.awd/tree.json");
+        Files.writeString(childMetadata, "current child manifest");
+        Files.writeString(root.resolve("projects/7/合同.txt"), "旧工作段的新修改");
+
+        assertNotNull(svc.commitNow(7L, 1L, "韩泽伟", "自动存档"));
+        var ended = svc.endSession(7L, 1L, "韩泽伟", "结束旧工作段");
+        assertNotNull(ended.sha());
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(List.of(repoSvc.mainBranch()), repoSvc.listBranches(7L));
+        assertEquals("旧工作段的新修改", Files.readString(root.resolve("projects/7/合同.txt")));
+        assertEquals("current child manifest", Files.readString(childMetadata));
+        assertFalse(repoSvc.listPaths(7L, "HEAD").contains("child/.awd/tree.json"));
+    }
+
     /**
      * 结束工作必须把已经并进主线的工作分支删掉。
      *

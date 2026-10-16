@@ -130,6 +130,10 @@ export function installExternalDragCleanup(onCleanup, win = typeof window !== 'u
     try { win.removeEventListener('drop', onDragEndOrDrop, true) } catch (_) {}
     try { win.removeEventListener('mousemove', onMouseMove, true) } catch (_) {}
     try { win.removeEventListener('mousedown', onMouseDown, true) } catch (_) {}
+    try { win.removeEventListener('mouseup', onDragEndOrDrop, true) } catch (_) {}
+    try { win.removeEventListener('pointerup', onDragEndOrDrop, true) } catch (_) {}
+    try { win.removeEventListener('focus', onFocus, true) } catch (_) {}
+    try { win.removeEventListener('keydown', onKeyDown, true) } catch (_) {}
     if (activeCleanupCancel === detach) activeCleanupCancel = null
   }
   const runCleanup = () => {
@@ -152,36 +156,57 @@ export function installExternalDragCleanup(onCleanup, win = typeof window !== 'u
   const onMouseDown = () => {
     runCleanup()
   }
+  const onFocus = (e) => {
+    if (!e || !e.target || e.target === win) onDragEndOrDrop()
+  }
+  const onKeyDown = (e) => {
+    if (e && e.key === 'Escape') onDragEndOrDrop()
+  }
   win.addEventListener('dragend', onDragEndOrDrop, true)
   win.addEventListener('drop', onDragEndOrDrop, true)
   win.addEventListener('mousemove', onMouseMove, true)
   win.addEventListener('mousedown', onMouseDown, true)
+  win.addEventListener('mouseup', onDragEndOrDrop, true)
+  win.addEventListener('pointerup', onDragEndOrDrop, true)
+  // 原生拖拽可能吞掉 dragend，且客体 webview 的鼠标事件不经过宿主。
+  // 返回应用、释放鼠标或 Esc 都应撤掉编辑器的透明接收层；不在 blur 时清理，
+  // 否则仍按着鼠标拖往另一个窗口时会丢掉应用内拖拽身份。
+  win.addEventListener('focus', onFocus, true)
+  win.addEventListener('keydown', onKeyDown, true)
   activeCleanupCancel = detach
-  return detach
+  return runCleanup
 }
 
-export function startExternalFileDrag(item, options = {}) {
-  if (!item || item.id == null || item.isFolder || item.fileType === 'folder') {
+export function startExternalFileDrag(itemOrItems, options = {}) {
+  const items = Array.isArray(itemOrItems) ? itemOrItems : [itemOrItems]
+  if (!items.length || items.some(item => !item || item.id == null || item.isFolder || item.fileType === 'folder')) {
     return { ok: false, reason: 'not-file' }
   }
   const fs = options.fs || (typeof window !== 'undefined' && window.checkbaDesktop && window.checkbaDesktop.fs) || null
   if (!fs || typeof fs.startDrag !== 'function') {
     return { ok: false, reason: 'unsupported' }
   }
-  const localPath = (typeof item.localPath === 'string' && item.localPath)
-    ? item.localPath
-    : resolveLocalFilePathSync(item.id, options)
-  if (!localPath) {
-    return { ok: false, reason: 'no-local-path' }
+  // Native export is optional: failure must leave the HTML drag identity intact.
+  // Keep the completion listeners armed until the actual drop/dragend (or lost-event fallback).
+  installExternalDragCleanup(options.onCleanup, options.win)
+  const paths = []
+  for (const item of items) {
+    const localPath = (typeof item.localPath === 'string' && item.localPath)
+      ? item.localPath
+      : resolveLocalFilePathSync(item.id, options)
+    // 选中整组就必须交付整组，不把缺失的一项静默丢掉。
+    if (!localPath) return { ok: false, reason: 'no-local-path' }
+    if (!paths.includes(localPath)) paths.push(localPath)
   }
+  const resultOf = res => res && res.ok === false ? res
+    : Array.isArray(itemOrItems) ? { ok: true, paths } : { ok: true, path: paths[0] }
+  const failureOf = e => ({ ok: false, reason: 'start-drag-error', message: String((e && e.message) || e) })
   try {
-    const res = fs.startDrag(localPath)
-    if (res && res.ok === false) return res
-    if (typeof options.onCleanup === 'function') {
-      installExternalDragCleanup(options.onCleanup, options.win)
-    }
-    return { ok: true, path: localPath }
+    const res = fs.startDrag(Array.isArray(itemOrItems) ? paths : paths[0])
+    // Some hosts expose invoke rather than send; absorb rejection without terminating
+    // the still-active internal drag or leaving an unhandled rejection in the renderer.
+    return res && typeof res.then === 'function' ? Promise.resolve(res).then(resultOf, failureOf) : resultOf(res)
   } catch (e) {
-    return { ok: false, reason: 'start-drag-error', message: String((e && e.message) || e) }
+    return failureOf(e)
   }
 }

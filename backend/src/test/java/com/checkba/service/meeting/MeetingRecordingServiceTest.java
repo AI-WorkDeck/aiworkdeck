@@ -268,6 +268,17 @@ class MeetingRecordingServiceTest {
     }
 
     @Test
+    void registerExistingAcceptsQtaWithoutTakingOwnership() {
+        when(projectFileRepository.findById(79L))
+                .thenReturn(Optional.of(audioFile(79L, 1L, "空间录音.QTA")));
+        when(meetingRepository.findByProjectIdOrderByCreatedAtDesc(1L)).thenReturn(java.util.List.of());
+        MeetingRecording m = service.registerExisting(1L, 79L, 10001L);
+        assertEquals(MeetingRecording.STATUS_RECORDED, m.getStatus());
+        assertEquals(79L, m.getAudioFileId());
+        assertEquals(Boolean.FALSE, m.getOwnsAudioFile());
+    }
+
+    @Test
     @DisplayName("注册围栏（视频扩展后）：文件夹仍拒绝；.txt 拒绝且文案说「音视频」")
     void registerExistingRejectsFolderAndNonMedia() {
         com.checkba.model.entity.ProjectFile folder = audioFile(2L, 1L, "录像.mp4");
@@ -320,6 +331,7 @@ class MeetingRecordingServiceTest {
     void audioFileNameDetection() {
         assertTrue(MeetingRecordingService.isAudioFileName("rec.m4a"));
         assertTrue(MeetingRecordingService.isAudioFileName("REC.MP3"));
+        assertTrue(MeetingRecordingService.isAudioFileName("空间录音.QTA"));
         assertFalse(MeetingRecordingService.isAudioFileName("合同.docx"));
         assertFalse(MeetingRecordingService.isAudioFileName("noext"));
         assertFalse(MeetingRecordingService.isAudioFileName(null));

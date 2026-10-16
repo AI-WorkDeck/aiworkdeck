@@ -39,11 +39,11 @@ function initLocalFileService() {
 
     // Handler: 把资源管理器/暂存区的文件直接拖出窗口（如拖到微信聊天、Finder/资源管理器，dev-board#1288）。
     // 同步/异步双注册：dragstart 期间 send 更快进入原生拖拽，invoke 便于回执与单测。
-    ipcMain.on('fs:startDrag', (event, { path: filePath } = {}) => {
-        startFileDrag(event && event.sender, filePath);
+    ipcMain.on('fs:startDrag', (event, { paths, path: filePath } = {}) => {
+        startFileDrag(event && event.sender, paths || filePath);
     });
-    ipcMain.handle('fs:startDrag', async (event, { path: filePath } = {}) => {
-        return startFileDrag(event && event.sender, filePath);
+    ipcMain.handle('fs:startDrag', async (event, { paths, path: filePath } = {}) => {
+        return startFileDrag(event && event.sender, paths || filePath);
     });
 
     // Handler: 回收站「彻底删除」把磁盘上的文件送进系统废纸篓（dev-board#1051）。
@@ -198,29 +198,37 @@ function startFileDrag(sender, filePath, deps = {}) {
     const fsMod = deps.fs || fs;
     const nativeImageMod = deps.nativeImage || nativeImage;
     if (!sender || typeof sender.startDrag !== 'function') return { ok: false, reason: 'no-sender' };
-    if (typeof filePath !== 'string' || !filePath || !path.isAbsolute(filePath)) {
-        return { ok: false, reason: 'bad-path' };
-    }
-    const resolved = path.resolve(filePath);
-    if (filePath.replace(/[\\/]+$/, '') !== resolved) {
-        return { ok: false, reason: 'not-normalized' };
-    }
-    let stat = null;
-    try {
-        stat = fsMod.statSync(resolved);
-    } catch (e) {
-        return { ok: false, reason: 'not-found' };
-    }
-    if (!stat || (typeof stat.isDirectory === 'function' && stat.isDirectory())) {
-        return { ok: false, reason: 'not-file' };
+    const filePaths = Array.isArray(filePath) ? filePath : [filePath];
+    if (!filePaths.length) return { ok: false, reason: 'bad-path' };
+    const resolvedPaths = [];
+    for (const candidate of filePaths) {
+        if (typeof candidate !== 'string' || !candidate || !path.isAbsolute(candidate)) {
+            return { ok: false, reason: 'bad-path' };
+        }
+        const resolved = path.resolve(candidate);
+        if (candidate.replace(/[\\/]+$/, '') !== resolved) {
+            return { ok: false, reason: 'not-normalized' };
+        }
+        let stat = null;
+        try {
+            stat = fsMod.statSync(resolved);
+        } catch (e) {
+            return { ok: false, reason: 'not-found' };
+        }
+        if (!stat || (typeof stat.isDirectory === 'function' && stat.isDirectory())) {
+            return { ok: false, reason: 'not-file' };
+        }
+        if (!resolvedPaths.includes(resolved)) resolvedPaths.push(resolved);
     }
     const icon = deps.icon || createDragFileIcon(nativeImageMod);
     if (!icon || (typeof icon.isEmpty === 'function' && icon.isEmpty())) {
         return { ok: false, reason: 'no-icon' };
     }
     try {
-        sender.startDrag({ file: resolved, icon });
-        return { ok: true, path: resolved };
+        sender.startDrag({ files: resolvedPaths, icon });
+        return Array.isArray(filePath)
+            ? { ok: true, paths: resolvedPaths }
+            : { ok: true, path: resolvedPaths[0] };
     } catch (e) {
         return { ok: false, reason: 'start-drag-failed', message: String((e && e.message) || e) };
     }

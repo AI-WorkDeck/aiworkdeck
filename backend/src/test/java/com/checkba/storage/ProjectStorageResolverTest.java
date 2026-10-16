@@ -210,4 +210,38 @@ class ProjectStorageResolverTest {
             out.put(prefix, node);
         }
     }
+    @Test
+    void strictLockLookupRetriesWhileOrdinaryResolutionKeepsItsFallback(@TempDir Path root) {
+        ProjectRepository projects = mock(ProjectRepository.class);
+        Project local = new Project();
+        local.setLocalRoot(root.resolve("local").toString());
+        when(projects.findById(7L)).thenThrow(new IllegalStateException("temporary"))
+                .thenReturn(Optional.empty(), Optional.of(local));
+        ProjectStorageResolver resolver = new ProjectStorageResolver(props(root), projects);
+
+        assertEquals(root.resolve("projects/7"), resolver.projectRoot(7L), "Ordinary resolution keeps its fallback");
+        assertThrows(StorageException.class, () -> resolver.hasLocalRootForVersionLock(7L));
+        assertTrue(resolver.hasLocalRootForVersionLock(7L));
+        assertEquals(root.resolve("local"), resolver.projectRoot(7L));
+        verify(projects, times(3)).findById(7L);
+    }
+
+    @Test
+    void strictLockLookupReusesConfirmedManagedAndLocalCache(@TempDir Path root) {
+        ProjectRepository projects = mock(ProjectRepository.class);
+        Project managed = new Project();
+        Project local = new Project();
+        local.setLocalRoot(root.resolve("local").toString());
+        when(projects.findById(7L)).thenReturn(Optional.of(managed));
+        when(projects.findById(8L)).thenReturn(Optional.of(local));
+        ProjectStorageResolver resolver = new ProjectStorageResolver(props(root), projects);
+
+        assertFalse(resolver.hasLocalRoot(7L));
+        assertTrue(resolver.hasLocalRoot(8L));
+        assertFalse(resolver.hasLocalRootForVersionLock(7L));
+        assertTrue(resolver.hasLocalRootForVersionLock(8L));
+        verify(projects).findById(7L);
+        verify(projects).findById(8L);
+    }
+
 }
