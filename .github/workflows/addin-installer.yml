@@ -53,6 +53,7 @@ jobs:
       # 否则合并到一个 artifact 里后构建的那份会静默覆盖前一份。
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 3
           name: addin-installer-exe
           path: |
             office-addin/installer/dist-cn/*.exe
