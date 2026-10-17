@@ -90,6 +90,9 @@ jobs:
         # desktop job 一直是干净的 npm ci）。本地验证过 frontend/ 的 lockfile 与
         # package.json 一致（npm ci 能正常跑通），收紧成单纯 npm ci。
         run: npm ci
+      - name: Test incremental speech playback
+        working-directory: frontend
+        run: npm run test:tts
       - name: Test project IM plugin and bridge
         run: node --test official-plugins/project-im/tests/*.mjs frontend/tests/plugin-sdk/im-*.test.mjs
       - name: Test Tencent Meeting plugin panel
