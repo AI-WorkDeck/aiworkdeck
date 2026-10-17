@@ -42,10 +42,10 @@ const server = await createServer({
   plugins: [{
     name: 'isolated-uni-compatibility', enforce: 'pre',
     transform(code, id) {
-      if (!id.endsWith('/EasyVoicePane.vue')) return
+      if (!/\/(EasyVoicePane|AwdSelect)\.vue$/.test(id)) return
       // Uni tags/events only; do not alter the script, reader, or audio implementation.
       return code.replace(/<template>([\s\S]*?)<\/template>\s*\n\s*<script>/, (_, template) =>
-        '<template>' + template.replace(/@tap(?=[.\s=])/g, '@click').replace(/(<\/?)(scroll-view|view|text)(?=[\s>])/g, (_, open, tag) => open + (tag === 'text' ? 'span' : 'div')) + '</template>\n<script>')
+        '<template>' + template.replace(/<textarea class="voice-textarea"([\s\S]*?)\/>/g, '<div class="voice-textarea"><textarea$1></textarea></div>').replace(/@tap(?=[.\s=])/g, '@click').replace(/(<\/?)(scroll-view|view|text)(?=[\s>])/g, (_, open, tag) => open + (tag === 'text' ? 'span' : 'div')) + '</template>\n<script>')
     },
     resolveId(id) { if (id === 'virtual:app-tokens.css') return '\0app-tokens.css' },
     load(id) { if (id === '\0app-tokens.css') return tokenCss },
@@ -99,7 +99,7 @@ try {
   }
   const snapshot = () => page.evaluate(() => window.__harness.snapshot())
   async function reset(config) {
-    await page.goto(url, { waitUntil: 'networkidle0' })
+    await page.goto(url + (process.argv.includes('--synthetic-only') ? '/?synthetic=1' : ''), { waitUntil: 'networkidle0' })
     await wait(() => window.__harness?.pane()?.voicesLoaded && window.__harness.pane().selectedVoiceId)
     await page.evaluate(config => { window.__testConfig = { ...window.__testConfig, ...config } }, config)
   }
@@ -192,7 +192,7 @@ try {
   // Identical safe synthetic text to the original whole-document baseline (744 characters).
   const longText = '第一条，合作内容。双方应当按照协议约定履行义务，及时提交所需材料。服务事项办理完毕后，按约定核对费用，确认无误后办理结算。\n'.repeat(12)
   assert.equal(longText.length, 744)
-  for (const [label, text] of [['first', realText], ['warm', realText], ['warm-long', longText]]) {
+  for (const [label, text] of (process.argv.includes('--synthetic-only') ? [] : [['first', realText], ['warm', realText], ['warm-long', longText]])) {
     await reset({ mode: 'real' })
     await start(text)
     await wait(() => window.__harness.pane().reading.status === 'playing')
