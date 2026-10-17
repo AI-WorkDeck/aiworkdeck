@@ -527,6 +527,11 @@ export async function postAccountPasswordOperation({ serverUrl }, operation, pay
   return response.data
 }
 
+export async function postAccountLoginChallenge({ serverUrl }, payload) {
+  const response = await postAnonymous(serverUrl, '/api/auth/account-login/captcha-challenge', payload)
+  return response.data
+}
+
 /**
  * 两个匿名登录端点共用的出站与信封解析。
  *

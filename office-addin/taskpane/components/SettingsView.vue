@@ -111,8 +111,24 @@
         持有它们。放进某个分支里，用户切一次 tab 节点就被 Vue 拆掉，SDK 攥着的是一个
         已经不在文档里的元素——弹不出滑块，也取不到 token，而且一声不响。
       -->
-      <div id="login-captcha" class="captcha-holder" :class="{ 'captcha-inactive': mode === 'password' || mode === 'setup' }"></div>
+      <div id="login-captcha" class="captcha-holder" :class="{ 'captcha-inactive': mode === 'password' || mode === 'setup' || compatibleMode }"></div>
       <button id="login-captcha-trigger" type="button" class="captcha-trigger" aria-hidden="true" tabindex="-1"></button>
+
+      <div v-if="mode === 'phone' || mode === 'email'" class="compatible-verification">
+        <button class="linklike" :disabled="sendingCode || challengeLoading" @click="enableCompatible">{{ t('compatibleVerification') }}</button>
+        <template v-if="compatibleMode">
+          <p class="hint">{{ t('compatibleVerificationHint') }}</p>
+          <div v-if="challenge" class="compatible-image-row">
+            <img :src="challenge.image" :alt="t('compatibleImageAlt')" width="180" height="64" />
+            <button class="linklike" :disabled="challengeLoading || sendingCode" @click="loadChallenge">{{ t('compatibleRefresh') }}</button>
+          </div>
+          <label class="field">
+            <span>{{ t('compatibleAnswerLabel') }}</span>
+            <input v-model="challengeAnswer" maxlength="6" autocomplete="off" :disabled="sendingCode" :placeholder="t('compatibleAnswerLabel')" />
+          </label>
+          <p v-if="challengeLoading" class="hint">{{ t('compatibleLoading') }}</p>
+        </template>
+      </div>
 
       <div class="actions">
         <button class="btn primary" :disabled="connecting" @click="connectWithAccount">
@@ -202,6 +218,7 @@ import {
   getAccountLoginCaptchaConfig,
   postAccountLogin,
   postAccountPasswordOperation,
+  postAccountLoginChallenge,
   postAccountLoginSendCode,
   postAccountLoginSendEmailCode,
   postAwdkLogin
@@ -248,6 +265,56 @@ const sendingCode = ref(false)
 const cooldown = ref(0)
 const loginStatus = ref('')
 const loginStatusKind = ref('ok')
+const compatibleMode = ref(false)
+const challenge = ref(null)
+const challengeAnswer = ref('')
+const challengeLoading = ref(false)
+let challengeGeneration = 0
+let disposed = false
+let captchaFailed = false
+
+function clearChallenge() {
+  challengeGeneration += 1
+  challenge.value = null
+  challengeAnswer.value = ''
+  challengeLoading.value = false
+}
+watch([phone, email, mode, resetMode, serverUrl], clearChallenge)
+
+async function enableCompatible() {
+  compatibleMode.value = true
+  loginStatus.value = ''
+  await loadChallenge()
+}
+
+async function loadChallenge() {
+  clearChallenge()
+  const generation = challengeGeneration
+  const channel = mode.value === 'email' ? 'email' : 'phone'
+  const identifier = (channel === 'email' ? email.value : phone.value).trim()
+  if (!identifier) {
+    loginStatusKind.value = 'error'
+    loginStatus.value = t('compatibleIdentifierRequired')
+    return
+  }
+  challengeLoading.value = true
+  try {
+    const result = await postAccountLoginChallenge({ serverUrl: serverUrl.value }, {
+      [channel]: identifier, purpose: resetMode.value ? 'reset' : 'login'
+    })
+    if (disposed || generation !== challengeGeneration) return
+    if (!result?.id || !result?.image?.startsWith('data:image/png;base64,')) throw new Error(t('compatibleLoadFailed'))
+    challenge.value = result
+    loginStatus.value = ''
+  } catch (e) {
+    if (!disposed && generation === challengeGeneration) {
+      loginStatusKind.value = 'error'
+      loginStatus.value = e.message || t('compatibleLoadFailed')
+    }
+  } finally {
+    if (generation === challengeGeneration) challengeLoading.value = false
+  }
+}
 
 watch(serverUrl, () => {
   setupToken.value = ''
@@ -283,6 +350,8 @@ const codeBtnLabel = computed(() => {
 // 任务窗格切视图会卸载本组件：倒计时的定时器必须跟着停（否则回来时还在跑），
 // 验证码控件也要拆掉（否则 SDK 还攥着已经不在文档里的节点）。
 onBeforeUnmount(() => {
+  disposed = true
+  clearChallenge()
   stopCooldown()
   if (captcha && captcha.destroy) captcha.destroy()
   captcha = null
@@ -294,6 +363,7 @@ onMounted(() => { captchaReady = ensureCaptcha() })
 
 async function ensureCaptcha() {
   if (captcha) return captcha
+  captchaFailed = false
   try {
     const config = await getAccountLoginCaptchaConfig({ serverUrl: serverUrl.value })
     // 同一份公开配置顺带告诉我们站点以什么为账号本体，不用再多一次往返
@@ -302,6 +372,7 @@ async function ensureCaptcha() {
   } catch (e) {
     console.warn('[settings] 人机验证控件装配失败:', e)
     captcha = null
+    captchaFailed = true
   }
   return captcha
 }
@@ -337,6 +408,8 @@ function startCooldown() {
 
 function switchMode(next) {
   if (connecting.value || sendingCode.value) return
+  compatibleMode.value = false
+  clearChallenge()
   resetMode.value = false
   setupToken.value = ''
   setupAccount.value = ''
@@ -375,8 +448,22 @@ async function sendCode(channel) {
   try {
     // 先过人机验证再发码：官网把 verifyCaptcha 排在发信之前，不带 token 就是 403。
     // 官网未启用时 ensureCaptcha() 给 null，token 留空，行为与从前一致。
-    const widget = await (captchaReady || ensureCaptcha())
     let captchaToken = ''
+    const widget = compatibleMode.value ? null : await (captchaReady || ensureCaptcha())
+    if (compatibleMode.value) {
+      if (!challenge.value || !challengeAnswer.value.trim()) {
+        loginStatusKind.value = 'error'
+        loginStatus.value = t('compatibleAnswerRequired')
+        if (!challenge.value) await loadChallenge()
+        return
+      }
+      captchaToken = `local:${challenge.value.id}:${challengeAnswer.value.trim()}`
+      clearChallenge()
+    } else if (captchaFailed) {
+      loginStatusKind.value = 'error'
+      loginStatus.value = t('compatibleUseOnFailure')
+      return
+    }
     if (widget) {
       captchaToken = await widget.getToken()
       if (!captchaToken) {
@@ -398,6 +485,7 @@ async function sendCode(channel) {
   } catch (e) {
     loginStatusKind.value = 'error'
     loginStatus.value = e.message || t('codeSendFailed')
+    if (compatibleMode.value) clearChallenge()
   } finally {
     sendingCode.value = false
   }
@@ -562,6 +650,10 @@ function save() {
 .field.login-method-links { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
 
 .captcha-inactive { display: none !important; }
+.compatible-verification { margin: 12px 0; }
+.compatible-verification .hint { font-size: 12px; line-height: 1.6; }
+.compatible-image-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.compatible-image-row img { max-width: 100%; object-fit: contain; }
 .settings {
   padding: 12px;
   overflow-y: auto;

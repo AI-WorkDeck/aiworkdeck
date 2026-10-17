@@ -5,6 +5,16 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
 
 # 授权与计费 领域地图
 
+## 受限网络兼容验证（dev-board#1330，2026-10-17）
+
+国内阿里云/国际 Turnstile 浏览器控件被网络拦截时，桌面登录卡与官网注册/重置表单可手动选「使用兼容验证」。短信本来就由官网服务器发送；兼容入口替换的是人机验证，不是短信供应商。官网 `POST /api/auth/captcha-challenge` 接收 `{phone|email,purpose:login|reset}`，返回 `{id,image,expiresAt}`；图片为服务端栅格化的 PNG data URL，无答案明文。桌面 `/api/account/captcha-challenge` 经机器账户闸代理；插件匿名桥 `/api/auth/account-login/captcha-challenge` 受桥接开关与独立图片签发限频，不能扣短信发送桶，也不信任客户端提供的 IP 字段。
+
+发送仍用既有 `captchaToken`，兼容格式 `local:<id>:<answer>`。官网 SQLite `captcha_challenge` 存哈希、规范联系方式、用途、来源 IP 与有效期；3 分钟失效，BEGIN IMMEDIATE 原子核销，每次尝试（含错误/绑定不符）作废。挑战签发独立限制账号/IP/全局频率，发送沿用短信/邮件冷却、日配额与全局熔断。兼容验证不能借缺 token、SDK失败、主供应商未配置直接放行；不是第三方行为风控的等价替代。Java 图片签发与发送走相同出站路径，官网来源 IP 仍沿用既有可信反代边界，未添加任意 XFF 转发。
+
+错误分层：组件加载失败、`captcha_failed`、账户服务网络失败、短信/邮件发送失败；后者保留上游已脱敏的冷却/日配额具体提示。错误联系方式是 `invalid_phone` / `invalid_email`，不得显示为验证码错误。错误/过期图需换一张；切联系方式、用途或站点清掉旧图。
+
+验证：官网隔离空目录 `scripts/verify-captcha-challenge.mts`（cn/intl，所有外发拦截）；主仓 `frontend/tests/account/compatible-{desktop,website,addin}-ui.mjs`（合成 API + 主动阻断第三方 + 实际 PNG）；`AccountServiceTest`、`AwdkLoginServiceTest`、`AuthControllerHardeningTest`。不代表生产短信、律所网络、正式安装包或真实反代 IP 配置已实测。
+
 ## 统一密码登录（dev-board#1299，2026-10-15）
 
 此节取代下文历史条目的「验证码即登录」「桌面无密码入口」。官网是唯一密码权威；桌面

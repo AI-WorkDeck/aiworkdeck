@@ -399,6 +399,21 @@ public class AuthController {
         return result;
     }
 
+    @PostMapping("/account-login/captcha-challenge")
+    public Map<String, Object> accountLoginCaptchaChallenge(@RequestBody(required = false) Map<String, String> body,
+            jakarta.servlet.http.HttpServletRequest http) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            authAbuseGuard.recordCaptchaChallenge(http.getRemoteAddr());
+            result.put("data", awdkLoginService.captchaChallenge(body));
+            result.put("code", 0);
+        } catch (com.checkba.service.account.AccountException | IllegalArgumentException e) {
+            result.put("code", 1);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
     @PostMapping("/account-login/send-code")
     public Map<String, Object> accountLoginSendCode(@RequestBody(required = false) Map<String, String> body,
                                                     jakarta.servlet.http.HttpServletRequest http) {

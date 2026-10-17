@@ -82,6 +82,17 @@ class AwdkLoginServiceTest {
         }
     }
 
+    @Test
+    void compatibilityChallengeRespectsBridgeSwitchAndUsesSameTransport() {
+        assertThrows(IllegalArgumentException.class, () -> service(false).captchaChallenge(Map.of("phone", "13800138000", "purpose", "login")));
+        assertTrue(transport.calls.isEmpty());
+        transport.enqueue(200, "{\"id\":\"challenge\",\"image\":\"data:image/png;base64,fixture\"}");
+        Map<String, Object> result = service(true).captchaChallenge(Map.of("phone", "13800138000", "purpose", "login", "ip", "forged"));
+        assertEquals("challenge", result.get("id"));
+        assertTrue(transport.calls.get(0).endsWith("/api/auth/captcha-challenge"));
+        assertFalse(transport.bodies.get(0).contains("forged"));
+    }
+
     private StubTransport transport;
     private UserService userService;
     private com.checkba.service.UserSessionService sessionService;

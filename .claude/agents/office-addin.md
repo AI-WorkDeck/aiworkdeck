@@ -502,3 +502,15 @@ spec `docs/superpowers/specs/2026-09-18-addin-cross-file-design.md`。一句话�
 已有普通云项目保留其云 id，桌面项目选在线位置并走既有 ensure-addin-link 归档绑定。
 同名不同项目不合并；影子容器属于同一项目的云位置，不能与完整桌面原件混同。
 目录接口仅 404 兼容旧设备列表，连接失败显示原有重试入口；护栏 `projectCatalog.test.js`。
+
+## 受限网络兼容验证（2026-10-17，dev-board#1330）
+
+`SettingsView.vue` 注册及找回密码均有「使用兼容验证」。经匿名
+`POST /api/auth/account-login/captcha-challenge` 申请官网生成的 PNG 挑战，
+body 为 `{phone|email,purpose:'login'|'reset'}`，返回 `{id,image,expiresAt}`；
+答案只放 `captchaToken=local:<id>:<answer>`，由官网按账号/用途/来源 IP 校验并一次核销。
+验证码仍走原短信/邮件发送路径和限流，前端加载失败不能视为免验证。
+切账号、用途、服务器或卸载清理挑战，迟到响应不恢复旧挑战；第三方脚本15秒超时并允许重载。
+只访问自有站点的备用验证入口与第三方组件独立，不等待第三方 SDK 加载成功。
+验证：`taskpane/lib/api.test.js` 与主仓 `frontend/tests/account/compatible-addin-ui.mjs`
+（实际任务窗格、主动阻断第三方域名、合成账号接口，无真实短信）。
