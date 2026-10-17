@@ -41,8 +41,15 @@ function loadScript(src) {
     const el = document.createElement('script')
     el.src = src
     el.async = true
-    el.onload = resolve
-    el.onerror = () => reject(new Error('captcha script load failed: ' + src))
+    const fail = () => {
+      clearTimeout(timer)
+      el.remove()
+      loading.delete(src)
+      reject(new Error('captcha script unavailable'))
+    }
+    const timer = setTimeout(fail, 15000)
+    el.onload = () => { clearTimeout(timer); resolve() }
+    el.onerror = fail
     document.head.appendChild(el)
   })
   loading.set(src, p)

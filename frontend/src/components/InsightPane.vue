@@ -7,7 +7,7 @@
     <view class="ip-head">
       <text class="ip-doc" :title="docName || ''">{{ docName || $t('insight.noDoc') }}</text>
     </view>
-    <view class="ip-online">
+    <view v-if="tab !== 'contract-review'" class="ip-online">
       <text
         class="ip-parse"
         :class="{ disabled: !canParse }"
@@ -16,11 +16,11 @@
       <text class="ip-online-note">{{ $t('insight.onlineHint') }}</text>
     </view>
 
-    <view v-if="runLine" class="ip-run" :class="runClass">
+    <view v-if="tab !== 'contract-review' && runLine" class="ip-run" :class="runClass">
       <view v-if="isRunning" class="ip-spin"></view>
       <text class="ip-run-t">{{ runLine }}</text>
     </view>
-    <view v-if="error" class="ip-error">{{ error }}</view>
+    <view v-if="tab !== 'contract-review' && error" class="ip-error">{{ error }}</view>
 
     <view class="ip-tabs">
       <text class="ip-tab" :class="{ on: tab === 'retrieval' }" @tap="tab = 'retrieval'">
@@ -29,7 +29,13 @@
       <text class="ip-tab" :class="{ on: tab === 'checks' }" @tap="tab = 'checks'">
         {{ $t('insight.tab.checks') }}<text v-if="findings.length" class="ip-tab-n">{{ findings.length }}</text>
       </text>
+      <text class="ip-tab" :class="{ on: tab === 'contract-review' }" @tap="contractReviewOpened = true; tab = 'contract-review'">
+        {{ $t('contractReview.title') }}
+      </text>
     </view>
+    <ContractReviewPane v-if="contractReviewOpened" v-show="tab === 'contract-review'"
+      :project-id="projectId" :doc-file-id="docFileId" :doc-name="docName"
+      :can-write="canWrite" :prepare-document="prepareDocument" @locate="locate" />
 
     <!-- ————————————————— 外部检索 ————————————————— -->
     <scroll-view v-show="tab === 'retrieval'" class="ip-body" scroll-y>
@@ -245,9 +251,10 @@
 <script>
 // InsightPane.vue — 工作台「依据」面板（dev-board#181/#182）。
 //
-// 两个 tab：
+// 三个 tab：
 //   外部检索  —— 解析抽出的公司/法规/案例实体 + 各自的外部库检索结果（详情懒加载）；
 //   一致性校验 —— 文档内部前后矛盾的发现，点条目定位、点建议一键改好。
+//   合同审查 —— 保存和确认项目标准，逐项审查与规则快照；首次打开后保留编辑草稿。
 //
 // 后端契约见 .claude/agents/doc-insight.md（列表瘦身/发现不瘦身、UNAVAILABLE≠查无此项）。
 // 文档内的两个动作都走 worker 只读/替换原语，**定位一律 find_navigate**——
@@ -255,6 +262,8 @@
 //
 // 停靠：这个面板注册在 config/panelRegistry.js（right 默认、left 也允许），
 // 宿主 project-overview.vue 在两个 dock 分支里各显式渲染一份。面板不自画标题。
+
+import ContractReviewPane from './ContractReviewPane.vue'
 
 import {
   parseDocInsight, getDocInsight, getDocInsightEntity, refreshDocInsightEntity,
@@ -277,6 +286,7 @@ function unwrap(resp) {
 
 export default {
   name: 'InsightPane',
+  components: { ContractReviewPane },
   // entities：实体清单同步给宿主，宿主据此在正文点击时做 matchEntityAt（面板自己
   // 不知道用户点了画布哪里，宿主不知道有哪些实体——索引必须交给宿主一份）。
   // open-url：法宝链接（权威条文 / 案号识别 / 引用候选）交给宿主的浏览器面板打开，
@@ -305,6 +315,7 @@ export default {
   data() {
     return {
       tab: 'retrieval',
+      contractReviewOpened: false,
       run: null, entities: [], findings: [],
       loading: false, error: '',
       expandedId: null, highlightId: null,

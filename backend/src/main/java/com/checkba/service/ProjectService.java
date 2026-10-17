@@ -74,7 +74,8 @@ public class ProjectService {
     private static final List<String> PROJECT_SCOPED_ENTITIES = List.of(
             "ProjectMember", "ProjectFile", "ProjectVariable", "ProjectProfileField",
             "ProjectMemory", "ProjectInvitation", "ProjectRemote", "ProjectTask",
-            "ProjectAiMessage", "EvidenceLink", "WorkSession");
+            "ProjectAiMessage", "EvidenceLink", "WorkSession",
+            "ContractReviewRun", "ContractReviewStandard");
 
     /**
      * 项目建好了（dev-board#438）。{@code VersionLifecycleService} 监听它自动开启版本记录——

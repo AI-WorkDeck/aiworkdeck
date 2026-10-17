@@ -951,6 +951,14 @@ public class AccountService {
      * 官网不可达时返回「未启用」而不是抛错：拿不到配置就渲染不出控件，
      * 而发码本身还有 Layer 1 的限流兜着——为了一个配置读不到就让人登不进来，不划算。
      */
+    public Map<String, Object> captchaChallenge(Map<String, String> body) {
+        Map<String, Object> request = new HashMap<>();
+        if (body != null) for (String field : java.util.List.of("phone", "email", "purpose")) {
+            if (body.containsKey(field)) request.put(field, body.get(field));
+        }
+        return postLogin("/api/auth/captcha-challenge", request);
+    }
+
     public Map<String, Object> captchaConfig() {
         AccountTransport.Reply reply = transport.send("GET", baseUrl() + "/api/auth/captcha-config", null, null);
         if (reply.networkFailure() || reply.status() < 200 || reply.status() >= 300) {

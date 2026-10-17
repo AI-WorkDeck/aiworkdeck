@@ -180,6 +180,11 @@ jobs:
       - name: Document insight and link preview tests
         working-directory: frontend
         run: npm run test:insight
+      - name: Confirmed contract review standards and results
+        working-directory: frontend
+        run: node --test tests/contract-review/*.test.mjs
+      - name: Office compatible verification API
+        run: node --test office-addin/taskpane/lib/api.test.js
       - name: Inline review contracts (dev-board#547)
         working-directory: frontend
         run: npm run test:inline-review
