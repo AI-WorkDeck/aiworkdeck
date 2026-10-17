@@ -18,7 +18,7 @@ const wave = () => {
 }
 function pane() {
   const requests = [], audios = [], events = [], notices = []
-  const factory = new Function('hasTtsText', 'createTtsReader', 'generateTtsAudio', 'componentDownloads', 'host', 'ICONS', 'uni', script)
+  const factory = new Function('hasTtsText', 'createTtsReader', 'generateTtsAudio', 'componentDownloads', 'host', 'ICONS', 'uni', 'AwdSelect', script)
   const component = factory(
     hasTtsText,
     options => createTtsReader({ ...options,
@@ -28,8 +28,8 @@ function pane() {
         audios.push(audio); return audio
       }
     }),
-    (payload, options) => new Promise(resolve => requests.push({ payload, options, resolve })),
-    {}, {}, {}, { $emit() {}, showToast: value => notices.push(value) }
+    (payload, options) => new Promise((resolve, reject) => requests.push({ payload, options, resolve, reject })),
+    {}, {}, {}, { $emit() {}, showToast: value => notices.push(value) }, {}
   )
   const vm = { ...component.data(), ...component.methods, fetchVoices() {}, loadModelState() {},
     $t: key => key, $emit: (...event) => events.push(event) }
@@ -118,4 +118,126 @@ test('component teardown aborts unfinished synthesis and late document callbacks
   assert.equal(h.audios.length, 0)
   assert.equal(h.vm.text, '旧文。')
   assert.deepEqual(h.events.at(-1), ['clear-highlight'])
+})
+
+test('voice selection applies to the next reading without changing the active synthesis voice', async () => {
+  const h = pane()
+  h.vm.voices = [{ voiceId: 'first', name: 'First' }, { voiceId: 'second', name: 'Second' }]
+  h.vm.text = '第一句。第二句。'
+  h.vm.selectVoiceIndex(1)
+  const done = h.vm.handleGenerate()
+  assert.equal(h.requests[0].payload.voice, 'second')
+  h.vm.selectVoiceIndex(0)
+  h.requests[0].resolve(wave()); await tick()
+  assert.equal(h.requests[1].payload.voice, 'second')
+  h.requests[1].resolve(wave()); await done
+  const restarted = h.vm.handleGenerate()
+  assert.equal(h.requests[2].payload.voice, 'first')
+  h.component.beforeUnmount.call(h.vm)
+  h.requests[2].resolve(wave()); await restarted
+})
+
+test('keyboard speed changes affect current audio, clamp the supported range, and reset without regeneration', async () => {
+  const h = pane()
+  h.vm.text = '朗读测试。'; h.vm.selectedVoiceId = 'test'
+  const done = h.vm.handleGenerate()
+  h.requests[0].resolve(wave()); await done
+  for (const [key, expected] of [['ArrowRight', 105], ['PageUp', 130], ['End', 200], ['ArrowUp', 200], ['Home', 50], ['ArrowDown', 50]]) {
+    let prevented = false
+    h.vm.onRateKey({ key, preventDefault() { prevented = true } })
+    assert.ok(prevented)
+    assert.equal(h.vm.rate, expected)
+    assert.equal(h.audios[0].playbackRate, expected / 100)
+  }
+  h.vm.resetRate()
+  assert.equal(h.audios[0].playbackRate, 1)
+  assert.equal(h.requests.length, 1)
+  h.component.beforeUnmount.call(h.vm)
+})
+
+test('disabled or repeated keyboard actions cannot restart synthesis; active actions keep their component receiver', () => {
+  const h = pane()
+  let calls = 0
+  const action = function () { assert.equal(this, h.vm); calls++ }
+  for (const [key, disabled, repeat] of [['Enter', true, false], [' ', true, false], ['Enter', false, true], ['Escape', false, false]]) {
+    h.vm.onActionKey({ key, repeat, preventDefault() {} }, action, disabled)
+  }
+  assert.equal(calls, 0)
+  h.vm.onActionKey({ key: 'Enter', preventDefault() {} }, action)
+  h.vm.onActionKey({ key: ' ', preventDefault() {} }, action)
+  assert.equal(calls, 2)
+  h.component.beforeUnmount.call(h.vm)
+})
+
+test('generation failure keeps an actionable error and text until retry succeeds', async () => {
+  const h = pane()
+  h.vm.text = '失败后保留原文。'; h.vm.selectedVoiceId = 'test'
+  const failed = h.vm.handleGenerate()
+  h.requests[0].reject(new Error('controlled failure')); await failed
+  assert.equal(h.vm.readingError, 'generation')
+  assert.equal(h.vm.text, '失败后保留原文。')
+  assert.equal(h.vm.startLabel, 'panels.evRetry')
+  assert.equal(h.vm.startDisabled, false)
+  const retried = h.vm.handleGenerate()
+  assert.equal(h.vm.readingError, '')
+  h.requests[1].resolve(wave()); await retried
+  h.audios[0].onplaying()
+  assert.equal(h.vm.reading.status, 'playing')
+  h.component.beforeUnmount.call(h.vm)
+})
+
+test('reading immediately after typing consumes the native textarea value before Uni emits its delayed update', async () => {
+  const h = pane()
+  h.vm.text = '旧'; h.vm.selectedVoiceId = 'test'
+  const field = { value: '完整输入，没有截尾。', setAttribute() {} }
+  h.vm.onTextInput({ target: field })
+  const done = h.vm.handleGenerate()
+  assert.equal(h.vm.text, field.value)
+  assert.equal(h.requests[0].payload.text, field.value)
+  h.requests[0].resolve(wave()); await done
+  h.component.beforeUnmount.call(h.vm)
+})
+
+test('the focusable Uni textarea receives the translated name after mounting and language changes', () => {
+  const h = pane()
+  const labels = []
+  h.vm.$el = { querySelector: () => ({ setAttribute: (name, value) => labels.push([name, value]), addEventListener() {}, removeEventListener() {} }) }
+  h.vm.$t = () => '文本内容'
+  h.vm.syncTextFieldLabel()
+  h.vm.$t = () => 'Text Content'
+  h.component.updated.call(h.vm)
+  assert.deepEqual(labels, [['aria-label', '文本内容'], ['aria-label', 'Text Content']])
+  h.component.beforeUnmount.call(h.vm)
+})
+
+
+test('reading immediately after importing preserves new text while the Uni textarea still displays the old value', async () => {
+  const h = pane()
+  h.vm.text = '旧正文。'; h.vm.selectedVoiceId = 'test'
+  h.vm.$el = { querySelector: () => ({ value: '旧正文。' }) }
+  await h.vm.importFromDoc()
+  h.events.find(event => event[0] === 'request-doc-text')[1]('新导入正文。')
+  const done = h.vm.handleGenerate()
+  assert.equal(h.vm.text, '新导入正文。')
+  assert.equal(h.requests[0].payload.text, '新导入正文。')
+  h.requests[0].resolve(wave()); await done
+  h.component.beforeUnmount.call(h.vm)
+})
+
+
+test('native textarea input subscription is installed once and removed on teardown', () => {
+  const h = pane()
+  let listener, installed = 0, removed = 0
+  const field = {
+    value: '', setAttribute() {},
+    addEventListener(name, fn) { assert.equal(name, 'input'); listener = fn; installed++ },
+    removeEventListener(name, fn) { assert.equal(name, 'input'); assert.equal(fn, listener); removed++ }
+  }
+  h.vm.$el = { querySelector: () => field }
+  h.vm.syncTextFieldLabel(); h.vm.syncTextFieldLabel()
+  listener({ target: { value: '完整输入。' } })
+  assert.equal(h.vm.text, '完整输入。')
+  assert.equal(installed, 1)
+  h.component.beforeUnmount.call(h.vm)
+  assert.equal(removed, 1)
 })
