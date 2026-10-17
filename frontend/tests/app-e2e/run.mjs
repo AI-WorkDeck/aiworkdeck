@@ -903,6 +903,12 @@ try {
   /** 等登录弹层出现并断言形态；siteInfo 为 null 时跳过站点分段断言。返回弹层里的文本。 */
   const assertLoginDialog = async (pg, { reasonIncludes = '', siteInfo = site0, cancelText = LOGIN_CANCEL_TEXT, noCjk = false } = {}) => {
     await pg.waitForSelector('.awd-login-mask .unlock-card.is-dialog', { visible: true, timeout: 15000 })
+    // Site status arrives asynchronously after the dialog shell mounts.
+    if (siteInfo && siteInfo.multiSite) {
+      await pg.waitForFunction(() => document.querySelectorAll(
+        '.awd-login-mask .unlock-site-seg .unlock-site-seg-item').length === 2,
+      { timeout: 15000 })
+    }
     const st = await pg.evaluate(() => {
       const mask = document.querySelector('.awd-login-mask')
       const q = (s) => mask && mask.querySelector(s)
@@ -4222,7 +4228,7 @@ try {
       const ok = await pollUntil(async () => {
         const notes = await visibleTexts('.adopt-dialog .adopt-row-note')
         return notes.includes('同一段两边都改了 · 1 处')
-          && notes.includes('PDF 与图片没有可比对的段落，只能整份选择')
+          && notes.includes('这份文件暂不支持逐处合并，请选择要保留的整份版本')
       }, 30000, 1000)
       if (!ok) {
         throw new Error('总览没有同时给出这两句，实际可见文案: '
