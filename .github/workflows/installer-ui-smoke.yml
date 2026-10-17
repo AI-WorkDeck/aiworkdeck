@@ -90,6 +90,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 3
           name: installer-ui-shots
           path: shots/
           if-no-files-found: warn
@@ -156,6 +157,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 3
           name: installer-ui-shots-arm
           path: shots-arm/
           if-no-files-found: warn
