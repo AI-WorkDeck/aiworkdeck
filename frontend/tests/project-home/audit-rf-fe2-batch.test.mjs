@@ -309,17 +309,9 @@ test('AdminPane: 每个「保存配置」按钮都绑了 :disabled="saving"（�
 
 // ======================================================================
 // 6. EasyVoicePane.vue：生成的音频 Blob URL 卸载时从不 revoke
-//    文档现址 983（原始行号误标 927）——复核结论：**已经修复，不需要改动**。
-//
-//    beforeUnmount() 里已经有：
-//      this._unmounted = true
-//      if (this.audioUrl) { URL.revokeObjectURL(this.audioUrl); this.audioUrl = '' }
-//    并且已有专门的回归测试锁住这两行：
-//      tests/project-home/audit-b2-source-assertions.test.mjs
-//      「beforeUnmount 置卸载位并释放 audioUrl」
-//    大概率是上一轮 PR#510「TTS 卸载后自动播放泄漏」顺带修的（同一个 _unmounted
-//    判据、同一个 beforeUnmount 钩子）。这里不重复造一份测试，只留下这条说明，
-//    交付回报里也会点出来，别被空跑的红/绿状态误导成"这条我修的"。
+//    原修复的组件内 audioUrl 已迁入 ttsReader。卸载时调用 destroy，队列中止请求并
+//    释放当前片段 URL。行为覆盖见 tests/tts/reader.test.mjs 的 stop/destroy 回归，
+//    组件生命周期接线见 easy-voice-karaoke.test.mjs；不再依赖旧字段名的文本断言。
 // ======================================================================
 
 // ======================================================================

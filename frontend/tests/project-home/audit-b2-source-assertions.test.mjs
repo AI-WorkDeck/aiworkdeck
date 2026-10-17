@@ -212,29 +212,23 @@ test('cancelTotpPanel 解锁 totpBusy，否则 in-flight 期间取消一次就�
 // 8. EasyVoicePane.vue：TTS 生成在组件卸载后继续，泄漏一段没有控件能停的音频
 // ======================================================================
 
-test('beforeUnmount 置卸载位并释放 audioUrl', () => {
+// 具体取消/URL释放/迟到响应行为由 tests/tts/reader.test.mjs 与
+// easy-voice-karaoke.test.mjs 使用真实队列 + 可控音频事件覆盖；这里只守组件接线。
+test('beforeUnmount 置卸载位并销毁持有请求和音频的 reader', () => {
   const src = stripComments(read('components/EasyVoicePane.vue'))
   const start = src.indexOf('beforeUnmount() {')
-  assert.ok(start > 0)
-  const end = src.indexOf('methods: {', start)
-  const body = src.slice(start, end > 0 ? end : start + 800)
+  const body = src.slice(start, src.indexOf('methods: {', start))
   assert.match(body, /this\._unmounted = true/)
-  assert.match(body, /URL\.revokeObjectURL\(this\.audioUrl\)/)
+  assert.match(body, /this\._reader\?\.destroy\(\)/)
+  assert.match(body, /this\.\$emit\('clear-highlight'\)/)
 })
 
-test('handleGenerate 在 await 之后、真正播放之前检查卸载位', () => {
+test('handleGenerate 交给可取消队列，组件不另起卸载后失控的音频', () => {
   const src = stripComments(read('components/EasyVoicePane.vue'))
   const start = src.indexOf('async handleGenerate()')
-  assert.ok(start > 0)
-  const end = src.indexOf('downloadAudio()', start)
-  const body = src.slice(start, end > 0 ? end : start + 2000)
-
-  const awaitIdx = body.indexOf('await generateTtsAudio(payload)')
-  const guardIdx = body.indexOf('if (this._unmounted) return')
-  const togglePlayIdx = body.lastIndexOf('this.togglePlay()')
-  assert.ok(awaitIdx > 0 && guardIdx > awaitIdx,
-    '卸载判据必须排在 generateTtsAudio 的 await 之后')
-  assert.ok(guardIdx < togglePlayIdx, '卸载判据必须排在真正播放之前，不能播完才检查')
+  const body = src.slice(start, src.indexOf('downloadAudio()', start))
+  assert.match(body, /await this\._reader\?\.start\(/)
+  assert.doesNotMatch(body, /new Audio|togglePlay\(|createObjectURL/)
 })
 
 // ======================================================================
