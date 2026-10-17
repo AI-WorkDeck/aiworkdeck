@@ -2352,11 +2352,13 @@ export function getTtsVoices() {
   });
 }
 
-export function generateTtsAudio(payload) {
+export function generateTtsAudio(payload, options = {}) {
   return request({
     url: '/api/tts/generate',
     method: 'POST',
     data: payload,
+    signal: options.signal,
+    logBody: false,
     responseType: 'arraybuffer'
   });
 }
