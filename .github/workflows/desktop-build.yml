@@ -363,6 +363,10 @@ jobs:
           ulimit -n 524288 || ulimit -n "$(ulimit -Hn)" || true
           echo "fd soft=$(ulimit -n) hard=$(ulimit -Hn)"
           npx electron-builder --publish never
+      - name: Compress macOS disk image
+        if: runner.os == 'macOS'
+        working-directory: desktop
+        run: bash scripts/compress-mac-dmg.sh release/*.dmg
       - name: Notarization failure log (macOS)
         if: failure() && runner.os == 'macOS'
         env:
