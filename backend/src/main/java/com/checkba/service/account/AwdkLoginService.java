@@ -244,6 +244,15 @@ public class AwdkLoginService {
      * 与这次出站的成败无关——把「站点是哪个」和「控件开没开」绑在一起，等于官网一抖
      * 插件的登录页就又退回瞎猜。
      */
+    public Map<String, Object> captchaChallenge(Map<String, String> body) {
+        requireEnabled();
+        Map<String, Object> request = new HashMap<>();
+        if (body != null) for (String field : java.util.List.of("phone", "email", "purpose")) {
+            if (body.containsKey(field)) request.put(field, body.get(field));
+        }
+        return AccountLoginExchange.post(transport, objectMapper, baseUrl, "/api/auth/captcha-challenge", request);
+    }
+
     public Map<String, Object> captchaConfig() {
         Map<String, Object> config = new HashMap<>();
         AccountTransport.Reply reply = transport.send("GET", baseUrl + "/api/auth/captcha-config", null, null);
