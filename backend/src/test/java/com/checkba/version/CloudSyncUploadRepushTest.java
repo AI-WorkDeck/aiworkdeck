@@ -84,6 +84,23 @@ class CloudSyncUploadRepushTest {
         cloud = new CloudSyncService(repo, sessions, manifests, files, connections, remotes, projects);
     }
 
+    @Test
+    void backgroundRejectedPushWithFailedFetchRemainsPendingWithoutIntegrating() {
+        when(repo.pushMainlineToOrigin(anyLong(), any(), any()))
+                .thenReturn(new ProjectRepoService.PushOutcome(false, true, "远端已前移"));
+        when(repo.fetchFromOrigin(anyLong(), any(), any()))
+                .thenThrow(new VersionException("fetch disconnected"));
+
+        CloudSyncService.UploadResult result = cloud.uploadToCloud(PROJECT, true);
+
+        assertEquals(CloudSyncService.UploadStatus.OFFLINE_PENDING, result.status());
+        assertTrue(remoteRow.getPendingUpload());
+        assertEquals("已同步到这里", remoteRow.getLastSyncSha());
+        verify(repo).fetchFromOrigin(PROJECT, "韩泽伟", "awdt_test");
+        verify(repo, never()).mergeNoCommit(anyLong(), any(), any(), any(), any());
+        verify(repo, times(1)).pushMainlineToOrigin(anyLong(), any(), any());
+    }
+
     /** 第一次推被拒（同事先交了稿），第二次推（合并后的回传）按 outcome 给结果。 */
     private void pushRejectedThen(ProjectRepoService.PushOutcome second) {
         when(repo.pushMainlineToOrigin(anyLong(), any(), any()))

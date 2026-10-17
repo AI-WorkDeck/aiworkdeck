@@ -903,6 +903,12 @@ try {
   /** 等登录弹层出现并断言形态；siteInfo 为 null 时跳过站点分段断言。返回弹层里的文本。 */
   const assertLoginDialog = async (pg, { reasonIncludes = '', siteInfo = site0, cancelText = LOGIN_CANCEL_TEXT, noCjk = false } = {}) => {
     await pg.waitForSelector('.awd-login-mask .unlock-card.is-dialog', { visible: true, timeout: 15000 })
+    // Site status arrives asynchronously after the dialog shell mounts.
+    if (siteInfo && siteInfo.multiSite) {
+      await pg.waitForFunction(() => document.querySelectorAll(
+        '.awd-login-mask .unlock-site-seg .unlock-site-seg-item').length === 2,
+      { timeout: 15000 })
+    }
     const st = await pg.evaluate(() => {
       const mask = document.querySelector('.awd-login-mask')
       const q = (s) => mask && mask.querySelector(s)
@@ -2531,11 +2537,18 @@ try {
       if (dialogOpen) throw new Error('后台上传不该自动整合出冲突弹窗（I2 新语义被破坏）')
     })
 
-    await step('A：点「交稿」前台整合撞上冲突弹窗且标签正确', async () => {
+    await step('A：点「交稿」按引导取回新稿后冲突弹窗标签正确', async () => {
       await mouseClickText('打开协作')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('交稿')
-      // 撞冲突时协作抽屉自己关掉、页面把人送到裁决现场（版本面板），不用再手工关
+      // 已知案件库领先时，交稿先进入 #645 三步引导，按当前可操作步骤取回新稿。
+      await page.waitForFunction(() =>
+        document.querySelector('.submit-guide .sg-step-end-session.sg-done')
+        && document.querySelector('.submit-guide .sg-step-pull-latest.sg-active')
+        && document.querySelector('.submit-guide .sg-step-submit.sg-todo'),
+      { timeout: 15000 })
+      await mouseClickSel('.submit-guide .sg-step-pull-latest.sg-active .sg-step-btn')
+      // 取回撞冲突时引导自己关掉、页面把人送到裁决现场（版本面板），不用再手工关
       await page.waitForFunction(() => {
         const dlg = document.querySelector('.adopt-dialog')
         if (!dlg || dlg.getClientRects().length === 0) return false
@@ -4222,7 +4235,7 @@ try {
       const ok = await pollUntil(async () => {
         const notes = await visibleTexts('.adopt-dialog .adopt-row-note')
         return notes.includes('同一段两边都改了 · 1 处')
-          && notes.includes('PDF 与图片没有可比对的段落，只能整份选择')
+          && notes.includes('这份文件暂不支持逐处合并，请选择要保留的整份版本')
       }, 30000, 1000)
       if (!ok) {
         throw new Error('总览没有同时给出这两句，实际可见文案: '
