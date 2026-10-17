@@ -231,17 +231,12 @@
              会议录音 webm/opus 转 16kHz 单声道 mp3。原先引的聚合体 javacv-platform
              会把 opencv/openblas/leptonica/tesseract/librealsense2 与一堆摄像头驱动
              一并拖进 backend/lib（mac 51MB、win 101MB），而这些库一个调用方都没有。
-             改成 javacv 本体 + ffmpeg-platform：-Djavacpp.platform=<平台> 照旧把
-             ffmpeg 的原生 jar 收敛到单平台（安装包瘦身 dev-board#528）。 -->
+             使用 javacv 本体，原生库由下方 profile 显式选择目标平台；
+             不依赖仓库 POM 读取命令行属性（Maven 3.10 已限制该行为，dev-board#1335）。 -->
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>javacv</artifactId>
             <version>1.5.10</version>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>ffmpeg-platform</artifactId>
-            <version>6.1.1-1.5.10</version>
         </dependency>
 
         <!-- Apache POI for DOCX Processing -->
@@ -314,6 +309,45 @@
     </repositories>
 
     <profiles>
+        <!-- 未指定目标平台的开发/服务器构建保留原来的全平台依赖。 -->
+        <profile>
+            <id>ffmpeg-all-platforms</id>
+            <activation>
+                <property>
+                    <name>!javacpp.platform</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg-platform</artifactId>
+                    <version>6.1.1-1.5.10</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <!-- 在本项目解析 classifier，避免 Maven 升级后把其他平台的原生库打进安装包。 -->
+        <profile>
+            <id>ffmpeg-target-platform</id>
+            <activation>
+                <property>
+                    <name>javacpp.platform</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>1.5.10</version>
+                    <classifier>${javacpp.platform}</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>6.1.1-1.5.10</version>
+                    <classifier>${javacpp.platform}</classifier>
+                </dependency>
+            </dependencies>
+        </profile>
         <!-- 桌面安装包用（Epic #18 T2）：mac 通用 jar。
              -Djavacpp.platform 的值会被 bytedeco 按构建宿主收敛（实测请求
              macosx-x86_64 仍得到宿主 arm64 natives），所以 Intel 的原生库
