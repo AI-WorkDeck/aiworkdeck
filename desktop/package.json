@@ -139,6 +139,7 @@
       ]
     },
     "dmg": {
+      "writeUpdateInfo": false,
       "title": "AI WorkDeck ${version}",
       "background": "build/background.png",
       "window": {
