@@ -570,7 +570,7 @@ public class CloudSyncService {
      * 维持旧行为：只置 pendingUpload，等律师自己处理完再手动上传或从云端更新。
      *
      * **后台路径（background=true，含结束工作的 onMainlineMerged 自动上传）被拒时一律
-     * 不自动整合**，只置 pendingUpload（remoteAhead 灯自然亮起，等律师前台点「立即上传」）。
+     * 不自动整合**，只刷新远端引用并置 pendingUpload，让状态区显示新稿，等律师前台处理。
      * 两条理由（v2 终审 I2）：① 后台整合会改写磁盘，却没有任何通道通知打开中的编辑器
      * 重载（v1 地雷 #11 的 autosave 覆盖形态——编辑器把整合前的旧字节写回，整合结果被
      * 静默冲掉）；② 后台整合撞上冲突会开出一个律师不知情的 MERGING 裁决窗口。
@@ -657,6 +657,11 @@ public class CloudSyncService {
                     // 走到这里只剩 OFFLINE（fetch 联不上）：整合本身没能进行，落回
                     // 旧行为。integrateFromCloud 直接复用这里已经解析好的 conn、
                     // 不会再走一次 remoteOpt 查找，NOT_LINKED 不会从这条路径出现。
+                }
+                if (background) {
+                    // 被拒的 push 不会更新 origin/master；只 fetch 引用，让下一次状态快照
+                    // 看见新稿，不整合、切换分支或改写打开中的文件。失败沿用离线待交稿状态。
+                    repoService.fetchFromOrigin(projectId, conn.getUsername(), conn.getDeviceToken());
                 }
                 remote.setPendingUpload(true);
                 remoteRepository.save(remote);
