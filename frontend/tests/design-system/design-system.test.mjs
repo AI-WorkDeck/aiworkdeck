@@ -59,7 +59,7 @@ test('switch respects disabled state and emits only the intended new boolean', (
 test('select keyboard arrows, commit and escape use existing selection/cancel paths', () => {
   const { methods } = component('AwdSelect')
   const actions = []
-  const ctx = { range: ['A','B','C'], focusOption: i => actions.push(['focus',i]), pick: i => actions.push(['pick',i]), focusTrigger: () => actions.push(['trigger']), close: () => actions.push(['close']) }
+  const ctx = { range: ['A','B','C'], filteredOptions: ['A','B','C'].map((label, index) => ({ label, index })), focusOption: i => actions.push(['focus',i]), pick: i => actions.push(['pick',i]), focusTrigger: () => actions.push(['trigger']), close: () => actions.push(['close']) }
   const key = (key, i) => methods.onOptionKey.call(ctx, { key, preventDefault() {} }, i)
   key('ArrowDown',2); key('ArrowUp',0); key('Enter',1); key('Escape',1)
   assert.deepEqual(actions, [['focus',0],['focus',2],['pick',1],['trigger'],['close'],['trigger']])
