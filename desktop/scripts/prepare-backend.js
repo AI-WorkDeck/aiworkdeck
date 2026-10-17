@@ -7,7 +7,7 @@
 // extraResources (see package.json, "bundled/${os}-${arch}").
 //
 // Usage:
-//   node scripts/prepare-backend.js --jar <path-to-backend.jar> --out <target dir> [--jmods <jmods dir>]
+//   node scripts/prepare-backend.js --jar <path-to-backend.jar> --out <target dir> [--jmods <jmods dir>] [--native-platform <javacpp platform>]
 //
 // --jmods points jlink at another platform's jmods for cross-arch linking
 // (e.g. building the mac-x64 runtime on an arm64 runner); defaults to the
@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const { verifyBackendNatives } = require('./verify-backend-natives');
 const { driverPlatformDir, findDriverBundleJar, trimDriverBundleJar } = require('./trim-driver-bundle');
 
 // Module set = `jdeps --print-module-deps` over the backend fat jar, widened
@@ -47,13 +48,14 @@ function parseArgs(argv) {
         if (argv[i] === '--jar') args.jar = argv[++i];
         else if (argv[i] === '--out') args.out = argv[++i];
         else if (argv[i] === '--jmods') args.jmods = argv[++i];
+        else if (argv[i] === '--native-platform') args.nativePlatform = argv[++i];
     }
     return args;
 }
 
 const args = parseArgs(process.argv.slice(2));
 if (!args.jar || !args.out) {
-    console.error('Usage: node scripts/prepare-backend.js --jar <backend.jar> --out <target dir> [--jmods <jmods dir>]');
+    console.error('Usage: node scripts/prepare-backend.js --jar <backend.jar> --out <target dir> [--jmods <jmods dir>] [--native-platform <javacpp platform>]');
     process.exit(1);
 }
 
@@ -93,6 +95,11 @@ execFileSync(jarTool, ['-x', '-f', jarPath, 'BOOT-INF/lib', 'BOOT-INF/classes'],
 const backendDir = path.join(outDir, 'backend');
 fs.mkdirSync(backendDir, { recursive: true });
 fs.renameSync(path.join(work, 'BOOT-INF', 'lib'), path.join(backendDir, 'lib'));
+
+if (args.nativePlatform) {
+    verifyBackendNatives(path.join(backendDir, 'lib'), args.nativePlatform);
+    console.log(`Backend native dependencies verified for ${args.nativePlatform}`);
+}
 
 const classesDir = path.join(work, 'BOOT-INF', 'classes');
 const mainClassFile = path.join(classesDir, 'com', 'checkba', 'CheckbaApplication.class');
