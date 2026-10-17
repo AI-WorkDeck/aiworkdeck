@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Only the HTTP/host boundary is adapted. The production reader and Audio are real.
 export async function getTtsVoices() {
+  if (new URLSearchParams(location.search).has('synthetic')) return [{ voiceId: 'test', name: 'Synthetic voice' }]
   const response = await fetch('/kokoro/v1/audio/voices')
   if (!response.ok) throw new Error(`Voices HTTP ${response.status}`)
   return (await response.json()).voices
