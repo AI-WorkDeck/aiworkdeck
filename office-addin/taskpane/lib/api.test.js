@@ -19,6 +19,7 @@ import {
   getAccountLoginCaptchaConfig,
   postAccountLogin,
   postAccountPasswordOperation,
+  postAccountLoginChallenge,
   postAccountLoginSendCode,
   postAccountLoginSendEmailCode,
   fetchMobileDevices,
@@ -46,6 +47,27 @@ function stubFetch(handler) {
 function jsonReply(body, ok = true, status = 200) {
   return { ok, status, json: async () => body }
 }
+
+test('兼容验证使用匿名桥并保留账号与用途绑定', async () => {
+  const f = stubFetch(() => jsonReply({ code: 0, data: { id: 'challenge', image: 'data:image/png;base64,test' } }))
+  try {
+    const result = await postAccountLoginChallenge({ serverUrl: 'https://addin.example.com' }, { phone: '13800138000', purpose: 'reset' })
+    assert.equal(result.id, 'challenge')
+    assert.equal(f.calls[0].url, 'https://addin.example.com/api/auth/account-login/captcha-challenge')
+    assert.deepEqual(JSON.parse(f.calls[0].options.body), { phone: '13800138000', purpose: 'reset' })
+  } finally { f.restore() }
+})
+
+test('兼容验证网络故障与验证拒绝保留不同错误', async () => {
+  let f = stubFetch(() => { throw new Error('synthetic network failure') })
+  try {
+    await assert.rejects(postAccountLoginChallenge({ serverUrl: 'https://addin.example.com' }, {}), /后端|Backend/i)
+  } finally { f.restore() }
+  f = stubFetch(() => jsonReply({ code: 1, message: '安全验证失败，请更换图片后重试' }))
+  try {
+    await assert.rejects(postAccountLoginChallenge({ serverUrl: 'https://addin.example.com' }, {}), /安全验证失败/)
+  } finally { f.restore() }
+})
 
 test('发验证码把人机验证 token 带进请求体——不带的话官网恒 403', async () => {
   const f = stubFetch(() => jsonReply({ code: 0, data: { sent: true } }))

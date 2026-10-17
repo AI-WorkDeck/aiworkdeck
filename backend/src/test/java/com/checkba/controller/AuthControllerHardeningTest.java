@@ -400,6 +400,18 @@ class AuthControllerHardeningTest {
     }
 
     @Test
+    void captchaRefreshHasIndependentQuotaAndLeavesSmsAllowanceIntact() {
+        AwdkLoginService service = mock(AwdkLoginService.class);
+        when(service.captchaChallenge(any())).thenReturn(Map.of("id", "test"));
+        AuthController controller = controller(service, serverGuard("open"));
+        for (int i = 0; i < 60; i++) assertEquals(0, controller.accountLoginCaptchaChallenge(Map.of("phone", "13800138000", "purpose", "login"), http()).get("code"));
+        assertEquals(1, controller.accountLoginCaptchaChallenge(Map.of("phone", "13800138000", "purpose", "login"), http()).get("code"));
+        for (int i = 0; i < 20; i++) assertEquals(0, controller.accountLoginSendCode(Map.of("phone", "13800138000"), http()).get("code"));
+        verify(service, times(60)).captchaChallenge(any());
+        verify(service, times(20)).sendLoginCode(anyString(), any());
+    }
+
+    @Test
     @DisplayName("发验证码成功：code=0 信封")
     void accountLoginSendCodeSuccessEnvelope() {
         AwdkLoginService awdkLoginService = mock(AwdkLoginService.class);

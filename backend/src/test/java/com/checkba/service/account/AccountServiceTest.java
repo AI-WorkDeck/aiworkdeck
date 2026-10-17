@@ -78,6 +78,25 @@ class AccountServiceTest {
         }
     }
 
+    @Test
+    void compatibilityChallengeUsesAccountTransportAndWhitelistsFields() {
+        transport = new StubTransport().enqueue(200, "{\"id\":\"challenge\",\"image\":\"data:image/png;base64,fixture\",\"expiresAt\":123}");
+        Map<String, Object> result = service().captchaChallenge(Map.of("phone", "13800138000", "purpose", "reset", "ip", "forged"));
+        assertEquals("challenge", result.get("id"));
+        assertTrue(transport.calls.get(0).endsWith("/api/auth/captcha-challenge"));
+        assertTrue(transport.bodies.get(0).contains("reset"));
+        assertFalse(transport.bodies.get(0).contains("forged"));
+        assertNull(transport.lastBearer);
+    }
+
+    @Test
+    void deliveryFailureIsNotAnInvalidPassword() {
+        transport = new StubTransport().enqueue(400, "{\"error\":\"sms_send_failed\",\"message\":\"请求过于频繁，60 秒后可重新获取验证码\"}");
+        AccountException error = assertThrows(AccountException.class, () -> service().sendLoginCode("13800138000", "token"));
+        assertEquals(AccountException.Kind.CONFLICT, error.getKind());
+        assertTrue(error.getMessage().contains("60 秒后"));
+    }
+
     private StubTransport transport;
 
     private AccountService service() {

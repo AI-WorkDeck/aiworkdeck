@@ -1409,6 +1409,10 @@ export function sendAccountLoginCode(identifier, captchaToken, isPhone = true) {
 
 // 官网人机验证的公开配置（只有公开参数，没有密钥）。未启用时 provider 为空，
 // 调用方据此跳过控件直接发码——与官网此刻确实不校验是同一个判断。
+export function getAccountCaptchaChallenge(payload) {
+  return request({ url: '/api/account/captcha-challenge', method: 'POST', accountPrompt: false, data: payload }).then(unwrapEnvelope);
+}
+
 export function getAccountCaptchaConfig() {
   return request({ url: '/api/account/captcha-config', method: 'GET' }).then(unwrapEnvelope);
 }

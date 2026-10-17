@@ -91,6 +91,31 @@ class ProjectDeleteCascadeTest {
     @Autowired private MemoryRemoteRepository memoryRemoteRepository;
     @Autowired private MemoryRepoService memoryRepoService;
     @Autowired private CompletionEntryRepository completionEntryRepository;
+    @Autowired private com.checkba.repository.ContractReviewStandardRepository reviewStandards;
+    @Autowired private com.checkba.repository.ContractReviewRunRepository reviewRuns;
+
+    @Test
+    void deleteProject_removesReviewRulesAndQuotedContractSnapshots() throws IOException {
+        Long projectId = seedProject();
+        var standard = new com.checkba.model.entity.ContractReviewStandard();
+        standard.setProjectId(projectId);
+        standard.setName("Synthetic review policy");
+        standard.setRulesJson("[]");
+        reviewStandards.saveAndFlush(standard);
+        var run = new com.checkba.model.entity.ContractReviewRun();
+        run.setProjectId(projectId);
+        run.setDocFileId(seededDocFileId);
+        run.setStandardJson("{}");
+        run.setResultsJson("[{\"quote\":\"synthetic confidential clause\"}]");
+        run.setStatus("PARTIAL");
+        run.setDocumentHash("a".repeat(64));
+        reviewRuns.saveAndFlush(run);
+
+        projectService.deleteProject(projectId);
+
+        assertFalse(reviewStandards.existsById(standard.getId()));
+        assertFalse(reviewRuns.existsById(run.getId()));
+    }
 
     @Test
     void deleteProject_clearsEveryProjectScopedTableAndOnDiskDirectory() throws IOException {

@@ -69,7 +69,7 @@
               type="tel"
               inputmode="numeric"
               autocomplete="tel"
-              :disabled="authFlow === 'setup' || submitBusy"
+              :disabled="authFlow === 'setup' || submitBusy || sendingCode"
               :value="phone"
               :placeholder="$t('onboarding.unlock.phonePlaceholder')"
               @input="phone = $event.target.value"
@@ -82,7 +82,7 @@
               class="unlock-field"
               type="email"
               autocomplete="email"
-              :disabled="authFlow === 'setup' || submitBusy"
+              :disabled="authFlow === 'setup' || submitBusy || sendingCode"
               :value="email"
               :placeholder="$t('onboarding.unlock.emailPlaceholder')"
               @input="email = $event.target.value"
@@ -107,7 +107,7 @@
               :is="'button'"
               type="button"
               class="unlock-code-btn"
-              :disabled="sendingCode || cooldown > 0 || !codeIdentifier"
+              :disabled="sendingCode || compatLoading || cooldown > 0 || !codeIdentifier"
               @click="handleSendCode"
             >{{ codeBtnLabel }}</component>
           </div>
@@ -127,10 +127,18 @@
             <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow(authFlow === 'password' ? 'register' : 'password')">{{ $t(authFlow === 'password' ? 'accountPassword.register' : 'accountPassword.back') }}</component>
             <component v-if="authFlow === 'password'" :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="switchAuthFlow('reset')">{{ $t('accountPassword.reset') }}</component>
           </div>
+          <div v-if="authFlow === 'register' || authFlow === 'reset'" class="unlock-compat-verification">
+            <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="loadCompatChallenge">{{ $t(compatLoading ? 'onboarding.unlock.compatLoading' : compatVerification ? 'onboarding.unlock.compatRefresh' : 'onboarding.unlock.compatUse') }}</component>
+            <div v-if="compatVerification" class="unlock-desc">{{ $t('onboarding.unlock.compatHint') }}</div>
+            <template v-if="compatChallenge">
+              <img :src="compatChallenge.image" width="210" height="70" :alt="$t('onboarding.unlock.compatImage')" />
+              <div class="unlock-field-box"><component :is="'input'" class="unlock-field" type="text" maxlength="6" autocomplete="off" :value="compatAnswer" :placeholder="$t('onboarding.unlock.compatAnswer')" :aria-label="$t('onboarding.unlock.compatAnswer')" :disabled="sendingCode" @input="compatAnswer = $event.target.value" /></div>
+            </template>
+          </div>
           <!-- 人机验证控件挂点。阿里云（大陆站）点了才弹拼图，平时不占版面；
                Turnstile（国际站）走官网托管页，is-embed 给它留位置。未启用时整块不渲染。 -->
           <div
-            v-show="captcha && (authFlow === 'register' || authFlow === 'reset')"
+            v-show="!compatVerification && captcha && (authFlow === 'register' || authFlow === 'reset')"
             class="unlock-captcha-holder"
             :class="{ 'is-embed': captcha && captcha.provider === 'turnstile' }"
           >
@@ -209,7 +217,7 @@
 </template>
 
 <script>
-import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, accountPasswordOperation } from '@/services/api.js'
+import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, getAccountCaptchaChallenge, accountPasswordOperation } from '@/services/api.js'
 import { setupCaptcha, teardownCaptcha } from '@/utils/captcha.js'
 import { captchaFailureNotice, toCaptchaFailure } from '@/utils/captchaFailure.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
@@ -269,6 +277,10 @@ export default {
       cooldownTimer: null,
       // 人机验证控件。null 且 captchaFailure 为空 = 本站未启用，此时照常发码（官网那边也不会校验）
       captcha: null,
+      compatVerification: false,
+      compatChallenge: null,
+      compatAnswer: '',
+      compatLoading: false,
       // 官网说启用了、控件却装不出来：{ provider, reason }。此时绝不盲发码（必 403），
       // 点「获取验证码」先重试一次装配，仍失败就说清楚要放行哪些地址（dev-board#1056）
       captchaFailure: null,
@@ -334,8 +346,13 @@ export default {
       return this.loggingIn ? this.$t('onboarding.unlock.loggingIn') : this.$t({password:'accountPassword.signIn', register:'accountPassword.verify', setup:'accountPassword.setup', reset:'accountPassword.resetTitle'}[this.authFlow])
     },
     submitBusy() {
-      return this.loggingIn || this.unlocking
+      return this.loggingIn || this.unlocking || this.compatLoading
     },
+  },
+  watch: {
+    codeIdentifier() { this.clearCompatChallenge() },
+    authFlow() { this.clearCompatChallenge() },
+    'siteStatus.current'() { this.clearCompatChallenge() },
   },
   mounted() {
     loadSiteLinks()
@@ -359,7 +376,29 @@ export default {
     onEsc() {
       if (this.variant === 'dialog') this.cancel()
     },
+    clearCompatChallenge() {
+      this.compatChallenge = null
+      this.compatAnswer = ''
+    },
+    async loadCompatChallenge() {
+      if (this.submitBusy || this.sendingCode) return
+      if (!this.codeIdentifier) { this.errorMsg = this.$t('onboarding.unlock.compatContactFirst'); return }
+      this.compatVerification = true
+      this.clearCompatChallenge()
+      this.errorMsg = ''
+      this.compatLoading = true
+      const identifier = this.codeIdentifier
+      const purpose = this.authFlow === 'reset' ? 'reset' : 'login'
+      const site = this.siteStatus.current
+      try {
+        const challenge = await getAccountCaptchaChallenge({ [this.isPhoneSite ? 'phone' : 'email']: identifier, purpose })
+        if (!this.done && identifier === this.codeIdentifier && site === this.siteStatus.current && purpose === (this.authFlow === 'reset' ? 'reset' : 'login')) this.compatChallenge = challenge
+      } catch (e) {
+        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.accountNetworkFailed')
+      } finally { this.compatLoading = false }
+    },
     clearLoginSecrets() {
+      this.clearCompatChallenge()
       this.password = ''
       this.confirmPassword = ''
       this.smsCode = ''
@@ -503,7 +542,7 @@ export default {
       this.errorMsg = ''
     },
     async handleSendCode() {
-      if (this.sendingCode || this.cooldown > 0) return
+      if (this.sendingCode || this.compatLoading || this.cooldown > 0) return
       const identifier = this.codeIdentifier
       if (!identifier) {
         this.errorMsg = this.isPhoneSite
@@ -515,7 +554,13 @@ export default {
       this.sendingCode = true
       try {
         // 先取人机验证 token 再发。拿不到就别发——发了必被官网 403，白让用户等一轮。
-        const got = await this.acquireCaptchaToken()
+        if (this.compatVerification && (!this.compatChallenge || !/^[a-z0-9]{6}$/i.test(this.compatAnswer.trim()))) {
+          this.errorMsg = this.$t('onboarding.unlock.compatAnswerFirst')
+          return
+        }
+        const got = this.compatVerification
+          ? { token: `local:${this.compatChallenge.id}:${this.compatAnswer.trim()}` }
+          : await this.acquireCaptchaToken()
         if (got.failure) {
           this.errorMsg = this.captchaFailureMessage(got.failure)
           this.sendingCode = false
@@ -527,6 +572,7 @@ export default {
           return
         }
         const captchaToken = got.token
+        if (this.compatVerification) this.clearCompatChallenge()
         if (this.authFlow === 'reset') {
           await accountPasswordOperation('reset/send-code', { [this.isPhoneSite ? 'phone' : 'email']: identifier, captchaToken })
         } else {
@@ -535,7 +581,7 @@ export default {
         uni.showToast({ title: this.$t('onboarding.unlock.codeSent'), icon: 'none', duration: 1600 })
         this.startCooldown(60)
       } catch (e) {
-        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.loginFailed')
+        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.accountNetworkFailed')
       } finally {
         this.sendingCode = false
       }
@@ -655,7 +701,7 @@ export default {
             : this.$t('onboarding.unlock.loggedIn'),
         })
       } catch (e) {
-        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.loginFailed')
+        this.errorMsg = (e && e.message) || this.$t('onboarding.unlock.accountNetworkFailed')
       } finally {
         this.loggingIn = false
       }
