@@ -96,12 +96,7 @@
         <view v-if="showVoiceDropdown" class="dropdown-mask" @tap="showVoiceDropdown = false"></view>
       </view>
 
-      <!-- 语速。
-           这里以前有三个滑杆（语速/语调/音量），三个都是死的：前端把 '+0%' / '+0Hz'
-           写死在 payload 里、根本没读滑杆的值；而后端三档里 ElevenLabs 与平台代采
-           压根没有这几个参数，只有本地 Kokoro 吃一个倍率制的 speed——'+0%' 传过去
-           解析失败恒回落 1.0。语调与音量已删（没有任何一档支持，留着就是骗人），
-           语速改成倍率并真正下发。 -->
+      <!-- 播放倍率即时生效；合成始终使用原速，避免重复变速。 -->
       <view class="form-item">
         <view class="slider-header">
            <text class="label">{{ $t('panels.evRateLabel') }}</text>
@@ -110,8 +105,9 @@
         <slider
           :value="rate"
           @change="onRateChange"
+          @changing="onRateChange"
           min="50"
-          max="150"
+          max="200"
           step="5"
           block-size="12"
           activeColor="var(--awd-accent)"
@@ -121,36 +117,47 @@
       </view>
     </view>
 
-    <!-- Generate Action -->
     <view class="action-area">
       <button
         class="workdeck-btn workdeck-btn-primary full-width"
         @tap="handleGenerate"
-        :disabled="generating || !text"
-        :loading="generating"
+        :disabled="reading.generating || !canReadText || !selectedVoiceId"
       >
-        {{ generating ? $t('panels.evGenerating') : $t('panels.evGenerate') }}
+        {{ reading.generating ? $t('panels.evPreparing') : $t('panels.evGenerate') }}
       </button>
     </view>
 
-    <!-- Result Area -->
-    <view v-if="audioUrl" class="section result-area">
+    <view v-if="reading.segments.length" class="section result-area">
       <view class="result-header">
-         <text class="result-title">{{ $t('panels.evResultTitle') }}</text>
-         <text class="download-link" @tap="downloadAudio">{{ $t('panels.evDownload') }}</text>
+        <text class="result-title">{{ $t('panels.evResultTitle') }}</text>
+        <button class="download-link" :disabled="!reading.exportBuffer" @tap="downloadAudio">
+          {{ $t('panels.evDownload') }}
+        </button>
       </view>
-
-      <!-- Custom Audio Player -->
-      <view class="custom-player" :class="{ playing: isPlaying }">
-          <view class="play-btn" @tap="togglePlay">
-              <text class="play-icon">{{ isPlaying ? '⏸' : '▶' }}</text>
-          </view>
-          <view class="player-info">
-              <text class="player-status">{{ isPlaying ? $t('panels.evPlaying') : $t('panels.evClickToPlay') }}</text>
-          </view>
+      <view class="custom-player">
+        <button class="play-btn" :disabled="reading.status === 'error'" @tap="togglePlay"
+          :aria-label="$t(canPause ? 'panels.evPause' : 'panels.evResume')">
+          {{ canPause ? '⏸' : '▶' }}
+        </button>
+        <view class="player-info" aria-live="polite">
+          <text class="player-status">{{ readingStatus }}</text>
+          <text v-if="reading.generating" class="player-progress">
+            {{ $t('panels.evPreparedSegments', { done: reading.generated, total: reading.segments.length }) }}
+          </text>
+        </view>
+        <button class="stop-btn" @tap="stopAudio">{{ $t('panels.evStop') }}</button>
       </view>
+      <text class="export-hint">{{ $t('panels.evExportHint') }}</text>
+      <scroll-view scroll-y scroll-with-animation class="reading-transcript"
+        :scroll-into-view="reading.currentIndex >= 0 ? 'tts-segment-' + reading.currentIndex : ''">
+        <view v-for="(segment, index) in reading.segments" :key="index" :id="'tts-segment-' + index"
+          class="reading-segment" :class="{ active: index === reading.currentIndex }"
+          :aria-current="index === reading.currentIndex ? 'true' : undefined">
+          <text>{{ segment }}</text>
+        </view>
+      </scroll-view>
     </view>
-    
+
   </scroll-view>
 </template>
 
@@ -159,6 +166,8 @@ import { getTtsVoices, generateTtsAudio, promptFeatureNotConfigured } from '@/se
 import { ICONS } from '@/config/icons.js'
 import { host } from '@/services/host.js'
 import { componentDownloads } from '@/services/componentDownloads.js'
+import { createTtsReader } from '@/utils/ttsReader.js'
+import { hasTtsText } from '@/utils/ttsText.js'
 
 // 本机语音引擎 = 运行时 pack + 模型两件事（设计 §3.1）。0.38.0 起运行时也是按需下载的，
 // 面板上仍然只是一个按钮，底层顺序执行两条通道（pack → 模型 → ensure，顺序不能换：
@@ -190,23 +199,21 @@ export default {
       installing: false,
       // 应用级下载单例（dev-board#581）：别的入口正在下的，这里接上同一份进度
       controller: componentDownloads,
-      // 语速以「百分之几倍」存（100 = 原速），下发时除以 100 变成 Kokoro 的 speed
+      // 100 = 原速；仅影响播放，完整下载仍为原速 WAV。
       rate: 100,
-      generating: false,
-      audioUrl: '',
-      audioInstance: null,
-      isPlaying: false,
-      // Karaoke highlighting
-      sentences: [],
-      currentSentenceIndex: -1,
-      sentenceDurations: [],
-      audioDuration: 0,
-      _unmounted: false // 卸载判据：generateTtsAudio 的响应可能在切走面板之后才回来
+      reading: { status: 'idle', segments: [], currentIndex: -1, generated: 0, generating: false, paused: false, exportBuffer: null }
     }
   },
   computed: {
     ICONS() { return ICONS },
     speedText() { return (this.rate / 100).toFixed(2).replace(/0$/, '') + 'x' },
+    canReadText() { return hasTtsText(this.text) },
+    canPause() { return ['playing', 'buffering'].includes(this.reading.status) },
+    readingStatus() {
+      if (this.reading.status === 'playing') return this.$t('panels.evReadingSegment', { current: this.reading.currentIndex + 1, total: this.reading.segments.length })
+      const keys = { buffering: 'evPreparingAudio', paused: 'evPaused', complete: 'evReadComplete', error: 'evGenerateFailed' }
+      return this.$t('panels.' + (keys[this.reading.status] || 'evClickToPlay'))
+    },
     /** 拿不到音色 = 引擎没就绪。问过之后才判，免得加载中先闪一下红字。 */
     engineGateVisible() {
       return this.voicesLoaded && this.voices.length === 0
@@ -259,7 +266,29 @@ export default {
        )
     }
   },
+  watch: {
+    // 正文变化时旧音频立即失效；下一次朗读重新建立字幕快照。
+    text: { flush: 'sync', handler() { this.stopAudio() } }
+  },
   mounted() {
+    this._unmounted = false
+    this._reader = createTtsReader({
+      generate: generateTtsAudio,
+      onChange: state => {
+        if (this._unmounted) return
+        const previous = this.reading.currentIndex
+        this.reading = state
+        if (state.currentIndex !== previous) {
+          if (state.currentIndex >= 0) this.$emit('highlight-sentence', state.segments[state.currentIndex].trim())
+          else this.$emit('clear-highlight')
+        }
+      },
+      onError: (error, phase) => {
+        if (this._unmounted) return
+        if (error && error.featureNotConfigured) promptFeatureNotConfigured(error)
+        else uni.showToast({ title: this.$t(phase === 'playback' ? 'panels.evCannotPlay' : 'panels.evGenerateFailed'), icon: 'none' })
+      }
+    })
     this.fetchVoices()
     this.loadModelState()
     // 下载进度直接订阅主进程，与「组件管理」页同一条事件流：
@@ -282,135 +311,21 @@ export default {
     this._unmounted = true
     // 在途的组件下载不停，只是不再由本面板交代结果
     if (this._releaseClaim) { this._releaseClaim(); this._releaseClaim = null }
-    this.stopAudio()
-    // 卸载时手上可能还攥着一个已经生成好、但还没播的 blob URL，必须一并释放，
-    // 否则每次"生成完切走面板"都会泄漏一个 blob。
-    if (this.audioUrl) {
-      URL.revokeObjectURL(this.audioUrl)
-      this.audioUrl = ''
-    }
+    this._reader?.destroy()
+    this.$emit('clear-highlight')
     if (this._modelProgressUnsub) {
       this._modelProgressUnsub()
       this._modelProgressUnsub = null
     }
   },
   methods: {
-    // ==================== Karaoke Highlighting ====================
-    /**
-     * Split text into sentences by Chinese/English punctuation
-     */
-    splitTextToSentences(text) {
-      if (!text) return []
-      // Split by common sentence-ending punctuation
-      const raw = text.split(/[。！？；.!?;]+/)
-      // Filter empty and trim whitespace
-      return raw.map(s => s.trim()).filter(s => s.length > 0)
-    },
-
-    /**
-     * Estimate duration for each sentence based on character ratio
-     */
-    estimateSentenceDurations() {
-      if (!this.sentences.length || !this.audioDuration) return []
-      const totalChars = this.sentences.reduce((sum, s) => sum + s.length, 0)
-      if (totalChars === 0) return []
-      return this.sentences.map(s => (s.length / totalChars) * this.audioDuration * 1000) // ms
-    },
-
-    /**
-     * Determine current sentence index based on playback time
-     */
-    getCurrentSentenceIndex(currentTimeMs) {
-      let accumulated = 0
-      for (let i = 0; i < this.sentenceDurations.length; i++) {
-        accumulated += this.sentenceDurations[i]
-        if (currentTimeMs < accumulated) {
-          return i
-        }
-      }
-      return this.sentences.length - 1
-    },
-
-    /**
-     * Handle timeupdate event for karaoke sync
-     */
-    onAudioTimeUpdate() {
-      if (!this.audioInstance || !this.sentences.length) return
-      const currentTimeMs = this.audioInstance.currentTime * 1000
-      const newIndex = this.getCurrentSentenceIndex(currentTimeMs)
-      
-      if (newIndex !== this.currentSentenceIndex) {
-        this.currentSentenceIndex = newIndex
-        const sentence = this.sentences[newIndex]
-        if (sentence) {
-          console.log('[EasyVoice] Highlighting sentence:', newIndex, sentence.substring(0, 30) + '...')
-          this.$emit('highlight-sentence', sentence)
-        }
-      }
-    },
-
-    /**
-     * Handle audio ended event
-     */
-    onAudioEnded() {
-      this.isPlaying = false
-      this.currentSentenceIndex = -1
+    stopAudio() {
+      this._reader?.stop()
       this.$emit('clear-highlight')
     },
-
-    // ==================== Audio Control ====================
-    stopAudio() {
-        if (this.audioInstance) {
-            this.audioInstance.pause()
-            this.audioInstance = null
-            this.isPlaying = false
-            this.currentSentenceIndex = -1
-            this.$emit('clear-highlight')
-        }
-    },
     togglePlay() {
-        if (!this.audioUrl) return
-        
-        if (!this.audioInstance) {
-            this.audioInstance = new Audio(this.audioUrl)
-            
-            // Get audio duration for sentence timing estimation
-            this.audioInstance.onloadedmetadata = () => {
-                this.audioDuration = this.audioInstance.duration
-                console.log('[EasyVoice] Audio duration:', this.audioDuration, 's')
-                this.sentenceDurations = this.estimateSentenceDurations()
-                console.log('[EasyVoice] Sentence durations:', this.sentenceDurations)
-            }
-            
-            // Karaoke sync via timeupdate
-            this.audioInstance.ontimeupdate = () => {
-                this.onAudioTimeUpdate()
-            }
-            
-            this.audioInstance.onended = () => {
-                this.onAudioEnded()
-            }
-            this.audioInstance.onpause = () => {
-                this.isPlaying = false
-            }
-            this.audioInstance.onplay = () => {
-                this.isPlaying = true
-            }
-             this.audioInstance.onerror = (e) => {
-                console.error('Audio playback error', e)
-                this.isPlaying = false
-                uni.showToast({ title: this.$t('panels.evPlayFailed'), icon: 'none' })
-            }
-        }
-
-        if (this.isPlaying) {
-            this.audioInstance.pause()
-        } else {
-            this.audioInstance.play().catch(e => {
-                console.error('Play failed', e)
-                uni.showToast({ title: this.$t('panels.evCannotPlay'), icon: 'none' })
-            })
-        }
+      if (this.canPause) this._reader?.pause()
+      else this._reader?.resume()
     },
     toggleVoiceDropdown() {
        this.showVoiceDropdown = !this.showVoiceDropdown
@@ -449,7 +364,8 @@ export default {
       }
     },
     onRateChange(e) {
-      this.rate = e.detail.value
+      this.rate = Number(e.detail.value)
+      this._reader?.setRate(this.rate / 100)
     },
 
     // ==================== 本机语音组件 ====================
@@ -546,15 +462,12 @@ export default {
       }
     },
     async importFromDoc() {
+        // 请求文档前就停下旧朗读，避免父级切换文档时高亮串入新文档。
+        this.stopAudio()
         const callback = (content) => {
+            if (this._unmounted) return
             if (content) {
                 this.text = content;
-                // sentences 是「当前这段音频的时间轴」，不是「文本框里现在有什么」，
-                // 所以导入时不能顺手把它换掉：旧音频还在播的话，ontimeupdate 会按旧音频
-                // 的时长算出下标、去新文档的句子数组里取字符串 emit 出去——而导入路径
-                // （project-overview 的 handleEasyVoiceDocRequest）随后就 openFile 打开了
-                // 新文档，那些句子在新文档里真能被 find 到，选区于是跟着旧音频乱跳。
-                // handleGenerate 在每次合成前都会按当前正文重算，这里不需要提前拆句。
                 uni.showToast({ title: this.$t('panels.evImportedDocSuccess'), icon: 'success' })
             } else {
                  uni.showToast({ title: this.$t('panels.evCannotGetDocContent'), icon: 'none' })
@@ -565,69 +478,19 @@ export default {
         this.$emit('request-doc-text', callback);
     },
     async handleGenerate() {
-      if (!this.text) return
-      this.generating = true
-      this.stopAudio() 
-      
-      // Split text into sentences before generating
-      this.sentences = this.splitTextToSentences(this.text)
-      console.log('[EasyVoice] Prepared', this.sentences.length, 'sentences for karaoke')
-      
-      try {
-        const payload = {
-            text: this.text,
-            voice: this.selectedVoiceId,
-            // 倍率制字符串，后端 TtsService.parseSpeed 认这个格式（"1"/"1.2"/"1.2x"）。
-            // 此前这里写死 '+0%'，解析必然失败、恒回落 1.0——滑杆等于没接。
-            // #386 已把它接上（当时滑杆还是 -50..+50，换算成 1 + rate/100）；
-            // 这里进一步把滑杆本身改成倍率制（50..150 = 0.5x..1.5x），
-            // 界面上直接显示 "1.3x"，不再让用户在百分比与倍率之间脑内换算。
-            // pitch / volume 不再随请求发出：本机引擎不支持、面板上那两个滑杆也已删，
-            // 发一个恒定的假值只会让人以为它有用（DTO 侧的 setter 仍在，存量客户端不受影响）。
-            rate: String(this.rate / 100)
-        }
-        
-        console.log('[EasyVoicePane] Generating with payload:', payload)
-        const audioBuffer = await generateTtsAudio(payload)
-        console.log('[EasyVoicePane] Generated audio buffer size:', audioBuffer.byteLength)
-
-        // 卸载判据：await 期间用户可能已经切走了这个面板（切左栏面板/切到会议录音
-        // tab 都会销毁组件）。此时没有任何播放控件能停下接下来 togglePlay() 会起播
-        // 的音频，必须在这里拦住，不落地播放。
-        if (this._unmounted) return
-
-        const blob = new Blob([audioBuffer], { type: 'audio/mpeg' })
-        if (this.audioUrl) {
-            URL.revokeObjectURL(this.audioUrl)
-        }
-        this.audioUrl = URL.createObjectURL(blob)
-
-        this.$nextTick(() => {
-             if (this._unmounted) return
-             this.togglePlay()
-        })
-
-      } catch (e) {
-        if (this._unmounted) return
-        console.error('[EasyVoicePane] Generation failed', e)
-        if (e && e.featureNotConfigured) {
-          // TTS 未配置：引导去设置而非报"生成失败"（#18 T7）
-          promptFeatureNotConfigured(e)
-        } else {
-          uni.showToast({ title: this.$t('panels.evGenerateFailed'), icon: 'none' })
-        }
-      } finally {
-        this.generating = false
-      }
+      if (!this.canReadText || !this.selectedVoiceId || this.reading.generating) return
+      await this._reader?.start({ text: this.text, voice: this.selectedVoiceId, playbackRate: this.rate / 100 })
     },
     downloadAudio() {
-        if (!this.audioUrl) return
-        const a = document.createElement('a')
-        a.href = this.audioUrl
-        a.download = `voice_${Date.now()}.mp3`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
+      if (!this.reading.exportBuffer) return
+      const url = URL.createObjectURL(new Blob([this.reading.exportBuffer], { type: 'audio/wav' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `voice_${Date.now()}.wav`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
     }
   }
 }
@@ -980,7 +843,14 @@ export default {
     color: var(--awd-panel-accent);
     cursor: pointer;
     font-weight: 500;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    line-height: 1.5;
 }
+.download-link:disabled { opacity: .45; cursor: not-allowed; }
+.download-link::after, .play-btn::after, .stop-btn::after { border: 0; }
 
 .custom-player {
     display: flex;
@@ -992,8 +862,13 @@ export default {
     border: 1px solid var(--awd-mint);
 }
 .play-btn {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    line-height: 1;
     border-radius: 50%;
     background: var(--awd-accent);
     display: flex;
@@ -1009,10 +884,50 @@ export default {
 }
 .player-info {
     flex: 1;
+    min-width: 0;
 }
 .player-status {
     font-size: var(--awd-font-size-body);
     color: var(--awd-text);
+}
+
+.player-progress, .export-hint {
+    display: block;
+    font-size: var(--awd-panel-fs-meta);
+    color: var(--awd-panel-text-3);
+    line-height: 1.5;
+}
+.export-hint { margin: var(--awd-space-2) 0; }
+.stop-btn {
+    margin: 0;
+    padding: 4px 6px;
+    font-size: var(--awd-panel-fs-meta);
+    color: var(--awd-panel-text-2);
+    background: var(--awd-surface);
+    border: 1px solid var(--awd-panel-border);
+    border-radius: var(--awd-radius-sm);
+    line-height: 1.5;
+}
+.reading-transcript {
+    height: 220px;
+    border: 1px solid var(--awd-panel-border);
+    border-radius: var(--awd-panel-radius);
+    box-sizing: border-box;
+}
+.reading-segment {
+    padding: 4px 8px;
+    border-left: 3px solid transparent;
+    font-size: var(--awd-panel-fs);
+    color: var(--awd-panel-text);
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.reading-segment.active {
+    background: var(--awd-accent-wash);
+    border-left-color: var(--awd-accent);
+    color: var(--awd-accent-text);
+    font-weight: 600;
 }
 
 .btn-glyph {

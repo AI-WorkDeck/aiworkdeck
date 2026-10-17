@@ -1,33 +1,121 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// 审计（dev-board#74）：EasyVoicePane 的卡拉OK 高亮与正在播的音频脱钩。
-// 源码文本断言——本仓既有 node:test 用例的一贯写法（组件带 @/ 别名，import 不进来）。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { createTtsReader } from '../../src/utils/ttsReader.js'
+import { hasTtsText } from '../../src/utils/ttsText.js'
 
-const SRC = readFileSync(new URL('../../src/components/EasyVoicePane.vue', import.meta.url), 'utf8')
-const stripComments = (s) =>
-  s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-const CODE = stripComments(SRC)
+const source = readFileSync(new URL('../../src/components/EasyVoicePane.vue', import.meta.url), 'utf8')
+const script = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .+$/gm, '').replace('export default', 'return')
+const tick = () => new Promise(resolve => setImmediate(resolve))
+const wave = () => {
+  const buffer = new ArrayBuffer(48), v = new DataView(buffer)
+  for (const [i, text] of [[0, 'RIFF'], [8, 'WAVE'], [12, 'fmt '], [36, 'data']]) [...text].forEach((c, j) => v.setUint8(i + j, c.charCodeAt(0)))
+  v.setUint32(4, 40, true); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true)
+  v.setUint32(24, 24000, true); v.setUint32(28, 48000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(40, 4, true)
+  return buffer
+}
+function pane() {
+  const requests = [], audios = [], events = [], notices = []
+  const factory = new Function('hasTtsText', 'createTtsReader', 'generateTtsAudio', 'componentDownloads', 'host', 'ICONS', 'uni', script)
+  const component = factory(
+    hasTtsText,
+    options => createTtsReader({ ...options,
+      urls: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
+      createAudio: () => {
+        const audio = { play: () => Promise.resolve(), pause() {}, load() {}, removeAttribute() {} }
+        audios.push(audio); return audio
+      }
+    }),
+    (payload, options) => new Promise(resolve => requests.push({ payload, options, resolve })),
+    {}, {}, {}, { $emit() {}, showToast: value => notices.push(value) }
+  )
+  const vm = { ...component.data(), ...component.methods, fetchVoices() {}, loadModelState() {},
+    $t: key => key, $emit: (...event) => events.push(event) }
+  for (const [key, fn] of Object.entries(component.computed)) Object.defineProperty(vm, key, { get: () => fn.call(vm) })
+  component.mounted.call(vm)
+  return { vm, component, requests, audios, events, notices }
+}
 
-// sentences 是「当前这段音频的时间轴」，不是「文本框里现在有什么」。
-// 导入时就把它整块换掉，而旧音频还在播：ontimeupdate 会拿旧音频的时长算出下标，
-// 去新文档的句子数组里取字符串 emit 出去，编辑器的选区就跟着旧音频在新文档里乱跳。
-test('importFromDoc 不改写 sentences（时间轴归音频，不归文本框）', () => {
-  const start = CODE.indexOf('async importFromDoc()')
-  assert.ok(start > 0, '找不到 importFromDoc')
-  const body = CODE.slice(start, CODE.indexOf('async handleGenerate()'))
-  assert.ok(body.length > 0 && body.length < 2000, 'importFromDoc 函数体切取失败')
-  assert.ok(!/this\.sentences\s*=/.test(body),
-    '导入正文不许改 sentences：旧音频还在播时会把高亮串到新文档去')
+test('component renders a scrollable transcript and live rate controls; audio events select the spoken snapshot', async () => {
+  const h = pane()
+  h.vm.text = '旧文第一句。旧文第二句。'; h.vm.selectedVoiceId = 'test'
+  const done = h.vm.handleGenerate()
+  h.requests[0].resolve(wave()); await tick()
+  assert.equal(h.vm.reading.currentIndex, -1)
+  assert.ok(!h.events.some(event => event[0] === 'highlight-sentence'))
+  h.audios[0].onplaying()
+  assert.deepEqual(h.events.at(-1), ['highlight-sentence', '旧文第一句。'])
+  assert.equal(h.vm.canPause, true)
+  h.vm.onRateChange({ detail: { value: 175 } })
+  assert.equal(h.audios[0].playbackRate, 1.75)
+  assert.equal(h.vm.speedText, '1.75x')
+  assert.equal(h.requests[0].payload.rate, '1')
+  h.vm.togglePlay(); assert.equal(h.vm.reading.status, 'paused')
+  h.requests[1].resolve(wave()); await done
+  assert.equal(h.vm.reading.status, 'paused')
+  assert.ok(h.vm.reading.exportBuffer)
+  h.vm.togglePlay(); h.audios[0].onplaying(); h.audios[0].onended()
+  h.audios[1].onplaying()
+  assert.deepEqual(h.events.at(-1), ['highlight-sentence', '旧文第二句。'])
+  h.audios[1].onended()
+  assert.deepEqual(h.events.at(-1), ['clear-highlight'])
+  assert.equal(h.vm.reading.status, 'complete')
+  assert.match(source, /scroll-into-view=[\s\S]*?reading\.currentIndex/)
+  assert.match(source, /v-for="\(segment, index\) in reading\.segments"/)
+  assert.match(source, /active: index === reading\.currentIndex/)
+  assert.match(source, /@changing="onRateChange"/)
+  h.component.beforeUnmount.call(h.vm)
 })
 
-test('sentences 的唯一写点在 handleGenerate（生成前重算）', () => {
-  const writes = CODE.match(/this\.sentences\s*=/g) || []
-  assert.equal(writes.length, 1, 'sentences 只许在生成音频前赋值一次，实际 ' + writes.length + ' 处')
-  const start = CODE.indexOf('async handleGenerate()')
-  const body = CODE.slice(start, CODE.indexOf('downloadAudio()'))
-  assert.match(body, /this\.sentences\s*=\s*this\.splitTextToSentences\(this\.text\)/,
-    'handleGenerate 必须在生成前按当前正文重算 sentences')
+test('editing text synchronously stops the reader and rejects old highlights and late generation', async () => {
+  const h = pane()
+  h.vm.text = '旧文第一句。旧文第二句。'; h.vm.selectedVoiceId = 'test'
+  const done = h.vm.handleGenerate()
+  h.requests[0].resolve(wave()); await tick()
+  const stalePlaying = h.audios[0].onplaying
+  h.audios[0].onplaying()
+  h.vm.text = '修改后的新文。'
+  assert.equal(h.component.watch.text.flush, 'sync')
+  h.component.watch.text.handler.call(h.vm)
+  assert.equal(h.requests[1].options.signal.aborted, true)
+  assert.deepEqual(h.events.at(-1), ['clear-highlight'])
+  const count = h.events.length
+  stalePlaying(); h.requests[1].resolve(wave()); await done
+  assert.equal(h.events.length, count)
+  assert.equal(h.vm.reading.status, 'idle')
+  assert.deepEqual(h.vm.reading.segments, [])
+  h.component.beforeUnmount.call(h.vm)
+})
+
+test('import stops the old reader before the parent can switch documents, even when the imported text is identical', async () => {
+  const h = pane()
+  h.vm.text = '旧文。'; h.vm.selectedVoiceId = 'test'
+  const done = h.vm.handleGenerate()
+  await h.vm.importFromDoc()
+  assert.equal(h.requests[0].options.signal.aborted, true)
+  const requestIndex = h.events.findIndex(event => event[0] === 'request-doc-text')
+  const clearIndex = h.events.findIndex(event => event[0] === 'clear-highlight')
+  assert.ok(clearIndex >= 0 && clearIndex < requestIndex)
+  h.events[requestIndex][1]('旧文。')
+  h.requests[0].resolve(wave()); await done
+  assert.equal(h.audios.length, 0)
+  assert.equal(h.vm.reading.status, 'idle')
+  h.component.beforeUnmount.call(h.vm)
+})
+
+test('component teardown aborts unfinished synthesis and late document callbacks cannot update its text', async () => {
+  const h = pane()
+  await h.vm.importFromDoc()
+  const callback = h.events.find(event => event[0] === 'request-doc-text')[1]
+  h.vm.text = '旧文。'; h.vm.selectedVoiceId = 'test'
+  const done = h.vm.handleGenerate()
+  h.component.beforeUnmount.call(h.vm)
+  assert.equal(h.requests[0].options.signal.aborted, true)
+  h.requests[0].resolve(wave()); await done
+  callback('新文。')
+  assert.equal(h.audios.length, 0)
+  assert.equal(h.vm.text, '旧文。')
+  assert.deepEqual(h.events.at(-1), ['clear-highlight'])
 })
