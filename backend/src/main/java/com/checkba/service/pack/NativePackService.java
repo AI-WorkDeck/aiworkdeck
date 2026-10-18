@@ -154,7 +154,7 @@ public class NativePackService {
             });
 
     private final Map<String, PackStatus> statuses = new ConcurrentHashMap<>();
-    private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
+    private final Map<String, PackStatus> inFlight = new ConcurrentHashMap<>();
     private final Map<String, CachedManifest> manifestCache = new ConcurrentHashMap<>();
 
     /**
@@ -546,15 +546,23 @@ public class NativePackService {
     public void installAsync(String packId) {
         requireValidId(packId);
         requireEnabled();
-        if (!inFlight.add(packId)) {
-            log.info("Pack {} install already in flight, ignoring duplicate request", packId);
-            return;
+        final PackStatus st;
+        synchronized (inFlight) {
+            PackStatus pending = inFlight.get(packId);
+            if (pending != null && !STATE_FAILED.equals(pending.getState())) {
+                log.info("Pack {} install already in flight, ignoring duplicate request", packId);
+                return;
+            }
+            // failed 已对外可见时，即便旧任务尚在 catch/finally 中，也必须接受重试。
+            // 每次任务独占状态对象，旧任务的迟到错误与清理不能影响新任务。
+            st = new PackStatus();
+            st.setId(packId);
+            st.setInstalledVersion(liveStatus(packId).getInstalledVersion());
+            st.setState(STATE_DOWNLOADING);
+            st.setPhase(PHASE_DOWNLOADING);
+            statuses.put(packId, st);
+            inFlight.put(packId, st);
         }
-        PackStatus st = liveStatus(packId);
-        resetProgress(st);
-        st.setState(STATE_DOWNLOADING);
-        st.setPhase(PHASE_DOWNLOADING);
-        st.setError(null);
         installer.submit(() -> {
             try {
                 install(packId);
@@ -562,14 +570,13 @@ public class NativePackService {
                 // 兜住 Throwable：install() 自己已把状态落到 failed；这里再兜一层，防止
                 // 锁外的前置检查（如开关在排队期间被关）抛出后状态永远停在「下载中」
                 log.warn("Pack {} install failed: {}", packId, describe(t));
-                PackStatus cur = liveStatus(packId);
-                if (isInFlight(cur.getState())) {
-                    cur.setState(STATE_FAILED);
-                    cur.setPhase(PHASE_FAILED);
-                    cur.setError(describe(t));
+                if (isInFlight(st.getState())) {
+                    st.setPhase(PHASE_FAILED);
+                    st.setError(describe(t));
+                    st.setState(STATE_FAILED);
                 }
             } finally {
-                inFlight.remove(packId);
+                inFlight.remove(packId, st);
             }
         });
     }
@@ -641,14 +648,14 @@ public class NativePackService {
                 // 因封禁被拒不是「安装失败」：状态要如实停在 revoked，否则广场把平台封禁
                 // 显示成一次网络出错，用户只会一遍遍重试
                 JSONObject current = readCurrent(packId);
+                st.setPhase(PHASE_FAILED);
+                st.setError(describe(e));
                 if (current != null && current.getBool("revoked", false)) {
                     st.setState(STATE_REVOKED);
                     st.setInstalledVersion(current.getStr("version"));
                 } else {
                     st.setState(STATE_FAILED);
                 }
-                st.setPhase(PHASE_FAILED);
-                st.setError(describe(e));
                 if (e instanceof Error) {
                     log.error("Pack {} install aborted by {}", packId, e.toString(), e);
                 }

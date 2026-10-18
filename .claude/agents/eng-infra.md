@@ -572,3 +572,7 @@ preload `host.backend.getHealth()` / `onHealthChanged(callback)`；主进程 IPC
 ## 随包业务插件构建（#1340/#1341，待发版）
 
 frontend build:h5前置build:plugins，8个独立Uni/Vite包输出official-plugins/<id>/web，desktop extraResources只带对应manifest/web。后端通过AI_PLUGINS_BUNDLED_DIR读取只读来源，安装到可写plugins目录；OAuth回调由实际分配的后端端口注入AI_PLUGINS_OAUTH_REDIRECT_URI。纯服务端开发显式指定bundled-dir并先构建。QA启动后端必须复制jar到隔离runtime后运行，不可直接运行随后会被Maven改写的target jar；同一target目录不可并行package与test。
+
+### 原生组件失败后的立即重试（dev-board#1260）
+
+`NativePackService.installAsync` 的占用表按每次任务的 `PackStatus` 对象区分。`failed` 对用户可见后即可接受重试；旧任务的 catch 只改自身状态，finally 条件删除自身占用，不能覆盖或释放新任务。失败详情先写、failed 最后发布。不要退回按 packId 的 Set 去重，也不要通过延长轮询或 sleep 掩盖窗口。`NativePackServiceTest.immediateRetryAfterFailureKeepsNewAttemptInFlight` 用 latch 固定这个窗口，并验证运行中与排队中的去重、旧收尾隔离及最终真实安装文件。
