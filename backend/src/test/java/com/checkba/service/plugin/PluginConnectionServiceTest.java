@@ -54,6 +54,17 @@ class PluginConnectionServiceTest {
         void target(String url) { super.validateTarget(url); }
     }
 
+    @Test void switchingAccountDuringCredentialResolutionDoesNotSendMixedContextRequest() {
+        when(account.accountFingerprintOrNull()).thenReturn("account-b");
+        service.connect("demo", 1L, "service", "synthetic-b-token");
+        when(account.accountFingerprintOrNull()).thenReturn("account-a");
+        service.connect("demo", 1L, "service", "synthetic-a-token");
+        when(account.accountFingerprintOrNull()).thenReturn("account-a", "account-b");
+        assertThrows(IllegalStateException.class, () -> service.request("demo", 1L, "service", "lookup", Map.of("data", "account-a-request")));
+        assertNull(service.lastUrl, "No request may be sent with a different account's credential");
+        assertNull(service.lastBearer);
+    }
+
     @Test void encryptedPerUserCredentialsNeverAppearInStatus() {
         service.connect("demo", 1L, "service", "user-one-secret");
         service.connect("demo", 2L, "service", "user-two-secret");
