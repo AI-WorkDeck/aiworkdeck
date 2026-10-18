@@ -101,6 +101,7 @@ function buildFixture(dir, { id, version, minAppVersion = '0.1.0' }) {
 /** worker 线程体：造 fixture、起 HTTP 服务器，通过 parentPort 把端口/公钥报回主线程。 */
 function runWorkerServer() {
   const { dir, id, version, minAppVersion } = workerData
+  let failDownloads = !!workerData.failDownloads
   const fx = buildFixture(dir, { id, version, minAppVersion })
   const manifestBytes = fs.readFileSync(path.join(dir, 'manifest.json'))
   const sigBytes = fs.readFileSync(path.join(dir, 'manifest.json.sig'))
@@ -123,6 +124,9 @@ function runWorkerServer() {
       res.on('error', (e) => dbg(`RES ERROR ${req.url} ${e && e.message}`))
     }
     const url = new URL(req.url, 'http://internal')
+    if (url.pathname === '/registry/skills' || url.pathname === '/registry/plugins') {
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('[]'); return
+    }
     const prefix = `/plugin-packs/${id}/`
     if (!url.pathname.startsWith(prefix)) { res.writeHead(404); res.end(); return }
     const rel = url.pathname.slice(prefix.length)
@@ -133,6 +137,7 @@ function runWorkerServer() {
       res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end(sigBytes); return
     }
     if (rel === `${version}/${fx.archiveName}`) {
+      if (failDownloads) { res.writeHead(503); res.end('Synthetic download failure'); return }
       res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': String(archiveBuf.length) })
       let offset = 0
       let chunkN = 0
@@ -159,6 +164,10 @@ function runWorkerServer() {
   })
 
   parentPort.on('message', (msg) => {
+    if (msg === 'allow-downloads') {
+      failDownloads = false
+      parentPort.postMessage({ type: 'downloads-allowed' })
+    }
     if (msg === 'close') {
       try { server.closeAllConnections?.() } catch (e) { /* 老 Node 没有这个方法也无妨 */ }
       server.close(() => { parentPort.postMessage({ type: 'closed' }) })
@@ -178,8 +187,8 @@ if (!isMainThread) {
  *
  * @returns {{ url: string, publicKeyPem: string, version: string, archiveSize: number, close: () => Promise<void> }}
  */
-export async function startPackStub(dir, { id = 'litigation-visual', version = '9.9.9', minAppVersion } = {}) {
-  const worker = new Worker(new URL(import.meta.url), { workerData: { dir, id, version, minAppVersion } })
+export async function startPackStub(dir, { id = 'litigation-visual', version = '9.9.9', minAppVersion, failDownloads = false } = {}) {
+  const worker = new Worker(new URL(import.meta.url), { workerData: { dir, id, version, minAppVersion, failDownloads } })
   const ready = await new Promise((resolve, reject) => {
     worker.once('error', reject)
     worker.once('exit', (code) => reject(new Error('pack-stub worker exited early (code ' + code + ')')))
@@ -187,6 +196,14 @@ export async function startPackStub(dir, { id = 'litigation-visual', version = '
   })
   return {
     url: `http://127.0.0.1:${ready.port}/plugin-packs`,
+    registryUrl: `http://127.0.0.1:${ready.port}/registry`,
+    allowDownloads: () => new Promise(resolve => {
+      const allowed = msg => {
+        if (msg?.type === 'downloads-allowed') { worker.off('message', allowed); resolve() }
+      }
+      worker.on('message', allowed)
+      worker.postMessage('allow-downloads')
+    }),
     publicKeyPem: ready.publicKeyPem,
     version: ready.version,
     archiveSize: ready.archiveSize,

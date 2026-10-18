@@ -72,7 +72,7 @@
                    会让面板里的 kick-off 按钮点了没反应。判据见 leftSidebarPlugins.js。
                    挂着原生资源包（packId 非空）的再加一层：包没就绪前不给开关，
                    见 docs/NATIVE_PACK_DISTRIBUTION.md §4.3/§7.1。 -->
-              <template v-if="installedInfo && !installedInfo.sourcePluginId && isPanel">
+              <template v-if="installedInfo && !installedInfo.sourcePluginId && (isPanel || packId)">
                 <text v-if="packRevokedState" class="mdp-pack-revoked">{{ $t('market.packRevokedNotice') }}</text>
                 <view v-else-if="packId && packDownloading" class="mdp-pack-progress">
                   <text>{{ packProgressText }}</text>
