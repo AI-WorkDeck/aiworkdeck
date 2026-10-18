@@ -141,10 +141,14 @@ public class PluginConnectionService {
 
     public String bearerToken(String pluginId, Long userId, String connectionId) {
         Connection c = declaration(pluginId, connectionId);
-        if ("none".equals(c.authType())) return "";
         String scope = scope(pluginId, userId, connectionId);
+        return bearerToken(pluginId, userId, c, scope, generation(scope));
+    }
+
+    private String bearerToken(String pluginId, Long userId, Connection c, String scope, long generation) {
         synchronized (lock(scope)) {
-        long generation = generation(scope);
+        assertCurrent(pluginId, userId, c, scope, generation);
+        if ("none".equals(c.authType())) return "";
         String raw = credentials.get(scope);
         if (raw.isEmpty()) throw new IllegalStateException("connection_required");
         Map<String, Object> record = parse(raw);
@@ -162,6 +166,7 @@ public class PluginConnectionService {
             credentials.put(scope, json(next));
             record = next;
         }
+        assertCurrent(pluginId, userId, c, scope, generation);
         return string(record, "access_token", "");
         }
     }
@@ -178,7 +183,10 @@ public class PluginConnectionService {
         String url = c.baseUrl() + op.path();
         String body = "GET".equals(op.method()) ? "" : json(args);
         if ("GET".equals(op.method()) && !args.isEmpty()) url += "?" + form(args);
-        Reply reply = exchange(url, op.method(), bearerToken(pluginId, userId, connectionId), body, false);
+        // Resolve credentials in the captured account scope, never a newly selected account.
+        String token = bearerToken(pluginId, userId, c, scope, generation);
+        assertCurrent(pluginId, userId, c, scope, generation);
+        Reply reply = exchange(url, op.method(), token, body, false);
         assertCurrent(pluginId, userId, c, scope, generation);
         requireSuccess(reply);
         return reply.body();
