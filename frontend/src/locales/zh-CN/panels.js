@@ -43,6 +43,8 @@ export default {
   litLayoutComparison: '对比表',
   litLayoutFallback: '图',
   // 原生资源包状态条，见 docs/NATIVE_PACK_DISTRIBUTION.md §5
+  litPackNotInstalled: '需安装诉讼可视化资源包后才能出图。',
+  litPackRevoked: '诉讼可视化资源包已停用，请联系支持。',
   litPackDownloading: '正在下载诉讼可视化资源包…',
   litPackDownloadingProgress: '正在下载诉讼可视化资源包…{downloaded} / {total} MB',
   litPackFailedText: '资源包下载失败',

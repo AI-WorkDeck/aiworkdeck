@@ -11,12 +11,12 @@
   <view class="lv-pack-bar" :class="{ failed: litPackStatus && litPackStatus.state === 'failed' }" v-if="showPackBar">
     <text class="lv-pack-text">{{ packBarText }}</text>
     <view
-      v-if="litPackStatus && litPackStatus.state === 'failed'"
+      v-if="canInstallPack"
       class="lv-pack-retry"
       :class="{ disabled: litPackRetrying }"
       @tap="retryPackInstall"
     >
-      <text>{{ litPackRetrying ? $t('panels.litPackRetrying') : $t('common.retry') }}</text>
+      <text>{{ litPackRetrying ? $t('panels.litPackRetrying') : $t(litPackStatus.state === 'not_installed' ? 'market.install' : 'common.retry') }}</text>
     </view>
   </view>
 
@@ -194,9 +194,14 @@ export default {
     showPackBar() {
       return !!this.litPackStatus && this.litPackStatus.state !== 'ready'
     },
+    canInstallPack() {
+      return !!this.litPackStatus && ['not_installed', 'failed'].includes(this.litPackStatus.state)
+    },
     packBarText() {
       const s = this.litPackStatus
       if (!s) return ''
+      if (s.state === 'not_installed') return this.$t('panels.litPackNotInstalled')
+      if (s.state === 'revoked') return this.$t('panels.litPackRevoked')
       if (s.state === 'failed') return s.error || this.$t('panels.litPackFailedText')
       const total = s.bytesTotal || 0
       if (total > 0) {
@@ -242,7 +247,7 @@ export default {
         return
       }
       const state = this.litPackStatus && this.litPackStatus.state
-      if (state === 'ready' || state === 'failed') {
+      if (['ready', 'failed', 'not_installed', 'revoked'].includes(state)) {
         this.stopPackPoll()
         if (state === 'ready' && previousState && previousState !== 'ready') await this.reload()
       } else if (state && !this.litPackTimer) {
@@ -257,7 +262,7 @@ export default {
       if (this.litPackTimer) { clearInterval(this.litPackTimer); this.litPackTimer = null }
     },
     async retryPackInstall() {
-      if (this.litPackRetrying) return
+      if (this.litPackRetrying || this.litPackStatus?.state === 'revoked') return
       this.litPackRetrying = true
       try {
         await packInstall(PACK_ID)
