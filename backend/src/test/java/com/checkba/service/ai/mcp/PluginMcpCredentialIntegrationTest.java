@@ -63,7 +63,7 @@ class PluginMcpCredentialIntegrationTest {
     class Connections extends PluginConnectionService {
         Reply reply = new Reply(200, Map.of());
         RuntimeException transportFailure;
-        Connections() { super(plugins, credentials, account, "http://localhost:9696/api/plugins/oauth/callback"); }
+        Connections() { super(plugins, credentials, account, "https://host.example.invalid/api/plugins/oauth/callback"); }
         @Override protected Reply exchange(String url, String method, String bearer, String body, boolean form) {
             if (transportFailure != null) throw transportFailure;
             return reply;

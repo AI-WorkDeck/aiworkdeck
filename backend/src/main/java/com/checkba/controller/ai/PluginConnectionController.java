@@ -4,10 +4,12 @@ package com.checkba.controller.ai;
 
 import com.checkba.controller.AuthController;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.LangText;
 import com.checkba.service.account.MachineAccountGuard;
 import com.checkba.service.ai.PluginService;
 import com.checkba.service.entitlement.EntitlementService;
 import com.checkba.service.plugin.PluginConnectionService;
+import com.checkba.service.site.SiteProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +24,7 @@ public class PluginConnectionController {
     private final EntitlementService entitlements;
     private final MachineAccountGuard machineAccountGuard;
     private final ProjectMemberService projectMembers;
+    private final SiteProfileService sites;
 
     @GetMapping("/{id}/connections")
     public Map<String, Object> list(@PathVariable String id, @RequestHeader(value="X-Session-Id", required=false) String session) {
@@ -80,14 +83,17 @@ public class PluginConnectionController {
         requirePlugin(id);
         if (connectionId != null) return Map.of("code", 0, "data", connections.billingStatus(id, userId, connectionId));
         machineAccountGuard.requireMachineScope(session);
-        return Map.of("code", 0, "data", Map.of("provider", "host", "active", entitlements.isEnabled("plugin:" + id)));
+        boolean refreshed = entitlements.refreshQuietly();
+        return Map.of("code", 0, "data", Map.of("provider", "host", "active", entitlements.isEnabled("plugin:" + id),
+                "refreshed", refreshed));
     }
 
     @GetMapping("/{id}/billing/checkout")
     public Map<String, Object> checkout(@PathVariable String id, @RequestParam(required=false) String connectionId,
             @RequestHeader(value="X-Session-Id", required=false) String session) {
         user(session); requirePlugin(id);
-        String url = connectionId == null ? "https://www.aiworkdeck.com/zh/plugins" : connections.checkout(id, connectionId);
+        String url = connectionId == null ? sites.baseUrl() + (LangText.isEnglish() ? "/en" : "/zh")
+                + "/marketplace/plugins" : connections.checkout(id, connectionId);
         return Map.of("code", 0, "data", Map.of("url", url));
     }
 

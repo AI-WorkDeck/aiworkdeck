@@ -829,8 +829,8 @@ export function pluginPlatformRequest(pluginId, action, params = {}, signal) {
     'connections.authorize': ['POST', `${connection}/authorize`, {}],
     'connections.disconnect': ['POST', `${connection}/disconnect`, {}],
     'connections.request': ['POST', `${connection}/request`, { operation: params.operation, params: params.params, projectId: params.projectId }],
-    'billing.status': ['GET', `${base}/billing`, { connectionId: params.connectionId }],
-    'billing.checkout': ['GET', `${base}/billing/checkout`, { connectionId: params.connectionId }],
+    'billing.status': ['GET', `${base}/billing`, params.connectionId == null ? {} : { connectionId: params.connectionId }],
+    'billing.checkout': ['GET', `${base}/billing/checkout`, params.connectionId == null ? {} : { connectionId: params.connectionId }],
     'mcp.servers': ['GET', `${base}/mcp/servers`, { projectId: params.projectId }],
     'mcp.call': ['POST', `${base}/mcp/call`, { serverId: params.serverId, name: params.name, arguments: params.arguments, projectId: params.projectId }]
   }
