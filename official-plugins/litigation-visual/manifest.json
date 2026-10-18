@@ -1,0 +1,12 @@
+{
+  "id": "litigation-visual",
+  "name": "诉讼可视化",
+  "version": "1.0.0",
+  "description": "选择案卷材料，生成并管理可编辑的诉讼图表。",
+  "author": "AI WorkDeck",
+  "permissions": ["file_read", "file_write"],
+  "frontendEntry": "web/index.html",
+  "contributes": {
+    "views": [{ "id": "main", "name": "诉讼可视化", "entry": "web/index.html", "placement": "sidebar", "scope": "project", "defaultDock": "left", "allowedDocks": ["left"] }]
+  }
+}

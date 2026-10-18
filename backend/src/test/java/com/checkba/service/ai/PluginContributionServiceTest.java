@@ -164,4 +164,23 @@ class PluginContributionServiceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> svc.readContributedFile("hr-pack", "../outside.md"));
     }
+    @Test void scopedSettingsSeparateUsersAndProjectsAndRejectPartialInvalidWrites() {
+        var meta = pluginService.getPlugin("hr-pack");
+        var user = new PluginService.PluginSettingDecl();
+        user.setKey("tone"); user.setType("string"); user.setScope("user");
+        var project = new PluginService.PluginSettingDecl();
+        project.setKey("jurisdiction"); project.setType("string"); project.setScope("project");
+        meta.setSettings(List.of(user, project));
+        svc.saveSettings("hr-pack", Map.of("tone", "formal", "jurisdiction", "cn"), 1L, 11L);
+        svc.saveSettings("hr-pack", Map.of("tone", "plain"), 2L, 11L);
+        assertEquals("formal", svc.settingsView("hr-pack", 1L, 11L).get(0).get("value"));
+        assertEquals("plain", svc.settingsView("hr-pack", 2L, 12L).get(0).get("value"));
+        assertNull(svc.settingsView("hr-pack", 2L, 12L).get(1).get("value"));
+        assertThrows(IllegalArgumentException.class, () -> svc.saveSettings("hr-pack", Map.of("jurisdiction", "wrong"), 1L, null));
+        var invalid = new java.util.LinkedHashMap<String, Object>();
+        invalid.put("tone", "must-not-save"); invalid.put("undeclared", "bad");
+        assertThrows(IllegalArgumentException.class, () -> svc.saveSettings("hr-pack", invalid, 1L, 11L));
+        assertEquals("formal", svc.settingsView("hr-pack", 1L, 11L).get(0).get("value"));
+    }
+
 }

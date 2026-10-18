@@ -1,0 +1,4 @@
+{
+  "pages": [{ "path": "pages/panel", "style": { "navigationStyle": "custom" } }],
+  "globalStyle": { "navigationStyle": "custom" }
+}

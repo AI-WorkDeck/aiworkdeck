@@ -189,3 +189,7 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 接口地雷：新增 `/note/add` 与更新 `/note/edit` 分开；编辑用 `noteId`。本人列表用 `/note/lawyer/page`；每次写入前再次校验笔记归属。`status:DRAFT` 才是草稿，`isNoteDraft:Y` 是媒体上传中标识，不能混淆。图文 `content` 是媒体引用、`description` 才是正文，编辑时必须保留媒体、类型及关联字段。构建/单测入口见插件 README；上架仍须按本页真实受理、签名、双站同步与实际工作台安装路径验收，不能把存在目录当成已交付。
 
 **媒体上传补齐（#1249，2026-10-14）**：新建遵循当前APP的暂存→COS上传→`updateAfterUploadSuccess`链路，不能仅依赖DTO有TEXT枚举就开放纯文字新增。`description`是正文，图片`content`用分号连接，视频必须独立封面。客户端分片通过工具桥传到插件后端，不把平台签名交给页面。保存结果未知不得重新add；续传必须绑定原记录和原账号。只有回填响应与读回验证完成才显示保存成功。实际账户及Marketplace实测结果以台账为准。
+
+## 可安装业务面板与服务设置（#1340/#1341，待发版）
+
+搜索/语音/脱敏/诉讼可视化/日历/收藏/剪贴板/洞察改为official-plugins中的真实Web包；MarketSidebarPanel/MarketDetailPane将/api/plugins/bundled的随应用目录与在线广场合并，断网仍可装随包项。PluginBundledInstaller首次复制、保留禁用和卸载意愿，不覆盖独立同名包；desktop extraResources提供只读来源。旧voice skill合成项仅用于旧实现兼容，实际新入口按voice插件启停。PluginConnectionSettings为可信宿主设置面板，负责开发服务授权、令牌输入、OAuth与连接状态；iframe没有授权写接口。主产品插件权益与开发者SaaS付费是两条通道。

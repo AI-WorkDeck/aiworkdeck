@@ -66,6 +66,28 @@
           "**/*",
           "!**/__pycache__/**"
         ]
+      },
+      {
+        "from": "../official-plugins",
+        "to": "official-plugins",
+        "filter": [
+          "search/manifest.json",
+          "voice/manifest.json",
+          "desensitize/manifest.json",
+          "litigation-visual/manifest.json",
+          "calendar/manifest.json",
+          "favorites/manifest.json",
+          "clipboard/manifest.json",
+          "insight/manifest.json",
+          "search/web/**",
+          "voice/web/**",
+          "desensitize/web/**",
+          "litigation-visual/web/**",
+          "calendar/web/**",
+          "favorites/web/**",
+          "clipboard/web/**",
+          "insight/web/**"
+        ]
       }
     ],
     "mac": {

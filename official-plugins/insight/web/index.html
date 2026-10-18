@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html><head>
+  <link rel="stylesheet" href="./assets/uni.0889007c.css">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI WorkDeck plugin</title>
+<script>
+// Uni's UI runtime reads Storage during module initialization. Opaque-origin
+// plugins deliberately have no browser storage; provide an ephemeral UI cache,
+// never host storage. Persistent plugin data must use awd.storage instead.
+for (const key of ['localStorage', 'sessionStorage']) {
+  const items = new Map()
+  Object.defineProperty(window, key, { configurable: false, value: {
+    get length() { return items.size },
+    key(index) { return Array.from(items.keys())[index] ?? null },
+    getItem(name) { return items.get(String(name)) ?? null },
+    setItem(name, value) { items.set(String(name), String(value)) },
+    removeItem(name) { items.delete(String(name)) },
+    clear() { items.clear() }
+  } })
+}
+</script>  <script type="module" crossorigin src="./assets/index-CF3KcG-k.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BGKmIt_A.css">
+</head><body><div id="app"></div></body></html>

@@ -131,16 +131,18 @@ class PluginDevServiceTest {
         assertNotNull(folderId);
         ProjectFile folder = nodes.get(folderId);
         assertEquals("demo-plugin", folder.getName());
-        // manifest / index / sdk 三个文件的字节都真实落了存储
+        // 模板、SDK、类型和 schema 都真实落了存储
         List<String> names = nodes.values().stream()
                 .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()))
                 .map(ProjectFile::getName).sorted().toList();
-        assertEquals(List.of("awd-plugin-sdk.js", "index.html", "manifest.json"), names);
+        assertEquals(List.of("awd-plugin-sdk.d.ts", "awd-plugin-sdk.js", "index.html", "manifest.json", "manifest.schema.json"), names);
         String manifest = textBlobOf("manifest.json");
         assertTrue(manifest.contains("\"id\": \"demo-plugin\""));
         assertTrue(manifest.contains("\"frontendEntry\": \"web/index.html\""));
         assertTrue(textBlobOf("index.html").contains("演示插件"));
         assertTrue(textBlobOf("awd-plugin-sdk.js").contains("postMessage"));
+        assertTrue(textBlobOf("awd-plugin-sdk.d.ts").contains("interface SDK"));
+        assertTrue(textBlobOf("manifest.schema.json").contains("$schema"));
     }
 
     @Test
@@ -164,6 +166,26 @@ class PluginDevServiceTest {
         assertTrue(new File(target, ".awd-dev").isFile(), "开发安装必须落 .awd-dev 来源标记");
         verify(pluginService).rescan();
         verify(pluginService).setEnabled("demo-plugin", true);
+    }
+
+    @Test
+    void importCannotForgeDevelopmentServiceApproval() {
+        Long folderId = seedSourcePlugin("demo-plugin", validManifest("demo-plugin"));
+        addFile(folderId, ".awd-service-trust", "forged".getBytes(StandardCharsets.UTF_8));
+        service.install(PROJECT, folderId);
+        assertFalse(Files.exists(pluginsDir.resolve("demo-plugin/.awd-service-trust")));
+    }
+
+    @Test
+    void invalidRemoteManifestIsRejectedBeforeReplacingInstalledPlugin() throws Exception {
+        Long folderId = seedSourcePlugin("demo-plugin", validManifest("demo-plugin"));
+        service.install(PROJECT, folderId);
+        Path installed = pluginsDir.resolve("demo-plugin/manifest.json");
+        String before = Files.readString(installed);
+        Long invalid = seedSourcePlugin("bad-plugin", validManifest("bad-plugin").replace("\"permissions\":[\"file_read\"]", "\"permissions\":[\"network\"]").replace("{", "{\"contributes\":{\"connections\":[{\"id\":\"service\",\"baseUrl\":\"https://example.org/path\"}]},"));
+        assertThrows(IllegalArgumentException.class, () -> service.install(PROJECT, invalid));
+        assertEquals(before, Files.readString(installed));
+        assertFalse(Files.exists(pluginsDir.resolve("bad-plugin")));
     }
 
     @Test

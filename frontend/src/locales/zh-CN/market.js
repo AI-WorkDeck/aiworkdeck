@@ -64,7 +64,7 @@ export default {
   panelPluginLabel: '面板插件',
   panelPluginHint: '启用后出现在左栏，点开是一个完整面板',
   installingShort: '安装中',
-  pluginTrustNote: '插件与本机应用同等权限，安装前请确认来源可信。所有在线插件都经过人工审核与平台签名，桌面端安装时验签；安装后默认停用，需你在「已安装」里手动启用。',
+  pluginTrustNote: "安装前请核对来源和声明能力。Web 界面在隔离环境中运行，调用工作台功能受权限限制；含后端程序的插件可访问本机资源。手动安装后默认停用。",
 
   // ---- 已安装 ----
   skillWord: 'Skill',
@@ -112,7 +112,7 @@ export default {
   unknownSize: '未知大小',
 
   confirmInstallPluginTitle: '确认安装插件',
-  confirmInstallPluginContent: '{name} v{version}\n作者：{author}\n声明能力：{perms}\n\n插件与本机应用同等权限，能读写你的文件并访问网络。安装后默认停用，需你手动启用。',
+  confirmInstallPluginContent: "{name} v{version}\n作者：{author}\n声明能力：{perms}\n\n请核对来源及所需权限。安装后默认停用，需你手动启用。",
   unknownAuthor: '未知',
   cancelBtn: '取消',
   installedEnableHint: '已安装，请在「已安装」中启用',
@@ -139,7 +139,7 @@ export default {
   // ---- MarketDetailPane ----
   kindBadgeSkill: 'Skill',
   downloadsCount: '{count} 下载',
-  kindNotePlugin: '插件是可执行扩展：为工作台增加新功能，与本机应用同等权限，经平台人工审核并签名分发。',
+  kindNotePlugin: "插件为工作台增加界面、工具或服务。启用前请核对来源和声明能力。",
   kindNoteSkill: 'Skill 是提示词工作流：教 AI 助手按一套业务方法做事，纯文本、不含可执行代码。',
   buyWithPrice: '购买 {price}',
   refreshing: '刷新中…',
@@ -156,7 +156,7 @@ export default {
   scenarioNote: '也可以在输入框用 / 手动选用；生效方式可随时在本页调整。',
   declaredCapability: '声明能力',
   providesTools: '提供 {count} 个工具',
-  pluginPermissionNote: '插件与本机应用同等权限。平台已人工审核并签名，安装后默认停用，启用前不会执行任何插件代码。',
+  pluginPermissionNote: "Web 插件通过授权接口使用工作台功能；含后端程序的插件还可访问本机资源。随应用提供、本地开发和在线安装是不同来源，请按来源核对。",
   detailInfo: '详细信息',
   kvToolPermission: '工具权限',
   kvPrice: '价格',
@@ -230,4 +230,9 @@ export default {
   confirmUninstallPackTitle: '确认卸载',
   uninstallPackConfirmSized: '停用后将删除已下载的资源包（约 {size} MB）。继续吗？',
   uninstallPackConfirmPlain: '停用后将删除已下载的资源包。继续吗？',
+  permAi: "AI 调用",
+  permSpeech: "语音合成与录音",
+  permTasks: "日程与事项",
+  permClipboard: "剪贴板",
+  permLawfirm: "团队信息",
 }

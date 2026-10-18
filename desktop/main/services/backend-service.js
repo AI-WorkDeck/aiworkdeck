@@ -212,6 +212,8 @@ function spawnEnv(ctx) {
   // CHECKBA_BACKEND_PORT 口子（会正确流入 ctx.ports.backend），不需要也不该再认
   // 环境里裸的 SERVER_PORT。
   env.SERVER_PORT = String(ctx.ports.backend)
+  if (!env.AI_PLUGINS_BUNDLED_DIR) env.AI_PLUGINS_BUNDLED_DIR = path.join(ctx.packaged ? ctx.resourcesPath : ctx.projectRoot, 'official-plugins')
+  if (!env.AI_PLUGINS_OAUTH_REDIRECT_URI) env.AI_PLUGINS_OAUTH_REDIRECT_URI = `http://localhost:${ctx.ports.backend}/api/plugins/oauth/callback`
   // 其他本地服务的动态端口注入（Spring SystemEnvironmentPropertySource 将
   // external.pptx-service.base-url 解析为 EXTERNAL_PPTX_SERVICE_BASE_URL）
   if (ctx.ports['pptx-service']) {

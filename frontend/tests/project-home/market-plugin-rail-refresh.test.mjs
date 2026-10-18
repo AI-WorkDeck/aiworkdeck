@@ -6,6 +6,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { pluginWorkspaceTabMethods } from '../../src/pages/project-overview/pluginWorkspaceTabs.js'
+import { pluginViews, isGlobalPlugin } from '../../src/utils/pluginViews.js'
 
 const page = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
 const sidebar = readFileSync(new URL('../../src/components/MarketSidebarPanel.vue', import.meta.url), 'utf8')
@@ -32,6 +33,7 @@ function harness() {
     showModal(options) { options.success({ confirm: true }) },
   }
   const deps = {
+    pluginViews, isGlobalPlugin,
     uni, console: quiet, NO_PROJECT_DEFAULT_PANE: 'projects', getPlugins: () => get(), getSkills: async () => [],
     resolvePluginEntryUrl: (id, path) => path ? `/api/plugin-web/${id}/${path.slice(4)}` : '',
     getCurrentUser: () => ({ role: 'ADMIN' }), getPluginsForUser: () => [{ key: 'files' }],

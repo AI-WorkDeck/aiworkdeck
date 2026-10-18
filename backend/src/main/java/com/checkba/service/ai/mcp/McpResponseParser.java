@@ -95,7 +95,7 @@ public final class McpResponseParser {
         }
 
         // Case 4: Unknown format
-        log.warn("Unknown response format: {}", trimmedResponse);
+        log.debug("Unknown MCP response format");
         return trimmedResponse;
     }
 
