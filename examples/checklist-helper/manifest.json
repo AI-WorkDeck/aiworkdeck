@@ -1,0 +1,42 @@
+{
+  "$schema": "./manifest.schema.json",
+  "id": "checklist-helper",
+  "name": "清单助手",
+  "version": "0.2.0",
+  "description": "把粘贴文字按行整理为去重清单，支持编号和复选框，格式偏好保存在宿主。",
+  "author": "AI WorkDeck contributors",
+  "permissions": [],
+  "frontendEntry": "web/index.html",
+  "tools": [],
+  "backendJars": [],
+  "settings": [
+    {
+      "key": "listStyle",
+      "scope": "user",
+      "type": "select",
+      "label": "清单格式",
+      "options": [
+        "checkbox",
+        "numbered"
+      ],
+      "default": "checkbox"
+    }
+  ],
+  "contributes": {
+    "views": [
+      {
+        "id": "main",
+        "name": "清单助手",
+        "entry": "web/index.html",
+        "placement": "sidebar",
+        "scope": "global",
+        "defaultDock": "left",
+        "allowedDocks": [
+          "left",
+          "right",
+          "bottom"
+        ]
+      }
+    ]
+  }
+}

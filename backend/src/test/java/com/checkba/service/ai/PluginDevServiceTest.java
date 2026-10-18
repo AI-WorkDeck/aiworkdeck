@@ -169,6 +169,23 @@ class PluginDevServiceTest {
     }
 
     @Test
+    void installPublicCliManifestPreservesSchemaAndSettingDefault() throws Exception {
+        String manifest = """
+                {"$schema":"./manifest.schema.json","id":"demo-plugin","name":"CLI example","version":"1.0.0",
+                 "frontendEntry":"web/index.html","permissions":[],
+                 "settings":[{"key":"greeting","type":"string","scope":"user","default":"Hello"}]}
+                """;
+        Long folderId = seedSourcePlugin("demo-plugin", manifest);
+        assertEquals("demo-plugin", service.install(PROJECT, folderId));
+        assertEquals(manifest, Files.readString(pluginsDir.resolve("demo-plugin/manifest.json")));
+        PluginService loaded = new PluginService(null, pluginsDir.toString());
+        loaded.init();
+        assertEquals("Hello", loaded.getPlugin("demo-plugin").getSettings().get(0).getDefaultValue());
+        verify(pluginService).rescan();
+        verify(pluginService).setEnabled("demo-plugin", true);
+    }
+
+    @Test
     void importCannotForgeDevelopmentServiceApproval() {
         Long folderId = seedSourcePlugin("demo-plugin", validManifest("demo-plugin"));
         addFile(folderId, ".awd-service-trust", "forged".getBytes(StandardCharsets.UTF_8));

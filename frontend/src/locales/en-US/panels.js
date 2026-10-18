@@ -324,6 +324,8 @@ export default {
   pgWorkspacePending: 'Checking plugin availability. Retry if it does not load.',
   pgWorkspaceRetry: 'Reload',
   pgDefaultIntro: '{name} is installed. Describe what you need in the AI chat on the right to use it.',
+  ppVerifying: 'Verifying plugin status…',
+  ppAuthorizationChanged: 'Plugin status changed or could not be verified. Switch to another sidebar panel, then open this one again. If it still fails, confirm the plugin is enabled in the Plugin Center.',
   ppLoadFailed: 'Unable to load the plugin: entry URL not configured',
 
   // EasyVoicePane.vue
