@@ -230,6 +230,15 @@ try {
     await page.mouse.click(box.x, box.y)
     await sleep(700)
   }
+  // 独立 Web 插件内容位于 opaque-origin iframe；只在可见且已挂载的真实面板内断言。
+  const pluginFrame = async (id, selector) => {
+    const iframe = await page.waitForSelector(`iframe.plugin-iframe[src*="/api/plugin-web/${id}/"]`,
+      { visible: true, timeout: 15000 })
+    const frame = await iframe.contentFrame()
+    if (!frame) throw new Error('插件 iframe 尚未挂载: ' + id)
+    await frame.waitForSelector(selector, { visible: true, timeout: 15000 })
+    return frame
+  }
   // 协作抽屉（PR-E）：交稿/取回/放进团队案件库三个动作全在这个页面级弹窗里，做完
   // 必须显式关掉——它是全屏遮罩，不关的话后续点版本面板/rail 的坐标全落在遮罩上，
   // 且不会报错、只会让后面的断言默默超时（v1 地雷 #24 的同款失败形态）。
@@ -1106,45 +1115,48 @@ try {
 
   // ============ J6 左栏功能区（title 定位图标） ============
   console.log('== J6 左栏功能区 ==')
-  // 标题取自 config/leftSidebarPlugins.js 的 label（i18n 键 config.sidebar.*）——
-  // 改名会让这一步整条失配。「EasyVoice」在 #389 已改成「语音合成」；2026-08-19
-  // 语音合成与会议录音合并成一个 rail 入口「语音」（合成成了面板内的一个 tab），
-  // rail 标题跟着改。以后再改名，先看这一行。
-  // 「文件脱敏」自 2026-08-19 起是门控面板（skill desensitize 默认不装），
-  // 不再常显，单独走下面的安装/卸载全周期断言。
-  for (const title of ['搜索', '语音', '文件暂存区', '资源管理器']) {
+  // #1151 后业务面板由独立插件贡献；入口名称与内容分别在宿主 rail / 插件 iframe。
+  await step('左栏项目搜索打开独立插件内容', async () => {
+    await mouseClickSel('[title="项目搜索"]')
+    await pluginFrame('search', '.search-panel input')
+  })
+  for (const title of ['语音', '文件暂存区', '资源管理器']) {
     await step('左栏 ' + title, () => mouseClickSel('[title="' + title + '"]'))
   }
-  await step('脱敏默认不装：rail 无入口', async () => {
-    if (await page.$('[title="文件脱敏"]')) {
-      throw new Error('desensitize 未启用时 rail 不该出现「文件脱敏」入口')
-    }
-  })
-  await step('广场安装（启用）脱敏后入口出现，卸载后消失', async () => {
-    // 与广场「安装」同一条后端路径；enabledSkillIds 是挂载时拉取的，翻转后整页刷新再断言
-    await api('/api/skills/desensitize/enable', { method: 'POST' })
+  await step('插件中心启停脱敏：当前工作台即时更新入口并打开实际面板', async () => {
+    const original = (await api('/api/plugins/list')).find(p => p.id === 'desensitize')
+    if (!original) throw new Error('缺少随应用分发的脱敏插件')
     try {
-      await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 })
-      await page.waitForSelector('[title="文件脱敏"]', { timeout: 15000 })
-      await mouseClickSel('[title="文件脱敏"]')
+      await mouseClickSel('[title="插件中心"]')
+      const row = await page.waitForFunction(() => [...document.querySelectorAll('.msb .msb-row-name')]
+        .find(el => el.innerText.trim() === '脱敏'), { timeout: 15000 })
+      await row.asElement().click()
+      await page.waitForSelector('.mdp .awd-switch', { visible: true, timeout: 15000 })
+      if (!original.enabled) {
+        await mouseClickSel('.mdp .awd-switch')
+        await page.waitForSelector('.left-rail [title="脱敏"]', { visible: true, timeout: 15000 })
+      }
+      await mouseClickSel('.mdp .awd-switch')
+      await page.waitForFunction(() => !document.querySelector('.left-rail [title="脱敏"]'), { timeout: 15000 })
+      await page.waitForSelector('.mdp .awd-switch[aria-checked="false"]', { timeout: 15000 })
+      await mouseClickSel('.mdp .awd-switch')
+      await page.waitForSelector('.left-rail [title="脱敏"]', { visible: true, timeout: 15000 })
+      await page.waitForSelector('.mdp .awd-switch[aria-checked="true"]', { timeout: 15000 })
+      await mouseClickSel('.left-rail [title="脱敏"]')
+      await pluginFrame('desensitize', '.desensitize-pane .operation-tabs')
     } finally {
-      // 还原到默认态（长驻后端不能被 e2e 改状态）
-      await api('/api/skills/desensitize/disable', { method: 'POST' })
+      // 这里只恢复测试前的后端状态；上述 UI 通知链断言不借助 API 写入、reload 或手动刷新。
+      await api('/api/plugins/desensitize/' + (original.enabled ? 'enable' : 'disable'), { method: 'POST' })
     }
-    await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 })
-    await page.waitForFunction(
-      () => !document.querySelector('[title="文件脱敏"]'),
-      { timeout: 15000 },
-    )
   })
-  await step('「语音」面板里是两个 tab 而不是两个 rail 入口', async () => {
+  await step('「语音」独立插件里显示语音合成与会议录音两个 tab', async () => {
     await mouseClickSel('[title="语音"]')
-    await page.waitForSelector('.voice-tabs', { timeout: 10000 })
-    const t = await textOf()
-    if (!t.includes('语音合成')) throw new Error('语音面板里没有「语音合成」tab')
-    // dev-board#66 起语音合成与会议录音是**一个**合并插件（启停一体，后端
-    // SkillRegistry 收敛保证两个成员状态一致）：语音入口在，两个 tab 就都在。
-    if (!t.includes('会议录音')) throw new Error('语音面板里没有「会议录音」tab（合并插件启停一体后应恒在）')
+    const frame = await pluginFrame('voice', '.voice-tabs')
+    const tabs = await frame.$$eval('.voice-tab', els => els.map(el => el.innerText.trim()))
+    if (JSON.stringify(tabs) !== JSON.stringify(['语音合成', '会议录音'])) {
+      throw new Error('语音插件 tab 不匹配: ' + JSON.stringify(tabs))
+    }
+    await frame.waitForSelector('.easy-voice-pane', { visible: true, timeout: 10000 })
     await mouseClickSel('[title="资源管理器"]')
   })
   await shot('j6-rails')
@@ -1266,8 +1278,8 @@ try {
     if (!(await page.$('.bottom-panel'))) await mouseClickSel('[title="常用工具"]')
     await page.waitForSelector('.bottom-panel', { timeout: 10000 })
     await mouseClickText('剪贴板')
-    // 断言 ClipboardPanel 组件真的挂载了（.tab-indicator 只说明有 tab 激活，面板挂载失败也存在）
-    await page.waitForSelector('.clip-panel', { timeout: 10000 })
+    // 真正进入插件 iframe，不能只验宿主 tab 激活。
+    await pluginFrame('clipboard', '.clip-panel .collection-search')
   })
   await shot('j6.6-clipboard')
 
