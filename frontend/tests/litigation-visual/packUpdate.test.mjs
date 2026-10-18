@@ -17,6 +17,7 @@ function panel(states) {
     async (id) => { assert.equal(id, 'litigation-visual'); installs++ }
   )
   const vm = Object.assign(component.data(), component.methods, {
+    $t: key => key,
     reload: async () => { reloads++ },
     startPackPoll: () => {}, stopPackPoll: () => {}
   })
@@ -55,3 +56,38 @@ test('下载中不重复安装，已有语义地图启动入口保留', async ()
 function componentStart() {
   return script.slice(script.indexOf('async start()'), script.indexOf('openDiagram(d)'))
 }
+
+
+test('首次打开未安装资源包：如实说明并提供安装；失败后仍可重试', async () => {
+  const p = panel(['downloading', 'failed', 'ready'])
+  p.vm.litPackStatus = { state: 'not_installed' }
+  assert.equal(p.vm.canInstallPack, true)
+  assert.equal(p.vm.packBarText, 'panels.litPackNotInstalled')
+  await p.vm.retryPackInstall()
+  assert.equal(p.installs(), 1)
+  assert.equal(p.vm.canInstallPack, false)
+  await p.vm.refreshPackStatus()
+  assert.equal(p.vm.canInstallPack, true)
+  await p.vm.retryPackInstall()
+  assert.equal(p.installs(), 2)
+  assert.equal(p.vm.showPackBar, false)
+})
+
+test('未安装与封禁状态不伪装下载中，也不持续轮询', async () => {
+  for (const state of ['not_installed', 'revoked']) {
+    const p = panel([state])
+    let stopped = 0
+    let started = 0
+    p.vm.stopPackPoll = () => stopped++
+    p.vm.startPackPoll = () => started++
+    await p.vm.refreshPackStatus()
+    assert.equal(stopped, 1)
+    assert.equal(started, 0)
+    if (state === 'revoked') {
+      assert.equal(p.vm.canInstallPack, false)
+      assert.equal(p.vm.packBarText, 'panels.litPackRevoked')
+      await p.vm.retryPackInstall()
+      assert.equal(p.installs(), 0)
+    }
+  }
+})

@@ -230,6 +230,15 @@ try {
     await page.mouse.click(box.x, box.y)
     await sleep(700)
   }
+  // 独立 Web 插件内容位于 opaque-origin iframe；只在可见且已挂载的真实面板内断言。
+  const pluginFrame = async (id, selector) => {
+    const iframe = await page.waitForSelector(`iframe.plugin-iframe[src*="/api/plugin-web/${id}/"]`,
+      { visible: true, timeout: 15000 })
+    const frame = await iframe.contentFrame()
+    if (!frame) throw new Error('插件 iframe 尚未挂载: ' + id)
+    await frame.waitForSelector(selector, { visible: true, timeout: 15000 })
+    return frame
+  }
   // 协作抽屉（PR-E）：交稿/取回/放进团队案件库三个动作全在这个页面级弹窗里，做完
   // 必须显式关掉——它是全屏遮罩，不关的话后续点版本面板/rail 的坐标全落在遮罩上，
   // 且不会报错、只会让后面的断言默默超时（v1 地雷 #24 的同款失败形态）。
@@ -1106,45 +1115,48 @@ try {
 
   // ============ J6 左栏功能区（title 定位图标） ============
   console.log('== J6 左栏功能区 ==')
-  // 标题取自 config/leftSidebarPlugins.js 的 label（i18n 键 config.sidebar.*）——
-  // 改名会让这一步整条失配。「EasyVoice」在 #389 已改成「语音合成」；2026-08-19
-  // 语音合成与会议录音合并成一个 rail 入口「语音」（合成成了面板内的一个 tab），
-  // rail 标题跟着改。以后再改名，先看这一行。
-  // 「文件脱敏」自 2026-08-19 起是门控面板（skill desensitize 默认不装），
-  // 不再常显，单独走下面的安装/卸载全周期断言。
-  for (const title of ['搜索', '语音', '文件暂存区', '资源管理器']) {
+  // #1151 后业务面板由独立插件贡献；入口名称与内容分别在宿主 rail / 插件 iframe。
+  await step('左栏项目搜索打开独立插件内容', async () => {
+    await mouseClickSel('[title="搜索"]')
+    await pluginFrame('search', '.search-panel input')
+  })
+  for (const title of ['语音', '文件暂存区', '资源管理器']) {
     await step('左栏 ' + title, () => mouseClickSel('[title="' + title + '"]'))
   }
-  await step('脱敏默认不装：rail 无入口', async () => {
-    if (await page.$('[title="文件脱敏"]')) {
-      throw new Error('desensitize 未启用时 rail 不该出现「文件脱敏」入口')
-    }
-  })
-  await step('广场安装（启用）脱敏后入口出现，卸载后消失', async () => {
-    // 与广场「安装」同一条后端路径；enabledSkillIds 是挂载时拉取的，翻转后整页刷新再断言
-    await api('/api/skills/desensitize/enable', { method: 'POST' })
+  await step('插件中心启停脱敏：当前工作台即时更新入口并打开实际面板', async () => {
+    const original = (await api('/api/plugins/list')).find(p => p.id === 'desensitize')
+    if (!original) throw new Error('缺少随应用分发的脱敏插件')
     try {
-      await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 })
-      await page.waitForSelector('[title="文件脱敏"]', { timeout: 15000 })
-      await mouseClickSel('[title="文件脱敏"]')
+      await mouseClickSel('[title="插件中心"]')
+      const row = await page.waitForFunction(() => [...document.querySelectorAll('.msb .msb-row-name')]
+        .find(el => el.innerText.trim() === '脱敏'), { timeout: 15000 })
+      await row.asElement().click()
+      await page.waitForSelector('.mdp .awd-switch', { visible: true, timeout: 15000 })
+      if (!original.enabled) {
+        await mouseClickSel('.mdp .awd-switch')
+        await page.waitForSelector('.left-rail [title="文件脱敏"]', { visible: true, timeout: 15000 })
+      }
+      await mouseClickSel('.mdp .awd-switch')
+      await page.waitForFunction(() => !document.querySelector('.left-rail [title="文件脱敏"]'), { timeout: 15000 })
+      await page.waitForSelector('.mdp .awd-switch[aria-checked="false"]', { timeout: 15000 })
+      await mouseClickSel('.mdp .awd-switch')
+      await page.waitForSelector('.left-rail [title="文件脱敏"]', { visible: true, timeout: 15000 })
+      await page.waitForSelector('.mdp .awd-switch[aria-checked="true"]', { timeout: 15000 })
+      await mouseClickSel('.left-rail [title="文件脱敏"]')
+      await pluginFrame('desensitize', '.desensitize-pane .operation-tabs')
     } finally {
-      // 还原到默认态（长驻后端不能被 e2e 改状态）
-      await api('/api/skills/desensitize/disable', { method: 'POST' })
+      // 这里只恢复测试前的后端状态；上述 UI 通知链断言不借助 API 写入、reload 或手动刷新。
+      await api('/api/plugins/desensitize/' + (original.enabled ? 'enable' : 'disable'), { method: 'POST' })
     }
-    await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 })
-    await page.waitForFunction(
-      () => !document.querySelector('[title="文件脱敏"]'),
-      { timeout: 15000 },
-    )
   })
-  await step('「语音」面板里是两个 tab 而不是两个 rail 入口', async () => {
+  await step('「语音」独立插件里显示语音合成与会议录音两个 tab', async () => {
     await mouseClickSel('[title="语音"]')
-    await page.waitForSelector('.voice-tabs', { timeout: 10000 })
-    const t = await textOf()
-    if (!t.includes('语音合成')) throw new Error('语音面板里没有「语音合成」tab')
-    // dev-board#66 起语音合成与会议录音是**一个**合并插件（启停一体，后端
-    // SkillRegistry 收敛保证两个成员状态一致）：语音入口在，两个 tab 就都在。
-    if (!t.includes('会议录音')) throw new Error('语音面板里没有「会议录音」tab（合并插件启停一体后应恒在）')
+    const frame = await pluginFrame('voice', '.voice-tabs')
+    const tabs = await frame.$$eval('.voice-tab', els => els.map(el => el.innerText.trim()))
+    if (JSON.stringify(tabs) !== JSON.stringify(['语音合成', '会议录音'])) {
+      throw new Error('语音插件 tab 不匹配: ' + JSON.stringify(tabs))
+    }
+    await frame.waitForSelector('.easy-voice-pane', { visible: true, timeout: 10000 })
     await mouseClickSel('[title="资源管理器"]')
   })
   await shot('j6-rails')
@@ -1266,8 +1278,8 @@ try {
     if (!(await page.$('.bottom-panel'))) await mouseClickSel('[title="常用工具"]')
     await page.waitForSelector('.bottom-panel', { timeout: 10000 })
     await mouseClickText('剪贴板')
-    // 断言 ClipboardPanel 组件真的挂载了（.tab-indicator 只说明有 tab 激活，面板挂载失败也存在）
-    await page.waitForSelector('.clip-panel', { timeout: 10000 })
+    // 真正进入插件 iframe，不能只验宿主 tab 激活。
+    await pluginFrame('clipboard', '.clip-panel .collection-search')
   })
   await shot('j6.6-clipboard')
 
@@ -3270,9 +3282,9 @@ try {
     await page.waitForSelector('[title="资源管理器"]', { timeout: 20000 })
   })
 
-  // ============ J13 广场安装带资源包的插件（诉讼可视化 + 桩 pack 源） ============
+  // ============ J13 独立插件与广场安装资源包（诉讼可视化 + 桩 pack 源） ============
   // 规范 docs/NATIVE_PACK_DISTRIBUTION.md §4/§7.1，契约在 NativePackService/PackController；
-  // UI 状态机在 MarketDetailPane.vue（packId/packReady/packDownloading 三态)。
+  // UI 状态机在独立插件 LitigationVisualPanel.vue 与 MarketDetailPane.vue。
   //
   // 为什么不能复用本文件全程驱动的主后端（BACKEND，默认 9696/9797）：
   // 广场装 pack 要后端把 ai.packs.base-urls 指向一个真会应答签了名 manifest 的源、
@@ -3303,7 +3315,14 @@ try {
     const j13SkillsDir = path.join(j13Home, 'skills-copy')
     fs.cpSync(path.join(repoRoot, 'backend/skills'), j13SkillsDir, { recursive: true })
 
-    const j13Stub = await startPackStub(path.join(j13Home, 'pack-src'), { id: 'litigation-visual', version: '9.9.9' })
+    const j13Stub = await startPackStub(path.join(j13Home, 'pack-src'), { id: 'litigation-visual', version: '9.9.9', failDownloads: true })
+    // 装入真正的独立插件分发内容，测试从其 iframe 发起依赖包安装。
+    const pluginSource = path.join(repoRoot, 'official-plugins/litigation-visual')
+    const pluginTarget = path.join(j13Cwd, 'plugins/litigation-visual')
+    fs.mkdirSync(pluginTarget, { recursive: true })
+    for (const item of ['manifest.json', 'web', 'l10n']) {
+      if (fs.existsSync(path.join(pluginSource, item))) fs.cpSync(path.join(pluginSource, item), path.join(pluginTarget, item), { recursive: true })
+    }
     const j13Port = 9703 // J11 占了 9701(S)/9702(B)，这里另取一个
     const j13Backend = 'http://127.0.0.1:' + j13Port
     const j13Args = [
@@ -3313,6 +3332,8 @@ try {
       '--spring.datasource.url=jdbc:h2:file:' + path.join(j13Home, 'db') + ';MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE',
       '--ai.skills.dir=' + j13SkillsDir,
       '--ai.packs.base-urls[0]=' + j13Stub.url,
+      '--ai.skills.registry-url=' + j13Stub.registryUrl + '/skills',
+      '--ai.plugins.registry-url=' + j13Stub.registryUrl + '/plugins',
       '--ai.plugins.registry-public-key=' + j13Stub.publicKeyPem,
     ]
     const j13Child = spawn(process.env.JAVA_HOME + '/bin/java', j13Args, { cwd: j13Cwd, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -3404,69 +3425,66 @@ try {
           await j13WaitText('资源管理器', 30000)
         })
 
-        await step13('J13 rail 点开插件中心，诉讼可视化显示待安装', async () => {
-          await j13ClickSel('[title="插件中心"]')
-          await j13WaitText('诉讼可视化', 15000)
-        })
-
-        await step13('J13 详情面板显示需下载资源包的安装按钮', async () => {
-          await j13ClickTextIn('.msb', '诉讼可视化')
-          await j13WaitText('需下载资源包', 15000)
-        })
-
-        await step13('J13 点安装后出现下载进度（bytesTotal>0）', async () => {
-          await j13ClickSel('.mdp .mdp-btn.primary')
-          let sawBytesTotal = false
-          for (let i = 0; i < 30; i++) {
+        const j13PackFrame = async () => {
+          const el = await j13Page.waitForSelector('iframe.plugin-iframe[src*="/api/plugin-web/litigation-visual/"]', { visible: true, timeout: 15000 })
+          const frame = await el.contentFrame()
+          if (!frame) throw new Error('诉讼可视化插件 iframe 未加载')
+          return frame
+        }
+        const j13WaitState = async (state) => {
+          for (let i = 0; i < 60; i++) {
             const st = await j13Api('/api/packs/litigation-visual/status')
-            if (st && st.status && st.status.bytesTotal > 0) { sawBytesTotal = true; break }
-            if (st && st.status && st.status.state === 'ready') { sawBytesTotal = st.status.bytesTotal > 0; break }
-            await sleep(200)
-          }
-          if (!sawBytesTotal) throw new Error('未观察到 bytesTotal>0 的下载进度')
-        })
-
-        await step13('J13 轮询到 ready 且 skill 自动启用', async () => {
-          // 直接轮询后端状态（权威数据源），不靠 DOM 文本猜——UI 那句「已启用」见下面
-          // j13WaitTextIn 的注释，整页文本判定会被别的 skill 的同名标签撞上。
-          let st = null
-          for (let i = 0; i < 40; i++) {
-            st = await j13Api('/api/packs/litigation-visual/status')
-            if (st && st.status && (st.status.state === 'ready' || st.status.state === 'failed')) break
+            if (st?.status?.state === state) return st.status
             await sleep(500)
           }
-          if (!st || !st.status || st.status.state !== 'ready') throw new Error('后端状态未到 ready: ' + JSON.stringify(st))
-          await j13WaitTextIn('.mdp', '已启用', 20000)
+          throw new Error('资源包未进入状态: ' + state)
+        }
+        await step13('J13 独立插件未安装依赖时如实提示并提供安装按钮', async () => {
+          await j13ClickSel('[title="诉讼可视化"]')
+          const frame = await j13PackFrame()
+          await frame.waitForSelector('.lv-pack-retry', { visible: true, timeout: 15000 })
+          const text = await frame.$eval('.lv-pack-bar', el => el.innerText)
+          if (!text.includes('需安装') || text.includes('正在下载')) throw new Error('未安装状态文案失真: ' + text)
         })
-
-        await step13('J13 左栏 rail 出现诉讼可视化入口', async () => {
-          await j13Page.waitForSelector('[title="诉讼可视化"]', { timeout: 15000 })
+        await step13('J13 点击插件安装：真实下载失败显示重试按钮', async () => {
+          const frame = await j13PackFrame()
+          await frame.click('.lv-pack-retry')
+          await j13WaitState('failed')
+          await frame.waitForSelector('.lv-pack-bar.failed .lv-pack-retry', { visible: true, timeout: 15000 })
         })
-
-        await step13('J13 卸载：确认框 + rail 入口消失', async () => {
+        await step13('J13 插件内重试：真实下载进度、验签解包后 ready', async () => {
+          await j13Stub.allowDownloads()
+          const frame = await j13PackFrame()
+          await frame.click('.lv-pack-retry')
+          await frame.waitForFunction(() => document.querySelector('.lv-pack-text')?.innerText.includes(' / '), { timeout: 15000 })
+          const status = await j13WaitState('ready')
+          if (!(status.bytesTotal > 0)) throw new Error('没有真实资源包下载字节')
+          await frame.waitForSelector('.lv-pack-bar', { hidden: true, timeout: 15000 })
+        })
+        await step13('J13 Skill 详情仍提供资源包管理入口', async () => {
+          await j13ClickSel('[title="插件中心"]')
+          await j13ClickTextIn('.msb .msb-tabs', 'Skill')
           await j13ClickTextIn('.msb', '诉讼可视化')
           await j13WaitTextIn('.mdp', '已启用', 15000)
-          await j13ClickSel('.mdp .mdp-btn.danger')
-          // uni.showModal 已转发给应用内对话框 AwdDialog（dev-board#849），确认按钮是
-          // .awd-dlg-mask .awd-dlg__confirm（不是文案「卸载」本身——那个词在卸载按钮与
-          // 确认按钮上各出现一次，覆盖态下用文本点击会点到底下被遮住的原按钮，实测踩过）。
-          await j13ClickSel('.awd-dlg-mask .awd-dlg__confirm')
-          let railGone = false
-          for (let i = 0; i < 15; i++) {
-            if (!(await j13Page.$('[title="诉讼可视化"]'))) { railGone = true; break }
-            await sleep(300)
-          }
-          if (!railGone) throw new Error('卸载后 rail 入口未消失')
         })
-
-        await step13('J13 卸载后端状态回到 not_installed', async () => {
-          let st = null
-          for (let i = 0; i < 15; i++) {
-            st = await j13Api('/api/packs/litigation-visual/status')
-            if (st && st.status && st.status.state === 'not_installed') break
-            await sleep(300)
-          }
-          if (!st || !st.status || st.status.state !== 'not_installed') throw new Error('卸载后状态未回到 not_installed: ' + JSON.stringify(st))
+        await step13('J13 卸载资源包：确认后回到 not_installed，独立插件保留安装入口', async () => {
+          await j13ClickSel('.mdp .mdp-btn.danger')
+          await j13ClickSel('.awd-dlg-mask .awd-dlg__confirm')
+          await j13WaitState('not_installed')
+          await j13ClickSel('[title="诉讼可视化"]')
+          const frame = await j13PackFrame()
+          await frame.waitForSelector('.lv-pack-retry', { visible: true, timeout: 15000 })
+        })
+        await step13('J13 广场手动安装仍可用且完成后自动启用 Skill', async () => {
+          await j13ClickSel('[title="插件中心"]')
+          await j13ClickTextIn('.msb .msb-tabs', 'Skill')
+          await j13ClickTextIn('.msb', '诉讼可视化')
+          await j13WaitTextIn('.mdp', '需下载资源包', 15000)
+          await j13ClickSel('.mdp .mdp-btn.primary')
+          await j13WaitState('ready')
+          await j13WaitTextIn('.mdp', '已启用', 15000)
+          const skills = await j13Api('/api/skills/list')
+          if (!skills.find(s => s.id === 'litigation-visual')?.enabled) throw new Error('资源包就绪后 Skill 未启用')
         })
       }
     } finally {
