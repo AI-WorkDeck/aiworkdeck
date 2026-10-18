@@ -42,6 +42,7 @@ class PluginAiRoutingIntegrationTest {
     PlatformUsageAccountant accountant;
     TokenUsageService usage;
     PluginService plugins;
+    ChatModelFactory factory;
     MockMvc mvc;
     volatile int sharedStatus = 200, ownStatus = 200;
 
@@ -66,7 +67,7 @@ class PluginAiRoutingIntegrationTest {
             return "synthetic-shared-" + PlatformAiUserScope.current();
         });
         when(channel.keyFingerprint()).thenAnswer(i -> "fixture-fingerprint-" + PlatformAiUserScope.current());
-        var factory = new ChatModelFactory(properties, settings, channel, credits, accountant, resolver, mock(TelemetryService.class));
+        factory = new ChatModelFactory(properties, settings, channel, credits, accountant, resolver, mock(TelemetryService.class));
         var members = mock(ProjectMemberService.class); when(members.hasWritePermission(7L, 8L)).thenReturn(true); when(members.hasWritePermission(7L, 9L)).thenReturn(true);
         var controller = new PluginController(plugins, mock(PluginMarketService.class), mock(PluginRevocationService.class),
                 mock(UserRepository.class), mock(AdminAccessService.class), mock(TelemetryService.class), mock(ToolRegistry.class), members,
@@ -131,4 +132,13 @@ class PluginAiRoutingIntegrationTest {
         assertEquals("ai_failed", request(8L).get("errorCode")); assertFalse(ownRequests.isEmpty()); assertTrue(sharedRequests.isEmpty());
         verifyNoInteractions(channel, credits, accountant);
     }
+    @Test void officialDesktopIgnoresLegacyByokKeysAndUsesTheSignedInAccount() throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "localMode", true);
+        settingsData.put("ai.activeProvider", "OPENROUTER");
+        assertEquals("fixture answer", request(8L).get("text"));
+        assertEquals(List.of("Bearer synthetic-shared-8"), sharedRequests);
+        assertTrue(ownRequests.isEmpty(), "Desktop plugins must not inherit a legacy machine BYOK key");
+        verify(credits).ensureCredits(8L);
+    }
+
 }

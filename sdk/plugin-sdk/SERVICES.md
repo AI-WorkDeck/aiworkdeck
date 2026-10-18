@@ -175,6 +175,8 @@ favorites 条目包含 id/title/content/sourceUrl/sourceHost/createdAt，图片�
 
 共享宿主渠道例子是 `awd.ai.request(prompt, options)`、`voice.synthesize`、会议转写和文档审查：使用宿主现有配置、账户、用量和权限，不让 iframe 读取供应商密钥。`awd.ai.request` 需 `ai`，有现有长度/频率/计费约束；它返回文本，不是任意 Agent 工具执行器。要把任务作为可见用户消息交给宿主 Agent，用现有 `awd.chat.send(prompt)`，不会通过 services 新建私有 Agent 会话。
 
+官方桌面模式的云端 AI 调用固定使用当前登录账户，忽略遗留全局 BYOK 密钥；服务端/私有部署可按其设置使用宿主 BYOK。插件自有服务不依赖该全局选择，使用下面的独立 connections。
+
 BYO 则用 manifest 的 `contributes.connections` 声明公开 HTTPS origin、auth 与固定 operations，或用 `mcpServers` 声明工具。支持 none、Bearer、OAuth2 公共客户端 PKCE；凭据按用户/插件/连接由宿主保管，不能作为 connect 参数传入 iframe。开发安装的远程服务还需管理员在宿主设置页明确授权；完整 manifest 改变会使该信任失效。此授权不开放开发 JAR 或本地进程。
 
 OAuth 使用 Authorization Code + S256 PKCE 公共客户端流程。桌面单机模式回调为实际监听端口的 `http://127.0.0.1:<port>/api/plugins/oauth/callback`；服务端部署必须配置 `ai.plugins.oauth-redirect-uri` 为可信 HTTPS 回调，并在供应商处登记。不要在插件中放 client secret。授权状态一次有效；连接失效或无刷新令牌的凭据过期后，`connections.list()` 返回 `connected:false, needsReconnect:true`。用户断开或重新连接会取消旧连接的在途 HTTP；已到服务商的副作用不会因此回滚。
