@@ -222,35 +222,71 @@ function positiveId(value, name) {
 }
 async function jsonRequest(url, init) {
   const response = await fetch(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(30000) })
-  if (!response.ok) throw new Error('Server rejected request (HTTP ' + response.status + ')')
-  const result = await response.json()
-  if (result.error || (result.code != null && result.code !== 0)) throw new Error('Server reported failure; inspect the authenticated host interface')
+  const result = await response.json().catch(() => null)
+  if (!response.ok || result?.error || (result?.code != null && result.code !== 0)) {
+    // Only print known codes, never arbitrary response text that might echo credentials.
+    const hints = {
+      developer_not_approved: 'Complete the application and review in the website developer portal.',
+      developer_approval_required: 'Complete the application and review in the website developer portal.',
+      developer_permissions_required: 'Update the requested permissions in the developer portal and wait for review.',
+      invalid_plugin_token: 'Create or renew the submission token in the website developer portal.',
+      developer_required: 'Complete your profile in the website developer portal.',
+      unauthorized: 'Create or renew the submission token in the website developer portal.',
+      version_not_newer: 'Check submissions first, then increment manifest.version for a new submission.',
+      id_taken: 'This plugin ID belongs to another account. Choose a different ID.',
+      manifest_invalid: 'Run validate and check the manifest against the published schema.',
+    }
+    const code = Object.hasOwn(hints, result?.error || '') ? result.error : null
+    throw new Error('Server rejected request (HTTP ' + response.status + ')' + (code ? ': ' + code + '. ' + hints[code] : '; inspect the authenticated host or developer portal before retrying.'))
+  }
+  if (!result || typeof result !== 'object') throw new Error('Unexpected response; verify status in the developer portal before retrying')
   return result
+}
+function submissionHeaders(env) {
+  if (env.AWD_PLUGIN_TOKEN != null) {
+    if (!/^\S+$/.test(env.AWD_PLUGIN_TOKEN)) throw new Error('Invalid submission token')
+    return { Authorization: 'Bearer ' + env.AWD_PLUGIN_TOKEN }
+  }
+  // Compatibility for existing automation; new developers should use scoped tokens.
+  if (!env.AWD_PLUGIN_SESSION_COOKIE) throw new Error('Set AWD_PLUGIN_TOKEN from the website developer portal (legacy AWD_PLUGIN_SESSION_COOKIE is also supported)')
+  if (/[\r\n]/.test(env.AWD_PLUGIN_SESSION_COOKIE)) throw new Error('Invalid session cookie')
+  return { Cookie: env.AWD_PLUGIN_SESSION_COOKIE }
 }
 export async function main(args = process.argv.slice(2), env = process.env) {
   const command = args.shift()
-  if (!command || command === 'help' || command === '--help') return { usage: 'node scripts/plugin-dev.mjs init <dir> --id <id> | validate <dir> | package <dir> --out <zip> | status <dir> | dev/install --endpoint <loopback-origin> --project-id <N> --folder-id <N> | status --endpoint <loopback-origin> --project-id <N> | submit <dir> --endpoint <HTTPS-submit-URL>', credentials: 'AWD_SESSION_ID for explicit local host commands; AWD_PLUGIN_SESSION_COOKIE for explicit submit only. No network for init/validate/package/local status.' }
+  if (!command || command === 'help' || command === '--help') return { usage: 'node scripts/plugin-dev.mjs init <dir> --id <id> | validate <dir> | package <dir> --out <zip> | status <dir> | install --endpoint <loopback-origin> --project-id <N> --folder-id <N> | status --endpoint <loopback-origin> --project-id <N> | submit <dir> --endpoint <HTTPS-submit-URL> | submissions --endpoint <HTTPS-submit-URL>', credentials: 'AWD_SESSION_ID for explicit local host commands; AWD_PLUGIN_TOKEN from the developer portal for submit/submissions. No network for init/validate/package/local status.' }
   const { positionals, options } = parseArgs(args)
   if (positionals.length > 1) throw new Error('Only one source directory is accepted')
   if (command === 'init') {
     if (!positionals[0] || !options.id) throw new Error('init requires directory and --id')
     return initPlugin(positionals[0], options.id)
   }
+  if (command === 'submissions') {
+    if (positionals.length) throw new Error('submissions takes an endpoint, not a source directory')
+    const endpoint = httpsUrl(options.endpoint, 'submissions endpoint')
+    const response = await jsonRequest(endpoint, { method: 'GET', headers: submissionHeaders(env) })
+    if (!Array.isArray(response.plugins)) throw new Error('Unexpected submissions response; inspect the website developer portal')
+    return { plugins: response.plugins.map(({ id, version, status }) => ({ id, version, status })) }
+  }
   if (['dev', 'install'].includes(command) || (command === 'status' && options.endpoint)) {
     if (positionals.length) throw new Error('Host installation takes project/folder IDs, not a local directory. Import your source into the host project first.')
     const endpoint = new URL(options.endpoint || '')
     if (!['http:', 'https:'].includes(endpoint.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(endpoint.hostname) || endpoint.username || endpoint.password || endpoint.pathname !== '/' || endpoint.search || endpoint.hash) throw new Error('Host endpoint must be an explicit loopback origin')
-    if (!env.AWD_SESSION_ID) throw new Error('Set AWD_SESSION_ID to an existing host session; credentials are not read automatically')
+    if (env.AWD_SESSION_ID && /[\r\n]/.test(env.AWD_SESSION_ID)) throw new Error('Invalid host session')
     const projectId = positiveId(options['project-id'], 'project-id')
     const status = command === 'status'
     const body = status ? undefined : JSON.stringify({ projectId, folderId: positiveId(options['folder-id'], 'folder-id') })
-    return jsonRequest(new URL(status ? '/api/plugins/dev/status?projectId=' + projectId : '/api/plugins/dev/install', endpoint), { method: status ? 'GET' : 'POST', headers: { 'X-Session-Id': env.AWD_SESSION_ID, 'Content-Type': 'application/json' }, body })
+    const headers = { 'Content-Type': 'application/json' }
+    if (env.AWD_SESSION_ID) headers['X-Session-Id'] = env.AWD_SESSION_ID
+    // Local-mode hosts already authorize loopback calls. Other hosts still enforce login.
+    return jsonRequest(new URL(status ? '/api/plugins/dev/status?projectId=' + projectId : '/api/plugins/dev/install', endpoint), { method: status ? 'GET' : 'POST', headers, body })
   }
   if (!['validate', 'package', 'status', 'submit'].includes(command)) throw new Error('Unknown command: ' + command)
   if (!positionals[0]) throw new Error(command + ' requires a source directory')
   const checked = await validatePlugin(positionals[0])
   const result = { id: checked.manifest.id, version: checked.manifest.version, files: checked.files.length, bytes: checked.bytes, excluded: checked.excluded }
   if (command === 'validate' || command === 'status') return { ...result, valid: true, installation: 'not queried' }
+  if (command === 'submit' && !/^\d+\.\d+\.\d+$/.test(result.version)) throw new Error('Marketplace submission requires an x.y.z version without prerelease or build suffixes')
   const zip = zipFiles(checked.files)
   if (command === 'package') {
     if (!options.out?.endsWith('.zip')) throw new Error('package requires --out <file.zip>')
@@ -259,15 +295,14 @@ export async function main(args = process.argv.slice(2), env = process.env) {
   }
   if (!options.endpoint) throw new Error('submit requires an explicit HTTPS submission endpoint')
   const endpoint = httpsUrl(options.endpoint, 'submit endpoint')
-  if (!env.AWD_PLUGIN_SESSION_COOKIE) throw new Error('Set AWD_PLUGIN_SESSION_COOKIE to your existing website session cookie; no token is fabricated')
-  if (/[\r\n]/.test(env.AWD_PLUGIN_SESSION_COOKIE)) throw new Error('Invalid session cookie')
+  const headers = submissionHeaders(env)
   const form = new FormData()
   form.append('file', new Blob([zip], { type: 'application/zip' }), result.id + '-' + result.version + '.zip')
   if (options['price-cents'] != null) {
     if (!/^\d+$/.test(options['price-cents']) || Number(options['price-cents']) > 199900) throw new Error('price-cents must be 0–199900')
     form.append('priceCents', options['price-cents'])
   }
-  const response = await jsonRequest(endpoint, { method: 'POST', headers: { Cookie: env.AWD_PLUGIN_SESSION_COOKIE }, body: form })
+  const response = await jsonRequest(endpoint, { method: 'POST', headers, body: form })
   if (!response.plugin?.id || !response.plugin?.status) throw new Error('Unexpected submission response; verify status in the website developer portal before retrying')
   return { id: response.plugin.id, version: response.plugin.version, status: response.plugin.status, published: false }
 }
