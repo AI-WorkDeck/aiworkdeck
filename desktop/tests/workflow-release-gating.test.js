@@ -42,6 +42,33 @@ function stepsUseGhRelease(steps) {
   return (steps || []).some((s) => typeof s.uses === 'string' && s.uses.startsWith('softprops/action-gh-release'))
 }
 
+test('desktop frontend failure stops before editor build on both runner platforms', () => {
+  const step = loadWorkflow('desktop-build.yml').jobs.build.steps.find(s => s.name === 'Build frontend')
+  assert.equal(step.shell, 'bash', 'Use the same fail-fast shell on Windows and macOS')
+  const result = require('child_process').spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', `
+    npm() {
+      printf '%s\\n' "$*"
+      if [ "$*" = 'run build:h5' ]; then return 42; fi
+    }
+    ${step.run}
+  `], { encoding: 'utf8' })
+  assert.equal(result.status, 42, result.stderr)
+  assert.match(result.stdout, /run build:h5/)
+  assert.doesNotMatch(result.stdout, /run build:zetaoffice/)
+})
+
+test('desktop frontend step rejects a successful compiler with missing output', (t) => {
+  const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'awd-frontend-gate-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const step = loadWorkflow('desktop-build.yml').jobs.build.steps.find(s => s.name === 'Build frontend')
+  const result = require('child_process').spawnSync('bash', ['-e', '-o', 'pipefail', '-c', `
+    npm() { printf '%s\\n' "$*"; }
+    ${step.run}
+  `], { cwd: dir, encoding: 'utf8' })
+  assert.notEqual(result.status, 0)
+  assert.doesNotMatch(result.stdout, /run build:zetaoffice/)
+})
+
 test('前提：workflows 目录真的存在且非空（防止路径写错导致下面的用例全部空跑通过）', () => {
   const files = workflowFiles()
   assert.ok(files.includes('desktop-build.yml'), 'desktop-build.yml 应该在 .github/workflows 下')
