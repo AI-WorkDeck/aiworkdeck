@@ -89,6 +89,10 @@ A developer should be able to spend their effort on a valuable workflow and reus
 
 Web plugins use a sandboxed iframe and a permission-checked bridge. Java plugins run in the backend process and must be trusted. The [plugin guide](docs/plugin-guide.md) explains those boundaries and the publication process.
 
+### Build a plugin with an Agent
+
+Follow the [developer walkthrough](docs/plugin-developer-journey.md): describe a small workflow, build the [checklist example](examples/checklist-helper/), install and debug in an isolated project, then apply through the website developer center and submit with a revocable token. The developer program initially has no application fee. Basic profile review records the maintainer, private contact details, purpose, and requested permissions; each plugin version still undergoes separate review and signing. This is not identity certification. [SDK and service contracts](sdk/plugin-sdk/) cover settings, host AI, external connections, MCP and independent subscriptions. New host / portal features in this branch remain pending release / deployment.
+
 ### Contributing
 
 Start by turning a review or research task you know well into an extension. If you prefer improving the core, a small reproducible case is especially valuable: a document that loses formatting, a source link that no longer resolves, an edit that fails to round-trip, or an unclear setup step. Use synthetic or appropriately redacted materials and describe the expected result. Discuss the scope in an [issue](https://github.com/AI-WorkDeck/aiworkdeck/issues) before starting a large change.

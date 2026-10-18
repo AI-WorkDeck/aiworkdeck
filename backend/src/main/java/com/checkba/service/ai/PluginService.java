@@ -240,6 +240,10 @@ public class PluginService {
 
     @lombok.Data
     public static class PluginMetadata {
+        /** Optional editor schema reference; metadata only, never fetched by the host. */
+        @com.fasterxml.jackson.annotation.JsonProperty("$schema")
+        @cn.hutool.core.annotation.Alias("$schema")
+        private String schema;
         private String id;
         private String name;
         private String version;
@@ -377,6 +381,7 @@ public class PluginService {
         private String description;
         /** JSON 字段名是 default（Java 关键字），经 Hutool @Alias 映射；统一按字符串存取 */
         @cn.hutool.core.annotation.Alias("default")
+        @com.fasterxml.jackson.annotation.JsonAlias("default")
         private Object defaultValue;
         private List<String> options;
         private Boolean secret;
@@ -1055,7 +1060,16 @@ public class PluginService {
      * @return 解析后的元数据；id 缺失时返回 null（插件必须有稳定 id 才能启停）
      */
     PluginMetadata parseManifest(String json) {
-        PluginMetadata meta = cn.hutool.json.JSONUtil.toBean(json, PluginMetadata.class);
+        var manifest = cn.hutool.json.JSONUtil.parseObj(json);
+        // Hutool's field alias accepts the public spelling only; retain historical manifests too.
+        var settings = manifest.getJSONArray("settings");
+        if (settings != null) for (int i = 0; i < settings.size(); i++) {
+            var setting = settings.getJSONObject(i);
+            if (setting != null && !setting.containsKey("default") && setting.containsKey("defaultValue")) {
+                setting.set("default", setting.get("defaultValue"));
+            }
+        }
+        PluginMetadata meta = cn.hutool.json.JSONUtil.toBean(manifest, PluginMetadata.class);
         if (meta.getId() == null || meta.getId().isBlank()) {
             return null;
         }

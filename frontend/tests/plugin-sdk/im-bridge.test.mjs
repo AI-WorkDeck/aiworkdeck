@@ -19,9 +19,9 @@ function harness(deps = {}) {
   const win = { addEventListener() {}, removeEventListener() {}, ...deps.window }
   const uni = { $on: (key, fn) => listeners.set(key, fn), $off: key => listeners.delete(key), $emit: (...args) => events.push(args) }
   const options = new Function('getProjectFiles', 'requestPluginIm', 'preparePluginImDrag', 'endPluginImDrag',
-    'ACCOUNT_CHANGED_EVENT', 'APP_THEME_EVENT', 'window', 'uni', 'setTimeout', 'subscribeTaskChanges', body)(deps.getProjectFiles || (async () => files),
+    'ACCOUNT_CHANGED_EVENT', 'APP_THEME_EVENT', 'window', 'uni', 'setTimeout', 'subscribeTaskChanges', 'getPlugins', body)(deps.getProjectFiles || (async () => files),
     deps.requestPluginIm || (async () => ({ code: 0, data: { conversations: [] } })), preparePluginImDrag, endPluginImDrag,
-    'awd:account-changed', 'theme', win, uni, deps.setTimeout || setTimeout, () => () => {})
+    'awd:account-changed', 'theme', win, uni, deps.setTimeout || setTimeout, () => () => {}, async () => [{ id: 'project-im', enabled: true, permissions: ['im', 'file_read'], version: '1.0', devInstalled: false }])
   const vm = { ...options.data(), projectId: 5, pluginId: 'project-im', url: '/api/plugin-web/project-im/index.html',
     permissions: ['im', 'file_read'], addFileToAi: deps.addFileToAi || (async value => { events.push(['addFile', value]) }),
     $refs: { pluginFrame: { contentWindow: { postMessage: message => sent.push(message) } } },
@@ -85,9 +85,11 @@ test('changing project while resolving a path prevents add, open and drag side e
 test('account change invalidates in-flight IM results and pushes subscribed event', async () => {
   const gate = deferred(), h = harness({ requestPluginIm: () => gate.promise })
   h.options.mounted.call(h.vm)
+  await h.vm.initializeAuthorization()
   await h.vm.handleCall('events.subscribe', { events: ['account.changed'] })
   const request = h.vm.onMessage({ source: h.vm.$refs.pluginFrame.contentWindow,
     data: { awd: 1, type: 'call', seq: 1, method: 'im.request', params: { action: 'list' } } })
+  await new Promise(resolve => setImmediate(resolve))
   h.listeners.get('awd:account-changed')()
   gate.resolve({ code: 0, data: { private: 'old account' } })
   await request
@@ -110,6 +112,7 @@ test('prepared drag is one-use, host-authoritative and cleared on context change
   receipt = (await h.vm.handleCall('files.prepareDrag', { path })).result
   h.options.watch.projectId.call(h.vm, 6)
   assert.equal(consumePluginImDrag(dataTransfer(receipt), 5).file, null)
+  await h.vm.initializeAuthorization()
   receipt = (await h.vm.handleCall('files.prepareDrag', { path })).result
   await h.vm.handleCall('files.endDrag', {})
   assert.equal(consumePluginImDrag(dataTransfer(receipt), 5).file, null)

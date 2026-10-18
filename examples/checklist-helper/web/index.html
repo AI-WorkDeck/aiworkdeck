@@ -1,0 +1,127 @@
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>清单助手</title>
+  <style>
+    :root { font: 13px system-ui; color: var(--awd-text, #2B2A26); background: var(--awd-surface, #FCFBF7); }
+    body { margin: 16px; max-width: 680px; }
+    h1 { font-size: 18px; margin: 0 0 8px; }
+    p { line-height: 1.6; color: var(--awd-text-2, #6B675C); }
+    label { display: block; margin: 14px 0 5px; }
+    select, textarea, button { font: inherit; color: inherit; background: var(--awd-surface, #FCFBF7); border: 1px solid var(--awd-border, #DDD8CA); border-radius: var(--awd-radius-sm, 4px); box-sizing: border-box; }
+    select, textarea { width: 100%; min-width: 0; padding: 7px; }
+    textarea { resize: vertical; line-height: 1.7; }
+    button, select { min-height: var(--awd-control-height, 32px); }
+    button { padding: 5px 10px; cursor: pointer; }
+    button:hover { background: var(--awd-surface-2, #E9E6DC); }
+    button:disabled { opacity: .6; cursor: wait; }
+    :focus-visible { outline: 2px solid var(--awd-primary, #315f53); outline-offset: 2px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    #status { min-height: 22px; }
+    #status[data-error=true] { color: var(--awd-danger, #a33131); }
+    @media (pointer: coarse) { button, select { min-height: 48px; } }
+  </style>
+</head>
+<body>
+  <h1>清单助手</h1>
+  <p>粘贴文字，每行一项。合并重复行，保留原有顺序；正文只在本页处理。</p>
+  <label for="source">待整理文字</label>
+  <textarea id="source" rows="7" placeholder="每行一项" maxlength="200000"></textarea>
+  <label for="style">清单格式</label>
+  <select id="style"><option value="checkbox">复选框</option><option value="numbered">编号</option></select>
+  <div class="actions">
+    <button id="build">整理清单</button>
+    <button id="save" disabled>保存格式偏好</button>
+    <button id="settings" disabled>宿主设置</button>
+  </div>
+  <p id="status" role="status" aria-live="polite">正在连接宿主…</p>
+  <label for="result">整理结果（可选择复制）</label>
+  <textarea id="result" rows="8" readonly></textarea>
+  <!-- 同步加载 SDK，避免错过 iframe load 后的宿主握手。 -->
+  <script src="awd-plugin-sdk.js"></script>
+  <script>
+    (function () {
+      const $ = id => document.getElementById(id);
+      let generation = 0, controller, connected = false, saving = false;
+      function status(text, error = false) {
+        $('status').textContent = text;
+        $('status').dataset.error = String(error);
+      }
+      function controls(busy) {
+        $('save').disabled = busy || !connected;
+        $('settings').disabled = busy || !connected;
+      }
+      function showError(error) {
+        if (error.name === 'AbortError') return;
+        status(error.code === 'unknown_method'
+          ? '当前宿主不支持此功能，请升级后重试。'
+          : '操作失败：' + error.message, true);
+      }
+      async function withHost(message, operation) {
+        controller?.abort();
+        controller = new AbortController();
+        const current = ++generation;
+        controls(true);
+        status(message);
+        try { await operation(controller.signal, () => current === generation); }
+        catch (error) { if (current === generation) showError(error); }
+        finally { if (current === generation) controls(false); }
+      }
+      async function loadSetting(signal, current) {
+        const style = await awd.settings.get('listStyle', { signal });
+        if (!current()) return;
+        $('style').value = style === 'numbered' ? 'numbered' : 'checkbox';
+        status('格式偏好已读取，可以整理文字。');
+      }
+      $('build').onclick = () => {
+        // 只处理逐行清单前缀；数字后须有空白，避免误删 3.14 等正文。
+        const items = [...new Set($('source').value.split(/\r?\n/).map(line =>
+          line.replace(/^\s*(?:[-*]\s+(?:\[[ xX]\]\s*)?|\d+[.)、]\s+)?/, '').trim()
+        ).filter(Boolean))];
+        $('result').value = items.map((line, index) =>
+          ($('style').value === 'numbered' ? (index + 1) + '. ' : '- [ ] ') + line
+        ).join('\n');
+        status(items.length ? '已整理 ' + items.length + ' 项，重复行已合并。' : '请先输入文字。');
+      };
+      $('save').onclick = () => withHost('正在保存偏好…', async (signal, current) => {
+        saving = true;
+        try {
+          await awd.settings.update({ listStyle: $('style').value }, { scope: 'user', signal });
+          if (current()) status('格式偏好已保存至宿主。');
+        } finally { saving = false; }
+      });
+      $('settings').onclick = () => withHost('正在打开宿主设置…', async (signal, current) => {
+        await awd.settings.open({ signal });
+        if (current()) status('已打开宿主设置。');
+      });
+      function clearContext() {
+        ++generation;
+        controller?.abort();
+        $('source').value = '';
+        $('result').value = '';
+        controls(false);
+        status('上下文已改变，已清除本页文字。');
+      }
+      const unsubscribe = [
+        awd.events.on('account.changed', clearContext),
+        awd.events.on('project.switched', clearContext),
+        awd.events.on('settings.changed', () => {
+          if (!saving) withHost('正在刷新偏好…', loadSetting);
+        })
+      ];
+      awd.ready().then(() => {
+        connected = true;
+        return withHost('正在读取格式偏好…', loadSetting);
+      }).catch(showError);
+      window.addEventListener('pagehide', () => {
+        clearContext();
+        unsubscribe.forEach(dispose => dispose());
+      });
+    })();
+  </script>
+</body>
+</html>

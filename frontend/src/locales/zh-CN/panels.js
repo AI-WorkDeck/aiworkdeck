@@ -323,6 +323,8 @@ export default {
   pgWorkspacePending: '正在核验插件是否可用；若未能加载，请重试。',
   pgWorkspaceRetry: '重新加载',
   pgDefaultIntro: '{name} 已安装。在右侧 AI 对话里描述你的需求即可使用。',
+  ppVerifying: '正在核验插件状态…',
+  ppAuthorizationChanged: '插件状态已改变或无法核验。请先切换到其他侧栏面板，再重新打开；若仍无法加载，请在插件中心确认插件已启用。',
   ppLoadFailed: '无法加载插件：未配置入口地址',
 
   // EasyVoicePane.vue

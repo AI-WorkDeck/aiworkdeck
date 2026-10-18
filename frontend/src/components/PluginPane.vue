@@ -3,7 +3,7 @@
 <template>
   <view class="plugin-pane">
     <iframe
-      v-if="url"
+      v-if="url && (!isWebPlugin || authorizationReady)"
       :key="sessionGeneration"
       ref="pluginFrame"
       :src="url"
@@ -12,8 +12,11 @@
       frameborder="0"
       @load="onFrameLoad"
     ></iframe>
+    <view v-else-if="url && isWebPlugin && !authorizationInvalid" class="plugin-error" role="status">
+      <text>{{ $t('panels.ppVerifying') }}</text>
+    </view>
     <view v-else class="plugin-error">
-      <text>{{ $t('panels.ppLoadFailed') }}</text>
+      <text>{{ $t(authorizationInvalid ? 'panels.ppAuthorizationChanged' : 'panels.ppLoadFailed') }}</text>
     </view>
   </view>
 </template>
@@ -45,7 +48,7 @@
 // v2.7 实验 API：x- 前缀方法只对本机 dev 免签直装的插件开放（devInstalled prop），
 // 广场装的插件调用一律 experimental_not_allowed——运行时闸是真保证，受理扫描只是辅助。
 import {
-  getProjectFiles, getFileText, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm,
+  getPlugins, getProjectFiles, getFileText, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm,
   requestPluginLawFirm,
   createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks,
   getTeam, getProjectMembers, getCurrentUser, searchProjectContent, getProjectTags,
@@ -169,22 +172,26 @@ export default {
       // 于是 A 发起的桥调用可能在 B 已经载入之后才 resolve。响应按 seq 匹配，而新插件的
       // 序号也从 1 起，投错窗口就是把 A 的数据（可能含 B 无权读的文件内容）兑现给 B。
       // 换插件时自增，回响应前比对，代次对不上就丢弃。
-      sessionGeneration: 0
+      sessionGeneration: 0,
+      authorizationReady: false,
+      authorizationInvalid: false
     }
   },
   watch: {
-    permissions: { deep: true, handler() { this.disposeBusinessServices(); this.sessionGeneration++; this.resetEventChannel() } },
+    permissions: { deep: true, handler() { this.disposeBusinessServices(); this.sessionGeneration++; this.resetEventChannel(); this.initializeAuthorization() } },
     url() {
       this.disposeBusinessServices()
       this.sessionGeneration++
       this.clearPreparedDrag()
       this.resetEventChannel()
+      this.initializeAuthorization()
     },
     pluginId() {
       this.disposeBusinessServices()
       this.sessionGeneration++
       this.clearPreparedDrag()
       this.resetEventChannel()
+      this.initializeAuthorization()
     },
     // 当前架构下切项目走 uni.reLaunch 整页重建，本 watch 极少触发；
     // 语义为未来面板持久化预留（规范 v2.7 事件表），触发了就如实推送
@@ -193,6 +200,7 @@ export default {
       this.sessionGeneration++
       this.clearPreparedDrag()
       this.forwardEvent('project.switched', { projectId: val == null ? '' : String(val) })
+      this.initializeAuthorization()
     }
   },
   computed: {
@@ -212,6 +220,7 @@ export default {
     this._pendingSidebarCommand = null
   },
   mounted() {
+    this.initializeAuthorization()
     window.addEventListener('message', this.onMessage)
     this._onThemeChanged = () => this.pushTheme()
     uni.$on(APP_THEME_EVENT, this._onThemeChanged)
@@ -258,6 +267,7 @@ export default {
       this.sessionGeneration++
       this.clearPreparedDrag()
       this.forwardEvent('account.changed', {})
+      this.initializeAuthorization()
     }
     uni.$on(ACCOUNT_CHANGED_EVENT, this._onAccountChanged)
     // 团队 / 律所切换（utils/orgContext.js 的 ORG_CHANGED_EVENT；此处写字面量，
@@ -270,6 +280,8 @@ export default {
     uni.$on('awd:org-changed', this._onOrgChanged)
   },
   beforeUnmount() {
+    this._authorizationDestroyed = true
+    this.authorizationReady = false
     this._collectionEvents?.forEach(off => off())
     this._unsubscribeTasks?.()
     this._unsubscribeSpeech?.()
@@ -288,6 +300,82 @@ export default {
     this.resetEventChannel()
   },
   methods: {
+    // Capture authority before rendering code. Never adopt new privileges into a running iframe.
+    async initializeAuthorization() {
+      this.authorizationReady = false
+      this.authorizationInvalid = false
+      this._pendingSidebarCommand = null
+      this._pendingLawfirmTab = null
+      this._authorizationSnapshot = null
+      this._authorizationBlocked = false
+      if (!this.isWebPlugin || this._authorizationDestroyed) return
+      const generation = this.sessionGeneration
+      try {
+        const record = await this.readAuthorization()
+        if (generation !== this.sessionGeneration || this._authorizationDestroyed) return
+        const permissions = [...(this.permissions || [])].sort()
+        if (!record || JSON.stringify(record.permissions) !== JSON.stringify(permissions)
+            || record.devInstalled !== !!this.devInstalled) {
+          this.invalidateAuthorization(record)
+          return
+        }
+        this._authorizationSnapshot = record
+        this.authorizationReady = true
+      } catch (_) {
+        if (generation === this.sessionGeneration && !this._authorizationDestroyed) this.invalidateAuthorization()
+      }
+    },
+    async readAuthorization() {
+      // No TTL: a CLI reinstall/disable need not send any UI event.
+      const response = await getPlugins()
+      const rows = Array.isArray(response) ? response : response?.data
+      if (!Array.isArray(rows)) throw new Error('Plugin authorization unavailable')
+      const record = rows.find(row => row.id === this.pluginId)
+      if (!record || record.enabled !== true || record.revokedReason || record.incompatibleReason) return null
+      return {
+        id: record.id, version: record.version, frontendEntry: record.frontendEntry,
+        permissions: [...(record.permissions || [])].sort(), devInstalled: !!record.devInstalled,
+        contributes: record.contributes, tools: record.tools,
+      }
+    },
+    invalidateAuthorization(record) {
+      if (this._authorizationBlocked) return
+      this._authorizationBlocked = true
+      this.authorizationInvalid = true
+      this.authorizationReady = false
+      this._authorizationSnapshot = null
+      this.sessionGeneration++
+      this.disposeBusinessServices()
+      this.clearPreparedDrag()
+      this.resetEventChannel()
+      // External installs do not emit the UI event. Refresh the rail's metadata once
+      // per changed state so closing/reopening cannot keep reusing stale props.
+      const key = JSON.stringify(record)
+      if (record !== undefined && key !== this._authorizationNotified) {
+        this._authorizationNotified = key
+        uni.$emit('awd:market-changed')
+        uni.$emit('awd:market-changed-from-sidebar')
+      }
+    },
+    async verifyAuthorization(generation) {
+      if (!this.authorizationReady || this._authorizationBlocked || this._authorizationDestroyed
+          || generation !== this.sessionGeneration) return false
+      try {
+        const record = await this.readAuthorization()
+        if (generation !== this.sessionGeneration || this._authorizationDestroyed) return false
+        if (!record || JSON.stringify(record) !== JSON.stringify(this._authorizationSnapshot)) {
+          this.invalidateAuthorization(record)
+          return false
+        }
+        return true
+      } catch (_) {
+        if (generation === this.sessionGeneration && !this._authorizationDestroyed) this.invalidateAuthorization()
+        return false
+      }
+    },
+    effectivePermissions() {
+      return this._authorizationSnapshot?.permissions || (this._authorizationBlocked ? [] : this.permissions)
+    },
     disposeBusinessServices() {
       this._businessServices?.dispose()
       this._businessServices = null
@@ -303,15 +391,15 @@ export default {
           try { link.href = url; link.download = name; document.body.appendChild(link); link.click() }
           finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000) }
         } }
-        const voice = createPluginVoiceServices({ projectId: () => this.projectId, permissions: () => this.permissions, isCurrent: () => generation === this.sessionGeneration, actions })
-        const collections = createPluginCollectionServices({ projectId: () => this.projectId, permissions: () => this.permissions, isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles(), openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
-        const insight = createPluginInsightServices({ projectId: () => this.projectId, permissions: () => this.permissions, isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles(), openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
+        const voice = createPluginVoiceServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions })
+        const collections = createPluginCollectionServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles(), openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
+        const insight = createPluginInsightServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles(), openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
         this._businessServices = createPluginBusinessServices({
           delegates: { ...Object.fromEntries(['calendar', 'favorites', 'clipboard'].map(service => [service, (operation, params, signal) => collections.request(service, operation, params, signal)])), voice: (operation, params, signal) => voice.request(operation, params, signal), insight: (operation, params, signal) => insight.request(operation, params, signal) },
           api: { searchProjectContent, getProjectTags, getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile,
             getLitigationVisualStatus, getLitigationDiagrams, getLitigationKickoffPrompt, restyleLitigationDiagram, packStatus, packInstall },
           projectId: () => this.projectId,
-          permissions: () => this.permissions,
+          permissions: () => this.effectivePermissions(),
           isCurrent: () => generation === this.sessionGeneration,
           listFiles: () => this.listProjectFiles(),
           openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id, locator: null, linkKey: null }),
@@ -325,7 +413,7 @@ export default {
         const generation = this.sessionGeneration
         this._platformServices = createPluginPlatformServices({
           pluginId: () => this.pluginId, projectId: () => this.projectId,
-          permissions: () => this.permissions, isCurrent: () => generation === this.sessionGeneration,
+          permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration,
         })
       }
       return this._platformServices
@@ -334,7 +422,7 @@ export default {
       endPluginImDrag(this)
     },
     onFrameLoad() {
-      if (!this.isWebPlugin) return
+      if (!this.isWebPlugin || !this.authorizationReady) return
       const frame = this.$refs.pluginFrame
       if (!frame || !frame.contentWindow) return
       // 时序：load 之后才握手。插件侧 SDK 是同步 <script>，此刻监听已就位。
@@ -379,12 +467,14 @@ export default {
 
       // 发起调用时的代次，await 之后据此判断这条响应还属不属于当前插件
       const generation = this.sessionGeneration
+      if (!await this.verifyAuthorization(generation)) return
       let out
       try {
         out = await this.handleCall(String(msg.method || ''), msg.params || {})
       } catch (e) {
         out = { ok: false, error: { code: 'internal_error', message: (e && e.message) || '调用失败' } }
       }
+      if (!await this.verifyAuthorization(generation)) return
       this.reply(msg.seq, out, generation)
     },
 
@@ -400,7 +490,7 @@ export default {
     },
 
     hasPermission(name) {
-      return Array.isArray(this.permissions) && this.permissions.indexOf(name) >= 0
+      return Array.isArray(this.effectivePermissions()) && this.effectivePermissions().indexOf(name) >= 0
     },
 
     denied(permission) {
@@ -767,8 +857,11 @@ export default {
       if (!this.isWebPlugin) return
       if (!this._subscribedEvents || !this._subscribedEvents.has(name)) return
       const def = PLUGIN_EVENTS[name]
-      const fire = () => {
+      const generation = this.sessionGeneration
+      const fire = async () => {
         delete this._eventTimers[name]
+        // Empty account/project lifecycle signals may be delivered before resetting the frame.
+        if (!['account.changed', 'project.switched'].includes(name) && !await this.verifyAuthorization(generation)) return
         // 定时器落地时可能已换插件：订阅集合在 resetEventChannel 里清过，再查一次
         if (!this._subscribedEvents || !this._subscribedEvents.has(name)) return
         const frame = this.$refs.pluginFrame
