@@ -178,10 +178,10 @@
 // 插件广场左栏面板（VS Code 扩展栏形态）：搜索 + 已安装/Skill 广场/插件广场
 // 三个折叠分组的紧凑列表；点行在中栏开详情 tab（emit open-detail），行内快捷安装。
 // 数据与安装链路复用 MarketPane 同一组 services/api.js 封装。
-import { getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
+import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
 import { ICONS } from '@/config/icons.js'
 import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
-import { isPanelSkill, isVoiceGroupMember, buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
+import { isPanelSkill, isVoiceGroupMember } from '@/config/leftSidebarPlugins.js'
 import { canInstall, paidState, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
@@ -253,38 +253,12 @@ export default {
     installedRows() {
       const kw = this.searchText.trim().toLowerCase()
       const rows = []
-      // 「语音」合并插件（dev-board#66）：左栏一个图标 = 一个插件。语音合成与
-      // 会议录音两个成员 skill 不单列，在首个成员的位置合成一行；启停在详情页
-      // 一次作用于全部成员。
-      const voiceGroup = buildVoiceGroupSkill(this.skills)
-      let voiceEmitted = false
+      // Voice UI is an installed plugin. Its legacy AI skills stay in the Skill tab.
       for (const s of this.skills) {
-        if (voiceGroup && isVoiceGroupMember(s.id) && !s.sourcePluginId) {
-          if (!voiceEmitted) {
-            voiceEmitted = true
-            const metaParts = []
-            if (voiceGroup.version) metaParts.push('v' + voiceGroup.version)
-            if (voiceGroup.author) metaParts.push(voiceGroup.author)
-            rows.push({
-              kind: 'skill',
-              id: voiceGroup.id,
-              group: true,
-              name: voiceGroup.name,
-              desc: voiceGroup.description,
-              glyph: ICONS.panelLeft,
-              meta: metaParts.join(' · '),
-              panel: true,
-              stateLabel: voiceGroup.enabled ? this.$t('market.enabledTag') : this.$t('market.disabledTag'),
-              stateClass: voiceGroup.enabled ? 'ok' : 'off',
-              raw: voiceGroup,
-            })
-          }
-          continue
-        }
         const mode = s.activationMode || (s.enabled ? 'auto' : 'disabled')
         // 面板型（背后挂着左栏面板）在列表里也按插件标注：用户看到的是一个面板，
         // 说它是「Skill · 自动触发」只会让人对不上号。判据见 leftSidebarPlugins.js。
-        const panel = isPanelSkill(s.id) && !s.sourcePluginId
+        const panel = isPanelSkill(s.id) && !isVoiceGroupMember(s.id) && !s.sourcePluginId
         // 「面板插件/Skill」标签不再在行内重复——子分组标题（installedGroups）已经
         // 表明了这一行属于哪一类，见下方 installedSkillRows/installedPluginRows。
         const metaParts = []
@@ -360,6 +334,7 @@ export default {
         const cat = m.category || 'other'
         const metaParts = []
         if (m.version) metaParts.push('v' + m.version)
+        if (m.bundled) metaParts.push(this.$t('pluginPlatform.bundled'))
         const dl = fmtDownloads(m.downloads)
         if (dl) metaParts.push(dl + this.$t('market.downloadsSuffix'))
         metaParts.push(CATEGORY_LABELS[cat] || this.$t('market.catOther'))
@@ -391,6 +366,7 @@ export default {
       const rows = this.marketPlugins.map(m => {
         const metaParts = []
         if (m.version) metaParts.push('v' + m.version)
+        if (m.bundled) metaParts.push(this.$t('pluginPlatform.bundled'))
         const author = m.authorDisplayName || m.author
         if (author) metaParts.push(author)
         metaParts.push(priceLabel(m))
@@ -483,8 +459,12 @@ export default {
       this.marketPluginLoading = true
       this.marketPluginError = ''
       try {
-        const res = await getPluginMarket()
-        this.marketPlugins = res?.plugins || []
+        const [remote, bundled] = await Promise.allSettled([getPluginMarket(), getBundledPlugins()])
+        const res = remote.status === 'fulfilled' ? remote.value : null
+        const local = bundled.status === 'fulfilled' ? bundled.value?.plugins || [] : []
+        const localIds = new Set(local.map(item => item.id))
+        this.marketPlugins = [...local, ...(res?.plugins || []).filter(item => !localIds.has(item.id))]
+        if (remote.status === 'rejected' && !local.length) throw remote.reason
         if (typeof res?.accountConnected === 'boolean') this.accountConnected = res.accountConnected
       } catch (e) {
         console.warn('在线插件广场不可用:', e)
@@ -514,7 +494,8 @@ export default {
     async installPluginRow(row) {
       if (this.pluginBusyId) return
       const m = row.raw
-      const perms = (m.permissions || []).join(this.$t('market.listSeparator')) || this.$t('market.noSensitiveCapability')
+      const labels = { file_read: 'permFileRead', file_write: 'permFileWrite', network: 'permNetwork', im: 'permIm', editor: 'permEditor', ai: 'permAi', speech: 'permSpeech', tasks: 'permTasks', clipboard: 'permClipboard', lawfirm: 'permLawfirm' }
+      const perms = (m.permissions || []).map(p => labels[p] ? this.$t(`market.${labels[p]}`) : p).join(this.$t('market.listSeparator')) || this.$t('market.noSensitiveCapability')
       const ok = await new Promise(resolve => {
         uni.showModal({
           title: this.$t('market.confirmInstallPluginTitle'),
@@ -533,7 +514,7 @@ export default {
       if (!ok) return
       this.pluginBusyId = row.id
       try {
-        await installMarketPlugin(row.id)
+        await (m.bundled ? installBundledPlugin(row.id) : installMarketPlugin(row.id))
         uni.showToast({ title: this.$t('market.installedNoExecuteHint'), icon: 'none' })
         await this.reloadAll()
         uni.$emit('awd:market-changed-from-sidebar')

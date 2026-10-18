@@ -7,7 +7,7 @@ import { serializeTab, restore } from '../../src/pages/project-overview/tabSnaps
 import { isContextEligibleTab } from '../../src/pages/project-overview/activeTabContext.js'
 
 const source = readFileSync(new URL('../../src/pages/project-overview/panelSwitching.js', import.meta.url), 'utf8')
-const { panelSwitchingMethods } = await import('data:text/javascript;base64,' + Buffer.from(source.replace(/^import .*$/gm, '') + '\nconst track = () => {}; const isPaneAllowedWithoutProject = () => false; const workbenchStorageKey = () => "pane";').toString('base64'))
+const { panelSwitchingMethods } = await import('data:text/javascript;base64,' + Buffer.from(source.replace(/^import .*$/gm, '') + '\nconst migrateLeftPaneKey = key => key; const isGlobalPlugin = plugin => plugin?.views?.some(v => v.scope === "global"); const track = () => {}; const isPaneAllowedWithoutProject = () => false; const workbenchStorageKey = () => "pane";').toString('base64'))
 
 test('rail click opens the plugin workspace instead of only selecting a narrow pane', () => {
   const opened = []

@@ -221,6 +221,9 @@
           </view>
         </view>
 
+        <PluginConnectionSettings v-if="spec.kind === 'plugin' && installedInfo && installedInfo.enabled && (installedInfo.permissions || []).includes('network')"
+          :key="spec.id" :plugin-id="spec.id" />
+
         <!-- 样式画像（规范 v2.9 P4）：插件贡献的画像可设为全局默认（写端导出走它） -->
         <view v-if="spec.kind === 'plugin' && installedInfo && ownStyleProfiles.length" class="mdp-section">
           <text class="mdp-sec-title">{{ $t('market.styleProfilesTitle') }}</text>
@@ -268,11 +271,12 @@
 // 插件广场详情 tab（VS Code 扩展详情页形态）。spec = { kind: 'skill'|'plugin', id, name }
 // 由左栏 MarketSidebarPanel 点行打开。自行拉取市场与已安装两份数据合成视图，
 // 装/卸/启停后通过 uni.$emit('awd:market-changed') 通知左栏刷新。
-import { getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile } from '@/services/api.js'
+import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile } from '@/services/api.js'
 import { ICONS } from '@/config/icons.js'
 import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { isPanelSkill, buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
 import { formatPrice, isPaid, paidState, priceCentsOf, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
+import PluginConnectionSettings from '@/components/PluginConnectionSettings.vue'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { refreshEntitlements } from '@/composables/useEntitlement.js'
 import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
@@ -306,6 +310,11 @@ const PERMISSION_LABELS = {
   network: t('market.permNetwork'),
   im: t('market.permIm'),
   editor: t('market.permEditor'),
+  ai: t('market.permAi'),
+  speech: t('market.permSpeech'),
+  tasks: t('market.permTasks'),
+  clipboard: t('market.permClipboard'),
+  lawfirm: t('market.permLawfirm'),
 }
 
 /**
@@ -329,7 +338,7 @@ const ACTIVATION_LABELS = [t('market.activationAuto'), t('market.activationManua
 
 export default {
   name: 'MarketDetailPane',
-  components: { AwdSelect, AwdSwitch },
+  components: { AwdSelect, AwdSwitch, PluginConnectionSettings },
   props: {
     spec: {
       type: Object,
@@ -357,6 +366,7 @@ export default {
       pluginSettings: [],   // manifest.settings 声明 + 当前值（secret 已掩码）
       settingsDraft: {},    // 表单草稿；secret 项只保存被用户改过的（掩码值原样 = 未改）
       settingsBusy: false,
+      contributionGeneration: 0,
       ownStyleProfiles: [], // 本插件贡献的样式画像 + 是否被选为全局默认
     }
   },
@@ -542,15 +552,22 @@ export default {
     },
     sourceText() {
       if (this.installedInfo?.sourcePluginId) return this.$t('market.sourceBuiltinPlugin', { id: this.installedInfo.sourcePluginId })
+      if (this.marketInfo?.bundled) return this.$t('pluginPlatform.bundled')
       if (this.marketInfo) return this.$t('market.sourceOfficialMarket')
       return this.$t('market.sourceLocal')
     },
   },
+  watch: {
+    'spec.projectId'() { this.loadContribution() },
+  },
   mounted() {
+    uni.$on('awd:account-changed', this.loadContribution)
     this.reload()
     uni.$on('awd:market-changed-from-sidebar', this.reload)
   },
   beforeUnmount() {
+    this.contributionGeneration++
+    uni.$off('awd:account-changed', this.loadContribution)
     uni.$off('awd:market-changed-from-sidebar', this.reload)
     this.stopPackPoll()
   },
@@ -582,11 +599,12 @@ export default {
           this.marketInfo = marketList.find(s => s.id === this.spec.id) || null
           this.installedInfo = installedList.find(s => s.id === this.spec.id) || null
         } else {
-          const [mRes, iRes] = await Promise.all([
+          const [mRes, iRes, bundledRes] = await Promise.all([
             getPluginMarket().catch(keepMarketError),
             getPlugins().catch(() => null),
+            getBundledPlugins().catch(() => null),
           ])
-          const marketList = mRes?.plugins || []
+          const marketList = [...(bundledRes?.plugins || []), ...(mRes?.plugins || [])]
           const installedList = Array.isArray(iRes) ? iRes : (iRes?.data || [])
           if (typeof mRes?.accountConnected === 'boolean') this.accountConnected = mRes.accountConnected
           this.marketInfo = marketList.find(p => p.id === this.spec.id) || null
@@ -627,27 +645,34 @@ export default {
     // ---- 声明式贡献点（规范 v2.9 P4）：设置表单 + 样式画像 ----
 
     async loadContribution() {
+      const generation = ++this.contributionGeneration
+      const { id, projectId } = this.spec
+      this.pluginSettings = []; this.settingsDraft = {}; this.ownStyleProfiles = []
       if (this.spec.kind !== 'plugin' || !this.installedInfo) {
         this.pluginSettings = []
         this.ownStyleProfiles = []
         return
       }
       try {
-        const res = await getPluginSettings(this.spec.id)
+        const res = await getPluginSettings(id, projectId)
+        if (generation !== this.contributionGeneration) return
         const body = res && res.settings !== undefined ? res : (res && res.data) || {}
         this.pluginSettings = Array.isArray(body.settings) ? body.settings : []
         const draft = {}
         this.pluginSettings.forEach(s => { draft[s.key] = s.value == null ? '' : String(s.value) })
         this.settingsDraft = draft
       } catch (e) {
+        if (generation !== this.contributionGeneration) return
         this.pluginSettings = []
       }
       try {
         const res = await getContributedStyleProfiles()
+        if (generation !== this.contributionGeneration) return
         const body = res && res.profiles !== undefined ? res : (res && res.data) || {}
         const all = Array.isArray(body.profiles) ? body.profiles : []
-        this.ownStyleProfiles = all.filter(p => p.pluginId === this.spec.id)
+        this.ownStyleProfiles = all.filter(p => p.pluginId === id)
       } catch (e) {
+        if (generation !== this.contributionGeneration) return
         this.ownStyleProfiles = []
       }
     },
@@ -660,10 +685,10 @@ export default {
         this.pluginSettings.forEach(s => {
           const v = this.settingsDraft[s.key]
           // secret 项的掩码回显（****xxxx）原样未动 = 用户没改，不回写
-          if (s.secret && v === s.value) return
+          if (String(v == null ? '' : v) === String(s.value == null ? '' : s.value)) return
           values[s.key] = v == null ? '' : String(v)
         })
-        const res = await savePluginSettings(this.spec.id, values)
+        const res = await savePluginSettings(this.spec.id, values, this.spec.projectId)
         const body = res && res.code !== undefined ? res : (res && res.data) || {}
         if (body.code !== 0) throw new Error(body.message || this.$t('market.saveFailed'))
         uni.showToast({ title: this.$t('market.settingsSaved'), icon: 'none' })
@@ -892,7 +917,7 @@ export default {
       if (!ok) return
       this.busy = true
       try {
-        await installMarketPlugin(this.spec.id)
+        await (this.marketInfo?.bundled ? installBundledPlugin(this.spec.id) : installMarketPlugin(this.spec.id))
         uni.showToast({ title: this.$t('market.installedUsableHint'), icon: 'none' })
         await this.reload()
         this.notifyChanged()

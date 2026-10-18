@@ -32,49 +32,18 @@ function normGroup(v) {
 export const calendarTabMethods = {
   /** 打开（或激活）日程标签。opts.focus / opts.group 是一次性深链。 */
   openCalendarTab(opts) {
-    const focus = normFocus(opts && opts.focus)
-    const group = normGroup(opts && opts.group)
-    for (const pane of ['left', 'right']) {
-      const list = pane === 'left' ? this.leftFiles : this.rightFiles
-      const existing = list.find((f) => f.id === CALENDAR_TAB_ID)
-      if (existing) {
-        const sameValue = (focus && existing.calendarFocus === focus) || (group && existing.calendarGroup === group)
-        if (sameValue) {
-          existing.calendarFocus = ''
-          existing.calendarGroup = ''
-          this.$nextTick(() => {
-            existing.calendarFocus = focus
-            existing.calendarGroup = group
-          })
-        } else {
-          existing.calendarFocus = focus
-          existing.calendarGroup = group
-        }
-        this[pane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'] = existing.id
-        this.focusedPane = pane
-        this.$nextTick(() => this.triggerWorkbenchResize())
-        return
-      }
-    }
-    const targetPane = this.splitMode ? this.focusedPane : 'left'
-    const list = targetPane === 'left' ? this.leftFiles : this.rightFiles
-    list.push({
-      id: CALENDAR_TAB_ID,
-      tabType: CALENDAR_TAB_TYPE,
-      name: this.$t('calendar.tabName'),
-      calendarFocus: focus,
-      calendarGroup: group,
-    })
-    this[targetPane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'] = CALENDAR_TAB_ID
-    this.focusedPane = targetPane
-    this.$nextTick(() => this.triggerWorkbenchResize())
+    if (!this.dynamicPluginsLoaded) { this.pendingCalendarOpen = opts || {}; return }
+    this.openPluginTab('calendar')
+    const payload = { pluginId: 'calendar', command: 'calendar-focus', focus: normFocus(opts?.focus), group: normGroup(opts?.group) }
+    this.$nextTick(() => uni.$emit('awd:plugin-sidebar-command', payload))
   },
 
   /** 标签里的「关闭」（页头返回在标签形态下隐藏，保留给键盘 / 程序调用） */
   closeCalendarTab() {
     for (const pane of ['left', 'right']) {
       const list = pane === 'left' ? this.leftFiles : this.rightFiles
-      if (list.some((f) => f.id === CALENDAR_TAB_ID)) this.closeFile(CALENDAR_TAB_ID, pane)
+      const tab = list.find(f => f.id === CALENDAR_TAB_ID || (f.tabType === 'plugin' && f.pluginId === 'calendar'))
+      if (tab) this.closeFile(tab.id, pane)
     }
   },
 

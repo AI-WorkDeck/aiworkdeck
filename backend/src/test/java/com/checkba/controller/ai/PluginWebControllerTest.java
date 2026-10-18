@@ -92,6 +92,8 @@ class PluginWebControllerTest {
         assertEquals("nosniff", res.getHeaders().getFirst("X-Content-Type-Options"));
         assertEquals("no-cache", res.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL));
         assertNotNull(res.getHeaders().getFirst("Content-Security-Policy"));
+        assertEquals("*", get("web-plugin", "assets/app.js").getHeaders().getFirst(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+        assertNull(res.getHeaders().getFirst(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
 
         assertEquals(200, get("web-plugin", "assets/app.js").getStatusCode().value(), "子目录资产应可服务");
     }
@@ -123,10 +125,12 @@ class PluginWebControllerTest {
 
         String offline = get("offline-plugin", "index.html").getHeaders().getFirst("Content-Security-Policy");
         assertTrue(offline.contains("default-src 'none'"), offline);
-        assertTrue(offline.endsWith("connect-src 'none'"), offline);
+        assertTrue(offline.contains("connect-src 'none';"), offline);
+        assertTrue(offline.endsWith("media-src blob:"));
+        assertFalse(offline.contains("unsafe-eval"));
 
         String online = get("online-plugin", "index.html").getHeaders().getFirst("Content-Security-Policy");
-        assertTrue(online.endsWith("connect-src https:"), online);
+        assertTrue(online.contains("connect-src https:;"), online);
         assertTrue(online.contains("img-src 'self' data:"), online);
     }
 

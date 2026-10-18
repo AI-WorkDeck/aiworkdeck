@@ -58,5 +58,7 @@ public class McpProperties {
         private int timeoutSeconds = 60;
         /** 启用开关 */
         private boolean enabled = true;
+        /** Internal flag for manifest endpoints; never relaxes configured provider authentication. */
+        private boolean pluginEndpoint;
     }
 }

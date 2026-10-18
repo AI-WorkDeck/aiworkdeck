@@ -348,6 +348,7 @@ export default {
   name: 'MeetingRecordingPanel',
   components: { AwdSwitch, AwdSelect },
   props: {
+    loadAudio: { type: Function, default: null },
     projectId: {
       type: [String, Number],
       required: true
@@ -1055,11 +1056,12 @@ export default {
         return
       }
       try {
-        const resp = await fetch(`${getApiBaseUrl()}/api/files/${m.audioFileId}/download`, {
-          headers: getAuthHeaders()
-        })
-        if (!resp.ok) throw new Error('HTTP ' + resp.status)
-        const blob = await resp.blob()
+        const blob = this.loadAudio ? await this.loadAudio(m) : await (async () => {
+          const resp = await fetch(`${getApiBaseUrl()}/api/files/${m.audioFileId}/download`, { headers: getAuthHeaders() })
+          if (!resp.ok) throw new Error('HTTP ' + resp.status)
+          return resp.blob()
+        })()
+        if (this._unmounted) return
         this._audioUrl = URL.createObjectURL(blob)
         this._player = new window.Audio(this._audioUrl)
         this._player.onended = () => { this.playingId = null }

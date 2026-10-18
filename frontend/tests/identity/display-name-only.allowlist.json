@@ -23,5 +23,10 @@
     "file": "src/pages/login/login.vue",
     "pattern": "this.registerForm.displayName || this.registerForm.username",
     "reason": "自建服务器的注册表单：显示名是选填项，留空时拿用户名当初始展示名写进新账号。这是一次性的建号取值，不是把用户名当名字显示——之后用户改了展示名，这里再也不参与。"
+  },
+  {
+    "file": "src/components/PluginConnectionSettings.vue",
+    "pattern": "url.username.length > 0",
+    "reason": "这里检查 OAuth 授权 URL 不得包含 userinfo 凭据，URL.username 不是产品用户名，也不参与界面姓名显示。"
   }
 ]

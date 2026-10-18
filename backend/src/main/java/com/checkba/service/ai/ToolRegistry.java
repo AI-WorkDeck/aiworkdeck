@@ -195,6 +195,11 @@ public class ToolRegistry {
         }
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.mcp.PluginMcpService pluginMcpService;
+
+    public void setPluginMcpService(com.checkba.service.ai.mcp.PluginMcpService service) { this.pluginMcpService = service; }
+
     private final List<AgentToolComponent> toolComponents;
     private final PluginService pluginService;
     private final ClientCapabilityService clientCapabilityService;
@@ -260,7 +265,9 @@ public class ToolRegistry {
      * 不按启停过滤——禁用插件的工具本来就不进候选集，目录里也就不会出现。
      */
     public Set<String> pluginToolNames() {
-        return java.util.Collections.unmodifiableSet(pluginService.getPluginTools().keySet());
+        Set<String> names = new java.util.HashSet<>(pluginService.getPluginTools().keySet());
+        if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
+        return java.util.Collections.unmodifiableSet(names);
     }
 
     /** 组件自报可用性绝不能掀翻启动：探测里抛出来的一律当"可用"，最坏只是多下发一个工具。 */
@@ -419,6 +426,7 @@ public class ToolRegistry {
      */
     public List<ToolSpecification> getAllSpecifications() {
         List<ToolSpecification> all = new ArrayList<>(builtinSpecifications);
+        if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> all.add(b.specification()));
         for (ToolSpecification spec : pluginService.getToolSpecifications()) {
             if (pluginToolEnabled(spec.name())) {
                 all.add(offerable(spec));
@@ -522,6 +530,7 @@ public class ToolRegistry {
                 names.add(name);
             }
         }
+        if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
         names.sort(Comparator.comparingInt(String::length).reversed());
         return names;
     }
@@ -544,6 +553,10 @@ public class ToolRegistry {
         RegisteredTool tool = builtinTools.get(name);
         if (tool != null) {
             return Optional.of(tool);
+        }
+        if (pluginMcpService != null) {
+            var binding = pluginMcpService.find(name);
+            if (binding != null) return Optional.of(new RegisteredTool(pluginMcpService, null, binding.specification(), null, true));
         }
         // 插件工具：先过启停过滤（禁用插件的工具视同不存在，重新启用即恢复）
         if (!pluginToolEnabled(name)) {
@@ -588,6 +601,15 @@ public class ToolRegistry {
             return new ToolResult(unknownToolMessage(resolvedName), null, false);
         }
         RegisteredTool tool = toolOpt.get();
+        if (tool.bean() instanceof com.checkba.service.ai.mcp.PluginMcpService mcp) {
+            try {
+                return new ToolResult(mcp.callAgent(resolvedName, new java.util.LinkedHashMap<>(parseArgs(argsJson)), ctx), tool, true);
+            } catch (com.checkba.service.ai.mcp.PluginMcpException e) {
+                return new ToolResult("Error: " + e.code() + ": " + e.getMessage(), tool, true);
+            } catch (IllegalArgumentException e) {
+                return new ToolResult("Error: invalid MCP arguments.", tool, true);
+            }
+        }
 
         // 插件工具权限校验（规范 v2）：所需权限未在 manifest permissions 中声明即拒绝
         if (tool.fromPlugin()) {
