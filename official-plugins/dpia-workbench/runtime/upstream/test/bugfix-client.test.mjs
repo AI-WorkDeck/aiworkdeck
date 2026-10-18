@@ -1,0 +1,51 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+const path=process.env.DPIA_CLIENT_SOURCE||new URL('../client.js',import.meta.url);
+const source=readFileSync(path,'utf8');
+const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
+const clone=x=>JSON.parse(JSON.stringify(x));
+function base(){return {id:'caseA',title:'案例A',version:4,materialDigest:'old',evidence:[],assets:[],events:[],answerDrafts:[],answerStates:[],result:{record:{revisionId:'old',inputVersion:4,materialDigest:'old'},assessment:{jurisdictions:[],facts:[{id:'F1',value:'文字',status:'documented',implementation:'planned',source_ids:[]}],questions:[],risks:[{id:'R1',scenario:'测试风险',fact_ids:['F1'],gdpr_rating:{level:'high'}}],actions:[],controls:[],rule_assessments:[],sources:[]},intake:{fact_links:[],checks:[]},sourceIndex:{passages:[],sources:[]},dimensions:[],warnings:[]}};}
+function fixture(c=base()){
+ const hooks=[],pending=[],timers=new Map(),boundaries=new Map(),calls=[];let cursor=0,component,props,tree,scheduled=false,disposed=false,clock=0;
+ const state={c,execution:{requestId:'request1',revision:1,phase:'accepted',running:true,statusKnown:true,sync:{state:'synced',revisionId:'old'}},handler:null};
+ const rpc=async p=>{calls.push(p);if(state.handler){const answer=state.handler(p);if(answer!==undefined)return await answer;}if(p.action==='list')return {cases:[{id:'caseA',title:'案例A',openGaps:0,riskCount:1,resultStatus:'synced'},{id:'caseB',title:'案例B',openGaps:0,riskCount:1,resultStatus:'synced'}],testFixtures:[],errors:[]};if(p.action==='get')return clone({...state.c,id:p.id,title:p.id==='caseB'?'案例B':'案例A'});if(p.action==='execution')return clone(state.execution);if(p.action==='reportList')return [];throw Error(p.action);};
+ function schedule(){if(scheduled||disposed)return;scheduled=true;queueMicrotask(()=>{scheduled=false;if(!disposed)render();});}
+ class Component{constructor(props){this.props=props;this.state={};}setState(v){this.state={...this.state,...v};schedule();}}
+ const React={Component,Fragment:'fragment',createElement:(type,props,...children)=>({type,props:{...props,children:children.flat(Infinity)},children:children.flat(Infinity)}),useState(initial){const i=cursor++;if(!(i in hooks))hooks[i]=initial;return [hooks[i],v=>{hooks[i]=typeof v==='function'?v(hooks[i]):v;schedule();}];},useRef(initial){const i=cursor++;return hooks[i]??={current:initial};},useEffect(fn,deps){const i=cursor++,old=hooks[i];if(!old||deps.some((v,j)=>!Object.is(v,old.deps[j]))){hooks[i]={deps,cleanup:old?.cleanup};pending.push(()=>{hooks[i].cleanup?.();hooks[i].cleanup=fn();});}}};
+ function expand(n,at='root'){
+  if(n==null||typeof n==='boolean'||typeof n==='string'||typeof n==='number')return n;
+  if(Array.isArray(n))return n.map((x,i)=>expand(x,at+'.'+i));
+  if(!('type' in n))throw Error('Objects are not valid as a React child: '+Object.keys(n).join(','));
+  if(typeof n.type==='function'){
+   if(n.type.prototype instanceof Component){const key=at+':'+(n.props.key||'');let inst=boundaries.get(key);if(!inst){inst=new n.type(n.props);boundaries.set(key,inst);}inst.props=n.props;
+    try{return expand(inst.render(),at+'.boundary');}catch(e){if(!n.type.getDerivedStateFromError)throw e;inst.state={...inst.state,...n.type.getDerivedStateFromError(e)};return expand(inst.render(),at+'.fallback');}}
+   return expand(n.type(n.props),at+'.function');
+  }
+  return {...n,children:n.children.map((x,i)=>expand(x,at+'.'+i))};
+ }
+ function render(){cursor=0;tree=expand(component(props));for(const fn of pending.splice(0))fn();}
+ vm.runInNewContext(source,{window:{__ModuleLoader__:{load(spec){spec.factory(()=>React).apply({connection:{rpc:{call:async(a,b,p)=>({ok:true,value:await rpc(p)})}},slots:{inject:(n,fn)=>fn(),register:(o,fn)=>{if(o.name==='main'){component=fn;props=o.inject();}}},uiWorkspace:{}});}}},setInterval:fn=>{timers.set(++clock,fn);return clock;},clearInterval:id=>timers.delete(id),setTimeout,console});
+ const all=(n,out=[])=>{if(Array.isArray(n)){n.forEach(x=>all(x,out));}else if(n&&typeof n==='object'){out.push(n);n.children?.forEach(x=>all(x,out));}return out;};
+ const text=n=>Array.isArray(n)?n.map(text).join(''):n==null||typeof n==='boolean'?'':typeof n==='object'?(n.children||[]).map(text).join(''):String(n);
+ const flush=async()=>{for(let i=0;i<4;i++)await new Promise(r=>setImmediate(r));};
+ const click=async(label,wait=true)=>{const n=all(tree).find(n=>n.type==='button'&&text(n)===label);assert.ok(n,'Missing button '+label);const result=n.props.onClick();if(wait){await result;await flush();}return wait?result:{promise:result};};
+ return {state,calls,flush,click,text:()=>text(tree),nodes:()=>all(tree),async open(){render();await flush();await click('案例A0 个待答 · 1 项风险记录');},tick:()=>{const fn=[...timers.values()][0];assert.ok(fn,'active poll');return fn();},dispose(){disposed=true;for(const h of hooks)h?.cleanup?.();},timerCount:()=>timers.size};
+}
+function newer(f){f.state.c={...f.state.c,version:5,materialDigest:'new',result:{...f.state.c.result,record:{revisionId:'new',inputVersion:5,materialDigest:'new'}}};f.state.execution={...f.state.execution,revision:2,running:false,stoppedAt:'2026-10-08T00:00:00Z',sync:{state:'synced',revisionId:'new'}};}
+const noError=f=>assert.doesNotMatch(f.text(),/这部分内容暂时无法显示/);
+
+test('BUG-001 JSON types remain readable across facts, confirm, correct, risks and opinion options',async()=>{
+ const c=base();c.result.assessment.facts[0].value={文字:'原文',零:0,布尔:false,列表:['甲',{乙:[true,0]}],空:null,空列表:[],空对象:{}};const f=fixture(c);try{await f.open();await f.click('材料与事实');noError(f);for(const text of ['原文','零0','布尔false','乙true0','空未提供','空列表空列表','空对象空对象'])assert.ok(f.text().includes(text),text);for(const label of ['确认这一事实','纠正 / 补充']){await f.click(label);noError(f);assert.ok(f.nodes().some(n=>n.props.role==='dialog'));await f.click('关闭 ×');}await f.click('评估与风险');noError(f);assert.match(f.text(),/布尔false/);await f.click('报告与版本');await f.click('筛查事实范围确认');noError(f);const option=f.nodes().find(n=>n.type==='option'&&n.props.value==='F1');assert.ok(option);assert.match(JSON.stringify(option.children),/布尔：false/);assert.doesNotMatch(f.text(),/\[object Object\]/);}finally{f.dispose();}
+});
+test('BUG-001 render failure stays local; retry and home preserve selected case and revision',async()=>{
+ const c=base();let broken=true;const f=fixture(c);try{await f.open();f.state.handler=p=>{if(p.action==='get'){const value=clone(c);Object.defineProperty(value.result.assessment.facts[0],'value',{get(){if(broken)throw Error('controlled page render fault');return c.result.assessment.facts[0].value;}});return value;}};await f.click('刷新运行状态');await f.click('材料与事实');assert.match(f.text(),/这部分内容暂时无法显示/);assert.match(f.text(),/案例A/);broken=false;await f.click('重试显示');noError(f);assert.match(f.text(),/文字/);broken=true;await f.click('总览');await f.click('材料与事实');assert.match(f.text(),/这部分内容暂时无法显示/);await f.click('返回总览');noError(f);assert.match(f.text(),/当前材料修订 4 · 分析依据材料 4/);}finally{f.dispose();}
+});
+test('BUG-002 manual refresh reads and applies adopted result, including terminal executions',async()=>{const f=fixture();try{await f.open();newer(f);const start=f.calls.length;await f.click('刷新运行状态');assert.deepEqual(f.calls.slice(start).map(x=>x.action),['execution','get','list']);assert.match(f.text(),/当前材料修订 5 · 分析依据材料 5/);assert.equal(f.timerCount(),0);}finally{f.dispose();}});
+test('BUG-002 slow result completes before terminal effect cleanup',async()=>{const f=fixture();try{await f.open();newer(f);const d=deferred();f.state.handler=p=>p.action==='get'?d.promise:undefined;const run=f.tick();await f.flush();assert.match(f.text(),/分析依据材料 4/);assert.equal(f.timerCount(),1);d.resolve(clone(f.state.c));await run;await f.flush();assert.match(f.text(),/分析依据材料 5/);assert.equal(f.timerCount(),0);}finally{f.dispose();}});
+test('BUG-002 fast result and report list update before stopping poll',async()=>{const f=fixture();try{await f.open();newer(f);f.state.execution.kind='report';await f.tick();await f.flush();assert.match(f.text(),/分析依据材料 5/);assert.ok(f.calls.some(x=>x.action==='reportList'));assert.equal(f.timerCount(),0);}finally{f.dispose();}});
+test('BUG-002 pending case A result cannot overwrite newly selected case B',async()=>{const f=fixture();try{await f.open();newer(f);const d=deferred();f.state.handler=p=>p.action==='get'&&p.id==='caseA'?d.promise:undefined;const run=f.tick();await f.flush();await f.click('案例B0 个待答 · 1 项风险记录');d.resolve({...clone(f.state.c),title:'过时案件A'});await run;await f.flush();assert.doesNotMatch(f.text(),/过时案件A/);assert.ok(f.nodes().some(n=>n.type==='h2'&&n.children.includes('案例B')));}finally{f.dispose();}});
+test('BUG-002 a newer refresh supersedes an older pending response',async()=>{const f=fixture();try{await f.open();const d=deferred();let reads=0;f.state.handler=p=>p.action==='get'&&reads++===0?d.promise:undefined;const old=clone(f.state.c);const run=f.tick();await f.flush();newer(f);await f.click('刷新运行状态');d.resolve(old);await run;await f.flush();assert.match(f.text(),/分析依据材料 5/);}finally{f.dispose();}});
+test('BUG-002 read failure retains old state, explains failure and permits retry',async()=>{const f=fixture();try{await f.open();newer(f);f.state.handler=p=>p.action==='get'?Promise.reject(Error('read failed')):undefined;await f.tick();await f.flush();assert.match(f.text(),/刷新未完成/);assert.match(f.text(),/分析依据材料 4/);assert.equal(f.timerCount(),1);f.state.handler=null;await f.click('刷新运行状态');assert.match(f.text(),/分析依据材料 5/);assert.doesNotMatch(f.text(),/刷新未完成/);}finally{f.dispose();}});
+test('BUG-002 a new request invalidates an old pending poll',async()=>{const f=fixture();try{await f.open();const d=deferred();let reads=0;f.state.handler=p=>p.action==='get'&&reads++===0?d.promise:undefined;const old=clone(f.state.c);const run=f.tick();await f.flush();f.state.execution={...f.state.execution,requestId:'request2'};await f.click('案例A0 个待答 · 1 项风险记录');d.resolve({...old,title:'过时请求'});await run;await f.flush();assert.doesNotMatch(f.text(),/过时请求/);}finally{f.dispose();}});

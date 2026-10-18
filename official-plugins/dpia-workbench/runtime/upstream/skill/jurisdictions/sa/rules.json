@@ -1,0 +1,367 @@
+{
+  "jurisdiction": "SA",
+  "version": "0.1.0",
+  "verified_at": "2026-09-11",
+  "rules": [
+    {
+      "id": "SA-T01",
+      "jurisdiction": "SA",
+      "kind": "trigger",
+      "title": "敏感数据处理",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(1)(a)"
+        }
+      ],
+      "required_facts": [
+        "processing_facts",
+        "data_categories",
+        "scale",
+        "affected_people",
+        "rights_impact"
+      ],
+      "logic": "已分类为SA敏感数据即触发，不另加规模限制。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-T02",
+      "jurisdiction": "SA",
+      "kind": "trigger",
+      "title": "不同来源两个以上数据集",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(1)(b)"
+        }
+      ],
+      "required_facts": [
+        "processing_facts",
+        "data_categories",
+        "scale",
+        "affected_people",
+        "rights_impact"
+      ],
+      "logic": "收集、比较或关联；记录数据集和来源。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-T03",
+      "jurisdiction": "SA",
+      "kind": "trigger",
+      "title": "第25(1)(c)整体情形",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(1)(c)"
+        }
+      ],
+      "required_facts": [
+        "processing_facts",
+        "data_categories",
+        "scale",
+        "affected_people",
+        "rights_impact"
+      ],
+      "logic": "按阿文核对大规模或重复与并列活动的修饰范围；解释不足unknown，不机械采用英译AND。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-T04",
+      "jurisdiction": "SA",
+      "kind": "trigger",
+      "title": "产品服务可能严重损害隐私",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(1)(d)"
+        }
+      ],
+      "required_facts": [
+        "processing_facts",
+        "data_categories",
+        "scale",
+        "affected_people",
+        "rights_impact"
+      ],
+      "logic": "结合活动与损害事实作出判断。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C01",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "目的和法律基础",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(2)(a)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C02",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "性质种类来源和接收方",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(2)(b)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C03",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "种类及地理范围",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(2)(c)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C04",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "主体和处理关系背景",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(2)(d)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C05",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "必要性比例性及最少处理",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(2)(e)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C06",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "物质精神影响和可能性",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(2)(f)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C07",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "预防减轻风险措施",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(2)(g)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C08",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "计划措施适当性",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(2)(h)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C09",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "向相关处理者提供副本",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(3)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C10",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "消除损害原因并复评",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "25(4)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C11",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "关联原则权利安全处理者义务",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "17,19,23; PDPL related provisions"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "SA-C12",
+      "jurisdiction": "SA",
+      "kind": "content",
+      "title": "LIA及出境专项衔接",
+      "legal_force": "regulation",
+      "source_refs": [
+        {
+          "source_id": "SA-IR",
+          "locator": "16; PDPL29 and operative transfer regulation"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项论证；法定要素不可空白，不适用须记录事实与理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    }
+  ]
+}

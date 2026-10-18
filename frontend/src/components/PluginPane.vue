@@ -48,7 +48,7 @@
 // v2.7 实验 API：x- 前缀方法只对本机 dev 免签直装的插件开放（devInstalled prop），
 // 广场装的插件调用一律 experimental_not_allowed——运行时闸是真保证，受理扫描只是辅助。
 import {
-  getPlugins, getProjectFiles, getFileText, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm,
+  getPlugins, getProjectFiles, getFileText, getAiConversations, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm,
   requestPluginLawFirm,
   createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks,
   getTeam, getProjectMembers, getCurrentUser, searchProjectContent, getProjectTags,
@@ -703,6 +703,33 @@ export default {
           if (!prompt) return { ok: false, error: { code: 'invalid_params', message: 'prompt 不能为空' } }
           if (prompt.length > 4000) return { ok: false, error: { code: 'quota_exceeded', message: 'prompt 超过 4000 字上限' } }
           this.$emit('kickoff', { prompt })
+          return { ok: true, result: {} }
+        }
+
+        case 'chat.open': {
+          if (!this.hasPermission('ai')) return this.denied('ai')
+          const conversationId = String(params.conversationId || '')
+          if (!conversationId || conversationId.length > 200) return { ok: false, error: { code: 'invalid_params', message: '无效的会话标识' } }
+          const generation = this.sessionGeneration
+          const projectId = this.projectId
+          const response = await getAiConversations(projectId)
+          if (generation !== this.sessionGeneration || String(projectId) !== String(this.projectId)) return this.staleContext()
+          const rows = Array.isArray(response) ? response : response?.data
+          const conversation = Array.isArray(rows) && rows.find(row => row.conversationId === conversationId)
+          if (!conversation) return { ok: false, error: { code: 'not_found', message: '当前项目中尚无该会话记录，请在任务开始后重试' } }
+          if (!this.businessActions.openConversation || !await this.businessActions.openConversation(conversation)) {
+            return { ok: false, error: { code: 'open_failed', message: '执行会话未能打开，请重试' } }
+          }
+          return { ok: true, result: {} }
+        }
+
+        case 'ui.openUrl': {
+          if (!this.hasPermission('network')) return this.denied('network')
+          let url
+          try { url = new URL(String(params.url || '')) } catch { return { ok: false, error: { code: 'invalid_params', message: '无效的网址' } } }
+          if (url.protocol !== 'https:' || url.username || url.password) return { ok: false, error: { code: 'invalid_params', message: '仅支持不含登录信息的 HTTPS 网址' } }
+          if (!this.businessActions.openBrowser) return { ok: false, error: { code: 'unavailable', message: '浏览器入口暂不可用' } }
+          await this.businessActions.openBrowser(url.href)
           return { ok: true, result: {} }
         }
 

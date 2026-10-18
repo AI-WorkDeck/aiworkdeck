@@ -1,6 +1,6 @@
 # AI WorkDeck 隐私说明
 
-更新日期：2026-10-16
+更新日期：2026-10-18
 
 本说明描述 AI WorkDeck 桌面应用及 Office/WPS 插件的两件事：
 
@@ -72,6 +72,8 @@
 **第三方插件的自有服务（可选，新宿主能力）。** 启用声明了网络权限的插件并使用其连接、MCP 或订阅功能时，本机可向该插件清单声明的 HTTPS 服务发送本次操作参数，以及你已授权该插件读取并用于该操作的材料。接收方由插件开发者提供，可在插件设置和清单中核对；它可能不是 AI WorkDeck 的服务。自有账号登录在系统浏览器或宿主可信连接表单中完成，令牌按用户、宿主账户、插件和连接加密保存在本机，不提供给插件页面。你可以断开连接、撤销开发服务授权或禁用插件；这会阻止后续使用该连接，不能撤回接收方已经收到的内容。
 
 开发者订阅状态由其服务返回，付款页面经确认后在浏览器打开，登录与付款信息按接收方政策处理。使用主产品共享 AI、文件或文档通道时仍适用本说明对应规则及产品额度。插件开发投稿只在开发者主动提交时上传插件源包和清单到官网，不自动上传工作项目材料；审核与签名不意味着第三方服务采用与主产品相同的留存规则。
+
+**DPIA 工作台插件（可选，新宿主能力）。** 安装启用后，评估材料、事实记录、补答、报告与历史版本以明文保存在运行插件的后端用户目录，按 AI WorkDeck 用户和项目分隔；桌面本地后端存于本机，团队后端存于该服务器。你明确启动分析、复评或报告任务时，材料经现有原生 AI 会话发送给所选模型，检索沿用宿主既有通道及计费规则。核验公开模板时直接访问欧洲数据保护委员会网站（edpb.europa.eu），只请求公开资源，不向上游工作台作者上传评估材料。导出写入当前项目，适用该项目的备份与共享规则；禁用或卸载插件不删除评估历史，删除原生会话也不同时删除插件案件文件。
 
 **包晴天插件（可选）。** 安装并启用后，插件在你登录、浏览案源或管理笔记时，由本机直接访问包晴天服务（uat.bqt.com）。发送验证码和登录会向包晴天提交你填写的手机号、区号和验证码；新增、修改、发布或删除笔记会向包晴天提交对应内容或状态。新建图文或视频笔记时，你主动选择的图片、视频和独立封面会经本机插件上传到包晴天指定的腾讯云 COS 存储；上传签名和分片缓存仅在本机后端内存中暂存，不写入插件配置。会话仅保留在本机后端内存，按 AI WorkDeck 用户隔离，退出插件登录或重启后端即清除。笔记保存在包晴天平台，受其用户协议与隐私政策约束；本插件不上传项目文件正文，也不向 Marketplace 回传笔记或案源。工作区页面操作不主动调用模型；本插件的工具桥仅供页面加密调用，不开放 AI 对话中的明文业务调用。公开发布与删除由你明确操作；关闭未保存的编辑页可能丢失本页草稿。
 
@@ -195,7 +197,7 @@
 
 # AI WorkDeck Privacy Note
 
-Last updated: 2026-10-16
+Last updated: 2026-10-18
 
 ## Part 1 — Platform services
 
@@ -231,6 +233,8 @@ This decision **does not separately include attachments, chat history or documen
 **Add-in document and conversation retention.** Inline document bodies and raw tool arguments/results are used for the current turn and transient memory caches, not stored in the request queue or conversation history. The add-in does not automatically create durable conversation summaries. Queued input bodies expire after at most 30 minutes and may be evicted earlier or lost on restart; a new upload is then required. User messages, AI replies and reasoning remain as conversation history **until the user deletes the conversation, with no separate automatic expiry**. This includes document text pasted by the user or quoted by the AI. Conversation deletion also removes queue requests and derived summaries and clears document caches; billing usage records remain. Copies already mirrored to a desktop project follow that project's rules and are not remotely erased by deleting the cloud conversation. Earlier versions stored inline bodies in the queue and tool excerpts and summaries in conversation storage; this update removes historical inline bodies from the live request queue. It also removes raw tool excerpts and derived summaries from conversations still identifiable as Office/WPS add-in conversations through their request-source records. Historical conversations without those source records cannot be reliably classified and are not covered by this Office-specific cleanup. Operational backups and material already sent to third parties are separate; this is not a promise of retrospective erasure of every copy.
 
 **Recipients of add-in AI requests.** Official add-in requests reach the AI WorkDeck cloud backend, then **OpenRouter**, then the inference provider serving the selected model. Available model developers include DeepSeek, Z.ai, Moonshot AI, Alibaba/Qwen, Anthropic, Google, OpenAI and xAI. A model's developer and its inference host can differ depending on routing. Requests include the current question, necessary conversation history, the current document and references the user selects. OpenRouter and each inference provider have their own retention, training and processing-location policies; our transient processing rule does not promise third-party zero retention. See the [OpenRouter provider list](https://openrouter.ai/providers/) and [OpenRouter privacy policy](https://openrouter.ai/privacy/).
+
+**DPIA Workbench plugin (optional, new host capability).** Assessment materials, fact records, follow-up answers, reports and revisions are stored unencrypted under the user directory of the backend running the plugin, separated by AI WorkDeck user and project. A local desktop backend stores them on the device; a team backend stores them on that server. Explicitly starting an analysis, reassessment or report task sends materials to your selected model through the existing native AI conversation flow; retrieval uses the host’s existing channels and billing rules. Public template checks contact the European Data Protection Board (edpb.europa.eu) for public resources only; assessment materials are not uploaded to the upstream workbench author. Exports are saved to the current project and follow its backup and sharing rules. Disabling or uninstalling the plugin retains assessment history, and deleting a native conversation does not also delete plugin case files.
 
 **Baoqingtian plugin (optional).** When you sign in, browse case leads or manage notes, the plugin connects directly from your device to Baoqingtian (uat.bqt.com). Requesting a verification code and signing in sends your entered phone number, country code and verification code to that service. Creating, editing, publishing or deleting a note sends the corresponding content or status. When creating an image or video note, the images, video and separate cover you select are uploaded by the local plugin to Baoqingtian’s designated Tencent Cloud COS storage. Upload signatures and buffered file chunks remain temporarily in local backend memory and are not written to plugin settings. Sessions remain only in the local backend memory, separated by AI WorkDeck user, and are cleared on plugin sign-out or backend restart. Notes are stored by Baoqingtian under its terms and privacy policy. The plugin does not upload project document contents or send notes or leads to the Marketplace. Workspace actions do not initiate model requests. The plugin tool bridge is reserved for encrypted workspace calls and does not accept plaintext business actions from AI chat. Publishing and deletion require your explicit action; closing an unsaved editor may discard its local edits.
 

@@ -555,8 +555,8 @@ insertText(text)/addComment(anchorText, text)`、`awd.events.on(name, cb)`（返
 
 ## 11. 宿主 SPI（`plugin-api`，v2.4）
 
-工件 `com.checkba:plugin-api`（当前 **1.2.0**：1.1.0 加 `Evidence.linkAtQuote`，1.2.0 加
-`evidence` 包——见 §13；源码 `backend/plugin-api/`，Java 21，无第三方依赖）。
+工件 `com.checkba:plugin-api`（当前 **1.3.0**：1.1.0 加 `Evidence.linkAtQuote`，1.2.0 加
+`evidence` 包——见 §13，1.3.0 加 `PluginSessions`——见 §18；源码 `backend/plugin-api/`，Java 21，无第三方依赖）。
 不在远端仓库：本地 `mvn -q -f backend/plugin-api/pom.xml install` 后，插件以 `provided` 依赖它
 （示例 `examples/hello-plugin/pom.xml`）。**只加不破**：已发布的方法签名与 record 字段不改不删，
 新增能力走新方法 / 新 record 字段追加。
@@ -569,6 +569,7 @@ public interface PluginHost {
     String pluginId(); ToolCall call();
     Files files(); Text text(); Tags tags(); Evidence evidence();
     Jobs jobs(); Docs docs(); Settings settings(); Llm llm();
+    default PluginSessions sessions(); // 1.3.0；旧实现默认抛 UnsupportedOperationException
 }
 public record ToolCall(Long projectId, String conversationId, Long userId, String modelId) {}
 ```
@@ -961,3 +962,25 @@ SDK 1.5.0 新增可选权限 `im`。`im.request {action,params}` 经 `/api/plugi
 插件需完成安装、启用、即时出现入口、打开视图、至少一次主要操作、禁用/卸载后入口和在途结果清理。另验证无项目场景、身份切换、权限不足、取消/迟到响应、窄面板和主题。服务接入测试应说明是真实供应商联调还是本地协议替身；单元测试不能代替实际 OAuth、支付或跨平台设备验证。
 
 侧栏保留项逐项理由：home 提供当前项目概况；projects 管理切换项目及离开前保存；files 提供文件树、编辑器与拖放根入口；dev/market 是可信安装和授权管理；version/staging 参与文档合并、落盘和发布事务；members 管理成员及访问控制。CLIENT 的 dd-files 是客户访问码下的受限资料门户，继续按角色隔离，云端律师的尽调资料入口维持云端轨道条件。腾讯会议使用已有 tencent-meeting 插件，不保留重复静态面板。
+
+
+## 18. 插件原生 Agent 会话（plugin-api 1.3.0，宿主 0.65.0 起）
+
+`PluginHost.sessions()` 为需要多步工具执行、持久任务和可见过程的 JAR 插件提供原生 Agent 会话。`authorize()` 检查当前插件启用/未撤销、`file_read`/`file_write` 权限以及当前用户对项目的内部成员写权限；CLIENT 不可调用。`ensure(key,title)` 创建或复用持久绑定，`status(key)` 返回 `PluginSession(key, conversationId, running)`。key 为 `session-<UUID>`，标题 1–120 字；用户、项目和插件身份均取可信 `ToolCall`，不接受参数自报。绑定在数据库持久化，空会话不保证立即出现在历史列表。
+
+`submit(key,requestId,prompt,skillIds)` 通过现有持久 inbox 排队，沿用 Agent 的模型配置、付费检查、用量记录和工具调用链；必须有 `ai` 权限，且指定该插件拥有并可用的 skill。prompt 不超过 200,000 字符，requestId 不超过 128 字符；重试复用同一 requestId 和冻结输入，不生成第二份任务。返回 true 表示接受，不表示评估成功。`cancel(key)` 删除待执行输入并向在途任务请求取消；回执不代表已经执行的工具已停止或写入已撤回。停用后旧 JAR 实例也不能继续使用这些接口。
+
+Web 侧通过现有 `awd.call` 使用两个新增方法，无需升级 SDK 副本：
+
+- `chat.open {conversationId}`：需 `ai` 权限；只打开当前项目、当前用户历史列表中的原生会话。查询途中切换项目或账户会丢弃结果。
+- `ui.openUrl {url}`：需 `network` 权限；只接受不含用户名/密码的 HTTPS 地址，交由宿主浏览器入口打开。
+
+### 18.1 DPIA 工作台参考实现
+
+`official-plugins/dpia-workbench/` 包含独立 manifest、JAR、React 面板、受限 Node 适配器与上游 Python 工具。上游固定为 DSH DPIA Workbench `66c5e11c022277625072a50765793b257a6626a7`（0.3.11-beta.6，AGPL-3.0-only）；作者、模板属性和改动清单见该目录 `UPSTREAM.md`。保留上游事实溯源、冻结任务、补答/复评、追加版本及报告检查门槛。
+
+UI 的 `dpia_workbench_action` 和 Agent 的 `dpia_workbench_task` 按可信调用上下文分离：AI 不能经工具替用户确认事实或审批，任务必须绑定本案件原生会话、冻结 requestId 和当前执行阶段；读写限于本案件及只读 skill，不能执行任意脚本。取消可越过长渲染的项目锁。导出先写入当前项目再用 `ui.openFile` 打开，不依赖 sandbox 下载权限。
+
+运行依赖 Node.js、Python 文档库，PDF/页面渲染另需 LibreOffice；路径来自插件设置或系统安装。案件数据在后端用户目录按用户/项目隔离，禁用/卸载保留。模板核验只访问 EDPB 公开来源，业务材料经用户选择的宿主模型处理。GDPR/EU 方法不自动等同中国个人信息保护影响评估。
+
+本次源码和独立包交付未发布宿主 0.65.0，当前 0.64.1 必须拒载；市场签名发布与客户端升级需单独执行。安装装载、模型替身及报告测试的实际范围见插件 README，不将合成测试等同正式业务结论验收。
