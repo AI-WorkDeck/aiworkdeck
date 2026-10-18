@@ -21,3 +21,22 @@ export function openExternalUrl(url) {
     console.warn('打开外部链接失败:', e)
   }
 }
+
+// Plugin login/checkout must not report "opened" when the browser rejected it.
+// Keep the legacy fire-and-forget helper above unchanged for existing callers.
+export async function openExternalUrlChecked(value) {
+  const url = new URL(value)
+  if (url.protocol !== 'https:' || url.username.length > 0 || url.password.length > 0) throw new Error('Invalid external URL')
+  const shell = host.shell
+  if (shell && typeof shell.openExternal === 'function') {
+    const result = await shell.openExternal(url.href)
+    if (result?.ok === false) throw new Error(result.message || 'System browser could not open the page')
+    return
+  }
+  const tab = window.open('', '_blank')
+  if (!tab) throw new Error('浏览器阻止打开页面，请允许弹出窗口后重试 / Browser blocked the page; allow pop-ups and retry')
+  try {
+    tab.opener = null
+    tab.location.replace(url.href)
+  } catch (error) { tab.close(); throw error }
+}

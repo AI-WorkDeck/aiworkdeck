@@ -10,9 +10,9 @@ declare namespace awd {
   interface CallOptions { signal?: AbortSignal; /** 1–120000 ms; default 60000. */ timeoutMs?: number }
   interface RequestOptions extends CallOptions { requestId?: string }
   interface SettingsOptions extends CallOptions { scope?: 'user' | 'project'; projectId?: number | string }
-  interface ConnectionSummary { id: string; label?: string; connected?: boolean; [key: string]: unknown }
+  interface ConnectionSummary { id: string; label?: string; connected?: boolean; needsReconnect?: boolean; [key: string]: unknown }
   interface McpServer { id: string; name?: string; [key: string]: unknown }
-  interface BillingStatus { provider: 'host' | 'developer'; active: boolean; plan?: string }
+  interface BillingStatus { provider: 'host' | 'developer'; active: boolean; plan?: string; /** Host status: false means cached/offline, not a fresh payment confirmation. */ refreshed?: boolean }
   interface BridgeError extends Error { code: string }
   interface Context { pluginId?: string; projectId?: number | string | null; language?: string; theme?: 'light' | 'dark'; themeTokens?: Record<string, string>; [key: string]: unknown }
   interface File { path: string; name: string; size: number; [key: string]: unknown }

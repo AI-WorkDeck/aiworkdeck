@@ -2,26 +2,119 @@
   "$schema": "../../sdk/plugin-sdk/manifest.schema.json",
   "id": "plugin-service-demo",
   "name": "宿主服务与连接示例",
-  "version": "0.1.0",
-  "description": "演示插件设置、宿主 AI、自带服务连接、MCP 与订阅入口。示例服务地址需要开发者替换。",
+  "version": "0.2.0",
+  "description": "演示宿主设置与 AI、独立 Bearer/OAuth 服务连接、MCP、平台插件权益和自有订阅。接入前请配置自己的服务地址。",
   "author": "AI WorkDeck",
-  "permissions": ["ai", "network", "file_read"],
+  "permissions": [
+    "ai",
+    "network",
+    "file_read"
+  ],
   "frontendEntry": "web/index.html",
   "backendJars": [],
   "tools": [],
-  "settings": [{ "key": "greeting", "scope": "user", "type": "string", "label": "问候语", "default": "你好" }],
+  "settings": [
+    {
+      "key": "greeting",
+      "scope": "user",
+      "type": "string",
+      "label": "问候语",
+      "default": "你好"
+    }
+  ],
   "contributes": {
-    "views": [{ "id": "main", "name": "宿主服务示例", "entry": "web/index.html", "placement": "sidebar", "scope": "project", "defaultDock": "left", "allowedDocks": ["left", "right", "bottom"] }],
-    "connections": [{
-      "id": "example-provider",
-      "label": "示例服务（需替换地址）",
-      "baseUrl": "https://service.example.invalid",
-      "auth": { "type": "bearer" },
-      "operations": {
-        "query": { "path": "/v1/query", "method": "POST" },
-        "subscription": { "path": "/v1/subscription", "method": "GET" }
+    "views": [
+      {
+        "id": "main",
+        "name": "宿主服务示例",
+        "entry": "web/index.html",
+        "placement": "sidebar",
+        "scope": "project",
+        "defaultDock": "left",
+        "allowedDocks": [
+          "left",
+          "right",
+          "bottom"
+        ]
+      }
+    ],
+    "connections": [
+      {
+        "id": "example-provider",
+        "label": "Bearer 示例服务（需替换地址）",
+        "baseUrl": "https://service.example.invalid",
+        "auth": {
+          "type": "bearer"
+        },
+        "operations": {
+          "query": {
+            "path": "/v1/query",
+            "method": "POST"
+          },
+          "subscription": {
+            "path": "/v1/subscription",
+            "method": "GET"
+          }
+        },
+        "billing": {
+          "statusOperation": "subscription",
+          "checkoutUrl": "https://service.example.invalid/plans"
+        }
       },
-      "billing": { "statusOperation": "subscription", "checkoutUrl": "https://service.example.invalid/plans" }
-    }]
+      {
+        "id": "oauth-provider",
+        "label": "OAuth 示例服务（需替换地址）",
+        "baseUrl": "https://service.example.invalid",
+        "auth": {
+          "type": "oauth2",
+          "authorizationUrl": "https://service.example.invalid/oauth/authorize",
+          "tokenUrl": "https://service.example.invalid/oauth/token",
+          "clientId": "plugin-service-demo",
+          "scopes": [
+            "profile"
+          ]
+        },
+        "operations": {
+          "query": {
+            "path": "/v1/query",
+            "method": "POST"
+          },
+          "subscription": {
+            "path": "/v1/subscription",
+            "method": "GET"
+          }
+        },
+        "billing": {
+          "statusOperation": "subscription",
+          "checkoutUrl": "https://service.example.invalid/plans"
+        }
+      }
+    ],
+    "mcpServers": [
+      {
+        "id": "example-mcp",
+        "transport": "streamable-http",
+        "url": "https://service.example.invalid/mcp",
+        "connectionId": "example-provider",
+        "tools": [
+          {
+            "name": "echo",
+            "description": "回显输入文本，用于验证服务连接与工具调用。",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ]
+      }
+    ]
   }
 }
