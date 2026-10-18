@@ -981,10 +981,10 @@ check('无项目态：项目面板不挂载、右栏 AI 不渲染、暂存区不
   const src = readVue('src/pages/project-overview/project-overview.vue')
   if (!extractDefinition(src, 'hasProject')) return '缺 hasProject 计算属性'
   const sw = readFrontend('src/pages/project-overview/panelSwitching.js')
-  if (!/if \(\(!this\.hasProject \|\| this\.isLooseWorkspace\) && !isPaneAllowedWithoutProject\(key\)\) return/.test(sw)) {
+  if (!sw.includes('!this.hasProject || this.isLooseWorkspace') || !sw.includes('!isPaneAllowedWithoutProject(key)') || !sw.includes('!isGlobalPlugin(')) {
     return 'toggleLeftPane 没有在无项目态拦下项目面板的 key'
   }
-  if (!src.includes('v-if="aiPanelMounted && hasProject"')) return '右栏 AI 面板在无项目态仍会渲染'
+  if (!/<ChatInterface\s+v-if="hasProject"/.test(src)) return '右栏 AI 面板在无项目态仍会渲染'
   const tog = extractDefinition(src, 'toggleAiPanel')
   if (!tog || !tog.includes('if (!this.hasProject) return')) return 'toggleAiPanel 在无项目态没有直接返回'
   const onLoad = extractMethodBody(src, 'onLoad(query)')
@@ -1034,7 +1034,7 @@ check('日程是工作台里的中栏标签：四处入口开 openCalendarTab，
   if (!open || !open.includes("this.$emit('open-calendar')") || /pages\/calendar|leave-workbench/.test(open)) {
     return 'ProjectCalendarPane.openGlobalCalendar 应当 emit open-calendar'
   }
-  if (!src.includes('@open-calendar="openCalendarTab()"')) return '工作台没有把日程面板的 open-calendar 接到 openCalendarTab'
+  if (!readFrontend('src/pages/project-overview/calendarTab.js').includes("this.openPluginTab('calendar')")) return '日程入口未连接真实插件工作区'
   if (src.includes('@leave-workbench="leaveWorkbench"')) return '日程面板的 leave-workbench 绑定应已撤掉'
   // 3. 左栏「项目」面板的事项概览格 / 查看日程 / 下一件
   const list = readVue('src/components/project-list/ProjectListPane.vue')
@@ -1057,40 +1057,20 @@ check('日程是工作台里的中栏标签：四处入口开 openCalendarTab，
   return null
 })
 
-check('日程标签：单例 tabType calendar，左右两条渲染链 embedded + 全局视图，非文件标签', () => {
+check('日程插件：全局工作区贡献，复用双侧插件标签、深链和受限宿主导航', () => {
+  const manifest = JSON.parse(readRepo('official-plugins/calendar/manifest.json'))
+  if (!manifest.contributes.views.some(view => view.placement === 'workspace' && view.scope === 'global')) return '日程缺少全局工作区贡献'
   const src = readVue('src/pages/project-overview/project-overview.vue')
-  const n = countOf(src, "tabType === 'calendar'")
-  if (n !== 2) return `左右两条渲染链应各有一条 calendar 分支，实际 ${n} 处`
-  for (const side of ['Left', 'Right']) {
-    const at = src.indexOf(`v-else-if="activeFile${side}.tabType === 'calendar'"`)
-    const tag = src.slice(src.lastIndexOf('<CalendarPane', at), src.indexOf('/>', at))
-    if (!tag.startsWith('<CalendarPane')) return `${side} 分支渲染的不是 CalendarPane`
-    if (!/\bembedded\b/.test(tag)) return `${side} 分支没有 embedded`
-    if (!tag.includes(':project-id="null"')) return `${side} 分支应传 :project-id="null"（全局视图，筛选里按项目收窄）`
-    for (const ev of ['@open-project="onCalendarOpenProject"', '@open-file="onCalendarOpenFile"', '@close="closeCalendarTab"']) {
-      if (!tag.includes(ev)) return `${side} 分支缺 ${ev}`
-    }
-  }
+  if (countOf(src, ':url="entry.plugin.workspaceView?.url || entry.plugin.frontendEntry"') !== 2) return '左右两侧必须使用当前manifest工作区入口'
+  if (src.includes('<CalendarPane')) return '宿主仍直接挂业务日历组件'
   const tab = readFrontend('src/pages/project-overview/calendarTab.js')
-  if (!tab.includes("export const CALENDAR_TAB_ID = 'calendar'")) return '日程标签的单例 id 不是 calendar'
+  if (!tab.includes("this.openPluginTab('calendar')") || !tab.includes("command: 'calendar-focus'")) return '日程未连接插件标签及深链'
   const op = extractDefinition(tab, 'onCalendarOpenProject')
-  if (!op || !op.includes('this.leaveWorkbench(')) return '日程标签跨项目「进入项目」要走 leaveWorkbench'
+  if (!op || !op.includes('this.leaveWorkbench(')) return '跨项目仍须走保存后离开工作台'
   const of = extractDefinition(tab, 'onCalendarOpenFile')
-  if (!of || !of.includes('this.onTaskOpenFile(') || !of.includes('this.leaveWorkbench(')) {
-    return '日程标签「打开文件」：同项目就地 onTaskOpenFile、跨项目 leaveWorkbench'
-  }
-  const kind = readFrontend('src/pages/project-overview/fileKind.js')
-  if (!/NON_FILE_TAB_TYPES = \[[^\]]*'calendar'/.test(kind)) return "NON_FILE_TAB_TYPES 里没有 'calendar'"
-  // 标签形态下 CalendarPane 的跳转只 emit、不自己 reLaunch（它是 defineAsyncComponent 引入的，
-  // 上面「组件跳出工作台」那条按 import 语句扫不到它，这里单独钉住）
-  const cp = readVue('src/components/calendar/CalendarPane.vue')
-  for (const m of ['goToProject', 'onOpenFile', 'goBack']) {
-    const body = extractDefinition(cp, m)
-    const emitAt = body ? body.indexOf('if (this.embedded)') : -1
-    const navAt = body ? body.search(/uni\.(reLaunch|navigateTo|redirectTo)\(/) : -1
-    if (emitAt < 0 || (navAt >= 0 && navAt < emitAt)) return `CalendarPane.${m} 在 embedded 时必须先 emit 再 return`
-  }
-  if (!/v-if="!embedded" class="cal-back"/.test(cp)) return '标签形态下页头「返回」应隐藏'
+  if (!of || !of.includes('this.onTaskOpenFile(') || !of.includes('this.leaveWorkbench(')) return '日程文件导航丢失同项目/跨项目边界'
+  const cp = readFrontend('plugin-app/calendar/Panel.vue')
+  if (!cp.includes("'sidebar.command'") || !cp.includes("'calendar-file'") || !cp.includes('fileScopeId')) return '日程包缺深链或文件筛选'
   return null
 })
 

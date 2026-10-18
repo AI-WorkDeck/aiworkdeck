@@ -372,7 +372,7 @@ import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
 import { refreshEntitlements } from '@/composables/useEntitlement.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { ICONS } from '@/config/icons.js'
-import { isPanelSkill, isVoiceGroupMember, buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
+import { isPanelSkill, isVoiceGroupMember } from '@/config/leftSidebarPlugins.js'
 import { t } from '@/i18n'
 import AwdSelect from '@/components/AwdSelect.vue'
 import AwdSwitch from '@/components/AwdSwitch.vue'
@@ -383,6 +383,11 @@ const PERMISSION_LABELS = {
   network: t('market.permNetwork'),
   im: t('market.permIm'),
   editor: t('market.permEditor'),
+  ai: t('market.permAi'),
+  speech: t('market.permSpeech'),
+  tasks: t('market.permTasks'),
+  clipboard: t('market.permClipboard'),
+  lawfirm: t('market.permLawfirm'),
 }
 
 // 分类沿用官网 SKILL_CATEGORIES（aiworkdeckweb lib/skill-categories）；registry 未返回 category 时归入"其他"
@@ -463,30 +468,12 @@ export default {
     ICONS() {
       return ICONS
     },
-    /** 面板型（长在左栏 rail 上）：广场里按插件呈现。
-        「语音」的两个成员 skill 合成一张卡（左栏一个图标 = 一个插件，dev-board#66），
-        开关一次作用于全部成员（onPanelSkillToggle）。 */
+    /** The voice panel has a real plugin lifecycle; AI skills retain their own activation mode. */
     panelSkills() {
-      // 插件携带的 skill 跟随插件启停，不在这里单列
-      const rows = []
-      const voiceGroup = buildVoiceGroupSkill(this.skills)
-      let voiceEmitted = false
-      for (const s of this.skills) {
-        if (!isPanelSkill(s.id) || s.sourcePluginId) continue
-        if (voiceGroup && isVoiceGroupMember(s.id)) {
-          if (!voiceEmitted) {
-            voiceEmitted = true
-            rows.push(voiceGroup)
-          }
-          continue
-        }
-        rows.push(s)
-      }
-      return rows
+      return this.skills.filter(s => isPanelSkill(s.id) && !isVoiceGroupMember(s.id) && !s.sourcePluginId)
     },
-    /** 对话型：在对话里被触发词命中的那一类，才有「生效方式三档」 */
     conversationSkills() {
-      return this.skills.filter((s) => !isPanelSkill(s.id) || s.sourcePluginId)
+      return this.skills.filter(s => !isPanelSkill(s.id) || isVoiceGroupMember(s.id) || s.sourcePluginId)
     },
     installedCount() {
       return this.plugins.length + this.skills.length

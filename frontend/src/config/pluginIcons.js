@@ -22,6 +22,11 @@ export const PLUGIN_GLYPH_MAP = Object.freeze({
   tmeet: ICONS.tmeet,
   baoqingtian: ICONS.baoqingtian,
   voice: ICONS.audioLines,
+  search: ICONS.search,
+  calendar: ICONS.calendar,
+  favorites: ICONS.star,
+  clipboard: ICONS.copyDoc,
+  insight: ICONS.bookSearch,
   desensitize: ICONS.catCompliance,
   'litigation-visual': [
     'M3 17h18',

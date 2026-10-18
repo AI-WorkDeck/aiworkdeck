@@ -331,7 +331,7 @@
           <text v-else class="rail-icon">{{ p.icon }}</text>
           <!-- 日程徽标（dev-board#899）：当前项目 逾期 + 今天 的未完成事项数，0 不显；有逾期时转朱砂红 -->
           <text
-            v-if="p.key === 'calendar' && railScheduleCount > 0"
+            v-if="p.key === 'plugin-calendar' && railScheduleCount > 0"
             class="rail-badge"
             :class="{ 'is-overdue': railScheduleSummary.overdue > 0 }"
             :aria-label="$t('calendar.railScheduleTitle', railScheduleSummary)"
@@ -683,13 +683,6 @@
             :current-user="currentUser"
             @start-verification="handleShareholderMeetingStart"
           />
-          <LitigationVisualPanel
-            v-else-if="leftPaneKey === 'litigation-visual'"
-            :project-id="projectId"
-            @start-drawing="handleLitigationStart"
-            @open-file="handleLitigationOpenFile"
-            @request-scope-select="handleLitigationScopeSelect"
-          />
           <!-- 项目概览：2026-08-19 起在左栏展示（此前是中栏标签）。
                同一个 ProjectHomePane，薄壳页那个宿主一行没改。 -->
           <ProjectHomePane
@@ -706,54 +699,7 @@
                整个 rail 位在两者都停用时才隐藏，见 LEFT_SIDEBAR_PLUGINS 计算属性。
                实际渲染哪个 tab 走 effectiveVoiceTab（voiceTab 记的是用户选择，
                选的那个被停用时兜底落到唯一可用的那个）。 -->
-          <view v-else-if="leftPaneKey === 'voice'" class="voice-pane">
-            <view class="voice-tabs">
-              <view
-                v-if="ttsEnabled"
-                class="voice-tab"
-                :class="{ active: effectiveVoiceTab === 'tts' }"
-                @tap="voiceTab = 'tts'"
-              >
-                <text>{{ $t('workbench.voiceTts') }}</text>
-              </view>
-              <view
-                v-if="meetingRecorderEnabled"
-                class="voice-tab"
-                :class="{ active: effectiveVoiceTab === 'recorder' }"
-                @tap="voiceTab = 'recorder'"
-              >
-                <text>{{ $t('workbench.voiceRecorder') }}</text>
-              </view>
-            </view>
-            <view class="voice-tab-body">
-              <MeetingRecordingPanel
-                v-if="effectiveVoiceTab === 'recorder'"
-                :project-id="projectId"
-                :current-user="currentUser"
-                :focus-meeting-id="meetingFocusId"
-                @generate-minutes="handleMeetingMinutesStart"
-              />
-              <EasyVoicePane
-                v-else-if="effectiveVoiceTab === 'tts'"
-                @request-doc-text="handleEasyVoiceDocRequest"
-                @highlight-sentence="handleTtsHighlight"
-                @clear-highlight="handleTtsClearHighlight"
-              />
-            </view>
-          </view>
-          <DesensitizePane
-             v-else-if="leftPaneKey === 'desensitize'"
-             :project-id="projectId"
-             :prepare-file="prepareSensitiveFile"
-             @request-file-select="handleDesensitizeSelectFile"
-             @request-active-file="handleDesensitizeActiveFile"
-             @open-file="handleDesensitizeSuccess"
-          />
-          <SearchPanel
-            v-else-if="leftPaneKey === 'search'"
-            :project-id="projectId"
-            @open-file="handleSearchOpenFile"
-          />
+
           <VersionPanel
             v-else-if="leftPaneKey === 'version'"
             :project-id="projectId"
@@ -776,17 +722,7 @@
             v-else-if="leftPaneKey === 'market'"
             @open-detail="openMarketDetail"
           />
-          <ProjectCalendarPane
-            v-else-if="leftPaneKey === 'calendar'"
-            :project-id="hasNamedProject ? projectId : null"
-            :file-filter="calendarFileFilter"
-            :file-filter-name="calendarFileFilterName"
-            @open-calendar="openCalendarTab()"
-            @new-task="openTaskDialog({ mode: 'create', presetFileIds: $event && $event.presetFileIds })"
-            @open-task="openTaskDialog({ mode: 'edit', task: $event })"
-            @open-file="onTaskOpenFile"
-            @clear-file-filter="calendarFileFilter = null; calendarFileFilterName = ''"
-          />
+
           <PluginDevPanel
             v-else-if="leftPaneKey === 'dev'"
             :project-id="projectId"
@@ -795,13 +731,7 @@
             @open-plugin="toggleLeftPane"
             @ai-develop="onPluginDevAiDevelop"
           />
-          <TencentMeetingPanel
-            v-else-if="leftPaneKey === 'tmeet'"
-            :project-id="projectId"
-            @open-transcript="onOpenTmeetTranscript"
-            @generate-minutes="handleTmeetMinutesStart"
-            @generate-todos="handleTmeetTodosStart"
-          />
+
           <!-- 停靠到左栏的工具面板（dev-board#180）。三个面板组件本身一行没改，这里只做宿主：
                一条紧凑搜索行（底栏那份的等价物——这三个面板的搜索早就外置给宿主了，
                不给就等于没有搜索）+ 面板体。三个 dock 的 props/@event 逐个显式写，
@@ -821,51 +751,26 @@
               />
             </view>
           </view>
-          <view v-else-if="leftPaneKey === 'favorites'" class="dock-tool-pane">
-            <view class="dock-tool-head">
-              <input class="dock-tool-search" v-model="toolsSearchKeyword" :placeholder="$t('workbench.searchFavorites')" confirm-type="search" />
-            </view>
-            <view class="dock-tool-body">
-              <ProjectFavoritesPanel
-                ref="favoritesPanel"
-                :project-id="projectId"
-                :query="toolsSearchKeyword"
-                @insert="insertPlainTextToWps"
-                @open-url="openBrowserTab($event)"
-              />
-            </view>
-          </view>
-          <view v-else-if="leftPaneKey === 'clipboard'" class="dock-tool-pane">
-            <view class="dock-tool-head">
-              <input class="dock-tool-search" v-model="toolsSearchKeyword" :placeholder="$t('workbench.searchClipboard')" confirm-type="search" />
-            </view>
-            <view class="dock-tool-body">
-              <ClipboardPanel
-                ref="clipboardPanel"
-                :query="toolsSearchKeyword"
-                @insert="insertPlainTextToWps"
-                @preview-image="openImagePreview"
-              />
-            </view>
-          </view>
+
+
           <!-- 依据被拖到左栏时（dev-board#182）。标题由外壳的 .sidebar-header 出，
                面板自己不画标题；这里也不套 .dock-tool-pane 的搜索行——它自带头部。 -->
-          <InsightPane
-            v-else-if="leftPaneKey === 'insight'"
-            :project-id="projectId"
-            :doc-file-id="insightDocFileId"
-            :doc-name="insightDocName"
-            :get-executor="getInsightExecutor"
-            :can-write="canWriteProject"
-            :prepare-document="prepareInsightDocument"
-            :cursor-context="insightCursorContext"
-            @entities="onInsightEntities"
-            @open-hover="openInsightHoverCard($event)"
-            @open-url="openBrowserTab($event)"
-            @open-settings="openSettingsTab($event || {})"
-            @open-doc-file="openInsightDocFile($event)"
-          />
+
           <!-- 动态插件左栏工作区：飞书式双栏导航（通讯录/对话列表/阶段切换/快捷动作），与中栏工作区标签联动 -->
+          <PluginPane
+            v-else-if="activeDynamicPlugin && activeDynamicPlugin.sidebarView"
+            :key="activeDynamicPlugin.pluginId + ':' + activeDynamicPlugin.sidebarView.id"
+            :business-actions="pluginBusinessActions"
+            :url="activeDynamicPlugin.sidebarView.url"
+            :plugin-id="activeDynamicPlugin.pluginId"
+            :permissions="activeDynamicPlugin.permissions || []"
+            :project-id="activeDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
+            :get-active-editor="getPluginActiveEditor"
+            :add-file-to-ai="onPluginAddFileToAi"
+            :dev-installed="!!activeDynamicPlugin.devInstalled"
+            @files-changed="onArchiveExtracted"
+            @kickoff="onPluginQuickAction"
+          />
           <PluginWorkspaceSummary
             v-else-if="activeDynamicPlugin"
             :plugin="activeDynamicPlugin"
@@ -1161,10 +1066,11 @@
                   >
                     <PluginPane
                       v-if="entry.plugin.hasFrontend"
-                      :url="entry.plugin.frontendEntry"
+                      :url="entry.plugin.workspaceView?.url || entry.plugin.frontendEntry"
+                      :business-actions="pluginBusinessActions"
                       :plugin-id="entry.plugin.pluginId"
                       :permissions="entry.plugin.permissions || []"
-                      :project-id="projectId"
+                      :project-id="entry.plugin.workspaceView?.scope === 'global' ? null : projectId"
                       :get-active-editor="getPluginActiveEditor"
                       :add-file-to-ai="onPluginAddFileToAi"
                       @files-changed="onArchiveExtracted"
@@ -1288,17 +1194,7 @@
                     <!-- 「日程」标签（dev-board#1048）：单例，全局视图（projectId 恒传 null，跨项目事项，
                          筛选里可按项目收窄）。宿主 .pane-content 是定高 flex 列，FullCalendar 不会塌成 0；
                          窗格尺寸变化走 triggerWorkbenchResize 派发的 window resize，FullCalendar 自己响应。 -->
-                    <CalendarPane
-                      v-else-if="activeFileLeft.tabType === 'calendar'"
-                      :key="activeFileLeft.id"
-                      embedded
-                      :project-id="null"
-                      :focus="activeFileLeft.calendarFocus || ''"
-                      :group="activeFileLeft.calendarGroup || ''"
-                      @open-project="onCalendarOpenProject"
-                      @open-file="onCalendarOpenFile"
-                      @close="closeCalendarTab"
-                    />
+
                     <TencentMeetingTranscriptPane
                       v-else-if="activeFileLeft.tabType === 'tmeet-transcript'"
                       :key="activeFileLeft.id"
@@ -1415,10 +1311,11 @@
                   >
                     <PluginPane
                       v-if="entry.plugin.hasFrontend"
-                      :url="entry.plugin.frontendEntry"
+                      :url="entry.plugin.workspaceView?.url || entry.plugin.frontendEntry"
+                      :business-actions="pluginBusinessActions"
                       :plugin-id="entry.plugin.pluginId"
                       :permissions="entry.plugin.permissions || []"
-                      :project-id="projectId"
+                      :project-id="entry.plugin.workspaceView?.scope === 'global' ? null : projectId"
                       :get-active-editor="getPluginActiveEditor"
                       :add-file-to-ai="onPluginAddFileToAi"
                       @files-changed="onArchiveExtracted"
@@ -1529,17 +1426,7 @@
                       @update:show-on-startup="setShowWelcomeOnStartup"
                     />
                     <!-- 「日程」标签：见左窗格同名注释 -->
-                    <CalendarPane
-                      v-else-if="activeFileRight.tabType === 'calendar'"
-                      :key="activeFileRight.id"
-                      embedded
-                      :project-id="null"
-                      :focus="activeFileRight.calendarFocus || ''"
-                      :group="activeFileRight.calendarGroup || ''"
-                      @open-project="onCalendarOpenProject"
-                      @open-file="onCalendarOpenFile"
-                      @close="closeCalendarTab"
-                    />
+
                     <TencentMeetingTranscriptPane
                       v-else-if="activeFileRight.tabType === 'tmeet-transcript'"
                       :key="activeFileRight.id"
@@ -1640,28 +1527,29 @@
               </view>
               <view class="panel-body">
                 <view class="tools-content">
+                  <PluginPane
+            v-if="activeBottomDynamicPlugin && activeBottomDynamicPlugin.sidebarView"
+            :key="activeBottomDynamicPlugin.pluginId + ':' + activeBottomDynamicPlugin.sidebarView.id"
+            :business-actions="pluginBusinessActions"
+            :url="activeBottomDynamicPlugin.sidebarView.url"
+            :plugin-id="activeBottomDynamicPlugin.pluginId"
+            :permissions="activeBottomDynamicPlugin.permissions || []"
+            :project-id="activeBottomDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
+            :get-active-editor="getPluginActiveEditor"
+            :add-file-to-ai="onPluginAddFileToAi"
+            :dev-installed="!!activeBottomDynamicPlugin.devInstalled"
+            @files-changed="onArchiveExtracted"
+            @kickoff="onPluginQuickAction"
+          />
                   <VariablePanel
-                    v-if="activeToolKey === 'variables'"
+                    v-else-if="activeToolKey === 'variables'"
                     ref="variablePanel"
                     :project-id="projectId"
                     :get-editor="getLibreVariableBridge"
                     :search-keyword="toolsSearchKeyword"
                   />
-                  <ProjectFavoritesPanel
-                    v-else-if="activeToolKey === 'favorites'"
-                    ref="favoritesPanel"
-                    :project-id="projectId"
-                    :query="toolsSearchKeyword"
-                    @insert="insertPlainTextToWps"
-                    @open-url="openBrowserTab($event)"
-                  />
-                  <ClipboardPanel
-                    v-else-if="activeToolKey === 'clipboard'"
-                    ref="clipboardPanel"
-                    :query="toolsSearchKeyword"
-                    @insert="insertPlainTextToWps"
-                    @preview-image="openImagePreview"
-                  />
+
+
                 </view>
               </view>
             </view>
@@ -1672,7 +1560,7 @@
                原来整块挂在 v-if="showAiPanel" 上，关一下右栏就把 ChatInterface 连同
                当前会话、消息和进行中的流一起卸掉，再打开是空白新对话。 -->
           <view
-            v-if="aiPanelMounted && hasProject"
+            v-if="aiPanelMounted && (hasProject || activeRightDynamicPlugin)"
             v-show="showAiPanel"
             ref="aiPanel"
             class="side-panel side-panel-ai"
@@ -1685,6 +1573,7 @@
                  平时右侧仍然只有 AI 对话本体，零视觉回归。 -->
             <view v-if="rightDockPanels.length" class="right-dock-tabs">
               <view
+                v-if="hasProject"
                 class="right-dock-tab"
                 :class="{ active: rightPaneKey === 'ai' }"
                 @tap="switchRightPane('ai')"
@@ -1713,6 +1602,7 @@
                  $refs.chatInterface 也会消失（resolveChatInterface 靠它）。 -->
             <view class="right-dock-body" v-show="rightPaneKey === 'ai'">
               <ChatInterface
+                v-if="hasProject"
                 ref="chatInterface"
                 :project-id="String(projectId)"
                 :project-name="isLooseWorkspace ? $t('workbench.looseFiles') : project.name"
@@ -1744,41 +1634,21 @@
                  见 config/panelRegistry.js 顶部的步骤清单）。
                  链头是 v-if 而不是接着上面那块的 v-else-if——上面那块挂的是 v-show，
                  v-else-if 挨着它会得到「v-else/v-else-if has no adjacent v-if」编译错。 -->
-            <view v-if="rightPaneKey === 'voice'" class="right-dock-body voice-pane">
-              <view class="voice-tabs">
-                <view
-                  v-if="ttsEnabled"
-                  class="voice-tab"
-                  :class="{ active: effectiveVoiceTab === 'tts' }"
-                  @tap="voiceTab = 'tts'"
-                >
-                  <text>{{ $t('workbench.voiceTts') }}</text>
-                </view>
-                <view
-                  v-if="meetingRecorderEnabled"
-                  class="voice-tab"
-                  :class="{ active: effectiveVoiceTab === 'recorder' }"
-                  @tap="voiceTab = 'recorder'"
-                >
-                  <text>{{ $t('workbench.voiceRecorder') }}</text>
-                </view>
-              </view>
-              <view class="voice-tab-body">
-                <MeetingRecordingPanel
-                  v-if="effectiveVoiceTab === 'recorder'"
-                  :project-id="projectId"
-                  :current-user="currentUser"
-                  :focus-meeting-id="meetingFocusId"
-                  @generate-minutes="handleMeetingMinutesStart"
-                />
-                <EasyVoicePane
-                  v-else-if="effectiveVoiceTab === 'tts'"
-                  @request-doc-text="handleEasyVoiceDocRequest"
-                  @highlight-sentence="handleTtsHighlight"
-                  @clear-highlight="handleTtsClearHighlight"
-                />
-              </view>
-            </view>
+
+            <PluginPane
+            v-if="activeRightDynamicPlugin && activeRightDynamicPlugin.sidebarView"
+            :key="activeRightDynamicPlugin.pluginId + ':' + activeRightDynamicPlugin.sidebarView.id"
+            :business-actions="pluginBusinessActions"
+            :url="activeRightDynamicPlugin.sidebarView.url"
+            :plugin-id="activeRightDynamicPlugin.pluginId"
+            :permissions="activeRightDynamicPlugin.permissions || []"
+            :project-id="activeRightDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
+            :get-active-editor="getPluginActiveEditor"
+            :add-file-to-ai="onPluginAddFileToAi"
+            :dev-installed="!!activeRightDynamicPlugin.devInstalled"
+            @files-changed="onArchiveExtracted"
+            @kickoff="onPluginQuickAction"
+          />
             <view v-else-if="rightPaneKey === 'variables'" class="right-dock-body dock-tool-pane">
               <view class="dock-tool-head">
                 <input class="dock-tool-search" v-model="toolsSearchKeyword" :placeholder="$t('workbench.searchVariables')" confirm-type="search" />
@@ -1794,50 +1664,10 @@
                 />
               </view>
             </view>
-            <view v-else-if="rightPaneKey === 'favorites'" class="right-dock-body dock-tool-pane">
-              <view class="dock-tool-head">
-                <input class="dock-tool-search" v-model="toolsSearchKeyword" :placeholder="$t('workbench.searchFavorites')" confirm-type="search" />
-              </view>
-              <view class="dock-tool-body">
-                <ProjectFavoritesPanel
-                  ref="favoritesPanel"
-                  :project-id="projectId"
-                  :query="toolsSearchKeyword"
-                  @insert="insertPlainTextToWps"
-                  @open-url="openBrowserTab($event)"
-                />
-              </view>
-            </view>
-            <view v-else-if="rightPaneKey === 'clipboard'" class="right-dock-body dock-tool-pane">
-              <view class="dock-tool-head">
-                <input class="dock-tool-search" v-model="toolsSearchKeyword" :placeholder="$t('workbench.searchClipboard')" confirm-type="search" />
-              </view>
-              <view class="dock-tool-body">
-                <ClipboardPanel
-                  ref="clipboardPanel"
-                  :query="toolsSearchKeyword"
-                  @insert="insertPlainTextToWps"
-                  @preview-image="openImagePreview"
-                />
-              </view>
-            </view>
+
+
             <!-- 依据（dev-board#182）：默认就停在右侧——它要和正文并排看。 -->
-            <view v-else-if="rightPaneKey === 'insight'" class="right-dock-body">
-              <InsightPane
-                :project-id="projectId"
-                :doc-file-id="insightDocFileId"
-                :doc-name="insightDocName"
-                :get-executor="getInsightExecutor"
-                :can-write="canWriteProject"
-                :prepare-document="prepareInsightDocument"
-                :cursor-context="insightCursorContext"
-                @entities="onInsightEntities"
-                @open-hover="openInsightHoverCard($event)"
-                @open-url="openBrowserTab($event)"
-                @open-settings="openSettingsTab($event || {})"
-                @open-doc-file="openInsightDocFile($event)"
-              />
-            </view>
+
 
             <view class="side-resize-handle" @touchstart="startResize('right', $event)" @mousedown="startResize('right', $event)"></view>
 
@@ -2347,14 +2177,13 @@ import CommandPalette from '@/components/CommandPalette.vue'
 import AppMenuBar from '@/components/AppMenuBar.vue'
 import FilePreview from '@/components/FilePreview.vue'
 import VariablePanel from '@/components/VariablePanel.vue'
-import ProjectFavoritesPanel from '@/components/ProjectFavoritesPanel.vue'
 import EvidenceMethodBar from '@/components/EvidenceMethodBar.vue'
 import FileStagingArea from '@/components/FileStagingArea.vue'
 import PluginPane from '@/components/PluginPane.vue' // Added
+import { pluginViews, isGlobalPlugin } from '@/utils/pluginViews.js'
 import PluginGuidePane from '@/components/PluginGuidePane.vue'
 import PluginWorkspaceSummary from '@/components/PluginWorkspaceSummary.vue'
 import PluginDevPanel from '@/components/PluginDevPanel.vue'
-import TencentMeetingPanel from '@/components/tmeet/TencentMeetingPanel.vue'
 import TencentMeetingTranscriptPane from '@/components/tmeet/TencentMeetingTranscriptPane.vue'
 import DrawioEditor from '@/components/DrawioEditor.vue'
 import PlainTextEditor from '@/components/PlainTextEditor.vue'
@@ -2363,15 +2192,10 @@ import MarketSidebarPanel from '@/components/MarketSidebarPanel.vue'
 import MarketDetailPane from '@/components/MarketDetailPane.vue'
 import ProjectHomePane from '@/components/project-home/ProjectHomePane.vue'
 import AdminPane from '@/components/admin/AdminPane.vue'
-import EasyVoicePane from '@/components/EasyVoicePane.vue'
-import DesensitizePane from '@/components/DesensitizePane.vue'
-import ClipboardPanel from '@/components/ClipboardPanel.vue'
-import InsightPane from '@/components/InsightPane.vue'
 // 正文 Cmd/Ctrl 点中实体后的浮窗 + 它的「在新标签页打开」落点（dev-board#541）。
 // 浮窗必须挂在页面根节点才叠得上编辑器 <webview>，所以宿主持有它而不是面板。
 import InsightHoverCard from '@/components/InsightHoverCard.vue'
 import InsightEntityDetailPane from '@/components/InsightEntityDetailPane.vue'
-import SearchPanel from '@/components/SearchPanel.vue'
 import VersionPanel from '@/components/version/VersionPanel.vue'
 import CommitHistoryTab from '@/components/version/CommitHistoryTab.vue'
 // 异步组件：历史上是为了不把 FullCalendar 拖进工作台主 chunk；dev-board#899 重做后面板
@@ -2379,9 +2203,7 @@ import CommitHistoryTab from '@/components/version/CommitHistoryTab.vue'
 import TaskDialog from '@/components/calendar/TaskDialog.vue'
 import { taskStore, loadProjectTasks } from '@/utils/taskStore.js'
 import { startTaskReminders, todayDigest } from '@/utils/taskReminders.js'
-const ProjectCalendarPane = defineAsyncComponent(() => import('@/components/project-calendar/ProjectCalendarPane.vue'))
 // 日程标签（dev-board#1048）：CalendarPane 带着 FullCalendar，懒加载——只有开过日程标签的会话才付这份成本
-const CalendarPane = defineAsyncComponent(() => import('@/components/calendar/CalendarPane.vue'))
 import InviteMemberDialog from '@/components/InviteMemberDialog.vue'
 import CollabDialog from '@/components/collab/CollabDialog.vue'
 import SubmitDraftGuide from '@/components/collab/SubmitDraftGuide.vue'
@@ -2491,8 +2313,6 @@ import { isSoloLocalProject } from '@/utils/soloLocalProject.js'
 import { openFeedbackWidget } from '@/utils/feedbackWidget.js'
 import DdFilesPanel from '@/components/DdFilesPanel.vue'
 import ShareholderMeetingPanel from '@/components/ShareholderMeetingPanel.vue'
-import MeetingRecordingPanel from '@/components/MeetingRecordingPanel.vue'
-import LitigationVisualPanel from '@/components/LitigationVisualPanel.vue'
 import DdRequestEditor from '@/components/DdRequestEditor.vue'
 import ChatInterface from '@/components/ChatInterface.vue'
 import { panelSwitchingMethods } from './panelSwitching.js'
@@ -2568,18 +2388,13 @@ export default {
     FileTree,
     FilePreview,
     VariablePanel,
-    ProjectFavoritesPanel,
     EvidenceMethodBar,
     FileStagingArea,
-    ClipboardPanel,
-    InsightPane,
     InsightHoverCard,
     DocumentLinkPreview,
     InsightEntityDetailPane,
     DdFilesPanel,
     ShareholderMeetingPanel,
-    MeetingRecordingPanel,
-    LitigationVisualPanel,
     DdRequestEditor,
     InviteMemberDialog,
     CollabDialog,
@@ -2590,7 +2405,6 @@ export default {
     PluginGuidePane,
     PluginWorkspaceSummary,
     PluginDevPanel,
-    TencentMeetingPanel,
     TencentMeetingTranscriptPane,
     DrawioEditor,
     PlainTextEditor,
@@ -2602,14 +2416,9 @@ export default {
     DocDiffViewer,
     VersionCompareTab,
     MergeReviewTab,
-    EasyVoicePane,
-    DesensitizePane,
     FilePickerDialog,
-    SearchPanel,
     VersionPanel,
     CommitHistoryTab,
-    ProjectCalendarPane,
-    CalendarPane,
     TaskDialog,
     ProjectListPane,
     WelcomePane,
@@ -2678,7 +2487,6 @@ export default {
       // 「语音」面板内部的 tab（语音合成 / 会议录音）。刻意不持久化：
       // 会议录音那个 tab 是 skill 门控的，记住它会让停用 skill 之后再进来落在
       // 一个不渲染的 tab 上（v-else 兜底能救，但 tab 条上没有高亮项，看着像坏了）。
-      voiceTab: 'tts',
       // 工作台唯一的 TaskDialog 的状态（dev-board#899），见 openTaskDialog
       taskDialog: { visible: false, mode: 'create', task: null, presetFileIds: [] },
       // 日程面板按文件过滤（文件右键「查看事项 (N)」），null = 不过滤
@@ -3050,39 +2858,7 @@ export default {
       const en = this.$i18n && this.$i18n.locale === 'en-US'
       return (en ? m.nameEn : m.nameZh) || m.nameZh || m.nameEn || ''
     },
-    /**
-     * 「语音」面板里的「会议录音」tab 显不显示。语音两项合并后门控从 rail 位挪到
-     * 了这里，判据仍是同一份 enabledSkillIds——**null（还没拉到）按启用处理**，
-     * 与 LEFT_SIDEBAR_PLUGINS 那处同一个口径：宁可多显示一瞬，也不要让用户
-     * 以为功能没了。
-     */
-    meetingRecorderEnabled() {
-      // enabledSkillIds 是**数组**（loadEnabledSkills 里 .map 出来的），不是 Set
-      if (this.enabledSkillIds === null) return true
-      return this.enabledSkillIds.includes('meeting-recorder')
-    },
-    /**
-     * 「语音」面板里的「语音合成」tab 显不显示，判据同 meetingRecorderEnabled：
-     * text-to-speech skill 默认启用（老用户升级后入口不消失），可在广场停用。
-     */
-    ttsEnabled() {
-      if (this.enabledSkillIds === null) return true
-      return this.enabledSkillIds.includes('text-to-speech')
-    },
-    /**
-     * voiceTab 记的是用户上一次点的 tab，与「当前哪个 tab 真的可用」是两回事——
-     * 默认值是 'tts'，如果 text-to-speech 被停用而 meeting-recorder 还启用，
-     * 直接按 voiceTab 渲染会两个面板都不出现。这里做一次兜底折算：优先尊重用户
-     * 选择，选的那个不可用时落到唯一可用的那个，两个都不可用时（rail 位本应已
-     * 隐藏）返回 null。
-     */
-    effectiveVoiceTab() {
-      if (this.voiceTab === 'recorder' && this.meetingRecorderEnabled) return 'recorder'
-      if (this.voiceTab === 'tts' && this.ttsEnabled) return 'tts'
-      if (this.ttsEnabled) return 'tts'
-      if (this.meetingRecorderEnabled) return 'recorder'
-      return null
-    },
+    meetingRecorderEnabled() { return this.dynamicPlugins.some(plugin => plugin.pluginId === 'voice') },
     /**
      * 历史下拉里过滤后的会话（dev-board#796）。
      *
@@ -3137,9 +2913,10 @@ export default {
       const user = getCurrentUser()
       // 无项目态（dev-board#1047）：rail 只留全局项（项目 / 日程 / 插件中心，以及被停到左栏的剪贴板），
       // 动态插件与项目面板一律不上 rail——它们都带着 projectId 干活。
+      if (user?.role === 'CLIENT') return getPluginsForUser('CLIENT')
       if (!this.hasProject || this.isLooseWorkspace) {
-        const globals = LEFT_SIDEBAR_PLUGINS.filter(p => isPaneAllowedWithoutProject(p.key))
-        return this.applyRailOrder(this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key)))
+        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(isGlobalPlugin)]
+        return this.applyRailOrder(this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key) || isGlobalPlugin(p)))
       }
       const base = (user && user.role === 'CLIENT')
         ? getPluginsForUser('CLIENT')
@@ -3156,11 +2933,6 @@ export default {
       // 排序只改先后、不增删项，所以套在所有过滤/停靠之后
       if (this.enabledSkillIds === null) return this.applyRailOrder(this.applyPanelDocks(base))
       const filtered = filterPluginsByEnabledSkills(base, this.enabledSkillIds)
-      // 「语音」rail 位本身没有 requiresSkill（门控在面板内部按两个 tab 分别做），
-      // 两个 tab 都停用时才整个位隐藏，判据复用同一份 ttsEnabled/meetingRecorderEnabled。
-      if (!this.ttsEnabled && !this.meetingRecorderEnabled) {
-        return this.applyRailOrder(this.applyPanelDocks(filtered.filter(p => p.key !== 'voice')))
-      }
       return this.applyRailOrder(this.applyPanelDocks(filtered))
     },
     // 版本记录 2026-08-19 挪出 rail 数组、独立渲染在「项目成员」与「暂存区」之间，
@@ -3309,6 +3081,73 @@ export default {
       return user && user.role !== 'CLIENT'
     },
     // 当前左栏选中的动态插件（rail key = plugin-<id>）；决定走 iframe 还是启动面板
+    pluginBusinessActions() {
+      return {
+        insertContent: payload => this.insertPlainTextToWps(payload),
+        previewImage: url => this.openImagePreview(url),
+        copyText: text => this.insertClipboardAndCopy(text),
+        openProject: payload => this.onCalendarOpenProject(payload),
+        openTaskFile: payload => this.onCalendarOpenFile(payload),
+        insightContext: () => ({ docFileId: this.insightDocFileId, docName: this.insightDocName, canWrite: this.canWriteProject, cursorContext: this.insightCursorContext }),
+        insightExecutor: () => this.getInsightExecutor(),
+        prepareInsight: id => this.prepareInsightDocument(id),
+        insightEntities: payload => this.onInsightEntities(payload),
+        insightHover: payload => this.openInsightHoverCard(payload),
+        openBrowser: url => this.openBrowserTab(url),
+        openAccount: () => this.openSettingsTab({ nav: 'account' }),
+        importVoiceText: signal => new Promise(resolve => {
+          this.handleFilePickerCancel()
+          const finish = (text, fileId) => {
+            signal.removeEventListener('abort', cancel)
+            if (this.easyVoiceImportCallback === finish) this.easyVoiceImportCallback = null
+            resolve(text ? { text, fileId } : null)
+          }
+          const cancel = () => { if (this.easyVoiceImportCallback === finish) this.showFilePicker = false; finish(null) }
+          signal.addEventListener('abort', cancel, { once: true })
+          this.handleEasyVoiceDocRequest(finish)
+          if (signal.aborted) cancel()
+        }),
+        highlightVoice: ({ sentence, fileId }) => {
+          if (fileId && String(this.getPluginActiveEditor()?.fileId) === String(fileId)) return this.handleTtsHighlight(sentence, fileId)
+        },
+        clearVoiceHighlight: ({ fileId }) => {
+          if (fileId && String(this.getPluginActiveEditor()?.fileId) === String(fileId)) return this.handleTtsClearHighlight()
+        },
+        prepareFile: fileId => this.prepareSensitiveFile(fileId),
+        chooseScope: signal => new Promise(resolve => {
+          this.handleFilePickerCancel()
+          const finish = scope => {
+            signal.removeEventListener('abort', cancel)
+            if (this.litigationScopeCallback === finish) this.litigationScopeCallback = null
+            resolve(scope || null)
+          }
+          const cancel = () => {
+            if (this.litigationScopeCallback === finish) this.showFilePicker = false
+            finish(null)
+          }
+          signal.addEventListener('abort', cancel, { once: true })
+          this.handleLitigationScopeSelect(finish)
+          if (signal.aborted) cancel()
+        }),
+        chooseFile: signal => new Promise(resolve => {
+          this.handleFilePickerCancel()
+          const finish = file => {
+            signal.removeEventListener('abort', cancel)
+            if (this.desensitizeFileSelectCallback === finish) this.desensitizeFileSelectCallback = null
+            resolve(file || null)
+          }
+          const cancel = () => {
+            if (this.desensitizeFileSelectCallback === finish) this.showFilePicker = false
+            finish(null)
+          }
+          signal.addEventListener('abort', cancel, { once: true })
+          this.handleDesensitizeSelectFile(finish)
+          if (signal.aborted) cancel()
+        }),
+      }
+    },
+    activeRightDynamicPlugin() { return this.dynamicPlugins.find(p => p.key === this.rightPaneKey) || null },
+    activeBottomDynamicPlugin() { return this.dynamicPlugins.find(p => p.key === this.activeToolKey) || null },
     activeDynamicPlugin() {
       if (!this.leftPaneKey) return null
       return this.dynamicPlugins.find(p => p.key === this.leftPaneKey) || null
@@ -3317,8 +3156,8 @@ export default {
       if (this.leftPaneKey === 'market') return this.$t('workbench.pluginMarket')
       // 停靠到左栏的工具面板（变量库/收藏夹/剪贴板）在 leftSidebarPlugins 里查不到，
       // 会掉进兜底显示成「资源管理器」——从注册表取它的 labelKey（dev-board#180）
-      const movable = getMovablePanel(this.leftPaneKey)
-      if (movable) return this.$t(movable.labelKey)
+      const movable = getMovablePanel(this.leftPaneKey, this.dockPanels)
+      if (movable) return movable.label || this.$t(movable.labelKey)
       // 动态插件的标题在 getLeftSidebarPlugin（只认静态 + OFF_RAIL）里查不到，
       // 会掉进兜底显示成「资源管理器」——从 dynamicPlugins 直接取它的 label。
       if (this.activeDynamicPlugin) return this.activeDynamicPlugin.label || this.$t('workbench.explorerFallback')
@@ -3363,8 +3202,8 @@ export default {
     // ——「依据」窗格（dev-board#182）——
     // 窗格开着没有（不管它停在右栏还是被拖去了左栏）。
     insightPaneOpen() {
-      if (this.showAiPanel && this.rightPaneKey === 'insight') return true
-      return this.leftPaneKey === 'insight' && !this.sidebarCollapsed
+      if (this.showAiPanel && this.rightPaneKey === 'plugin-insight') return true
+      return this.leftPaneKey === 'plugin-insight' && !this.sidebarCollapsed
     },
     // 窗格绑哪份文档：聚焦那一侧的活跃 writer 文档，聚焦侧没有就看另一侧。
     // 只认 Writer——解析的是正文，表格/演示文稿没有可通读的段落。
@@ -3503,29 +3342,35 @@ export default {
     ,
     // ——— 面板停靠（dev-board#180）———
     // 三个 dock 的分配，唯一出处是 config/panelRegistry.js 的纯函数 resolveDocks
+    dockPanels() {
+      if (this.isClientView) return []
+      return this.dynamicPlugins.filter(plugin => plugin.sidebarView).map(plugin => ({
+        ...plugin, defaultDock: plugin.sidebarView.defaultDock, allowedDocks: plugin.sidebarView.allowedDocks,
+      }))
+    },
     panelDocks() {
-      const docks = resolveDocks(this.panelDockOverrides)
+      const docks = resolveDocks(this.panelDockOverrides, this.dockPanels)
       if (this.hasNamedProject) return docks
       // 无项目态：可停靠面板里只有剪贴板是全局的（收藏夹 / 语音 / 依据都挂在项目上）
-      const keep = (list) => list.filter(p => NO_PROJECT_PANE_KEYS.includes(p.key))
+      const keep = (list) => list.filter(p => (NO_PROJECT_PANE_KEYS.includes(p.key) || isGlobalPlugin(p)))
       return { left: keep(docks.left), right: keep(docks.right), bottom: keep(docks.bottom) }
     },
     // 底部抽屉的 tab 列表（原 WORKBENCH_TOOLS）。底栏 tab 条与状态条工具入口同源消费，
     // 面板被搬到左/右之后这里自动少一项，两处一起变。
     bottomToolsList() {
-      return this.panelDocks.bottom.map(p => ({ key: p.key, label: this.$t(p.labelKey) }))
+      return this.panelDocks.bottom.map(p => ({ key: p.key, label: p.label || this.$t(p.labelKey) }))
     },
     // 停靠到右侧面板的面板（非空时右栏才长出 tab 条；平时右侧只有 AI 对话，零视觉回归）
     rightDockPanels() {
-      return this.panelDocks.right.map(p => ({ key: p.key, label: this.$t(p.labelKey) }))
+      return this.panelDocks.right.map(p => ({ key: p.key, label: p.label || this.$t(p.labelKey) }))
     },
     // 右键「移到…」菜单的选项：只列这个面板允许的 dock，当前所在的那一档置灰
     dockMenuOptions() {
       const key = this.dockMenu.panelKey
       if (!key) return []
-      const cur = resolveDock(key, this.panelDockOverrides)
+      const cur = resolveDock(key, this.panelDockOverrides, this.dockPanels)
       return DOCKS
-        .filter(d => isDockAllowed(key, d))
+        .filter(d => isDockAllowed(key, d, this.dockPanels))
         .map(d => ({
           dock: d,
           label: this.$t('workbench.dockTo' + d.charAt(0).toUpperCase() + d.slice(1)),
@@ -3533,20 +3378,20 @@ export default {
         }))
     },
     dockMenuTitle() {
-      const p = getMovablePanel(this.dockMenu.panelKey)
-      return p ? this.$t(p.labelKey) : ''
+      const p = getMovablePanel(this.dockMenu.panelKey, this.dockPanels)
+      return p ? p.label || this.$t(p.labelKey) : ''
     },
     // 拖拽中的面板允许落到哪几个 dock（决定投放高亮层渲染哪几块）
     dockDropZones() {
       const key = this.draggingPanelKey
       if (!key) return []
-      return DOCKS.filter(d => isDockAllowed(key, d)).map(d => ({
+      return DOCKS.filter(d => isDockAllowed(key, d, this.dockPanels)).map(d => ({
         dock: d,
         label: this.$t('workbench.dockTo' + d.charAt(0).toUpperCase() + d.slice(1))
       }))
     },
     isMovablePanel() {
-      return isMovablePanel
+      return key => isMovablePanel(key, this.dockPanels)
     }
     ,
     isDesktopApp() {
@@ -3570,6 +3415,7 @@ export default {
     this.unbindTabsWheel()
     this._comparisonDisposed = true
     clearInterval(this._mergeElapsedTimer)
+    if (this._onPluginOpenSettings) uni.$off('awd:plugin-open-settings', this._onPluginOpenSettings)
     // 标签快照（dev-board#1049）：卸载前把节流中的那次写掉
     this.flushTabSnapshot()
     if (typeof window !== 'undefined' && this._onTabSnapshotPageHide) {
@@ -3877,6 +3723,8 @@ export default {
     // 广场安装、卸载或启停后，同时刷新 skill 门控与动态插件入口。
     // 左栏列表面板和中栏详情 tab 各发一个事件，两处操作都应立即反映到 rail。
     this._onMarketChanged = () => Promise.all([this.loadEnabledSkills(), this.loadDynamicPlugins()])
+    this._onPluginOpenSettings = ({ pluginId }) => this.openMarketDetail({ kind: 'plugin', id: pluginId, projectId: this.projectId })
+    uni.$on('awd:plugin-open-settings', this._onPluginOpenSettings)
     uni.$on('awd:market-changed', this._onMarketChanged)
     uni.$on('awd:market-changed-from-sidebar', this._onMarketChanged)
     // Web 插件 evidence.locate（PluginPane）要打开底稿：整个 payload（{fileId, locator, linkKey}）
@@ -4140,17 +3988,7 @@ export default {
               // 就是「点了没反应」。照 OCR 摘录收藏（ocrDoFavorite）的模式：打开收藏面板
               // 并高亮新卡片——面板参与布局，BrowserView 会让位，反馈真实可见。
               const favId = created && created.id ? created.id : (created && created.data && created.data.id ? created.data.id : null)
-              this.showToolsPanel = true
-              this.activeToolKey = 'favorites'
-              this.$nextTick(async () => {
-                try {
-                  const panel = this.$refs.favoritesPanel
-                  if (panel && typeof panel.refresh === 'function') await panel.refresh(true)
-                  if (favId && panel && typeof panel.focusFavorite === 'function') panel.focusFavorite(Number(favId))
-                } catch (e) {
-                  // ignore
-                }
-              })
+              this.focusFavoritePlugin(favId)
               uni.showToast({ title: this.$t('workbench.webMarkFavAdded'), icon: 'success' })
             } catch (e) {
               console.error('保存网核收藏失败:', e)
@@ -4232,18 +4070,7 @@ export default {
               if (raw.startsWith('checkba://webfav')) {
                 const favId = params.get('id')
                 if (!favId) return
-                this.showToolsPanel = true
-                this.activeToolKey = 'favorites'
-                this.$nextTick(() => {
-                  try {
-                    const panel = this.$refs.favoritesPanel
-                    if (panel && typeof panel.focusFavorite === 'function') {
-                      panel.focusFavorite(Number(favId))
-                    }
-                  } catch (e) {
-                    // ignore
-                  }
-                })
+                this.focusFavoritePlugin(favId)
                 return
               }
 
@@ -4294,14 +4121,7 @@ export default {
             if (raw.startsWith('checkba://webfav')) {
               const favId = params.get('id')
               if (!favId) return
-              this.showToolsPanel = true
-              this.activeToolKey = 'favorites'
-              this.$nextTick(() => {
-                try {
-                  const panel = this.$refs.favoritesPanel
-                  if (panel && typeof panel.focusFavorite === 'function') panel.focusFavorite(Number(favId))
-                } catch (e) {}
-              })
+              this.focusFavoritePlugin(favId)
               return
             }
 
@@ -4546,8 +4366,8 @@ export default {
       try {
         const res = await registerMeetingFromFile(this.projectId, file.id)
         this.meetingFocusId = res && res.meeting ? res.meeting.id : null
-        this.voiceTab = 'recorder'
-        if (this.leftPaneKey !== 'voice') this.toggleLeftPane('voice')
+        this.openPanelInItsDock('voice')
+        this.$nextTick(() => uni.$emit('awd:plugin-sidebar-command', { pluginId: 'voice', command: 'recording-focus', meetingId: this.meetingFocusId }))
         uni.showToast({
           title: res && res.submitted
             ? this.$t('fileTree.transcribeSubmitted')
@@ -4707,7 +4527,8 @@ export default {
       if (!file || file.id == null) return
       this.calendarFileFilter = file.id
       this.calendarFileFilterName = file.name || ''
-      if (this.leftPaneKey !== 'calendar' || this.sidebarCollapsed) this.toggleLeftPane('calendar')
+      if (this.leftPaneKey !== 'plugin-calendar' || this.sidebarCollapsed) this.toggleLeftPane('calendar')
+      this.$nextTick(() => uni.$emit('awd:plugin-sidebar-command', { pluginId: 'calendar', command: 'calendar-file', fileId: file.id, name: file.name || '' }))
     },
     // 事项上的文件芯片 → 在工作台里打开该文件。以服务端为准查文件（文件树可能没展开到那一层）；
     // 查不到（已删除/不属于本项目）就提示，不静默。
@@ -4994,12 +4815,12 @@ export default {
     },
     handleDesensitizeSuccess(file) {
         if (!file) return
-        
+
         // Refresh file tree to show the new file
         if (this.$refs.fileTree && this.$refs.fileTree.refresh) {
             this.$refs.fileTree.refresh()
         }
-        
+
         // Open the file directly
         // The backend returns the full ProjectFile object now
         this.openFile(file)
@@ -5010,9 +4831,15 @@ export default {
     // 别的面板开选择器时抢先命中 handleFilePickerConfirm 的分支——新面板的回调永远不
     // 会被调用，用户选了文件却什么都没发生。
     handleFilePickerCancel() {
+        const pluginCallback = this.desensitizeFileSelectCallback
         this.desensitizeFileSelectCallback = null
+        if (pluginCallback) pluginCallback(null)
+        const scopeCallback = this.litigationScopeCallback
         this.litigationScopeCallback = null
+        if (scopeCallback) scopeCallback(null)
+        const voiceCallback = this.easyVoiceImportCallback
         this.easyVoiceImportCallback = null
+        if (voiceCallback) voiceCallback(null)
     },
 
     async handleFilePickerConfirm(file) {
@@ -5055,10 +4882,10 @@ export default {
             if (res && res.code === 0) {
                 const text = res.data
                 if (this.easyVoiceImportCallback) {
-                    this.easyVoiceImportCallback(text)
+                    this.easyVoiceImportCallback(text, file.id)
                 }
                 // P0: 打开文件到右侧标签页
-                
+
                 // Extract fileType from name if missing
                 let fileType = file.fileType
                 if (!fileType && file.name) {
@@ -5067,7 +4894,7 @@ export default {
                     fileType = ext.toLowerCase()
                   }
                 }
-                
+
                 this.openFile({
                   id: file.id,
                   wpsFileId: file.wpsFileId,
@@ -5089,7 +4916,7 @@ export default {
     },
 
     // TTS Karaoke Highlighting（#79：经 LibreOffice 执行器 find+select 实现）
-    async handleTtsHighlight(sentence) {
+    async handleTtsHighlight(sentence, sourceFileId) {
       console.log('[TTS Highlight] Highlighting:', sentence?.substring(0, 50) + '...')
 
       if (!this.libreOfficeActive || !this.libreOfficeExecutor) {
@@ -5106,6 +4933,7 @@ export default {
           console.warn('[TTS] Sentence not found in document')
           return
         }
+        if (sourceFileId && String(this.getPluginActiveEditor()?.fileId) !== String(sourceFileId)) return
         await this.libreOfficeExecutor.executeCommand('set_selection', { anchor })
       } catch (e) {
         console.warn('[TTS] Failed to highlight:', e && e.message)
@@ -5566,11 +5394,16 @@ export default {
         uni.showToast({ title: e.message || this.$t('workbench.copyFailed'), icon: 'none' })
       }
     },
+    focusFavoritePlugin(id) {
+      this.openPanelInItsDock('favorites')
+      uni.$emit('awd:favorites-changed')
+      this.$nextTick(() => uni.$emit('awd:plugin-sidebar-command', { pluginId: 'favorites', command: 'favorites-focus', id: Number(id) || null }))
+    },
     switchToolTab(key) {
-      this.activeToolKey = key
+      this.activeToolKey = migrateLeftPaneKey(key)
       // 如果用户切到剪贴板，且之前有 pending，则立刻刷新
       this.$nextTick(() => {
-        if (key === 'clipboard') {
+        if (this.activeToolKey === 'plugin-clipboard') {
           this.triggerClipboardRefresh()
         }
       })
@@ -5697,18 +5530,7 @@ export default {
     // 这里只负责面板侧反馈。
     onBrowserFavoriteAdded(payload) {
       const favId = payload && payload.id ? Number(payload.id) : null
-      this.showToolsPanel = true
-      this.activeToolKey = 'favorites'
-      this.$nextTick(async () => {
-        try {
-          const panel = this.$refs.favoritesPanel
-          // force=true 绕过 1.2s 节流，否则新卡片可能刷不出来、高亮落空
-          if (panel && typeof panel.refresh === 'function') await panel.refresh(true)
-          if (favId && panel && typeof panel.focusFavorite === 'function') panel.focusFavorite(favId)
-        } catch (e) {
-          // ignore
-        }
-      })
+      this.focusFavoritePlugin(favId)
     },
     // 激活的网页标签变化：记进保活 LRU（超上限的尾巴直接出池 = 组件卸载 = iframe 收掉，
     // 不像编辑器那样需要先落盘，网页没有我们负责保存的状态）。顺带清掉已关标签的残留记账。
@@ -6277,11 +6099,13 @@ export default {
     },
     // 左栏列表点行 → 中栏开该项详情 tab（同 id 单例，任一窗格已开则激活）
     openMarketDetail(spec) {
+      spec = { ...spec, projectId: Object.prototype.hasOwnProperty.call(spec, 'projectId') ? spec.projectId : (this.projectId || null) }
       const tabId = `market-detail_${spec.kind}_${spec.id}`
       for (const pane of ['left', 'right']) {
         const list = pane === 'left' ? this.leftFiles : this.rightFiles
         const existing = list.find(f => f.id === tabId)
         if (existing) {
+          existing.marketSpec = spec
           const idProp = pane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'
           this[idProp] = existing.id
           this.focusedPane = pane
@@ -7469,6 +7293,7 @@ export default {
           // 请求世代防止安装时的旧响应在禁用/卸载后迟到，把入口重新加回来。
           this.dynamicPlugins = list.filter(p => p && p.enabled === true && !p.revokedReason && !p.incompatibleReason).map(p => {
             const frontendEntry = resolvePluginEntryUrl(p.id, p.frontendEntry)
+            const views = pluginViews(p, resolvePluginEntryUrl)
             return {
               key: `plugin-${p.id}`,
               // 左栏面板 key 是 plugin-<id>，桥要的是原始 id（握手上下文 + KV 分区键），
@@ -7486,6 +7311,9 @@ export default {
               // 有真正的前端入口才走 iframe（PluginPane）；纯工具/skill 插件走宿主渲染的
               // 启动面板（PluginGuidePane）——否则点开只有一句「未配置入口地址」。
               hasFrontend: !!frontendEntry,
+              views,
+              sidebarView: views.find(view => view.placement === 'sidebar') || null,
+              workspaceView: views.find(view => view.placement === 'workspace') || null,
               description: p.description || '',
               tools: Array.isArray(p.tools) ? p.tools : [],
               guide: p.guide || null,
@@ -7499,7 +7327,15 @@ export default {
             }
           })
           this.dynamicPluginsLoaded = true
+          for (const tab of [...this.leftFiles, ...this.rightFiles]) if (tab.tabType === 'calendar') {
+            const oldId = tab.id
+            tab.tabType = 'plugin'; tab.pluginId = 'calendar'; tab.id = 'plugin-calendar'
+            if (this.activeFileIdLeft === oldId) this.activeFileIdLeft = tab.id
+            if (this.activeFileIdRight === oldId) this.activeFileIdRight = tab.id
+          }
           this.reconcilePluginTabs()
+          if (this.pendingCalendarOpen) { const pending = this.pendingCalendarOpen; this.pendingCalendarOpen = null; this.openCalendarTab(pending) }
+          this.normalizeDockSelections?.()
           if (this.leftPaneKey?.startsWith('plugin-') && !this.activeDynamicPlugin) {
             this.leftPaneKey = this.hasProject ? 'files' : NO_PROJECT_DEFAULT_PANE
           }

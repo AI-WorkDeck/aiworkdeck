@@ -17,6 +17,7 @@
             </svg>
           </view>
           <input
+            ref="searchInput"
             class="search-input"
             v-model="searchQuery"
             :placeholder="$t('files.searchPlaceholder')"
@@ -344,7 +345,7 @@ export default {
       if (this.debounceTimer) clearTimeout(this.debounceTimer)
       this.debounceTimer = setTimeout(() => {
         this.debounceTimer = null
-        this.performSearch()
+        this.performSearch(true)
       }, SEARCH_DEBOUNCE_MS)
     },
     toggleOption(option) {
@@ -353,7 +354,12 @@ export default {
         this.performSearch()
       }
     },
-    async performSearch() {
+    async performSearch(syncInput = false) {
+      // Uni batches v-model updates. Read the native value when the debounced
+      // query actually runs, so a fast paste/type is searched in full.
+      const root = this.$refs?.searchInput?.$el || this.$refs?.searchInput
+      const native = root?.matches?.('input') ? root : root?.querySelector?.('input')
+      if (syncInput && native && typeof native.value === 'string') this.searchQuery = native.value
       // 回车/点标签/清空都会直接调到这里：撤掉还没到点的防抖，免得同一次输入再发一遍
       if (this.debounceTimer) clearTimeout(this.debounceTimer)
       this.debounceTimer = null

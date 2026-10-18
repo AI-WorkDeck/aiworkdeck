@@ -17,7 +17,7 @@ const CODE = stripComments(SRC)
 
 // 从起始位置抠出一段花括号配平的函数体（跳过字符串里的括号）
 function braceBody(src, header) {
-  const at = src.indexOf(header)
+  const at = src.indexOf('\n    ' + header + ' {')
   assert.ok(at >= 0, `找不到 ${header}`)
   let i = src.indexOf('{', at)
   const start = i + 1

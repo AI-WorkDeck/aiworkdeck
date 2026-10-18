@@ -569,6 +569,10 @@ start/stop/restart 共用按服务串行队列。后端端口分配后固定，�
 
 preload `host.backend.getHealth()` / `onHealthChanged(callback)`；主进程 IPC `checkba:backend-health` / `checkba:backend-health-changed`。快照 `{state, ok, owned, attempts, reason, updatedAt}`；state 为 starting/healthy/degraded/restarting/failed/suspended/stopped。启动链异常也保留 failed/startup-failed 快照；只有已有本壳 child 所有权时才启动监督器允许恢复，端口分配失败不能永久显示 starting。回归 `desktop/tests/backend-supervisor.test.js`、`service-manager.test.js`、`quit-lifecycle.test.js` 用随机回环端口/合成 child；端口链测试同样注入随机端口，不占用户默认5269。mac/Windows正式包的数据库耗尽与真实文件写入恢复仍须隔离验收，不得在用户未保存文稿的客户端直接强杀演练。
 
+## 随包业务插件构建（#1340/#1341，待发版）
+
+frontend build:h5前置build:plugins，8个独立Uni/Vite包输出official-plugins/<id>/web，desktop extraResources只带对应manifest/web。后端通过AI_PLUGINS_BUNDLED_DIR读取只读来源，安装到可写plugins目录；OAuth回调由实际分配的后端端口注入AI_PLUGINS_OAUTH_REDIRECT_URI。纯服务端开发显式指定bundled-dir并先构建。QA启动后端必须复制jar到隔离runtime后运行，不可直接运行随后会被Maven改写的target jar；同一target目录不可并行package与test。
+
 ### 原生组件失败后的立即重试（dev-board#1260）
 
 `NativePackService.installAsync` 的占用表按每次任务的 `PackStatus` 对象区分。`failed` 对用户可见后即可接受重试；旧任务的 catch 只改自身状态，finally 条件删除自身占用，不能覆盖或释放新任务。失败详情先写、failed 最后发布。不要退回按 packId 的 Set 去重，也不要通过延长轮询或 sleep 掩盖窗口。`NativePackServiceTest.immediateRetryAfterFailureKeepsNewAttemptInFlight` 用 latch 固定这个窗口，并验证运行中与排队中的去重、旧收尾隔离及最终真实安装文件。

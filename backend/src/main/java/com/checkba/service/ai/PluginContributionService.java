@@ -189,6 +189,10 @@ public class PluginContributionService {
 
     /** 设置声明 + 当前值（secret 只回显尾 4 位）；给广场详情页渲染表单 */
     public List<Map<String, Object>> settingsView(String pluginId) {
+        return settingsView(pluginId, null, null);
+    }
+
+    public List<Map<String, Object>> settingsView(String pluginId, Long userId, Long projectId) {
         PluginService.PluginMetadata meta = pluginService.getPlugin(pluginId);
         List<Map<String, Object>> out = new ArrayList<>();
         if (meta == null || meta.getSettings() == null) {
@@ -203,7 +207,10 @@ public class PluginContributionService {
             row.put("options", d.getOptions());
             boolean secret = Boolean.TRUE.equals(d.getSecret());
             row.put("secret", secret);
-            String value = currentValue(pluginId, d);
+            row.put("scope", settingScope(d));
+            if (("user".equals(settingScope(d)) && userId == null)
+                    || ("project".equals(settingScope(d)) && projectId == null)) continue;
+            String value = currentValue(pluginId, d, userId, projectId);
             row.put("value", secret ? mask(value) : value);
             out.add(row);
         }
@@ -212,18 +219,24 @@ public class PluginContributionService {
 
     /** 保存设置（按声明校验类型；未声明的键拒绝）。写入只走这条——配置权在用户手里 */
     public void saveSettings(String pluginId, Map<String, Object> values) {
+        saveSettings(pluginId, values, null, null);
+    }
+
+    public void saveSettings(String pluginId, Map<String, Object> values, Long userId, Long projectId) {
         PluginService.PluginMetadata meta = pluginService.getPlugin(pluginId);
         if (meta == null || meta.getSettings() == null) {
             throw new IllegalArgumentException("插件没有可配置项: " + pluginId);
         }
+        Map<String, String> writes = new LinkedHashMap<>();
         for (Map.Entry<String, Object> e : values.entrySet()) {
             PluginService.PluginSettingDecl d = meta.getSettings().stream()
                     .filter(x -> x.getKey().equals(e.getKey())).findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("未声明的设置项: " + e.getKey()));
             String v = e.getValue() == null ? "" : String.valueOf(e.getValue());
             validateValue(d, v);
-            systemSettingService.set("plugin." + pluginId + "." + d.getKey(), v);
+            writes.put(settingKey(pluginId, d, userId, projectId), v);
         }
+        writes.forEach(systemSettingService::set);
     }
 
     /**
@@ -245,8 +258,34 @@ public class PluginContributionService {
     }
 
     private String currentValue(String pluginId, PluginService.PluginSettingDecl d) {
+        return currentValue(pluginId, d, null, null);
+    }
+
+    private String currentValue(String pluginId, PluginService.PluginSettingDecl d, Long userId, Long projectId) {
         String def = d.getDefaultValue() == null ? null : String.valueOf(d.getDefaultValue());
-        return systemSettingService.get("plugin." + pluginId + "." + d.getKey(), def);
+        return systemSettingService.get(settingKey(pluginId, d, userId, projectId), def);
+    }
+
+    public static String settingScope(PluginService.PluginSettingDecl d) {
+        String scope = d.getScope() == null ? "installation" : d.getScope();
+        if (!List.of("installation", "user", "project").contains(scope)) throw new IllegalArgumentException("Unknown setting scope");
+        if (Boolean.TRUE.equals(d.getSecret()) && !"installation".equals(scope)) {
+            throw new IllegalArgumentException("Use a connection for per-user credentials");
+        }
+        return scope;
+    }
+
+    private static String settingKey(String pluginId, PluginService.PluginSettingDecl d, Long userId, Long projectId) {
+        String scope = settingScope(d);
+        String prefix = "plugin." + pluginId + ".";
+        if ("user".equals(scope)) {
+            if (userId == null) throw new IllegalArgumentException("A user is required for this setting");
+            prefix = "plugin-user." + userId + "." + pluginId + ".";
+        } else if ("project".equals(scope)) {
+            if (projectId == null) throw new IllegalArgumentException("A project is required for this setting");
+            prefix = "plugin-project." + projectId + "." + pluginId + ".";
+        }
+        return prefix + d.getKey();
     }
 
     private static void validateValue(PluginService.PluginSettingDecl d, String v) {
@@ -259,7 +298,7 @@ public class PluginContributionService {
             case "number" -> {
                 if (!v.isEmpty()) {
                     try {
-                        Double.parseDouble(v);
+                        if (!Double.isFinite(Double.parseDouble(v))) throw new NumberFormatException();
                     } catch (NumberFormatException e) {
                         throw new IllegalArgumentException(d.getKey() + " 需要数字");
                     }

@@ -917,3 +917,47 @@ SDK 1.5.0 新增可选权限 `im`。`im.request {action,params}` 经 `/api/plugi
 `im.downloadAttachment {conversationId,attachmentId}`（im）在服务端再次校验附件可读后，由宿主 Blob 下载链路触发另存为，不要求项目写权限、不创建项目文件。返回 `{started:true,name}` 只表示发起下载，不表示用户已保存；文件名清洗、8 MiB边界及账户/项目迟到校验均在宿主完成。客户可直接下载自己的或已开放附件，不必先存入项目。
 
 文件变量、音频转写/纪要读取沿用来源文件ACL；股东核查、诉讼图表、内部插件任务结果等可混合私有材料的模块禁止客户读取。`ProjectMemberService.isClient` 与写权限同时检查全局客户身份，防默认成员/owner角色绕过Git与云端内部成员限制。
+
+## 17. SDK 1.6：可安装视图、共享能力与开发者服务（待随宿主发版）
+
+本节描述已实现的新宿主契约。代码合并不代表已升级用户客户端；新方法在旧宿主上返回 `unknown_method`。开发者应检测错误并提示兼容版本，不能用模拟成功替代真实结果。Web SDK 的类型与 JSON Schema 位于 `sdk/plugin-sdk/`，可运行示例为 `examples/plugin-service-demo/`。
+
+### 17.1 开发、验证和提交
+
+对 Agent 可以直接描述：“基于官方插件模板开发一个……插件，使用宿主文件/文档能力，添加用户设置，在本机开发安装，验证主要操作后打包提交审核。” Agent 应先读取 `backend/skills/plugin-dev/prompt.md` 与 SDK 文档，使用 `plugin_dev_scaffold`、`plugin_dev_install` 形成产品内迭代；有本地开发环境时使用 `node scripts/plugin-dev.mjs` 的 `init / validate / package / dev / status / submit`。命令参数、会话获取边界和包大小限制见 SDK README。`submit` 需要开发者本人已有官网会话和显式 HTTPS 地址；投稿进入人工审核，未经审核签名不成为广场可安装版本。
+
+开发免签只限纯 Web 包，不开放本机进程、任意 JAR 或 stdio MCP。开发包声明远程连接或 MCP 后，还需在宿主插件设置中由管理员明确允许服务调用。授权绑定当前 manifest 内容；重新安装或修改清单后重新审核，撤销后停止后续调用。导入、打包均排除宿主授权标记，插件不能通过携带 `.awd-service-trust` 自行取得授权。
+
+### 17.2 视图与侧边栏
+
+`contributes.views` 的每个视图声明 `id / name / entry / placement / scope`；`entry` 必须是插件 `web/` 中真实文件，`placement` 为 `sidebar` 或 `workspace`，`scope` 为 `project` 或 `global`。可声明 `allowedDocks`（left/right/bottom）与其中一个 `defaultDock`。当前每种 placement 最多一个视图。未声明 views 的旧插件仍按 `frontendEntry` 打开工作区。
+
+搜索、语音、脱敏、诉讼可视化、日历、收藏、剪贴板和洞察使用同一安装、启停、视图与权限通道；源码在 `frontend/plugin-app/`，发行内容在 `official-plugins/<id>/`。宿主保留文件树、工作区编辑器、Agent 对话、账户、插件管理与系统设置等运行基础，以及受权限检查的文件、编辑器和本机设备操作。无需把插件加载器本身再做成插件。
+
+桌面资源通过 `AI_PLUGINS_BUNDLED_DIR` 指向只读随包目录，首次启动复制到可写插件目录；禁用状态迁移，用户卸载后不会每次启动强行恢复。随包升级只更新带宿主管理标记且版本更高的副本，不覆盖独立安装的同名插件；可从广场的“随应用提供”项目重新安装。纯服务端开发需显式配置 `ai.plugins.bundled-dir` 并先构建 Web 包。
+
+### 17.3 设置与共享能力
+
+顶层 `settings` 新增 `scope`：缺省 `installation`，仅管理员在可信宿主表单修改；`user` 按本机用户隔离；`project` 按项目隔离并检查项目写权限。SDK `settings.get/open/update` 可读非密设置、打开宿主表单、写已声明的 user/project 非密设置。凭据放进 connections，不能用项目设置或页面存储承载；旧 installation secret 仅保留兼容接口。
+
+`services.request(service, operation, params, options)` 调用固定服务与动作，不接受任意后端 URL。宿主继续验证当前用户、项目和权限；`services.cancel` 支持中止可取消的在途工作，已经完成的写入不能靠取消回滚。共享模型走 `ai.request`，使用用户平台配置及额度；文档操作走 `doc.*`，IM 走 `im.request`。插件无需取得平台密钥。新增 `speech / tasks / clipboard` 权限分别约束语音设备与合成、任务日历、剪贴板能力，导入导出和文档修改仍需相应文件/编辑器权限。录音和付费云端动作使用可信宿主确认界面。
+
+### 17.4 自有登录、服务和付费
+
+`contributes.connections` 声明最多 10 个连接，每项包含 `id / label / baseUrl / auth / operations`。baseUrl 必须是公共 HTTPS origin；操作定义固定路径与 GET/POST 方法，不能由插件传入新目标。`auth.type` 支持 none、bearer、oauth2。bearer 在宿主可信设置表单输入；oauth2 使用公开客户端 Authorization Code + PKCE（S256），需要 authorizationUrl/tokenUrl/clientId/scopes。桌面把当前后端端口组成 `http://localhost:<port>/api/plugins/oauth/callback`，供应商须允许对应回调；无嵌入客户端密钥。暂不提供设备码、动态注册或 stdio 认证。
+
+凭据按用户、宿主账户、插件、连接隔离，在本机使用 AES-GCM 加密保存，密钥位于用户私有文件；连接目标或认证声明变更要求重新连接。SDK 只取得连接状态及业务结果。退出、切换账户、禁用插件或断开连接会使旧上下文结果失效。网络传输限制公共地址、拒绝重定向，并在实际解析连接时检查地址，防止访问本机和内网服务。
+
+可选 `billing: {statusOperation, checkoutUrl}` 把开发者自己的订阅状态与收银页面接入宿主；statusOperation 对应已声明操作，服务必须返回 `{active:boolean, plan?:string}`。`billing.status(connectionId)` 读取服务端真实权益，`billing.checkout(connectionId)` 经宿主确认打开供应商页面。不传 connectionId 时使用现有主产品插件权益与广场购买入口。主产品提供的插件购买渠道与开发者 SaaS 订阅分别核验；本接口不提供自动代收分账或托管第三方收款密钥。
+
+### 17.5 插件 MCP 与 Agent
+
+`contributes.mcpServers` 每插件最多 8 个服务器，transport 当前为 `streamable-http`，声明公共 HTTPS url、可选 connectionId（同一服务 origin）或兼容 credentialKey，以及 1–64 个 tools。工具声明包含 name、description、inputSchema；宿主将其注册为有命名空间的 Agent 工具，也可用 `awd.mcp.servers/call` 调用。身份和项目权限由宿主绑定，不能从插件参数冒充；每次调用重新检查启停、撤销、开发授权和账户状态。
+
+调用执行 MCP initialize、initialized、tools/list 与 tools/call，支持 JSON/SSE 响应及会话清理。实际服务器工具必须与已审核声明匹配。inputSchema 只支持实现明确验证的对象、数组、标量及约束子集，未知关键字拒绝；不要把此实现称为完整 JSON Schema 引擎。副作用调用失败不会自动重放。暂不支持 stdio、本地可执行扩展宿主、MCP resources/prompts/subscriptions 或 VS Code 扩展包兼容。
+
+### 17.6 验收底线
+
+插件需完成安装、启用、即时出现入口、打开视图、至少一次主要操作、禁用/卸载后入口和在途结果清理。另验证无项目场景、身份切换、权限不足、取消/迟到响应、窄面板和主题。服务接入测试应说明是真实供应商联调还是本地协议替身；单元测试不能代替实际 OAuth、支付或跨平台设备验证。
+
+侧栏保留项逐项理由：home 提供当前项目概况；projects 管理切换项目及离开前保存；files 提供文件树、编辑器与拖放根入口；dev/market 是可信安装和授权管理；version/staging 参与文档合并、落盘和发布事务；members 管理成员及访问控制。CLIENT 的 dd-files 是客户访问码下的受限资料门户，继续按角色隔离，云端律师的尽调资料入口维持云端轨道条件。腾讯会议使用已有 tencent-meeting 插件，不保留重复静态面板。

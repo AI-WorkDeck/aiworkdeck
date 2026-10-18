@@ -88,14 +88,7 @@ export const LEFT_SIDEBAR_PLUGINS = [
       { d: 'M9 17h6' }
     ]
   },
-  {
-    key: 'search',
-    label: t('config.sidebar.search'),
-    svgPaths: [
-      { d: "M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z" },
-      { d: "M21 21L16.65 16.65" }
-    ]
-  },
+
   {
     // 插件中心：原来单挂在 rail 底部（goToPluginMarket）。它和其它面板一样只是
     // toggleLeftPane('market')，没有任何特殊性，收进数组后 rail 顺序才有单一出处。
@@ -123,81 +116,8 @@ export const LEFT_SIDEBAR_PLUGINS = [
       { d: 'M13 5l-2 14' }
     ]
   },
-  {
-    // 语音：语音合成 + 会议录音的合并入口（2026-08-19）。两者都是语音功能，
-    // 各占一个 rail 位纯属浪费；面板内部用两个 tab 切换，组件本身一行没改。
-    //
-    // 入口常显（语音合成本来就没有门控）；「会议录音」那个 tab 仅在
-    // meeting-recorder skill 启用时出现，门控判据仍是 PANEL_SKILL_IDS。
-    //
-    // 路由键是新的 'voice'——uni.storage 里 leftPaneKey 的存量值可能是 'easyvoice'
-    // 或 'meeting-recorder'，由 migrateLeftPaneKey() 兜底映射过来。
-    key: 'voice',
-    label: t('config.sidebar.voice'),
-    svgPaths: [
-      { d: 'M2 10v4' },
-      { d: 'M6 6v12' },
-      { d: 'M10 3v18' },
-      { d: 'M14 8v8' },
-      { d: 'M18 5v14' },
-      { d: 'M22 10v4' }
-    ]
-  },
-  {
-    key: 'tmeet',
-    label: t('config.sidebar.tmeet'),
-    requiresSkill: 'tencent-meeting',
-    // 摄像机/视频会议图标
-    svgPaths: [
-      { d: 'm16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.934a.5.5 0 0 0-.777-.416L16 11' },
-      { d: 'M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z' }
-    ]
-  },
-  {
-    key: 'desensitize',
-    label: t('config.sidebar.desensitize'),
-    // 对应 skill.yml 的 enabled_by_default:false——默认不装，装了才出现在左栏。
-    // 见 filterPluginsByEnabledSkills。
-    requiresSkill: 'desensitize',
-    svgPaths: [
-      { d: "M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" }
-    ]
-  },
-  // 股东大会核查已下线（2026-08-17，维护者决定不做了）。左栏入口移除即等于功能隐藏；
-  // ShareholderMeetingPanel.vue / api.js 的 /api/shareholder-meeting/* / 后端 controller
-  // 与实体一律保留不动（存量案卷的数据还在库里），skill 也只改成默认不启用。
-  // 想恢复的话把这一项加回来即可，不需要重写任何东西。
-  {
-    key: 'litigation-visual',
-    label: t('config.sidebar.litigationVisual'),
-    // 对应 skill.yml 的 enabled_by_default:false——默认不装，装了才出现在左栏。
-    // 见 filterPluginsByEnabledSkills。
-    requiresSkill: 'litigation-visual',
-    // 折线 + 节点：时间轴/关系图的共同意象
-    svgPaths: [
-      { d: 'M3 17h18' },
-      { d: 'M7 17v-4' },
-      { d: 'M12 17V8' },
-      { d: 'M17 17v-7' },
-      { d: 'M7 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z' },
-      { d: 'M17 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z' }
-    ]
-  },
-  {
-    // 日历：内置功能（文件右键「设置截止日」/概览页日程块 落的同一张 project_task 表
-    // 在这里再开一个入口），不做 requiresSkill 门控。放在数组末位——rail 上它紧挨着
-    // 底部单独渲染的「版本记录」，视觉上与版本相邻。
-    // label 用「日程」（dev-board#899：产品口径里「日程」= 日历视图、「事项」= 条目）；
-    // config.sidebar.calendar 键保留给旧引用，不再在 rail 上显示。
-    key: 'calendar',
-    label: t('calendar.railSchedule'),
-    svgPaths: [
-      { d: 'M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z' },
-      { d: 'M16 2v4' },
-      { d: 'M8 2v4' },
-      { d: 'M3 10h18' }
-    ]
-  }
+
+
 ]
 
 /** 不在 rail 数组里、但仍要能按 key 查到 label 的面板（CLIENT / 云端轨道律师的尽调文件、版本记录） */
@@ -242,8 +162,11 @@ export function getPluginsForUser(role, { cloudTrack = false } = {}) {
  * 判不出这份案卷有没有放进案件库，宁可落在资源管理器也不落在一个可能不存在的面板上。
  */
 const LEFT_PANE_KEY_ALIASES = {
-  easyvoice: 'voice',
-  'meeting-recorder': 'voice',
+  search: 'plugin-search', voice: 'plugin-voice', calendar: 'plugin-calendar', favorites: 'plugin-favorites', clipboard: 'plugin-clipboard', insight: 'plugin-insight', tmeet: 'plugin-tencent-meeting',
+  desensitize: 'plugin-desensitize',
+  'litigation-visual': 'plugin-litigation-visual',
+  easyvoice: 'plugin-voice',
+  'meeting-recorder': 'plugin-voice',
   'shareholder-meeting': 'files',
   'dd-files': 'files',
   'project-home': 'home',

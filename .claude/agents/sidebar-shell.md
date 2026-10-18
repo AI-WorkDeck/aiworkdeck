@@ -1429,3 +1429,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 原生拖拽开始前登记清理；路径或原生启动失败只提示外拖失败，保留仍在进行的内部拖动；除 DOM dragend/drop 外，宿主回焦、松开鼠标/pointer、Esc 也撤销拖拽状态并发 `file-drag-end`，解除编辑器 `evidenceDropArmed` 透明层。不要在 blur 时立即清理，鼠标可能仍按住跨窗拖动；焦点监听只处理窗口本身，不能把内部控件 focus 当拖拽结束。
 
 回归：`file-tree-keyboard.test.mjs`、`file-tree-external-drop.test.mjs`、桌面 `file-drag.test.js`。微信接收端与正式安装版本需要分别验收，不把原生 API 桩和浏览器合成环境称为真实微信投放。
+
+## 业务侧栏真实插件迁移（#1340，待发版）
+
+8个业务包为search/voice/desensitize/litigation-visual/calendar/favorites/clipboard/insight；tmeet由已有tencent-meeting包承接。布局从manifest contributes.views解析，动态PluginPane承载sidebar/workspace，global无项目可开，project受项目/CLIENT门控。源在frontend/plugin-app，构建npm run build:plugins；npm run build:h5先构建8包。业务服务桥分pluginBusinessServices/pluginCollectionServices/pluginVoiceServices/pluginInsightServices，账号与本机设备仍在宿主。日历深链转插件workspace视图，保留task/file/focus过滤。核心保留home/projects/files/dev/market/version/staging/members及受限CLIENT dd-files，详见PLUGIN_SPEC §17盘点。验证除了单元测试还需真实Uni+opaque sandbox：ES模块静态资产需要仅plugin-web路由ACAO:*；不增加allow-same-origin或unsafe-eval。

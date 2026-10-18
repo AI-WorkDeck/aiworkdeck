@@ -134,6 +134,7 @@ const TTS_MODEL_ID = 'kokoro-models'
 export default {
   name: 'EasyVoicePane',
   components: { AwdSelect },
+  props: { downloadArtifact: { type: Function, default: null } },
   data() {
     return {
       text: '',
@@ -479,6 +480,7 @@ export default {
     },
     downloadAudio() {
       if (!this.reading.exportBuffer) return
+      if (this.downloadArtifact) return this.downloadArtifact({ content: this.reading.exportBuffer })
       const url = URL.createObjectURL(new Blob([this.reading.exportBuffer], { type: 'audio/wav' }))
       const a = document.createElement('a')
       a.href = url

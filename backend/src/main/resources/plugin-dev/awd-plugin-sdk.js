@@ -80,6 +80,11 @@
  *   account.changed is a data-free event: discard cached identity, messages and pending work.
  *   Older hosts return unknown_method; do not emulate IM with localStorage.
  *
+ * SDK 1.6.0: services, MCP, host-managed connections, billing and editable settings.
+ * All calls accept transport options { signal, timeoutMs }; timeout defaults to 60000 ms.
+ * Timeout/abort discard late responses. Service requests also send best-effort cancellation.
+ * unknown_method remains a rejected promise: offer an upgrade, never pretend success.
+ *
  * 错误码：permission_denied（manifest 未声明所需权限）、unknown_method（宿主不认识的方法）、
  *   anchor_ambiguous（引文 0 或多处命中 / anchor 形状不对）、no_selection（要求选区但当前没有）、
  *   not_found（链接或文件不存在）、no_active_document（当前没有打开的 Word 文档）、
@@ -95,7 +100,7 @@
 
   var PROTOCOL = 1;
   var seq = 0;
-  var pending = {};
+  var pending = Object.create(null);
   var resolveReady;
   var readyPromise = new Promise(function (resolve) { resolveReady = resolve; });
 
@@ -135,7 +140,7 @@
     if (msg.type === 'result') {
       var entry = pending[msg.seq];
       if (!entry) return;
-      delete pending[msg.seq];
+      entry.cleanup();
       if (msg.ok) {
         entry.resolve(msg.result);
       } else {
@@ -170,11 +175,53 @@
     });
   }
 
-  function call(method, params) {
+  function bridgeError(code, message) {
+    var error = new Error(message);
+    error.code = code;
+    if (code === 'aborted') error.name = 'AbortError';
+    return error;
+  }
+
+  function call(method, params, options) {
+    var opts = options || {};
     return new Promise(function (resolve, reject) {
+      var timeoutMs = opts.timeoutMs == null ? 60000 : opts.timeoutMs;
+      if (typeof timeoutMs !== 'number' || !isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000) {
+        reject(bridgeError('invalid_params', 'timeoutMs must be between 1 and 120000 ms'));
+        return;
+      }
+      var signal = opts.signal;
+      if (signal && signal.aborted) {
+        reject(bridgeError('aborted', 'Call aborted'));
+        return;
+      }
       var id = ++seq;
-      pending[id] = { resolve: resolve, reject: reject };
-      post({ awd: PROTOCOL, type: 'call', seq: id, method: method, params: params || {} });
+      var timer;
+      function cleanup() {
+        delete pending[id];
+        clearTimeout(timer);
+        if (signal) signal.removeEventListener('abort', abort);
+      }
+      function abort() {
+        if (!pending[id]) return;
+        cleanup();
+        reject(bridgeError('aborted', 'Call aborted'));
+      }
+      pending[id] = { resolve: resolve, reject: reject, cleanup: cleanup };
+      timer = setTimeout(function () {
+        if (!pending[id]) return;
+        cleanup();
+        reject(bridgeError('timeout', 'Host call timed out: ' + method));
+      }, timeoutMs);
+      // Node-based developer harnesses must not be kept alive by unanswered mock messages.
+      if (timer && timer.unref) timer.unref();
+      try {
+        if (signal) signal.addEventListener('abort', abort, { once: true });
+        post({ awd: PROTOCOL, type: 'call', seq: id, method: method, params: params || {} });
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
     });
   }
 
@@ -189,7 +236,7 @@
 
   var awd = {
     /** SDK 版本，与桥协议版本无关 */
-    version: '1.5.0',
+    version: '1.6.0',
     /** 握手拿到的上下文；ready() 之前为 null */
     context: null,
     /** 等待宿主握手，resolve 值即 awd.context */
@@ -198,55 +245,91 @@
     call: call,
     files: {
       /** -> Array<{ path, name, size }> */
-      list: function () {
-        return call('files.list', {}).then(function (r) { return (r && r.files) || []; });
+      list: function (options) {
+        return call('files.list', {}, options).then(function (r) { return (r && r.files) || []; });
       },
       /** -> { path, content, truncated } */
-      read: function (path) { return call('files.read', { path: path }); },
-      prepareDrag: function (path, rect) { return call('files.prepareDrag', { path: path, rect: rect }); },
-      endDrag: function () { return call('files.endDrag', {}); }
+      read: function (path, options) { return call('files.read', { path: path }, options); },
+      prepareDrag: function (path, rect, options) { return call('files.prepareDrag', { path: path, rect: rect }, options); },
+      endDrag: function (options) { return call('files.endDrag', {}, options); }
     },
     ui: {
-      toast: function (message) { return call('ui.toast', { message: message }); },
+      toast: function (message, options) { return call('ui.toast', { message: message }, options); },
       /** 把项目文件打开到工作台中栏（需 file_read） */
-      openFile: function (path) { return call('ui.openFile', { path: path }); }
+      openFile: function (path, options) { return call('ui.openFile', { path: path }, options); }
     },
     tools: {
       /** 直调本插件的 JAR 工具 -> 工具原始字符串输出（自行 JSON.parse） */
-      invoke: function (name, args) {
-        return call('tools.invoke', { name: name, args: args || {} }).then(function (r) {
+      invoke: function (name, args, options) {
+        return call('tools.invoke', { name: name, args: args || {} }, options).then(function (r) {
           return r && r.output != null ? r.output : '';
         });
       }
     },
     chat: {
       /** 把 prompt 作为可见用户消息发进 AI 对话（起草类动作走这条，不直调工具） */
-      send: function (prompt) { return call('chat.send', { prompt: prompt }); },
-      addFile: function (path) { return call('chat.addFile', { path: path }); }
+      send: function (prompt, options) { return call('chat.send', { prompt: prompt }, options); },
+      addFile: function (path, options) { return call('chat.addFile', { path: path }, options); }
     },
     im: {
-      request: function (action, params) { return call('im.request', { action: action, params: params || {} }); }
+      request: function (action, params, options) { return call('im.request', { action: action, params: params || {} }, options); }
     },
     lawfirm: {
-      request: function (action, params) { return call('lawfirm.request', { action: action, params: params || {} }); }
+      request: function (action, params, options) { return call('lawfirm.request', { action: action, params: params || {} }, options); }
     },
     storage: {
       /** -> 存过的值，没有则 null */
-      get: function (key) {
-        return call('storage.get', { key: key }).then(function (r) {
+      get: function (key, options) {
+        return call('storage.get', { key: key }, options).then(function (r) {
           return r && r.value !== undefined ? r.value : null;
         });
       },
-      set: function (key, value) { return call('storage.set', { key: key, value: value }); }
+      set: function (key, value, options) { return call('storage.set', { key: key, value: value }, options); }
+    },
+    services: {
+      request: function (service, operation, params, options) {
+        var opts = options || {};
+        var alreadyAborted = opts.signal && opts.signal.aborted;
+        var requestId = opts.requestId || ('awd-' + Date.now().toString(36) + '-' + (++seq) + '-' + Math.random().toString(36).slice(2));
+        return call('services.request', { service: service, operation: operation, params: params || {}, requestId: requestId }, opts)
+          .catch(function (error) {
+            if ((error.code === 'aborted' || error.code === 'timeout') && !alreadyAborted) {
+              // Cancellation is best effort; an old host may reject it. Never convert the original error to success.
+              call('services.cancel', { requestId: requestId }).catch(function () {});
+            }
+            throw error;
+          });
+      },
+      cancel: function (params, options) { return call('services.cancel', params || {}, options); }
+    },
+    mcp: {
+      servers: function (options) { return call('mcp.servers', {}, options); },
+      call: function (serverId, name, args, options) { return call('mcp.call', { serverId: serverId, name: name, arguments: args || {} }, options); }
+    },
+    connections: {
+      list: function (options) { return call('connections.list', {}, options); },
+      // Token entry and OAuth belong to trusted host UI. No credential argument or secret result.
+      connect: function (id, options) { return call('connections.connect', { id: id }, options); },
+      disconnect: function (id, options) { return call('connections.disconnect', { id: id }, options); },
+      request: function (id, operation, params, options) { return call('connections.request', { id: id, operation: operation, params: params || {} }, options); }
+    },
+    billing: {
+      status: function (connectionId, options) { return call('billing.status', { connectionId: connectionId }, options); },
+      checkout: function (connectionId, options) { return call('billing.checkout', { connectionId: connectionId }, options); }
     },
     settings: {
+      open: function (options) { return call('settings.open', {}, options); },
+      update: function (values, options) {
+        var opts = options || {};
+        return call('settings.update', { values: values, scope: opts.scope, projectId: opts.projectId }, opts);
+      },
       /**
        * 读 manifest.settings 声明的配置项 -> 字符串值（v2.9，宿主 0.28+）。
        * 与 storage 的区别：settings 是用户在插件广场详情页填写的配置（插件只读），
        * storage 是插件自己的 KV。secret 项拿不到；配置变更会推 settings.changed 事件。
        */
-      get: function (key) {
-        return call('settings.get', { key: key }).then(function (r) {
+      get: function (key, options) {
+        return call('settings.get', { key: key }, options).then(function (r) {
           return r && r.value != null ? r.value : '';
         });
       }
@@ -268,32 +351,32 @@
     },
     evidence: {
       /** -> { linkKey, targetIds } */
-      link: function (params) { return call('evidence.link', params || {}); },
+      link: function (params, options) { return call('evidence.link', params || {}, options); },
       /** -> { links: [...] } 原始 result，不解包 */
-      list: function (params) { return call('evidence.list', params || {}); },
+      list: function (params, options) { return call('evidence.list', params || {}, options); },
       /** -> {} */
-      locate: function (params) { return call('evidence.locate', params || {}); }
+      locate: function (params, options) { return call('evidence.locate', params || {}, options); }
     },
     doc: {
       /** 对当前聚焦文档执行编辑原语 -> 原语的原始返回对象（需 editor 权限） */
-      exec: function (action, params) {
-        return call('doc.exec', { action: action, params: params || {} }).then(function (r) {
+      exec: function (action, params, options) {
+        return call('doc.exec', { action: action, params: params || {} }, options).then(function (r) {
           return r ? r.result : {};
         });
       },
       /** -> { fileId, kind }；没有打开的文档时 fileId 为 null（需 editor 权限） */
-      active: function () { return call('doc.active', {}); },
+      active: function (options) { return call('doc.active', {}, options); },
       /** 糖衣：读全文 -> 原语原始返回（含段落数组，形状见宿主 get_document_text 文档） */
-      getText: function () { return awd.doc.exec('get_document_text', {}); },
+      getText: function (options) { return awd.doc.exec('get_document_text', {}, options); },
       /** 糖衣：读当前选区 */
-      getSelection: function () { return awd.doc.exec('get_selection', {}); },
+      getSelection: function (options) { return awd.doc.exec('get_selection', {}, options); },
       /** 糖衣：查找文本出现位置 */
-      find: function (text) { return awd.doc.exec('find_text_locations', { text: text }); },
+      find: function (text, options) { return awd.doc.exec('find_text_locations', { text: text }, options); },
       /** 糖衣：光标处插入文本（Writer 走修订，署名 AI WorkDeck） */
-      insertText: function (text) { return awd.doc.exec('insert_at_cursor', { text: text }); },
+      insertText: function (text, options) { return awd.doc.exec('insert_at_cursor', { text: text }, options); },
       /** 糖衣：在恰好命中一次的锚点文字上加批注 */
-      addComment: function (anchorText, text) {
-        return awd.doc.exec('add_comment', { anchorText: anchorText, text: text });
+      addComment: function (anchorText, text, options) {
+        return awd.doc.exec('add_comment', { anchorText: anchorText, text: text }, options);
       }
     },
     events: {
@@ -329,7 +412,7 @@
        */
       request: function (prompt, opts) {
         var p = opts || {};
-        return call('ai.request', { prompt: prompt, system: p.system, purpose: p.purpose })
+        return call('ai.request', { prompt: prompt, system: p.system, purpose: p.purpose }, p)
           .then(function (r) { return r && r.text != null ? r.text : ''; });
       }
     }

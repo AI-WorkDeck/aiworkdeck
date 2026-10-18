@@ -1,0 +1,27 @@
+{
+  "$schema": "../../sdk/plugin-sdk/manifest.schema.json",
+  "id": "plugin-service-demo",
+  "name": "宿主服务与连接示例",
+  "version": "0.1.0",
+  "description": "演示插件设置、宿主 AI、自带服务连接、MCP 与订阅入口。示例服务地址需要开发者替换。",
+  "author": "AI WorkDeck",
+  "permissions": ["ai", "network", "file_read"],
+  "frontendEntry": "web/index.html",
+  "backendJars": [],
+  "tools": [],
+  "settings": [{ "key": "greeting", "scope": "user", "type": "string", "label": "问候语", "default": "你好" }],
+  "contributes": {
+    "views": [{ "id": "main", "name": "宿主服务示例", "entry": "web/index.html", "placement": "sidebar", "scope": "project", "defaultDock": "left", "allowedDocks": ["left", "right", "bottom"] }],
+    "connections": [{
+      "id": "example-provider",
+      "label": "示例服务（需替换地址）",
+      "baseUrl": "https://service.example.invalid",
+      "auth": { "type": "bearer" },
+      "operations": {
+        "query": { "path": "/v1/query", "method": "POST" },
+        "subscription": { "path": "/v1/subscription", "method": "GET" }
+      },
+      "billing": { "statusOperation": "subscription", "checkoutUrl": "https://service.example.invalid/plans" }
+    }]
+  }
+}

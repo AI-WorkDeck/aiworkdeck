@@ -110,6 +110,7 @@ export default {
   props: {
     projectId: { type: [String, Number], required: true },
     prepareFile: { type: Function, required: true },
+    downloadArtifact: { type: Function, default: null },
   },
   data() {
     return {
@@ -219,7 +220,7 @@ export default {
         this.exportedKitName = this.kitFileName(source.name)
         this.lastRedaction = res.recoveryKit ? { source, file: res.file, kit: res.recoveryKit } : null
         if (this.exportedKit) {
-          try { this.downloadKit() }
+          try { await this.downloadKit() }
           catch (e) { this.error = this.$t('panels.deDownloadRetry') }
         }
         this.password = ''
@@ -232,8 +233,9 @@ export default {
       const base = String(sourceName || '').replace(/\.[^.]+$/, '').trim() || this.$t('panels.deKitFallbackName')
       return `${base}-${this.$t('panels.deKitFileTag')}-${Date.now()}.awd-recovery`
     },
-    downloadKit() {
+    async downloadKit() {
       if (!this.exportedKit) return
+      if (this.downloadArtifact) return this.downloadArtifact({ content: this.exportedKit, name: this.exportedKitName || this.kitFileName('') })
       const url = URL.createObjectURL(new Blob([this.exportedKit], { type: 'application/octet-stream' }))
       const link = document.createElement('a')
       link.href = url

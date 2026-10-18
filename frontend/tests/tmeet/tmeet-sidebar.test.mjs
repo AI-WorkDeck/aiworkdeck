@@ -5,50 +5,28 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const SRC = readFileSync(new URL('../../src/config/leftSidebarPlugins.js', import.meta.url), 'utf8')
+const source = readFileSync(new URL('../../src/config/leftSidebarPlugins.js', import.meta.url), 'utf8')
+const body = source.replace(/^import .*$/gm, '').replace(/^export /gm, '')
+  + '\nreturn { LEFT_SIDEBAR_PLUGINS, filterPluginsByEnabledSkills, isPanelSkill, migrateLeftPaneKey }'
+const { LEFT_SIDEBAR_PLUGINS, filterPluginsByEnabledSkills, isPanelSkill, migrateLeftPaneKey } = new Function('t', body)(key => key)
 
-function load() {
-  const body = SRC.replace(/^import .*$/gm, '').replace(/^export /gm, '')
-    + '\nreturn { LEFT_SIDEBAR_PLUGINS, getLeftSidebarPlugin, filterPluginsByEnabledSkills, isPanelSkill }'
-  return new Function('t', body)((k) => k)
-}
-
-const {
-  LEFT_SIDEBAR_PLUGINS,
-  getLeftSidebarPlugin,
-  filterPluginsByEnabledSkills,
-  isPanelSkill
-} = load()
-
-test('tmeet 插件在左侧边栏插件列表中正确声明', () => {
-  const plugin = LEFT_SIDEBAR_PLUGINS.find(p => p.key === 'tmeet')
-  assert.ok(plugin, 'LEFT_SIDEBAR_PLUGINS 应该包含 tmeet')
-  assert.equal(plugin.requiresSkill, 'tencent-meeting')
-  assert.ok(plugin.svgPaths && plugin.svgPaths.length > 0, '应该有图标路径')
+test('Tencent Meeting has one installed-plugin entry instead of a duplicate skill-owned sidebar', () => {
+  assert.equal(LEFT_SIDEBAR_PLUGINS.some(plugin => plugin.key === 'tmeet'), false)
+  for (const skills of [new Set(['tencent-meeting']), new Set()]) {
+    assert.equal(filterPluginsByEnabledSkills(LEFT_SIDEBAR_PLUGINS, skills).some(plugin => plugin.key === 'tmeet'), false)
+  }
+  assert.equal(isPanelSkill('tencent-meeting'), false)
 })
 
-test('getLeftSidebarPlugin 能按 key 查到 tmeet 插件', () => {
-  const p = getLeftSidebarPlugin('tmeet')
-  assert.ok(p)
-  assert.equal(p.key, 'tmeet')
+test('stored Tencent Meeting pane selection migrates to its real plugin identity', () => {
+  assert.equal(migrateLeftPaneKey('tmeet'), 'plugin-tencent-meeting')
+  assert.equal(migrateLeftPaneKey('plugin-tencent-meeting'), 'plugin-tencent-meeting')
 })
 
-test('filterPluginsByEnabledSkills 在启用了 tencent-meeting 时保留入口', () => {
-  const all = LEFT_SIDEBAR_PLUGINS
-  const enabled = new Set(['tencent-meeting'])
-  const filtered = filterPluginsByEnabledSkills(all, enabled)
-  const found = filtered.find(p => p.key === 'tmeet')
-  assert.ok(found, '启用 tencent-meeting skill 时应该能看到 tmeet 面板位')
-})
-
-test('filterPluginsByEnabledSkills 在未启用 tencent-meeting 时隐藏入口', () => {
-  const all = LEFT_SIDEBAR_PLUGINS
-  const enabled = new Set(['some-other-skill'])
-  const filtered = filterPluginsByEnabledSkills(all, enabled)
-  const found = filtered.find(p => p.key === 'tmeet')
-  assert.equal(found, undefined, '未启用 tencent-meeting 时应隐藏 tmeet 面板位')
-})
-
-test('tencent-meeting 属于面板型 Skill (isPanelSkill)', () => {
-  assert.equal(isPanelSkill('tencent-meeting'), true)
+test('the installed Tencent Meeting package provides the view, tool and skill', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../../../official-plugins/tencent-meeting/manifest.json', import.meta.url), 'utf8'))
+  assert.equal(manifest.id, 'tencent-meeting')
+  assert.equal(manifest.frontendEntry, 'web/index.html')
+  assert.ok(manifest.tools.some(tool => tool.name === 'tencent_meeting_action'))
+  assert.ok(manifest.skills.includes('skill'))
 })
