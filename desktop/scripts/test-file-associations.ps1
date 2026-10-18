@@ -54,6 +54,8 @@ function Read-UserChoice([string]$Extension) {
     } finally { $item.Dispose() }
 }
 function Run-Installer([string]$Path, [string]$Arguments) {
+    $startedAt = Get-Date
+    Write-Host ('Running installer: ' + $Path + '; bytes: ' + (Get-Item -LiteralPath $Path).Length)
     $process = Start-Process -FilePath $Path -ArgumentList $Arguments -PassThru
     if (-not $process.WaitForExit(300000)) {
         & taskkill.exe /PID $process.Id /T /F | Out-Null
@@ -61,6 +63,16 @@ function Run-Installer([string]$Path, [string]$Arguments) {
     }
     # Refresh the process object after WaitForExit before reading its native exit status.
     $process.Refresh()
+    if ($process.ExitCode -ne 0) {
+        try { Write-Host ('Failed installer SHA256: ' + (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash) }
+        catch { Write-Host ('Failed installer hash unavailable: ' + $_.Exception.Message) }
+        # Preserve the crash module/exception from Windows rather than guessing
+        # that an access violation is a flaky runner. Keep the original exit gate.
+        try {
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $startedAt; Id = @(1000, 1001) } -ErrorAction Stop |
+                Select-Object TimeCreated, Id, ProviderName, Message | Format-List | Out-String | Write-Host
+        } catch { Write-Host ('Application crash event unavailable: ' + $_.Exception.Message) }
+    }
     Assert-Equal $process.ExitCode 0 'NSIS exit code'
 }
 function Assert-Preserved([string]$Default) {
