@@ -19,4 +19,8 @@ public interface PluginHost {
     Docs docs();
     Settings settings();
     Llm llm();
+    /** Available on hosts supporting native plugin Agent sessions. */
+    default PluginSessions sessions() {
+        throw new UnsupportedOperationException("Native Agent sessions are unavailable on this host");
+    }
 }

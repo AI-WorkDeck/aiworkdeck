@@ -1,0 +1,148 @@
+{
+  "version": "0.1.0",
+  "templates": [
+    {
+      "id": "generic-v1",
+      "status": "internal",
+      "sections": {
+        "范围事实": [
+          "EU-C01",
+          "SA-C02",
+          "SA-C03",
+          "SA-C04"
+        ],
+        "合法性": [
+          "EU-C02",
+          "SA-C01"
+        ],
+        "必要性比例性": [
+          "EU-C03",
+          "SA-C05"
+        ],
+        "权益与控制": [
+          "EU-C04",
+          "EU-C05",
+          "EU-C06",
+          "EU-C07",
+          "SA-C06",
+          "SA-C07",
+          "SA-C08",
+          "SA-C11"
+        ],
+        "参与及后续": [
+          "EU-C08",
+          "EU-C09",
+          "EU-C10",
+          "EU-C11",
+          "EU-C12",
+          "EU-C13",
+          "SA-C09",
+          "SA-C10",
+          "SA-C12"
+        ]
+      }
+    },
+    {
+      "id": "cnil-2018",
+      "status": "internal_crosswalk_to_official_guidance",
+      "sections": {
+        "1 Context": [
+          "EU-C01"
+        ],
+        "2 Principles": [
+          "EU-C02",
+          "EU-C03",
+          "EU-C06",
+          "EU-C07",
+          "EU-C08",
+          "EU-C13"
+        ],
+        "3 Risks": [
+          "EU-C04",
+          "EU-C05"
+        ],
+        "4 Validation": [
+          "EU-C09",
+          "EU-C10",
+          "EU-C11",
+          "EU-C12"
+        ]
+      }
+    },
+    {
+      "id": "edpb-2026-draft",
+      "status": "draft_not_verified_final",
+      "sections": {
+        "0 Overview": [
+          "EU-C01",
+          "EU-C12"
+        ],
+        "1 Description": [
+          "EU-C01",
+          "EU-C13"
+        ],
+        "2 Analysis": [
+          "EU-C02",
+          "EU-C06",
+          "EU-C07",
+          "EU-C08"
+        ],
+        "3 Necessity proportionality": [
+          "EU-C03"
+        ],
+        "4 Risk management": [
+          "EU-C04",
+          "EU-C05"
+        ],
+        "5 Interested parties": [
+          "EU-C09",
+          "EU-C10"
+        ],
+        "6 Decision": [
+          "EU-C11",
+          "EU-C12"
+        ]
+      }
+    },
+    {
+      "id": "sa-article25-internal",
+      "status": "internal_not_official_online_form",
+      "sections": {
+        "25(2)(a)": [
+          "SA-C01"
+        ],
+        "25(2)(b)": [
+          "SA-C02"
+        ],
+        "25(2)(c)": [
+          "SA-C03"
+        ],
+        "25(2)(d)": [
+          "SA-C04"
+        ],
+        "25(2)(e)": [
+          "SA-C05"
+        ],
+        "25(2)(f)": [
+          "SA-C06"
+        ],
+        "25(2)(g)": [
+          "SA-C07"
+        ],
+        "25(2)(h)": [
+          "SA-C08"
+        ],
+        "25(3)": [
+          "SA-C09"
+        ],
+        "25(4)": [
+          "SA-C10"
+        ],
+        "Associated requirements": [
+          "SA-C11",
+          "SA-C12"
+        ]
+      }
+    }
+  ]
+}

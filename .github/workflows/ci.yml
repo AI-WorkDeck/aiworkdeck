@@ -48,6 +48,11 @@ jobs:
         # backend 以普通依赖引用 com.checkba:plugin-api，它是 backend/plugin-api 独立工程，
         # 不在任何远端仓库，必须先 install 进本机 ~/.m2 再跑 backend 的 Maven。
         run: mvn -B -q -f backend/plugin-api/pom.xml install
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build and test DPIA workbench plugin
+        run: ./official-plugins/dpia-workbench/build.sh
       - name: Build and test Tencent Meeting marketplace plugin
         run: ./official-plugins/tencent-meeting/build.sh
       - name: Build and test Baoqingtian marketplace plugin
@@ -73,6 +78,32 @@ jobs:
             echo
           done
 
+  dpia-reports:
+    name: DPIA report lifecycle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install document rendering dependencies
+        run: |
+          python -m pip install -r official-plugins/dpia-workbench/runtime/requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libreoffice-writer fonts-noto-cjk
+      - name: Test original workflow and native report lifecycle
+        env:
+          DSH_DPIA_PYTHON: python
+          AWD_DPIA_SOFFICE: /usr/bin/soffice
+        run: |
+          node --test official-plugins/dpia-workbench/runtime/upstream/test/*.mjs official-plugins/dpia-workbench/tests/lifecycle.test.mjs
+          python official-plugins/dpia-workbench/runtime/upstream/test/template-preservation.test.py
+          python official-plugins/dpia-workbench/runtime/upstream/test/native-pdf.test.py
+          python official-plugins/dpia-workbench/tests/test_render.py
+
   frontend:
     name: Frontend (build:h5)
     runs-on: ubuntu-latest
@@ -97,6 +128,8 @@ jobs:
         run: npm run test:tts
       - name: Test project IM plugin and bridge
         run: node --test official-plugins/project-im/tests/*.mjs frontend/tests/plugin-sdk/im-*.test.mjs
+      - name: Test DPIA native navigation boundaries
+        run: node --test frontend/tests/plugin-sdk/dpia-navigation.test.mjs
       - name: Test Tencent Meeting plugin panel
         run: node --test official-plugins/tencent-meeting/tests/web-*.mjs
       - name: Test Baoqingtian plugin workspace

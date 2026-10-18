@@ -1,0 +1,63 @@
+{
+  "name": "dsh-dpia-workbench",
+  "version": "0.3.11-beta.6",
+  "description": "Versioned DPIA assessment, evidence, reevaluation and report workbench for DeepSeek Harness",
+  "keywords": ["dsh", "deepseek-harness", "dsh-plugin", "dpia", "gdpr", "privacy"],
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "store.js",
+    "workbench.js",
+    "runner.js",
+    "results.js",
+    "answers.js",
+    "records.js",
+    "telemetry.js",
+    "assets.js",
+    "reports.js",
+    "template-source.js",
+    "local-delivery.js",
+    "local-delivery.py",
+    "internal-format.js",
+    "internal-word.py",
+    "report-resume.js",
+    "result-check.py",
+    "asset-extract.py",
+    "report-check.py",
+    "report-compose.py",
+    "report-pdf.py",
+    "commit-result.mjs",
+    "report-task.mjs",
+    "client.js",
+    "cordis.patch.yml",
+    "skill",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "CONTRIBUTING.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ]
+    }
+  }
+}

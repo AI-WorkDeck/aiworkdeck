@@ -23,6 +23,7 @@ export const EXCLUDED_DIR_PREFIXES = [
   // 上游改证提交 a9a5c36，见 pptx-service/LICENSE 与 UPGRADE_CHECKBA.md），checkba
   // 侧定制靠 FORCE_INCLUDE_FILES 单独挑出。
   'pptx-service/',
+  'official-plugins/dpia-workbench/runtime/upstream/', // AGPL-3.0-only vendor; see its UPSTREAM.md.
 ];
 
 // 目录名黑名单：路径中任意一级目录名命中即排除（生成物/依赖，常见于任意深度）。
@@ -35,6 +36,8 @@ export const EXCLUDED_DIR_SEGMENTS = new Set([
 
 // 单个文件路径的精确排除。
 export const EXCLUDED_EXACT_FILES = new Set([
+  'official-plugins/dpia-workbench/web/panel.js', // Generated bundle; upstream and dependency notices retained.
+  'official-plugins/dpia-workbench/web-src/upstream-client.js', // Exact upstream copy, original license preserved.
   // MIT 许可的 zetajs vendor 文件（上游原文，头不改，见同目录 UPSTREAM.md）。
   'frontend/src/zetaoffice/public/zeta.js',
   // 由 frontend/scripts/sync-house-profile.mjs 生成的包装，跑一次构建就被重写，加头会反复被抹掉。
