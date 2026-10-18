@@ -106,7 +106,7 @@ node scripts/plugin-dev.mjs status /tmp/my-plugin
 
 `validate` 检查权限、manifest 类型、声明文件存在、连接/OAuth/视图约束；`package` 生成可解压的 ZIP，拒绝符号链接及路径逃逸，并排除 `.env*`、常见凭据文件、私钥文件、Git、依赖目录及旧 ZIP。检测到文件正文中的私钥会拒绝打包。自定义命名的密码或令牌不能靠静态扫描穷尽，提交前仍须核对包内容。开发包限制与宿主一致：200 文件、单文件 5 MB、合计 20 MB；已有输出 ZIP 不覆盖。
 
-开发安装使用**已经导入宿主项目**的源码文件夹，`folderId` 是项目内数据库 ID，不是磁盘路径。`dev` 是一次安装/重新安装命令，不提供文件监视。调用前由开发者设置已有本机登录会话的 `AWD_SESSION_ID`，不会读取客户端账号或自行生成令牌：
+开发安装使用**已经导入宿主项目**的源码文件夹，`folderId` 是项目内数据库 ID，不是磁盘路径。`dev` 是一次安装/重新安装命令，不提供文件监视。桌面单机免登模式可以不设 `AWD_SESSION_ID`，由原有宿主回环地址保护与本机身份机制鉴权。需要登录的宿主仍须已有会话；CLI 不读取客户端凭据或生成令牌。也可直接使用插件开发面板安装，无需复制会话：
 
 ```sh
 node scripts/plugin-dev.mjs install --endpoint http://127.0.0.1:5269 --project-id 7 --folder-id 9
@@ -116,15 +116,16 @@ node scripts/plugin-dev.mjs status --endpoint http://127.0.0.1:5269 --project-id
 
 端口由当前宿主实际地址确定；CLI 不启动后端。安装调用现有 `/api/plugins/dev/install`，状态调用 `/api/plugins/dev/status`，保留管理员、纯 Web 包与同名包保护；不提供免签 JAR 安装。
 
-投稿仅在显式执行 `submit` 时上传。设置 `AWD_PLUGIN_SESSION_COOKIE` 为本人已有官网会话的完整 Cookie 头，在安全环境中传入，不写进插件。必须显式给出完整 HTTPS 投稿端点，路径通常是官网 `/api/plugins`，不跟随重定向：
+投稿前登录官网「开发者中心」，填写资料并通过基本资料审核，然后创建专用投稿令牌，通过环境变量 `AWD_PLUGIN_TOKEN` 传入。令牌只用于本人插件投稿和状态查询，可过期、撤销；不要写入插件、命令参数或聊天记录。投稿仅在显式执行 `submit` 时上传，必须显式给出完整 HTTPS 投稿端点，路径通常是官网 `/api/plugins`，不跟随重定向。旧自动化的 `AWD_PLUGIN_SESSION_COOKIE` 暂时兼容；同时设置时只发送专用令牌：
 
 ```sh
 node scripts/plugin-dev.mjs submit /tmp/my-plugin --endpoint https://YOUR-PORTAL/api/plugins
+node scripts/plugin-dev.mjs submissions --endpoint https://YOUR-PORTAL/api/plugins
 ```
 
-可选 `--price-cents 0`，缺省不更改上版定价。提交返回 `pending` 等服务端实际状态，不等于已审核、已签名或已发布。超时/异常结果不明时先到开发者后台核对，不自动重复上传。本地 `status` 只检查源包，不能冒充服务端审核状态。
+官网投稿版本目前只接受 `x.y.z` 三段数字，不能带预发布或构建后缀；本地 validate/package 仍支持完整语义版本。可选 `--price-cents 0`，缺省不更改上版定价。提交返回 `pending` 等服务端实际状态，不等于已审核、已签名或已发布。超时/异常结果不明时先到开发者后台核对，不自动重复上传。本地 `status` 只检查源包，不能冒充服务端审核状态。
 
-完整按钮示例见 `examples/plugin-service-demo/`。本轮协议测试使用真实 MessageChannel 消息、可控计时器及合成 loopback 安装 API；打包由 Python 标准库独立解压验证；投稿只在 fetch 边界模拟，不调用真实官网或供应商。
+完整按钮示例见 `examples/plugin-service-demo/`。从需求到安装、调试、申请、投稿的步骤见 [外部开发者指南](../../docs/plugin-developer-journey.md)，可运行的最小业务示例见 [清单助手](../../examples/checklist-helper/)。CLI 单测使用合成 loopback / fetch 契约夹具；真实旅程的验证范围另见示例记录，不把夹具当作生产认证或正式上架。
 
 侧栏服务事件：`calendar.changed` 需 tasks、`favorites.changed` 需 file_read、`clipboard.changed` 需 clipboard，收到后重新读取授权数据。`speech.progress` 需 speech，只转发本机 Kokoro/ASR 组件进度。事件不携带平台凭据；账户/项目变更必须丢弃旧请求和缓存。新宿主能力目前尚未发版。
 

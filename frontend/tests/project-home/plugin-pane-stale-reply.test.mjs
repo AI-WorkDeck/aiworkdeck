@@ -19,8 +19,12 @@ function loadOptions(deps) {
     .replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export\s+default/, 'return')
   const factory = new Function(
-    'getProjectFiles', 'getFileText', 'getAppLanguage', 'uni', 'endPluginImDrag', body)
-  return factory(deps.getProjectFiles, deps.getFileText, () => 'zh-CN', deps.uni || {}, endPluginImDrag)
+    'getProjectFiles', 'getFileText', 'getAppLanguage', 'uni', 'endPluginImDrag', 'getPlugins', body)
+  const getPlugins = async () => [
+    { id: 'alpha', version: '1.0.0', enabled: true, permissions: ['file_read'] },
+    { id: 'beta', version: '1.0.0', enabled: true, permissions: [] }
+  ]
+  return factory(deps.getProjectFiles, deps.getFileText, () => 'zh-CN', deps.uni || {}, endPluginImDrag, getPlugins)
 }
 
 function makeVm(options, props) {
@@ -57,8 +61,8 @@ const URL_A = 'http://127.0.0.1:9696/api/plugin-web/alpha/index.html'
 const URL_B = 'http://127.0.0.1:9696/api/plugin-web/beta/index.html'
 
 test('换插件之后，前一个插件迟到的桥响应不许投进新插件的窗口', async () => {
-  const gate = deferred()
-  const options = loadOptions({ getProjectFiles: () => gate.promise })
+  const gate = deferred(), entered = deferred()
+  const options = loadOptions({ getProjectFiles: () => { entered.resolve(); return gate.promise } })
   const winA = makeWindow()
   const winB = makeWindow()
   const frame = { contentWindow: winA }
@@ -66,12 +70,14 @@ test('换插件之后，前一个插件迟到的桥响应不许投进新插件�
     url: URL_A, pluginId: 'alpha', permissions: ['file_read'], projectId: 7
   })
   vm.$refs = { pluginFrame: frame }
+  await vm.initializeAuthorization()
 
   // 插件 A 发起一次慢调用
   const pending = vm.onMessage({
     source: winA,
     data: { awd: 1, type: 'call', seq: 1, method: 'files.list', params: {} }
   })
+  await entered.promise // Ensure the protected file read really started before switching.
 
   // 还没回来就把同一个槽位换成插件 B：组件复用，iframe 换 src
   switchPlugin(options, vm, { url: URL_B, pluginId: 'beta', permissions: [] })
@@ -94,6 +100,7 @@ test('没换插件时正常回响应', async () => {
     url: URL_A, pluginId: 'alpha', permissions: ['file_read'], projectId: 7
   })
   vm.$refs = { pluginFrame: { contentWindow: win } }
+  await vm.initializeAuthorization()
 
   await vm.onMessage({
     source: win,

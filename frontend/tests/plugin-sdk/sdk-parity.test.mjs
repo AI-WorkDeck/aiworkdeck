@@ -14,10 +14,20 @@ const source = readFileSync(resolve(root, 'sdk/plugin-sdk/awd-plugin-sdk.js'))
 
 for (const copy of [
   'examples/hello-web-plugin/web/awd-plugin-sdk.js',
+  'examples/checklist-helper/web/awd-plugin-sdk.js',
   'backend/src/main/resources/plugin-dev/awd-plugin-sdk.js'
 ]) {
   test('SDK 副本逐字节一致：' + copy, () => {
     assert.ok(source.equals(readFileSync(resolve(root, copy))), copy + ' 与 sdk/plugin-sdk/awd-plugin-sdk.js 不一致')
+  })
+}
+
+for (const [sourcePath, copyPath] of [
+  ['sdk/plugin-sdk/awd-plugin-sdk.d.ts', 'examples/checklist-helper/web/awd-plugin-sdk.d.ts'],
+  ['sdk/plugin-sdk/manifest.schema.json', 'examples/checklist-helper/manifest.schema.json']
+]) {
+  test('Checklist distribution matches SDK: ' + copyPath, () => {
+    assert.deepEqual(readFileSync(resolve(root, copyPath)), readFileSync(resolve(root, sourcePath)))
   })
 }
 

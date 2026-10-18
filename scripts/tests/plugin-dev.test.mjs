@@ -89,14 +89,22 @@ test('install/dev/status use actual loopback existing host APIs only on explicit
   const endpoint = 'http://127.0.0.1:' + server.address().port
   const args = ['--endpoint', endpoint, '--project-id', '7', '--folder-id', '9']
   const env = { AWD_SESSION_ID: 'synthetic-session' }
-  await assert.rejects(main(['install', ...args], {}), /AWD_SESSION_ID/)
-  assert.equal(calls.length, 0)
+  await main(['status', '--endpoint', endpoint, '--project-id', '7'], {})
+  assert.equal(calls[0].session, undefined)
+  calls.length = 0
   await main(['install', ...args], env); await main(['dev', ...args], env)
   await main(['status', '--endpoint', endpoint, '--project-id', '7'], env)
   assert.deepEqual(calls.map(x => x.url), ['/api/plugins/dev/install', '/api/plugins/dev/install', '/api/plugins/dev/status?projectId=7'])
   assert.deepEqual(JSON.parse(calls[0].body), { projectId: 7, folderId: 9 })
   assert.equal(calls[0].session, 'synthetic-session')
   await assert.rejects(main(['install', '--endpoint', 'https://public.example.invalid', '--project-id', '7', '--folder-id', '9'], env), /loopback/)
+})
+
+test('sessionless loopback calls cannot bypass server authentication', async t => {
+  const server = createServer((req, res) => { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ code: 1 })) })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections() }))
+  await assert.rejects(main(['status', '--endpoint', 'http://127.0.0.1:' + server.address().port, '--project-id', '1'], {}), /HTTP 403/)
 })
 
 test('submit requires explicit HTTPS endpoint/cookie, uses multipart ZIP and preserves pending state', async t => {
@@ -125,6 +133,47 @@ test('schema patterns accept semantic versions and web entry paths, reject malfo
   assert.deepEqual(validateSchema({ ...base, version: '1.2.3-rc.1+build.2' }), [])
   for (const version of ['1x0x0', '1.0', String.raw`\d.\d.\d`]) assert.ok(validateSchema({ ...base, version }).length)
   for (const frontendEntry of ['web/../outside.html', 'web/indexXhtml', String.raw`web\index.html`]) assert.ok(validateSchema({ ...base, frontendEntry }).length)
+})
+
+test('submission token takes precedence over cookies and remote status reads only owned submissions', async t => {
+  const { dir } = await fixture(t)
+  const calls = []
+  t.mock.method(globalThis, 'fetch', async (url, request) => {
+    calls.push(request)
+    assert.equal(request.headers.Authorization, 'Bearer awdpt_synthetic')
+    assert.equal(request.headers.Cookie, undefined)
+    return new Response(JSON.stringify(request.method === 'GET'
+      ? { plugins: [{ id: 'test-plugin', version: '0.1.0', status: 'pending', permissions: [], files: { 'private': 'hash' } }] }
+      : { plugin: { id: 'test-plugin', version: '0.1.0', status: 'pending' } }))
+  })
+  const env = { AWD_PLUGIN_TOKEN: 'awdpt_synthetic', AWD_PLUGIN_SESSION_COOKIE: 'session=must-not-send' }
+  await main(['submit', dir, '--endpoint', 'https://portal.example.invalid/api/plugins'], env)
+  const status = await main(['submissions', '--endpoint', 'https://portal.example.invalid/api/plugins'], env)
+  assert.deepEqual(status.plugins, [{ id: 'test-plugin', version: '0.1.0', status: 'pending' }])
+  assert.deepEqual(calls.map(call => call.method), ['POST', 'GET'])
+  await assert.rejects(main(['submissions', '--endpoint', 'https://portal.example.invalid/api/plugins'], { AWD_PLUGIN_TOKEN: 'bad\r\nvalue' }), /Invalid submission token/)
+  assert.equal(calls.length, 2)
+})
+
+test('submission errors explain developer action without echoing untrusted server text or credentials', async t => {
+  const { dir } = await fixture(t)
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ error: 'developer_not_approved', message: 'secret-echo' }), { status: 403 }))
+  await assert.rejects(main(['submit', dir, '--endpoint', 'https://portal.example.invalid/api/plugins'], { AWD_PLUGIN_TOKEN: 'awdpt_synthetic' }), error => {
+    assert.match(error.message, /developer_not_approved/)
+    assert.match(error.message, /developer portal/)
+    assert.doesNotMatch(error.message, /secret-echo|awdpt_synthetic/)
+    return true
+  })
+})
+
+test('local prerelease versions remain valid but marketplace submission requires three numeric parts', async t => {
+  const { dir, manifest } = await fixture(t)
+  await editManifest(manifest, m => { m.version = '1.2.3-rc.1+build.2' })
+  await validatePlugin(dir)
+  let calls = 0
+  t.mock.method(globalThis, 'fetch', async () => { calls++; throw new Error('must not upload') })
+  await assert.rejects(main(['submit', dir, '--endpoint', 'https://portal.example.invalid/api/plugins'], { AWD_PLUGIN_TOKEN: 'synthetic' }), /Marketplace.*x.y.z/)
+  assert.equal(calls, 0)
 })
 
 test('view and connection identifiers, origin and operations follow Java runtime contract', async t => {
