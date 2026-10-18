@@ -96,8 +96,9 @@ RequestExecutionLevel user
 SilentInstall silent
 !include LogicLib.nsh
 !define FOLDERID_UserProgramFiles {5CD7AEE2-2219-4A67-B85D-6C9CE15660CB}
-# Query only; do not create folders in the runner's profile.
-!define KF_FLAG_CREATE 0
+# Match production: create the known folder if missing in this disposable runner.
+# Flag 0 would make the copy test depend on the folder already existing.
+!define KF_FLAG_CREATE 0x8000
 Function .onInit
   StrCpy $0 "fallback"
   StrCpy $1 "sentinel-one"
