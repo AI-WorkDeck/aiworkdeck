@@ -422,3 +422,12 @@ CSS 在弹窗期间把 `.pane-content` 里的 `iframe`/`webview` 置 `visibility
 ## SDK 1.6 与声明式服务（#1340/#1341，待发版）
 
 Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings.scope，规范见docs/PLUGIN_SPEC.md §17；SDK源、类型/schema及CLI在sdk/plugin-sdk与scripts/plugin-dev.mjs，官网模板须字节同步。PluginMcpService把审核声明接入ToolRegistry实际工具链；HTTP MCP协议/DNS/取消边界位于service/ai/mcp/PluginMcp*。PluginConnectionService管理固定操作、OAuth PKCE、按用户/账户加密凭据及开发者订阅；PluginDevTrustService的显式开发授权绑定manifest摘要，安装端排除所有来源/信任标记。scope存储使用plugin-user/plugin-project前缀，不能与旧installation的plugin.<id>.<key>混用。新增测试：PluginMcp*、PluginConnection*、PluginDevTrust*及scripts/tests/plugin-dev.test.mjs。
+
+
+## 插件服务完整验收（2026-10-18，dev-board#1344/#1345/#1346）
+
+`PluginConnectionService` 的 OAuth 桌面回调跟随实际监听端口；server 模式需显式可信 HTTPS `ai.plugins.oauth-redirect-uri`。失效/过期凭据返回 needsReconnect，重连/断连取消旧 HTTP；不回滚远端副作用。连接响应阻止原始 token 直接回显，非通用泄漏检测。`PluginConnectionSettings` 的列表与订阅各自按请求序号拒绝迟到结果；`openExternalUrlChecked` 同时处理 IPC reject 和 `{ok:false}`，避免失败仍报 opened。
+
+平台 billing.status/checkout 未指定 connectionId 时，前端请求须完全省略该 query 键（Uni 会把 undefined 序列化为空字符串，导致后端误选自有连接）；显式连接 ID 原样传递。平台 billing.status 在机器级权限校验后主动刷新权益，并提供 refreshed 标记；失败可保留本账户离线缓存，不能当成新支付确认。结账入口按 SiteProfileService 与界面语言生成。自有订阅仍只有固定状态/结账接口，不是宿主支付处理器。SDK 类型、示例与官网镜像须同步。验证入口与证据边界见 `docs/plugin-services-validation.md`；`PluginServicesFixtureApplication` 只在 test classpath，精确映射合成域名，不得搬入生产或放宽 SSRF。
+
+官方 desktop local-mode 的 ai.request 云调用仍固定当前账户；BYOK 选路集成测试须在服务端模式解释。插件自己的 BYO connections 独立。测试启动器连接恢复应与生产保持一致（不能禁用默认 retryOnConnectionFailure 后把合成服务闲置断连误报为产品故障），并关闭 mobile.relay 后台同步。

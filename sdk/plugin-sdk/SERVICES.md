@@ -175,7 +175,15 @@ favorites 条目包含 id/title/content/sourceUrl/sourceHost/createdAt，图片�
 
 共享宿主渠道例子是 `awd.ai.request(prompt, options)`、`voice.synthesize`、会议转写和文档审查：使用宿主现有配置、账户、用量和权限，不让 iframe 读取供应商密钥。`awd.ai.request` 需 `ai`，有现有长度/频率/计费约束；它返回文本，不是任意 Agent 工具执行器。要把任务作为可见用户消息交给宿主 Agent，用现有 `awd.chat.send(prompt)`，不会通过 services 新建私有 Agent 会话。
 
+官方桌面模式的云端 AI 调用固定使用当前登录账户，忽略遗留全局 BYOK 密钥；服务端/私有部署可按其设置使用宿主 BYOK。插件自有服务不依赖该全局选择，使用下面的独立 connections。
+
 BYO 则用 manifest 的 `contributes.connections` 声明公开 HTTPS origin、auth 与固定 operations，或用 `mcpServers` 声明工具。支持 none、Bearer、OAuth2 公共客户端 PKCE；凭据按用户/插件/连接由宿主保管，不能作为 connect 参数传入 iframe。开发安装的远程服务还需管理员在宿主设置页明确授权；完整 manifest 改变会使该信任失效。此授权不开放开发 JAR 或本地进程。
+
+OAuth 使用 Authorization Code + S256 PKCE 公共客户端流程。桌面单机模式回调为实际监听端口的 `http://127.0.0.1:<port>/api/plugins/oauth/callback`；服务端部署必须配置 `ai.plugins.oauth-redirect-uri` 为可信 HTTPS 回调，并在供应商处登记。不要在插件中放 client secret。授权状态一次有效；连接失效或无刷新令牌的凭据过期后，`connections.list()` 返回 `connected:false, needsReconnect:true`。用户断开或重新连接会取消旧连接的在途 HTTP；已到服务商的副作用不会因此回滚。
+
+平台 `billing.status()` 每次主动刷新当前账户权益；`refreshed:false` 表示刷新失败或未连接账户，`active` 可能来自有效期内的本账户缓存，不能作为新支付的确认。开发者状态操作须返回布尔 `active`，可附字符串 `plan`；宿主不接收任意状态作为已付款证明。`checkout` 等待外部浏览器打开结果，失败会 reject；页面成功打开也必须随后重新查询权益。平台结账入口跟随宿主站点和语言，自有结账入口只使用 manifest 固定 URL。
+
+宿主阻止连接操作把当前原始 access/refresh token 直接回显到 iframe（包括嵌套 JSON）；这不是对恶意服务商编码泄露的通用防护。使用自己控制或信任的服务端，并自行完成供应商 OAuth、订阅回调和真实环境验收。可运行示例见 [plugin-service-demo](../../examples/plugin-service-demo/)，覆盖 Bearer、OAuth、MCP、两种计费入口及共享 AI；完整测试边界见 [服务验收](../../docs/plugin-services-validation.md)。
 
 当前 MCP 只支持公网 HTTPS Streamable HTTP，不支持 stdio、私网地址、任意重定向或通用 JSON Schema。schema 子集与连接声明见 [manifest.schema.json](manifest.schema.json) 和 [类型声明](manifest.d.ts)。平台 billing 仅有插件购买权益，不提供第三方按调用代收或分账；开发者自有订阅需走自己声明的 statusOperation/checkoutUrl。剪贴板 `purchase` 是另一个固定宿主权益动作，不能改商品 ID。
 

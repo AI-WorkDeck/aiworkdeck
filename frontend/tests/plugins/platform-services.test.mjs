@@ -13,7 +13,7 @@ function fixture(options = {}) {
     savePluginSettings: async (...args) => { calls.push(args) }, ...options.api
   }
   const uni = { $emit: (...args) => events.push(args), showModal: args => args.success({ confirm: options.confirm === true }) }
-  const create = new Function('api', 'uni', 'openExternalUrl', `const {pluginPlatformRequest,getPluginSettings,savePluginSettings}=api; ${source}; return createPluginPlatformServices`)(api, uni, url => urls.push(url))
+  const create = new Function('api', 'uni', 'openExternalUrlChecked', `const {pluginPlatformRequest,getPluginSettings,savePluginSettings}=api; ${source}; return createPluginPlatformServices`)(api, uni, options.open || (async url => { urls.push(url) }))
   return { bridge: create({ pluginId: 'plugin-one', projectId: 7, permissions: options.permissions || ['network'], isCurrent: options.isCurrent }), calls, events, urls }
 }
 test('plugin cannot select another project or write credentials/installation settings', async () => {
@@ -53,4 +53,23 @@ test('checkout requires host confirmation and current identity after response', 
   const { bridge, calls } = fixture({ isCurrent: () => false })
   assert.equal((await bridge.request('billing.checkout')).error.code, 'cancelled')
   assert.equal(calls.length, 0)
+})
+
+test('checkout never reports opened when the system browser rejects it', async () => {
+  const { bridge } = fixture({ confirm: true, open: async () => { throw Error('browser unavailable') } })
+  const result = await bridge.request('billing.checkout')
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'plugin_service_failed')
+  assert.match(result.error.message, /browser unavailable/)
+  assert.equal(result.result, undefined)
+})
+test('checkout waits for opening and discards completion after account change', async () => {
+  let finish, current = true
+  const { bridge } = fixture({ confirm: true, isCurrent: () => current, open: () => new Promise(resolve => { finish = resolve }) })
+  let complete = false
+  const pending = bridge.request('billing.checkout').then(result => { complete = true; return result })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(complete, false)
+  current = false; finish()
+  assert.equal((await pending).error.code, 'cancelled')
 })

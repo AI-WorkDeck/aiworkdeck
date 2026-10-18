@@ -30,24 +30,25 @@
 </template>
 <script>
 import { pluginPlatformRequest, getPluginDevTrust, setPluginDevTrust } from '@/services/api.js'
-import { openExternalUrl } from '@/utils/externalLink.js'
+import { openExternalUrlChecked } from '@/utils/externalLink.js'
 export default {
   props: { pluginId: { type: String, required: true } },
-  data: () => ({ rows: [], tokens: {}, subscription: {}, error: '', busy: '', generation: 0, devInstalled: false, trusted: false }),
+  data: () => ({ rows: [], tokens: {}, subscription: {}, error: '', busy: '', generation: 0, reloadSequence: 0, billingSequence: {}, devInstalled: false, trusted: false }),
   watch: { pluginId: { immediate: true, handler() { this.generation++; this.tokens = {}; this.rows = []; this.subscription = {}; this.devInstalled = false; this.trusted = false; this.busy = ''; this.reload() } } },
   mounted() { this._changed = () => { this.generation++; this.tokens = {}; this.rows = []; this.subscription = {}; this.devInstalled = false; this.trusted = false; this.busy = ''; this.reload() }; uni.$on('awd:account-changed', this._changed) },
   beforeUnmount() { this.generation++; this.tokens = {}; uni.$off('awd:account-changed', this._changed) },
   methods: {
     async reload() {
-      const generation = this.generation
+      const generation = this.generation, sequence = ++this.reloadSequence
+      const current = () => generation === this.generation && sequence === this.reloadSequence
       try {
         const trust = await getPluginDevTrust(this.pluginId)
-        if (generation !== this.generation) return
+        if (!current()) return
         this.devInstalled = trust.devInstalled; this.trusted = trust.trusted
         if (!trust.trusted) { this.rows = []; this.error = ''; return }
         const response = await pluginPlatformRequest(this.pluginId, 'connections.list')
-        if (generation === this.generation) { this.rows = response.connections || []; this.error = '' }
-      } catch (error) { if (generation === this.generation) this.error = error.message }
+        if (current()) { this.rows = response.connections || []; this.error = '' }
+      } catch (error) { if (current()) this.error = error.message }
     },
     async changeTrust() {
       if (this.busy) return
@@ -56,6 +57,9 @@ export default {
         const confirmed = await new Promise(resolve => uni.showModal({ title: this.$t('pluginPlatform.grantTrust'), content: this.$t('pluginPlatform.devTrustNotice'), success: result => resolve(result.confirm), fail: () => resolve(false) }))
         if (!confirmed || generation !== this.generation) return
       }
+      this.reloadSequence++
+      this.subscription = {}
+      Object.keys(this.billingSequence).forEach(id => { this.billingSequence[id]++ })
       this.busy = 'trust'
       try { await setPluginDevTrust(pluginId, trusted); if (generation === this.generation) await this.reload() }
       catch (error) { if (generation === this.generation) this.error = error.message }
@@ -64,6 +68,9 @@ export default {
     async act(row) {
       if (this.busy) return
       const generation = this.generation
+      this.reloadSequence++
+      this.subscription[row.id] = ''
+      this.billingSequence[row.id] = (this.billingSequence[row.id] || 0) + 1
       this.busy = row.id; this.error = ''
       try {
         if (row.connected) {
@@ -77,7 +84,7 @@ export default {
           if (generation !== this.generation) return
           const url = new URL(response.data.authorizationUrl)
           if (url.protocol !== 'https:' || url.username.length > 0 || url.password.length > 0) throw new Error('Invalid authorization URL')
-          openExternalUrl(url.href)
+          await openExternalUrlChecked(url.href)
         }
         if (generation === this.generation) {
           uni.$emit('awd:plugin-settings-changed', { pluginId: this.pluginId })
@@ -88,11 +95,15 @@ export default {
     },
     async checkBilling(row) {
       const generation = this.generation
+      const sequence = (this.billingSequence[row.id] || 0) + 1
+      this.billingSequence[row.id] = sequence
+      this.subscription[row.id] = ''; this.error = ''
+      const current = () => generation === this.generation && sequence === this.billingSequence[row.id]
       try {
         const response = await pluginPlatformRequest(this.pluginId, 'billing.status', { connectionId: row.id })
-        if (generation !== this.generation) return
+        if (!current()) return
         this.subscription[row.id] = this.$t(response.data.active ? 'pluginPlatform.active' : 'pluginPlatform.inactive')
-      } catch (error) { if (generation === this.generation) this.error = error.message }
+      } catch (error) { if (current()) this.error = error.message }
     }
   }
 }
