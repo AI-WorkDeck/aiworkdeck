@@ -50,7 +50,7 @@ node scripts/test-fixtures/plugin-shared-account-fixture.mjs --port 19854
 
 该启动器仅把生产已校验的 `https://service.example.invalid` 精确映射到本机合成 HTTP；保留真实控制器、数据库、开发服务信任与凭据存储。它不在正式 JAR 中，禁止将其变为生产代理或放宽 SSRF。浏览器端 OAuth/结账页也需要测试浏览器对这个精确域名做传输转发，业务响应来自实际合成 HTTP，不能伪造桥返回成功。
 
-共享账户测试可将 `ai.account.base-url` 指向第二个服务，模型 `ai.model.open-router.base-url` 指向其 `/v1`。平台 checkout 按生产规则只打开 HTTPS：要测试此入口，可在隔离服务前设置本机 HTTPS 代理，证书仅放入此测试 JVM 的独立 truststore，测试浏览器也使用独立 context；不要修改系统信任或产品 URL 校验。BYOK 地址则通过真实宿主设置 `external.openrouter.baseUrl` 配置，与平台模型地址分开。
+共享账户测试可将 `ai.account.base-url` 指向第二个服务，模型 `ai.model.open-router.base-url` 指向其 `/v1`。平台 checkout 按生产规则只打开 HTTPS：要测试此入口，可在隔离服务前设置本机 HTTPS 代理，证书仅放入此测试 JVM 的独立 truststore，测试浏览器也使用独立 context；不要修改系统信任或产品 URL 校验。服务端/私有部署的 BYOK 地址通过真实宿主设置 `external.openrouter.baseUrl` 配置，与平台模型地址分开。官方桌面 local-mode 的云调用强制使用当前账户通道，忽略遗留 DB/env 自带密钥；不要把改写 ai.activeProvider 当成桌面切换 BYOK。插件自己的 BYO 服务仍走独立 connections，按插件凭据与固定 HTTPS 声明访问。验证宿主 BYOK 时应另用隔离服务端模式、真实登录，并关闭桌面 allow-all-users / local-folder-projects 便利开关。
 
 从真实插件开发入口创建源码、安装、授予服务信任、打开工作区，然后逐项执行上表。源码新文件必须经宿主资源管理器导入/创建；直接往项目磁盘目录复制未注册的新文件，不等于已进入安装清单。实际操作应保留截图、去敏服务审计、请求计数和断言，尤其核对 iframe 与可信宿主设置页各自的职责。
 

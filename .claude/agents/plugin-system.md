@@ -429,3 +429,5 @@ Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings
 `PluginConnectionService` 的 OAuth 桌面回调跟随实际监听端口；server 模式需显式可信 HTTPS `ai.plugins.oauth-redirect-uri`。失效/过期凭据返回 needsReconnect，重连/断连取消旧 HTTP；不回滚远端副作用。连接响应阻止原始 token 直接回显，非通用泄漏检测。`PluginConnectionSettings` 的列表与订阅各自按请求序号拒绝迟到结果；`openExternalUrlChecked` 同时处理 IPC reject 和 `{ok:false}`，避免失败仍报 opened。
 
 平台 billing.status 在机器级权限校验后主动刷新权益，并提供 refreshed 标记；失败可保留本账户离线缓存，不能当成新支付确认。结账入口按 SiteProfileService 与界面语言生成。自有订阅仍只有固定状态/结账接口，不是宿主支付处理器。SDK 类型、示例与官网镜像须同步。验证入口与证据边界见 `docs/plugin-services-validation.md`；`PluginServicesFixtureApplication` 只在 test classpath，精确映射合成域名，不得搬入生产或放宽 SSRF。
+
+官方 desktop local-mode 的 ai.request 云调用仍固定当前账户；BYOK 选路集成测试须在服务端模式解释。插件自己的 BYO connections 独立。测试启动器连接恢复应与生产保持一致（不能禁用默认 retryOnConnectionFailure 后把合成服务闲置断连误报为产品故障），并关闭 mobile.relay 后台同步。

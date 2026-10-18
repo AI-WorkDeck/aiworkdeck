@@ -41,6 +41,7 @@ public final class PluginServicesFixtureApplication {
         defaults.put("telemetry.ingest-url", base + "/api/telemetry");
         defaults.put("feedback.upload.enabled", false);
         defaults.put("optimizer.enabled", false);
+        defaults.put("mobile.relay.enabled", false);
         defaults.put("ai.model.open-router.base-url", base + "/v1");
         // Existing environment credentials must not become a synthetic provider's credentials.
         defaults.put("ai.model.open-router.api-key", "synthetic-fixture-key");
@@ -79,7 +80,7 @@ public final class PluginServicesFixtureApplication {
      * Only the agreed synthetic public origin is mapped; redirects and all other origins fail. */
     static OkHttpClient connectionTransport(int port) {
         return new OkHttpClient.Builder().proxy(Proxy.NO_PROXY).followRedirects(false).followSslRedirects(false)
-                .retryOnConnectionFailure(false).connectTimeout(Duration.ofSeconds(2))
+                .connectTimeout(Duration.ofSeconds(2))
                 .readTimeout(Duration.ofSeconds(30)).callTimeout(Duration.ofSeconds(45))
                 .addInterceptor(chain -> {
                     var request = chain.request(); var url = request.url();
