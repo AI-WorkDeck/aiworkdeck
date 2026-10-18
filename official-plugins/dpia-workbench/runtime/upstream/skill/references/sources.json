@@ -1,0 +1,105 @@
+{
+  "version": "0.1.0",
+  "verified_at": "2026-09-11",
+  "sources": [
+    {
+      "id": "EU-GDPR",
+      "title": "GDPR Regulation (EU) 2016/679",
+      "url": "https://eur-lex.europa.eu/eli/reg/2016/679/oj",
+      "legal_force": "statute",
+      "version": "2016-04-27",
+      "locator": "Arts 2–3, 5–10, 12–22, 25, 28, 32, 35–36, Chapter V",
+      "verification_status": "read_via_regulator_hosted_text",
+      "limitations": "EUR-Lex access challenge. CNIL regulator-hosted French text read: https://www.cnil.fr/fr/reglement-europeen-protection-donnees/chapitre1 ; /chapitre2 ; /chapitre4 . Primary official publication remains EUR-Lex; check amendments and other provisions when relied upon.",
+      "verified_at": "2026-09-11"
+    },
+    {
+      "id": "EU-WP248",
+      "title": "WP248 rev.01",
+      "url": "https://www.cnil.fr/sites/default/files/atoms/files/20171013_wp248_rev01_enpdf_4.pdf",
+      "legal_force": "guidance",
+      "version": "2017-10-04",
+      "locator": "pp 8–13 triggers/exceptions; pp14–19 process; Annex2",
+      "verification_status": "read",
+      "limitations": "EDPB endorsement page: https://www.edpb.europa.eu/endorsed-wp29-guidelines_en",
+      "verified_at": "2026-09-11"
+    },
+    {
+      "id": "EU-CNIL-M",
+      "title": "CNIL PIA methodology",
+      "url": "https://www.cnil.fr/sites/default/files/atoms/files/cnil-pia-1-en-methodology.pdf",
+      "legal_force": "guidance",
+      "version": "2018-02",
+      "locator": "sections 1–4",
+      "verification_status": "read",
+      "limitations": "Methodological reference, not a universal statutory risk matrix.",
+      "verified_at": "2026-09-11"
+    },
+    {
+      "id": "EU-CNIL-T",
+      "title": "CNIL PIA templates",
+      "url": "https://www.cnil.fr/sites/default/files/atoms/files/cnil-pia-2-en-templates.pdf",
+      "legal_force": "guidance",
+      "version": "2018-02",
+      "locator": "sections 1–4",
+      "verification_status": "read",
+      "limitations": "Adaptable templates; not mandatory single EU form.",
+      "verified_at": "2026-09-11"
+    },
+    {
+      "id": "EU-EDPB-T",
+      "title": "EDPB DPIA template consultation",
+      "url": "https://www.edpb.europa.eu/public-consultations/template-for-data-protection-impact-assessment_en",
+      "legal_force": "draft",
+      "version": "2026-03-10",
+      "locator": "consultation status; explainer v1.0 sections 0–6",
+      "verification_status": "read",
+      "limitations": "Feedback ended 2026-06-09; final version not verified. Explainer: https://www.edpb.europa.eu/system/files/2026-05/edpb_dpia_template_explainer_2026_v1_en.pdf",
+      "verified_at": "2026-09-11"
+    },
+    {
+      "id": "SA-PDPL",
+      "title": "Saudi Personal Data Protection Law",
+      "url": "https://dgp.sdaia.gov.sa/wps/portal/pdp/knowledgecenter/details/PDPL",
+      "legal_force": "statute",
+      "version": "M/19 as amended",
+      "locator": "Arts 1,2,5,6,22,29",
+      "verification_status": "read",
+      "limitations": "Official Arabic PDPL page read. Use Arabic text for interpretation; verify operative sector/transfer instruments separately.",
+      "verified_at": "2026-09-11"
+    },
+    {
+      "id": "SA-IR",
+      "title": "PDPL Implementing Regulation",
+      "url": "https://dgp.sdaia.gov.sa/wps/portal/pdp/knowledgecenter/details/PDPL2",
+      "legal_force": "regulation",
+      "version": "official page read 2026-09-11",
+      "locator": "Arts16,17,19,23,25; Arabic Art25(1)(c)",
+      "verification_status": "read",
+      "limitations": "Arabic page checked; English official page also read. Art25(1)(c) OR/AND translation mismatch recorded in sa.md.",
+      "verified_at": "2026-09-11"
+    },
+    {
+      "id": "SA-SERVICE",
+      "title": "SDAIA DPIA online service",
+      "url": "https://dgp.sdaia.gov.sa/wps/portal/pdp/services/privacyimpactassessment",
+      "legal_force": "official_service",
+      "version": "page read 2026-09-11",
+      "locator": "service description and steps",
+      "verification_status": "read",
+      "limitations": "Public description only; authenticated form not obtained.",
+      "verified_at": "2026-09-11"
+    },
+    {
+      "id": "SA-TRANSFER-G",
+      "title": "Risk Assessment Guideline for Transferring Personal Data Outside the Kingdom",
+      "url": "https://dgp.sdaia.gov.sa/wps/portal/pdp/knowledgecenter/details/RiskAssessmentGuideline%20orTransferringPersonalData",
+      "legal_force": "guidance",
+      "version": "page read 2026-09-11",
+      "locator": "phases I–IV",
+      "verification_status": "read",
+      "limitations": "Transfer scope; do not treat as universal DPIA template or substitute operative Transfer Regulation.",
+      "verified_at": "2026-09-11"
+    }
+  ]
+}

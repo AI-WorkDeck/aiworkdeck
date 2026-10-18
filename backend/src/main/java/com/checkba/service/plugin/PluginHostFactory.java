@@ -60,6 +60,10 @@ public class PluginHostFactory {
     final ObjectMapper objectMapper;
     final PluginHostQuota quota;
 
+    // Lazy resolution avoids the AgentOrchestrator → ToolRegistry → PluginHostFactory cycle.
+    @Autowired
+    org.springframework.beans.factory.ObjectProvider<PluginAgentSessionService> agentSessions;
+
     private final ThreadLocal<ToolCall> currentCall = new ThreadLocal<>();
     private final ThreadLocal<Boolean> inJob = new ThreadLocal<>();
     private final Map<String, PluginHost> hosts = new ConcurrentHashMap<>();

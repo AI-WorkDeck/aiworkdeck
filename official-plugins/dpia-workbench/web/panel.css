@@ -1,0 +1,26 @@
+/* SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+:root{color-scheme:light;--dpia-surface:var(--awd-surface,#fff);--dpia-bg:var(--awd-surface-2,#f5f7f6);--dpia-text:var(--awd-text,#1b2924);--dpia-muted:var(--awd-text-2,#596b62);--dpia-border:var(--awd-border,#dce4df);--dpia-accent:var(--awd-accent,#267154);--dpia-soft:var(--awd-accent-soft,#e8f3ed);--dpia-danger:#a83530;--dpia-error-bg:#fff0ee;--dpia-on-accent:#fff}
+:root[data-theme=dark]{color-scheme:dark;--dpia-surface:var(--awd-surface,#18211c);--dpia-bg:var(--awd-surface-2,#121914);--dpia-text:var(--awd-text,#e3eee7);--dpia-muted:var(--awd-text-2,#a4b4a9);--dpia-border:var(--awd-border,#36483c);--dpia-accent:var(--awd-accent,#79bb94);--dpia-soft:var(--awd-accent-soft,#243b2d);--dpia-danger:#ffb5ae;--dpia-error-bg:#3c2423;--dpia-on-accent:#10291b}
+html,body,#app{margin:0;height:100%;min-width:0;background:var(--dpia-bg);color:var(--dpia-text)}
+.boot-message,#host-error:not(:empty){padding:20px;font:14px/1.7 system-ui,sans-serif;white-space:pre-wrap}
+#host-error:not(:empty){background:var(--dpia-error-bg);color:var(--dpia-danger)}
+#app .dpia{background:var(--dpia-bg);color:var(--dpia-text);padding:24px;font-size:14px}
+#app .dpia h1{font-size:24px;font-weight:650;letter-spacing:-.02em}
+#app .dpia .grid{grid-template-columns:minmax(200px,260px) minmax(0,1fr);gap:18px}
+#app .dpia main,#app .dpia aside{min-width:0}
+#app .dpia .card{background:var(--dpia-surface);border-color:var(--dpia-border);border-radius:10px;padding:18px}
+#app .dpia .muted,#app .dpia .hint,#app .dpia .case small{color:var(--dpia-muted)}
+#app .dpia input,#app .dpia textarea,#app .dpia select,#app .dpia button{background:var(--dpia-surface);color:var(--dpia-text);border-color:var(--dpia-border);max-width:100%}
+#app .dpia input:focus,#app .dpia textarea:focus,#app .dpia select:focus,#app .dpia button:focus-visible{outline-color:var(--dpia-accent)}
+#app .dpia button.primary{background:var(--dpia-accent);border-color:var(--dpia-accent);color:var(--awd-text-on-accent,var(--dpia-on-accent))}
+#app .dpia .pill,#app .dpia .notice,#app .dpia .case.active{background:var(--dpia-soft);color:var(--dpia-text)}
+#app .dpia .case.active{border-color:var(--dpia-accent)}
+#app .dpia .error{background:var(--dpia-error-bg);color:var(--dpia-danger)}
+#app .dpia .row,#app .dpia .report-table td,#app .dpia .report-table th{border-color:var(--dpia-border)}
+#app .dpia .stats span,#app .dpia .report-table th{background:var(--dpia-bg)}
+#app .dpia a{color:var(--awd-accent-text,var(--dpia-accent));overflow-wrap:anywhere}
+#app .dpia .modal-body{padding-bottom:4px}
+#app .dpia .actions{gap:4px}
+@media(max-width:850px){#app .dpia{padding:16px}#app .dpia .grid{grid-template-columns:minmax(0,1fr)}#app .dpia .top{display:block}#app .dpia .pill{display:inline-block;white-space:normal;margin-top:8px}}
+@media(max-width:420px){#app .dpia{padding:10px}#app .dpia .card{padding:12px}#app .dpia button{white-space:normal}#app .dpia [role=dialog]>.card{width:96%!important}}

@@ -1,0 +1,612 @@
+{
+  "jurisdiction": "EU",
+  "version": "0.1.0",
+  "verified_at": "2026-09-11",
+  "rules": [
+    {
+      "id": "EU-T01",
+      "jurisdiction": "EU",
+      "kind": "trigger",
+      "title": "系统且广泛评价并据此作出重大决定",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(3)(a)"
+        }
+      ],
+      "required_facts": [
+        "systematic_extensive_evaluation",
+        "automated_processing",
+        "legal_or_similar_effect"
+      ],
+      "logic": "完整组合条件满足才met。",
+      "exceptions": "另核35(5)/(10)和适用例外；冲突不可静默覆盖。",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-T02",
+      "jurisdiction": "EU",
+      "kind": "trigger",
+      "title": "大规模特殊类别或犯罪数据",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(3)(b)"
+        }
+      ],
+      "required_facts": [
+        "data_categories",
+        "scale"
+      ],
+      "logic": "特殊类别或Art10数据与大规模同时满足。",
+      "exceptions": "另核35(5)/(10)和适用例外；冲突不可静默覆盖。",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-T03",
+      "jurisdiction": "EU",
+      "kind": "trigger",
+      "title": "大规模系统监测公共可进入区域",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(3)(c)"
+        }
+      ],
+      "required_facts": [
+        "systematic_monitoring",
+        "public_area",
+        "scale"
+      ],
+      "logic": "三个要件同时满足。",
+      "exceptions": "另核35(5)/(10)和适用例外；冲突不可静默覆盖。",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-T04",
+      "jurisdiction": "EU",
+      "kind": "trigger",
+      "title": "一般可能高风险",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(1)"
+        }
+      ],
+      "required_facts": [
+        "nature",
+        "scope",
+        "context",
+        "purposes",
+        "rights_impact"
+      ],
+      "logic": "对个人权利和自由可能产生高风险的实质判断；不限列举情形。",
+      "exceptions": "另核35(5)/(10)和适用例外；冲突不可静默覆盖。",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-T05",
+      "jurisdiction": "EU",
+      "kind": "trigger",
+      "title": "适用监管机构强制清单",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(4)"
+        }
+      ],
+      "required_facts": [
+        "competent_authority",
+        "national_list",
+        "list_match"
+      ],
+      "logic": "取得实际适用的官方清单，逐要件匹配；未取得unknown。",
+      "exceptions": "另核35(5)/(10)和适用例外；冲突不可静默覆盖。",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-I01",
+      "jurisdiction": "EU",
+      "kind": "indicator",
+      "title": "评价或评分",
+      "legal_force": "guidance",
+      "source_refs": [
+        {
+          "source_id": "EU-WP248",
+          "locator": "III.B.a pp9–11"
+        }
+      ],
+      "required_facts": [
+        "relevant_processing_facts"
+      ],
+      "logic": "根据场景记录met/not_met/unknown；指标数量不代替35(1)实质判断。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-I02",
+      "jurisdiction": "EU",
+      "kind": "indicator",
+      "title": "产生重大效果的自动决定",
+      "legal_force": "guidance",
+      "source_refs": [
+        {
+          "source_id": "EU-WP248",
+          "locator": "III.B.a pp9–11"
+        }
+      ],
+      "required_facts": [
+        "relevant_processing_facts"
+      ],
+      "logic": "根据场景记录met/not_met/unknown；指标数量不代替35(1)实质判断。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-I03",
+      "jurisdiction": "EU",
+      "kind": "indicator",
+      "title": "系统监测",
+      "legal_force": "guidance",
+      "source_refs": [
+        {
+          "source_id": "EU-WP248",
+          "locator": "III.B.a pp9–11"
+        }
+      ],
+      "required_facts": [
+        "relevant_processing_facts"
+      ],
+      "logic": "根据场景记录met/not_met/unknown；指标数量不代替35(1)实质判断。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-I04",
+      "jurisdiction": "EU",
+      "kind": "indicator",
+      "title": "敏感或高度私人性数据",
+      "legal_force": "guidance",
+      "source_refs": [
+        {
+          "source_id": "EU-WP248",
+          "locator": "III.B.a pp9–11"
+        }
+      ],
+      "required_facts": [
+        "relevant_processing_facts"
+      ],
+      "logic": "根据场景记录met/not_met/unknown；指标数量不代替35(1)实质判断。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-I05",
+      "jurisdiction": "EU",
+      "kind": "indicator",
+      "title": "大规模",
+      "legal_force": "guidance",
+      "source_refs": [
+        {
+          "source_id": "EU-WP248",
+          "locator": "III.B.a pp9–11"
+        }
+      ],
+      "required_facts": [
+        "relevant_processing_facts"
+      ],
+      "logic": "根据场景记录met/not_met/unknown；指标数量不代替35(1)实质判断。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-I06",
+      "jurisdiction": "EU",
+      "kind": "indicator",
+      "title": "匹配或合并数据集",
+      "legal_force": "guidance",
+      "source_refs": [
+        {
+          "source_id": "EU-WP248",
+          "locator": "III.B.a pp9–11"
+        }
+      ],
+      "required_facts": [
+        "relevant_processing_facts"
+      ],
+      "logic": "根据场景记录met/not_met/unknown；指标数量不代替35(1)实质判断。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-I07",
+      "jurisdiction": "EU",
+      "kind": "indicator",
+      "title": "弱势数据主体",
+      "legal_force": "guidance",
+      "source_refs": [
+        {
+          "source_id": "EU-WP248",
+          "locator": "III.B.a pp9–11"
+        }
+      ],
+      "required_facts": [
+        "relevant_processing_facts"
+      ],
+      "logic": "根据场景记录met/not_met/unknown；指标数量不代替35(1)实质判断。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-I08",
+      "jurisdiction": "EU",
+      "kind": "indicator",
+      "title": "创新技术或组织方案",
+      "legal_force": "guidance",
+      "source_refs": [
+        {
+          "source_id": "EU-WP248",
+          "locator": "III.B.a pp9–11"
+        }
+      ],
+      "required_facts": [
+        "relevant_processing_facts"
+      ],
+      "logic": "根据场景记录met/not_met/unknown；指标数量不代替35(1)实质判断。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-I09",
+      "jurisdiction": "EU",
+      "kind": "indicator",
+      "title": "妨碍权利或服务",
+      "legal_force": "guidance",
+      "source_refs": [
+        {
+          "source_id": "EU-WP248",
+          "locator": "III.B.a pp9–11"
+        }
+      ],
+      "required_facts": [
+        "relevant_processing_facts"
+      ],
+      "logic": "根据场景记录met/not_met/unknown；指标数量不代替35(1)实质判断。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-X01",
+      "jurisdiction": "EU",
+      "kind": "exception",
+      "title": "例外或既有等效评估可适用",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(5),35(10); see WP248 III.B.b"
+        }
+      ],
+      "required_facts": [
+        "exception_scope",
+        "prior_assessment",
+        "changes",
+        "reviewer"
+      ],
+      "logic": "写出具体路径、完整要件及最新官方支持；复核前保持unknown。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C01",
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "系统描述与目的",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(7)(a)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C02",
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "逐目的合法性与特殊类别条件",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "6,9,10"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C03",
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "必要性比例性与替代方案",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(7)(b)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C04",
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "个人权益风险",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(7)(c)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C05",
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "措施及证明机制",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(7)(d)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C06",
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "原则与权利行使",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "5,12–22"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C07",
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "设计默认保护、处理者和安全",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "25,28,32"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C08",
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "国际传输与专项衔接",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "Chapter V"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C09",
+      "project_procedure": true,
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "DPO意见",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(2)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C10",
+      "project_procedure": true,
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "主体或代表意见",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(9)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C11",
+      "project_procedure": true,
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "事前监管咨询判断",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "36(1)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C12",
+      "project_procedure": true,
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "风险变化时复评",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(11)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    },
+    {
+      "id": "EU-C13",
+      "project_procedure": true,
+      "jurisdiction": "EU",
+      "kind": "content",
+      "title": "相关批准行为准则",
+      "legal_force": "statute",
+      "source_refs": [
+        {
+          "source_id": "EU-GDPR",
+          "locator": "35(8)"
+        }
+      ],
+      "required_facts": [
+        "activity_facts",
+        "supporting_controls",
+        "applicability"
+      ],
+      "logic": "逐项写法律要件、事实、分析和结论；条件不适用须说明理由。",
+      "exceptions": "",
+      "output_field": "rule_assessments",
+      "version": "0.1.0"
+    }
+  ]
+}

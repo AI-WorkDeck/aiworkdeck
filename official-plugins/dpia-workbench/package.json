@@ -1,0 +1,19 @@
+{
+  "name": "@aiworkdeck/dpia-workbench-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "build": "node build-web.mjs",
+    "test": "npm run build && node --test tests/web*.mjs"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "jsdom": "30.1.3"
+  }
+}

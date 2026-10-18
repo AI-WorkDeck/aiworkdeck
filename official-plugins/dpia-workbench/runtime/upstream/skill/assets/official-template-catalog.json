@@ -1,0 +1,52 @@
+{
+  "reviewed_at": "2026-09-12",
+  "templates": [
+    {
+      "id": "edpb-2026-v1",
+      "publisher": "EDPB",
+      "scope": "EU common; national overlays required",
+      "status": "public_consultation_version_not_verified_final",
+      "landing_url": "https://www.edpb.europa.eu/public-consultations/template-for-data-protection-impact-assessment_en",
+      "format": "DOCX",
+      "native_asset": "assets/official/edpb-2026-v1-en.docx",
+      "field_map": "assets/official/edpb-2026-v1-map.json",
+      "availability": "Bundled user-supplied DOCX; native cell adapter available; legal completeness and page QA required for each case",
+      "sha256": "dd63eb8ef24db25639961a50e320e6c5fe674114d1478efce8f84be0ea269720",
+      "provenance": "User-supplied original; internal version history and official publisher page checked; no independent publisher hash available",
+      "working_translations": [
+        {
+          "language": "zh-CN",
+          "asset": "assets/official/edpb-2026-v1-zh-user-translation.docx",
+          "sha256": "a24070fb30702fca39068ef9509c2f13e51fdc0f8f87b9fba4c62e44e6b72dca",
+          "status": "user_supplied_unofficial_translation",
+          "notes": "30 tables vs 35 in English: some narrative cells become paragraphs and numbering columns are merged. Map by question meaning, never reuse English paragraph/cell offsets. Section 6 consultation reference 6.2 must be corrected to GDPR Article 36 from English source. Original English footnote references must be checked and supplemented where needed."
+        }
+      ]
+    },
+    {
+      "id": "cnil-2018-en",
+      "publisher": "CNIL",
+      "scope": "French authority methodology; current national law must be checked",
+      "status": "published_guidance_template_2018",
+      "landing_url": "https://www.cnil.fr/en/privacy-impact-assessment-pia",
+      "download_url": "https://www.cnil.fr/sites/default/files/atoms/files/cnil-pia-2-en-templates.pdf",
+      "format": "PDF",
+      "native_asset": null,
+      "field_map": null,
+      "availability": "Official PDF verified on web; not bundled; not an editable DOCX"
+    }
+  ],
+  "services": [
+    {
+      "id": "sa-official-service",
+      "publisher": "SDAIA",
+      "scope": "Saudi Arabia subject to PDPL applicability",
+      "status": "online_service_only_not_a_published_template",
+      "landing_url": "https://dgp.sdaia.gov.sa/wps/portal/pdp/services/privacyimpactassessment",
+      "format": "online",
+      "native_asset": null,
+      "field_map": null,
+      "availability": "No publicly released official DPIA template verified. Online service does not establish a reusable official template. Use legal-elements route without waiting for a form."
+    }
+  ]
+}
