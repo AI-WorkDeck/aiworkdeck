@@ -7293,6 +7293,17 @@ export default {
         const list = Array.isArray(res) ? res : ((res && res.data) || null)
         if (loadSeq !== this._dynamicPluginsLoadSeq) return
         if (Array.isArray(list)) {
+          // 迁移为插件的内置面板沿用已有翻译；第三方插件保留 manifest 自定义名称。
+          const migratedLabelKeys = new Map([
+            ['search', 'config.sidebar.search'],
+            ['voice', 'config.sidebar.voice'],
+            ['desensitize', 'config.sidebar.desensitize'],
+            ['litigation-visual', 'config.sidebar.litigationVisual'],
+            ['calendar', 'calendar.railSchedule'],
+            ['favorites', 'config.tools.favorites'],
+            ['clipboard', 'config.tools.clipboard'],
+            ['insight', 'insight.title'],
+          ])
           // list 同时包含停用、封禁和版本不兼容项；rail 只显示当前可用的插件。
           // 请求世代防止安装时的旧响应在禁用/卸载后迟到，把入口重新加回来。
           this.dynamicPlugins = list.filter(p => p && p.enabled === true && !p.revokedReason && !p.incompatibleReason).map(p => {
@@ -7303,7 +7314,7 @@ export default {
               // 左栏面板 key 是 plugin-<id>，桥要的是原始 id（握手上下文 + KV 分区键），
               // 两者别混用
               pluginId: p.id,
-              label: p.name,
+              label: migratedLabelKeys.has(p.id) ? this.$t(migratedLabelKeys.get(p.id)) : p.name,
               // registry 的 icon 字段是 emoji（全站禁 emoji，一律不当图片渲染），
               // 且 /static/plugin_default.png 并不存在（会 404 成 HTML=破图）。所以
               // 纯工具/skill 插件不给位图，改由 rail 用统一的 SVG 兜底（见模板 svgFallback）。
