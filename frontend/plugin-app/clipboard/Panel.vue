@@ -1,0 +1,577 @@
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<template>
+  <view class="clip-panel">
+    <input class="collection-search" v-model="localQuery" :placeholder="$t('common.search')" :aria-label="$t('common.search')" />
+    <!-- 免费额度提示：只在确实有记录被挡住时出现。没超额时一个字都不显示，不打扰。 -->
+    <UnlockHint
+      v-if="hiddenCount > 0"
+      class="clip-unlock-hint"
+      :text="$t('panels.cpUnlockHint', { count: hiddenCount })"
+      sku-id="feature:clipboard.unlimited"
+    />
+    <scroll-view class="clip-body" :scroll-y="false" :scroll-x="true" :show-scrollbar="false">
+      <view v-if="loading" class="loading">{{ $t('panels.cpLoading') }}</view>
+      <!-- BUG-68：改成与文档主区域一致的图标+双行文案空态（见 project-overview.scss 的
+           .empty-workspace/.empty-logo-tile 范式），不再是一行纯文字。 -->
+      <view v-else-if="items.length === 0" class="empty">
+        <view class="empty-logo-tile">
+          <image :src="'./static/iconmark_v2.png'" class="empty-state-img" mode="aspectFit" />
+        </view>
+        <text class="empty-title">{{ $t('panels.cpEmpty') }}</text>
+        <text class="empty-sub">{{ $t('panels.cpEmptyHint') }}</text>
+      </view>
+      <view v-else class="list-grid">
+        <view v-for="it in items" :key="it.id" class="clip-card" @tap="onCardTap(it)">
+          <view class="card-header">
+            <view class="header-left">
+              <view class="type-line">
+                <view class="left-badge" :class="'tone-' + getTypeMeta(it.type).tone">
+                  <text class="badge-text">{{ formatTypeLabel(it.type) }}</text>
+                </view>
+                <!-- Source label removed as requested -->
+              </view>
+              <text class="time-label">{{ formatTime(it.createdAt) }}</text>
+            </view>
+            <!-- Actions Top Right -->
+            <!-- BUG-67：与 ProjectFavoritesPanel 统一为「插入到文档 / 复制 / 删除」的固定顺序，
+                 避免两处卡片同样三图标布局但位置语义不同、容易凭记忆点错。 -->
+            <view class="cli-actions-top">
+               <!-- Text Insert -->
+               <view v-if="it.type === 'TEXT'" class="cli-btn" @tap.stop="insertItem(it)" :title="$t('panels.cpInsertTitle')">
+                 <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in ICONS.bolt" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+               </view>
+               <!-- Image Insert -->
+               <view v-if="it.type === 'IMAGE'" class="cli-btn" @tap.stop="insertItem(it)" :title="$t('panels.cpInsertTitle')">
+                 <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in ICONS.bolt" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+               </view>
+               <view v-if="it.type === 'TEXT'" class="cli-btn" @tap.stop="copy(it)" :title="$t('panels.cpCopyTitle')">
+                 <text class="icon">⧉</text>
+               </view>
+               <!-- 图片卡没有复制：留一个不可见、不可点的占位，让删除恒在第三位 -->
+               <view v-else class="cli-btn cli-btn-placeholder" aria-hidden="true">
+                 <text class="icon">⧉</text>
+               </view>
+               <view class="del-wrapper" style="position: relative;">
+                 <view class="cli-btn danger" @tap.stop="requestDelete(it.id)" :title="$t('panels.cpDeleteTitle')">
+                   <text class="icon">×</text>
+                 </view>
+                 <!-- Inline Confirm Popup -->
+                 <view v-if="confirmDeleteId === it.id" class="delete-popover" @tap.stop>
+                   <view class="pop-arrow"></view>
+                   <text class="pop-text">{{ $t('panels.cpConfirmDeleteText') }}</text>
+                   <view class="pop-row">
+                     <view class="pop-btn" @tap.stop="cancelDelete">{{ $t('panels.cpCancel') }}</view>
+                     <view class="pop-btn danger" @tap.stop="confirmDelete(it.id)">{{ $t('panels.cpConfirm') }}</view>
+                   </view>
+                 </view>
+               </view>
+            </view>
+          </view>
+
+          <!-- Content: Horizontal Scroll -->
+          <view class="card-content">
+            <text v-if="it.type === 'TEXT'" class="content-text">{{ it.text }}</text>
+            <SafeImage v-else-if="it.type === 'IMAGE'" class="content-image" :item-id="it.id" @click.stop="previewImage(it)" />
+            <view v-else class="content-file">
+               <svg class="file-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                 <path v-for="(d, gi) in ICONS.doc" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+               </svg>
+               <text class="file-name">{{ it.fileName || $t('panels.cpUnknownFile') }}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script>
+/* ... script keeps same logic ... */
+import { listClipboard, deleteClipboardItem, perform, subscribe } from './api.js'
+import SafeImage from './SafeImage.vue'
+import { getClipboardTypeMeta } from '@/config/clipboard.js'
+import { ICONS } from '@/config/icons.js'
+import UnlockHint from './UnlockHint.vue'
+import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
+
+export default {
+
+  components: { UnlockHint, SafeImage },
+  computed: {
+
+    ICONS() { return ICONS }
+
+  },
+  name: 'ClipboardPanel',
+  /* ... props/data/methods same ... */
+  props: {
+    query: {
+      type: String,
+      default: ''
+    }
+  },
+  data() {
+    return {
+      localQuery: '',
+      loading: false,
+      items: [],
+      // 免费额度下被隐藏（注意：不是被删除）的历史记录条数。解锁后这些记录会原样回来。
+      hiddenCount: 0,
+      confirmDeleteId: null,
+      // 已点「确定」、DELETE 与重拉还没回来的那一条：期间卡片不再响应复制（BUG-63）
+      deletingId: null,
+      _refreshSeq: 0
+    }
+  },
+  mounted() {
+    this.refresh()
+    this._unsubscribe = subscribe(() => this.refreshSilently())
+  },
+  beforeUnmount() { this._unsubscribe?.(); ++this._refreshSeq },
+  watch: {
+    query(value) { this.localQuery = value },
+    localQuery() { this.refresh() }
+  },
+  methods: {
+    getTypeMeta(type) {
+      return getClipboardTypeMeta(type)
+    },
+    formatTypeLabel(type) {
+      return (getClipboardTypeMeta(type)?.label || String(type || ''))
+    },
+    // query 同样绑的是父级搜索框、没有去抖（连 ProjectFavoritesPanel 那种同关键字
+    // 节流都没有），每敲一下键就发一次 listClipboard。响应到达顺序不保证跟敲键顺序
+    // 一致，先敲的（陈旧）关键字若后回，会把已经渲染好的最新结果和「N 条被免费额度
+    // 隐藏」提示一起盖成陈旧值。只认"此刻最新一次"发出的那份。
+    // 采集后的实时重拉：不切「加载中」、失败不弹 toast——复制是机器级高频事件，
+    // 每次都闪一下加载态或弹一次失败提示都是打扰（BUG-62）
+    refreshSilently() {
+      this._silentNext = true
+      return this.refresh()
+    },
+    async refresh() {
+      const silent = !!this._silentNext
+      this._silentNext = false
+      const seq = ++this._refreshSeq
+      if (!silent) this.loading = true
+      try {
+        const res = await listClipboard(this.localQuery, 80)
+        if (!shouldAcceptResponse(seq, this._refreshSeq)) return
+        // PR-C 起后端返回 { items, limited, hiddenCount, ... }；
+        // 数组分支保留给旧后端（桌面壳可能连着未升级的 backend），此时按无额度处理。
+        if (Array.isArray(res)) {
+          this.items = res
+          this.hiddenCount = 0
+        } else {
+          this.items = res?.items || res?.data || []
+          this.hiddenCount = res?.limited ? (res.hiddenCount || 0) : 0
+        }
+      } catch (e) {
+        if (!shouldAcceptResponse(seq, this._refreshSeq)) return
+        console.error('加载剪贴板失败:', e)
+        if (!silent) uni.showToast({ title: this.$t('panels.cpLoadFailed'), icon: 'none' })
+      } finally {
+        if (shouldAcceptResponse(seq, this._refreshSeq)) this.loading = false
+      }
+    },
+    preview(it) {
+      if (it.type === 'TEXT') {
+        const t = (it.text || '').trim()
+        /* No truncation here if we want scroll, pass full text or reasonably long */
+        return t
+      }
+      return it.meta || this.$t('panels.cpUnknownContent')
+    },
+    formatTime(v) {
+      if (!v) return ''
+      try {
+        const d = new Date(v)
+        if (Number.isNaN(d.getTime())) return ''
+        const Y = d.getFullYear()
+        const M = String(d.getMonth() + 1).padStart(2, '0')
+        const D = String(d.getDate()).padStart(2, '0')
+        const h = String(d.getHours()).padStart(2, '0')
+        const m = String(d.getMinutes()).padStart(2, '0')
+        return `${Y}-${M}-${D} ${h}:${m}`
+      } catch (e) {
+        return ''
+      }
+    },
+    async run(operation, id) {
+      try { return await perform(operation, { id }) }
+      catch (error) { uni.showToast({ title: error.message, icon: 'none' }) }
+    },
+    insertItem(item) { return this.run('insert', item.id) },
+    async copy(item) {
+      if (item?.type !== 'TEXT') return
+      if ((await this.run('copy', item.id))?.ok) uni.showToast({ title: this.$t('panels.cpCopied'), icon: 'success' })
+    },
+    // 确认态刻意不自动收起：原先 5 秒后自己清空 confirmDeleteId，超时之后用户点
+    // 「确定」，点到的是卡片本身的 @tap="copy(it)"——表现正是「卡片仍在、
+    // 什么也没发生」（dev-board#455）。取消靠再点一次 ×、点「取消」，
+    // 或者点另一张卡片的 ×（confirmDeleteId 只认一个 id）。
+    // 卡片本体的点击（BUG-63）：删除气泡开着时，点偏落到卡片上只收起气泡、不复制；
+    // 已确认删除、还没重拉完的那张卡也不复制——两种情况下的「复制」都不是用户本意。
+    onCardTap(it) {
+      if (this.confirmDeleteId !== null) {
+        this.cancelDelete()
+        return
+      }
+      if (it && this.deletingId === it.id) return
+      return this.copy(it)
+    },
+    requestDelete(id) {
+      if (this.confirmDeleteId === id) {
+        this.confirmDeleteId = null
+        return
+      }
+      this.confirmDeleteId = id
+    },
+
+    cancelDelete() {
+      this.confirmDeleteId = null
+    },
+
+    async confirmDelete(id) {
+      this.cancelDelete()
+      this.deletingId = id
+      try {
+        await deleteClipboardItem(id)
+        await this.refresh()
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || this.$t('panels.cpDeleteFailed'), icon: 'none' })
+      } finally {
+        if (this.deletingId === id) this.deletingId = null
+      }
+    },
+    previewImage(it) { return this.run('preview', it.id) }
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+.collection-search { margin: 8px 12px; min-height: 32px; padding: 0 8px; border: 1px solid var(--awd-border); border-radius: 4px; font-size: 13px; }
+/* Unified AI WorkDeck Palette */
+
+.clip-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--awd-surface);
+}
+
+/* 额度提示贴在列表上方，不占据滚动区，避免翻到底才看到 */
+.clip-unlock-hint {
+  margin: 12px 16px 0;
+  flex-shrink: 0;
+}
+
+.clip-body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--awd-space-4);
+}
+
+/* 空态（BUG-68）：与文档主区域 .empty-workspace 同一套图标+双行文案范式，
+   贴着抽屉尺寸缩小一档。 */
+.empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.empty-logo-tile {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-dialog);
+  box-shadow: var(--awd-shadow-md);
+}
+
+.empty-state-img {
+  width: 32px;
+  height: 32px;
+}
+
+.empty-title {
+  margin-top: 16px;
+  font-size: var(--awd-font-size-body);
+  font-weight: 600;
+  color: var(--awd-text);
+}
+
+.empty-sub {
+  margin-top: 6px;
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-text-2);
+}
+
+/* Horizontal Scroll Layout */
+.list-grid {
+  display: inline-flex;
+  gap: var(--awd-space-4);
+  height: 100%;
+  align-items: stretch;
+  padding: var(--awd-space-1); /* Fix border clipping */
+}
+
+.clip-card {
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  padding: var(--awd-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--awd-space-3);
+  width: 240px; /* Fixed width */
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  position: relative;
+  box-shadow: var(--awd-shadow-sm);
+  /* Fixed Height */
+  height: 130px;
+  cursor: default;
+  overflow: hidden;
+}
+
+.clip-card:hover {
+  border-color: var(--awd-accent-text);
+  box-shadow: var(--awd-shadow-md);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--awd-space-2);
+  flex-shrink: 0;
+}
+
+.header-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.type-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+}
+
+.badge-text {
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  color: var(--awd-text);
+}
+
+.clip-source {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time-label {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Actions Top Right - Horizontal */
+.cli-actions-top {
+  display: flex;
+  flex-direction: row;
+  gap: var(--awd-space-1);
+  flex-shrink: 0;
+  align-items: flex-start;
+}
+
+.cli-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--awd-radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+
+  .icon {
+
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+    color: var(--awd-text-2);
+  }
+
+  &:hover {
+    background: var(--awd-accent-soft);
+    border-color: transparent;
+    .icon { color: var(--awd-accent-text); }
+  }
+}
+
+.cli-btn.cli-btn-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.cli-btn.danger:hover {
+  background: var(--awd-danger-soft);
+  .icon { color: var(--awd-danger-text); }
+}
+
+.card-content {
+  flex: 1;
+  min-height: 0;
+  background: var(--awd-surface-2);
+  border-radius: var(--awd-radius-md);
+  padding: var(--awd-space-2);
+  overflow: hidden;
+  position: relative;
+  display: block; /* Reset flex */
+}
+
+/* Content Types */
+.content-text {
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-text);
+  line-height: 1.5;
+
+  /* Top-Left No Scroll Ellipsis */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-all;
+}
+
+.content-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--awd-radius-sm);
+}
+
+.content-file {
+  display: flex;
+  align-items: center;
+  gap: var(--awd-space-2);
+  height: 100%;
+}
+
+.file-icon {
+
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  flex-shrink: 0;
+}
+/* Inline Delete Popover */
+.delete-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  box-shadow: var(--awd-shadow-md);
+  padding: var(--awd-space-2);
+  z-index: 100;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: fadeIn 0.1s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pop-arrow {
+  position: absolute;
+  top: -4px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  background: var(--awd-surface);
+  border-top: 1px solid var(--awd-border);
+  border-left: 1px solid var(--awd-border);
+  transform: rotate(45deg);
+}
+
+.pop-text {
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-text);
+  text-align: center;
+  font-weight: 500;
+  display: block;
+}
+
+.pop-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--awd-space-2);
+}
+
+.pop-btn {
+  flex: 1;
+  font-size: var(--awd-panel-fs-meta);
+  padding: 4px 0;
+  text-align: center;
+  border-radius: var(--awd-radius-sm);
+  cursor: pointer;
+  background: var(--awd-bg);
+  color: var(--awd-text-2);
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--awd-surface-3);
+    color: var(--awd-text);
+  }
+}
+
+.pop-btn.danger {
+  background: var(--awd-danger-soft);
+  color: var(--awd-danger-text);
+
+  &:hover {
+    background: var(--awd-danger-soft);
+  }
+}
+
+.file-name {
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

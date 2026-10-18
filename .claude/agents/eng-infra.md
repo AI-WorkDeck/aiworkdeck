@@ -568,3 +568,7 @@ Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Ac
 start/stop/restart 共用按服务串行队列。后端端口分配后固定，恢复不能改渲染层已注入的地址。本次 spawn 随机注入 `AWD_BACKEND_CONTROL_TOKEN`，优雅停止请求为 loopback POST `/api/desktop/shutdown` + `X-AWD-Backend-Control-Token`；令牌只在进程内存/env，不写日志。停止先等待 Spring graceful 关闭，45s 后才强杀，且确认 child exit 后才能起新 JVM；尤其 Windows 不能直接把 Node `SIGTERM` 当优雅退出。应用退出总等待55s；睡眠暂停检测，唤醒30s宽限，退出移除监测。恢复不刷新窗口，保留编辑器内未保存内容。
 
 preload `host.backend.getHealth()` / `onHealthChanged(callback)`；主进程 IPC `checkba:backend-health` / `checkba:backend-health-changed`。快照 `{state, ok, owned, attempts, reason, updatedAt}`；state 为 starting/healthy/degraded/restarting/failed/suspended/stopped。启动链异常也保留 failed/startup-failed 快照；只有已有本壳 child 所有权时才启动监督器允许恢复，端口分配失败不能永久显示 starting。回归 `desktop/tests/backend-supervisor.test.js`、`service-manager.test.js`、`quit-lifecycle.test.js` 用随机回环端口/合成 child；端口链测试同样注入随机端口，不占用户默认5269。mac/Windows正式包的数据库耗尽与真实文件写入恢复仍须隔离验收，不得在用户未保存文稿的客户端直接强杀演练。
+
+## 随包业务插件构建（#1340/#1341，待发版）
+
+frontend build:h5前置build:plugins，8个独立Uni/Vite包输出official-plugins/<id>/web，desktop extraResources只带对应manifest/web。后端通过AI_PLUGINS_BUNDLED_DIR读取只读来源，安装到可写plugins目录；OAuth回调由实际分配的后端端口注入AI_PLUGINS_OAUTH_REDIRECT_URI。纯服务端开发显式指定bundled-dir并先构建。QA启动后端必须复制jar到隔离runtime后运行，不可直接运行随后会被Maven改写的target jar；同一target目录不可并行package与test。

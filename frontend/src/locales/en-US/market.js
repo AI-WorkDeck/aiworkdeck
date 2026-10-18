@@ -62,7 +62,7 @@ export default {
   panelPluginLabel: 'Panel plugin',
   panelPluginHint: 'Adds a sidebar icon that opens a full panel',
   installingShort: 'Installing',
-  pluginTrustNote: 'Plugins have the same permissions as apps on this machine — confirm the source is trustworthy before installing. All online plugins are manually reviewed and platform-signed; they are disabled by default after install and must be enabled manually under "Installed".',
+  pluginTrustNote: "Check the source and declared capabilities before installing. Web views run in isolation with permission-checked host access; plugins with backend code can access local resources. Manual installs start disabled.",
 
   // ---- Installed ----
   skillWord: 'Skill',
@@ -110,7 +110,7 @@ export default {
   unknownSize: 'Unknown size',
 
   confirmInstallPluginTitle: 'Confirm Plugin Install',
-  confirmInstallPluginContent: '{name} v{version}\nAuthor: {author}\nDeclared capabilities: {perms}\n\nPlugins have the same permissions as apps on this machine and can read/write your files and access the network. Disabled by default after install; you\'ll need to enable it manually.',
+  confirmInstallPluginContent: "{name} v{version}\nAuthor: {author}\nDeclared capabilities: {perms}\n\nCheck the source and required permissions. Installed disabled; enable it manually when ready.",
   unknownAuthor: 'Unknown',
   cancelBtn: 'Cancel',
   installedEnableHint: 'Installed — enable it under "Installed"',
@@ -137,7 +137,7 @@ export default {
   // ---- MarketDetailPane ----
   kindBadgeSkill: 'Skill',
   downloadsCount: '{count} downloads',
-  kindNotePlugin: 'A plugin is an executable extension: it adds new capabilities to the workbench, has the same permissions as apps on this machine, and is manually reviewed and signed by the platform.',
+  kindNotePlugin: "Plugins add views, tools or services to the workbench. Check their source and declared capabilities before enabling.",
   kindNoteSkill: 'A Skill is a prompt workflow: it teaches the AI assistant to follow a set of business methods — plain text, no executable code.',
   buyWithPrice: 'Buy {price}',
   refreshing: 'Refreshing…',
@@ -154,7 +154,7 @@ export default {
   scenarioNote: 'You can also select it manually in the input box with /; activation can be adjusted on this page anytime.',
   declaredCapability: 'Declared Capabilities',
   providesTools: 'Provides {count} tools',
-  pluginPermissionNote: 'Plugins have the same permissions as apps on this machine. The platform has manually reviewed and signed it; disabled by default after install, and no plugin code runs before it\'s enabled.',
+  pluginPermissionNote: "Web plugins use authorized host interfaces; plugins with backend code can also access local resources. Bundled, locally developed and online plugins have different sources. Check the source shown here.",
   detailInfo: 'Details',
   kvToolPermission: 'Tool Permissions',
   kvPrice: 'Price',
@@ -228,4 +228,9 @@ export default {
   confirmUninstallPackTitle: 'Confirm Uninstall',
   uninstallPackConfirmSized: 'This will disable the feature and delete the downloaded resource pack (about {size} MB). Continue?',
   uninstallPackConfirmPlain: 'This will disable the feature and delete the downloaded resource pack. Continue?',
+  permAi: "AI requests",
+  permSpeech: "Speech and recording",
+  permTasks: "Calendar and tasks",
+  permClipboard: "Clipboard",
+  permLawfirm: "Team information",
 }

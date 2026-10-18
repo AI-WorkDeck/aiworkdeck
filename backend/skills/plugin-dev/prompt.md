@@ -6,7 +6,7 @@
 
 ## 工作流程（每轮迭代都走这个环）
 
-1. **新插件**：先用 `plugin_dev_scaffold(pluginId, displayName)` 建骨架。它会在项目「插件开发/<id>/」下生成 manifest.json、web/index.html、web/awd-plugin-sdk.js，并返回源码文件夹 ID（后面安装要用）。
+1. **新插件**：先用 `plugin_dev_scaffold(pluginId, displayName)` 建骨架。它会在项目「插件开发/<id>/」下生成 manifest.json、web/index.html、web/awd-plugin-sdk.js、类型声明和 manifest.schema.json，并返回源码文件夹 ID（后面安装要用）。
 2. **读现状**：改已有插件前，先用 `list_files` / `extract_file_text` / `read_file` 读 manifest.json 与 web/ 下的源码，弄清现有结构再动手。
 3. **写代码**：
    - 修改已有文件用 `text_write_file`（整篇覆盖）或 `text_find_replace`（局部替换）；
@@ -43,7 +43,7 @@
 }
 ```
 
-- `permissions` 可用值：`file_read`（读项目文件）、`file_write`（预留）、`network`（放开 fetch 到 https）、`editor`（文档读写：doc.*/evidence.*，v2.7 起真实生效）、`ai`（面板内静默调平台模型 ai.request，v2.7 起，烧用户 Credits——真用得上才声明）。未声明 `file_read` 时调 `files.*` 会得到 `permission_denied`；未声明 `network` 时 CSP 是 `connect-src 'none'`，fetch 一律被浏览器拦截。权限最小化：用不到的不要声明。
+- `permissions` 可用值：`file_read`（读项目文件）、`file_write`（写入获授权项目文件）、`network`（放开 fetch 到 https）、`editor`（文档读写：doc.*/evidence.*，v2.7 起真实生效）、`ai`（面板内静默调平台模型 ai.request，v2.7 起，烧用户 Credits——真用得上才声明）。未声明 `file_read` 时调 `files.*` 会得到 `permission_denied`；未声明 `network` 时 CSP 是 `connect-src 'none'`，fetch 一律被浏览器拦截。权限最小化：用不到的不要声明。
 - **v2.9 声明式贡献点**：manifest 顶层 `settings`（用户可配置项，广场详情页渲染表单）与 `contributes.templates`/`contributes.styleProfiles`（文书模板/样式画像，纯数据文件）对开发安装开放；`contributes.evidenceSources` 不收（数据源接入要走广场审核）。字段形状见 docs/PLUGIN_SPEC.md §13/§14。
 - **开发安装只收纯 Web 插件**：`backendJars` / `tools` / `skills` / `packs` 任一非空会被拒装。需要后端代码的插件必须走插件广场的人工审核 + 签名流程，不要试图绕开。
 
@@ -124,3 +124,15 @@ manifest 建议：用到 v2.7 能力（doc.*/events/ai.request）时声明 `"min
 `im.request {action,params}` 需声明 `im` 权限，调用固定 IM 动作，不接受任意 URL，不返回凭据。项目文件导入、归档、绑定还需 `file_write`；发送项目文件需 `file_read`；服务端分别检查会话成员及项目权限。聊天参与不等于项目授权。可用动作与限制见 `official-plugins/project-im/README.md`。
 
 `chat.addFile {path}` 需 `file_read`，只添加当前项目文件材料，不自动向 AI 发送。`files.prepareDrag {path}` 返回短时一次性拖拽票据，需在真正 dragstart 之前准备，并在 dragstart 同步写入返回的随机 `dragType/dragToken` MIME；dragend 用 `files.endDrag {}` 清理。账户变更的 `account.changed` 与项目变更都应清缓存、作废在途结果。旧宿主返回 unknown_method，明确提示需要兼容宿主，不降级为本地假聊天。
+
+## SDK 1.6 开发路径（新宿主，待发版）
+
+可声明 contributes.views 选择 sidebar/workspace 和 project/global，使用主题令牌适配窄栏。每种 placement 最多一个视图。旧 frontendEntry 兼容工作区入口。迁移后验收以实际 manifest 的入口为准。
+
+设置可声明 scope=installation/user/project；用 settings.open 打开可信宿主表单，settings.update 只改 user/project 非密设置。插件自有登录放 contributes.connections，支持 bearer 或 OAuth PKCE；SDK connections.connect 打开宿主连接界面，不在插件页面索取平台密钥。独立订阅用 connections.billing 的服务端状态与 checkoutUrl；共享模型仍用 ai.request 及主产品额度。
+
+插件 MCP 通过 contributes.mcpServers 声明 streamable-http 公共 HTTPS 服务、连接和固定 tools/inputSchema；会进入实际 Agent 工具链。开发安装后须由管理员在宿主设置明确授权服务，manifest 改变后重新授权。不要写授权标记，不要让 Agent 自动批准自己生成的插件。暂不支持 stdio 或任意本机进程。
+
+本地命令入口 scripts/plugin-dev.mjs 提供 init、validate、package、dev/install、status、submit；详见 sdk/plugin-sdk/README.md。投稿需已有官网会话与显式 HTTPS 端点，结果为待审核，不等于已签名发布。代码合并、发版与官网部署分别说明。
+
+完整契约与边界见 docs/PLUGIN_SPEC.md §17，结构以 sdk/plugin-sdk/manifest.schema.json、manifest.d.ts 为准。新增权限 speech/tasks/clipboard 分别约束语音、任务和剪贴板服务；文件、编辑器和付费云端权限不因此省略。所有新增 API 在旧宿主上应处理 unknown_method；不得承诺用户当前客户端已具备未发版能力。

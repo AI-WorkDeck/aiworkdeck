@@ -449,18 +449,7 @@ export const ocrActionMethods = {
         })
         const favId = created && created.id ? created.id : null
         // 立即给用户可见反馈：打开收藏夹并高亮新卡片
-        this.showToolsPanel = true
-        this.activeToolKey = 'favorites'
-        this.$nextTick(async () => {
-          try {
-            const panel = this.$refs.favoritesPanel
-            // 先等列表刷新完成，新卡片进入列表后再定位高亮，否则高亮必然落空
-            if (panel && typeof panel.refresh === 'function') await panel.refresh()
-            if (favId && panel && typeof panel.focusFavorite === 'function') panel.focusFavorite(Number(favId))
-          } catch (e) {
-            // ignore
-          }
-        })
+        this.focusFavoritePlugin(favId)
         uni.showToast({ title: this.$t('workbenchOps.favoriteSuccess'), icon: 'success' })
       } catch (e) {
         console.error('收藏失败:', e)
@@ -544,9 +533,7 @@ export const ocrActionMethods = {
         const saved = res && res.id ? res : (res && res.data ? res.data : null)
         const favId = saved && saved.id ? saved.id : null
 
-        if (this.$refs.favoritesPanel && typeof this.$refs.favoritesPanel.refresh === 'function') {
-          this.$refs.favoritesPanel.refresh()
-        }
+        uni.$emit('awd:favorites-changed')
 
         // 3) 进入拖拽模式（把证据块拖到 WPS 插入标记）
         this.startWebLinkDrag({

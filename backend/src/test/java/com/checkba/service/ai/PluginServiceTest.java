@@ -524,7 +524,7 @@ class PluginServiceTest {
     // ==== contributes.evidenceSources（规范 v2.8 P3）====
 
     private static final String EVIDENCE_MANIFEST = """
-            {"id": "p1", "name": "P1", "version": "1.0.0",
+            {"id": "p1", "name": "P1", "version": "1.0.0", "permissions": ["network"],
              "contributes": {"evidenceSources": [
                {"sourceId": "p1.registry", "name": "工商", "transport": "spi"},
                {"sourceId": "wrong-prefix.x", "name": "坏前缀"},

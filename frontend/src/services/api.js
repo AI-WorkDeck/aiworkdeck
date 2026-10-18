@@ -815,16 +815,40 @@ export function createFileFromContributedTemplate(pluginId, templateId, projectI
 }
 
 // 插件设置：声明 + 当前值（secret 只回显尾 4 位）-> { code, settings: [...] }
-export function getPluginSettings(pluginId) {
-  return request({ url: `/api/plugins/${pluginId}/settings`, method: 'GET' });
+export function getPluginSettings(pluginId, projectId = null) {
+  return request({ url: `/api/plugins/${pluginId}/settings`, method: 'GET', data: projectId == null ? {} : { projectId }, logBody: false });
 }
 
-// 保存插件设置（仅管理员；按声明校验类型）
-export function savePluginSettings(pluginId, values) {
+// Fixed platform routes; plugins never supply an arbitrary URL or host session header.
+export function pluginPlatformRequest(pluginId, action, params = {}, signal) {
+  const base = `/api/plugins/${encodeURIComponent(pluginId)}`
+  const connection = `${base}/connections/${encodeURIComponent(params.connectionId || params.id || '')}`
+  const routes = {
+    'connections.list': ['GET', `${base}/connections`, {}],
+    'connections.connect': ['POST', `${connection}/connect`, { token: params.token }],
+    'connections.authorize': ['POST', `${connection}/authorize`, {}],
+    'connections.disconnect': ['POST', `${connection}/disconnect`, {}],
+    'connections.request': ['POST', `${connection}/request`, { operation: params.operation, params: params.params, projectId: params.projectId }],
+    'billing.status': ['GET', `${base}/billing`, { connectionId: params.connectionId }],
+    'billing.checkout': ['GET', `${base}/billing/checkout`, { connectionId: params.connectionId }],
+    'mcp.servers': ['GET', `${base}/mcp/servers`, { projectId: params.projectId }],
+    'mcp.call': ['POST', `${base}/mcp/call`, { serverId: params.serverId, name: params.name, arguments: params.arguments, projectId: params.projectId }]
+  }
+  const route = routes[action]
+  if (!route) return Promise.reject(new Error('Unknown plugin platform action'))
+  return request({ method: route[0], url: route[1], data: route[2], signal, logBody: false, timeout: 60000, accountPrompt: false })
+}
+
+export const getBundledPlugins = () => request({ url: '/api/plugins/bundled', method: 'GET' })
+export const installBundledPlugin = id => request({ url: `/api/plugins/bundled/${encodeURIComponent(id)}/install`, method: 'POST' })
+
+// 保存已声明设置：installation 仅管理员，user/project 按身份与项目权限校验。
+export function savePluginSettings(pluginId, values, projectId = null) {
   return request({
-    url: `/api/plugins/${pluginId}/settings`,
+    url: `/api/plugins/${pluginId}/settings${projectId == null ? '' : '?projectId=' + encodeURIComponent(projectId)}`,
     method: 'POST',
     data: values,
+    logBody: false,
     header: { 'Content-Type': 'application/json' },
   });
 }
@@ -2206,15 +2230,15 @@ export function mergeFilesToPdf(projectId, fileIds) {
 
 // ===================== 脱敏处理 API =====================
 // ===================== 脱敏处理 API =====================
-export function getSensitiveOptions() {
-  return request({
+export function getSensitiveOptions(opts = {}) {
+  return request({ signal: opts.signal, logBody: false,
     url: '/api/sensitive/options',
     method: 'GET',
   });
 }
 
-export function desensitizeFile(payload) {
-  return request({
+export function desensitizeFile(payload, opts = {}) {
+  return request({ signal: opts.signal, logBody: false,
     url: '/api/sensitive/desensitize',
     method: 'POST',
     data: payload,
@@ -2225,12 +2249,12 @@ export function desensitizeFile(payload) {
   });
 }
 
-export function previewSensitiveFile(payload) {
-  return request({ url: '/api/sensitive/preview', method: 'POST', data: payload, timeout: 300000 });
+export function previewSensitiveFile(payload, opts = {}) {
+  return request({ signal: opts.signal, logBody: false, url: '/api/sensitive/preview', method: 'POST', data: payload, timeout: 300000 });
 }
 
-export function restoreSensitiveFile(payload) {
-  return request({ url: '/api/sensitive/restore', method: 'POST', data: payload, timeout: 300000 });
+export function restoreSensitiveFile(payload, opts = {}) {
+  return request({ signal: opts.signal, logBody: false, url: '/api/sensitive/restore', method: 'POST', data: payload, timeout: 300000 });
 }
 
 // 获取文件详情
@@ -3365,8 +3389,8 @@ export function sendEditorResult(conversationId, requestId, success, data, error
 }
 
 // ==================== 标签管理 (Tag Management) ====================
-export function getProjectTags(projectId) {
-  return request({
+export function getProjectTags(projectId, opts = {}) {
+  return request({ signal: opts.signal, logBody: false,
     url: `/api/projects/${projectId}/tags`,
     method: 'GET'
   })
@@ -4465,4 +4489,12 @@ export function updateProjectFileAccess(projectId, fileId, clientVisible) {
     url: `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/access`,
     method: 'PUT', data: { clientVisible }
   }).then(unwrapEnvelope)
+}
+
+// Only trusted host settings expose development service approval.
+export function getPluginDevTrust(pluginId) {
+  return request({ url: `/api/plugins/${encodeURIComponent(pluginId)}/dev-trust`, method: 'GET', logBody: false })
+}
+export function setPluginDevTrust(pluginId, trusted) {
+  return request({ url: `/api/plugins/${encodeURIComponent(pluginId)}/dev-trust`, method: 'POST', data: { trusted }, logBody: false })
 }

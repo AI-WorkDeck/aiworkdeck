@@ -1,0 +1,7 @@
+{
+  "name": "AI WorkDeck plugin",
+  "appid": "",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "h5": { "router": { "mode": "hash" } }
+}

@@ -10,7 +10,7 @@
 // 与 FileTree 分片上传同一后端端点）——进程被杀最多丢最后 5 秒 + 未上传队列。
 // 录音配方（getUserMedia/pickAudioMime/轨道必须 stop）抄自 FeedbackWidget。
 import { reactive } from 'vue'
-import { getApiBaseUrl, createMeetingRecording, finishMeetingRecording } from '@/services/api.js'
+import { getApiBaseUrl, createMeetingRecording, finishMeetingRecording, deleteMeetingRecording } from '@/services/api.js'
 import { getAuthHeaders } from '@/utils/auth.js'
 // 报错直接显示在会议录音面板里（recorderState.error 与 throw 出去的 message 都是），
 // 所以文案与面板同一个命名空间。非组件模块的翻译入口是 t()，且只能在函数体内取值。
@@ -126,7 +126,9 @@ async function acquireMicStream(deviceId) {
  * @param {string} [deviceId] 指定的麦克风 deviceId；不传则用浏览器默认设备
  * @returns {Promise<object>} 后端返回的 meeting
  */
-export async function startRecording(projectId, deviceId) {
+export async function startRecording(projectId, deviceId, options = {}) {
+  const checkCancelled = () => { if (options.signal?.aborted || options.isCurrent?.() === false) throw Object.assign(new Error('Recording cancelled'), { code: 'cancelled' }) }
+  checkCancelled()
   if (isRecordingActive()) {
     throw new Error(t('meeting.alreadyRecording'))
   }
@@ -143,9 +145,14 @@ export async function startRecording(projectId, deviceId) {
   try {
     // 先拿麦克风再建档：权限被拒时不留空会议记录
     mediaStream = await acquireMicStream(deviceId)
+    checkCancelled()
     mediaStream.getTracks().forEach((track) => { track.onended = handleTrackEnded })
     const res = await createMeetingRecording(projectId)
     const meeting = res.meeting || res
+    try { checkCancelled() } catch (error) {
+      await deleteMeetingRecording(meeting.id).catch(() => {})
+      throw error
+    }
     recorderState.meetingId = meeting.id
     recorderState.audioFileId = meeting.audioFileId
     recorderState.configured = res.configured !== undefined ? !!res.configured : null

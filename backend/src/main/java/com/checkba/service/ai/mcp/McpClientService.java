@@ -48,7 +48,7 @@ public class McpClientService {
      * @return The result as a string
      */
     public String callTool(String serverName, String toolName, Map<String, Object> args) {
-        log.info("MCP callTool: server={}, tool={}, args={}", serverName, toolName, args);
+        log.debug("MCP callTool: server={}, tool={}", serverName, toolName);
 
         McpProperties.ServerConfig server = mcpProperties.findByName(serverName);
         if (server == null) {
@@ -72,7 +72,15 @@ public class McpClientService {
      * token 解析与 provider 分发与静态表路径完全一致。
      */
     public String callTool(McpProperties.ServerConfig server, String toolName, Map<String, Object> args) {
-        log.info("MCP callTool (ad-hoc): server={}, tool={}", server.getName(), toolName);
+        // Plugin references can only name their own secret settings. Configured host servers use the named overload.
+        String[] parts = server.getName() == null ? new String[0] : server.getName().split(":", 3);
+        if (parts.length != 3 || !"plugin".equals(parts[0]) || !parts[1].matches("[a-z0-9][a-z0-9-]{1,49}")
+                || (server.getToken() != null && !server.getToken().isBlank())
+                || (StringUtils.hasText(server.getTokenSettingKey()) && !server.getTokenSettingKey().startsWith("plugin." + parts[1] + ".")))
+            return "Error: invalid plugin MCP credential reference.";
+        try { PluginMcpEndpointPolicy.validateUrl(server.getUrl()); }
+        catch (PluginMcpException invalid) { return "Error: invalid plugin MCP endpoint."; }
+        server.setPluginEndpoint(true);
         if (!server.isEnabled()) {
             return "Error: MCP server is disabled: " + server.getName();
         }

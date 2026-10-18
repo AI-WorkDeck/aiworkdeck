@@ -4,6 +4,7 @@
   <view class="plugin-pane">
     <iframe
       v-if="url"
+      :key="sessionGeneration"
       ref="pluginFrame"
       :src="url"
       :sandbox="sandboxAttr"
@@ -47,8 +48,17 @@ import {
   getProjectFiles, getFileText, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm,
   requestPluginLawFirm,
   createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks,
-  getTeam, getProjectMembers, getCurrentUser
+  getTeam, getProjectMembers, getCurrentUser, searchProjectContent, getProjectTags,
+  getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile,
+  getLitigationVisualStatus, getLitigationDiagrams, getLitigationKickoffPrompt, restyleLitigationDiagram, packStatus, packInstall
 } from '@/services/api.js'
+import { host } from '@/services/host.js'
+import { createPluginCollectionServices } from '@/utils/pluginCollectionServices.js'
+import { subscribe as subscribeTaskChanges } from '@/utils/taskStore.js'
+import { createPluginInsightServices } from '@/utils/pluginInsightServices.js'
+import { createPluginVoiceServices } from '@/utils/pluginVoiceServices.js'
+import { createPluginBusinessServices, clonePluginData } from '@/utils/pluginBusinessServices.js'
+import { createPluginPlatformServices } from '@/utils/pluginPlatformServices.js'
 import { PLUGIN_DOC_ACTIONS } from '@/config/pluginDocActions.js'
 import { getAppLanguage } from '@/utils/appLanguage.js'
 import { getResolvedTheme, collectThemeTokens, APP_THEME_EVENT } from '@/utils/appTheme.js'
@@ -79,6 +89,10 @@ const AI_REQUEST_MAX_CHARS = 16000
  * 未达权限的事件名在 subscribe 时静默剔除（回声集合里自然缺席），与老宿主 unknown_method 降级同一取向。
  */
 const PLUGIN_EVENTS = {
+  'speech.progress': { permission: 'speech', throttleMs: 100 },
+  'calendar.changed': { permission: 'tasks', throttleMs: 300 },
+  'favorites.changed': { permission: 'file_read', throttleMs: 300 },
+  'clipboard.changed': { permission: 'clipboard', throttleMs: 300 },
   'files.changed': { permission: 'file_read', throttleMs: 500 },
   'selection.changed': { permission: 'editor', throttleMs: 300 },
   'project.switched': { permission: null, throttleMs: 0 },
@@ -109,6 +123,7 @@ export default {
   // prompt 作为可见的用户消息进入 AI 对话，用户随时可停，不存在静默注入
   emits: ['kickoff', 'files-changed'],
   props: {
+    businessActions: { type: Object, default: () => ({}) },
     url: {
       type: String,
       default: ''
@@ -158,12 +173,15 @@ export default {
     }
   },
   watch: {
+    permissions: { deep: true, handler() { this.disposeBusinessServices(); this.sessionGeneration++; this.resetEventChannel() } },
     url() {
+      this.disposeBusinessServices()
       this.sessionGeneration++
       this.clearPreparedDrag()
       this.resetEventChannel()
     },
     pluginId() {
+      this.disposeBusinessServices()
       this.sessionGeneration++
       this.clearPreparedDrag()
       this.resetEventChannel()
@@ -171,6 +189,7 @@ export default {
     // 当前架构下切项目走 uni.reLaunch 整页重建，本 watch 极少触发；
     // 语义为未来面板持久化预留（规范 v2.7 事件表），触发了就如实推送
     projectId(val) {
+      this.disposeBusinessServices()
       this.sessionGeneration++
       this.clearPreparedDrag()
       this.forwardEvent('project.switched', { projectId: val == null ? '' : String(val) })
@@ -198,6 +217,13 @@ export default {
     uni.$on(APP_THEME_EVENT, this._onThemeChanged)
     // 事件源（v2.7）：FileTree.loadFiles 成功后与编辑器选区变化时各发一个应用级事件，
     // 这里按插件的订阅集合转发进 iframe（未订阅不推，见 forwardEvent）
+    if (this.hasPermission('speech') && host.model?.onProgress) this._unsubscribeSpeech = host.model.onProgress(event => { if (['kokoro-models', 'asr-models'].includes(event?.id)) this.forwardEvent('speech.progress', event) })
+    this._collectionEvents = [['awd:clipboard-saved', 'clipboard.changed'], ['awd:entitlements-changed', 'clipboard.changed'], ['awd:favorites-changed', 'favorites.changed']].map(([source, event]) => {
+      const callback = () => this.forwardEvent(event, {})
+      uni.$on(source, callback)
+      return () => uni.$off(source, callback)
+    })
+    this._unsubscribeTasks = subscribeTaskChanges(event => { if (['created', 'updated', 'deleted'].includes(event.kind)) this.forwardEvent('calendar.changed', {}) })
     this._onFilesChanged = () => this.forwardEvent('files.changed', {})
     this._onSelectionChanged = () => this.forwardEvent('selection.changed', {})
     // v2.9：设置变更只推给设置所属的插件——别的插件订阅了也收不到别人的
@@ -228,6 +254,7 @@ export default {
     uni.$on('awd:lawfirm-tab', this._onLawfirmTab)
     uni.$on('awd:plugin-sidebar-command', this._onSidebarCommand)
     this._onAccountChanged = () => {
+      this.disposeBusinessServices()
       this.sessionGeneration++
       this.clearPreparedDrag()
       this.forwardEvent('account.changed', {})
@@ -243,6 +270,10 @@ export default {
     uni.$on('awd:org-changed', this._onOrgChanged)
   },
   beforeUnmount() {
+    this._collectionEvents?.forEach(off => off())
+    this._unsubscribeTasks?.()
+    this._unsubscribeSpeech?.()
+    this.disposeBusinessServices()
     this.sessionGeneration++
     this.clearPreparedDrag()
     window.removeEventListener('message', this.onMessage)
@@ -257,6 +288,48 @@ export default {
     this.resetEventChannel()
   },
   methods: {
+    disposeBusinessServices() {
+      this._businessServices?.dispose()
+      this._businessServices = null
+      this._platformServices?.dispose()
+      this._platformServices = null
+    },
+    businessServices() {
+      if (!this._businessServices) {
+        const generation = this.sessionGeneration
+        const actions = { ...this.businessActions, emit: (name, data) => uni.$emit(name, data), activeFileId: () => this.activeEditor()?.fileId, download: ({ content, name, type }) => {
+          const url = URL.createObjectURL(new Blob([content], { type }))
+          const link = document.createElement('a')
+          try { link.href = url; link.download = name; document.body.appendChild(link); link.click() }
+          finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000) }
+        } }
+        const voice = createPluginVoiceServices({ projectId: () => this.projectId, permissions: () => this.permissions, isCurrent: () => generation === this.sessionGeneration, actions })
+        const collections = createPluginCollectionServices({ projectId: () => this.projectId, permissions: () => this.permissions, isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles(), openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
+        const insight = createPluginInsightServices({ projectId: () => this.projectId, permissions: () => this.permissions, isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles(), openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
+        this._businessServices = createPluginBusinessServices({
+          delegates: { ...Object.fromEntries(['calendar', 'favorites', 'clipboard'].map(service => [service, (operation, params, signal) => collections.request(service, operation, params, signal)])), voice: (operation, params, signal) => voice.request(operation, params, signal), insight: (operation, params, signal) => insight.request(operation, params, signal) },
+          api: { searchProjectContent, getProjectTags, getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile,
+            getLitigationVisualStatus, getLitigationDiagrams, getLitigationKickoffPrompt, restyleLitigationDiagram, packStatus, packInstall },
+          projectId: () => this.projectId,
+          permissions: () => this.permissions,
+          isCurrent: () => generation === this.sessionGeneration,
+          listFiles: () => this.listProjectFiles(),
+          openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id, locator: null, linkKey: null }),
+          actions,
+        })
+      }
+      return this._businessServices
+    },
+    platformServices() {
+      if (!this._platformServices) {
+        const generation = this.sessionGeneration
+        this._platformServices = createPluginPlatformServices({
+          pluginId: () => this.pluginId, projectId: () => this.projectId,
+          permissions: () => this.permissions, isCurrent: () => generation === this.sessionGeneration,
+        })
+      }
+      return this._platformServices
+    },
     clearPreparedDrag() {
       endPluginImDrag(this)
     },
@@ -338,6 +411,12 @@ export default {
     },
 
     async handleCall(method, params) {
+      const generation = this.sessionGeneration
+      if (/^(settings|connections|mcp|billing)\./.test(method)) {
+        const platform = await this.platformServices().request(method, params)
+        if (platform) return platform
+      }
+      if (generation !== this.sessionGeneration) return this.staleContext()
       // 实验 API 闸（v2.7）：x- 前缀方法只对 dev 免签直装插件开放。
       // dev 插件的 x- 方法继续落进 switch（当前没有任何实验方法，得到 unknown_method）。
       if (method.indexOf('x-') === 0 && !this.devInstalled) {
@@ -347,6 +426,16 @@ export default {
         }
       }
       switch (method) {
+        case 'services.cancel':
+          return { ok: true, result: this.businessServices().cancel(params.requestId) }
+        case 'services.request': {
+          try {
+            const data = { ...(params.params || {}), requestId: params.requestId || params.params?.requestId }
+            return { ok: true, result: clonePluginData(await this.businessServices().request(params.service, params.operation, data)) }
+          } catch (e) {
+            return { ok: false, error: { code: e.code || (e.name === 'AbortError' ? 'cancelled' : 'invoke_failed'), message: e.message } }
+          }
+        }
         case 'im.downloadAttachment': {
           if (!this.hasPermission('im')) return this.denied('im')
           const conversationId = typeof params.conversationId === 'string' ? params.conversationId.trim() : ''

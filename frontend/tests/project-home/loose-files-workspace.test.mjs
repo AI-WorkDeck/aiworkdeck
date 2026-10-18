@@ -26,7 +26,7 @@ test('独立文件仍有编辑/AI上下文，但没有普通项目上下文', ()
   assert.equal(hasProject.call({ projectId: 12 }), true)
   assert.equal(hasNamed.call({ hasProject: true, isLooseWorkspace: true }), false)
   assert.equal(hasNamed.call({ hasProject: true, isLooseWorkspace: false }), true)
-  assert.match(page, /v-if="aiPanelMounted && hasProject"/)
+  assert.match(page, /<ChatInterface\s+v-if="hasProject"/)
 })
 
 test('真实独立工作区详情不记最近项目，不加载成员/协作/事项/暂存区', async () => {
@@ -73,7 +73,7 @@ test('独立文件窗口标题不泄露内部项目名称', () => {
 test('菜单项目标志关闭，文件编辑标志保留', () => {
   const flags = new Function('WORD_EXT', `return function() {${body('buildMenuFlags', menu, 2)}}`)(/\.docx$/i)
   const state = flags.call({ project: { id: 12 }, isLooseWorkspace: true,
-    activeFileLeft: { name: '合同.docx' }, activeFileIdLeft: 9, $refs: {},
+    activeFileLeft: { name: '合同.docx' }, activeFileIdLeft: 9, $refs: {}, isPanelOpenIn: () => false,
     activeLibreEditor: () => ({ menuReady: () => true }) })
   assert.equal(state.hasProject, false)
   assert.equal(state.hasTab, true)
@@ -121,7 +121,8 @@ test('保存成功后仍等待导航回执，导航失败向打开请求报告',
 test('独立文件禁止项目面板切换，即使菜单以外的调用方传入项目key', () => {
   const src = readFileSync(new URL('../../src/pages/project-overview/panelSwitching.js', import.meta.url), 'utf8')
   const blocked = body('toggleLeftPane', src, 4).split('      // 埋点')[0]
-  const check = new Function('isPaneAllowedWithoutProject', 'key', blocked + '\nreturn true')
+  const checkCore = new Function('isPaneAllowedWithoutProject', 'migrateLeftPaneKey', 'isGlobalPlugin', 'key', blocked + '\nreturn true')
+  const check = function(allow, key) { return checkCore.call({ dynamicPlugins: [], ...this }, allow, value => value, () => false, key) }
   const allow = key => key === 'projects'
   assert.equal(check.call({ hasProject: true, isLooseWorkspace: true }, allow, 'files'), undefined)
   assert.equal(check.call({ hasProject: true, isLooseWorkspace: true }, allow, 'projects'), true)

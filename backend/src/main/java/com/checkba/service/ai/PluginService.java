@@ -301,6 +301,27 @@ public class PluginService {
         private List<StyleProfileDecl> styleProfiles;
         /** 能力实现（规范 v2.10 §15）：把插件目录里的一份实现挂进宿主的某个能力槽 */
         private List<CapabilityDecl> capabilities;
+        private List<McpServerDecl> mcpServers;
+        private List<PluginViewDecl> views;
+        private List<Map<String, Object>> connections;
+    }
+
+    @lombok.Data
+    public static class PluginViewDecl {
+        private String id, name, entry, placement, scope, defaultDock;
+        private List<String> allowedDocks;
+    }
+
+    @lombok.Data
+    public static class McpServerDecl {
+        private String id, transport, url, credentialKey, connectionId;
+        private List<McpToolDecl> tools;
+    }
+
+    @lombok.Data
+    public static class McpToolDecl {
+        private String name, description;
+        private Map<String, Object> inputSchema;
     }
 
     /**
@@ -359,6 +380,7 @@ public class PluginService {
         private Object defaultValue;
         private List<String> options;
         private Boolean secret;
+        private String scope = "installation";
     }
 
     /**
@@ -417,8 +439,12 @@ public class PluginService {
         private List<String> permissions;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private PluginBundledInstaller bundledInstaller;
+
     @PostConstruct
     public void init() {
+        if (bundledInstaller != null) bundledInstaller.installDefaults();
         loadDisabledState();
         loadPlugins();
     }
@@ -894,7 +920,7 @@ public class PluginService {
             return;
         }
 
-        File[] pluginDirs = dir.listFiles(File::isDirectory);
+        File[] pluginDirs = dir.listFiles(file -> file.isDirectory() && !file.getName().startsWith("."));
         if (pluginDirs == null || pluginDirs.length == 0) {
             log.info("No plugin directories found in {}", pluginsDir);
             return;
@@ -922,6 +948,7 @@ public class PluginService {
                     continue;
                 }
                 validateFrontendEntry(pluginDir, meta);
+                PluginManifestContractValidator.validateViews(meta, pluginDir);
                 plugins.add(meta);
                 pluginDirById.put(meta.getId(), pluginDir);
 
@@ -1265,6 +1292,16 @@ public class PluginService {
                 sourceId, provider, () -> isEnabled(pluginId)));
     }
 
+    private boolean safeEvidenceCredential(PluginMetadata meta, McpServerRef ref) {
+        if (ref == null || (ref.getToken() != null && !ref.getToken().isBlank())) return false;
+        String key = ref.getTokenSettingKey();
+        if (key == null || key.isBlank()) return true;
+        String prefix = "plugin." + meta.getId() + ".";
+        return key.startsWith(prefix) && meta.getSettings() != null && meta.getSettings().stream()
+                .anyMatch(setting -> setting != null && (prefix + setting.getKey()).equals(key) && Boolean.TRUE.equals(setting.getSecret())
+                        && (setting.getScope() == null || "installation".equals(setting.getScope())));
+    }
+
     /** manifest 声明的远程 MCP 证据来源 → 证据注册表（规范 v2.8 P3）；transport=spi 的走 JAR 加载路径 */
     void registerDeclaredMcpEvidenceSources(PluginMetadata meta) {
         if (evidenceRetrieverRegistry == null || mcpClientService == null
@@ -1274,6 +1311,11 @@ public class PluginService {
         String pluginId = meta.getId();
         for (EvidenceSourceDecl d : meta.getContributes().getEvidenceSources()) {
             if (!"mcp".equals(d.getTransport())) {
+                continue;
+            }
+            if (isDevInstalled(pluginId) || meta.getPermissions() == null || !meta.getPermissions().contains("network")
+                    || !safeEvidenceCredential(meta, d.getServer())) {
+                log.warn("Plugin {} MCP evidence source rejected by credential/network policy", pluginId);
                 continue;
             }
             com.checkba.service.ai.mcp.McpProperties.ServerConfig cfg =

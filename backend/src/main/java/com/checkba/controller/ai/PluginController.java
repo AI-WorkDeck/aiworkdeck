@@ -8,6 +8,7 @@ import com.checkba.repository.UserRepository;
 import com.checkba.service.AdminAccessService;
 import com.checkba.service.LangText;
 import com.checkba.service.ai.PluginService;
+import com.checkba.service.ai.PluginContributionService;
 import com.checkba.service.ai.ToolRegistry;
 import com.checkba.service.ai.tools.ToolContext;
 import lombok.RequiredArgsConstructor;
@@ -416,35 +417,56 @@ public class PluginController {
     }
 
     /** 插件设置：声明 + 当前值（secret 只回显尾 4 位） */
+    public ResponseEntity<Map<String, Object>> getPluginSettings(String pluginId, String sessionId) {
+        return getPluginSettings(pluginId, null, sessionId);
+    }
+
     @GetMapping("/{id}/settings")
     public ResponseEntity<Map<String, Object>> getPluginSettings(
             @PathVariable("id") String pluginId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long projectId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        if (AuthController.getUserIdFromSession(sessionId) == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(LangText.of("请先登录", "Please sign in first")));
-        }
-        if (pluginService.getPlugin(pluginId) == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(LangText.of("插件不存在: ", "Plugin not found: ") + pluginId));
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("Sign in required"));
+        if (pluginService.getPlugin(pluginId) == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Plugin not found"));
+        if (projectId != null && !projectMemberService.hasReadPermission(projectId, userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No access to this project"));
         }
         Map<String, Object> result = ok();
-        result.put("settings", contributionService.settingsView(pluginId));
+        result.put("settings", contributionService.settingsView(pluginId, userId, projectId));
         return ResponseEntity.ok(result);
     }
 
-    /** 保存插件设置（admin，与启停同口径；按声明校验类型，未声明的键拒绝） */
+    public ResponseEntity<Map<String, Object>> savePluginSettings(String pluginId, Map<String, Object> values, String sessionId) {
+        return savePluginSettings(pluginId, values, null, sessionId);
+    }
+
     @PostMapping("/{id}/settings")
     public ResponseEntity<Map<String, Object>> savePluginSettings(
             @PathVariable("id") String pluginId,
             @org.springframework.web.bind.annotation.RequestBody Map<String, Object> values,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long projectId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        if (!isAdmin(sessionId)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("仅管理员可操作", "Administrator permission required")));
-        }
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("Sign in required"));
+        synchronized (pluginService) {
+        PluginService.PluginMetadata meta = pluginService.getPlugin(pluginId);
+        if (meta == null || meta.getSettings() == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("Plugin settings not found"));
         try {
-            contributionService.saveSettings(pluginId, values);
+            for (String key : values.keySet()) {
+                PluginService.PluginSettingDecl decl = meta.getSettings().stream().filter(d -> key.equals(d.getKey())).findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Undeclared setting"));
+                String scope = PluginContributionService.settingScope(decl);
+                if ("installation".equals(scope) && !isAdmin(sessionId)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("Administrator permission required"));
+                if ("project".equals(scope) && (projectId == null || !projectMemberService.hasWritePermission(projectId, userId))) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("No access to this project"));
+                }
+            }
+            contributionService.saveSettings(pluginId, values, userId, projectId);
             return ResponseEntity.ok(ok());
-        } catch (Exception e) {
-            return ResponseEntity.ok(error(e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(error(e.getMessage()));
+        }
         }
     }
 

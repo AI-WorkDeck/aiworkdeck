@@ -76,17 +76,17 @@ export const MOVABLE_PANELS = [
 const BY_KEY = new Map(MOVABLE_PANELS.map((p) => [p.key, p]))
 
 /** 这个 key 是不是可停靠面板（rail/tab 上要不要挂拖拽与右键菜单的判据）。 */
-export function isMovablePanel(key) {
-  return BY_KEY.has(key)
+export function isMovablePanel(key, panels = MOVABLE_PANELS) {
+  return panels.some(panel => panel.key === key)
 }
 
-export function getMovablePanel(key) {
-  return BY_KEY.get(key) || null
+export function getMovablePanel(key, panels = MOVABLE_PANELS) {
+  return panels.find(panel => panel.key === key) || null
 }
 
 /** 这个面板允不允许停到该位置（右键菜单只列允许的，拖拽只高亮允许的投放区）。 */
-export function isDockAllowed(key, dock) {
-  const p = BY_KEY.get(key)
+export function isDockAllowed(key, dock, panels = MOVABLE_PANELS) {
+  const p = getMovablePanel(key, panels)
   return !!p && p.allowedDocks.includes(dock)
 }
 
@@ -94,8 +94,8 @@ export function isDockAllowed(key, dock) {
  * 单个面板的生效停靠位：override 合法才用它，否则一律回落 defaultDock。
  * 「合法」= 该 key 确实是可停靠面板、值在 DOCKS 里、且在这个面板的 allowedDocks 里。
  */
-export function resolveDock(key, overrides) {
-  const p = BY_KEY.get(key)
+export function resolveDock(key, overrides, panels = MOVABLE_PANELS) {
+  const p = getMovablePanel(key, panels)
   if (!p) return null
   const want = overrides && overrides[key]
   if (want && DOCKS.includes(want) && p.allowedDocks.includes(want)) return want
@@ -106,10 +106,10 @@ export function resolveDock(key, overrides) {
  * 全量停靠分配：{ left: [panel...], right: [...], bottom: [...] }，各档内按注册表顺序。
  * 纯函数（本模块唯一的状态入口），单测就打这里。
  */
-export function resolveDocks(overrides) {
+export function resolveDocks(overrides, panels = MOVABLE_PANELS) {
   const out = { left: [], right: [], bottom: [] }
-  for (const p of MOVABLE_PANELS) {
-    out[resolveDock(p.key, overrides)].push(p)
+  for (const p of panels) {
+    out[resolveDock(p.key, overrides, panels)].push(p)
   }
   return out
 }
