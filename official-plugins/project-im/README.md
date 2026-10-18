@@ -14,7 +14,7 @@
 
 ## 构建与验证
 
-执行 `./official-plugins/project-im/build.sh`。测试复用前端安装的 jsdom（先按仓库指引安装 frontend 依赖），输出 `dist/project-im-0.1.0.zip`。构建从仓库 `sdk/plugin-sdk/awd-plugin-sdk.js` 直接放入 ZIP，避免维护过期 SDK 副本。
+执行 `./official-plugins/project-im/build.sh`。测试复用前端安装的 jsdom（先按仓库指引安装 frontend 依赖），输出 `dist/project-im-0.1.1.zip`。构建从仓库 `sdk/plugin-sdk/awd-plugin-sdk.js` 直接放入 ZIP，避免维护过期 SDK 副本。
 
 测试覆盖合成 DOM 流程与安全边界；跨账号真实联网、正式安装/启用/工作区及客户端发版须由集成验收单独确认。
 
