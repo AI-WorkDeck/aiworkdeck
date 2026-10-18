@@ -3094,6 +3094,10 @@ export default {
         insightEntities: payload => this.onInsightEntities(payload),
         insightHover: payload => this.openInsightHoverCard(payload),
         openBrowser: url => this.openBrowserTab(url),
+        openConversation: async conversation => {
+          if (!await this.resolveChatInterface()) return false
+          return this.loadHistoryChat(conversation)
+        },
         openAccount: () => this.openSettingsTab({ nav: 'account' }),
         importVoiceText: signal => new Promise(resolve => {
           this.handleFilePickerCancel()

@@ -554,4 +554,22 @@ class PluginHostImplTest {
         }
         invokeInject(ps, tool, pluginId);
     }
+    @Test
+    void nativeSessionsUseCurrentHostContextAndRejectUnboundThreads() {
+        PluginAgentSessionService sessions = mock(PluginAgentSessionService.class);
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<PluginAgentSessionService> provider =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(provider.getObject()).thenReturn(sessions);
+        factory.agentSessions = provider;
+        String key = "session-12345678-1234-1234-1234-123456789abc";
+        host.sessions().authorize();
+        host.sessions().ensure(key, "Assessment");
+        verify(sessions).authorize("dd", new ToolCall(PROJECT, "conv-1", USER, null));
+        verify(sessions).ensure("dd", new ToolCall(PROJECT, "conv-1", USER, null), key, "Assessment");
+        var handle = host.sessions();
+        factory.clear();
+        assertThrows(IllegalStateException.class, () -> handle.status(key));
+    }
+
 }
