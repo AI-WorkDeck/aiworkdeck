@@ -68,10 +68,12 @@ class DpiaWorkbenchToolsTest {
         assertEquals("/env/python", request.environment().get("DSH_DPIA_DOCUMENT_PYTHON"));
         assertFalse(request.environment().containsKey("DOCUMENT_PYTHON"));
         host.settings.put("nodePath", "/setting/node"); host.settings.put("pythonPath", "/setting/python");
-        host.settings.put("sofficePath", "/setting/office"); call("list", "{}");
+        host.settings.put("sofficePath", "/setting/office");
+        host.settings.put("pdfFontPath", "/setting/font.ttf"); call("list", "{}");
         assertEquals("/setting/node", request.command().getFirst());
         assertEquals("/setting/python", request.environment().get("DSH_DPIA_PYTHON"));
         assertEquals("/setting/office", request.environment().get("AWD_DPIA_SOFFICE"));
+        assertEquals("/setting/font.ttf", request.environment().get("DSH_DPIA_PDF_FONT"));
     }
     @Test void hostCallbacksUseFixedSkillAndKeepTheirArguments() throws Exception {
         behavior = (req, callback) -> {

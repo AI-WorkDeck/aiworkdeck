@@ -28,5 +28,10 @@
     "file": "src/components/PluginConnectionSettings.vue",
     "pattern": "url.username.length > 0",
     "reason": "这里检查 OAuth 授权 URL 不得包含 userinfo 凭据，URL.username 不是产品用户名，也不参与界面姓名显示。"
+  },
+  {
+    "file": "src/components/PluginPane.vue",
+    "pattern": "url.username || url.password",
+    "reason": "插件浏览器入口拒绝含 userinfo 凭据的 HTTPS 地址；URL.username 不属于产品账户姓名，也不用于界面显示。"
   }
 ]
