@@ -13,6 +13,7 @@
   "settings": [
     {"key":"nodePath","type":"string","label":"Node.js 可执行文件","description":"留空使用系统 PATH 中的 node；需要 Node.js 20 或更新版本。"},
     {"key":"pythonPath","type":"string","label":"Python 可执行文件","description":"需安装 runtime/requirements.txt 中的文档依赖；可填写独立虚拟环境中的 Python 路径。"},
+    {"key":"pdfFontPath","type":"string","label":"PDF 中文字体文件","description":"原生 PDF 模板填写中文需可嵌入的 TrueType 字体（TTF/TTC）；Linux 可安装文泉驿正黑。留空使用上游系统字体查找。"},
     {"key":"sofficePath","type":"string","label":"LibreOffice 可执行文件","description":"仅报告 PDF 与页面预览需要；留空尝试系统安装位置。"}
   ],
   "tools": [

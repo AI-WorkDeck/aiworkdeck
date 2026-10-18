@@ -10,7 +10,9 @@ AI WorkDeck 的可选独立插件，基于朱玲凤的
 需要包含插件会话 SPI 的 AI WorkDeck 0.65.0 或更新版本，以及 Node.js 20+、Python 3.9+。
 在独立 Python 虚拟环境执行 `pip install -r runtime/requirements.txt`，把该环境的 Python
 可执行文件填入插件设置。Word 转 PDF 和逐页预览还需安装 LibreOffice；插件设置可指定其
-`soffice` 路径。依赖未就绪会说明阻断；插件不暗中安装程序，不依赖开发者 Codex 目录。
+`soffice` 路径。原生 PDF 模板填写中文另需可嵌入且覆盖所填文字的 TrueType 字体，
+可在“PDF 中文字体文件”中指定 TTF/TTC；Linux 可安装文泉驿正黑（fonts-wqy-zenhei）。
+依赖未就绪会说明阻断；插件不暗中安装程序，不依赖开发者 Codex 目录。
 
 安装并启用后打开“DPIA 工作台”：新建评估→登记或导入材料→开始分析→核对结果与补答→
 按需复评→报告与版本。只有明确点击分析/报告生成才提交模型任务；专用 skill 将业务工具限制为本案任务与网页检索。执行过程可打开原生

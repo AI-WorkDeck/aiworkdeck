@@ -71,6 +71,8 @@ public final class DpiaWorkbenchTools implements HostAware {
         Map<String, String> childEnvironment = new HashMap<>();
         String python = setting("pythonPath", "AWD_DPIA_PYTHON", null);
         if (python != null) { childEnvironment.put("DSH_DPIA_PYTHON", python); childEnvironment.put("DSH_DPIA_DOCUMENT_PYTHON", python); }
+        String pdfFont = setting("pdfFontPath", "DSH_DPIA_PDF_FONT", null);
+        if (pdfFont != null) childEnvironment.put("DSH_DPIA_PDF_FONT", pdfFont);
         String soffice = setting("sofficePath", "AWD_DPIA_SOFFICE", null);
         if (soffice != null) childEnvironment.put("AWD_DPIA_SOFFICE", soffice);
         Request request = new Request(List.of(setting("nodePath", "AWD_DPIA_NODE", "node"),
