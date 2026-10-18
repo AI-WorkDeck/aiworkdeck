@@ -82,9 +82,12 @@ jobs:
           cache: maven
       - name: Build frontend
         working-directory: frontend
+        # PowerShell can hide a failed npm build when the next npm command succeeds.
+        shell: bash
         run: |
           npm ci || npm install
           npm run build:h5
+          test -s dist/build/h5/index.html
           # Epic #43: build the embedded LibreOffice editor bundle (dist/zetaoffice),
           # shipped via extraResources for the experimental "LibreOffice 验证" window.
           npm run build:zetaoffice

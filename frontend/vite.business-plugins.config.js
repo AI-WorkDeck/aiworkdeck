@@ -6,7 +6,9 @@ import { resolve } from 'node:path'
 import { readdir } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { baseCompile } from '@intlify/message-compiler'
-const root = resolve(__dirname)
+// Vite module IDs use forward slashes even when node:path resolves Windows paths.
+const normalizePath = path => path.replace(/\\/g, '/')
+const root = normalizePath(resolve(__dirname))
 const panels = { search: 'components/SearchPanel.vue', desensitize: 'components/DesensitizePane.vue', 'litigation-visual': 'components/LitigationVisualPanel.vue', insight: '../plugin-app/insight/Panel.vue', voice: '../plugin-app/voice/Panel.vue', calendar: '../plugin-app/calendar/Panel.vue', favorites: '../plugin-app/favorites/Panel.vue', clipboard: '../plugin-app/clipboard/Panel.vue' }
 const id = process.env.AWD_BUSINESS_PLUGIN
 if (!panels[id]) throw new Error('Unknown business plugin: ' + id)
@@ -31,12 +33,13 @@ export default defineConfig({
       return 'export default ' + compile(locales)
     },
     transform(code, file) {
+      file = normalizePath(file)
       if (!file.startsWith(root + '/') || !/\.(js|vue)(?:\?|$)/.test(file)) return
       return code.replace(/(['"])@\/([^'"\n]+)\1/g, (_match, quote, path) => {
         const voiceOverrides = { 'services/host.js': 'host.js', 'services/componentDownloads.js': 'componentDownloads.js', 'utils/meetingRecorder.js': 'meetingRecorder.js', 'utils/paidTranscribeGate.js': 'account.js', 'utils/requireAccount.js': 'account.js', 'utils/auth.js': 'account.js' }
         const target = id === 'insight' && path === 'services/contractReview.js' ? resolve(root, 'plugin-app/insight/api.js') : id === 'voice' && voiceOverrides[path] ? resolve(root, 'plugin-app/voice', voiceOverrides[path]) : /^services\/api(?:\.js)?$/.test(path) ? resolve(root, ['insight', 'voice', 'calendar', 'favorites', 'clipboard'].includes(id) ? 'plugin-app/' + id + '/api.js' : 'plugin-app/adapters/api.js')
           : /^i18n(?:\/index\.js)?$/.test(path) ? resolve(root, 'plugin-app/adapters/i18n.js') : resolve(root, 'src', path)
-        return quote + target + quote
+        return quote + normalizePath(target) + quote
       })
     },
     generateBundle(_options, bundle) {
