@@ -141,3 +141,24 @@ test('removed dynamic selection falls back without a project; unrelated selectio
   h.setTransport(async () => { throw new Error('offline') }); await h.vm.loadDynamicPlugins()
   assert.equal(h.vm.leftPaneKey, 'plugin-tencent-meeting')
 })
+
+const migratedPluginIds = ['search', 'voice', 'desensitize', 'litigation-visual', 'calendar', 'favorites', 'clipboard', 'insight']
+for (const [language, expected] of [
+  ['zh-CN', ['搜索', '语音', '文件脱敏', '诉讼可视化', '日程', '收藏夹', '剪贴板', '依据']],
+  ['en-US', ['Search', 'Voice', 'File Redaction', 'Litigation Visualization', 'Schedule', 'Favorites', 'Clipboard', 'References']],
+]) {
+  test(`migrated plugin navigation keeps its ${language} labels and preserves custom plugin names`, async () => {
+    const messages = Object.fromEntries(await Promise.all(['config', 'calendar', 'insight'].map(async namespace =>
+      [namespace, (await import(`../../src/locales/${language}/${namespace}.js`)).default])))
+    const h = harness(); await flush()
+    h.vm.$t = key => key.split('.').reduce((value, part) => value?.[part], messages) ?? key
+    h.setResponse([
+      ...migratedPluginIds.map(id => plugin(JSON.parse(readFileSync(new URL(`../../../official-plugins/${id}/manifest.json`, import.meta.url), 'utf8')))),
+      plugin({ id: 'custom-review', name: '客户自定义 Review' }),
+      plugin({ id: 'constructor', name: 'Custom Constructor' }),
+    ])
+    await h.vm.loadDynamicPlugins()
+    assert.deepEqual(h.vm.dynamicPlugins.map(p => p.label), [...expected, '客户自定义 Review', 'Custom Constructor'])
+    assert.deepEqual(h.vm.dynamicPlugins.map(p => p.pluginId), [...migratedPluginIds, 'custom-review', 'constructor'])
+  })
+}

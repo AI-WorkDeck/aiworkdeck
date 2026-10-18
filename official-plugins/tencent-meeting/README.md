@@ -31,7 +31,7 @@
 NODE_PATH="$PWD/frontend/node_modules" node --test official-plugins/tencent-meeting/tests/web-*.mjs
 ```
 
-输出 `dist/tencent-meeting-1.0.0.zip`，包含真实 JAR、Web 资源和独立技能。JAR 仅使用公开 PluginHost API，宿主依赖不打包进插件。发布使用官网现有 `publish-plugin.mts` 的受理、扫描、审核、签名流程；本构建脚本不会发布。
+输出 `dist/tencent-meeting-1.0.1.zip`，包含真实 JAR、Web 资源和独立技能。JAR 仅使用公开 PluginHost API，宿主依赖不打包进插件。发布使用官网现有 `publish-plugin.mts` 的受理、扫描、审核、签名流程；本构建脚本不会发布。
 
 ## English
 

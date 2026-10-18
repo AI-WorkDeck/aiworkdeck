@@ -43,6 +43,8 @@ export default {
   litLayoutComparison: 'Comparison Table',
   litLayoutFallback: 'Diagram',
   // Native pack status bar, see docs/NATIVE_PACK_DISTRIBUTION.md §5
+  litPackNotInstalled: 'Install the litigation visualization resource pack to create diagrams.',
+  litPackRevoked: 'The litigation visualization resource pack has been revoked. Contact support.',
   litPackDownloading: 'Downloading the litigation visualization resource pack…',
   litPackDownloadingProgress: 'Downloading the litigation visualization resource pack…{downloaded} / {total} MB',
   litPackFailedText: 'Resource pack download failed',
