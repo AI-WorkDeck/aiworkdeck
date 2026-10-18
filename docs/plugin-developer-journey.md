@@ -69,6 +69,8 @@ node scripts/plugin-dev.mjs install --endpoint http://127.0.0.1:PORT --project-i
 
 官网模板的 `dev/host-simulator.html` 仅供浏览器调试桥契约，返回模拟数据或 `host_required`。它不能证明文件权限、账户登录、MCP、付款、真实安装或审核通过。不要给 iframe 加 `allow-same-origin`、把平台密钥放进网页，或借放宽 CSP 修运行失败。
 
+有独立账号、订阅或 MCP 的插件，继续按 [服务验收](plugin-services-validation.md) 跑真实宿主流程。清单助手和模拟器通过，不能代替服务接入验收；先测断连、过期、付款未完成、账户切换和通道失败，再验证成功路径。
+
 ## 5. 开发者申请与维护
 
 正式入口为官网开发者中心：中国站 `/zh/plugins/developer`，国际站 `/en/plugins/developer`，由插件开发页和账户页导航。登录自己的官网账户，填写个人/机构类型、展示名、联系方式、开发用途与拟申请权限，再提交基本资料审核。初期开发者申请和基本资料审核不收费；已有插件定价、服务商订阅和平台模型计费按各自规则执行，不承诺全部插件或模型免费。

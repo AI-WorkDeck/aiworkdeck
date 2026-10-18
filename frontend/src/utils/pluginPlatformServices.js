@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { pluginPlatformRequest, getPluginSettings, savePluginSettings } from '@/services/api.js'
-import { openExternalUrl } from '@/utils/externalLink.js'
+import { openExternalUrlChecked } from '@/utils/externalLink.js'
 
 const handled = new Set(['settings.open', 'settings.get', 'settings.update', 'connections.list', 'connections.connect',
   'connections.disconnect', 'connections.request', 'billing.status', 'billing.checkout', 'mcp.servers', 'mcp.call'])
@@ -63,7 +63,7 @@ export function createPluginPlatformServices({ pluginId, projectId, permissions,
               success: answer => resolve(!!answer.confirm), fail: () => resolve(false)
             }))
             if (!confirmed || !current()) return fail('cancelled', 'Checkout cancelled')
-            openExternalUrl(url.href)
+            await openExternalUrlChecked(url.href)
             result = { opened: true }
           }
         }

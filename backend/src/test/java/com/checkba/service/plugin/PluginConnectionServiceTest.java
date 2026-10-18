@@ -40,6 +40,7 @@ class PluginConnectionServiceTest {
         contributes.setConnections(List.of(declaration));
         when(plugins.getPlugin("demo")).thenReturn(metadata); when(plugins.isEnabled("demo")).thenReturn(true);
         service = new TestService();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "localMode", true);
     }
 
     class TestService extends PluginConnectionService {

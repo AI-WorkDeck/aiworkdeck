@@ -12,6 +12,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.context.event.EventListener;
+import org.springframework.boot.web.context.WebServerInitializedEvent;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -29,21 +31,36 @@ public class PluginConnectionService {
     private final PluginService plugins;
     private final PluginCredentialStore credentials;
     private final AccountService account;
-    private final String redirectUri;
+    private volatile String redirectUri;
+    @Value("${security.local-mode:false}") private boolean localMode;
     private final Map<String, Pending> pending = new ConcurrentHashMap<>();
     private final Map<String, Long> generations = new ConcurrentHashMap<>();
     private final Map<String, Object> locks = new ConcurrentHashMap<>();
+    private final Map<String, Set<Call>> activeCalls = new ConcurrentHashMap<>();
+    // Separate from credential locks: invalidation must never wait for a token refresh's HTTP.
+    private final Object lifecycleLock = new Object();
+    private record CallScope(String scope, long generation) {}
+    private final ThreadLocal<CallScope> callScope = new ThreadLocal<>();
     private final OkHttpClient http = new OkHttpClient.Builder().dns(new PluginMcpEndpointPolicy())
             .proxy(Proxy.NO_PROXY).followRedirects(false).followSslRedirects(false)
             .connectTimeout(Duration.ofSeconds(10)).readTimeout(Duration.ofSeconds(30)).callTimeout(Duration.ofSeconds(45)).build();
     private final SecureRandom random = new SecureRandom();
 
     public PluginConnectionService(PluginService plugins, PluginCredentialStore credentials, AccountService account,
-            @Value("${ai.plugins.oauth-redirect-uri:http://localhost:9696/api/plugins/oauth/callback}") String redirectUri) {
+            @Value("${ai.plugins.oauth-redirect-uri:}") String redirectUri) {
         this.plugins = plugins;
         this.credentials = credentials;
         this.account = account;
-        this.redirectUri = redirectUri;
+        this.redirectUri = redirectUri == null ? "" : redirectUri;
+    }
+
+    @EventListener
+    public void onWebServerInitialized(WebServerInitializedEvent event) {
+        if (!redirectUri.isBlank() || event.getApplicationContext().getServerNamespace() != null) return;
+        localMode = event.getApplicationContext().getEnvironment().getProperty("security.local-mode", Boolean.class, false);
+        if (localMode) {
+            redirectUri = "http://127.0.0.1:" + event.getWebServer().getPort() + "/api/plugins/oauth/callback";
+        }
     }
 
     public record Operation(String path, String method) {}
@@ -51,7 +68,7 @@ public class PluginConnectionService {
             String tokenUrl, String clientId, List<String> scopes, Map<String, Operation> operations,
             String statusOperation, String checkoutUrl) {}
     private record Pending(String pluginId, Long userId, Connection connection, String scope,
-            String verifier, long generation, Instant expiresAt) {}
+            String verifier, String redirectUri, long generation, Instant expiresAt) {}
     public record Reply(int status, Map<String, Object> body) {}
 
     public List<Map<String, Object>> list(String pluginId, Long userId) {
@@ -62,7 +79,10 @@ public class PluginConnectionService {
             boolean reconnect = false;
             if (!connected) try {
                 String stored = credentials.get(scope(pluginId, userId, c.id()));
-                connected = !stored.isEmpty() && identity(c).equals(parse(stored).get("connection_identity"));
+                Map<String, Object> record = stored.isEmpty() ? Map.of() : parse(stored);
+                boolean expiredWithoutRefresh = expired(record) && string(record, "refresh_token", "").isBlank();
+                connected = !stored.isEmpty() && identity(c).equals(record.get("connection_identity"))
+                        && !Boolean.TRUE.equals(record.get("invalid")) && !expiredWithoutRefresh;
                 reconnect = !stored.isEmpty() && !connected;
             } catch (IllegalStateException e) { reconnect = true; }
             row.put("connected", connected);
@@ -81,8 +101,9 @@ public class PluginConnectionService {
             throw new IllegalArgumentException("Invalid service token");
         }
         String scope = scope(pluginId, userId, connectionId);
+        long revision = invalidate(scope);
         synchronized (lock(scope)) {
-            invalidate(scope);
+            assertCurrent(pluginId, userId, c, scope, revision);
             credentials.put(scope, json(Map.of("access_token", token.trim(), "connection_identity", identity(c))));
         }
     }
@@ -90,30 +111,51 @@ public class PluginConnectionService {
     public void disconnect(String pluginId, Long userId, String connectionId) {
         declaration(pluginId, connectionId);
         String scope = scope(pluginId, userId, connectionId);
-        synchronized (lock(scope)) { invalidate(scope); credentials.remove(scope); }
+        long revision = invalidate(scope);
+        synchronized (lock(scope)) { if (generation(scope) == revision) credentials.remove(scope); }
     }
 
-    private void invalidate(String scope) {
-        generations.merge(scope, 1L, Long::sum);
-        pending.entrySet().removeIf(e -> e.getValue().scope().equals(scope));
+    private long invalidate(String scope) {
+        long revision;
+        Set<Call> calls;
+        synchronized (lifecycleLock) {
+            revision = generations.merge(scope, 1L, Long::sum);
+            pending.entrySet().removeIf(e -> e.getValue().scope().equals(scope));
+            calls = activeCalls.remove(scope);
+        }
+        // The detached set cannot receive newer-generation calls. Cancel outside the short lock.
+        if (calls != null) calls.forEach(Call::cancel);
+        return revision;
     }
 
     public Map<String, Object> authorize(String pluginId, Long userId, String connectionId) {
         Connection c = declaration(pluginId, connectionId);
         if (!"oauth2".equals(c.authType())) throw new IllegalArgumentException("This connection does not use OAuth");
+        String callbackUri = redirectUri;
+        if (callbackUri.isBlank()) throw new IllegalStateException("Configure the OAuth callback HTTPS URL for this server");
+        URI callback = URI.create(callbackUri);
+        boolean loopback = localMode && "http".equals(callback.getScheme()) && Set.of("localhost", "127.0.0.1", "[::1]").contains(callback.getHost());
+        if ((!"https".equals(callback.getScheme()) && !loopback) || callback.getHost() == null || callback.getUserInfo() != null
+                || callback.getFragment() != null || callback.getQuery() != null || !"/api/plugins/oauth/callback".equals(callback.getPath())) {
+            throw new IllegalStateException("Invalid OAuth callback URL");
+        }
         pending.entrySet().removeIf(e -> e.getValue().expiresAt().isBefore(Instant.now()));
         if (pending.size() >= 100) throw new IllegalStateException("Too many pending connections");
         String scope = scope(pluginId, userId, connectionId);
+        long revision = invalidate(scope);
         synchronized (lock(scope)) {
-        invalidate(scope);
+        assertCurrent(pluginId, userId, c, scope, revision);
         String state = randomToken();
         String verifier = randomToken();
-        pending.put(state, new Pending(pluginId, userId, c, scope, verifier, generation(scope), Instant.now().plusSeconds(600)));
+        synchronized (lifecycleLock) {
+            assertCurrent(pluginId, userId, c, scope, revision);
+            pending.put(state, new Pending(pluginId, userId, c, scope, verifier, callbackUri, revision, Instant.now().plusSeconds(600)));
+        }
         String challenge;
         try { challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(MessageDigest.getInstance("SHA-256")
                 .digest(verifier.getBytes(StandardCharsets.US_ASCII))); }
         catch (Exception e) { throw new IllegalStateException(e); }
-        String query = form(Map.of("response_type", "code", "client_id", c.clientId(), "redirect_uri", redirectUri,
+        String query = form(Map.of("response_type", "code", "client_id", c.clientId(), "redirect_uri", callbackUri,
                 "scope", String.join(" ", c.scopes()), "state", state, "code_challenge", challenge, "code_challenge_method", "S256"));
         return Map.of("authorizationUrl", c.authorizationUrl() + (c.authorizationUrl().contains("?") ? "&" : "?") + query,
                 "expiresIn", 600);
@@ -127,8 +169,8 @@ public class PluginConnectionService {
             throw new IllegalArgumentException("Authorization expired; start again from the plugin settings");
         }
         assertCurrent(p.pluginId(), p.userId(), p.connection(), p.scope(), p.generation());
-        Reply reply = exchange(p.connection().tokenUrl(), "POST", "", form(Map.of("grant_type", "authorization_code",
-                "code", code, "client_id", p.connection().clientId(), "redirect_uri", redirectUri,
+        Reply reply = scopedExchange(p.scope(), p.generation(), p.connection().tokenUrl(), "POST", "", form(Map.of("grant_type", "authorization_code",
+                "code", code, "client_id", p.connection().clientId(), "redirect_uri", p.redirectUri(),
                 "code_verifier", p.verifier())), true);
         requireSuccess(reply);
         Map<String, Object> token = tokenRecord(reply.body());
@@ -152,12 +194,16 @@ public class PluginConnectionService {
         String raw = credentials.get(scope);
         if (raw.isEmpty()) throw new IllegalStateException("connection_required");
         Map<String, Object> record = parse(raw);
-        if (!identity(c).equals(record.get("connection_identity"))) throw new IllegalStateException("connection_required");
-        if (record.get("expires_at") instanceof Number n && n.longValue() <= Instant.now().getEpochSecond() + 30) {
+        if (!identity(c).equals(record.get("connection_identity")) || Boolean.TRUE.equals(record.get("invalid"))) throw new IllegalStateException("connection_required");
+        if (expired(record)) {
             String refresh = string(record, "refresh_token", "");
             if (refresh.isBlank() || !"oauth2".equals(c.authType())) throw new IllegalStateException("connection_required");
-            Reply reply = exchange(c.tokenUrl(), "POST", "", form(Map.of("grant_type", "refresh_token",
+            Reply reply = scopedExchange(scope, generation, c.tokenUrl(), "POST", "", form(Map.of("grant_type", "refresh_token",
                     "refresh_token", refresh, "client_id", c.clientId())), true);
+            if (reply.status() == 400 || reply.status() == 401 || reply.status() == 403) {
+                markReconnect(scope, generation);
+                throw new IllegalStateException("connection_required");
+            }
             requireSuccess(reply);
             Map<String, Object> next = tokenRecord(reply.body());
             next.putIfAbsent("refresh_token", refresh);
@@ -186,9 +232,14 @@ public class PluginConnectionService {
         // Resolve credentials in the captured account scope, never a newly selected account.
         String token = bearerToken(pluginId, userId, c, scope, generation);
         assertCurrent(pluginId, userId, c, scope, generation);
-        Reply reply = exchange(url, op.method(), token, body, false);
+        Reply reply = scopedExchange(scope, generation, url, op.method(), token, body, false);
         assertCurrent(pluginId, userId, c, scope, generation);
+        if (reply.status() == 401 || reply.status() == 403) markReconnect(scope, generation);
         requireSuccess(reply);
+        Map<String, Object> stored = parseOrEmpty(credentials.get(scope));
+        if (containsSecret(reply.body(), token) || containsSecret(reply.body(), string(stored, "refresh_token", ""))) {
+            throw new IllegalStateException("Service returned credential data; response withheld");
+        }
         return reply.body();
     }
 
@@ -209,6 +260,24 @@ public class PluginConnectionService {
     private void assertCurrent(String pluginId, Long userId, Connection c, String scope, long generation) {
         if (!c.equals(declaration(pluginId, c.id())) || !scope.equals(scope(pluginId, userId, c.id()))
                 || generation != generation(scope)) throw new IllegalStateException("Connection changed; response discarded");
+    }
+    private static boolean expired(Map<String, Object> record) {
+        return record.get("expires_at") instanceof Number n && n.longValue() <= Instant.now().getEpochSecond() + 30;
+    }
+    private void markReconnect(String scope, long expectedGeneration) {
+        synchronized (lock(scope)) {
+            if (generation(scope) != expectedGeneration) return;
+            Map<String, Object> record = parseOrEmpty(credentials.get(scope));
+            if (!record.isEmpty()) { record.put("invalid", true); credentials.put(scope, json(record)); }
+        }
+    }
+    private static Map<String, Object> parseOrEmpty(String value) { return value.isEmpty() ? new LinkedHashMap<>() : parse(value); }
+    private static boolean containsSecret(Object value, String secret) {
+        if (secret.isEmpty()) return false;
+        if (value instanceof String s) return s.contains(secret);
+        if (value instanceof Map<?, ?> map) return map.entrySet().stream().anyMatch(e -> containsSecret(e.getKey(), secret) || containsSecret(e.getValue(), secret));
+        if (value instanceof Collection<?> list) return list.stream().anyMatch(item -> containsSecret(item, secret));
+        return false;
     }
     private long generation(String scope) { return generations.getOrDefault(scope, 0L); }
     private String scope(String pluginId, Long userId, String connectionId) {
@@ -294,6 +363,13 @@ public class PluginConnectionService {
         catch (Exception e) { throw new IllegalArgumentException("Service destination is not a public HTTPS endpoint"); }
     }
 
+    private Reply scopedExchange(String scope, long revision, String url, String method, String bearer, String body, boolean form) {
+        CallScope previous = callScope.get();
+        callScope.set(new CallScope(scope, revision));
+        try { return exchange(url, method, bearer, body, form); }
+        finally { if (previous == null) callScope.remove(); else callScope.set(previous); }
+    }
+
     /** DNS is checked at connection time. Redirects and JVM proxies cannot bypass the destination boundary. */
     protected Reply exchange(String url, String method, String bearer, String body, boolean form) {
         validateTarget(url);
@@ -303,13 +379,23 @@ public class PluginConnectionService {
             if ("GET".equals(method)) builder.get();
             else builder.post(RequestBody.create(body.getBytes(StandardCharsets.UTF_8), MediaType.get(
                     form ? "application/x-www-form-urlencoded" : "application/json")));
-            try (Response response = http.newCall(builder.build()).execute()) {
+            Call call = http.newCall(builder.build());
+            CallScope captured = callScope.get();
+            Set<Call> calls = null;
+            if (captured != null) synchronized (lifecycleLock) {
+                if (generation(captured.scope()) != captured.generation()) call.cancel();
+                else {
+                    calls = activeCalls.computeIfAbsent(captured.scope(), ignored -> ConcurrentHashMap.newKeySet());
+                    calls.add(call);
+                }
+            }
+            try (Response response = call.execute()) {
                 if (!response.isSuccessful()) return new Reply(response.code(), Map.of());
                 if (response.body() == null) return new Reply(response.code(), Map.of());
                 byte[] bytes = response.body().byteStream().readNBytes(2 * 1024 * 1024 + 1);
                 if (bytes.length > 2 * 1024 * 1024) throw new IllegalStateException("Service response exceeds 2 MB");
                 return new Reply(response.code(), bytes.length == 0 ? Map.of() : JSON.readValue(bytes, MAP));
-            }
+            } finally { if (calls != null) calls.remove(call); }
         } catch (Exception e) { throw new IllegalStateException("Service request failed", e); }
     }
 
