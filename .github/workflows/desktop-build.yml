@@ -516,7 +516,12 @@ jobs:
           # 未设 AZURE_SIGNING_*（普通 PR / fork PR）时钩子跳过，产物未签名。
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npx electron-builder --publish never
+      - name: Regress NSIS known-folder path copy
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./desktop/scripts/test-nsis-known-folder.ps1
       - name: Smoke test installed Windows file associations
+        id: file-associations
         if: runner.os == 'Windows'
         timeout-minutes: 16
         shell: pwsh
@@ -524,6 +529,14 @@ jobs:
           $installers = @(Get-ChildItem 'desktop/release/*.exe')
           if ($installers.Count -ne 1) { throw "Expected one NSIS installer, found $($installers.Count)" }
           & ./desktop/scripts/test-file-associations.ps1 -InstallerPath $installers[0].FullName
+      - name: Preserve failed Windows installer for diagnosis
+        if: failure() && runner.os == 'Windows' && steps.file-associations.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-windows-installer-${{ github.run_attempt }}
+          path: desktop/release/*.exe
+          retention-days: 1
+          if-no-files-found: error
       - name: Verify Windows signatures
         # 对安装器、解包后的 x64 应用 exe、ARM64 壳 exe 做 signtool verify /pa；
         # 还要求带时间戳，否则证书到期（Artifact Signing 证书只有几天有效期）后签名即失效。

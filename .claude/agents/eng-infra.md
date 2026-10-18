@@ -576,3 +576,9 @@ frontend build:h5前置build:plugins，8个独立Uni/Vite包输出official-plugi
 ### 原生组件失败后的立即重试（dev-board#1260）
 
 `NativePackService.installAsync` 的占用表按每次任务的 `PackStatus` 对象区分。`failed` 对用户可见后即可接受重试；旧任务的 catch 只改自身状态，finally 条件删除自身占用，不能覆盖或释放新任务。失败详情先写、failed 最后发布。不要退回按 packId 的 Set 去重，也不要通过延长轮询或 sleep 掩盖窗口。`NativePackServiceTest.immediateRetryAfterFailureKeepsNewAttemptInFlight` 用 latch 固定这个窗口，并验证运行中与排队中的去重、旧收尾隔离及最终真实安装文件。
+
+### Windows 插件构建与 NSIS 首装门（dev-board#1354/#1355）
+
+`vite.business-plugins.config.js` 必须统一 root、传入模块 ID 和生成的导入目标路径分隔符；Windows 路径不能直接与 POSIX 前缀比较。Desktop Build 的前端步骤明确用 Bash，`build:h5` 后校验非空 `dist/build/h5/index.html`，避免 PowerShell 将前一步失败掩盖为后续编辑器构建成功。随包插件的 Vue scope/chunk hash 受构建绝对路径影响，跨平台校验以源码、结构和运行行为为准。
+
+`desktop/scripts/patch-nsis-known-folder.js` 在 postinstall 精确回移 electron-builder PR#9769，修复 24.13.3 首装路径查询后的固定长度越界读取；未知模板结构必须失败，不能跳过。来源见 `desktop/scripts/UPSTREAM.md`。打包后 Windows 跑 `test-nsis-known-folder.ps1`：旧读法在保护页负例中应以 0xC0000005 退出，实际修复块和真实 KnownFolder 查询应成功。随后仍执行真实安装→重装→卸载关联测试；失败保留安装器一天，并记录 SHA256 与 Windows Application 崩溃事件。首轮失败未取得 fault module/dump，不把相同退出码当成已证明同一根因。
