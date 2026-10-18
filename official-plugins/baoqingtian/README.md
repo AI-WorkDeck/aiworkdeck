@@ -25,7 +25,7 @@ AI WorkDeck 的独立 Marketplace 插件。先打开一个项目，在插件中�
 NODE_PATH=frontend/node_modules node --test official-plugins/baoqingtian/tests/web-*.mjs
 ```
 
-构建产物在 `dist/baoqingtian-1.0.0.zip`。必须经过官网受理、扫描、审核与签名流程才可上架。构建成功不代表已上架；合成接口测试不代表真实账号业务联调通过。
+构建产物在 `dist/baoqingtian-1.0.1.zip`。必须经过官网受理、扫描、审核与签名流程才可上架。构建成功不代表已上架；合成接口测试不代表真实账号业务联调通过。
 
 ## Sources and scope
 
