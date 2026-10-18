@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -32,12 +33,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -461,6 +465,88 @@ class NativePackServiceTest {
         svc.installAsync(PACK_ID);
         while (System.currentTimeMillis() < d2 && !svc.isReady(PACK_ID)) Thread.sleep(20);
         assertTrue(svc.isReady(PACK_ID));
+    }
+
+    @Test
+    @DisplayName("失败一经可见即可重试；旧任务收尾不覆盖新状态或释放新任务占用")
+    void immediateRetryAfterFailureKeepsNewAttemptInFlight() throws Exception {
+        byte[] archive = tarGzWithContents(Map.of("cli.py", "retry-ok".getBytes(StandardCharsets.UTF_8)));
+        publish(primary, archive, "litviz", List.of("*"), true);
+        CountDownLatch firstEntered = new CountDownLatch(1);
+        CountDownLatch failFirst = new CountDownLatch(1);
+        CountDownLatch failurePublished = new CountDownLatch(1);
+        CountDownLatch finishFirst = new CountDownLatch(1);
+        CountDownLatch retryEntered = new CountDownLatch(1);
+        CountDownLatch finishRetry = new CountDownLatch(1);
+        AtomicInteger attempts = new AtomicInteger();
+        TestPackService svc = new TestPackService(props(primary.baseUrl()), publicKeyPem, "0.21.0") {
+            @Override
+            public String install(String packId) {
+                int attempt = attempts.incrementAndGet();
+                if (attempt == 1) {
+                    firstEntered.countDown();
+                    awaitGate(failFirst);
+                    injectedError = new OutOfMemoryError("controlled first attempt failure");
+                    try {
+                        return super.install(packId);
+                    } catch (Error failure) {
+                        // 真正 install() 已发布 failed，但异步包装层尚未进入 catch/finally。
+                        injectedError = null;
+                        failurePublished.countDown();
+                        awaitGate(finishFirst);
+                        throw failure;
+                    }
+                }
+                retryEntered.countDown();
+                awaitGate(finishRetry);
+                return super.install(packId);
+            }
+        };
+        ExecutorService installer = (ExecutorService) ReflectionTestUtils.getField(svc, "installer");
+        try {
+            svc.installAsync(PACK_ID);
+            assertTrue(firstEntered.await(10, TimeUnit.SECONDS));
+            NativePackService.PackStatus first = svc.status(PACK_ID);
+            svc.installAsync(PACK_ID);
+            assertSame(first, svc.status(PACK_ID), "运行中的重复请求不能重置状态");
+
+            failFirst.countDown();
+            assertTrue(failurePublished.await(10, TimeUnit.SECONDS));
+            assertEquals(NativePackService.STATE_FAILED, svc.status(PACK_ID).getState());
+            svc.installAsync(PACK_ID);
+            NativePackService.PackStatus retry = svc.status(PACK_ID);
+            assertEquals(NativePackService.STATE_DOWNLOADING, retry.getState(), "failed 可见后立即重试必须受理");
+            svc.installAsync(PACK_ID);
+            assertSame(retry, svc.status(PACK_ID), "排队中的重试同样要去重");
+
+            finishFirst.countDown();
+            assertTrue(retryEntered.await(10, TimeUnit.SECONDS));
+            assertEquals(NativePackService.STATE_DOWNLOADING, retry.getState(), "旧 catch 不能把新任务改回 failed");
+            assertEquals(null, retry.getError());
+            svc.installAsync(PACK_ID);
+            assertSame(retry, svc.status(PACK_ID), "旧 finally 不能释放新任务的占用");
+            finishRetry.countDown();
+            // 执行器屏障等待所有已受理任务完成，既不赌 sleep，也能抓到多排的一次重复安装。
+            installer.submit(() -> {}).get(10, TimeUnit.SECONDS);
+            assertEquals(2, attempts.get());
+            assertEquals(NativePackService.STATE_READY, svc.status(PACK_ID).getState());
+            assertEquals("retry-ok", Files.readString(svc.componentDir(PACK_ID, "litviz").orElseThrow().resolve("cli.py")));
+        } finally {
+            failFirst.countDown();
+            finishFirst.countDown();
+            finishRetry.countDown();
+            svc.shutdown();
+            assertTrue(installer.awaitTermination(10, TimeUnit.SECONDS), "测试安装线程必须退出");
+        }
+    }
+
+    private static void awaitGate(CountDownLatch gate) {
+        try {
+            assertTrue(gate.await(10, TimeUnit.SECONDS), "安装同步点未被释放");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("安装同步点被中断", e);
+        }
     }
 
     @Test
