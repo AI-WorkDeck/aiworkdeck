@@ -19,7 +19,17 @@ const page = await browser.newPage()
 const errors = []
 page.on('pageerror', e => errors.push(e.message))
 const switchSelector = '.decision-assist-switch'
+const summarySelector = '.decision-assist-summary'
 const state = () => page.$eval(switchSelector, el => el.getAttribute('aria-checked'))
+const expanded = () => page.$eval('.decision-assist', el => el.open)
+const switchVisible = () => page.$eval(switchSelector, el => el.checkVisibility())
+const expandControl = async () => {
+  const before = await state()
+  if (!await expanded()) await page.click(summarySelector)
+  assert.equal(await expanded(), true)
+  assert.equal(await switchVisible(), true)
+  assert.equal(await state(), before, 'expanding the explanation must not change consent')
+}
 const open = async (query = '') => {
   await page.goto(`http://127.0.0.1:5197/${query}`)
   await page.waitForFunction(() => window.ready)
@@ -34,10 +44,35 @@ try {
   await page.setViewport({ width: 350, height: 860 })
   await open()
   assert.equal(await state(), 'false')
-  assert.match(await page.$eval('.decision-assist-state', el => el.textContent), /已关闭/)
+  assert.equal(await expanded(), false, 'Jev explanation is collapsed by default')
+  assert.equal(await switchVisible(), false, 'the opt-in switch is hidden until expanded')
+  assert.match(await page.$eval(summarySelector, el => el.textContent), /了解并使用 Jev.*已关闭/)
   assert.equal((await submit('默认关闭的合成问题')).decisionAssistEnabled, false)
+  await expandControl()
+  await page.click(summarySelector)
+  assert.equal(await expanded(), false)
+  assert.equal(await state(), 'false', 'collapsing the explanation must not enable consent')
+  await expandControl()
   await page.click(switchSelector)
   assert.equal(await state(), 'true')
+  await page.click(summarySelector)
+  assert.equal(await expanded(), false)
+  assert.equal(await switchVisible(), false)
+  assert.equal(await state(), 'true', 'collapsing the explanation must not disable consent')
+  assert.equal(await page.$eval('.decision-assist-summary-state', el => el.checkVisibility()), true)
+  assert.match(await page.$eval('.decision-assist-summary-state', el => el.textContent), /已开启/)
+  for (const key of ['Enter', 'Space']) {
+    await page.focus(summarySelector)
+    await page.keyboard.press(key)
+    assert.equal(await expanded(), true, `${key} expands the native disclosure`)
+    assert.equal(await switchVisible(), true)
+    assert.equal(await state(), 'true')
+    await page.keyboard.press(key)
+    assert.equal(await expanded(), false, `${key} collapses the native disclosure`)
+    assert.equal(await switchVisible(), false)
+    assert.equal(await state(), 'true', `${key} disclosure activation preserves consent`)
+  }
+  await expandControl()
   assert.match(await page.$eval('.decision-assist-hint', el => el.textContent), /费用.*稍慢/)
   assert.equal(await page.$eval('.decision-assist-details', el => el.open), false)
   await page.click('.decision-assist-details > summary')
@@ -57,6 +92,15 @@ try {
   }
   // Regeneration must carry the current setting through its rollback request.
   await open()
+  await submit('重新生成的合成问题')
+  // A real submission records its context snapshot; historical fixture rows do not.
+  // Finish the synthetic reply because this fixture does not emit SSE bubble_end.
+  await page.evaluate(() => {
+    const reply = window.chatState.bubbles.filter(b => b.role === 'ASSISTANT').at(-1)
+    reply.content = '<final>合成回答。</final>'
+    reply.isStreaming = false
+    window.chatState.isStreaming = false
+  })
   await page.click('.message-row.assistant:last-child .msg-regen-btn')
   await page.waitForSelector('[data-rollback-confirm]')
   const beforeRegenerate = await page.evaluate(() => window.chatPosts.length)
@@ -66,15 +110,20 @@ try {
   // Persist and restore only the signed-in user's choice.
   await open()
   assert.equal(await state(), 'true')
+  assert.equal(await expanded(), false, 'persisted opt-in does not automatically expand the explanation')
+  assert.match(await page.$eval('.decision-assist-summary-state', el => el.textContent), /已开启/)
   await page.evaluate(() => { uni.setStorageSync('checkba_user', { id: 1002 }); window.dispatchEvent(new Event('focus')) })
   assert.equal(await state(), 'false')
   assert.equal((await submit('另一用户的合成问题')).decisionAssistEnabled, false)
   await page.evaluate(() => { uni.setStorageSync('checkba_user', { id: 1001 }); window.dispatchEvent(new Event('focus')) })
   assert.equal(await state(), 'true')
-  // The switch remains visible below the empty conversation's composer.
+  // Empty conversations expose the summary below the composer; the switch needs expansion.
   await page.evaluate(() => window.chat.loadMessages('synthetic-empty', []))
-  assert.ok(await page.$eval(switchSelector, el => el.offsetWidth > 0))
+  assert.equal(await expanded(), false)
+  assert.equal(await switchVisible(), false)
+  assert.equal(await page.$eval(summarySelector, el => el.checkVisibility()), true)
   assert.ok(await page.$eval('.decision-assist', el => el.getBoundingClientRect().top >= document.querySelector('.chat-input-rich').getBoundingClientRect().bottom))
+  await expandControl()
   // Freeze the user's setting before awaiting the active-document flush.
   await page.evaluate(() => {
     window.chatFixtureProps.activeTab = { id: 13, name: '合成材料.docx', fileType: 'docx' }
@@ -113,6 +162,8 @@ try {
   // Narrow English and Chinese controls must remain visible without horizontal overflow.
   for (const lang of ['zh-CN', 'en-US']) {
     await open(`?lang=${lang}`)
+    assert.equal(await expanded(), false)
+    await expandControl()
     for (const width of [320, 350, 420]) {
       await page.setViewport({ width, height: 860 })
       assert.ok(await page.$eval('.decision-assist', el => el.scrollWidth <= el.clientWidth + 1), `${lang} at ${width}px`)
@@ -130,6 +181,7 @@ try {
   await page.evaluate(() => uni.removeStorageSync('checkba_user'))
   await open('?localUser=1003')
   assert.equal(await state(), 'false')
+  await expandControl()
   await page.click(switchSelector)
   assert.equal(await state(), 'true', 'the switch must visibly flip in local-mode')
   await page.waitForFunction(() => Object.entries(window.fixtureStorage).some(([k, v]) => k.startsWith('awd_decision_assist:') && k.endsWith(':1003') && v === true))
@@ -142,11 +194,12 @@ try {
   await page.evaluate(() => uni.setStorageSync('checkba_user', { id: 1001 }))
   await open('?provider=local')
   await page.waitForFunction(() => window.chatState.isLocalOnlyProvider)
-  assert.match(await page.$eval('.decision-assist-hint', el => el.textContent), /本地模型.*不向 Jev/)
+  await expandControl()
+  assert.match(await page.$eval('.decision-assist-hint', el => el.textContent), /本地模型.*不外发内容/)
   await page.click(switchSelector)
-  assert.match(await page.$eval('.decision-assist-hint', el => el.textContent), /本地模型.*不向 Jev/)
+  assert.match(await page.$eval('.decision-assist-hint', el => el.textContent), /本地模型.*不外发内容/)
   assert.deepEqual(errors, [])
-  console.log('PASS: visible on/off state, keyboard, per-user persistence, POST opt-in, queue/steer, frozen consent and identity changes, bilingual narrow layout')
+  console.log('PASS: default collapse, consent-preserving mouse/keyboard disclosure, visible collapsed opt-in state, switch keyboard, per-user persistence, POST opt-in, queue/steer, frozen consent and identity changes, bilingual narrow layout')
 } finally {
   await browser.close()
   await server.close()

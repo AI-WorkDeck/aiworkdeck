@@ -5,6 +5,7 @@ export default {
   earlierFiles: '早期会话文件',
   fileCreated: '已新增',
   fileModified: '已修改',
+  decisionAssistEntry: '了解并使用 Jev',
   decisionAssistLabel: '智能决策辅助（实验性）',
   decisionAssistOn: '已开启',
   decisionAssistOff: '已关闭',

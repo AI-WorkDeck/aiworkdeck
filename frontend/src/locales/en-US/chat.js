@@ -5,6 +5,7 @@ export default {
   earlierFiles: 'Earlier conversation files',
   fileCreated: 'Created',
   fileModified: 'Modified',
+  decisionAssistEntry: 'About Jev & settings',
   decisionAssistLabel: 'Decision assistance (experimental)',
   decisionAssistOn: 'On',
   decisionAssistOff: 'Off',
