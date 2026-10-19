@@ -17,6 +17,12 @@ import { isDocxDoc, runDocxComparison } from '@/utils/docxComparison.js'
 // 必须与后端 TextFileEditTools.PLAIN_TEXT_TYPES 完全一致，改这里要同步改那边。
 const PLAIN_TEXT_TYPES = ['txt', 'md', 'markdown', 'json', 'js', 'mjs', 'css', 'html', 'htm', 'yml', 'yaml']
 
+function isImagePreview(item) {
+  return item && !item.isFolder && !item.tabType
+    && /^(png|jpe?g|gif|webp|bmp|svg|ico|avif)$/i.test(item.fileType || item.name?.split('.').pop() || '')
+}
+
+
 // 取鼠标事件的键位。uni-app H5 会把 <view> 上的原生事件重新包装成普通对象
 // （uni-h5 的 createNativeEvent），只给 click / mouse 系 / touch / keyboard 几类补字段，
 // 补的也只是坐标，`button` 一类都没有；`auxclick` 连"补字段"这一步都不走，
@@ -39,7 +45,52 @@ function tabDomId(pane, fileId) {
 export const fileOpenTabsMethods = {
     handleFileTreeSelect(file) {
       if (!file || file.isFolder) return
+      if (this.quickLookFile) { this.quickLookFile = file; return }
+      if (isImagePreview(file)) { this.handleFileTreeNavigate(file); return }
       this.openFile(file)
+    },
+
+    handleFileTreeOpen(file) {
+      if (!file || file.isFolder) return
+      this.closeQuickLook()
+      this.openFile(file)
+    },
+    toggleQuickLook(file) {
+      if (this.quickLookFile) this.closeQuickLook()
+      else if (file && !file.isFolder) this.quickLookFile = file
+    },
+    closeQuickLook() {
+      this.quickLookFile = null
+      this.$nextTick(() => this.$refs.fileTree?.focusTree())
+    },
+    navigateQuickLook(direction) {
+      const tree = this.$refs.fileTree
+      const files = (tree?.displayFiles || []).filter(file => !file.isFolder)
+      const index = files.findIndex(file => String(file.id) === String(this.quickLookFile?.id))
+      if (!files.length) return
+      const next = Math.max(0, Math.min(files.length - 1, index + direction))
+      tree.selectKeyboardItem(files[next])
+    },
+    handleFileTreeNavigate(file) {
+      if (this.quickLookFile) {
+        if (file?.isFolder) this.closeQuickLook()
+        else this.quickLookFile = file
+        return
+      }
+      // Only an ordinary image preview may follow selection. Never replace an editor,
+      // special tab, or another pane; arrow navigation does not create a tab trail.
+      const pane = this.splitMode ? this.focusedPane : 'left'
+      const list = pane === 'right' ? this.rightFiles : this.leftFiles
+      const idProp = pane === 'right' ? 'activeFileIdRight' : 'activeFileIdLeft'
+      const index = list.findIndex(tab => String(tab.id) === String(this[idProp]))
+      const current = list[index]
+      if (!isImagePreview(file) || !isImagePreview(current) || current.dirty || current.isDirty || current.saving) return
+      const existing = list.find(tab => !tab.tabType && String(tab.id) === String(file.id))
+      if (existing) this[idProp] = existing.id
+      else { list.splice(index, 1, { ...file }); this[idProp] = file.id }
+      const mode = this.leftPaneKey || 'files'
+      this.lastActiveIdsByMode[pane][mode] = this[idProp]
+      this.saveActiveIdsByMode()
     },
 
     // Handle file open from SearchPanel
@@ -499,7 +550,7 @@ export const fileOpenTabsMethods = {
 
       // PDF must reach FilePreview even when FileTree supplies a legacy wpsFileId.
       // Writer otherwise imports its binary bytes as text (dev-board#1178).
-      if (type === 'pdf') return false
+      if (type === 'pdf' || ['zip', 'rar', '7z'].includes(type)) return false
 
       // 1. Force native preview for media types (Images, Video, Audio)
       const mediaTypes = [

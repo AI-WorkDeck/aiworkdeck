@@ -83,3 +83,63 @@ test('ordinary documents stay visible throughout sidebar workflows', () => {
     assert.equal(isTabVisible.call({ leftPaneKey, isMovablePanel: () => false }, { id: 1, fileType: 'docx' }), true)
   }
 })
+
+test('image keyboard browsing replaces the current preview without accumulating tabs', () => {
+  const vm = workspace()
+  vm.openFile({ id: 1, name: 'one.jpg' })
+  vm.handleFileTreeNavigate({ id: 2, name: 'two.PNG' })
+  vm.handleFileTreeNavigate({ id: 3, name: 'three.jpg' })
+  assert.deepEqual(vm.leftFiles.map(file => file.id), [3])
+  assert.equal(vm.activeFileIdLeft, 3)
+  vm.leftFiles.push({ id: 4, name: 'four.jpg' })
+  vm.handleFileTreeNavigate({ id: '4', name: 'four.jpg' })
+  assert.equal(vm.leftFiles.length, 2)
+  assert.equal(vm.activeFileIdLeft, 4)
+})
+
+test('arrows never replace unrelated editors, special tabs, or dirty previews', () => {
+  for (const current of [{ id: 1, name: 'edit.docx' }, { id: 1, name: 'edit.md' },
+    { id: 1, name: 'special.jpg', tabType: 'browser' }, { id: 1, name: 'dirty.jpg', isDirty: true }]) {
+    const vm = workspace(); vm.leftFiles = [current]; vm.activeFileIdLeft = 1
+    vm.handleFileTreeNavigate({ id: 2, name: 'photo.jpg' })
+    assert.equal(vm.leftFiles[0], current)
+    assert.equal(vm.activeFileIdLeft, 1)
+  }
+  const vm = workspace(); vm.leftFiles = [{ id: 1, name: 'left.jpg' }]; vm.activeFileIdLeft = 1
+  vm.rightFiles = [{ id: 2, name: 'right.docx' }]; vm.activeFileIdRight = 2
+  vm.splitMode = true; vm.focusedPane = 'right'
+  vm.handleFileTreeNavigate({ id: 3, name: 'third.jpg' })
+  assert.equal(vm.activeFileIdLeft, 1); assert.equal(vm.activeFileIdRight, 2)
+})
+
+test('Quick Look follows tree navigation without opening tabs; double click opens the selected file', () => {
+  const vm = workspace(); let focused = 0
+  vm.$refs.fileTree = { focusTree() { focused++ } }
+  vm.toggleQuickLook({ id: 1, name: 'a.jpg' })
+  vm.handleFileTreeNavigate({ id: 2, name: 'b.jpg' })
+  vm.handleFileTreeSelect({ id: 3, name: 'c.jpg' })
+  assert.equal(vm.quickLookFile.id, 3)
+  assert.equal(vm.leftFiles.length, 0)
+  vm.handleFileTreeOpen(vm.quickLookFile)
+  assert.equal(vm.quickLookFile, null); assert.equal(vm.activeFileIdLeft, 3)
+  assert.equal(focused, 1)
+})
+
+test('single image click selects without creating a tab; other files retain single-click opening', () => {
+  const vm = workspace()
+  vm.handleFileTreeSelect({ id: 1, name: 'one.jpg' })
+  assert.equal(vm.leftFiles.length, 0)
+  vm.handleFileTreeOpen({ id: 1, name: 'one.jpg' })
+  assert.equal(vm.leftFiles.length, 1)
+  vm.handleFileTreeSelect({ id: 2, name: 'two.jpg' })
+  assert.equal(vm.leftFiles.length, 1); assert.equal(vm.activeFileIdLeft, 2)
+  vm.handleFileTreeSelect({ id: 3, name: 'draft.docx' })
+  assert.equal(vm.leftFiles.length, 2); assert.equal(vm.activeFileIdLeft, 3)
+})
+
+
+test('archives always reach their preview even when project records have a wpsFileId', () => {
+  for (const fileType of ['zip', 'rar', '7z', 'ZIP']) {
+    assert.equal(methods.isEditorOpenableFile({ fileType, wpsFileId: 'project_1_doc_archive' }), false)
+  }
+})

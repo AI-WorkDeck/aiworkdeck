@@ -205,6 +205,7 @@ export default {
   name: 'MediaPlayer',
   components: { MediaControls, MediaTranscript },
   props: {
+    sourceUrl: { type: String, default: '' },
     kind: { type: String, default: 'video' }, // 'video' | 'audio'
     // 需要 id / wpsFileId / name / fileType / projectId
     file: { type: Object, default: null },
@@ -430,7 +431,7 @@ export default {
       this._fellBack = false
       this._autoplayed = false
       // 直链流式播放（#1025）：媒体元素设不了请求头，鉴权走 ?token=
-      this._streamUrl = buildStreamUrl(getFileBytesUrl(f.id), getSessionId())
+      this._streamUrl = this.sourceUrl || buildStreamUrl(getFileBytesUrl(f.id), getSessionId())
       el.src = this._streamUrl
     },
     teardownMedia() {
@@ -598,7 +599,7 @@ export default {
     loadBlob() {
       const f = this.file
       if (!f) return
-      const url = getFileBytesUrl(f.id)
+      const url = this.sourceUrl || getFileBytesUrl(f.id)
       const reqId = (this._mediaReqId = (this._mediaReqId || 0) + 1)
       this.loading = true
       const headers = getAuthHeaders() || {}

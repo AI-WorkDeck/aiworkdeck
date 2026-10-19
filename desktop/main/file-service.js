@@ -3,6 +3,10 @@
 const { ipcMain, dialog, shell, BrowserWindow, ShareMenu, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { createHash } = require('crypto');
+const ARCHIVE_ENTRY_MAX_BYTES = 128 * 1024 * 1024;
+const ARCHIVE_CACHE_MAX_BYTES = 1024 * 1024 * 1024;
 const { execFile, spawn } = require('child_process');
 
 /**
@@ -15,6 +19,14 @@ const { execFile, spawn } = require('child_process');
 function initLocalFileService() {
     console.log('[LocalFileService] Initializing...');
     require('./dropped-files').initDroppedFileService(ipcMain);
+    const archiveCache = createArchiveEntryCache();
+    // Receiving apps may read the dragged path after DOM dragend or window closure.
+    // Keep our copies until process exit; only remove directories created by this cache.
+    process.once('exit', () => archiveCache.clear());
+    ipcMain.handle('fs:cacheArchiveEntry', (event, payload) => {
+        if (event.senderFrame !== event.sender.mainFrame) return { ok: false, reason: 'not-main-frame' };
+        return archiveCache.cache(payload);
+    });
 
     // Handler: Open File Dialog（仅弹系统选择框，安全）
     ipcMain.handle('fs:showOpenDialog', async (event, options) => {
@@ -52,6 +64,67 @@ function initLocalFileService() {
     ipcMain.handle('fs:trashItems', async (event, { paths } = {}) => {
         return trashItems(paths);
     });
+}
+
+// Materialize archive bytes in a private temporary directory, never at a path
+// supplied by the renderer. The cache has a per-file and aggregate disk budget.
+function createArchiveEntryCache({ tempDir = os.tmpdir() } = {}) {
+    const directories = new Set();
+    const cachedEntries = new Map();
+    let totalBytes = 0;
+    let closed = false;
+    function clear() {
+        closed = true;
+        for (const dir of directories) {
+            try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+        }
+        directories.clear();
+        cachedEntries.clear();
+    }
+    async function cache({ name, bytes } = {}) {
+        if (closed) return { ok: false, reason: 'closed' };
+        if (typeof name !== 'string' || !name || Buffer.byteLength(name, 'utf8') > 255
+            || /[\\/\x00-\x1f<>:"|?*]/.test(name) || /[. ]$/.test(name)
+            || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) {
+            return { ok: false, reason: 'bad-name' };
+        }
+        if (!(bytes instanceof ArrayBuffer) && !ArrayBuffer.isView(bytes)) return { ok: false, reason: 'bad-bytes' };
+        const size = bytes.byteLength;
+        if (size > ARCHIVE_ENTRY_MAX_BYTES) return { ok: false, reason: 'too-large' };
+        const data = Buffer.from(bytes instanceof ArrayBuffer ? bytes : bytes.buffer, bytes.byteOffset || 0, size);
+        // Re-selecting a photo (or mounting a second preview) must not consume the
+        // budget again. Include the name so native receivers retain the exact name.
+        const key = name + '\0' + createHash('sha256').update(data).digest('hex');
+        if (cachedEntries.has(key)) return cachedEntries.get(key);
+        if (totalBytes + size > ARCHIVE_CACHE_MAX_BYTES) return { ok: false, reason: 'too-large' };
+        // Reserve and publish the promise before awaiting, including concurrent IPCs.
+        totalBytes += size;
+        const pending = (async () => {
+            let dir;
+            try {
+                dir = await fs.promises.mkdtemp(path.join(tempDir, 'awd-archive-'));
+                directories.add(dir);
+                if (closed) throw new Error('closed');
+                const filePath = path.join(dir, name);
+                await fs.promises.writeFile(filePath, data, { flag: 'wx', mode: 0o600 });
+                if (closed) throw new Error('closed');
+                return { ok: true, path: filePath };
+            } catch (_) {
+                totalBytes -= size;
+                if (dir) {
+                    try { await fs.promises.rm(dir, { recursive: true, force: true }); } catch (_) {}
+                    directories.delete(dir);
+                }
+                return { ok: false, reason: closed ? 'closed' : 'cache-failed' };
+            }
+        })();
+        cachedEntries.set(key, pending);
+        const result = await pending;
+        if (!result.ok) cachedEntries.delete(key);
+        return result;
+    }
+
+    return { cache, clear };
 }
 
 /**
@@ -236,6 +309,8 @@ function startFileDrag(sender, filePath, deps = {}) {
 
 module.exports = {
     initLocalFileService,
+    createArchiveEntryCache,
+    ARCHIVE_ENTRY_MAX_BYTES,
     shareFile,
     startFileDrag,
     createDragFileIcon,

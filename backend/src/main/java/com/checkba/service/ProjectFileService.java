@@ -2038,6 +2038,168 @@ public class ProjectFileService {
     private static final long MAX_ARCHIVE_BYTES = 1024L * 1024 * 1024;      // 整包载入内存，1GB 上限
     private static final long MAX_EXTRACT_TOTAL = 8L * 1024 * 1024 * 1024;  // 解压后总量上限（防 zip bomb）
     private static final int MAX_ARCHIVE_ENTRIES = 5000;
+    private static final int MAX_ARCHIVE_ENTRY_BYTES = 128 * 1024 * 1024;
+
+    public record ArchiveEntryContent(String name, byte[] bytes) { }
+
+    /** Read one entry without importing it into the project. Never trust the declared size alone. */
+    public ArchiveEntryContent readArchiveEntry(Long fileId, String path) {
+        String requested = normalizeEntryPath(path);
+        if (requested == null) throw new IllegalArgumentException(LangText.of("请选择压缩包内的文件", "Select a file in the archive"));
+        ProjectFile archive = getFile(fileId);
+        if (Boolean.TRUE.equals(archive.getIsDeleted())) {
+            throw new IllegalArgumentException(LangText.of("压缩包已被删除", "The archive has been deleted"));
+        }
+        ArchiveEntryContent[] result = { null };
+        int[] count = { 0 };
+        try {
+            walkArchiveEntry(archive, (raw, dir, size, content) -> {
+                if (++count[0] > MAX_ARCHIVE_ENTRIES) {
+                    throw new IllegalArgumentException(LangText.of("压缩包条目过多", "Too many entries in the archive"));
+                }
+                String normalized = normalizeEntryPath(raw);
+                if (!requested.equals(normalized)) return;
+                if (result[0] != null) {
+                    throw new IllegalArgumentException(LangText.of("压缩包内存在重复路径，无法确定文件", "The archive contains an ambiguous duplicate path"));
+                }
+                if (dir || content == null) {
+                    throw new IllegalArgumentException(LangText.of("请先解压文件夹，再预览或拖拽其中的文件", "Extract the folder before previewing or dragging its files"));
+                }
+                if (size > MAX_ARCHIVE_ENTRY_BYTES) throw archiveEntryTooLarge();
+                try (java.io.InputStream in = content.call()) {
+                    result[0] = new ArchiveEntryContent(normalized.substring(normalized.lastIndexOf('/') + 1),
+                            readArchiveEntryBytes(in));
+                }
+            });
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException(archiveErrorMessage(e), e);
+        }
+        if (result[0] == null) throw new IllegalArgumentException(LangText.of("压缩包中找不到该文件", "File not found in the archive"));
+        return result[0];
+    }
+
+    /** Local ZIPs are seekable: previewing a photo must not load the entire archive into memory. */
+    private void walkArchiveEntry(ProjectFile archive, ArchiveVisitor visitor) throws Exception {
+        if ("zip".equals(archiveType(archive))) {
+            var resource = storageServiceFactory.getStorageService().load(archive.getFilePath());
+            if (resource.isFile()) {
+                java.nio.file.Path archivePath = resource.getFile().toPath();
+                if (java.nio.file.Files.size(archivePath) > MAX_ARCHIVE_BYTES) {
+                    throw new IllegalArgumentException(LangText.of("压缩包过大（上限 1GB）", "Archive too large (limit 1GB)"));
+                }
+                try (var zip = org.apache.commons.compress.archivers.zip.ZipFile.builder()
+                        .setPath(archivePath).setCharset(java.nio.charset.StandardCharsets.UTF_8).get()) {
+                    var entries = zip.getEntries();
+                    while (entries.hasMoreElements()) {
+                        var entry = entries.nextElement();
+                        visitor.visit(zipEntryName(entry), entry.isDirectory(), entry.getSize(), () -> zip.getInputStream(entry));
+                    }
+                }
+                return;
+            }
+        }
+        walkArchive(archiveType(archive), loadArchiveBytes(archive), visitor);
+    }
+
+    private byte[] readArchiveEntryBytes(java.io.InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            if ((long) out.size() + read > MAX_ARCHIVE_ENTRY_BYTES) throw archiveEntryTooLarge();
+            out.write(buffer, 0, read);
+        }
+        return out.toByteArray();
+    }
+
+    private IllegalArgumentException archiveEntryTooLarge() {
+        return new IllegalArgumentException(LangText.of(
+                "单个文件超过 128MB，请先解压后操作", "This file exceeds 128MB; extract the archive first"));
+    }
+
+    /** Publish a complete new file without overwriting an unindexed file already on disk. */
+    @Transactional
+    public ProjectFile importArchiveEntry(Long projectId, Long fileId, String path, Long parentId, Long userId) {
+        if (projectId == null || userId == null) throw new IllegalArgumentException("Project and user are required");
+        ProjectFile archive = getFile(fileId);
+        if (!projectId.equals(archive.getProjectId())) throw new IllegalArgumentException(LangText.of("文件不属于该项目", "This file does not belong to this project"));
+        parentId = resolveParentId(projectId, parentId);
+        ArchiveEntryContent entry = readArchiveEntry(fileId, path);
+        String name = entry.name().trim();
+        validateNodeName(name);
+        if (projectFileRepository.existsByProjectIdAndParentIdAndNameAndIdNot(projectId, parentId, name, -1L)) {
+            throw new IllegalArgumentException(LangText.of("该文件夹下已存在同名文件: ", "A file with this name already exists: ") + name);
+        }
+        requireWithinProjectSizeLimit(projectId, entry.bytes().length);
+        if (cloudStorageQuota != null) cloudStorageQuota.requireProjectCapacity(projectId, entry.bytes().length);
+        int dot = name.lastIndexOf('.');
+        String ext = dot > 0 ? name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT) : "";
+        if (ext.length() > 32) ext = ext.substring(0, 32);
+        String target = requireProjectScopedPath(projectId, buildPhysicalPath(projectId, parentId, name));
+        String staging = "projects/" + projectId + "/.awd/archive-" + UUID.randomUUID() + ".tmp";
+        var storage = storageServiceFactory.getStorageService();
+        boolean[] published = {false};
+        boolean transactional = org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive();
+        if (transactional) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() {
+                            try {
+                                if (transactionManager == null) { signalChange(projectId, userId); return; }
+                                var tx = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+                                tx.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                                tx.executeWithoutResult(status -> signalChange(projectId, userId));
+                            } catch (RuntimeException e) {
+                                log.warn("归档文件已导入，版本变更信号失败", e);
+                            }
+                        }
+                        @Override public void afterCompletion(int status) {
+                            if (status != STATUS_COMMITTED && published[0]) cleanupArchiveImport(target);
+                            cleanupArchiveImport(staging);
+                        }
+                    });
+        }
+        try {
+            storage.save(staging, new java.io.ByteArrayInputStream(entry.bytes()));
+            // moveNew is the no-overwrite boundary, including files Finder has created since the last scan.
+            storage.moveNew(staging, target);
+            published[0] = true;
+            ProjectFile created = new ProjectFile();
+            created.setProjectId(projectId);
+            created.setParentId(parentId);
+            created.setIsFolder(false);
+            created.setName(name);
+            created.setFileType(ext);
+            created.setFileSize((long) entry.bytes().length);
+            created.setFilePath(target);
+            created.setWpsFileId(generateWpsFileId(projectId));
+            Integer order = projectFileRepository.maxSortOrder(projectId, parentId);
+            created.setSortOrder((order == null ? -1 : order) + 1);
+            created.setUserId(userId);
+            created.setCreatedAt(LocalDateTime.now());
+            created.setUpdatedAt(LocalDateTime.now());
+            ProjectFile saved = projectFileRepository.saveAndFlush(created);
+            if (!transactional) signalChange(projectId, userId);
+            return saved;
+        } catch (RuntimeException e) {
+            if (published[0]) { cleanupArchiveImport(target); published[0] = false; }
+            cleanupArchiveImport(staging);
+            if (e instanceof com.checkba.storage.StorageException) {
+                if (e.getCause() instanceof java.nio.file.FileAlreadyExistsException) {
+                    throw new IllegalArgumentException(LangText.of("目标目录已有同名文件，未覆盖: ", "The destination already contains this file; it was not overwritten: ") + name, e);
+                }
+                throw new IllegalArgumentException(LangText.of("保存解压文件失败，请重试", "Failed to save the extracted file; please retry"), e);
+            }
+            throw e;
+        }
+    }
+
+    private void cleanupArchiveImport(String path) {
+        try { storageServiceFactory.getStorageService().delete(path); }
+        catch (RuntimeException e) { log.warn("清理未完成的归档导入文件失败", e); }
+    }
 
     /** 条目访问器：list 与 extract 共用同一套格式遍历逻辑。content 仅文件条目非 null。 */
     private interface ArchiveVisitor {
@@ -2164,6 +2326,9 @@ public class ProjectFileService {
     private String normalizeEntryPath(String raw) {
         if (raw == null) return null;
         String p = raw.replace('\\', '/');
+        if (p.startsWith("/") || p.matches("^[A-Za-z]:.*") || p.chars().anyMatch(c -> c < 32 || c == 127)) {
+            throw new IllegalArgumentException(LangText.of("压缩包含非法路径: ", "Archive contains an invalid path: ") + raw);
+        }
         List<String> segs = new ArrayList<>();
         for (String s : p.split("/")) {
             String seg = s.trim();
