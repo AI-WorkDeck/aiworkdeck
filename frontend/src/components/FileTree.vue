@@ -4389,7 +4389,7 @@ export default {
 
 /* Finder 风格：奇偶行浅色差（尽量克制） */
 .tree-list .tree-item:nth-child(odd) {
-  background-color: var(--awd-accent-wash); /* Using Brand Color Tint */
+  background-color: color-mix(in srgb, var(--awd-text) 4%, transparent);
 }
 
 .tree-list .tree-item:nth-child(even) {
@@ -4404,7 +4404,7 @@ export default {
   background-color: var(--awd-accent-soft);
 }
 
-/* Increase specificity to override zebra striping (.tree-list .tree-item:nth-child) */
+/* Selection stays distinct from both alternating rows and hover. */
 .tree-list .tree-item.tree-item-selected {
   background-color: var(--awd-mint) !important; /* Forest Green Lighter Tint - darkened for visibility */
 }
@@ -4449,7 +4449,7 @@ export default {
 }
 
 .tree-item[draggable="true"]:hover {
-  background-color: var(--awd-bg);
+  background-color: var(--awd-accent-soft);
 }
 
 .tree-item-content {
@@ -4472,7 +4472,7 @@ export default {
   bottom: 0;
   width: 1px;
   background-color: transparent;
-  border-left: 1px dashed var(--awd-border);
+  border-left: 1px solid var(--awd-border-subtle);
   pointer-events: none;
 }
 
