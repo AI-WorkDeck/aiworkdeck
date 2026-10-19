@@ -34,6 +34,7 @@ import { getAuthHeaders } from '@/utils/auth.js'
 import { host } from '@/services/host.js'
 import { beginArchiveEntryDrag, endArchiveEntryDrag } from '@/utils/archiveEntryDrag.js'
 import { installExternalDragCleanup } from '@/utils/fileLocalDrag.js'
+import { nativeEvent } from '@/utils/fileTreeExternalDrop.js'
 import { applyDragImage } from '@/utils/dragImage.js'
 
 export default {
@@ -127,23 +128,30 @@ export default {
       event.currentTarget.children[next]?.focus()
     },
     onDragStart(event, entry) {
-      if (entry.dir) { event.preventDefault(); return }
+      const dragEvent = nativeEvent(event)
+      if (entry.dir) { dragEvent?.preventDefault(); return }
       this.finishDrag()
       const payload = { projectId: this.file.projectId, fileId: this.file.id, path: entry.path }
       this._dragEntry = payload
-      beginArchiveEntryDrag(event.dataTransfer, payload)
-      applyDragImage(event)
+      beginArchiveEntryDrag(dragEvent?.dataTransfer, payload)
+      applyDragImage(dragEvent)
       uni.$emit('archive-drag-start')
       this._cleanupDrag = installExternalDragCleanup(() => this.finishDrag())
-      if (this.selected?.path === entry.path && this.localPath) {
-        try {
-          Promise.resolve(host.fs.startDrag(this.localPath)).then(result => {
-            if (result?.ok === false) throw new Error('native drag failed')
-          }).catch(() => {
-            uni.showToast({ title: this.$t('files.archiveDragFailed'), icon: 'none' })
-          })
-        } catch (_) {
+      if (this.selected?.path === entry.path && this.localPath && typeof host.fs?.startDrag === 'function') {
+        const fail = () => {
+          // A late response must not clear a newer archive gesture.
+          if (this._dragEntry !== payload) return
+          this.finishDrag()
           uni.showToast({ title: this.$t('files.archiveDragFailed'), icon: 'none' })
+        }
+        try {
+          // Give Electron exclusive ownership, as for ordinary project files.
+          dragEvent?.preventDefault()
+          Promise.resolve(host.fs.startDrag(this.localPath)).then(result => {
+            if (result?.ok === false) fail()
+          }).catch(fail)
+        } catch (_) {
+          fail()
         }
       } else {
         this.primeEntry(entry)
