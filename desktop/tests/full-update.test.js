@@ -254,3 +254,38 @@ test('Windows helper: slow startup handshakes before parent exits; early failure
     }
   }
 })
+
+
+test('Windows真实helper：生产spawn完成握手，父进程退出后继续校验并清理', { skip: process.platform !== 'win32', timeout: 120000 }, async t => {
+  const dir = root(t), file = lockPath(dir)
+  const modulePath = require.resolve('../main/services/full-update')
+  const parentSource = `
+    const fs = require('fs'), path = require('path')
+    const { createFullUpdate, lockPath } = require(process.argv[2])
+    const dir = process.argv[1], file = lockPath(dir), installer = path.join(dir, 'unsigned.exe')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(installer, 'unsigned startup fixture; must never execute')
+    ;(async () => {
+      // Only skip the initial signature preflight; the real helper must reject it after parent exit.
+      const updater = createFullUpdate({ platform: 'win32', dataDir: dir }, async () => ({}))
+      await updater.prepare(installer, '0.12.0')
+      await updater.installOnQuit(false)
+      if (!fs.existsSync(file) || fs.existsSync(file + '.error')) throw new Error('Helper did not wait for its live parent')
+      process.stdout.write(JSON.stringify(JSON.parse(fs.readFileSync(file, 'utf8'))))
+      process.exit(0)
+    })().catch(error => { console.error(error); process.exit(1) })
+  `
+  const child = require('child_process').spawn(process.execPath, ['-e', parentSource, dir, modulePath], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+  let stdout = '', stderr = ''
+  child.stdout.on('data', bytes => { stdout += bytes })
+  child.stderr.on('data', bytes => { stderr += bytes })
+  const timer = setTimeout(() => child.kill(), 75000)
+  const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve) }).finally(() => clearTimeout(timer))
+  assert.equal(code, 0, stderr)
+  assert.ok(Number.isInteger(JSON.parse(stdout).helperPid), 'Real helper acknowledged before parent exited')
+  const end = Date.now() + 30000
+  while ((!fs.existsSync(file + '.error') || fs.existsSync(file)) && Date.now() < end) await new Promise(resolve => setTimeout(resolve, 100))
+  assert.match(fs.readFileSync(file + '.error', 'utf8'), /Invalid installer signature/, 'Helper continued executing after its parent exited')
+  assert.equal(fs.existsSync(file), false)
+  assert.equal(fs.existsSync(file + '.job'), false)
+})
