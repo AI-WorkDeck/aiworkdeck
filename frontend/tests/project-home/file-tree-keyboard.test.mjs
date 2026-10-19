@@ -275,3 +275,20 @@ test('the keyup confirm from Enter opening rename does not immediately close the
   await vm.handleRenameKeydown(event('Enter', { target: { value: 'renamed.txt' } }))
   assert.equal(vm.calls.renames.length, 1)
 })
+
+test('Space opens Quick Look once, arrows publish navigation, native double-click opens a tab', async () => {
+  const vm = makeVm(); rows(vm); vm.selectedFileId = 1
+  await vm.handleKeyDown(event(' '))
+  await vm.handleKeyDown(event(' ', { repeat: true }))
+  assert.deepEqual(vm.calls.emits.filter(([name]) => name === 'quick-look').map(([, file]) => file.id), [1])
+  await vm.handleKeyDown(event('ArrowDown'))
+  assert.equal(vm.calls.emits.find(([name]) => name === 'file-navigate')[1].id, 2)
+  const target = { closest: selector => selector === '.tree-item[data-file-id]' ? { getAttribute: () => '2' } : null }
+  vm.onFileDoubleClick({ target })
+  assert.equal(vm.calls.emits.find(([name]) => name === 'file-open')[1].id, 2)
+  vm.onFileDoubleClick({ target, metaKey: true })
+  assert.equal(vm.calls.emits.filter(([name]) => name === 'file-open').length, 1)
+  await vm.handleKeyDown(event(' ', { target: { closest: () => ({}) } }))
+  vm.selectionMode = true; await vm.handleKeyDown(event(' '))
+  assert.equal(vm.calls.emits.filter(([name]) => name === 'quick-look').length, 1)
+})

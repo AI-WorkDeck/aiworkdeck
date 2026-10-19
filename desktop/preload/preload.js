@@ -244,6 +244,8 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
       return () => ipcRenderer.removeListener('checkba:download-done', listener)
     },
     stageDroppedFile: (file) => ipcRenderer.invoke('fs:stageDroppedFile', file),
+    // Cache archive-entry bytes for native file export; callers cannot choose a disk path.
+    cacheArchiveEntry: (file) => ipcRenderer.invoke('fs:cacheArchiveEntry', file),
     releaseDroppedFile: (token) => ipcRenderer.invoke('fs:releaseDroppedFile', token),
     // 拖放的 File 对象 → 绝对路径（Electron 32 起 File.path 移除，webUtils 是正途）
     getPathForFile: (file) => {

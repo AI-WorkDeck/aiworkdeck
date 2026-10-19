@@ -728,6 +728,8 @@ import { groupByParent, buildTreeFromGroups } from '@/utils/fileTreeBuild.js'
 import { evidenceRefCounts } from '@/services/api.js'
 import { createRefCountsFetcher } from '@/utils/fileTreeRefCounts.js'
 import { warmDragImage, applyDragImage } from '@/utils/dragImage.js'
+import { readArchiveEntryDrag, isArchiveEntryDrag } from '@/utils/archiveEntryDrag.js'
+import { importArchiveEntry } from '@/services/api.js'
 import { nativeEvent, nativeDataTransfer, isExternalFileDrag, compatibleDropEffect, claimExternalDrop, captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
 import { prefetchLocalFilePath, startExternalFileDrag } from '@/utils/fileLocalDrag.js'
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
@@ -1132,6 +1134,8 @@ export default {
   mounted() {
     // 预加载拖拽 ghost 小徽标（dragstart 现场加载来不及，见 utils/dragImage.js）
     warmDragImage()
+    // uni <view> drops native dblclick fields; delegate from the actual DOM root.
+    this.$el?.addEventListener?.('dblclick', this.onFileDoubleClick)
     // selectionMode 关闭时，确保不残留选中态
     if (!this.selectionMode) {
       this.clearChecked()
@@ -1147,6 +1151,8 @@ export default {
     this._onDragEnd = () => { this.isAnyDragging = false; this.stagingDragOver = false; this.rootDropActive = false; this.externalDragActive = false; this.dragStartPoint = null }
     uni.$on('file-drag-start', this._onDragStart)
     uni.$on('file-drag-end', this._onDragEnd)
+    this._onArchiveDragEnd = () => this.resetExternalDrag()
+    uni.$on('archive-drag-end', this._onArchiveDragEnd)
     // 「管理标签」「标签管理」两个内联弹窗的 Esc（v0.49.0 BUG-74）：它们是 awd-dialog-mask，
     // 不走 AwdDialog，只认鼠标；捕获段挂 window，与 TaskDialog 的 attachKeys 同法。
     this._onTagDialogKeydown = (e) => this.onTagDialogKeydown(e)
@@ -1154,9 +1160,11 @@ export default {
   },
   beforeUnmount() {
     this.fileAccessRequest++
+    this.$el?.removeEventListener?.('dblclick', this.onFileDoubleClick)
     if (this._marqueeRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._marqueeRaf)
     uni.$off('file-drag-start', this._onDragStart)
     uni.$off('file-drag-end', this._onDragEnd)
+    uni.$off('archive-drag-end', this._onArchiveDragEnd)
     if (typeof window !== 'undefined') window.removeEventListener('keydown', this._onTagDialogKeydown, true)
   },
   methods: {
@@ -2212,6 +2220,12 @@ export default {
         if (f.isFolder && next[String(f.id)] && !seen.has(String(f.id))) covered(f, seen)
       }))
     },
+    onFileDoubleClick(event) {
+      if (this.selectionMode || this.viewMode === 'recycle' || this.renamingId != null || event.metaKey || event.ctrlKey || event.shiftKey || this.isTreeControlTarget(event.target)) return
+      const row = event.target?.closest?.('.tree-item[data-file-id]')
+      const item = this.displayFiles.find(file => String(file.id) === row?.getAttribute('data-file-id'))
+      if (item && !item.isFolder) this.$emit('file-open', item)
+    },
     handleItemClick(item, event) {
       if (!item) return
 
@@ -2650,6 +2664,7 @@ export default {
         this.multiSelectedIds = [item.id]
         this.$emit('multi-select-change', this.multiSelectedIds)
       }
+      if (!this.selectionMode && this.viewMode !== 'recycle') this.$emit('file-navigate', item)
       this.activeFolderId = item.isFolder ? item.id : item.parentId
       this.lastClickItemId = null
       this.lastClickTime = 0
@@ -2672,14 +2687,16 @@ export default {
       const key = e.key
       const deleting = key === 'Delete' || key === 'Backspace'
       if ((e.metaKey || e.ctrlKey) && !deleting && !key?.startsWith('Arrow')) return
-      if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter', 'Delete', 'Backspace'].includes(key)) return
+      if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter', 'Delete', 'Backspace', ' '].includes(key)) return
       const list = this.displayFiles
       if (!list.length) return
       e.preventDefault?.()
       e.stopPropagation?.()
       const idx = list.findIndex(f => String(f.id) === String(this.selectedFileId))
       const cur = idx < 0 ? null : list[idx]
-      if (key === 'ArrowDown' || key === 'ArrowUp') {
+      if (key === ' ') {
+        if (!e.repeat && !this.selectionMode && this.viewMode !== 'recycle' && cur && !cur.isFolder) this.$emit('quick-look', cur)
+      } else if (key === 'ArrowDown' || key === 'ArrowUp') {
         const next = idx < 0 ? 0 : Math.max(0, Math.min(list.length - 1, idx + (key === 'ArrowDown' ? 1 : -1)))
         this.selectKeyboardItem(list[next])
       } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
@@ -2932,6 +2949,13 @@ export default {
     handleDragOver(e, index) {
       e.preventDefault()
       const dt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(dt)) {
+        const payload = readArchiveEntryDrag(dt)
+        if (this.viewMode === 'recycle' || (payload && String(payload.projectId) !== String(this.projectId))) return
+        this.dragOverIndex = index
+        try { dt.dropEffect = 'copy' } catch (_) {}
+        return
+      }
       if (dt) {
         try { dt.dropEffect = compatibleDropEffect(dt, 'move') } catch (err) { /* ignore */ }
       }
@@ -2969,6 +2993,10 @@ export default {
       // Case 0: 外部（Finder/资源管理器/微信）文件（dev-board#363）——磁盘上有、项目里没有，
       // 走导入通道而不是移动。dataTransfer 要从原生事件上取（uni 重建的 <view> 事件没有它）。
       const externalDt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(externalDt)) {
+        await this.importArchiveDrop(e, externalDt, targetParentId)
+        return
+      }
       if (isExternalFileDrag(externalDt)) {
           if (e.stopPropagation) e.stopPropagation()
           await this.importExternalDrop(externalDt, targetParentId)
@@ -3106,6 +3134,12 @@ export default {
       uni.$emit('file-drag-end')
     },
     onRootDragOver(e) {
+      const dt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(dt)) {
+        const payload = readArchiveEntryDrag(dt)
+        if (this.viewMode === 'recycle' || (payload && String(payload.projectId) !== String(this.projectId))) return
+        try { dt.dropEffect = 'copy' } catch (_) {}
+      }
       e.preventDefault()
       this.rootDropActive = true
     },
@@ -3123,6 +3157,10 @@ export default {
 
       // Case 0: 外部文件落到根投放区 → 导入到项目根（同 handleDrop 的 Case 0）
       const externalDt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(externalDt)) {
+        await this.importArchiveDrop(e, externalDt, targetParentId)
+        return
+      }
       if (isExternalFileDrag(externalDt)) {
           if (e.stopPropagation) e.stopPropagation()
           await this.importExternalDrop(externalDt, targetParentId)
@@ -3212,10 +3250,24 @@ export default {
     // 树空白区落根 / 拖出窗口复位」。四个事件都从原生事件上取 dataTransfer / relatedTarget。
     onTreeDragEnter(e) {
       if (this.viewMode === 'recycle') return
-      if (isExternalFileDrag(nativeDataTransfer(e))) this.externalDragActive = true
+      const dt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(dt)) {
+        const payload = readArchiveEntryDrag(dt)
+        this.externalDragActive = !payload || String(payload.projectId) === String(this.projectId)
+        return
+      }
+      if (isExternalFileDrag(dt)) this.externalDragActive = true
     },
     onTreeDragOver(e) {
       const dt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(dt)) {
+        const payload = readArchiveEntryDrag(dt)
+        if (this.viewMode === 'recycle' || (payload && String(payload.projectId) !== String(this.projectId))) return
+        this.externalDragActive = true
+        e.preventDefault?.()
+        try { dt.dropEffect = 'copy' } catch (_) {}
+        return
+      }
       if (!isExternalFileDrag(dt)) {
         // 暂存区拖回来的文件（dev-board#974）：空白区也要 preventDefault，否则浏览器
         // 不派发 drop，只有临时出现的根投放区能接住，其余位置静默无效。回收站视图同样
@@ -3257,6 +3309,11 @@ export default {
     },
     async onTreeDrop(e) {
       const dt = nativeDataTransfer(e)
+      if (isArchiveEntryDrag(dt)) {
+        if (this.isNodeDropTarget(e)) return
+        await this.importArchiveDrop(e, dt, null)
+        return
+      }
       if (!isExternalFileDrag(dt) && this.isStagingFileDrag()) {
         this.resetExternalDrag()
         if (this.viewMode === 'recycle') {
@@ -3293,6 +3350,21 @@ export default {
       if (e.preventDefault) e.preventDefault()
       // 树空白区 = 项目根（与 onRootDrop 同口径）
       await this.importExternalDrop(dt, null)
+    },
+    async importArchiveDrop(event, dt, targetParentId) {
+      const payload = readArchiveEntryDrag(dt)
+      event.preventDefault?.()
+      event.stopPropagation?.()
+      this.resetExternalDrag()
+      if (!claimExternalDrop(nativeEvent(event))) return
+      if (this.viewMode === 'recycle' || !payload || String(payload.projectId) !== String(this.projectId)) return
+      const projectId = this.projectId
+      try {
+        await importArchiveEntry(projectId, payload.fileId, payload.path, targetParentId)
+        if (String(this.projectId) === String(projectId)) await this.loadFiles()
+      } catch (error) {
+        uni.showToast({ title: error.message || this.$t('fileTree.moveFailed'), icon: 'none' })
+      }
     },
     // 应用内、且不是本树自己发起的文件拖拽（暂存区 → 树）。判据是 uni 的 file-drag-start
     // （暂存区 onDragStart 会发，dragend 发 file-drag-end 复位）：暂存区条目是 <view>，

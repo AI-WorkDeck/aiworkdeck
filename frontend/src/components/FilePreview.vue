@@ -46,7 +46,7 @@
         <view v-else-if="isOffice" class="preview-unsupported">
           <text>{{ $t('files.officePreviewUnsupported') }}</text>
           <text class="preview-hint">{{ $t('files.fileTypeHintOpenLocal', { type: file.fileType || $t('files.unknown') }) }}</text>
-          <button class="btn-open-local" type="default" size="mini" @tap="handleOpenLocal">
+          <button v-if="!sourceUrl" class="btn-open-local" type="default" size="mini" @tap="handleOpenLocal">
             {{ isDesktopShell ? $t(revealInFolderKey) : $t('files.openFileInBrowser') }}
           </button>
         </view>
@@ -141,6 +141,7 @@
             ref="mediaPlayer"
             :key="mediaKey"
             :kind="isVideo ? 'video' : 'audio'"
+            :source-url="sourceUrl"
             :file="file"
             :project-id="projectId"
             :locator-sec="mediaLocatorSec"
@@ -164,13 +165,7 @@
           </view>
           <view v-if="archiveLoading" class="archive-status"><text>{{ $t('files.readingArchive') }}</text></view>
           <view v-else-if="archiveError" class="archive-status archive-error"><text>{{ archiveError }}</text></view>
-          <scroll-view v-else scroll-y class="archive-list">
-            <view v-for="(entry, i) in archiveEntries" :key="i" class="archive-entry">
-              <svg class="entry-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path v-for="(d, gi) in (entry.dir ? ICONS.folder : ICONS.doc)" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
-              <text class="entry-path">{{ entry.path }}</text>
-              <text class="entry-size" v-if="!entry.dir">{{ formatFileSize(entry.size) }}</text>
-            </view>
-          </scroll-view>
+          <ArchiveEntriesPane v-else :key="file.id + '-' + (file.wpsFileId || '')" :file="file" :entries="archiveEntries" />
         </view>
 
         <!-- 不支持预览的文件类型 -->
@@ -178,7 +173,7 @@
           <text>{{ $t('files.previewUnsupportedType') }}</text>
           <text class="preview-hint">{{ $t('files.fileTypeHint', { type: file.fileType || $t('files.unknown') }) }}</text>
           <text class="preview-hint">{{ $t('files.fileIdHint', { id: file.wpsFileId || file.id }) }}</text>
-          <button class="btn-open-local" type="default" size="mini" @tap="handleOpenLocal">
+          <button v-if="!sourceUrl" class="btn-open-local" type="default" size="mini" @tap="handleOpenLocal">
             {{ isDesktopShell ? $t(revealInFolderKey) : $t('files.openFileInBrowser') }}
           </button>
         </view>
@@ -190,7 +185,6 @@
 <script>
 import { getFileBytesUrl, getArchiveEntries, extractArchive } from '@/services/api.js'
 import { getAuthHeaders, getSessionId } from '@/utils/auth.js'
-import { ICONS } from '@/config/icons.js'
 import { getFileLocalPath } from '@/services/api.js'
 import { host } from '@/services/host.js'
 import { revealInFolderKey } from '@/utils/windowChrome.js'
@@ -198,6 +192,7 @@ import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
 import { previewKindOf } from '@/utils/media/mediaTypes.js'
 import { shouldGrabMediaFocus } from '@/utils/media/mediaShortcuts.js'
 import MediaPlayer from '@/components/media/MediaPlayer.vue'
+import ArchiveEntriesPane from '@/components/ArchiveEntriesPane.vue'
 import {
   parsePdfLocator, parseImageRect, parseMediaStartSec,
   imageTransform, imageRectBox, rotatedDisplaySize, normalizeRotation,
@@ -218,8 +213,10 @@ const IMAGE_MAX_SCALE = 8
 
 export default {
   name: 'FilePreview',
-  components: { MediaPlayer },
+  components: { MediaPlayer, ArchiveEntriesPane },
   props: {
+    // A read-only archive entry is supplied as a prepared blob, never as a project file ID.
+    sourceUrl: { type: String, default: '' },
     file: {
       type: Object,
       default: null
@@ -290,11 +287,11 @@ export default {
     revealInFolderKey() {
       return revealInFolderKey()
     },
-    ICONS() { return ICONS },
     isDesktopShell() {
       return !!(host.fs && host.fs.showItemInFolder)
     },
     fileUrl() {
+      if (this.sourceUrl) return this.sourceUrl
       if (!this.file) {
         console.log('FilePreview: file 为空')
         return ''
@@ -438,6 +435,9 @@ export default {
     }
   },
   beforeUnmount() {
+    this._mediaReqId = (this._mediaReqId || 0) + 1
+    this._mediaXhr?.abort()
+    this._archiveReqSeq = (this._archiveReqSeq || 0) + 1
     this.clearEvidenceRectTimers()
     if (this.blobUrl) {
       URL.revokeObjectURL(this.blobUrl)
@@ -459,6 +459,9 @@ export default {
   methods: {
     // file watch 与 wpsFileId watch 共用的加载分发（原 file watch handler 逻辑原样抽出）
     reloadPreview(newFile) {
+      this._mediaReqId = (this._mediaReqId || 0) + 1
+      this._mediaXhr?.abort()
+      this._archiveReqSeq = (this._archiveReqSeq || 0) + 1
       // 换文件：定位副本随之作废（新文件的 locator 会经 prop watch 重新 apply）
       this.clearEvidenceRectTimers()
       this.appliedLocator = null
@@ -546,6 +549,7 @@ export default {
         
         // 使用 XMLHttpRequest 来正确处理大文件的 arraybuffer 响应
         const xhr = new XMLHttpRequest()
+        this._mediaXhr = xhr
         xhr.open('GET', this.fileUrl, true)
         xhr.responseType = 'blob'  // 直接获取 blob，避免 arraybuffer 大小限制
         
@@ -579,6 +583,7 @@ export default {
         }
         
         xhr.onerror = function() {
+          if (self._mediaReqId !== reqId) return
           console.error('loadMediaResource: 网络错误')
           uni.showToast({
             title: self.$t('files.networkErrorResource'),
@@ -588,6 +593,7 @@ export default {
         }
         
         xhr.onprogress = function(event) {
+          if (self._mediaReqId !== reqId) return
           if (event.lengthComputable) {
             const percent = Math.round((event.loaded / event.total) * 100)
             console.log('loadMediaResource: 下载进度', percent + '%', event.loaded, '/', event.total)
@@ -1378,38 +1384,5 @@ export default {
   color: var(--awd-danger-text);
 }
 
-.archive-list {
-  flex: 1;
-  min-height: 0;
-}
-
-.archive-entry {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 12rpx 24rpx;
-  border-bottom: 1rpx solid var(--awd-border-subtle);
-}
-
-.entry-icon {
-
-  width: 28rpx;
-  height: 28rpx;
-  flex-shrink: 0;
-}
-
-.entry-path {
-  flex: 1;
-  font-size: 26rpx;
-  color: var(--awd-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.entry-size {
-  font-size: 24rpx;
-  color: var(--awd-text-3);
-}
 </style>
 
