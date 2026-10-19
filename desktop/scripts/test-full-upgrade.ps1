@@ -148,7 +148,7 @@ try {
     $project = (Api '/projects/open-local' @{ localRoot = $fixtureDir; name = $marker }).data
     $projectId = $project.projectId
     Assert-That ($projectId -gt 0) 'Old backend persisted real local-folder project'
-    $oldFiles = @(Api "/projects/$projectId/files")
+    $oldFiles = Api "/projects/$projectId/files"
     Assert-That (@($oldFiles | Where-Object name -eq 'retained-document.txt').Count -eq 1) 'Old backend indexed fixture document'
     $fileId = ($oldFiles | Where-Object name -eq 'retained-document.txt').id
     $hash = (Get-FileHash -LiteralPath $fixture).Hash
@@ -235,9 +235,9 @@ http.createServer((req,res)=>{
     Wait-Backend
     # The production helper intentionally relaunches without test CDP flags. A real HTTP read
     # verifies persisted data; the visible native window is additionally captured below.
-    $projects = @(Api '/projects/my')
+    $projects = Api '/projects/my'
     Assert-That (@($projects | Where-Object { $_.id -eq $projectId -and $_.name -eq $marker }).Count -eq 1) 'New backend reopens the same persisted project ID and name'
-    $files = @(Api "/projects/$projectId/files")
+    $files = Api "/projects/$projectId/files"
     Assert-That (@($files | Where-Object { $_.id -eq $fileId -and $_.name -eq 'retained-document.txt' }).Count -eq 1) 'New backend preserves file ID and metadata'
     Assert-That ((Get-FileHash -LiteralPath $fixture).Hash -eq $hash) 'Document bytes survive real NSIS upgrade'
     Wait-Until { @(Get-Process -Name 'AI WorkDeck' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero }).Count -gt 0 } 'new native workbench visible' 120
