@@ -89,14 +89,16 @@ const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
 const target = targets.find(t => t.type === 'page' && /index\.html/.test(t.url));
 if (!target) throw Error('Installed workbench renderer not found');
 const ws = new WebSocket(target.webSocketDebuggerUrl);
+let replied = false;
 const timer = setTimeout(() => { console.error('CDP timeout'); process.exit(1); }, 180000);
 ws.onopen = () => ws.send(JSON.stringify({id: 1, method, params: JSON.parse(params)}));
-ws.onmessage = e => { const r = JSON.parse(e.data); if (r.id !== 1) return;
+ws.onmessage = e => { const r = JSON.parse(e.data); if (r.id !== 1) return; replied = true;
   if (r.error || r.result?.exceptionDetails) { console.error(JSON.stringify(r)); process.exitCode = 1; }
   else console.log(JSON.stringify(r.result));
   clearTimeout(timer); ws.close();
 };
 ws.onerror = e => { console.error(String(e.message)); process.exit(1); };
+ws.onclose = () => { if (!replied) { console.error('Renderer closed before CDP reply'); process.exit(1); } };
 '@
 function Renderer([string]$Expression) {
     $params = ConvertTo-Json -Compress -InputObject @{ expression = $Expression; awaitPromise = $true; returnByValue = $true }
@@ -179,7 +181,9 @@ http.createServer((req,res)=>{
         Assert-That ($state.phase -eq 'ready' -and $state.available.kind -eq 'installer' -and $state.available.version -eq $CandidateVersion) 'Real baseline updater downloaded, hashed and prepared signed candidate'
         Screenshot '02-update-ready'
         if ($ExitMode -eq 'Restart') {
-            Renderer 'window.checkbaDesktop.update.restart()' | Out-Null
+            # Obtain the CDP acknowledgment before the IPC closes this renderer. The following
+            # lock/process/version gates, not this scheduling acknowledgment, prove completion.
+            Assert-That ((Renderer 'setTimeout(() => window.checkbaDesktop.update.restart(), 250); true') -eq $true) 'Scheduled real update restart'
         } else { Close-App $app }
     } else {
         # Released 0.65.0 cannot prepare a full update itself. Execute the unchanged candidate
@@ -222,7 +226,7 @@ http.createServer((req,res)=>{
     Wait-Backend
     # The production helper intentionally relaunches without test CDP flags. A real HTTP read
     # verifies persisted data; the visible native window is additionally captured below.
-    $projects = @(Api '/projects')
+    $projects = @(Api '/projects/my')
     Assert-That (@($projects | Where-Object { $_.id -eq $projectId -and $_.name -eq $marker }).Count -eq 1) 'New backend reopens the same persisted project ID and name'
     $files = @(Api "/projects/$projectId/files")
     Assert-That (@($files | Where-Object { $_.id -eq $fileId -and $_.name -eq 'retained-document.txt' }).Count -eq 1) 'New backend preserves file ID and metadata'
