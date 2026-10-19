@@ -1,61 +1,53 @@
-# Office/WPS 插件的 Windows 安装器（.exe）在 Windows runner 上构建。
-#
-# 为什么要有这条：安装器的 NSIS 一键 UI 引擎（desktop/build/win/awd-oneclick-ui.nsh）
-# 与桌面端共用，引擎一改插件 exe 就得重出；而**维护者 Mac 上的 makensis 是坏的**
-# （Homebrew 3.12 与 electron-builder 缓存的 3.04 都一样，纯 ASCII 脚本走到写产物时
-# std::bad_alloc，2026-09-01 实测，见 .claude/agents/eng-infra.md 6.5.1），
-# 本机 `npm run build:installers` 出不了 Windows 那一半。没有这条工作流，
-# 插件端的安装器修复就只能烂在仓库里（dev-board#356 发版时实际撞上）。
-#
-# mac 那一半（.dmg，swiftc + 签名 + 公证）仍然只能在维护者 Mac 上跑：
-# `cd office-addin && npm run build:installers -- --skip-win`。
-#
-# 版本号取 desktop/package.json（单一来源），产物两份：国内站与国际站各一份
-#（托管地址焙进包内 manifest，不是「与站点无关」的通用包）。
-name: addin-installer
-
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# NEVER MERGE: temporary tool-capability probe, not an installer build.
+name: temporary-mac-native-input-probe
 on:
   workflow_dispatch:
-
+permissions:
+  contents: read
 jobs:
-  win:
-    runs-on: windows-latest
-    timeout-minutes: 20
+  probe:
+    runs-on: macos-15
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Ensure NSIS
-        shell: pwsh
+      - name: Compile and check real event permission without prompting
         run: |
-          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
-            choco install nsis -y --no-progress
-            Add-Content $env:GITHUB_PATH 'C:\Program Files (x86)\NSIS'
-          }
-
-      # 位图由 render-oneclick-art.mjs 现场渲染（Chrome + ImageMagick，runner 自带），
-      # 产物不入库；build-installers.mjs 内部会调它，这里不用单独跑。
-      - name: Build Windows installers (both site variants)
-        shell: pwsh
+          mkdir -p evidence
+          launchctl print gui/$(id -u) > evidence/gui-session.txt
+          swiftc scripts/qa/mac-native-input-probe.swift -o "$RUNNER_TEMP/native-input-probe" -framework AppKit -framework ApplicationServices -framework CryptoKit
+          "$RUNNER_TEMP/native-input-probe" permissions "$PWD/evidence"
+      - name: Cross-process native drag, received bytes and return mouse click
         run: |
-          node office-addin/installer/build-installers.mjs --skip-mac `
-            --url https://addin.aiworkdeck.com/office-addin --dist office-addin/installer/dist-cn
-          if ($LASTEXITCODE -ne 0) { throw 'cn installer build failed' }
-          node office-addin/installer/build-installers.mjs --skip-mac `
-            --url https://addin.workdeck.ai/office-addin --dist office-addin/installer/dist-intl
-          if ($LASTEXITCODE -ne 0) { throw 'intl installer build failed' }
-          Get-ChildItem -Recurse office-addin/installer/dist-cn, office-addin/installer/dist-intl |
-            Select-Object FullName, Length | Format-Table -AutoSize
-
-      # 两份产物文件名相同（下载地址靠 host 区分），所以必须分目录上传，
-      # 否则合并到一个 artifact 里后构建的那份会静默覆盖前一份。
-      - uses: actions/upload-artifact@v4
+          printf 'Synthetic native drag capability probe 1367\n' > evidence/fixture.txt
+          "$RUNNER_TEMP/native-input-probe" receiver "$PWD/evidence" > evidence/receiver.log 2>&1 & receiver=$!
+          "$RUNNER_TEMP/native-input-probe" source "$PWD/evidence" > evidence/source.log 2>&1 & source=$!
+          trap 'kill "$receiver" "$source" 2>/dev/null || true' EXIT
+          for n in {1..40}; do
+            if test -f evidence/receiver-ready.json && test -f evidence/source-ready.json; then break; fi
+            sleep 0.25
+          done
+          "$RUNNER_TEMP/native-input-probe" drive "$PWD/evidence"
+          sleep 2
+          python3 - <<'PY'
+          import json,hashlib,pathlib
+          p=pathlib.Path('evidence')
+          def read(n):return json.loads((p/n).read_text())
+          a=read('source-ready.json');b=read('receiver-ready.json');assert a['pid']!=b['pid']
+          assert read('source-dragstart.json')['nativeSessionStarted']
+          receipt=read('receiver-drop.json');assert receipt['name']=='fixture.txt'
+          expected=hashlib.sha256((p/'fixture.txt').read_bytes()).hexdigest()
+          assert receipt['sha256']==expected==hashlib.sha256((p/'received.txt').read_bytes()).hexdigest()
+          assert read('source-dragend.json')['operation']==1
+          click=read('source-click-recovered.json');assert click['receivedMouseUp'] and click['marker']==1367
+          (p/'result.json').write_text(json.dumps({'result':'PASS','scope':'CGEvent to cross-process AppKit native drag and return click; not product validation','sha256':expected},indent=2))
+          PY
+      - name: Preserve actual permissions and receiver evidence
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          retention-days: 3
-          name: addin-installer-exe
-          path: |
-            office-addin/installer/dist-cn/*.exe
-            office-addin/installer/dist-intl/*.exe
+          name: mac-native-input-probe-${{ github.run_attempt }}
+          path: evidence/
+          retention-days: 7
           if-no-files-found: error
