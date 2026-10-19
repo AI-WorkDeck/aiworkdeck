@@ -207,7 +207,7 @@ http.createServer((req,res)=>{
         $oldModulePath = $env:PSModulePath
         try {
             Remove-Item Env:PSModulePath -ErrorAction SilentlyContinue
-            $helperProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"`"$helper`"","`"$lock`"") -PassThru -WindowStyle Hidden
+            $helperProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"`"$helper`"","`"$lock`"") -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $OutDir 'helper.stdout.log') -RedirectStandardError (Join-Path $OutDir 'helper.stderr.log')
         } finally { $env:PSModulePath = $oldModulePath }
         Wait-Until { Test-Path -LiteralPath $lock } 'real helper handshake' 15
         Assert-ExeVersion $OldVersion 'Helper waits for live parent before replacing app'
@@ -262,6 +262,16 @@ http.createServer((req,res)=>{
 } finally {
     $evidence | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath (Join-Path $OutDir 'evidence.json') -Encoding utf8
     if (Test-Path (Join-Path $dataDir 'logs')) { Copy-Item (Join-Path $dataDir 'logs') (Join-Path $OutDir 'app-logs') -Recurse -Force }
+    # Keep only the synthetic helper's small diagnostics, never the installer or user database.
+    $installerDir = Split-Path $lock
+    if (Test-Path -LiteralPath $installerDir) {
+        $diagnostics = Join-Path $OutDir 'installer-diagnostics'
+        New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
+        foreach ($name in @('install-update.ps1', 'installing.json', 'installing.json.job', 'installing.json.error', 'installing.json.tmp', 'installing.json.launch')) {
+            $file = Join-Path $installerDir $name
+            if (Test-Path -LiteralPath $file) { Copy-Item -LiteralPath $file -Destination $diagnostics }
+        }
+    }
     if ($null -ne $feed -and -not $feed.HasExited) { Stop-Process -Id $feed.Id -Force }
     # Disposable runner teardown only. Never copy H2 data, browser storage or any user credentials.
     Get-Process -Name 'AI WorkDeck' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
