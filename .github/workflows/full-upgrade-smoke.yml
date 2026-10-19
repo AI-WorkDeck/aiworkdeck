@@ -56,6 +56,10 @@ jobs:
           }})().catch(e=>{console.error(e);process.exitCode=1});
           '@ | Set-Content "$env:RUNNER_TEMP/bridge-probe.cjs"
           node "$env:RUNNER_TEMP/bridge-probe.cjs"
+      - name: Locate production helper stage after parent exit
+        shell: pwsh
+        run: |
+          node --test --test-name-pattern='Windows真实helper' desktop/tests/full-update.test.js
       - name: Download and identify signed installer builds
         shell: pwsh
         env:
