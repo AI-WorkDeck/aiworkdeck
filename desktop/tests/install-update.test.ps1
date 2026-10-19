@@ -45,6 +45,39 @@ try {
     if (Test-Path $lockPath) { throw 'Installation lock left behind' }
     if ($global:AwdInstallerFixture.launches -ne 0) { throw 'Ordinary quit must not relaunch' }
   }
+  # A launched helper without this application's commitment must never run NSIS.
+  $caseDir = Join-Path $root 'no-commit'
+  New-Item -ItemType Directory -Path $caseDir | Out-Null
+  $lockPath = Join-Path $caseDir 'installing.json'
+  $global:AwdInstallerFixture.installs = 0
+  $job = @{ id = 'old-job'; parentPid = 2147483647; installer = $global:AwdInstallerFixture.installerPath; executable = $global:AwdInstallerFixture.executable; restart = $false; sha256 = 'unused-without-commit' }
+  $job | ConvertTo-Json | Set-Content -LiteralPath ($lockPath + '.job') -Encoding UTF8
+  Set-Content -LiteralPath ($lockPath + '.ack') -Value 'new-job' -NoNewline -Encoding UTF8
+  & (Join-Path $PSScriptRoot '../main/services/install-update.ps1') $lockPath 'old-job'
+  if ($global:AwdInstallerFixture.installs -ne 0) { throw 'An uncommitted helper ran the installer' }
+  if ((Get-Content -LiteralPath ($lockPath + '.error') -Raw) -notmatch 'did not commit') { throw 'Missing explicit no-commit failure' }
+  if (Test-Path -LiteralPath $lockPath) { throw 'Uncommitted helper retained its lock' }
+  if ((Get-Content -LiteralPath ($lockPath + '.ack') -Raw) -ne 'new-job') { throw 'Old helper deleted a newer acknowledgement' }
+
+  # A delayed launcher must not read or clean a replacement job, lock or ack.
+  $job.id = 'new-job'
+  $job | ConvertTo-Json | Set-Content -LiteralPath ($lockPath + '.job') -Encoding UTF8
+  $sentinel = @{ helperPid = 999; jobId = 'new-job' } | ConvertTo-Json
+  Set-Content -LiteralPath $lockPath -Value $sentinel -NoNewline -Encoding UTF8
+  $rejected = $false
+  try { & (Join-Path $PSScriptRoot '../main/services/install-update.ps1') $lockPath 'old-job' }
+  catch { $rejected = $_ -match 'job was replaced' }
+  if (-not $rejected) { throw 'Delayed helper accepted a replacement job' }
+  if ((Get-Content -LiteralPath $lockPath -Raw) -ne $sentinel) { throw 'Delayed helper replaced a newer lock' }
+  if ((Get-Content -LiteralPath ($lockPath + '.job') -Raw | ConvertFrom-Json).id -ne 'new-job') { throw 'Delayed helper deleted a newer job' }
+  if ((Get-Content -LiteralPath ($lockPath + '.ack') -Raw) -ne 'new-job') { throw 'Delayed helper deleted a newer acknowledgement' }
+
+  # Even a matching job cannot steal an existing helper's exclusive lock.
+  $rejected = $false
+  try { & (Join-Path $PSScriptRoot '../main/services/install-update.ps1') $lockPath 'new-job' }
+  catch { $rejected = $true }
+  if (-not $rejected -or (Get-Content -LiteralPath $lockPath -Raw) -ne $sentinel) { throw 'Existing helper lock was not preserved' }
+  if (-not (Test-Path -LiteralPath ($lockPath + '.job'))) { throw 'Rejected helper deleted a job it never owned' }
 } finally {
   Remove-Item -LiteralPath $root -Recurse -Force
   Remove-Variable -Name AwdInstallerFixture -Scope Global

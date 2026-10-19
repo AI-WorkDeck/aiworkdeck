@@ -136,44 +136,74 @@ function createFullUpdate({ app, autoUpdater, dataDir, platform = process.platfo
         return false
       }
       const file = lockPath(dataDir)
-      const job = { parentPid: process.pid, installer: prepared.file, executable: process.execPath, sha256: prepared.sha256, restart: !!restart }
+      if (fs.existsSync(file)) {
+        let active = false
+        try { process.kill(JSON.parse(fs.readFileSync(file, 'utf8')).helperPid, 0); active = true } catch (_) { /* stale lock */ }
+        if (active) throw new Error('已有完整更新安装器正在运行')
+        fs.rmSync(file, { force: true })
+      }
+      const job = { id: crypto.randomBytes(16).toString('hex'), parentPid: process.pid, installer: prepared.file, executable: process.execPath, sha256: prepared.sha256, restart: !!restart }
       const jobContents = JSON.stringify(job)
       fs.writeFileSync(file + '.job', jobContents)
       fs.rmSync(file + '.launch', { force: true })
       const helper = path.join(path.dirname(file), 'install-update.ps1')
       fs.copyFileSync(path.join(__dirname, 'install-update.ps1'), helper) // PowerShell cannot read app.asar
       const stderrFile = file + '.stderr.log'
-      const stderrFd = fs.openSync(stderrFile, 'w')
-      let child
+      const psString = value => `'${value.replace(/'/g, "''")}'`
+      const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', `"${helper}"`, `"${file}"`, job.id].map(psString).join(',')
+      // libuv kills non-detached direct children when Electron exits, while detached
+      // powershell.exe has no usable console. Start-Process creates an independent helper.
+      // Redirect both outputs so it cannot retain the launcher's pipes after launch.
+      const pidFile = `${file}.${job.id}.pid`
+      const launch = `$ErrorActionPreference='Stop'; $p=Start-Process -FilePath powershell.exe -ArgumentList @(${args}) -WindowStyle Hidden -PassThru -RedirectStandardOutput ${psString(file + '.stdout.log')} -RedirectStandardError ${psString(stderrFile)}; [IO.File]::WriteAllText(${psString(pidFile)}, [string]$p.Id)`
+      const launchErrorFd = fs.openSync(file + '.launcher.stderr.log', 'w')
+      let launcher
       try {
-        child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
-          helper, file], { detached: true, stdio: ['ignore', 'ignore', stderrFd], windowsHide: true, env: windowsPowerShellEnv() })
-        await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
-      } finally { fs.closeSync(stderrFd) }
-      child.unref()
+        launcher = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(launch, 'utf16le').toString('base64')], { stdio: ['ignore', 'ignore', launchErrorFd], windowsHide: true, env: windowsPowerShellEnv() })
+        await new Promise((resolve, reject) => {
+          let timedOut = false
+          const timer = setTimeout(() => { timedOut = true; launcher.kill() }, 60000)
+          launcher.once('error', error => { clearTimeout(timer); reject(error) })
+          launcher.once('exit', code => {
+            clearTimeout(timer)
+            if (timedOut || code !== 0) reject(new Error('更新安装器启动桥接失败'))
+            else resolve()
+          })
+        })
+      } finally { fs.closeSync(launchErrorFd) }
+      let helperPid
+      try { helperPid = Number(fs.readFileSync(pidFile, 'utf8').trim()) }
+      finally { fs.rmSync(pidFile, { force: true }) }
+      if (!Number.isInteger(helperPid) || helperPid <= 0) throw new Error('更新安装器未返回有效进程标识')
+      const alive = () => { try { process.kill(helperPid, 0); return true } catch (_) { return false } }
       // A cold Windows PowerShell can take more than ten seconds to load its modules.
-      // Keep the parent alive until handshake, with a bounded minute and early-exit detection.
+      // Keep the parent alive until the actual helper acknowledges, never the launcher.
       for (let n = 0; n < 600; n++) {
-        try { if (JSON.parse(fs.readFileSync(file, 'utf8')).helperPid === child.pid) return false } catch (_) { /* starting */ }
-        if (child.exitCode !== null || child.signalCode !== null) break
+        try {
+          const lock = JSON.parse(fs.readFileSync(file, 'utf8'))
+          if (lock.helperPid === helperPid && lock.jobId === job.id && alive()) {
+            fs.writeFileSync(file + '.ack', job.id)
+            return false
+          }
+        } catch (_) { /* starting */ }
+        if (!alive()) break
         await new Promise((resolve) => setTimeout(resolve, 100))
       }
-      // Do not let a late detached helper install after a successor has started.
-      // Windows kill terminates this owned process; wait for confirmed exit before
-      // allowing main to exit/relaunch. While we are alive it cannot pass Wait-Process.
-      if (child.exitCode === null && child.signalCode === null) {
-        child.ref()
-        await new Promise((resolve) => { child.once('exit', resolve); child.kill() })
+      // Stop this helper and confirm exit before allowing a successor to start.
+      if (alive()) {
+        process.kill(helperPid)
+        while (alive()) await new Promise((resolve) => setTimeout(resolve, 100))
       }
       try {
-        if (JSON.parse(fs.readFileSync(file, 'utf8')).helperPid === child.pid) fs.rmSync(file, { force: true })
+        const lock = JSON.parse(fs.readFileSync(file, 'utf8'))
+        if (lock.helperPid === helperPid && lock.jobId === job.id) fs.rmSync(file, { force: true })
       } catch (_) { /* no lock from this helper */ }
       try {
         if (fs.readFileSync(file + '.job', 'utf8') === jobContents) fs.rmSync(file + '.job', { force: true })
       } catch (_) { /* job was already consumed or replaced */ }
       let detail = ''
       try { detail = fs.readFileSync(stderrFile, 'utf8').trim().slice(0, 4096) } catch (_) { /* no diagnostic */ }
-      throw new Error(`更新安装器未能启动${child.exitCode === null ? '' : `（退出码 ${child.exitCode}）`}${detail ? `：${detail}` : ''}`)
+      throw new Error(`更新安装器未能启动${detail ? `：${detail}` : ''}`)
     }
   }
 }
