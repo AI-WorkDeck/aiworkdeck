@@ -6,13 +6,20 @@ $job = Get-Content -LiteralPath ($LockPath + '.job') -Raw -Encoding UTF8 | Conve
 $lockTemp = $LockPath + '.tmp'
 @{ helperPid = $PID; startedAt = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } | ConvertTo-Json | Set-Content -LiteralPath $lockTemp -Encoding ASCII
 Move-Item -LiteralPath $lockTemp -Destination $LockPath -Force
+function Stage($Name) { [IO.File]::AppendAllText(($LockPath + '.stages'), ([DateTime]::UtcNow.ToString('o') + ' ' + $Name + ' helper=' + $PID + ' parent=' + $job.parentPid + [Environment]::NewLine)) }
 $installed = $false
 try {
   # Wait before touching the application. /S skips the custom installer GUI;
   # --updated preserves the existing installation and associations.
+  Stage 'before-wait'
   Wait-Process -Id $job.parentPid -ErrorAction SilentlyContinue
+  Stage 'after-wait'
+  Stage 'before-hash'
   if ((Get-FileHash -LiteralPath $job.installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne $job.sha256) { throw 'Installer hash changed after preparation' }
+  Stage 'after-hash'
+  Stage 'before-signature'
   if ((Get-AuthenticodeSignature -LiteralPath $job.installer).Status -ne 'Valid') { throw 'Invalid installer signature' }
+  Stage 'after-signature'
   $installer = Start-Process -FilePath $job.installer -ArgumentList @('/S', '--updated') -PassThru -Wait
   if ($installer.ExitCode -ne 0) { throw "Installer exited with $($installer.ExitCode)" }
   $installed = $true

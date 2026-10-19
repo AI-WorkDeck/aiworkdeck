@@ -285,6 +285,9 @@ test('Windows真实helper：生产spawn完成握手，父进程退出后继续�
   assert.ok(Number.isInteger(JSON.parse(stdout).helperPid), 'Real helper acknowledged before parent exited')
   const end = Date.now() + 30000
   while ((!fs.existsSync(file + '.error') || fs.existsSync(file)) && Date.now() < end) await new Promise(resolve => setTimeout(resolve, 100))
+  const helperPid = JSON.parse(stdout).helperPid
+  const alive = pid => { try { process.kill(pid, 0); return true } catch (_) { return false } }
+  console.log(JSON.stringify({ parentPid: child.pid, parentAlive: alive(child.pid), helperPid, helperAlive: alive(helperPid), stages: fs.existsSync(file + '.stages') ? fs.readFileSync(file + '.stages', 'utf8') : null, stderr: fs.readFileSync(file + '.stderr.log', 'utf8') }))
   assert.match(fs.readFileSync(file + '.error', 'utf8'), /Invalid installer signature/, 'Helper continued executing after its parent exited')
   assert.equal(fs.existsSync(file), false)
   assert.equal(fs.existsSync(file + '.job'), false)
