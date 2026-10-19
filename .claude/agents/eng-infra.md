@@ -594,3 +594,5 @@ frontend build:h5前置build:plugins，8个独立Uni/Vite包输出official-plugi
 `quitInProgress` 从准备开始阻止 open-path 投递及 Dock/second-instance 唤回旧窗口，重开意图交给安装/重启链。打开文件队列保存在本机 `.aiworkdeck/restart-open-paths.json`，下一进程等工作台 ready 再交付并在 ACK 后移除；取消退出恢复投递。Windows 安装锁期间的带文件启动也保存到该队列。renderer 先等已经接受的文件打开结束才暂停/保存；取消期间排队打开等待退出清理完成。
 
 Mac `quitAndInstall` 在窗口与服务关闭后仍可能异步报错，必须保留安装阶段 error 监听：本机记录错误、relaunch 并退出旧进程，不能留下持有单实例锁的无窗口进程。Windows PowerShell 5.1 读取 Node 写入的无 BOM job 必须显式 UTF8，合成回归使用中文目录。相关行为回归含还原病灶转红；仍不等于正式签名安装及 Windows 实机升级已验收。
+
+Windows 下从 pwsh→Node 再启动 powershell.exe 会继承不兼容 PSModulePath（#1356 Windows CI 已复现 Get-FileHash 不存在）。完整更新的签名检查与 helper 使用删除该变量的子进程环境，让 Windows PowerShell 重建系统模块路径；不改用户全局环境。握手超时必须先结束本 helper 并确认 exit，再按 helperPid/job 内容清理本次文件，不能放任迟到 helper 在后继客户端已启动时安装。退出中的原生业务菜单不再获得工作台窗口；服务尚未初始化的退出交给原生关闭。
