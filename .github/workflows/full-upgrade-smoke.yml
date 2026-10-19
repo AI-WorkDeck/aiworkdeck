@@ -38,23 +38,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Diagnose Windows PowerShell startup handles
+      - name: Verify real helper regression red then green
         shell: pwsh
         run: |
-          @'
-          const fs=require('fs'),path=require('path'),cp=require('child_process');
-          const dir=path.join(process.env.RUNNER_TEMP,'powershell-survival-probe');fs.mkdirSync(dir,{recursive:true});
-          const delay=ms=>new Promise(r=>setTimeout(r,ms));
-          (async()=>{for(const detached of [false,true])for(const windowsHide of [true,false]){
-            const name=`detached-${detached}-hide-${windowsHide}`,marker=path.join(dir,name+'.marker'),script=path.join(dir,name+'.ps1'),parent=path.join(dir,name+'.cjs');
-            fs.writeFileSync(script,`param([int]$ParentId)\n[IO.File]::WriteAllText('${marker.replace(/'/g,"''")}.started','started'); Wait-Process -Id $ParentId -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300; [IO.File]::WriteAllText('${marker.replace(/'/g,"''")}.finished','parent exited')`);
-            fs.writeFileSync(parent,`const fs=require('fs'),cp=require('child_process');const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>k.toUpperCase()!=='PSMODULEPATH')); const fd=fs.openSync(${JSON.stringify(marker+'.stderr')},'w');const c=cp.spawn('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',${JSON.stringify(script)},String(process.pid)],{detached:${detached},windowsHide:${windowsHide},env,stdio:['ignore','ignore',fd]});c.on('spawn',()=>{fs.closeSync(fd);c.unref();});c.on('exit',code=>console.log('helper exit '+code));let n=0;const t=setInterval(()=>{if(fs.existsSync(${JSON.stringify(marker+'.started')})||++n>=200){clearInterval(t);process.exit(fs.existsSync(${JSON.stringify(marker+'.started')})?0:2)}},100);`);
-            const started=Date.now(),proc=cp.spawn(process.execPath,[parent],{stdio:['ignore','pipe','pipe']});let log='';proc.stdout.on('data',b=>log+=b);proc.stderr.on('data',b=>log+=b);
-            const parentExit=await new Promise(resolve=>proc.on('exit',resolve));let polls=0;while(!fs.existsSync(marker+'.finished')&&polls++<30)await delay(100);
-            console.log(JSON.stringify({name,parentExit,elapsedMs:Date.now()-started,started:fs.existsSync(marker+'.started'),survivedParent:fs.existsSync(marker+'.finished'),stderr:fs.readFileSync(marker+'.stderr','utf8'),log}));
-          }})().catch(e=>{console.error(e);process.exitCode=1});
-          '@ | Set-Content "$env:RUNNER_TEMP/spawn-probe.cjs"
-          node "$env:RUNNER_TEMP/spawn-probe.cjs"
+          $source = 'desktop/main/services/full-update.js'
+          Copy-Item $source "$env:RUNNER_TEMP/full-update-fixed.js"
+          # Exact pre-fix product source, with the same new real-process test.
+          git fetch origin 6cf6cebe3c29e706947e8adaf0268490b1212625 --depth=1
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch pre-fix source' }
+          $old = git show '6cf6cebe3c29e706947e8adaf0268490b1212625:desktop/main/services/full-update.js'
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read pre-fix source' }
+          [IO.File]::WriteAllText((Join-Path $env:GITHUB_WORKSPACE $source), ($old -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+          node --test --test-name-pattern='Windows真实helper' desktop/tests/full-update.test.js
+          if ($LASTEXITCODE -eq 0) { throw 'Old product source unexpectedly passed real helper regression' }
+          Copy-Item "$env:RUNNER_TEMP/full-update-fixed.js" $source -Force
+          node --test --test-name-pattern='Windows真实helper' desktop/tests/full-update.test.js
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed product source failed real helper regression' }
       - name: Download and identify signed installer builds
         shell: pwsh
         env:
