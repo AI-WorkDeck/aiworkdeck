@@ -11,6 +11,8 @@ description: 侧边栏与工作台外壳领域。任务涉及左侧 rail/左栏�
 
 `project-overview.scss` 的 `--awd-workbench-header-height` 统一资源管理器标题、中间标签栏和右侧 dock 页签的实际盒高（37px，含边线）；不要单独缩矮右侧 tab。`--awd-workbench-divider` 使用现有弱分隔令牌，rail 与左栏共用底色，内容区用 surface 区分。FileTree 的奇偶行底色必须保留以便逐行定位；悬停、选中与拖入提示仍独立。用户明确要求斑马纹不能因视觉简化而直接取消。
 
+Windows 顶栏（dev-board#1370）由 `App.vue` 平台样式分成菜单行与项目/工具行，不重复展示中央 Logo，保留原生窗口控件的右侧安全区。全局平台样式必须显式覆盖 `.page-project-overview.compact-mode`：项目 scoped 样式会增加属性选择器权重，单靠全局加载顺序不能覆盖窄屏的高度和 padding。原生拖拽验收同时检查顶栏几何不重叠及真实鼠标菜单开关；菜单容器不得用 overflow:hidden 截断下拉。
+
 ## 离开工作台前必须落盘（已踩）
 
 自动保存是防抖的，用户敲完最后一个字到真正落盘之间有一段窗口。`closeFile`
