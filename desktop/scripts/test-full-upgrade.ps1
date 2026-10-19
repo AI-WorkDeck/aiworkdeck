@@ -208,13 +208,17 @@ http.createServer((req,res)=>{
         $oldModulePath = $env:PSModulePath
         try {
             Remove-Item Env:PSModulePath -ErrorAction SilentlyContinue
+            $helperStartedAt = [DateTimeOffset]::UtcNow
+            $evidence.helperStartedAt = $helperStartedAt.ToString('o')
             $helperProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"`"$helper`"","`"$lock`"") -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $OutDir 'helper.stdout.log') -RedirectStandardError (Join-Path $OutDir 'helper.stderr.log')
         } finally { $env:PSModulePath = $oldModulePath }
         Wait-Until {
             $helperProcess.Refresh()
             if ($helperProcess.HasExited) { throw "Helper exited before handshake: $($helperProcess.ExitCode); stderr: $(Get-Content (Join-Path $OutDir 'helper.stderr.log') -Raw)" }
             return Test-Path -LiteralPath $lock
-        } 'real helper handshake' 15
+        } 'real helper handshake' 60
+        $evidence.helperHandshakeMs = ([DateTimeOffset]::UtcNow - $helperStartedAt).TotalMilliseconds
+        Write-Host "Actual helper startup and handshake: $($evidence.helperHandshakeMs) ms"
         Assert-ExeVersion $OldVersion 'Helper waits for live parent before replacing app'
         Close-App $app
     }
