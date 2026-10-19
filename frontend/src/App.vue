@@ -13,7 +13,9 @@ import { initAppMenuBridge } from '@/utils/appMenuBridge.js'
 import { getAppLanguage, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
 import { initAppTheme } from '@/utils/appTheme.js'
 import { installModalFocusGuard } from '@/utils/modalFocusGuard.js'
-import { saveAppLanguageRemote } from '@/services/api.js'
+import { saveAppLanguageRemote, prepareAgentRestart, abortAgentRestart } from '@/services/api.js'
+import { createDesktopQuitGuard, flushQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
+import { setGlobalOverlay } from '@/utils/overlayState.js'
 
 export default {
   onLaunch: function () {
@@ -71,18 +73,72 @@ export default {
     // 应用菜单：命令表 → 菜单树的下发与动作派发全部收在 appMenuBridge 里。
     // App 级注册一次，天然避开 project-overview 的页面栈多实例问题。
     initAppMenuBridge()
+    let systemOpenPending = Promise.resolve()
+    let quitPreparationPending = Promise.resolve()
+    if (host.lifecycle?.onPrepareQuit) {
+      const quitGuard = createDesktopQuitGuard({
+        prepare: prepareAgentRestart,
+        abort: abortAgentRestart,
+        flush: flushQuitWorkbenches,
+        progress: stage => uni.showLoading({ title: this.$t('admin.quit' + (stage === 'pausing' ? 'Pausing' : 'Saving')), mask: true }),
+        errorText: key => this.$t('admin.quitErrors.' + key),
+      })
+      let preparing = false
+      const releaseQuitOverlay = () => {
+        preparing = false
+        uni.hideLoading()
+        setGlobalOverlay(false, 'desktop-quit')
+      }
+      const cancel = async () => {
+        if (!preparing) return
+        try { await quitGuard.cancel() } catch (_) { /* Keep the window open. */ }
+        releaseQuitOverlay()
+      }
+      // Escape cancels a slow shutdown; ordinary input cannot dirty a saved editor.
+      window.addEventListener('keydown', event => {
+        if (!preparing) return
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        if (event.key === 'Escape') host.lifecycle.cancelQuit?.()
+      }, true)
+      host.lifecycle.onQuitCancelled?.(cancel)
+      host.lifecycle.onPrepareQuit(() => {
+        uni.$emit('awd:cancel-restart-recovery')
+        preparing = true
+        setGlobalOverlay(true, 'desktop-quit')
+        const alreadyOpening = systemOpenPending
+        quitPreparationPending = (async () => {
+          await alreadyOpening
+          if (!preparing) return { ok: false, error: this.$t('admin.quitErrors.cancelled') }
+          const result = await quitGuard.prepare()
+          // Keep input blocked after ACK until the main process hides the window.
+          if (!result.ok) {
+            releaseQuitOverlay()
+            uni.showModal({ title: this.$t('admin.quitStopped'), content: result.error, showCancel: false })
+          }
+          return result
+        })()
+        return quitPreparationPending
+      })
+    }
     // Dock/访达「打开方式」进来的路径不是菜单命令，主进程直发，单独接。
     if (host.menu && host.menu.onAction) {
       host.menu.onAction(async (data) => {
         if (!data || data.action !== 'open-path' || !data.path) return
-        try {
-          if (data.isDirectory) await openLocalRootPath(data.path)
-          else await openLocalFilePath(data.path)
-        } catch (e) {
-          uni.showToast({ title: (e && e.message) || this.$t('shell.menuActionFailed'), icon: 'none' })
-        } finally {
-          if (data.requestId) host.menu?.ackOpenPath?.(data.requestId)
-        }
+        const beforeOpen = Promise.all([systemOpenPending, quitPreparationPending])
+        systemOpenPending = (async () => {
+          await beforeOpen
+          uni.$emit('awd:cancel-restart-recovery')
+          try {
+            if (data.isDirectory) await openLocalRootPath(data.path)
+            else await openLocalFilePath(data.path)
+          } catch (e) {
+            uni.showToast({ title: (e && e.message) || this.$t('shell.menuActionFailed'), icon: 'none' })
+          } finally {
+            if (data.requestId) host.menu?.ackOpenPath?.(data.requestId)
+          }
+        })()
+        return systemOpenPending
       })
     }
     // IDE 化：拖一个文件夹到窗口任意位置 = 打开为项目（capture 段拦截，
@@ -113,6 +169,7 @@ export default {
             confirmText: this.$t('shell.open'),
             success: (r) => {
               if (r.confirm) {
+                uni.$emit('awd:cancel-restart-recovery')
                 openLocalRootPath(path).catch((err) => {
                   uni.showToast({ title: (err && err.message) || this.$t('shell.openFolderFailed'), icon: 'none' })
                 })

@@ -608,11 +608,19 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           pattern: aiworkdeck-*
           merge-multiple: true
+      - name: Bind full installers to signed update manifest
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: node desktop/scripts/finalize-update-manifest.js artifacts "${GITHUB_REF_NAME#v}"
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
         with:

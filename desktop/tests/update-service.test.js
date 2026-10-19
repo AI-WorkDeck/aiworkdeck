@@ -382,3 +382,100 @@ test('超过 maxBytes 上限：WriteStream 被销毁，不泄漏文件描述符'
   assert.strictEqual(created.length, 1)
   await waitClosed(created[0])
 })
+
+async function fullFixture(t, { hash, prepareError } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'full-upd-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const routes = {}
+  const { server, origin } = await serve(routes)
+  t.after(() => server.close())
+  const asset = Buffer.from('synthetic signed installer')
+  Object.assign(routes, signedManifestRoutes({ schema: 1, latestMajor: '0.12', channels: {
+    '0.12': { latest: '0.12.2', installers: { 'darwin-arm64': { version: '0.12.2', size: asset.length,
+      sha256: hash || crypto.createHash('sha256').update(asset).digest('hex'), urls: [origin + '/installer.dmg'] } } }
+  } }, { '/installer.dmg': asset }))
+  testEnv(t, origin, pubPem)
+  const prepared = []
+  const svc = createUpdateService({ packaged: true, dataDir: root, appVersion: '0.11.0', platform: 'darwin', arch: 'arm64' }, {
+    prepareInstaller: async (file, version) => { prepared.push({ bytes: fs.readFileSync(file), version }); if (prepareError) throw new Error(prepareError) }
+  })
+  return { svc, prepared, asset, ctx: { packaged: true, dataDir: root, appVersion: '0.11.0', platform: 'darwin', arch: 'arm64' } }
+}
+
+test('完整更新：签名清单和安装包哈希通过且原生准备完成才 ready，重复检查仍 ready', async (t) => {
+  const { svc, prepared, asset } = await fullFixture(t)
+  const state = await svc.check()
+  assert.equal(state.phase, 'ready')
+  assert.deepEqual(state.available, { version: '0.12.2', kind: 'installer' })
+  assert.equal(state.majorAvailable, null)
+  assert.equal(prepared.length, 1)
+  assert.deepEqual(prepared[0], { bytes: asset, version: '0.12.2' })
+  assert.equal((await svc.check()).phase, 'ready')
+  assert.equal(prepared.length, 1)
+})
+
+test('完整更新：安装包哈希失败不调用原生准备器', async (t) => {
+  const { svc, prepared } = await fullFixture(t, { hash: 'a'.repeat(64) })
+  const state = await svc.check()
+  assert.equal(state.phase, 'error')
+  assert.equal(state.available, null)
+  assert.equal(prepared.length, 0)
+})
+
+test('完整更新：原生签名或准备失败不误报ready，保留手动下载入口', async (t) => {
+  const { svc } = await fullFixture(t, { prepareError: 'code signature mismatch' })
+  const state = await svc.check()
+  assert.equal(state.phase, 'error')
+  assert.equal(state.available, null)
+  assert.match(state.error, /code signature mismatch/)
+  assert.equal(state.majorAvailable.major, '0.12.2')
+})
+
+test('大文件写盘不再同时累积内存chunks，背压路径仍返回正确哈希', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'upd-stream-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const data = Buffer.alloc(2 * 1024 * 1024, 0x61)
+  const { server, origin } = await serve({ '/large': data })
+  t.after(() => server.close())
+  // Evaluate the real fetch function with an Array constructor proxy that counts
+  // retained response buffers; toFile must never push any response body chunks.
+  const vm = require('vm')
+  const source = fs.readFileSync(path.join(__dirname, '../main/services/update-service.js'), 'utf8')
+  const section = source.slice(source.indexOf('function fetchUrl('), source.indexOf('// 按 urls 顺序尝试'))
+  const context = vm.createContext({ URL, http, https: require('https'), crypto, fs, Buffer, MAX_COMPONENT_BYTES: data.length, FETCH_TIMEOUT_MS: 5000 })
+  vm.runInContext('globalThis.retained = 0; const originalPush = Array.prototype.push; Array.prototype.push = function(...items) { if (items.some(x => Buffer.isBuffer(x))) globalThis.retained += items.reduce((n,x) => n + x.length, 0); return originalPush.apply(this, items) }', context)
+  vm.runInContext(section, context)
+  const target = path.join(root, 'large.bin')
+  const result = await context.fetchUrl(origin + '/large', { toFile: target })
+  assert.equal(context.retained, 0, 'toFile不得同时把完整安装包缓存在chunks')
+  assert.equal(result.size, data.length)
+  assert.equal(result.sha256, crypto.createHash('sha256').update(data).digest('hex'))
+  assert.deepEqual(fs.readFileSync(target), data)
+})
+
+test('main.js实际启动接线把完整包交给prepare，成功后才向renderer发ready', async (t) => {
+  const { ctx, asset } = await fullFixture(t)
+  const calls = [], events = []
+  const main = fs.readFileSync(path.join(__dirname, '../main/main.js'), 'utf8')
+  const begin = main.indexOf("        const { createUpdateService } = require('./services/update-service')")
+  const end = main.indexOf('        updateService.start()', begin) + '        updateService.start()'.length
+  assert.ok(begin > 0 && end > begin)
+  const context = require('vm').createContext({
+    app: {}, overlayCtx: () => ctx,
+    mainWindow: { webContents: { send: (_name, event) => events.push(event.type) } },
+    require: (name) => {
+      if (name === './services/update-service') return { createUpdateService }
+      if (name === './services/pysvc-runtime') return { extractTar }
+      if (name === './services/full-update') return { createFullUpdate: () => ({ lastError: () => null,
+        prepare: async (file, version) => calls.push({ bytes: fs.readFileSync(file), version }) }) }
+      if (name === 'electron') return { autoUpdater: {}, Notification: { isSupported: () => false } }
+      if (name === './app-language') return { t: (x) => x.en }
+      throw new Error('Unexpected module ' + name)
+    }
+  })
+  require('vm').runInContext(`let updateService, fullUpdate; ${main.slice(begin, end)}; globalThis.service = updateService`, context)
+  t.after(() => context.service.stop())
+  assert.equal((await context.service.check()).phase, 'ready')
+  assert.deepEqual(calls, [{ bytes: asset, version: '0.12.2' }])
+  assert.ok(events.includes('ready'))
+})
