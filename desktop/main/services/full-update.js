@@ -146,8 +146,10 @@ function createFullUpdate({ app, autoUpdater, dataDir, platform = process.platfo
       const stderrFd = fs.openSync(stderrFile, 'w')
       let child
       try {
+        // A detached Windows console makes PowerShell exit
+        // before running -File. Unref and file-backed stdio let this helper outlive us.
         child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
-          helper, file], { detached: true, stdio: ['ignore', 'ignore', stderrFd], windowsHide: true, env: windowsPowerShellEnv() })
+          helper, file], { stdio: ['ignore', 'ignore', stderrFd], windowsHide: true, env: windowsPowerShellEnv() })
         await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
       } finally { fs.closeSync(stderrFd) }
       child.unref()
@@ -158,7 +160,7 @@ function createFullUpdate({ app, autoUpdater, dataDir, platform = process.platfo
         if (child.exitCode !== null || child.signalCode !== null) break
         await new Promise((resolve) => setTimeout(resolve, 100))
       }
-      // Do not let a late detached helper install after a successor has started.
+      // Do not let a late helper install after a successor has started.
       // Windows kill terminates this owned process; wait for confirmed exit before
       // allowing main to exit/relaunch. While we are alive it cannot pass Wait-Process.
       if (child.exitCode === null && child.signalCode === null) {
