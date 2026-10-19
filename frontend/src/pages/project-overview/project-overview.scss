@@ -33,6 +33,8 @@ $color-accent: var(--awd-mint); // Mint Green
       padding: 0 16px;
       /* 这两行必须跟着 padding 简写走。少了它们，窗口窄于 1360px（compact 的阈值）
          时简写就把顶栏让位整条吃掉，交通灯直接压在项目名上。 */
+      --awd-header-pad-start: max(16px, var(--awd-titlebar-safe-inline-start));
+      --awd-header-pad-end: max(16px, var(--awd-titlebar-safe-inline-end));
       padding-left: max(16px, var(--awd-titlebar-safe-inline-start));
       padding-right: max(16px, var(--awd-titlebar-safe-inline-end));
     }
@@ -52,6 +54,8 @@ $color-accent: var(--awd-mint); // Mint Green
      非桌面/全屏下是 0，max() 自动退回上面这行的 18px。
      写在这里而不是 App.vue 是刻意的——和自己的 padding 简写同处一份样式表，
      不会被 .compact-mode 那条更高权重的简写吃掉（曾经就是这么坏的）。 */
+  --awd-header-pad-start: max(18px, var(--awd-titlebar-safe-inline-start));
+  --awd-header-pad-end: max(18px, var(--awd-titlebar-safe-inline-end));
   padding-left: max(18px, var(--awd-titlebar-safe-inline-start));
   padding-right: max(18px, var(--awd-titlebar-safe-inline-end));
   position: relative; // For absolute centering
@@ -63,7 +67,12 @@ $color-accent: var(--awd-mint); // Mint Green
 
 .header-left {
   display: flex;
+  flex: 1 1 auto;
   min-width: 0;
+  /* 非 Windows 布局中央有 100px 宽的绝对居中品牌标志（left: 50% 相对 padding-box）。
+     内容区 50% 减去左右非对称安全区内边距差的一半，使左侧区域右缘恒停在中央标志左侧。
+     不得在此容器或 .project-title-row 上设 overflow: hidden，否则会裁切最近项目下拉菜单。 */
+  max-width: calc(50% - (var(--awd-header-pad-start) - var(--awd-header-pad-end)) / 2 - 64px);
   align-items: center;
   gap: 16px;
 }
@@ -108,6 +117,7 @@ $color-accent: var(--awd-mint); // Mint Green
 
 .project-info {
   display: flex;
+  flex: 1 1 auto;
   min-width: 0;
   flex-direction: row;
   align-items: center;
@@ -116,6 +126,8 @@ $color-accent: var(--awd-mint); // Mint Green
 
 .project-title-row {
   display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
   align-items: center;
   gap: 8px;
   position: relative; /* 最近项目切换器下拉的定位基准 */
@@ -123,6 +135,7 @@ $color-accent: var(--awd-mint); // Mint Green
 
 .project-name {
   display: block;
+  flex: 0 1 auto;
   min-width: 0;
   @include text-ellipsis;
   font-size: var(--awd-font-size-title);
@@ -139,7 +152,9 @@ $color-accent: var(--awd-mint); // Mint Green
 /* 协作状态 chip（顶栏；只在案卷已放进团队案件库时渲染） */
 .collab-chip {
   display: flex;
-  flex-shrink: 0;
+  flex: 0 2 auto;
+  min-width: 0;
+  max-width: 220px;
   align-items: center;
   gap: 6px;
   padding: 2px 10px;
@@ -172,14 +187,17 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .collab-chip-dot {
+  flex-shrink: 0;
   width: 7px;
   height: 7px;
   border-radius: 50%;
 }
 
 .collab-chip-text {
+  display: block;
+  min-width: 0;
+  @include text-ellipsis;
   font-size: 12px;
-  white-space: nowrap;
 }
 
 /* 名称原位编辑，箭头独立打开最近项目。 */
@@ -338,6 +356,10 @@ $color-accent: var(--awd-mint); // Mint Green
 
 .project-meta {
   display: flex;
+  flex: 0 4 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   align-items: center;
   font-size: var(--awd-panel-fs-sec);
   color: var(--awd-text-2);
@@ -346,11 +368,18 @@ $color-accent: var(--awd-mint); // Mint Green
   white-space: nowrap;
 }
 
+.meta-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .compact-mode .project-meta {
   display: none;
 }
 
 .meta-divider {
+  flex-shrink: 0;
   color: var(--awd-border);
   font-size: var(--awd-panel-fs-sec);
 }
