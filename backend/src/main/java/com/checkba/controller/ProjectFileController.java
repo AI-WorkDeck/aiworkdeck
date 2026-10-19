@@ -267,6 +267,63 @@ public class ProjectFileController {
         return resp;
     }
 
+    @GetMapping("/{fileId}/archive/entry")
+    public ResponseEntity<byte[]> readArchiveEntry(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @RequestParam("path") String path,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new UnauthorizedException("请先登录");
+        checkFileTreeAccess(projectId, userId);
+        checkFileInProject(fileId, projectId);
+        ProjectFileService.ArchiveEntryContent entry = projectFileService.readArchiveEntry(fileId, path);
+        String name = entry.name().toLowerCase(java.util.Locale.ROOT);
+        // Use an explicit passive-media allowlist: HTML/SVG/XML must never execute at the API origin.
+        String extension = name.substring(name.lastIndexOf('.') + 1);
+        String mediaType = switch (extension) {
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "bmp" -> "image/bmp";
+            case "avif" -> "image/avif";
+            case "pdf" -> "application/pdf";
+            case "mp3" -> "audio/mpeg";
+            case "m4a" -> "audio/mp4";
+            case "wav" -> "audio/wav";
+            case "mp4" -> "video/mp4";
+            case "webm" -> "video/webm";
+            case "txt", "md", "csv", "json", "log" -> "text/plain;charset=UTF-8";
+            default -> "application/octet-stream";
+        };
+        return ResponseEntity.ok()
+                .header("Content-Type", mediaType)
+                .header("Content-Disposition", org.springframework.http.ContentDisposition.attachment()
+                        .filename(entry.name(), java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Security-Policy", "sandbox; default-src 'none'")
+                .header("Cache-Control", "private, no-store")
+                .contentLength(entry.bytes().length)
+                .body(entry.bytes());
+    }
+
+    @PostMapping("/{fileId}/archive/import-entry")
+    public ProjectFile importArchiveEntry(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @RequestBody ImportArchiveEntryRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new UnauthorizedException("请先登录");
+        checkFileWriteAccess(projectId, userId);
+        checkFileInProject(fileId, projectId);
+        Long parentId = request.getParentId();
+        if (Long.valueOf(0L).equals(parentId)) parentId = null;
+        checkParentFolder(parentId, projectId);
+        return projectFileService.importArchiveEntry(projectId, fileId, request.getPath(), parentId, userId);
+    }
+
     /**
      * 解压压缩包到其所在目录下的新文件夹
      * POST /api/projects/{projectId}/files/{fileId}/archive/extract
@@ -755,6 +812,12 @@ public class ProjectFileController {
         public void setParentId(Long parentId) { this.parentId = parentId; }
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
+    }
+
+    @Data
+    static class ImportArchiveEntryRequest {
+        private String path;
+        private Long parentId;
     }
 
     static class CreateFileRequest {

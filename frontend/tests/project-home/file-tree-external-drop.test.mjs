@@ -47,6 +47,7 @@ const IMPORT_NAMES = [
   'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagSelector',
   'TagManager', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
   'createTag', 'createTask', 'importLocalFile', 'getProjectFileAccess', 'updateProjectFileAccess',
+  'isArchiveEntryDrag', 'readArchiveEntryDrag', 'importArchiveEntry',
   'nativeEvent', 'nativeDataTransfer', 'isExternalFileDrag', 'compatibleDropEffect', 'claimExternalDrop', 'captureDroppedFiles', 'importDroppedFile',
   'prefetchLocalFilePath', 'startExternalFileDrag',
 ]

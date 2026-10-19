@@ -1433,3 +1433,15 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 ## 业务侧栏真实插件迁移（#1340，待发版）
 
 8个业务包为search/voice/desensitize/litigation-visual/calendar/favorites/clipboard/insight；tmeet由已有tencent-meeting包承接。布局从manifest contributes.views解析，动态PluginPane承载sidebar/workspace，global无项目可开，project受项目/CLIENT门控。源在frontend/plugin-app，构建npm run build:plugins；npm run build:h5先构建8包。业务服务桥分pluginBusinessServices/pluginCollectionServices/pluginVoiceServices/pluginInsightServices，账号与本机设备仍在宿主。日历深链转插件workspace视图，保留task/file/focus过滤。核心保留home/projects/files/dev/market/version/staging/members及受限CLIENT dd-files，详见PLUGIN_SPEC §17盘点。验证除了单元测试还需真实Uni+opaque sandbox：ES模块静态资产需要仅plugin-web路由ACAO:*；不增加allow-same-origin或unsafe-eval。
+
+
+## Finder 式图片快览（dev-board#1359，2026-10-19）
+
+图片单击只选中；已有普通图片预览标签时单击/上下键安全替换当前图片，不增加标签、不覆盖编辑文档。
+空格打开 `QuickLookDialog`，上下键沿树的可见文件切换，空格/Esc关闭并恢复树焦点；双击打开正式标签。
+其他文档原单击打开习惯保留。FileTree 新事件 `file-navigate` / `quick-look` / `file-open` 接至
+`fileOpenTabs` 方法组；双击在真实DOM根委托，避免uni的事件包装。输入框、重命名、回收站和选择模式有守卫。
+弹窗复用 FilePreview、独立 overlay holder，`quick-look-open` 只以 visibility 隐藏后台 pane-content 原生画布；
+不能隐藏弹窗自己的预览。所有蒙层 no-drag；卸载按 holder 释放，不清其他弹窗的状态。
+回归 `file-tree-keyboard` / `file-tab-focus`；`finder-preview-ui.mjs` 使用真实工作台
+与合成API验证原生键鼠、首次单击不建标签、双击标签、上下联动、关闭焦点及overlay模块实际状态。

@@ -2,6 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // File preview / picker / staging / search / tag component copy
 export default {
+  archiveContents: 'Archive contents',
+  archivePreview: 'File preview',
+  archiveSelectEntry: 'Select a file to preview it here',
+  archivePreparing: 'Reading file…',
+  archiveRetry: 'Retry',
+  archiveDragReady: 'Drag into the file explorer, or out to WeChat, Mail or Finder',
+  archiveDragHint: 'Drag into the file explorer to copy this file',
+  archiveNestedHint: 'Copy this archive into the file explorer to open it',
+  archiveDragFailed: 'Unable to drag out this file. Please retry.',
+  archivePrepareDrag: 'Preparing file. Drag out after the preview loads.',
+
   // FileTree.vue: root-level _模板 folder (dev-board#112)
   templateFolderHint: 'Template folder: drop your firm\'s report templates here; once learned, AI drafts with their fonts, numbering and table styles',
 
@@ -123,6 +134,8 @@ export default {
   matchesSuffix: 'matches',
   filesSuffix: 'files',
   searchAllFiles: 'Search across all files',
+  quickLookHint: 'Space / Esc to close · ↑ ↓ to browse',
+  quickLookOpen: 'Open in tab',
   // QuickOpenPanel.vue
   quickOpenPlaceholder: 'Type a file name and press Enter to open',
   loadingFileList: 'Loading file list…',
