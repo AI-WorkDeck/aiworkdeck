@@ -83,6 +83,13 @@ function deferWindowsLaunch(dataDir, isAlive = (pid) => { try { process.kill(pid
   } catch (_) { return false }
 }
 
+// pwsh -> Node -> powershell.exe otherwise inherits incompatible PS7 modules.
+// Let Windows PowerShell construct its own default system module search path.
+// https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_psmodulepath#starting-windows-powershell-from-powershell-7
+function windowsPowerShellEnv(env = process.env) {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => key.toUpperCase() !== 'PSMODULEPATH'))
+}
+
 function createFullUpdate({ app, autoUpdater, dataDir, platform = process.platform }, command = run) {
   let prepared = null
   return {
@@ -92,7 +99,7 @@ function createFullUpdate({ app, autoUpdater, dataDir, platform = process.platfo
       } else if (platform === 'win32') {
         // The signed manifest pins exact bytes; Authenticode adds Windows trust.
         await command('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-          `$s=Get-AuthenticodeSignature -LiteralPath '${file.replace(/'/g, "''")}'; if ($s.Status -ne 'Valid') { throw 'Invalid installer signature' }` ])
+          `$s=Get-AuthenticodeSignature -LiteralPath '${file.replace(/'/g, "''")}'; if ($s.Status -ne 'Valid') { throw 'Invalid installer signature' }` ], { env: windowsPowerShellEnv() })
       } else throw new Error('此平台不支持完整自动更新')
       const hash = crypto.createHash('sha256')
       for await (const chunk of fs.createReadStream(file)) hash.update(chunk)
@@ -130,12 +137,13 @@ function createFullUpdate({ app, autoUpdater, dataDir, platform = process.platfo
       }
       const file = lockPath(dataDir)
       const job = { parentPid: process.pid, installer: prepared.file, executable: process.execPath, sha256: prepared.sha256, restart: !!restart }
-      fs.writeFileSync(file + '.job', JSON.stringify(job))
+      const jobContents = JSON.stringify(job)
+      fs.writeFileSync(file + '.job', jobContents)
       fs.rmSync(file + '.launch', { force: true })
       const helper = path.join(path.dirname(file), 'install-update.ps1')
       fs.copyFileSync(path.join(__dirname, 'install-update.ps1'), helper) // PowerShell cannot read app.asar
       const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
-        helper, file], { detached: true, stdio: 'ignore', windowsHide: true })
+        helper, file], { detached: true, stdio: 'ignore', windowsHide: true, env: windowsPowerShellEnv() })
       await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
       child.unref()
       // Handshake before exiting: a failed helper must not leave a phantom update.
@@ -143,9 +151,22 @@ function createFullUpdate({ app, autoUpdater, dataDir, platform = process.platfo
         try { if (JSON.parse(fs.readFileSync(file, 'utf8')).helperPid === child.pid) return false } catch (_) { /* starting */ }
         await new Promise((resolve) => setTimeout(resolve, 100))
       }
+      // Do not let a late detached helper install after a successor has started.
+      // Windows kill terminates this owned process; wait for confirmed exit before
+      // allowing main to exit/relaunch. While we are alive it cannot pass Wait-Process.
+      if (child.exitCode === null && child.signalCode === null) {
+        child.ref()
+        await new Promise((resolve) => { child.once('exit', resolve); child.kill() })
+      }
+      try {
+        if (JSON.parse(fs.readFileSync(file, 'utf8')).helperPid === child.pid) fs.rmSync(file, { force: true })
+      } catch (_) { /* no lock from this helper */ }
+      try {
+        if (fs.readFileSync(file + '.job', 'utf8') === jobContents) fs.rmSync(file + '.job', { force: true })
+      } catch (_) { /* job was already consumed or replaced */ }
       throw new Error('更新安装器未能启动')
     }
   }
 }
 
-module.exports = { createFullUpdate, prepareMac, deferWindowsLaunch, lockPath }
+module.exports = { createFullUpdate, prepareMac, deferWindowsLaunch, lockPath, windowsPowerShellEnv }

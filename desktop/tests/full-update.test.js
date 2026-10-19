@@ -8,7 +8,7 @@ const os = require('os')
 const http = require('http')
 const crypto = require('crypto')
 const { EventEmitter } = require('events')
-const { prepareMac, createFullUpdate, deferWindowsLaunch, lockPath } = require('../main/services/full-update')
+const { prepareMac, createFullUpdate, deferWindowsLaunch, lockPath, windowsPowerShellEnv } = require('../main/services/full-update')
 const { finalize } = require('../scripts/finalize-update-manifest')
 function root(t) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'full-update-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); return dir }
 function get(url) { return new Promise((resolve, reject) => http.get(url, (res) => { const chunks = []; res.on('data', (b) => chunks.push(b)); res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) })); res.on('error', reject) }).on('error', reject)) }
@@ -94,7 +94,7 @@ test('发布汇总：缺任一平台拒绝，齐套后将真实字节哈希绑�
 })
 
 test('Windows helper：NSIS失败落日志并保留安装包，普通退出不重开', { skip: process.platform !== 'win32' }, () => {
-  const result = require('child_process').spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'install-update.test.ps1')], { encoding: 'utf8' })
+  const result = require('child_process').spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'install-update.test.ps1')], { encoding: 'utf8', env: windowsPowerShellEnv() })
   assert.equal(result.status, 0, result.stderr || result.stdout)
 })
 
@@ -135,4 +135,88 @@ test('Windows安装期间用文件关联快开：下一进程仍收到原文档'
   fs.writeFileSync(file, JSON.stringify({ helperPid: 12345 }))
   assert.equal(deferWindowsLaunch(dir, () => true, () => {}, ['C:\\材料\\合同.docx']), true)
   assert.deepEqual(require('../main/open-paths').readQueuedPaths(path.join(dir, 'restart-open-paths.json')), ['C:\\材料\\合同.docx'])
+})
+
+
+test('Windows PowerShell子进程只清除继承的模块搜索路径，保留其他环境且不修改父进程', () => {
+  const env = { Path: 'runtime-bin', PSModulePath: 'PS7-modules', psMODULEpath: 'other-PS7-modules', TEMP: 'temp-dir' }
+  assert.deepEqual(windowsPowerShellEnv(env), { Path: 'runtime-bin', TEMP: 'temp-dir' })
+  assert.equal(env.PSModulePath, 'PS7-modules')
+})
+
+test('Windows真实PowerShell：污染模块路径导致失败，生产环境修复后真实hash与签名命令可用', { skip: process.platform !== 'win32' }, async t => {
+  const dir = root(t)
+  const input = path.join(dir, 'unsigned.txt')
+  fs.writeFileSync(input, 'installer integrity fixture')
+  // Model PS7 module inheritance without relying on which pwsh CI installed.
+  // Windows PowerShell must not try loading these incompatible module versions.
+  for (const name of ['Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Security']) {
+    const moduleDir = path.join(dir, 'incompatible-modules', name)
+    fs.mkdirSync(moduleDir, { recursive: true })
+    fs.writeFileSync(path.join(moduleDir, name + '.psd1'), "@{ ModuleVersion = '99.0'; PowerShellVersion = '99.0'; RootModule = 'unavailable.psm1' }")
+  }
+  const polluted = { ...windowsPowerShellEnv(), PSModulePath: path.join(dir, 'incompatible-modules') }
+  const command = `$ErrorActionPreference='Stop'; $f='${input.replace(/'/g, "''")}'; @{ hash=(Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash; signature=(Get-AuthenticodeSignature -LiteralPath $f).Status.ToString() } | ConvertTo-Json -Compress`
+  const { spawnSync } = require('child_process')
+  const bad = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { env: polluted, encoding: 'utf8' })
+  assert.notEqual(bad.status, 0, '负例必须先证明模块路径污染确实使真实命令失败')
+  assert.match(bad.stderr, /Get-FileHash|Microsoft.PowerShell.Utility/)
+  const good = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { env: windowsPowerShellEnv(polluted), encoding: 'utf8' })
+  assert.equal(good.status, 0, good.stderr || good.stdout)
+  const result = JSON.parse(good.stdout)
+  assert.equal(result.hash.toLowerCase(), crypto.createHash('sha256').update(fs.readFileSync(input)).digest('hex'))
+  assert.equal(result.signature, 'NotSigned')
+  // Exercise the shipping Authenticode preflight too: it must reject unsigned
+  // bytes for the signature reason, never because the cmdlet could not load.
+  const original = process.env.PSModulePath
+  process.env.PSModulePath = polluted.PSModulePath
+  try {
+    const updater = createFullUpdate({ platform: 'win32', dataDir: dir })
+    await assert.rejects(updater.prepare(input, '0.12.0'), /Invalid installer signature/)
+    assert.equal(updater.isReady(), false)
+  } finally {
+    if (original === undefined) delete process.env.PSModulePath
+    else process.env.PSModulePath = original
+  }
+})
+
+
+test('Windows helper握手超时必须确认子进程退出，再允许main退出；不删除其他helper的锁或job', async t => {
+  const vm = require('node:vm')
+  const source = fs.readFileSync(path.join(__dirname, '../main/services/full-update.js'), 'utf8')
+  for (const replaced of [false, true]) {
+    const dir = root(t), file = lockPath(dir), events = []
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    const input = path.join(dir, 'update.exe')
+    fs.writeFileSync(input, 'verified fixture')
+    const child = new EventEmitter()
+    Object.assign(child, { pid: 321, exitCode: null, signalCode: null, unref() {}, ref() {},
+      kill() {
+        events.push('kill')
+        // A helper can finish starting just as the handshake expires.
+        fs.writeFileSync(file, JSON.stringify({ helperPid: replaced ? 999 : child.pid }))
+        if (replaced) fs.writeFileSync(file + '.job', 'different helper job')
+        return true
+      }
+    })
+    const context = vm.createContext({ module: { exports: {} }, __dirname: path.join(__dirname, '../main/services'),
+      process, Buffer, setTimeout: resolve => setImmediate(resolve), clearTimeout,
+      require(name) {
+        if (name === 'child_process') return { ...require(name), spawn: () => { setImmediate(() => child.emit('spawn')); return child } }
+        return require(name)
+      }
+    })
+    vm.runInContext(source, context)
+    const updater = context.module.exports.createFullUpdate({ platform: 'win32', dataDir: dir }, async () => ({}))
+    await updater.prepare(input, '0.12.0')
+    let settled = false
+    const attempt = updater.installOnQuit(false).then(() => { settled = true }, error => { settled = true; return error })
+    while (!events.length) await new Promise(resolve => setImmediate(resolve))
+    assert.equal(settled, false, '发kill还不够，必须等exit确认才能交还main')
+    child.signalCode = 'SIGTERM'; child.emit('exit', null, 'SIGTERM')
+    assert.match((await attempt).message, /更新安装器未能启动/)
+    assert.equal(fs.existsSync(file), replaced)
+    assert.equal(fs.existsSync(file + '.job'), replaced)
+    if (replaced) assert.equal(fs.readFileSync(file + '.job', 'utf8'), 'different helper job')
+  }
 })

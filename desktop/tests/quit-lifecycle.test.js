@@ -149,7 +149,7 @@ function section(from, to) {
   return MAIN_SRC.slice(start, end)
 }
 
-function quitHarness({ stopAll, prepare = async () => {}, fullUpdate = null, restart = false }) {
+function quitHarness({ stopAll, prepare = async () => {}, fullUpdate = null, restart = false, noServices = false }) {
   const events = []
   const windows = []
   class Window extends EventEmitter {
@@ -176,12 +176,12 @@ function quitHarness({ stopAll, prepare = async () => {}, fullUpdate = null, res
   vm.runInContext(`
     let quitInProgress = false
     let backendSupervisor = null
-    let services = { stopAll: globalThis.__stopAll }
+    let services = globalThis.__noServices ? null : { stopAll: globalThis.__stopAll }
     let modelManager = { killAllActive: () => globalThis.__events.push('killAllActive') }
     ${section("app.on('activate'", '// 后端有 45s')}
     ${section('const QUIT_STOP_TIMEOUT_MS', "ipcMain.handle('checkba:backend-restart'")}
-  `, Object.assign(context, { __stopAll: stopAll, __events: events }))
-  return { app, windows, events }
+  `, Object.assign(context, { __stopAll: stopAll, __events: events, __noServices: noServices }))
+  return { app, windows, events, quitting: () => vm.runInContext('quitInProgress', context) }
 }
 
 test('before-quit：窗口先藏起来，再去 await stopAll（⌘Q 后不能还有一个能用的窗口杵着）', async () => {
@@ -335,4 +335,27 @@ test('Windows helper握手期间重开不会漏掉稍后重启意图', async () 
   await sleep(10)
   assert.ok(h.events.includes('relaunch'))
   assert.ok(h.events.includes('exit:0'))
+})
+
+
+test('服务尚未初始化时退出直接放行，标记退出以便原生close不会hide或反复quit', async () => {
+  const h = quitHarness({ noServices: true, prepare: async () => { throw new Error('must not prepare') } })
+  let prevented = false
+  h.app.emit('before-quit', { preventDefault() { prevented = true } })
+  assert.equal(prevented, false)
+  assert.equal(h.quitting(), true)
+  assert.deepEqual(h.events, [])
+})
+
+test('原生业务菜单的真实getWindow在退出准备中不可取得旧renderer', () => {
+  const source = section("require('./app-menu').initAppMenu(", '\n  } catch')
+  let getter
+  const win = {}
+  const context = vm.createContext({ mainWindow: win, quitInProgress: false, views: {}, require: () => ({ initAppMenu: getWindow => { getter = getWindow } }) })
+  vm.runInContext(source, context)
+  assert.equal(getter(), win)
+  context.quitInProgress = true
+  assert.equal(getter(), null)
+  context.quitInProgress = false
+  assert.equal(getter(), win)
 })
