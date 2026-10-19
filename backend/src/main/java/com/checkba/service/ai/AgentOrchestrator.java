@@ -141,6 +141,10 @@ public class AgentOrchestrator {
         private volatile Long assistantMessageId;
         private volatile String clientRequestId;
         private String inboxItemId;
+        private volatile boolean restartRequested;
+        private volatile String restartAttemptId;
+        private volatile boolean restartUnsafe;
+        private AiAgentController.AgentChatRequest originalRequest;
         private FileChangeTurn fileChangeTurn = new FileChangeTurn();
         /** 本轮的取消标志。只有 {@link AgentOrchestrator#setCancelled} 解析到的那一轮会被置位。 */
         private final java.util.concurrent.atomic.AtomicBoolean cancelled =
@@ -239,7 +243,7 @@ public class AgentOrchestrator {
             if (canceller != null && cancelled.get()) cancelInflight();
         }
 
-        void cancel() {
+        synchronized void cancel() {
             cancelled.set(true);
             abandonDecision();
             cancelInflight();
@@ -523,11 +527,22 @@ public class AgentOrchestrator {
     public boolean setCancelled(String conversationId) {
         RunGuard guard = activeRuns.get(conversationId);
         if (guard == null) {
+            if (inboxService != null) {
+                // A paused restart checkpoint is cancellable too, without executing it.
+                var state = agentRunStateService.get(conversationId);
+                if (state != null && state.status() == AgentRunStateService.RunStatus.INTERRUPTED) {
+                    agentRunStateService.mark(conversationId, AgentRunStateService.RunStatus.CANCELLED);
+                }
+            }
             log.info("Cancel requested for {} but no run is active, ignoring", conversationId);
             return false;
         }
         log.info("Cancelling conversation {} (run {})", conversationId, guard.runId);
-        guard.cancel();
+        synchronized (guard) {
+            guard.cancel();
+            if (activeRuns.get(conversationId) == null)
+                agentRunStateService.mark(conversationId, AgentRunStateService.RunStatus.CANCELLED);
+        }
         if (subAgentService != null) subAgentService.cancelParentRun(conversationId, guard.runId);
         // 桥上的等待与 LLM 请求是两条独立的阻塞，缺一条停止就还是「按了要等」
         editorBridgeService.cancelPendingActions(conversationId);
@@ -811,7 +826,7 @@ public class AgentOrchestrator {
                                          String projectId, Long userId, String modelId, AgentMode agentMode,
                                          StringBuilder executionLog) {
         AgentInboxService inbox = this.inboxService;
-        if (inbox == null || !inbox.hasPendingSteering(guard.conversationId)) return false;
+        if (inbox == null || restartAttempts.containsKey(userId) || !inbox.hasPendingSteering(guard.conversationId)) return false;
         requireInboxProjectAccess(Long.valueOf(projectId), userId);
         java.util.List<com.checkba.model.entity.AgentInboxItem> inputs =
                 inbox.claimPendingSteering(guard.conversationId, guard.runId);
@@ -1033,6 +1048,9 @@ public class AgentOrchestrator {
         }
         long toolStartMs = System.currentTimeMillis();
         ToolRegistry.ToolResult result = toolRegistry.execute(toolName, argsJson, ctx);
+        // A failed/unknown editor or external effect is not evidence of non-execution.
+        // Do not manufacture a safely resumable snapshot after an ambiguous tool outcome.
+        if (guard != null && !result.success()) guard.restartUnsafe = true;
         // 目录展开只在下一轮生效：本轮的工具集已经发给模型了，中途加进去会让
         // 「一轮内工具集不变」那条契约失效（只加不减，所以不会让已宣布的工具消失）。
         noteToolCategoryExpansion(guard, toolName, argsJson, result, disclosedCategories);
@@ -1414,8 +1432,302 @@ public class AgentOrchestrator {
     public void handleUserMessage(AiAgentController.AgentChatRequest request, Long userId) {
         // 本轮的身份证：runId 在这里签发，随 RunGuard 一路传到每一层递归与两处流式回调。
         // 登记发生在做任何事之前——POST /cancel 靠这张表解析「现在跑的是哪一轮」。
-        RunGuard guard = beginRun(request.getConversationId());
+        RunGuard guard;
+        synchronized (restartAdmission) {
+            if (restartAttempts.containsKey(userId)) throw new IllegalStateException("Application restart is being prepared");
+            guard = beginRun(request.getConversationId());
+            guard.userId = userId;
+            guard.originalRequest = request;
+        }
         launchTurn(request, userId, guard);
+    }
+
+    public record RestartPending(String conversationId, Long projectId, Long activeFileId, String activeFileName) {}
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private BackgroundTaskService restartBackgroundTasks;
+
+    private record ParkedRestart(String attemptId, Long userId, Long projectId, Long activeFileId, long epoch) {}
+    private final java.util.Map<String, ParkedRestart> parkedRestarts = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Object restartAdmission = new Object();
+    private final java.util.Map<Long, String> restartAttempts = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<Long, java.util.Set<String>> abortedRestarts = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public java.util.Map<String, Object> prepareRestart(Long userId, String attemptId) {
+        int running = 0;
+        synchronized (restartAdmission) {
+            if (abortedRestarts.getOrDefault(userId, java.util.Set.of()).contains(attemptId))
+                return java.util.Map.of("ready", false, "aborted", true, "running", 0, "suspended", 0);
+            restartAttempts.put(userId, attemptId);
+            for (RunGuard guard : activeRuns.values()) {
+                if (!java.util.Objects.equals(userId, guard.userId) || guard.originalRequest == null
+                        || "office".equalsIgnoreCase(guard.originalRequest.getClientCapability())) continue;
+                guard.restartRequested = true;
+                guard.restartAttemptId = attemptId;
+                running++;
+            }
+        }
+        if (restartBackgroundTasks != null) running += (int) restartBackgroundTasks.getActiveTasksForUser(userId).stream()
+                .filter(task -> clientCapabilities == null || clientCapabilities.capabilityOf(task.getConversationId())
+                        != ClientCapabilityService.Capability.OFFICE).count();
+        return java.util.Map.of("ready", running == 0, "running", running,
+                "suspended", pendingRestarts(userId).size());
+    }
+
+    public List<RestartPending> pendingRestarts(Long userId) {
+        if (inboxService == null || userId == null) return List.of();
+        List<RestartPending> pending = new java.util.ArrayList<>();
+        for (var row : inboxService.restartCheckpoints(userId)) {
+            var state = agentRunStateService.get(row.getConversationId());
+            if (state == null || state.status() != AgentRunStateService.RunStatus.INTERRUPTED) continue;
+            var cp = inboxService.restartCheckpoint(row);
+            if (!restartAccountMatches(cp)) continue;
+            try { requireInboxProjectAccess(row.getProjectId(), userId); }
+            catch (SecurityException denied) { continue; }
+            pending.add(new RestartPending(row.getConversationId(), row.getProjectId(),
+                    cp.path("guard").path("activeFileId").isNumber() ? cp.path("guard").path("activeFileId").longValue() : null,
+                    cp.path("guard").path("activeFileName").asText(null)));
+        }
+        return pending;
+    }
+
+    private boolean restartAccountMatches(com.fasterxml.jackson.databind.JsonNode cp) {
+        return cp != null && cp.path("version").asInt() == 1
+                && java.util.Objects.equals(cp.path("accountFingerprint").asText(null),
+                trialTurnMeter == null ? null : trialTurnMeter.accountFingerprint());
+    }
+
+    public java.util.Map<String, Object> abortRestart(Long userId, String attemptId) {
+        synchronized (restartAdmission) {
+            abortedRestarts.computeIfAbsent(userId, key -> java.util.concurrent.ConcurrentHashMap.newKeySet()).add(attemptId);
+            if (!restartAttempts.remove(userId, attemptId)) return java.util.Map.of("aborted", true, "resumed", 0, "paused", 0);
+        }
+        for (RunGuard guard : activeRuns.values()) {
+            synchronized (guard) {
+                if (java.util.Objects.equals(userId, guard.userId)) guard.restartRequested = false;
+            }
+        }
+        int resumed = 0;
+        int paused = 0;
+        for (var entry : List.copyOf(parkedRestarts.entrySet())) {
+            ParkedRestart parked = entry.getValue();
+            if (!java.util.Objects.equals(userId, parked.userId()) || !attemptId.equals(parked.attemptId())) continue;
+            // Same renderer binding is required. If it navigated/reconnected, leave a visible
+            // checkpoint for the workbench to reopen rather than send edits to another editor.
+            try {
+                if (sseEmitterService.currentEpoch(entry.getKey()) == parked.epoch()
+                        && resumeRestart(entry.getKey(), parked.projectId(), parked.activeFileId(), userId)) resumed++;
+                else paused++;
+            } catch (RuntimeException failure) { paused++; }
+        }
+        return java.util.Map.of("aborted", true, "resumed", resumed, "paused", paused);
+    }
+
+    public boolean resumeRestart(String conversationId, Long projectId, Long activeFileId, Long userId) {
+        if (inboxService == null || restartAttempts.containsKey(userId)) return false;
+        synchronized (inboxService.conversationLock(conversationId)) {
+            RunGuard running = activeRuns.get(conversationId);
+            if (running != null) return java.util.Objects.equals(running.userId, userId)
+                    && running.originalRequest != null && java.util.Objects.equals(running.originalRequest.getProjectId(), projectId)
+                    && java.util.Objects.equals(running.activeFileId, activeFileId);
+            var state = agentRunStateService.get(conversationId);
+            if (state == null || state.status() != AgentRunStateService.RunStatus.INTERRUPTED) return false;
+            var row = inboxService.restartCheckpoints(userId).stream()
+                    .filter(item -> conversationId.equals(item.getConversationId())
+                            && java.util.Objects.equals(projectId, item.getProjectId())).findFirst().orElse(null);
+            if (row == null) return false;
+            requireInboxExecutionAccess(conversationId, row.getId(), userId);
+            var cp = inboxService.restartCheckpoint(row);
+            if (!restartAccountMatches(cp)) return false;
+            var data = cp.path("guard");
+            Long expectedFileId = data.path("activeFileId").isNumber() ? data.path("activeFileId").longValue() : null;
+            if (!java.util.Objects.equals(expectedFileId, activeFileId)) return false;
+            var request = inboxService.requestMetadataOf(row);
+            if ("office".equalsIgnoreCase(request.getClientCapability())) return false;
+            var messages = new java.util.ArrayList<>(dev.langchain4j.data.message.ChatMessageDeserializer
+                    .messagesFromJson(cp.path("messages").asText()));
+            StringBuilder executionLog = new StringBuilder(cp.path("executionLog").asText());
+            com.checkba.service.AppLanguageScope.run(request.getAppLanguage(), () -> messages.add(dev.langchain4j.data.message.UserMessage.from(LangText.of(
+                    "[系统恢复提示] 应用已重新启动；上面的工具结果是已完成步骤，不得重放已完成的修改或外部操作。继续原授权任务前，重新读取原目标的当前内容核对进度；编辑器锚点需重新定位，不能复用重启前锚点。恢复本身不扩大授权范围。",
+                    "[System recovery] The app restarted. Prior tool results represent completed steps; do not repeat completed edits or external actions. Before continuing the original authorized task, read the original target again to verify progress. Resolve editor anchors again; pre-restart anchors are stale. Restart does not expand authorization."))));
+            RunGuard guard = new RunGuard(conversationId, row.getRunId(), sseEmitterService.currentEpoch(conversationId));
+            restoreRestartGuard(guard, data);
+            guard.inboxItemId = row.getId();
+            guard.userId = userId;
+            guard.originalRequest = request;
+            if (data.path("decisionChannel").isTextual() && !guard.decisionAbandoned) {
+                guard.decisionContext = new DecisionAssistContext(request.isDecisionAssistEnabled(), projectId, userId,
+                        conversationId, request.getModel(), com.checkba.config.AiModelProperties.Provider.valueOf(data.path("decisionChannel").asText()));
+                guard.decisionInput = request.getMessage();
+            }
+            guard.trialAccountFingerprint = cp.path("accountFingerprint").asText(null);
+            guard.trace.restoreForRestart(cp.path("trace").asText(), cp.path("reasoning").asText(null));
+            guard.streamContent.append(cp.path("streamContent").asText());
+            List<String> skills = new java.util.ArrayList<>();
+            cp.path("skills").forEach(id -> skills.add(id.asText()));
+            skillRouter.activateForTurn(conversationId, guard.runId, request.getMessage(), request.getPinnedSkillId(),
+                    request.getAgentMode() == AgentMode.ASK ? null : request.getSkillIds());
+            skillRouter.restoreAutomaticSkills(conversationId, guard.runId, skills);
+            var restoredSkills = skillRouter.activeSkills(guard.runId).stream().map(skill -> skill.definition().getId())
+                    .collect(java.util.stream.Collectors.toSet());
+            if (!restoredSkills.equals(new java.util.HashSet<>(skills))) {
+                skillRouter.clearRun(guard.runId);
+                return false;
+            }
+            // Consume durably before any new model/tool work. An uncertain crash after this point
+            // returns to the explicit interruption path, never replays this checkpoint twice.
+            synchronized (restartAdmission) {
+                if (restartAttempts.containsKey(userId)) { skillRouter.clearRun(guard.runId); return false; }
+                inboxService.consumeRestartCheckpoint(row.getId());
+                parkedRestarts.remove(conversationId);
+                activeRuns.put(conversationId, guard);
+            }
+            if (clientCapabilities != null) clientCapabilities.record(conversationId, request.getClientCapability(),
+                    request.getOfficeHost(), request.getOfficeFamily());
+            agentRunStateService.mark(conversationId, AgentRunStateService.RunStatus.RUNNING, projectId, userId);
+            sendRunEvent(guard, "run_state", "{\"status\":\"RUNNING\"}");
+            sendRunEvent(guard, "state_recovery", guard.trace.recoveryPayload(guard.streamSnapshot()));
+            Runnable turn = () -> com.checkba.service.AppLanguageScope.run(request.getAppLanguage(),
+                    () -> PlatformAiUserScope.run(userId, () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
+                        try {
+                            requireInboxExecutionAccess(conversationId, row.getId(), userId);
+                            if (!restartAccountMatches(cp)) throw new SecurityException("Account changed during restart");
+                            runLoop(chatModelFactory.getStreamingChatModel(cp.path("modelId").asText()), messages,
+                                    conversationId, String.valueOf(projectId), userId, cp.path("modelId").asText(),
+                                    cp.path("depth").asInt(), executionLog,
+                                    AgentMode.valueOf(cp.path("mode").asText()), guard);
+                        } catch (Throwable e) {
+                            finishWithError(guard, String.valueOf(projectId), userId, "Restart continuation failed", executionLog);
+                        }
+                    })));
+            try { if (turnExecutor == null) turn.run(); else turnExecutor.execute(turn); }
+            catch (RuntimeException rejected) {
+                // Submission rejection has executed no model/tool: preserve the exact checkpoint.
+                inboxService.saveRestartCheckpoint(row.getId(), cp);
+                agentRunStateService.suspendForRestart(conversationId, projectId, userId);
+                endRun(guard);
+                return false;
+            }
+            return true;
+        }
+    }
+
+    private boolean suspendForRestart(List<dev.langchain4j.data.message.ChatMessage> messages, String projectId,
+                                      Long userId, String modelId, int depth, StringBuilder executionLog,
+                                      AgentMode mode, RunGuard guard) {
+        synchronized (guard) {
+            if (guard.isCancelled() || !guard.restartRequested || guard.restartUnsafe || guard.inboxItemId == null || inboxService == null
+                    || (restartBackgroundTasks != null && restartBackgroundTasks.hasActiveTasks(guard.conversationId))
+                    || !guard.fileChangeTurn.pending.isEmpty() || !isCurrentRun(guard) || editorBridgeService.isStreamingMode(guard.conversationId)) return false;
+            try {
+                var cp = SKILL_UPDATE_MAPPER.createObjectNode();
+                cp.put("version", 1); cp.put("accountFingerprint", guard.trialAccountFingerprint);
+                cp.put("messages", dev.langchain4j.data.message.ChatMessageSerializer.messagesToJson(messages));
+                cp.put("executionLog", executionLog.toString()); cp.put("modelId", modelId);
+                cp.put("mode", mode.name()); cp.put("depth", depth);
+                cp.put("trace", guard.trace.recoveryPayload(guard.streamSnapshot()));
+                cp.put("reasoning", guard.trace.reasoningJson()); cp.put("streamContent", guard.streamSnapshot());
+                cp.set("guard", snapshotRestartGuard(guard));
+                cp.set("skills", SKILL_UPDATE_MAPPER.valueToTree(skillRouter.activeSkills(guard.runId).stream()
+                        .map(skill -> skill.definition().getId()).toList()));
+                // The checkpoint is durable before the run becomes eligible for shutdown.
+                inboxService.saveRestartCheckpoint(guard.inboxItemId, cp);
+                agentRunStateService.suspendForRestart(guard.conversationId, Long.valueOf(projectId), userId);
+                parkedRestarts.put(guard.conversationId, new ParkedRestart(guard.restartAttemptId, userId,
+                        Long.valueOf(projectId), guard.activeFileId, guard.connectionEpoch));
+                sendRunEvent(guard, "run_state", "{\"status\":\"INTERRUPTED\",\"reason\":\"restart_ready\"}");
+                endRun(guard);
+                return true;
+            } catch (RuntimeException failure) {
+                log.warn("Could not checkpoint run {} for restart", guard.runId);
+                // If snapshot persistence was partial, do not perform more side effects behind it.
+                // The quit preparation reports this as blocked until the user cancels the attempt.
+                guard.restartUnsafe = true;
+                try { inboxService.consumeRestartCheckpoint(guard.inboxItemId); }
+                catch (RuntimeException cannotInvalidate) {
+                    finishWithError(guard, projectId, userId, "Restart checkpoint could not be saved", executionLog);
+                    return true;
+                }
+                return false;
+            }
+        }
+    }
+
+    private com.fasterxml.jackson.databind.node.ObjectNode snapshotRestartGuard(RunGuard guard) {
+        var json = SKILL_UPDATE_MAPPER.createObjectNode();
+        json.put("assistantMessageId", guard.assistantMessageId);
+        json.put("clientRequestId", guard.clientRequestId);
+        json.put("documentEdited", guard.documentEdited);
+        json.put("producedText", guard.producedText);
+        json.put("consecutiveFailures", guard.consecutiveFailures);
+        json.put("llmRetries", guard.llmRetries);
+        json.put("malformedToolRounds", guard.malformedToolRounds);
+        json.put("overflowCompactions", guard.overflowCompactions);
+        json.put("activeFileId", guard.activeFileId);
+        json.put("defaultOutputFolderId", guard.defaultOutputFolderId);
+        json.put("activeFileName", guard.activeFileName);
+        json.put("opinionCompletionCheckDone", guard.opinionCompletionCheckDone);
+        json.put("opinionTargetFileId", guard.opinionTargetFileId);
+        json.put("opinionTargetFileName", guard.opinionTargetFileName);
+        json.put("activeDocKind", guard.activeDocKind);
+        json.put("docCategoryTrimActive", guard.docCategoryTrimActive);
+        json.put("catalogOffered", guard.catalogOffered);
+        json.put("llmRounds", guard.llmRounds);
+        json.put("promptTokensRecorded", guard.promptTokensRecorded);
+        json.set("opinionInstructions", SKILL_UPDATE_MAPPER.valueToTree(guard.opinionInstructions));
+        json.set("clarificationSkillIds", SKILL_UPDATE_MAPPER.valueToTree(guard.clarificationSkillIds));
+        json.set("expandedToolCategories", SKILL_UPDATE_MAPPER.valueToTree(guard.expandedToolCategories));
+        json.set("unusableTools", SKILL_UPDATE_MAPPER.valueToTree(guard.unusableTools));
+        json.set("triedModels", SKILL_UPDATE_MAPPER.valueToTree(guard.triedModels));
+        json.set("stuck", SKILL_UPDATE_MAPPER.valueToTree(guard.stuck.snapshot()));
+        json.set("reportedFiles", SKILL_UPDATE_MAPPER.valueToTree(guard.fileChangeTurn.reported));
+        if (guard.decisionContext != null && guard.decisionContext.expectedChannel() != null)
+            json.put("decisionChannel", guard.decisionContext.expectedChannel().name());
+        json.put("decisionAttempted", guard.decisionAttempted);
+        json.put("decisionAbandoned", guard.decisionAbandoned);
+        json.put("assistedDisclosure", guard.assistedDisclosure);
+        json.put("platformUsed", guard.platformUsed.get());
+        json.put("trialReported", guard.trialReported.get());
+        return json;
+    }
+
+    private void restoreRestartGuard(RunGuard guard, com.fasterxml.jackson.databind.JsonNode json) {
+        guard.assistantMessageId = json.path("assistantMessageId").isNumber() ? json.path("assistantMessageId").longValue() : null;
+        guard.clientRequestId = json.path("clientRequestId").asText(null);
+        guard.documentEdited = json.path("documentEdited").asBoolean();
+        guard.producedText = json.path("producedText").asBoolean();
+        guard.consecutiveFailures = json.path("consecutiveFailures").asInt();
+        guard.llmRetries = json.path("llmRetries").asInt();
+        guard.malformedToolRounds = json.path("malformedToolRounds").asInt();
+        guard.overflowCompactions = json.path("overflowCompactions").asInt();
+        guard.activeFileId = json.path("activeFileId").isNumber() ? json.path("activeFileId").longValue() : null;
+        guard.defaultOutputFolderId = json.path("defaultOutputFolderId").isNumber() ? json.path("defaultOutputFolderId").longValue() : null;
+        guard.activeFileName = json.path("activeFileName").asText(null);
+        guard.opinionCompletionCheckDone = json.path("opinionCompletionCheckDone").asBoolean();
+        guard.opinionTargetFileId = json.path("opinionTargetFileId").isNumber() ? json.path("opinionTargetFileId").longValue() : null;
+        guard.opinionTargetFileName = json.path("opinionTargetFileName").asText(null);
+        guard.activeDocKind = json.path("activeDocKind").asText(null);
+        guard.docCategoryTrimActive = json.path("docCategoryTrimActive").asBoolean();
+        guard.catalogOffered = json.path("catalogOffered").asBoolean();
+        guard.llmRounds = json.path("llmRounds").asInt();
+        guard.promptTokensRecorded = json.path("promptTokensRecorded").asBoolean();
+        guard.clarificationSkillIds = new java.util.ArrayList<>();
+        guard.unusableTools = new java.util.HashSet<>();
+        json.path("opinionInstructions").forEach(value -> guard.opinionInstructions.add(value.asText()));
+        json.path("clarificationSkillIds").forEach(value -> guard.clarificationSkillIds.add(value.asText()));
+        json.path("expandedToolCategories").forEach(value -> guard.expandedToolCategories.add(value.asText()));
+        json.path("unusableTools").forEach(value -> guard.unusableTools.add(value.asText()));
+        json.path("triedModels").forEach(value -> guard.triedModels.add(value.asText()));
+        try { guard.stuck.restore(SKILL_UPDATE_MAPPER.treeToValue(json.path("stuck"), StuckDetector.Snapshot.class)); }
+        catch (Exception invalid) { throw new IllegalStateException("Invalid restart progress", invalid); }
+        guard.fileChangeTurn.clientRequestId = guard.clientRequestId;
+        guard.fileChangeTurn.assistantMessageId = guard.assistantMessageId;
+        json.path("reportedFiles").forEach(value -> guard.fileChangeTurn.reported.add(value.asText()));
+        guard.decisionAttempted = json.path("decisionAttempted").asBoolean();
+        guard.decisionAbandoned = json.path("decisionAbandoned").asBoolean();
+        guard.assistedDisclosure = json.path("assistedDisclosure").asBoolean();
+        guard.platformUsed.set(json.path("platformUsed").asBoolean());
+        guard.trialReported.set(json.path("trialReported").asBoolean());
     }
 
     /** Persisted production entrypoint. Returns the active run id for the HTTP receipt. */
@@ -1457,6 +1769,7 @@ public class AgentOrchestrator {
                 return item.getRunId() != null ? item.getRunId() : activeRunId(item.getConversationId());
             }
             requireInboxProjectAccess(item.getProjectId(), item.getUserId());
+            if (restartAttempts.containsKey(item.getUserId())) return null;
             RunGuard current = activeRuns.get(item.getConversationId());
             if (current != null) {
                 if (AgentInboxService.STEER.equals(item.getSubmissionMode())) current.abandonDecision();
@@ -1472,8 +1785,13 @@ public class AgentOrchestrator {
                         + "\"retryWithInlineContent\":true,\"message\":\"文档正文缓存已失效，请重新发送文档正文。 / Resend the document text.\"}");
                 throw e;
             }
-            guard = beginRun(item.getConversationId());
-            guard.inboxItemId = itemId;
+            synchronized (restartAdmission) {
+                if (restartAttempts.containsKey(item.getUserId())) return null;
+                guard = beginRun(item.getConversationId());
+                guard.userId = item.getUserId();
+                guard.originalRequest = request;
+                guard.inboxItemId = itemId;
+            }
             claimed = inbox.claim(itemId, guard.runId, emitApplied);
             if (!AgentInboxService.APPLIED.equals(claimed.getState())
                     || !guard.runId.equals(claimed.getRunId())) {
@@ -1508,6 +1826,12 @@ public class AgentOrchestrator {
         // 不跟着池线程走，而 system prompt 选中英文版正是在这条循环里做的（ContextAssembler）。
         // 缺省（桌面端不上送）时 AppLanguageScope 不覆盖任何东西，照旧读全局 app.language。
         guard.userId = userId;
+        if (inboxService != null) for (var old : inboxService.restartCheckpoints(userId)) {
+            if (guard.conversationId.equals(old.getConversationId())) inboxService.consumeRestartCheckpoint(old.getId());
+        }
+        guard.originalRequest = request;
+        guard.restartRequested = restartAttempts.containsKey(userId);
+        guard.restartAttemptId = restartAttempts.get(userId);
         guard.trialAccountFingerprint = trialTurnMeter == null ? null : trialTurnMeter.accountFingerprint();
         Runnable turn = () -> com.checkba.service.AppLanguageScope.run(request.getAppLanguage(),
                 () -> PlatformAiUserScope.run(userId,
@@ -1803,6 +2127,8 @@ public class AgentOrchestrator {
             return;
         }
 
+        if (suspendForRestart(messages, projectId, userId, modelId, depth, executionLog, agentMode, guard)) return;
+
         // Productive work has no fixed turn count. Cancellation, bounded request retries, context
         // compaction and the observation-aware no-progress detector remain the terminating guards.
 
@@ -1982,7 +2308,7 @@ public class AgentOrchestrator {
                     dev.langchain4j.agent.tool.ToolExecutionRequest req = nativeRequests.get(nativeIndex);
                     // Native tool_calls must be paired before the steering USER message is inserted.
                     AgentInboxService inbox = this.inboxService;
-                    if (inbox != null && inbox.hasPendingSteering(conversationId)) {
+                    if (inbox != null && !restartAttempts.containsKey(userId) && inbox.hasPendingSteering(conversationId)) {
                         cancelPendingNativeTools(nativeRequests, nativeIndex, messages, executionLog, guard);
                         applyPendingSteering(guard, messages, projectId, userId, modelId, agentMode, executionLog);
                         continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
@@ -2153,7 +2479,7 @@ public class AgentOrchestrator {
                 for (int xmlIndex = 0; xmlIndex < xmlCalls.size(); xmlIndex++) {
                     XmlToolCallParser.ParsedCall call = xmlCalls.get(xmlIndex);
                     AgentInboxService inbox = this.inboxService;
-                    if (inbox != null && inbox.hasPendingSteering(conversationId)) {
+                    if (inbox != null && !restartAttempts.containsKey(userId) && inbox.hasPendingSteering(conversationId)) {
                         cancelPendingXmlTools(xmlCalls, xmlIndex, messages, executionLog, guard);
                         applyPendingSteering(guard, messages, projectId, userId, modelId, agentMode, executionLog);
                         continueRunLoop(model, messages, conversationId, projectId, userId, modelId,

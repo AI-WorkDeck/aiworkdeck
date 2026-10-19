@@ -172,6 +172,59 @@ public class AgentInboxService implements org.springframework.boot.ApplicationRu
         return request;
     }
 
+    /** Graceful desktop restart only; never reconstruct a checkpoint from conversation text. */
+    public void saveRestartCheckpoint(String itemId, com.fasterxml.jackson.databind.JsonNode checkpoint) {
+        synchronized (conversationLock(conversationId(itemId))) {
+            inTransaction(() -> {
+                AgentInboxItem row = fresh(itemId);
+                if (!APPLIED.equals(row.getState())) throw new IllegalStateException("Run is no longer applied");
+                var json = readStoredObject(row);
+                if ("office".equalsIgnoreCase(json.path("clientCapability").asText())) {
+                    throw new IllegalStateException("Office document bodies cannot be persisted for restart");
+                }
+                json.set("_restartCheckpoint", checkpoint);
+                row.setRequestJson(json.toString());
+                repository.saveAndFlush(row);
+                return null;
+            });
+        }
+    }
+
+    public List<AgentInboxItem> restartCheckpoints(Long userId) {
+        return repository.findRestartCheckpoints(userId).stream()
+                .filter(row -> (APPLIED.equals(row.getState()) || INTERRUPTED.equals(row.getState()))
+                        && readStoredObject(row).has("_restartCheckpoint")).toList();
+    }
+
+    public com.fasterxml.jackson.databind.JsonNode restartCheckpoint(AgentInboxItem row) {
+        return readStoredObject(row).get("_restartCheckpoint");
+    }
+
+    public AiAgentController.AgentChatRequest requestMetadataOf(AgentInboxItem row) {
+        try { return mapper.treeToValue(readStoredObject(row), AiAgentController.AgentChatRequest.class); }
+        catch (Exception e) { throw new IllegalStateException("Stored request metadata is unreadable"); }
+    }
+
+    public void consumeRestartCheckpoint(String itemId) {
+        synchronized (conversationLock(conversationId(itemId))) {
+            inTransaction(() -> {
+                AgentInboxItem row = fresh(itemId);
+                var json = readStoredObject(row);
+                json.remove("_restartCheckpoint");
+                row.setRequestJson(json.toString());
+                // Same run / input / sequence. Resuming is not a second inbox submission.
+                if (INTERRUPTED.equals(row.getState())) row.setState(APPLIED);
+                repository.saveAndFlush(row);
+                return null;
+            });
+        }
+    }
+
+    private com.fasterxml.jackson.databind.node.ObjectNode readStoredObject(AgentInboxItem row) {
+        try { return (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(row.getRequestJson()); }
+        catch (Exception e) { throw new IllegalStateException("Stored request metadata is unreadable"); }
+    }
+
     /** Server-owned continuation metadata in the existing durable request snapshot. */
     public record Clarification(List<String> instructions, List<String> skillIds,
                                 Long targetFileId, String targetFileName) {}

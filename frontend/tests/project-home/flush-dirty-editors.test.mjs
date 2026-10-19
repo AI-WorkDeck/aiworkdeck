@@ -77,7 +77,7 @@ test('工作台离开路径只有一个出口：除 leaveWorkbench / handleLogou
   assert.ok(bare.length <= 2,
     `工作台的离开路径必须先落盘。裸 uni.reLaunch 出现 ${bare.length} 处，` +
     '新增离开路径请走 leaveWorkbench()（或像 handleLogout 那样自己先 flush 再清会话）')
-  assert.ok(code.includes('async leaveWorkbench(url)'), 'leaveWorkbench 出口必须还在')
+  assert.match(code, /async leaveWorkbench\(url(?:, options)?\)/, 'leaveWorkbench 出口必须还在')
   assert.ok(code.includes('flushDirtyEditors'), '离开前必须调用 flushDirtyEditors')
 })
 

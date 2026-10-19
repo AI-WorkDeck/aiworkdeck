@@ -4489,7 +4489,7 @@ $color-accent: var(--awd-mint); // Mint Green
   50% { opacity: 0.4; }
 }
 
-/* ===================== 面板停靠（dev-board#180） =====================
+/* ===================== 面板停靠（dev-board#180） ==============
    录音窗格拖到右侧就在右侧开、变量库拖到左侧就在左侧开。停靠位的唯一出处是
    config/panelRegistry.js，这里只管三处宿主的样式：右侧 tab 条 / 左右两栏里的
    工具面板宿主 / 右键菜单与拖拽投放层。密度一律走 App.vue 的 --awd-panel-* 令牌。 */
@@ -4751,3 +4751,30 @@ $color-accent: var(--awd-mint); // Mint Green
 // Native editor surfaces must yield to Quick Look without suspending their lifecycle.
 .quick-look-open .pane-content :deep(iframe),
 .quick-look-open .pane-content :deep(webview) { visibility: hidden; }
+
+.restart-recovery {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px;
+  flex-shrink: 0;
+  max-height: 120px;
+  overflow-y: auto;
+  background: var(--awd-surface);
+  border-bottom: 1px solid var(--awd-border);
+  color: var(--awd-text-2);
+  font-size: 12px;
+}
+.restart-recovery-action {
+  margin: 0;
+  padding: 3px 8px;
+  font: inherit;
+  line-height: 1.5;
+  color: var(--awd-text);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-sm, 4px);
+}
+.restart-recovery-action:focus-visible { outline: 2px solid var(--awd-mint); }
+.restart-recovery-action:disabled { opacity: 0.5; }
