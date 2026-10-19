@@ -16,7 +16,7 @@ if (@(Get-Process -Name 'AI WorkDeck' -ErrorAction SilentlyContinue).Count) { th
 $Installer = (Resolve-Path -LiteralPath $Installer).Path
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $OutDir = (Resolve-Path -LiteralPath $OutDir).Path
-$evidence = [ordered]@{ version = $Version; assertions = @(); gestures = @(); signatures = @(); result = 'NOT_RUN' }
+$evidence = [ordered]@{ version = $Version; assertions = @(); gestures = @(); signatures = @(); versions = @(); result = 'NOT_RUN' }
 $receiver = $null
 $app = $null
 Add-Type @'
@@ -45,6 +45,14 @@ function Assert-That([bool]$Value, [string]$Label) {
     $script:evidence.assertions += $Label
     Write-Host "PASS: $Label"
 }
+function Assert-ExeVersion([string]$Expected, [string]$Label) {
+    $info = (Get-Item -LiteralPath $exe).VersionInfo
+    $actual = $info.ProductVersion
+    $script:evidence.versions += @{ expected = $Expected; productVersion = $actual; fileVersion = $info.FileVersion; path = $exe }
+    Write-Host "Executable version: ProductVersion=[$actual], FileVersion=[$($info.FileVersion)], expected=[$Expected]"
+    # Windows PE resources may encode the semver release with a fourth zero component.
+    Assert-That ($actual -ceq $Expected -or $actual -ceq "$Expected.0") $Label
+}
 function Wait-Until([scriptblock]$Check, [string]$Label, [int]$Seconds = 120) {
     $end = (Get-Date).AddSeconds($Seconds)
     while ((Get-Date) -lt $end) { if (& $Check) { return }; Start-Sleep -Milliseconds 250 }
@@ -69,7 +77,7 @@ const target = targets.find(t=>t.type==='page' && /index\.html/.test(t.url));
 if(!target) throw Error('Installed workbench not found');
 const ws = new WebSocket(target.webSocketDebuggerUrl); let replied=false;
 const timer=setTimeout(()=>{console.error('CDP read timed out');process.exit(1)},15000);
-ws.onopen=()=>ws.send(JSON.stringify({id:1,method:'Runtime.evaluate',params:{expression,returnByValue:true,awaitPromise:false}}));
+ws.onopen=()=>ws.send(JSON.stringify({id:1,method:'Runtime.evaluate',params:{expression,returnByValue:true,awaitPromise:true}}));
 ws.onmessage=e=>{const r=JSON.parse(e.data);if(r.id!==1)return;replied=true;
  if(r.error||r.result?.exceptionDetails){console.error(JSON.stringify(r));process.exitCode=1}
  else console.log(JSON.stringify(r.result.result.value));clearTimeout(timer);ws.close();};
@@ -166,7 +174,7 @@ try {
     Assert-That ($installed.WaitForExit(300000)) 'Actual NSIS completed'
     $installed.Refresh()
     Assert-That ($installed.ExitCode -eq 0) 'Actual NSIS exit code zero'
-    Assert-That ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -eq $Version) 'Installed executable version matches candidate'
+    Assert-ExeVersion $Version 'Installed executable version matches candidate'
     Signature $exe
     $fixtureDir = Join-Path $env:RUNNER_TEMP 'Native drag fixture'
     $zipDir = Join-Path $env:RUNNER_TEMP 'Native drag zip source'
@@ -182,6 +190,7 @@ try {
     $env:CHECKBA_UPDATE_MANIFEST_URL='http://127.0.0.1:19578/no-production-updates'
     $app = Start-Process $exe -ArgumentList @('--remote-debugging-port=19577',"`"$fixtureDir`"") -PassThru
     Wait-Until { try { return $null -ne (Read-Dom 'document.querySelector(".page-project-overview") ? true : null') } catch { return $false } } 'real installed workbench loads' 240
+    Assert-That ((Read-Dom 'window.checkbaDesktop.update.status()').appVersion -ceq $Version) 'Running candidate reports exact semantic version'
     $app.Refresh()
     Assert-That ($app.MainWindowHandle -ne [IntPtr]::Zero) 'Installed app has a native window'
     [DragInput]::SetWindowPos($app.MainWindowHandle,[IntPtr]::Zero,$screen.X,$screen.Y,$screen.Width,$screen.Height-40,0x0040) | Out-Null
