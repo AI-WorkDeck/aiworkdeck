@@ -18,6 +18,11 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 0. **版本规则 0.X.Y**（docs/INCREMENTAL_UPDATE_DESIGN.md）：X=大版本全量安装包；Y=小版本应用内补丁（overlay 机制，组件=backend-app/frontend-h5/zetaoffice-wrapper）。小版本 tag 触发 CI `patch-gate` job（desktop/scripts/patch-gate.sh）：改壳（desktop/）、pom、LOWA 引擎、requirements.lock、`backend/skills/` 都会被拒；内置 skill 需全量版本，requirements.lock 改动走独立 pack 发版。补丁产物+签名 manifest 由 build-patch-assets.js 在 windows job 生成（私钥=secret UPDATE_SIGNING_KEY，备份 ~/.ssh/aiworkdeck_update_signing.pem；公钥内置 update-service.js，换钥须发大版本）；镜像同步 deploy/update-mirror-sync.sh 在官网 ECS 跑。
 0.1. **服务上下文必须传 `appVersion: app.getVersion()`（dev-board#589）**：backendLayout 与 UI 的 overlay 使用不同调用链。漏传时 UI 显示补丁已更新，但后端因无法解析大版本目录而静默回落内置 app.jar。回归必须运行 main.js 的实际 createServices，再验证 backendLayout 读取激活补丁及回滚；只单测 overlay 不足以覆盖接线。旧 0.38 壳存在此缺陷，脱敏 2.0 必须先装完整 0.38.4；修复随 0.39.0 全量版本交付，不能用旧壳自身的补丁修复。
 0.2. **桌面端默认关闭自动 AI 标签（dev-board#590，0.39.0）**：上传、本地导入及编辑器保存共用 AutoTaggingService；脱敏前 flushSave 也会经过此链路。`application-desktop.yml` 设置 `ai.auto-tagging.enabled: false`，在读取正文和调用模型之前返回，避免原文先被自动发送。云端默认行为及手动标签不变。DesktopAutoTaggingPrivacyTest 加载真实 desktop 配置，验证入口不读正文、不调用模型。0.38.4 仅供合成样例测试，真实敏感材料需完整 0.39.0；普通 AI 会话仍须由用户核查项目和历史上下文。
+0.3. **完整版本退出安装（dev-board#1356）**：`update-service.js` 继续先验证 Ed25519 清单；`channels[major].installers` 的 `darwin-arm64` / `win32` 含 `{version,size,sha256,urls}`，只接受更新版本并流式校验完整字节。沿用现有 DMG/NSIS 和 `/update/desktop/installers/` 镜像；`installers/latest.json` 没有签名，仍仅供官网，不作为客户端安装信任依据。`finalize-update-manifest.js` 在 release job 收齐两个平台后验证原清单签名、绑定实际产物哈希并重新签名，任一平台缺失不发布。旧壳不具备完整安装能力，首次仍需安装包含本改动的完整版本；不得声称补丁能升级旧壳。
+   - Mac：`full-update.js` 挂载已校验 DMG、核对 plist 版本、用系统 ditto 转本地 ZIP，由 Electron 内置 Squirrel.Mac 经随机路径的回环 HTTP 校验签名并准备安装；只在 `update-downloaded` 后 ready。正常退出不调用 `quitAndInstall`（ShipIt 随下次启动应用更新），主动重启才调用；签名身份变更可能拒绝自动升级，不能删除签名校验。签名拒绝、替换/回退由原生更新器负责，单测替身不证明正式签名安装成功。
+   - Windows：`install-update.ps1` 复制到数据目录后运行（PowerShell 不认识 app.asar 路径），握手完成才退出；helper 等父进程退出，再次校验 SHA256 与 Authenticode，运行原 NSIS `/S --updated`。只在成功且用户主动重启/安装期间手动重开时启动。helper 存活期间启动锁阻止第二后端；超过20分钟提示检查安装器，不强杀。失败保留已验证下载件和 `.error`，下次状态读出；沿用 NSIS 的失败行为，不保证产品级回退，不能声称 Windows 安装失败自动恢复旧版。
+   - 退出：`host.lifecycle.onPrepareQuit/onQuitCancelled/cancelQuit` 与主renderer的 `checkba:prepare-quit` / `quit-prepared` ACK 共用普通退出/更新重启。renderer暂停任务、保存dirty编辑器后ACK；主进程只接受当前主窗口同requestId，60s超时/取消不隐藏或停服务。完成ACK后才停后端再安装。Windows点X同样走此路径；Mac红叉只隐藏保留编辑器，Dock激活恢复，避免退出时renderer已销毁无法保存。
+   - 验证：`update-service.test.js` 的本地签名HTTP、`full-update.test.js` 的真实回环feed/平台替身、`quit-lifecycle.test.js` 的实际主进程片段和ACK，以及 Windows CI 才运行的 helper 合成测试。正式签名Mac/Windows升级、Squirrel回退、Windows NSIS安装/安装期间快开须另外隔离实测，不可用源码测试替代；未获本次发版授权不打tag或部署。
 1. 版本号**单一来源 `desktop/package.json` version**（backend 拆为 backend/app.jar + backend/lib/，启动 `java -cp "app.jar:lib/*" com.checkba.CheckbaApplication`，见 backend-service.js javaLaunchArgs；frontend version 不参与）。
 2. `git tag v<ver> && git push origin v<ver>` → 触发 desktop-build 双平台。auto 模式下 tag 推送不被分支保护拦；可用 Monitor 等 PR 合并后自动打 tag（v0.8.0 配方）。
 3. 产物：mac 仅 dmg（**arm64 only**，已放弃 Intel）；win 仅 nsis exe——**单包双架构**（dev-board#341）：主体 x64 全量 + 纯 arm64 Electron 壳（desktop-build.yml 在打包前 `electron-builder --dir --arm64` 产出、剪掉 resources/ 后由 installer.nsh 的 customInstall 在 ARM64 机器上覆盖进安装目录；壳约 260MB 未压缩、装器 +约 106MB）。ARM64 上渲染与 LOWA WASM 原生、JVM/Python 走转译层（javacv/torch 无 windows-arm64 natives，这是为什么不出纯 arm64 包）；x64 机器行为不变；本地构建无壳目录自动降级纯 x64。electron-builder 配置在 desktop/package.json "build" 字段（appId com.aiworkdeck.desktop、extraResources 打入 frontend/dist、backend.jar、jre、python、pysvc.tar.gz+meta、**graphviz、skills（随包内置 skill，v0.11.1 以前漏打）、litviz（诉讼可视化引擎）**；`notarize: true`（**不能写 teamId**：公证走 ASC API Key，@electron/notarize 把 teamId 归为密码凭据、与 API Key 并存即报 "Cannot use password credentials, API key credentials ... at once"，v0.34.0 首次 tag 构建踩过；团队由 issuer 决定=境内主体 8WKHZVR2W8，2026-09-05 起，此前香港主体 X9B97KVA84，dev-board#447）；entitlements desktop/build/entitlements.mac.plist）。**win 侧 `nsis` 字段（2026-08-31 起搜狗式一键 UI，dev-board#339）**：`oneClick:false` 但页面全部换装 `build/win/awd-oneclick-ui.nsh` 引擎——无边框大卡片（立即安装大按钮/协议链接/「自定义安装」展开路径行），点击后主窗收起为桌面右上角小进度卡，完成卡「立即体验」；`allowToChangeInstallationDirectory:false`（目录选择收进卡片，engine 强制追加 `AI WorkDeck` 子目录）；`include: build/installer.nsh` 只做桌面端接线（customWelcomePage/customInstallMode/customFinishPage 三钩子）。引擎设 `ManifestDPIAware`（根治高分屏点阵字）+ `CRCCheck off`（去掉大包启动前 verifying 长进度）；**卸载器仍走 MUI 经典页**，`installerSidebar`/`installerHeader` BMP 只为它保留；**静默安装（/S，自动更新路径）不进 GUI 代码**。改卡片布局必须同步改引擎 AWDUI_* 常量与 `build/win/oneclick-*.html` 的绝对定位（两边同一 96dpi 基准）。
@@ -38,8 +43,8 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
    `notarytool history/log` 同样改 `--key/--key-id/--issuer`，**API Key 认证不接 `--team-id`**
    （团队由 issuer 唯一确定），此前那条「APPLE_TEAM_ID secret 会让 history API 报 403」的注释
    只对 Apple ID 认证成立。团队号全仓只剩 `desktop/package.json` 的 `mac.notarize.teamId` 一处。
-   换主体对存量 mac 用户无影响：桌面端没有应用内自动更新（`build.publish` 为空、不带
-   electron-updater），也不用钥匙串/safeStorage，签名主体变了不会让旧版失效或掉数据。
+   当时换主体对存量 mac 用户无影响：旧桌面壳没有全量自动更新（`build.publish` 为空、不带
+   electron-updater；后续完整更新机制见下），也不用钥匙串/safeStorage，签名主体变了不会让旧版失效或掉数据。
    **`office-addin/installer/build-installers.mjs` 不共用这套**：它在维护者 Mac 上取钥匙串里
    **第一条** `Developer ID Application` 身份，两个主体的证书都装着时选到哪张不确定（见「已知地雷」）。
 4.2. **最终 macOS 打包复用前置签名钥匙串（dev-board#523）**：`Sign bundled backend natives` 已导入证书到 `$RUNNER_TEMP/awd-sign.keychain-db`；最终打包显式解锁它，设置 `CSC_KEYCHAIN` 并 `unset CSC_LINK`。electron-builder 24.13.3 新建随机口令钥匙串后，`importCerts` 却把 P12 口令传给 `set-key-partition-list -k`，可报 `SecKeychainUnlock`；不要把这个错误误判成证书口令失效而轮换 secrets。`CSC_LINK` 未清会优先走旧导入链，`CSC_KEYCHAIN` 不生效。无凭据的 fork 路径不设置钥匙串；ASC 公证流程不变。失败诊断里的 notary history 可能是旧版记录，须核上传时间，不能当本轮已公证的证据。
@@ -582,3 +587,12 @@ frontend build:h5前置build:plugins，8个独立Uni/Vite包输出official-plugi
 `vite.business-plugins.config.js` 必须统一 root、传入模块 ID 和生成的导入目标路径分隔符；Windows 路径不能直接与 POSIX 前缀比较。Desktop Build 的前端步骤明确用 Bash，`build:h5` 后校验非空 `dist/build/h5/index.html`，避免 PowerShell 将前一步失败掩盖为后续编辑器构建成功。随包插件的 Vue scope/chunk hash 受构建绝对路径影响，跨平台校验以源码、结构和运行行为为准。
 
 `desktop/scripts/patch-nsis-known-folder.js` 在 postinstall 精确回移 electron-builder PR#9769，修复 24.13.3 首装路径查询后的固定长度越界读取；未知模板结构必须失败，不能跳过。来源见 `desktop/scripts/UPSTREAM.md`。打包后 Windows 跑 `test-nsis-known-folder.ps1`：旧读法在保护页负例中应以 0xC0000005 退出，实际修复块和真实 KnownFolder 查询应成功。随后仍执行真实安装→重装→卸载关联测试；失败保留安装器一天，并记录 SHA256 与 Windows Application 崩溃事件。首轮失败未取得 fault module/dump，不把相同退出码当成已证明同一根因。
+
+
+### #1356 退出中重开与原生安装失败
+
+`quitInProgress` 从准备开始阻止 open-path 投递及 Dock/second-instance 唤回旧窗口，重开意图交给安装/重启链。打开文件队列保存在本机 `.aiworkdeck/restart-open-paths.json`，下一进程等工作台 ready 再交付并在 ACK 后移除；取消退出恢复投递。Windows 安装锁期间的带文件启动也保存到该队列。renderer 先等已经接受的文件打开结束才暂停/保存；取消期间排队打开等待退出清理完成。
+
+Mac `quitAndInstall` 在窗口与服务关闭后仍可能异步报错，必须保留安装阶段 error 监听：本机记录错误、relaunch 并退出旧进程，不能留下持有单实例锁的无窗口进程。Windows PowerShell 5.1 读取 Node 写入的无 BOM job 必须显式 UTF8，合成回归使用中文目录。相关行为回归含还原病灶转红；仍不等于正式签名安装及 Windows 实机升级已验收。
+
+Windows 下从 pwsh→Node 再启动 powershell.exe 会继承不兼容 PSModulePath（#1356 Windows CI 已复现 Get-FileHash 不存在）。完整更新的签名检查与 helper 使用删除该变量的子进程环境，让 Windows PowerShell 重建系统模块路径；不改用户全局环境。握手超时必须先结束本 helper 并确认 exit，再按 helperPid/job 内容清理本次文件，不能放任迟到 helper 在后继客户端已启动时安装。退出中的原生业务菜单不再获得工作台窗口；服务尚未初始化的退出交给原生关闭。

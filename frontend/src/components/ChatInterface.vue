@@ -864,6 +864,7 @@
 </template>
 
 <script>
+import { getPendingAgentRestarts, resumeAgentRestart, getCloudAccountGeneration } from '@/services/api.js'
 import { fileChangesForBubble, summarizeFileChanges } from '@/utils/chatFileChange.js'
 import RootBubble from './AgentMessage/RootBubble.vue'
 import ChatTurnRail from './AgentMessage/ChatTurnRail.vue'
@@ -4056,9 +4057,33 @@ export default {
       reviewStates.value = { ...reviewStates.value, [st.fileId]: withOpenerArtifactId(st) }
     }
 
+    let restartResuming = false
+    // Called by the workbench only after the original editor reports ready.
+    const resumeAfterRestart = async (activeFileId = null, canResume = () => true) => {
+      if (restartResuming || !currentConversationId.value) return false
+      const conversationId = currentConversationId.value
+      const projectId = Number(props.projectId)
+      const accountGeneration = getCloudAccountGeneration()
+      const stillCurrent = () => canResume() && currentConversationId.value === conversationId
+        && Number(props.projectId) === projectId && getCloudAccountGeneration() === accountGeneration
+        && (activeFileId == null || String(activeDocChip.value?.id ?? '') === String(activeFileId))
+      if (!stillCurrent()) return false
+      restartResuming = true
+      try {
+        const pending = await getPendingAgentRestarts()
+        if (!stillCurrent()) return false
+        const target = pending.find(item => item.conversationId === conversationId && Number(item.projectId) === projectId)
+        if (!target || String(target.activeFileId ?? '') !== String(activeFileId ?? '')) return false
+        const connected = await reattachSSE(conversationId)
+        if (!connected || !stillCurrent()) return false
+        const result = await resumeAgentRestart({ conversationId, projectId, activeFileId })
+        return result.resumed === true
+      } finally { restartResuming = false }
+    }
+
     // Expose methods for parent ref access
     expose({
-      addFile, loadMessages, loadConversationMetadata, sendExternalPrompt,
+      addFile, loadMessages, loadConversationMetadata, sendExternalPrompt, resumeAfterRestart,
       startNewChat, menuSetMode, menuStop, menuState,
       uploadLocalFilesAndAddContext,
       handleReviewSubmit, handleReviewState,

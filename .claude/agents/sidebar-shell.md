@@ -1445,3 +1445,9 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 不能隐藏弹窗自己的预览。所有蒙层 no-drag；卸载按 holder 释放，不清其他弹窗的状态。
 回归 `file-tree-keyboard` / `file-tab-focus`；`finder-preview-ui.mjs` 使用真实工作台
 与合成API验证原生键鼠、首次单击不建标签、双击标签、上下联动、关闭焦点及overlay模块实际状态。
+
+## 桌面重开恢复入口（dev-board#1356）
+
+`restartRecovery.js` 只在桌面冷启动且没有外部打开意图时自动接续一个安全检查点；先导航原项目，等待项目资料/标签快照，再打开原会话和文件。Office 文件必须由相同 fileId 的 LOWA 实例与 executor 报 ready，预览或加载失败不算就绪。其余待恢复任务保留提示条供选择，不轮流切换用户编辑器。用户导航、指针/键盘操作、账户变化和外部打开取消迟到恢复。
+
+`App.vue` 的宿主退出回调先取消启动恢复，经 `desktopQuitGuard.js` 等后端安全暂停，再对所有已注册工作台执行 `flushDirtyEditors` 与标签快照。保存失败或退出取消恢复原任务；恢复条件已变时保留检查点并明确提示。成功 ACK 后保持输入遮罩直到主进程隐藏窗口，只有主进程确认取消才解除退出屏障。正常退出契约与安装边界见 ai-chat.md / eng-infra.md。回归为 desktop-quit(-app)、restart-recovery、restart-resume；合成行为测试不代替正式安装包与真实 LOWA 跨升级验收。

@@ -12,7 +12,7 @@ const overlay = require('./overlay')
  *
  * 职责：拉 manifest → Ed25519 验签 → 判定大/小版本 → 小版本逐组件下载到
  * staging（sha256 校验、按 urls 顺序降级）→ overlay.activate 原子激活 →
- * 通知渲染层"重启后生效"。大版本只提示 + 引导官网下载全量包。
+ * 通知渲染层"重启后生效"。大版本下载同一签名清单内的完整安装包，交给原生安装器。
  *
  * 安全不变式（§8）：
  *   - manifest 验签失败 / 组件 sha256 不符 → 丢弃整批，本次不更新；
@@ -37,6 +37,7 @@ const DEFAULT_MANIFEST_URLS = [
 const CHECK_DELAY_MS = 2 * 60 * 1000        // 启动后首查延迟
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000 // 周期检查
 const MAX_COMPONENT_BYTES = 512 * 1024 * 1024
+const MAX_INSTALLER_BYTES = 4 * 1024 * 1024 * 1024
 const FETCH_TIMEOUT_MS = 30000
 
 function manifestUrls() {
@@ -79,6 +80,7 @@ function fetchUrl(url, { toFile = null, maxBytes = MAX_COMPONENT_BYTES, timeoutM
       let total = 0
       const chunks = []
       out = toFile ? fs.createWriteStream(toFile) : null
+      if (out) out.on('error', (e) => { req.destroy(e); fail(e) })
       res.on('data', (c) => {
         total += c.length
         if (total > maxBytes) {
@@ -86,8 +88,9 @@ function fetchUrl(url, { toFile = null, maxBytes = MAX_COMPONENT_BYTES, timeoutM
           return
         }
         hash.update(c)
-        if (out) out.write(c)
-        else chunks.push(c)
+        if (out) {
+          if (!out.write(c)) { res.pause(); out.once('drain', () => res.resume()) }
+        } else chunks.push(c)
         if (onBytes) onBytes(total)
       })
       res.on('end', () => {
@@ -120,16 +123,17 @@ function createUpdateService(ctx, hooks = {}) {
   // ctx: { packaged, dataDir, appVersion }
   // hooks: { onEvent(evt), extractTar(archive, destDir) => Promise, onLog }
   const state = {
-    phase: 'idle', // idle | checking | downloading | ready | error
+    phase: hooks.initialError ? 'error' : 'idle', // idle | checking | downloading | ready | error
     checkedAt: null,
     effectiveVersion: overlay.effectiveVersion(ctx),
     appVersion: ctx.appVersion,
     available: null,       // { version } 补丁已就绪待重启
     majorAvailable: null,  // { major, page } 新大版本
     progress: null,        // { component, received, total }
-    error: null
+    error: hooks.initialError || null
   }
   let timer = null
+  let firstTimer = null
   let checking = null
   let telemetryUrl = null
 
@@ -227,7 +231,40 @@ function createUpdateService(ctx, hooks = {}) {
     emit('ready', { version: target })
   }
 
+  async function downloadInstaller(installer) {
+    if (!/^\d+\.\d+\.\d+$/.test(installer.version) || !/^[a-f0-9]{64}$/i.test(installer.sha256 || '') ||
+        !Number.isSafeInteger(installer.size) || installer.size <= 0 || installer.size > MAX_INSTALLER_BYTES) {
+      throw new Error('完整安装包清单无效')
+    }
+    const dir = path.join(ctx.dataDir, 'updates', 'installer')
+    fs.mkdirSync(dir, { recursive: true })
+    const file = path.join(dir, (ctx.platform || process.platform) === 'darwin' ? 'update.dmg' : 'update.exe')
+    state.phase = 'downloading'
+    state.progress = { component: 'installer', received: 0, total: installer.size }
+    emit('downloading', { version: installer.version })
+    let lastProgressAt = 0
+    try {
+      const r = await fetchFirst(installer.urls || [], { toFile: file, maxBytes: installer.size,
+        onBytes: (received) => {
+          state.progress = { component: 'installer', received, total: installer.size }
+          if (Date.now() - lastProgressAt >= 250 || received === installer.size) { lastProgressAt = Date.now(); emit('progress') }
+        } })
+      if (r.size !== installer.size || r.sha256 !== installer.sha256.toLowerCase()) throw new Error('完整安装包 sha256 校验失败')
+      await hooks.prepareInstaller(file, installer.version)
+      state.available = { version: installer.version, kind: 'installer' }
+      state.majorAvailable = null
+      state.progress = null
+      state.phase = 'ready'
+      logEvent('installer-ready', { version: installer.version })
+      emit('ready', { version: installer.version })
+    } catch (e) {
+      fs.rmSync(file, { force: true })
+      throw e
+    }
+  }
+
   async function check() {
+    if (state.available) return snapshot() // 已准备的版本保持 ready，避免重复下载/原生准备
     if (checking) return checking
     checking = (async () => {
       state.phase = 'checking'
@@ -244,6 +281,13 @@ function createUpdateService(ctx, hooks = {}) {
           const majorChannel = manifest.channels && manifest.channels[manifest.latestMajor]
           const majorVersion = (majorChannel && majorChannel.latest) || manifest.latestMajor
           state.majorAvailable = { major: majorVersion, page: manifest.majorDownloadPage || 'https://www.aiworkdeck.com' }
+          const platform = ctx.platform || process.platform
+          const key = platform === 'win32' ? 'win32' : `${platform}-${ctx.arch || process.arch}`
+          const installer = majorChannel && majorChannel.installers && majorChannel.installers[key]
+          if (installer && hooks.prepareInstaller && overlay.compareVersions(installer.version, ctx.appVersion) > 0) {
+            await downloadInstaller(installer)
+            return snapshot()
+          }
           emit('major-available', state.majorAvailable)
         } else {
           state.majorAvailable = null
@@ -279,12 +323,15 @@ function createUpdateService(ctx, hooks = {}) {
 
   function start() {
     if (!ctx.packaged && !process.env.CHECKBA_UPDATE_MANIFEST_URL) return // dev 态默认不查
-    setTimeout(() => { check().catch(() => {}) }, CHECK_DELAY_MS)
+    firstTimer = setTimeout(() => { check().catch(() => {}) }, CHECK_DELAY_MS)
+    if (firstTimer.unref) firstTimer.unref()
     timer = setInterval(() => { check().catch(() => {}) }, CHECK_INTERVAL_MS)
     if (timer.unref) timer.unref()
   }
 
   function stop() {
+    if (firstTimer) clearTimeout(firstTimer)
+    firstTimer = null
     if (timer) clearInterval(timer)
     timer = null
   }

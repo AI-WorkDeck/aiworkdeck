@@ -171,8 +171,26 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
     set: (key, value) => ipcRenderer.invoke('checkba:prefs-set', { key, value })
   },
   // 应用内增量更新（docs/INCREMENTAL_UPDATE_DESIGN.md）：小版本补丁自动下载、
-  // 重启生效；大版本引导官网下载全量包。onEvent 返回退订函数——页面栈多实例
+  // 重启生效；完整版本验签准备后退出安装。onEvent 返回退订函数——页面栈多实例
   // 场景务必用活跃实例指针消费（见剪贴板去重地雷，PR#151）。
+  lifecycle: {
+    onPrepareQuit: (handler) => {
+      const listener = async (_event, { requestId }) => {
+        let result
+        try { result = await handler() } catch (e) { result = { ok: false, error: String(e?.message || e) } }
+        return ipcRenderer.invoke('checkba:quit-prepared', { requestId, ...result })
+      }
+      ipcRenderer.on('checkba:prepare-quit', listener)
+      ipcRenderer.send('checkba:quit-handler-ready')
+      return () => ipcRenderer.removeListener('checkba:prepare-quit', listener)
+    },
+    onQuitCancelled: (handler) => {
+      const listener = (_event, data) => handler && handler(data)
+      ipcRenderer.on('checkba:quit-cancelled', listener)
+      return () => ipcRenderer.removeListener('checkba:quit-cancelled', listener)
+    },
+    cancelQuit: () => ipcRenderer.invoke('checkba:cancel-quit')
+  },
   update: {
     status: () => ipcRenderer.invoke('checkba:update-status'),
     check: () => ipcRenderer.invoke('checkba:update-check'),

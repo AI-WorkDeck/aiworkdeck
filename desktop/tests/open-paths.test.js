@@ -22,7 +22,7 @@ function harness(options = {}) {
     window = { webContents, isDestroyed: () => false }
     return webContents
   }
-  installOpenPaths({
+  const controller = installOpenPaths({
     app, ipcMain, getWindow: () => window, focusWindow: () => { focusCount++ },
     platform: 'darwin', argv: [],
     stat: filePath => {
@@ -38,7 +38,7 @@ function harness(options = {}) {
     app.emit('open-file', { preventDefault() { prevented = true } }, filePath)
     assert.equal(prevented, true)
   }
-  return { app, ipcMain, delivered, makeWindow, ready, ack, open, focused: () => focusCount }
+  return { controller, app, ipcMain, delivered, makeWindow, ready, ack, open, focused: () => focusCount }
 }
 
 test('mac cold launch preserves every file and waits for explicit ready plus per-file completion', () => {
@@ -181,15 +181,54 @@ test('shipping main wiring recreates a closed window and brings open requests to
   const app = new EventEmitter()
   const ipcMain = new EventEmitter()
   const actions = []
-  const context = vm.createContext({ app, ipcMain,
+  app.getPath = () => os.tmpdir()
+  const context = vm.createContext({ app, ipcMain, path, quitInProgress: false, updateRestartRequested: false,
     mainWindow: null, mainWindowStartupReady: true,
     createMainWindow() { context.mainWindow = { isDestroyed: () => false, isMinimized: () => true,
       restore: () => actions.push('restore'), show: () => actions.push('show'), focus: () => actions.push('focus') }; actions.push('create') },
     require(name) { assert.equal(name, './open-paths'); return { installOpenPaths(options) {
-      installOpenPaths({ ...options, platform: 'win32', argv: [], stat: () => ({ isFile: () => true, isDirectory: () => false }) })
+      installOpenPaths({ ...options, queueFile: null, platform: 'win32', argv: [], stat: () => ({ isFile: () => true, isDirectory: () => false }) })
     } } },
   })
   vm.runInContext(source.slice(start, end), context)
   app.emit('second-instance', {}, ['app.exe', 'C:\\contract.docx'], 'C:\\')
   assert.deepEqual(actions.slice(0, 4), ['create', 'restore', 'show', 'focus'])
+})
+
+
+test('退出准备中系统打开请求不投递；取消退出恢复顺序，跨进程只恢复尚未ACK的文件', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-restart-open-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const queueFile = path.join(dir, 'restart-open-paths.json')
+  let quitting = true, relaunches = 0
+  const h = harness({ queueFile, isQuitting: () => quitting, requestRelaunch: () => relaunches++ })
+  h.makeWindow(); h.ready()
+  h.open('/合同一.docx'); h.open('/证据二.pdf')
+  assert.equal(h.delivered.length, 0)
+  assert.equal(h.focused(), 0)
+  assert.equal(relaunches, 2)
+  quitting = false
+  h.controller.resume()
+  assert.equal(h.delivered[0].path, '/合同一.docx')
+  h.ack(h.delivered[0].requestId)
+  assert.equal(h.delivered[1].path, '/证据二.pdf')
+  const reopened = harness({ queueFile })
+  reopened.makeWindow(); reopened.ready()
+  assert.deepEqual(reopened.delivered.map(x => x.path), ['/证据二.pdf'])
+  reopened.ack(reopened.delivered[0].requestId)
+  assert.deepEqual(JSON.parse(fs.readFileSync(queueFile, 'utf8')), [])
+})
+
+test('Windows退出中第二实例带文件时持久化文件并登记重启，不显示旧窗口', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-second-open-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const queueFile = path.join(dir, 'restart-open-paths.json')
+  let relaunches = 0
+  const h = harness({ platform: 'win32', queueFile, isQuitting: () => true, requestRelaunch: () => relaunches++ })
+  h.makeWindow(); h.ready()
+  h.app.emit('second-instance', {}, ['app.exe', '合同.docx'], 'C:\\材料')
+  assert.equal(h.delivered.length, 0)
+  assert.equal(h.focused(), 0)
+  assert.ok(relaunches > 0)
+  assert.deepEqual(JSON.parse(fs.readFileSync(queueFile, 'utf8')), ['C:\\材料\\合同.docx'])
 })

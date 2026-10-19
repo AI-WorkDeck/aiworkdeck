@@ -88,6 +88,32 @@ class AgentInboxTransactionBoundaryTest {
         assertEquals(durable.getRequestJson(), repository.findById(row.getId()).orElseThrow().getRequestJson());
     }
 
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void restartCheckpointCommitsAndIsConsumedAcrossServiceInstances() {
+        var states = mock(AgentRunStateService.class);
+        var first = durableInbox(mock(SseEmitterService.class), states);
+        var input = request(); input.setConversationId("graceful-restart-durable");
+        var row = first.submit(input, 7L);
+        first.claim(row.getId(), "original-run-id");
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var cp = mapper.createObjectNode();
+        cp.put("version", 1);
+        cp.put("messages", "synthetic complete tool result; preserve original authorization");
+        first.saveRestartCheckpoint(row.getId(), cp);
+        var second = durableInbox(mock(SseEmitterService.class), states);
+        var stored = second.restartCheckpoints(7L).stream().filter(r -> r.getId().equals(row.getId())).findFirst().orElseThrow();
+        assertEquals(cp, second.restartCheckpoint(stored));
+        assertEquals(input.getMessage(), second.requestMetadataOf(stored).getMessage(), "private checkpoint metadata is not an unknown DTO field");
+        assertTrue(second.restartCheckpoints(8L).isEmpty());
+        second.consumeRestartCheckpoint(row.getId());
+        var third = durableInbox(mock(SseEmitterService.class), states);
+        assertNull(third.restartCheckpoint(repository.findById(row.getId()).orElseThrow()));
+        assertEquals("original-run-id", repository.findById(row.getId()).orElseThrow().getRunId());
+        third.consumeRestartCheckpoint(row.getId());
+        assertNull(third.restartCheckpoint(repository.findById(row.getId()).orElseThrow()));
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"client", "global-client", "removed"})
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -119,6 +145,8 @@ class AgentInboxTransactionBoundaryTest {
         AgentInboxService restored = durableInbox(sse, state);
         var tasks = new java.util.ArrayList<Runnable>();
         var orchestrator = mock(AgentOrchestrator.class, CALLS_REAL_METHODS);
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "restartAttempts", new java.util.concurrent.ConcurrentHashMap<>());
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "restartAdmission", new Object());
         var modelFactory = mock(ChatModelFactory.class);
         var assembler = mock(ContextAssemblerService.class);
         org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "activeRuns", new java.util.concurrent.ConcurrentHashMap<>());
