@@ -249,12 +249,14 @@ http.createServer((req,res)=>{
     $files = Api "/projects/$projectId/files"
     Assert-That (@($files | Where-Object { $_.id -eq $fileId -and $_.name -eq 'retained-document.txt' }).Count -eq 1) 'New backend preserves file ID and metadata'
     Assert-That ((Get-FileHash -LiteralPath $fixture).Hash -eq $hash) 'Document bytes survive real NSIS upgrade'
-    Wait-Until { @(Get-Process -Name 'AI WorkDeck' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero }).Count -gt 0 } 'new native workbench visible' 120
+    Wait-Until { @(Get-Process -Name 'AI WorkDeck' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.MainWindowTitle }).Count -gt 0 } 'new native workbench visible' 120
+    Start-Sleep -Seconds 3
     Screenshot '03-upgraded-workbench'
     $evidence.processes = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'AI WorkDeck.exe' -or ($_.Name -eq 'java.exe' -and $_.CommandLine -like '*com.checkba.CheckbaApplication*') } | Select-Object ProcessId, ParentProcessId, ExecutablePath, CommandLine)
     # Explicit second normal restart verifies Chromium preference persistence in the installed app.
     $current = Get-Process -Name 'AI WorkDeck' | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
     Close-App $current
+    if (-not $current.WaitForExit(10000)) { Close-App $current }
     Assert-That ($current.WaitForExit(120000)) 'Upgraded app closes normally'
     $app = Launch
     Wait-Backend
