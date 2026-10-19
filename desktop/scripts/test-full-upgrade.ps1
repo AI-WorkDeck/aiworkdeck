@@ -36,6 +36,7 @@ $env:CHECKBA_BACKEND_PORT = '19566'
 $env:CHECKBA_UPDATE_MANIFEST_URL = 'http://127.0.0.1:19568/manifest.json'
 $evidence = [ordered]@{ mechanism = $Mechanism; exitMode = $ExitMode; oldVersion = $OldVersion; candidateVersion = $CandidateVersion; installDir = $installDir; dataDir = $dataDir; assertions = @(); signatures = @(); versions = @() }
 $feed = $null
+$helperProcess = $null
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type @'
@@ -209,7 +210,11 @@ http.createServer((req,res)=>{
             Remove-Item Env:PSModulePath -ErrorAction SilentlyContinue
             $helperProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"`"$helper`"","`"$lock`"") -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $OutDir 'helper.stdout.log') -RedirectStandardError (Join-Path $OutDir 'helper.stderr.log')
         } finally { $env:PSModulePath = $oldModulePath }
-        Wait-Until { Test-Path -LiteralPath $lock } 'real helper handshake' 15
+        Wait-Until {
+            $helperProcess.Refresh()
+            if ($helperProcess.HasExited) { throw "Helper exited before handshake: $($helperProcess.ExitCode); stderr: $(Get-Content (Join-Path $OutDir 'helper.stderr.log') -Raw)" }
+            return Test-Path -LiteralPath $lock
+        } 'real helper handshake' 15
         Assert-ExeVersion $OldVersion 'Helper waits for live parent before replacing app'
         Close-App $app
     }
@@ -262,6 +267,9 @@ http.createServer((req,res)=>{
 } finally {
     $evidence | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath (Join-Path $OutDir 'evidence.json') -Encoding utf8
     if (Test-Path (Join-Path $dataDir 'logs')) { Copy-Item (Join-Path $dataDir 'logs') (Join-Path $OutDir 'app-logs') -Recurse -Force }
+    $evidence.processDiagnostics = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -in @('AI WorkDeck.exe', 'powershell.exe', 'pwsh.exe') } | Select-Object ProcessId, ParentProcessId, ExecutablePath, CommandLine)
+    if ($null -ne $helperProcess) { $helperProcess.Refresh(); $evidence.helperState = @{ id = $helperProcess.Id; hasExited = $helperProcess.HasExited; exitCode = $(if ($helperProcess.HasExited) { $helperProcess.ExitCode } else { $null }) } }
+    $evidence | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath (Join-Path $OutDir 'evidence.json') -Encoding utf8
     # Keep only the synthetic helper's small diagnostics, never the installer or user database.
     $installerDir = Split-Path $lock
     if (Test-Path -LiteralPath $installerDir) {
