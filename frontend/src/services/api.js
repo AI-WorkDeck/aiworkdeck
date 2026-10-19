@@ -2037,6 +2037,19 @@ export function getArchiveEntries(projectId, fileId) {
   });
 }
 
+export function getArchiveEntryUrl(projectId, fileId, path) {
+  return `${getApiBaseUrl()}/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/archive/entry?path=${encodeURIComponent(path)}`;
+}
+
+export function importArchiveEntry(projectId, fileId, path, parentId) {
+  return request({
+    url: `/api/projects/${projectId}/files/${fileId}/archive/import-entry`,
+    method: 'POST',
+    data: { path, parentId },
+    header: { 'Content-Type': 'application/json' },
+  });
+}
+
 // 解压压缩包到其所在目录下的新文件夹，返回新建的根文件夹记录
 export function extractArchive(projectId, fileId) {
   return request({

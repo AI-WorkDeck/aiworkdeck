@@ -1,7 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view class="page-project-overview" :class="{ 'compact-mode': isCompactLayout, 'is-resizing': resizing && resizing.active, 'rail-edit-mode': railEditMode, 'no-project': !hasProject }">
+  <view class="page-project-overview" :class="{ 'quick-look-open': !!quickLookFile, 'compact-mode': isCompactLayout, 'is-resizing': resizing && resizing.active, 'rail-edit-mode': railEditMode, 'no-project': !hasProject }">
     <!-- 顶部固定项目信息 -->
     <view class="project-header">
       <view class="header-left">
@@ -656,6 +656,9 @@
             :hidden-file-ids="stagedFileIds"
             @checked-change="onFileTreeCheckedChange"
             @file-select="handleFileTreeSelect"
+            @file-open="handleFileTreeOpen"
+            @file-navigate="handleFileTreeNavigate"
+            @quick-look="toggleQuickLook"
             @file-drag-start="onFileLinkDragStart"
             @file-drag-end="onFileLinkDragEnd"
             @compare-documents="onCompareDocumentsRequest"
@@ -1820,6 +1823,15 @@
         </view>
       </view>
 
+      <QuickLookDialog
+        v-if="quickLookFile"
+        :file="quickLookFile"
+        :project-id="projectId"
+        @close="closeQuickLook"
+        @navigate="navigateQuickLook"
+        @open="handleFileTreeOpen(quickLookFile)"
+        @extracted="onArchiveExtracted"
+      />
       <!-- 图片预览（剪贴板等）：桌面端 BrowserView 盖 DOM，须走 desktopOverlayActive 守卫 -->
       <view v-if="imagePreviewUrl" class="image-preview-mask" @tap="closeImagePreview">
         <image class="image-preview-img" :src="imagePreviewUrl" mode="aspectFit"></image>
@@ -2187,6 +2199,7 @@ import QuickOpenPanel from '@/components/QuickOpenPanel.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 import AppMenuBar from '@/components/AppMenuBar.vue'
 import FilePreview from '@/components/FilePreview.vue'
+import QuickLookDialog from '@/components/QuickLookDialog.vue'
 import VariablePanel from '@/components/VariablePanel.vue'
 import EvidenceMethodBar from '@/components/EvidenceMethodBar.vue'
 import FileStagingArea from '@/components/FileStagingArea.vue'
@@ -2399,6 +2412,7 @@ export default {
     AppMenuBar,
     FileTree,
     FilePreview,
+    QuickLookDialog,
     VariablePanel,
     EvidenceMethodBar,
     FileStagingArea,
@@ -2675,6 +2689,7 @@ export default {
       stagingUsage: null,
       stagingOriginalParents: {}, // 记录文件进入暂存区前的原始 parentId: { fileId: originalParentId }
       splitMode: false,
+      quickLookFile: null,
       quickOpenVisible: false, // IDE 化 Cmd+P 快速打开
       commandPaletteVisible: false, // 命令面板（⌥⌘P），读命令注册表
       menuBarRefreshKey: 0, // Windows 自绘菜单栏的重建信号（跟着 pushMenuState 走）

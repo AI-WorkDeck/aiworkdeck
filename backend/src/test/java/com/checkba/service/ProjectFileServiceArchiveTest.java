@@ -35,6 +35,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.eq;
 
 /**
  * 压缩包预览/解压（zip/7z/rar）：条目列表、中文名、macOS 噪音过滤、
@@ -172,6 +175,8 @@ class ProjectFileServiceArchiveTest {
         List<Map<String, Object>> entries = projectFileService.listArchiveEntries(ARCHIVE_ID);
         List<String> paths = entries.stream().map(e -> (String) e.get("path")).toList();
         assertTrue(paths.contains("目录/中文文档.txt"), String.valueOf(paths));
+        assertArrayEquals("gbk".getBytes(StandardCharsets.UTF_8),
+                projectFileService.readArchiveEntry(ARCHIVE_ID, "目录/中文文档.txt").bytes());
     }
 
     @Test
@@ -199,6 +204,7 @@ class ProjectFileServiceArchiveTest {
                 () -> projectFileService.listArchiveEntries(ARCHIVE_ID));
         assertNotNull(e.getMessage());
         assertFalse(e.getMessage().isBlank());
+        assertThrows(IllegalArgumentException.class, () -> projectFileService.readArchiveEntry(ARCHIVE_ID, "missing.txt"));
     }
 
     @Test
@@ -208,6 +214,134 @@ class ProjectFileServiceArchiveTest {
     }
 
     // ---- 解压 ---------------------------------------------------------------
+
+    @Test
+    void readEntryKeepsChineseNameAndBinaryBytes() throws Exception {
+        byte[] binary = {0, (byte) 255, (byte) 128, 13, 10};
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(out)) {
+            zip.putNextEntry(new ZipEntry("照片/现场.jpg"));
+            zip.write(binary);
+            zip.closeEntry();
+        }
+        stubArchive("图片.zip", "zip", out.toByteArray());
+        ProjectFileService.ArchiveEntryContent entry = projectFileService.readArchiveEntry(ARCHIVE_ID, "照片/现场.jpg");
+        assertEquals("现场.jpg", entry.name());
+        assertArrayEquals(binary, entry.bytes());
+        verify(storageService, never()).save(any(), any());
+    }
+
+    @Test
+    void read7zEntryReturnsContent() throws Exception {
+        stubArchive("样本.7z", "7z", make7z());
+        assertArrayEquals("7z 内容".getBytes(StandardCharsets.UTF_8),
+                projectFileService.readArchiveEntry(ARCHIVE_ID, "附件/证据清单.txt").bytes());
+    }
+
+    @Test
+    void readEntryRejectsDirectoryMissingAndInvalidPaths() throws Exception {
+        stubArchive("样本.zip", "zip", makeZip());
+        for (String path : List.of("docs", "missing.txt", "../evil.txt", "/docs/合同范本.txt", "C:\\evil.txt", "docs/evil\u0000.txt", "")) {
+            assertThrows(IllegalArgumentException.class, () -> projectFileService.readArchiveEntry(ARCHIVE_ID, path), path);
+        }
+    }
+
+    @Test
+    void readEntryRejectsAmbiguousNormalizedNames() throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(out)) {
+            for (String path : List.of("docs/a.txt", "docs//a.txt")) {
+                zip.putNextEntry(new ZipEntry(path));
+                zip.write(1);
+                zip.closeEntry();
+            }
+        }
+        stubArchive("重复.zip", "zip", out.toByteArray());
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> projectFileService.readArchiveEntry(ARCHIVE_ID, "docs/a.txt")).getMessage().contains("重复路径"));
+    }
+
+    @Test
+    void readEntryEnforcesLimitEvenWhenCentralDirectoryUnderstatesSize() throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(out)) {
+            zip.putNextEntry(new ZipEntry("large.bin"));
+            byte[] chunk = new byte[1024 * 1024];
+            for (int i = 0; i < 128; i++) zip.write(chunk);
+            zip.write(1);
+            zip.closeEntry();
+        }
+        byte[] bytes = out.toByteArray();
+        stubArchive("大文件.zip", "zip", bytes);
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> projectFileService.readArchiveEntry(ARCHIVE_ID, "large.bin")).getMessage().contains("128MB"));
+        // ZIP central directory uncompressed size is untrusted. Lie about it to exercise the stream guard.
+        for (int i = 0; i < bytes.length - 28; i++) {
+            if (bytes[i] == 0x50 && bytes[i + 1] == 0x4b && bytes[i + 2] == 1 && bytes[i + 3] == 2) {
+                bytes[i + 24] = 1;
+                bytes[i + 25] = bytes[i + 26] = bytes[i + 27] = 0;
+                break;
+            }
+        }
+        stubArchive("大文件.zip", "zip", bytes);
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> projectFileService.readArchiveEntry(ARCHIVE_ID, "large.bin")).getMessage().contains("128MB"));
+    }
+
+    @Test
+    void importEntryCopiesOnlySelectedFileToRequestedFolder() throws Exception {
+        stubArchive("样本.zip", "zip", makeZip());
+        ProjectFile folder = new ProjectFile();
+        folder.setId(50L);
+        folder.setProjectId(PROJECT_ID);
+        folder.setIsFolder(true);
+        folder.setName("目标");
+        rows.put(50L, folder);
+        when(projectFileRepository.saveAndFlush(any(ProjectFile.class))).thenAnswer(inv -> {
+            ProjectFile file = inv.getArgument(0);
+            file.setId(100L);
+            rows.put(100L, file);
+            return file;
+        });
+        List<byte[]> written = new ArrayList<>();
+        when(storageService.save(any(), any(java.io.InputStream.class))).thenAnswer(inv -> {
+            written.add(inv.<java.io.InputStream>getArgument(1).readAllBytes());
+            return inv.getArgument(0);
+        });
+        ProjectFile imported = projectFileService.importArchiveEntry(PROJECT_ID, ARCHIVE_ID, "docs/合同范本.txt", 50L, 42L);
+        assertEquals(50L, imported.getParentId());
+        assertEquals("合同范本.txt", imported.getName());
+        assertEquals("txt", imported.getFileType());
+        assertEquals(1, written.size());
+        assertArrayEquals("hello 合同".getBytes(StandardCharsets.UTF_8), written.get(0));
+    }
+
+    @Test
+    void importEntryRejectsExistingNameWithoutWriting() throws Exception {
+        stubArchive("样本.zip", "zip", makeZip());
+        when(projectFileRepository.existsByProjectIdAndParentIdAndNameAndIdNot(eq(PROJECT_ID), eq(null), eq("readme.md"), eq(-1L)))
+                .thenReturn(true);
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> projectFileService.importArchiveEntry(PROJECT_ID, ARCHIVE_ID, "readme.md", null, 42L))
+                .getMessage().contains("同名文件"));
+        verify(storageService, never()).save(any(), any());
+        verify(projectFileRepository, never()).save(any());
+    }
+
+    @Test
+    void importEntryRejectsForeignProjectOrParentBeforeReading() throws Exception {
+        stubArchive("样本.zip", "zip", makeZip());
+        assertThrows(IllegalArgumentException.class,
+                () -> projectFileService.importArchiveEntry(99L, ARCHIVE_ID, "readme.md", null, 42L));
+        ProjectFile foreign = new ProjectFile();
+        foreign.setId(60L);
+        foreign.setProjectId(99L);
+        foreign.setIsFolder(true);
+        rows.put(60L, foreign);
+        assertThrows(IllegalArgumentException.class,
+                () -> projectFileService.importArchiveEntry(PROJECT_ID, ARCHIVE_ID, "readme.md", 60L, 42L));
+        verify(storageService, never()).save(any(), any());
+    }
 
     @Test
     void extractZipCreatesTreeAndWritesBytes() throws Exception {

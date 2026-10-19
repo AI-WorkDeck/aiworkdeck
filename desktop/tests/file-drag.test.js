@@ -8,13 +8,14 @@ const os = require('node:os')
 const path = require('node:path')
 
 const electronId = require.resolve('electron')
+const ipcHandlers = new Map()
 const fakeIcon = { isEmpty: () => false, kind: 'png-icon' }
 require.cache[electronId] = {
   id: electronId,
   filename: electronId,
   loaded: true,
   exports: {
-    ipcMain: { handle() {}, on() {} },
+    ipcMain: { handle(name, handler) { ipcHandlers.set(name, handler) }, on() {} },
     dialog: {},
     shell: {},
     BrowserWindow: {},
@@ -98,5 +99,105 @@ test('startFileDrag：两份文件整组交给系统，去重且任一无效不�
     assert.deepEqual(calls[0].files, [files[0]])
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})
+
+
+test('archive cache preserves original names and exact bytes in private temp directories until explicit process cleanup', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-archive-test-'))
+  const store = svc.createArchiveEntryCache({ tempDir })
+  try {
+    const backing = Uint8Array.of(99, 0, 255, 10, 99)
+    const bytes = backing.subarray(1, 4)
+    const first = await store.cache({ name: '现场照片.jpg', bytes })
+    const second = await store.cache({ name: '现场照片.jpg', bytes: bytes.slice().buffer })
+    assert.equal(first.ok, true)
+    assert.equal(second.ok, true)
+    assert.equal(first.path, second.path, 'reselecting unchanged bytes must reuse the cached file')
+    assert.equal(path.basename(first.path), '现场照片.jpg')
+    assert.deepEqual(fs.readFileSync(first.path), Buffer.from([0, 255, 10]))
+    if (process.platform !== 'win32') assert.equal(fs.statSync(first.path).mode & 0o777, 0o600)
+    const dragged = []
+    assert.equal(svc.startFileDrag({ startDrag: value => dragged.push(value) }, first.path).ok, true)
+    assert.equal(fs.existsSync(first.path), true, 'starting native export must not delete bytes needed by the receiving app')
+    assert.deepEqual(dragged[0].files, [first.path])
+    const empty = await store.cache({ name: '空文件.txt', bytes: new ArrayBuffer(0) })
+    assert.equal(empty.ok, true)
+    assert.equal(fs.statSync(empty.path).size, 0)
+    store.clear()
+    assert.deepEqual(fs.readdirSync(tempDir), [])
+    assert.equal((await store.cache({ name: 'x', bytes })).reason, 'closed')
+  } finally {
+    store.clear()
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('archive cache rejects traversal, unsafe cross-platform names, nonbytes and files over 128MiB without writing', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-archive-test-'))
+  const store = svc.createArchiveEntryCache({ tempDir })
+  try {
+    for (const name of ['', '.', '..', '../escape', '/tmp/escape', 'a\\b', 'C:escape', 'a\0b', 'CON', 'nul.txt', 'x?', 'x.', 'x ', '照'.repeat(86)]) {
+      assert.equal((await store.cache({ name, bytes: Uint8Array.of(1) })).reason, 'bad-name', name)
+    }
+    assert.equal((await store.cache({ name: 'x', bytes: '/tmp/private' })).reason, 'bad-bytes')
+    assert.equal(svc.ARCHIVE_ENTRY_MAX_BYTES, 128 * 1024 * 1024)
+    assert.equal((await store.cache({ name: 'x', bytes: new ArrayBuffer(svc.ARCHIVE_ENTRY_MAX_BYTES + 1) })).reason, 'too-large')
+    assert.deepEqual(fs.readdirSync(tempDir), [])
+  } finally {
+    store.clear()
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('archive cache cleanup during async materialization leaves no temporary files', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-archive-test-'))
+  const store = svc.createArchiveEntryCache({ tempDir })
+  try {
+    const pending = store.cache({ name: 'fixture.txt', bytes: Uint8Array.of(1) })
+    store.clear()
+    assert.equal((await pending).reason, 'closed')
+    assert.deepEqual(fs.readdirSync(tempDir), [])
+  } finally {
+    store.clear()
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('archive cache IPC accepts only main-frame byte payloads and preload exposes the restricted endpoint', async () => {
+  svc.initLocalFileService()
+  const mainFrame = {}
+  const handler = ipcHandlers.get('fs:cacheArchiveEntry')
+  const payload = { name: 'synthetic-archive-entry.txt', bytes: Uint8Array.of(1) }
+  assert.equal((await handler({ senderFrame: {}, sender: { mainFrame } }, payload)).reason, 'not-main-frame')
+  assert.equal((await handler({ senderFrame: mainFrame, sender: { mainFrame } }, { ...payload, name: '../escape' })).reason, 'bad-name')
+  const result = await handler({ senderFrame: mainFrame, sender: { mainFrame } }, payload)
+  assert.equal(result.ok, true)
+  assert.deepEqual(fs.readFileSync(result.path), Buffer.from([1]))
+  assert.match(PRELOAD, /cacheArchiveEntry:.*ipcRenderer\.invoke\('fs:cacheArchiveEntry', file\)/)
+  fs.rmSync(path.dirname(result.path), { recursive: true, force: true })
+})
+
+
+test('archive cache reuses concurrent same-name same-byte requests but preserves changed bytes and different names', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-archive-test-'))
+  const store = svc.createArchiveEntryCache({ tempDir })
+  try {
+    const payload = { name: '现场照片.jpg', bytes: Uint8Array.of(1, 2, 3) }
+    const repeated = await Promise.all(Array.from({ length: 25 }, () => store.cache(payload)))
+    assert.equal(repeated.every(result => result.ok), true)
+    assert.equal(new Set(repeated.map(result => result.path)).size, 1)
+    assert.equal(fs.readdirSync(tempDir).length, 1, 'concurrent preview requests materialize only one copy')
+    const renamed = await store.cache({ ...payload, name: '第二张.jpg' })
+    const changed = await store.cache({ ...payload, bytes: Uint8Array.of(4, 5, 6) })
+    assert.notEqual(renamed.path, repeated[0].path)
+    assert.notEqual(changed.path, repeated[0].path)
+    assert.equal(path.basename(renamed.path), '第二张.jpg')
+    assert.deepEqual(fs.readFileSync(changed.path), Buffer.from([4, 5, 6]))
+    assert.deepEqual(fs.readFileSync(repeated[0].path), Buffer.from([1, 2, 3]), 'old drag recipients keep their original bytes')
+    assert.equal(fs.readdirSync(tempDir).length, 3)
+  } finally {
+    store.clear()
+    fs.rmSync(tempDir, { recursive: true, force: true })
   }
 })

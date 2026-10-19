@@ -2,6 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 文件预览/选择/暂存/搜索/标签组件文案
 export default {
+  archiveContents: '压缩包内容',
+  archivePreview: '文件预览',
+  archiveSelectEntry: '选择文件，在这里预览',
+  archivePreparing: '正在读取文件…',
+  archiveRetry: '重试',
+  archiveDragReady: '可拖到资源管理器，或拖出到微信、邮件、访达',
+  archiveDragHint: '可拖到资源管理器以复制文件',
+  archiveNestedHint: '请先将此压缩包拖入资源管理器，再打开查看',
+  archiveDragFailed: '暂时无法拖出，请重试',
+  archivePrepareDrag: '正在准备文件，预览加载后可拖出',
+
   // FileTree.vue：根级 _模板 文件夹（dev-board#112）
   templateFolderHint: '模板文件夹：放入你所的报告模板，AI 学习后按它的字体、编号与表格样式起草',
 
@@ -123,6 +134,8 @@ export default {
   matchesSuffix: '个匹配',
   filesSuffix: '个文件',
   searchAllFiles: '在所有文件中搜索',
+  quickLookHint: '空格 / Esc 关闭 · ↑ ↓ 切换',
+  quickLookOpen: '在标签页中打开',
   // QuickOpenPanel.vue
   quickOpenPlaceholder: '输入文件名，回车打开',
   loadingFileList: '加载文件列表…',
