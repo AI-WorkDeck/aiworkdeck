@@ -4,6 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { beginArchiveEntryDrag, endArchiveEntryDrag } from '../../src/utils/archiveEntryDrag.js'
+import { nativeEvent } from '../../src/utils/fileTreeExternalDrop.js'
 import { installExternalDragCleanup, startExternalFileDrag } from '../../src/utils/fileLocalDrag.js'
 
 const PREVIEW = readFileSync(new URL('../../src/components/FilePreview.vue', import.meta.url), 'utf8')
@@ -125,7 +126,7 @@ for (const nativeResult of ['success', 'throw', 'reject', 'not-ready']) {
     const stubs = {
       defineAsyncComponent: () => ({}), host,
       beginArchiveEntryDrag, endArchiveEntryDrag, installExternalDragCleanup, startExternalFileDrag,
-      applyDragImage() {},
+      nativeEvent, applyDragImage() {},
       uni: { $emit: name => calls.events.push(name), showToast: value => calls.toasts.push(value) },
       URL: { revokeObjectURL: value => calls.revoked.push(value) },
     }
@@ -140,9 +141,9 @@ for (const nativeResult of ['success', 'throw', 'reject', 'not-ready']) {
     for (const [name, fn] of Object.entries(options.methods)) vm[name] = fn.bind(vm)
     vm.primeEntry = () => { calls.primes++ }
     const dt = { effectAllowed: 'all', setData() {} }
-    vm.onDragStart({ dataTransfer: dt }, entry)
-    assert.ok(win.listeners.size > 0)
-    assert.equal(document.__checkbaDraggedArchiveEntry?.path, entry.path)
+    vm.onDragStart({ dataTransfer: dt, preventDefault() {} }, entry)
+    assert.equal(win.listeners.size > 0, nativeResult !== 'throw')
+    assert.equal(document.__checkbaDraggedArchiveEntry?.path, nativeResult === 'throw' ? undefined : entry.path)
     assert.equal(document.__checkbaDraggedFile, undefined, 'archive entries must not impersonate project files')
     assert.equal(calls.events.includes('file-drag-start'), false, 'archive drag must not arm the LOWA overlay')
     options.beforeUnmount.call(vm)

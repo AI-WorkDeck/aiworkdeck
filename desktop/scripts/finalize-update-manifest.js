@@ -23,11 +23,13 @@ async function finalize(dir, version, signingKey) {
     if (names.length !== 1) throw new Error(`Expected one ${platform} installer`)
     const name = names[0]
     const file = path.join(dir, name)
+    // GitHub release uploads and sync-mirror both replace spaces with dots.
+    const assetName = name.replace(/ /g, '.')
     const hash = crypto.createHash('sha256')
     for await (const chunk of fs.createReadStream(file)) hash.update(chunk)
     installers[platform] = { version, size: fs.statSync(file).size, sha256: hash.digest('hex'), urls: [
-      `https://www.aiworkdeck.com/update/desktop/installers/${encodeURIComponent(name)}`,
-      `https://github.com/AI-WorkDeck/aiworkdeck/releases/download/v${version}/${encodeURIComponent(name)}`
+      `https://www.aiworkdeck.com/update/desktop/installers/${encodeURIComponent(assetName)}`,
+      `https://github.com/AI-WorkDeck/aiworkdeck/releases/download/v${version}/${encodeURIComponent(assetName)}`
     ] }
   }
   channel.installers = installers

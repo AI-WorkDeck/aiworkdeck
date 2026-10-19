@@ -559,4 +559,7 @@ FilePickerDialog :298 / EasyVoicePane :537 / DesensitizePane :543 / SearchPanel 
 `file-drag-start`，不写 `__checkbaDraggedFile`**，否则 LOWA 会为不存在的项目文件挂证据接收层。
 FileTree 的节点/根/空白落点先认包内载荷，先同步快照与 claim 再 await 导入；清理复用
 `installExternalDragCleanup`，仅安装一套，不再叠 `startExternalFileDrag` 的第二套。
+包内条目与普通文件一样，拿到真实同步 dragstart 事件后、原生临时路径准备好时先
+`preventDefault()` 再启动 Electron 拖拽，避免两套拖拽竞争宿主输入。原生启动成功不等于结束；
+启动失败必须结束本次包内身份并提示，旧请求迟到失败不得清理或提示覆盖新手势。
 回归：`archive-entry-preview`、`archive-media-lifecycle`、`file-tree-archive-drop`、desktop `file-drag`。
