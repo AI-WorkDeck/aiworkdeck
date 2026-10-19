@@ -90,7 +90,12 @@ test('发布汇总：缺任一平台拒绝，齐套后将真实字节哈希绑�
   const entry = JSON.parse(fs.readFileSync(file)).channels['0.12'].installers.win32
   assert.equal(entry.size, 13)
   assert.equal(entry.sha256, crypto.createHash('sha256').update('synthetic exe').digest('hex'))
-  assert.ok(entry.urls[0].includes('/installers/AI%20WorkDeck%20Setup%200.12.0.exe'))
+  assert.deepEqual(entry.urls, [
+    'https://www.aiworkdeck.com/update/desktop/installers/AI.WorkDeck.Setup.0.12.0.exe',
+    'https://github.com/AI-WorkDeck/aiworkdeck/releases/download/v0.12.0/AI.WorkDeck.Setup.0.12.0.exe'
+  ])
+  const mac = JSON.parse(fs.readFileSync(file)).channels['0.12'].installers['darwin-arm64']
+  assert.ok(mac.urls.every(url => url.endsWith('/AI.WorkDeck-0.12.0-arm64.dmg')))
 })
 
 test('Windows helper：NSIS失败落日志并保留安装包，普通退出不重开', { skip: process.platform !== 'win32' }, () => {

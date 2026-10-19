@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: full-upgrade-mac-smoke
+on:
+  workflow_dispatch:
+    inputs:
+      baseline_run_id:
+        description: Successful signed 0.65.0 build containing the full updater
+        required: true
+        default: '39213434701'
+      baseline_sha:
+        description: Exact expected baseline source commit
+        required: true
+        default: '109ebe48b97630bb336a8dd60c691420c9b855a9'
+      candidate_run_id:
+        description: Successful signed 0.66.0 candidate build
+        required: true
+        default: '39214022951'
+      candidate_sha:
+        description: Exact expected candidate source commit
+        required: true
+        default: 'a1fa26317270df303b99b99fe1735460b236e8b7'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native-upgrade:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Exercise genuine signed bundles, Squirrel, ordinary quit and manual reopen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASELINE_RUN: ${{ inputs.baseline_run_id }}
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run_id }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: node desktop/scripts/test-full-upgrade-mac.mjs
+      - name: Preserve provenance, signatures, screenshots and ShipIt diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-upgrade-mac-quit-${{ github.run_attempt }}
+          path: evidence/mac-upgrade/
+          retention-days: 7
+          if-no-files-found: error

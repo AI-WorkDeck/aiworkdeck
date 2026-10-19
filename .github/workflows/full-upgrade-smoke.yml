@@ -1,0 +1,96 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: full-upgrade-smoke
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Successful desktop-build run containing the signed candidate
+        required: true
+      candidate_version:
+        description: Candidate version
+        required: true
+        default: '0.66.0'
+      baseline_run_id:
+        description: Optional signed older-version new-updater build (empty uses original v0.65.0)
+        required: false
+      baseline_version:
+        description: Baseline version
+        required: true
+        default: '0.65.0'
+      mechanism:
+        type: choice
+        options: [LegacyHelper, AppUpdater]
+        default: LegacyHelper
+      exit_mode:
+        type: choice
+        options: [Restart, Quit, Reopen]
+        default: Restart
+permissions:
+  contents: read
+  actions: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download and identify signed installer builds
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run_id }}
+          BASELINE_RUN: ${{ inputs.baseline_run_id }}
+          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+          BASELINE_VERSION: ${{ inputs.baseline_version }}
+          MECHANISM: ${{ inputs.mechanism }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force evidence, candidate, baseline | Out-Null
+          if ($env:CANDIDATE_VERSION -notmatch '^\d+\.\d+\.\d+$' -or $env:BASELINE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
+          function Download-Build($id, $destination) {
+            if ($id -notmatch '^\d+$') { throw 'Run ID must be numeric' }
+            $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$id" | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.path -ne '.github/workflows/desktop-build.yml' -or $run.event -ne 'workflow_dispatch') { throw 'Requires successful manually dispatched official desktop build' }
+            $run | Select-Object id, head_sha, head_branch, path, event, conclusion, html_url | ConvertTo-Json | Set-Content "evidence/$destination-build.json"
+            gh run download $id --repo $env:GITHUB_REPOSITORY --name aiworkdeck-windows-latest --dir $destination
+            if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed' }
+          }
+          Download-Build $env:CANDIDATE_RUN candidate
+          if ($env:BASELINE_RUN) { Download-Build $env:BASELINE_RUN baseline }
+          else {
+            if ($env:MECHANISM -eq 'AppUpdater') { throw 'AppUpdater requires an explicitly supplied signed baseline with new updater code' }
+            gh release download "v$env:BASELINE_VERSION" --repo $env:GITHUB_REPOSITORY --pattern '*.exe' --dir baseline
+            if ($LASTEXITCODE -ne 0) { throw 'Original release download failed' }
+            @{ tag = "v$env:BASELINE_VERSION"; source = 'Original published release; no full-update mechanism' } | ConvertTo-Json | Set-Content evidence/baseline-build.json
+          }
+          # Use the helper from the candidate's exact source commit, even when test scripts are newer.
+          $candidate = Get-Content evidence/candidate-build.json -Raw | ConvertFrom-Json
+          git fetch origin $candidate.head_sha --depth=1
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch candidate source' }
+          $helper = git show "$($candidate.head_sha):desktop/main/services/install-update.ps1"
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate source helper missing' }
+          [IO.File]::WriteAllText("$env:GITHUB_WORKSPACE/desktop/main/services/install-update.ps1", ($helper -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+      - name: Exercise real signed NSIS and installed application
+        shell: pwsh
+        env:
+          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+          BASELINE_VERSION: ${{ inputs.baseline_version }}
+          MECHANISM: ${{ inputs.mechanism }}
+          EXIT_MODE: ${{ inputs.exit_mode }}
+        run: |
+          $old = @(Get-ChildItem baseline -Filter '*.exe' -Recurse)
+          $new = @(Get-ChildItem candidate -Filter '*.exe' -Recurse)
+          if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Expected exactly one installer in each artifact' }
+          & ./desktop/scripts/test-full-upgrade.ps1 -OldInstaller $old[0].FullName -CandidateInstaller $new[0].FullName -OldVersion $env:BASELINE_VERSION -CandidateVersion $env:CANDIDATE_VERSION -Mechanism $env:MECHANISM -ExitMode $env:EXIT_MODE -OutDir evidence
+      - name: Preserve screenshots, signatures and process evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-upgrade-${{ inputs.mechanism }}-${{ inputs.exit_mode }}-${{ github.run_attempt }}
+          path: evidence/
+          retention-days: 7
+          if-no-files-found: error
