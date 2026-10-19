@@ -15,6 +15,9 @@ func sha(_ data: Data) -> String { SHA256.hash(data:data).map { String(format:"%
 let permissions: [String:Any] = ["postEventAccess":CGPreflightPostEventAccess(),"accessibilityTrusted":AXIsProcessTrusted(),"screenCaptureAccess":CGPreflightScreenCaptureAccess(),"pid":ProcessInfo.processInfo.processIdentifier]
 if mode == "permissions" { save("permissions.json",permissions); exit(CGPreflightPostEventAccess() ? 0 : 2) }
 if mode == "mouse" {
+    let mouseApp=NSApplication.shared
+    mouseApp.setActivationPolicy(.prohibited) // Initialize AppKit without creating/activating a helper window.
+    mouseApp.finishLaunching()
     let cfg = try! JSONSerialization.jsonObject(with:Data(CommandLine.arguments[3].utf8)) as! [String:Any]
     let label = cfg["label"] as! String
     save("\(label)-permissions.json",permissions)
@@ -33,7 +36,7 @@ if mode == "mouse" {
         let windows=CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as! [[String:Any]]
         let matched=windows.first { ($0[kCGWindowNumber as String] as? Int)==number }
         let pid=Int32(matched?[kCGWindowOwnerPID as String] as? Int ?? -1)
-        save("\(label)-window-at-\(Int(point.x))-\(Int(point.y)).json",["windowNumber":number,"ownerPid":pid,"appKitPoint":["x":screenPoint.x,"y":screenPoint.y]])
+        save("\(label)-window-at-\(Int(point.x))-\(Int(point.y)).json",["windowNumber":number,"ownerPid":pid,"appKitPoint":["x":screenPoint.x,"y":screenPoint.y],"windows":windows.map { w in w.filter { [kCGWindowNumber,kCGWindowOwnerPID,kCGWindowOwnerName,kCGWindowBounds,kCGWindowLayer,kCGWindowAlpha].map { $0 as String }.contains($0.key) } }])
         return pid
     }
     let start=point("source"); let startOwner=owner(start)
