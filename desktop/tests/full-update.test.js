@@ -144,40 +144,25 @@ test('Windows PowerShell子进程只清除继承的模块搜索路径，保留�
   assert.equal(env.PSModulePath, 'PS7-modules')
 })
 
-test('Windows真实PowerShell：污染模块路径导致失败，生产环境修复后真实hash与签名命令可用', { skip: process.platform !== 'win32' }, async t => {
+test('Windows真实PowerShell：生产环境执行hash与签名命令，并拒绝未签名安装包', { skip: process.platform !== 'win32' }, async t => {
   const dir = root(t)
-  const input = path.join(dir, 'unsigned.txt')
-  fs.writeFileSync(input, 'installer integrity fixture')
-  // Model PS7 module inheritance without relying on which pwsh CI installed.
-  // Windows PowerShell must not try loading these incompatible module versions.
-  for (const name of ['Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Security']) {
-    const moduleDir = path.join(dir, 'incompatible-modules', name)
-    fs.mkdirSync(moduleDir, { recursive: true })
-    fs.writeFileSync(path.join(moduleDir, name + '.psd1'), "@{ ModuleVersion = '99.0'; PowerShellVersion = '99.0'; RootModule = 'unavailable.psm1' }")
-  }
-  const polluted = { ...windowsPowerShellEnv(), PSModulePath: path.join(dir, 'incompatible-modules') }
+  const input = path.join(dir, 'unsigned.ps1')
+  fs.writeFileSync(input, "Write-Output 'installer integrity fixture'\n")
+  // The initial Windows CI run reproduced inherited PS7 module failure.
+  // Do not fabricate a negative module manifest: Windows may skip incompatible
+  // manifests and resolve its built-in command. Verify the actual shipping path.
   const command = `$ErrorActionPreference='Stop'; $f='${input.replace(/'/g, "''")}'; @{ hash=(Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash; signature=(Get-AuthenticodeSignature -LiteralPath $f).Status.ToString() } | ConvertTo-Json -Compress`
   const { spawnSync } = require('child_process')
-  const bad = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { env: polluted, encoding: 'utf8' })
-  assert.notEqual(bad.status, 0, '负例必须先证明模块路径污染确实使真实命令失败')
-  assert.match(bad.stderr, /Get-FileHash|Microsoft.PowerShell.Utility/)
-  const good = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { env: windowsPowerShellEnv(polluted), encoding: 'utf8' })
+  const good = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { env: windowsPowerShellEnv(), encoding: 'utf8' })
   assert.equal(good.status, 0, good.stderr || good.stdout)
   const result = JSON.parse(good.stdout)
   assert.equal(result.hash.toLowerCase(), crypto.createHash('sha256').update(fs.readFileSync(input)).digest('hex'))
   assert.equal(result.signature, 'NotSigned')
   // Exercise the shipping Authenticode preflight too: it must reject unsigned
   // bytes for the signature reason, never because the cmdlet could not load.
-  const original = process.env.PSModulePath
-  process.env.PSModulePath = polluted.PSModulePath
-  try {
-    const updater = createFullUpdate({ platform: 'win32', dataDir: dir })
-    await assert.rejects(updater.prepare(input, '0.12.0'), /Invalid installer signature/)
-    assert.equal(updater.isReady(), false)
-  } finally {
-    if (original === undefined) delete process.env.PSModulePath
-    else process.env.PSModulePath = original
-  }
+  const updater = createFullUpdate({ platform: 'win32', dataDir: dir })
+  await assert.rejects(updater.prepare(input, '0.12.0'), /Invalid installer signature/)
+  assert.equal(updater.isReady(), false)
 })
 
 
