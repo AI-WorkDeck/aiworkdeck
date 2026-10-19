@@ -197,8 +197,8 @@ try {
     Assert-That ((Read-Dom 'window.devicePixelRatio') -eq 1) '100 percent DPI required for physical coordinate verification'
     $api='http://127.0.0.1:19576/api'
     Wait-Until { try { return @((Invoke-RestMethod "$api/projects/my") | Where-Object name -eq 'Native drag fixture').Count -eq 1 } catch { return $false } } 'real OS open-folder request creates project' 120
-    $project = @(Invoke-RestMethod "$api/projects/my" | Where-Object name -eq 'Native drag fixture')[0]
-    $files = @(Invoke-RestMethod "$api/projects/$($project.id)/files")
+    $project = @((Invoke-RestMethod "$api/projects/my") | Where-Object name -eq 'Native drag fixture')[0]
+    $files = Invoke-RestMethod "$api/projects/$($project.id)/files"
     $ordinaryId = ($files | Where-Object name -eq 'ordinary-drag.txt').id
     $archiveId = ($files | Where-Object name -eq 'drag-fixture.zip').id
     $recoveryId = ($files | Where-Object name -eq 'after-drag.txt').id
