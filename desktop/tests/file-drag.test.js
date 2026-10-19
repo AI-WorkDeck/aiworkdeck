@@ -35,7 +35,7 @@ const PRELOAD = fs.readFileSync(path.join(__dirname, '../preload/preload.js'), '
 
 test('preload 暴露 fs.startDrag，走 fs:startDrag 通道', () => {
   assert.match(PRELOAD, /startDrag:\s*\(path\)\s*=>/)
-  assert.match(PRELOAD, /ipcRenderer\.send\('fs:startDrag',\s*\{\s*paths\s*\}\)/)
+  assert.match(PRELOAD, /return ipcRenderer\.invoke\('fs:startDrag',\s*\{\s*paths\s*\}\)/)
 })
 
 test('主进程同时登记 ipcMain.on / ipcMain.handle 的 fs:startDrag', () => {

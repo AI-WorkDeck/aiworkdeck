@@ -2936,13 +2936,18 @@ export default {
         const items = this.externalDragItems(item)
         const result = startExternalFileDrag(items.length === 1 ? items[0] : items, {
           fs: host.fs,
+          event: nativeEv || e,
           baseUrl: getApiBaseUrl(),
           headers: getAuthHeaders(),
           onCleanup: () => this.handleDragEnd()
         })
-        if (host.fs?.startDrag && result?.ok === false && result.reason !== 'unsupported') {
-          uni.showToast({ title: this.$t('fileTree.externalDragFailed'), icon: 'none' })
+        const reportFailure = res => {
+          if (host.fs?.startDrag && res?.ok === false && res.reason !== 'unsupported') {
+            uni.showToast({ title: this.$t('fileTree.externalDragFailed'), icon: 'none' })
+          }
         }
+        if (result && typeof result.then === 'function') result.then(reportFailure)
+        else reportFailure(result)
       }
     },
     // #endif

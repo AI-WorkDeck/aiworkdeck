@@ -278,16 +278,20 @@ export default {
       }
 
       if (file && file.id && file.fileType !== 'folder') {
-        startExternalFileDrag(file, {
+        const result = startExternalFileDrag(file, {
           fs: host.fs,
+          event: nativeEv || event,
           baseUrl: getApiBaseUrl(),
           headers: getAuthHeaders(),
-          onCleanup: () => {
-            if (typeof document !== 'undefined' && document.__checkbaDraggedFile) {
-              this.onDragEnd()
-            }
-          }
+          onCleanup: () => this.onDragEnd()
         })
+        const reportFailure = res => {
+          if (host.fs?.startDrag && res?.ok === false && res.reason !== 'unsupported') {
+            uni.showToast({ title: this.$t('fileTree.externalDragFailed'), icon: 'none' })
+          }
+        }
+        if (result && typeof result.then === 'function') result.then(reportFailure)
+        else reportFailure(result)
       }
     },
     onDragEnd() {
