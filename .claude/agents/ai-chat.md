@@ -7,6 +7,10 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## Jev 折叠入口（dev-board#1366）
+
+`DecisionAssistControl.vue` 在空会话和已有会话的输入区均默认收成「了解并使用 Jev」；原生 `details/summary` 支持鼠标与 Enter/Space，摘要始终显示启用状态。展开仅改变显示，不代表同意启用；原开关继续通过 `toggle` 和既有按用户隔离的偏好控制下一次发送，费用、数据范围与本地模型说明保留在展开区。回归：`frontend/tests/chat-presentation-ui/decision-assist.mjs`，使用真实 ChatInterface 和合成 HTTP，不代表调用真实 Jev。
+
 ## 桌面正常退出与重启接续（2026-10-19，dev-board#1356）
 
 - `AgentRestartController` 只在 local-mode 注册，`/api/agent/restart/{prepare,abort,pending,resume}` 沿现有本机认证；prepare/abort 使用同一 attemptId，迟到 prepare 不得把已取消退出重新冻结。prepare 先封住新 run 与插话消费，再等当前模型/工具到下一次 runLoop 安全边界；不把 SSE 重连当作进程恢复。只有轮次真正暂停、运行态写透 DB 后才返回 ready。桌面此后才 flushDirtyEditors、停止服务和退出。
