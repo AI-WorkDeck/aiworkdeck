@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: native-drag-smoke
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Successful signed desktop-build run
+        required: true
+      candidate_version:
+        description: Expected installed version
+        required: true
+        default: '0.66.0'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download signed complete client
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run_id }}
+        run: |
+          $ErrorActionPreference='Stop'
+          if($env:CANDIDATE_RUN -notmatch '^\d+$'){throw 'Invalid run ID'}
+          New-Item -ItemType Directory -Force evidence,candidate|Out-Null
+          $run=gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:CANDIDATE_RUN"|ConvertFrom-Json
+          if($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.path -ne '.github/workflows/desktop-build.yml' -or $run.event -ne 'workflow_dispatch'){throw 'Requires successful manually dispatched official desktop build'}
+          $run|Select-Object id,head_sha,head_branch,path,event,conclusion,html_url|ConvertTo-Json|Set-Content evidence/candidate-build.json
+          gh run download $env:CANDIDATE_RUN --repo $env:GITHUB_REPOSITORY --name aiworkdeck-windows-latest --dir candidate
+          if($LASTEXITCODE -ne 0){throw 'Artifact download failed'}
+      - name: Exercise native pointer drags and post-drag clicks
+        shell: pwsh
+        env:
+          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+        run: |
+          $installers=@(Get-ChildItem candidate -Filter '*.exe' -Recurse)
+          if($installers.Count -ne 1){throw 'Expected exactly one signed installer'}
+          & ./desktop/scripts/test-native-drag.ps1 -Installer $installers[0].FullName -Version $env:CANDIDATE_VERSION -OutDir evidence
+      - name: Preserve real receiver files and desktop screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-drag-${{ github.run_attempt }}
+          path: evidence/
+          retention-days: 7
+          if-no-files-found: error
