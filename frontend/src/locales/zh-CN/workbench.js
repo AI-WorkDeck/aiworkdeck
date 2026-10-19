@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 工作台（pages/project-overview/project-overview.vue）文案。
 export default {
+  restartPending: '{count} 个任务可继续',
+  restartContinue: '继续：{name}',
+  restartRestoring: '正在恢复原会话与文档…',
+  restartRestoreFailed: '未能恢复原文档或会话，任务已保留，可重试。',
+  restartCancel: '暂不继续',
+  restartTask: '任务 {id}',
+
   backendHealth: {
     externalUnavailable: '已有本地服务不可用，请检查启动它的应用',
     startupFailed: '本地服务启动失败，请重新打开应用',

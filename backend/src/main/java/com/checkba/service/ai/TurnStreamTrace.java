@@ -142,6 +142,28 @@ final class TurnStreamTrace {
         return n;
     }
 
+    /** Restores the same assistant segment; persisted reasoning must not be overwritten on resume. */
+    synchronized void restoreForRestart(String traceJson, String reasoningJson) {
+        resetSegment();
+        try {
+            var trace = MAPPER.readTree(traceJson);
+            segmentStartedAt = trace.path("startedAt").asLong(clock.getAsLong());
+            for (var item : trace.path("events")) {
+                Entry entry = new Entry(item.path("type").asText(), item.path("at").asLong());
+                entry.content.append(item.path("content").asText());
+                entry.lastAt = item.path("lastAt").asLong(entry.at);
+                replay.add(entry); replayChars += entry.content.length();
+            }
+            if (reasoningJson != null && !reasoningJson.isBlank()) for (var item : MAPPER.readTree(reasoningJson)) {
+                Block block = new Block(item.path("startedAt").asLong(), item.path("anchor").asInt());
+                block.text.append(item.path("text").asText());
+                block.endedAt = item.path("endedAt").asLong();
+                block.truncated = item.path("truncated").asBoolean();
+                blocks.add(block); reasoningChars += block.text.length();
+            }
+        } catch (Exception invalid) { throw new IllegalStateException("Invalid restart trace", invalid); }
+    }
+
     /**
      * 随消息落库的思考记录：{@code [{"text","startedAt","endedAt","anchor"[,"truncated"]}]}。
      * 一段思考都没有时返回 null（落库保持 null，老行为不变）。

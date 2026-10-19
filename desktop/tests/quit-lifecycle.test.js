@@ -149,7 +149,7 @@ function section(from, to) {
   return MAIN_SRC.slice(start, end)
 }
 
-function quitHarness({ stopAll }) {
+function quitHarness({ stopAll, prepare = async () => {}, fullUpdate = null, restart = false }) {
   const events = []
   const windows = []
   class Window extends EventEmitter {
@@ -160,10 +160,13 @@ function quitHarness({ stopAll }) {
   }
   const app = new EventEmitter()
   app.exit = (code) => events.push('exit:' + code)
+  app.relaunch = () => events.push('relaunch')
   new Window()
   new Window()
   const context = vm.createContext({
     app, BrowserWindow: Window, console, path,
+    openPaths: { resume: () => events.push('resume-open-paths') },
+    prepareRendererForQuit: prepare, fullUpdate, updateRestartRequested: restart, updateService: null, mainWindow: { webContents: { send: (type) => events.push(type) } },
     process: { pid: 4242, platform: 'darwin', env: {} },
     // 墙钟上限的那个定时器在测试里立刻到点：本用例要验的是「卡住也会退出」，不是等 4 秒
     setTimeout: (fn) => { Promise.resolve().then(fn); return 0 },
@@ -171,9 +174,11 @@ function quitHarness({ stopAll }) {
     stopClipboardWatcher: () => events.push('stopClipboardWatcher'),
   })
   vm.runInContext(`
+    let quitInProgress = false
     let backendSupervisor = null
     let services = { stopAll: globalThis.__stopAll }
     let modelManager = { killAllActive: () => globalThis.__events.push('killAllActive') }
+    ${section("app.on('activate'", '// 后端有 45s')}
     ${section('const QUIT_STOP_TIMEOUT_MS', "ipcMain.handle('checkba:backend-restart'")}
   `, Object.assign(context, { __stopAll: stopAll, __events: events }))
   return { app, windows, events }
@@ -232,4 +237,102 @@ test('主进程有 uncaughtException / unhandledRejection 兜底，且明确不�
     assert.ok(!/app\.(exit|quit)\(/.test(body), `${evName} 兜底绝不能退出应用`)
     assert.ok(!/dialog\./.test(body), `${evName} 兜底不弹框：断网时错误源成片出现会连环弹`)
   }
+})
+
+test('正常退出先完成任务暂停与文档保存，然后停服务，最后安装且不重开', async () => {
+  const h = quitHarness({ prepare: async () => h.events.push('saved'), stopAll: async () => h.events.push('stopped'),
+    fullUpdate: { isReady: () => true, installOnQuit: async (restart) => { assert.equal(restart, false); h.events.push('installed'); return false } } })
+  h.app.emit('before-quit', { preventDefault() {} })
+  await sleep(30)
+  assert.ok(h.events.indexOf('saved') < h.events.indexOf('stopped'))
+  assert.ok(h.events.indexOf('stopped') < h.events.indexOf('installed'))
+  assert.ok(h.events.indexOf('installed') < h.events.indexOf('exit:0'))
+})
+
+test('保存/任务暂停失败取消退出，不能隐藏、停服务或安装', async () => {
+  const h = quitHarness({ prepare: async () => { throw new Error('save failed') }, stopAll: async () => h.events.push('stopped'),
+    fullUpdate: { isReady: () => true, installOnQuit: async () => h.events.push('installed') } })
+  h.app.emit('before-quit', { preventDefault() {} })
+  await sleep(30)
+  for (const event of ['hide', 'stopped', 'installed', 'exit:0']) assert.ok(!h.events.includes(event), event)
+  assert.ok(h.events.includes('checkba:quit-cancelled'))
+})
+
+test('主动重启完整更新：原生更新器接管重开，只在停服后调用一次', async () => {
+  const h = quitHarness({ restart: true, stopAll: async () => h.events.push('stopped'),
+    fullUpdate: { isReady: () => true, installOnQuit: async (restart) => { assert.equal(restart, true); h.events.push('installed'); return true } } })
+  h.app.emit('before-quit', { preventDefault() {} })
+  h.app.emit('before-quit', { preventDefault() {} })
+  await sleep(30)
+  assert.equal(h.events.filter((e) => e === 'installed').length, 1)
+  assert.ok(h.events.indexOf('stopped') < h.events.indexOf('installed'))
+  assert.ok(!h.events.includes('exit:0'))
+})
+
+function preparationHarness() {
+  const handlers = {}, listeners = {}, sent = [], timers = []
+  const sender = { send: (type, data) => sent.push({ type, data }) }
+  const context = vm.createContext({
+    require, mainWindow: { isDestroyed: () => false, webContents: sender },
+    ipcMain: { on: (name, fn) => { listeners[name] = fn }, handle: (name, fn) => { handlers[name] = fn } },
+    setTimeout: (fn) => { timers.push(fn); return timers.length }, clearTimeout: () => {}
+  })
+  vm.runInContext(`${section('// Acknowledgement comes only', "app.on('window-all-closed'")}\nglobalThis.prepare = prepareRendererForQuit`, context)
+  return { handlers, listeners, sent, timers, sender, prepare: context.prepare }
+}
+
+test('退出IPC真实接线：只接受主renderer同requestId的ACK，过期/伪造ACK无效', async () => {
+  const h = preparationHarness()
+  h.listeners['checkba:quit-handler-ready']({ sender: h.sender })
+  let resolved = false
+  const done = h.prepare().then(() => { resolved = true })
+  const requestId = h.sent[0].data.requestId
+  h.handlers['checkba:quit-prepared']({ sender: {} }, { requestId, ok: true })
+  h.handlers['checkba:quit-prepared']({ sender: h.sender }, { requestId: 'stale', ok: true })
+  await Promise.resolve()
+  assert.equal(resolved, false)
+  h.handlers['checkba:quit-prepared']({ sender: h.sender }, { requestId, ok: true })
+  await done
+  assert.equal(resolved, true)
+})
+
+test('退出IPC：未注册、超时与用户取消均拒绝退出准备', async () => {
+  const h = preparationHarness()
+  await assert.rejects(h.prepare(), /尚未准备/)
+  h.listeners['checkba:quit-handler-ready']({ sender: h.sender })
+  const timeout = h.prepare()
+  h.timers.at(-1)()
+  await assert.rejects(timeout, /取消退出/)
+  const cancelled = h.prepare()
+  h.handlers['checkba:cancel-quit']({ sender: h.sender })
+  await assert.rejects(cancelled, /取消退出/)
+})
+
+
+test('退出准备期间重开只登记意图，完成后relaunch；不会重新展示旧窗口', async () => {
+  let prepared
+  const h = quitHarness({ prepare: () => new Promise(resolve => { prepared = resolve }), stopAll: async () => {} })
+  h.app.emit('before-quit', { preventDefault() {} })
+  h.app.emit('activate')
+  assert.ok(!h.events.includes('relaunch'))
+  prepared()
+  await sleep(30)
+  assert.ok(h.events.includes('relaunch'))
+  assert.ok(h.events.indexOf('relaunch') < h.events.indexOf('exit:0'))
+})
+
+
+test('Windows helper握手期间重开不会漏掉稍后重启意图', async () => {
+  let handoff
+  const h = quitHarness({ stopAll: async () => {}, fullUpdate: {
+    isReady: () => true,
+    installOnQuit: restart => { assert.equal(restart, false); return new Promise(resolve => { handoff = resolve }) }
+  } })
+  h.app.emit('before-quit', { preventDefault() {} })
+  await sleep(10)
+  h.app.emit('activate')
+  handoff(false)
+  await sleep(10)
+  assert.ok(h.events.includes('relaunch'))
+  assert.ok(h.events.includes('exit:0'))
 })

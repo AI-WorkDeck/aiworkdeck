@@ -33,6 +33,14 @@ if (!singleInstanceLock) {
   return
 }
 
+// NSIS may still be replacing files after a very fast manual reopen.
+if (app.isPackaged && process.platform === 'win32' && require('./services/full-update').deferWindowsLaunch(path.join(app.getPath('home'), '.aiworkdeck'), undefined, () => {
+  require('electron').dialog.showErrorBox('AI WorkDeck 更新仍在进行', '安装过程超过预期，请检查正在运行的安装程序后再打开应用。 / Installation is taking longer than expected. Check the running installer before reopening the app.')
+}, require('./open-paths').pathsFromArgv(process.argv))) {
+  app.exit(0)
+  return
+}
+
 // BUG-28：Chromium 内置 PDF 查看器的「更多」菜单（Two page view / Annotations /
 // Document properties）字符串来自 Chromium 自己那份 .pak 本地化资源，只认启动期
 // 的 --lang 开关，运行期用 IPC 通知改不动它，必须在 app ready 之前设好。
@@ -100,6 +108,9 @@ let mainWindowStartupReady = false
 let services = null
 let modelManager = null
 let updateService = null
+let fullUpdate = null
+let updateRestartRequested = false
+let quitInProgress = false
 // 首启进度窗的引用。0.38.0 起首启不再解压 pysvc（四个 Python 服务改走 native pack），
 // 这里只剩「等本机服务起来」这一段的兜底；当前没有创建它的路径，保留是为了
 // retireFirstLaunchSplash 的调用点不必跟着分支。
@@ -554,6 +565,13 @@ function createMainWindow() {
   }
 
   const createdWindow = mainWindow
+  createdWindow.on('close', (event) => {
+    if (quitInProgress && !services) return
+    event.preventDefault()
+    if (quitInProgress) return
+    if (process.platform === 'darwin') createdWindow.hide()
+    else app.quit()
+  })
   createdWindow.on('closed', () => {
     // 旧窗迟到的 closed 不能断开新窗的剪贴板、菜单和原生弹窗。
     if (mainWindow === createdWindow) mainWindow = null
@@ -1656,7 +1674,7 @@ ipcMain.handle('checkba:update-check', async () => {
 })
 ipcMain.handle('checkba:update-restart', async () => {
   // 补丁已在下载完成时原子激活（overlay.activate），重启后三个 seam 自然读到新版本
-  app.relaunch()
+  updateRestartRequested = true
   app.quit()
   return { ok: true }
 })
@@ -1719,8 +1737,11 @@ ipcMain.handle('checkba:set-theme', (_evt, mode) => applyNativeTheme(String(mode
 
 // 系统文件打开请求由主进程排队，直到工作台明确 ready；每条处理后 ack 再发下一条。
 // Windows 启动 argv / second-instance 与 macOS open-file 共用同一条交付链。
-require('./open-paths').installOpenPaths({
+const openPaths = require('./open-paths').installOpenPaths({
   app, ipcMain,
+  queueFile: path.join(app.getPath('home'), '.aiworkdeck', 'restart-open-paths.json'),
+  isQuitting: () => quitInProgress,
+  requestRelaunch: () => { updateRestartRequested = true },
   getWindow: () => mainWindow,
   focusWindow: () => {
     if ((!mainWindow || mainWindow.isDestroyed()) && mainWindowStartupReady) createMainWindow()
@@ -1797,7 +1818,10 @@ app.whenReady().then(() => {
       try {
         const { createUpdateService } = require('./services/update-service')
         const { extractTar } = require('./services/pysvc-runtime')
+        fullUpdate = require('./services/full-update').createFullUpdate({ app, autoUpdater: require('electron').autoUpdater, dataDir: overlayCtx().dataDir })
         updateService = createUpdateService(overlayCtx(), {
+          initialError: fullUpdate.lastError(),
+          prepareInstaller: (file, version) => fullUpdate.prepare(file, version),
           extractTar,
           onEvent: (evt) => {
             try { if (mainWindow) mainWindow.webContents.send('checkba:update-event', evt) } catch (e) { /* ignore */ }
@@ -1857,12 +1881,42 @@ app.whenReady().then(() => {
     })
 })
 
+// Acknowledgement comes only from the main renderer, after task suspension and
+// dirty editors have been saved. An old/stale window cannot authorize exit.
+let quitPreparation = null
+let quitHandlerSender = null
+ipcMain.on('checkba:quit-handler-ready', (event) => {
+  if (event.sender === mainWindow?.webContents) quitHandlerSender = event.sender
+})
+ipcMain.handle('checkba:quit-prepared', (event, data = {}) => {
+  if (quitPreparation && event.sender === mainWindow?.webContents && data.requestId === quitPreparation.id) {
+    data.ok === true ? quitPreparation.resolve() : quitPreparation.reject(new Error(data.error || '退出前保存未完成'))
+  }
+})
+ipcMain.handle('checkba:cancel-quit', (event) => {
+  if (event.sender === mainWindow?.webContents) quitPreparation?.reject(new Error('已取消退出'))
+})
+async function prepareRendererForQuit() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (quitHandlerSender !== mainWindow.webContents) throw new Error('工作台尚未准备好退出，请稍后重试')
+  try {
+    await new Promise((resolve, reject) => {
+      const id = require('crypto').randomUUID()
+      const timer = setTimeout(() => reject(new Error('任务或文档仍在保存，已取消退出')), 60000)
+      quitPreparation = { id, resolve: () => { clearTimeout(timer); resolve() }, reject: (e) => { clearTimeout(timer); reject(e) } }
+      mainWindow.webContents.send('checkba:prepare-quit', { requestId: id })
+    })
+  } finally { quitPreparation = null }
+}
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('activate', () => {
-  if (mainWindowStartupReady && BrowserWindow.getAllWindows().length === 0) createMainWindow()
+  if (quitInProgress) { updateRestartRequested = true; return }
+  if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus() }
+  else if (mainWindowStartupReady && BrowserWindow.getAllWindows().length === 0) createMainWindow()
 })
 
 // 后端有 45s 事务/文件退出宽限，再给强杀确认与队列清理留时间。
@@ -1877,11 +1931,21 @@ function hideAllWindowsForQuit() {
 }
 
 app.on('before-quit', async (e) => {
+  if (quitInProgress && services) { e.preventDefault(); return }
   // 尽量在退出时停止我们启动的本地服务进程
   if (services) {
     const quitStartedAt = Date.now()
     try {
       e.preventDefault()
+      quitInProgress = true
+      try { await prepareRendererForQuit() } catch (err) {
+        updateRestartRequested = false
+        quitInProgress = false
+        mainWindow?.webContents.send('checkba:quit-cancelled', { error: String(err.message || err) })
+        logDesktopEvent('quit-cancelled', { message: String(err.message || err) })
+        openPaths.resume()
+        return
+      }
       // ① 先记账：下次再出现「应用自己消失了」，能直接从 desktop.log 读出退出起点与耗时，
       //    不用再去反推 macOS 统一日志（dev-board#602 那次就是这么查的）。
       logDesktopEvent('quit-begin', { pid: process.pid })
@@ -1905,6 +1969,19 @@ app.on('before-quit', async (e) => {
     services = null
     stopClipboardWatcher()
     logDesktopEvent('quit-end', { elapsedMs: Date.now() - quitStartedAt })
+    updateService?.stop()
+    try {
+      if (fullUpdate?.isReady()) {
+        const restart = updateRestartRequested
+        if (await fullUpdate.installOnQuit(restart)) return
+        // A second launch can arrive while the Windows helper is starting.
+        // The successor will see its lock and ask it to reopen after installation.
+        if (!restart && updateRestartRequested) app.relaunch()
+      } else if (updateRestartRequested) app.relaunch()
+    } catch (err) {
+      logDesktopEvent('update-install-error', { message: String(err.message || err) })
+      if (updateRestartRequested) app.relaunch()
+    }
     app.exit(0)
   }
 })

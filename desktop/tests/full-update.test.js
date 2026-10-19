@@ -1,0 +1,138 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('fs')
+const path = require('path')
+const os = require('os')
+const http = require('http')
+const crypto = require('crypto')
+const { EventEmitter } = require('events')
+const { prepareMac, createFullUpdate, deferWindowsLaunch, lockPath } = require('../main/services/full-update')
+const { finalize } = require('../scripts/finalize-update-manifest')
+function root(t) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'full-update-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); return dir }
+function get(url) { return new Promise((resolve, reject) => http.get(url, (res) => { const chunks = []; res.on('data', (b) => chunks.push(b)); res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) })); res.on('error', reject) }).on('error', reject)) }
+function commands(calls, version = '0.12.0') {
+  return async (cmd, args) => {
+    calls.push([cmd, args])
+    if (cmd.endsWith('hdiutil') && args[0] === 'attach') fs.mkdirSync(path.join(args.at(-1), 'AI WorkDeck.app'))
+    if (cmd.endsWith('plutil')) return { stdout: version }
+    if (cmd.endsWith('ditto')) fs.writeFileSync(args.at(-1), 'local ZIP bytes')
+    return { stdout: '' }
+  }
+}
+
+test('Mac：真实回环feed仅发布已准备ZIP，收到原生downloaded后才ready，普通退出不重开', async (t) => {
+  const dir = root(t), calls = [], native = new EventEmitter()
+  let feed, fetched
+  native.setFeedURL = ({ url }) => { feed = url }
+  native.checkForUpdates = () => { (async () => {
+    assert.equal((await get(new URL('/wrong', feed))).status, 404)
+    const data = JSON.parse((await get(feed)).body)
+    fetched = (await get(data.url)).body.toString()
+    native.emit('update-downloaded')
+  })().catch((e) => native.emit('error', e)) }
+  let restarts = 0
+  native.quitAndInstall = () => restarts++
+  fs.writeFileSync(path.join(dir, 'update.dmg'), 'verified synthetic dmg')
+  const updater = createFullUpdate({ platform: 'darwin', dataDir: dir, autoUpdater: native }, commands(calls))
+  assert.equal(updater.isReady(), false)
+  await updater.prepare(path.join(dir, 'update.dmg'), '0.12.0')
+  assert.equal(fetched, 'local ZIP bytes')
+  assert.equal(updater.isReady(), true)
+  assert.ok(calls.some(([cmd, args]) => cmd.endsWith('hdiutil') && args[0] === 'detach'))
+  assert.equal(await updater.installOnQuit(false), false)
+  assert.equal(restarts, 0)
+  assert.equal(await updater.installOnQuit(true), true)
+  assert.equal(restarts, 1)
+  assert.equal(fs.existsSync(path.join(dir, 'update.zip')), false)
+  await assert.rejects(get(feed))
+})
+
+test('Mac：原生签名拒绝不ready；版本不符仍卸载DMG且不启动原生检查', async (t) => {
+  const dir = root(t), native = new EventEmitter(), calls = []
+  native.setFeedURL = () => {}
+  native.checkForUpdates = () => native.emit('error', new Error('signature rejected'))
+  const updater = createFullUpdate({ platform: 'darwin', dataDir: dir, autoUpdater: native }, commands(calls))
+  await assert.rejects(updater.prepare(path.join(dir, 'update.dmg'), '0.12.0'), /signature rejected/)
+  assert.equal(updater.isReady(), false)
+  const otherCalls = []
+  await assert.rejects(prepareMac(path.join(dir, 'update.dmg'), '0.13.0', native, commands(otherCalls)), /版本/)
+  assert.ok(otherCalls.some(([cmd, args]) => cmd.endsWith('hdiutil') && args[0] === 'detach'))
+  assert.ok(!otherCalls.some(([cmd]) => cmd.endsWith('ditto')))
+})
+
+test('Windows：安装期间快开仅登记稍后启动；helper已死/损坏锁不能永久拦截', (t) => {
+  const dir = root(t), file = lockPath(dir)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify({ helperPid: 12345 }))
+  assert.equal(deferWindowsLaunch(dir, (pid) => pid === 12345), true)
+  assert.ok(fs.existsSync(file + '.launch'))
+  assert.equal(deferWindowsLaunch(dir, () => false), false)
+  fs.writeFileSync(file, 'broken')
+  assert.equal(deferWindowsLaunch(dir), false)
+})
+
+test('发布汇总：缺任一平台拒绝，齐套后将真实字节哈希绑定到原签名清单', async (t) => {
+  const dir = root(t), { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519')
+  fs.mkdirSync(path.join(dir, 'patch'))
+  const file = path.join(dir, 'patch/manifest.json')
+  const bytes = Buffer.from(JSON.stringify({ schema: 1, channels: { '0.12': { latest: '0.12.0' } } }))
+  fs.writeFileSync(file, bytes)
+  fs.writeFileSync(file + '.sig', crypto.sign(null, bytes, privateKey).toString('base64'))
+  const key = privateKey.export({ type: 'pkcs8', format: 'pem' })
+  fs.writeFileSync(path.join(dir, 'AI WorkDeck-0.12.0-arm64.dmg'), 'synthetic dmg')
+  await assert.rejects(finalize(dir, '0.12.0', key), /win32/)
+  assert.deepEqual(fs.readFileSync(file), bytes)
+  fs.writeFileSync(path.join(dir, 'AI WorkDeck Setup 0.12.0.exe'), 'synthetic exe')
+  await finalize(dir, '0.12.0', key)
+  assert.ok(crypto.verify(null, fs.readFileSync(file), publicKey, Buffer.from(fs.readFileSync(file + '.sig', 'utf8'), 'base64')))
+  const entry = JSON.parse(fs.readFileSync(file)).channels['0.12'].installers.win32
+  assert.equal(entry.size, 13)
+  assert.equal(entry.sha256, crypto.createHash('sha256').update('synthetic exe').digest('hex'))
+  assert.ok(entry.urls[0].includes('/installers/AI%20WorkDeck%20Setup%200.12.0.exe'))
+})
+
+test('Windows helper：NSIS失败落日志并保留安装包，普通退出不重开', { skip: process.platform !== 'win32' }, () => {
+  const result = require('child_process').spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'install-update.test.ps1')], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr || result.stdout)
+})
+
+test('发布实际接线：先checkout再下载双平台产物，签名汇总在Release之前', () => {
+  const yaml = require('js-yaml')
+  const workflow = yaml.load(fs.readFileSync(path.join(__dirname, '../../.github/workflows/desktop-build.yml'), 'utf8'))
+  const steps = workflow.jobs.release.steps
+  const checkout = steps.findIndex((s) => s.uses?.startsWith('actions/checkout'))
+  const download = steps.findIndex((s) => s.uses?.startsWith('actions/download-artifact'))
+  const finalize = steps.findIndex((s) => s.run?.includes('finalize-update-manifest.js'))
+  const release = steps.findIndex((s) => s.uses?.startsWith('softprops/action-gh-release'))
+  assert.ok(checkout >= 0 && download > checkout && finalize > download && release > finalize)
+  assert.ok(steps[finalize].env.UPDATE_SIGNING_KEY.includes('secrets.UPDATE_SIGNING_KEY'))
+})
+
+
+test('Mac安装提交异步失败：记下错误、重开并退出，不能留下无窗口单实例锁', async (t) => {
+  const dir = root(t), native = new EventEmitter(), events = []
+  native.setFeedURL = () => {}
+  native.checkForUpdates = () => native.emit('update-downloaded')
+  native.quitAndInstall = () => setImmediate(() => native.emit('error', new Error('ShipIt permission denied')))
+  fs.writeFileSync(path.join(dir, 'update.dmg'), 'verified synthetic dmg')
+  const app = { relaunch: () => events.push('relaunch'), exit: code => events.push(`exit:${code}`) }
+  const updater = createFullUpdate({ app, platform: 'darwin', dataDir: dir, autoUpdater: native }, commands([]))
+  await updater.prepare(path.join(dir, 'update.dmg'), '0.12.0')
+  assert.equal(await updater.installOnQuit(true), true)
+  assert.deepEqual(events, [])
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(events, ['relaunch', 'exit:0'])
+  assert.match(updater.lastError(), /ShipIt permission denied/)
+  native.emit('error', new Error('duplicate error'))
+  assert.equal(events.length, 2, '同次失败不能重复发起重开')
+})
+
+test('Windows安装期间用文件关联快开：下一进程仍收到原文档', t => {
+  const dir = root(t), file = lockPath(dir)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify({ helperPid: 12345 }))
+  assert.equal(deferWindowsLaunch(dir, () => true, () => {}, ['C:\\材料\\合同.docx']), true)
+  assert.deepEqual(require('../main/open-paths').readQueuedPaths(path.join(dir, 'restart-open-paths.json')), ['C:\\材料\\合同.docx'])
+})
