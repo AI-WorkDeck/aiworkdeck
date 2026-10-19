@@ -118,7 +118,7 @@ const mounts = new Set()
 async function ready(version) {
   const jar = fs.statSync(path.join(app, 'Contents/Resources/backend/app.jar'))
   await until(async () => (await api('/admin/wizard')).build === `${jar.size}-${Math.round(jar.mtimeMs)}`, 'bundled backend JAR identity', 240)
-  await until(() => renderer('!!window.checkbaDesktop?.update && document.readyState === "complete"'), 'installed renderer', 180)
+  await until(() => renderer('!!window.checkbaDesktop?.update && !!document.querySelector(".page-project-overview") && document.readyState === "complete"'), 'installed workbench renderer', 180)
   check((await renderer('window.checkbaDesktop.update.status()')).appVersion === version, `Running shell version ${version}`)
   const identity = await main(`({pid:process.pid,execPath:process.execPath,version:process.mainModule.require('electron').app.getVersion(),visible:process.mainModule.require('electron').BrowserWindow.getAllWindows().some(w=>w.isVisible())})`)
   check(identity.pid === child.pid && identity.execPath === path.join(app, 'Contents/MacOS/AI WorkDeck') && identity.version === version && identity.visible, 'Running app identity and visible native window')
@@ -193,7 +193,14 @@ try {
   check(plist(app, 'CFBundleShortVersionString') === versions.baseline, 'ShipIt waits while baseline runs')
   await screenshot('02-native-update-ready')
   await quit()
-  await until(async () => exists(path.join(app, 'Contents/Resources/app.asar')) && plist(app, 'CFBundleShortVersionString') === versions.candidate && await hash(path.join(app, 'Contents/Resources/app.asar')) === candidateAsar && await hash(path.join(app, 'Contents/Resources/backend/app.jar')) === candidateJar, 'ShipIt installs exact candidate bundle', 600)
+  const installation = await until(async () => {
+    const log = path.join(shipDir, 'ShipIt_stderr.log')
+    const diagnostics = exists(log) ? fs.readFileSync(log, 'utf8') : ''
+    if (diagnostics.includes('Too many attempts to install, aborting update')) return { error: diagnostics }
+    if (exists(path.join(app, 'Contents/Resources/app.asar')) && plist(app, 'CFBundleShortVersionString') === versions.candidate && await hash(path.join(app, 'Contents/Resources/app.asar')) === candidateAsar && await hash(path.join(app, 'Contents/Resources/backend/app.jar')) === candidateJar) return { ok: true }
+    return false
+  }, 'ShipIt installs exact candidate bundle', 600)
+  check(installation.ok, `ShipIt installed candidate${installation.error ? ': ' + installation.error : ''}`)
   signature(app, versions.candidate, 'installed')
   await sleep(4000)
   check(!run('/bin/ps', ['-axo', 'command=']).split('\n').some(line => line.includes(`${app}/Contents/MacOS/`)), 'Ordinary quit installed candidate without relaunch')
