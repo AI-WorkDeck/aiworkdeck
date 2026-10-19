@@ -16,7 +16,7 @@ if (@(Get-Process -Name 'AI WorkDeck' -ErrorAction SilentlyContinue).Count) { th
 $Installer = (Resolve-Path -LiteralPath $Installer).Path
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $OutDir = (Resolve-Path -LiteralPath $OutDir).Path
-$evidence = [ordered]@{ version = $Version; assertions = @(); gestures = @(); signatures = @(); result = 'NOT_RUN' }
+$evidence = [ordered]@{ version = $Version; assertions = @(); gestures = @(); signatures = @(); versions = @(); result = 'NOT_RUN' }
 $receiver = $null
 $app = $null
 Add-Type @'
@@ -27,6 +27,7 @@ public class DragInput {
   [DllImport("user32.dll")] public static extern IntPtr OpenInputDesktop(uint f, bool inherit, uint access);
   [DllImport("user32.dll")] public static extern bool CloseDesktop(IntPtr h);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int command);
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int ht, uint f);
   [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h, ref POINT p);
   [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT p);
@@ -44,6 +45,14 @@ function Assert-That([bool]$Value, [string]$Label) {
     if (-not $Value) { throw $Label }
     $script:evidence.assertions += $Label
     Write-Host "PASS: $Label"
+}
+function Assert-ExeVersion([string]$Expected, [string]$Label) {
+    $info = (Get-Item -LiteralPath $exe).VersionInfo
+    $actual = $info.ProductVersion
+    $script:evidence.versions += @{ expected = $Expected; productVersion = $actual; fileVersion = $info.FileVersion; path = $exe }
+    Write-Host "Executable version: ProductVersion=[$actual], FileVersion=[$($info.FileVersion)], expected=[$Expected]"
+    # Windows PE resources may encode the semver release with a fourth zero component.
+    Assert-That ($actual -ceq $Expected -or $actual -ceq "$Expected.0") $Label
 }
 function Wait-Until([scriptblock]$Check, [string]$Label, [int]$Seconds = 120) {
     $end = (Get-Date).AddSeconds($Seconds)
@@ -69,7 +78,7 @@ const target = targets.find(t=>t.type==='page' && /index\.html/.test(t.url));
 if(!target) throw Error('Installed workbench not found');
 const ws = new WebSocket(target.webSocketDebuggerUrl); let replied=false;
 const timer=setTimeout(()=>{console.error('CDP read timed out');process.exit(1)},15000);
-ws.onopen=()=>ws.send(JSON.stringify({id:1,method:'Runtime.evaluate',params:{expression,returnByValue:true,awaitPromise:false}}));
+ws.onopen=()=>ws.send(JSON.stringify({id:1,method:'Runtime.evaluate',params:{expression,returnByValue:true,awaitPromise:true}}));
 ws.onmessage=e=>{const r=JSON.parse(e.data);if(r.id!==1)return;replied=true;
  if(r.error||r.result?.exceptionDetails){console.error(JSON.stringify(r));process.exitCode=1}
  else console.log(JSON.stringify(r.result.result.value));clearTimeout(timer);ws.close();};
@@ -166,7 +175,7 @@ try {
     Assert-That ($installed.WaitForExit(300000)) 'Actual NSIS completed'
     $installed.Refresh()
     Assert-That ($installed.ExitCode -eq 0) 'Actual NSIS exit code zero'
-    Assert-That ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -eq $Version) 'Installed executable version matches candidate'
+    Assert-ExeVersion $Version 'Installed executable version matches candidate'
     Signature $exe
     $fixtureDir = Join-Path $env:RUNNER_TEMP 'Native drag fixture'
     $zipDir = Join-Path $env:RUNNER_TEMP 'Native drag zip source'
@@ -182,14 +191,15 @@ try {
     $env:CHECKBA_UPDATE_MANIFEST_URL='http://127.0.0.1:19578/no-production-updates'
     $app = Start-Process $exe -ArgumentList @('--remote-debugging-port=19577',"`"$fixtureDir`"") -PassThru
     Wait-Until { try { return $null -ne (Read-Dom 'document.querySelector(".page-project-overview") ? true : null') } catch { return $false } } 'real installed workbench loads' 240
+    Assert-That ((Read-Dom 'window.checkbaDesktop.update.status()').appVersion -ceq $Version) 'Running candidate reports exact semantic version'
     $app.Refresh()
     Assert-That ($app.MainWindowHandle -ne [IntPtr]::Zero) 'Installed app has a native window'
     [DragInput]::SetWindowPos($app.MainWindowHandle,[IntPtr]::Zero,$screen.X,$screen.Y,$screen.Width,$screen.Height-40,0x0040) | Out-Null
     Assert-That ((Read-Dom 'window.devicePixelRatio') -eq 1) '100 percent DPI required for physical coordinate verification'
     $api='http://127.0.0.1:19576/api'
     Wait-Until { try { return @((Invoke-RestMethod "$api/projects/my") | Where-Object name -eq 'Native drag fixture').Count -eq 1 } catch { return $false } } 'real OS open-folder request creates project' 120
-    $project = @(Invoke-RestMethod "$api/projects/my" | Where-Object name -eq 'Native drag fixture')[0]
-    $files = @(Invoke-RestMethod "$api/projects/$($project.id)/files")
+    $project = @((Invoke-RestMethod "$api/projects/my") | Where-Object name -eq 'Native drag fixture')[0]
+    $files = Invoke-RestMethod "$api/projects/$($project.id)/files"
     $ordinaryId = ($files | Where-Object name -eq 'ordinary-drag.txt').id
     $archiveId = ($files | Where-Object name -eq 'drag-fixture.zip').id
     $recoveryId = ($files | Where-Object name -eq 'after-drag.txt').id
@@ -202,6 +212,27 @@ try {
         Click-Element '.ocd-actions .ocd-btn:not(.primary)'
         Wait-Until { $null -eq (Element '.ocd-mask') } 'physical Later button dismisses first-launch prompt' 15
     }
+    # The Windows menu must not overlap project identity or tools at the runner's narrow width.
+    $header = Read-Dom @'
+(() => {
+ const box = selector => { const r=document.querySelector(selector).getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}; };
+ const items=Array.from(document.querySelectorAll('.amb-top'),el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};});
+ return {menu:box('.amb'), items, title:box('.project-title-row'), tools:box('.header-right'), header:box('.project-header'), safeEnd:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--awd-titlebar-safe-inline-end')), width:innerWidth};
+})()
+'@
+    $evidence.header = $header
+    Assert-That ($header.menu.bottom -le $header.title.top -and $header.menu.bottom -le $header.tools.top) 'Windows menu has its own row above project and tools'
+    Assert-That ($header.title.width -gt 0 -and $header.title.right -le $header.tools.left) 'Project title and tools do not overlap'
+    Assert-That ($header.menu.right -le ($header.width-$header.safeEnd) -and $header.tools.right -le ($header.width-$header.safeEnd+1)) 'Menus and tools remain outside native window controls'
+    for ($i=0; $i -lt $header.items.Count; $i++) {
+        Assert-That ($header.items[$i].left -ge 0 -and $header.items[$i].right -le ($header.width-$header.safeEnd)) 'Every menu entry remains within the safe visible title bar'
+        if ($i -gt 0) { Assert-That ($header.items[$i-1].right -le $header.items[$i].left) 'Adjacent menu entries do not overlap' }
+    }
+    Click-Element '.amb-top'
+    Wait-Until { $null -ne (Element '.amb-menu') } 'native click opens application menu' 15
+    Screenshot 'header-menu-open'
+    Click-Element '.amb-top'
+    Wait-Until { $null -eq (Element '.amb-menu') } 'native click closes application menu' 15
     # Separate STA message loop receives real OLE data. This process only writes this run's fixtures.
     $receiverScript = Join-Path $OutDir 'receiver.ps1'
     @'
@@ -244,6 +275,11 @@ $form.add_Shown({
     } finally { $env:PSModulePath=$oldModulePath }
     Wait-Until { Test-Path (Join-Path $OutDir 'receiver-ready.json') } 'STA native receiver window ready' 30
     $receiverInfo=Get-Content (Join-Path $OutDir 'receiver-ready.json') -Raw|ConvertFrom-Json
+    # Hidden PowerShell suppresses its console but can also hide the first WinForms window.
+    # Show the actual receiver explicitly; the pointer hit-test below still requires its HWND.
+    [DragInput]::ShowWindow([IntPtr]$receiverInfo.handle,5) | Out-Null
+    [DragInput]::SetWindowPos([IntPtr]$receiverInfo.handle,[IntPtr](-1),0,0,0,0,0x0053) | Out-Null
+    Start-Sleep -Milliseconds 250
     $evidence.appPid=$app.Id;$evidence.receiverPid=$receiver.Id;$evidence.installDir=$installDir;$evidence.dataDir=$dataDir
     Screenshot '01-ready'
     Drag-Element ".tree-item[data-file-id='$ordinaryId']" 1 'ordinary-drag.txt' ((Get-FileHash -LiteralPath $ordinary).Hash)

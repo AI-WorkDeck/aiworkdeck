@@ -34,8 +34,9 @@ $cdpPort = 19567
 $env:CHECKBA_BACKEND_PORT = '19566'
 # Block production update checks. AppUpdater replaces this with a signed local fixture feed.
 $env:CHECKBA_UPDATE_MANIFEST_URL = 'http://127.0.0.1:19568/manifest.json'
-$evidence = [ordered]@{ mechanism = $Mechanism; exitMode = $ExitMode; oldVersion = $OldVersion; candidateVersion = $CandidateVersion; installDir = $installDir; dataDir = $dataDir; assertions = @(); signatures = @() }
+$evidence = [ordered]@{ mechanism = $Mechanism; exitMode = $ExitMode; oldVersion = $OldVersion; candidateVersion = $CandidateVersion; installDir = $installDir; dataDir = $dataDir; assertions = @(); signatures = @(); versions = @() }
 $feed = $null
+$helperProcess = $null
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type @'
@@ -49,6 +50,14 @@ function Assert-That([bool]$Value, [string]$Label) {
     if (-not $Value) { throw $Label }
     $script:evidence.assertions += $Label
     Write-Host "PASS: $Label"
+}
+function Assert-ExeVersion([string]$Expected, [string]$Label) {
+    $info = (Get-Item -LiteralPath $exe).VersionInfo
+    $actual = $info.ProductVersion
+    $script:evidence.versions += @{ expected = $Expected; productVersion = $actual; fileVersion = $info.FileVersion; path = $exe }
+    Write-Host "Executable version: ProductVersion=[$actual], FileVersion=[$($info.FileVersion)], expected=[$Expected]"
+    # Windows PE resources may encode the semver release with a fourth zero component.
+    Assert-That ($actual -ceq $Expected -or $actual -ceq "$Expected.0") $Label
 }
 function Wait-Until([scriptblock]$Check, [string]$Label, [int]$Seconds = 180) {
     $end = (Get-Date).AddSeconds($Seconds)
@@ -125,11 +134,12 @@ try {
     $p.Refresh()
     Assert-That ($p.ExitCode -eq 0) 'Old NSIS exit code zero'
     Assert-That (Test-Path -LiteralPath $exe) 'Old application installed in explicit test directory'
-    Assert-That ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -eq $OldVersion) 'Old installed executable has expected version'
+    Assert-ExeVersion $OldVersion 'Old installed executable has expected version'
     Signature $exe
     $app = Launch
     Wait-Backend
     Wait-Renderer
+    Assert-That ((Renderer 'window.checkbaDesktop.update.status()').appVersion -ceq $OldVersion) 'Running baseline reports exact semantic version'
     Screenshot '01-old-workbench'
     $marker = 'WINDOWS_UPGRADE_' + [guid]::NewGuid().ToString('N')
     $fixtureDir = Join-Path $env:RUNNER_TEMP 'upgrade-project'
@@ -139,7 +149,7 @@ try {
     $project = (Api '/projects/open-local' @{ localRoot = $fixtureDir; name = $marker }).data
     $projectId = $project.projectId
     Assert-That ($projectId -gt 0) 'Old backend persisted real local-folder project'
-    $oldFiles = @(Api "/projects/$projectId/files")
+    $oldFiles = Api "/projects/$projectId/files"
     Assert-That (@($oldFiles | Where-Object name -eq 'retained-document.txt').Count -eq 1) 'Old backend indexed fixture document'
     $fileId = ($oldFiles | Where-Object name -eq 'retained-document.txt').id
     $hash = (Get-FileHash -LiteralPath $fixture).Hash
@@ -198,10 +208,18 @@ http.createServer((req,res)=>{
         $oldModulePath = $env:PSModulePath
         try {
             Remove-Item Env:PSModulePath -ErrorAction SilentlyContinue
-            $helperProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"`"$helper`"","`"$lock`"") -PassThru -WindowStyle Hidden
+            $helperStartedAt = [DateTimeOffset]::UtcNow
+            $evidence.helperStartedAt = $helperStartedAt.ToString('o')
+            $helperProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"`"$helper`"","`"$lock`"") -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $OutDir 'helper.stdout.log') -RedirectStandardError (Join-Path $OutDir 'helper.stderr.log')
         } finally { $env:PSModulePath = $oldModulePath }
-        Wait-Until { Test-Path -LiteralPath $lock } 'real helper handshake' 15
-        Assert-That ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -eq $OldVersion) 'Helper waits for live parent before replacing app'
+        Wait-Until {
+            $helperProcess.Refresh()
+            if ($helperProcess.HasExited) { throw "Helper exited before handshake: $($helperProcess.ExitCode); stderr: $(Get-Content (Join-Path $OutDir 'helper.stderr.log') -Raw)" }
+            return Test-Path -LiteralPath $lock
+        } 'real helper handshake' 60
+        $evidence.helperHandshakeMs = ([DateTimeOffset]::UtcNow - $helperStartedAt).TotalMilliseconds
+        Write-Host "Actual helper startup and handshake: $($evidence.helperHandshakeMs) ms"
+        Assert-ExeVersion $OldVersion 'Helper waits for live parent before replacing app'
         Close-App $app
     }
     Wait-Until { Test-Path -LiteralPath $lock } 'installer lock observed' 120
@@ -216,7 +234,7 @@ http.createServer((req,res)=>{
     }
     Wait-Until { -not (Test-Path -LiteralPath $lock) } 'real NSIS/helper finishes' 600
     if (Test-Path -LiteralPath ($lock + '.error')) { throw (Get-Content -LiteralPath ($lock + '.error') -Raw) }
-    Assert-That ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -eq $CandidateVersion) 'Candidate executable replaced old version'
+    Assert-ExeVersion $CandidateVersion 'Candidate executable replaced old version'
     Signature $exe
     if ($ExitMode -eq 'Quit') {
         Start-Sleep -Seconds 3
@@ -226,17 +244,19 @@ http.createServer((req,res)=>{
     Wait-Backend
     # The production helper intentionally relaunches without test CDP flags. A real HTTP read
     # verifies persisted data; the visible native window is additionally captured below.
-    $projects = @(Api '/projects/my')
+    $projects = Api '/projects/my'
     Assert-That (@($projects | Where-Object { $_.id -eq $projectId -and $_.name -eq $marker }).Count -eq 1) 'New backend reopens the same persisted project ID and name'
-    $files = @(Api "/projects/$projectId/files")
+    $files = Api "/projects/$projectId/files"
     Assert-That (@($files | Where-Object { $_.id -eq $fileId -and $_.name -eq 'retained-document.txt' }).Count -eq 1) 'New backend preserves file ID and metadata'
     Assert-That ((Get-FileHash -LiteralPath $fixture).Hash -eq $hash) 'Document bytes survive real NSIS upgrade'
-    Wait-Until { @(Get-Process -Name 'AI WorkDeck' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero }).Count -gt 0 } 'new native workbench visible' 120
+    Wait-Until { @(Get-Process -Name 'AI WorkDeck' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.MainWindowTitle }).Count -gt 0 } 'new native workbench visible' 120
+    Start-Sleep -Seconds 3
     Screenshot '03-upgraded-workbench'
     $evidence.processes = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'AI WorkDeck.exe' -or ($_.Name -eq 'java.exe' -and $_.CommandLine -like '*com.checkba.CheckbaApplication*') } | Select-Object ProcessId, ParentProcessId, ExecutablePath, CommandLine)
     # Explicit second normal restart verifies Chromium preference persistence in the installed app.
     $current = Get-Process -Name 'AI WorkDeck' | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
     Close-App $current
+    if (-not $current.WaitForExit(10000)) { Close-App $current }
     Assert-That ($current.WaitForExit(120000)) 'Upgraded app closes normally'
     $app = Launch
     Wait-Backend
@@ -253,6 +273,19 @@ http.createServer((req,res)=>{
 } finally {
     $evidence | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath (Join-Path $OutDir 'evidence.json') -Encoding utf8
     if (Test-Path (Join-Path $dataDir 'logs')) { Copy-Item (Join-Path $dataDir 'logs') (Join-Path $OutDir 'app-logs') -Recurse -Force }
+    $evidence.processDiagnostics = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -in @('AI WorkDeck.exe', 'powershell.exe', 'pwsh.exe') } | Select-Object ProcessId, ParentProcessId, ExecutablePath, CommandLine)
+    if ($null -ne $helperProcess) { $helperProcess.Refresh(); $evidence.helperState = @{ id = $helperProcess.Id; hasExited = $helperProcess.HasExited; exitCode = $(if ($helperProcess.HasExited) { $helperProcess.ExitCode } else { $null }) } }
+    $evidence | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath (Join-Path $OutDir 'evidence.json') -Encoding utf8
+    # Keep only the synthetic helper's small diagnostics, never the installer or user database.
+    $installerDir = Split-Path $lock
+    if (Test-Path -LiteralPath $installerDir) {
+        $diagnostics = Join-Path $OutDir 'installer-diagnostics'
+        New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
+        foreach ($name in @('install-update.ps1', 'installing.json', 'installing.json.job', 'installing.json.error', 'installing.json.tmp', 'installing.json.launch', 'installing.json.stderr.log')) {
+            $file = Join-Path $installerDir $name
+            if (Test-Path -LiteralPath $file) { Copy-Item -LiteralPath $file -Destination $diagnostics }
+        }
+    }
     if ($null -ne $feed -and -not $feed.HasExited) { Stop-Process -Id $feed.Id -Force }
     # Disposable runner teardown only. Never copy H2 data, browser storage or any user credentials.
     Get-Process -Name 'AI WorkDeck' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
