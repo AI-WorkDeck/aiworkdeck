@@ -142,13 +142,20 @@ function createFullUpdate({ app, autoUpdater, dataDir, platform = process.platfo
       fs.rmSync(file + '.launch', { force: true })
       const helper = path.join(path.dirname(file), 'install-update.ps1')
       fs.copyFileSync(path.join(__dirname, 'install-update.ps1'), helper) // PowerShell cannot read app.asar
-      const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
-        helper, file], { detached: true, stdio: 'ignore', windowsHide: true, env: windowsPowerShellEnv() })
-      await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
+      const stderrFile = file + '.stderr.log'
+      const stderrFd = fs.openSync(stderrFile, 'w')
+      let child
+      try {
+        child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+          helper, file], { detached: true, stdio: ['ignore', 'ignore', stderrFd], windowsHide: true, env: windowsPowerShellEnv() })
+        await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
+      } finally { fs.closeSync(stderrFd) }
       child.unref()
-      // Handshake before exiting: a failed helper must not leave a phantom update.
-      for (let n = 0; n < 100; n++) {
+      // A cold Windows PowerShell can take more than ten seconds to load its modules.
+      // Keep the parent alive until handshake, with a bounded minute and early-exit detection.
+      for (let n = 0; n < 600; n++) {
         try { if (JSON.parse(fs.readFileSync(file, 'utf8')).helperPid === child.pid) return false } catch (_) { /* starting */ }
+        if (child.exitCode !== null || child.signalCode !== null) break
         await new Promise((resolve) => setTimeout(resolve, 100))
       }
       // Do not let a late detached helper install after a successor has started.
@@ -164,7 +171,9 @@ function createFullUpdate({ app, autoUpdater, dataDir, platform = process.platfo
       try {
         if (fs.readFileSync(file + '.job', 'utf8') === jobContents) fs.rmSync(file + '.job', { force: true })
       } catch (_) { /* job was already consumed or replaced */ }
-      throw new Error('更新安装器未能启动')
+      let detail = ''
+      try { detail = fs.readFileSync(stderrFile, 'utf8').trim().slice(0, 4096) } catch (_) { /* no diagnostic */ }
+      throw new Error(`更新安装器未能启动${child.exitCode === null ? '' : `（退出码 ${child.exitCode}）`}${detail ? `：${detail}` : ''}`)
     }
   }
 }

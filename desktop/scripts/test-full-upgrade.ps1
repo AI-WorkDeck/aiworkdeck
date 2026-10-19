@@ -279,7 +279,7 @@ http.createServer((req,res)=>{
     if (Test-Path -LiteralPath $installerDir) {
         $diagnostics = Join-Path $OutDir 'installer-diagnostics'
         New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
-        foreach ($name in @('install-update.ps1', 'installing.json', 'installing.json.job', 'installing.json.error', 'installing.json.tmp', 'installing.json.launch')) {
+        foreach ($name in @('install-update.ps1', 'installing.json', 'installing.json.job', 'installing.json.error', 'installing.json.tmp', 'installing.json.launch', 'installing.json.stderr.log')) {
             $file = Join-Path $installerDir $name
             if (Test-Path -LiteralPath $file) { Copy-Item -LiteralPath $file -Destination $diagnostics }
         }
