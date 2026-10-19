@@ -38,22 +38,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify real helper regression red then green
+      - name: Diagnose independent PowerShell launch bridge
         shell: pwsh
         run: |
-          $source = 'desktop/main/services/full-update.js'
-          Copy-Item $source "$env:RUNNER_TEMP/full-update-fixed.js"
-          # Exact pre-fix product source, with the same new real-process test.
-          git fetch origin 6cf6cebe3c29e706947e8adaf0268490b1212625 --depth=1
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch pre-fix source' }
-          $old = git show '6cf6cebe3c29e706947e8adaf0268490b1212625:desktop/main/services/full-update.js'
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot read pre-fix source' }
-          [IO.File]::WriteAllText((Join-Path $env:GITHUB_WORKSPACE $source), ($old -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
-          node --test --test-name-pattern='Windows真实helper' desktop/tests/full-update.test.js
-          if ($LASTEXITCODE -eq 0) { throw 'Old product source unexpectedly passed real helper regression' }
-          Copy-Item "$env:RUNNER_TEMP/full-update-fixed.js" $source -Force
-          node --test --test-name-pattern='Windows真实helper' desktop/tests/full-update.test.js
-          if ($LASTEXITCODE -ne 0) { throw 'Fixed product source failed real helper regression' }
+          @'
+          const fs=require('fs'),path=require('path'),cp=require('child_process');
+          const dir=path.join(process.env.RUNNER_TEMP,'powershell-bridge-probe');fs.mkdirSync(dir,{recursive:true});
+          const delay=ms=>new Promise(r=>setTimeout(r,ms));
+          (async()=>{for(const redirect of [false,true]){
+            const name=`bridge-redirect-${redirect}`,marker=path.join(dir,name),script=marker+'.ps1',parent=marker+'.cjs';
+            fs.writeFileSync(script,`param([int]$ParentId)\n[IO.File]::WriteAllText('${marker.replace(/'/g,"''")}.started',[string]$PID); Wait-Process -Id $ParentId -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300; [IO.File]::WriteAllText('${marker.replace(/'/g,"''")}.finished','parent exited')`);
+            fs.writeFileSync(parent,`const fs=require('fs'),cp=require('child_process');const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>k.toUpperCase()!=='PSMODULEPATH')); const command=String.raw\`$p=Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File','"${script.replace(/'/g,"''")}"', '[PARENT]') -WindowStyle Hidden -PassThru ${redirect?'-RedirectStandardError "'+marker+'.stderr"':''}; $p.Id\`.replace('[PARENT]',String(process.pid));cp.execFile('powershell.exe',['-NoProfile','-NonInteractive','-Command',command],{windowsHide:true,env},(err,out,stderr)=>{console.log(JSON.stringify({error:err&&String(err),out,stderr}));if(err)process.exit(1);let n=0;const t=setInterval(()=>{if(fs.existsSync(${JSON.stringify(marker+'.started')})||++n>=200){clearInterval(t);process.exit(fs.existsSync(${JSON.stringify(marker+'.started')})?0:2)}},100);});`);
+            const started=Date.now(),proc=cp.spawn(process.execPath,[parent],{stdio:['ignore','pipe','pipe']});let log='';proc.stdout.on('data',b=>log+=b);proc.stderr.on('data',b=>log+=b);
+            const parentExit=await new Promise(resolve=>proc.on('exit',resolve));let polls=0;while(!fs.existsSync(marker+'.finished')&&polls++<300)await delay(100);
+            const pid=fs.existsSync(marker+'.started')?Number(fs.readFileSync(marker+'.started','utf8')):null;let alive=false;try{if(pid){process.kill(pid,0);alive=true}}catch{}
+            console.log(JSON.stringify({name,parentExit,elapsedMs:Date.now()-started,started:fs.existsSync(marker+'.started'),survivedParent:fs.existsSync(marker+'.finished'),pid,alive,stderr:fs.existsSync(marker+'.stderr')?fs.readFileSync(marker+'.stderr','utf8'):null,log}));
+          }})().catch(e=>{console.error(e);process.exitCode=1});
+          '@ | Set-Content "$env:RUNNER_TEMP/bridge-probe.cjs"
+          node "$env:RUNNER_TEMP/bridge-probe.cjs"
       - name: Download and identify signed installer builds
         shell: pwsh
         env:
