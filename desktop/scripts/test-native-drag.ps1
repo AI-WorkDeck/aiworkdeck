@@ -212,6 +212,27 @@ try {
         Click-Element '.ocd-actions .ocd-btn:not(.primary)'
         Wait-Until { $null -eq (Element '.ocd-mask') } 'physical Later button dismisses first-launch prompt' 15
     }
+    # The Windows menu must not overlap project identity or tools at the runner's narrow width.
+    $header = Read-Dom @'
+(() => {
+ const box = selector => { const r=document.querySelector(selector).getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}; };
+ const items=Array.from(document.querySelectorAll('.amb-top'),el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};});
+ return {menu:box('.amb'), items, title:box('.project-title-row'), tools:box('.header-right'), header:box('.project-header'), safeEnd:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--awd-titlebar-safe-inline-end')), width:innerWidth};
+})()
+'@
+    $evidence.header = $header
+    Assert-That ($header.menu.bottom -le $header.title.top -and $header.menu.bottom -le $header.tools.top) 'Windows menu has its own row above project and tools'
+    Assert-That ($header.title.width -gt 0 -and $header.title.right -le $header.tools.left) 'Project title and tools do not overlap'
+    Assert-That ($header.menu.right -le ($header.width-$header.safeEnd) -and $header.tools.right -le ($header.width-$header.safeEnd+1)) 'Menus and tools remain outside native window controls'
+    for ($i=0; $i -lt $header.items.Count; $i++) {
+        Assert-That ($header.items[$i].left -ge 0 -and $header.items[$i].right -le ($header.width-$header.safeEnd)) 'Every menu entry remains within the safe visible title bar'
+        if ($i -gt 0) { Assert-That ($header.items[$i-1].right -le $header.items[$i].left) 'Adjacent menu entries do not overlap' }
+    }
+    Click-Element '.amb-top'
+    Wait-Until { $null -ne (Element '.amb-menu') } 'native click opens application menu' 15
+    Screenshot 'header-menu-open'
+    Click-Element '.amb-top'
+    Wait-Until { $null -eq (Element '.amb-menu') } 'native click closes application menu' 15
     # Separate STA message loop receives real OLE data. This process only writes this run's fixtures.
     $receiverScript = Join-Path $OutDir 'receiver.ps1'
     @'

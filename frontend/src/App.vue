@@ -538,6 +538,30 @@ html.is-mac.is-fullscreen {
 html.is-win {
     --awd-titlebar-safe-inline-end: 148px;
 }
+/* Windows 没有系统全局菜单栏：菜单独占一行，避免和项目名、工具挤在一起。 */
+html.is-win .page-project-overview .project-header,
+html.is-win .page-project-overview.compact-mode .project-header {
+    height: 72px;
+    padding-top: 28px;
+    box-sizing: border-box;
+    gap: 16px;
+}
+html.is-win .project-header .amb {
+    position: absolute;
+    top: 4px;
+    left: 18px;
+    height: 24px;
+}
+html.is-win .project-header .header-center { display: none; }
+html.is-win .project-header .header-left,
+html.is-win .project-header .project-info { flex: 1; min-width: 0; }
+html.is-win .project-header .project-title-row { min-width: 0; }
+html.is-win .project-header .header-right { flex-shrink: 0; }
+html.is-win .project-header .project-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 /* win：非最大化时应用边界与浅色资源管理器（#F8F9FA 页面、#FFFFFF 顶栏）几乎同色
    （dev-board#722），描 1px 内框区分开；最大化/全屏时系统本身就有窗口边界，不描。
    用 outline + 负 outline-offset，不用 inset box-shadow：body/页面根节点（100vh、
