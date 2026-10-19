@@ -179,20 +179,23 @@ test('Windows helper握手超时必须确认子进程退出，再允许main退�
     fs.mkdirSync(path.dirname(file), { recursive: true })
     const input = path.join(dir, 'update.exe')
     fs.writeFileSync(input, 'verified fixture')
-    const child = new EventEmitter()
-    Object.assign(child, { pid: 321, exitCode: null, signalCode: null, unref() {}, ref() {},
-      kill() {
-        events.push('kill')
-        // A helper can finish starting just as the handshake expires.
-        fs.writeFileSync(file, JSON.stringify({ helperPid: replaced ? 999 : child.pid }))
-        if (replaced) fs.writeFileSync(file + '.job', 'different helper job')
-        return true
-      }
-    })
+    let running = true
     const context = vm.createContext({ module: { exports: {} }, __dirname: path.join(__dirname, '../main/services'),
-      process, Buffer, setTimeout: resolve => setImmediate(resolve), clearTimeout,
+      process: { ...process, kill(pid, signal) {
+        assert.equal(pid, 321)
+        if (!running) throw new Error('Process exited')
+        if (signal === 0) return
+        events.push('kill')
+        fs.writeFileSync(file, JSON.stringify({ helperPid: replaced ? 999 : pid, jobId: replaced ? 'new-job' : JSON.parse(fs.readFileSync(file + '.job')).id }))
+        if (replaced) fs.writeFileSync(file + '.job', 'different helper job')
+      } }, Buffer, setTimeout: (resolve, ms) => ms === 60000 ? setTimeout(resolve, ms) : setImmediate(resolve), clearTimeout,
       require(name) {
-        if (name === 'child_process') return { ...require(name), spawn: () => { setImmediate(() => child.emit('spawn')); return child } }
+        if (name === 'child_process') return { ...require(name), spawn() {
+          const launcher = new EventEmitter()
+          fs.writeFileSync(`${file}.${JSON.parse(fs.readFileSync(file + '.job')).id}.pid`, '321')
+          setImmediate(() => launcher.emit('exit', 0))
+          return launcher
+        } }
         return require(name)
       }
     })
@@ -203,7 +206,7 @@ test('Windows helper握手超时必须确认子进程退出，再允许main退�
     const attempt = updater.installOnQuit(false).then(() => { settled = true }, error => { settled = true; return error })
     while (!events.length) await new Promise(resolve => setImmediate(resolve))
     assert.equal(settled, false, '发kill还不够，必须等exit确认才能交还main')
-    child.signalCode = 'SIGTERM'; child.emit('exit', null, 'SIGTERM')
+    running = false
     assert.match((await attempt).message, /更新安装器未能启动/)
     assert.equal(fs.existsSync(file), replaced)
     assert.equal(fs.existsSync(file + '.job'), replaced)
@@ -220,23 +223,25 @@ test('Windows helper: slow startup handshakes before parent exits; early failure
     const installer = path.join(dir, 'update.exe')
     fs.writeFileSync(installer, 'verified fixture')
     let ticks = 0
-    const child = new EventEmitter()
-    Object.assign(child, { pid: 543, exitCode: earlyExit ? 1 : null, signalCode: null, unref() {}, ref() {},
-      kill() { assert.fail('Must not kill a live helper before its slow startup handshake') }
-    })
     const context = vm.createContext({ module: { exports: {} }, __dirname: path.join(__dirname, '../main/services'),
-      process, Buffer, clearTimeout,
-      setTimeout(resolve) {
+      process: { ...process, kill(pid, signal) {
+        assert.equal(pid, 543)
+        assert.equal(signal, 0, 'Must not kill a live helper before its slow startup handshake')
+        if (earlyExit) throw new Error('Process exited')
+      } }, Buffer, clearTimeout,
+      setTimeout(resolve, ms) {
+        if (ms === 60000) return setTimeout(resolve, ms)
         ticks++
-        if (ticks === 150) fs.writeFileSync(file, JSON.stringify({ helperPid: child.pid }))
+        if (ticks === 150) fs.writeFileSync(file, JSON.stringify({ helperPid: 543, jobId: JSON.parse(fs.readFileSync(file + '.job')).id }))
         return setImmediate(resolve)
       },
       require(name) {
-        if (name === 'child_process') return { ...require(name), spawn(command, args, options) {
-          assert.equal(command, 'powershell.exe')
-          if (earlyExit) fs.writeSync(options.stdio[2], 'helper startup fixture error')
-          setImmediate(() => child.emit('spawn'))
-          return child
+        if (name === 'child_process') return { ...require(name), spawn() {
+          const launcher = new EventEmitter()
+          fs.writeFileSync(`${file}.${JSON.parse(fs.readFileSync(file + '.job')).id}.pid`, '543')
+          if (earlyExit) fs.writeFileSync(file + '.stderr.log', 'helper startup fixture error')
+          setImmediate(() => launcher.emit('exit', 0))
+          return launcher
         } }
         return require(name)
       }
@@ -245,12 +250,48 @@ test('Windows helper: slow startup handshakes before parent exits; early failure
     const updater = context.module.exports.createFullUpdate({ platform: 'win32', dataDir: dir }, async () => ({}))
     await updater.prepare(installer, '0.12.0')
     if (earlyExit) {
-      await assert.rejects(updater.installOnQuit(false), /退出码 1.*helper startup fixture error/)
+      await assert.rejects(updater.installOnQuit(false), /helper startup fixture error/)
       assert.equal(ticks, 0, 'An exited helper must fail without waiting for the timeout')
     } else {
       assert.equal(await updater.installOnQuit(false), false)
       assert.equal(ticks, 150, 'A startup exceeding the old ten-second bound can complete')
-      assert.equal(JSON.parse(fs.readFileSync(file)).helperPid, child.pid)
+      assert.equal(JSON.parse(fs.readFileSync(file)).helperPid, 543)
     }
   }
+})
+
+
+test('Windows真实helper：生产spawn完成握手，父进程退出后继续校验并清理', { skip: process.platform !== 'win32', timeout: 120000 }, async t => {
+  const dir = path.join(root(t), "中文 helper's space"), file = lockPath(dir)
+  fs.mkdirSync(dir)
+  const modulePath = require.resolve('../main/services/full-update')
+  const parentSource = `
+    const fs = require('fs'), path = require('path')
+    const { createFullUpdate, lockPath } = require(process.argv[2])
+    const dir = process.argv[1], file = lockPath(dir), installer = path.join(dir, 'unsigned.exe')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(installer, 'unsigned startup fixture; must never execute')
+    ;(async () => {
+      // Only skip the initial signature preflight; the real helper must reject it after parent exit.
+      const updater = createFullUpdate({ platform: 'win32', dataDir: dir }, async () => ({}))
+      await updater.prepare(installer, '0.12.0')
+      await updater.installOnQuit(false)
+      if (!fs.existsSync(file) || fs.existsSync(file + '.error')) throw new Error('Helper did not wait for its live parent')
+      process.stdout.write(JSON.stringify(JSON.parse(fs.readFileSync(file, 'utf8'))))
+      process.exit(0)
+    })().catch(error => { console.error(error); process.exit(1) })
+  `
+  const child = require('child_process').spawn(process.execPath, ['-e', parentSource, dir, modulePath], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+  let stdout = '', stderr = ''
+  child.stdout.on('data', bytes => { stdout += bytes })
+  child.stderr.on('data', bytes => { stderr += bytes })
+  const timer = setTimeout(() => child.kill(), 75000)
+  const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve) }).finally(() => clearTimeout(timer))
+  assert.equal(code, 0, stderr)
+  assert.ok(Number.isInteger(JSON.parse(stdout).helperPid), 'Real helper acknowledged before parent exited')
+  const end = Date.now() + 30000
+  while ((!fs.existsSync(file + '.error') || fs.existsSync(file) || fs.existsSync(file + '.job')) && Date.now() < end) await new Promise(resolve => setTimeout(resolve, 100))
+  assert.match(fs.readFileSync(file + '.error', 'utf8'), /Invalid installer signature/, 'Helper continued executing after its parent exited')
+  assert.equal(fs.existsSync(file), false)
+  assert.equal(fs.existsSync(file + '.job'), false)
 })
