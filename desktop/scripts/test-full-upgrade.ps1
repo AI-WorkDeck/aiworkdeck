@@ -34,7 +34,7 @@ $cdpPort = 19567
 $env:CHECKBA_BACKEND_PORT = '19566'
 # Block production update checks. AppUpdater replaces this with a signed local fixture feed.
 $env:CHECKBA_UPDATE_MANIFEST_URL = 'http://127.0.0.1:19568/manifest.json'
-$evidence = [ordered]@{ mechanism = $Mechanism; exitMode = $ExitMode; oldVersion = $OldVersion; candidateVersion = $CandidateVersion; installDir = $installDir; dataDir = $dataDir; assertions = @(); signatures = @() }
+$evidence = [ordered]@{ mechanism = $Mechanism; exitMode = $ExitMode; oldVersion = $OldVersion; candidateVersion = $CandidateVersion; installDir = $installDir; dataDir = $dataDir; assertions = @(); signatures = @(); versions = @() }
 $feed = $null
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -49,6 +49,14 @@ function Assert-That([bool]$Value, [string]$Label) {
     if (-not $Value) { throw $Label }
     $script:evidence.assertions += $Label
     Write-Host "PASS: $Label"
+}
+function Assert-ExeVersion([string]$Expected, [string]$Label) {
+    $info = (Get-Item -LiteralPath $exe).VersionInfo
+    $actual = $info.ProductVersion
+    $script:evidence.versions += @{ expected = $Expected; productVersion = $actual; fileVersion = $info.FileVersion; path = $exe }
+    Write-Host "Executable version: ProductVersion=[$actual], FileVersion=[$($info.FileVersion)], expected=[$Expected]"
+    # Windows PE resources may encode the semver release with a fourth zero component.
+    Assert-That ($actual -ceq $Expected -or $actual -ceq "$Expected.0") $Label
 }
 function Wait-Until([scriptblock]$Check, [string]$Label, [int]$Seconds = 180) {
     $end = (Get-Date).AddSeconds($Seconds)
@@ -125,11 +133,12 @@ try {
     $p.Refresh()
     Assert-That ($p.ExitCode -eq 0) 'Old NSIS exit code zero'
     Assert-That (Test-Path -LiteralPath $exe) 'Old application installed in explicit test directory'
-    Assert-That ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -eq $OldVersion) 'Old installed executable has expected version'
+    Assert-ExeVersion $OldVersion 'Old installed executable has expected version'
     Signature $exe
     $app = Launch
     Wait-Backend
     Wait-Renderer
+    Assert-That ((Renderer 'window.checkbaDesktop.update.status()').appVersion -ceq $OldVersion) 'Running baseline reports exact semantic version'
     Screenshot '01-old-workbench'
     $marker = 'WINDOWS_UPGRADE_' + [guid]::NewGuid().ToString('N')
     $fixtureDir = Join-Path $env:RUNNER_TEMP 'upgrade-project'
@@ -201,7 +210,7 @@ http.createServer((req,res)=>{
             $helperProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"`"$helper`"","`"$lock`"") -PassThru -WindowStyle Hidden
         } finally { $env:PSModulePath = $oldModulePath }
         Wait-Until { Test-Path -LiteralPath $lock } 'real helper handshake' 15
-        Assert-That ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -eq $OldVersion) 'Helper waits for live parent before replacing app'
+        Assert-ExeVersion $OldVersion 'Helper waits for live parent before replacing app'
         Close-App $app
     }
     Wait-Until { Test-Path -LiteralPath $lock } 'installer lock observed' 120
@@ -216,7 +225,7 @@ http.createServer((req,res)=>{
     }
     Wait-Until { -not (Test-Path -LiteralPath $lock) } 'real NSIS/helper finishes' 600
     if (Test-Path -LiteralPath ($lock + '.error')) { throw (Get-Content -LiteralPath ($lock + '.error') -Raw) }
-    Assert-That ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -eq $CandidateVersion) 'Candidate executable replaced old version'
+    Assert-ExeVersion $CandidateVersion 'Candidate executable replaced old version'
     Signature $exe
     if ($ExitMode -eq 'Quit') {
         Start-Sleep -Seconds 3
