@@ -165,7 +165,7 @@ http.createServer((req,res)=>{
  else res.writeHead(404).end();
 }).listen(19568,'127.0.0.1',()=>fs.writeFileSync(`${dir}/feed-ready`, 'ready'));
 '@ | Set-Content -LiteralPath $feedScript -Encoding utf8
-        $feed = Start-Process node -ArgumentList @("`"$feedScript`"", "`"$CandidateInstaller`"", $CandidateVersion, "`"$OutDir`"") -PassThru -RedirectStandardError (Join-Path $OutDir 'feed.stderr.log')
+        $feed = Start-Process node -ArgumentList @("`"$feedScript`"", "`"$CandidateInstaller`"", $CandidateVersion, "`"$OutDir`"") -PassThru -WindowStyle Hidden -RedirectStandardError (Join-Path $OutDir 'feed.stderr.log')
         Wait-Until { Test-Path (Join-Path $OutDir 'feed-ready') } 'local signed feed ready' 60
         # The public key override is read at check time, but process env is inherited at startup.
         Close-App $app
@@ -194,7 +194,7 @@ http.createServer((req,res)=>{
         $oldModulePath = $env:PSModulePath
         try {
             Remove-Item Env:PSModulePath -ErrorAction SilentlyContinue
-            $helperProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"`"$helper`"","`"$lock`"") -PassThru
+            $helperProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"`"$helper`"","`"$lock`"") -PassThru -WindowStyle Hidden
         } finally { $env:PSModulePath = $oldModulePath }
         Wait-Until { Test-Path -LiteralPath $lock } 'real helper handshake' 15
         Assert-That ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -eq $OldVersion) 'Helper waits for live parent before replacing app'
