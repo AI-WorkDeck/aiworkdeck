@@ -191,7 +191,7 @@ try {
   fs.writeFileSync(ordinary, 'ORDINARY_NATIVE_DROP_1367'); fs.writeFileSync(archiveEntry, 'ARCHIVE_NATIVE_DROP_1367')
   fs.writeFileSync(path.join(fixtureDir, 'after-drag.txt'), 'POST_DRAG_CLICK_1367')
   run('/usr/bin/zip', ['-j', path.join(fixtureDir, 'drag-fixture.zip'), archiveEntry])
-  child = start(path.join(app, 'Contents/MacOS/AI WorkDeck'), [`--remote-debugging-port=${ports.renderer}`, `--inspect=127.0.0.1:${ports.inspector}`, fixtureDir], 'app', { PATH: process.env.PATH, HOME: os.homedir(), TMPDIR: process.env.TMPDIR, LANG: 'en_US.UTF-8', CHECKBA_BACKEND_PORT: String(ports.api), CHECKBA_UPDATE_MANIFEST_URL: 'http://127.0.0.1:19568/no-production-updates' })
+  child = start(path.join(app, 'Contents/MacOS/AI WorkDeck'), [`--remote-debugging-port=${ports.renderer}`, `--inspect=127.0.0.1:${ports.inspector}`], 'app', { PATH: process.env.PATH, HOME: os.homedir(), TMPDIR: process.env.TMPDIR, LANG: 'en_US.UTF-8', CHECKBA_BACKEND_PORT: String(ports.api), CHECKBA_UPDATE_MANIFEST_URL: 'http://127.0.0.1:19568/no-production-updates' })
   await until(() => renderer('!!document.querySelector(".page-project-overview") && document.readyState === "complete"'), 'real signed workbench loaded', 240)
   check((await renderer('window.checkbaDesktop.update.status()')).appVersion === versions.candidate, 'Running shell exact semantic version')
   const identity = await main("({pid:process.pid,execPath:process.execPath,version:process.mainModule.require('electron').app.getVersion(),home:process.mainModule.require('electron').app.getPath('home'),userData:process.mainModule.require('electron').app.getPath('userData')})")
@@ -199,6 +199,12 @@ try {
   save('running-identity.json', identity)
   const jar = fs.statSync(path.join(app, 'Contents/Resources/backend/app.jar'))
   await until(async () => (await api('/admin/wizard')).build === `${jar.size}-${Math.round(jar.mtimeMs)}`, 'backend belongs to candidate JAR', 240)
+  if (await element('.ocd-mask')) {
+    await screenshot('optional-components-prompt'); await click('.ocd-actions .ocd-btn:not(.primary)')
+    await until(async () => !(await element('.ocd-mask')), 'real Later click dismisses optional components prompt', 20)
+  }
+  // macOS routes file/folder requests through LaunchServices open-file, not process argv.
+  run('/usr/bin/open', ['-a', app, fixtureDir])
   const project = await until(async () => (await api('/projects/my')).find(p => p.name === 'Native drag fixture'), 'real launch folder request opens project', 120)
   const files = await api(`/projects/${project.id}/files`)
   const file = name => files.find(f => f.name === name)
@@ -206,10 +212,6 @@ try {
   check(ordinaryId > 0 && archiveId > 0 && recoveryId > 0, 'Backend indexed all synthetic fixtures')
   evidence.project = { id: project.id, ordinaryId, archiveId, recoveryId }
   await until(() => element(`.tree-item[data-file-id='${ordinaryId}']`), 'visible project file tree', 60)
-  if (await element('.ocd-mask')) {
-    await screenshot('optional-components-prompt'); await click('.ocd-actions .ocd-btn:not(.primary)')
-    await until(async () => !(await element('.ocd-mask')), 'real Later click dismisses optional components prompt', 20)
-  }
   // Open the ordinary file through the same coordinate path that is checked after dragging.
   await click(`.tree-item[data-file-id='${ordinaryId}']`)
   await until(() => renderer("[...document.querySelectorAll('.tab-item.active .tab-name')].some(e=>e.textContent==='ordinary-drag.txt')"), 'real ordinary-file click opens tab', 30)
