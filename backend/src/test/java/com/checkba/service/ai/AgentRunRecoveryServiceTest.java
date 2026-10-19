@@ -246,6 +246,7 @@ class AgentRunRecoveryServiceTest {
 
         assertEquals(0, recovery.recoverInterruptedRuns(), "等回答不是被杀，不该被回收");
         assertEquals("AWAITING_INPUT", table.get(CONV).getStatus(), "DB 状态不许被改写成 INTERRUPTED");
+        assertEquals("AWAITING_INPUT", fresh.statusName(CONV), "reconnect must show waiting without executing");
         assertFalse(question.getContent().contains("[进程中断]"), "问题气泡不许被补中断标记");
     }
 

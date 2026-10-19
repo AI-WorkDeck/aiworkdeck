@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Workbench copy (pages/project-overview/project-overview.vue).
 export default {
+  restartPending: '{count} tasks can be resumed',
+  restartContinue: 'Continue: {name}',
+  restartRestoring: 'Restoring the original conversation and document…',
+  restartRestoreFailed: 'The original document or conversation could not be restored. Your task is retained; you can retry.',
+  restartCancel: 'Not now',
+  restartTask: 'Task {id}',
+
   backendHealth: {
     externalUnavailable: 'Existing local service unavailable; check the app that started it',
     startupFailed: 'Local service failed to start; reopen the app',

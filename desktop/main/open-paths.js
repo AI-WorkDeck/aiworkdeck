@@ -12,7 +12,20 @@ function pathsFromArgv(argv, { defaultApp = false, cwd = process.cwd(), platform
     .map(value => paths.resolve(cwd, value))
 }
 
+function readQueuedPaths(file) {
+  if (!file) return []
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')).filter(p => typeof p === 'string') } catch (_) { return [] }
+}
+
+function writeQueuedPaths(file, paths) {
+  if (!file) return
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file + '.tmp', JSON.stringify(paths))
+  fs.renameSync(file + '.tmp', file)
+}
+
 function installOpenPaths({ app, ipcMain, getWindow, focusWindow,
+  queueFile = null, isQuitting = () => false, requestRelaunch = () => {},
   platform = process.platform, argv = process.argv, defaultApp = process.defaultApp,
   stat = fs.statSync, cwd = process.cwd() }) {
   const pending = []
@@ -20,8 +33,10 @@ function installOpenPaths({ app, ipcMain, getWindow, focusWindow,
   let readySender = null
   let inFlight = null
   const observed = new WeakSet()
+  const persist = () => writeQueuedPaths(queueFile, pending.map(request => request.path))
 
   function flush() {
+    if (isQuitting()) return
     const win = getWindow()
     if (!readySender || inFlight || !pending.length || !win || win.isDestroyed() || win.webContents !== readySender) return
     inFlight = pending[0]
@@ -40,6 +55,8 @@ function installOpenPaths({ app, ipcMain, getWindow, focusWindow,
     try { info = stat(filePath) } catch (_) { return }
     if (!info.isFile() && !info.isDirectory()) return
     pending.push({ action: 'open-path', path: filePath, isDirectory: info.isDirectory(), requestId: ++nextId })
+    persist()
+    if (isQuitting()) { requestRelaunch(); return }
     focusWindow()
     flush()
   }
@@ -54,8 +71,10 @@ function installOpenPaths({ app, ipcMain, getWindow, focusWindow,
   })
   app.on('second-instance', (_event, args, workingDirectory) => {
     if (platform === 'win32') enqueueArgv(args, workingDirectory || cwd)
-    focusWindow()
+    if (isQuitting()) requestRelaunch()
+    else focusWindow()
   })
+  for (const filePath of readQueuedPaths(queueFile)) enqueue(filePath)
   if (platform === 'win32') enqueueArgv(argv, cwd)
 
   ipcMain.on('checkba:open-paths-ready', (event) => {
@@ -85,9 +104,11 @@ function installOpenPaths({ app, ipcMain, getWindow, focusWindow,
     if (event.sender !== readySender || !inFlight || inFlight.requestId !== requestId ||
       (event.senderFrame && event.senderFrame !== event.sender.mainFrame)) return
     pending.shift()
+    persist()
     inFlight = null
     flush()
   })
+  return { resume: () => { if (pending.length) focusWindow(); flush() } }
 }
 
-module.exports = { pathsFromArgv, installOpenPaths }
+module.exports = { pathsFromArgv, installOpenPaths, readQueuedPaths, writeQueuedPaths }

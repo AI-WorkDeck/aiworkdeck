@@ -1433,3 +1433,10 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 ## 业务侧栏真实插件迁移（#1340，待发版）
 
 8个业务包为search/voice/desensitize/litigation-visual/calendar/favorites/clipboard/insight；tmeet由已有tencent-meeting包承接。布局从manifest contributes.views解析，动态PluginPane承载sidebar/workspace，global无项目可开，project受项目/CLIENT门控。源在frontend/plugin-app，构建npm run build:plugins；npm run build:h5先构建8包。业务服务桥分pluginBusinessServices/pluginCollectionServices/pluginVoiceServices/pluginInsightServices，账号与本机设备仍在宿主。日历深链转插件workspace视图，保留task/file/focus过滤。核心保留home/projects/files/dev/market/version/staging/members及受限CLIENT dd-files，详见PLUGIN_SPEC §17盘点。验证除了单元测试还需真实Uni+opaque sandbox：ES模块静态资产需要仅plugin-web路由ACAO:*；不增加allow-same-origin或unsafe-eval。
+
+
+## 桌面重开恢复入口（dev-board#1356）
+
+`restartRecovery.js` 只在桌面冷启动且没有外部打开意图时自动接续一个安全检查点；先导航原项目，等待项目资料/标签快照，再打开原会话和文件。Office 文件必须由相同 fileId 的 LOWA 实例与 executor 报 ready，预览或加载失败不算就绪。其余待恢复任务保留提示条供选择，不轮流切换用户编辑器。用户导航、指针/键盘操作、账户变化和外部打开取消迟到恢复。
+
+`App.vue` 的宿主退出回调先取消启动恢复，经 `desktopQuitGuard.js` 等后端安全暂停，再对所有已注册工作台执行 `flushDirtyEditors` 与标签快照。保存失败或退出取消恢复原任务；恢复条件已变时保留检查点并明确提示。成功 ACK 后保持输入遮罩直到主进程隐藏窗口，只有主进程确认取消才解除退出屏障。正常退出契约与安装边界见 ai-chat.md / eng-infra.md。回归为 desktop-quit(-app)、restart-recovery、restart-resume；合成行为测试不代替正式安装包与真实 LOWA 跨升级验收。
