@@ -1,53 +1,32 @@
 # SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# NEVER MERGE: temporary tool-capability probe, not an installer build.
-name: temporary-mac-native-input-probe
+# NEVER MERGE: temporary native-drag acceptance, not an Office installer build.
+name: temporary-mac-product-native-drag
 on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
-  probe:
+  native-drag:
     runs-on: macos-15
-    timeout-minutes: 8
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Compile and check real event permission without prompting
-        run: |
-          mkdir -p evidence
-          launchctl print gui/$(id -u) > evidence/gui-session.txt
-          swiftc scripts/qa/mac-native-input-probe.swift -o "$RUNNER_TEMP/native-input-probe" -framework AppKit -framework ApplicationServices -framework CryptoKit
-          "$RUNNER_TEMP/native-input-probe" permissions "$PWD/evidence"
-      - name: Cross-process native drag, received bytes and return mouse click
-        run: |
-          printf 'Synthetic native drag capability probe 1367\n' > evidence/fixture.txt
-          "$RUNNER_TEMP/native-input-probe" receiver "$PWD/evidence" > evidence/receiver.log 2>&1 & receiver=$!
-          "$RUNNER_TEMP/native-input-probe" source "$PWD/evidence" > evidence/source.log 2>&1 & source=$!
-          trap 'kill "$receiver" "$source" 2>/dev/null || true' EXIT
-          for n in {1..40}; do
-            if test -f evidence/receiver-ready.json && test -f evidence/source-ready.json; then break; fi
-            sleep 0.25
-          done
-          "$RUNNER_TEMP/native-input-probe" drive "$PWD/evidence"
-          sleep 2
-          python3 - <<'PY'
-          import json,hashlib,pathlib
-          p=pathlib.Path('evidence')
-          def read(n):return json.loads((p/n).read_text())
-          a=read('source-ready.json');b=read('receiver-ready.json');assert a['pid']!=b['pid']
-          assert read('source-dragstart.json')['nativeSessionStarted']
-          receipt=read('receiver-drop.json');assert receipt['name']=='fixture.txt'
-          expected=hashlib.sha256((p/'fixture.txt').read_bytes()).hexdigest()
-          assert receipt['sha256']==expected==hashlib.sha256((p/'received.txt').read_bytes()).hexdigest()
-          assert read('source-dragend.json')['operation']==1
-          click=read('source-click-recovered.json');assert click['receivedMouseUp'] and click['marker']==1367
-          (p/'result.json').write_text(json.dumps({'result':'PASS','scope':'CGEvent to cross-process AppKit native drag and return click; not product validation','sha256':expected},indent=2))
-          PY
-      - name: Preserve actual permissions and receiver evidence
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Real signed candidate, CGEvent drag and AppKit file receiver
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: '39222690909'
+          CANDIDATE_SHA: '11516bc1aa8b43f99b29bf6515a90f7ecdd78ced'
+        run: node desktop/scripts/test-native-drag-mac.mjs
+      - name: Preserve signatures, screenshots, receipts and process evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mac-native-input-probe-${{ github.run_attempt }}
-          path: evidence/
+          name: mac-product-native-drag-${{ github.run_attempt }}
+          path: evidence/mac-native-drag/
           retention-days: 7
           if-no-files-found: error
