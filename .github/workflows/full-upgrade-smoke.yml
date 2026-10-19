@@ -38,6 +38,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Diagnose Windows PowerShell startup handles
+        shell: pwsh
+        run: |
+          @'
+          const fs=require('fs'),path=require('path'),cp=require('child_process');
+          const dir=path.join(process.env.RUNNER_TEMP,'powershell-spawn-probe');fs.mkdirSync(dir,{recursive:true});
+          const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>k.toUpperCase()!=='PSMODULEPATH'));
+          (async()=>{ for(const detached of [true,false])for(const input of ['ignore','pipe'])for(const output of ['ignore','pipe']) {
+            const name=`detached-${detached}-in-${input}-out-${output}`,marker=path.join(dir,name+'.marker'),script=path.join(dir,name+'.ps1');
+            fs.writeFileSync(script,`[IO.File]::WriteAllText('${marker.replace(/'/g,"''")}','started'); Start-Sleep -Milliseconds 200; Write-Output 'body completed'`);
+            const started=Date.now();let stdout='',stderr='';
+            const child=cp.spawn('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',script],{detached,windowsHide:true,env,stdio:[input,output,'pipe']});
+            child.stdout?.on('data',b=>stdout+=b);child.stderr.on('data',b=>stderr+=b);
+            const timer=setTimeout(()=>child.kill(),30000);
+            const result=await new Promise(resolve=>{child.on('error',e=>resolve({error:String(e)}));child.on('exit',(code,signal)=>resolve({code,signal}));});clearTimeout(timer);
+            console.log(JSON.stringify({name,...result,elapsedMs:Date.now()-started,marker:fs.existsSync(marker),stdout,stderr}));
+          } })().catch(e=>{console.error(e);process.exitCode=1});
+          '@ | Set-Content "$env:RUNNER_TEMP/spawn-probe.cjs"
+          node "$env:RUNNER_TEMP/spawn-probe.cjs"
       - name: Download and identify signed installer builds
         shell: pwsh
         env:
