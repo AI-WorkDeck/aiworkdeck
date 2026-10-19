@@ -27,6 +27,7 @@ public class DragInput {
   [DllImport("user32.dll")] public static extern IntPtr OpenInputDesktop(uint f, bool inherit, uint access);
   [DllImport("user32.dll")] public static extern bool CloseDesktop(IntPtr h);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int command);
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int ht, uint f);
   [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h, ref POINT p);
   [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT p);
@@ -253,6 +254,11 @@ $form.add_Shown({
     } finally { $env:PSModulePath=$oldModulePath }
     Wait-Until { Test-Path (Join-Path $OutDir 'receiver-ready.json') } 'STA native receiver window ready' 30
     $receiverInfo=Get-Content (Join-Path $OutDir 'receiver-ready.json') -Raw|ConvertFrom-Json
+    # Hidden PowerShell suppresses its console but can also hide the first WinForms window.
+    # Show the actual receiver explicitly; the pointer hit-test below still requires its HWND.
+    [DragInput]::ShowWindow([IntPtr]$receiverInfo.handle,5) | Out-Null
+    [DragInput]::SetWindowPos([IntPtr]$receiverInfo.handle,[IntPtr](-1),0,0,0,0,0x0053) | Out-Null
+    Start-Sleep -Milliseconds 250
     $evidence.appPid=$app.Id;$evidence.receiverPid=$receiver.Id;$evidence.installDir=$installDir;$evidence.dataDir=$dataDir
     Screenshot '01-ready'
     Drag-Element ".tree-item[data-file-id='$ordinaryId']" 1 'ordinary-drag.txt' ((Get-FileHash -LiteralPath $ordinary).Hash)
