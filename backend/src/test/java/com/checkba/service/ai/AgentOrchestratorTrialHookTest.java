@@ -25,6 +25,7 @@ class AgentOrchestratorTrialHookTest {
     @Test
     void queuedTurnCapturesOwnerAtLaunchAndPassesItToCompletionHook() {
         AgentOrchestrator orchestrator = mock(AgentOrchestrator.class, CALLS_REAL_METHODS);
+        ReflectionTestUtils.setField(orchestrator, "restartAttempts", new java.util.concurrent.ConcurrentHashMap<>());
         TrialTurnMeter meter = mock(TrialTurnMeter.class);
         when(meter.accountFingerprint()).thenReturn("account-a");
         java.util.List<Runnable> queued = new java.util.ArrayList<>();

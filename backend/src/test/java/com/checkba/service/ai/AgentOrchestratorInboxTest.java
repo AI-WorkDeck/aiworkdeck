@@ -51,6 +51,7 @@ class AgentOrchestratorInboxTest {
     private SseEmitterService sse;
     private AgentRunStateService runState;
     private AgentInboxItemRepository repository;
+    private SkillRouter skills;
 
     @BeforeEach
     void setUp() {
@@ -95,14 +96,19 @@ class AgentOrchestratorInboxTest {
         tools = mock(ToolRegistry.class);
         when(tools.getAllSpecifications(any(), any())).thenReturn(List.of());
         when(tools.resolve(anyString())).thenReturn(Optional.empty());
-        SkillRouter skills = mock(SkillRouter.class);
+        skills = mock(SkillRouter.class);
         when(skills.visibleTools(any(), any())).thenAnswer(inv -> inv.getArgument(1));
         when(skills.activeSkill(any())).thenReturn(Optional.empty());
         xml = mock(XmlToolCallParser.class);
         when(xml.containsToolCall(any())).thenReturn(false);
-        AiContextProperties props = new AiContextProperties();
+        members = mock(com.checkba.service.ProjectMemberService.class);
+        when(members.hasReadPermission(42L, 7L)).thenReturn(true);
+        orchestrator = newProcess();
+    }
 
-        orchestrator = new AgentOrchestrator(
+    private AgentOrchestrator newProcess() {
+        AiContextProperties props = new AiContextProperties();
+        AgentOrchestrator created = new AgentOrchestrator(
                 modelFactory, messageService, sse, mock(TokenUsageService.class), assembler,
                 tools, skills, xml, mock(MemoryPipelineService.class), mock(ProjectFileService.class),
                 mock(EditorBridgeService.class), mock(ConversationFileChangeService.class),
@@ -112,10 +118,9 @@ class AgentOrchestratorInboxTest {
                 mock(com.checkba.service.telemetry.TelemetryService.class),
                 mock(com.checkba.service.telemetry.TelemetryTurnTracker.class),
                 mock(com.checkba.service.telemetry.MatterClassifierService.class), new OfficePassStateStore());
-        orchestrator.setInboxService(inbox);
-        members = mock(com.checkba.service.ProjectMemberService.class);
-        when(members.hasReadPermission(42L, 7L)).thenReturn(true);
-        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "projectMemberService", members);
+        created.setInboxService(inbox);
+        org.springframework.test.util.ReflectionTestUtils.setField(created, "projectMemberService", members);
+        return created;
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -721,6 +726,132 @@ class AgentOrchestratorInboxTest {
         assertFalse(modelToolNames.get(3).contains("doc_set_font"));
     }
 
+    private void durableRunStates() {
+        Map<String, AgentRunStateService.RunState> states = new HashMap<>();
+        doAnswer(inv -> { states.put(inv.getArgument(0), new AgentRunStateService.RunState(inv.getArgument(1), 0)); return null; })
+                .when(runState).mark(anyString(), any());
+        doAnswer(inv -> { states.put(inv.getArgument(0), new AgentRunStateService.RunState(inv.getArgument(1), 0)); return null; })
+                .when(runState).mark(anyString(), any(), any(), any());
+        doAnswer(inv -> { states.put(inv.getArgument(0), new AgentRunStateService.RunState(AgentRunStateService.RunStatus.INTERRUPTED, 0)); return null; })
+                .when(runState).suspendForRestart(anyString(), anyLong(), anyLong());
+        when(runState.get(anyString())).thenAnswer(inv -> states.get(inv.getArgument(0)));
+    }
+
+    @Test
+    void gracefulRestartContinuesNewProcessFromToolResultWithoutRepeatingUserOrTool() {
+        durableRunStates();
+        var input = request("Revise only clause 2; preserve the exceptions", "restart", "steer");
+        var active = new AiAgentController.ContextItem(); active.setId("99"); active.setName("original.docx");
+        input.setActiveContext(active);
+        var item = inbox.submit(input, 7L);
+        when(tools.execute(eq("write_clause"), anyString(), any())).thenAnswer(inv -> {
+            orchestrator.prepareRestart(7L, "quit-1");
+            return new ToolRegistry.ToolResult("Applied once: clause 2; verification token 12345", null, true);
+        });
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(AiMessage.from(tool("write_clause", "tool-1"))));
+        String runId = orchestrator.acceptInboxSubmission(item.getId());
+        assertNull(orchestrator.activeRunId(CONV));
+        assertEquals(1, orchestrator.pendingRestarts(7L).size());
+        assertTrue((boolean) orchestrator.prepareRestart(7L, "quit-1").get("ready"));
+        var checkpoint = inbox.restartCheckpoint(item);
+        assertTrue(checkpoint.path("messages").asText().contains("verification token 12345"));
+        assertTrue(checkpoint.path("messages").asText().contains("preserve the exceptions"));
+
+        // A new service and orchestrator have no previous process's guards, transcript or caches.
+        inbox = new AgentInboxService(repository, sse, runState);
+        orchestrator = newProcess();
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(AiMessage.from("Verification complete")));
+        assertFalse(orchestrator.resumeRestart(CONV, 42L, 100L, 7L), "wrong editor cannot consume checkpoint");
+        assertFalse(orchestrator.resumeRestart(CONV, 43L, 99L, 7L));
+        assertFalse(orchestrator.resumeRestart(CONV, 42L, 99L, 8L));
+        assertNotNull(inbox.restartCheckpoint(item));
+        assertTrue(orchestrator.resumeRestart(CONV, 42L, 99L, 7L));
+        assertFalse(orchestrator.resumeRestart(CONV, 42L, 99L, 7L));
+        assertNull(inbox.restartCheckpoint(item));
+        assertEquals(runId, item.getRunId());
+        assertEquals(2, modelRequests.size());
+        assertTrue(modelRequests.get(1).stream().anyMatch(m -> m instanceof ToolExecutionResultMessage
+                && text(m).contains("verification token 12345")));
+        verify(tools, times(1)).execute(eq("write_clause"), anyString(), any());
+        verify(messageService, times(1)).saveMessage(eq("42"), eq(7L), eq(CONV), eq("USER"), any(), any(), any());
+        verify(assembler, times(1)).assemble(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void preparedExitKeepsNewInputPendingUntilAbort() {
+        durableRunStates();
+        assertEquals(true, orchestrator.prepareRestart(7L, "empty-exit").get("ready"));
+        var pending = inbox.submit(request("new task", "late-input", "steer"), 7L);
+        assertNull(orchestrator.acceptInboxSubmission(pending.getId()));
+        assertEquals(AgentInboxService.PENDING, pending.getState());
+        assertTrue(modelRequests.isEmpty());
+        orchestrator.abortRestart(7L, "empty-exit");
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(AiMessage.from("done")));
+        assertNotNull(orchestrator.acceptInboxSubmission(pending.getId()));
+        assertEquals(1, modelRequests.size());
+    }
+
+    @Test
+    void abortAfterCheckpointResumesSameTaskOnceAndLatePrepareCannotSuspendIt() {
+        durableRunStates();
+        var item = inbox.submit(request("edit", "abort-saved", "steer"), 7L);
+        when(tools.execute(eq("write_clause"), anyString(), any())).thenAnswer(inv -> {
+            orchestrator.prepareRestart(7L, "quit-abort");
+            return new ToolRegistry.ToolResult("Applied once", null, true);
+        });
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(
+                AiMessage.from(tool("write_clause", "tool-1")), AiMessage.from("Done")));
+        orchestrator.acceptInboxSubmission(item.getId());
+        assertEquals(1, orchestrator.pendingRestarts(7L).size());
+        var result = orchestrator.abortRestart(7L, "quit-abort");
+        assertEquals(1, result.get("resumed"));
+        assertEquals(0, result.get("paused"));
+        assertTrue(orchestrator.pendingRestarts(7L).isEmpty());
+        assertEquals(true, orchestrator.prepareRestart(7L, "quit-abort").get("aborted"));
+        assertEquals(0, orchestrator.abortRestart(7L, "quit-abort").get("resumed"));
+        verify(tools, times(1)).execute(eq("write_clause"), anyString(), any());
+    }
+
+    @Test
+    void failedToolCannotBecomeAutomaticallyResumableAndAbortedAttemptCannotFreezeAgain() {
+        durableRunStates();
+        var item = inbox.submit(request("edit", "uncertain", "steer"), 7L);
+        when(tools.execute(eq("write_clause"), anyString(), any())).thenAnswer(inv -> {
+            orchestrator.prepareRestart(7L, "quit-failed");
+            return new ToolRegistry.ToolResult("Timed out waiting for editor ACK; outcome unknown", null, false);
+        });
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(
+                AiMessage.from(tool("write_clause", "tool-1")), AiMessage.from("Please inspect the document")));
+        orchestrator.acceptInboxSubmission(item.getId());
+        assertNull(inbox.restartCheckpoint(item));
+        assertTrue(orchestrator.pendingRestarts(7L).isEmpty());
+        orchestrator.abortRestart(7L, "quit-aborted");
+        assertEquals(true, orchestrator.prepareRestart(7L, "quit-aborted").get("aborted"));
+    }
+
+    @Test
+    void cancelledAndChangedAccountCheckpointsAreNotResumed() {
+        durableRunStates();
+        var meter = mock(com.checkba.service.trial.TrialTurnMeter.class);
+        when(meter.accountFingerprint()).thenReturn("original-account");
+        orchestrator.setTrialTurnMeter(meter);
+        var queued = new ArrayList<Runnable>();
+        orchestrator.setTurnExecutor(queued::add);
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(AiMessage.from("must not generate")));
+        var item = inbox.submit(request("continue task", "cancel-checkpoint", "steer"), 7L);
+        orchestrator.acceptInboxSubmission(item.getId());
+        orchestrator.prepareRestart(7L, "quit");
+        queued.remove(0).run();
+        assertNotNull(inbox.restartCheckpoint(item));
+        when(meter.accountFingerprint()).thenReturn("other-account");
+        assertTrue(orchestrator.pendingRestarts(7L).isEmpty());
+        assertFalse(orchestrator.resumeRestart(CONV, 42L, null, 7L));
+        when(meter.accountFingerprint()).thenReturn("original-account");
+        orchestrator.setCancelled(CONV);
+        assertFalse(orchestrator.resumeRestart(CONV, 42L, null, 7L));
+        assertTrue(modelRequests.isEmpty());
+    }
+
     private StreamingChatLanguageModel scripted(AiMessage... script) {
         AtomicInteger call = new AtomicInteger();
         return new StreamingChatLanguageModel() {
@@ -757,6 +888,9 @@ class AgentOrchestratorInboxTest {
                         Objects.equals(i.getConversationId(), inv.getArgument(0))
                                 && Objects.equals(i.getUserId(), inv.getArgument(1))
                                 && Objects.equals(i.getClientRequestId(), inv.getArgument(2))).findFirst());
+        when(repo.findRestartCheckpoints(anyLong())).thenAnswer(inv -> rows.values().stream()
+                .filter(row -> Objects.equals(row.getUserId(), inv.getArgument(0))
+                        && row.getRequestJson().contains("_restartCheckpoint")).toList());
         when(repo.findByRunIdAndState(anyString(), anyString())).thenAnswer(inv -> rows.values().stream()
                 .filter(row -> Objects.equals(row.getRunId(), inv.getArgument(0))
                         && Objects.equals(row.getState(), inv.getArgument(1))).toList());

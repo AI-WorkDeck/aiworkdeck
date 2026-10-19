@@ -4747,3 +4747,30 @@ $color-accent: var(--awd-mint); // Mint Green
   gap: 16px;
   color: var(--awd-text-3);
 }
+
+.restart-recovery {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px;
+  flex-shrink: 0;
+  max-height: 120px;
+  overflow-y: auto;
+  background: var(--awd-surface);
+  border-bottom: 1px solid var(--awd-border);
+  color: var(--awd-text-2);
+  font-size: 12px;
+}
+.restart-recovery-action {
+  margin: 0;
+  padding: 3px 8px;
+  font: inherit;
+  line-height: 1.5;
+  color: var(--awd-text);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-sm, 4px);
+}
+.restart-recovery-action:focus-visible { outline: 2px solid var(--awd-mint); }
+.restart-recovery-action:disabled { opacity: 0.5; }

@@ -276,6 +276,14 @@
       </view>
     </view>
 
+    <view v-if="restartPendingTasks.length" class="restart-recovery" role="status" aria-live="polite">
+      <text>{{ restartRestoring ? $t('workbench.restartRestoring') : (restartRecoveryFailed ? $t('workbench.restartRestoreFailed') : $t('workbench.restartPending', { count: restartPendingTasks.length })) }}</text>
+      <button v-if="restartRestoring" class="restart-recovery-action" @click="cancelRestartRecovery">{{ $t('workbench.restartCancel') }}</button>
+      <button v-for="task in restartPendingTasks" :key="task.conversationId" class="restart-recovery-action"
+        :disabled="restartRestoring" @click="recoverRestartTask(task)">
+        {{ $t('workbench.restartContinue', { name: task.activeFileName || $t('workbench.restartTask', { id: task.conversationId.slice(-6) }) }) }}
+      </button>
+    </view>
     <!-- 主体布局 -->
     <view class="main-layout" :class="{ 'is-compact': isCompactLayout }">
       <!-- Cursor 风格：最左常驻栏（Activity Bar） -->
@@ -1604,6 +1612,7 @@
               <ChatInterface
                 v-if="hasProject"
                 ref="chatInterface"
+                :onVnodeMounted="notifyRestartRecovery"
                 :project-id="String(projectId)"
                 :project-name="isLooseWorkspace ? $t('workbench.looseFiles') : project.name"
                 :recent-history="chatHistoryList.slice(0, 3)"
@@ -2160,6 +2169,8 @@ import { registerOpenWorkbench, unregisterOpenWorkbench } from '@/utils/ideOpen.
 import { resolveLooseWorkspace } from './looseFiles.js'
 import { trialBalanceText } from '@/utils/trialBalanceText.js'
 import { flushDirtyEditors } from './flushDirtyEditors.js'
+import { registerQuitSave, unregisterQuitSave } from '@/utils/desktopQuitGuard.js'
+import { claimRestartStartup, createRestartRecovery } from './restartRecovery.js'
 import { flushActiveDocument } from './flushActiveDocument.js'
 import { isTabVisibleInPane } from './tabVisibility.js'
 import { pickActiveContextTab, isContextEligibleTab } from './activeTabContext.js'
@@ -2219,6 +2230,7 @@ import FilePickerDialog from '@/components/FilePickerDialog.vue'
 
 import {
   getProject,
+  getPendingAgentRestarts,
   renameProject,
   getFileDetail,
   renameFile,
@@ -2427,6 +2439,9 @@ export default {
   },
   data() {
     return {
+      restartPendingTasks: [],
+      restartRestoring: false,
+      restartRecoveryFailed: false,
       projectId: null,
       project: {},
       looseWorkspaceHint: false,
@@ -3419,6 +3434,8 @@ export default {
     this.unbindTabsWheel()
     this._comparisonDisposed = true
     clearInterval(this._mergeElapsedTimer)
+    this.disposeRestartRecovery()
+    unregisterQuitSave(this)
     if (this._onPluginOpenSettings) uni.$off('awd:plugin-open-settings', this._onPluginOpenSettings)
     // 标签快照（dev-board#1049）：卸载前把节流中的那次写掉
     this.flushTabSnapshot()
@@ -3597,6 +3614,8 @@ export default {
     // Cleanup manual event listener removed
   },
   onLoad(query) {
+    this.initRestartRecovery(query || {})
+    this._restartProjectReady = Promise.resolve()
     this._collabDisposed = false
     this.pageEnterTime = Date.now()
     this.loadLicenseMode()
@@ -3608,7 +3627,7 @@ export default {
       this.projectId = Number(query.id)
       this.looseWorkspaceHint = query.loose === '1'
       // 以服务端类型决定项目侧初始化，独立文件工作区不进最近项目。
-      this.loadProjectInfo()
+      this._restartProjectReady = this.loadProjectInfo()
 
       // 概览页的 AI 对话列表点进来时带着 conversationId：把那条历史会话真打开。
       // 右侧 AI 面板默认收起（showAiPanel: false）且 ChatInterface 挂在 v-if 里，
@@ -3714,6 +3733,7 @@ export default {
     }).finally(() => {
       this._openWorkbenchRestored = true
       this.maybeRegisterOpenWorkbench()
+      Promise.resolve(this._restartProjectReady).then(() => this._restartRecovery?.start(query || {}))
     })
     if (typeof window !== 'undefined') {
       // 刷新 / 关窗时节流中的那次写可能来不及：pagehide 同步补一次
@@ -3796,6 +3816,8 @@ export default {
     }
   },
   onUnload() {
+    this.disposeRestartRecovery()
+    unregisterQuitSave(this)
     this.stopCollabPolling({ dispose: true })
     this._openWorkbenchMounted = false
     unregisterOpenWorkbench(this)
@@ -3813,6 +3835,11 @@ export default {
     }
   },
   mounted() {
+    registerQuitSave(this, async () => {
+      const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs)
+      this.flushTabSnapshot()
+      return result
+    })
     // 多实例守卫：本页经 navigateTo 反复进入时页面栈里会有多个存活实例，每个都在
     // mounted 绑定了全局（ipcRenderer/window 级）监听；全局事件只让最近展示的实例
     // 处理，否则一次事件触发 N 份副作用（与 PR#148 剪贴板重复入库同源）
@@ -4227,7 +4254,8 @@ export default {
     // PR#151 WPS 编辑器模式）。
     activeFileLeft(f) { this.onActiveOfficeFileChanged('left', f); this.touchWebKeepAlive('left', f); this.prefetchInsightIndex(f) },
     activeFileRight(f) { this.onActiveOfficeFileChanged('right', f); this.touchWebKeepAlive('right', f); this.prefetchInsightIndex(f) },
-    focusedPane() { this.syncLibreExecutor() },
+    focusedPane() { this.syncLibreExecutor(); this.notifyRestartRecovery() },
+    currentActiveTab() { this.notifyRestartRecovery() },
     // 关闭 tab 后清掉文件已不在左列表的过继备胎条目（closeFile 已 flush）
     'leftFiles.length'() { this.pruneClosedLibreSpares() },
     'rightFiles.length'() { this.pruneClosedLibreSpares() },
@@ -4357,6 +4385,44 @@ export default {
     ...tmeetTabMethods,
     ...tabSnapshotMethods,
     ...documentLinkPreviewMethods,
+    initRestartRecovery(query) {
+      if (!isDesktopHost()) return
+      this._restartRecovery = createRestartRecovery(this, {
+        pending: getPendingAgentRestarts,
+        fileDetail: getFileDetail,
+        identity: getCloudAccountGeneration,
+        nextTick: () => this.$nextTick(),
+        navigate: (url, canNavigate) => this.leaveWorkbench(url, { restartRecovery: true, canNavigate }),
+        autoEligible: claimRestartStartup(query, true),
+      })
+      // User interaction wins over an in-flight automatic restoration, including
+      // selecting another tab before its editor finishes loading.
+      this._restartIntent = () => this.cancelRestartRecovery()
+      uni.$on('awd:cancel-restart-recovery', this._restartIntent)
+      if (typeof window !== 'undefined') {
+        window.addEventListener('pointerdown', this._restartIntent, true)
+        window.addEventListener('keydown', this._restartIntent, true)
+      }
+    },
+    notifyRestartRecovery() { this.$nextTick(() => this._restartRecovery?.notify()) },
+    cancelRestartRecovery() { this._restartRecovery?.cancel() },
+    recoverRestartTask(task) { return this._restartRecovery?.recover(task) },
+    disposeRestartRecovery() {
+      this._restartRecovery?.dispose()
+      if (this._restartIntent) uni.$off('awd:cancel-restart-recovery', this._restartIntent)
+      if (typeof window !== 'undefined' && this._restartIntent) {
+        window.removeEventListener('pointerdown', this._restartIntent, true)
+        window.removeEventListener('keydown', this._restartIntent, true)
+      }
+    },
+    onLibreReady(executor, pane, fileId) {
+      librePoolMethods.onLibreReady.call(this, executor, pane, fileId)
+      this.notifyRestartRecovery()
+    },
+    openFile(file, options = {}) {
+      if (!options.restartRecovery) this.cancelRestartRecovery()
+      return fileOpenTabsMethods.openFile.call(this, file, options)
+    },
     // 右键「这份文件的历史」：切到版本面板并只显示这份文件的版本
     onFileHistory(file) {
       this.versionFileFilter = { fileId: file.id, name: file.name }
@@ -4474,7 +4540,9 @@ export default {
     //    从列表页再进另一个项目就出现两个存活的工作台实例（全局监听多实例地雷）。
     //
     // 逐个保存；只要仍有未落盘的改动就留在工作台，让用户重试或先关闭该文档处理。
-    async leaveWorkbench(url) {
+    async leaveWorkbench(url, options) {
+      const { restartRecovery = false, canNavigate = () => true } = options || {}
+      if (!restartRecovery) this._restartRecovery?.cancel()
       // 标签快照（dev-board#1049）：离开前同步写一次，不等节流
       if (this.flushTabSnapshot) this.flushTabSnapshot()
       try {
@@ -4489,6 +4557,7 @@ export default {
         uni.showToast({ title: this.$t('editor.saveBeforeLeaving'), icon: 'none', duration: 4000 })
         return false
       }
+      if (!canNavigate()) return false
       await new Promise((resolve, reject) => uni.reLaunch({ url, success: resolve, fail: reject }))
       return true
     },
@@ -7586,6 +7655,7 @@ export default {
         }
     },
     startNewChat() {
+      this.cancelRestartRecovery()
       this.aiMessages = []
       this.currentConversationId = null
       this.pluginReadOnlySource = null // 新对话必然可写，清掉插件只读态
@@ -7655,6 +7725,7 @@ export default {
     },
 
     async loadHistoryChat(chat) {
+        if (!chat?.restartRecovery) this.cancelRestartRecovery()
         if (!chat || !chat.conversationId) return
         this.currentConversationId = chat.conversationId
         // 插件镜像会话只读态（dev-board#298）：跟着会话走。深链只带 conversationId

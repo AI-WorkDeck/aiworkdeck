@@ -20,6 +20,8 @@ public interface AgentInboxItemRepository extends JpaRepository<AgentInboxItem, 
     Optional<AgentInboxItem> findByConversationIdAndUserIdAndClientRequestId(
             String conversationId, Long userId, String clientRequestId);
     List<AgentInboxItem> findByRunIdAndState(String runId, String state);
+    @Query("select i from AgentInboxItem i where i.userId = :userId and i.requestJson like '%_restartCheckpoint%'")
+    List<AgentInboxItem> findRestartCheckpoints(@Param("userId") Long userId);
     void deleteByConversationId(String conversationId);
 
     @Query("select i.id from AgentInboxItem i where i.id > :cursor order by i.id")

@@ -4477,6 +4477,12 @@ export const getLawFirmFinanceCsvUrl = () => `${getApiBaseUrl()}/api/lawfirm/fin
 
 
 
+// Graceful desktop restart. Attempt identity prevents a delayed prepare after cancellation.
+export const prepareAgentRestart = (data) => request({ url: '/api/agent/restart/prepare', method: 'POST', data })
+export const abortAgentRestart = (data) => request({ url: '/api/agent/restart/abort', method: 'POST', data })
+export const getPendingAgentRestarts = () => request({ url: '/api/agent/restart/pending', method: 'GET' })
+export const resumeAgentRestart = (data) => request({ url: '/api/agent/restart/resume', method: 'POST', data })
+
 export function getProjectFileAccess(projectId, fileId) {
   return request({
     url: `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/access`,

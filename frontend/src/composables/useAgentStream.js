@@ -2809,8 +2809,9 @@ export function useAgentStream() {
         upsertPluginJob,
         // 切回会话时重连 SSE：后端 connect 会推 run_state（运行中还会推 state_recovery 续流）。
         reattachSSE: async (conversationId) => {
-            if (!conversationId) return
-            try { await connectSSE(conversationId) } catch (e) { console.warn('[AgentStream] reattach failed', e) }
+            if (!conversationId) return false
+            try { await connectSSE(conversationId); return isConnected.value }
+            catch (e) { console.warn('[AgentStream] reattach failed', e); return false }
         },
         // Load metadata for historical conversations
         loadConversationMetadata: async (conversationId) => {

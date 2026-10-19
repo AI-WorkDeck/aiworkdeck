@@ -38,6 +38,16 @@ public class StuckDetector {
     private boolean intervened;
     private String lastPattern;
 
+    record Snapshot(java.util.List<String> window, boolean intervened, String lastPattern) {}
+    Snapshot snapshot() { return new Snapshot(java.util.List.copyOf(window), intervened, lastPattern); }
+    void restore(Snapshot state) {
+        window.clear();
+        if (state == null) return;
+        window.addAll(state.window());
+        intervened = state.intervened();
+        lastPattern = state.lastPattern();
+    }
+
     /**
      * 记录一次工具调用并给出裁决。
      *

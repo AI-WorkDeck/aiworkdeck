@@ -590,8 +590,7 @@
           </SettingsSection>
         </scroll-view>
 
-        <!-- 软件更新（仅桌面端）：小版本补丁应用内更新，大版本引导官网下载全量包
-             （docs/INCREMENTAL_UPDATE_DESIGN.md §6/§7） -->
+        <!-- 软件更新（仅桌面端）：后台准备，安全退出后安装。 -->
         <scroll-view
           v-else-if="activeNav === 'updates'"
           scroll-y
@@ -608,7 +607,7 @@
                   </text>
                   <text v-if="update.phase === 'checking'" class="comp-sub">{{ $t('admin.checkingUpdate') }}</text>
                   <text v-else-if="update.phase === 'downloading'" class="comp-sub">
-                    {{ update.progress && update.progress.component ? $t('admin.downloadingPatchComp', { name: update.progress.component }) : $t('admin.downloadingPatch') }}
+                    {{ update.progress?.component === 'installer' ? $t('admin.downloadingInstaller') : (update.progress && update.progress.component ? $t('admin.downloadingPatchComp', { name: update.progress.component }) : $t('admin.downloadingPatch')) }}
                   </text>
                   <text v-else-if="update.phase === 'ready'" class="comp-sub">
                     {{ $t('admin.updateReady', { version: update.available && update.available.version }) }}

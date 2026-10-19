@@ -511,7 +511,7 @@ check('工作台「全部项目」开左栏「项目」面板，不离开工作�
   if (/uni\.(reLaunch|navigateTo|redirectTo)/.test(body) || body.includes('leaveWorkbench')) {
     return '项目列表已经是工作台里的面板，「全部项目…」不该再离开工作台'
   }
-  const exit = extractMethodBody(src, 'async leaveWorkbench(url)')
+  const exit = extractMethodBody(src, 'async leaveWorkbench(url, options)')
   if (!exit) return '找不到统一出口 leaveWorkbench'
   if (!exit.includes('uni.reLaunch')) return 'leaveWorkbench 必须用 reLaunch（工作台参与的跳转一律 reLaunch）'
   if (!exit.includes('flushDirtyEditors')) return '离开工作台前必须先落盘'
@@ -1098,7 +1098,7 @@ check('标签快照：两份键、恢复在 onLoad、leaveWorkbench 前同步写
   const src = readVue('src/pages/project-overview/project-overview.vue')
   const onLoad = extractMethodBody(src, 'onLoad(query)')
   if (!onLoad || !onLoad.includes('this.restoreTabSnapshot()')) return 'onLoad 没有恢复标签快照'
-  const exit = extractMethodBody(src, 'async leaveWorkbench(url)')
+  const exit = extractMethodBody(src, 'async leaveWorkbench(url, options)')
   const flushAt = exit ? exit.indexOf('this.flushTabSnapshot()') : -1
   const navAt = exit ? exit.indexOf('uni.reLaunch') : -1
   if (flushAt < 0 || flushAt > navAt) return 'leaveWorkbench 在 reLaunch 之前没有同步写标签快照'

@@ -34,6 +34,9 @@ function harness(platform = 'darwin') {
       windows.push(this)
     }
     isDestroyed() { return this.destroyed }
+    show() { this.hidden = false }
+    hide() { this.hidden = true }
+    focus() {}
     loadFile() {}
     isFullScreen() { return false }
     // dev-board#726：win32 建窗后应显式收起原生菜单条，见 createMainWindow。
@@ -70,6 +73,7 @@ function harness(platform = 'darwin') {
     startChangeCounter: () => null,
   })
   vm.runInContext(`let mainWindow = null; let mainWindowStartupReady = false;
+    let quitInProgress = false; let updateRestartRequested = false;
     let services = { ports: { backend: 9799 } }; const IS_DEV = false;
     let clipboardWatchTimer = null; let clipboardPrimed = false; let lastClipboardFingerprint = '';
     let clipboardChangeCounter = null;
@@ -180,4 +184,18 @@ test('missing or malformed physical memory remains unknown, never zero', () => {
     const bridge = preloadBridge(value === null ? [] : ['--checkba-system-memory=' + value])
     assert.equal(bridge.systemMemory.totalBytes, null, String(value))
   }
+})
+
+test('Mac 红叉隐藏并保留编辑器，Dock 激活恢复同一窗口供退出时保存', () => {
+  const h = harness()
+  h.context.finishStartup()
+  const current = h.current ? h.current() : h.context.current()
+  let prevented = false
+  current.emit('close', { preventDefault: () => { prevented = true } })
+  assert.equal(prevented, true)
+  assert.equal(current.hidden, true)
+  assert.equal(current.destroyed, false)
+  h.app.emit('activate')
+  assert.equal(current.hidden, false)
+  assert.equal(h.windows.length, 1)
 })

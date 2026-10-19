@@ -104,7 +104,7 @@ test('页面生命周期接线：恢复结束和 mounted 均尝试注册，离�
 
 test('保存成功后仍等待导航回执，导航失败向打开请求报告', async () => {
   let navigate
-  const leave = new Function('flushDirtyEditors', 'uni', `return async function(url) {${body('leaveWorkbench')}}`)(
+  const leave = new Function('flushDirtyEditors', 'uni', `return async function(url, options = {}) {${body('leaveWorkbench')}}`)(
     async () => ({ failed: 0 }), { reLaunch: opts => { navigate = opts } })
   let complete = false
   const pending = leave.call({}, '/target').then(value => { complete = true; return value })
