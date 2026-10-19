@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Download only the two pinned official Mac build artifacts
+      - name: Download only the pinned official Mac candidate artifact
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -25,8 +25,7 @@ jobs:
           import hashlib, json, os, pathlib, subprocess
           repo = 'AI-WorkDeck/aiworkdeck'
           builds = [
-              ('39213434701', '109ebe48b97630bb336a8dd60c691420c9b855a9', '0.65.0'),
-              ('39214022951', 'a1fa26317270df303b99b99fe1735460b236e8b7', '0.66.0'),
+              ('39222690909', '11516bc1aa8b43f99b29bf6515a90f7ecdd78ced', '0.66.0'),
           ]
           work = pathlib.Path(os.environ['RUNNER_TEMP']) / 'awd-qa-1367-relay'
           work.mkdir(mode=0o700)
@@ -70,7 +69,7 @@ jobs:
           pathlib.Path('evidence/CLEANUP.txt').write_text(
               'Private QA relay only. Do not move files into any web-served directory.\n'
               'After downloading each installer, verify its SHA256 against the matching provenance JSON.\n'
-              'On the mirror host remove only these exact files (including a partial upload after failure), then rmdir the two run directories and parent:\n'
+              'On the mirror host remove only these exact files (including a partial upload after failure), then rmdir the run directory and parent:\n'
               + ''.join(f'/tmp/awd-qa-1367/{run_id}/{name}\n' for run_id, _, _ in builds
                         for name in ['installer.dmg', 'installer.dmg.partial', 'provenance.json'])
               + 'Delete remote Git branch codex/qa-candidate-relay-1367 after retrieval; do not merge its workflow replacement.\n'
@@ -96,7 +95,7 @@ jobs:
           test "$(ssh-keygen -lf "$hosts" -E sha256 | awk '{print $2}')" = 'SHA256:itboT6XLi9D58vPUNzMYOepCXRNSryMgvIUpPXJVTnY'
           opts=(-i "$key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$hosts" -o HostKeyAlgorithms=ssh-ed25519 -o ConnectTimeout=20 -o ServerAliveInterval=20 -o ServerAliveCountMax=6)
           ssh "${opts[@]}" "root@$MIRROR_HOST" 'set -eu; umask 077; base=/tmp/awd-qa-1367; if [ -e "$base" ] || [ -L "$base" ]; then test -d "$base" && test ! -L "$base" && test "$(stat -c %u "$base")" = 0 && test "$(stat -c %a "$base")" = 700; else mkdir -m 700 "$base"; fi'
-          for id in 39213434701 39214022951; do
+          for id in 39222690909; do
             source="$RUNNER_TEMP/awd-qa-1367-relay/$id"
             dest="/tmp/awd-qa-1367/$id"
             expected=$(sha256sum "$source/installer.dmg" | awk '{print $1}')
