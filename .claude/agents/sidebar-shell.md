@@ -7,6 +7,10 @@ description: 侧边栏与工作台外壳领域。任务涉及左侧 rail/左栏�
 
 职责边界：工作台整体布局、左侧 rail 与左栏、面板切换状态机、页面路由。各面板内部逻辑归 utility-tools / plugin-system；右栏聊天内容归 ai-chat；编辑器归 doc-editor。
 
+## 工作台视觉层次（dev-board#1365）
+
+`project-overview.scss` 的 `--awd-workbench-header-height` 统一资源管理器标题、中间标签栏和右侧 dock 页签的实际盒高（37px，含边线）；不要单独缩矮右侧 tab。`--awd-workbench-divider` 使用现有弱分隔令牌，rail 与左栏共用底色，内容区用 surface 区分。FileTree 的奇偶行底色必须保留以便逐行定位；悬停、选中与拖入提示仍独立。用户明确要求斑马纹不能因视觉简化而直接取消。
+
 ## 离开工作台前必须落盘（已踩）
 
 自动保存是防抖的，用户敲完最后一个字到真正落盘之间有一段窗口。`closeFile`
