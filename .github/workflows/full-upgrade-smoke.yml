@@ -38,6 +38,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify real Windows helper red then green
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force evidence | Out-Null
+          $source = 'desktop/main/services/full-update.js'
+          Copy-Item $source "$env:RUNNER_TEMP/full-update-fixed.js"
+          git fetch origin 6cf6cebe3c29e706947e8adaf0268490b1212625 --depth=1
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch pre-fix source' }
+          $old = git show '6cf6cebe3c29e706947e8adaf0268490b1212625:desktop/main/services/full-update.js'
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read pre-fix source' }
+          [IO.File]::WriteAllText((Join-Path $env:GITHUB_WORKSPACE $source), ($old -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+          node --test --test-name-pattern='Windows真实helper' desktop/tests/full-update.test.js 2>&1 | Tee-Object evidence/helper-before.log
+          if ($LASTEXITCODE -eq 0) { throw 'Old product source unexpectedly passed' }
+          Copy-Item "$env:RUNNER_TEMP/full-update-fixed.js" $source -Force
+          node --test --test-name-pattern='Windows' desktop/tests/full-update.test.js 2>&1 | Tee-Object evidence/helper-after.log
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed Windows helper tests failed' }
       - name: Download and identify signed installer builds
         shell: pwsh
         env:

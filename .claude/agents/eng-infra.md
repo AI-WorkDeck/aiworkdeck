@@ -15,6 +15,8 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 
 ## 发版链路
 
+- **Mac 原生升级的 JRE 权限（dev-board#1368，验收总卡 #1367）**：jlink 产出的 `jre/legal/` 中部分许可证为 `0444`。真实签名升级 run `39217849923` 已证明 ShipIt 在复制候选包后、验签/接管文件前清除 quarantine 时对 `java.xml/bcel.md` 报 `EACCES`，重试三次后放弃。`desktop/scripts/after-pack.js` 现在只给该目录内普通文件补 owner-write，保留内容、其他权限和符号链接，发生在外层 app 签名前；不可在验收时 chmod 已签名候选包来掩盖问题。`after-pack.test.js` 包含 macOS 真实 xattr 红绿复现；修复后仍须重打签名候选并跑 `full-upgrade-mac-smoke.yml`，原成功交接 ShipIt 的 0.65 baseline 可保留。该 smoke 在 ShipIt 明确终止重试时立即失败并保存原因，避免再空等十分钟。
+
 0. **版本规则 0.X.Y**（docs/INCREMENTAL_UPDATE_DESIGN.md）：X=大版本全量安装包；Y=小版本应用内补丁（overlay 机制，组件=backend-app/frontend-h5/zetaoffice-wrapper）。小版本 tag 触发 CI `patch-gate` job（desktop/scripts/patch-gate.sh）：改壳（desktop/）、pom、LOWA 引擎、requirements.lock、`backend/skills/` 都会被拒；内置 skill 需全量版本，requirements.lock 改动走独立 pack 发版。补丁产物+签名 manifest 由 build-patch-assets.js 在 windows job 生成（私钥=secret UPDATE_SIGNING_KEY，备份 ~/.ssh/aiworkdeck_update_signing.pem；公钥内置 update-service.js，换钥须发大版本）；镜像同步 deploy/update-mirror-sync.sh 在官网 ECS 跑。
 0.1. **服务上下文必须传 `appVersion: app.getVersion()`（dev-board#589）**：backendLayout 与 UI 的 overlay 使用不同调用链。漏传时 UI 显示补丁已更新，但后端因无法解析大版本目录而静默回落内置 app.jar。回归必须运行 main.js 的实际 createServices，再验证 backendLayout 读取激活补丁及回滚；只单测 overlay 不足以覆盖接线。旧 0.38 壳存在此缺陷，脱敏 2.0 必须先装完整 0.38.4；修复随 0.39.0 全量版本交付，不能用旧壳自身的补丁修复。
 0.2. **桌面端默认关闭自动 AI 标签（dev-board#590，0.39.0）**：上传、本地导入及编辑器保存共用 AutoTaggingService；脱敏前 flushSave 也会经过此链路。`application-desktop.yml` 设置 `ai.auto-tagging.enabled: false`，在读取正文和调用模型之前返回，避免原文先被自动发送。云端默认行为及手动标签不变。DesktopAutoTaggingPrivacyTest 加载真实 desktop 配置，验证入口不读正文、不调用模型。0.38.4 仅供合成样例测试，真实敏感材料需完整 0.39.0；普通 AI 会话仍须由用户核查项目和历史上下文。
@@ -600,3 +602,5 @@ frontend build:h5前置build:plugins，8个独立Uni/Vite包输出official-plugi
 Mac `quitAndInstall` 在窗口与服务关闭后仍可能异步报错，必须保留安装阶段 error 监听：本机记录错误、relaunch 并退出旧进程，不能留下持有单实例锁的无窗口进程。Windows PowerShell 5.1 读取 Node 写入的无 BOM job 必须显式 UTF8，合成回归使用中文目录。相关行为回归含还原病灶转红；仍不等于正式签名安装及 Windows 实机升级已验收。
 
 Windows 下从 pwsh→Node 再启动 powershell.exe 会继承不兼容 PSModulePath（#1356 Windows CI 已复现 Get-FileHash 不存在）。完整更新的签名检查与 helper 使用删除该变量的子进程环境，让 Windows PowerShell 重建系统模块路径；不改用户全局环境。握手超时必须先结束本 helper 并确认 exit，再按 helperPid/job 内容清理本次文件，不能放任迟到 helper 在后继客户端已启动时安装。退出中的原生业务菜单不再获得工作台窗口；服务尚未初始化的退出交给原生关闭。
+
+**Windows helper 冷启动与独立进程交接（dev-board#1369）**：真实签名 NSIS 验收发现两层约束：① PowerShell 冷启动至握手可达 `11656.7881 ms`（run `39221453044`），超过旧 10 秒门限；② Node 直接 `spawn('powershell.exe', ..., { detached: true })` 在无控制台下约 214–323 ms 即退出码 0 结束、脚本首句未执行（run `39225970537` / `39227178526`），而 `detached: false` 直接子进程会在 Electron 退出时被 libuv 终止。现由非 detached 桥接 PowerShell 调用 `Start-Process powershell.exe -WindowStyle Hidden -PassThru`（标准输出/错误重定向到文件并写回独立 `helperPid`），helper 以 `FileMode::CreateNew` 独占写锁 `{ helperPid, jobId }`，父进程在 60 秒窗口内核对 `helperPid` 与 `jobId` 后写 `.ack` 提交，helper 确认 `.ack` 且父进程退出后才校验签名并执行 `NSIS /S --updated`。父进程未写 `.ack` 即退出的桥接异常若伴随 `.launch`，helper 在父进程退出后重开原应用而不执行安装。
