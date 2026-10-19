@@ -50,7 +50,7 @@ function initLocalFileService() {
     });
 
     // Handler: 把资源管理器/暂存区的文件直接拖出窗口（如拖到微信聊天、Finder/资源管理器，dev-board#1288）。
-    // 同步/异步双注册：dragstart 期间 send 更快进入原生拖拽，invoke 便于回执与单测。
+    // invoke 回传启动失败；保留 send 兼容旧入口。成功仅表示已启动，不代表用户已松手。
     ipcMain.on('fs:startDrag', (event, { paths, path: filePath } = {}) => {
         startFileDrag(event && event.sender, paths || filePath);
     });
