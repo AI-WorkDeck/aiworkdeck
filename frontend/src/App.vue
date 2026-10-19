@@ -554,7 +554,7 @@ html.is-win .project-header .amb {
 }
 html.is-win .project-header .header-center { display: none; }
 html.is-win .project-header .header-left,
-html.is-win .project-header .project-info { flex: 1; min-width: 0; }
+html.is-win .project-header .project-info { flex: 1; min-width: 0; max-width: none; }
 html.is-win .project-header .project-title-row { min-width: 0; }
 html.is-win .project-header .header-right { flex-shrink: 0; }
 html.is-win .project-header .project-meta {
