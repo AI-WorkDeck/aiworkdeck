@@ -195,6 +195,13 @@ try {
     $recoveryId = ($files | Where-Object name -eq 'after-drag.txt').id
     Assert-That ($ordinaryId -gt 0 -and $archiveId -gt 0 -and $recoveryId -gt 0) 'Real backend indexed all synthetic fixtures'
     Wait-Until { $null -ne (Element ".tree-item[data-file-id='$ordinaryId']") } 'project file tree is visible' 60
+    # A fresh profile may show the ordinary optional-components prompt. Dismiss via the real
+    # visible Later button rather than pre-seeding preferences or mutating component state.
+    if ($null -ne (Element '.ocd-mask')) {
+        Screenshot 'optional-components-prompt'
+        Click-Element '.ocd-actions .ocd-btn:not(.primary)'
+        Wait-Until { $null -eq (Element '.ocd-mask') } 'physical Later button dismisses first-launch prompt' 15
+    }
     # Separate STA message loop receives real OLE data. This process only writes this run's fixtures.
     $receiverScript = Join-Path $OutDir 'receiver.ps1'
     @'
