@@ -26,14 +26,15 @@ if mode == "mouse" {
         let p=cfg[key] as! [String:Double]; return CGPoint(x:p["x"]!,y:p["y"]!)
     }
     func owner(_ point:CGPoint) -> Int32 {
+        // AppKit uses real mouse-down hit-testing, ignoring transparent/click-through
+        // system tracking windows (a rectangular CGWindow scan can falsely hit Dock).
+        let screenPoint=NSPoint(x:point.x,y:NSScreen.screens[0].frame.maxY-point.y)
+        let number=NSWindow.windowNumber(at:screenPoint,belowWindowWithWindowNumber:0)
         let windows=CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as! [[String:Any]]
-        for w in windows {
-            guard (w[kCGWindowAlpha as String] as? Double ?? 0)>0,
-                  let b=w[kCGWindowBounds as String] as? [String:CGFloat],
-                  let x=b["X"],let y=b["Y"],let width=b["Width"],let height=b["Height"] else { continue }
-            if CGRect(x:x,y:y,width:width,height:height).contains(point) { return Int32(w[kCGWindowOwnerPID as String] as! Int) }
-        }
-        return -1
+        let matched=windows.first { ($0[kCGWindowNumber as String] as? Int)==number }
+        let pid=Int32(matched?[kCGWindowOwnerPID as String] as? Int ?? -1)
+        save("\(label)-window-at-\(Int(point.x))-\(Int(point.y)).json",["windowNumber":number,"ownerPid":pid,"appKitPoint":["x":screenPoint.x,"y":screenPoint.y]])
+        return pid
     }
     let start=point("source"); let startOwner=owner(start)
     var record:[String:Any] = ["sourceOwner":startOwner,"expectedSourceOwner":expectedPid,"source":cfg["source"]!,"action":cfg["action"]!]
