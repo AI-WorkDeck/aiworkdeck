@@ -134,7 +134,11 @@ export function installExternalDragCleanup(onCleanup, win = typeof window !== 'u
     try { win.removeEventListener('pointerup', onDragEndOrDrop, true) } catch (_) {}
     try { win.removeEventListener('focus', onFocus, true) } catch (_) {}
     try { win.removeEventListener('keydown', onKeyDown, true) } catch (_) {}
-    if (activeCleanupCancel === detach) activeCleanupCancel = null
+    if (activeCleanupCancel === cancel) activeCleanupCancel = null
+  }
+  const cancel = () => {
+    done = true
+    detach()
   }
   const runCleanup = () => {
     if (done) return
@@ -173,7 +177,7 @@ export function installExternalDragCleanup(onCleanup, win = typeof window !== 'u
   // 否则仍按着鼠标拖往另一个窗口时会丢掉应用内拖拽身份。
   win.addEventListener('focus', onFocus, true)
   win.addEventListener('keydown', onKeyDown, true)
-  activeCleanupCancel = detach
+  activeCleanupCancel = cancel
   return runCleanup
 }
 
@@ -186,9 +190,8 @@ export function startExternalFileDrag(itemOrItems, options = {}) {
   if (!fs || typeof fs.startDrag !== 'function') {
     return { ok: false, reason: 'unsupported' }
   }
-  // Native export is optional: failure must leave the HTML drag identity intact.
-  // Keep the completion listeners armed until the actual drop/dragend (or lost-event fallback).
-  installExternalDragCleanup(options.onCleanup, options.win)
+  // Until paths are resolved, native export is optional and HTML dragging stays available.
+  const cleanup = installExternalDragCleanup(options.onCleanup, options.win)
   const paths = []
   for (const item of items) {
     const localPath = (typeof item.localPath === 'string' && item.localPath)
@@ -198,13 +201,26 @@ export function startExternalFileDrag(itemOrItems, options = {}) {
     if (!localPath) return { ok: false, reason: 'no-local-path' }
     if (!paths.includes(localPath)) paths.push(localPath)
   }
-  const resultOf = res => res && res.ok === false ? res
-    : Array.isArray(itemOrItems) ? { ok: true, paths } : { ok: true, path: paths[0] }
-  const failureOf = e => ({ ok: false, reason: 'start-drag-error', message: String((e && e.message) || e) })
+  let htmlCancelled = false
+  const resultOf = res => {
+    if (res && res.ok === false) {
+      if (htmlCancelled) cleanup()
+      return res
+    }
+    return Array.isArray(itemOrItems) ? { ok: true, paths } : { ok: true, path: paths[0] }
+  }
+  const failureOf = e => resultOf({ ok: false, reason: 'start-drag-error', message: String((e && e.message) || e) })
   try {
+    // Electron owns the native drag. Starting Chromium's default HTML drag as well
+    // can strand the host renderer's input even after all Vue overlays are cleared.
+    // Capture/pass the real dragstart event before leaving the synchronous handler.
+    if (typeof options.event?.preventDefault === 'function') {
+      options.event.preventDefault()
+      htmlCancelled = true
+    }
     const res = fs.startDrag(Array.isArray(itemOrItems) ? paths : paths[0])
-    // Some hosts expose invoke rather than send; absorb rejection without terminating
-    // the still-active internal drag or leaving an unhandled rejection in the renderer.
+    // A rejected native handoff cannot resume HTML after preventDefault; release
+    // its identity/overlays. Success only acknowledges dispatch, not completion.
     return res && typeof res.then === 'function' ? Promise.resolve(res).then(resultOf, failureOf) : resultOf(res)
   } catch (e) {
     return failureOf(e)

@@ -23,7 +23,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { captureDroppedFiles, isExternalFileDrag, importDroppedFile } from '../../src/utils/fileTreeExternalDrop.js'
+import { captureDroppedFiles, isExternalFileDrag, importDroppedFile, nativeEvent, nativeDataTransfer } from '../../src/utils/fileTreeExternalDrop.js'
+import { prefetchLocalFilePath, startExternalFileDrag } from '../../src/utils/fileLocalDrag.js'
+import { applyDragImage } from '../../src/utils/dragImage.js'
 
 const SRC = readFileSync(new URL('../../src/components/FileStagingArea.vue', import.meta.url), 'utf8')
 
@@ -31,8 +33,14 @@ function loadOptions(host = {}) {
   const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
     .replace(/^import .*$/gm, '')
     .replace(/export default \{/, 'return {')
-  const factory = new Function('ICONS', 'UnlockHint', 'FileTypeIcon', 'host', 'captureDroppedFiles', 'isExternalFileDrag', body)
-  return factory({}, {}, {}, host, captureDroppedFiles, isExternalFileDrag)
+  const dependencies = {
+    ICONS: {}, UnlockHint: {}, FileTypeIcon: {}, host,
+    captureDroppedFiles, isExternalFileDrag, nativeEvent, nativeDataTransfer,
+    prefetchLocalFilePath, startExternalFileDrag, applyDragImage,
+    getApiBaseUrl: () => 'http://fixture.invalid', getAuthHeaders: () => ({}),
+  }
+  const factory = new Function(...Object.keys(dependencies), body)
+  return factory(...Object.values(dependencies))
 }
 
 function makeVm(host) {
@@ -41,8 +49,87 @@ function makeVm(host) {
   for (const [k, fn] of Object.entries(options.methods)) vm[k] = fn.bind(vm)
   vm.emitted = []
   vm.$emit = (name, payload) => vm.emitted.push({ name, payload })
+  vm.$t = key => key
   return vm
 }
+
+function nativeDragFixture(startDrag) {
+  const previous = Object.fromEntries(['window', 'document', 'uni'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
+  const listeners = new Map(), signals = [], toasts = [], order = []
+  const event = new Event('dragstart', { cancelable: true })
+  event.dataTransfer = { setData() {}, types: [], files: [] }
+  const preventDefault = event.preventDefault.bind(event)
+  event.preventDefault = () => { order.push('prevent-default'); preventDefault() }
+  globalThis.window = {
+    event,
+    addEventListener(type, fn) { listeners.set(type, fn) },
+    removeEventListener(type, fn) { if (listeners.get(type) === fn) listeners.delete(type) },
+  }
+  globalThis.document = {}
+  globalThis.uni = {
+    $emit: type => signals.push(type),
+    showToast: toast => toasts.push(toast),
+  }
+  const vm = makeVm({ fs: { startDrag(paths) {
+    order.push('start-drag')
+    assert.equal(event.defaultPrevented, true, '必须在原生启动前取消 Chromium 默认拖拽')
+    return startDrag(paths)
+  } } })
+  const file = { id: 501, name: '暂存合同.docx', fileType: 'docx', localPath: '/synthetic/staging-contract.docx' }
+  return {
+    vm, file, event, order, signals, toasts, listeners,
+    // uni-h5 回调缺 dataTransfer；组件须从 window.event 取得原生事件。
+    wrappedEvent: { preventDefault() { throw new Error('应使用已捕获的原生 dragstart') } },
+    release() { listeners.get('mousemove')?.({ buttons: 0 }) },
+    restore() {
+      listeners.get('mousedown')?.()
+      for (const [key, descriptor] of Object.entries(previous)) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor)
+        else delete globalThis[key]
+      }
+    },
+  }
+}
+
+test('暂存区原生外拖在 IPC 前取消原生 dragstart，成功回执不冒充拖拽结束', async () => {
+  const paths = []
+  const fixture = nativeDragFixture(path => { paths.push(path); return Promise.resolve({ ok: true }) })
+  try {
+    fixture.vm.onDragStart(fixture.file, fixture.wrappedEvent)
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(fixture.order, ['prevent-default', 'start-drag'])
+    assert.deepEqual(paths, [fixture.file.localPath])
+    assert.deepEqual(fixture.signals, ['file-drag-start'])
+    assert.equal(document.__checkbaDraggedFile.fileId, fixture.file.id)
+    assert.deepEqual(fixture.toasts, [])
+    fixture.release()
+    assert.deepEqual(fixture.signals, ['file-drag-start', 'file-drag-end'])
+  } finally { fixture.restore() }
+})
+
+test('暂存区外拖身份已被消费者清空时，结束仍广播 file-drag-end 解除编辑器接收层', () => {
+  const fixture = nativeDragFixture(() => ({ ok: true }))
+  try {
+    fixture.vm.onDragStart(fixture.file, fixture.wrappedEvent)
+    document.__checkbaDraggedFile = null
+    fixture.release()
+    assert.deepEqual(fixture.signals, ['file-drag-start', 'file-drag-end'])
+    assert.equal(fixture.listeners.size, 0)
+  } finally { fixture.restore() }
+})
+
+test('暂存区原生启动 Promise 拒绝后清理已取消的拖拽并显示失败提示', async () => {
+  const fixture = nativeDragFixture(() => Promise.reject(new Error('native drag unavailable')))
+  try {
+    fixture.vm.onDragStart(fixture.file, fixture.wrappedEvent)
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(fixture.order, ['prevent-default', 'start-drag'])
+    assert.equal(document.__checkbaDraggedFile, null)
+    assert.deepEqual(fixture.signals, ['file-drag-start', 'file-drag-end'])
+    assert.equal(fixture.listeners.size, 0)
+    assert.deepEqual(fixture.toasts, [{ title: 'fileTree.externalDragFailed', icon: 'none' }])
+  } finally { fixture.restore() }
+})
 
 test('真实 OS 文件拖拽（dataTransfer.files，内部格式两条路径都取不到数据）触发 drop-files，而不是被静默丢弃', () => {
   const vm = makeVm()

@@ -227,8 +227,7 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
     startDrag: (path) => {
       const paths = Array.isArray(path) ? path : [path]
       if (!paths.length || paths.some(p => typeof p !== 'string' || !p)) return { ok: false, reason: 'bad-path' }
-      ipcRenderer.send('fs:startDrag', { paths })
-      return { ok: true }
+      return ipcRenderer.invoke('fs:startDrag', { paths })
     },
     // 回收站「彻底删除」把后端报回的物理路径送进系统废纸篓（dev-board#1051）。
     // 返回 { ok, results: [{ path, ok, missing?, reason? }] }；ok 为假时渲染层不清行。
