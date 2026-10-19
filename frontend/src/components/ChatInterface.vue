@@ -4361,7 +4361,7 @@ export default {
 
 .chat-header {
   height: 36px;
-  border-bottom: 1px solid var(--awd-border);
+  border-bottom: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -4687,7 +4687,7 @@ export default {
   padding: 16px;
   width: 100%;
   box-sizing: border-box;
-  box-shadow: var(--awd-shadow-md);
+  box-shadow: var(--awd-shadow-sm);
   position: relative;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -4701,7 +4701,7 @@ export default {
 /* 输入区获得焦点时整卡亮起：品牌绿描边 + mint 光晕（浅色，不做深色 chrome） */
 .input-card:focus-within {
   border-color: var(--awd-accent);
-  box-shadow: 0 0 0 3px var(--awd-accent-soft), var(--awd-shadow-md);
+  box-shadow: 0 0 0 2px var(--awd-accent-soft);
 }
 
 /* Recent History Section - 紧凑专业样式 */
@@ -4717,11 +4717,10 @@ export default {
 .recent-history {
   display: flex;
   flex-direction: column;
-  gap: 0; /* 无间距 */
-  border: 1px solid var(--awd-border);
-  border-radius: var(--awd-radius-sm); /* 减小圆角 */
+  gap: var(--awd-space-1);
+  border: none;
   overflow: hidden;
-  background: var(--awd-surface);
+  background: transparent;
 }
 
 /* 会话后台任务状态点（与宿主抽屉同一套视觉）：
@@ -4755,10 +4754,10 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
-  background: var(--awd-surface);
-  border-bottom: 1px solid var(--awd-border-subtle);
-  border-radius: 0; /* 无圆角 */
+  padding: 10px 8px;
+  background: transparent;
+  border-bottom: none;
+  border-radius: var(--awd-radius-md);
   cursor: pointer;
   transition: background 0.15s ease;
   box-shadow: none;
@@ -4805,7 +4804,7 @@ export default {
   text-align: center;
   padding: 16px 0 0;
   margin-top: 12px;
-  border-top: 1px solid var(--awd-border-subtle);
+  border-top: none;
 }
 
 .chat-input-rich {
@@ -4832,7 +4831,7 @@ export default {
   row-gap: 6px;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--awd-border-subtle);
+  border-top: none;
 }
 
 .action-bar-left {
