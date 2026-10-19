@@ -708,3 +708,88 @@ test('#1307 异步预取失败后仍可用uni包装事件完成树内移动，dr
     restore()
   }
 })
+
+
+test('#1307 cancel the browser drag before starting the native session', () => {
+  const win = dragWindow(), order = []
+  const event = { preventDefault() { order.push('cancel-html') } }
+  let cleaned = 0
+  const result = startExternalFileDrag({ id: 1, localPath: '/synthetic/a.docx' }, {
+    event, win, onCleanup: () => { cleaned++ },
+    fs: { startDrag() { order.push('native'); return { ok: true } } },
+  })
+  assert.equal(result.ok, true)
+  assert.deepEqual(order, ['cancel-html', 'native'])
+  assert.equal(cleaned, 0, 'native dispatch is not drag completion')
+  win.fire('mousemove', { buttons: 0 })
+  assert.equal(cleaned, 1)
+})
+
+test('#1307 unsupported or unresolved native export keeps the browser drag', () => {
+  clearLocalPathCache()
+  for (const options of [{ fs: {} }, { fs: { startDrag() { assert.fail('no paths') } } }]) {
+    let cancelled = false
+    const win = dragWindow()
+    const result = startExternalFileDrag({ id: 9999 }, {
+      ...options, win, event: { preventDefault() { cancelled = true } }, onCleanup() {},
+    })
+    assert.equal(result.ok, false)
+    assert.equal(cancelled, false)
+    win.fire('mousedown')
+  }
+})
+
+test('#1307 failed native dispatch after cancelling HTML releases the drag identity', async () => {
+  for (const failure of ['returned', 'thrown', 'resolved-failure', 'rejected']) {
+    const win = dragWindow()
+    let cleaned = 0, cancelled = false
+    const result = await startExternalFileDrag({ id: 700, localPath: '/synthetic/a.docx' }, {
+      win, event: { preventDefault() { cancelled = true } }, onCleanup() { cleaned++ },
+      fs: { startDrag() {
+        assert.equal(cancelled, true)
+        if (failure === 'thrown') throw new Error('native failure')
+        if (failure === 'rejected') return Promise.reject(new Error('native failure'))
+        const result = { ok: false, reason: 'native failure' }
+        return failure === 'resolved-failure' ? Promise.resolve(result) : result
+      } },
+    })
+    assert.equal(result.ok, false)
+    assert.equal(cleaned, 1, failure)
+    assert.equal(win.listeners.size, 0)
+  }
+})
+
+test('#1307 FileTree passes the real uni-h5 native event to the handoff', () => {
+  const restore = installGlobals()
+  try {
+    const order = []
+    const vm = makeVm({ desktopFs: { startDrag() { order.push('native'); return { ok: true } } } })
+    const item = { ...doc, localPath: '/synthetic/a.docx' }
+    window.event = { dataTransfer: { setData() {} }, preventDefault() { order.push('cancel-html') } }
+    vm.handleDragStart(wrappedEvent(), item, 0)
+    assert.deepEqual(order, ['cancel-html', 'native'])
+    assert.equal(document.__checkbaDraggedFile.fileId, item.id, 'retain identity for native internal drops')
+    vm.handleDragEnd()
+  } finally { restore() }
+})
+
+
+test('#1307 late native failure from the previous drag cannot clean the new drag', async () => {
+  const win = dragWindow()
+  let rejectFirst, oldCleaned = 0, newCleaned = 0
+  const event = { preventDefault() {} }
+  const first = startExternalFileDrag({ id: 1, localPath: '/synthetic/old.docx' }, {
+    event, win, onCleanup: () => { oldCleaned++ },
+    fs: { startDrag: () => new Promise((resolve, reject) => { rejectFirst = reject }) },
+  })
+  startExternalFileDrag({ id: 2, localPath: '/synthetic/new.docx' }, {
+    event, win, onCleanup: () => { newCleaned++ }, fs: { startDrag: () => ({ ok: true }) },
+  })
+  rejectFirst(new Error('old native request failed'))
+  assert.equal((await first).ok, false)
+  assert.equal(oldCleaned, 0)
+  assert.equal(newCleaned, 0)
+  assert.ok(win.listeners.has('mousemove'))
+  win.fire('mousemove', { buttons: 0 })
+  assert.equal(newCleaned, 1)
+})

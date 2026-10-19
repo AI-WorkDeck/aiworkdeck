@@ -1408,7 +1408,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 `FileTree` 与 `FileStagingArea` 支持将文件直接拖到软件窗口外部（如微信聊天、Finder/资源管理器）。微信等外部桌面应用只认 OS 级文件拖拽（macOS `NSFilenamesPboardType` / Windows `CF_HDROP`），不认 Chromium HTML5 `dataTransfer`。
 
-- 桌面主进程 `desktop/main/file-service.js` 注册 `fs:startDrag`（`ipcMain.on` + `ipcMain.handle`），校验路径为已存在的本地文件后调 `event.sender.startDrag({ file, icon })`（内置非空 32×32 PNG `nativeImage` 图标），preload 暴露 `host.fs.startDrag(path)`。
+- 桌面主进程 `desktop/main/file-service.js` 注册 `fs:startDrag`（`ipcMain.on` + `ipcMain.handle`），校验路径为已存在的本地文件后调 `event.sender.startDrag({ files, icon })`（内置非空 32×32 PNG `nativeImage` 图标），preload 暴露 `host.fs.startDrag(path)`，用 `ipcRenderer.invoke` 返回实际启动结果（只表示已调用原生 API，不表示用户已经松手）。
 - 前端 `utils/fileLocalDrag.js` 在行悬停/按下时通过 `prefetchLocalFilePath(file)` 调 `/files/{id}/local-path` 预取并缓存本地绝对路径（`file.localPath` 已有时直接复用），`dragstart` 同步解析路径并在写入应用内 `dataTransfer` 后调 `startExternalFileDrag`。
 - `webContents.startDrag` 会向 `dataTransfer.types` 注入 `'Files'`、将 `effectAllowed` 锁为 `'copy'`，且拖到软件外松手时可能吞掉 DOM `dragend`：① `isExternalFileDrag(dt)` 在 `document.__checkbaDraggedFile` 存在时返回 `false`，避免应用内文件树把自己拖出的文件误判为外部上传；② 内部树移动/暂存区拖回/编辑器建链统一走 `compatibleDropEffect(dt, preferred)`，当 `effectAllowed === 'copy'` 时返回 `'copy'` 防止目标区拒绝落点；③ `installExternalDragCleanup` 监听窗口级 `mousemove (buttons === 0)` / `mousedown` / `dragend` / `drop`，兜底清理 `document.__checkbaDraggedFile` 与拖拽残留态。
 - 回归：`desktop/tests/file-drag.test.js`、`frontend/tests/project-home/file-tree-external-drop.test.mjs`。
@@ -1426,9 +1426,11 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 外拖以 `externalDragItems` 取当前有效选区：起拖项在选区则传整组，否则只传起拖项。`fileLocalDrag` 整组解析/去重，不允许漏掉缺路径的一项后部分拖出。preload `fs.startDrag` 接受字符串或字符串数组，主进程校验所有路径后以 `webContents.startDrag({files,icon})` 交给系统。文件夹混选或路径不可用提示失败；不自动发送微信消息。
 
-原生拖拽开始前登记清理；路径或原生启动失败只提示外拖失败，保留仍在进行的内部拖动；除 DOM dragend/drop 外，宿主回焦、松开鼠标/pointer、Esc 也撤销拖拽状态并发 `file-drag-end`，解除编辑器 `evidenceDropArmed` 透明层。不要在 blur 时立即清理，鼠标可能仍按住跨窗拖动；焦点监听只处理窗口本身，不能把内部控件 focus 当拖拽结束。
+原生拖拽开始前登记清理，全部路径解析成功后，必须在同步 `dragstart` 内先对捕获的原生事件 `preventDefault()`，再调用 `fs.startDrag`；否则浏览器默认拖拽和系统拖拽同时启动，可能令宿主吞掉点击，清除 Vue 蒙层也不能修复（#1307 复测追修）。文件树与暂存区都传 `nativeEv`，保留全局文件身份供原生内部 drop 消费。非桌面、文件夹和路径解析失败不取消 HTML 拖拽；取消默认后原生启动失败则清理并提示，不能再宣称恢复了已经取消的 HTML 会话。两个组件均消费异步启动结果，成功回执不提前清理。
 
-回归：`file-tree-keyboard.test.mjs`、`file-tree-external-drop.test.mjs`、桌面 `file-drag.test.js`。微信接收端与正式安装版本需要分别验收，不把原生 API 桩和浏览器合成环境称为真实微信投放。
+除 DOM dragend/drop 外，宿主回焦、松开鼠标/pointer、Esc 也撤销拖拽状态并发 `file-drag-end`，解除编辑器 `evidenceDropArmed` 透明层。暂存区即使全局身份已被消费者清空也必须广播结束；新拖拽替换旧清理器时将旧闭包标为完成，防止旧 IPC 迟到失败清掉新会话。不要在 blur 时立即清理，鼠标可能仍按住跨窗拖动；焦点监听只处理窗口本身，不能把内部控件 focus 当拖拽结束。
+
+回归：`file-tree-keyboard.test.mjs`、`file-tree-external-drop.test.mjs`、`staging-drop-external-files.test.mjs`、桌面 `file-drag.test.js`。2026-10-19 隔离 Electron 30.5.1 原生鼠标对照：无取消默认时拖后宿主按钮不响应，取消默认后按钮响应；该最小窗口未完成真实文件接收，不能代表完整工作台/微信端到端通过。微信接收端与正式安装版本需要分别验收，不把原生 API 桩和浏览器合成环境称为真实微信投放。
 
 ## 业务侧栏真实插件迁移（#1340，待发版）
 
