@@ -210,3 +210,47 @@ test('Windows helper握手超时必须确认子进程退出，再允许main退�
     if (replaced) assert.equal(fs.readFileSync(file + '.job', 'utf8'), 'different helper job')
   }
 })
+
+test('Windows helper: slow startup handshakes before parent exits; early failure retains diagnostics', async (t) => {
+  const vm = require('node:vm')
+  const source = fs.readFileSync(path.join(__dirname, '../main/services/full-update.js'), 'utf8')
+  for (const earlyExit of [false, true]) {
+    const dir = root(t), file = lockPath(dir)
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    const installer = path.join(dir, 'update.exe')
+    fs.writeFileSync(installer, 'verified fixture')
+    let ticks = 0
+    const child = new EventEmitter()
+    Object.assign(child, { pid: 543, exitCode: earlyExit ? 1 : null, signalCode: null, unref() {}, ref() {},
+      kill() { assert.fail('Must not kill a live helper before its slow startup handshake') }
+    })
+    const context = vm.createContext({ module: { exports: {} }, __dirname: path.join(__dirname, '../main/services'),
+      process, Buffer, clearTimeout,
+      setTimeout(resolve) {
+        ticks++
+        if (ticks === 150) fs.writeFileSync(file, JSON.stringify({ helperPid: child.pid }))
+        return setImmediate(resolve)
+      },
+      require(name) {
+        if (name === 'child_process') return { ...require(name), spawn(command, args, options) {
+          assert.equal(command, 'powershell.exe')
+          if (earlyExit) fs.writeSync(options.stdio[2], 'helper startup fixture error')
+          setImmediate(() => child.emit('spawn'))
+          return child
+        } }
+        return require(name)
+      }
+    })
+    vm.runInContext(source, context)
+    const updater = context.module.exports.createFullUpdate({ platform: 'win32', dataDir: dir }, async () => ({}))
+    await updater.prepare(installer, '0.12.0')
+    if (earlyExit) {
+      await assert.rejects(updater.installOnQuit(false), /退出码 1.*helper startup fixture error/)
+      assert.equal(ticks, 0, 'An exited helper must fail without waiting for the timeout')
+    } else {
+      assert.equal(await updater.installOnQuit(false), false)
+      assert.equal(ticks, 150, 'A startup exceeding the old ten-second bound can complete')
+      assert.equal(JSON.parse(fs.readFileSync(file)).helperPid, child.pid)
+    }
+  }
+})
