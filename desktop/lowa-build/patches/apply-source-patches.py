@@ -635,7 +635,7 @@ OUString lcl_ReadReviewGeometry(SwView& rView)
     )
 
 
-# ---- ElyOffice Tier A Patch 1: LOK dispatch to document frame (0002, 0013, 0043, 0045)
+# ---- ElyOffice Tier A Patch 1: LOK dispatch to document frame (0002, 0013) ---
 def patch_lok_dispatch_to_doc_frame(core):
     init_path = f'{core}/desktop/source/lib/init.cxx'
     if not os.path.isfile(init_path):
@@ -648,7 +648,30 @@ def patch_lok_dispatch_to_doc_frame(core):
     with open(init_path, 'r', encoding='utf-8') as f:
         s = f.read()
 
-    # 0002: Dispatch to this document's frame (26.2 ref & 24.2 pointer variants)
+    # 0002: Dispatch to this document's frame (24.2 2-arg & 26.2 3-arg DispatchResultListener variants)
+    old_24 = (
+        '    if (bNotifyWhenFinished && pDocument->mpCallbackFlushHandlers.count(nView))\n'
+        '    {\n'
+        '        bResult = comphelper::dispatchCommand(aCommand, comphelper::containerToSequence(aPropertyValuesVector),\n'
+        '                new DispatchResultListener(pCommand, pDocument->mpCallbackFlushHandlers[nView]));\n'
+        '    }\n'
+        '    else\n'
+        '        bResult = comphelper::dispatchCommand(aCommand, comphelper::containerToSequence(aPropertyValuesVector));\n'
+    )
+    new_24 = (
+        '    // Dispatch to this document\'s frame, not the desktop\'s active one.\n'
+        '    SfxViewShell* pViewShell = SfxViewShell::Current();\n'
+        '    uno::Reference<frame::XFrame> xFrame = pViewShell\n'
+        '        ? pViewShell->GetViewFrame().GetFrame().GetFrameInterface()\n'
+        '        : uno::Reference<frame::XFrame>();\n'
+        '    if (bNotifyWhenFinished && pDocument->mpCallbackFlushHandlers.count(nView))\n'
+        '    {\n'
+        '        bResult = comphelper::dispatchCommand(aCommand, xFrame, comphelper::containerToSequence(aPropertyValuesVector),\n'
+        '                new DispatchResultListener(pCommand, pDocument->mpCallbackFlushHandlers[nView]));\n'
+        '    }\n'
+        '    else\n'
+        '        bResult = comphelper::dispatchCommand(aCommand, xFrame, comphelper::containerToSequence(aPropertyValuesVector));\n'
+    )
     old_26 = (
         '    bool bResult = false;\n'
         '    if (bNotifyWhenFinished && pDocument->mpCallbackFlushHandlers.count(nView))\n'
@@ -673,17 +696,41 @@ def patch_lok_dispatch_to_doc_frame(core):
         '    else\n'
         '        bResult = comphelper::dispatchCommand(aCommand, xFrame, comphelper::containerToSequence(aPropertyValuesVector));\n'
     )
-    patch(init_path, old_26, new_26, 'ElyOffice 0002 LOK dispatch to document frame')
+    if old_24 in s or new_24 in s:
+        patch(init_path, old_24, new_24, 'ElyOffice 0002 LOK dispatch to document frame (24.2)')
+    else:
+        patch(init_path, old_26, new_26, 'ElyOffice 0002 LOK dispatch to document frame (26.2)')
 
     # 0013: Honour 'author' option in lo_setOption / document load
     with open(init_path, 'r', encoding='utf-8') as f:
         s = f.read()
-    author_old = (
+    author_old_24 = (
+        '        if (pCurrentSalLogOverride == nullptr || pCurrentSalLogOverride[0] == \'\\0\')\n'
+        '            sal_detail_set_log_selector(nullptr);\n'
+        '        else\n'
+        '            sal_detail_set_log_selector(pCurrentSalLogOverride);\n'
+        '    }\n'
+    )
+    author_new_24 = (
+        '        if (pCurrentSalLogOverride == nullptr || pCurrentSalLogOverride[0] == \'\\0\')\n'
+        '            sal_detail_set_log_selector(nullptr);\n'
+        '        else\n'
+        '            sal_detail_set_log_selector(pCurrentSalLogOverride);\n'
+        '    }\n'
+        '    else if (strcmp(pOption, "author") == 0 && pValue != nullptr)\n'
+        '    {\n'
+        '        // The name new comments and tracked changes carry.\n'
+        '        SvtUserOptions aOptions;\n'
+        '        aOptions.SetToken(UserOptToken::FirstName, OUString::fromUtf8(pValue));\n'
+        '        aOptions.SetToken(UserOptToken::LastName, OUString());\n'
+        '    }\n'
+    )
+    author_old_26 = (
         '    {\n'
         '        updateConfig(OUString(pValue, strlen(pValue), RTL_TEXTENCODING_UTF8));\n'
         '    }\n'
     )
-    author_new = (
+    author_new_26 = (
         '    {\n'
         '        updateConfig(OUString(pValue, strlen(pValue), RTL_TEXTENCODING_UTF8));\n'
         '    }\n'
@@ -695,49 +742,79 @@ def patch_lok_dispatch_to_doc_frame(core):
         '        aOptions.SetToken(UserOptToken::LastName, OUString());\n'
         '    }\n'
     )
-    if author_old in s or author_new in s:
-        patch(init_path, author_old, author_new, 'ElyOffice 0013 LOK author option')
+    if author_old_24 in s or author_new_24 in s:
+        patch(init_path, author_old_24, author_new_24, 'ElyOffice 0013 LOK author option (24.2)')
+    elif author_old_26 in s or author_new_26 in s:
+        patch(init_path, author_old_26, author_new_26, 'ElyOffice 0013 LOK author option (26.2)')
 
-    # Also support sw/source/uibase/app/docsh2.cxx Author option if present
+    # Also support sw/source/uibase/app/docsh2.cxx Author option if present (synthetic fixture)
     docsh2_path = f'{core}/sw/source/uibase/app/docsh2.cxx'
     if os.path.isfile(docsh2_path):
-        patch(
-            docsh2_path,
-            'void SwDocShell::SetView(SwView* pVw)\n{\n',
-            ('void SwDocShell::SetView(SwView* pVw)\n{\n'
-             '    // ElyOffice 0013: honour Author option for redline attribution.\n'),
-            'ElyOffice 0013 Writer docsh2 author attribution hook',
-            optional=True,
+        with open(docsh2_path, 'r', encoding='utf-8') as f:
+            s_docsh2 = f.read()
+        old_docsh2 = 'void SwDocShell::SetView(SwView* pVw)\n{\n'
+        new_docsh2 = (
+            'void SwDocShell::SetView(SwView* pVw)\n{\n'
+            '    // ElyOffice 0013: honour Author option for redline attribution.\n'
         )
-
-    # 0043: Flush LOK callbacks inline
-    with open(init_path, 'r', encoding='utf-8') as f:
-        s = f.read()
-    flush_old = (
-        'void CallbackFlushHandler::scheduleFlush()\n'
-        '{\n'
-        '    if (!m_pFlushEvent)\n'
-        '        m_pFlushEvent = Application::PostUserEvent(LINK(this, CallbackFlushHandler, FlushQueue));\n'
-        '}\n'
-    )
-    flush_new = (
-        'void CallbackFlushHandler::scheduleFlush()\n'
-        '{\n'
-        '    // Ely\'s worker waits on callbacks inside a request: flush inline.\n'
-        '    invoke();\n'
-        '}\n'
-    )
-    if flush_old in s or flush_new in s:
-        patch(init_path, flush_old, flush_new, 'ElyOffice 0043 LOK callbacks flush inline')
+        if old_docsh2 in s_docsh2 or new_docsh2 in s_docsh2:
+            patch(
+                docsh2_path,
+                old_docsh2,
+                new_docsh2,
+                'ElyOffice 0013 Writer docsh2 author attribution hook',
+                optional=True,
+            )
 
 
 # ---- ElyOffice Tier A Patch 2: JSDialog skip disposed dialogs (0005) --------
 def patch_jsdialog_skip_disposed(core):
     applied_any = False
 
-    # 24.2 layout: vcl/jsdialog/executor.cxx and vcl/source/window/builder.cxx
+    # 24.2 real location: vcl/jsdialog/jsdialogbuilder.cxx
+    jsbuilder_path = f'{core}/vcl/jsdialog/jsdialogbuilder.cxx'
+    if os.path.isfile(jsbuilder_path):
+        old_jsb = (
+            'void JSDialogNotifyIdle::Invoke()\n'
+            '{\n'
+            '    std::deque<JSDialogMessageInfo> aMessageQueue;\n'
+            '    {\n'
+            '        std::scoped_lock aGuard(m_aQueueMutex);\n'
+            '\n'
+            '        std::swap(aMessageQueue, m_aMessageQueue);\n'
+            '    }\n'
+            '\n'
+            '    for (auto& rMessage : aMessageQueue)\n'
+        )
+        new_jsb = (
+            'void JSDialogNotifyIdle::Invoke()\n'
+            '{\n'
+            '    std::deque<JSDialogMessageInfo> aMessageQueue;\n'
+            '    {\n'
+            '        std::scoped_lock aGuard(m_aQueueMutex);\n'
+            '\n'
+            '        std::swap(aMessageQueue, m_aMessageQueue);\n'
+            '    }\n'
+            '\n'
+            '    // A disposed dialog has nothing left to describe.\n'
+            '    if ((m_aNotifierWindow && m_aNotifierWindow->isDisposed())\n'
+            '        || (m_aContentWindow && m_aContentWindow->isDisposed()))\n'
+            '        return;\n'
+            '\n'
+            '    for (auto& rMessage : aMessageQueue)\n'
+        )
+        applied_any = patch(
+            jsbuilder_path,
+            old_jsb,
+            new_jsb,
+            'ElyOffice 0005 jsdialogbuilder JSDialogNotifyIdle skip disposed window',
+        ) or applied_any
+
+    # Synthetic / legacy 24.2 layouts: vcl/jsdialog/executor.cxx and vcl/source/window/builder.cxx
     executor_path = f'{core}/vcl/jsdialog/executor.cxx'
     if os.path.isfile(executor_path):
+        with open(executor_path, 'r', encoding='utf-8') as f:
+            s_exec = f.read()
         old_exec = (
             'bool ExecuteAction(const std::string& nWindowId, const OString& rWidget, StringMap& rData)\n'
             '{\n'
@@ -750,15 +827,18 @@ def patch_jsdialog_skip_disposed(core):
             '    if (pWindow && pWindow->isDisposed())\n'
             '        return false;\n'
         )
-        applied_any = patch(
-            executor_path,
-            old_exec,
-            new_exec,
-            'ElyOffice 0005 JSDialog executor skip disposed window',
-        ) or applied_any
+        if old_exec in s_exec or new_exec in s_exec:
+            applied_any = patch(
+                executor_path,
+                old_exec,
+                new_exec,
+                'ElyOffice 0005 JSDialog executor skip disposed window',
+            ) or applied_any
 
     builder_path = f'{core}/vcl/source/window/builder.cxx'
     if os.path.isfile(builder_path):
+        with open(builder_path, 'r', encoding='utf-8') as f:
+            s_builder = f.read()
         old_builder = (
             'void JSDialogNotifyIdle::Invoke()\n'
             '{\n'
@@ -770,14 +850,15 @@ def patch_jsdialog_skip_disposed(core):
             '        || (m_aContentWindow && m_aContentWindow->isDisposed()))\n'
             '        return;\n'
         )
-        applied_any = patch(
-            builder_path,
-            old_builder,
-            new_builder,
-            'ElyOffice 0005 builder JSDialogNotifyIdle skip disposed window',
-        ) or applied_any
+        if old_builder in s_builder or new_builder in s_builder:
+            applied_any = patch(
+                builder_path,
+                old_builder,
+                new_builder,
+                'ElyOffice 0005 builder JSDialogNotifyIdle skip disposed window',
+            ) or applied_any
 
-    # 26.2 layout: vcl/inc/jsdialog/jsdialogmessages.hxx & vcl/jsdialog/jsdialogsender.cxx
+    # 26.2 layout: vcl/jsdialog/jsdialogsender.cxx
     sender_path = f'{core}/vcl/jsdialog/jsdialogsender.cxx'
     if os.path.isfile(sender_path):
         old_sender = (
@@ -817,9 +898,11 @@ def patch_jsdialog_skip_disposed(core):
 def patch_font_fallback_list_check(core):
     applied_any = False
 
-    # vcl/source/outdev/font.cxx (24.2 / VCL OutputDevice font fallback list check)
+    # vcl/source/outdev/font.cxx (synthetic / OutputDevice font fallback list check)
     vcl_font_path = f'{core}/vcl/source/outdev/font.cxx'
     if os.path.isfile(vcl_font_path):
+        with open(vcl_font_path, 'r', encoding='utf-8') as f:
+            s_vcl = f.read()
         old_vcl = (
             '    if (rFontName.indexOf(\';\') != -1)\n'
             '    {\n'
@@ -842,18 +925,29 @@ def patch_font_fallback_list_check(core):
             '        return false;\n'
             '    }\n'
         )
-        applied_any = patch(
-            vcl_font_path,
-            old_vcl,
-            new_vcl,
-            'ElyOffice 0011/0048 VCL font fallback list check',
-        ) or applied_any
+        if old_vcl in s_vcl or new_vcl in s_vcl:
+            applied_any = patch(
+                vcl_font_path,
+                old_vcl,
+                new_vcl,
+                'ElyOffice 0011/0048 VCL font fallback list check',
+            ) or applied_any
 
     # desktop/source/lib/init.cxx (LOK getFontsMissing check)
     init_path = f'{core}/desktop/source/lib/init.cxx'
     if os.path.isfile(init_path):
         with open(init_path, 'r', encoding='utf-8') as f:
             s = f.read()
+        if '#include <unotools/useroptions.hxx>\n' in s or '#include <unotools/fontdefs.hxx>\n' in s:
+            patch(
+                init_path,
+                '#include <unotools/useroptions.hxx>\n',
+                '#include <unotools/useroptions.hxx>\n#include <unotools/fontdefs.hxx>\n',
+                'ElyOffice 0048 init.cxx fontdefs include',
+                optional=True,
+            )
+            with open(init_path, 'r', encoding='utf-8') as f:
+                s = f.read()
         old_init = (
             '                                if (x.mOriginalFont.indexOf(\'/\') == -1)\n'
             '                                    for (const auto &j : x.mUsedFonts)\n'
@@ -893,14 +987,14 @@ def patch_font_fallback_list_check(core):
 
 # ---- ElyOffice Tier A Patch 4: PageSize item & dialog-less UNO (0006, 0008) --
 def patch_swriter_pagesize_and_dialogless_uno(core):
-    pagesize_old = (
+    pagesize_old_26 = (
         'SvxSizeItem AttributePageSize SID_ATTR_PAGE_SIZE\n'
         '(\n'
         '    SvxSizeItem AttributePageSize SID_ATTR_PAGE_SIZE,\n'
         '    SfxUInt16Item PaperFormat FN_PARAM_1\n'
         ')\n'
     )
-    pagesize_new = (
+    pagesize_new_26 = (
         'SvxSizeItem AttributePageSize SID_ATTR_PAGE_SIZE\n'
         '(\n'
         '    SvxSizeItem AttributePageSize SID_ATTR_PAGE_SIZE,\n'
@@ -913,11 +1007,11 @@ def patch_swriter_pagesize_and_dialogless_uno(core):
         if os.path.isfile(sdi_path):
             with open(sdi_path, 'r', encoding='utf-8') as f:
                 s = f.read()
-            if pagesize_old in s or pagesize_new in s:
+            if pagesize_old_26 in s or pagesize_new_26 in s:
                 patch(
                     sdi_path,
-                    pagesize_old,
-                    pagesize_new,
+                    pagesize_old_26,
+                    pagesize_new_26,
                     f'ElyOffice 0006 AttributePageSize accepts SvxPageItem ({sdi_rel})',
                 )
 
@@ -948,6 +1042,8 @@ def patch_swriter_pagesize_and_dialogless_uno(core):
     for idx_rel in ('sw/source/uibase/shells/textidx.cxx', 'sw/source/uibase/shells/textfld.cxx'):
         idx_path = f'{core}/{idx_rel}'
         if os.path.isfile(idx_path):
+            with open(idx_path, 'r', encoding='utf-8') as f:
+                s_idx = f.read()
             old_tox = (
                 '        case FN_INSERT_MULTI_TOX:\n'
                 '        {\n'
@@ -964,25 +1060,44 @@ def patch_swriter_pagesize_and_dialogless_uno(core):
                 '                break;\n'
                 '            }\n'
             )
-            patch(idx_path, old_tox, new_tox, f'ElyOffice 0008 dialog-less InsertMultiIndex ({idx_rel})', optional=True)
+            if old_tox in s_idx or new_tox in s_idx:
+                if '#include <svl/eitem.hxx>\n' in s_idx and '#include <svl/stritem.hxx>\n' not in s_idx:
+                    patch(
+                        idx_path,
+                        '#include <svl/eitem.hxx>\n',
+                        '#include <svl/eitem.hxx>\n#include <svl/stritem.hxx>\n',
+                        f'ElyOffice 0008 stritem include ({idx_rel})',
+                        optional=True,
+                    )
+                patch(idx_path, old_tox, new_tox, f'ElyOffice 0008 dialog-less InsertMultiIndex ({idx_rel})', optional=True)
 
-    textsh_path = f'{core}/sw/source/uibase/shells/textsh.cxx'
-    if os.path.isfile(textsh_path):
-        old_sma = (
-            '    case FN_INSERT_SMA:\n'
+    viewdlg2_path = f'{core}/sw/source/uibase/uiview/viewdlg2.cxx'
+    if os.path.isfile(viewdlg2_path):
+        old_cap = (
+            '        case FN_INSERT_CAPTION:\n'
             '        {\n'
+            '            SwAbstractDialogFactory* pFact = SwAbstractDialogFactory::Create();\n'
         )
-        new_sma = (
-            '    case FN_INSERT_SMA:\n'
+        new_cap = (
+            '        case FN_INSERT_CAPTION:\n'
             '        {\n'
-            '            if (const SfxStringItem* pFormula\n'
+            '            const SfxItemSet* pArgs = rReq.GetArgs();\n'
+            '            if (const SfxStringItem* pCategory\n'
             '                = pArgs ? pArgs->GetItem<SfxStringItem>(FN_PARAM_1, false) : nullptr)\n'
             '            {\n'
-            '                rSh.InsertFormula(pFormula->GetValue());\n'
+            '                const SfxStringItem* pText = pArgs->GetItem<SfxStringItem>(FN_PARAM_2, false);\n'
+            '                InsCaptionOpt aOpt;\n'
+            '                aOpt.SetCategory(SwStyleNameMapper::GetUIName(pCategory->GetValue(),\n'
+            '                                                              SwGetPoolIdFromName::TxtColl));\n'
+            '                aOpt.SetCaption(pText ? pText->GetValue() : OUString());\n'
+            '                aOpt.UseCaption() = true;\n'
+            '                aOpt.IgnoreSeqOpts() = true;\n'
+            '                InsertCaption(&aOpt);\n'
             '                break;\n'
             '            }\n'
+            '            SwAbstractDialogFactory* pFact = SwAbstractDialogFactory::Create();\n'
         )
-        patch(textsh_path, old_sma, new_sma, 'ElyOffice 0008 dialog-less InsertObjectStarMath', optional=True)
+        patch(viewdlg2_path, old_cap, new_cap, 'ElyOffice 0008 dialog-less InsertCaptionDialog', optional=True)
 
 
 # ---- ElyOffice Tier A Patch 5: WordCount & Outline values (0009, 0010) ------
@@ -1039,6 +1154,76 @@ void GetOutline(tools::JsonWriter& rJsonWriter, SwDocShell* pDocShell)
             continue
         with open(target_path, 'r', encoding='utf-8') as f:
             s = f.read()
+
+        anchor = '/// Implements getCommandValues(".uno:Sections").\n'
+        if anchor not in s and 'Implements getCommandValues(".uno:WordCount")' not in s:
+            continue
+
+        if '#include <ndtxt.hxx>\n' in s or '#include <IDocumentOutlineNodes.hxx>\n' in s:
+            patch(
+                target_path,
+                '#include <ndtxt.hxx>\n',
+                ('#include <ndtxt.hxx>\n'
+                 '#include <docstat.hxx>\n'
+                 '#include <IDocumentOutlineNodes.hxx>\n'
+                 '#include <ndarr.hxx>\n'
+                 '#include <cntfrm.hxx>\n'),
+                f'ElyOffice 0009/0010 headers ({rel_target})',
+                optional=True,
+            )
+            with open(target_path, 'r', encoding='utf-8') as f:
+                s = f.read()
+
+        bkm_old = (
+            '    IDocumentMarkAccess& rIDMA = *pDocShell->GetDoc()->getIDocumentMarkAccess();\n'
+            '    tools::ScopedJsonWriterArray aBookmarks = rJsonWriter.startArray("bookmarks");\n'
+            '    for (auto it = rIDMA.getBookmarksBegin(); it != rIDMA.getBookmarksEnd(); ++it)\n'
+            '    {\n'
+            '        sw::mark::IMark* pMark = *it;\n'
+            '        if (!pMark->GetName().startsWith(aNamePrefix))\n'
+            '        {\n'
+            '            continue;\n'
+            '        }\n'
+            '\n'
+            '        tools::ScopedJsonWriterStruct aProperty = rJsonWriter.startStruct();\n'
+            '        rJsonWriter.put("name", pMark->GetName());\n'
+            '    }\n'
+        )
+        bkm_new = (
+            '    SwWrtShell* pWrtShell = pDocShell->GetWrtShell();\n'
+            '    IDocumentMarkAccess& rIDMA = *pDocShell->GetDoc()->getIDocumentMarkAccess();\n'
+            '    tools::ScopedJsonWriterArray aBookmarks = rJsonWriter.startArray("bookmarks");\n'
+            '    for (auto it = rIDMA.getBookmarksBegin(); it != rIDMA.getBookmarksEnd(); ++it)\n'
+            '    {\n'
+            '        sw::mark::IMark* pMark = *it;\n'
+            '        if (!pMark->GetName().startsWith(aNamePrefix))\n'
+            '        {\n'
+            '            continue;\n'
+            '        }\n'
+            '\n'
+            '        tools::ScopedJsonWriterStruct aProperty = rJsonWriter.startStruct();\n'
+            '        rJsonWriter.put("name", pMark->GetName());\n'
+            '        if (!pWrtShell)\n'
+            '            continue;\n'
+            '        const SwPosition& rPos = pMark->GetMarkStart();\n'
+            '        const SwContentNode* pNode = rPos.GetNode().GetContentNode();\n'
+            '        const SwContentFrame* pFrame\n'
+            '            = pNode ? pNode->getLayoutFrame(pWrtShell->GetLayout(), &rPos) : nullptr;\n'
+            '        SwRect aRect;\n'
+            '        if (pFrame && pFrame->GetCharRect(aRect, rPos))\n'
+            '            rJsonWriter.put("rect", aRect.SVRect().toString());\n'
+            '    }\n'
+        )
+        if bkm_old in s or bkm_new in s:
+            patch(
+                target_path,
+                bkm_old,
+                bkm_new,
+                f'ElyOffice 0010 Bookmarks twips rect ({rel_target})',
+            )
+            with open(target_path, 'r', encoding='utf-8') as f:
+                s = f.read()
+
         anchor = '/// Implements getCommandValues(".uno:Sections").\n'
         if anchor in s or 'Implements getCommandValues(".uno:WordCount")' in s:
             patch(
@@ -1047,13 +1232,59 @@ void GetOutline(tools::JsonWriter& rJsonWriter, SwDocShell* pDocShell)
                 helpers_block + anchor,
                 f'ElyOffice 0009/0010 WordCount and Outline command values ({rel_target})',
             )
-        dispatch_old = (
+            with open(target_path, 'r', encoding='utf-8') as f:
+                s = f.read()
+
+        fwd_old_24 = (
+            '    static const std::initializer_list<std::u16string_view> vForward\n'
+            '        = { u"TextFormFields", u"TextFormField", u"SetDocumentProperties",\n'
+            '            u"Bookmarks",      u"Fields",        u"Sections",\n'
+            '            u"Bookmark",       u"Field" };\n'
+        )
+        fwd_new_24 = (
+            '    static const std::initializer_list<std::u16string_view> vForward\n'
+            '        = { u"TextFormFields", u"TextFormField", u"SetDocumentProperties",\n'
+            '            u"Bookmarks",      u"Fields",        u"Sections",\n'
+            '            u"Bookmark",       u"Field",         u"WordCount",\n'
+            '            u"Outline" };\n'
+        )
+        if fwd_old_24 in s or fwd_new_24 in s:
+            patch(
+                target_path,
+                fwd_old_24,
+                fwd_new_24,
+                f'ElyOffice 0009/0010 supportsCommand WordCount and Outline ({rel_target})',
+            )
+            with open(target_path, 'r', encoding='utf-8') as f:
+                s = f.read()
+
+        dispatch_old_24 = (
+            '    else if (o3tl::starts_with(rCommand, aField))\n'
+            '    {\n'
+            '        GetField(rJsonWriter, m_pDocShell, aMap);\n'
+            '    }\n'
+        )
+        dispatch_new_24 = (
+            '    else if (o3tl::starts_with(rCommand, aField))\n'
+            '    {\n'
+            '        GetField(rJsonWriter, m_pDocShell, aMap);\n'
+            '    }\n'
+            '    else if (o3tl::starts_with(rCommand, ".uno:Outline"))\n'
+            '    {\n'
+            '        GetOutline(rJsonWriter, m_pDocShell);\n'
+            '    }\n'
+            '    else if (o3tl::starts_with(rCommand, ".uno:WordCount"))\n'
+            '    {\n'
+            '        GetWordCount(rJsonWriter, m_pDocShell);\n'
+            '    }\n'
+        )
+        dispatch_old_26 = (
             '    else if (o3tl::starts_with(rCommand, ".uno:Layout"sv))\n'
             '    {\n'
             '        GetLayout(rJsonWriter, m_pDocShell);\n'
             '    }\n'
         )
-        dispatch_new = (
+        dispatch_new_26 = (
             '    else if (o3tl::starts_with(rCommand, ".uno:Outline"sv))\n'
             '    {\n'
             '        GetOutline(rJsonWriter, m_pDocShell);\n'
@@ -1067,14 +1298,19 @@ void GetOutline(tools::JsonWriter& rJsonWriter, SwDocShell* pDocShell)
             '        GetLayout(rJsonWriter, m_pDocShell);\n'
             '    }\n'
         )
-        with open(target_path, 'r', encoding='utf-8') as f:
-            s = f.read()
-        if dispatch_old in s or dispatch_new in s:
+        if dispatch_old_24 in s or dispatch_new_24 in s:
             patch(
                 target_path,
-                dispatch_old,
-                dispatch_new,
-                f'ElyOffice 0009/0010 WordCount and Outline dispatch ({rel_target})',
+                dispatch_old_24,
+                dispatch_new_24,
+                f'ElyOffice 0009/0010 WordCount and Outline dispatch 24.2 ({rel_target})',
+            )
+        elif dispatch_old_26 in s or dispatch_new_26 in s:
+            patch(
+                target_path,
+                dispatch_old_26,
+                dispatch_new_26,
+                f'ElyOffice 0009/0010 WordCount and Outline dispatch 26.2 ({rel_target})',
             )
 
 

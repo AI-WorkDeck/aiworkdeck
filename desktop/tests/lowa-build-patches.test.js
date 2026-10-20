@@ -482,6 +482,21 @@ test('fs-image-patch.py strips Lightproof.py and non-zh/en dicts while preservin
         payload: Buffer.from('\xde\x12\x04\x95\x00\x00\x00\x00zh_CN_sw_mo_catalog', 'binary'),
         mustKeep: true,
       },
+      {
+        filename: '/instdir/share/fonts/truetype/LiberationSans-Regular.ttf',
+        payload: Buffer.from('TTF_LIBERATION_SANS', 'utf8'),
+        mustKeep: true,
+      },
+      {
+        filename: '/instdir/share/fonts/truetype/opens___.ttf',
+        payload: Buffer.from('TTF_OPENSYMBOL', 'utf8'),
+        mustKeep: true,
+      },
+      {
+        filename: '/instdir/share/fonts/truetype/LinLibertine_R.ttf',
+        payload: Buffer.from('TTF_LINLIBERTINE_BLOATED', 'utf8'),
+        mustKeep: false,
+      },
     ]
 
     const chunks = []
