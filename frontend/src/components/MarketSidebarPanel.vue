@@ -11,7 +11,8 @@
       <view v-if="searchText" class="msb-search-clear" @tap="searchText = ''">×</view>
     </view>
 
-    <scroll-view scroll-y class="msb-body">
+    <view class="msb-body">
+      <view class="msb-section" :class="{ expanded: sections.installed }">
       <!-- ===== 已安装 ===== -->
       <view class="msb-sec-head" @tap="toggleSection('installed')">
         <text class="msb-sec-chevron" :class="{ open: sections.installed }">›</text>
@@ -24,7 +25,7 @@
           </svg>
         </view>
       </view>
-      <view v-if="sections.installed">
+      <view v-if="sections.installed" class="msb-section-content">
         <!-- 「已安装」的插件/Skill 两类改为**横向标签并排**（dev-board#67）：
              竖着叠两个子分组时后一组常被推出视口，"看不全"。标签标题即类型，
              行内不再重复"面板插件/Skill"小字标签。顺序插件在前，与整页版一致。 -->
@@ -40,6 +41,7 @@
             <text class="msb-tab-count">{{ group.rows.length }}</text>
           </view>
         </view>
+        <scroll-view scroll-y class="msb-list">
         <view v-if="!activeInstalledRows.length" class="msb-empty">
           <text>{{ searchText ? activeInstalledEmptyText : $t('market.noInstalledYet') }}</text>
         </view>
@@ -64,16 +66,19 @@
             <text>{{ row.stateLabel }}</text>
           </view>
         </view>
+        </scroll-view>
+      </view>
       </view>
 
       <!-- ===== Marketplace：在线 Skill 与插件收进同一个分组，组内横向双标签
            （左 Skill 右插件，dev-board#67）===== -->
+      <view class="msb-section" :class="{ expanded: sections.market }">
       <view class="msb-sec-head" @tap="toggleSection('market')">
         <text class="msb-sec-chevron" :class="{ open: sections.market }">›</text>
         <text class="msb-sec-title">{{ $t('market.tabMarketplace') }}</text>
         <text class="msb-sec-count">{{ skillRows.length + pluginRows.length }}</text>
       </view>
-      <view v-if="sections.market">
+      <view v-if="sections.market" class="msb-section-content">
         <view class="msb-tabs">
           <view class="msb-tab" :class="{ active: marketTab === 'skill' }" @tap="marketTab = 'skill'">
             <text>{{ $t('market.sectionSkillTitle') }}</text>
@@ -85,6 +90,7 @@
           </view>
         </view>
 
+        <scroll-view scroll-y class="msb-list">
         <template v-if="marketTab === 'skill'">
           <view v-if="marketLoading" class="msb-empty"><text>{{ $t('market.loadingEllipsis') }}</text></view>
           <view v-else-if="marketError" class="msb-empty msb-error">
@@ -169,14 +175,16 @@
             </view>
           </view>
         </template>
+        </scroll-view>
       </view>
-    </scroll-view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script>
 // 插件广场左栏面板（VS Code 扩展栏形态）：搜索 + 已安装/Skill 广场/插件广场
-// 三个折叠分组的紧凑列表；点行在中栏开详情 tab（emit open-detail），行内快捷安装。
+// 两个独立滚动分组的紧凑列表；点行在中栏开详情 tab（emit open-detail），行内快捷安装。
 // 数据与安装链路复用 MarketPane 同一组 services/api.js 封装。
 import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
 import { ICONS } from '@/config/icons.js'
@@ -555,6 +563,8 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: transparent;
 }
 
@@ -562,12 +572,13 @@ export default {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 8px 10px 6px;
+  margin: 8px var(--awd-panel-pad-x) 6px;
+  flex-shrink: 0;
   height: 28px;
   padding: 0 8px;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  border-radius: var(--awd-radius-md);
+  border-radius: var(--awd-radius-sm);
 
   &:focus-within {
     border-color: var(--awd-accent-text);
@@ -613,6 +624,33 @@ export default {
 .msb-body {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.msb-section {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  &.expanded { flex: 1 1 0; }
+  & + & { border-top: 1px solid var(--awd-border); }
+}
+
+.msb-section-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.msb-list {
+  flex: 1;
+  height: 0;
+  min-height: 0;
 }
 
 /* 分组头：VS Code 式全大写小字 + 计数 */
@@ -620,8 +658,9 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 26px;
-  padding: 0 10px 0 6px;
+  height: var(--awd-panel-sec-h);
+  flex-shrink: 0;
+  padding: 0 var(--awd-panel-pad-x) 0 6px;
   cursor: pointer;
   user-select: none;
 
@@ -645,7 +684,6 @@ export default {
 .msb-sec-title {
   font-size: var(--awd-panel-fs-meta);
   font-weight: 700;
-  letter-spacing: 0.04em;
   color: var(--awd-text-2);
 }
 
@@ -692,13 +730,14 @@ export default {
   to { transform: rotate(360deg); }
 }
 
-/* 组内横向标签（已安装的插件/Skill、Marketplace 的 Skill/插件）：并排小胶囊，
+/* 组内横向标签（已安装的插件/Skill、Marketplace 的 Skill/插件）：紧凑下划线，
    竖着叠分组会把后一组推出视口（dev-board#67）。 */
 .msb-tabs {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px 4px 22px;
+  padding: 0 var(--awd-panel-pad-x) 4px 22px;
+  flex-shrink: 0;
 }
 
 .msb-tab {
@@ -707,7 +746,8 @@ export default {
   gap: 4px;
   height: 20px;
   padding: 0 8px;
-  border-radius: 999px;
+  border-radius: 0;
+  border-bottom: 1px solid transparent;
   cursor: pointer;
   background: transparent;
 
@@ -723,7 +763,7 @@ export default {
   }
 
   &.active {
-    background: var(--awd-accent-soft);
+    border-bottom-color: var(--awd-accent-text);
 
     text {
       color: var(--awd-accent-text);
@@ -751,12 +791,13 @@ export default {
   }
 }
 
-/* 列表行：紧凑三行（名称/描述/元信息），hover 出安装钮 */
+/* 三行扩展列表：名称和描述使用全宽，操作与版本信息同排。 */
 .msb-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 10px 6px 12px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  row-gap: 1px;
+  padding: 8px var(--awd-panel-pad-x);
   cursor: pointer;
 
   &:hover {
@@ -765,10 +806,11 @@ export default {
 }
 
 .msb-row-glyph {
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
-  margin-top: 1px;
+  width: 36px;
+  height: 36px;
+  grid-column: 1;
+  grid-row: 1 / 4;
+  align-self: center;
   border-radius: var(--awd-radius-md);
   background: var(--awd-accent-soft);
   display: flex;
@@ -778,8 +820,8 @@ export default {
   overflow: hidden;
 
   svg {
-    width: 14px;
-    height: 14px;
+    width: 22px;
+    height: 22px;
   }
 
   /* 插件 = 可执行扩展：深底图标与 Skill（浅底）一眼区分 */
@@ -804,14 +846,14 @@ export default {
 }
 
 .msb-row-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  display: contents;
 }
 
 .msb-row-name {
+  min-width: 0;
+  grid-column: 2 / 4;
+  grid-row: 1;
+  line-height: 18px;
   font-size: var(--awd-font-size-body);
   font-weight: 600;
   color: var(--awd-text);
@@ -821,8 +863,11 @@ export default {
 }
 
 .msb-row-desc {
-  font-size: var(--awd-panel-fs-meta);
-  line-height: 15px;
+  min-width: 0;
+  grid-column: 2 / 4;
+  grid-row: 2;
+  line-height: 18px;
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   white-space: nowrap;
   overflow: hidden;
@@ -830,6 +875,10 @@ export default {
 }
 
 .msb-row-meta {
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 3;
+  line-height: 18px;
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-2);
   white-space: nowrap;
@@ -838,6 +887,9 @@ export default {
 }
 
 .msb-row-install {
+  grid-column: 3;
+  grid-row: 3;
+  max-width: 100%;
   flex-shrink: 0;
   align-self: center;
   height: 20px;
@@ -879,6 +931,9 @@ export default {
 }
 
 .msb-row-state {
+  grid-column: 3;
+  grid-row: 3;
+  max-width: 100%;
   flex-shrink: 0;
   align-self: center;
   font-size: var(--awd-panel-fs-meta);

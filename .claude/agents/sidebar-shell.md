@@ -940,6 +940,15 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
 通过了 `ContextAssemblerService` 只判 `isBlank()` 的守卫，被当成文档正文写进
 `<active_document>` CDATA。后端同批补了第二道（`isToolFailureText`，见 ai-chat.md）。
 
+## 欢迎页侧栏缺省与展开（dev-board#1374，2026-10-21）
+
+未保存 `awd_sidebar_collapsed` 的无项目窗口缺省收起左栏，已有项目缺省展开；显式布尔偏好优先。
+`loadSidebarCollapsed(uni, !hasNamedProject)` 统一处理缺值、坏值和读取失败。独立文件仍收起，
+`?pane=projects` / `?pane=files` 的明确打开意图继续覆盖默认值。点击不同 rail 面板从收起转为展开时，
+也走 `toggleSidebar`，确保持久化与编辑区 resize；切换不改变中间的欢迎/文档标签。
+插件广场的已安装、Marketplace 两组各占可用空间并独立滚动，组头与搜索保持可见；收起一组后另一组填满。
+验证：`sidebar-collapse.test.mjs`；隔离 Vite + 合成 API 的 `welcome-sidebar-ui.mjs`，不连接真实后端。
+
 ## 工作台无项目态与欢迎标签（dev-board#1047，2026-09-29）
 
 规格：`docs/superpowers/specs/2026-09-29-defer-login-welcome-tab-design.md` §3 §4 §6。启动落不带 `?id=` 的工作台外壳，
