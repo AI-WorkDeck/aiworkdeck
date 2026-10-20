@@ -125,4 +125,17 @@ class McpResponseParserTest {
     void unknownFormatPassthrough() {
         assertEquals("plain text response", McpResponseParser.parse("  plain text response \n"));
     }
+
+    @Test
+    @DisplayName("FastMCP Pydantic 参数校验错误或 isError=true：补齐 Error from MCP server 前缀")
+    void fastMcpValidationErrorIsMarkedAsError() {
+        String sseValidationErr = "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"1 validation error for call[search_article]\\ntext\\n  Missing required argument\"}],\"isError\":true}}\n\n";
+        String parsed = McpResponseParser.parse(sseValidationErr);
+        assertTrue(parsed.startsWith("Error from MCP server: "), "actual: " + parsed);
+        assertTrue(parsed.contains("Missing required argument"));
+
+        String plainValidationErr = "data: 1 validation error for call[search_article]\ndata: text\ndata:   Missing required argument\n\n";
+        String parsedPlain = McpResponseParser.parse(plainValidationErr);
+        assertTrue(parsedPlain.startsWith("Error from MCP server: "), "actual: " + parsedPlain);
+    }
 }
