@@ -50,7 +50,7 @@ export const panelSwitchingMethods = {
         this.toggleSidebar()
       } else {
         this.leftPaneKey = key
-        this.sidebarCollapsed = false
+        if (this.sidebarCollapsed) this.toggleSidebar()
 
         // 「只看《某份文件》的历史」是版本面板的临时过滤态。切到别的面板就清掉，
         // 否则律师下次回到版本面板，还端着上一次右键那份文件的过滤条。

@@ -89,7 +89,7 @@ test('onLoad 用 loadSidebarCollapsed 恢复本机收起习惯', () => {
   assert.ok(onLoadStart > 0, '找不到 onLoad')
   const onLoadEnd = src.indexOf('\n  onShow(', onLoadStart)
   const body = src.slice(onLoadStart, onLoadEnd > 0 ? onLoadEnd : onLoadStart + 6000)
-  assert.match(body, /this\.sidebarCollapsed\s*=\s*loadSidebarCollapsed\(uni\)/,
+  assert.match(body, /this\.sidebarCollapsed\s*=\s*loadSidebarCollapsed\(uni,\s*!this\.hasNamedProject\)/,
     'onLoad 必须用 loadSidebarCollapsed 恢复状态，否则每次进项目左栏收起都会弹回来')
 })
 
@@ -113,4 +113,16 @@ test('rail 底部渲染了收起/展开按钮，@tap 绑的是 toggleSidebar', (
   assert.match(between, /@tap="toggleSidebar"/, '版本记录按钮与成员堆叠之间必须有一个走 toggleSidebar 的 rail-btn')
   assert.match(between, /class="rail-btn"/, '新按钮必须复用现有 .rail-btn 样式，不新起一套')
   assert.match(between, /GLYPHS\.panelLeft/, '图标复用顶栏同功能按钮的 GLYPHS.panelLeft')
+})
+
+
+test('欢迎首屏缺省收起，显式收展选择优先，存储故障也保持缺省', () => {
+  for (const value of ['', null, undefined, 'true', 1, {}]) {
+    assert.equal(loadSidebarCollapsed(fakeStorage({ awd_sidebar_collapsed: value }), true), true)
+  }
+  for (const saved of [true, false]) {
+    assert.equal(loadSidebarCollapsed(fakeStorage({ awd_sidebar_collapsed: saved }), true), saved)
+  }
+  assert.equal(loadSidebarCollapsed({ getStorageSync() { throw new Error('unavailable') } }, true), true)
+  assert.equal(loadSidebarCollapsed(fakeStorage(), false), false, '项目文件树保持默认展开')
 })
