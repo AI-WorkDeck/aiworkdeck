@@ -2159,6 +2159,15 @@
       <BackendHealthStatus />
       <MobileBackupConsent v-if="isDesktopApp" />
       <MobileReceiveStatus v-if="isDesktopApp" :project-id="hasNamedProject ? projectId : null" @received="onVersionReloadFiles([])" />
+      <view
+        v-if="isDesktopApp && appUpdateStatusVisible"
+        class="status-item status-update"
+        :class="{ 'status-clickable': appUpdate.phase === 'ready' || appUpdate.phase === 'error' || !!appUpdate.majorAvailable }"
+        @tap="onStatusUpdateTap"
+      >
+        <view class="status-dot" :class="appUpdateDotClass"></view>
+        <text>{{ appUpdateStatusLabel }}</text>
+      </view>
       <view class="status-spacer"></view>
       <view v-if="activeFileLeft" class="status-item status-file">
         <text>{{ activeFileLeft.name }}</text>
@@ -2186,7 +2195,7 @@ import { claimRestartStartup, createRestartRecovery } from './restartRecovery.js
 import { flushActiveDocument } from './flushActiveDocument.js'
 import { isTabVisibleInPane } from './tabVisibility.js'
 import { pickActiveContextTab, isContextEligibleTab } from './activeTabContext.js'
-import { nativeDataTransfer, captureDroppedFiles, isExternalFileDrag } from '@/utils/fileTreeExternalDrop.js'
+import { nativeDataTransfer, captureDroppedFiles, isExternalFileDrag, compatibleDropEffect } from '@/utils/fileTreeExternalDrop.js'
 import { consumePluginImDrag } from '@/utils/pluginImDrag.js'
 import { addPluginImFileToAi } from '@/utils/pluginImAi.js'
 import { AI_CONTEXT_FOLDER_FILE_LIMIT, countDescendantFiles } from '@/utils/aiContextFiles.js'
@@ -2697,6 +2706,15 @@ export default {
       switcherProjects: [],
       switcherLoadFailed: false, // 拉取最近项目失败：与"确实没有其他最近项目"的空态区分开，不能吞成同一句文案
       versionWorkStatus: { enabled: false, working: false, changedCount: 0, onDraft: null }, // 底部状态栏工作状态点（顶栏胶囊已去掉）
+      // 应用内静默自动更新状态（左下角状态栏实时显示下载进度，就绪后一键/弹窗确认自动替换重启）
+      appUpdate: {
+        phase: 'idle',
+        available: null,
+        majorAvailable: null,
+        progress: null,
+        error: null,
+        promptedVersion: null,
+      },
       // 协作（团队案件库）状态：{linked, serverUrl, pendingUpload, remoteAhead, offline}
       collabCloud: null,
       collabDialogVisible: false,
@@ -2852,6 +2870,40 @@ export default {
     // ---------- Credits 余额 chip（dev-board#187） ----------
     walletChipVisible() {
       return this.wallet.loaded && this.wallet.connected
+    },
+    appUpdateStatusVisible() {
+      const u = this.appUpdate || {}
+      return u.phase === 'checking' || u.phase === 'downloading' || (u.phase === 'ready' && !!u.available) || !!u.majorAvailable
+    },
+    appUpdateDotClass() {
+      const u = this.appUpdate || {}
+      if (u.phase === 'ready' && u.available) return 'mint'
+      if (u.phase === 'downloading' || u.phase === 'checking') return 'amber'
+      if (u.majorAvailable) return 'amber'
+      return 'mint'
+    },
+    appUpdateStatusLabel() {
+      const u = this.appUpdate || {}
+      if (u.phase === 'ready' && u.available) {
+        const ver = u.available.version ? ` v${u.available.version}` : ''
+        return `新版本${ver} 已就绪 · 点击重启更新`
+      }
+      if (u.phase === 'downloading') {
+        const p = u.progress
+        const ver = (p && p.version) ? ` v${p.version}` : ''
+        if (p && p.total > 0) {
+          const pct = Math.min(100, Math.max(0, Math.round((p.received / p.total) * 100)))
+          return `正在后台下载更新${ver} (${pct}%)`
+        }
+        return `正在后台下载更新${ver}…`
+      }
+      if (u.phase === 'checking') {
+        return this.$t('shell.menuCheckingUpdate')
+      }
+      if (u.majorAvailable) {
+        return this.$t('admin.majorReleased', { version: u.majorAvailable.major })
+      }
+      return ''
     },
     // ---------- rail 日程徽标（dev-board#899） ----------
     // 读 taskStore 的响应式缓存：弹窗/面板/AI 以外的写操作都经 taskStore 就地更新，
@@ -3577,6 +3629,13 @@ export default {
     }
     this._desktopOpenInternalUnsub = null
 
+    try {
+      if (this._desktopUpdateUnsub) this._desktopUpdateUnsub()
+    } catch (e) {
+      // ignore
+    }
+    this._desktopUpdateUnsub = null
+
     // WPS iframe：内部链接 postMessage 监听清理
     try {
       if (this._wpsInternalMsgHandler && typeof window !== 'undefined') {
@@ -4203,6 +4262,7 @@ export default {
     }
     this._openWorkbenchMounted = true
     this.maybeRegisterOpenWorkbench()
+    this.initDesktopAutoUpdateListener()
   },
   watch: {
     tabSnapshotSignature() {
@@ -4222,7 +4282,7 @@ export default {
     },
     // IDE 化窗口标题：「文件名 — 项目名 — AI WorkDeck」（Electron 窗口标题跟随 document.title）
     'project.name'() { this.updateWindowTitle() },
-    activeFileIdLeft() { this.updateWindowTitle(); this.pushMenuState(); this.ensureActiveTabVisible('left') },
+    activeFileIdLeft() { this.updateWindowTitle(); this.pushMenuState(); this.ensureActiveTabVisible('left'); this.syncFileTreeSelectionWithActiveTab() },
     // 菜单栏的勾选/置灰跟着这些走。编辑器与 AI 面板内部的状态走 @menu-state
     // 事件（见对应组件），这里只管工作台自己的。桥那边有浅比较+去抖，
     // 这些 watcher 只管「叫一声」，不必自己节流。
@@ -4232,7 +4292,7 @@ export default {
     ddCloudTrack(on) {
       if (!on && this.leftPaneKey === 'dd-files' && !this.isClientView) this.leftPaneKey = 'files'
     },
-    activeFileIdRight() { this.pushMenuState(); this.ensureActiveTabVisible('right') },
+    activeFileIdRight() { this.pushMenuState(); this.ensureActiveTabVisible('right'); this.syncFileTreeSelectionWithActiveTab() },
     sidebarCollapsed() { this.pushMenuState() },
     showToolsPanel() { this.pushMenuState() },
     showAiPanel() { this.pushMenuState() },
@@ -4269,7 +4329,7 @@ export default {
     // PR#151 WPS 编辑器模式）。
     activeFileLeft(f) { this.onActiveOfficeFileChanged('left', f); this.touchWebKeepAlive('left', f); this.prefetchInsightIndex(f) },
     activeFileRight(f) { this.onActiveOfficeFileChanged('right', f); this.touchWebKeepAlive('right', f); this.prefetchInsightIndex(f) },
-    focusedPane() { this.syncLibreExecutor(); this.notifyRestartRecovery() },
+    focusedPane() { this.syncLibreExecutor(); this.notifyRestartRecovery(); this.syncFileTreeSelectionWithActiveTab() },
     currentActiveTab() { this.notifyRestartRecovery() },
     // 关闭 tab 后清掉文件已不在左列表的过继备胎条目（closeFile 已 flush）
     'leftFiles.length'() { this.pruneClosedLibreSpares() },
@@ -5466,14 +5526,12 @@ export default {
         const created = (res && res.data && Array.isArray(res.data.files)) ? res.data.files : (res && res.files) || []
         const createdFile = Array.isArray(created) ? created[0] : null
         if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
-          this.$refs.fileTree.loadFiles()
+          await this.$refs.fileTree.loadFiles()
         }
         if (createdFile) {
-          // 强制在当前 pane 打开：临时聚焦 pane
-          const oldFocus = this.focusedPane
+          // 强制在目标 pane 打开并保持聚焦，确保活动标签与左侧资源管理器高亮一致
           this.focusedPane = pane === 'right' && this.splitMode ? 'right' : 'left'
           this.openFile(createdFile)
-          this.focusedPane = oldFocus
         } else {
           uni.showToast({ title: this.$t('workbench.copyFailedNoNewFile'), icon: 'none' })
         }
@@ -6356,6 +6414,7 @@ export default {
       sync(this.leftFiles)
       sync(this.rightFiles)
       if (changed) this.updateWindowTitle()
+      this.syncFileTreeSelectionWithActiveTab()
     },
 
     // refresh_files（AI 工具改名/移动/新建等触发的通用刷新信号）不带具体的
@@ -6381,6 +6440,7 @@ export default {
       sync(this.leftFiles)
       sync(this.rightFiles)
       if (changed) this.updateWindowTitle()
+      this.syncFileTreeSelectionWithActiveTab()
     },
 
     // 处理文件重命名（历史：WPS 时代由文件信息轮询触发；现无调用方，保留为通用逻辑）
@@ -7062,11 +7122,26 @@ export default {
         // rail 排序 / 面板停靠的拖拽不会被 handleAiDrop 接收，别给它亮落点
         // ——高亮画在输入框上就是一句「松手即进上下文」的承诺（dev-board#779 K6 ④）
         if (this.draggingRailKey || this.draggingPanelKey) return
+        const dt = nativeDataTransfer(e)
+        if (dt) {
+            try { dt.dropEffect = compatibleDropEffect(dt, 'copy') } catch (_) {}
+        }
         this.dragOverAiPanel = true
     },
     handleAiDragLeave(e) {
         if (e && e.preventDefault) e.preventDefault()
         this.dragOverAiPanel = false
+    },
+    finishInternalFileDragOnAiDrop() {
+        if (typeof document !== 'undefined' && document.__checkbaDraggedFile) {
+            document.__checkbaDraggedFile = null
+        }
+        if (typeof this.onFileLinkDragEnd === 'function') {
+            this.onFileLinkDragEnd()
+        }
+        if (this.$refs && this.$refs.fileTree && typeof this.$refs.fileTree.handleDragEnd === 'function') {
+            this.$refs.fileTree.handleDragEnd()
+        }
     },
     handleAiDrop(e) {
         if (e && e.preventDefault) e.preventDefault()
@@ -7076,9 +7151,11 @@ export default {
         // 否则会被当成「拖文件进对话」而弹「未获取到拖拽数据」（dev-board#220）
         if (this.draggingRailKey || this.draggingPanelKey) return
 
+        const dt = nativeDataTransfer(e) || (e && e.dataTransfer) || null
+
         // Plugin iframe drags use a one-use host receipt. Recover the native event
         // before uni's wrapper drops dataTransfer; never trust plugin-supplied ids.
-        const pluginDrop = consumePluginImDrag(nativeDataTransfer(e), this.projectId)
+        const pluginDrop = consumePluginImDrag(dt, this.projectId)
         if (pluginDrop.handled) {
              if (!pluginDrop.file) {
                   uni.showToast({ title: '拖拽已过期，请从文件卡片重新拖入', icon: 'none' })
@@ -7096,6 +7173,7 @@ export default {
         //    （uni-h5 把 <view> 上的 drag 事件重建成普通对象，dataTransfer 常常是空的）。
         if (this.draggingTab) {
              const dragged = this.findOpenTab(this.draggingTab.fileId)
+             this.onTabDragEnd()
              // 非文件标签（浏览器 / 设置 / 广场详情 / 依据实体 / 版本对比 / AI 计划…）
              // 不是能交给模型的文档，静默忽略（同 dev-board#220 的口径，不弹错误提示）
              if (dragged && isContextEligibleTab(dragged)) {
@@ -7113,14 +7191,14 @@ export default {
         let fileData = null
         try {
              // 1. Try standard json format
-             const raw = e.dataTransfer.getData('application/x-checkba-file')
+             const raw = dt && typeof dt.getData === 'function' ? dt.getData('application/x-checkba-file') : ''
              if (raw) fileData = JSON.parse(raw)
         } catch(e) {}
 
         if (!fileData) {
              try {
                   // 2. Try fallback text format
-                  const raw2 = e.dataTransfer.getData('text/checkba-file-json')
+                  const raw2 = dt && typeof dt.getData === 'function' ? dt.getData('text/checkba-file-json') : ''
                   if (raw2) fileData = JSON.parse(raw2)
              } catch(e) {}
         }
@@ -7135,6 +7213,7 @@ export default {
         }
 
         if (fileData) {
+             this.finishInternalFileDragOnAiDrop()
              this.addDraggedFileToAiContext({
                  id: fileData.fileId || fileData.id,
                  name: fileData.name || fileData.fileName,
@@ -7148,7 +7227,6 @@ export default {
         // 4. 本机文件（Finder / 资源管理器 / 微信）拖进对话区（dev-board#779 K6 ③）。
         //    应用内三种格式都落空才轮到这里。dataTransfer 要从正在派发的原生事件上取
         //    （uni-h5 重建 <view> 事件对象时把 drag 系字段全丢了，utils/fileTreeExternalDrop.js）。
-        const dt = nativeDataTransfer(e)
         const dropped = captureDroppedFiles(dt, host.fs)
         if (dropped.length) {
              // 文件夹在 dataTransfer.files 里是一个 0 字节、无类型的条目，照上传会在项目里
@@ -7999,6 +8077,62 @@ export default {
         if (chat.runStatus === 'ERROR') return this.$t('workbench.statusError')
         if (chat.unread) return this.$t('workbench.statusDone')
         return ''
+    },
+    initDesktopAutoUpdateListener() {
+        if (!this.isDesktopApp || !host.update) return
+        const applyState = (st) => {
+            if (!st || typeof st !== 'object') return
+            this.appUpdate.phase = st.phase || 'idle'
+            this.appUpdate.available = st.available || null
+            this.appUpdate.majorAvailable = st.majorAvailable || null
+            this.appUpdate.progress = st.progress || null
+            this.appUpdate.error = st.error || null
+            if (st.phase === 'ready' && st.available && st.available.version) {
+                const ver = st.available.version
+                if (this.appUpdate.promptedVersion !== ver && this.isActiveOverviewInstance()) {
+                    this.appUpdate.promptedVersion = ver
+                    this.promptUpdateRestartModal(ver)
+                }
+            }
+        }
+        try {
+            if (typeof host.update.status === 'function') {
+                Promise.resolve(host.update.status()).then(applyState).catch(() => {})
+            }
+            if (typeof host.update.onEvent === 'function' && !this._desktopUpdateUnsub) {
+                this._desktopUpdateUnsub = host.update.onEvent((payload) => {
+                    applyState(payload)
+                })
+            }
+        } catch (e) {
+            // ignore
+        }
+    },
+    promptUpdateRestartModal(version) {
+        if (!host.update || typeof host.update.restart !== 'function') return
+        uni.showModal({
+            title: this.$t('admin.restartAppTitle'),
+            content: this.$t('admin.restartAppContent', {
+                version: version || this.$t('admin.newVersionFallback'),
+            }),
+            confirmText: this.$t('admin.restartNowButton'),
+            cancelText: this.$t('common.close'),
+            success: (res) => {
+                if (res && res.confirm) {
+                    host.update.restart()
+                }
+            },
+        })
+    },
+    onStatusUpdateTap() {
+        const u = this.appUpdate || {}
+        if (u.phase === 'ready' && u.available) {
+            this.promptUpdateRestartModal(u.available.version)
+            return
+        }
+        if (u.majorAvailable && host.shell && host.shell.openExternal) {
+            host.shell.openExternal(u.majorAvailable.page || 'https://www.aiworkdeck.com')
+        }
     },
   }
 }

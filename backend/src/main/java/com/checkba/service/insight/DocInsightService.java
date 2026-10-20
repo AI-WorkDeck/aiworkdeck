@@ -1203,7 +1203,7 @@ public class DocInsightService {
             }
             String query = StringUtils.hasText(title) ? title + " " + article : article;
             callAndStore(row, PKULAW_SEMANTIC, "search_article",
-                    Map.of("query", query), unavailablePrefix, notFoundNote);
+                    Map.of("text", query), unavailablePrefix, notFoundNote);
             return;
         }
         callAndStore(row, PKULAW_KEYWORD, "get_law_list",
