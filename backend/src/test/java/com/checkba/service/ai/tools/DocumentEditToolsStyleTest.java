@@ -159,10 +159,45 @@ class DocumentEditToolsStyleTest {
         // 返回的 {success:false} 里又没有 applied——模型据此重试，同一张表被格式化两遍。
         assertFalse(ft.containsKey("columnWidthsCm"), "列宽不该下发给编辑器：" + ft);
 
-        tools.doc_format_selection(null, null, null, null, null, null, null, "Arial", "楷体_GB2312");
+        tools.doc_format_selection(null, null, null, null, null, null, null, "Arial", "楷体_GB2312",
+                "Times New Roman", "single", 2, 5);
         Map<String, Object> fs = paramsOf("format_selection");
         assertEquals("Arial", fs.get("fontName"));
         assertEquals("楷体_GB2312", fs.get("fontNameAsian"));
+        assertEquals("Times New Roman", fs.get("fontNameWestern"));
+        assertEquals("single", fs.get("underlineStyle"));
+        assertEquals(2, fs.get("startParagraph"));
+        assertEquals(5, fs.get("endParagraph"));
+
+        Mockito.clearInvocations(bridge);
+        tools.doc_set_paragraph_format("justify", null, "multiple", 1.5, 6.0, 12.0,
+                2.0, null, null, 24.0, 1.0, 0.5, 1.0, 3, 8);
+        Map<String, Object> pf = paramsOf("set_paragraph_format");
+        assertEquals("justify", pf.get("alignment"));
+        assertEquals("multiple", pf.get("lineSpacingMode"));
+        assertEquals(1.5, pf.get("lineSpacingValue"));
+        assertEquals(2.0, pf.get("firstLineIndentChars"));
+        assertEquals(24.0, pf.get("firstLineIndentPt"));
+        assertEquals(1.0, pf.get("leftIndentChars"));
+        assertEquals(0.5, pf.get("spaceBeforeLines"));
+        assertEquals(1.0, pf.get("spaceAfterLines"));
+        assertEquals(3, pf.get("startParagraph"));
+        assertEquals(8, pf.get("endParagraph"));
+
+        Mockito.clearInvocations(bridge);
+        tools.doc_select_paragraph(1, 4);
+        Map<String, Object> sp = paramsOf("select_paragraph");
+        assertEquals(1, sp.get("index"));
+        assertEquals(4, sp.get("endIndex"));
+
+        Mockito.clearInvocations(bridge);
+        tools.doc_apply_standard_format("宋体", "Times New Roman", 12.0, "1.5", null, 2.0, 0.0, 6.0);
+        Map<String, Object> hs = paramsOf("apply_house_style");
+        assertEquals("宋体", hs.get("fontNameAsian"));
+        assertEquals("Times New Roman", hs.get("fontNameWestern"));
+        assertEquals(12.0, hs.get("fontSize"));
+        assertEquals("1.5", hs.get("lineSpacingMode"));
+        assertEquals(2.0, hs.get("firstLineIndentChars"));
     }
 
     @Test
