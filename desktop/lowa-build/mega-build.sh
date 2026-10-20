@@ -74,22 +74,28 @@ log "PHASE_3_DONE $(emcc --version 2>/dev/null | head -1)"
 # ---------- Phase 4: qt5 (background) + core prep (parallel) -------------------
 log "[4] qt5 build (bg) + core patches/translations"
 QT5DIR="$ROOT/qt5-wasm-install"
-(
-  set -e; source "$ROOT/env.sh"; cd "$ROOT/qt5"
-  ./init-repository --module-subset=qtbase >/root/qt5.log 2>&1
-  ./configure -opensource -confirm-license -xplatform wasm-emscripten \
-    -feature-thread -prefix "$QT5DIR" \
-    QMAKE_CFLAGS+=-sSUPPORT_LONGJMP=wasm QMAKE_CXXFLAGS+=-sSUPPORT_LONGJMP=wasm >>/root/qt5.log 2>&1
-  make -j"$(nproc)" module-qtbase >>/root/qt5.log 2>&1
-  make -j"$(nproc)" install >>/root/qt5.log 2>&1
-  echo QT5_OK >> /root/qt5.log
-) &
-QT5_PID=$!
+if [ ! -f "$QT5DIR/bin/qmake" ]; then
+  (
+    set -e; source "$ROOT/env.sh"; cd "$ROOT/qt5"
+    ./init-repository --module-subset=qtbase >/root/qt5.log 2>&1
+    ./configure -opensource -confirm-license -xplatform wasm-emscripten \
+      -feature-thread -prefix "$QT5DIR" \
+      QMAKE_CFLAGS+=-sSUPPORT_LONGJMP=wasm QMAKE_CXXFLAGS+=-sSUPPORT_LONGJMP=wasm >>/root/qt5.log 2>&1
+    make -j"$(nproc)" module-qtbase >>/root/qt5.log 2>&1
+    make -j"$(nproc)" install >>/root/qt5.log 2>&1
+    echo QT5_OK >> /root/qt5.log
+  ) &
+  QT5_PID=$!
+else
+  QT5_PID=""
+fi
 cd "$ROOT/core"
-git submodule update --init --depth 1 translations >/root/translations.log 2>&1 || die translations
+[ -d translations/source/zh-CN ] || git submodule update --init --depth 1 translations >/root/translations.log 2>&1 || die translations
 [ -d translations/source/zh-CN ] || die translations-zh
 python3 /root/apply-source-patches.py || die source-patches
-wait $QT5_PID; grep -q QT5_OK /root/qt5.log || die qt5-build
+if [ -n "$QT5_PID" ]; then
+  wait $QT5_PID; grep -q QT5_OK /root/qt5.log || die qt5-build
+fi
 [ -f "$QT5DIR/bin/qmake" ] || die qmake-missing
 log "PHASE_4_DONE"
 
@@ -118,6 +124,7 @@ python3 /root/fs-image-patch.py || die fs-image-patch
 rm -f workdir/CustomTarget/static/emscripten_fs_image/soffice.data*
 rm -f "$ART/soffice.data" "$ART/soffice.data.js.metadata"
 make -j"$(nproc)" > /root/make6.log 2>&1 || { tail -30 /root/make6.log; die make6; }
+python3 /root/fs-image-patch.py "$ROOT/core" || die fs-image-repack
 grep -q "resource/zh_CN" "$ART/soffice.data.js.metadata" || die metadata-no-zh
 grep -q "ZZZ-aiworkdeck" "$ART/soffice.data.js.metadata" || die metadata-no-zzz
 log "PHASE_6_DONE"

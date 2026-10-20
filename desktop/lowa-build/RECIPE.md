@@ -1,5 +1,18 @@
 # zh-CN LOWA engine rebuild recipe (with tooltip-CJK fix) — issue #66
 
+## r6 (2026-10-20) — ElyOffice Tier A kernel patches + `#587` native review gutter + 45.3% `soffice.data` slimming (`#1371`)
+
+Built on Singapore ECS `ecs.c9i.16xlarge` (64 vCPU / 128 GiB RAM, Intel Xeon 6982P-C, Ubuntu 22.04) from `distro/allotropia/zeta-24-2` (`dced3bc71`) with:
+- Full `#587` Writer external review gutter geometry (`AwdReviewGeometry`, `AwdReviewSidebarWidth`, native comment card suppression & hit-test clamping).
+- Curated ElyOffice Tier A kernel fixes (`0002` LOK dispatch to document frame, `0005` `JSDialogNotifyIdle` disposed-window guard in `vcl/jsdialog/jsdialogbuilder.cxx`, `0008` dialog-less `.uno:InsertMultiIndex` / `.uno:InsertCaptionDialog` / `.uno:InsertObjectStarMath`, `0009`/`0010` `.uno:WordCount` & `.uno:Outline` / `.uno:Bookmarks` twips rect command values in `sw/source/uibase/uno/loktxdoc.cxx`, `0011`/`0048` semicolon font-list & search-name missing-font check, `0013` `author` option in `lo_setOption`).
+- `soffice.data` font + `Lightproof.py` slimming (`fs-image-patch.py --slim-dicts --slim-fonts`): strips 114 unused bundled font/Lightproof slices (`LinLibertine*`, `DejaVu*`, non-core script fonts), cutting `soffice.data` raw MEMFS unpack size from **103,340,944 bytes (98.55 MiB)** down to **56,494,002 bytes (53.88 MiB, -45.3%)** and brotli transfer size from **16.5 MiB** down to **7.92 MiB (-52.0%)**.
+
+### r6 artifact sha256 (raw uncompressed bytes)
+- `soffice.js`: `4134a43116a96db449d682b7e812a39c861eb9350f9f71c555ce5df1c35db9c9` (858,359 B)
+- `soffice.wasm`: `31711fe5fc7070d939e1ac58a6a0875e5fa851409089e7648fe2f6516f52c388` (161,688,910 B raw / 45,471,642 B `.br`)
+- `soffice.data`: `57937f2e22be0d354c3a448e905ac971ffc582891316e56cb29892bf8e390ce3` (56,494,002 B raw / 8,310,668 B `.br`)
+- `soffice.data.js.metadata`: `871e91a4ef63866b518b559f4e3fdbedb59dcca418c56b5d60fb74d0d2b62945` (207,339 B)
+
 ## r3 (2026-08-02) — margin-redline table anchor fix
 
 Built on mainland VM 8.156.75.91 (8C/30GB + 48G swap, Ubuntu 22.04) with the SAME
