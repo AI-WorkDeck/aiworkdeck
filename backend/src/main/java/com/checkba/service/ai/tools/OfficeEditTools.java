@@ -683,9 +683,11 @@ public class OfficeEditTools implements AgentToolComponent {
 
     // ==================== 格式（Word 原生修订） ====================
 
-    @Tool("在当前 Word 文档中设置指定文本的字符格式：字体、字号、加粗、斜体、下划线、删除线、颜色。" +
-          "anchorText 须与文档中的文本精确一致，默认只对第一处匹配生效，applyToAll=true 对所有匹配生效。" +
-          "格式参数至少要给一个，没传的保持原样。fontName 中西文字体名都可（如 宋体 / 楷体_GB2312 / Times New Roman）。" +
+    @Tool("在当前 Word 文档中设置指定文本或连续段落的字符格式：字体（含中/西文分设）、字号、加粗、斜体、下划线、删除线、颜色。" +
+          "anchorText 须与文档中的文本精确一致，默认只对第一处匹配生效，applyToAll=true 对所有匹配生效；" +
+          "若传 paragraphCount（>=1），则以 anchorText 命中的段落为起点连续对 paragraphCount 个段落整体设置字符格式。" +
+          "格式参数至少要给一个，没传的保持原样。fontName 中西文字体名都可（如 宋体 / 楷体_GB2312 / Times New Roman），" +
+          "也可分别传 fontNameAsian（中文字体）和 fontNameWestern（西文字体）。" +
           "修改以 Word 原生修订（Track Changes）形式呈现。")
     @ToolMeta(displayName = "设置文字格式", category = "office", fileEffect = "MODIFIED")
     public String office_format_text(
@@ -693,15 +695,18 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("要设置格式的目标文本（须与文档精确一致）") String anchorText,
             @P("是否对所有匹配生效（false=仅第一处）") Boolean applyToAll,
             @P("字体名，如 宋体 / 楷体_GB2312 / Times New Roman（不改则不传）") String fontName,
-            @P("字号（磅），如 12（不改则不传）") Double fontSize,
+            @P("字号（磅），如 小四=12、四号=14、三号=16（不改则不传）") Double fontSize,
             @P("加粗 true/false（不改则不传）") Boolean bold,
             @P("斜体 true/false（不改则不传）") Boolean italic,
             @P("下划线线型：none/single/double/dotted/wave（wave=波浪线；不改则不传）") String underline,
             @P("删除线 true/false（不改则不传）") Boolean strikeThrough,
             @P("双删除线 true/false（不改则不传）") Boolean doubleStrikeThrough,
-            @P("文字颜色 #RRGGBB，如 #C00000（不改则不传）") String color
+            @P("文字颜色 #RRGGBB，如 #C00000（不改则不传）") String color,
+            @P(value = "中文字体名（如 宋体 / 仿宋_GB2312 / 楷体_GB2312，不改则不传）", required = false) String fontNameAsian,
+            @P(value = "西文字体名（如 Times New Roman / Arial，不改则不传）", required = false) String fontNameWestern,
+            @P(value = "从锚点所在段落起连续套用整段字符格式的段数（可选，1~200；不传则仅对锚点文本本身生效）", required = false) Integer paragraphCount
     ) {
-        log.info("Tool: office_format_text called, anchor={}, applyToAll={}", anchorText, applyToAll);
+        log.info("Tool: office_format_text called, anchor={}, applyToAll={}, paragraphCount={}", anchorText, applyToAll, paragraphCount);
         if (anchorText == null || anchorText.isBlank()) {
             return "Error: 目标文本不能为空";
         }
@@ -714,6 +719,9 @@ public class OfficeEditTools implements AgentToolComponent {
         if (color != null && !color.isBlank() && !HEX_COLOR.matcher(color.trim()).matches()) {
             return "Error: color 须为 #RRGGBB 格式，如 #C00000";
         }
+        if (paragraphCount != null && (paragraphCount < 1 || paragraphCount > MAX_NUMBERING_PARAGRAPHS)) {
+            return "Error: paragraphCount 须为 1~" + MAX_NUMBERING_PARAGRAPHS + " 的整数";
+        }
         String underlineValue;
         try {
             underlineValue = normalizeEnum(underline, UNDERLINE_VALUES, "underline");
@@ -723,6 +731,8 @@ public class OfficeEditTools implements AgentToolComponent {
 
         Map<String, Object> args = new HashMap<>();
         if (fontName != null && !fontName.isBlank()) args.put("fontName", fontName.trim());
+        if (fontNameAsian != null && !fontNameAsian.isBlank()) args.put("fontNameAsian", fontNameAsian.trim());
+        if (fontNameWestern != null && !fontNameWestern.isBlank()) args.put("fontNameWestern", fontNameWestern.trim());
         if (fontSize != null) args.put("fontSize", fontSize);
         if (bold != null) args.put("bold", bold);
         if (italic != null) args.put("italic", italic);
@@ -731,21 +741,23 @@ public class OfficeEditTools implements AgentToolComponent {
         if (doubleStrikeThrough != null) args.put("doubleStrikeThrough", doubleStrikeThrough);
         if (color != null && !color.isBlank()) args.put("color", color.trim());
         if (args.isEmpty()) {
-            return "Error: 未给出任何格式参数（fontName/fontSize/bold/italic/underline/strikeThrough/"
+            return "Error: 未给出任何格式参数（fontName/fontNameAsian/fontNameWestern/fontSize/bold/italic/underline/strikeThrough/"
                     + "doubleStrikeThrough/color 至少给一个）";
         }
         args.put("anchorText", anchorText);
         args.put("applyToAll", applyToAll != null && applyToAll);
+        if (paragraphCount != null) args.put("paragraphCount", paragraphCount);
         return officeBridgeService.executeOfficeCommand(conversationId, "format_text", args);
     }
 
     @Tool("在当前 Word 文档中设置段落格式：对齐、行距、段前段后间距、缩进、标题级别。" +
           "anchorText 须与文档中的文本精确一致，命中处所在的整个段落即目标段落；" +
-          "默认只对第一处匹配所在段落生效，applyToAll=true 对所有匹配所在段落生效。" +
+          "默认只对第一处匹配所在段落生效，applyToAll=true 对所有匹配所在段落生效；" +
+          "若传 paragraphCount（1~200），则从命中段落起连续对 paragraphCount 个段落批量生效。" +
           "格式参数至少要给一个，没传的保持原样。" +
           "lineSpacing/spaceBefore/spaceAfter/firstLineIndent/leftIndent/rightIndent 单位都是磅：" +
-          "行距按字号换算（12 磅字的 1.5 倍行距填 18，2 倍填 24）；" +
-          "首行缩进按中文惯例 2 字符换算（12 磅字填 24）。" +
+          "行距按字号换算（12 磅字的 1.5 倍行距填 18，2 倍填 24；若直接传倍数如 1.5 或 2，会自动按 12 磅折算为 18 或 24）；" +
+          "首行缩进可传 firstLineIndentChars（字符数，如 2；传 0 取消缩进顶格）或 firstLineIndent（磅值，12 磅字缩进 2 字符填 24）。" +
           "styleBuiltIn 用于标题级别（heading1~heading4，normal 恢复正文）。" +
           "修改以 Word 原生修订（Track Changes）形式呈现。")
     @ToolMeta(displayName = "设置段落格式", category = "office", fileEffect = "MODIFIED")
@@ -754,16 +766,18 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("目标段落中的一段文本（须与文档精确一致）") String anchorText,
             @P("是否对所有匹配所在段落生效（false=仅第一处）") Boolean applyToAll,
             @P("对齐方式：left/center/right/justify（不改则不传）") String alignment,
-            @P("行距（磅），如 12 磅字的 1.5 倍行距填 18（不改则不传）") Double lineSpacing,
+            @P("行距（磅，如 12 磅字的 1.5 倍行距填 18；传 <=5 的倍数如 1.5 会自动折算为 18 磅）（不改则不传）") Double lineSpacing,
             @P("段前间距（磅）（不改则不传）") Double spaceBefore,
             @P("段后间距（磅）（不改则不传）") Double spaceAfter,
-            @P("首行缩进（磅），正值缩进；12 磅字缩进 2 字符填 24（不改则不传）") Double firstLineIndent,
+            @P("首行缩进（磅），正值缩进；12 磅字缩进 2 字符填 24，传 0 取消缩进（不改则不传）") Double firstLineIndent,
             @P("左缩进（磅）（不改则不传）") Double leftIndent,
             @P("右缩进（磅）（不改则不传）") Double rightIndent,
-            @P("段落样式（标题级别）：normal/heading1/heading2/heading3/heading4（不改则不传）") String styleBuiltIn
+            @P("段落样式（标题级别）：normal/heading1/heading2/heading3/heading4（不改则不传）") String styleBuiltIn,
+            @P(value = "首行缩进（字符数，如 2；传 0 取消缩进顶格；按 12 磅字折算，与 firstLineIndent 二选一）", required = false) Double firstLineIndentChars,
+            @P(value = "从命中段落起连续套用段落格式的段数（可选，1~200，缺省 1）", required = false) Integer paragraphCount
     ) {
-        log.info("Tool: office_set_paragraph_format called, anchor={}, alignment={}, styleBuiltIn={}",
-                anchorText, alignment, styleBuiltIn);
+        log.info("Tool: office_set_paragraph_format called, anchor={}, alignment={}, styleBuiltIn={}, paragraphCount={}",
+                anchorText, alignment, styleBuiltIn, paragraphCount);
         if (anchorText == null || anchorText.isBlank()) {
             return "Error: 目标文本不能为空";
         }
@@ -772,6 +786,9 @@ public class OfficeEditTools implements AgentToolComponent {
         }
         if (lineSpacing != null && lineSpacing <= 0) {
             return "Error: lineSpacing 须为大于 0 的磅值（12 磅字的 1.5 倍行距填 18）";
+        }
+        if (paragraphCount != null && (paragraphCount < 1 || paragraphCount > MAX_NUMBERING_PARAGRAPHS)) {
+            return "Error: paragraphCount 须为 1~" + MAX_NUMBERING_PARAGRAPHS + " 的整数";
         }
         String alignmentValue;
         String styleValue;
@@ -784,19 +801,28 @@ public class OfficeEditTools implements AgentToolComponent {
 
         Map<String, Object> args = new HashMap<>();
         if (alignmentValue != null) args.put("alignment", alignmentValue);
-        if (lineSpacing != null) args.put("lineSpacing", lineSpacing);
+        if (lineSpacing != null) {
+            double effectiveLineSpacing = lineSpacing <= 5.0 ? lineSpacing * 12.0 : lineSpacing;
+            args.put("lineSpacing", effectiveLineSpacing);
+        }
         if (spaceBefore != null) args.put("spaceBefore", spaceBefore);
         if (spaceAfter != null) args.put("spaceAfter", spaceAfter);
-        if (firstLineIndent != null) args.put("firstLineIndent", firstLineIndent);
+        if (firstLineIndent != null) {
+            args.put("firstLineIndent", firstLineIndent);
+        } else if (firstLineIndentChars != null) {
+            args.put("firstLineIndent", firstLineIndentChars * 12.0);
+            args.put("firstLineIndentChars", firstLineIndentChars);
+        }
         if (leftIndent != null) args.put("leftIndent", leftIndent);
         if (rightIndent != null) args.put("rightIndent", rightIndent);
         if (styleValue != null) args.put("styleBuiltIn", styleValue);
         if (args.isEmpty()) {
             return "Error: 未给出任何格式参数（alignment/lineSpacing/spaceBefore/spaceAfter/"
-                    + "firstLineIndent/leftIndent/rightIndent/styleBuiltIn 至少给一个）";
+                    + "firstLineIndent/firstLineIndentChars/leftIndent/rightIndent/styleBuiltIn 至少给一个）";
         }
         args.put("anchorText", anchorText);
         args.put("applyToAll", applyToAll != null && applyToAll);
+        if (paragraphCount != null) args.put("paragraphCount", paragraphCount);
         return officeBridgeService.executeOfficeCommand(conversationId, "set_paragraph_format", args);
     }
 

@@ -471,3 +471,7 @@ txt/md/markdown 自 dev-board#37 起不进 LOWA（前端走 PlainTextEditor.vue�
 ### 2026-10-11 导出与多产物身份回执（dev-board #1202）
 
 `doc_export_pdf` 继续不把源文档标成 ADDED；现在真实新 PDF 落盘后通过 GeneratedFileLocation 的 `{status:success,db_id,...}` 回执报告新文件。PdfTools 的衍生 PDF/Word、诉讼图/时间轴的已注册交付文件、dd_export 同样返回真实 ID；多产物用 files 数组，每一项独立成功。部分拆分失败保留失败原因，只列已落盘项；语义地图等内部中间数据不作为用户交付物。GeneratedFileLocation 的“新文件身份解析”和“默认输出目录策略”相互独立，PDF 仍继承源目录。编排器再次验证所属项目后才发 file_change，失败及重复未改动回执不伪造新成果。
+
+- **Word 自动编号定位、连续多段选区与六项常用格式对齐（dev-board#1372）**：
+  - `office_thread.js` 新增 `readParagraphListLabel(el)` / `readParagraphDisplayText(el)` 读取 `ListLabelString`，使 `get_clauses`、`find_text_locations`、`insert_under_heading`、`writingSectionOf` 能同时识别自动编号与手打编号条款（如 `第一条`、`一、`、`1.1`），并在 `find_text_locations` / `get_clauses` / `get_formatting` 中返回 `listLabel` 与 `isListItem`。
+  - `select_paragraph`、`format_selection`、`set_paragraph_format`、`office_format_text`、`office_set_paragraph_format` 支持 `paragraphCount`（按起止段或锚点向后连续扩展 $N$ 段）、`fontNameAsian` / `fontNameWestern` 中西文字体分设、`firstLineIndentChars`（按段落当前字号自动换算 `mm100` / `pt`，且自动编号段落默认不叠加首行缩进以免二次缩进），并对 `lineSpacing <= 5` 自动按倍数（`MULTIPLE` / `×12pt`）处理，修复 `1.5` 倍行距被误设为固定值或 `1.5pt` 的问题。
