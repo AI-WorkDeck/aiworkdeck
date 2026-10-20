@@ -627,6 +627,16 @@ function buildFontPlan(args) {
     props.Name = String(args.fontName)
     applied.name = String(args.fontName)
   }
+  if (args.fontNameAsian) {
+    props.NameFarEast = String(args.fontNameAsian)
+    if (!props.Name) props.Name = String(args.fontNameAsian)
+    applied.nameFarEast = String(args.fontNameAsian)
+  }
+  if (args.fontNameWestern) {
+    props.NameAscii = String(args.fontNameWestern)
+    if (!props.Name) props.Name = String(args.fontNameWestern)
+    applied.nameAscii = String(args.fontNameWestern)
+  }
   if (args.fontSize != null) {
     props.Size = Number(args.fontSize)
     applied.size = Number(args.fontSize)
@@ -686,7 +696,8 @@ function buildParagraphPlan(args) {
     applied.alignment = String(args.alignment).trim().toLowerCase()
   }
   if (args.lineSpacing != null) {
-    const v = Number(args.lineSpacing)
+    const rawLs = Number(args.lineSpacing)
+    const v = rawLs > 0 && rawLs <= 5 ? rawLs * 12 : rawLs
     ops.push((pf) => {
       pf.LineSpacingRule = wdLineSpaceAtLeast
       pf.LineSpacing = v
@@ -706,6 +717,11 @@ function buildParagraphPlan(args) {
       ops.push((pf) => { pf[propKey] = v })
       applied[argKey] = v
     }
+  }
+  if (args.firstLineIndent == null && args.firstLineIndentChars != null && isFinite(Number(args.firstLineIndentChars))) {
+    const v = Number(args.firstLineIndentChars) * 12
+    ops.push((pf) => { pf.FirstLineIndent = v })
+    applied.firstLineIndent = v
   }
   return { ops, applied, empty: !Object.keys(applied).length }
 }

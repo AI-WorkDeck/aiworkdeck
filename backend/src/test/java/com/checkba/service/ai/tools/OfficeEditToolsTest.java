@@ -159,7 +159,7 @@ class OfficeEditToolsTest {
                 .thenReturn("{\"formatted\":1,\"tracked\":true}");
 
         String result = tools.office_format_text("conv-1", "第一条", true, "楷体_GB2312", 12.0,
-                true, null, "Wave", null, null, "#C00000");
+                true, null, "Wave", null, null, "#C00000", "宋体", "Times New Roman", 3);
 
         assertEquals("{\"formatted\":1,\"tracked\":true}", result);
         @SuppressWarnings("unchecked")
@@ -169,6 +169,9 @@ class OfficeEditToolsTest {
         assertEquals("第一条", sent.get("anchorText"));
         assertEquals(true, sent.get("applyToAll"));
         assertEquals("楷体_GB2312", sent.get("fontName"));
+        assertEquals("宋体", sent.get("fontNameAsian"));
+        assertEquals("Times New Roman", sent.get("fontNameWestern"));
+        assertEquals(3, sent.get("paragraphCount"));
         assertEquals(12.0, sent.get("fontSize"));
         assertEquals(true, sent.get("bold"));
         assertEquals("wave", sent.get("underline"));
@@ -178,12 +181,12 @@ class OfficeEditToolsTest {
     }
 
     @Test
-    @DisplayName("office_set_paragraph_format：磅值与枚举透传，未给字段不下发")
+    @DisplayName("office_set_paragraph_format：磅值与枚举透传，行距倍数与字符数缩进自动折算")
     void setParagraphFormatDispatches() {
         when(bridge.executeOfficeCommand(any(), eq("set_paragraph_format"), anyMap())).thenReturn("{}");
 
-        tools.office_set_paragraph_format("conv-1", "第一条", null, "Justify", 18.0,
-                null, 18.0, 24.0, null, null, "heading2");
+        tools.office_set_paragraph_format("conv-1", "第一条", null, "Justify", 1.5,
+                null, 18.0, null, null, null, "heading2", 2.0, 4);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> args = ArgumentCaptor.forClass(Map.class);
@@ -195,6 +198,8 @@ class OfficeEditToolsTest {
         assertEquals(18.0, sent.get("lineSpacing"));
         assertEquals(18.0, sent.get("spaceAfter"));
         assertEquals(24.0, sent.get("firstLineIndent"));
+        assertEquals(2.0, sent.get("firstLineIndentChars"));
+        assertEquals(4, sent.get("paragraphCount"));
         assertEquals("heading2", sent.get("styleBuiltIn"));
         assertFalse(sent.containsKey("spaceBefore"));
         assertFalse(sent.containsKey("leftIndent"));
@@ -218,30 +223,30 @@ class OfficeEditToolsTest {
     void formatValidationFailuresDoNotTouchBridge() {
         // 空锚点 / 锚点超 255
         assertTrue(tools.office_format_text("conv-1", " ", null, "宋体", null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null, null).startsWith("Error"));
         assertTrue(tools.office_format_text("conv-1", "长".repeat(256), null, "宋体", null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null, null).startsWith("Error"));
         // 一个格式参数都没给
         assertTrue(tools.office_format_text("conv-1", "第一条", null, null, null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null, null).startsWith("Error"));
         // 非法枚举 / 非法颜色 / 非法字号
         assertTrue(tools.office_format_text("conv-1", "第一条", null, null, null,
-                null, null, "squiggly", null, null, null).startsWith("Error"));
+                null, null, "squiggly", null, null, null, null, null, null).startsWith("Error"));
         assertTrue(tools.office_format_text("conv-1", "第一条", null, null, null,
-                null, null, null, null, null, "红色").startsWith("Error"));
+                null, null, null, null, null, "红色", null, null, null).startsWith("Error"));
         assertTrue(tools.office_format_text("conv-1", "第一条", null, null, 0.0,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null, null).startsWith("Error"));
         // 段落面
         assertTrue(tools.office_set_paragraph_format("conv-1", "", null, "left", null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null).startsWith("Error"));
         assertTrue(tools.office_set_paragraph_format("conv-1", "第一条", null, null, null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null).startsWith("Error"));
         assertTrue(tools.office_set_paragraph_format("conv-1", "第一条", null, "middle", null,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null).startsWith("Error"));
         assertTrue(tools.office_set_paragraph_format("conv-1", "第一条", null, null, null,
-                null, null, null, null, null, "heading9").startsWith("Error"));
+                null, null, null, null, null, "heading9", null, null).startsWith("Error"));
         assertTrue(tools.office_set_paragraph_format("conv-1", "第一条", null, null, -1.0,
-                null, null, null, null, null, null).startsWith("Error"));
+                null, null, null, null, null, null, null, null).startsWith("Error"));
         // 读取面
         assertTrue(tools.office_get_formatting("conv-1", "长".repeat(256)).startsWith("Error"));
         verifyNoInteractions(bridge);

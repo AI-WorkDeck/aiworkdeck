@@ -323,6 +323,130 @@ function selectVisibly(range) {
   try { ctrl.getViewCursor().gotoRange(range, false); return true; }
   catch (e) { try { ctrl.select(range); return true; } catch (e2) { return false; } }
 }
+// 读取段落自动编号的可见标签（仅当 NumberingIsNumber !== false 且 ListLabelString 非空时返回）。
+function readParagraphLabel(el) {
+  if (!el || typeof el.getPropertyValue !== 'function') return '';
+  try {
+    const hasLabel = el.getPropertyValue('NumberingIsNumber');
+    if (hasLabel === false) return '';
+    const lbl = el.getPropertyValue('ListLabelString');
+    return typeof lbl === 'string' ? lbl.trim() : '';
+  } catch (e) { return ''; }
+}
+// 拼接自动编号标签与段落正文（如 ListLabelString="第一条" + text="服务内容" -> "第一条 服务内容"），
+// 供条款识别、标题定位与带编号关键词搜索统一匹配自动编号与手打编号。
+function paragraphCombinedText(el) {
+  const raw = String((el && typeof el.getString === 'function' && el.getString()) || '');
+  const lbl = readParagraphLabel(el);
+  if (!lbl) return raw;
+  const trimmed = raw.trim();
+  if (trimmed.indexOf(lbl) === 0) return raw;
+  const needSpace = !/[、.．:：）)\s]$/.test(lbl) && trimmed.length > 0 && !/^[、.．:：）)\s]/.test(trimmed);
+  return lbl + (needSpace ? ' ' : '') + raw;
+}
+// 当 XSearchable.findFirst 找不到带自动编号前缀的查询词（如 "第一条 服务内容"、"1.1 乙方义务" 或单独的 "第一条"）
+// 时，回退扫描段落的 ListLabelString + 正文，返回段落级或段内子区间 XTextRange 及其 paragraphIndex/numbering。
+function findNumberedParagraphRanges(keyword, matchCase, limit) {
+  const kw = String(keyword || '').trim();
+  if (!kw) return { hits: [], truncated: false };
+  const needle = matchCase ? kw : kw.toLowerCase();
+  const norm = function (s) { return (matchCase ? String(s) : String(s).toLowerCase()).replace(/[\s\u3000]+/g, ''); };
+  const needleCompact = norm(kw);
+  const hits = [];
+  let truncated = false;
+  const maxHits = Number(limit) || 50;
+  eachParagraph(function (el, idx) {
+    const lbl = readParagraphLabel(el);
+    if (!lbl) return false;
+    const raw = String(el.getString() || '');
+    const combined = paragraphCombinedText(el);
+    const hay = matchCase ? combined : combined.toLowerCase();
+    const lblCmp = matchCase ? lbl : lbl.toLowerCase();
+    const matched = hay.indexOf(needle) !== -1 || lblCmp === needle || (needleCompact.length > 0 && norm(combined).indexOf(needleCompact) !== -1);
+    if (!matched) return false;
+    if (hits.length >= maxHits) { truncated = true; return true; }
+    let range = el;
+    if (norm(combined).indexOf(needleCompact) === 0 && needleCompact.length > norm(lbl).length) {
+      const stripped = kw.slice(lbl.length).replace(/^[\s\u3000、.．:：）)]+/, '');
+      if (stripped && raw) {
+        const rawHay = matchCase ? raw : raw.toLowerCase();
+        const subNeedle = matchCase ? stripped : stripped.toLowerCase();
+        const pos = rawHay.indexOf(subNeedle);
+        if (pos >= 0 && !/[\uD800-\uDFFF]/.test(raw.slice(0, pos + stripped.length))) {
+          try {
+            const cur = el.getText().createTextCursorByRange(el.getStart());
+            if ((!pos || cur.goRight(pos, false)) && cur.goRight(stripped.length, true)) range = cur;
+          } catch (e) {}
+        }
+      }
+    }
+    hits.push({ range: range, paragraphIndex: idx, numbering: paragraphNumberingOf(el), combinedText: combined });
+    return false;
+  });
+  return { hits: hits, truncated: truncated };
+}
+// 选中闭区间 [startIdx, endIdx] 的正文段落（兼容单段与跨段，滚动视图光标并返回选中的段落数组）。
+function selectParagraphRange(startIdx, endIdx) {
+  const total = getParaIndex().total;
+  const s = Number(startIdx);
+  const e = endIdx != null ? Number(endIdx) : s;
+  if (!Number.isInteger(s) || !Number.isInteger(e) || s < 0 || e < s || s >= total || e >= total) {
+    return { error: 'paragraph index out of range: ' + startIdx + (endIdx != null ? '..' + endIdx : '') + ' (count ' + total + ')' };
+  }
+  const first = paraAt(s);
+  const last = e === s ? first : paraAt(e);
+  if (!first || !last) return { error: 'paragraph index out of range: ' + s + '..' + e + ' (count ' + total + ')' };
+  const paras = [];
+  for (let i = s; i <= e; i++) {
+    const pEl = paraAt(i);
+    if (pEl) paras.push(pEl);
+  }
+  try {
+    const vc = ctrl.getViewCursor();
+    if (s === e) {
+      if (!selectVisibly(first)) return { error: 'could not select paragraph ' + s };
+    } else {
+      vc.gotoRange(first.getStart(), false);
+      vc.gotoRange(last.getEnd(), true);
+    }
+  } catch (err) {
+    if (!selectVisibly(first)) return { error: 'could not select paragraph range ' + s + '..' + e };
+  }
+  return { startIndex: s, endIndex: e, paragraphs: paras, first: first, last: last };
+}
+// 收集当前选区覆盖到的正文段落对象（若选区在表格单元格或无法枚举则返回空数组，调用方回退到 vc）。
+function selectedBodyParagraphs(vc) {
+  const out = [];
+  try {
+    const cur = vc.getText().createTextCursorByRange(vc);
+    const en = cur.createEnumeration();
+    while (en.hasMoreElements()) {
+      const el = en.nextElement();
+      if (el && el.supportsService && el.supportsService('com.sun.star.text.Paragraph')) out.push(el);
+    }
+  } catch (e) {}
+  return out;
+}
+// 解析格式化原语可选携带的定位参数（paragraphIndex / index / startParagraph + endParagraph / anchor），
+// 若传入则先选中目标范围并返回 {paragraphs, startParagraph, endParagraph}；未传则沿用当前选区。
+function resolveFormatTargets(p) {
+  if (p && (p.paragraphIndex != null || p.index != null || p.startParagraph != null || p.endParagraph != null)) {
+    const s = p.startParagraph != null ? Number(p.startParagraph) : (p.paragraphIndex != null ? Number(p.paragraphIndex) : Number(p.index));
+    const e = p.endParagraph != null ? Number(p.endParagraph) : (p.endIndex != null ? Number(p.endIndex) : s);
+    const sel = selectParagraphRange(s, e);
+    if (sel.error) return { error: sel.error };
+    return { paragraphs: sel.paragraphs, startParagraph: sel.startIndex, endParagraph: sel.endIndex, explicitRange: true };
+  }
+  if (p && (p.anchor || p.anchorId)) {
+    const aName = String(p.anchor || p.anchorId);
+    const r = anchorRange(aName);
+    if (!r) return { error: 'anchor not found: ' + aName };
+    selectVisibly(r);
+  }
+  const vc = ctrl.getViewCursor();
+  const paras = selectedBodyParagraphs(vc);
+  return { paragraphs: paras, explicitRange: false };
+}
 function pad2(n) { return (n < 10 ? '0' : '') + n; }
 // ---- 审阅面板（修订/批注）的取址助手 ---------------------------------------
 // redline 枚举没有按索引取的接口，面板的 index 就是枚举顺序（每次操作后宿主
@@ -1192,6 +1316,85 @@ function setCharProp(ps, base, value) {
     try { ps.setPropertyValue(base + sfx, value); } catch (e) { /* not all props have siblings */ }
   }
 }
+// 中文字号名 → 磅值映射（兼容「小四」「小四号」「四号」「五号」「三号」「小三」等律师常用口令）
+const CN_FONT_SIZE_PT = {
+  '初号': 42, '小初': 36, '一号': 26, '小一': 24, '二号': 22, '小二': 18,
+  '三号': 16, '小三': 15, '四号': 14, '小四': 12, '五号': 10.5, '小五': 9,
+  '六号': 7.5, '小六': 6.5, '七号': 5.5, '八号': 5,
+};
+function parseFontSizePt(v) {
+  if (v == null) return null;
+  if (typeof v === 'number') return (isFinite(v) && v > 0) ? v : null;
+  const s = String(v).trim();
+  if (!s) return null;
+  const key = s.replace(/号$/, '');
+  if (CN_FONT_SIZE_PT[s] != null) return CN_FONT_SIZE_PT[s];
+  if (CN_FONT_SIZE_PT[key] != null) return CN_FONT_SIZE_PT[key];
+  if (CN_FONT_SIZE_PT[key + '号'] != null) return CN_FONT_SIZE_PT[key + '号'];
+  const num = Number(s.replace(/(pt|磅|号)$/i, '').trim());
+  return (isFinite(num) && num > 0) ? num : null;
+}
+// 读取光标/段落的有效字号（优先读中文实际生效的 CharHeightAsian，再读 CharHeight，最后兜底 HOUSE.bodyPt）。
+function effectiveCharHeightPt(ps, fallbackPs) {
+  const sources = [ps, fallbackPs];
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i];
+    if (!src || typeof src.getPropertyValue !== 'function') continue;
+    try { const ha = Number(src.getPropertyValue('CharHeightAsian')); if (isFinite(ha) && ha > 0) return ha; } catch (e) {}
+    try { const h = Number(src.getPropertyValue('CharHeight')); if (isFinite(h) && h > 0) return h; } catch (e) {}
+  }
+  return HOUSE.bodyPt || 12;
+}
+// 解析下划线参数：支持 boolean 与字符串线型（single/double/dotted/dashed/dash/wave/bold/none）。
+function resolveUnderlineEnum(u) {
+  const U = (css && css.awt && css.awt.FontUnderline) || {};
+  const NONE = U.NONE != null ? U.NONE : 0;
+  const SINGLE = U.SINGLE != null ? U.SINGLE : 1;
+  const DOUBLE = U.DOUBLE != null ? U.DOUBLE : 2;
+  const DOTTED = U.DOTTED != null ? U.DOTTED : 3;
+  const DASH = U.DASH != null ? U.DASH : 5;
+  const WAVE = U.WAVE != null ? U.WAVE : 10;
+  const BOLD = U.BOLD != null ? U.BOLD : 12;
+  if (typeof u === 'boolean') return { value: u ? SINGLE : NONE, label: u };
+  const s = String(u).trim().toLowerCase();
+  if (!s || s === 'false' || s === 'none' || s === '0' || s === 'off' || s === '无') return { value: NONE, label: false };
+  if (s === 'true' || s === 'single' || s === '1' || s === 'on' || s === '单下划线') return { value: SINGLE, label: s === 'single' ? 'single' : true };
+  if (s === 'double' || s === '双下划线') return { value: DOUBLE, label: 'double' };
+  if (s === 'dotted' || s === '点线' || s === '点式下划线') return { value: DOTTED, label: 'dotted' };
+  if (s === 'dash' || s === 'dashed' || s === '虚线') return { value: DASH, label: 'dashed' };
+  if (s === 'wave' || s === 'wavy' || s === '波浪线') return { value: WAVE, label: 'wave' };
+  if (s === 'bold' || s === 'thick' || s === '粗线') return { value: BOLD, label: 'bold' };
+  return { value: SINGLE, label: true };
+}
+// 解析行距参数（兼容 single/1.5/oneHalf/double/multiple/proportional/atLeast/minimum/exact/exactly/fixed 及直接数字字符串）
+function parseLineSpacingSpec(modeRaw, valueRaw) {
+  const mode = String(modeRaw || '').trim();
+  const modeLower = mode.toLowerCase();
+  const v = Number(valueRaw) || 0;
+  const M = (css && css.style && css.style.LineSpacingMode) || { PROP: 0, MINIMUM: 1, LEADING: 2, FIX: 3 };
+  if (modeLower === 'single' || mode === '1' || mode === '1.0') return { ls: { Mode: M.PROP, Height: 100 }, label: 'single' };
+  if (mode === '1.5' || modeLower === 'onehalf' || modeLower === '1.5x') return { ls: { Mode: M.PROP, Height: 150 }, label: '1.5' };
+  if (modeLower === 'double' || mode === '2' || mode === '2.0' || modeLower === '2x') return { ls: { Mode: M.PROP, Height: 200 }, label: 'double' };
+  if (modeLower === 'proportional' || modeLower === 'multiple' || modeLower === 'multi') {
+    if (v <= 0) return { error: 'proportional/multiple 行距需要正数 lineSpacingValue（百分比或倍数，如 150 或 1.5）' };
+    const pct = v <= 10 ? Math.round(v * 100) : Math.round(v);
+    return { ls: { Mode: M.PROP, Height: pct }, label: 'proportional:' + pct };
+  }
+  if (modeLower === 'atleast' || modeLower === 'minimum' || modeLower === 'min') {
+    if (v <= 0) return { error: 'atLeast 行距需要正数 lineSpacingValue（磅）' };
+    return { ls: { Mode: M.MINIMUM, Height: ptToMm100(v) }, label: 'atLeast:' + v };
+  }
+  if (modeLower === 'exactly' || modeLower === 'exact' || modeLower === 'fixed' || modeLower === 'fix') {
+    if (v <= 0) return { error: 'exactly 行距需要正数 lineSpacingValue（磅）' };
+    return { ls: { Mode: M.FIX, Height: ptToMm100(v) }, label: 'exactly:' + v };
+  }
+  const numMode = Number(mode.replace(/x$/i, ''));
+  if (isFinite(numMode) && numMode > 0) {
+    const pct = numMode <= 10 ? Math.round(numMode * 100) : Math.round(numMode);
+    return { ls: { Mode: M.PROP, Height: pct }, label: 'proportional:' + pct };
+  }
+  return { error: 'bad lineSpacingMode: ' + mode + ' (single/1.5/double/multiple/proportional/atLeast/exactly)' };
+}
 
 // ---- 标准格式（house style）与 markdown 剥离写入 -----------------------------
 // 用户规范：正文中文楷体_GB2312 / 西文 Arial、段前 0 磅段后 18 磅、行距最小值
@@ -1432,16 +1635,39 @@ function applyHouseChar(ps, opts) {
   }
   try { ps.setPropertyValue('CharColor', color); } catch (e) {}
 }
+// 同时对段落对象与跨整段的 XTextCursor 设字符格式，确保 Word 导入的 <w:rPr> run 级直接格式被覆盖。
+function applyHouseCharDeep(el, opts) {
+  applyHouseChar(el, opts);
+  try {
+    if (el && typeof el.getText === 'function') {
+      const cur = el.getText().createTextCursorByRange(el);
+      if (cur && cur !== el) applyHouseChar(cur, opts);
+    }
+  } catch (e) {}
+}
 // 段落规格按画像块取：title = 一级标题块；heading = opts.level 级标题块（缺省二级，
 // house-default 里二至六级与正文同款只加粗）；body / list（不缩进）= 正文块；
 // tableCell = 表格单元格块。opts.afterTable：紧跟表格的首段段前取 afterTableSpaceBefore。
 function houseParaSpec(kind, opts) {
   const o = opts || {};
-  if (kind === 'title') return headingSpec(1);
-  if (kind === 'heading') return headingSpec(o.level != null ? o.level : 2);
-  if (kind === 'tableCell') return HOUSE.cellSpec;
-  if (kind === 'list') return Object.assign({}, HOUSE.bodySpec, { indentMm: 0 });
-  return HOUSE.bodySpec;
+  let base;
+  if (kind === 'title') base = headingSpec(1);
+  else if (kind === 'heading') base = headingSpec(o.level != null ? o.level : 2);
+  else if (kind === 'tableCell') return HOUSE.cellSpec;
+  else if (kind === 'list') base = Object.assign({}, HOUSE.bodySpec, { indentMm: 0 });
+  else base = HOUSE.bodySpec;
+  const ov = o.overrides;
+  if (!ov && !o.isNumbered) return base;
+  const copy = Object.assign({}, base);
+  if (o.isNumbered) copy.indentMm = 0;
+  if (ov) {
+    if (kind !== 'title' && ov.align) copy.align = ov.align;
+    if (ov.topMm != null) copy.topMm = ov.topMm;
+    if (ov.bottomMm != null) copy.bottomMm = ov.bottomMm;
+    if (ov.ls != null) copy.ls = ov.ls;
+    if (kind === 'body' && !o.isNumbered && ov.indentMm != null) copy.indentMm = ov.indentMm;
+  }
+  return copy;
 }
 function applyHousePara(ps, kind, opts) {
   const o = opts || {};
@@ -1571,7 +1797,7 @@ function insertInlineStyled(vc, text) {
 // 文本里是否带 markdown 标记（插入路径按此决定走剥离转换还是原样插入）
 const MD_MARKER_RE = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\)|^\s*#{1,6}\s|^\s*>\s)/m;
 
-// 编号规则预设。preset: 'bullet' | 'decimal' | 'chinese' | 'multilevel'。
+// 编号规则预设。preset: 'bullet' | 'decimal' | 'chinese' | 'clause' | 'paren_chinese' | 'multilevel'。
 // replaceByIndex 收 sequence<PropertyValue>（zetajs 编组：纯 Array of PropertyValue）。
 function makeNumberingRules(preset) {
   // 常量组带数值兜底：zetajs 常量组个别项缺失时 undefined 进 PropertyValue 会编组失败
@@ -1589,6 +1815,14 @@ function makeNumberingRules(preset) {
     } else if (preset === 'chinese') {
       props.push(mkProp('NumberingType', NUMBER_LOWER_ZH));
       props.push(mkProp('Suffix', '、')); // 一、二、
+    } else if (preset === 'clause') {
+      props.push(mkProp('NumberingType', NUMBER_LOWER_ZH));
+      props.push(mkProp('Prefix', '第'));
+      props.push(mkProp('Suffix', '条 ')); // 第一条 、第二条 
+    } else if (preset === 'paren_chinese') {
+      props.push(mkProp('NumberingType', NUMBER_LOWER_ZH));
+      props.push(mkProp('Prefix', '（'));
+      props.push(mkProp('Suffix', '）')); // （一）（二）
     } else if (preset === 'multilevel') {
       props.push(mkProp('NumberingType', ARABIC));
       props.push(mkProp('Suffix', '.'));
@@ -2517,7 +2751,9 @@ function styleProfileSummary() {
   };
 }
 // 段落分类：首个非空短段（idx 0、<=60 字）为 title；OutlineLevel>0 或 Heading 样式为
-// heading（trueLevels 时取真实级别，否则一律二级 = 改造前"小标题=正文款加粗"）；其余 body。
+// heading（trueLevels 时取真实级别，否则一律二级 = 改造前"小标题=正文款加粗"）；
+// 合同短条款头（第X章/节/编、第X条、一、，兼容自动编号与手打编号）同样归为 heading；
+// 非标题的自动编号段落归为 list（不叠加 2 字符首行缩进）；其余 body。
 function paraKindOf(el, isFirst, trueLevels) {
   let lvl = 0, style = '';
   try { lvl = el.getPropertyValue('OutlineLevel') || 0; } catch (e) {}
@@ -2527,15 +2763,79 @@ function paraKindOf(el, isFirst, trueLevels) {
     if (!level) { const m = /(\d+)/.exec(style); level = m ? Number(m[1]) : 2; }
     return { kind: 'heading', level: trueLevels ? level : 2 };
   }
+  const combined = paragraphCombinedText(el).trim();
+  if (combined && combined.length <= 45 && !/[。；;！!？?：:]$/.test(combined)) {
+    if (/^\s*第[一二三四五六七八九十百千零〇0-9１-９]+\s*[章节编]/.test(combined)) {
+      return { kind: 'heading', level: 2 };
+    }
+    if (/^\s*(第[一二三四五六七八九十百千零〇0-9１-９]+\s*条|[一二三四五六七八九十]{1,3}\s*、)/.test(combined)) {
+      return { kind: 'heading', level: trueLevels ? 3 : 2 };
+    }
+  }
+  if (readParagraphLabel(el)) {
+    return { kind: 'list', level: null };
+  }
   return { kind: 'body', level: null };
 }
-function charOptsFor(k) {
-  if (k.kind === 'body') return { sizePt: HOUSE.bodyPt, bold: HOUSE.bodyBold, keepWeight: true };
+function buildStandardOverrides(p) {
+  if (!p || typeof p !== 'object') return null;
+  const ov = {};
+  if (p.fontNameAsian || p.fontName) ov.fontAsian = String(p.fontNameAsian || p.fontName);
+  if (p.fontNameWestern || p.fontName) ov.fontWestern = String(p.fontNameWestern || p.fontName);
+  const bodyPt = parseFontSizePt(p.bodyFontSizePt != null ? p.bodyFontSizePt : p.fontSize);
+  if (bodyPt) ov.bodyPt = bodyPt;
+  const titlePt = parseFontSizePt(p.titleFontSizePt);
+  if (titlePt) ov.titlePt = titlePt;
+  const headingPt = parseFontSizePt(p.headingFontSizePt);
+  if (headingPt) ov.headingPt = headingPt;
+  if (p.alignment && PROFILE_ALIGN[String(p.alignment).toLowerCase()]) {
+    ov.align = PROFILE_ALIGN[String(p.alignment).toLowerCase()];
+  }
+  if (p.spaceBeforePt != null && isFinite(Number(p.spaceBeforePt))) ov.topMm = ptToMm100(Number(p.spaceBeforePt));
+  if (p.spaceAfterPt != null && isFinite(Number(p.spaceAfterPt))) ov.bottomMm = ptToMm100(Number(p.spaceAfterPt));
+  if (p.lineSpacingMode != null) {
+    const parsed = parseLineSpacingSpec(p.lineSpacingMode, p.lineSpacingValue);
+    if (parsed && parsed.ls) {
+      const M = (css && css.style && css.style.LineSpacingMode) || { PROP: 0, MINIMUM: 1, FIX: 3 };
+      if (parsed.ls.Mode === M.PROP) ov.ls = { mode: 'prop', pct: parsed.ls.Height };
+      else if (parsed.ls.Mode === M.FIX) ov.ls = { mode: 'fix', mm: parsed.ls.Height };
+      else ov.ls = { mode: 'min', mm: parsed.ls.Height };
+    }
+  }
+  const effBodyPt = ov.bodyPt || HOUSE.bodyPt || 12;
+  if (p.firstLineIndentChars != null && isFinite(Number(p.firstLineIndentChars))) {
+    ov.indentMm = ptToMm100(Number(p.firstLineIndentChars) * effBodyPt);
+  } else if (p.firstLineIndentPt != null && isFinite(Number(p.firstLineIndentPt))) {
+    ov.indentMm = ptToMm100(Number(p.firstLineIndentPt));
+  }
+  return Object.keys(ov).length ? ov : null;
+}
+function charOptsFor(k, overrides) {
+  const ov = overrides || {};
+  if (k.kind === 'body' || k.kind === 'list') {
+    return {
+      sizePt: ov.bodyPt || HOUSE.bodyPt,
+      bold: HOUSE.bodyBold,
+      keepWeight: true,
+      fontAsian: ov.fontAsian || HOUSE.fontAsian,
+      fontWestern: ov.fontWestern || HOUSE.fontWestern,
+    };
+  }
   const hs = k.kind === 'title' ? headingSpec(1) : headingSpec(k.level);
-  return { sizePt: hs.sizePt, bold: hs.bold, fontAsian: hs.fontAsian, fontWestern: hs.fontWestern, color: hs.color };
+  const sz = k.kind === 'title'
+    ? (ov.titlePt || hs.sizePt)
+    : (ov.headingPt || ov.bodyPt || hs.sizePt);
+  return {
+    sizePt: sz,
+    bold: hs.bold,
+    fontAsian: ov.fontAsian || hs.fontAsian,
+    fontWestern: ov.fontWestern || hs.fontWestern,
+    color: hs.color,
+  };
 }
 async function applyHouseToDocument(p, opts) {
   const trueLevels = !!(opts && opts.trueLevels);
+  const overrides = buildStandardOverrides(p);
   // progress 的 total = 正文段数 + 表数（顶层元素数）；段数走索引缓存，表数一次 getCount。
   let total = 0;
   try { total = getParaIndex().total; } catch (e) {}
@@ -2558,8 +2858,8 @@ async function applyHouseToDocument(p, opts) {
         if (idx === 0 && text.length <= 60) k = { kind: 'title', level: 1 };
       }
       if (k.kind !== 'title') k = paraKindOf(el, idx === 0, trueLevels);
-      applyHousePara(el, k.kind, { afterTable: prevWasTable, level: k.level });
-      applyHouseChar(el, charOptsFor(k));
+      applyHousePara(el, k.kind, { afterTable: prevWasTable, level: k.level, isNumbered: !!readParagraphLabel(el), overrides: overrides });
+      applyHouseCharDeep(el, charOptsFor(k, overrides));
       prevWasTable = false;
       paras++;
     } else if (el.supportsService && el.supportsService('com.sun.star.text.TextTable')) {
@@ -2571,6 +2871,7 @@ async function applyHouseToDocument(p, opts) {
   } finally { unlockModel(); }
   if (idx > BATCH && !cancelled) postProgress(p, idx, total);
   const r = Object.assign({ success: true, paragraphs: paras, tables: tables, truncated: cancelled }, verifySnapshot());
+  if (overrides) r.overrides = overrides;
   if (cancelled) { r.cancelled = true; r.done = idx; }
   return r;
 }
@@ -3660,14 +3961,14 @@ function writingSectionOf(range) {
       if (index >= ix.total) return null;
       let appendix = '', heading = '', appendixSource = null, headingSource = null;
       for (let i = 0; i <= index; i++) {
-        const paragraph = ix.ranges[i], rawText = String(paragraph.getString() || ''), text = rawText.trim();
+        const paragraph = ix.ranges[i], rawText = String(paragraph.getString() || ''), combined = paragraphCombinedText(paragraph), text = combined.trim();
         const marker = text.match(/^(第[一二三四五六七八九十百零〇0-9]+[条节章]|附件[一二三四五六七八九十零〇0-9]+).{0,100}$/);
         if (marker) {
-          if (marker[1].indexOf('附件') === 0) { appendix = marker[1]; heading = ''; appendixSource = { index: i, text: rawText }; headingSource = null; }
-          else { heading = marker[1]; headingSource = { index: i, text: rawText }; }
+          if (marker[1].indexOf('附件') === 0) { appendix = marker[1]; heading = ''; appendixSource = { index: i, text: combined }; headingSource = null; }
+          else { heading = marker[1]; headingSource = { index: i, text: combined }; }
         } else {
           let level = 0; try { level = Number(paragraph.getPropertyValue('OutlineLevel')) || 0; } catch (e) {}
-          if (level > 0 && level <= 6 && text.length <= 100) { heading = text; headingSource = text ? { index: i, text: rawText } : null; }
+          if (level > 0 && level <= 6 && text.length <= 100) { heading = text; headingSource = text ? { index: i, text: rawText || combined } : null; }
         }
       }
       const path = [appendix, heading].filter(Boolean);
@@ -4251,9 +4552,20 @@ const EXEC = {
     // 同步执行，200 个匹配足以把 Qt 事件循环冻住好几秒（修订期假死的贡献因素）。
     // 消歧一个目标用不到 50 个候选；批量替换走 find_replace。
     const ranges = [];
+    const fallbackMetas = [];
     let hit = xModel.findFirst(sd);
     while (hit !== null && ranges.length < 50) { ranges.push(hit); hit = xModel.findNext(hit, sd); }
-    const truncated = hit !== null;
+    let truncated = hit !== null;
+    // 若 XSearchable 未命中，而查询词含自动编号前缀（如「第一条 服务内容」「1.1 乙方义务」或「第一条」），
+    // 回退扫描段落的 ListLabelString + 正文合并文本。
+    if (ranges.length === 0 && typeof findNumberedParagraphRanges === 'function') {
+      const fb = findNumberedParagraphRanges(String(p.keyword || ''), !!p.matchCase, 50);
+      for (let k = 0; k < fb.hits.length; k++) {
+        ranges.push(fb.hits[k].range);
+        fallbackMetas.push(fb.hits[k]);
+      }
+      if (fb.truncated) truncated = true;
+    }
     // Each match carries DISAMBIGUATION CONTEXT (chars before/after + enclosing
     // paragraph), so the AI can tell identical hits apart BEFORE editing — the
     // WPS-era "replaced the wrong one" class of bug dies here.
@@ -4262,12 +4574,19 @@ const EXEC = {
       try { anchorId = anchorBookmark(r); } catch (e) {}
       const ctx = contextAround(r, 40);
       const paragraph = paragraphTextOf(r) || '';
-      return {
+      const meta = fallbackMetas[i] || null;
+      const item = {
         matchIndex: i, anchorId: anchorId, text: r.getString(),
         contextBefore: ctx.before, contextAfter: ctx.after,
         paragraph: paragraph.slice(0, 160),
         paragraphLength: paragraph.length, paragraphTruncated: paragraph.length > 160,
       };
+      if (meta) {
+        item.paragraphIndex = meta.paragraphIndex;
+        item.numbering = meta.numbering;
+        item.matchedViaNumberingLabel = true;
+      }
+      return item;
     });
     const res = { success: true, count: matches.length, matches: matches };
     if (truncated) { res.truncated = true; res.note = '匹配超过 50 个，仅返回前 50——请用更长的关键词缩小范围，或用 find_replace 批量处理'; }
@@ -4369,43 +4688,69 @@ const EXEC = {
   // rarely use heading styles, which is why get_outline sees nothing there and
   // the model degraded to counting paragraphs/lines as "clauses".
   get_clauses() {
-    const RE_TIAO  = /^\s*第[一二三四五六七八九十百千零〇0-9１-９]+\s*条/;       // 第X条 — the clause proper
-    const RE_ZHANG = /^\s*第[一二三四五六七八九十百千零〇0-9１-９]+\s*[章节编]/;  // 第X章/节/编 — section above clauses
-    const RE_ENUM  = /^\s*[一二三四五六七八九十]{1,3}\s*、/;                      // 一、 二、 — top-level enum many contracts use
+    const RE_TIAO   = /^\s*第[一二三四五六七八九十百千零〇0-9１-９]+\s*条/;       // 第X条 — the clause proper
+    const RE_ZHANG  = /^\s*第[一二三四五六七八九十百千零〇0-9１-９]+\s*[章节编]/;  // 第X章/节/编 — section above clauses
+    const RE_ENUM   = /^\s*[一二三四五六七八九十]{1,3}\s*、/;                      // 一、 二、 — top-level enum many contracts use
+    const RE_PAREN  = /^\s*[（(][一二三四五六七八九十]{1,3}[）)]/;                  // （一）（二） — fallback enum
+    const RE_ARABIC = /^\s*\d{1,2}\s*[.．、]\s*(?!\d)\S/;                          // 1. / 1、 — top-level numeric clause
     const marks = []; let total = 0;
     eachParagraph(function (el, i) {
       total = i + 1;
-      const t = el.getString() || '';
+      const raw = el.getString() || '';
+      let label = '';
+      if (el && typeof el.getPropertyValue === 'function') {
+        try {
+          if (el.getPropertyValue('NumberingIsNumber') !== false) {
+            const lbl = el.getPropertyValue('ListLabelString');
+            if (typeof lbl === 'string') label = lbl.trim();
+          }
+        } catch (e) {}
+      }
+      const trimmedRaw = raw.trim();
+      const t = (label && trimmedRaw.indexOf(label) !== 0)
+        ? (label + (!/[、.．:：）)\s]$/.test(label) && trimmedRaw ? ' ' : '') + raw)
+        : raw;
       let type = null;
       if (RE_TIAO.test(t)) type = 'tiao';
       else if (RE_ZHANG.test(t)) type = 'zhang';
       else if (RE_ENUM.test(t)) type = 'enum';
-      if (type) marks.push({ index: i, type: type, text: t });
+      else if (RE_PAREN.test(t) && t.trim().length <= 60 && !/[。；;]$/.test(t.trim())) type = 'paren';
+      else if (RE_ARABIC.test(t) && t.trim().length <= 45 && !/[。；;]$/.test(t.trim())) type = 'arabic';
+      if (type) marks.push({ index: i, type: type, text: t, autoNumbered: !!label, listLabel: label || null });
       return false;
     });
     // Granularity: 第X条 wins when present (一、 then is usually a sub-item);
-    // otherwise fall back to the 一、 enum as the clause level. 章/节 always kept.
+    // otherwise fall back to 一、, then （一）, then 1. as the clause level. 章/节 always kept.
     const hasTiao = marks.some(function (m) { return m.type === 'tiao'; });
+    const hasEnum = marks.some(function (m) { return m.type === 'enum'; });
+    const hasParen = marks.some(function (m) { return m.type === 'paren'; });
+    const primaryType = hasTiao ? 'tiao' : (hasEnum ? 'enum' : (hasParen ? 'paren' : 'arabic'));
     const boundaries = marks.filter(function (m) {
-      return m.type === 'zhang' || m.type === (hasTiao ? 'tiao' : 'enum');
+      return m.type === 'zhang' || m.type === primaryType;
     });
     const clauses = [];
     for (let k = 0; k < boundaries.length && clauses.length < 300; k++) {
       const b = boundaries[k];
       const end = (k + 1 < boundaries.length) ? boundaries[k + 1].index - 1 : total - 1;
       const line = b.text.trim();
-      const re = b.type === 'tiao' ? RE_TIAO : (b.type === 'zhang' ? RE_ZHANG : RE_ENUM);
+      const re = b.type === 'tiao' ? RE_TIAO : (b.type === 'zhang' ? RE_ZHANG : (b.type === 'enum' ? RE_ENUM : (b.type === 'paren' ? RE_PAREN : /^\s*\d{1,2}\s*[.．、]/)));
       const m = line.match(re);
-      clauses.push({
+      const item = {
         no: (m ? m[0] : line.slice(0, 8)).trim(),
         type: b.type,
         title: line.slice(0, 60),
         startParagraph: b.index,
         endParagraph: end,
         paragraphCount: end - b.index + 1,
-      });
+      };
+      if (b.autoNumbered) {
+        item.autoNumbered = true;
+        item.listLabel = b.listLabel;
+      }
+      clauses.push(item);
     }
     const firstBoundary = boundaries.length ? boundaries[0].index : total;
+    const granLabel = hasTiao ? '第X条' : (hasEnum ? '一、二、…' : (hasParen ? '（一）（二）…' : (boundaries.length ? '1. 2. …' : 'none')));
     return {
       success: true, totalParagraphs: total, clauseCount: clauses.length,
       totalClauseCount: boundaries.length, truncated: boundaries.length > clauses.length,
@@ -4413,7 +4758,7 @@ const EXEC = {
         nextStartParagraph: boundaries[clauses.length].index,
         note: '条款目录超过 300 条，仅返回前 300 条；totalClauseCount 是完整目录数量。请从 nextStartParagraph 用 get_document_text 继续读取正文。',
       } : {}),
-      granularity: hasTiao ? '第X条' : (boundaries.length ? '一、二、…' : 'none'),
+      granularity: granLabel,
       // 0..preambleParagraphs-1 = 首部（合同名称/当事人信息），不属于任何条款
       preambleParagraphs: firstBoundary,
       clauses: clauses,
@@ -4659,8 +5004,21 @@ const EXEC = {
     let vc = null;
     try { vc = ctrl.getViewCursor(); } catch (e) { return { success: false, message: errStr(e) }; }
     const ch = {};
-    try { ch.bold = vc.getPropertyValue('CharWeight') > 100; } catch (e) {}
-    try { ch.italic = !enumEq(vc.getPropertyValue('CharPosture'), css.awt.FontSlant.NONE); } catch (e) {}
+    try {
+      const wa = Number(vc.getPropertyValue('CharWeightAsian')) || 0;
+      const ww = Number(vc.getPropertyValue('CharWeight')) || 0;
+      ch.bold = wa > 100 || ww > 100;
+    } catch (e) {
+      try { ch.bold = vc.getPropertyValue('CharWeight') > 100; } catch (e2) {}
+    }
+    try {
+      const paSlant = vc.getPropertyValue('CharPostureAsian');
+      const pwSlant = vc.getPropertyValue('CharPosture');
+      ch.italic = (paSlant != null && !enumEq(paSlant, css.awt.FontSlant.NONE))
+        || (pwSlant != null && !enumEq(pwSlant, css.awt.FontSlant.NONE));
+    } catch (e) {
+      try { ch.italic = !enumEq(vc.getPropertyValue('CharPosture'), css.awt.FontSlant.NONE); } catch (e2) {}
+    }
     try { ch.underline = !enumEq(vc.getPropertyValue('CharUnderline'), css.awt.FontUnderline.NONE); } catch (e) {}
     try { ch.strikeout = !enumEq(vc.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
     try {
@@ -4669,7 +5027,7 @@ const EXEC = {
     } catch (e) {}
     try { ch.font = vc.getPropertyValue('CharFontName'); } catch (e) {}
     try { ch.fontAsian = vc.getPropertyValue('CharFontNameAsian'); } catch (e) {}
-    try { ch.sizePt = vc.getPropertyValue('CharHeight'); } catch (e) {}
+    try { ch.sizePt = effectiveCharHeightPt(vc); } catch (e) {}
     try { const c = vc.getPropertyValue('CharColor'); ch.color = c === -1 ? 'auto' : '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); } catch (e) {}
     try { const h = vc.getPropertyValue('CharHighlight'); ch.highlight = h === -1 ? 'none' : '#' + ('000000' + (h >>> 0).toString(16)).slice(-6); } catch (e) {}
     out.character = ch;
@@ -5417,13 +5775,27 @@ const EXEC = {
       before: ctx.before, after: ctx.after, paragraph: (paragraphTextOf(vc) || '').slice(0, 300),
     };
   },
-  // [定位] select the Nth (0-based) body paragraph, visibly (view scrolls to it).
+  // [定位] select the Nth (0-based) body paragraph or [index, endIndex] range, visibly (view scrolls to it).
   select_paragraph(p) {
-    const idx = Number(p.index) || 0;
+    const idx = Number(p && p.index) || 0;
+    if (p && p.endIndex != null && Number(p.endIndex) !== idx) {
+      const sel = selectParagraphRange(idx, Number(p.endIndex));
+      if (sel.error) return { success: false, message: sel.error };
+      let txt = '';
+      try { txt = ctrl.getViewCursor().getString() || ''; } catch (e) {}
+      if (!txt) txt = sel.paragraphs.map(function (el) { return el.getString(); }).join('\n');
+      return {
+        success: true,
+        index: sel.startIndex,
+        endIndex: sel.endIndex,
+        paragraphCount: sel.paragraphs.length,
+        text: txt.slice(0, 300),
+      };
+    }
     const found = paraAt(idx);
     if (!found) return { success: false, message: 'paragraph index out of range: ' + idx };
     if (!selectVisibly(found)) return { success: false, message: 'could not select paragraph ' + idx };
-    return { success: true, index: idx, text: found.getString() };
+    return { success: true, index: idx, text: found.getString(), numbering: paragraphNumberingOf(found) };
   },
   // [定位] drop the cursor at the start/end edge of the current selection — the
   // human move for "insert BEFORE/AFTER this" (compose with insert_at_cursor).
@@ -5443,7 +5815,8 @@ const EXEC = {
     return Object.assign({ success: true, deletedText: had.slice(0, 200), deletedChars: had.length }, verifySnapshot());
   },
   // [格式] character formatting on the CURRENT selection (select first, then
-  // format — same order a human works in). Any subset of the params applies;
+  // format — same order a human works in) or on an explicit paragraph range
+  // (startParagraph/endParagraph/paragraphIndex). Any subset of the params applies;
   // booleans false/'none' explicitly clear. CJK-safe via Asian/Complex siblings.
   // atCursor:true（自建工具栏传）= Word 语义：没有选区时把格式设在光标处，之后在这里
   // 敲的字沿用新格式。真引擎实证（24.2.8-zhcn-r5）：塌陷视图光标上 setPropertyValue
@@ -5452,92 +5825,210 @@ const EXEC = {
   // AI 管线不传 atCursor，没选区照旧明确报错——否则模型会以为「格式已设」而文档上
   // 什么都看不见。
   format_selection(p) {
+    const tgt = resolveFormatTargets(p);
+    if (tgt.error) return { success: false, message: tgt.error };
     const vc = ctrl.getViewCursor();
-    const collapsed = (vc.getString() || '').length === 0;
+    const collapsed = (vc.getString() || '').length === 0 && !tgt.explicitRange;
     if (collapsed && !p.atCursor) return { success: false, message: 'nothing selected — select first, then format' };
-    const applied = {};
-    if (p.bold != null) { setCharProp(vc, 'CharWeight', p.bold ? css.awt.FontWeight.BOLD : css.awt.FontWeight.NORMAL); applied.bold = !!p.bold; }
-    if (p.italic != null) { setCharProp(vc, 'CharPosture', p.italic ? css.awt.FontSlant.ITALIC : css.awt.FontSlant.NONE); applied.italic = !!p.italic; }
-    if (p.underline != null) { vc.setPropertyValue('CharUnderline', p.underline ? css.awt.FontUnderline.SINGLE : css.awt.FontUnderline.NONE); applied.underline = !!p.underline; }
-    if (p.strikeout != null) { vc.setPropertyValue('CharStrikeout', p.strikeout ? css.awt.FontStrikeout.SINGLE : css.awt.FontStrikeout.NONE); applied.strikeout = !!p.strikeout; }
+    let hiColor = null;
     if (p.highlight != null) {
-      const c = parseColor(p.highlight, HIGHLIGHT_COLORS);
-      if (c == null) return { success: false, message: 'bad highlight color: ' + p.highlight + ' (use yellow/green/cyan/magenta/red/blue/gray/none or #RRGGBB)' };
-      vc.setPropertyValue('CharHighlight', c); applied.highlight = String(p.highlight);
+      hiColor = parseColor(p.highlight, HIGHLIGHT_COLORS);
+      if (hiColor == null) return { success: false, message: 'bad highlight color: ' + p.highlight + ' (use yellow/green/cyan/magenta/red/blue/gray/none or #RRGGBB)' };
     }
+    let fgColor = null;
     if (p.color != null) {
-      const c = parseColor(p.color, { auto: -1 });
-      if (c == null) return { success: false, message: 'bad color: ' + p.color + ' (use #RRGGBB or auto)' };
-      vc.setPropertyValue('CharColor', c); applied.color = String(p.color);
+      fgColor = parseColor(p.color, { auto: -1 });
+      if (fgColor == null) return { success: false, message: 'bad color: ' + p.color + ' (use #RRGGBB or auto)' };
     }
-    if (p.fontSize != null) { setCharProp(vc, 'CharHeight', Number(p.fontSize)); applied.fontSize = Number(p.fontSize); }
-    if (p.fontName != null) { setCharProp(vc, 'CharFontName', String(p.fontName)); applied.fontName = String(p.fontName); }
-    // 中文字体单独设（fontName 已把西文/中文/复杂文种三项一起设成同一字体；中西文分设时后设中文）
-    if (p.fontNameAsian != null) { vc.setPropertyValue('CharFontNameAsian', String(p.fontNameAsian)); applied.fontNameAsian = String(p.fontNameAsian); }
+    let parsedSize = null;
+    if (p.fontSize != null) {
+      parsedSize = parseFontSizePt(p.fontSize);
+      if (parsedSize == null) return { success: false, message: 'bad fontSize: ' + p.fontSize + ' (use number in pt or Chinese size like 小四/四号/三号)' };
+    }
+    let ulSpec = null;
+    const rawUl = p.underlineStyle != null ? p.underlineStyle : p.underline;
+    if (rawUl != null) ulSpec = resolveUnderlineEnum(rawUl);
+    const applied = {};
+    if (p.bold != null) applied.bold = !!p.bold;
+    if (p.italic != null) applied.italic = !!p.italic;
+    if (ulSpec != null) applied.underline = ulSpec.label;
+    if (p.strikeout != null) applied.strikeout = !!p.strikeout;
+    if (p.highlight != null) applied.highlight = String(p.highlight);
+    if (p.color != null) applied.color = String(p.color);
+    if (parsedSize != null) applied.fontSize = parsedSize;
+    if (p.fontName != null) applied.fontName = String(p.fontName);
+    if (p.fontNameWestern != null) applied.fontNameWestern = String(p.fontNameWestern);
+    if (p.fontNameAsian != null) applied.fontNameAsian = String(p.fontNameAsian);
     if (Object.keys(applied).length === 0) return { success: false, message: 'no format params given' };
-    return { success: true, applied: applied, selectedText: vc.getString().slice(0, 100), atCursor: collapsed };
+    const applyCharProps = function (target) {
+      if (!target || typeof target.setPropertyValue !== 'function') return;
+      if (p.bold != null) setCharProp(target, 'CharWeight', p.bold ? css.awt.FontWeight.BOLD : css.awt.FontWeight.NORMAL);
+      if (p.italic != null) setCharProp(target, 'CharPosture', p.italic ? css.awt.FontSlant.ITALIC : css.awt.FontSlant.NONE);
+      if (ulSpec != null) target.setPropertyValue('CharUnderline', ulSpec.value);
+      if (p.strikeout != null) target.setPropertyValue('CharStrikeout', p.strikeout ? css.awt.FontStrikeout.SINGLE : css.awt.FontStrikeout.NONE);
+      if (hiColor != null) target.setPropertyValue('CharHighlight', hiColor);
+      if (fgColor != null) target.setPropertyValue('CharColor', fgColor);
+      if (parsedSize != null) setCharProp(target, 'CharHeight', parsedSize);
+      if (p.fontName != null) setCharProp(target, 'CharFontName', String(p.fontName));
+      // 西文字体单独设（不覆盖 CharFontNameAsian）；中文字体单独设时放在后面确保生效
+      if (p.fontNameWestern != null) {
+        target.setPropertyValue('CharFontName', String(p.fontNameWestern));
+        try { target.setPropertyValue('CharFontNameComplex', String(p.fontNameWestern)); } catch (e) {}
+      }
+      if (p.fontNameAsian != null) target.setPropertyValue('CharFontNameAsian', String(p.fontNameAsian));
+    };
+    const selStr = vc.getString() || '';
+    const coverWholeParas = tgt.explicitRange
+      || tgt.paragraphs.length > 1
+      || (tgt.paragraphs.length === 1 && selStr === (tgt.paragraphs[0].getString() || ''));
+    if (coverWholeParas && tgt.paragraphs.length > 0) {
+      lockModel();
+      try {
+        applyCharProps(vc);
+        for (let i = 0; i < tgt.paragraphs.length; i++) {
+          const el = tgt.paragraphs[i];
+          applyCharProps(el);
+          try {
+            if (typeof el.getText === 'function') {
+              const cur = el.getText().createTextCursorByRange(el);
+              if (cur && cur !== el) applyCharProps(cur);
+            }
+          } catch (e) {}
+        }
+      } finally { unlockModel(); }
+    } else {
+      applyCharProps(vc);
+    }
+    const res = { success: true, applied: applied, selectedText: (vc.getString() || '').slice(0, 100), atCursor: collapsed };
+    if (tgt.explicitRange) {
+      res.startParagraph = tgt.startParagraph;
+      res.endParagraph = tgt.endParagraph;
+      res.paragraphCount = tgt.paragraphs.length;
+    }
+    return res;
   },
   // [格式] paragraph-level formatting on the selection's paragraph(s): alignment,
   // paragraph style, line spacing, space before/after, indents. headingLevel 1-9
   // maps to the programmatic style name ('Heading N', valid regardless of UI
   // language); 0 = back to body ('Standard').
   set_paragraph_format(p) {
+    const tgt = resolveFormatTargets(p);
+    if (tgt.error) return { success: false, message: tgt.error };
     const vc = ctrl.getViewCursor();
     const applied = {};
     let alignment = null;
     if (p.alignment != null) {
-      const m = { left: css.style.ParagraphAdjust.LEFT, right: css.style.ParagraphAdjust.RIGHT, center: css.style.ParagraphAdjust.CENTER, justify: css.style.ParagraphAdjust.BLOCK };
+      const m = {
+        left: css.style.ParagraphAdjust.LEFT,
+        right: css.style.ParagraphAdjust.RIGHT,
+        center: css.style.ParagraphAdjust.CENTER,
+        justify: css.style.ParagraphAdjust.BLOCK,
+        both: css.style.ParagraphAdjust.BLOCK,
+        distribute: css.style.ParagraphAdjust.BLOCK,
+      };
       alignment = m[String(p.alignment).toLowerCase()];
       if (alignment == null) return { success: false, message: 'bad alignment: ' + p.alignment + ' (left/right/center/justify)' };
+      applied.alignment = String(p.alignment);
     }
     let styleName = p.styleName != null ? String(p.styleName) : null;
     if (p.headingLevel != null) {
       const lvl = Number(p.headingLevel);
       styleName = lvl >= 1 && lvl <= 9 ? 'Heading ' + lvl : 'Standard';
     }
-    if (styleName != null) { vc.setPropertyValue('ParaStyleName', styleName); applied.styleName = styleName; }
-    // 切换段落样式会重置对齐；用户同次明确给出的格式必须在样式之后应用。
-    if (alignment != null) { vc.setPropertyValue('ParaAdjust', alignment); applied.alignment = String(p.alignment); }
-    // 行距：single / 1.5 / double（固定倍数），proportional（百分比），
-    // atLeast（最小值，磅），exactly（固定值，磅）
+    if (styleName != null) applied.styleName = styleName;
+    // 行距：single / 1.5 / double / multiple / proportional / atLeast / exactly（及常见别名）
+    let parsedLs = null;
     if (p.lineSpacingMode != null) {
+      parsedLs = parseLineSpacingSpec(p.lineSpacingMode, p.lineSpacingValue);
+      if (parsedLs.error) return { success: false, message: parsedLs.error };
       const mode = String(p.lineSpacingMode);
       const v = Number(p.lineSpacingValue) || 0;
-      const M = css.style.LineSpacingMode;
-      let ls = null;
-      if (mode === 'single') ls = { Mode: M.PROP, Height: 100 };
-      else if (mode === '1.5' || mode === 'oneHalf') ls = { Mode: M.PROP, Height: 150 };
-      else if (mode === 'double') ls = { Mode: M.PROP, Height: 200 };
-      else if (mode === 'proportional') { if (v <= 0) return { success: false, message: 'proportional 行距需要 lineSpacingValue（百分比，如 120）' }; ls = { Mode: M.PROP, Height: Math.round(v) }; }
-      else if (mode === 'atLeast') { if (v <= 0) return { success: false, message: 'atLeast 行距需要 lineSpacingValue（磅）' }; ls = { Mode: M.MINIMUM, Height: ptToMm100(v) }; }
-      else if (mode === 'exactly') { if (v <= 0) return { success: false, message: 'exactly 行距需要 lineSpacingValue（磅）' }; ls = { Mode: M.FIX, Height: ptToMm100(v) }; }
-      else return { success: false, message: 'bad lineSpacingMode: ' + mode + ' (single/1.5/double/proportional/atLeast/exactly)' };
-      vc.setPropertyValue('ParaLineSpacing', new css.style.LineSpacing(ls));
       applied.lineSpacing = mode + (v > 0 ? ':' + v : '');
     }
-    if (p.spaceBeforePt != null) { vc.setPropertyValue('ParaTopMargin', ptToMm100(p.spaceBeforePt)); applied.spaceBeforePt = Number(p.spaceBeforePt); }
-    if (p.spaceAfterPt != null) { vc.setPropertyValue('ParaBottomMargin', ptToMm100(p.spaceAfterPt)); applied.spaceAfterPt = Number(p.spaceAfterPt); }
-    // 首行缩进按"字符"数折算：以光标处字号为一个字符宽（CJK 方块字口径）
-    if (p.firstLineIndentChars != null) {
-      let chPt = HOUSE.bodyPt;
-      try { const h = vc.getPropertyValue('CharHeight'); if (h > 0) chPt = h; } catch (e) {}
-      vc.setPropertyValue('ParaFirstLineIndent', ptToMm100(Number(p.firstLineIndentChars) * chPt));
-      applied.firstLineIndentChars = Number(p.firstLineIndentChars);
-    } else if (p.firstLineIndentPt != null) {
-      vc.setPropertyValue('ParaFirstLineIndent', ptToMm100(p.firstLineIndentPt));
-      applied.firstLineIndentPt = Number(p.firstLineIndentPt);
-    }
-    if (p.leftIndentPt != null) { vc.setPropertyValue('ParaLeftMargin', ptToMm100(p.leftIndentPt)); applied.leftIndentPt = Number(p.leftIndentPt); }
-    if (p.rightIndentPt != null) { vc.setPropertyValue('ParaRightMargin', ptToMm100(p.rightIndentPt)); applied.rightIndentPt = Number(p.rightIndentPt); }
+    if (p.spaceBeforePt != null) applied.spaceBeforePt = Number(p.spaceBeforePt);
+    else if (p.spaceBeforeLines != null) applied.spaceBeforeLines = Number(p.spaceBeforeLines);
+    if (p.spaceAfterPt != null) applied.spaceAfterPt = Number(p.spaceAfterPt);
+    else if (p.spaceAfterLines != null) applied.spaceAfterLines = Number(p.spaceAfterLines);
+    if (p.firstLineIndentChars != null) applied.firstLineIndentChars = Number(p.firstLineIndentChars);
+    else if (p.firstLineIndentPt != null) applied.firstLineIndentPt = Number(p.firstLineIndentPt);
+    if (p.leftIndentChars != null) applied.leftIndentChars = Number(p.leftIndentChars);
+    else if (p.leftIndentPt != null) applied.leftIndentPt = Number(p.leftIndentPt);
+    if (p.rightIndentPt != null) applied.rightIndentPt = Number(p.rightIndentPt);
     if (Object.keys(applied).length === 0) return { success: false, message: 'no paragraph format params given' };
-    return Object.assign({ success: true, applied: applied }, verifySnapshot());
+    const applyParaProps = function (target) {
+      if (!target || typeof target.setPropertyValue !== 'function') return;
+      if (styleName != null) target.setPropertyValue('ParaStyleName', styleName);
+      // 切换段落样式会重置对齐；用户同次明确给出的格式必须在样式之后应用。
+      if (alignment != null) target.setPropertyValue('ParaAdjust', alignment);
+      if (parsedLs != null) target.setPropertyValue('ParaLineSpacing', new css.style.LineSpacing(parsedLs.ls));
+      const chPt = effectiveCharHeightPt(target, vc);
+      if (p.spaceBeforePt != null) target.setPropertyValue('ParaTopMargin', ptToMm100(p.spaceBeforePt));
+      else if (p.spaceBeforeLines != null) target.setPropertyValue('ParaTopMargin', ptToMm100(Number(p.spaceBeforeLines) * chPt * 1.2));
+      if (p.spaceAfterPt != null) target.setPropertyValue('ParaBottomMargin', ptToMm100(p.spaceAfterPt));
+      else if (p.spaceAfterLines != null) target.setPropertyValue('ParaBottomMargin', ptToMm100(Number(p.spaceAfterLines) * chPt * 1.2));
+      // 首行缩进按"字符"数折算：优先按中文实际字号 CharHeightAsian 计算（CJK 方块字口径）
+      if (p.firstLineIndentChars != null) {
+        const chars = Number(p.firstLineIndentChars);
+        target.setPropertyValue('ParaFirstLineIndent', ptToMm100(chars * chPt));
+        if (chars === 0 && p.leftIndentPt == null && p.leftIndentChars == null && !readParagraphLabel(target)) {
+          try { target.setPropertyValue('ParaLeftMargin', 0); } catch (e) {}
+        }
+      } else if (p.firstLineIndentPt != null) {
+        const ptVal = Number(p.firstLineIndentPt);
+        target.setPropertyValue('ParaFirstLineIndent', ptToMm100(ptVal));
+        if (ptVal === 0 && p.leftIndentPt == null && p.leftIndentChars == null && !readParagraphLabel(target)) {
+          try { target.setPropertyValue('ParaLeftMargin', 0); } catch (e) {}
+        }
+      }
+      if (p.leftIndentChars != null) target.setPropertyValue('ParaLeftMargin', ptToMm100(Number(p.leftIndentChars) * chPt));
+      else if (p.leftIndentPt != null) target.setPropertyValue('ParaLeftMargin', ptToMm100(p.leftIndentPt));
+      if (p.rightIndentPt != null) target.setPropertyValue('ParaRightMargin', ptToMm100(p.rightIndentPt));
+    };
+    if (tgt.paragraphs.length > 1) {
+      lockModel();
+      try {
+        applyParaProps(vc);
+        for (let i = 0; i < tgt.paragraphs.length; i++) applyParaProps(tgt.paragraphs[i]);
+      } finally { unlockModel(); }
+    } else {
+      applyParaProps(vc);
+      if (tgt.paragraphs.length === 1) applyParaProps(tgt.paragraphs[0]);
+    }
+    const out = Object.assign({ success: true, applied: applied }, verifySnapshot());
+    if (tgt.explicitRange) {
+      out.startParagraph = tgt.startParagraph;
+      out.endParagraph = tgt.endParagraph;
+      out.paragraphCount = tgt.paragraphs.length;
+    }
+    return out;
   },
   // [格式] 给选区所在段落设置编号/项目符号。preset: bullet（•）/ decimal（1. 2.）/
-  // chinese（一、二、）/ multilevel（1. → 1.1 → 1.1.1）/ none（去掉编号）。
+  // chinese（一、二、）/ clause（第一条）/ paren_chinese（（一））/ multilevel（1. → 1.1 → 1.1.1）/ none（去掉编号）。
   set_numbering(p) {
+    const tgt = resolveFormatTargets(p);
+    if (tgt.error) return { success: false, message: tgt.error };
     const preset = String(p.preset || 'decimal');
     if (preset === 'none') {
       dispatchUno('.uno:RemoveBullets');
+      const vc = ctrl.getViewCursor();
+      // 若跨段选区或样式绑定编号导致 RemoveBullets 未彻底清除，逐段补充清空 NumberingStyleName 并复位悬挂缩进
+      const clearNumOn = function (ps) {
+        if (!ps || typeof ps.setPropertyValue !== 'function') return;
+        try {
+          if (ps.getPropertyValue('NumberingIsNumber') !== false) {
+            try { ps.setPropertyValue('NumberingStyleName', ''); } catch (e) {}
+            try { ps.setPropertyValue('NumberingRules', null); } catch (e) {}
+          }
+        } catch (e) {}
+        try {
+          const fi = Number(ps.getPropertyValue('ParaFirstLineIndent')) || 0;
+          if (fi < 0) {
+            ps.setPropertyValue('ParaFirstLineIndent', 0);
+            ps.setPropertyValue('ParaLeftMargin', 0);
+          }
+        } catch (e) {}
+      };
+      for (let i = 0; i < tgt.paragraphs.length; i++) clearNumOn(tgt.paragraphs[i]);
       // UNO 派发可能不抛错却没有生效；去列表必须用真实状态判定，不能只回显 preset。
       const isNumbered = ctrl.getViewCursor().getPropertyValue('NumberingIsNumber');
       if (isNumbered !== false) return tableFail('项目符号或编号尚未清除，请重新选中目标段落后重试，并用 doc_get_formatting 核验');
@@ -5554,6 +6045,17 @@ const EXEC = {
     const vc = ctrl.getViewCursor();
     vc.setPropertyValue('NumberingRules', rules);
     vc.setPropertyValue('NumberingLevel', lvl);
+    if (tgt.paragraphs.length > 1) {
+      lockModel();
+      try {
+        for (let i = 0; i < tgt.paragraphs.length; i++) {
+          try {
+            tgt.paragraphs[i].setPropertyValue('NumberingRules', rules);
+            tgt.paragraphs[i].setPropertyValue('NumberingLevel', lvl);
+          } catch (e) {}
+        }
+      } finally { unlockModel(); }
+    }
     return Object.assign({ success: true, preset: preset, level: lvl + 1 }, verifySnapshot());
   },
   // [格式] 表格格式：边框/字号/首行加粗居中/单元格垂直对齐/数字居右/列宽/行高。
@@ -5878,30 +6380,52 @@ const EXEC = {
     };
   },
   // [感知] 读取光标/选区处的字符+段落+表格格式——"先看清现状再动手"的眼睛。
-  get_formatting() {
+  get_formatting(p) {
+    let targetEl = null;
+    if (p && p.paragraphIndex != null) {
+      const idx = Number(p.paragraphIndex);
+      targetEl = paraAt(idx);
+      if (!targetEl) return { success: false, message: 'paragraph index out of range: ' + idx };
+      try { selectVisibly(targetEl); } catch (e) {}
+    }
     const vc = ctrl.getViewCursor();
+    const src = targetEl || vc;
     const out = { success: true };
+    if (p && p.paragraphIndex != null) out.paragraphIndex = Number(p.paragraphIndex);
     const ch = {};
-    try { ch.fontWestern = vc.getPropertyValue('CharFontName'); } catch (e) {}
-    try { ch.fontAsian = vc.getPropertyValue('CharFontNameAsian'); } catch (e) {}
-    try { ch.sizePt = vc.getPropertyValue('CharHeight'); } catch (e) {}
-    try { ch.bold = vc.getPropertyValue('CharWeight') > 100; } catch (e) {}
-    try { ch.italic = !enumEq(vc.getPropertyValue('CharPosture'), css.awt.FontSlant.NONE); } catch (e) {}
-    try { ch.underline = !enumEq(vc.getPropertyValue('CharUnderline'), css.awt.FontUnderline.NONE); } catch (e) {}
-    try { ch.strikeout = !enumEq(vc.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
-    try { const c = vc.getPropertyValue('CharColor'); ch.color = c === -1 ? 'auto' : '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); } catch (e) {}
-    try { const h = vc.getPropertyValue('CharHighlight'); ch.highlight = h === -1 ? 'none' : '#' + ('000000' + (h >>> 0).toString(16)).slice(-6); } catch (e) {}
+    try { ch.fontWestern = src.getPropertyValue('CharFontName'); } catch (e) {}
+    try { ch.fontAsian = src.getPropertyValue('CharFontNameAsian'); } catch (e) {}
+    try { ch.sizePt = effectiveCharHeightPt(src, vc); } catch (e) {}
+    try {
+      const wa = Number(src.getPropertyValue('CharWeightAsian')) || 0;
+      const ww = Number(src.getPropertyValue('CharWeight')) || 0;
+      ch.bold = wa > 100 || ww > 100;
+    } catch (e) {
+      try { ch.bold = src.getPropertyValue('CharWeight') > 100; } catch (e2) {}
+    }
+    try {
+      const paSlant = src.getPropertyValue('CharPostureAsian');
+      const pwSlant = src.getPropertyValue('CharPosture');
+      ch.italic = (paSlant != null && !enumEq(paSlant, css.awt.FontSlant.NONE))
+        || (pwSlant != null && !enumEq(pwSlant, css.awt.FontSlant.NONE));
+    } catch (e) {
+      try { ch.italic = !enumEq(src.getPropertyValue('CharPosture'), css.awt.FontSlant.NONE); } catch (e2) {}
+    }
+    try { ch.underline = !enumEq(src.getPropertyValue('CharUnderline'), css.awt.FontUnderline.NONE); } catch (e) {}
+    try { ch.strikeout = !enumEq(src.getPropertyValue('CharStrikeout'), css.awt.FontStrikeout.NONE); } catch (e) {}
+    try { const c = src.getPropertyValue('CharColor'); ch.color = c === -1 ? 'auto' : '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); } catch (e) {}
+    try { const h = src.getPropertyValue('CharHighlight'); ch.highlight = h === -1 ? 'none' : '#' + ('000000' + (h >>> 0).toString(16)).slice(-6); } catch (e) {}
     out.character = ch;
     const pa = {};
-    try { pa.styleName = vc.getPropertyValue('ParaStyleName'); } catch (e) {}
+    try { pa.styleName = src.getPropertyValue('ParaStyleName'); } catch (e) {}
     try {
-      const a = vc.getPropertyValue('ParaAdjust');
+      const a = src.getPropertyValue('ParaAdjust');
       const A = css.style.ParagraphAdjust;
       pa.alignment = enumEq(a, A.CENTER) ? 'center' : enumEq(a, A.RIGHT) ? 'right'
         : (enumEq(a, A.BLOCK) || enumEq(a, A.STRETCH)) ? 'justify' : 'left';
     } catch (e) {}
     try {
-      const ls = vc.getPropertyValue('ParaLineSpacing');
+      const ls = src.getPropertyValue('ParaLineSpacing');
       if (ls) {
         const M = css.style.LineSpacingMode;
         if (enumEq(ls.Mode, M.PROP)) pa.lineSpacing = { mode: 'proportional', percent: ls.Height };
@@ -5910,13 +6434,20 @@ const EXEC = {
         else pa.lineSpacing = { mode: 'leading', valuePt: Math.round(ls.Height * 72 / 2540 * 10) / 10 };
       }
     } catch (e) {}
-    try { pa.spaceBeforePt = Math.round(vc.getPropertyValue('ParaTopMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
-    try { pa.spaceAfterPt = Math.round(vc.getPropertyValue('ParaBottomMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
-    try { pa.firstLineIndentPt = Math.round(vc.getPropertyValue('ParaFirstLineIndent') * 72 / 2540 * 10) / 10; } catch (e) {}
-    try { pa.leftIndentPt = Math.round(vc.getPropertyValue('ParaLeftMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
-    try { pa.rightIndentPt = Math.round(vc.getPropertyValue('ParaRightMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
-    try { pa.outlineLevel = vc.getPropertyValue('OutlineLevel') || 0; } catch (e) {}
-    try { pa.isNumbered = !!vc.getPropertyValue('NumberingIsNumber'); } catch (e) {}
+    try { pa.spaceBeforePt = Math.round(src.getPropertyValue('ParaTopMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
+    try { pa.spaceAfterPt = Math.round(src.getPropertyValue('ParaBottomMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
+    try {
+      pa.firstLineIndentPt = Math.round(src.getPropertyValue('ParaFirstLineIndent') * 72 / 2540 * 10) / 10;
+      const basePt = ch.sizePt || HOUSE.bodyPt || 12;
+      if (basePt > 0 && isFinite(pa.firstLineIndentPt)) {
+        pa.firstLineIndentChars = Math.round((pa.firstLineIndentPt / basePt) * 10) / 10;
+      }
+    } catch (e) {}
+    try { pa.leftIndentPt = Math.round(src.getPropertyValue('ParaLeftMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
+    try { pa.rightIndentPt = Math.round(src.getPropertyValue('ParaRightMargin') * 72 / 2540 * 10) / 10; } catch (e) {}
+    try { pa.outlineLevel = src.getPropertyValue('OutlineLevel') || 0; } catch (e) {}
+    try { pa.isNumbered = !!src.getPropertyValue('NumberingIsNumber'); } catch (e) {}
+    try { pa.numbering = paragraphNumberingOf(src); } catch (e) {}
     out.paragraph = pa;
     try {
       const table = currentTextTable(null);
@@ -5987,8 +6518,8 @@ const EXEC = {
           const el = en.nextElement();
           if (!(el.supportsService && el.supportsService('com.sun.star.text.Paragraph'))) continue;
           const k = paraKindOf(el, false, true);
-          applyHousePara(el, k.kind, { level: k.level });
-          applyHouseChar(el, charOptsFor(k));
+          applyHousePara(el, k.kind, { level: k.level, isNumbered: !!readParagraphLabel(el) });
+          applyHouseCharDeep(el, charOptsFor(k));
           paras++;
         }
       } finally { unlockModel(); }
@@ -6066,7 +6597,12 @@ const EXEC = {
     let target = null;
     eachParagraph(function (el) {
       const t = (el.getString() || '').trim();
-      if (t && (t === headingText || t.indexOf(headingText) !== -1)) { target = el; return true; }
+      const combined = paragraphCombinedText(el).trim();
+      if ((t && (t === headingText || t.indexOf(headingText) !== -1))
+        || (combined && (combined === headingText || combined.indexOf(headingText) !== -1))) {
+        target = el;
+        return true;
+      }
       return false;
     });
     if (!target) return { success: false, message: '未找到标题: ' + headingText };
