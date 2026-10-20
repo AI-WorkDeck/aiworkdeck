@@ -40,6 +40,34 @@ LIGHTPROOF_PATTERNS = (
     "/dict-en/dialog/",
 )
 
+TRUETYPE_DIR_MARKER = "/share/fonts/truetype/"
+
+KEPT_TRUETYPE_PREFIXES = (
+    "LiberationSans-",
+    "LiberationSerif-",
+    "LiberationMono-",
+    "Carlito-",
+    "Caladea-",
+    "AAA-CJK",
+    "cjk",
+    "NotoSansCJK",
+    "NotoSerifCJK",
+)
+
+KEPT_TRUETYPE_EXACT = frozenset(
+    {
+        "opens___.ttf",
+        "DejaVuMathTeXGyre.ttf",
+        "fc_local.conf",
+    }
+)
+
+
+def is_kept_truetype_font(basename: str) -> bool:
+    if basename in KEPT_TRUETYPE_EXACT:
+        return True
+    return any(basename.startswith(prefix) for prefix in KEPT_TRUETYPE_PREFIXES)
+
 
 def normalize_keep_dicts(keep_dicts: Sequence[str] | str) -> tuple[str, ...]:
     if isinstance(keep_dicts, str):
@@ -62,6 +90,7 @@ def should_strip_fs_entry(
     filename: str,
     slim_dicts: bool = True,
     keep_dicts: Sequence[str] = ("en", "zh"),
+    slim_fonts: bool = True,
 ) -> bool:
     """Return True if a virtual FS path should be stripped from soffice.data."""
     normalized = filename.replace("\\", "/")
@@ -80,6 +109,11 @@ def should_strip_fs_entry(
     # Always strip Lightproof Python grammar checker files (Python is disabled in WASM)
     for pattern in LIGHTPROOF_PATTERNS:
         if normalized.endswith(pattern) or pattern in normalized:
+            return True
+
+    if slim_fonts and TRUETYPE_DIR_MARKER in normalized:
+        basename = normalized.rsplit("/", 1)[-1]
+        if not is_kept_truetype_font(basename):
             return True
 
     if not slim_dicts:
@@ -136,7 +170,11 @@ gb_emscripten_fs_image_files := $(filter-out \\
     %/dict-en/pythonpath/% \\
     %/dict-en/dialog/%,$(gb_emscripten_fs_image_files))
 """
-            s = s.rstrip() + "\n" + slim_block
+            ruleset_anchor = "#\n# Ruleset\n#\n"
+            if ruleset_anchor in s:
+                s = s.replace(ruleset_anchor, slim_block.lstrip("\n") + "\n" + ruleset_anchor, 1)
+            else:
+                s = s.rstrip() + "\n" + slim_block
             applied.append("slim-lightproof-fs-image-mk")
         else:
             applied.append("slim-lightproof-fs-image-mk (already applied)")
@@ -150,6 +188,7 @@ def repack_soffice_data(
     metadata_paths: Sequence[Path],
     slim_dicts: bool = True,
     keep_dicts: Sequence[str] = ("en", "zh"),
+    slim_fonts: bool = True,
 ) -> dict:
     """Repack soffice.data and recalculate metadata offsets cleanly and idempotently."""
     if not metadata_paths:
@@ -174,7 +213,12 @@ def repack_soffice_data(
             raise ValueError(
                 f"Out-of-bounds slice for {filename}: [{start}, {end}) in {len(raw_data)}-byte {data_path}"
             )
-        if should_strip_fs_entry(filename, slim_dicts=slim_dicts, keep_dicts=keep_dicts):
+        if should_strip_fs_entry(
+            filename,
+            slim_dicts=slim_dicts,
+            keep_dicts=keep_dicts,
+            slim_fonts=slim_fonts,
+        ):
             removed_files.append(filename)
             continue
 
@@ -242,6 +286,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         default="en,zh",
         help="Comma-separated dictionary language prefixes to keep (default: en,zh).",
     )
+    parser.add_argument(
+        "--slim-fonts",
+        dest="slim_fonts",
+        action="store_true",
+        default=True,
+        help="Strip unused non-core fonts from /instdir/share/fonts/truetype/ (default: enabled).",
+    )
+    parser.add_argument(
+        "--no-slim-fonts",
+        dest="slim_fonts",
+        action="store_false",
+        help="Keep all bundled fonts in /instdir/share/fonts/truetype/.",
+    )
     args = parser.parse_args(argv)
     keep_dicts = normalize_keep_dicts(args.keep_dicts)
     target = Path(args.target)
@@ -286,6 +343,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             meta_files,
             slim_dicts=args.slim_dicts,
             keep_dicts=keep_dicts,
+            slim_fonts=args.slim_fonts,
         )
         print(
             f"repacked {d / 'soffice.data'}: kept={result['kept_count']} "
