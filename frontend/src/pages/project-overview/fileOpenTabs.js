@@ -255,8 +255,52 @@ export const fileOpenTabsMethods = {
       this.lastActiveIdsByMode[targetPane][mode] = tabId
       this.saveActiveIdsByMode()
 
+      this.syncFileTreeSelectionWithActiveTab?.(file)
+
       // 打开/激活后，给 WPS 一个机会刷新（避免容器尺寸/激活状态不对）
       this.$nextTick(() => this.triggerWorkbenchResize())
+    },
+
+    /**
+     * 强制把当前活动标签与左侧资源管理器（FileTree）的高亮选中状态绑定同步。
+     * 无论是 openFile、activateTab、closeFile、分屏切换、新建/复制标签还是打开特殊标签，
+     * 只要当前聚焦窗格的活动标签变化，左侧 FileTree 的高亮就必须指向同一个文件（或对非文件标签清空高亮），
+     * 避免出现「打开了新标签页，左侧却还高亮着另一个文件」的错位。
+     */
+    syncFileTreeSelectionWithActiveTab(fallbackFile = null) {
+      const pane = (this.splitMode && this.focusedPane === 'right') ? 'right' : 'left'
+      const activeId = pane === 'right' ? this.activeFileIdRight : this.activeFileIdLeft
+      const list = pane === 'right' ? this.rightFiles : this.leftFiles
+      let active = pane === 'right' ? this.activeFileRight : this.activeFileLeft
+      if (!active && activeId != null && Array.isArray(list)) {
+        active = list.find(f => f && String(f.id) === String(activeId)) || null
+      }
+      if (!active && fallbackFile && activeId != null && String(fallbackFile.id) === String(activeId)) {
+        active = fallbackFile
+      }
+      const applySync = () => {
+        const tree = this.$refs && this.$refs.fileTree
+        if (!tree) return
+        if (active && !this.isBrowserTab(active) && active.id != null && !active.tabType) {
+          if (typeof tree.revealFile === 'function') {
+            const revealed = tree.revealFile(active.id)
+            if (!revealed) {
+              tree.selectedFileId = active.id
+              tree.multiSelectedIds = [active.id]
+            }
+          } else {
+            tree.selectedFileId = active.id
+            tree.multiSelectedIds = [active.id]
+          }
+        } else {
+          tree.selectedFileId = null
+          tree.multiSelectedIds = []
+        }
+      }
+      applySync()
+      if (typeof this.$nextTick === 'function') {
+        this.$nextTick(applySync)
+      }
     },
 
     /** 模板里给每个 .tab-item 打 id 用（scroll-into-view 的锚点） */
@@ -313,29 +357,7 @@ export const fileOpenTabsMethods = {
       this.saveActiveIdsByMode()
 
       // 同步更新 FileTree 的选中状态
-      // 如果是文件类型（非浏览器标签、非特殊标签类型），需要更新资源管理器的选中状态
-      if (!this.isBrowserTab(file) && file.id && !file.tabType) {
-        // 只同步当前已挂载的文件树；文档标签不改变左侧功能区或折叠状态。
-        this.$nextTick(() => {
-          if (this.$refs.fileTree) {
-            // 使用 revealFile 方法来定位并选中文件（会展开父目录并滚动到文件）
-            if (this.$refs.fileTree.revealFile) {
-              this.$refs.fileTree.revealFile(file.id)
-            } else {
-              // 如果没有 revealFile 方法，直接设置 selectedFileId
-              this.$refs.fileTree.selectedFileId = file.id
-            }
-          }
-        })
-      } else {
-        // 如果是浏览器标签或其他特殊类型，清空 FileTree 的选中状态
-        this.$nextTick(() => {
-          if (this.$refs.fileTree) {
-            this.$refs.fileTree.selectedFileId = null
-            this.$refs.fileTree.multiSelectedIds = []
-          }
-        })
-      }
+      this.syncFileTreeSelectionWithActiveTab?.(file)
 
       // Track switch
       const meta = this.project && this.project.name ? `Project: ${this.project.name}` : ''
@@ -480,6 +502,7 @@ export const fileOpenTabsMethods = {
         this.lastActiveIdsByMode[pane][mode] = newActiveId
         this.saveActiveIdsByMode()
       }
+      this.syncFileTreeSelectionWithActiveTab?.()
     },
 
     /** 插件/广场详情标签若有品牌形象头像（如包晴天），优先渲染头像而非线性 SVG */

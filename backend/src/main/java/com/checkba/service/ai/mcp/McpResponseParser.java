@@ -41,7 +41,7 @@ public final class McpResponseParser {
             if (payload.startsWith("{") || payload.startsWith("[")) {
                 trimmedResponse = payload;
             } else {
-                return payload;
+                return formatIfToolErrorText(payload);
             }
         }
 
@@ -80,7 +80,11 @@ public final class McpResponseParser {
                             }
                         }
                     }
-                    return sb.toString();
+                    String text = sb.toString();
+                    if (Boolean.TRUE.equals(result.getBool("isError")) && !text.startsWith("Error")) {
+                        return "Error from MCP server: " + text;
+                    }
+                    return formatIfToolErrorText(text);
                 }
                 return result.toString();
             }
@@ -96,7 +100,19 @@ public final class McpResponseParser {
 
         // Case 4: Unknown format
         log.debug("Unknown MCP response format");
-        return trimmedResponse;
+        return formatIfToolErrorText(trimmedResponse);
+    }
+
+    /**
+     * FastMCP / Pydantic 参数校验失败时常以 200 + 纯文本（或 content[].text）返回
+     * {@code "1 validation error for call[...]"} 而不走 JSON-RPC {@code error} 字段。
+     * 统一补齐 {@code "Error from MCP server: "} 前缀，供 ToolRegistry 与 DocInsightService 识别为失败。
+     */
+    private static String formatIfToolErrorText(String text) {
+        if (text != null && !text.startsWith("Error") && text.contains("validation error for call[")) {
+            return "Error from MCP server: " + text;
+        }
+        return text;
     }
 
     /** 正文里出现任意一行 data:（SSE 事件流的唯一必需字段）即按 SSE 处理。 */

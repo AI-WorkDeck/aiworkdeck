@@ -212,6 +212,8 @@ export const tabDragSplitMethods = {
         this.focusedPane = 'right'
       }
 
+      this.syncFileTreeSelectionWithActiveTab?.()
+
       // 拖拽换序/跨窗格会改变容器尺寸分配，给 WPS 一个 resize
       this.$nextTick(() => this.triggerWorkbenchResize())
     },
@@ -473,6 +475,7 @@ export const tabDragSplitMethods = {
         // 开启分屏时，默认聚焦右侧，方便用户立即选择文件
         this.focusedPane = 'right'
       }
+      this.syncFileTreeSelectionWithActiveTab?.()
     },
     focusPane(pane) {
       // 只有在分屏模式下才允许聚焦右侧
@@ -480,6 +483,7 @@ export const tabDragSplitMethods = {
 
       const oldPane = this.focusedPane
       this.focusedPane = pane
+      this.syncFileTreeSelectionWithActiveTab?.()
 
       if (oldPane !== pane) {
           // Switch active tracking to the file in the new pane

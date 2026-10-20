@@ -34,7 +34,7 @@ const DEFAULT_MANIFEST_URLS = [
   'https://github.com/AI-WorkDeck/aiworkdeck/releases/latest/download/manifest.json'
 ]
 
-const CHECK_DELAY_MS = 2 * 60 * 1000        // 启动后首查延迟
+const CHECK_DELAY_MS = 10 * 1000            // 启动后 10s 自动首查，尽早后台拉取更新包
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000 // 周期检查
 const MAX_COMPONENT_BYTES = 512 * 1024 * 1024
 const MAX_INSTALLER_BYTES = 4 * 1024 * 1024 * 1024
@@ -198,13 +198,18 @@ function createUpdateService(ctx, hooks = {}) {
     for (const comp of channel.components || []) {
       // 组件级去重：本机已生效（overlay 或内置基线）不低于清单版本则跳过
       if (overlay.compareVersions(comp.version, overlay.installedComponentVersion(ctx, comp.name)) <= 0) continue
-      state.progress = { component: comp.name, received: 0, total: comp.size || 0 }
+      state.progress = { component: comp.name, version: target, received: 0, total: comp.size || 0 }
       emit('progress')
       const archive = path.join(staging, `${comp.name}.tar.gz`)
+      let lastPatchProgressAt = 0
       const r = await fetchFirst(comp.urls || [], {
         toFile: archive,
         onBytes: (n) => {
-          state.progress = { component: comp.name, received: n, total: comp.size || 0 }
+          state.progress = { component: comp.name, version: target, received: n, total: comp.size || 0 }
+          if (Date.now() - lastPatchProgressAt >= 250 || (comp.size && n >= comp.size)) {
+            lastPatchProgressAt = Date.now()
+            emit('progress')
+          }
         }
       })
       if (r.sha256 !== String(comp.sha256 || '').toLowerCase()) {
@@ -240,13 +245,13 @@ function createUpdateService(ctx, hooks = {}) {
     fs.mkdirSync(dir, { recursive: true })
     const file = path.join(dir, (ctx.platform || process.platform) === 'darwin' ? 'update.dmg' : 'update.exe')
     state.phase = 'downloading'
-    state.progress = { component: 'installer', received: 0, total: installer.size }
+    state.progress = { component: 'installer', version: installer.version, received: 0, total: installer.size }
     emit('downloading', { version: installer.version })
     let lastProgressAt = 0
     try {
       const r = await fetchFirst(installer.urls || [], { toFile: file, maxBytes: installer.size,
         onBytes: (received) => {
-          state.progress = { component: 'installer', received, total: installer.size }
+          state.progress = { component: 'installer', version: installer.version, received, total: installer.size }
           if (Date.now() - lastProgressAt >= 250 || received === installer.size) { lastProgressAt = Date.now(); emit('progress') }
         } })
       if (r.size !== installer.size || r.sha256 !== installer.sha256.toLowerCase()) throw new Error('完整安装包 sha256 校验失败')
@@ -276,18 +281,26 @@ function createUpdateService(ctx, hooks = {}) {
         state.checkedAt = new Date().toISOString()
         const myMajor = overlay.majorOf(ctx.appVersion)
 
-        // 大版本：manifest.latestMajor 比本机新 → 引导全量下载（§7）
+        // 大版本：manifest.latestMajor 比本机新 → 优先应用内自动下载完整安装包并静默准备自替换（§7）；
+        // 仅当清单未提供对应平台安装包，或安装包下载/校验失败时，才退回官网手动下载提示（majorAvailable）。
         if (manifest.latestMajor && overlay.compareVersions(manifest.latestMajor + '.0', myMajor + '.0') > 0) {
           const majorChannel = manifest.channels && manifest.channels[manifest.latestMajor]
           const majorVersion = (majorChannel && majorChannel.latest) || manifest.latestMajor
-          state.majorAvailable = { major: majorVersion, page: manifest.majorDownloadPage || 'https://www.aiworkdeck.com' }
+          const fallbackMajorInfo = { major: majorVersion, page: manifest.majorDownloadPage || 'https://www.aiworkdeck.com' }
           const platform = ctx.platform || process.platform
           const key = platform === 'win32' ? 'win32' : `${platform}-${ctx.arch || process.arch}`
           const installer = majorChannel && majorChannel.installers && majorChannel.installers[key]
           if (installer && hooks.prepareInstaller && overlay.compareVersions(installer.version, ctx.appVersion) > 0) {
-            await downloadInstaller(installer)
-            return snapshot()
+            state.majorAvailable = null
+            try {
+              await downloadInstaller(installer)
+              return snapshot()
+            } catch (installerErr) {
+              state.majorAvailable = fallbackMajorInfo
+              throw installerErr
+            }
           }
+          state.majorAvailable = fallbackMajorInfo
           emit('major-available', state.majorAvailable)
         } else {
           state.majorAvailable = null

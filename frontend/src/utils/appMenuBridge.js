@@ -151,18 +151,6 @@ async function runAppCommand(verb, arg) {
       const phase = r && r.phase
       if (phase === 'error') {
         toast((r && r.error) || t('shell.menuUpdateFailed'))
-      } else if (r && r.majorAvailable) {
-        uni.showModal({
-          title: t('admin.majorReleased', { version: r.majorAvailable.major }),
-          content: t('admin.majorNote'),
-          confirmText: t('admin.goDownloadButton'),
-          cancelText: t('common.close'),
-          success: (res) => {
-            if (res && res.confirm && host.shell && host.shell.openExternal) {
-              host.shell.openExternal(r.majorAvailable.page || 'https://www.aiworkdeck.com')
-            }
-          },
-        })
       } else if (phase === 'ready' && r && r.available) {
         uni.showModal({
           title: t('admin.restartAppTitle'),
@@ -179,6 +167,18 @@ async function runAppCommand(verb, arg) {
         })
       } else if (phase === 'downloading') {
         toast(t('admin.downloadingPatch'))
+      } else if (r && r.majorAvailable) {
+        uni.showModal({
+          title: t('admin.majorReleased', { version: r.majorAvailable.major }),
+          content: t('admin.majorNote'),
+          confirmText: t('admin.goDownloadButton'),
+          cancelText: t('common.close'),
+          success: (res) => {
+            if (res && res.confirm && host.shell && host.shell.openExternal) {
+              host.shell.openExternal(r.majorAvailable.page || 'https://www.aiworkdeck.com')
+            }
+          },
+        })
       } else if (phase === 'idle' || phase === 'up-to-date') {
         toast(t('shell.menuUpToDate'))
       }

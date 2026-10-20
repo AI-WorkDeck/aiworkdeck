@@ -147,7 +147,10 @@ public class LegalTools implements AgentToolComponent {
         if (!StringUtils.hasText(query)) {
             return "Error: query is required.";
         }
-        return callPkulaw("pkulaw-semantic", "search_article", Map.of("query", query));
+        // 北大法宝 pkulaw-semantic 的 search_article 工具入参字段名为 text（与 law_recognition、
+        // search_case 同口径）；传 query 会触发上游 FastMCP/Pydantic 校验错误：
+        // "1 validation error for call[search_article] text Missing required argument"。
+        return callPkulaw("pkulaw-semantic", "search_article", Map.of("text", query.trim()));
     }
 
     @ToolMeta(displayName = "关键词搜索法规", category = "legal")
@@ -157,8 +160,11 @@ public class LegalTools implements AgentToolComponent {
             @P(value = "法规正文中的关键词；与 title 至少给一个", required = false) String fulltext) {
         log.info("Tool: law_search_keyword called for title='{}', fulltext='{}'", title, fulltext);
         Map<String, Object> args = new HashMap<>();
-        if (StringUtils.hasText(title)) args.put("title", title);
-        if (StringUtils.hasText(fulltext)) args.put("fulltext", fulltext);
+        if (StringUtils.hasText(title)) args.put("title", title.trim());
+        if (StringUtils.hasText(fulltext)) args.put("fulltext", fulltext.trim());
+        if (args.isEmpty()) {
+            return "Error: title or fulltext is required.";
+        }
 
         return callPkulaw("pkulaw-keyword", "get_law_list", args);
     }

@@ -143,3 +143,43 @@ test('archives always reach their preview even when project records have a wpsFi
     assert.equal(methods.isEditorOpenableFile({ fileType, wpsFileId: 'project_1_doc_archive' }), false)
   }
 })
+
+test('openFile, closeFile, and special tabs strictly synchronize FileTree selection with the active tab', async () => {
+  const vm = workspace()
+  vm.useLibreEditor = () => false
+  vm.isPlainTextFile = () => false
+  vm.isOpenInOtherPane = () => false
+  const tree = {
+    selectedFileId: null,
+    multiSelectedIds: [],
+    revealFile(id) {
+      this.selectedFileId = id
+      this.multiSelectedIds = [id]
+      return true
+    },
+  }
+  vm.$refs.fileTree = tree
+
+  // 1) openFile on first file highlights file 101 in FileTree
+  vm.openFile({ id: 101, name: 'first.docx', fileType: 'docx' })
+  assert.equal(vm.activeFileIdLeft, 101)
+  assert.equal(tree.selectedFileId, 101)
+
+  // 2) openFile on second file (e.g. QuickOpen, AI citation, copy tab) immediately moves highlight to 202
+  vm.openFile({ id: 202, name: 'second.docx', fileType: 'docx' })
+  assert.equal(vm.activeFileIdLeft, 202)
+  assert.equal(tree.selectedFileId, 202)
+
+  // 3) Closing active tab 202 falls back to tab 101 and syncs FileTree highlight back to 101
+  await vm.closeFile(202, 'left')
+  assert.equal(vm.activeFileIdLeft, 101)
+  assert.equal(tree.selectedFileId, 101)
+
+  // 4) Activating a special tab (e.g. settings/market/web) clears FileTree highlight so no stale file stays highlighted
+  const settingsTab = { id: '__settings__', name: 'Settings', tabType: 'settings' }
+  vm.leftFiles.push(settingsTab)
+  vm.activateTab(settingsTab, 'left')
+  assert.equal(vm.activeFileIdLeft, '__settings__')
+  assert.equal(tree.selectedFileId, null)
+  assert.deepEqual(tree.multiSelectedIds, [])
+})
