@@ -1,0 +1,16 @@
+--- a/desktop/source/lib/init.cxx	2026-10-04 16:16:09
++++ b/desktop/source/lib/init.cxx	2026-10-04 16:16:09
+@@ -5351,6 +5351,13 @@
+     {
+         updateConfig(OUString(pValue, strlen(pValue), RTL_TEXTENCODING_UTF8));
+     }
++    else if (strcmp(pOption, "author") == 0)
++    {
++        // The name new comments and tracked changes carry.
++        SvtUserOptions aOptions;
++        aOptions.SetToken(UserOptToken::FirstName, OUString::fromUtf8(pValue));
++        aOptions.SetToken(UserOptToken::LastName, OUString());
++    }
+ #ifdef LINUX
+     else if (strcmp(pOption, "addfont") == 0)
+     {

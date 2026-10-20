@@ -1,0 +1,87 @@
+--- a/sw/source/uibase/uno/loktxdoc.cxx	2026-10-04 12:47:34
++++ b/sw/source/uibase/uno/loktxdoc.cxx	2026-10-04 12:47:34
+@@ -51,6 +51,8 @@
+ #include <unocontentcontrol.hxx>
+ #include <rootfrm.hxx>
+ #include <pagefrm.hxx>
++#include <cntfrm.hxx>
++#include <IDocumentOutlineNodes.hxx>
+ #include <com/sun/star/text/XTextContent.hpp>
+ 
+ #include <com/sun/star/text/XPageCursor.hpp>
+@@ -278,6 +280,7 @@
+         }
+     }
+ 
++    SwWrtShell* pWrtShell = pDocShell->GetWrtShell();
+     IDocumentMarkAccess& rIDMA = *pDocShell->GetDoc()->getIDocumentMarkAccess();
+     auto aBookmarks = rJsonWriter.startArray("bookmarks");
+     for (auto it = rIDMA.getBookmarksBegin(); it != rIDMA.getBookmarksEnd(); ++it)
+@@ -290,6 +293,15 @@
+ 
+         auto aProperty = rJsonWriter.startStruct();
+         rJsonWriter.put("name", pMark->GetName().toString());
++        if (!pWrtShell)
++            continue;
++        const SwPosition& rPos = pMark->GetMarkStart();
++        const SwContentNode* pNode = rPos.GetNode().GetContentNode();
++        const SwContentFrame* pFrame
++            = pNode ? pNode->getLayoutFrame(pWrtShell->GetLayout(), &rPos) : nullptr;
++        SwRect aRect;
++        if (pFrame && pFrame->GetCharRect(aRect, rPos))
++            rJsonWriter.put("rect", aRect.SVRect().toString());
+     }
+ }
+ 
+@@ -1131,6 +1143,31 @@
+     }
+ }
+ 
++/// Implements getCommandValues(".uno:Outline").
++void GetOutline(tools::JsonWriter& rJsonWriter, SwDocShell* pDocShell)
++{
++    SwWrtShell* pWrtShell = pDocShell->GetWrtShell();
++    if (!pWrtShell)
++        return;
++    const SwDoc& rDoc = *pDocShell->GetDoc();
++    const IDocumentOutlineNodes& rOutline = rDoc.getIDocumentOutlineNodes();
++    const SwOutlineNodes& rNodes = rDoc.GetNodes().GetOutLineNds();
++    const SwOutlineNodes::size_type nCurrent = pWrtShell->GetOutlinePos();
++    auto aHeadings = rJsonWriter.startArray("outline");
++    for (SwOutlineNodes::size_type i = 0; i < rNodes.size(); ++i)
++    {
++        const SwContentFrame* pFrame
++            = rNodes[i]->GetTextNode()->getLayoutFrame(pWrtShell->GetLayout());
++        if (!pFrame)
++            continue;
++        auto aHeading = rJsonWriter.startStruct();
++        rJsonWriter.put("text", rOutline.getOutlineText(i, pWrtShell->GetLayout(), true, false, false));
++        rJsonWriter.put("level", static_cast<sal_Int64>(rOutline.getOutlineLevel(i)));
++        rJsonWriter.put("rect", pFrame->getFrameArea().SVRect().toString());
++        rJsonWriter.put("current", i == nCurrent);
++    }
++}
++
+ /// Implements getCommandValues(".uno:Sections").
+ ///
+ /// Parameters:
+@@ -1169,7 +1206,7 @@
+         = { u"TextFormFields", u"TextFormField", u"SetDocumentProperties",
+             u"Bookmarks",      u"Fields",        u"Sections",
+             u"Bookmark",       u"Field",         u"Layout",
+-            u"Formula",        u"WordCount" };
++            u"Formula",        u"WordCount",     u"Outline" };
+ 
+     return std::find(vForward.begin(), vForward.end(), rCommand) != vForward.end();
+ }
+@@ -1256,6 +1293,10 @@
+     {
+         GetDocStructure(rJsonWriter, m_pDocShell, aMap);
+     }
++    else if (o3tl::starts_with(rCommand, ".uno:Outline"sv))
++    {
++        GetOutline(rJsonWriter, m_pDocShell);
++    }
+     else if (o3tl::starts_with(rCommand, ".uno:WordCount"sv))
+     {
+         GetWordCount(rJsonWriter, m_pDocShell);

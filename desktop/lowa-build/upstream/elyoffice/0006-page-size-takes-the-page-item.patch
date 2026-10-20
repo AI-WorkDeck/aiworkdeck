@@ -1,0 +1,14 @@
+diff --git a/svx/sdi/svx.sdi b/svx/sdi/svx.sdi
+index 5ccbd6018..9c81bb0a2 100644
+--- a/svx/sdi/svx.sdi
++++ b/svx/sdi/svx.sdi
+@@ -6464,7 +6464,8 @@ SvxPaperBinItem PagePaperBin SID_ATTR_PAGE_PAPERBIN
+ SvxSizeItem AttributePageSize SID_ATTR_PAGE_SIZE
+ (
+     SvxSizeItem AttributePageSize SID_ATTR_PAGE_SIZE,
+-    SfxUInt16Item PaperFormat FN_PARAM_1
++    SfxUInt16Item PaperFormat FN_PARAM_1,
++    SvxPageItem AttributePage SID_ATTR_PAGE
+ )
+ [
+     AutoUpdate = FALSE,

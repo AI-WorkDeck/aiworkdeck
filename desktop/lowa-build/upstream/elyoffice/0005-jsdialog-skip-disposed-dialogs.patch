@@ -1,0 +1,63 @@
+diff --git a/vcl/inc/jsdialog/jsdialogmessages.hxx b/vcl/inc/jsdialog/jsdialogmessages.hxx
+index 3958a702c..74448fd4f 100644
+--- a/vcl/inc/jsdialog/jsdialogmessages.hxx
++++ b/vcl/inc/jsdialog/jsdialogmessages.hxx
+@@ -10,6 +10,7 @@
+ #pragma once
+ 
+ #include <deque>
++#include <memory>
+ #include <mutex>
+ 
+ #include <rtl/ustring.hxx>
+@@ -96,10 +97,13 @@ class JSDialogNotifyIdle final : public Idle
+ 
+     std::deque<JSDialogMessageInfo> m_aMessageQueue;
+     std::mutex m_aQueueMutex;
++    // False once destroyed: a send may close the dialog.
++    std::shared_ptr<bool> m_pAlive;
+ 
+ public:
+     JSDialogNotifyIdle(VclPtr<vcl::Window> aNotifierWindow, VclPtr<vcl::Window> aContentWindow,
+                        const rtl::OUString& sTypeOfJSON);
++    ~JSDialogNotifyIdle() override;
+ 
+     void Invoke() override;
+ 
+diff --git a/vcl/jsdialog/jsdialogsender.cxx b/vcl/jsdialog/jsdialogsender.cxx
+index 1ca544647..155fd554c 100644
+--- a/vcl/jsdialog/jsdialogsender.cxx
++++ b/vcl/jsdialog/jsdialogsender.cxx
+@@ -20,10 +20,13 @@ JSDialogNotifyIdle::JSDialogNotifyIdle(VclPtr<vcl::Window> aNotifierWindow,
+     , m_aContentWindow(std::move(aContentWindow))
+     , m_sTypeOfJSON(sTypeOfJSON)
+     , m_bForce(false)
++    , m_pAlive(std::make_shared<bool>(true))
+ {
+     SetPriority(TaskPriority::POST_PAINT);
+ }
+ 
++JSDialogNotifyIdle::~JSDialogNotifyIdle() { *m_pAlive = false; }
++
+ void JSDialogNotifyIdle::forceUpdate() { m_bForce = true; }
+ 
+ void JSDialogNotifyIdle::send(const OString& sMsg)
+@@ -248,8 +251,18 @@ void JSDialogNotifyIdle::Invoke()
+         std::swap(aMessageQueue, m_aMessageQueue);
+     }
+ 
++    // A disposed dialog has nothing left to describe.
++    if ((m_aNotifierWindow && m_aNotifierWindow->isDisposed())
++        || (m_aContentWindow && m_aContentWindow->isDisposed()))
++        return;
++
++    const std::shared_ptr<bool> pAlive = m_pAlive;
+     for (auto& rMessage : aMessageQueue)
+     {
++        // The last send's client closed the dialog.
++        if (!*pAlive)
++            return;
++
+         jsdialog::MessageType eType = rMessage.m_eType;
+ 
+         if (m_sTypeOfJSON == "formulabar" && eType != jsdialog::MessageType::Action)

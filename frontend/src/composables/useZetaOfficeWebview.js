@@ -104,3 +104,73 @@ export function createIframeEditorExecutor(iframeEl, opts = {}) {
   const transport = iframeTransport(iframeEl)
   return createRelayExecutor({ send: transport.send, subscribe: transport.subscribe, timeoutMs: opts.timeoutMs, onReady: opts.onReady })
 }
+
+/**
+ * Build a `{send, subscribe}` transport over the Desktop Native LOK Sidecar bridge.
+ *
+ * Accepts either:
+ * - A preload/IPC bridge exposing `{ send(msg), subscribe(handler) }` (or `onMessage(handler)`);
+ * - A `LokSidecarManager` instance exposing `createSessionRelayBridge(sessionId)`.
+ *
+ * When `sessionId` (or `docId`) is provided, outgoing messages are tagged with `sessionId`
+ * and incoming messages for other sessions are filtered out, allowing multiple document
+ * tabs/panes to share a single native `lok-worker` process cleanly.
+ *
+ * @param {object} sidecarBridge
+ * @param {string|null} [sessionId=null]
+ */
+export function lokSidecarTransport(sidecarBridge, sessionId = null) {
+  if (!sidecarBridge || typeof sidecarBridge !== 'object') {
+    throw new TypeError('lokSidecarTransport requires a sidecarBridge object')
+  }
+  const resolvedBridge = (typeof sidecarBridge.send !== 'function' && typeof sidecarBridge.createSessionRelayBridge === 'function')
+    ? sidecarBridge.createSessionRelayBridge(sessionId)
+    : sidecarBridge
+  const boundSessionId = sessionId ?? resolvedBridge.sessionId ?? null
+
+  return {
+    send: (m) => {
+      const payload = (boundSessionId && m && typeof m === 'object' && m.sessionId === undefined)
+        ? { ...m, sessionId: boundSessionId }
+        : m
+      return resolvedBridge.send(payload)
+    },
+    subscribe: (h) => {
+      const subFn = resolvedBridge.subscribe || resolvedBridge.onMessage
+      if (typeof subFn !== 'function') {
+        throw new TypeError('sidecarBridge must provide subscribe(handler) or onMessage(handler)')
+      }
+      const f = (msg) => {
+        if (!msg || typeof msg !== 'object') return
+        if (boundSessionId && msg.sessionId && msg.sessionId !== boundSessionId) return
+        h(msg)
+      }
+      const off = subFn.call(resolvedBridge, f)
+      return typeof off === 'function' ? off : () => {}
+    },
+  }
+}
+
+/**
+ * Host-side LibreOffice executor driving a Native LOK Sidecar session.
+ * Produces the exact same `{ executeCommand(action, params, callOpts), dispose() }`
+ * contract as `createWebviewEditorExecutor` and `createIframeEditorExecutor`,
+ * so `useEditorBridge`, `LibreOfficeEditor.vue`, and all 100+ `EDITOR_ACTIONS`
+ * work without any upper-layer changes.
+ *
+ * @param {object} sidecarBridge
+ * @param {{sessionId?:string, docId?:string, timeoutMs?:number, onReady?:()=>void, onLateResult?:(action:string,result:any)=>void, onProgress?:(reqId:string,p:{done:number,total:number})=>void}} [opts]
+ * @returns {{executeCommand:(a:string,p?:object,callOpts?:object)=>Promise<any>, dispose:()=>void}}
+ */
+export function createLokSidecarEditorExecutor(sidecarBridge, opts = {}) {
+  const sessionId = opts.sessionId ?? opts.docId ?? null
+  const transport = lokSidecarTransport(sidecarBridge, sessionId)
+  return createRelayExecutor({
+    send: transport.send,
+    subscribe: transport.subscribe,
+    timeoutMs: opts.timeoutMs,
+    onReady: opts.onReady,
+    onLateResult: opts.onLateResult,
+    onProgress: opts.onProgress,
+  })
+}
