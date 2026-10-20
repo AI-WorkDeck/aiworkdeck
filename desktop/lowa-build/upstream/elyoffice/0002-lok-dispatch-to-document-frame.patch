@@ -1,0 +1,21 @@
+--- a/desktop/source/lib/init.cxx
++++ b/desktop/source/lib/init.cxx
+@@ -5627,14 +5627,16 @@
+         }
+     }
+     bool bResult = false;
++    // Dispatch to this document's frame, not the desktop's active one.
++    uno::Reference<frame::XFrame> xFrame = pViewShell->GetViewFrame().GetFrame().GetFrameInterface();
+     if (bNotifyWhenFinished && pDocument->mpCallbackFlushHandlers.count(nView))
+     {
+-        bResult = comphelper::dispatchCommand(aCommand, comphelper::containerToSequence(aPropertyValuesVector),
++        bResult = comphelper::dispatchCommand(aCommand, xFrame, comphelper::containerToSequence(aPropertyValuesVector),
+                 new DispatchResultListener(pCommand, pDocument->mpCallbackFlushHandlers[nView],
+                                            pDocSh && pDocSh->IsModified()));
+     }
+     else
+-        bResult = comphelper::dispatchCommand(aCommand, comphelper::containerToSequence(aPropertyValuesVector));
++        bResult = comphelper::dispatchCommand(aCommand, xFrame, comphelper::containerToSequence(aPropertyValuesVector));
+ 
+     if (!bResult)
+     {

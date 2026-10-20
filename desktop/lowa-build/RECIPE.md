@@ -73,6 +73,29 @@ Put a fake at /usr/local/bin/systemd-detect-virt (#!/bin/sh\nexit 0), and PATH=/
    cjk_zh-CN, res/fcfg_langpack_zh-CN, res/registry_zh-CN, ZZZ-aiworkdeck-locale-zh-CN, and
    $(wildcard $(INSTROOT)/program/resource/zh_CN/LC_MESSAGES/*.mo) (25 .mo). The fs_image list
    is hand-curated (en-US only by default); --with-lang BUILDS zh-CN but does not auto-PACK it.
+4. sw/source/core/text/frmpaint.cxx (or layout/frmpaint.cxx) — anchor ShowChangesInMargin
+   deleted text at the outer table frame (`FindTabFrame()`) so in-table deletions render in
+   the page margin instead of overlapping adjacent table cells.
+5. Curated ElyOffice Tier A WASM/LOK stability & dialog-less UNO patches (`#1371`, see
+   `ELYOFFICE_PATCH_AUDIT.md` and `upstream/elyoffice/`):
+   - `desktop/source/lib/init.cxx`: route `doc_iniUnoCommands` (`lok::Document::unoCommand`)
+     to the document frame (`GetDispatcher()->GetFrame()`) instead of an active JSDialog frame.
+   - `vcl/jsdialog/executor.cxx` (or `vcl/inc/jsdialog/jsdialogregister.hxx`): guard
+     `JSDialogRegister` against null/disposed weld widgets.
+   - `vcl/source/font/fontcache.cxx` (or `PhysicalFontCollection.cxx`): guard glyph/font
+     fallback when the physical font family list is empty in WASM.
+   - `sw/source/uibase/uiview/viewtab.cxx`, `sw/source/uibase/shells/textsh1.cxx`,
+     `sw/source/uibase/uiview/view2.cxx`, `sw/source/uibase/shells/txtnum.cxx`:
+     dialog-less UNO JSON/parameter support for `.uno:PageSize` (`Height`/`Width`/`Landscape`),
+     `.uno:ChapterNumberingDialog`, `.uno:FootnoteDialog`, `.uno:LineNumberingDialog`,
+     `.uno:OutlineBullet` state JSON, and live `.uno:WordCountDialog` state (`words,chars | selWords,selChars`).
+6. Dictionary & `Lightproof.py` slimming (`apply-source-patches.py --slim-dictionaries` and
+   `fs-image-patch.py --slim-dicts`):
+   - Strips broken WASM Python grammar checker files (`Lightproof.py`, `Lightproof.components`,
+     `dict-en/pythonpath/*`, `dict-en/dialog/*`) that fail without a Python runtime in WASM.
+   - Filters out unused European/African/South Asian Hunspell `dict-*` extensions from
+     `RepositoryModule_host.mk` and `soffice.data` while strictly preserving `dict-en` and all
+     `zh-CN` UI langpack `.xcd` / `.mo` resources.
 
 ## Build steps
 - autogen.input (see file): --with-distro=LibreOfficeWASM32, --with-package-format=emscripten,

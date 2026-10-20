@@ -1,0 +1,299 @@
+diff --git a/sw/sdi/olesh.sdi b/sw/sdi/olesh.sdi
+index 0d24c4686..13922a820 100644
+--- a/sw/sdi/olesh.sdi
++++ b/sw/sdi/olesh.sdi
+@@ -19,6 +19,12 @@
+ interface TextOLEObject : BaseTextOLEObject
+ {
+     import TextFrame;
++
++    FN_INSERT_SMA
++    [
++        ExecMethod = Execute ;
++        StateMethod = GetState ;
++    ]
+ }
+ 
+ shell SwOleShell : SwFrameShell
+diff --git a/sw/sdi/swriter.sdi b/sw/sdi/swriter.sdi
+index 2bf53f9ed..2cf26e846 100644
+--- a/sw/sdi/swriter.sdi
++++ b/sw/sdi/swriter.sdi
+@@ -2799,7 +2799,7 @@ SfxVoidItem InsertBreak FN_INSERT_BREAK_DLG
+ ]
+ 
+ SfxVoidItem InsertCaptionDialog FN_INSERT_CAPTION
+-()
++(SfxStringItem Category FN_PARAM_1, SfxStringItem Text FN_PARAM_2)
+ [
+     AutoUpdate = FALSE,
+     FastCall = FALSE,
+@@ -3410,7 +3410,7 @@ SfxVoidItem TransformDocumentStructure FN_TRANSFORM_DOCUMENT_STRUCTURE
+ ]
+ 
+ SfxVoidItem InsertMultiIndex FN_INSERT_MULTI_TOX
+-()
++(SfxStringItem Title FN_PARAM_1)
+ [
+     AutoUpdate = FALSE,
+     FastCall = FALSE,
+@@ -3481,7 +3481,7 @@ SfxVoidItem InsertObjectDialog FN_INSERT_OBJECT_DLG
+ ]
+ 
+ SfxVoidItem InsertObjectStarMath FN_INSERT_SMA
+-()
++(SfxStringItem Formula FN_PARAM_1)
+ [
+     AutoUpdate = FALSE,
+     FastCall = FALSE,
+diff --git a/sw/source/uibase/inc/wrtsh.hxx b/sw/source/uibase/inc/wrtsh.hxx
+index 956a962f7..edfdecc75 100644
+--- a/sw/source/uibase/inc/wrtsh.hxx
++++ b/sw/source/uibase/inc/wrtsh.hxx
+@@ -361,6 +361,8 @@ typedef bool (SwWrtShell::*FNSimpleMove)();
+     bool    InsertOleObject( const svt::EmbeddedObjectRef& xObj, SwFlyFrameFormat **pFlyFrameFormat = nullptr );
+     SW_DLLPUBLIC void LaunchOLEObj(sal_Int32 nVerb = css::embed::EmbedVerbs::MS_OLEVERB_PRIMARY); // start server
+     bool    IsOLEMath();
++    // Turns the text into a formula object, replacing the selection.
++    void    InsertFormula(const OUString& rFormula);
+     virtual void MoveObjectIfActive( svt::EmbeddedObjectRef& xObj, const Point& rOffset ) override;
+     virtual void CalcAndSetScale( svt::EmbeddedObjectRef& xObj,
+                                   const SwRect *pFlyPrtRect = nullptr,
+diff --git a/sw/source/uibase/shells/frmsh.cxx b/sw/source/uibase/shells/frmsh.cxx
+index b7c016ed3..483dede9f 100644
+--- a/sw/source/uibase/shells/frmsh.cxx
++++ b/sw/source/uibase/shells/frmsh.cxx
+@@ -140,6 +140,13 @@ void SwFrameShell::Execute(SfxRequest &rReq)
+             rSh.SelectionToTop();
+             break;
+ 
++        case FN_INSERT_SMA:
++            if (const SfxStringItem* pFormula
++                = pArgs ? pArgs->GetItem<SfxStringItem>(FN_PARAM_1, false) : nullptr;
++                pFormula && rSh.IsOLEMath())
++                rSh.InsertFormula(pFormula->GetValue());
++            break;
++
+         case SID_FRAME_TO_BOTTOM:
+             rSh.SelectionToBottom();
+             break;
+diff --git a/sw/source/uibase/shells/olesh.cxx b/sw/source/uibase/shells/olesh.cxx
+index 60bf35538..fb9ab78bf 100644
+--- a/sw/source/uibase/shells/olesh.cxx
++++ b/sw/source/uibase/shells/olesh.cxx
+@@ -22,6 +22,7 @@
+ #include <view.hxx>
+ #include <frmsh.hxx>
+ #include <olesh.hxx>
++#include <cmdid.h>
+ 
+ #include <sfx2/sidebar/SidebarController.hxx>
+ 
+diff --git a/sw/source/uibase/shells/textidx.cxx b/sw/source/uibase/shells/textidx.cxx
+index da59097f9..cb12c373f 100644
+--- a/sw/source/uibase/shells/textidx.cxx
++++ b/sw/source/uibase/shells/textidx.cxx
+@@ -21,6 +21,7 @@
+ #include <sfx2/request.hxx>
+ #include <sfx2/viewfrm.hxx>
+ #include <svl/eitem.hxx>
++#include <svl/stritem.hxx>
+ #include <editeng/sizeitem.hxx>
+ #include <osl/diagnose.h>
+ #include <fmtfsize.hxx>
+@@ -180,6 +181,14 @@ void SwTextShell::ExecIdx(SfxRequest const &rReq)
+         }
+         case FN_INSERT_MULTI_TOX:
+         {
++            if (const SfxStringItem* pTitle
++                = pArgs ? pArgs->GetItem<SfxStringItem>(FN_PARAM_1, false) : nullptr)
++            {
++                SwTOXDescription aDesc(TOX_CONTENT);
++                aDesc.SetTitle(pTitle->GetValue());
++                SwTOXMgr(&GetShell()).UpdateOrInsertTOX(aDesc, nullptr, nullptr);
++                break;
++            }
+             SfxItemSet aSet(SfxItemSet::makeFixedSfxItemSet<RES_FRM_SIZE, RES_FRM_SIZE,
+                                                             RES_LR_SPACE, RES_LR_SPACE,
+                                                             RES_BACKGROUND, RES_BACKGROUND,
+diff --git a/sw/source/uibase/shells/textsh.cxx b/sw/source/uibase/shells/textsh.cxx
+index 329460332..8c100bf1c 100644
+--- a/sw/source/uibase/shells/textsh.cxx
++++ b/sw/source/uibase/shells/textsh.cxx
+@@ -421,6 +421,12 @@ void SwTextShell::ExecInsert(SfxRequest &rReq)
+ 
+     case FN_INSERT_SMA:
+         {
++            if (const SfxStringItem* pFormula
++                = pArgs ? pArgs->GetItem<SfxStringItem>(FN_PARAM_1, false) : nullptr)
++            {
++                rSh.InsertFormula(pFormula->GetValue());
++                break;
++            }
+             // if sidebar is closed - open to show elements deck
+             if (comphelper::LibreOfficeKit::isActive())
+                 sfx2::sidebar::Sidebar::Setup(u"");
+diff --git a/sw/source/uibase/uiview/viewdlg2.cxx b/sw/source/uibase/uiview/viewdlg2.cxx
+index ff57083b1..88b1ef75b 100644
+--- a/sw/source/uibase/uiview/viewdlg2.cxx
++++ b/sw/source/uibase/uiview/viewdlg2.cxx
+@@ -52,6 +52,21 @@ void SwView::ExecDlgExt(SfxRequest& rReq)
+     {
+         case FN_INSERT_CAPTION:
+         {
++            const SfxItemSet* pArgs = rReq.GetArgs();
++            if (const SfxStringItem* pCategory
++                = pArgs ? pArgs->GetItem<SfxStringItem>(FN_PARAM_1, false) : nullptr)
++            {
++                const SfxStringItem* pText = pArgs->GetItem<SfxStringItem>(FN_PARAM_2, false);
++                InsCaptionOpt aOpt;
++                aOpt.SetCategory(SwStyleNameMapper::GetUIName(ProgName(pCategory->GetValue()),
++                                                              SwGetPoolIdFromName::TxtColl)
++                                     .toString());
++                aOpt.SetCaption(pText ? pText->GetValue() : OUString());
++                aOpt.UseCaption() = true;
++                aOpt.IgnoreSeqOpts() = true;
++                InsertCaption(&aOpt);
++                break;
++            }
+             SwAbstractDialogFactory* pFact = SwAbstractDialogFactory::Create();
+             VclPtr<VclAbstractDialog> pDialog(
+                 pFact->CreateSwCaptionDialog(GetFrameWeld(), *this));
+diff --git a/sw/source/uibase/uno/loktxdoc.cxx b/sw/source/uibase/uno/loktxdoc.cxx
+index 27f0ebca1..56d1c258a 100644
+--- a/sw/source/uibase/uno/loktxdoc.cxx
++++ b/sw/source/uibase/uno/loktxdoc.cxx
+@@ -65,6 +65,9 @@
+ #include <com/sun/star/document/XDocumentPropertiesSupplier.hpp>
+ 
+ #include <sax/tools/converter.hxx>
++#include <svtools/embedhlp.hxx>
++#include <com/sun/star/beans/XPropertySet.hpp>
++#include <com/sun/star/embed/XEmbeddedObject.hpp>
+ 
+ using namespace ::com::sun::star;
+ 
+@@ -1093,6 +1096,20 @@ void GetDocStructure(tools::JsonWriter& rJsonWriter, SwDocShell* pDocShell,
+         GetDocStructureTrackChanges(rJsonWriter, pDocShell, o3tl::trim(rest));
+ }
+ 
++/// Implements getCommandValues(".uno:Formula").
++void GetFormula(tools::JsonWriter& rJsonWriter, SwDocShell* pDocShell)
++{
++    SwWrtShell* pWrtShell = pDocShell->GetWrtShell();
++    if (!pWrtShell || !(pWrtShell->GetSelectionType() & SelectionType::Ole)
++        || !pWrtShell->IsOLEMath())
++        return;
++    svt::EmbeddedObjectRef& xObj = pWrtShell->GetOLEObject();
++    if (!svt::EmbeddedObjectRef::TryRunningState(xObj.GetObject()))
++        return;
++    uno::Reference<beans::XPropertySet> xSet(xObj->getComponent(), uno::UNO_QUERY_THROW);
++    rJsonWriter.put("formula", xSet->getPropertyValue(u"Formula"_ustr).get<OUString>());
++}
++
+ /// Implements getCommandValues(".uno:Sections").
+ ///
+ /// Parameters:
+@@ -1130,7 +1147,8 @@ bool SwXTextDocument::supportsCommand(std::u16string_view rCommand)
+     static const std::initializer_list<std::u16string_view> vForward
+         = { u"TextFormFields", u"TextFormField", u"SetDocumentProperties",
+             u"Bookmarks",      u"Fields",        u"Sections",
+-            u"Bookmark",       u"Field",         u"Layout" };
++            u"Bookmark",       u"Field",         u"Layout",
++            u"Formula" };
+ 
+     return std::find(vForward.begin(), vForward.end(), rCommand) != vForward.end();
+ }
+@@ -1217,6 +1235,10 @@ void SwXTextDocument::getCommandValues(tools::JsonWriter& rJsonWriter, std::stri
+     {
+         GetDocStructure(rJsonWriter, m_pDocShell, aMap);
+     }
++    else if (o3tl::starts_with(rCommand, ".uno:Formula"sv))
++    {
++        GetFormula(rJsonWriter, m_pDocShell);
++    }
+     else if (o3tl::starts_with(rCommand, ".uno:Layout"sv))
+     {
+         GetLayout(rJsonWriter, m_pDocShell);
+diff --git a/sw/source/uibase/wrtsh/wrtsh1.cxx b/sw/source/uibase/wrtsh/wrtsh1.cxx
+index 4fb53b840..3f4de184d 100644
+--- a/sw/source/uibase/wrtsh/wrtsh1.cxx
++++ b/sw/source/uibase/wrtsh/wrtsh1.cxx
+@@ -20,6 +20,7 @@
+ #include <com/sun/star/beans/XPropertySet.hpp>
+ #include <com/sun/star/container/XChild.hpp>
+ #include <com/sun/star/embed/EmbedMisc.hpp>
++#include <com/sun/star/text/VertOrientation.hpp>
+ #include <com/sun/star/embed/EmbedStates.hpp>
+ #include <com/sun/star/embed/EmbedVerbs.hpp>
+ #include <com/sun/star/embed/NoVisualAreaSizeException.hpp>
+@@ -28,7 +29,9 @@
+ #include <com/sun/star/lang/XInitialization.hpp>
+ 
+ #include <hintids.hxx>
++#include <optional>
+ #include <sot/exchange.hxx>
++#include <comphelper/classids.hxx>
+ #include <svx/xfillit0.hxx>
+ #include <svx/hdft.hxx>
+ #include <svx/svdview.hxx>
+@@ -50,6 +53,8 @@
+ #include <svx/fontworkbar.hxx>
+ #include <dialoghelp.hxx>
+ #include <frmfmt.hxx>
++#include <fmtanchr.hxx>
++#include <fmtornt.hxx>
+ #include <fmtftn.hxx>
+ #include <fmthdft.hxx>
+ #include <fmtpdsc.hxx>
+@@ -676,6 +681,50 @@ bool SwWrtShell::IsOLEMath() {
+     return false;
+ }
+ 
++void SwWrtShell::InsertFormula(const OUString& rFormula)
++{
++    StartUndo(SwUndoId::INSERT);
++    // A replaced formula's place: anchor, spacing, alignment.
++    std::optional<SfxItemSetFixed<RES_LR_SPACE, RES_UL_SPACE, RES_OPAQUE, RES_ANCHOR>> oPlace;
++    if (IsFrameSelected())
++    {
++        oPlace.emplace(GetAttrPool());
++        GetFlyFrameAttr(*oPlace);
++        // Baseline alignment places a new inline formula itself.
++        if (oPlace->Get(RES_ANCHOR).GetAnchorId() == RndStdIds::FLY_AS_CHAR
++            && oPlace->Get(RES_VERT_ORIENT).GetVertOrient() == css::text::VertOrientation::NONE)
++            oPlace->ClearItem(RES_VERT_ORIENT);
++    }
++    if (IsFrameSelected() || HasSelection())
++        DelRight();
++    // Write where the replaced formula was anchored.
++    if (oPlace && oPlace->Get(RES_ANCHOR).GetContentAnchor())
++    {
++        GetCursor()->DeleteMark();
++        *GetCursor()->GetPoint() = *oPlace->Get(RES_ANCHOR).GetContentAnchor();
++    }
++    const sal_Int32 nStart = GetCursor()->GetPoint()->GetContentIndex();
++    Insert(rFormula);
++    SwPaM* pCursor = GetCursor();
++    pCursor->SetMark();
++    pCursor->GetMark()->SetContent(nStart);
++    SvGlobalName aName(SO3_SM_CLASSID);
++    InsertObject(svt::EmbeddedObjectRef(), &aName);
++    if (oPlace)
++    {
++        const SwFormatAnchor& rOld = oPlace->Get(RES_ANCHOR);
++        if (rOld.GetAnchorId() != RndStdIds::FLY_AS_CHAR)
++        {
++            SwFormatAnchor aAnchor(rOld.GetAnchorId(), rOld.GetPageNum());
++            SfxItemSet aSet(SwFEShell::makeItemSetFromFormatAnchor(GetAttrPool(), aAnchor));
++            SetFlyFrameAttr(aSet);
++        }
++        oPlace->ClearItem(RES_ANCHOR);
++        SetFlyFrameAttr(*oPlace);
++    }
++    EndUndo();
++}
++
+ // The current selected OLE object will be loaded with the
+ // verb into the server.
+ void SwWrtShell::LaunchOLEObj(sal_Int32 nVerb)
