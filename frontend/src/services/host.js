@@ -16,7 +16,7 @@
 // 唯一被规范化的是 zetaoffice.getEditor：它现在返回带 kind 的描述符，
 // 宿主据此挂 <webview>（桌面）或 <iframe>（Web）。见 LibreOfficeEditor.vue。
 
-import { getAppLanguage } from '@/utils/appLanguage.js'
+import { getAppLanguage } from '../utils/appLanguage.js'
 
 /** 是否运行在桌面壳里。用于「仅桌面版可用」类的能力分支。 */
 export function isDesktopHost() {
@@ -102,10 +102,13 @@ function desktopZetaoffice(native) {
     zetaCache = {
       native,
       api: {
+        ...native.zetaoffice,
         isAvailable: async () => true, // 引擎随包分发，必然在
         getEditor: async () => {
-          const info = await native.zetaoffice.getEditor() // { url, preload, partition }
-          return { kind: 'webview', ...info }
+          const info = await native.zetaoffice.getEditor() // { url, preload, partition, kind? }
+          const normalized = info && typeof info === 'object' ? { ...info } : {}
+          if (!normalized.kind) delete normalized.kind
+          return { kind: info?.kind || 'webview', ...normalized }
         },
       },
     }

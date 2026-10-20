@@ -1,0 +1,93 @@
+LOK: callbacks flush inline on every platform
+
+0001 made the callback queue flush inline on macOS, where Aqua never
+runs posted user events. Elsewhere scheduleFlush posted a user event,
+so a callback reached the client only after the next turn of the
+main loop. Ely's worker posts a command and waits for its result and
+states inside the same request, which runs inside that loop (unipoll
+on Linux, a window message on Windows): the result never came. The
+queue now flushes inline everywhere; the flush event, its link and
+stop() are gone.
+
+diff --git a/desktop/source/lib/init.cxx b/desktop/source/lib/init.cxx
+index 76a02127d..39b72fb1a 100644
+--- a/desktop/source/lib/init.cxx
++++ b/desktop/source/lib/init.cxx
+@@ -1609,7 +1609,6 @@ extern "C" {
+ CallbackFlushHandler::CallbackFlushHandler(LibreOfficeKitDocument* pDocument, LibreOfficeKitCallback pCallback, void* pData)
+     : m_pDocument(pDocument),
+       m_pCallback(pCallback),
+-      m_pFlushEvent(nullptr),
+       m_pData(pData),
+       m_nDisableCallbacks(0)
+ {
+@@ -1638,18 +1637,8 @@ CallbackFlushHandler::CallbackFlushHandler(LibreOfficeKitDocument* pDocument, Li
+     }
+ }
+ 
+-void CallbackFlushHandler::stop()
+-{
+-    if (m_pFlushEvent)
+-    {
+-        Application::RemoveUserEvent(m_pFlushEvent);
+-        m_pFlushEvent = nullptr;
+-    }
+-}
+-
+ CallbackFlushHandler::~CallbackFlushHandler()
+ {
+-    stop();
+ }
+ 
+ CallbackFlushHandler::queue_type2::iterator CallbackFlushHandler::toQueue2(CallbackFlushHandler::queue_type1::iterator pos)
+@@ -2600,23 +2589,11 @@ void CallbackFlushHandler::invoke()
+ 
+     m_queue1.clear();
+     m_queue2.clear();
+-    stop();
+ }
+ 
+ void CallbackFlushHandler::scheduleFlush()
+ {
+-#if defined(MACOSX)
+-    // Aqua never runs posted user events: flush inline.
+-    invoke();
+-#else
+-    if (!m_pFlushEvent)
+-        m_pFlushEvent = Application::PostUserEvent(LINK(this, CallbackFlushHandler, FlushQueue));
+-#endif
+-}
+-
+-IMPL_LINK_NOARG(CallbackFlushHandler, FlushQueue, void*, void)
+-{
+-    m_pFlushEvent = nullptr;
++    // Ely's worker waits on callbacks inside a request: flush inline.
+     invoke();
+ }
+ 
+diff --git a/desktop/inc/lib/init.hxx b/desktop/inc/lib/init.hxx
+index 51d690307..6c21850fc 100644
+--- a/desktop/inc/lib/init.hxx
++++ b/desktop/inc/lib/init.hxx
+@@ -210,8 +210,6 @@ namespace desktop {
+         void enqueueUpdatedTypes();
+         void enqueueUpdatedType( int type, const SfxViewShell* sourceViewShell, int viewId );
+ 
+-        void stop();
+-
+         /** we frequently want to scan the queue, and mostly when we do so, we only care about the element type
+             so we split the queue in 2 to make the scanning cache friendly. */
+         queue_type1 m_queue1;
+@@ -246,12 +244,9 @@ namespace desktop {
+         OString m_aViewRenderState;
+         int m_viewId = -1; // view id of the associated SfxViewShell
+         LibreOfficeKitCallback m_pCallback;
+-        ImplSVEvent* m_pFlushEvent;
+         void *m_pData;
+         int m_nDisableCallbacks;
+         std::recursive_mutex m_mutex;
+-
+-        DECL_LINK(FlushQueue, void*, void);
+     };
+ 
+     struct DESKTOP_DLLPUBLIC LibLODocument_Impl : public _LibreOfficeKitDocument

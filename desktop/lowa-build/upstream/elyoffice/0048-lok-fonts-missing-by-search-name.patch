@@ -1,0 +1,38 @@
+LOK: a font the lookup finds is not missing
+
+The fonts-missing filter compared names as written: a document's
+"宋体" against the used face "SimSun", or "DEJAVU SANS" against
+"DejaVu Sans". The font lookup finds families by their English
+search name (GetEnglishSearchFontName: lower ASCII, no spaces,
+localized CJK names translated), so these fonts were found and
+used, yet reported missing. On Linux the kernel names fontconfig
+families in its UI language, English, so every localized name in
+a document failed the check. Compare search names instead.
+
+--- a/desktop/source/lib/init.cxx
++++ b/desktop/source/lib/init.cxx
+@@ -168,6 +168,7 @@
+ #include <vcl/vclevent.hxx>
+ #include <vcl/GestureEventPan.hxx>
+ #include <vcl/svapp.hxx>
++#include <unotools/fontdefs.hxx>
+ #include <unotools/resmgr.hxx>
+ #include <tools/debug.hxx>
+ #include <tools/fract.hxx>
+@@ -3047,11 +3048,12 @@
+                                     sal_Int32 nIndex = 0;
+                                     do
+                                     {
+-                                        const OUString aFamily
+-                                            = x.mOriginalFont.getToken(0, ';', nIndex);
++                                        // Names compare as the font lookup matches them.
++                                        const OUString aFamily = GetEnglishSearchFontName(
++                                            x.mOriginalFont.getToken(0, ';', nIndex));
+                                         for (const auto &j : x.mUsedFonts)
+-                                            if (j == aFamily
+-                                                || j.startsWith(Concat2View(aFamily + "/")))
++                                            if (GetEnglishSearchFontName(j.getToken(0, '/'))
++                                                == aFamily)
+                                                 return true;
+                                     } while (nIndex >= 0);
+                                 }

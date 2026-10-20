@@ -48,10 +48,12 @@ ssh root@<vm> 'nohup bash /root/mega-build.sh > /root/mega.log 2>&1 &'
 |---|---|
 | `EMSCRIPTEN_INTEL_GCC.mk` | **无条件**导出 `FS/callMain/specialHTMLTargets`（上游 QT6 门控，QT5 构建缺失 → 引导器崩） |
 | `vcl/qt5/QtInstance.cxx` | **tooltip 中文修复**：`AfterAppInit()` 里 `QFontDatabase::addApplicationFont()` 注册运行期注入的 CJK 字体（`/instdir/share/fonts/truetype/AAA-CJK.ttc`），把其 family 追加为 QApplication + `QTipLabel` 字体回退。Qt 原生 QToolTip 绕过 VCL/fontconfig，不打此补丁 tooltip 中文全是方框 |
-| `CustomTarget_emscripten_fs_image.mk` | 把 zh-CN（25 .mo + 4 registry xcd + ZZZ）打进 soffice.data |
+| `sw/source/core/text/frmpaint.cxx` | **表格内删除线边距锚点修复**：`ShowChangesInMargin` 通过 `FindTabFrame()` 锚定到外层表格左边界，避免表格单元格内删除修订文字盖在相邻单元格上 |
+| `desktop/source/lib/init.cxx` 等（`#1371`） | **WASM/LOK 稳定性与无弹窗 UNO 接口**（源自 ElyOffice `0.1.8` Tier A 补丁集，详见 [`ELYOFFICE_PATCH_AUDIT.md`](ELYOFFICE_PATCH_AUDIT.md) 与 `upstream/elyoffice/`）：JSDialog 激活时将 `unoCommand` 路由回文档 Frame、跳过已销毁 weld 控件、空字体列表回退保护，以及 `.uno:PageSize` / `ChapterNumberingDialog` / `FootnoteDialog` / `LineNumberingDialog` / `WordCountDialog` / `OutlineBullet` 的直接参数与 JSON 状态接口 |
+| `CustomTarget_emscripten_fs_image.mk` / `fs-image-patch.py` | 把 zh-CN（25 .mo + 4 registry xcd + ZZZ）打进 `soffice.data`，并支持剥离 WASM 下无 Python 运行时的 `Lightproof.py` 语法检查器及非 `zh`/`en` 拼写词典以精简镜像体积 |
 | `ZZZ-aiworkdeck-locale-zh-CN.xcd` | 设默认 `ooLocale=zh-CN`（语言包只注册不设默认） |
 
-完整增量记录见 `RECIPE.md`（含产物 sha256、工具链精确版本、每个坑的因果）。
+完整增量记录见 `RECIPE.md`（含产物 sha256、工具链精确版本、每个坑的因果），ElyOffice 51 个上游补丁的逐项审计见 [`ELYOFFICE_PATCH_AUDIT.md`](ELYOFFICE_PATCH_AUDIT.md)。
 
 ## 原生审阅区 / Native review gutter (#587)
 
