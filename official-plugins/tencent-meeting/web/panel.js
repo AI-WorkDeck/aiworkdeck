@@ -90,7 +90,7 @@
   function stopLogin() { clearTimeout(loginTimer); loginTimer = null; loginEpoch++; }
   function paintStatus(data) {
     status = data || {};
-    $('connection-status').textContent = status.cliAvailable === false ? t('missingCli') : status.loggedIn ? t('connected') + (value(status.userName) ? ' · ' + value(status.userName) : '') : t('disconnected');
+    $('connection-status').textContent = status.cliAvailable === false ? (value(status.message) || t('missingCli')) : status.loggedIn ? t('connected') + (value(status.userName) ? ' · ' + value(status.userName) : '') : t('disconnected');
     if (status.loggedIn) { stopLogin(); $('authorization').hidden = true; $('authorize-url').value = ''; }
     controls();
   }

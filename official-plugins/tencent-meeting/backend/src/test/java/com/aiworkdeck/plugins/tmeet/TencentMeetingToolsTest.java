@@ -60,6 +60,13 @@ class TencentMeetingToolsTest {
         JsonNode status = call("status", "{}").path("data");
         assertFalse(status.path("cliAvailable").asBoolean()); assertTrue(status.path("message").asText().contains("安装"));
     }
+    @Test void statusPreservesSanitizedMissingNodeGuidanceAndRecovers() throws Exception {
+        cli.answer = args -> { throw new TmeetCli.Failure(TmeetCliDiscovery.NODE_MISSING); };
+        assertEquals(TmeetCliDiscovery.NODE_MISSING, call("status", "{}").path("data").path("message").asText());
+        cli.answer = args -> new TmeetCli.Result(0, args.contains("--version") ? "1.0" : "Logged out");
+        JsonNode status = call("status", "{}").path("data");
+        assertTrue(status.path("cliAvailable").asBoolean()); assertFalse(status.path("loggedIn").asBoolean());
+    }
     @Test void loginValidatesOfficialUrlAndLogoutRequiresConfirmation() throws Exception {
         assertTrue(call("login", "{}").path("success").asBoolean());
         cli.url = "https://meeting.tencent.com.attacker.example/auth";

@@ -113,7 +113,7 @@ public class TencentMeetingTools implements HostAware {
     }
     private Object status() {
         try { successful(List.of("--version"), Duration.ofSeconds(5)); }
-        catch (Failure e) { return Map.of("cliAvailable", false, "loggedIn", false, "userName", "", "message", TmeetCli.MISSING); }
+        catch (Failure e) { return Map.of("cliAvailable", false, "loggedIn", false, "userName", "", "message", e.getMessage()); }
         String output = successful(List.of("auth", "status"), Duration.ofSeconds(10));
         boolean loggedIn = output.lines().anyMatch(line -> line.trim().equals("Logged in"));
         String name = output.lines().map(String::trim).filter(line -> line.startsWith("UserName:"))
