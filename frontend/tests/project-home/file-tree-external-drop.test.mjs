@@ -956,7 +956,7 @@ test('#1381 local change subscription follows mount, project switch and unmount'
         subscriptions.push({ id, onChange }); return () => stopped.push(id)
       },
     })
-    const vm = { ...options.data(), projectId: 42, loadFiles: () => reloads.push(vm.projectId) }
+    const vm = { ...options.data(), projectId: 42, watchLocalFiles: true, loadFiles: () => reloads.push(vm.projectId) }
     Object.assign(vm, options.methods)
     vm.loadFiles = () => reloads.push(vm.projectId)
     vm.subscribeLocalFileChanges()

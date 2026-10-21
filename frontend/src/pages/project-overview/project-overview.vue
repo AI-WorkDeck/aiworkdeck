@@ -656,6 +656,7 @@
             v-if="hasNamedProject && leftPaneKey === 'files'"
             ref="fileTree"
             :project-id="projectId"
+            :watch-local-files="canWatchLocalProjectFiles"
             :selection-mode="fileBatchMode"
             :show-footer-actions="false"
             :hidden-file-ids="stagedFileIds"
@@ -3089,6 +3090,11 @@ export default {
     },
     hasNamedProject() {
       return this.hasProject && !this.isLooseWorkspace
+    },
+    canWatchLocalProjectFiles() {
+      return this.projectInfoLoaded && !this.isClientView
+        && String(this.project?.id) === String(this.projectId)
+        && !!this.project?.localRoot?.trim()
     },
     hasProject() {
       return this.projectId != null && this.projectId !== '' && !Number.isNaN(Number(this.projectId))

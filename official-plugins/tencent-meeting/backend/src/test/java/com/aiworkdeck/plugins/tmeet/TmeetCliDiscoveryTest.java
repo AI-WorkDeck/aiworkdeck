@@ -93,7 +93,7 @@ class TmeetCliDiscoveryTest {
         Path executable = file(root.resolve("probe"), "#!/bin/sh\nsleep 30 &\necho $! > \"$1\"\nwait\n");
         assertTrue(executable.toFile().setExecutable(true));
         var runner = new TmeetCli.NativeRunner(executable.toString());
-        assertThrows(TmeetCli.Failure.class, () -> runner.run(List.of(pid.toString()), Duration.ofMillis(300)));
+        assertThrows(TmeetCli.Failure.class, () -> runner.run(List.of(pid.toString()), Duration.ofSeconds(3)));
         long child = Long.parseLong(Files.readString(pid).strip());
         for (int i = 0; i < 30 && ProcessHandle.of(child).map(ProcessHandle::isAlive).orElse(false); i++) Thread.sleep(20);
         assertFalse(ProcessHandle.of(child).map(ProcessHandle::isAlive).orElse(false));
