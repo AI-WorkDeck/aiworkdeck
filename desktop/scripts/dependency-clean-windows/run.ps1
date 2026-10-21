@@ -109,8 +109,16 @@ $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.
 if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Probe must run without administrator token' }
 $env:USERPROFILE = [Environment]::GetFolderPath('UserProfile')
 if ($env:USERPROFILE -notlike '*awd-dependency-test*') { throw 'Probe did not receive a fresh user profile' }
-$env:APPDATA = [Environment]::GetFolderPath('ApplicationData')
-$env:LOCALAPPDATA = [Environment]::GetFolderPath('LocalApplicationData')
+# A new non-interactive profile has no shell-folder registration yet.
+$env:APPDATA = Join-Path $env:USERPROFILE 'AppData\Roaming'
+$env:LOCALAPPDATA = Join-Path $env:USERPROFILE 'AppData\Local'
+New-Item -ItemType Directory -Force -Path $env:APPDATA,$env:LOCALAPPDATA | Out-Null
+# Start-Process -Credential inherits the runner's TEMP, even with LoadUserProfile.
+# A normal sign-in instead owns its temporary directory. Record and reproduce that boundary.
+@{inheritedTemp=$env:TEMP;inheritedTmp=$env:TMP;profile=$env:USERPROFILE} | ConvertTo-Json | Set-Content "$Root\child-profile.json"
+$env:TEMP = Join-Path $env:LOCALAPPDATA 'Temp'
+$env:TMP = $env:TEMP
+New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
 $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
 foreach ($name in @('JAVA_HOME','PYTHONHOME','PYTHONPATH','NODE_PATH','NODE_OPTIONS','LIBREOFFICE_PATH','SOFFICE_PATH','TMEET_PATH','TMEET_NODE_PATH','DOCKER_HOST','DOCKER_CONTEXT')) {
     [Environment]::SetEnvironmentVariable($name,$null,'Process')
@@ -127,7 +135,15 @@ function Run-Native([string]$Executable, [string[]]$Arguments, [string]$Log) {
         -RedirectStandardOutput "$Root\$Log.log" -RedirectStandardError "$Root\$Log.stderr.log"
     if ($process.ExitCode -ne 0) { throw "$Log exited $($process.ExitCode); inspect its stdout/stderr logs" }
 }
-Run-Native "$Resources\jre\bin\java.exe" @('-Dfile.encoding=UTF-8','-Djava.awt.headless=true','-cp',"$Root;$Resources\backend\app.jar;$Resources\backend\lib\*",'DependencyProbe',$Root,$Resources,$Version) 'probe'
+# Continue independent checks after installation; any failed stage still fails the job.
+$stageFailures = @()
+try {
+Run-Native "$Resources\jre\bin\java.exe" @('-Dfile.encoding=UTF-8','-Dstdout.encoding=UTF-8','-Dstderr.encoding=UTF-8','-Djava.awt.headless=true','-cp',"$Root;$Resources\backend\app.jar;$Resources\backend\lib\*",'DependencyProbe',$Root,$Resources,$Version) 'probe'
+} catch {
+    if (-not (Test-Path "$Root\installed.ready")) { throw }
+    $stageFailures += "core: $_"
+}
+try {
 Run-Native "$Resources\python\python.exe" @('-I','-m','venv',"$Root\dpia-venv") 'dpia-venv'
 $python = "$Root\dpia-venv\Scripts\python.exe"
 $env:PYTHONIOENCODING = 'utf-8'
@@ -145,7 +161,13 @@ $after | Set-Content "$Root\dpia-after.json" -Encoding utf8
 if (@(($after | ConvertFrom-Json).checks | Where-Object { $_.status -ne 'ready' }).Count) { throw 'DPIA preparation remains incomplete' }
 $env:AWD_DPIA_TEST_PYTHON = $python
 Run-Native 'C:\Program Files\nodejs\node.exe' @('--test',"$Root\dpia-workbench\tests\lifecycle.test.mjs") 'dpia-lifecycle'
+} catch { $stageFailures += "dpia: $_" }
+try {
 & "$Root\source\desktop\scripts\dependency-clean-windows\real-models.ps1" -Resources $Resources -Repo "$Root\source" -Output "$Root\real-models" -ProbeClasses $Root *> "$Root\real-models.log"
+} catch { $stageFailures += "models: $_" }
+@{failures=$stageFailures} | ConvertTo-Json | Set-Content "$Root\stages.json" -Encoding utf8
+if ($stageFailures.Count) { throw ($stageFailures -join '; ') }
+
 '@ | Set-Content "$root\probe.ps1" -Encoding utf8
     $powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
     $savedModulePath = $env:PSModulePath

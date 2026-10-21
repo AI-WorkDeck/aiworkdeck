@@ -37,3 +37,18 @@ test('expensive acceptance is gated by changes instead of all PRs or a branch na
   assert.match(acceptance.if, /needs\.build\.result == 'success'/, 'failed builds still cannot be accepted')
   assert.match(acceptance.if, /!cancelled\(\)/)
 })
+test('DPIA runtime and backend edits reach both workflow and acceptance gates', () => {
+  const workflow = require('js-yaml').load(read('.github/workflows/desktop-build.yml'))
+  const paths = workflow.on.pull_request.paths
+  const script = workflow.jobs['dependency-scope'].steps.find(step => step.id === 'scope').run
+  const scope = new RegExp(script.match(/grep -Eq '([^']+)'/)[1])
+  for (const file of [
+    'official-plugins/dpia-workbench/runtime/render.py',
+    'official-plugins/dpia-workbench/backend/src/main/java/com/aiworkdeck/plugins/dpia/DpiaEnvironment.java'
+  ]) {
+    assert.ok(paths.some(pattern => pattern === file || (pattern.endsWith('/**') && file.startsWith(pattern.slice(0, -2)))),
+      `${file} must start Desktop Build before dependency-scope can run`)
+    assert.ok(scope.test(file), `${file} must request real dependency acceptance`)
+  }
+  assert.equal(scope.test('official-plugins/unrelated-plugin/runtime/app.py'), false)
+})
