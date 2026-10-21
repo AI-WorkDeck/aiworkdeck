@@ -232,6 +232,9 @@ jobs:
       - name: Optional components prompts (dev-board#530)
         working-directory: frontend
         run: npm run test:optional-components
+      - name: External software preparation
+        working-directory: frontend
+        run: npm run test:external-dependencies
       - name: Test local redaction panel
         working-directory: frontend
         run: node --test tests/desensitize/*.test.mjs

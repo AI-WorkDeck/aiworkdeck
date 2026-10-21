@@ -45,6 +45,19 @@ class PythonToolsDockerGateTest {
     }
 
     @Test
+    void installingAndStoppingDockerUpdatesSameRegistryWithoutRestart() {
+        PythonTools tools = pythonTools(false);
+        ToolRegistry registry = new ToolRegistry(List.of(tools), new PluginService(), new ClientCapabilityService());
+        registry.init();
+        assertFalse(registry.getAllSpecifications().stream().anyMatch(s -> s.name().equals("run_python")));
+        tools.overrideDockerAvailable(true);
+        assertTrue(registry.getAllSpecifications().stream().anyMatch(s -> s.name().equals("run_python")));
+        tools.overrideDockerAvailable(false);
+        assertFalse(registry.getAllSpecifications().stream().anyMatch(s -> s.name().equals("run_python")));
+        assertTrue(registry.resolve("run_python").isPresent());
+    }
+
+    @Test
     @DisplayName("真被调到时说的是「Python 沙箱缺 Docker」，并明确不牵连读文件与 OCR")
     void safetyNetMessageDoesNotImplyOcrIsBroken() {
         String out = pythonTools(false).run_python("print(1)");

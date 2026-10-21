@@ -245,13 +245,7 @@ public class ToolRegistry {
     @PostConstruct
     public void init() {
         for (AgentToolComponent bean : toolComponents) {
-            boolean available = componentAvailable(bean);
-            if (!available) {
-                log.info("Tool component {} reports itself unavailable on this machine — "
-                        + "its tools stay registered but are not offered to the model",
-                        bean.getClass().getSimpleName());
-            }
-            registerBean(bean, available);
+            registerBean(bean);
         }
         if (disclosurePolicy != null) {
             disclosurePolicy.setPluginToolNames(this::pluginToolNames);
@@ -270,7 +264,7 @@ public class ToolRegistry {
         return java.util.Collections.unmodifiableSet(names);
     }
 
-    /** 组件自报可用性绝不能掀翻启动：探测里抛出来的一律当"可用"，最坏只是多下发一个工具。 */
+    /** 组件自报可用性绝不能掀翻工具清单读取：探测里抛出来的一律当"可用"，最坏只是多下发一个工具。 */
     private boolean componentAvailable(AgentToolComponent bean) {
         try {
             return bean.isAvailable();
@@ -281,14 +275,8 @@ public class ToolRegistry {
         }
     }
 
-    /**
-     * @param componentOffersToModel 组件级开关（{@code AgentToolComponent.isAvailable()}）：
-     *                     false 时本组件的工具只登记不下发。单个工具还能再用
-     *                     {@code @ToolMeta.offerToModel = false} 单独退出下发（dev-board#799）。
-     *                     两者都是「只登记不下发」：工具仍可被 resolve/execute 调到，
-     *                     拿到的是它自己那句可行动的错误，好过一句 "Tool not found"。
-     */
-    private void registerBean(Object bean, boolean componentOffersToModel) {
+    /** Keep eligible specs registered; component readiness is checked when a new turn requests them. */
+    private void registerBean(Object bean) {
         for (Method method : bean.getClass().getDeclaredMethods()) {
             if (!method.isAnnotationPresent(Tool.class)) {
                 continue;
@@ -307,7 +295,7 @@ public class ToolRegistry {
                     log.warn("Duplicate tool name '{}' — {} overrides {}",
                             spec.name(), bean.getClass().getSimpleName(),
                             previous.bean().getClass().getSimpleName());
-                } else if (componentOffersToModel && (meta == null || meta.offerToModel())) {
+                } else if (meta == null || meta.offerToModel()) {
                     builtinSpecifications.add(spec);
                 }
             } catch (Exception e) {
@@ -425,7 +413,13 @@ public class ToolRegistry {
      * 禁用插件的工具规格不下发——LLM 看不到即不会调用。
      */
     public List<ToolSpecification> getAllSpecifications() {
-        List<ToolSpecification> all = new ArrayList<>(builtinSpecifications);
+        List<ToolSpecification> all = new ArrayList<>();
+        Map<AgentToolComponent, Boolean> availability = new java.util.IdentityHashMap<>();
+        for (ToolSpecification spec : builtinSpecifications) {
+            Object owner = builtinTools.get(spec.name()).bean();
+            if (!(owner instanceof AgentToolComponent component)
+                    || availability.computeIfAbsent(component, this::componentAvailable)) all.add(spec);
+        }
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> all.add(b.specification()));
         for (ToolSpecification spec : pluginService.getToolSpecifications()) {
             if (pluginToolEnabled(spec.name())) {

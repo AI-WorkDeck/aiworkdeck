@@ -1049,6 +1049,10 @@ export function uninstallMarketSkill(skillId) {
 // 四个可选组件的一次性快照（后端 PackController.optionalComponents）。
 // 这条端点**不发网络请求**（体积取内存/落盘快照，0 = 未知），首次登录面板可以放心在
 // 登录后立刻调它；要精确体积再按需打 packInfo。
+export function checkExternalDependencies() {
+  return request({ url: "/api/external-dependencies", method: "GET", timeout: 25000 });
+}
+
 export function optionalComponents() {
   return request({
     url: '/api/packs/optional-components',
