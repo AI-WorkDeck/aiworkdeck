@@ -586,3 +586,13 @@ FileTree 的节点/根/空白落点先认包内载荷，先同步快照与 claim
 `preventDefault()` 再启动 Electron 拖拽，避免两套拖拽竞争宿主输入。原生启动成功不等于结束；
 启动失败必须结束本次包内身份并提示，旧请求迟到失败不得清理或提示覆盖新手势。
 回归：`archive-entry-preview`、`archive-media-lifecycle`、`file-tree-archive-drop`、desktop `file-drag`。
+
+### 扫描 PDF 转 Word 的依赖与数据去向（dev-board#1387）
+
+本地路径按 `pptx-runtime` → `mineru-runtime` + `mineru-models` 准备，复用 `component_required` 停轮/装好后续跑。专用 `/api/pdf/ocr-markdown-local` 强制 local_only，旧资源包404不回退旧端点。Python一般解析默认本地、失败不暗转云；明确配置的其它云解析入口保留。
+
+本地不可用或失败时，`OcrRoutingService` 按当前用户的明确偏好继续：默认ask；已保存cloud允许调用既有 `OcrService` 的阿里云/计费通道；local进入既有组件准备卡。没有同意时发 `ocr_route_required`（复用同一component等待终态，编排器显示选择方式而非误说下载）。用户点击 `/api/ocr/routing/choice` 后前端自动续原会话；服务端随机decision绑定用户、会话、项目、文件及文件指纹，30分钟有效，严格重检会话归属与文件权限。用户可只选本次或记住；设置「账户与用量→扫描件识别」可更改。provider默认值、密钥、AI跨境同意、模型工具参数都不算此选择。云失败重新展示重试/本地选择，不自动无限重试；逐页全部完成才生成Word，单页失败/空白结果不产残缺文件，重试可能重复消耗已识别页的费用。OCR产物明确为内容转换而非保真布局。
+
+取消选择调用 `/api/ocr/routing/cancel` 撤回本任务 decision，保留到期前的取消记录，迟到 choice 不得重新授权；取消不修改用户此前记住的偏好。原 run 和已续跑 run 被取消后不能借保存的 cloud 偏好继续，新任务须重新选择。前端成功交接只清 UI，不误撤权；取消失败显示重试，并保留原账户/服务端请求范围。逐页渲染前、上传前和结果导出前重检取消及权限，最后一页请求期间取消也不生成迟到 Word；已发出的 HTTP 无法撤回，已识别页面可能已计费。纯白页不上传、不计费，但仍执行取消检查。
+
+验证：`PdfOcrDependenciesTest`、`OcrRoutingServiceTest`、`PdfCloudOcrServiceTest`、`AgentOrchestratorEditorBootingAndComponentStopTest`；前端 `tests/optional-components/ocr-routing.test.mjs` 与真实ChatInterface/SSE浏览器 `tests/chat-presentation-ui/ocr-routing.mjs`。合成输入/传输替身不等于真实付费调用、模型推理或安装包更新。线上pptx-runtime1.0.1无专用local端点，后续需另行构建签名发布；当前版本本地路径会明确不可用，但用户可选择已披露的云端OCR继续，无需等待本地新包。

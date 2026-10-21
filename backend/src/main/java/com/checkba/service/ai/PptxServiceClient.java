@@ -1124,8 +1124,8 @@ public class PptxServiceClient {
     }
 
     /**
-     * 扫描件 OCR：MinerU 解析出 markdown（checkba 自有端点 POST /api/pdf/ocr-markdown）。
-     * 服务侧本地 mineru-service 优先、云端 MinerU token 兜底，不经第三方云 OCR。
+     * 扫描件 OCR：MinerU 解析出 markdown（自有端点 POST /api/pdf/ocr-markdown-local）。
+     * 服务侧只使用本地 mineru-service；失败不转云端，也不生成云端图片描述。
      * 解析可能耗时较长（本地 CPU pipeline）。
      *
      * @param pdfFilePath 本地 PDF 路径
@@ -1137,17 +1137,32 @@ public class PptxServiceClient {
         JSONObject body = new JSONObject();
         body.set("pdf_path", pdfFilePath);
 
-        HttpResponse resp = HttpRequest.post(baseUrl + "/api/pdf/ocr-markdown")
+        // 旧资源包的同名 OCR 接口可能隐式转云；新端点不存在时必须停止，不能回落旧接口。
+        HttpResponse resp = HttpRequest.post(baseUrl + "/api/pdf/ocr-markdown-local")
                 .header("Content-Type", "application/json")
                 .body(body.toString())
                 .timeout(600 * 1000) // 本地 CPU OCR 大文件可达数分钟
                 .execute();
 
+        if (resp.getStatus() == 404) {
+            throw new LocalOcrUnsupportedException();
+        }
         if (resp.getStatus() != 200) {
             throw new RuntimeException("Failed to OCR PDF: " + resp.body());
         }
 
         return JSONUtil.parseObj(resp.body()).getJSONObject("data").getStr("markdown");
+    }
+
+    public static final class LocalOcrUnsupportedException extends RuntimeException {
+        public LocalOcrUnsupportedException() {
+            super(LangText.of(
+                    "当前组件版本不支持可靠的本地 OCR，请在组件管理中更新「PPT 生成与 PDF 转 Word」组件。"
+                            + "更新前此功能暂不可用；未调用旧 OCR 接口，也未转用云端。",
+                    "This component version does not support reliable local OCR. Update the PPT generation and "
+                            + "PDF to Word component in Components. This feature is unavailable until then; "
+                            + "neither the legacy OCR endpoint nor cloud OCR was used."));
+        }
     }
 
     // 注：曾有 getPageScreenshot / editStandaloneImage / editPptxSlide 三个方法，调用的
