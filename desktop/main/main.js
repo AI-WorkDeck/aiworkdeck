@@ -1585,11 +1585,11 @@ ipcMain.handle('checkba:model-status', async () => {
   if (!modelManager) return { components: [] }
   const components = modelManager.status()
   // 「运行中」标注：对应服务端口是否有监听
-  const { isPortOpen } = require('./services/service-manager')
+  const { checkServiceHealth } = require('./services/pysvc-runtime')
   for (const c of components) {
     const svc = COMPONENT_SERVICE[c.id]
     if (svc && services && services.ports[svc]) {
-      c.serviceRunning = await isPortOpen(services.ports[svc])
+      c.serviceRunning = await checkServiceHealth(svc, services.ports[svc])
       c.serviceName = svc
     }
   }
@@ -1597,7 +1597,11 @@ ipcMain.handle('checkba:model-status', async () => {
 })
 ipcMain.handle('checkba:model-download', async (_evt, payload) => {
   if (!modelManager) return { ok: false, message: 'model manager 未就绪' }
-  return modelManager.download(payload && payload.id)
+  const id = payload && payload.id
+  const repair = payload?.repair === true
+  const svc = COMPONENT_SERVICE[id]
+  if (svc && services && (repair || !modelManager.isInstalled(id))) await services.stop(svc)
+  return modelManager.download(id, { repair })
 })
 ipcMain.handle('checkba:model-cancel', async (_evt, payload) => {
   if (!modelManager) return { ok: false, message: 'model manager 未就绪' }
@@ -1615,8 +1619,14 @@ ipcMain.handle('checkba:model-remove', async (_evt, payload) => {
 ipcMain.handle('checkba:service-ensure', async (_evt, payload) => {
   if (!services) return { ok: false, message: 'services not ready' }
   try {
-    const res = await services.start(payload && payload.name)
-    return { ok: !!res.ok, ...res }
+    const name = payload && payload.name
+    const res = await services.start(name)
+    if (!res.ok) return { ...res, ok: false }
+    const { PACK_ID_BY_SERVICE, waitForServiceHealth } = require('./services/pysvc-runtime')
+    if (PACK_ID_BY_SERVICE[name] && !(await waitForServiceHealth(name, services.ports[name]))) {
+      return { ok: false, message: require('./app-language').t({ zh: '组件服务启动检查未通过，请重试或校验并修复组件。', en: 'Component service did not pass its HTTP startup check. Retry or repair the component.' }) }
+    }
+    return { ...res, ok: true, validation: 'service-started' }
   } catch (e) {
     return { ok: false, message: String(e && e.message ? e.message : e) }
   }

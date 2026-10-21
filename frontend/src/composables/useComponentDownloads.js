@@ -99,12 +99,12 @@ export function createComponentDownloadManager(deps) {
   }
 
   /** 装一个组件；同一 packId 在途时返回同一个 Promise。**不抛**（同 installOne）。 */
-  function installOne(item) {
+  function installOne(item, options) {
     const cur = adopt(item)
     const id = cur.packId
     if (inflight.has(id)) return inflight.get(id)
     state.activeCount += 1
-    const p = ctl.installOne(cur).then((ok) => {
+    const p = ctl.installOne(cur, options).then((ok) => {
       inflight.delete(id)
       state.activeCount -= 1
       if (!((claims.get(id) || 0) > 0) && deps.notify) {

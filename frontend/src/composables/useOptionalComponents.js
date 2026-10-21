@@ -103,15 +103,21 @@ export function createOptionalComponentsController(deps) {
     try {
       const res = await deps.optionalComponents()
       const list = (res && res.components) || []
-      state.items = list.map((c) => ({
+      const models = deps.modelStatus ? (await deps.modelStatus()).components || [] : null
+      state.items = list.map((entry) => {
+        const model = models && models.find((m) => m.id === entry.modelId)
+        const c = { ...entry, ...(models && entry.modelId ? { modelInstalled: model?.state === 'installed' } : {}) }
+        return ({
         ...c,
         localeKey: PACK_LOCALE_KEY[c.packId] || c.packId,
         // phase: idle / runtime / model / starting / ready / failed
-        phase: c.installed && (!c.modelId || c.modelInstalled) ? 'ready' : 'idle',
+        phase: model?.state === 'error' ? 'failed' : (c.installed && (!c.modelId || c.modelInstalled) ? 'ready' : 'idle'),
+        serviceStarted: false,
+        repairRequired: !!model?.repairRequired,
         percent: 0,
-        error: '',
+        error: model?.message || '',
         selected: false,
-      }))
+      }) })
     } catch (e) {
       state.error = (e && e.message) || String(e)
       state.items = []
@@ -194,33 +200,64 @@ export function createOptionalComponentsController(deps) {
    * 那个方法 spawn 完下载器就 `return {ok:true}`，它 resolve 的时刻模型一个字节都还没落盘。
    * 只 await 它就会在模型没下完时去 ensure(service)，服务起来后找不到权重。
    */
-  async function installModel(item) {
-    if (!item.modelId || item.modelInstalled) return true
+  async function installModel(item, repair = false) {
+    if (!item.modelId) return true
+    if (deps.modelStatus) {
+      const models = (await deps.modelStatus()).components || []
+      item.modelInstalled = models.some((m) => m.id === item.modelId && m.state === 'installed')
+    }
+    if (item.modelInstalled && !repair) return true
     item.phase = 'model'
     item.stageKey = 'model'
     item.percent = 0
     return new Promise((resolve) => {
       let unsub = () => {}
+      let settled = false
+      let lastProgress = now()
+      const started = now()
+      let signature = ''
+      const watchdog = setInterval(() => {
+        if (now() - started >= (deps.modelTotalMs ?? 2 * 60 * 60 * 1000)
+            || now() - lastProgress >= (deps.modelStallMs ?? STALL_MS + 10000)) {
+          Promise.resolve().then(() => deps.modelCancel?.(item.modelId)).catch(() => {})
+          finish(false, deps.t ? deps.t('components.errorStalled') : FALLBACK_ERROR.stalled)
+        }
+      }, deps.modelPollMs ?? POLL_MS)
       const finish = (ok, msg) => {
+        if (settled) return
+        settled = true
+        clearInterval(watchdog)
         try { unsub() } catch (e) { /* ignore */ }
         if (!ok) { item.phase = 'failed'; item.stageKey = 'preparing'; item.error = msg || '' }
         else { item.modelInstalled = true; item.percent = 100 }
         resolve(ok)
       }
-      unsub = deps.onModelProgress((evt) => {
-        if (!evt || evt.id !== item.modelId) return
-        if (evt.phase === 'progress' && typeof evt.percent === 'number') item.percent = evt.percent
+      try {
+        unsub = deps.onModelProgress((evt) => {
+        if (!evt || evt.id !== item.modelId || settled) return
+        if (evt.phase === 'progress') {
+          const next = String(evt.bytesDownloaded ?? evt.percent ?? '')
+          if (next !== signature) { signature = next; lastProgress = now() }
+          if (typeof evt.percent === 'number') item.percent = evt.percent
+          if (evt.message === 'cancelled') finish(false, evt.message)
+        }
         else if (evt.phase === 'done') finish(true)
-        else if (evt.phase === 'error') finish(false, evt.message)
-      })
-      Promise.resolve(deps.modelDownload(item.modelId)).catch((e) => {
+        else if (evt.phase === 'error' || evt.phase === 'cancelled') finish(false, evt.message)
+        })
+        if (settled) { unsub(); return }
+      } catch (e) { finish(false, e.message || String(e)); return }
+      Promise.resolve().then(() => deps.modelDownload(item.modelId, { repair })).then((result) => {
+        if (result?.ok === false) finish(false, result.message || 'Model download could not start')
+      }).catch(async (e) => {
         const msg = (e && e.message) || String(e)
-        // model-manager.download() 对已经装好的模型直接抛 `${id} already installed`
-        // （desktop/main/services/model-manager.js:195）。重试一个「运行时装了、模型也装了、
-        // 只差 ensure」的组件必然撞上这条——模型就在盘上，这一段该算成功，
-        // 不能把整张卡打成 failed 让用户永远重试不出去。
-        if (/already installed/i.test(msg)) finish(true)
-        else finish(false, msg)
+        // A stale UI snapshot is not proof of installation; verify the main-process inventory.
+        if (/already installed/i.test(msg) && deps.modelStatus) {
+          try {
+            const models = (await deps.modelStatus()).components || []
+            if (models.some((m) => m.id === item.modelId && m.state === 'installed')) return finish(true)
+          } catch (_) { /* report the original error */ }
+        }
+        finish(false, msg)
       })
     })
   }
@@ -228,22 +265,23 @@ export function createOptionalComponentsController(deps) {
   /**
    * 装一个组件。**不抛**：面板要能「一个失败、后面照跑」，抛出去会把 installAll 打断。
    */
-  async function installOne(item) {
+  async function installOne(item, options = {}) {
     item.error = ''
     item.errorKey = ''
     try {
       if (!(await installPack(item))) return false
-      if (!(await installModel(item))) return false
+      if (!(await installModel(item, options.repairModel === true))) return false
       item.phase = 'starting'
       item.stageKey = 'starting'
       item.percent = 0
       const res = await deps.ensureService(item.service)
-      if (res && res.ok === false && !res.disabled) {
+      if (!res || res.ok !== true) {
         item.phase = 'failed'
-        item.error = res.message || 'service start failed'
+        item.error = res?.message || (deps.t ? deps.t('components.errorServiceUnavailable') : 'Component service could not start')
         return false
       }
       item.phase = 'ready'
+      item.serviceStarted = true
       item.percent = 100
       return true
     } catch (e) {

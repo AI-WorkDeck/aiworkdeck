@@ -116,13 +116,15 @@ def fetch_blob(repo, entry, blobs_dir, label):
     sha = sha if HEX64.match(sha) else None
     if sha:
         blob = os.path.join(blobs_dir, sha)
-        if os.path.isfile(blob) and os.path.getsize(blob) == size:
+        if os.path.isfile(blob) and os.path.getsize(blob) == size and _sha256_of(blob) == sha:
             return blob
     # 命名与 huggingface_hub 的 LFS 临时文件一致（blobs/<etag>.incomplete，LFS 的 etag 即 sha256）；
     # 本脚本自己中断后重跑会从这里续传
     tmp_name = sha or ("ms-" + hashlib.sha1(rel.encode("utf-8")).hexdigest())
     tmp = os.path.join(blobs_dir, tmp_name + ".incomplete")
-    url = f"{ENDPOINT}/models/{repo}/resolve/master/{urllib.parse.quote(rel)}"
+    revision = str(entry.get("Revision") or "")
+    revision = revision if HEX40.fullmatch(revision) else "master"
+    url = f"{ENDPOINT}/models/{repo}/resolve/{revision}/{urllib.parse.quote(rel)}"
 
     last_err = None
     for attempt in range(1, RETRIES + 1):
@@ -195,9 +197,16 @@ def fetch_repo(repo, hf_home):
     snap_root = os.path.join(storage, "snapshots", rev)
     pending = []
     for f in files:
+        rel = f["Path"]
+        if (not isinstance(rel, str) or not rel or "\\" in rel or ":" in rel
+                or any(part in ("", ".", "..") for part in rel.split("/"))):
+            raise ValueError("Unsafe model path in source metadata")
         snap = os.path.join(snap_root, *f["Path"].split("/"))
         # isfile 跟随软链：软链指向的 blob 在、大小对才算已就位
-        if os.path.isfile(snap) and os.path.getsize(snap) == int(f.get("Size") or 0):
+        sha = str(f.get("Sha256") or "").lower()
+        # Verify cached bytes during an explicit download/repair, never on application startup.
+        if (os.path.isfile(snap) and os.path.getsize(snap) == int(f.get("Size") or 0)
+                and HEX64.fullmatch(sha) and _sha256_of(snap) == sha):
             continue
         pending.append(f)
 
