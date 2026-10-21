@@ -144,7 +144,8 @@ public class LibreOfficePdfConverter {
 
     private static List<Path> candidates(String osName, String home, Map<String, String> env, String configured) {
         boolean windows = osName.toLowerCase(Locale.ROOT).startsWith("windows");
-        String binary = windows ? "soffice.exe" : "soffice";
+        // Windows provides a console launcher for command-line use; keep the GUI launcher as a legacy fallback.
+        List<String> binaries = windows ? List.of("soffice.com", "soffice.exe") : List.of("soffice");
         List<Path> candidates = new ArrayList<>();
         String override = configured;
         if (override == null || override.isBlank()) override = env.get("LIBREOFFICE_PATH");
@@ -152,24 +153,28 @@ public class LibreOfficePdfConverter {
         if (override != null && !override.isBlank()) {
             Path base = Path.of(override.trim());
             candidates.add(base);
-            candidates.add(base.resolve("program").resolve(binary));
+            for (String binary : binaries) candidates.add(base.resolve("program").resolve(binary));
             candidates.add(base.resolve("Contents/MacOS/soffice"));
-            candidates.add(base.resolve(binary));
+            for (String binary : binaries) candidates.add(base.resolve(binary));
         } else {
             if (windows) {
                 for (String key : List.of("ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "LOCALAPPDATA")) {
                     String root = env.get(key);
-                    if (root != null && !root.isBlank()) candidates.add(Path.of(root, "LibreOffice", "program", binary));
+                    if (root != null && !root.isBlank()) {
+                        for (String binary : binaries) candidates.add(Path.of(root, "LibreOffice", "program", binary));
+                    }
                 }
             } else {
                 candidates.add(Path.of("/Applications/LibreOffice.app/Contents/MacOS/soffice"));
                 candidates.add(Path.of(home, "Applications/LibreOffice.app/Contents/MacOS/soffice"));
-                for (String root : List.of("/opt/homebrew/bin", "/usr/local/bin", "/usr/bin")) candidates.add(Path.of(root, binary));
+                for (String root : List.of("/opt/homebrew/bin", "/usr/local/bin", "/usr/bin")) candidates.add(Path.of(root, "soffice"));
             }
             String path = env.getOrDefault("PATH", env.getOrDefault("Path", ""));
             for (String root : path.split(windows ? ";" : ":")) {
                 // Empty PATH entries are cwd and must not discover an unrelated project executable.
-                if (!root.isBlank()) candidates.add(Path.of(root.replaceAll("^\"|\"$", ""), binary));
+                if (!root.isBlank()) {
+                    for (String binary : binaries) candidates.add(Path.of(root.replaceAll("^\"|\"$", ""), binary));
+                }
             }
         }
         return candidates;

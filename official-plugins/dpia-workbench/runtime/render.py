@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 
 
@@ -15,9 +16,14 @@ def office():
     configured = os.environ.get('AWD_DPIA_SOFFICE')
     if configured:
         return configured if Path(configured).is_file() else None
+    if sys.platform == 'win32':
+        # The Windows GUI launcher can hang without an interactive desktop;
+        # LibreOffice provides .com specifically for command-line use.
+        program = Path(os.environ.get('PROGRAMFILES', 'C:/Program Files')) / 'LibreOffice/program'
+        return shutil.which('soffice.com') or next((str(program / name)
+            for name in ('soffice.com', 'soffice.exe') if (program / name).is_file()), None) or shutil.which('soffice')
     return shutil.which('soffice') or next((str(p) for p in [
         Path('/Applications/LibreOffice.app/Contents/MacOS/soffice'),
-        Path(os.environ.get('PROGRAMFILES', 'C:/Program Files')) / 'LibreOffice/program/soffice.exe',
     ] if p.is_file()), None)
 
 
