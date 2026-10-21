@@ -146,12 +146,12 @@ async function runAppCommand(verb, arg) {
     }
     case 'checkUpdate': {
       if (!(host.update && host.update.check)) return
-      toast(t('shell.menuCheckingUpdate'))
+      if (state.page !== 'workbench') toast(t('shell.menuCheckingUpdate'))
       const r = await host.update.check()
       const phase = r && r.phase
       if (phase === 'error') {
         toast((r && r.error) || t('shell.menuUpdateFailed'))
-      } else if (phase === 'ready' && r && r.available) {
+      } else if (phase === 'ready' && r && r.available && state.page !== 'workbench') {
         uni.showModal({
           title: t('admin.restartAppTitle'),
           content: t('admin.restartAppContent', {
@@ -167,7 +167,7 @@ async function runAppCommand(verb, arg) {
         })
       } else if (phase === 'downloading') {
         toast(t('admin.downloadingPatch'))
-      } else if (r && r.majorAvailable) {
+      } else if (r && r.majorAvailable && state.page !== 'workbench') {
         uni.showModal({
           title: t('admin.majorReleased', { version: r.majorAvailable.major }),
           content: t('admin.majorNote'),
