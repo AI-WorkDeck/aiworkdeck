@@ -29,7 +29,7 @@ import { openExternalUrlChecked } from '@/utils/externalLink.js'
 
 export default {
   components: { SettingsSection },
-  data: () => ({ busy: false, error: '', statuses: {}, platform: 'other', alive: false, awaitingReturn: false }),
+  data: () => ({ busy: false, error: '', statuses: {}, platform: 'other', alive: false, awaitingReturn: false, recheckQueued: false }),
   computed: {
     links() {
       return {
@@ -54,7 +54,8 @@ export default {
       return this.$t(`admin.${key}`)
     },
     async check() {
-      if (this.busy || !this.alive) return
+      if (!this.alive) return
+      if (this.busy) { this.recheckQueued = true; return }
       this.busy = true
       this.error = ''
       try {
@@ -65,7 +66,10 @@ export default {
         this.statuses = Object.fromEntries((result.dependencies || []).map(item => [item.id, item.status]))
       } catch (error) {
         if (this.alive) { this.statuses = {}; this.error = error.message || this.$t('admin.externalCheckFailed') }
-      } finally { this.busy = false }
+      } finally {
+        this.busy = false
+        if (this.alive && this.recheckQueued) { this.recheckQueued = false; this.check() }
+      }
     },
     async open(url) {
       this.error = ''
