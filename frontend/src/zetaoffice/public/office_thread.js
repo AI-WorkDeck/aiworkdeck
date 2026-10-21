@@ -1875,28 +1875,70 @@ function borderLineStyle(name) {
   if (n === 'dashed') return S.DASHED != null ? S.DASHED : 2;
   return S.SOLID != null ? S.SOLID : 0;
 }
-// 给一张表设边框。spec: {outsideMm, insideMm, color, style}（宽度单位 1/100mm；
-// 缺省取 HOUSE.tableBorder：Grid 实线、内外同宽）。
+// 给一张表设边框。spec: {preset, outsideMm, insideMm, color, style}（宽度单位 1/100mm；
+// 缺省取 HOUSE.tableBorder：Grid 实线、内外同宽；preset: 'all'|'threeLine'|'outer'|'none'）。
 function applyTableBorders(table, spec) {
   const o = Object.assign({}, HOUSE.tableBorder, spec || {});
-  if (o.insideMm == null) o.insideMm = o.outsideMm;
+  const outsideMm = o.outsideMm != null ? o.outsideMm : HOUSE.tableBorder.outsideMm;
+  const insideMm = o.insideMm != null ? o.insideMm : outsideMm;
+  const rawPreset = String((spec && spec.preset) || o.preset || 'all').trim().toLowerCase();
+  const preset = rawPreset === 'threeline' ? 'threeLine' : rawPreset;
+  const noneStyle = (css.table.BorderLineStyle && css.table.BorderLineStyle.NONE != null) ? css.table.BorderLineStyle.NONE : 0;
   const mk = function (mm) {
+    const w = mm > 0 ? mm : 0;
     return new css.table.BorderLine2({
       Color: o.color == null ? 0x000000 : o.color,
       InnerLineWidth: 0, OuterLineWidth: 0, LineDistance: 0,
-      LineStyle: borderLineStyle(o.style),
-      LineWidth: mm,
+      LineStyle: w <= 0 ? noneStyle : borderLineStyle(o.style),
+      LineWidth: w,
     });
   };
-  const bl = mk(o.outsideMm), il = mk(o.insideMm);
+  try {
+    const names = table.getCellNames();
+    const zeroBorder = mk(0);
+    for (let i = 0; i < names.length; i++) {
+      if (parseInt(String(names[i]).replace(/^[A-Z]+/, ''), 10) !== 1) continue;
+      try {
+        const cell = table.getCellByName(names[i]);
+        cell.setPropertyValue('TopBorder', zeroBorder);
+        cell.setPropertyValue('BottomBorder', zeroBorder);
+      } catch (e) {}
+    }
+  } catch (e) {}
+  let topLine, bottomLine, leftLine, rightLine, horizLine, vertLine;
+  if (preset === 'none') {
+    topLine = bottomLine = leftLine = rightLine = horizLine = vertLine = mk(0);
+  } else if (preset === 'outer') {
+    topLine = bottomLine = leftLine = rightLine = mk(outsideMm);
+    horizLine = vertLine = mk(0);
+  } else if (preset === 'threeLine') {
+    const topBottomMm = spec && spec.outsideMm != null ? spec.outsideMm : ptToMm100(1.5);
+    topLine = bottomLine = mk(topBottomMm);
+    leftLine = rightLine = horizLine = vertLine = mk(0);
+  } else {
+    topLine = bottomLine = leftLine = rightLine = mk(outsideMm);
+    horizLine = vertLine = mk(insideMm);
+  }
   const tb = new css.table.TableBorder2({
-    TopLine: bl, BottomLine: bl, LeftLine: bl, RightLine: bl,
-    HorizontalLine: il, VerticalLine: il,
+    TopLine: topLine, BottomLine: bottomLine, LeftLine: leftLine, RightLine: rightLine,
+    HorizontalLine: horizLine, VerticalLine: vertLine,
     IsTopLineValid: true, IsBottomLineValid: true, IsLeftLineValid: true,
     IsRightLineValid: true, IsHorizontalLineValid: true, IsVerticalLineValid: true,
     Distance: 0, IsDistanceValid: false,
   });
   table.setPropertyValue('TableBorder2', tb);
+  if (preset === 'threeLine') {
+    const headerBottom = mk(spec && spec.insideMm != null ? spec.insideMm : ptToMm100(0.75));
+    try {
+      const names = table.getCellNames();
+      for (let i = 0; i < names.length; i++) {
+        if (parseInt(String(names[i]).replace(/^[A-Z]+/, ''), 10) !== 1) continue;
+        try {
+          table.getCellByName(names[i]).setPropertyValue('BottomBorder', headerBottom);
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }
 }
 // 按标准格式刷一张已存在的表：字号/段距/行距/垂直居中/首行加粗居中/数字居右/边框。
 // keepWeight: 非首行不动原有粗体（apply_house_style 走这里，避免抹掉当事人加粗）。
@@ -6069,17 +6111,27 @@ const EXEC = {
       styleTableStandard(table, { headerRows: p.firstRowBold === false ? 0 : 1 });
       applied.standard = true;
     }
-    // 边框：borderWidthPt 内外同宽；outsideBorderWidthPt / insideBorderWidthPt 分设；
+    // 边框：borderPreset(all|threeLine|outer|none)；borderWidthPt 内外同宽；
+    // outsideBorderWidthPt / insideBorderWidthPt 分设；
     // borderColor / borderStyle(single|double|dashed) 单独给时宽度沿用画像值。
-    if (p.borderWidthPt != null || p.outsideBorderWidthPt != null || p.insideBorderWidthPt != null || p.borderColor != null || p.borderStyle != null) {
+    if (p.borderPreset != null || p.borderWidthPt != null || p.outsideBorderWidthPt != null || p.insideBorderWidthPt != null || p.borderColor != null || p.borderStyle != null) {
+      let preset = null;
+      if (p.borderPreset != null) {
+        const rawPreset = String(p.borderPreset).trim().toLowerCase();
+        preset = rawPreset === 'threeline' ? 'threeLine' : rawPreset;
+        if (['all', 'threeLine', 'outer', 'none'].indexOf(preset) < 0) {
+          return { success: false, message: 'bad borderPreset: ' + p.borderPreset + ' (all/threeLine/outer/none)' };
+        }
+      }
       const color = p.borderColor != null ? parseColor(p.borderColor, { black: 0 }) : HOUSE.tableBorder.color;
       if (color == null) return { success: false, message: 'bad borderColor: ' + p.borderColor + ' (use #RRGGBB)' };
       const style = p.borderStyle != null ? String(p.borderStyle).toLowerCase() : HOUSE.tableBorder.style;
       if (['single', 'double', 'dashed'].indexOf(style) < 0) return { success: false, message: 'bad borderStyle: ' + p.borderStyle + ' (single/double/dashed)' };
-      const outsideMm = p.outsideBorderWidthPt != null ? ptToMm100(p.outsideBorderWidthPt) : p.borderWidthPt != null ? ptToMm100(p.borderWidthPt) : HOUSE.tableBorder.outsideMm;
-      const insideMm = p.insideBorderWidthPt != null ? ptToMm100(p.insideBorderWidthPt) : p.borderWidthPt != null ? ptToMm100(p.borderWidthPt) : outsideMm;
-      try { applyTableBorders(table, { outsideMm: outsideMm, insideMm: insideMm, color: color, style: style }); }
+      const outsideMm = p.outsideBorderWidthPt != null ? ptToMm100(p.outsideBorderWidthPt) : p.borderWidthPt != null ? ptToMm100(p.borderWidthPt) : (preset === 'threeLine' ? null : HOUSE.tableBorder.outsideMm);
+      const insideMm = p.insideBorderWidthPt != null ? ptToMm100(p.insideBorderWidthPt) : p.borderWidthPt != null ? ptToMm100(p.borderWidthPt) : (preset === 'threeLine' ? null : outsideMm);
+      try { applyTableBorders(table, { preset: preset || 'all', outsideMm: outsideMm, insideMm: insideMm, color: color, style: style }); }
       catch (e) { return { success: false, message: '边框设置失败: ' + errStr(e) }; }
+      if (preset != null) applied.borderPreset = preset;
       if (p.borderWidthPt != null) applied.borderWidthPt = Number(p.borderWidthPt);
       if (p.outsideBorderWidthPt != null) applied.outsideBorderWidthPt = Number(p.outsideBorderWidthPt);
       if (p.insideBorderWidthPt != null) applied.insideBorderWidthPt = Number(p.insideBorderWidthPt);
@@ -6456,8 +6508,27 @@ const EXEC = {
         try { t.rows = table.getRows().getCount(); } catch (e) {}
         try { t.cols = table.getColumns().getCount(); } catch (e) {}
         try { const cell = vc.getPropertyValue('Cell'); if (cell) t.cell = cell.getPropertyValue('CellName'); } catch (e) {}
+        try { t.repeatHeader = !!table.getPropertyValue('RepeatHeadline'); } catch (e) {}
+        try { const c1 = table.getCellByName('A1'); if (c1) { const bc = c1.getPropertyValue('BackColor'); t.headerFill = (bc === -1 || bc == null) ? 'none' : '#' + ('000000' + (bc >>> 0).toString(16)).slice(-6); } } catch (e) {}
         out.table = t;
       }
+    } catch (e) {}
+    try {
+      const psName = String(vc.getPropertyValue('PageStyleName') || 'Standard');
+      const ps = xModel.getStyleFamilies().getByName('PageStyles').getByName(psName);
+      const rdMm = function (prop) { try { return Math.round(ps.getPropertyValue(prop)) / 100; } catch (e) { return null; } };
+      out.page = {
+        pageStyle: psName,
+        width: rdMm('Width'),
+        height: rdMm('Height'),
+        landscape: !!ps.getPropertyValue('IsLandscape'),
+        margins: {
+          top: rdMm('TopMargin'),
+          bottom: rdMm('BottomMargin'),
+          left: rdMm('LeftMargin'),
+          right: rdMm('RightMargin'),
+        },
+      };
     } catch (e) {}
     try { out.selectedText = (vc.getString() || '').slice(0, 80); } catch (e) {}
     return out;
