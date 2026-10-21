@@ -38,6 +38,7 @@ public class DependencyProbe {
         var before = Map.of("libreoffice", lo.probe(), "docker", docker.refreshDockerStatus(),
                 "tmeet", tmeet.isCliAvailable(), "javaHome", System.getProperty("java.home"),
                 "home", System.getProperty("user.home"), "path", System.getenv("PATH"));
+        write(root, "missing-observed.json", before);
         check(lo.probe().status().equals("MISSING"), "LibreOffice is not genuinely absent from product discovery");
         check(docker.refreshDockerStatus().equals("MISSING"), "Docker is not absent from product discovery");
         check(!tmeet.isCliAvailable(), "tmeet unexpectedly available");
