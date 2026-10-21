@@ -77,7 +77,7 @@ public class ModelPresence {
                 String revision = Files.readString(dir.resolve("hub/models--" + repo + "/refs/main")).trim();
                 if (!revision.matches("[a-fA-F0-9]{40,64}") || !revision.equals(marker.path("revision").asText())
                         || !relativeRoot.equals("hub/models--" + repo + "/snapshots/" + revision)) return false;
-                List<String> required = asr ? List.of("config.json", "tokenizer.json", "vocabulary.json", "model.bin")
+                List<String> required = asr ? List.of("config.json", "tokenizer.json", asrVocabulary(modelRoot), "model.bin")
                         : List.of("config.json", "kokoro-v1_1-zh.pth", "voices/zf_001.pt", "voices/zm_010.pt", "voices/af_maple.pt", "voices/bf_vale.pt");
                 for (String file : required) {
                     if (!present.contains(relativeRoot + "/" + file)) return false;
@@ -90,6 +90,20 @@ public class ModelPresence {
             return false;
         }
     }
+    /** CTranslate2 loads a JSON string array first, or its legacy text vocabulary. */
+    private String asrVocabulary(Path modelRoot) throws Exception {
+        Path json = modelRoot.resolve("vocabulary.json");
+        if (Files.exists(json)) {
+            var tokens = JSON.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readTree(Files.readString(json));
+            if (!tokens.isArray() || tokens.isEmpty()) throw new IllegalArgumentException("invalid ASR vocabulary");
+            for (var token : tokens) if (!token.isTextual()) throw new IllegalArgumentException("invalid ASR vocabulary");
+            return "vocabulary.json";
+        }
+        if (Files.readString(modelRoot.resolve("vocabulary.txt")).isBlank()) throw new IllegalArgumentException("empty ASR vocabulary");
+        return "vocabulary.txt";
+    }
+
     /** Legacy compatibility: establish only a structure/size baseline; desktop persists its schema. */
     private com.fasterxml.jackson.databind.JsonNode legacyInventory(String id, Path dir) throws Exception {
         Path modelRoot;
@@ -109,7 +123,7 @@ public class ModelPresence {
             Path hub = dir.resolve("hub/models--" + (asr ? "Systran--faster-whisper-medium" : "hexgrad--Kokoro-82M-v1.1-zh"));
             revision = Files.readString(hub.resolve("refs/main")).trim();
             modelRoot = hub.resolve("snapshots/" + revision);
-            required = asr ? List.of("config.json", "tokenizer.json", "vocabulary.json", "model.bin")
+            required = asr ? List.of("config.json", "tokenizer.json", asrVocabulary(modelRoot), "model.bin")
                     : List.of("config.json", "kokoro-v1_1-zh.pth", "voices/zf_001.pt", "voices/zm_010.pt", "voices/af_maple.pt", "voices/bf_vale.pt");
         }
         var marker = JSON.createObjectNode().put("schema", 1).put("id", id).put("revision", revision)

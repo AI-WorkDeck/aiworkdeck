@@ -103,6 +103,7 @@ jobs:
           python official-plugins/dpia-workbench/runtime/upstream/test/template-preservation.test.py
           python official-plugins/dpia-workbench/runtime/upstream/test/native-pdf.test.py
           python official-plugins/dpia-workbench/tests/test_render.py
+          python official-plugins/dpia-workbench/tests/test_office_discovery.py
 
   frontend:
     name: Frontend (build:h5)
