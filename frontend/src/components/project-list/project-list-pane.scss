@@ -555,11 +555,7 @@ $brand-dark: #221F1A;    /* Dark BG */
   }
 }
 
-/* ================= 新建区（页头下方紧凑操作行） =================
-   2026-08 从 pages/newproject/index.vue 搬来的两个入口，此前落在列表最下方、
-   还是两张大灰卡；现在紧跟页头，一条紧凑的水平按钮行——「已经有一堆案卷、想再开
-   一个」与「零项目新用户」共用同一个入口，不必先扫完整页才看得见。
-   「单独打开一个文件」那条已去掉——它造出的是个没有归属的临时项目。 */
+/* ================= 打开入口 ================= */
 
 .create-section {
     margin-bottom: 20px;
@@ -586,6 +582,11 @@ $brand-dark: #221F1A;    /* Dark BG */
     box-sizing: border-box;
     transition: all 0.15s;
 
+    &:focus-visible {
+        outline: 2px solid var(--awd-accent-text);
+        outline-offset: 2px;
+    }
+
     &.is-busy {
         opacity: 0.55;
         cursor: default;
@@ -593,7 +594,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     }
 }
 
-/* 主操作：新建项目文件夹——实底强调，这是最常见的落点 */
+/* 主操作：打开文件夹 */
 .create-card-primary {
     background: var(--awd-accent);
     color: var(--awd-text-on-accent);
@@ -608,7 +609,7 @@ $brand-dark: #221F1A;    /* Dark BG */
     }
 }
 
-/* 次操作：打开已有文件夹——白底描边 */
+/* 次操作：打开文件 */
 .create-card-secondary {
     background: var(--awd-surface);
     color: var(--awd-text);
@@ -642,98 +643,13 @@ $brand-dark: #221F1A;    /* Dark BG */
     color: var(--awd-text-2);
 }
 
-/* 新建项目文件夹的命名弹窗（随流程一起从 newproject 页搬来） */
-.naming-mask {
-    position: fixed;
-    inset: 0;
-    z-index: 3000;
-    background: rgba(18, 52, 77, 0.28);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.naming-dialog {
-    width: 420px;
-    max-width: calc(100vw - 48px);
-    padding: 20px;
-    background: var(--awd-surface);
-    border-radius: var(--awd-radius-md);
-    box-shadow: 0 16px 44px rgba(18, 52, 77, 0.2);
-    display: flex;
-    flex-direction: column;
-    gap: var(--awd-space-3);
-}
-
-.naming-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--awd-text);
-}
-
-.naming-location {
-    font-size: 12px;
+/* 项目面板用于查找和切换；与当前项目内的资源管理器区分。 */
+.project-list-purpose {
+    display: block;
+    margin-bottom: var(--awd-space-3);
     color: var(--awd-text-2);
-    word-break: break-all;
-}
-
-.naming-input {
-    min-height: var(--awd-control-height);
-    padding: 0 12px;
-    border: 1px solid var(--awd-border);
-    border-radius: var(--awd-radius-md);
     font-size: var(--awd-font-size-body);
-    color: var(--awd-text);
-    box-sizing: border-box;
-}
-
-.naming-actions {
-    display: flex;
-    flex-direction: row;
-    justify-content: flex-end;
-    gap: var(--awd-space-2);
-}
-
-/* awd-btn：与 CloudAcceptDialog 同一套视觉语言，本页按自己的 px 单位约定复制一份
-   （awd-* 全站没有集中定义，各组件各自 scoped 一份是既有约定）。 */
-.awd-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 7px 16px;
-    border-radius: var(--awd-radius-md);
-    font-size: var(--awd-font-size-body);
-    font-weight: 600;
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: all 0.15s;
-}
-
-.awd-btn-secondary {
-    background: var(--awd-surface);
-    color: var(--awd-text);
-    border-color: var(--awd-border);
-
-    &:hover {
-        border-color: var(--awd-accent-text);
-        color: var(--awd-accent-text);
-    }
-}
-
-.awd-btn-primary {
-    background: var(--awd-accent);
-    color: var(--awd-text-on-accent);
-    border-color: var(--awd-accent-text);
-
-    &:hover {
-        background: var(--awd-accent-hover);
-        border-color: var(--awd-accent-text);
-    }
-
-    &[disabled] {
-        opacity: 0.5;
-        cursor: default;
-    }
+    line-height: 1.5;
 }
 
 /* ===================== 视图切换与列表视图（2026-08-18） =====================

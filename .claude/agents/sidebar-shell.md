@@ -7,6 +7,12 @@ description: 侧边栏与工作台外壳领域。任务涉及左侧 rail/左栏�
 
 职责边界：工作台整体布局、左侧 rail 与左栏、面板切换状态机、页面路由。各面板内部逻辑归 utility-tools / plugin-system；右栏聊天内容归 ai-chat；编辑器归 doc-editor。
 
+## 更新状态与项目打开入口（dev-board#1401/#1403）
+
+工作台顶栏右侧工具组左边挂 `components/DesktopUpdateIndicator.vue`，直接消费 `host.update` 的 `{type,state}` 事件，挂载先订阅后取快照，旧快照不得覆盖更新的事件。检查/下载/原生准备持续显示；下载百分比只取真实字节，`preparing` 不显示虚构进度，`ready` 才允许点击原有 `host.update.restart()` 保存退出链。失败保留详情和重试；退出取消后恢复可点击。详情浮层用独立 holder 接入 `overlayState`，避免被 BrowserView 盖住，卸载必须退订及释放。菜单检查完成、后台就绪、工作台重挂载都不自动弹重启框；旧 `appUpdate` 底栏与自动提示已移除。
+
+`ProjectListPane` 桌面顶部顺序为打开文件夹（主按钮）、打开文件（次按钮），然后团队案件库。用说明文字交代该面板查找/切换已有项目，具体文件在资源管理器；不再有独立新建目录弹窗，目录选择器既有 `createDirectory` 支持新建，浏览器仍保留托管项目创建。复用 `ideOpen` / `localOpenCoordinator`，切换前保存，取消不换项目，单文件走隐藏 loose-files 工作区。CLIENT 仍隐藏这些操作；协作入口不删。回归 `desktop-update-indicator.test.mjs`、`project-list-open-actions.test.mjs` 与导航契约。
+
 ## 工作台视觉层次（dev-board#1365）
 
 `project-overview.scss` 的 `--awd-workbench-header-height` 统一资源管理器标题、中间标签栏和右侧 dock 页签的实际盒高（37px，含边线）；不要单独缩矮右侧 tab。`--awd-workbench-divider` 使用现有弱分隔令牌，rail 与左栏共用底色，内容区用 surface 区分。FileTree 的奇偶行底色必须保留以便逐行定位；悬停、选中与拖入提示仍独立。用户明确要求斑马纹不能因视觉简化而直接取消。

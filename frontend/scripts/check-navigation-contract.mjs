@@ -186,10 +186,10 @@ const hasSelector = (css, sel) =>
 check('project-list-pane.scss 保留统一紧凑列表所需的样式块', () => {
   const css = readFrontend(LIST_PANE_SCSS)
   // #1205：窄侧栏统一列表，旧网格/卡片不是必要结构；继续保护项目行、
-  // 搜索排序、成员操作与加载/空态。命名弹窗仍使用 awd-* 按钮。
+  // 搜索排序、成员操作与加载/空态。#1403：打开操作取代侧栏命名弹窗。
   const need = [
     '.project-list-pane', '.project-list-container', '.main-content',
-    '.content-header', '.header-actions', '.awd-btn', '.awd-btn-primary', '.btn-secondary-small',
+    '.content-header', '.header-actions', '.create-card', '.create-card-primary', '.btn-secondary-small',
     '.cloud-accept-entry', '.projects-stats-row', '.stat-card',
     '.project-table', '.ptable-head', '.ptable-row', '.ptable-item', '.ptable-name', '.ptable-sub',
     '.project-list-toolbar', '.project-search-input', '.project-sort', '.action-btn-icon',
@@ -276,14 +276,14 @@ check('「项目」面板点卡片直达工作台（走注入的 leaveWorkbench 
   return null
 })
 
-check('项目列表页自带两个新建入口，且没有「打开单个文件」', () => {
+check('项目侧栏优先打开文件夹，其次打开文件；浏览器保留新建入口', () => {
   const src = readVue(LIST_PANE)
-  const miss = ['openFolderFlow', 'createFolderFlow'].filter((f) => !src.includes(f))
-  if (miss.length) return '缺新建入口: ' + miss.join(', ')
-  if (src.includes('openFileFlow')) {
-    return '「打开单个文件」造出的是没有归属的临时项目，已从新建入口去掉'
-  }
-  if (!src.includes('namingVisible')) return '新建项目文件夹的命名弹窗没搬过来'
+  const miss = ['openFolderFlow', 'openFileFlow'].filter((f) => !src.includes(f))
+  if (miss.length) return '缺打开入口: ' + miss.join(', ')
+  if (!/create-card-primary[^>]*@tap="onOpenFolder"/.test(src)) return '打开文件夹必须是主操作'
+  if (!/create-card-secondary[^>]*@tap="onOpenFile"/.test(src)) return '打开文件必须是次操作'
+  if (!/<view v-else[^>]*@tap="goToNewProject"/.test(src)) return '浏览器缺少托管项目创建入口'
+  if (src.includes('namingVisible')) return '侧栏不再保留独立命名弹窗，目录创建使用系统选择器'
   return null
 })
 

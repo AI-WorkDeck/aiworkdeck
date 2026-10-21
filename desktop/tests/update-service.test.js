@@ -228,11 +228,14 @@ test('大版本：latestMajor 频道含具体补丁版本时展示具体版本�
   testEnv(t, origin, pubPem)
 
   const events = []
-  const svc = createUpdateService(ctx, { extractTar, onEvent: (e) => events.push(e.type) })
+  const snapshots = []
+  const svc = createUpdateService(ctx, { extractTar, onEvent: (e) => { events.push(e.type); snapshots.push(e.state) } })
   const state = await svc.check()
   assert.deepStrictEqual(state.majorAvailable, { major: '0.61.2', page: 'https://www.aiworkdeck.com' })
   assert.ok(events.includes('major-available'))
   assert.ok(!events.includes('up-to-date'))
+  assert.equal(snapshots.at(-1).phase, 'idle', 'manual download fallback must not leave live subscribers stuck checking')
+  assert.equal(snapshots.at(-1).majorAvailable.major, '0.61.2')
 })
 
 test('多镜像回退：组件首个 URL 失败时 fetchFirst 落到第二个 URL，流程仍走完', async (t) => {
@@ -383,7 +386,7 @@ test('超过 maxBytes 上限：WriteStream 被销毁，不泄漏文件描述符'
   await waitClosed(created[0])
 })
 
-async function fullFixture(t, { hash, prepareError } = {}) {
+async function fullFixture(t, { hash, prepareError, onEvent, beforePrepare } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'full-upd-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   const routes = {}
@@ -397,7 +400,8 @@ async function fullFixture(t, { hash, prepareError } = {}) {
   testEnv(t, origin, pubPem)
   const prepared = []
   const svc = createUpdateService({ packaged: true, dataDir: root, appVersion: '0.11.0', platform: 'darwin', arch: 'arm64' }, {
-    prepareInstaller: async (file, version) => { prepared.push({ bytes: fs.readFileSync(file), version }); if (prepareError) throw new Error(prepareError) }
+    onEvent,
+    prepareInstaller: async (file, version) => { if (beforePrepare) await beforePrepare(); prepared.push({ bytes: fs.readFileSync(file), version }); if (prepareError) throw new Error(prepareError) }
   })
   return { svc, prepared, asset, ctx: { packaged: true, dataDir: root, appVersion: '0.11.0', platform: 'darwin', arch: 'arm64' } }
 }
@@ -478,4 +482,26 @@ test('main.js实际启动接线把完整包交给prepare，成功后才向render
   assert.equal((await context.service.check()).phase, 'ready')
   assert.deepEqual(calls, [{ bytes: asset, version: '0.12.2' }])
   assert.ok(events.includes('ready'))
+})
+
+
+test('完整更新：下载完成后持续广播 preparing，原生准备结束前不可重启', async (t) => {
+  const events = []
+  let entered, release
+  const enteredPromise = new Promise(resolve => { entered = resolve })
+  const prepareGate = new Promise(resolve => { release = resolve })
+  const { svc } = await fullFixture(t, {
+    onEvent: event => events.push(event),
+    beforePrepare: async () => { entered(); await prepareGate },
+  })
+  const checking = svc.check()
+  await enteredPromise
+  try {
+    assert.equal(svc.getState().phase, 'preparing')
+    assert.equal(svc.getState().available, null)
+    assert.equal(events.at(-1).state.phase, 'preparing')
+    assert.equal(events.at(-1).state.progress, null)
+  } finally { release() }
+  assert.equal((await checking).phase, 'ready')
+  assert.equal(events.at(-1).state.phase, 'ready')
 })
