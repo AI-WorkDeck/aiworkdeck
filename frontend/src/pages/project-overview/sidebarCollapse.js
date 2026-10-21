@@ -17,15 +17,17 @@
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'awd_sidebar_collapsed'
 
 /**
- * 读取左栏收起状态，默认展开（false）。
+ * 读取左栏收起状态。欢迎页缺省收起，已有项目缺省展开；显式选择优先。
  * @param {{ getStorageSync: (key: string) => any }} storage
+ * @param {boolean} defaultCollapsed 未保存选择时的缺省状态
  * @returns {boolean}
  */
-export function loadSidebarCollapsed(storage) {
+export function loadSidebarCollapsed(storage, defaultCollapsed = false) {
   try {
-    return storage.getStorageSync(SIDEBAR_COLLAPSED_STORAGE_KEY) === true
+    const saved = storage.getStorageSync(SIDEBAR_COLLAPSED_STORAGE_KEY)
+    return typeof saved === 'boolean' ? saved : defaultCollapsed
   } catch (e) {
-    return false
+    return defaultCollapsed
   }
 }
 
