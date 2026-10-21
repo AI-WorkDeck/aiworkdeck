@@ -1600,8 +1600,9 @@ ipcMain.handle('checkba:model-download', async (_evt, payload) => {
   const id = payload && payload.id
   const repair = payload?.repair === true
   const svc = COMPONENT_SERVICE[id]
-  if (svc && services && (repair || !modelManager.isInstalled(id))) await services.stop(svc)
-  return modelManager.download(id, { repair })
+  return modelManager.download(id, { repair, beforeStart: async () => {
+    if (svc && services && (repair || !modelManager.isInstalled(id))) await services.stop(svc)
+  } })
 })
 ipcMain.handle('checkba:model-cancel', async (_evt, payload) => {
   if (!modelManager) return { ok: false, message: 'model manager 未就绪' }

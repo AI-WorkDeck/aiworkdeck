@@ -390,3 +390,52 @@ test('legacy model directory symlink loop is rejected without recursive traversa
   fs.writeFileSync(path.join(dir, '.aiworkdeck-complete'), '2026-10-21T01:02:03.000Z')
   assert.strictEqual(mm.isInstalled('mineru-models'), false)
 })
+
+test('cancelling while the running service stops prevents a later downloader launch', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, FAKE_DOWNLOAD_HANG, events)
+  let release
+  const stopped = new Promise(resolve => { release = resolve })
+  const pending = mm.download('asr-models', { beforeStart: () => stopped })
+  await mm.cancel('asr-models')
+  release()
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(events.filter(e => e.phase === 'cancelled').length, 1)
+  assert.equal(mm.active.size, 0)
+})
+
+test('real IPC handlers retain cancellation ownership while services.stop is pending', async (t) => {
+  const vm = require('node:vm')
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, FAKE_DOWNLOAD_HANG, events)
+  const source = fs.readFileSync(path.join(__dirname, '../main/main.js'), 'utf8')
+  const start = source.indexOf("ipcMain.handle('checkba:model-download'")
+  const end = source.indexOf("ipcMain.handle('checkba:model-remove'", start)
+  const handlers = {}; let release
+  const stopped = new Promise(resolve => { release = resolve })
+  vm.runInNewContext(source.slice(start, end), {
+    ipcMain: { handle: (name, fn) => { handlers[name] = fn } },
+    modelManager: mm,
+    COMPONENT_SERVICE: { 'asr-models': 'asr-service' },
+    services: { stop: () => stopped },
+  })
+  const pending = handlers['checkba:model-download'](null, { id: 'asr-models', repair: true })
+  assert.equal(mm.active.has('asr-models'), true)
+  await handlers['checkba:model-cancel'](null, { id: 'asr-models' })
+  release()
+  assert.equal((await pending).cancelled, true)
+  assert.equal(mm.active.size, 0)
+  assert.equal(fs.existsSync(mm.dirOf('asr-models')), false, 'cancelled preparation leaves model cache untouched')
+  assert.equal(events.filter(e => e.phase === 'cancelled').length, 1)
+})
+
+test('service-stop failure settles download ownership and remains retryable', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const events = []; const mm = makeManager(root, FAKE_DOWNLOAD_HANG, events)
+  const result = await mm.download('asr-models', { beforeStart: async () => { throw new Error('service busy') } })
+  assert.equal(result.ok, false)
+  assert.match(result.message, /service busy/)
+  assert.equal(mm.active.size, 0)
+  assert.equal(events.filter(e => e.phase === 'error').length, 1)
+})
