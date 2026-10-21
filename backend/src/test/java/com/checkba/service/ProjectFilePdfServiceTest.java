@@ -6,7 +6,6 @@ package com.checkba.service;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.repository.ProjectFileRepository;
 import com.checkba.service.ai.LitigationPngService;
-import com.checkba.service.ai.PdfEditService;
 import com.checkba.storage.StorageService;
 import com.checkba.storage.StorageServiceFactory;
 import org.apache.pdfbox.Loader;
@@ -56,9 +55,8 @@ class ProjectFilePdfServiceTest {
     ProjectFileAccessService fileAccess = mock(ProjectFileAccessService.class);
     StorageServiceFactory storageServiceFactory = mock(StorageServiceFactory.class);
     StorageService storageService = mock(StorageService.class);
-    PdfEditService pdfEditService = new PdfEditService();
+    LibreOfficePdfConverter converter = mock(LibreOfficePdfConverter.class);
     LitigationPngService litigationPngService = new LitigationPngService();
-    DocumentTextService documentTextService = mock(DocumentTextService.class);
 
     final Map<Long, ProjectFile> store = new ConcurrentHashMap<>();
     final Map<Long, byte[]> contentStore = new ConcurrentHashMap<>();
@@ -121,14 +119,19 @@ class ProjectFilePdfServiceTest {
             return pf;
         });
 
+        when(converter.convert(any(), anyString())).thenAnswer(inv -> {
+            try (var doc = new PDDocument(); var out = new ByteArrayOutputStream()) {
+                doc.addPage(new org.apache.pdfbox.pdmodel.PDPage()); doc.save(out); return out.toByteArray();
+            }
+        });
+
         service = new ProjectFilePdfService(
                 projectFileService,
                 projectFileRepository,
                 fileAccess,
                 storageServiceFactory,
-                pdfEditService,
-                litigationPngService,
-                documentTextService
+                converter,
+                litigationPngService
         );
     }
 
@@ -160,6 +163,35 @@ class ProjectFilePdfServiceTest {
             assertTrue(mergedDoc.getNumberOfPages() >= 4,
                     "4 份文件分别转 PDF 后合并应至少包含 4 页，实际页数=" + mergedDoc.getNumberOfPages());
         }
+    }
+
+    @Test
+    void imagesAndExistingPdfMergeWithoutLibreOffice() throws Exception {
+        var image = registerFile("scan.png", "png", createSamplePng());
+        byte[] pdf;
+        try (var document = new PDDocument(); var out = new ByteArrayOutputStream()) {
+            document.addPage(new org.apache.pdfbox.pdmodel.PDPage()); document.save(out); pdf = out.toByteArray();
+        }
+        var existing = registerFile("existing.pdf", "pdf", pdf);
+        var merged = service.mergeFilesToPdf(1L, List.of(image.getId(), existing.getId()), 9L);
+        try (var document = Loader.loadPDF(Path.of(merged.getFilePath()).toFile())) {
+            assertEquals(2, document.getNumberOfPages());
+            assertTrue(document.getPage(0).getResources().getXObjectNames().iterator().hasNext(), "image survives merge");
+        }
+        org.mockito.Mockito.verifyNoInteractions(converter);
+    }
+
+    @Test
+    void failedOfficeConversionNeverCreatesOrSavesReplacementPdf() throws Exception {
+        var source = registerFile("contract.docx", "docx", createSampleDocx("合同金额 CNY 100"));
+        byte[] original = contentStore.get(source.getId()).clone();
+        when(converter.convert(any(), anyString())).thenThrow(new LibreOfficePdfConverter.ConversionException(
+                LibreOfficePdfConverter.Failure.NOT_INSTALLED, "LibreOffice missing"));
+        int originalFileCount = store.size();
+        assertThrows(LibreOfficePdfConverter.ConversionException.class, () -> service.convertFileToPdf(1L, source.getId(), 9L));
+        org.mockito.Mockito.verify(storageService, org.mockito.Mockito.never()).save(anyString(), any(InputStream.class));
+        assertEquals(originalFileCount, store.size());
+        org.junit.jupiter.api.Assertions.assertArrayEquals(original, Files.readAllBytes(Path.of(source.getFilePath())));
     }
 
     @Test
