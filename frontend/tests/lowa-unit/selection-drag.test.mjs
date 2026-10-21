@@ -186,3 +186,55 @@ test('attachSelectionDrag: consecutive drops within 16px emit a reset click at d
   ])
 })
 
+
+test('wheel updates an active native selection at the stationary pointer, but not after release or blur', (t) => {
+  const dom = new JSDOM('<canvas></canvas>', { pretendToBeVisual: true })
+  const { window } = dom, canvas = window.document.querySelector('canvas')
+  canvas.getBoundingClientRect = () => surface
+  const drag = attachSelectionDrag({ canvas, execute: async () => singleLineRaw })
+  t.after(() => { drag.destroy(); window.close() })
+  const moves = []
+  canvas.addEventListener('mousemove', e => moves.push([e.clientX, e.clientY, e.buttons]))
+  const mouse = (type, buttons) => canvas.dispatchEvent(new window.MouseEvent(type, {
+    bubbles: true, button: 0, buttons, clientX: 400, clientY: 300,
+  }))
+  const wheel = (ctrlKey = false) => canvas.dispatchEvent(new window.WheelEvent('wheel', {
+    bubbles: true, cancelable: true, deltaY: 400, ctrlKey,
+  }))
+  mouse('mousedown', 1)
+  mouse('mousemove', 1)
+  moves.length = 0
+  assert.equal(wheel(), true, 'native scrolling is not prevented')
+  assert.equal(moves.length, 2)
+  assert.notEqual(moves[0][0], 400, 'defeats Qt same-position filtering')
+  assert.deepEqual(moves.at(-1), [400, 300, 1], 'ends at the real pointer with left held')
+  moves.length = 0
+  wheel(true)
+  assert.equal(moves.length, 0, 'pinch zoom must not extend selection')
+  mouse('mouseup', 0)
+  wheel()
+  assert.equal(moves.length, 0, 'normal scrolling after release leaves selection alone')
+  mouse('mousedown', 1)
+  window.dispatchEvent(new window.Event('blur'))
+  wheel()
+  assert.equal(moves.length, 0, 'window blur ends the gesture')
+})
+
+test('wheel during selected-text move does not send selection-extension events to Qt', (t) => {
+  const dom = new JSDOM('<canvas></canvas>', { pretendToBeVisual: true })
+  const { window } = dom, canvas = window.document.querySelector('canvas')
+  canvas.getBoundingClientRect = () => surface
+  const drag = attachSelectionDrag({ canvas, execute: async () => singleLineRaw })
+  t.after(() => { drag.destroy(); window.close() })
+  drag.updateFromCursorRaw(singleLineRaw)
+  let moves = 0
+  canvas.addEventListener('mousemove', () => moves++)
+  canvas.dispatchEvent(new window.MouseEvent('mousedown', {
+    bubbles: true, cancelable: true, button: 0, buttons: 1, detail: 1, clientX: 195, clientY: 225,
+  }))
+  canvas.dispatchEvent(new window.MouseEvent('mousemove', {
+    bubbles: true, cancelable: true, buttons: 1, clientX: 280, clientY: 225,
+  }))
+  canvas.dispatchEvent(new window.WheelEvent('wheel', { deltaY: 400 }))
+  assert.equal(moves, 0, 'moving selected text keeps its source selection intact')
+})

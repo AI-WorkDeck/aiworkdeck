@@ -7,6 +7,12 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 职责边界：编辑器内核与宿主集成。AI 发编辑指令的链路属 ai-doc-bridge 领域。引擎 = LibreOffice 24.2.8 自建 zh-CN 版（LO core 分支 distro/allotropia/zeta-24-2）。
 
+## 拖选期间滚轮翻页（dev-board#1393）
+
+`get_cursor_rect()` 默认只读光标，不再读取 `selectionRects`。端点测量会通过 `gotoRange` 临时移动视光标，后台审校在 wheel 后调用它会拉回视口并打断正在进行的鼠标选区。只有 `zetaOfficeSelectionDrag.refreshSelection` 在鼠标松开后显式请求 `{selectionRects:true}`；普通 IME/审校读取不得隐式开启。非空选区的普通光标回包不清除已缓存的端点，折叠光标仍清除；键盘选区通过 `sel_changed` 刷新。
+
+Qt 滚轮本身不更新静止鼠标下的选区终点。原生左键拖选期间，画布 wheel 后同步补两次 mousemove（偏移 1px 再回实际位置，避开 Qt 同坐标过滤）；Ctrl+wheel、已选文字搬移、mouseup/blur 后不补。回归 `npm run test:lowa-drag-wheel` 使用真实引擎、多页带修订文档与开启的审校状态，覆盖上下滚轮、反向选择、快速松手、全文与修订保留；同时跑 `selected-text-drag-move.mjs` 防止破坏选中文字搬移。松手后的显式端点测量仍可能产生小幅原生可见性调整，本修复不承诺所有选区几何读取零滚动。
+
 ## 大段粘贴与文本边界（dev-board#1172/#1173，2026-10-10）
 
 覆盖层 Cmd/Ctrl+V 读取剪贴板纯文本后走 `replace_selection`，不是 `insert_at_cursor`。整次替换（含字符级修订分支）须配对 `lockModel/unlockModel`，用 `finally` 释放；否则多段粘贴会逐段触发布局与 JS 修改监听。`test:lowa-paste-large` 通过真实键盘和浏览器剪贴板测试 180 段约 1.8 万字、HTML+纯文本剪贴板、长单段、继续输入及导出重开全文一致；富文本剪贴板仍沿用原有纯文本粘贴语义，不代表保留 HTML 格式。
