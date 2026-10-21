@@ -50,7 +50,7 @@ JSON 对不对，不取决于模型对像素多聪明——这是上游的核心
   一律经 modelFilesJson 参数提交，由 Java 写进 workdir；材料由 Java 用 Tika 预转成
   UTF-8 文本再进管线（上游 read_source 只认 UTF-8 文本与 python-docx，后者打包
   运行时没有）；溯源索引由服务端按管线落的 `-trace.json` 用 POI 出 Word 三线表
-  （上游的 node 路线桌面端不可用）。守卫：`LitigationTimelineFlowTest`。
+  （管线自身的索引现由标准库 `trace_index.py` 生成，无需 Node/npm；Java POI 发布路径保留）。守卫：`LitigationTimelineFlowTest`、`litviz/tests/test_timeline_trace_index.py`。
 - `service/ai/LitigationPngService.java` — SVG→PNG（Batik，纯 Java）。位图是插进文书
   的那一环，见「已知地雷」里 PNG 那条。
 - `service/LitigationVisualPanelService.java` — 面板后端：图廊、换风格、拼 kickoff prompt。

@@ -839,6 +839,7 @@
     <!-- 可选组件缺失（设计 §4.2）：确认前把体积、解锁什么、不装则什么不可用都说全，
          确认后卡片就地跳进度，装完自动重发原消息。下载中可「后台下载」收起卡片继续用对话
          （dev-board#581），装完是否重发见 useComponentRequired.shouldAutoResend。 -->
+    <OcrRoutingCard v-if="ocrRouteState" :key="ocrRouteState.decisionId" :state="ocrRouteState" @choose="chooseOcrRoute" @cancel="cancelOcrRoute" />
     <view v-if="componentReadyContinue" class="chat-component-ready">
       <text class="ccr-text">{{ $t('components.chatReadyContinue') }}</text>
       <view class="cg-btn primary" :class="{ disabled: isStreaming }" @tap="continueComponentPending">{{ $t('components.chatReadyContinueBtn') }}</view>
@@ -878,7 +879,7 @@ import { useAgentStream } from '@/composables/useAgentStream.js'
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed } from 'vue'
 import { createFile, importLocalFile, getProjectFiles, getApiBaseUrl, getAiHistory, rollbackConversation, performPptGeneration, getSkills, getCurrentUser as getCurrentUserApi, fetchAiModels, getAiConfig, cancelBackgroundTask, listPluginJobs, cancelPluginJob, getMeetingRecordings, resolveProjectFileByPath } from '@/services/api.js'
 import { audioNeedingTranscription, isTranscribableMedia, transcribedAudioFileIds } from '@/utils/audioAttachment.js'
-import { getAuthHeaders, getCurrentUser } from '@/utils/auth.js'
+import { getAuthHeaders, getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { host } from '@/services/host.js'
 import { captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
 import DecisionAssistControl from './DecisionAssistControl.vue'
@@ -889,6 +890,9 @@ import { createDecisionAssistState, decisionAssistPreferenceKey, decisionAssistU
 import { getAppLanguage } from '@/utils/appLanguage.js'
 import { t } from '@/i18n'
 import { ICONS } from '@/config/icons.js'
+import OcrRoutingCard from '@/components/OcrRoutingCard.vue'
+import { createOcrRoutingHandler } from '@/composables/useOcrRouting.js'
+import { chooseOcrRouting, cancelOcrRouting } from '@/services/api.js'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import { componentDownloads } from '@/services/componentDownloads.js'
 import { createComponentRequiredHandler, shouldAutoResend } from '@/composables/useComponentRequired.js'
@@ -928,7 +932,7 @@ import {
 
 export default {
   name: 'ChatInterface',
-  components: { ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, MemoryBrowser, OptionalComponentCard },
+  components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, MemoryBrowser, OptionalComponentCard },
   props: {
     projectId: String,
     projectName: String,
@@ -1013,6 +1017,7 @@ export default {
     const componentGateItem = ref(null)
     const componentReadyContinue = ref(null) // 装完但没自动重发时挂着的「待继续」原消息
     const dropComponentPending = () => {
+      ocrRouteHandler.cancel()
       if (typeof componentRequiredHandler !== 'undefined') componentRequiredHandler.dismissPending()
       componentReadyContinue.value = null
     }
@@ -1120,6 +1125,31 @@ export default {
       if (resolve) resolve(ok)
     }
 
+    const ocrRouteState = ref(null)
+    const ocrRouteHandler = createOcrRoutingHandler({
+      conversation: () => currentConversationId.value,
+      identity: () => JSON.stringify([getApiBaseUrl(), getSessionId(), getCloudAccountGeneration()]),
+      userCount: userMessageCount,
+      streaming: () => isStreaming.value,
+      onState: (state) => { ocrRouteState.value = state },
+      lastUserMessage: () => [...bubbles.value].reverse().find(b => String(b?.role).toUpperCase() === 'USER')?.content || '',
+      choose: chooseOcrRouting,
+      captureCancel: () => {
+        const scope = { baseUrl: getApiBaseUrl(), headers: { ...getAuthHeaders(), 'X-Session-Id': getSessionId() || '' } }
+        return body => cancelOcrRouting(body, scope)
+      },
+      resend: async (prompt) => {
+        await sendMessage({ prompt, projectId: props.projectId, modelId: currentModelId.value,
+          mode: currentModeId.value, skillIds: currentSkillIds() })
+        scrollToBottom()
+      },
+    })
+    const chooseOcrRoute = (choice, remember) => ocrRouteHandler.choose(choice, remember)
+    const cancelOcrRoute = () => ocrRouteHandler.cancel()
+    watch(isStreaming, (streaming) => { if (!streaming) ocrRouteHandler.continueReady() })
+    watch(currentConversationId, () => ocrRouteHandler.cancel())
+    onBeforeUnmount(() => ocrRouteHandler.cancel())
+
     // Bridge Stream Events to Component Events
     onClientAction((action) => {
         if (action.action === 'ppt_config_required') {
@@ -1127,6 +1157,8 @@ export default {
            pptConfigData.value = action
            pptExportEditable.value = false // Default to safe option
            showPptConfigDialog.value = true
+        } else if (action.action === 'ocr_route_required') {
+           ocrRouteHandler.onAction(action)
         } else if (action.action === 'component_required') {
            // 可选组件缺失（设计 §4.2）：就地弹窗 → 装 → 自动重发原消息。
            // 刻意不往下 emit：它不是编辑器命令，执行器只会回 Unknown action。
@@ -4092,6 +4124,7 @@ export default {
     })
 
     return {
+       ocrRouteState, chooseOcrRoute, cancelOcrRoute,
        bubbles,
        currentConversationId,
        reviewStates,

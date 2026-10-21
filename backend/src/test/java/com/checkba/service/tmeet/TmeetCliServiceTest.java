@@ -24,6 +24,17 @@ class TmeetCliServiceTest {
     private static final String CLI_PATH = "/test-only/tmeet";
 
     @Test
+    void missingNodeKeepsItsActionableMessageWithoutStartingAuthentication() {
+        var service = service();
+        doThrow(new TmeetCliLocator.UnresolvableException("未找到 node.exe，请安装 Node.js"))
+                .when(service).resolveCommandPrefix();
+        var status = service.getAuthStatus();
+        assertFalse(status.isCliAvailable());
+        assertTrue(status.getMessage().contains("Node.js"));
+        verify(service, never()).isCliAvailable();
+    }
+
+    @Test
     void testResolveCliPath() {
         TmeetCliService service = new TmeetCliService("");
         String path = service.resolveCliPath();
@@ -37,11 +48,28 @@ class TmeetCliServiceTest {
         Process process = mock(Process.class);
         when(process.waitFor(5, TimeUnit.SECONDS)).thenReturn(finished);
         when(process.exitValue()).thenReturn(exitCode);
+        when(process.isAlive()).thenReturn(!finished);
+        when(process.descendants()).thenAnswer(inv -> java.util.stream.Stream.empty());
         try (var builders = mockCommands(process)) {
             assertEquals(expected, service().isCliAvailable());
             assertEquals(1, builders.constructed().size());
             verify(process).waitFor(5, TimeUnit.SECONDS);
             if (!finished) verify(process, never()).exitValue();
+            if (!finished) verify(process).destroyForcibly();
+        }
+    }
+
+    @Test
+    void versionProbeTimeoutKillsProcess() throws Exception {
+        Process process = mock(Process.class);
+        when(process.waitFor(5, TimeUnit.SECONDS)).thenReturn(false);
+        when(process.isAlive()).thenReturn(true);
+        when(process.descendants()).thenAnswer(inv -> java.util.stream.Stream.empty());
+        when(process.destroyForcibly()).thenReturn(process);
+        try (var builders = mockCommands(process)) {
+            assertFalse(service().isCliAvailable());
+            verify(process).destroyForcibly();
+            verify(process, never()).exitValue();
         }
     }
 
@@ -49,6 +77,8 @@ class TmeetCliServiceTest {
     void unavailableCliDoesNotQueryAuth() throws Exception {
         try (var builders = mockConstruction(ProcessBuilder.class, (builder, context) -> {
             when(builder.redirectErrorStream(true)).thenReturn(builder);
+            when(builder.redirectOutput(ProcessBuilder.Redirect.DISCARD)).thenReturn(builder);
+            when(builder.redirectError(ProcessBuilder.Redirect.DISCARD)).thenReturn(builder);
             when(builder.start()).thenThrow(new IOException("CLI missing"));
         })) {
             TmeetAuthStatus status = service().getAuthStatus();
@@ -115,6 +145,7 @@ class TmeetCliServiceTest {
     private TmeetCliService service() {
         TmeetCliService service = spy(new TmeetCliService(""));
         doReturn(CLI_PATH).when(service).resolveCliPath();
+        doReturn(List.of(CLI_PATH)).when(service).resolveCommandPrefix();
         return service;
     }
 
@@ -144,6 +175,8 @@ class TmeetCliServiceTest {
             assertEquals(index == 0 ? List.of(CLI_PATH, "--version") : List.of(CLI_PATH, "auth", "status"), command);
             assertTrue(index < processes.length, "Unexpected CLI command: " + command);
             when(builder.redirectErrorStream(true)).thenReturn(builder);
+            when(builder.redirectOutput(ProcessBuilder.Redirect.DISCARD)).thenReturn(builder);
+            when(builder.redirectError(ProcessBuilder.Redirect.DISCARD)).thenReturn(builder);
             when(builder.environment()).thenReturn(new HashMap<>());
             when(builder.start()).thenReturn(processes[index]);
         });

@@ -276,6 +276,11 @@
       </view>
     </view>
 
+    <view v-if="pdfRecovery" class="restart-recovery pdf-export-recovery" role="status" aria-live="polite">
+      <text>{{ $t(pdfRecovery.phase === 'failed' ? 'fileTree.pdfResumeFailed' : (pdfRecovery.phase === 'exporting' ? 'fileTree.pdfResumeExporting' : 'fileTree.pdfResumeOpening'), { name: pdfRecovery.name }) }}</text>
+      <button v-if="pdfRecovery.phase === 'failed'" class="restart-recovery-action" @click="retryFileTreePdfExport">{{ $t('common.retry') }}</button>
+      <button class="restart-recovery-action" @click="cancelFileTreePdfExport">{{ $t('common.cancel') }}</button>
+    </view>
     <view v-if="restartPendingTasks.length" class="restart-recovery" role="status" aria-live="polite">
       <text>{{ restartRestoring ? $t('workbench.restartRestoring') : (restartRecoveryFailed ? $t('workbench.restartRestoreFailed') : $t('workbench.restartPending', { count: restartPendingTasks.length })) }}</text>
       <button v-if="restartRestoring" class="restart-recovery-action" @click="cancelRestartRecovery">{{ $t('workbench.restartCancel') }}</button>
@@ -657,6 +662,7 @@
             @checked-change="onFileTreeCheckedChange"
             @file-select="handleFileTreeSelect"
             @file-open="handleFileTreeOpen"
+            @file-export-pdf="handleFileTreePdfExport"
             @file-navigate="handleFileTreeNavigate"
             @quick-look="toggleQuickLook"
             @file-drag-start="onFileLinkDragStart"
@@ -2353,6 +2359,7 @@ import { panelSwitchingMethods } from './panelSwitching.js'
 import { menuCommandsMethods } from './menuCommands.js'
 import { agentClientActionMethods } from './agentClientActions.js'
 import { librePoolMethods } from './librePool.js'
+import { fileTreePdfRecoveryMethods } from './fileTreePdfRecovery.js'
 import { stagingAreaMethods } from './stagingArea.js'
 import { evidenceLinkData, evidenceLinkMethods } from './evidenceLinkActions.js'
 import { tabDragSplitMethods } from './tabDragSplit.js'
@@ -2462,6 +2469,7 @@ export default {
   },
   data() {
     return {
+      pdfRecovery: null,
       restartPendingTasks: [],
       restartRestoring: false,
       restartRecoveryFailed: false,
@@ -3498,6 +3506,7 @@ export default {
   beforeUnmount() {
     this._openWorkbenchMounted = false
     unregisterOpenWorkbench(this)
+    this.cancelFileTreePdfExport()
     this.unbindTabsWheel()
     this._comparisonDisposed = true
     clearInterval(this._mergeElapsedTimer)
@@ -3890,6 +3899,7 @@ export default {
     }
   },
   onUnload() {
+    this.cancelFileTreePdfExport()
     this.disposeRestartRecovery()
     unregisterQuitSave(this)
     this.stopCollabPolling({ dispose: true })
@@ -4265,6 +4275,7 @@ export default {
     this.initDesktopAutoUpdateListener()
   },
   watch: {
+    projectId() { this.cancelFileTreePdfExport() },
     tabSnapshotSignature() {
       this.scheduleTabSnapshotSave()
     },
@@ -4437,6 +4448,7 @@ export default {
     ...menuCommandsMethods,
     ...agentClientActionMethods,
     ...librePoolMethods,
+    ...fileTreePdfRecoveryMethods,
     // Phase 2 外置的方法组
     ...stagingAreaMethods,
     ...evidenceLinkMethods,

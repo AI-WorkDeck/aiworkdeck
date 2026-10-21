@@ -367,7 +367,7 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
   下游 fetch-lowa-assets.js 对 data 只查「长度 ≥1024」，兜不住双重压缩）。
   落盘先落 web root 之外的暂存区、校验通过再 rename 换入，旧版本自动备份到 `/root/lowa-engine-backup/`。
 - 官网部署在独立仓库（website/，gitignore 掉），服务器 ssh -i ~/.ssh/aiworkdeck_ops root@47.92.111.102；ECS 8.137.95.63(~/.ssh/checkba_ecs)。
-- **kokoro/asr 模型下载源顺序（dev-board#583）**：先 ModelScope，失败再回落 hf-mirror 的 `snapshot_download`（`CHECKBA_MODEL_SOURCE=modelscope|hf` 强制单源）。原因：hf-mirror 只代理元数据，大文件 302 到 HF 官方 CDN（cas-bridge.xethub.hf.co），国内无代理必挂 `LocalEntryNotFoundError`。ModelScope 路径是 `desktop/main/services/model-fetch.py`（纯标准库，按 HF 缓存布局落 `HF_HOME/hub/models--*/{blobs/<sha256>, snapshots/<ModelScope commit>, refs/main}`，续传临时文件 `blobs/<sha256>.incomplete`，refs/main 最后写——所以旧的半截缓存里 refs/main 指向不存在的 snapshot 也能直接续下），运行侧 pack 的 app.py 不用改。**地雷**：脚本随 `main/**` 进 app.asar，Python 读不了，model-manager 每次下载前把它拷到 `~/.aiworkdeck/models/.model-fetch.py` 再跑。mineru 仍走 MinerU 官方 CLI（`-s modelscope`），不动。
+- **kokoro/asr 模型下载源顺序（dev-board#583）**：先 ModelScope，失败再回落 hf-mirror，经 `model-fetch.py --source hf` 读取固定 revision 与逐文件 metadata，大小及 LFS SHA256 / Git blob SHA1 验证后才发布 refs/main（`CHECKBA_MODEL_SOURCE=modelscope|hf` 强制单源）。原因：hf-mirror 只代理元数据，大文件 302 到 HF 官方 CDN（cas-bridge.xethub.hf.co），国内无代理必挂 `LocalEntryNotFoundError`。ModelScope 路径是 `desktop/main/services/model-fetch.py`（纯标准库，按 HF 缓存布局落 `HF_HOME/hub/models--*/{blobs/<sha256>, snapshots/<ModelScope commit>, refs/main}`，续传临时文件 `blobs/<sha256>.incomplete`，refs/main 最后写——所以旧的半截缓存里 refs/main 指向不存在的 snapshot 也能直接续下），运行侧 pack 的 app.py 不用改。**地雷**：脚本随 `main/**` 进 app.asar，Python 读不了，model-manager 每次下载前把它拷到 `~/.aiworkdeck/models/.model-fetch.py` 再跑。mineru 仍走 MinerU 官方 CLI（`-s modelscope`），不动。
 - 模型不进包：mineru/kokoro/asr 模型首启在"组件管理"下载（下载进度按字节级整体，PR#142）。asr 的 faster-whisper medium 约 1.5GB，依赖闭包 182MB（压缩后约 57MB 进安装包，大头是 onnxruntime 70MB + PyAV 44MB，两者都是 faster-whisper 的硬依赖）。
 
 ## 已知地雷
@@ -604,3 +604,9 @@ Mac `quitAndInstall` 在窗口与服务关闭后仍可能异步报错，必须�
 Windows 下从 pwsh→Node 再启动 powershell.exe 会继承不兼容 PSModulePath（#1356 Windows CI 已复现 Get-FileHash 不存在）。完整更新的签名检查与 helper 使用删除该变量的子进程环境，让 Windows PowerShell 重建系统模块路径；不改用户全局环境。握手超时必须先结束本 helper 并确认 exit，再按 helperPid/job 内容清理本次文件，不能放任迟到 helper 在后继客户端已启动时安装。退出中的原生业务菜单不再获得工作台窗口；服务尚未初始化的退出交给原生关闭。
 
 **Windows helper 冷启动与独立进程交接（dev-board#1369）**：真实签名 NSIS 验收发现两层约束：① PowerShell 冷启动至握手可达 `11656.7881 ms`（run `39221453044`），超过旧 10 秒门限；② Node 直接 `spawn('powershell.exe', ..., { detached: true })` 在无控制台下约 214–323 ms 即退出码 0 结束、脚本首句未执行（run `39225970537` / `39227178526`），而 `detached: false` 直接子进程会在 Electron 退出时被 libuv 终止。现由非 detached 桥接 PowerShell 调用 `Start-Process powershell.exe -WindowStyle Hidden -PassThru`（标准输出/错误重定向到文件并写回独立 `helperPid`），helper 以 `FileMode::CreateNew` 独占写锁 `{ helperPid, jobId }`，父进程在 60 秒窗口内核对 `helperPid` 与 `jobId` 后写 `.ack` 提交，helper 确认 `.ack` 且父进程退出后才校验签名并执行 `NSIS /S --updated`。父进程未写 `.ack` 即退出的桥接异常若伴随 `.launch`，helper 在父进程退出后重开原应用而不执行安装。
+
+## 模型校验与准备阶段取消（2026-10-21，dev-board#1386）
+
+`.aiworkdeck-complete` 使用 schema1 文件清单；启动只检查结构/大小，完整旧时间戳安装可本地迁移，不强制重新下载。显式修复逐文件核对上游摘要，正确缓存保留；HF SDK 仅凭文件存在会复用坏缓存，普通 snapshot 副本即使 force_download 也可能不替换，确认损坏后须移除该 pointer 再下载并校验，不能盲目重写完成清单。ModelScope 失败回落 HF 也走这条链。
+`ModelManager.download({beforeStart})` 在等待关联服务停止之前取得任务所有权，期间取消会阻止迟到下载启动。取消/超时等待子进程 close 后才解锁，避免重试写入竞态。HTTP health 仅证明服务身份和基础启动，界面不称业务能力已验证；真实 OCR/ASR/TTS 仍需独立业务测试。
+回归：`desktop/tests/model-manager.test.js`、`model-fetch.test.py`（真实 SDK 需安装包 Python/lib；普通环境可显式 skip 该项，不把 skip 算通过）。

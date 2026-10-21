@@ -22,50 +22,23 @@ class TmeetCli {
         void cancelLogin(long userId);
     }
     static class NativeRunner implements Runner {
-        private final List<String> executable;
+        private final java.util.function.Supplier<List<String>> executable;
         private Process loginProcess;
         private long loginUser;
         private String loginUrl;
-        NativeRunner() { this.executable = resolveExecutable(); }
-        NativeRunner(String executable) { this.executable = List.of(executable); }
+        NativeRunner() { this(TmeetCli.NativeRunner::resolveExecutable); }
+        NativeRunner(String executable) { this(() -> List.of(executable)); }
+        NativeRunner(java.util.function.Supplier<List<String>> executable) { this.executable = executable; }
         static boolean windows() { return System.getProperty("os.name").toLowerCase(Locale.ROOT).startsWith("windows"); }
         static List<String> resolveExecutable() {
-            String configured = System.getenv("TMEET_PATH");
-            if (configured != null && !configured.isBlank()) {
-                return configured.endsWith(".js") ? List.of(nodeExecutable(), configured) : List.of(configured);
-            }
-            if (windows()) {
-                String appData = System.getenv("APPDATA");
-                if (appData != null) {
-                    Path script = Path.of(appData, "npm", "node_modules", "@tencentcloud", "tmeet", "scripts", "tmeet.js");
-                    if (Files.isRegularFile(script)) return List.of(nodeExecutable(), script.toString());
-                }
-                return List.of("tmeet.exe");
-            }
-            String home = System.getProperty("user.home");
-            for (String path : List.of(home + "/.local/bin/tmeet", "/opt/homebrew/bin/tmeet", "/usr/local/bin/tmeet")) {
-                if (Files.isExecutable(Path.of(path))) return List.of(path);
-            }
-            return List.of("tmeet");
-        }
-        private static String nodeExecutable() {
-            List<Path> candidates = new ArrayList<>();
-            if (windows()) {
-                for (String env : List.of("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA")) {
-                    String base = System.getenv(env);
-                    if (base != null) candidates.add(Path.of(base, "nodejs", "node.exe"));
-                }
-            } else {
-                candidates.add(Path.of("/opt/homebrew/bin/node")); candidates.add(Path.of("/usr/local/bin/node"));
-            }
-            for (Path candidate : candidates) if (Files.isRegularFile(candidate) && Files.isExecutable(candidate)) return candidate.toString();
-            return windows() ? "node.exe" : "node";
+            return TmeetCliDiscovery.resolve(windows(), System.getenv(), System.getProperty("user.home"));
         }
         private Process start(List<String> args) throws IOException {
             // Never feed identifiers or tokens into cmd.exe/a shell. A Windows npm .cmd shim is not executable here.
-            String first = executable.getFirst().toLowerCase(Locale.ROOT);
+            List<String> resolved = executable.get(); // Resolve again after the user repairs an installation.
+            String first = resolved.getFirst().toLowerCase(Locale.ROOT);
             if (windows() && (first.endsWith(".cmd") || first.endsWith(".bat"))) throw new IOException("unsupported CLI wrapper");
-            List<String> command = new ArrayList<>(executable); command.addAll(args);
+            List<String> command = new ArrayList<>(resolved); command.addAll(args);
             ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
             String path = builder.environment().getOrDefault("PATH", "");
             List<String> extra = new ArrayList<>();

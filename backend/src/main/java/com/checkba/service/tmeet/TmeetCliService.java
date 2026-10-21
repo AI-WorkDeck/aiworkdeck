@@ -12,8 +12,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -51,47 +49,55 @@ public class TmeetCliService {
     }
 
     /**
-     * 解析 tmeet 可执行文件的绝对路径。
+     * 解析 tmeet 可执行文件的绝对路径（展示用）。运行时执行一律走 {@link #resolveCommandPrefix()}，
+     * 两个方法共用同一套发现逻辑。
      */
     public String resolveCliPath() {
-        if (configuredCliPath != null && !configuredCliPath.isBlank()) {
-            File f = new File(configuredCliPath);
-            if (f.exists() && f.canExecute()) return f.getAbsolutePath();
+        try {
+            TmeetCliLocator.Resolution r = locate();
+            return r.displayPath();
+        } catch (TmeetCliLocator.UnresolvableException e) {
+            return "tmeet";
         }
+    }
 
-        String envPath = System.getenv("TMEET_PATH");
-        if (envPath != null && !envPath.isBlank()) {
-            File f = new File(envPath);
-            if (f.exists() && f.canExecute()) return f.getAbsolutePath();
-        }
+    /**
+     * 所有 CLI 执行（含登录）共用的命令前缀：macOS/Linux 为可执行文件绝对路径，
+     * Windows 为 node.exe + 包内 JS 绝对路径，绝不经 cmd.exe/bat 转发动态参数。
+     */
+    protected List<String> resolveCommandPrefix() {
+        return locate().command();
+    }
 
-        String userHome = System.getProperty("user.home");
-        Path localBin = Path.of(userHome, ".local", "bin", "tmeet");
-        if (Files.exists(localBin) && Files.isExecutable(localBin)) {
-            return localBin.toAbsolutePath().toString();
-        }
+    private TmeetCliLocator.Resolution locate() {
+        return TmeetCliLocator.resolve(configuredCliPath, isWindowsOs(),
+                System::getenv, System.getProperty("user.home", ""));
+    }
 
-        Path commonMacPath = Path.of("/usr/local/bin/tmeet");
-        if (Files.exists(commonMacPath) && Files.isExecutable(commonMacPath)) {
-            return commonMacPath.toAbsolutePath().toString();
-        }
-
-        Path optHomebrew = Path.of("/opt/homebrew/bin/tmeet");
-        if (Files.exists(optHomebrew) && Files.isExecutable(optHomebrew)) {
-            return optHomebrew.toAbsolutePath().toString();
-        }
-
-        return "tmeet";
+    private boolean isWindowsOs() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows");
     }
 
     public boolean isCliAvailable() {
         try {
-            String path = resolveCliPath();
-            Process process = new ProcessBuilder(path, "--version")
-                    .redirectErrorStream(true)
+            List<String> command = new ArrayList<>(resolveCommandPrefix());
+            command.add("--version");
+            Process process = new ProcessBuilder(command)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
-            boolean finished = process.waitFor(5, TimeUnit.SECONDS);
-            return finished && process.exitValue() == 0;
+            try {
+                boolean finished = process.waitFor(5, TimeUnit.SECONDS);
+                return finished && process.exitValue() == 0;
+            } finally {
+                if (process.isAlive()) {
+                    process.descendants().forEach(ProcessHandle::destroyForcibly);
+                    process.destroyForcibly();
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
         } catch (Exception e) {
             log.warn("检测 tmeet CLI 失败: {}", e.getMessage());
             return false;
@@ -103,6 +109,12 @@ public class TmeetCliService {
      */
     public TmeetAuthStatus getAuthStatus() {
         String cliPath = resolveCliPath();
+        try {
+            resolveCommandPrefix();
+        } catch (TmeetCliLocator.UnresolvableException error) {
+            return TmeetAuthStatus.builder().cliAvailable(false).cliPath(cliPath)
+                    .loggedIn(false).message(error.getMessage()).build();
+        }
         boolean available = isCliAvailable();
         if (!available) {
             return TmeetAuthStatus.builder()
@@ -177,8 +189,9 @@ public class TmeetCliService {
                 existing.destroyForcibly();
             }
 
-            String cliPath = resolveCliPath();
-            ProcessBuilder pb = new ProcessBuilder(cliPath, "auth", "login", "--no-browser");
+            List<String> loginCommand = new ArrayList<>(resolveCommandPrefix());
+            loginCommand.addAll(List.of("auth", "login", "--no-browser"));
+            ProcessBuilder pb = new ProcessBuilder(loginCommand);
             pb.environment().put("TMEET_AGENT", "AI WorkDeck");
             pb.environment().put("TMEET_MODEL", "WorkDeck AI");
             pb.redirectErrorStream(true);
@@ -566,9 +579,7 @@ public class TmeetCliService {
     }
 
     private ExecutionResult executeCommand(List<String> commandArgs, int timeoutSeconds) {
-        String cliPath = resolveCliPath();
-        List<String> fullCommand = new ArrayList<>();
-        fullCommand.add(cliPath);
+        List<String> fullCommand = new ArrayList<>(resolveCommandPrefix());
         fullCommand.addAll(commandArgs);
 
         try {

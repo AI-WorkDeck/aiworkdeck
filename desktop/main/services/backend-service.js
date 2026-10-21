@@ -214,6 +214,9 @@ function spawnEnv(ctx) {
   env.SERVER_PORT = String(ctx.ports.backend)
   if (!env.AI_PLUGINS_BUNDLED_DIR) env.AI_PLUGINS_BUNDLED_DIR = path.join(ctx.packaged ? ctx.resourcesPath : ctx.projectRoot, 'official-plugins')
   if (!env.AI_PLUGINS_OAUTH_REDIRECT_URI) env.AI_PLUGINS_OAUTH_REDIRECT_URI = `http://localhost:${ctx.ports.backend}/api/plugins/oauth/callback`
+  // PDFBox 直接复用随包 LOWA 的可嵌入 TrueType 字体；用户显式配置优先。
+  const pdfFont = path.join(ctx.packaged ? ctx.resourcesPath : ctx.projectRoot, 'frontend', 'dist', 'zetaoffice', 'cjk-kai.ttf')
+  if (!env.EXTERNAL_PDF_EDIT_CJK_FONT_PATH && fs.existsSync(pdfFont)) env.EXTERNAL_PDF_EDIT_CJK_FONT_PATH = pdfFont
   // 其他本地服务的动态端口注入（Spring SystemEnvironmentPropertySource 将
   // external.pptx-service.base-url 解析为 EXTERNAL_PPTX_SERVICE_BASE_URL）
   if (ctx.ports['pptx-service']) {

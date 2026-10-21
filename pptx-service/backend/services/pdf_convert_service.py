@@ -4,9 +4,8 @@
 [checkba] PDF 转换服务：
 
 - to_docx: 文本型 PDF 的版式级转 Word（pdf2docx：段落/表格/图片/分栏尽量保留原排版）
-- ocr_markdown: 扫描件（或任意 PDF）经 MinerU 解析出 markdown——本地 mineru-service
-  优先（桌面捆绑，MINERU_LOCAL_URL 注入）、云端 MinerU 兜底（需 MINERU_TOKEN），
-  复用 FileParserService 的既有路由，不引入第三方云 OCR。
+- ocr_markdown: 扫描件经本地 mineru-service 解析出 markdown；失败不转云端，
+  不生成云端图片描述。即使配置 MINERU_FORCE_CLOUD 或云端凭据，也保持本地处理。
 
 供主仓 backend PdfTools.pdf_to_word 调用（本地同机部署，传本地文件路径）。
 """
@@ -14,10 +13,8 @@ import logging
 import os
 
 import fitz  # pymupdf（pdf2docx 依赖自带）
-from flask import current_app
 from pdf2docx import Converter
 
-from config import Config
 from services.file_parser_service import FileParserService
 
 logger = logging.getLogger(__name__)
@@ -69,24 +66,18 @@ def to_docx(pdf_path: str, output_path: str) -> dict:
 
 
 def ocr_markdown(pdf_path: str) -> dict:
-    """扫描件 OCR：MinerU 解析出 markdown（本地服务优先，云端兜底）。"""
+    """扫描件 OCR：只使用本地 MinerU，不隐式上传或生成云端图片描述。"""
     _validate(pdf_path)
 
     parser = FileParserService(
-        mineru_token=current_app.config.get("MINERU_TOKEN", ""),
-        mineru_api_base=current_app.config.get("MINERU_API_BASE", ""),
-        google_api_key=current_app.config.get("GOOGLE_API_KEY", ""),
-        google_api_base=current_app.config.get("GOOGLE_API_BASE", ""),
-        openai_api_key=current_app.config.get("OPENAI_API_KEY", ""),
-        openai_api_base=current_app.config.get("OPENAI_API_BASE", ""),
-        image_caption_model=current_app.config.get("IMAGE_CAPTION_MODEL", Config.IMAGE_CAPTION_MODEL),
-        provider_format=current_app.config.get("AI_PROVIDER_FORMAT", "gemini"),
+        mineru_token="",
+        local_only=True,
     )
 
     _batch_id, markdown, _extract_id, error, _failed = parser.parse_file(
         pdf_path, os.path.basename(pdf_path))
 
-    if not markdown or not markdown.strip():
+    if error or not markdown or not markdown.strip():
         raise PdfConvertError(
-            error or "MinerU 未返回解析内容（本地 mineru-service 未运行且未配置云端 MINERU_TOKEN？）")
+            error or "本地 OCR 未返回解析内容，请检查本机扫描件 OCR 组件与模型后重试；未转用云端 OCR。")
     return {'markdown': markdown}

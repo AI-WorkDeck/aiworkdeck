@@ -7,6 +7,8 @@
 
 **结论：QTA 可以支持；右键 Word 转 PDF 缺 LibreOffice 时不会引导安装，而是静默切换到有损重排。后者必须优先处理。** 当前组件下载体系已有相当完整的校验和落盘机制，但“安装完成”与“功能可用”的验证还没有接齐。本文的整改清单是建议，不代表已经修复；本次产品实现仅为 QTA 预览。
 
+> 后续整改另见[落实记录](external-dependency-remediation-2026-10-21.md)。本文“当前”指上述原审计基线，保留作为问题复现依据。
+
 ## 1. QTA：当前支持范围与本次交付
 
 QTA 是 QuickTime 音频容器。Apple 说明：空间录音可同时包含 AAC 立体声兼容轨与 APAC 空间轨；不能把扩展名直接改成普通音频就承诺支持。[Apple WWDC25 原始说明](https://developer.apple.com/videos/play/wwdc2025/251/)。

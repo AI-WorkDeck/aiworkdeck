@@ -530,6 +530,8 @@
               </view>
           </SettingsSection>
 
+          <OcrRoutingSettings :key="'ocr-routing-' + identityCurrentId" />
+
           <!-- 花费闸门。原属已撤销的「平台服务」分区，官方版全部外部服务统一平台代采后
                那个分区已无实际作用；这张卡是其中仍然真实的功能，随通知一起搬来本分区末尾
                （刻意放在最后，减少与本分区其它改动的冲突面）。
@@ -580,6 +582,7 @@
                   :busy="optional.state.activeCount > 0"
                   @install="onInstallComponent"
                   @retry="onInstallComponent"
+                  @cancel="onCancelComponent"
                 />
                 <view v-if="item.phase === 'ready'" class="comp-actions">
                   <button class="comp-btn danger" @tap="handleComponentRemove(item)">
@@ -588,6 +591,7 @@
                 </view>
               </view>
           </SettingsSection>
+          <ExternalDependenciesPanel />
         </scroll-view>
 
         <!-- 软件更新（仅桌面端）：后台准备，安全退出后安装。 -->
@@ -1007,7 +1011,9 @@ import PersonalFavoritesPanel from '@/components/userprofile/PersonalFavoritesPa
 import PersonalTodosPanel from '@/components/userprofile/PersonalTodosPanel.vue'
 import PersonalSettingsPanel from '@/components/userprofile/PersonalSettingsPanel.vue'
 import TeamPanel from '@/components/admin/TeamPanel.vue'
+import OcrRoutingSettings from '@/components/admin/OcrRoutingSettings.vue'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
+import ExternalDependenciesPanel from '@/components/admin/ExternalDependenciesPanel.vue'
 import MemoryBrowser from '@/components/MemoryBrowser.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
@@ -1040,9 +1046,10 @@ export function resolveAdminNavKey(key) {
 export default {
   name: 'AdminPane',
   components: {
+    OcrRoutingSettings,
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
-    TeamPanel, OptionalComponentCard, MemoryBrowser,
+    TeamPanel, OptionalComponentCard, MemoryBrowser, ExternalDependenciesPanel,
     SettingsSection, SettingsRow,
   },
   /**
@@ -1662,11 +1669,20 @@ export default {
      * 旧的「下载 / 启用」两个按钮的语义都并进了这里——分开摆只会让用户在
      * 「下完了为什么还不能用」上多绕一圈。
      */
-    async onInstallComponent(packId) {
+    async onInstallComponent(packId, options) {
       const item = this.optional.state.items.find((i) => i.packId === packId)
       // 在途数由应用级下载管理记（首次登录面板、AI 对话发起的也算）：一次只装一个
       if (!item || this.optional.state.activeCount > 0) return
-      await this.optional.installOne(item)
+      await this.optional.installOne(item, options)
+    },
+    async onCancelComponent(packId) {
+      const item = this.optional.state.items.find((i) => i.packId === packId)
+      if (!item?.modelId || item.phase !== 'model') return
+      try {
+        const result = await host.model.cancel(item.modelId)
+        if (result?.ok === false) throw new Error(result.error || this.$t('components.errorServiceUnavailable'))
+      }
+      catch (e) { uni.showToast({ title: e.message || String(e), icon: 'none' }) }
     },
     /** 卸载 = 删模型 + 删 pack 目录（规范 §6：确认框注明可释放体积） */
     handleComponentRemove(item) {

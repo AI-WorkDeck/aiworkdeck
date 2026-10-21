@@ -77,7 +77,9 @@ test('folders, readonly files, recycled files and concurrent opens cannot change
 test('API methods use the project-scoped endpoint and preserve boolean instead of truthy strings', async () => {
   const api = readFileSync(new URL('../../src/services/api.js', import.meta.url), 'utf8')
   const calls = []
-  const body = api.slice(api.indexOf('export function getProjectFileAccess(')).replaceAll('export function', 'function')
+  const body = ['getProjectFileAccess', 'updateProjectFileAccess'].map(name =>
+    api.match(new RegExp(`export function ${name}\\([\\s\\S]*?\\n\\}`))[0].replace('export function', 'function')
+  ).join('\n')
   const functions = new Function('request', 'unwrapEnvelope', body + '; return {getProjectFileAccess,updateProjectFileAccess}')(async (args) => { calls.push(args); return { code: 0, data: { clientVisible: false } } }, (r) => r.data)
   assert.deepEqual(await functions.getProjectFileAccess(1, 7), { clientVisible: false })
   await functions.updateProjectFileAccess(1, 7, false)

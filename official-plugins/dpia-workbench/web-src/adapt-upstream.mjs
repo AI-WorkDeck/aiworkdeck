@@ -12,7 +12,7 @@ export function adaptUpstream(source) {
   const registration = source.indexOf(" exports.inject=['slots','connection','uiWorkspace'];");
   if (registration < 0 || !source.endsWith('}});\n')) throw new Error('Upstream registration boundary changed');
   source = source.slice(0, registration) + '\nexport { Workbench };\n';
-  replace('function Workbench({rpc,openSession})', 'function Workbench({rpc,openSession:openHostSession,openArtifact:openHostArtifact})');
+  replace('function Workbench({rpc,openSession})', 'function Workbench({rpc,openSession:openHostSession,openArtifact:openHostArtifact,openEnvironment})');
   replace("  function download(content,name,type){const url=URL.createObjectURL(new Blob([content],{type}));const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}", `  async function openArtifact(out){
    try{await openHostArtifact(out);setNote('已保存到项目并打开：'+(out.filename||out.path));return true;}
    catch(e){setError(errText(e));return false;}
@@ -22,6 +22,7 @@ export function adaptUpstream(source) {
   replace("()=>download(x.content,current.title+'-内部评估.md','text/markdown')", "async()=>{const out=await command('exportInternalMarkdown',{revisionId:x.revisionId},false);if(out)await openArtifact(out);}");
   replace("if(out){await openArtifact(out);setNote('归档包已生成，共 '+out.files+' 个文件。');setModal(null);}", "if(out&&await openArtifact(out)){setNote('归档包已保存到项目并打开'+(Number.isInteger(out.files)?'，共 '+out.files+' 个文件。':'。'));setModal(null);}");
   replace("error&&h('div',{role:'alert',className:'notice error'},error),note&&h('div',{role:'status',className:'notice'},note),", "busy&&h('div',{role:'status',className:'notice','aria-live':'polite'},'正在处理，请稍候…'),error&&h('div',{role:'alert',className:'notice error'},error),note&&h('div',{role:'status',className:'notice'},note),");
+  replace("h('h2',null,modal.title),h('button',{type:'button','aria-label':'关闭窗口'", "h('h2',null,modal.title),h('button',{type:'button',onClick:openEnvironment},'运行环境'),h('button',{type:'button','aria-label':'关闭窗口'");
   replace("'完整版开发中 · Skill 0.7.8'", "'DPIA 0.3.11-beta.6 · Skill 0.7.8'");
   source = source.replaceAll('DSH_DPIA_PYTHON', 'DPIA 文档运行时').replaceAll('DSH', 'AI WorkDeck');
   source = source.replaceAll('下载 Word', '保存 Word 到项目').replaceAll('下载 Markdown', '保存 Markdown 到项目')

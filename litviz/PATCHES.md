@@ -176,6 +176,32 @@ comparison-table）渲染后 `lint_svg()` 零告警，输出色集恰好等于�
 
 ---
 
+## PATCH 8 · 溯源索引 DOCX 改用纯 Python 标准库生成，不再依赖用户机器的 Node/npm（`mqc-timeline-master/scripts/pipeline.py` · `_trace()` + 新增 `scripts/trace_index.py`，2026-10-21）
+
+**症状**：桌面端（打包运行时）不随包分发 Node，更没有全局 npm `docx` 包。时间轴管线
+render 阶段的溯源索引走 `subprocess node trace_index.js`，于是用户机器上主 SVG 出得来、
+索引却报「溯源索引没写成」——依赖缺口只在用户侧爆。
+
+**改法**：新增同目录 `scripts/trace_index.py`（纯标准库：zipfile + 手拼 OOXML），
+`pipeline.py::_trace()` 改为进程内 `import trace_index` 直接生成，输出语义与
+`trace_index.js` 逐条对齐（五列三线表、列宽、宋体/Times 字体标签、直角引号换中文引号、
+autoSpaceDE/DN 逐段关闭、表头跨页重复、单元格纵向居中、A4 + 1440 缇页边距、居中页码
+页脚）。不改动句选、编号、截断与管线布局逻辑；`-trace.json` 照旧落盘（后端 POI 路线）。
+写盘原子（同目录唯一临时文件 + `os.replace`），失败保留旧产物，不碰另一写入者的临时文件。
+换行/制表符写为 `w:br`/`w:tab`；非法 XML 控制字符明确拒绝，不能静默删除原文。
+OOXML 守卫精确检查 `tblGrid` 为 `tbl` 子节点、`fldSimple` 为 `p` 子节点、`tcMar` 在 `vAlign` 之前；
+并用安装的 LibreOffice 渲染 100 行合成索引，检查全部行、跨页表头与逐页页码。
+真实渲染测试需要 LibreOffice/pdftotext，仅是测试依赖，运行时生成 DOCX 仍只需 Python 标准库。
+不把 PDF 可提取文字当成字形显示完整：Mac 实测核对渲染图；Windows 与缺字体环境另验。
+`trace_index.js` 保留：上游
+回归 `run_checks.py` 的引号守卫仍走它，两版语义由
+`litviz/tests/test_timeline_trace_index.py` 钉住（清空 PATH、绝对路径 Python 跑）。
+
+**上游该不该回馈**：可回。上游若也想去 Node 依赖，这份标准库替身可直接拿去；但上游
+当前以 node 为既定路线，故先记本地补丁。
+
+---
+
 ## PATCH 5 · 三条以上泳道时，泳道号覆盖几何层号却不检查带内碰撞（`mqc-timeline-master/scripts/render_multiband.py` · `render()` 内 `if lane_band:` 分支）
 
 **症状**（dev-board#888，真机 QA-048-20260923 bug-008）：三方对读（申请方 / 北岸质检室 /

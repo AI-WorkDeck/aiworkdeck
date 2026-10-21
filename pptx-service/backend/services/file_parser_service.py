@@ -140,6 +140,7 @@ class FileParserService:
                  provider_format: str = None,
                  mineru_model_version: str = "vlm",
                  mineru_local_url: str = None,
+                 local_only: bool = False,
                  ):
         """
         Initialize the file parser service
@@ -157,10 +158,12 @@ class FileParserService:
             mineru_model_version: MinerU model version ('vlm' or 'pipeline'). Default is 'vlm'.
             mineru_local_url: [checkba] Local MinerU service URL (e.g., http://mineru-service:8000).
                 If None, reads from Flask config / MINERU_LOCAL_URL env.
+            local_only: Never use cloud OCR or image captions, even with cloud credentials/configuration.
         """
         self.mineru_token = mineru_token
         self.mineru_api_base = mineru_api_base
         self.mineru_model_version = mineru_model_version
+        self.local_only = local_only
         self.get_upload_url_api = f"{mineru_api_base}/api/v4/file-urls/batch"
         self.get_result_api_template = f"{mineru_api_base}/api/v4/extract-results/batch/{{}}"
 
@@ -221,6 +224,8 @@ class FileParserService:
     
     def _can_generate_captions(self) -> bool:
         """Check if image caption generation is available"""
+        if self.local_only:
+            return False
         if self._provider_format == 'openai':
             return bool(self._openai_api_key)
         elif self._provider_format == 'lazyllm':
@@ -262,10 +267,10 @@ class FileParserService:
         """
         [checkba] 本机 MinerU 引擎是否可用（探测带缓存，与 parse_file 同一判据）。
 
-        强制云端开关打开时一律返回 False——那种配置下解析根本不会走本地服务。
+        一般解析显式选择云端时返回 False；local_only 不受云配置影响。
         供工厂层判断「无 token 能不能构造」，避免外部去摸私有方法。
         """
-        if _should_force_cloud():
+        if not self.local_only and _should_force_cloud():
             return False
         return self._check_local_service()
 
@@ -443,20 +448,18 @@ class FileParserService:
             # For other file types, use MinerU service
             logger.info(f"File {filename} requires MinerU parsing...")
 
-            # [checkba] Try local MinerU service first (no token required)
-            if _should_force_cloud():
+            # Cloud parsing requires an explicit provider choice, never a local failure fallback.
+            if not self.local_only and _should_force_cloud():
                 logger.info("MINERU_FORCE_CLOUD enabled, skipping local MinerU and using cloud service...")
             elif self._check_local_service():
                 logger.info("Using local MinerU service...")
-                result = self._parse_with_local_service(file_path, filename)
-                if result[3] is None:  # No error
-                    return result
-                else:
-                    logger.warning(f"Local MinerU failed: {result[3]}, falling back to cloud service...")
+                return self._parse_with_local_service(file_path, filename)
+            else:
+                return None, None, None, "Local MinerU service is unavailable. Prepare the local OCR component and retry; no file was sent to cloud OCR.", 0
 
             # [checkba] Check if cloud service token is available
             if not self.mineru_token:
-                error_msg = "MinerU token not configured and local service not available"
+                error_msg = "Cloud MinerU was explicitly selected but MINERU_TOKEN is not configured"
                 logger.error(error_msg)
                 return None, None, None, error_msg, 0
 
