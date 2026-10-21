@@ -139,7 +139,7 @@
             <text class="etb-tx sm">{{ $t('editor.format.button') }}</text>
             <text class="etb-caret">⌄</text>
           </view>
-          <view v-if="menu === 'para'" class="etb-menu w320 pad" :style="popStyle(320, true)" @tap.stop>
+          <view v-if="menu === 'para'" class="etb-menu w320 pad etb-prop-card" :style="popStyle(320, true)" @tap.stop>
             <ParagraphFormatPanel :call="call" :has-selection="!noSelection"
                                   @applied="onParagraphApplied" @ai-format="onAiFormat" @house-style="runHouseStyle" />
           </view>
@@ -148,11 +148,11 @@
 
         <!-- 插入 -->
         <view class="etb-drop" :class="{ open: menu === 'insert' }">
-          <view ref="trig_insert" class="etb-field w72" :title="$t('editor.toolbar.insert')" @tap.stop="openInsert">
+          <view ref="trig_insert" class="etb-field w72" :class="{ on: menu === 'insert' }" :title="$t('editor.toolbar.insert')" @tap.stop="openInsert">
             <text class="etb-field-t">{{ $t('editor.toolbar.insert') }}</text>
             <text class="etb-caret">⌄</text>
           </view>
-          <view v-if="menu === 'insert'" class="etb-menu w200 pad" :style="popStyle(200)" @tap.stop>
+          <view v-if="menu === 'insert'" class="etb-menu w240 pad etb-prop-card" :style="popStyle(240, true)" @tap.stop>
             <!-- 一级清单 -->
             <template v-if="!insertMode">
               <view class="etb-item" @tap.stop="insertMode = 'table'"><text class="etb-item-t">{{ $t('editor.toolbar.insertTable') }}</text></view>
@@ -165,6 +165,9 @@
                 <text class="etb-item-t">{{ $t('editor.toolbar.insertComment') }}</text>
                 <text v-if="noSelection" class="etb-hint">{{ $t('editor.toolbar.needSelection') }}</text>
               </view>
+              <view class="etb-menu-sep"></view>
+              <view class="etb-item" @tap.stop="startToc"><text class="etb-item-t">{{ $t('editor.toolbar.insertToc') }}</text></view>
+              <view class="etb-item" @tap.stop="startPageNumber"><text class="etb-item-t">{{ $t('editor.toolbar.insertPageNumber') }}</text></view>
               <view class="etb-item" @tap.stop="ui('page_break')"><text class="etb-item-t">{{ $t('editor.toolbar.insertPageBreak') }}</text></view>
               <view class="etb-item" @tap.stop="startText('footnote')"><text class="etb-item-t">{{ $t('editor.toolbar.insertFootnote') }}</text></view>
               <view class="etb-item" @tap.stop="startText('header')"><text class="etb-item-t">{{ $t('editor.toolbar.editHeader') }}</text></view>
@@ -179,6 +182,52 @@
               <view class="etb-form-acts">
                 <text class="etb-form-b" @tap.stop="insertMode = ''">{{ $t('editor.toolbar.cancel') }}</text>
                 <text class="etb-form-b ok" @tap.stop="doTextForm">{{ $t('editor.toolbar.confirm') }}</text>
+              </view>
+            </view>
+
+            <!-- 目录（ElyOffice PropertyGroup 表单） -->
+            <view v-else-if="insertMode === 'toc'" class="etb-form">
+              <text class="etb-form-t">{{ $t('editor.toolbar.tocTitle') }}</text>
+              <input class="etb-input" v-model="tocForm.title" :placeholder="$t('editor.toolbar.tocDefaultTitle')" @click.stop />
+              <view class="etb-pg-grid compact">
+                <text class="etb-pg-l">{{ $t('editor.toolbar.tocLevels') }}</text>
+                <view class="etb-seg">
+                  <text v-for="lv in [2, 3, 4]" :key="lv" class="etb-seg-b" :class="{ on: tocForm.levels === lv }" @tap.stop="tocForm.levels = lv">1-{{ lv }}</text>
+                </view>
+                <text class="etb-pg-l">{{ $t('editor.toolbar.tocPosition') }}</text>
+                <view class="etb-seg">
+                  <text class="etb-seg-b" :class="{ on: tocForm.position === 'cursor' }" @tap.stop="tocForm.position = 'cursor'">{{ $t('editor.toolbar.tocAtCursor') }}</text>
+                  <text class="etb-seg-b" :class="{ on: tocForm.position === 'start' }" @tap.stop="tocForm.position = 'start'">{{ $t('editor.toolbar.tocAtStart') }}</text>
+                </view>
+              </view>
+              <view class="etb-form-acts">
+                <text class="etb-form-b" @tap.stop="insertMode = ''">{{ $t('editor.toolbar.cancel') }}</text>
+                <text class="etb-form-b ok" @tap.stop="doInsertToc">{{ $t('editor.toolbar.confirm') }}</text>
+              </view>
+            </view>
+
+            <!-- 页码（ElyOffice PropertyGroup 表单） -->
+            <view v-else-if="insertMode === 'pageNumber'" class="etb-form">
+              <text class="etb-form-t">{{ $t('editor.toolbar.pageNumberTitle') }}</text>
+              <view class="etb-pg-grid compact">
+                <text class="etb-pg-l">{{ $t('editor.toolbar.pageNumberPos') }}</text>
+                <view class="etb-seg">
+                  <text class="etb-seg-b" :class="{ on: pageNumForm.target === 'footer' }" @tap.stop="pageNumForm.target = 'footer'">{{ $t('editor.toolbar.pageNumberFooter') }}</text>
+                  <text class="etb-seg-b" :class="{ on: pageNumForm.target === 'header' }" @tap.stop="pageNumForm.target = 'header'">{{ $t('editor.toolbar.pageNumberHeader') }}</text>
+                </view>
+                <text class="etb-pg-l">{{ $t('editor.toolbar.pageNumberAlign') }}</text>
+                <view class="etb-seg">
+                  <text class="etb-seg-b" :class="{ on: pageNumForm.align === 'left' }" @tap.stop="pageNumForm.align = 'left'">{{ $t('editor.format.align.left') }}</text>
+                  <text class="etb-seg-b" :class="{ on: pageNumForm.align === 'center' }" @tap.stop="pageNumForm.align = 'center'">{{ $t('editor.format.align.center') }}</text>
+                  <text class="etb-seg-b" :class="{ on: pageNumForm.align === 'right' }" @tap.stop="pageNumForm.align = 'right'">{{ $t('editor.format.align.right') }}</text>
+                </view>
+              </view>
+              <view class="etb-pg-chips">
+                <text v-for="p in PAGE_NUM_PATTERNS" :key="p.k" class="etb-pg-chip" :class="{ on: pageNumForm.pattern === p.pattern }" @tap.stop="pageNumForm.pattern = p.pattern">{{ $t('editor.toolbar.' + p.label) }}</text>
+              </view>
+              <view class="etb-form-acts">
+                <text class="etb-form-b" @tap.stop="insertMode = ''">{{ $t('editor.toolbar.cancel') }}</text>
+                <text class="etb-form-b ok" @tap.stop="doInsertPageNumber">{{ $t('editor.toolbar.confirm') }}</text>
               </view>
             </view>
 
@@ -216,6 +265,66 @@
           </view>
         </view>
 
+        <!-- 页面设置（ElyOffice PropertyGroup 检查器卡片：纸张方向、纸张大小、页边距预设与自定义、标尺/标记） -->
+        <view class="etb-drop" :class="{ open: menu === 'page' }">
+          <view ref="trig_page" class="etb-field w72" :class="{ on: menu === 'page' }" :title="$t('editor.toolbar.pageSetup')" @tap.stop="openPageMenu">
+            <text class="etb-field-t">{{ $t('editor.toolbar.page') }}</text>
+            <text class="etb-caret">⌄</text>
+          </view>
+          <view v-if="menu === 'page'" class="etb-menu w280 pad etb-prop-card" :style="popStyle(280, true)" @tap.stop>
+            <view class="etb-pg-head">
+              <text class="etb-pg-title">{{ $t('editor.toolbar.pageSetup') }}</text>
+            </view>
+            <view class="etb-pg-grid">
+              <text class="etb-pg-l">{{ $t('editor.toolbar.pageOrientation') }}</text>
+              <view class="etb-seg">
+                <text class="etb-seg-b" :class="{ on: pageForm.orientation === 'portrait' }" @tap.stop="applyPageOrientation('portrait')">{{ $t('editor.toolbar.portrait') }}</text>
+                <text class="etb-seg-b" :class="{ on: pageForm.orientation === 'landscape' }" @tap.stop="applyPageOrientation('landscape')">{{ $t('editor.toolbar.landscape') }}</text>
+              </view>
+              <text class="etb-pg-l">{{ $t('editor.toolbar.paperSize') }}</text>
+              <view class="etb-pg-chips">
+                <text v-for="p in PAPER_SIZES" :key="p.k" class="etb-pg-chip" :class="{ on: pageForm.paper === p.k }" @tap.stop="applyPaperSize(p)">{{ p.label }}</text>
+              </view>
+              <text class="etb-pg-l">{{ $t('editor.toolbar.marginPresets') }}</text>
+              <view class="etb-pg-chips">
+                <text v-for="m in MARGIN_PRESETS" :key="m.k" class="etb-pg-chip" @tap.stop="useMarginPreset(m)">{{ $t('editor.toolbar.marginPreset_' + m.k) }}</text>
+              </view>
+            </view>
+            <view class="etb-menu-sep"></view>
+            <view class="etb-pg-subhead">
+              <text class="etb-pg-sec">{{ $t('editor.toolbar.marginsCm') }}</text>
+              <text class="etb-form-b ok sm" @tap.stop="applyPageMargins">{{ $t('editor.toolbar.applyMargins') }}</text>
+            </view>
+            <view class="etb-margin-grid">
+              <view class="etb-margin-cell">
+                <text class="etb-pg-u">{{ $t('editor.toolbar.marginTop') }}</text>
+                <input class="etb-num" type="digit" v-model="pageForm.topCm" @click.stop />
+              </view>
+              <view class="etb-margin-cell">
+                <text class="etb-pg-u">{{ $t('editor.toolbar.marginBottom') }}</text>
+                <input class="etb-num" type="digit" v-model="pageForm.bottomCm" @click.stop />
+              </view>
+              <view class="etb-margin-cell">
+                <text class="etb-pg-u">{{ $t('editor.toolbar.marginLeft') }}</text>
+                <input class="etb-num" type="digit" v-model="pageForm.leftCm" @click.stop />
+              </view>
+              <view class="etb-margin-cell">
+                <text class="etb-pg-u">{{ $t('editor.toolbar.marginRight') }}</text>
+                <input class="etb-num" type="digit" v-model="pageForm.rightCm" @click.stop />
+              </view>
+            </view>
+            <view class="etb-menu-sep"></view>
+            <view class="etb-pg-grid">
+              <text class="etb-pg-l">{{ $t('editor.toolbar.viewAssist') }}</text>
+              <view class="etb-pg-chips">
+                <text class="etb-pg-chip" :class="{ on: rulerOn }" @tap.stop="toggleRuler">{{ $t('editor.toolbar.ruler') }}</text>
+                <text class="etb-pg-chip" :class="{ on: formattingMarks }" @tap.stop="setAllMarks(!formattingMarks)">{{ $t('editor.toolbar.formattingMarks') }} ¶</text>
+              </view>
+            </view>
+            <text v-if="pageErr" class="etb-err">{{ pageErr }}</text>
+          </view>
+        </view>
+
         <view class="etb-drop" :class="{ open: menu === 'marks' }">
           <button ref="trig_marks" class="etb-btn etb-marks-trigger" :class="{ on: formattingMarks }"
                   :title="$t('editor.toolbar.specialCharacters')" :aria-label="$t('editor.toolbar.specialCharacters')"
@@ -241,10 +350,41 @@
 
         <!-- 表格上下文组：光标在表格里才出现（LO 自己那条 singlemode-table 工具栏
              的替代品）。行/列号从 get_ui_state 回的单元格名算出来——table_* 原语
-             收的是绝对行号列号，没有「当前位置」的概念。 -->
+             收的是绝对行号列号，没有「当前位置」的概念。点「表格 ⌄」弹出 ElyOffice
+             PropertyGroup 表格属性卡片（边框预设、表头底纹、垂直对齐、跨页表头）。 -->
         <template v-if="inTable">
           <view class="etb-sep"></view>
-          <text class="etb-group-t">{{ $t('editor.toolbar.tableGroup') }}</text>
+          <view class="etb-drop" :class="{ open: menu === 'table' }">
+            <view ref="trig_table" class="etb-btn wide" :class="{ on: menu === 'table' }" :title="$t('editor.toolbar.tablePropsTitle')" @tap.stop="openTableMenu">
+              <text class="etb-tx sm">{{ $t('editor.toolbar.tableGroup') }}</text>
+              <text class="etb-caret">⌄</text>
+            </view>
+            <view v-if="menu === 'table'" class="etb-menu w260 pad etb-prop-card" :style="popStyle(260, true)" @tap.stop>
+              <view class="etb-pg-head">
+                <text class="etb-pg-title">{{ $t('editor.toolbar.tablePropsTitle') }}</text>
+                <text class="etb-pg-chip ok" @tap.stop="applyTableFormat({ applyStandard: true })">{{ $t('editor.toolbar.tableStandardPreset') }}</text>
+              </view>
+              <view class="etb-pg-grid">
+                <text class="etb-pg-l">{{ $t('editor.toolbar.tableBorders') }}</text>
+                <view class="etb-seg">
+                  <text v-for="b in TABLE_BORDER_OPTIONS" :key="b.k" class="etb-seg-b" :class="{ on: tableForm.borderPreset === b.k }" @tap.stop="applyTableFormat({ borderPreset: b.k })">{{ $t('editor.toolbar.' + b.label) }}</text>
+                </view>
+                <text class="etb-pg-l">{{ $t('editor.toolbar.tableHeaderFill') }}</text>
+                <view class="etb-pg-swatches">
+                  <view v-for="c in TABLE_FILL_SWATCHES" :key="c" class="etb-chip" :class="{ none: c === 'none', on: tableForm.headerFill === c }" :style="{ background: c === 'none' ? '#fff' : c }" @tap.stop="applyTableFormat({ headerFill: c })"></view>
+                </view>
+                <text class="etb-pg-l">{{ $t('editor.toolbar.tableVAlign') }}</text>
+                <view class="etb-seg">
+                  <text v-for="v in TABLE_VALIGNS" :key="v.k" class="etb-seg-b" :class="{ on: tableForm.cellVerticalAlign === v.k }" @tap.stop="applyTableFormat({ cellVerticalAlign: v.k })">{{ $t('editor.toolbar.' + v.label) }}</text>
+                </view>
+                <text class="etb-pg-l">{{ $t('editor.toolbar.tableRepeatHeader') }}</text>
+                <view class="etb-pg-chips">
+                  <text class="etb-pg-chip" :class="{ on: tableForm.repeatHeader }" @tap.stop="applyTableFormat({ repeatHeader: !tableForm.repeatHeader })">{{ $t('editor.toolbar.tableRepeatHeaderToggle') }}</text>
+                </view>
+              </view>
+              <text v-if="tableErr" class="etb-err">{{ tableErr }}</text>
+            </view>
+          </view>
           <view class="etb-btn" :title="$t('editor.toolbar.rowAbove')" @tap.stop="tableOp('rowAbove')">
             <svg class="etb-ico" viewBox="0 0 24 24" fill="none"><path v-for="(d,i) in ICONS.rowAbove" :key="i" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           </view>
@@ -276,41 +416,41 @@
 
     <!-- 右侧常驻区：不参与滚动 -->
     <view class="etb-right">
-      <view class="etb-btn wide" :class="{ on: !chromeHidden }" :title="$t('editor.toolbar.nativeMenusTitle')" @tap.stop="toggleChrome">
-        <text class="etb-tx sm">{{ $t('editor.toolbar.nativeMenus') }}</text>
-      </view>
       <view class="etb-btn wide" :class="{ on: findOpen }" :title="$t('editor.toolbar.findAndReplace')" @tap.stop="toggleFind">
         <text class="etb-tx sm">{{ $t('editor.toolbar.find') }}</text>
       </view>
       <view class="etb-btn wide" :class="{ on: state.view.recordChanges }" :title="$t('editor.toolbar.trackChanges')" @tap.stop="toggleTrack">
         <text class="etb-tx sm">{{ $t('editor.toolbar.trackChangesShort') }}</text>
       </view>
-      <!-- #66 PR-B：黄金路径「接受/拒绝当前 + 全部」。当前条走 worker
-           resolve_revision_at_cursor（命中光标下 redline 再进既有 resolve_revision）；
-           全部直接 resolve_all_revisions，不必先开审阅面板。文案全 i18n。 -->
-      <view class="etb-btn wide" :class="{ off: resolvingRevision }" :title="$t('editor.toolbar.acceptCurrent')" @tap.stop="resolveAtCursor('accept')">
-        <text class="etb-tx sm">{{ $t('editor.toolbar.acceptCurrentShort') }}</text>
-      </view>
-      <view class="etb-btn wide" :class="{ off: resolvingRevision }" :title="$t('editor.toolbar.rejectCurrent')" @tap.stop="resolveAtCursor('reject')">
-        <text class="etb-tx sm">{{ $t('editor.toolbar.rejectCurrentShort') }}</text>
-      </view>
-      <view class="etb-btn wide" :class="{ off: resolvingRevision }" :title="$t('editor.toolbar.acceptAll')" @tap.stop="resolveAllRevisions('accept')">
-        <text class="etb-tx sm">{{ $t('editor.toolbar.acceptAllShort') }}</text>
-      </view>
-      <view class="etb-btn wide" :class="{ off: resolvingRevision }" :title="$t('editor.toolbar.rejectAll')" @tap.stop="resolveAllRevisions('reject')">
-        <text class="etb-tx sm">{{ $t('editor.toolbar.rejectAllShort') }}</text>
-      </view>
-      <!-- 修订显示方式三态（dev-board#368）。当前态取自 get_ui_state 的真实读回，
-           不是本地记的；引擎不支持页边显示时中间项自动消失（退成两态）。 -->
+      <!-- 修订显示方式三态（dev-board#368）与 #66 PR-B 黄金路径「接受/拒绝当前 + 全部」
+           折入同一张 PropertyGroup 卡片，让右侧常驻区干净收拢。当前态取自 get_ui_state
+           的真实读回；引擎不支持页边显示时中间项自动消失（退成两态）。 -->
       <view v-if="state.view.revisionView" class="etb-drop" :class="{ open: menu === 'revview' }">
-        <view ref="trig_revview" class="etb-field w96" :title="$t('editor.toolbar.revisionView')" @tap.stop="toggleMenu('revview')">
+        <view ref="trig_revview" class="etb-field w96" :class="{ on: menu === 'revview' }" :title="$t('editor.toolbar.revisionView')" @tap.stop="toggleMenu('revview')">
           <text class="etb-field-t">{{ revisionViewLabel }}</text>
           <text class="etb-caret">⌄</text>
         </view>
-        <view v-if="menu === 'revview'" class="etb-menu w150" :style="popStyle(150)" @tap.stop>
+        <view v-if="menu === 'revview'" class="etb-menu w200 pad etb-prop-card" :style="popStyle(200)" @tap.stop>
+          <text class="etb-pg-sec">{{ $t('editor.toolbar.revisionView') }}</text>
           <view v-for="o in revisionViewOptions" :key="o.k" class="etb-item"
                 :class="{ on: o.k === state.view.revisionView }" @tap.stop="pickRevisionView(o.k)">
             <text class="etb-item-t">{{ $t('editor.toolbar.' + o.t) }}</text>
+          </view>
+          <view class="etb-menu-sep"></view>
+          <text class="etb-pg-sec">{{ $t('editor.toolbar.revisionResolveSection') }}</text>
+          <view class="etb-pg-acts">
+            <view class="etb-btn wide" :class="{ off: resolvingRevision }" :title="$t('editor.toolbar.acceptCurrent')" @tap.stop="resolveAtCursor('accept')">
+              <text class="etb-tx sm">{{ $t('editor.toolbar.acceptCurrentShort') }}</text>
+            </view>
+            <view class="etb-btn wide" :class="{ off: resolvingRevision }" :title="$t('editor.toolbar.rejectCurrent')" @tap.stop="resolveAtCursor('reject')">
+              <text class="etb-tx sm">{{ $t('editor.toolbar.rejectCurrentShort') }}</text>
+            </view>
+            <view class="etb-btn wide" :class="{ off: resolvingRevision }" :title="$t('editor.toolbar.acceptAll')" @tap.stop="resolveAllRevisions('accept')">
+              <text class="etb-tx sm">{{ $t('editor.toolbar.acceptAllShort') }}</text>
+            </view>
+            <view class="etb-btn wide" :class="{ off: resolvingRevision }" :title="$t('editor.toolbar.rejectAll')" @tap.stop="resolveAllRevisions('reject')">
+              <text class="etb-tx sm">{{ $t('editor.toolbar.rejectAllShort') }}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -486,6 +626,46 @@ const GRID_R = 8, GRID_C = 8
 const GRID_CELLS = []
 for (let r = 1; r <= GRID_R; r++) for (let c = 1; c <= GRID_C; c++) GRID_CELLS.push({ r, c, k: r + '-' + c })
 
+// ElyOffice PropertyGroup 页面/目录/页码/表格预设常量
+const PAPER_SIZES = [
+  { k: 'A4', label: 'A4', width: 210, height: 297 },
+  { k: 'A3', label: 'A3', width: 297, height: 420 },
+  { k: 'A5', label: 'A5', width: 148, height: 210 },
+  { k: 'B5', label: 'B5', width: 176, height: 250 },
+  { k: 'Letter', label: 'Letter', width: 215.9, height: 279.4 },
+  { k: 'Legal', label: 'Legal', width: 215.9, height: 355.6 },
+]
+const MARGIN_PRESETS = [
+  { k: 'normal', top: 2.54, bottom: 2.54, left: 3.18, right: 3.18 },
+  { k: 'official', top: 3.7, bottom: 3.5, left: 2.8, right: 2.6 },
+  { k: 'narrow', top: 1.27, bottom: 1.27, left: 1.27, right: 1.27 },
+  { k: 'moderate', top: 2.54, bottom: 2.54, left: 1.91, right: 1.91 },
+]
+const PAGE_NUM_PATTERNS = [
+  { k: 'pageOfTotal', label: 'pageNumPatternTotal', pattern: '第 {PAGE} 页 共 {NUMPAGES} 页' },
+  { k: 'slash', label: 'pageNumPatternSlash', pattern: '{PAGE} / {NUMPAGES}' },
+  { k: 'dash', label: 'pageNumPatternDash', pattern: '- {PAGE} -' },
+  { k: 'plain', label: 'pageNumPatternPlain', pattern: '{PAGE}' },
+]
+const TABLE_BORDER_OPTIONS = [
+  { k: 'all', label: 'tableBorderAll' },
+  { k: 'threeLine', label: 'tableBorderThreeLine' },
+  { k: 'outer', label: 'tableBorderOuter' },
+  { k: 'none', label: 'tableBorderNone' },
+]
+const TABLE_BORDER_PRESETS = {
+  all: { outsideBorderWidthPt: 0.75, insideBorderWidthPt: 0.5 },
+  threeLine: { outsideBorderWidthPt: 1.5, insideBorderWidthPt: 0.75 },
+  outer: { outsideBorderWidthPt: 1, insideBorderWidthPt: 0 },
+  none: { borderWidthPt: 0 },
+}
+const TABLE_FILL_SWATCHES = ['none', '#F1F3F5', '#E3EFEA', '#EBF3FE', '#FDF6EC', '#DEE2E6']
+const TABLE_VALIGNS = [
+  { k: 'top', label: 'tableVAlignTop' },
+  { k: 'center', label: 'tableVAlignCenter' },
+  { k: 'bottom', label: 'tableVAlignBottom' },
+]
+
 const EMPTY = () => ({ character: {}, paragraph: {}, view: {}, selection: {}, undo: null })
 
 export default {
@@ -515,8 +695,15 @@ export default {
       // BUG-13：主命令区还能不能往左/右滚，驱动两端渐隐遮罩；由 bindToolbarWheel
       // 里的原生 scroll/resize 监听实时更新，不是一次性算好就不变。
       canScrollLeft: false, canScrollRight: false,
-      // 插入菜单：'' | 'table' | 'link' | 'comment'
+      // 插入菜单：'' | 'table' | 'link' | 'comment' | 'toc' | 'pageNumber'
       insertMode: '', insertErr: '', grid: { r: 0, c: 0 }, linkUrl: '', commentText: '', formText: '', selText: '',
+      tocForm: { title: '', levels: 3, position: 'cursor' },
+      pageNumForm: { target: 'footer', align: 'center', pattern: PAGE_NUM_PATTERNS[0].pattern },
+      // 页面设置与表格属性 PropertyGroup 状态
+      pageForm: { orientation: 'portrait', paper: 'A4', widthMm: 210, heightMm: 297, topCm: 2.54, bottomCm: 2.54, leftCm: 3.18, rightCm: 3.18 },
+      pageErr: '',
+      tableForm: { borderPreset: 'all', headerFill: 'none', cellVerticalAlign: 'center', repeatHeader: false },
+      tableErr: '',
       // 查找替换
       findOpen: false, findText: '', replaceText: '', matchCase: false,
       resolvingRevision: false,
@@ -530,6 +717,9 @@ export default {
     ICONS: () => ICONS, ALIGNS: () => ALIGNS,
     TEXT_COLORS: () => TEXT_COLORS, HL_COLORS: () => HL_COLORS, GRID_CELLS: () => GRID_CELLS,
     TEXT_FORMS: () => TEXT_FORMS, MARK_OPTIONS: () => MARK_OPTIONS,
+    PAPER_SIZES: () => PAPER_SIZES, MARGIN_PRESETS: () => MARGIN_PRESETS,
+    PAGE_NUM_PATTERNS: () => PAGE_NUM_PATTERNS, TABLE_BORDER_OPTIONS: () => TABLE_BORDER_OPTIONS,
+    TABLE_FILL_SWATCHES: () => TABLE_FILL_SWATCHES, TABLE_VALIGNS: () => TABLE_VALIGNS,
     CN_FONT_SIZES: () => CN_FONT_SIZES, PT_FONT_SIZES: () => PT_FONT_SIZES,
     showCnSizes: () => !isEnglish(),
     systemFontsSupported: () => !!(host.systemFonts && typeof host.systemFonts.list === 'function'),
@@ -703,7 +893,7 @@ export default {
       }
       return st
     },
-    closeMenus() { this.menu = ''; this.insertMode = ''; this.insertErr = '' },
+    closeMenus() { this.menu = ''; this.insertMode = ''; this.insertErr = ''; this.pageErr = ''; this.tableErr = '' },
     // BUG-15：点在工具栏 DOM 树之外（文档画布是独立的 webview，够不到；右栏
     // AI 面板是同页面的另一棵子树）都要关掉手写下拉。捕获阶段挂，免得目标元素
     // 自己的 @tap.stop 先把冒泡吃掉。
@@ -759,6 +949,151 @@ export default {
       if (!text) { this.insertErr = this.$t('editor.toolbar.textRequired'); return null }
       const params = Object.assign({ [form.arg]: text }, form.extra || {})
       return this.call(form.action, params).then((res) => this.finishInsert(res))
+    },
+    startToc() {
+      this.insertErr = ''
+      this.tocForm = { title: this.$t('editor.toolbar.tocDefaultTitle'), levels: 3, position: 'cursor' }
+      this.insertMode = 'toc'
+    },
+    doInsertToc() {
+      const title = String(this.tocForm.title || '').trim() || this.$t('editor.toolbar.tocDefaultTitle')
+      return this.call('insert_toc', {
+        title,
+        levels: Number(this.tocForm.levels) || 3,
+        position: this.tocForm.position || 'cursor',
+      }).then((res) => this.finishInsert(res))
+    },
+    startPageNumber() {
+      this.insertErr = ''
+      this.pageNumForm = { target: 'footer', align: 'center', pattern: PAGE_NUM_PATTERNS[0].pattern }
+      this.insertMode = 'pageNumber'
+    },
+    doInsertPageNumber() {
+      return this.call('edit_header_footer', {
+        target: this.pageNumForm.target || 'footer',
+        align: this.pageNumForm.align || 'center',
+        pageNumberPattern: this.pageNumForm.pattern || PAGE_NUM_PATTERNS[0].pattern,
+      }).then((res) => this.finishInsert(res))
+    },
+    // ---- 页面设置（ElyOffice PropertyGroup 检查器卡片） ----
+    openPageMenu() {
+      const opening = this.menu !== 'page'
+      this.pageErr = ''
+      this.menu = opening ? 'page' : ''
+      if (opening) {
+        this.capturePopPos('page')
+        this.call('get_formatting', {}).then((r) => {
+          if (r && r.page) this.syncPageForm(r.page)
+        })
+      }
+    },
+    syncPageForm(pg) {
+      if (!pg) return
+      const land = !!pg.landscape || pg.orientation === 'landscape'
+      this.pageForm.orientation = land ? 'landscape' : 'portrait'
+      if (pg.width > 0 && pg.height > 0) {
+        this.pageForm.widthMm = pg.width
+        this.pageForm.heightMm = pg.height
+        const shortSide = Math.min(pg.width, pg.height)
+        const longSide = Math.max(pg.width, pg.height)
+        const hit = PAPER_SIZES.find((p) => Math.abs(p.width - shortSide) < 2 && Math.abs(p.height - longSide) < 2)
+        if (hit) this.pageForm.paper = hit.k
+      }
+      if (pg.margins) {
+        const toCm = (mm) => Math.round((Number(mm) / 10) * 100) / 100
+        if (pg.margins.top != null) this.pageForm.topCm = toCm(pg.margins.top)
+        if (pg.margins.bottom != null) this.pageForm.bottomCm = toCm(pg.margins.bottom)
+        if (pg.margins.left != null) this.pageForm.leftCm = toCm(pg.margins.left)
+        if (pg.margins.right != null) this.pageForm.rightCm = toCm(pg.margins.right)
+      }
+    },
+    async applyPageOrientation(orientation) {
+      this.pageErr = ''
+      this.pageForm.orientation = orientation
+      const res = await this.call('set_page_setup', { orientation })
+      if (!res || res.success !== true) {
+        this.pageErr = (res && res.message) || this.$t('editor.toolbar.opFailed')
+        return null
+      }
+      if (res.page) this.syncPageForm(res.page)
+      return this.after(res)
+    },
+    async applyPaperSize(p) {
+      this.pageErr = ''
+      this.pageForm.paper = p.k
+      const isLand = this.pageForm.orientation === 'landscape'
+      const width = isLand ? p.height : p.width
+      const height = isLand ? p.width : p.height
+      this.pageForm.widthMm = width
+      this.pageForm.heightMm = height
+      const res = await this.call('set_page_setup', { width, height, orientation: this.pageForm.orientation })
+      if (!res || res.success !== true) {
+        this.pageErr = (res && res.message) || this.$t('editor.toolbar.opFailed')
+        return null
+      }
+      if (res.page) this.syncPageForm(res.page)
+      return this.after(res)
+    },
+    useMarginPreset(m) {
+      this.pageForm.topCm = m.top
+      this.pageForm.bottomCm = m.bottom
+      this.pageForm.leftCm = m.left
+      this.pageForm.rightCm = m.right
+      return this.applyPageMargins()
+    },
+    async applyPageMargins() {
+      this.pageErr = ''
+      const mm = (cm) => Math.round(Number(cm) * 10 * 10) / 10
+      const margins = {
+        top: mm(this.pageForm.topCm),
+        bottom: mm(this.pageForm.bottomCm),
+        left: mm(this.pageForm.leftCm),
+        right: mm(this.pageForm.rightCm),
+      }
+      if (Object.values(margins).some((v) => !Number.isFinite(v) || v < 0)) {
+        this.pageErr = this.$t('editor.toolbar.opFailed')
+        return null
+      }
+      const res = await this.call('set_page_setup', { margins })
+      if (!res || res.success !== true) {
+        this.pageErr = (res && res.message) || this.$t('editor.toolbar.opFailed')
+        return null
+      }
+      if (res.page) this.syncPageForm(res.page)
+      return this.after(res)
+    },
+    // ---- 表格属性（ElyOffice PropertyGroup 检查器卡片） ----
+    openTableMenu() {
+      const opening = this.menu !== 'table'
+      this.tableErr = ''
+      this.menu = opening ? 'table' : ''
+      if (opening) {
+        this.capturePopPos('table')
+        this.call('get_formatting', {}).then((r) => {
+          if (r && r.table) {
+            if (r.table.repeatHeader != null) this.tableForm.repeatHeader = !!r.table.repeatHeader
+            if (r.table.headerFill != null) this.tableForm.headerFill = r.table.headerFill
+          }
+        })
+      }
+    },
+    async applyTableFormat(patch) {
+      if (!patch) return null
+      this.tableErr = ''
+      const params = Object.assign({}, patch)
+      if (patch.borderPreset) {
+        this.tableForm.borderPreset = patch.borderPreset
+        Object.assign(params, TABLE_BORDER_PRESETS[patch.borderPreset] || {})
+      }
+      if (patch.headerFill != null) this.tableForm.headerFill = patch.headerFill
+      if (patch.cellVerticalAlign != null) this.tableForm.cellVerticalAlign = patch.cellVerticalAlign
+      if (patch.repeatHeader != null) this.tableForm.repeatHeader = !!patch.repeatHeader
+      const res = await this.call('format_table', params)
+      if (!res || res.success !== true) {
+        this.tableErr = (res && res.message) || this.$t('editor.toolbar.opFailed')
+        return null
+      }
+      return this.after(res)
     },
     // 表格相对操作。position 的语义是「插在该行/列之前」，缺省追加到末尾——
     // 所以「下方插入」= position+1，「右侧插入」= 列号+1。删除直接给当前行/列。
@@ -1191,6 +1526,7 @@ export default {
   box-sizing: border-box;
   padding: 0 6px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-surface); }
 .etb-field:hover { border-color: var(--awd-border-strong); }
+.etb-field.on { border-color: var(--awd-mint); background: var(--awd-accent-soft); }
 .etb-field-t { font-size: var(--awd-panel-fs); color: var(--awd-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .etb-caret { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
 .w110 { width: 110px; }
@@ -1203,16 +1539,48 @@ export default {
 .w150 { width: 150px; }
 .w160 { width: 160px; }
 .w180 { width: 180px; }
-.w200 { width: 200px; }
+.w200 { width: 200px; box-sizing: border-box; }
+.w240 { width: 240px; box-sizing: border-box; }
+.w260 { width: 260px; box-sizing: border-box; }
+.w280 { width: 280px; box-sizing: border-box; }
 .w120 { width: 120px; }
 .w320 { width: 320px; box-sizing: border-box; }
-.etb-menu-sep { height: 1px; margin: 4px 2px; background: var(--awd-border); }
+.etb-menu-sep { height: 1px; margin: 5px 2px; background: var(--awd-border); }
 .etb-item-manage { border-bottom: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm) var(--awd-radius-sm) 0 0; margin-bottom: 3px; }
 .etb-item-manage .etb-item-t { color: var(--awd-accent-text); }
 .etb-step-v.pick { cursor: pointer; }
 .etb-step-v.pick:hover { background: var(--awd-surface-2); }
 .w72 { width: 72px; }
-.etb-menu.pad { padding: 6px; }
+.etb-menu.pad { padding: 8px; }
+.etb-prop-card { max-height: 440px; display: flex; flex-direction: column; gap: 6px; }
+.etb-pg-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--awd-border); }
+.etb-pg-subhead { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.etb-pg-title { font-size: 12.5px; font-weight: 600; color: var(--awd-text); letter-spacing: 0.01em; }
+.etb-pg-sec { display: block; font-size: 11px; font-weight: 600; color: var(--awd-text-3); padding: 1px 2px; }
+.etb-pg-grid { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 6px 8px; }
+.etb-pg-grid.compact { grid-template-columns: 56px 1fr; gap: 5px 6px; }
+.etb-pg-l { font-size: 11.5px; font-weight: 500; color: var(--awd-text-2); }
+.etb-pg-u { font-size: 11px; color: var(--awd-text-3); min-width: 14px; }
+.etb-seg { display: flex; border: 1px solid var(--awd-border); border-radius: 5px; overflow: hidden; background: var(--awd-surface); }
+.etb-seg-b { flex: 1; text-align: center; padding: 3px 6px; font-size: 11px; color: var(--awd-text-2); border-right: 1px solid var(--awd-border); cursor: pointer; }
+.etb-seg-b:last-child { border-right: none; }
+.etb-seg-b:hover { background: var(--awd-surface-2); }
+.etb-seg-b.on { background: var(--awd-accent-soft); color: var(--awd-accent-text); font-weight: 500; }
+.etb-pg-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.etb-pg-chip { padding: 2px 8px; border: 1px solid var(--awd-border); border-radius: 10px; font-size: 11px;
+  color: var(--awd-text-2); background: var(--awd-surface); cursor: pointer; }
+.etb-pg-chip:hover { border-color: var(--awd-mint); color: var(--awd-accent-text); }
+.etb-pg-chip.on, .etb-pg-chip.ok { border-color: var(--awd-mint); background: var(--awd-accent-soft); color: var(--awd-accent-text); font-weight: 500; }
+.etb-pg-swatches { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.etb-chip.on { outline: 2px solid var(--awd-mint); outline-offset: 1px; }
+.etb-margin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 8px; }
+.etb-margin-cell { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.etb-num { width: 64px; height: 24px; padding: 0 6px; box-sizing: border-box; font-size: 12px; color: var(--awd-text);
+  border: 1px solid var(--awd-border); border-radius: 4px; background: var(--awd-surface); }
+.etb-pg-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding-top: 2px; }
+.etb-pg-acts .etb-btn { border: 1px solid var(--awd-border); background: var(--awd-surface); }
+.etb-pg-acts .etb-btn:hover { border-color: var(--awd-mint); background: var(--awd-accent-soft); color: var(--awd-accent-text); }
+.etb-form-b.sm { padding: 2px 8px; font-size: 11px; cursor: pointer; }
 .etb-item { display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
   padding: 5px 8px; border-radius: var(--awd-radius-sm); }
 .etb-item:hover { background: var(--awd-surface-2); }
