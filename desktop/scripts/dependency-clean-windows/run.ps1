@@ -55,7 +55,7 @@ try {
     # installed, but are excluded from the child PATH. This is not an OS factory-reset claim.
     $quarantined = @()
     foreach ($path in @('C:\Program Files\nodejs','C:\Program Files (x86)\nodejs','C:\Program Files\LibreOffice',
-            'C:\Program Files (x86)\LibreOffice','C:\Program Files\Docker')) {
+            'C:\Program Files (x86)\LibreOffice','C:\Program Files\Docker',"$env:SystemRoot\System32\docker.exe")) {
         if (Test-Path $path) {
             $target = $path + '.awd-ci-quarantined'
             Move-Item -LiteralPath $path -Destination $target
@@ -116,28 +116,35 @@ foreach ($name in @('JAVA_HOME','PYTHONHOME','PYTHONPATH','NODE_PATH','NODE_OPTI
     [Environment]::SetEnvironmentVariable($name,$null,'Process')
 }
 Set-Location $Root
-& "$Resources\jre\bin\java.exe" '-Dfile.encoding=UTF-8' '-Djava.awt.headless=true' -cp "$Root;$Resources\backend\app.jar;$Resources\backend\lib\*" DependencyProbe $Root $Resources $Version *> "$Root\probe.log"
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-& "$Resources\python\python.exe" -I -m venv "$Root\dpia-venv" *> "$Root\dpia-venv.log"
-if ($LASTEXITCODE -ne 0) { throw 'Bundled Python could not create isolated DPIA venv; no system Python fallback' }
+function Run-Native([string]$Executable, [string[]]$Arguments, [string]$Log) {
+    $quoted = @($Arguments | ForEach-Object {
+        if ($_ -match '"' -or $_.EndsWith('\')) { throw 'Unsupported native argument' }
+        '"' + $_ + '"'
+    }) -join ' '
+    # PS5 otherwise decodes native stderr as an error record and can stop on a
+    # harmless warning; direct redirection also preserves original UTF-8 bytes.
+    $process = Start-Process $Executable -ArgumentList $quoted -NoNewWindow -PassThru -Wait `
+        -RedirectStandardOutput "$Root\$Log.log" -RedirectStandardError "$Root\$Log.stderr.log"
+    if ($process.ExitCode -ne 0) { throw "$Log exited $($process.ExitCode); inspect its stdout/stderr logs" }
+}
+Run-Native "$Resources\jre\bin\java.exe" @('-Dfile.encoding=UTF-8','-Djava.awt.headless=true','-cp',"$Root;$Resources\backend\app.jar;$Resources\backend\lib\*",'DependencyProbe',$Root,$Resources,$Version) 'probe'
+Run-Native "$Resources\python\python.exe" @('-I','-m','venv',"$Root\dpia-venv") 'dpia-venv'
 $python = "$Root\dpia-venv\Scripts\python.exe"
 $env:PYTHONIOENCODING = 'utf-8'
 $env:DSH_DPIA_PDF_FONT = "$Resources\frontend\dist\zetaoffice\cjk-kai.ttf"
 $env:AWD_DPIA_SOFFICE = 'C:\Program Files\LibreOffice\program\soffice.exe'
 $check = "$Root\dpia-workbench\runtime\environment-check.py"
-$before = & $python $check
-if ($LASTEXITCODE -ne 0) { throw 'DPIA missing-environment check crashed' }
+Run-Native $python @($check) 'dpia-before'
+$before = Get-Content "$Root\dpia-before.log" -Raw -Encoding UTF8
 $before | Set-Content "$Root\dpia-before.json" -Encoding utf8
 if (@(($before | ConvertFrom-Json).checks | Where-Object { $_.status -eq 'needs_attention' }).Count -eq 0) { throw 'Fresh DPIA venv unexpectedly contains dependencies' }
-& $python -m pip install --disable-pip-version-check -r "$Root\dpia-workbench\runtime\requirements.txt" *> "$Root\dpia-pip.log"
-if ($LASTEXITCODE -ne 0) { throw 'DPIA locked dependency installation failed' }
-$after = & $python $check
-if ($LASTEXITCODE -ne 0) { throw 'DPIA prepared-environment check crashed' }
+Run-Native $python @('-m','pip','install','--disable-pip-version-check','-r',"$Root\dpia-workbench\runtime\requirements.txt") 'dpia-pip'
+Run-Native $python @($check) 'dpia-after'
+$after = Get-Content "$Root\dpia-after.log" -Raw -Encoding UTF8
 $after | Set-Content "$Root\dpia-after.json" -Encoding utf8
 if (@(($after | ConvertFrom-Json).checks | Where-Object { $_.status -ne 'ready' }).Count) { throw 'DPIA preparation remains incomplete' }
 $env:AWD_DPIA_TEST_PYTHON = $python
-& 'C:\Program Files\nodejs\node.exe' --test "$Root\dpia-workbench\tests\lifecycle.test.mjs" *> "$Root\dpia-lifecycle.log"
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Run-Native 'C:\Program Files\nodejs\node.exe' @('--test',"$Root\dpia-workbench\tests\lifecycle.test.mjs") 'dpia-lifecycle'
 & "$Root\source\desktop\scripts\dependency-clean-windows\real-models.ps1" -Resources $Resources -Repo "$Root\source" -Output "$Root\real-models" -ProbeClasses $Root *> "$Root\real-models.log"
 '@ | Set-Content "$root\probe.ps1" -Encoding utf8
     $powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
