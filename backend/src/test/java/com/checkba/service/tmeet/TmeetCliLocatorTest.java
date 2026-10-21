@@ -23,6 +23,18 @@ class TmeetCliLocatorTest {
     @TempDir
     Path root;
 
+    @Test
+    void invalidPackageBinReturnsRepairGuidance() throws IOException {
+        Path pkg = root.resolve("node_modules/@tencentcloud/tmeet");
+        Files.createDirectories(pkg);
+        Files.writeString(pkg.resolve("package.json"), "{\"bin\":\"bad\\u0000.js\"}");
+        Path shim = root.resolve("tmeet.cmd");
+        Files.writeString(shim, "");
+        var error = assertThrows(TmeetCliLocator.UnresolvableException.class,
+                () -> TmeetCliLocator.resolve(shim.toString(), true, key -> null, root.toString()));
+        assertTrue(error.getMessage().contains("重新安装"));
+    }
+
     private static final class FunctionRef implements java.util.function.Function<String, String> {
         final Map<String, String> env = new HashMap<>();
 

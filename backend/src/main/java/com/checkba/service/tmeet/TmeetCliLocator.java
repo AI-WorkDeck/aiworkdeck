@@ -49,7 +49,11 @@ final class TmeetCliLocator {
 
     static Resolution resolve(String configuredCliPath, boolean windows,
                               Function<String, String> env, String userHome) {
-        return new TmeetCliLocator(windows, env, userHome).resolve(configuredCliPath);
+        try {
+            return new TmeetCliLocator(windows, env, userHome).resolve(configuredCliPath);
+        } catch (java.nio.file.InvalidPathException error) {
+            throw new UnresolvableException("腾讯会议 CLI 安装路径或入口无效，请检查路径设置或重新安装 @tencentcloud/tmeet");
+        }
     }
 
     private Resolution resolve(String configuredCliPath) {

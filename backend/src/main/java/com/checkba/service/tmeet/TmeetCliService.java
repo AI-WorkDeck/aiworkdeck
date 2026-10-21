@@ -109,6 +109,12 @@ public class TmeetCliService {
      */
     public TmeetAuthStatus getAuthStatus() {
         String cliPath = resolveCliPath();
+        try {
+            resolveCommandPrefix();
+        } catch (TmeetCliLocator.UnresolvableException error) {
+            return TmeetAuthStatus.builder().cliAvailable(false).cliPath(cliPath)
+                    .loggedIn(false).message(error.getMessage()).build();
+        }
         boolean available = isCliAvailable();
         if (!available) {
             return TmeetAuthStatus.builder()

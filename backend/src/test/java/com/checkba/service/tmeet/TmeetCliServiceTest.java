@@ -24,6 +24,17 @@ class TmeetCliServiceTest {
     private static final String CLI_PATH = "/test-only/tmeet";
 
     @Test
+    void missingNodeKeepsItsActionableMessageWithoutStartingAuthentication() {
+        var service = service();
+        doThrow(new TmeetCliLocator.UnresolvableException("未找到 node.exe，请安装 Node.js"))
+                .when(service).resolveCommandPrefix();
+        var status = service.getAuthStatus();
+        assertFalse(status.isCliAvailable());
+        assertTrue(status.getMessage().contains("Node.js"));
+        verify(service, never()).isCliAvailable();
+    }
+
+    @Test
     void testResolveCliPath() {
         TmeetCliService service = new TmeetCliService("");
         String path = service.resolveCliPath();
