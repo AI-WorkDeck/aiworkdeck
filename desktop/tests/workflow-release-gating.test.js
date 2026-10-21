@@ -19,8 +19,8 @@ try {
 // 一条腿失败完全不妨碍另一条腿继续跑完，会独立调用 softprops/action-gh-release
 // 把 release 发出去——mac 腿在公证抖动处失败时，windows 腿会把只有 .exe、
 // 缺 .dmg 的半成品版本发布给用户。修复把发布步骤挪到一个 needs:[build] 的
-// 独立 job（不加 if:always()，天然要求 build 的所有矩阵腿都成功才跑），
-// 同构于 pack-release.yml 里 needs:[mac,win] 的 release job。
+// 独立 job，并显式要求 build 的所有矩阵腿成功；always() 只用于绕过
+// PR 专属祖先 job 在 tag 上的正常跳过（dev-board#1399）。
 //
 // 这里是纯静态检查：解析仓库里全部 workflow YAML，断言任何带 strategy.matrix
 // 的 job 都不能再直接包含 action-gh-release 步骤——防止以后哪次改动又把发布
@@ -102,13 +102,28 @@ test('desktop-build.yml：发布已收口到独立 release job，且被 needs �
   assert.ok(stepsUseGhRelease(releaseJob.steps), 'release job 应该包含 action-gh-release 步骤')
 
   const needs = Array.isArray(releaseJob.needs) ? releaseJob.needs : [releaseJob.needs]
-  assert.ok(needs.includes('build'), 'release job 必须 needs: build——默认语义下 build 任一矩阵腿失败它就不会跑')
-
-  // 不能用 if: always() 之类的条件放行失败腿——否则又把「必须全部成功」这道
-  // 门禁架空，等于走了一遍手续但没有实际效果。
-  const ifCond = String(releaseJob.if || '')
-  assert.ok(!/always\s*\(\s*\)/.test(ifCond), 'release job 的 if 条件不应该用 always() 绕开 needs 的全部成功前提')
+  assert.ok(needs.includes('build'), 'release job 必须等待 build 的所有矩阵腿完成')
 })
+
+// Evaluate only the boolean expression subset used by these two gates. This is
+// a local guard regression, not a reproduction of GitHub's scheduler.
+for (const [jobId, dependency] of [['release', 'build'], ['sync-mirror', 'release']]) {
+  test(`desktop-build.yml: ${jobId} survives skipped ancestors but requires its direct dependency to succeed`, () => {
+    const condition = String(loadWorkflow('desktop-build.yml').jobs[jobId].if || '')
+    assert.match(condition, /always\s*\(\s*\)/, 'A skipped PR-only ancestor must not implicitly skip tag delivery')
+    const evaluate = new Function('always', 'cancelled', 'needs', 'github', 'startsWith', `return (${condition})`)
+    for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
+      for (const isCancelled of [false, true]) {
+        for (const ref of ['refs/tags/v0.68.0', 'refs/heads/master', 'refs/pull/1176/merge']) {
+          const actual = evaluate(() => true, () => isCancelled,
+            { [dependency]: { result } }, { ref }, (value, prefix) => value.startsWith(prefix))
+          assert.equal(actual, result === 'success' && !isCancelled && ref.startsWith('refs/tags/v'),
+            `${jobId}: ${dependency}=${result}, cancelled=${isCancelled}, ref=${ref}`)
+        }
+      }
+    }
+  })
+}
 
 test('desktop-build.yml：镜像同步必须排在 release 之后（它是从 GitHub Release 拉资产的）', () => {
   const doc = loadWorkflow('desktop-build.yml')
