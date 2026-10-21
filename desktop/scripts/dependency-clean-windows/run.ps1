@@ -111,6 +111,12 @@ $env:USERPROFILE = [Environment]::GetFolderPath('UserProfile')
 if ($env:USERPROFILE -notlike '*awd-dependency-test*') { throw 'Probe did not receive a fresh user profile' }
 $env:APPDATA = [Environment]::GetFolderPath('ApplicationData')
 $env:LOCALAPPDATA = [Environment]::GetFolderPath('LocalApplicationData')
+# Start-Process -Credential inherits the runner's TEMP, even with LoadUserProfile.
+# A normal sign-in instead owns its temporary directory. Record and reproduce that boundary.
+@{inheritedTemp=$env:TEMP;inheritedTmp=$env:TMP;profile=$env:USERPROFILE} | ConvertTo-Json | Set-Content "$Root\child-profile.json"
+$env:TEMP = Join-Path $env:LOCALAPPDATA 'Temp'
+$env:TMP = $env:TEMP
+New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
 $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
 foreach ($name in @('JAVA_HOME','PYTHONHOME','PYTHONPATH','NODE_PATH','NODE_OPTIONS','LIBREOFFICE_PATH','SOFFICE_PATH','TMEET_PATH','TMEET_NODE_PATH','DOCKER_HOST','DOCKER_CONTEXT')) {
     [Environment]::SetEnvironmentVariable($name,$null,'Process')
@@ -127,7 +133,7 @@ function Run-Native([string]$Executable, [string[]]$Arguments, [string]$Log) {
         -RedirectStandardOutput "$Root\$Log.log" -RedirectStandardError "$Root\$Log.stderr.log"
     if ($process.ExitCode -ne 0) { throw "$Log exited $($process.ExitCode); inspect its stdout/stderr logs" }
 }
-Run-Native "$Resources\jre\bin\java.exe" @('-Dfile.encoding=UTF-8','-Djava.awt.headless=true','-cp',"$Root;$Resources\backend\app.jar;$Resources\backend\lib\*",'DependencyProbe',$Root,$Resources,$Version) 'probe'
+Run-Native "$Resources\jre\bin\java.exe" @('-Dfile.encoding=UTF-8','-Dstdout.encoding=UTF-8','-Dstderr.encoding=UTF-8','-Djava.awt.headless=true','-cp',"$Root;$Resources\backend\app.jar;$Resources\backend\lib\*",'DependencyProbe',$Root,$Resources,$Version) 'probe'
 Run-Native "$Resources\python\python.exe" @('-I','-m','venv',"$Root\dpia-venv") 'dpia-venv'
 $python = "$Root\dpia-venv\Scripts\python.exe"
 $env:PYTHONIOENCODING = 'utf-8'
