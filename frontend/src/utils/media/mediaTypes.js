@@ -7,7 +7,7 @@
 // 只有显式的 ogv 才当视频。
 
 export const PREVIEW_VIDEO_EXTENSIONS = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'm4v']
-export const PREVIEW_AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'opus']
+export const PREVIEW_AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'opus', 'qta']
 
 const MIME = {
   mp4: 'video/mp4',
@@ -24,6 +24,7 @@ const MIME = {
   flac: 'audio/flac',
   aac: 'audio/aac',
   opus: 'audio/ogg',
+  qta: 'audio/quicktime', // 容器 MIME；播放器必须先请求本机转换，不能直接播放原件。
 }
 
 function normExt(ext) {

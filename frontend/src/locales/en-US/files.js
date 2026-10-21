@@ -53,6 +53,8 @@ export default {
     showTranscript: 'Show transcript',
     hideTranscript: 'Hide transcript',
     loading: 'Loading…',
+    qtaExtractFirst: 'Extract the QTA recording into your project before opening its preview.',
+    previewTimeout: 'Audio preview preparation timed out. Close this tab and open it again.',
     playFailed: 'This file cannot be played. The codec may not be supported.',
     backToCurrent: 'Back to current',
     // Speaker prefix on the caption overlay (only with two or more speakers)

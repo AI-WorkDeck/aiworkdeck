@@ -53,6 +53,8 @@ export default {
     showTranscript: '显示逐字稿',
     hideTranscript: '隐藏逐字稿',
     loading: '加载中…',
+    qtaExtractFirst: '请先将 QTA 录音从压缩包解压到项目，再打开预览。',
+    previewTimeout: '准备音频预览超时，请关闭此标签后重新打开。',
     playFailed: '无法播放此文件，可能是编码格式不支持',
     backToCurrent: '回到当前',
     // 叠层字幕的说话人前缀（两人及以上才出现）

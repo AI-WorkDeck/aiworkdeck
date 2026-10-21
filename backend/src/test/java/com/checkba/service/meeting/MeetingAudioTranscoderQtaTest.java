@@ -76,6 +76,17 @@ class MeetingAudioTranscoderQtaTest {
         assertArrayEquals(original, Files.readAllBytes(input.toPath()));
     }
 
+    @Test void previewHonorsThreadInterruption() throws Exception {
+        File input = fixture();
+        Thread.currentThread().interrupt();
+        try {
+            assertThrows(java.util.concurrent.TimeoutException.class,
+                    () -> new MeetingAudioTranscoder().toPreviewMp3(input, workDir));
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
     @Test void prefersAacCompatibilityTrackOverFirstAudioTrack() throws Exception {
         assertConverted(fixture(), 1);
     }

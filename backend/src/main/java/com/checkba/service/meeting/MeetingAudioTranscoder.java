@@ -35,37 +35,54 @@ public class MeetingAudioTranscoder {
 
     /** 转成 mp3；失败时返回原文件（调用方按返回文件的扩展名决定 OSS objectKey）。 */
     public File toMp3(File input, Path workDir) {
+        try {
+            return convert(input, workDir, SAMPLE_RATE, BITRATE, 1, 0);
+        } catch (Throwable t) {
+            // Throwable：bytedeco 原生库缺失时抛 UnsatisfiedLinkError，不能让它穿透
+            log.warn("音频转码失败，回退原始音频: {}", t.toString());
+            return input;
+        }
+    }
+
+    /** 播放预览不得回传原 QTA；音轨选择与转写共用，预览保留双声道及较高采样率。 */
+    public File toPreviewMp3(File input, Path workDir) throws Exception {
+        return convert(input, workDir, 44100, 128_000, 2, 240_000);
+    }
+
+    private File convert(File input, Path workDir, int sampleRate, int bitrate, int maxChannels, long timeoutMs) throws Exception {
+        long started = System.nanoTime();
         File output = workDir.resolve("meeting-audio.mp3").toFile();
         try (FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(input)) {
             if (isQuickTimeAudio(input.getName())) {
                 grabber.setAudioStream(qtaAudioStream(input));
             }
             grabber.start();
+            int channels = Math.min(maxChannels, grabber.getAudioChannels());
+            if (channels < 1) throw new IllegalStateException("音频没有可播放的音轨");
             boolean recordedSamples = false;
-            try (FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(output, 1)) {
+            try (FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(output, channels)) {
                 recorder.setFormat("mp3");
                 recorder.setAudioCodec(avcodec.AV_CODEC_ID_MP3);
-                recorder.setSampleRate(SAMPLE_RATE);
-                recorder.setAudioBitrate(BITRATE);
-                recorder.setAudioChannels(1);
+                recorder.setSampleRate(sampleRate);
+                recorder.setAudioBitrate(bitrate);
+                recorder.setAudioChannels(channels);
                 recorder.start();
                 Frame frame;
                 while ((frame = grabber.grabSamples()) != null) {
+                    if (Thread.currentThread().isInterrupted()
+                            || (timeoutMs > 0 && (System.nanoTime() - started) / 1_000_000 > timeoutMs)) {
+                        throw new java.util.concurrent.TimeoutException("音频转换超时或已中断");
+                    }
                     recorder.record(frame);
                     recordedSamples = true;
                 }
                 recorder.stop();
             }
             grabber.stop();
-            if (recordedSamples && output.length() > 0) {
-                return output;
+            if (!recordedSamples || output.length() == 0) {
+                throw new IllegalStateException("音频没有可播放的内容");
             }
-            log.warn("转码产物为空，回退原始音频: {}", input.getName());
-            return input;
-        } catch (Throwable t) {
-            // Throwable：bytedeco 原生库缺失时抛 UnsatisfiedLinkError，不能让它穿透
-            log.warn("音频转码失败，回退原始音频: {}", t.toString());
-            return input;
+            return output;
         }
     }
 
