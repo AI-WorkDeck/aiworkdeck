@@ -20,7 +20,7 @@ jobs:
         run: |
           $changed = @(git diff --name-only 6f956f44a081e2e3cc07e0dfe9de1ab5ee28af2d HEAD)
           if ($LASTEXITCODE -ne 0) { throw 'Cannot compare installer source' }
-          $productChanges = @($changed | Where-Object { $_ -notmatch '^([.]github/workflows/|desktop/tests/|desktop/scripts/dependency-clean-windows/|asr-service/tests/|doc/)' })
+          $productChanges = @($changed | Where-Object { $_ -notmatch '^([.]github/workflows/|desktop/tests/|desktop/scripts/dependency-clean-windows/|asr-service/tests/|doc/|official-plugins/dpia-workbench/runtime/|official-plugins/dpia-workbench/UPSTREAM[.]md)' })
           if ($productChanges.Count) { throw "Installer payload differs: $productChanges" }
       - uses: actions/download-artifact@v4
         with:

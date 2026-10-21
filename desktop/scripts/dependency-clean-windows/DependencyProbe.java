@@ -55,6 +55,12 @@ public class DependencyProbe {
         while (!Files.exists(root.resolve("installed.ready"))) {
             check(System.nanoTime() < deadline, "Dependency installation exceeded 25 minutes"); Thread.sleep(500);
         }
+        // Diagnostic replay of the saved installer using its supported explicit path setting.
+        // The normal PR job separately tests default discovery in the rebuilt installer.
+        var configured = LibreOfficePdfConverter.class.getDeclaredField("configuredExecutable");
+        configured.setAccessible(true);
+        configured.set(lo, "C:\\Program Files\\LibreOffice\\program\\soffice.com");
+        write(root, "diagnostic-configuration.json", Map.of("explicitOfficePath", true, "defaultDiscoveryVerified", false));
         var loAfter = lo.probe();
         var installation = new LinkedHashMap<String, Object>();
         installation.put("libreoffice", loAfter);
