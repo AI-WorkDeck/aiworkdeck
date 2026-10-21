@@ -18,7 +18,7 @@ jobs:
       - name: Require identical product payload to the saved installer
         shell: pwsh
         run: |
-          $changed = @(git diff --name-only 1c0b5cb3d195b5f3283ac4e55f3e8f811f5c9743 HEAD)
+          $changed = @(git diff --name-only 5adee919f30e6bcf91f87d1271d32917c0c81968 HEAD)
           if ($LASTEXITCODE -ne 0) { throw 'Cannot compare installer source' }
           $productChanges = @($changed | Where-Object { $_ -notmatch '^([.]github/workflows/|desktop/tests/|desktop/scripts/dependency-clean-windows/|asr-service/tests/|doc/)' })
           if ($productChanges.Count) { throw "Installer payload differs: $productChanges" }
@@ -26,7 +26,7 @@ jobs:
         with:
           name: windows-pr-dependency-installer
           path: installer
-          run-id: 39547120278
+          run-id: 39549799400
           github-token: ${{ github.token }}
       # javac is preparation-only; the standard-user probe uses the installed trimmed JRE.
       - uses: actions/setup-java@v4
