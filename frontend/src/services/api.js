@@ -11,6 +11,7 @@ import { host, isDesktopHost } from '@/services/host.js'
 import { t } from '@/i18n'
 import { accountRequiredError, isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
 import { createCloudConnectivity } from '@/utils/cloudConnectivity.js'
+import { subscribeProjectFileChanges } from '@/utils/projectFileChanges.js'
 
 // Desktop account changes do not replace the local session. Invalidate only on
 // successful identity mutations, never on account-status polling.
@@ -1996,6 +1997,15 @@ export async function resolveProjectFileByPath(projectId, path) {
     if (e && e.status === 404) return null;
     throw e;
   }
+}
+
+// 本机磁盘对账完成通知，建立连接时也补读一次。
+export function subscribeLocalProjectFileChanges(projectId, onChange) {
+  return subscribeProjectFileChanges(projectId, {
+    url: `${getApiBaseUrl()}/api/projects/${encodeURIComponent(projectId)}/files/changes`,
+    getHeaders: getAuthHeaders,
+    onChange,
+  });
 }
 
 // 获取项目文件列表
