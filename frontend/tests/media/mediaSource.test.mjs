@@ -64,7 +64,7 @@ test('shouldFallbackToBlob：已回退过只触发一次；ABORTED(1)/DECODE(3)/
 
 test('扩展名表是契约值', () => {
   assert.deepEqual(PREVIEW_VIDEO_EXTENSIONS, ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'm4v'])
-  assert.deepEqual(PREVIEW_AUDIO_EXTENSIONS, ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'opus'])
+  assert.deepEqual(PREVIEW_AUDIO_EXTENSIONS, ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'opus', 'qta'])
 })
 
 test('previewKindOf：视频/音频分流，大小写与前导点不敏感', () => {
@@ -74,6 +74,7 @@ test('previewKindOf：视频/音频分流，大小写与前导点不敏感', () 
   assert.equal(previewKindOf('m4v'), 'video')
   assert.equal(previewKindOf('mp3'), 'audio')
   assert.equal(previewKindOf('Opus'), 'audio')
+  assert.equal(previewKindOf('QTA'), 'audio')
   assert.equal(previewKindOf('m4a'), 'audio')
 })
 
