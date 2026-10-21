@@ -55,7 +55,22 @@ public class DependencyProbe {
         while (!Files.exists(root.resolve("installed.ready"))) {
             check(System.nanoTime() < deadline, "Dependency installation exceeded 25 minutes"); Thread.sleep(500);
         }
-        check(lo.probe().status().equals("AVAILABLE"), "LO install did not restore production probe");
+        var loAfter = lo.probe();
+        var installation = new LinkedHashMap<String, Object>();
+        installation.put("libreoffice", loAfter);
+        installation.put("environment", System.getenv().entrySet().stream()
+                .filter(e -> e.getKey().toLowerCase(Locale.ROOT).contains("programfiles") || e.getKey().equalsIgnoreCase("ProgramW6432"))
+                .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+        Path soffice = Path.of("C:\\Program Files\\LibreOffice\\program\\soffice.exe");
+        installation.put("knownFile", Map.of("exists", Files.isRegularFile(soffice), "executable", Files.isExecutable(soffice)));
+        write(root, "installed-observed.json", installation);
+        if (!loAfter.status().equals("AVAILABLE")) {
+            for (String name : List.of("soffice.exe", "soffice.com")) {
+                try { run(root, name + "-version.log", List.of(soffice.resolveSibling(name).toString(), "--headless", "--version"), 20); }
+                catch (AssertionError | java.io.IOException diagnostic) { Files.writeString(root.resolve(name + "-failure.txt"), diagnostic.toString()); }
+            }
+            throw new AssertionError("LO install did not restore production probe: " + loAfter);
+        }
         check(tmeet.isCliAvailable(), "Node + npm tmeet install did not restore production probe");
         var auth = tmeet.getAuthStatus();
         check(!auth.isLoggedIn(), "Clean user unexpectedly has tmeet credentials");
