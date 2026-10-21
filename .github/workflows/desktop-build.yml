@@ -22,6 +22,8 @@ on:
       # requirements.lock 决定它的依赖闭包——改这里不跑桌面打包冒烟，
       # re-vendor 之类的整包替换就没有任何 CI 覆盖。
       - 'pptx-service/**'
+      - 'asr-service/**'
+      - 'kokoro-service/**'
 
 # The "Attach to GitHub Release" step (softprops/action-gh-release) creates the
 # release for a v* tag, which needs write access to repository contents. The
