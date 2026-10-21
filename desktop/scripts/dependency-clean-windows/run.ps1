@@ -82,7 +82,7 @@ try {
         ConvertTo-Json | Set-Content (Join-Path $OutDir 'installer.json')
     # Preparation uses setup-java's absolute javac, never the probe's runtime or discovery PATH.
     $classpath = "$resources\backend\app.jar;$resources\backend\lib\*"
-    & "$env:JAVA_HOME\bin\javac.exe" -encoding UTF-8 --release 17 -cp $classpath -d $root "$PSScriptRoot\DependencyProbe.java"
+    & "$env:JAVA_HOME\bin\javac.exe" -encoding UTF-8 --release 17 -cp $classpath -d $root "$PSScriptRoot\DependencyProbe.java" "$PSScriptRoot\RuntimeInstallProbe.java"
     if ($LASTEXITCODE -ne 0) { throw 'Cannot compile probe against installed production classes' }
     $config = Get-Content 'backend/src/main/resources/application.yml' -Raw
     $publicKey = [regex]::Match($config, '(?s)-----BEGIN PUBLIC KEY-----.*?-----END PUBLIC KEY-----').Value -replace '(?m)^\s+', ''
@@ -90,6 +90,16 @@ try {
     $publicKey | Set-Content "$root\public.pem" -Encoding ascii
     $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
     Copy-Item 'official-plugins/dpia-workbench' "$root\dpia-workbench" -Recurse
+    # Copy only the acceptance inputs into the standard user's writable test root.
+    # No checkout credentials, development dependencies or unrelated files are inherited.
+    foreach ($file in @('backend/src/main/resources/application.yml','desktop/package.json',
+        'desktop/main/services/model-fetch.py','desktop/main/services/model-inventory.js','desktop/main/services/pysvc-runtime.js',
+        'asr-service/app.py','asr-service/tests/real_inference.py','kokoro-service/app.py',
+        'desktop/scripts/dependency-clean-windows/model-prepare.cjs','desktop/scripts/dependency-clean-windows/real-models.ps1')) {
+        $destination = Join-Path "$root\source" $file
+        New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null
+        Copy-Item -LiteralPath $file -Destination $destination
+    }
     # Powershell child initializes the new real profile, validates the token, and drops inherited
     # overrides. A standard user cannot turn a dependency install failure into an admin success.
     @'
@@ -127,7 +137,8 @@ $after | Set-Content "$Root\dpia-after.json" -Encoding utf8
 if (@(($after | ConvertFrom-Json).checks | Where-Object { $_.status -ne 'ready' }).Count) { throw 'DPIA preparation remains incomplete' }
 $env:AWD_DPIA_TEST_PYTHON = $python
 & 'C:\Program Files\nodejs\node.exe' --test "$Root\dpia-workbench\tests\lifecycle.test.mjs" *> "$Root\dpia-lifecycle.log"
-exit $LASTEXITCODE
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& "$Root\source\desktop\scripts\dependency-clean-windows\real-models.ps1" -Resources $Resources -Repo "$Root\source" -Output "$Root\real-models" -ProbeClasses $Root *> "$Root\real-models.log"
 '@ | Set-Content "$root\probe.ps1" -Encoding utf8
     $powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
     $savedModulePath = $env:PSModulePath
@@ -163,13 +174,23 @@ exit $LASTEXITCODE
     $process = Start-Process 'C:\Program Files\nodejs\node.exe' -PassThru -ArgumentList "`"$npmCli`" install --global --prefix $root\npm --ignore-scripts @tencentcloud/tmeet@1.0.19" -RedirectStandardOutput "$root\npm-install.log" -RedirectStandardError "$root\npm-install.stderr.log"
     Wait-ProcessChecked $process 300 'Official tmeet npm installation' | Out-Null
     New-Item "$root\installed.ready" -ItemType File | Out-Null
-    Wait-ProcessChecked $child 900 'Same-process recovery, conversion, pack and DPIA execution' | Out-Null
+    Wait-ProcessChecked $child 4200 'Same-process recovery, conversion, pack, DPIA and real model inference' | Out-Null
     if (-not (Test-Path "$root\core-passed.json")) { throw 'Probe did not report completion' }
-    @{passed=$true;core='core-passed.json';dpia='dpia-lifecycle.log';standardUser=$account} | ConvertTo-Json | Set-Content "$root\passed.json"
+    if (-not (Test-Path "$root\real-models\inference\report.json")) { throw 'Real model inference report missing' }
+    @{passed=$true;core='core-passed.json';dpia='dpia-lifecycle.log';models='real-models/inference/report.json';standardUser=$account} | ConvertTo-Json | Set-Content "$root\passed.json"
 } finally {
     if ($child -and -not $child.HasExited) { & taskkill.exe /PID $child.Id /T /F | Out-Null }
     # No installations, npm packages, model archives, credentials or user profile enter artifacts.
     Get-ChildItem $root -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in @('.json','.log','.txt','.png','.pdf','.docx','.dot','.svg') } |
         Copy-Item -Destination $OutDir -Force
+    foreach ($directory in @('real-models','real-models/inference')) {
+        $source = Join-Path $root $directory
+        if (Test-Path $source) {
+            $destination = Join-Path $OutDir $directory
+            New-Item -ItemType Directory -Path $destination -Force | Out-Null
+            Get-ChildItem $source -File | Where-Object { $_.Extension -in @('.json','.log','.wav') } |
+                Copy-Item -Destination $destination -Force
+        }
+    }
     if (Get-LocalUser $account -ErrorAction SilentlyContinue) { Remove-LocalUser $account }
 }
