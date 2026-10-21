@@ -2494,6 +2494,7 @@ export default {
         uni.showModal(pdfConversionRecoveryOptions({
           error: e, items: [item], t: (key) => this.$t(key),
           openFile: (file) => this.$emit('file-open', file),
+          exportFile: (file) => { if (this.projectId === projectId) this.$emit('file-export-pdf', file) },
         }))
       } finally {
         if (typeof uni !== 'undefined' && typeof uni.hideLoading === 'function') {
@@ -2529,6 +2530,7 @@ export default {
         uni.showModal(pdfConversionRecoveryOptions({
           error: e, items, t: (key) => this.$t(key),
           openFile: (file) => this.$emit('file-open', file),
+          exportFile: (file) => { if (this.projectId === projectId) this.$emit('file-export-pdf', file) },
         }))
       } finally {
         if (typeof uni !== 'undefined' && typeof uni.hideLoading === 'function') {
