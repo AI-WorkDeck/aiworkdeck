@@ -35,6 +35,15 @@ test('existing dirty tab is activated without assigning stale file metadata or s
   assert.equal(tab.dirty, true); assert.equal(tab.filePath, '/current')
 })
 
+for (const statusKey of ['saveFailed', 'movedSaveFailed']) test(statusKey + ' still permits exporting current edits', async () => {
+  const { vm, editor, calls } = setup({ existing: true })
+  Object.assign(editor, { ready: true, dirty: true, isError: true, statusKey, docLoadFailed: false })
+  editor.retryLoad = () => { throw new Error('must not reload unsaved edits') }
+  vm._libreRefs['left:7'] = editor
+  assert.equal(await resumePdfExport(vm, file, { retry: true }), true)
+  assert.deepEqual(calls.map(c => c[0]), ['activate', 'export'])
+})
+
 test('timeout retains the target for an in-place retry', async () => {
   const { vm, editor, calls } = setup()
   assert.equal(await resumePdfExport(vm, file, { timeoutMs: 2, pollMs: 1 }), false)

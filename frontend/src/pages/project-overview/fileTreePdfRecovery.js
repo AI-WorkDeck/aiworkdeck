@@ -9,6 +9,10 @@ function targetTab(vm, file) {
   return null
 }
 
+function loadFailed(editor) {
+  return editor.docLoadFailed || (editor.isError && !['saveFailed', 'movedSaveFailed'].includes(editor.statusKey))
+}
+
 export async function resumePdfExport(vm, file, { timeoutMs = 300000, pollMs = 100, retry = false } = {}) {
   vm.cancelFileTreePdfExport()
   if (!file || file.isFolder || file.id == null) return false
@@ -28,12 +32,12 @@ export async function resumePdfExport(vm, file, { timeoutMs = 300000, pollMs = 1
     const key = target.pane + ':' + target.tab.id
     const initialEditor = vm._libreRefs?.[key]
     // Only an explicit retry may restart a failed, unmodified document load.
-    if (retry && initialEditor && (initialEditor.docLoadFailed || initialEditor.isError) && !initialEditor.dirty) initialEditor.retryLoad?.()
+    if (retry && initialEditor && loadFailed(initialEditor) && !initialEditor.dirty) initialEditor.retryLoad?.()
     const deadline = Date.now() + timeoutMs
     while (current()) {
       const editor = vm._libreRefs?.[key]
       if (editor && String(editor.file?.id) === String(file.id)) {
-        if (editor.docLoadFailed || editor.isError || ['desktopOnly', 'unsupported'].includes(editor.statusKey)) throw new Error('editor failed')
+        if (loadFailed(editor) || ['desktopOnly', 'unsupported'].includes(editor.statusKey)) throw new Error('editor failed')
         if (editor.ready && editor.executor && !editor._reloading && !editor.loadingOverlayVisible) {
           const executor = editor.executor
           const stillCurrent = () => current() && vm._libreRefs?.[key] === editor && editor.executor === executor && String(editor.file?.id) === String(file.id)
