@@ -84,7 +84,7 @@ try {
        standardUser=$true; resources=$Resources; source=$Repo } |
        ConvertTo-Json | Set-Content (Join-Path $Output 'installed-inputs.json') -Encoding utf8
     Run-Checked $java @('-Dfile.encoding=UTF-8',"-Duser.home=$Output\home",'-cp',"$ProbeClasses;$Resources\backend\app.jar;$Resources\backend\lib\*",'RuntimeInstallProbe',$Output,"$Output\public.pem",$version) 'runtime-install' 3600
-    Run-Checked $Node @((Join-Path $PSScriptRoot 'model-prepare.cjs'),$Resources,$Repo,$Output) 'model-prepare' 2400
+    Run-Checked $Node @((Join-Path $PSScriptRoot 'model-prepare.cjs'),$Resources,$Repo,$Output) 'model-prepare' 3000
     $runtimes = Get-Content (Join-Path $Output 'runtime-install.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     $asr = @($runtimes.packs | Where-Object id -eq 'asr-runtime')[0]
     $kokoro = @($runtimes.packs | Where-Object id -eq 'kokoro-runtime')[0]

@@ -18,10 +18,17 @@ def office():
         return configured if Path(configured).is_file() else None
     if sys.platform == 'win32':
         # The Windows GUI launcher can hang without an interactive desktop;
-        # LibreOffice provides .com specifically for command-line use.
-        program = Path(os.environ.get('PROGRAMFILES', 'C:/Program Files')) / 'LibreOffice/program'
-        return shutil.which('soffice.com') or next((str(program / name)
-            for name in ('soffice.com', 'soffice.exe') if (program / name).is_file()), None) or shutil.which('soffice')
+        # prefer .com within each PATH directory, matching DpiaEnvironment.
+        binaries = ('soffice.com', 'soffice.exe')
+        for part in os.environ.get('PATH', os.environ.get('Path', '')).split(';'):
+            if not part.strip():
+                continue
+            for name in binaries:
+                candidate = Path(part.strip('"')) / name
+                if candidate.is_file() and os.access(candidate, os.X_OK):
+                    return str(candidate)
+        program = Path(os.environ.get('PROGRAMFILES', os.environ.get('ProgramFiles', 'C:/Program Files'))) / 'LibreOffice/program'
+        return next((str(program / name) for name in binaries if (program / name).is_file()), None)
     return shutil.which('soffice') or next((str(p) for p in [
         Path('/Applications/LibreOffice.app/Contents/MacOS/soffice'),
     ] if p.is_file()), None)
