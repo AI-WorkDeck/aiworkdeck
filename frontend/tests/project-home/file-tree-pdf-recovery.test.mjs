@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { pdfConversionRecoveryOptions } from '../../src/utils/fileTreePdfActions.js'
 const source = readFileSync(new URL('../../src/components/FileTree.vue', import.meta.url), 'utf8')
 
-test('failed Office conversion shows persistent recovery and opens the original through existing event', async () => {
+test('failed Office conversion shows persistent recovery and continues built-in PDF export through a dedicated event', async () => {
   const body = source.match(/    async handleContextConvertToPdf\(\) \{\n([\s\S]*?)\n    \},/)[1]
   let modal, toasts = [], emitted = []
   const item = { id: 7, name: '合同.docx', fileType: 'docx' }
@@ -19,7 +19,7 @@ test('failed Office conversion shows persistent recovery and opens the original 
   assert.match(modal.content, /LibreOffice unavailable/)
   assert.match(modal.content, /pdfRecoveryExport/)
   modal.success({ confirm: false }); assert.deepEqual(emitted, [])
-  modal.success({ confirm: true }); assert.deepEqual(emitted, [['file-open', item]])
+  modal.success({ confirm: true }); assert.deepEqual(emitted, [['file-export-pdf', item]])
 })
 
 test('mixed merge recovery explicitly asks for individual export, never silently starts another conversion', () => {

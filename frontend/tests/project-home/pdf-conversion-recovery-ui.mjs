@@ -48,16 +48,60 @@ try {
   await page.waitForSelector('.awd-dlg', { visible: true })
   const content = await page.$eval('.awd-dlg', el => el.textContent)
   assert.match(content, /未找到可用的 LibreOffice/)
-  assert.match(content, /在内置编辑器中打开/)
+  assert.match(content, /使用内置引擎导出 PDF/)
   await new Promise(resolve => setTimeout(resolve, 3500))
   assert.ok(await page.$('.awd-dlg'), 'error remains visible after the old toast timeout')
   await page.screenshot({ path: out + '/01-missing-libreoffice.png' })
   await page.click('.awd-dlg__confirm')
   await page.waitForFunction(() => [...document.querySelectorAll('.tab-item')].some(el => el.textContent.includes('合成合同.docx')))
-  await page.screenshot({ path: out + '/02-opened-in-editor.png' })
+  await page.waitForFunction(() => {
+    let instance = document.querySelector('.page-project-overview')?.__vueParentComponent
+    while (instance) {
+      if (instance.proxy?._libreRefs?.['left:1385']) { window.__pdfVm = instance.proxy; return true }
+      instance = instance.parent
+    }
+    return false
+  })
+  // Real mounted editor + actual exportPdf method, synthetic engine bytes/desktop download events.
+  await page.evaluate(() => {
+    const vm = window.__pdfVm, ed = vm._libreRefs['left:1385']
+    window.__pdfNeedsRetry = vm.pdfRecovery?.phase === 'failed'
+    window.__pdfDownloads = []; window.__pdfCommands = []; window.__pdfDone = []
+    window.checkbaDesktop = { fs: {
+      onDownloadDone(fn) { window.__pdfDone.push(fn); return () => { window.__pdfDone = window.__pdfDone.filter(x => x !== fn) } },
+    } }
+    const click = HTMLAnchorElement.prototype.click
+    HTMLAnchorElement.prototype.click = function () {
+      if (this.download.endsWith('.pdf')) window.__pdfDownloads.push(this.download)
+      else click.call(this)
+    }
+    ed.executor = { executeCommand: async action => { window.__pdfCommands.push(action); return { success: true, bytes: new Uint8Array([37,80,68,70]) } } }
+    ed.docLoadFailed = false; ed.statusKey = 'ready'; ed.ready = true
+  })
+  if (await page.evaluate(() => window.__pdfNeedsRetry)) await page.click('.pdf-export-recovery .restart-recovery-action')
+  await page.waitForFunction(() => window.__pdfDownloads.length === 1)
+  assert.deepEqual(await page.evaluate(() => window.__pdfCommands.filter(x => x === 'export_pdf')), ['export_pdf'])
+  assert.equal(await page.evaluate(() => window.__pdfDone.length), 1, 'download completion is still pending')
+  assert.equal(await page.evaluate(() => document.body.textContent.includes('已导出')), false)
+  await page.screenshot({ path: out + '/02-export-awaiting-save.png' })
+  await page.evaluate(() => window.__pdfDone.forEach(fn => fn({ filename: '合成合同.pdf', state: 'completed', savePath: '/synthetic/合成合同.pdf' })))
+  await page.waitForFunction(() => document.body.textContent.includes('已导出'))
+  await page.screenshot({ path: out + '/03-download-complete.png' })
+  await page.evaluate(() => {
+    const vm = window.__pdfVm, ed = vm._libreRefs['left:1385']
+    ed.ready = false; ed.statusKey = 'openingDoc'
+    vm.handleFileTreePdfExport(vm.leftFiles.find(f => f.id === 1385))
+  })
+  await page.waitForSelector('.pdf-export-recovery', { visible: true })
+  const cancel = await page.$$('.pdf-export-recovery .restart-recovery-action')
+  await cancel[cancel.length - 1].click()
+  await page.evaluate(() => { const ed = window.__pdfVm._libreRefs['left:1385']; ed.statusKey = 'ready'; ed.ready = true })
+  await new Promise(resolve => setTimeout(resolve, 200))
+  assert.equal(await page.evaluate(() => window.__pdfDownloads.length), 1, 'cancelled readiness must not export later')
+  assert.equal(await page.evaluate(() => window.__pdfVm.leftFiles.filter(f => f.id === 1385).length), 1, 'reuse tab without duplicates')
   assert.equal(requests.filter(r => r.path.endsWith('/convert-pdf') && r.method === 'POST').length, 1)
   assert.equal(requests.filter(r => r.path.includes('/upload')).length, 0)
-  fs.writeFileSync(out + '/report.json', JSON.stringify({ checks: ['real context menu conversion', 'persistent actionable error', 'normal file-open route', 'no save/overwrite'], errors, requests }, null, 2))
+  fs.writeFileSync(out + '/report.json', JSON.stringify({ checks: ['real context menu conversion', 'persistent actionable error', 'normal file-open route', 'mounted editor auto export with synthetic engine bytes', 'success only on download-done', 'cancel blocks late export and keeps tab', 'no save/overwrite'], errors, requests }, null, 2))
 } catch (e) {
   await page.screenshot({ path: out + '/failure.png' }); fs.writeFileSync(out + '/failure.html', await page.content()); fs.writeFileSync(out + '/failure.json', JSON.stringify({ requests, errors }, null, 2)); throw e
 } finally { await browser.close() }

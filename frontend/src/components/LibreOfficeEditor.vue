@@ -927,7 +927,9 @@ export default {
     // 引擎在 WASM 里起不来文件选择器，派发静默结束；worker 拦下这两条命令转成
     // export-pdf-request，这里取 PDF 字节走应用自己的下载链路（与脱敏复敏包同一条：
     // blob + a[download]，桌面主进程接管成「另存为」），成功失败都有提示。
-    async exportPdf() {
+    async exportPdf(options = {}) {
+      const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true
+      if (!isCurrent()) return false
       if (this._pdfExporting) return
       if (!this.executor || !this.ready) return
       this._pdfExporting = true
@@ -941,15 +943,18 @@ export default {
         try {
           const r = await getFileLocalPath(this.file.id)
           const abs = r && r.data && r.data.path
+          if (!isCurrent()) { this._pdfExporting = false; return false }
           if (abs) await host.fs.setNextExportSource(String(abs))
         } catch (e) { /* 拿不到就让它退回系统默认目录，不阻塞导出 */ }
       }
+      if (!isCurrent()) { this._pdfExporting = false; return false }
       try { uni.showLoading({ title: this.$t('editor.pdfExporting'), mask: false }) } catch (e) { /* ignore */ }
       let res = null, reason = ''
       try { res = await this.executor.executeCommand('export_pdf', {}) }
       catch (e) { reason = (e && e.message) || String(e) }
       try { uni.hideLoading() } catch (e) { /* ignore */ }
       this._pdfExporting = false
+      if (!isCurrent()) return false
       // 字节经 relay 两跳结构化克隆后形态不定，同 saveDocument 的归一
       const raw = res && res.success ? res.bytes : null
       let bytes = null
