@@ -1468,3 +1468,16 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 `restartRecovery.js` 只在桌面冷启动且没有外部打开意图时自动接续一个安全检查点；先导航原项目，等待项目资料/标签快照，再打开原会话和文件。Office 文件必须由相同 fileId 的 LOWA 实例与 executor 报 ready，预览或加载失败不算就绪。其余待恢复任务保留提示条供选择，不轮流切换用户编辑器。用户导航、指针/键盘操作、账户变化和外部打开取消迟到恢复。
 
 `App.vue` 的宿主退出回调先取消启动恢复，经 `desktopQuitGuard.js` 等后端安全暂停，再对所有已注册工作台执行 `flushDirtyEditors` 与标签快照。保存失败或退出取消恢复原任务；恢复条件已变时保留检查点并明确提示。成功 ACK 后保持输入遮罩直到主进程隐藏窗口，只有主进程确认取消才解除退出屏障。正常退出契约与安装边界见 ai-chat.md / eng-infra.md。回归为 desktop-quit(-app)、restart-recovery、restart-resume；合成行为测试不代替正式安装包与真实 LOWA 跨升级验收。
+
+
+## 多选移动与磁盘状态刷新（dev-board#1381/#1383）
+
+`FileTree.handleDragStart` 固定完整选区；内部节点/根目录落点的多选使用 `batchMoveFiles`，文件夹及其选中子孙折叠为最上层，禁止整组移入选中文件夹或后代，同父条目不重复搬动。原地判定按文件 id，不能比较可能已被后台刷新重排的行下标。旧移动请求不得清除新拖拽的选区/状态（`dragSequence`）。
+
+文件树刷新按请求序号只接收最新响应，刷新开始与完成均失效原生拖出路径缓存；`fileLocalDrag` 的预取回填/清理须核对 Promise 身份，避免旧路径在清除后被迟到响应重新写回。宿主 `not-found` 回执仅失效本次仍匹配的缓存路径。不能靠一分钟 TTL 等待恢复。
+
+桌面文件树挂载时经 `services/api.subscribeLocalProjectFileChanges` 订阅本机项目 `/api/projects/{id}/files/changes`。`ready` 补读，`files_changed` 在 watcher 对账返回后重读，心跳不拉树；切项目/卸载清理旧订阅，旧项目事件不刷新当前树。后端只在 local-mode、项目有 localRoot、具备读取权限且非客户端成员时开放；长连接排除 OSIV，发送前再次校验权限。具体流契约见 version-control.md。
+
+单文件同目录排序最终会走 `ProjectFileService.movePhysicalFile`，旧新路径相同时必须直接返回，保留排序元数据更新；否则“复制再删除”会删除自身。回归必须使用真实 `LocalFileStorageService` 与临时文件核对字节，存储 mock 无法发现该问题。
+
+验证：`npm --prefix frontend run test:project-home`、`ProjectFileMovePhysicalTest`、`LocalRootWatchNotificationTest`、`LocalProjectFileChangeControllerTest`、`LocalProjectFileChangeOsivTest`。浏览器组件夹具不等于正式 Electron/Finder 原生拖放验收。

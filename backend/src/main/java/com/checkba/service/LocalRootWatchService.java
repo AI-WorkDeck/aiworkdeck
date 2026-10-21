@@ -66,6 +66,7 @@ public class LocalRootWatchService {
 
     private final ProjectRepository projectRepository;
     private final LocalProjectService localProjectService;
+    private final LocalProjectFileChangeService fileChanges;
 
     private final Map<Long, DirectoryWatcher> watchers = new ConcurrentHashMap<>();
     private final Map<Long, ScheduledFuture<?>> pending = new ConcurrentHashMap<>();
@@ -84,9 +85,11 @@ public class LocalRootWatchService {
     });
 
     public LocalRootWatchService(ProjectRepository projectRepository,
-                                 LocalProjectService localProjectService) {
+                                 LocalProjectService localProjectService,
+                                 LocalProjectFileChangeService fileChanges) {
         this.projectRepository = projectRepository;
         this.localProjectService = localProjectService;
+        this.fileChanges = fileChanges;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -186,6 +189,8 @@ public class LocalRootWatchService {
             pending.remove(projectId);
             try {
                 LocalProjectService.ReconcileResult r = localProjectService.reconcileProject(projectId);
+                // 独立事务已提交、整轮对账结束后才通知，避免文件树读到搬移的中间态。
+                if (r.changed() > 0) fileChanges.filesChanged(projectId);
                 if (r.rootMissing()) {
                     // 文件夹被移走/外置盘拔出：停监听，等下次打开项目时重新建立
                     stopWatch(projectId);

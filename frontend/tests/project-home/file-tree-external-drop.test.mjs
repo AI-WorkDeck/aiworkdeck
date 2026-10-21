@@ -28,17 +28,20 @@ import {
 } from '../../src/utils/fileTreeExternalDrop.js'
 import {
   prefetchLocalFilePath,
+  cacheLocalFilePath,
+  getCachedLocalFilePath,
   startExternalFileDrag,
   clearLocalPathCache,
   installExternalDragCleanup,
 } from '../../src/utils/fileLocalDrag.js'
+import { collapseToTopmostSelected } from '../../src/utils/fileTreeRecycle.js'
 
 const SRC = readFileSync(new URL('../../src/components/FileTree.vue', import.meta.url), 'utf8')
 
 // <script> 里的 import 有单行也有多行块（api.js 那组 tag 接口），一并剥掉；
 // 被引用的符号全部由 new Function 的形参喂桩。
 const IMPORT_NAMES = [
-  'getProjectFiles', 'createFolder', 'createFile', 'renameFile', 'deleteFile', 'deleteFilePerm',
+  'isDesktopHost', 'subscribeLocalProjectFileChanges', 'getProjectFiles', 'createFolder', 'createFile', 'renameFile', 'deleteFile', 'deleteFilePerm',
   'getFilePermDiskPaths', 'restoreFileApi', 'getRecycleBinFiles', 'moveFile', 'batchDeleteFiles', 'batchMoveFiles',
   'batchCopyFiles', 'getApiBaseUrl', 'getContributedTemplates', 'createFileFromContributedTemplate',
   'getSessionId', 'getAuthHeaders', 'getFileLocalPath', 'host', 'findTopmostDeletedAncestor', 'summarizeDeleteResults',
@@ -49,7 +52,7 @@ const IMPORT_NAMES = [
   'createTag', 'createTask', 'importLocalFile', 'getProjectFileAccess', 'updateProjectFileAccess',
   'isArchiveEntryDrag', 'readArchiveEntryDrag', 'importArchiveEntry',
   'nativeEvent', 'nativeDataTransfer', 'isExternalFileDrag', 'compatibleDropEffect', 'claimExternalDrop', 'captureDroppedFiles', 'importDroppedFile',
-  'prefetchLocalFilePath', 'startExternalFileDrag',
+  'prefetchLocalFilePath', 'startExternalFileDrag', 'clearLocalPathCache',
 ]
 
 function loadOptions(stubs) {
@@ -63,10 +66,12 @@ function loadOptions(stubs) {
 
 // desktopPaths: File 对象 → 本机绝对路径的映射（桌面壳 host.fs.getPathForFile 的桩）。
 // 不传 = 浏览器态，host.fs 整个缺席，一条都导不进去。
-function makeVm({ moveFile, createFolder, desktopPaths, desktopFs, importLocalFails, getFileLocalPath } = {}) {
-  const calls = { moveFile: [], importLocal: [], loadFiles: 0, emits: [], toasts: [] }
+function makeVm({ moveFile, batchMoveFiles, createFolder, desktopPaths, desktopFs, importLocalFails, getFileLocalPath } = {}) {
+  const calls = { moveFile: [], batchMoveFiles: [], importLocal: [], loadFiles: 0, emits: [], toasts: [] }
   const stubs = {
     moveFile: async (...a) => { calls.moveFile.push(a); return { parentId: a[2] } },
+    batchMoveFiles: batchMoveFiles || (async (...a) => { calls.batchMoveFiles.push(a); return { data: { files: a[1].map(id => ({ id, parentId: a[2] })) } } }),
+    collapseToTopmostSelected, clearLocalPathCache,
     createFolder: createFolder || (async () => ({ id: 999 })),
     ICONS: {},
     getApiBaseUrl: () => 'http://127.0.0.1:5269',
@@ -793,4 +798,183 @@ test('#1307 late native failure from the previous drag cannot clean the new drag
   assert.ok(win.listeners.has('mousemove'))
   win.fire('mousemove', { buttons: 0 })
   assert.equal(newCleaned, 1)
+})
+
+
+// #1381: the native handoff and an internal folder drop must use the same selection.
+for (const selectionMode of [false, true]) {
+  for (const root of [false, true]) {
+    test(`#1381 multi-selection moves both files (${selectionMode ? 'checkbox' : 'Cmd'}, ${root ? 'root' : 'folder'})`, async () => {
+      const restore = installGlobals()
+      try {
+        const vm = makeVm()
+        const a = { id: 801, name: '甲.txt', parentId: 9 }
+        const b = { id: 802, name: '乙.txt', parentId: 9 }
+        vm.files = vm.allFiles = vm.displayFiles = vm.windowedDisplayFiles = [a, b, folder]
+        vm.selectionMode = selectionMode
+        vm.multiSelectedIds = [801, 802]
+        vm.checkedMap = { 801: true, 802: true }
+        Object.defineProperty(vm, 'checkedIds', { get: () => Object.keys(vm.checkedMap).filter(id => vm.checkedMap[id]).map(Number) })
+        vm.handleDragStart(wrappedEvent(), a, 0)
+        // Background selection changes must not change the drag that is already in flight.
+        vm.multiSelectedIds = [801]
+        if (root) await vm.onRootDrop(wrappedEvent()); else await vm.handleDrop(wrappedEvent(), 2)
+        assert.deepEqual(vm.calls.batchMoveFiles, [[42, [801, 802], root ? null : 7]])
+        assert.deepEqual(vm.calls.moveFile, [])
+        assert.equal(vm.calls.loadFiles, 1)
+        assert.deepEqual(vm.multiSelectedIds, [])
+        assert.deepEqual(vm.checkedMap, {})
+      } finally { restore() }
+    })
+  }
+}
+
+test('#1381 folder plus selected descendants moves the folder once and never into itself', async () => {
+  const restore = installGlobals()
+  try {
+    const vm = makeVm()
+    const child = { id: 801, parentId: folder.id }
+    const target = { id: 9, isFolder: true, parentId: null }
+    vm.files = vm.allFiles = vm.displayFiles = vm.windowedDisplayFiles = [folder, child, target]
+    vm.multiSelectedIds = [folder.id, child.id]
+    vm.handleDragStart(wrappedEvent(), folder, 0)
+    await vm.handleDrop(wrappedEvent(), 2)
+    assert.deepEqual(vm.calls.batchMoveFiles, [[42, [folder.id], 9]])
+    vm.multiSelectedIds = [folder.id, child.id]
+    vm.handleDragStart(wrappedEvent(), folder, 0)
+    await vm.handleDrop(wrappedEvent(), 1)
+    assert.equal(vm.calls.batchMoveFiles.length, 1, 'must reject destination under a selected folder')
+  } finally { restore() }
+})
+
+test('#1381 partial move response reports occupied and reloads, rejected batch also reloads', async () => {
+  const restore = installGlobals()
+  try {
+    for (const reject of [false, true]) {
+      const vm = makeVm({ batchMoveFiles: async () => {
+        if (reject) throw new Error('move failed')
+        return { data: { files: [{ id: 801, parentId: 7 }, { id: 802, parentId: null }] } }
+      } })
+      const a = { id: 801, parentId: null }, b = { id: 802, parentId: null }
+      vm.files = vm.allFiles = vm.displayFiles = vm.windowedDisplayFiles = [a, b, folder]
+      vm.multiSelectedIds = [801, 802]
+      vm.handleDragStart(wrappedEvent(), a, 0)
+      await vm.handleDrop(wrappedEvent(), 2)
+      assert.equal(vm.calls.loadFiles, 1)
+      assert.ok(!vm.calls.toasts.includes('fileTree.moveSuccess'))
+      assert.equal(vm.draggedIndex, -1)
+    }
+  } finally { restore() }
+})
+
+test('#1381 reload invalidates drag paths and ignores a late pre-move listing', async () => {
+  const restore = installGlobals()
+  try {
+    const pending = []
+    const options = loadOptions({ ICONS: {}, clearLocalPathCache,
+      getProjectFiles: () => new Promise(resolve => pending.push(resolve)),
+    })
+    const vm = { ...options.data(), projectId: 42, parentId: null, showTree: false,
+      $t: key => key, scheduleRefCountsFetch() {},
+    }
+    const load = options.methods.loadFiles.bind(vm)
+    cacheLocalFilePath(801, '/old/甲.txt')
+    const oldLoad = load()
+    const newLoad = load()
+    pending[1]([{ id: 801, name: '甲.txt', parentId: 7 }])
+    await newLoad
+    assert.equal(getCachedLocalFilePath(801), '', 'refreshed listing cannot keep pre-move native paths')
+    pending[0]([{ id: 801, name: '甲.txt', parentId: null }])
+    await oldLoad
+    assert.equal(vm.files[0].parentId, 7, 'late old response must not resurrect old parent')
+  } finally { clearLocalPathCache(); restore() }
+})
+
+test('#1381 reordering the tree during a drag cannot mistake the destination for the old source index', async () => {
+  const restore = installGlobals()
+  try {
+    const vm = makeVm()
+    const a = { id: 801, parentId: null }, b = { id: 802, parentId: null }
+    vm.files = vm.allFiles = vm.displayFiles = vm.windowedDisplayFiles = [a, b, folder]
+    vm.multiSelectedIds = [801, 802]
+    vm.handleDragStart(wrappedEvent(), a, 0)
+    // An intervening file-tree refresh places the target at the drag's original index.
+    vm.files = vm.allFiles = vm.displayFiles = vm.windowedDisplayFiles = [folder, a, b]
+    await vm.handleDrop(wrappedEvent(), 0)
+    assert.deepEqual(vm.calls.batchMoveFiles, [[42, [801, 802], folder.id]])
+    assert.deepEqual(vm.calls.moveFile, [])
+    assert.equal(vm.calls.loadFiles, 1)
+  } finally { restore() }
+})
+
+test('#1381 a previous batch settling after a new drag starts preserves the new selection and drag', async () => {
+  const restore = installGlobals()
+  try {
+    for (const reject of [false, true]) {
+      let resolveFirst, rejectFirst
+      const batches = []
+      const vm = makeVm({ batchMoveFiles: (...args) => {
+        batches.push(args)
+        if (batches.length === 1) return new Promise((resolve, reject) => {
+          resolveFirst = resolve
+          rejectFirst = reject
+        })
+        return Promise.resolve({ data: { files: args[1].map(id => ({ id, parentId: args[2] })) } })
+      } })
+      const a = { id: 801, parentId: null }, b = { id: 802, parentId: null }
+      const c = { id: 803, parentId: null }, d = { id: 804, parentId: null }
+      vm.files = vm.allFiles = vm.displayFiles = vm.windowedDisplayFiles = [a, b, folder, c, d]
+      vm.multiSelectedIds = [801, 802]
+      vm.handleDragStart(wrappedEvent(), a, 0)
+      const firstDrop = vm.handleDrop(wrappedEvent(), 2)
+      vm.handleDragEnd()
+      vm.multiSelectedIds = [803, 804]
+      vm.checkedMap = { 803: true, 804: true }
+      vm.handleDragStart(wrappedEvent(), c, 3)
+      if (reject) rejectFirst(new Error('previous batch failed'))
+      else resolveFirst({ data: { files: [{ id: 801, parentId: folder.id }, { id: 802, parentId: folder.id }] } })
+      await firstDrop
+      assert.deepEqual(vm.draggedFileIds, [803, 804])
+      assert.equal(vm.draggedFileId, 803)
+      assert.equal(vm.draggedIndex, 3)
+      assert.deepEqual(vm.multiSelectedIds, [803, 804])
+      assert.deepEqual(vm.checkedMap, { 803: true, 804: true })
+      await vm.handleDrop(wrappedEvent(), 2)
+      assert.deepEqual(batches, [[42, [801, 802], folder.id], [42, [803, 804], folder.id]])
+      assert.equal(vm.calls.loadFiles, 2)
+    }
+  } finally { restore() }
+})
+
+
+test('#1381 local change subscription follows mount, project switch and unmount', async () => {
+  const restore = installGlobals()
+  try {
+    const subscriptions = [], stopped = [], reloads = []
+    const options = loadOptions({ isDesktopHost: () => true, ICONS: {},
+      subscribeLocalProjectFileChanges: (id, onChange) => {
+        subscriptions.push({ id, onChange }); return () => stopped.push(id)
+      },
+    })
+    const vm = { ...options.data(), projectId: 42, loadFiles: () => reloads.push(vm.projectId) }
+    Object.assign(vm, options.methods)
+    vm.loadFiles = () => reloads.push(vm.projectId)
+    vm.subscribeLocalFileChanges()
+    assert.equal(subscriptions.length, 0, 'immediate project watcher waits for mount')
+    vm._fileChangesMounted = true
+    vm.subscribeLocalFileChanges()
+    subscriptions[0].onChange()
+    assert.deepEqual(reloads, [42])
+    vm.projectId = 43
+    vm.subscribeLocalFileChanges()
+    assert.deepEqual(stopped, [42])
+    subscriptions[0].onChange()
+    subscriptions[1].onChange()
+    assert.deepEqual(reloads, [42, 43], 'old project events cannot reload the current project')
+    window.removeEventListener = () => {}
+    options.beforeUnmount.call(vm)
+    subscriptions[1].onChange()
+    assert.deepEqual(stopped, [42, 43])
+    assert.deepEqual(reloads, [42, 43])
+  } finally { restore() }
 })
