@@ -18,8 +18,9 @@ function run(args, env, log) {
     const child = spawn(python, args, { env, cwd: root, stdio: ['ignore', fd, fd], windowsHide: true })
     fs.closeSync(fd)
     let timedOut = false
-    // Four source attempts fit within the Windows job's forty-minute preparation budget.
-    const timer = setTimeout(() => { timedOut = true; child.kill() }, 9 * 60 * 1000)
+    // A 1.5 GB model can take more than nine minutes while steadily progressing.
+    // Bound each source separately; real-models.ps1 also caps total preparation.
+    const timer = setTimeout(() => { timedOut = true; child.kill() }, 20 * 60 * 1000)
     child.once('error', error => { clearTimeout(timer); reject(error) })
     child.once('close', code => { clearTimeout(timer); resolve({ code, timedOut }) })
   })
