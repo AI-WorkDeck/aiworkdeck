@@ -530,7 +530,7 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
      → 起跑时存进 `RunGuard.unusableTools` → **在编排器里**做最后一道过滤（与 skill 白名单、
      ASK 只读记忆工具同一处；**刻意不放进 ToolRegistry**：那里多一个重载会让只 stub 了旧重载的
      Mockito 测试静默拿到空工具集，本次就踩了两个）。
-     与 `isAvailable()` 的分工：那个是**进程级**的（@PostConstruct 探一次，如本机有没有 Docker），
+     与 `isAvailable()` 的分工：那个是**组件级**的（新轮读取短缓存，如本机 Docker 是否可用），
      这个是**运行期**的（账户随时可连可断）；粒度也不同，这个按工具名——同一组件里常常一半要账户、
      一半是纯本地的（`WebTools` 的 search_web 要、browse_url 不要；`LegalTools` 的 law_* 要、
      read_document 不要），**连坐的表现是「模型以为它连文件都读不了」**。
@@ -739,9 +739,9 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
     **`RealToolBeans` 的清单必须齐全**：CheckpointTools 与 SlideEditTools 长期漏列，
     于是针对它们的 `offeredToolsExclude` 全是空断言（工具名没注册，排除断言恒过）——
     已于 dev-board#729 补齐，`EvalToolBeanParityTest.KNOWN_MISSING` 现在是空集，别再往里加名字。
-- **组件级可用性闸（dev-board#396）**：`AgentToolComponent.isAvailable()`（default true）。返回 false 的组件**仍然登记进 builtinTools**（resolve/execute 照常命中），但**它的 spec 不进 builtinSpecifications**——模型看不见即不会去试，而万一被 XML 兜底路径调到，拿到的是工具自己那句可行动的错误（远好过 "tool not found"）。探测在 `ToolRegistry.init` 的 @PostConstruct 上跑，所以实现**必须自己缓存且绝不抛异常**（抛了也被 `componentAvailable` 兜成"可用"，最坏多下发一个工具，但不许让后端起不来）。今天唯一的使用者是 `PythonTools`：`run_python` 无条件 `docker run python:3.9-slim`，判据是「docker 可执行文件在 **且** `docker version` 成功」（Docker Desktop 装了没开的机器上 CLI 在、守护进程不在，run 一样起不来），3 秒超时、输出 DISCARD（接了管道又不读会把子进程卡在 write 上）、**进程级**缓存（不是每实例一份：eval 里每个 harness 都会新建一个 PythonTools，逐个 fork docker 子进程会把测试拖慢几分钟）。护栏 `ToolRegistryAvailabilityTest` / `PythonToolsDockerGateTest`。
+- **组件级可用性闸（dev-board#396/#1388）**：`AgentToolComponent.isAvailable()`（default true）。所有 eligible 规格保留登记，`ToolRegistry.getAllSpecifications()` 在每轮读取时按组件当前状态过滤，同一组件每轮只查一次；`offerToModel=false` 仍不下发，resolve/execute 仍可命中。`PythonTools` 检测 Docker CLI 与 daemon，探测最多 3 秒、输出 DISCARD、30 秒缓存；设置页 `refreshDockerStatus()` 强制重检。安装/启动 Docker 后无需重启后端即可恢复工具下发，真正执行使用探测同一可执行文件，不退回宿主 Python。护栏 `ToolRegistryAvailabilityTest` / `PythonToolsDockerGateTest` / `PythonToolsDockerProbeTest`。
 - **永久不下发的工具（dev-board#799，审计 A15）**：`@ToolMeta(offerToModel = false)`。与
-  `isAvailable()`（**进程级**，本机有没有 Docker）和 `currentlyUnusableTools()`（**运行期**，
+  `isAvailable()`（**组件级**，本机 Docker 当前是否可用）和 `currentlyUnusableTools()`（**运行期**，
   账户连没连）同一口径——**只裁 spec、不裁 resolve/execute**，但这一个是**永久的**：工具本身
   已经停用或者压根不该出现在律师面前，与环境无关，所以写成声明而不是每次现算。
   最早的两个使用者：`delete_file`（永久停用，实现就是一句拒绝；每轮白付一份 schema，而且用户说

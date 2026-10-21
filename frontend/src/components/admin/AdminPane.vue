@@ -588,6 +588,7 @@
                 </view>
               </view>
           </SettingsSection>
+          <ExternalDependenciesPanel />
         </scroll-view>
 
         <!-- 软件更新（仅桌面端）：后台准备，安全退出后安装。 -->
@@ -1008,6 +1009,7 @@ import PersonalTodosPanel from '@/components/userprofile/PersonalTodosPanel.vue'
 import PersonalSettingsPanel from '@/components/userprofile/PersonalSettingsPanel.vue'
 import TeamPanel from '@/components/admin/TeamPanel.vue'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
+import ExternalDependenciesPanel from '@/components/admin/ExternalDependenciesPanel.vue'
 import MemoryBrowser from '@/components/MemoryBrowser.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
@@ -1042,7 +1044,7 @@ export default {
   components: {
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
-    TeamPanel, OptionalComponentCard, MemoryBrowser,
+    TeamPanel, OptionalComponentCard, MemoryBrowser, ExternalDependenciesPanel,
     SettingsSection, SettingsRow,
   },
   /**
