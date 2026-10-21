@@ -14,6 +14,18 @@ export function captureChatTimeline(bubble) {
     cursors.set(toRaw(bubble), cursor)
   }
   const entries = bubble.timeline
+  const contentEnd = (bubble.content || '').length
+  if (contentEnd < cursor.textEnd) {
+    // Editor placeholders are removed before the final reply. Retire their slices
+    // and rewind the text cursor so even a shorter reply gets its own position.
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (entries[i].type !== 'text') continue
+      if (entries[i].start >= contentEnd) entries.splice(i, 1)
+      else entries[i].end = Math.min(entries[i].end, contentEnd)
+    }
+    cursor.textEnd = contentEnd
+    if (cursor.plan !== null) cursor.plan = entries.findIndex(entry => entry.type === 'plan')
+  }
   const thought = bubble.thinking
   if (thought && (thought.content || thought.status === 'thinking') && cursor.thinking !== toRaw(thought)) {
     entries.push({ type: 'thinking', data: thought })

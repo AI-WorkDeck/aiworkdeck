@@ -294,6 +294,8 @@ public class AgentOrchestrator {
         int llmRetries;
         // 截断/未闭合 <tool_code> 的纠正轮次数（防纠正本身进入死循环）
         int malformedToolRounds;
+        // One tool-free completion round after a document stream omitted its chat summary.
+        boolean documentSummaryOnly;
         // 上下文溢出后的强制压缩重试次数（每个成功完成的轮次清零；上限 1，压不动就终态）
         int overflowCompactions;
         // 当前活跃文档 ID（来自 activeContext 或 doc_open_file），用于修改前自动创建检查点
@@ -850,6 +852,7 @@ public class AgentOrchestrator {
 
         // A new submission has its own consent. Do not classify or narrow it using the old input.
         guard.abandonDecision();
+        guard.documentSummaryOnly = false;
 
         String streamed = guard.takeStreamSnapshot();
         String segment = executionLog.toString() + streamed;
@@ -1662,6 +1665,7 @@ public class AgentOrchestrator {
         json.put("consecutiveFailures", guard.consecutiveFailures);
         json.put("llmRetries", guard.llmRetries);
         json.put("malformedToolRounds", guard.malformedToolRounds);
+        json.put("documentSummaryOnly", guard.documentSummaryOnly);
         json.put("overflowCompactions", guard.overflowCompactions);
         json.put("activeFileId", guard.activeFileId);
         json.put("defaultOutputFolderId", guard.defaultOutputFolderId);
@@ -1699,6 +1703,7 @@ public class AgentOrchestrator {
         guard.consecutiveFailures = json.path("consecutiveFailures").asInt();
         guard.llmRetries = json.path("llmRetries").asInt();
         guard.malformedToolRounds = json.path("malformedToolRounds").asInt();
+        guard.documentSummaryOnly = json.path("documentSummaryOnly").asBoolean();
         guard.overflowCompactions = json.path("overflowCompactions").asInt();
         guard.activeFileId = json.path("activeFileId").isNumber() ? json.path("activeFileId").longValue() : null;
         guard.defaultOutputFolderId = json.path("defaultOutputFolderId").isNumber() ? json.path("defaultOutputFolderId").longValue() : null;
@@ -2138,6 +2143,7 @@ public class AgentOrchestrator {
         // 设置当前会话 ID 到 EditorBridgeService，以便文档编辑工具可以发送 SSE 事件
         editorBridgeService.setCurrentConversationId(conversationId);
 
+        final boolean summaryOnly = guard.documentSummaryOnly;
         AgentStreamHandler handler = new AgentStreamHandler(
             sseEmitterService,
             conversationId,
@@ -2150,7 +2156,7 @@ public class AgentOrchestrator {
             // text_delta / reasoning_delta / bubble_start 一律不再打到 emitter 上——
             // 一个会话只有一条流，旧轮次的 token 发出去就是混进新一轮的气泡里。
             // 旧轮次自己照常跑到终态、照常落自己的库，只是对 SSE 静默。
-            () -> isCurrentRun(guard)
+            () -> isCurrentRun(guard) && !summaryOnly
         );
         
 
@@ -2160,7 +2166,7 @@ public class AgentOrchestrator {
         handler.setCancellationCheck(guard::isCancelled);
 
         // 实时更新当前生成的内容 (用于断线重连恢复)
-        handler.setOnToken(guard::appendStream);
+        if (!summaryOnly) handler.setOnToken(guard::appendStream);
         // 思考增量同样进恢复日志，并随消息落库（dev-board#1060）；每次调模型另起一块思考
         guard.trace.beginModelRound(executionLog);
         handler.setOnReasoning(guard::appendReasoning);
@@ -2238,6 +2244,18 @@ public class AgentOrchestrator {
             editorBridgeService.setCurrentConversationId(conversationId);
             
             dev.langchain4j.data.message.AiMessage aiMessage = response.content();
+            if (summaryOnly) {
+                // Buffer this round until validated: neither native nor XML tool hallucinations
+                // may execute or appear as actionable cards during a chat-only report.
+                if (applyPendingSteering(guard, messages, projectId, userId, modelId, agentMode, executionLog)) {
+                    continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                            depth + 1, executionLog, agentMode, guard);
+                    return;
+                }
+                String summary = documentSummaryReply(aiMessage, response.finishReason());
+                sendTextDelta(guard, summary);
+                aiMessage = dev.langchain4j.data.message.AiMessage.from(summary);
+            }
 
             // 空响应当瞬时错误重试，不当正常收尾（对标 dsh EMPTY_RESPONSE 教训）：
             // 上游偶发「正常终止 + 零内容零工具调用」，落到默认收尾会静默 FINISHED——
@@ -2260,7 +2278,7 @@ public class AgentOrchestrator {
             // 参数被砍半后 JSON 解析失败还好（已有回喂纠正），恰好仍可解析才最危险——
             // 半篇正文的 write_file 会直接覆盖掉用户的文件。带截断 tool_calls 的 AiMessage
             // 也不入栈：不执行又入栈会让 OpenAI 兼容通道以「tool_calls 无配对结果」400。
-            if (isTruncatedToolCallRound(response.finishReason(), aiMessage)) {
+            if (!summaryOnly && isTruncatedToolCallRound(response.finishReason(), aiMessage)) {
                 if (guard.malformedToolRounds < 2) {
                     guard.malformedToolRounds++;
                     log.warn("LENGTH-truncated native tool calls for {} (correction round {}), asking model to re-emit",
@@ -2812,7 +2830,7 @@ public class AgentOrchestrator {
             // 3.3 正文被长度上限截断（LENGTH 且无工具调用）：不能装作正常完成。
             // 半句话戛然而止的回答按「暂停 + 继续」收尾，语义同步数预算耗尽（存档 + 请示）；
             // 刻意不触发记忆管线与版本落档——本轮没有真正结束，续写完成的那轮一并跑。
-            if (response.finishReason() == dev.langchain4j.model.output.FinishReason.LENGTH) {
+            if (!summaryOnly && response.finishReason() == dev.langchain4j.model.output.FinishReason.LENGTH) {
                 log.warn("Answer truncated by output length limit for {}, pausing for continuation", conversationId);
                 String notice = LangText.of(
                         "\n\n> 回答达到单次输出长度上限被截断，点击下方「继续」按钮可接着生成。",
@@ -2832,8 +2850,19 @@ public class AgentOrchestrator {
             // dev-board#1097：法律意见书实质修订的正常收尾由系统安排一次独立只读核验，
             // 把发现接回主助手核对后续一轮；门控与边界见 runOpinionCompletionCheckOnce。
             // 反问/审批/暂停/取消各有自己的终态分支、走不到这里；返回 true 表示已接管收尾。
-            if (runOpinionCompletionCheckOnce(model, messages, conversationId, projectId, userId,
+            if (!summaryOnly && runOpinionCompletionCheckOnce(model, messages, conversationId, projectId, userId,
                     modelId, depth, executionLog, agentMode, guard, content)) {
+                return;
+            }
+            if (!summaryOnly && wasStreaming && streamWrote && isCurrentRun(guard)
+                    && !hasDocumentSummary(content)) {
+                guard.documentSummaryOnly = true;
+                appendBoundedExecutionLog(executionLog, content + "\n");
+                messages.add(dev.langchain4j.data.message.UserMessage.from(LangText.of(
+                        "[系统提醒] 文档正文生成已结束，但你尚未给用户书面汇报。请仅用 <final> 简要说明本次调整、原因与尚未验证的事项。不要重写正文或调用工具。正文已发往编辑器不代表已保存或已回读核验；不得声称未验证的成功。",
+                        "[System reminder] Document text generation ended without a written report to the user. Reply only with <final>, briefly describing the changes, reasons and anything unverified. Do not repeat the document or call tools. Sending text to the editor does not prove it was saved or read back; do not claim unverified success.")));
+                continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                        depth + 1, executionLog, agentMode, guard);
                 return;
             }
             if (!content.isEmpty()) {
@@ -2916,6 +2945,12 @@ public class AgentOrchestrator {
                     closeSse(guard);
                     endRun(guard);
                 }
+                return;
+            }
+            if (summaryOnly) {
+                finishWithError(guard, projectId, userId, LangText.of(
+                        "文档正文已发往编辑器，但修改说明生成失败；请检查当前文档。",
+                        "Document text was sent to the editor, but the change summary failed. Please check the current document."), executionLog);
                 return;
             }
             boolean replayable = !handler.hasStreamedTokens();
@@ -3076,6 +3111,7 @@ public class AgentOrchestrator {
                 guard.catalogOffered = true;
             }
         }
+        if (summaryOnly) visible = List.of();
         roundTimings.mark("tools", visible.size());
         roundTimings.done(log);
         // Cancellation/steering may arrive during the bounded decision call, before main generation starts.
@@ -3107,6 +3143,28 @@ public class AgentOrchestrator {
             // 同步抛错与异步失败共用终态闸：取消看门狗并执行有限重试 / 模型切换。
             handler.onError(e);
         }
+    }
+
+    private static boolean hasDocumentSummary(String content) {
+        if (content == null) return false;
+        var matcher = java.util.regex.Pattern.compile("(?s)<final\\b[^>]*>(.*?)</final>").matcher(content);
+        while (matcher.find()) if (!matcher.group(1).isBlank()) return true;
+        return false;
+    }
+
+    private static String documentSummaryReply(dev.langchain4j.data.message.AiMessage message,
+                                               dev.langchain4j.model.output.FinishReason reason) {
+        String text = message == null || message.text() == null ? "" : message.text().trim();
+        if (text.startsWith("<final>") && text.endsWith("</final>")) {
+            text = text.substring(7, text.length() - 8).trim();
+        }
+        if (message == null || message.hasToolExecutionRequests() || text.isBlank()
+                || reason == dev.langchain4j.model.output.FinishReason.LENGTH
+                || java.util.regex.Pattern.compile("</?[A-Za-z_][^>]*>").matcher(text).find()) {
+            text = LangText.of("文档正文已发往编辑器，但未能生成完整的修改说明。请检查当前文档；本次未确认保存或回读结果。",
+                    "Document text was sent to the editor, but a complete change summary could not be generated. Please check the current document; saving and read-back were not confirmed.");
+        }
+        return "<final>" + text + "</final>";
     }
 
     /**
