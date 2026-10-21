@@ -97,10 +97,12 @@ public class DependencyProbe {
         try (var doc = Loader.loadPDF(pdf)) {
             check(doc.getNumberOfPages() == 2, "Expected exactly two pages, got " + doc.getNumberOfPages());
             String text = new PDFTextStripper().getText(doc); Files.writeString(root.resolve("pdf-text.txt"), text);
-            for (String expected : List.of("合成验收第1页", "合成验收第2页", "合同金额", "人民币壹佰元", "CNY 100", "CNY 200"))
-                check(text.contains(expected), "PDF lost " + expected);
             var renderer = new PDFRenderer(doc);
             for (int page = 0; page < 2; page++) ImageIO.write(renderer.renderImageWithDPI(page, 100), "png", root.resolve("page-" + (page + 1) + ".png").toFile());
+            // PDF text extraction can insert layout spaces between CJK and digits.
+            String compact = text.replaceAll("\\s+", "");
+            for (String expected : List.of("合成验收第1页", "合成验收第2页", "合同金额", "人民币壹佰元", "CNY100", "CNY200"))
+                check(compact.contains(expected), "PDF lost " + expected);
         }
         // The verifier does not install models or use account/OAuth credentials.
         var props = new PackProperties(); props.setDir(root.resolve("packs").toString()); props.setAutoUpgrade(false);
