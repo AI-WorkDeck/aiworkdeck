@@ -1137,7 +1137,6 @@ def _trace(items, S, st, out):
     它现在能自动生成，是因为每个事项都带 src_sids：那个字段本来是给子序列检查用的，
     顺带就把溯源这件事解决了。一个字段管两件事，不必让模型再答一遍。
     """
-    import subprocess
     rows = []
     for it in items:
         sids = it.get("src_sids") or ([it["src_sid"]] if it.get("src_sid") is not None else [])
@@ -1160,18 +1159,18 @@ def _trace(items, S, st, out):
     payload = {"title": (st.get("title") or "本图") + "・溯源索引",
                "rows": [{k: _squeeze_cjk(v) if isinstance(v, str) else v
                          for k, v in r.items()} for r in rows]}
-    js = os.path.join(HERE, "trace_index.js")
+    # [AWD-PATCH 8] 溯源索引改用同目录的 trace_index.py（纯标准库）生成，
+    # 不再起 node 子进程 —— 桌面端不随包分发 Node/npm docx，那条路在用户
+    # 机器上会「主图出来了、索引没写成」。trace_index.js 保留（上游回归
+    # run_checks.py 的引号守卫仍走它），两版输出语义保持一致。
     docx = os.path.splitext(out)[0] + "-溯源索引.docx"
     tmp = os.path.splitext(out)[0] + "-trace.json"
-    json.dump(payload, open(tmp, "w", encoding="utf-8"), ensure_ascii=False)
+    with open(tmp, "w", encoding="utf-8") as trace_file:
+        json.dump(payload, trace_file, ensure_ascii=False)
     try:
-        r = subprocess.run(["node", js, tmp, docx], capture_output=True, text=True,
-                           timeout=120)
-        if r.returncode == 0:
-            _kill_autospace(docx)
-            print(f"溯源索引：{docx}（{len(rows)} 行）")
-        else:
-            print(f"溯源索引没写成：{(r.stderr or r.stdout)[:100]}")
+        import trace_index as _TI   # HERE 已在 sys.path（本文件头部）
+        _TI.write_docx(payload, docx)   # 原子写：失败不留半个 docx
+        print(f"溯源索引：{docx}（{len(rows)} 行）")
     except Exception as exc:
         print(f"溯源索引没写成：{exc}")
 
