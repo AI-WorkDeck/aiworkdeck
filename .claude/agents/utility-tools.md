@@ -351,8 +351,8 @@ AwdDialog 队列非空时持有 `overlayState` 的 `'awd-dialog'`（`utils/dialo
 **资源管理器 Office 转 PDF（dev-board#1385）**：`ProjectFilePdfService` 的 Office 路径只接受
 `LibreOfficePdfConverter` 的完整排版输出；原 POI/PDFBox 抽正文重画/过滤缺字的备用分支已删除。
 缺 LO、启动失败、超时、非零退出、无产物或无效 PDF 都阻断且不创建项目文件；图片转 PDF 与已有 PDF 合卷仍用内置 PDFBox。
-`FileTree` 错误持久弹窗可按「在内置编辑器中打开」，复用 `file-open`，不替换已打开的脏内容；用户从「文件 → 导出为」导出并核对版面。
-这不是自动借隐藏 LOWA 引擎，亦不自动下载/安装 LibreOffice。
+`FileTree` 单文件错误提供「使用内置引擎导出 PDF」，经 `file-export-pdf` → `fileTreePdfRecovery.js` 打开或激活普通可见标签，等待实际加载就绪后调用既有 `exportPdf({isCurrent})`，不替换或保存已打开的脏内容。保存失败不阻断当前内容导出；加载失败重试时必须等待异步加载完成，不能提前清编辑器的保存闸。
+过程条可取消/就地重试，切项目、关标签、换 executor 都作废旧任务；系统另存为由用户选位置，只有 download-done 才表示保存成功。多文件仍先分别导出再合卷，不虚报自动合并。
 发现器接受 `external.libreoffice.executable`、`LIBREOFFICE_PATH`、`SOFFICE_PATH`，支持完整执行文件/安装目录/app bundle，
 其次 Mac 系统/用户 Applications、Homebrew/常见 bin，Windows ProgramFiles/ProgramW6432/x86/LOCALAPPDATA 和 PATH。
 显式覆盖无效时不悄悄切另一套安装。独立 profile、参数数组无 shell、输出丢弃防管道阻塞、默认120秒等待后终止子进程。
