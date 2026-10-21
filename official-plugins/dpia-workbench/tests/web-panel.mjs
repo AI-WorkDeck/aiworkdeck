@@ -37,6 +37,7 @@ async function panel(t, options = {}) {
       if (customized !== undefined) return JSON.stringify(customized);
       let value;
       switch (payload.action) {
+        case 'environmentCheck': value = { platform: 'Windows 11', ready: false, requirementsPath: 'C:/Plugin/runtime/requirements.txt', checks: [{ id: 'node', label: 'Node.js', status: 'needs_attention', message: '未安装 Node.js；请设置路径' }] }; break;
         case 'list': value = { cases: [{ ...current, resultStatus: 'synced', openGaps: 1, riskCount: 0 }], testFixtures: [], errors: [] }; break;
         case 'get': value = current; break;
         case 'execution': value = execution; break;
@@ -58,7 +59,7 @@ async function panel(t, options = {}) {
   t.after(() => { dom.window.close(); assert.deepEqual(errors, []); });
   const document = dom.window.document;
   const text = () => document.body.textContent;
-  await until(() => text().includes(options.context?.projectId === null ? '请先打开项目' : '合成评估项目'));
+  await until(() => text().includes(options.initialError || (options.context?.projectId === null ? '请先打开项目' : '合成评估项目')));
   async function click(label) {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent === label);
     assert.ok(button, 'button: ' + label); assert.equal(button.disabled, false);
@@ -134,4 +135,53 @@ test('late data cannot reappear after account changes', async (t) => {
   release({ ok: true, value: { title: '旧账号', text: 'STALE_PRIVATE_CONTENT' } }); await tick(); await tick();
   assert.ok(p.text().includes('项目或账号已切换')); assert.equal(p.text().includes('STALE_PRIVATE_CONTENT'), false);
   assert.equal(p.document.querySelector('.dpia'), null);
+});
+
+
+test('environment preparation preserves unfinished form and project context, rechecks on return', async (t) => {
+  const p = await panel(t);
+  const title = p.document.querySelector('input[name=title]');
+  title.value = '尚未提交的评估标题';
+  await p.click('运行环境与准备指引');
+  await until(() => p.text().includes('未安装 Node.js'));
+  assert.equal(p.document.querySelector('input[name=title]'), title);
+  assert.equal(title.value, '尚未提交的评估标题');
+  assert.ok(p.text().includes('PowerShell'));
+  assert.ok(p.text().includes('C:/Plugin/runtime/requirements.txt'));
+  assert.equal(p.calls.some(c => c.action === 'create' || c.action === 'start'), false);
+  const before = p.calls.filter(c => c.action === 'environmentCheck').length;
+  p.dom.window.dispatchEvent(new p.dom.window.Event('focus'));
+  await until(() => p.calls.filter(c => c.action === 'environmentCheck').length > before);
+  p.document.querySelector('.dpia-environment a').click();
+  await until(() => p.calls.some(c => c.method === 'ui.openUrl' && c.url === 'https://nodejs.org/en/download'));
+  const afterFocus = p.calls.filter(c => c.action === 'environmentCheck').length;
+  p.events['settings.changed']();
+  await until(() => p.calls.filter(c => c.action === 'environmentCheck').length > afterFocus);
+  await p.click('收起运行环境');
+  assert.equal(title.value, '尚未提交的评估标题');
+  await p.click('运行环境与准备指引');
+  await until(() => p.calls.filter(c => c.action === 'environmentCheck').length > before + 1);
+});
+
+test('task failure still allows opening preparation without retrying or discarding task', async (t) => {
+  const p = await panel(t, { handle: payload => payload.action === 'downloadInternalWord' ? { ok: false, error: { message: 'Python 缺少文档库' } } : undefined });
+  await p.open(); await p.click('查看本轮报告');
+  await until(() => p.text().includes('合成内部报告'));
+  await p.click('保存 Word 到项目'); await until(() => p.text().includes('Python 缺少文档库'));
+  await p.click('运行环境'); await until(() => p.text().includes('未安装 Node.js'));
+  assert.equal(p.document.querySelector('.dpia-environment').style.zIndex, '10000');
+  assert.ok(p.text().includes('合成内部报告'));
+  await p.click('收起运行环境');
+  assert.ok(p.document.querySelector('[role=dialog]'));
+  assert.ok(p.text().includes('合成内部报告'));
+  assert.equal(p.calls.filter(c => c.action === 'downloadInternalWord').length, 1);
+});
+
+
+test('missing Node on initial list leaves environment entry reachable', async (t) => {
+  const p = await panel(t, { initialError: '无法启动 DPIA 运行环境', handle: payload => payload.action === 'list' ? { ok: false, error: { message: '无法启动 DPIA 运行环境' } } : undefined });
+  await p.click('运行环境与准备指引');
+  await until(() => p.text().includes('未安装 Node.js'));
+  assert.equal(p.calls.filter(c => c.action === 'list').length, 1);
+  assert.equal(p.calls.filter(c => c.action === 'environmentCheck').length, 1);
 });

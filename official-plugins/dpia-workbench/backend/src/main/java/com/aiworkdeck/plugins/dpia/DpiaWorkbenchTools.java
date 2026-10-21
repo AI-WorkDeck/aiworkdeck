@@ -24,6 +24,8 @@ public final class DpiaWorkbenchTools implements HostAware {
     private final Path dataRoot;
     private final Map<String, String> environment;
     private PluginHost host;
+    private DpiaEnvironment environmentCheck = new DpiaEnvironment();
+    void setEnvironmentCheck(DpiaEnvironment check) { this.environmentCheck = check; }
 
     public DpiaWorkbenchTools() {
         this(new NativeRunner(), installedRoot(), Path.of(System.getProperty("user.home"), ".aiworkdeck", "plugin-data", "dpia-workbench"), System.getenv());
@@ -49,6 +51,8 @@ public final class DpiaWorkbenchTools implements HostAware {
             if (action == null || action.isBlank()) throw new Failure("请指定 DPIA 操作");
             ObjectNode payload = (ObjectNode) parsed;
             payload.put("action", action);
+            // Readiness must not wait for an active project task or require Node RPC.
+            if ("environmentCheck".equals(action)) return ok(environmentCheck.check(pluginRoot, key -> host.settings().get(key), environment)).toString();
             Path scope = dataRoot.resolve("u" + call.userId()).resolve("p" + call.projectId());
             // Cancellation must reach the native Agent while a long report task holds the project lock.
             // Runner persists cancellation with its append-only revision guard; acknowledgement is not completion.
