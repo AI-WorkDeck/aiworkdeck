@@ -5343,7 +5343,7 @@ const EXEC = {
   //   - zoom: ZoomValue (%) from the view settings.
   //   - winPx: the Qt component window rect (px) — the canvas surface bounds.
   // Each field is independently try/caught so a missing API degrades, not throws.
-  get_cursor_rect() {
+  get_cursor_rect(p) {
     // The IME/caret timer can outlive a Writer document during a tab switch.
     if (!isWriterDoc()) return completionUnavailable('not-writer');
     const out = { success: true };
@@ -5378,7 +5378,9 @@ const EXEC = {
     } catch (e) { out.viewDataErr = errStr(e); }
     try { out.nativeCaret = readNativeCaretRect(ctrl.getFrame(), ctrl.getViewData(), out.charHeightPt); }
     catch (e) { /* Older engines retain the click-calibrated fallback. */ }
-    if (vc && out.collapsed === false) {
+    // Endpoint geometry temporarily moves the view cursor. Background caret
+    // reads must stay read-only, especially during mouse selection + scrolling.
+    if (vc && out.collapsed === false && p && p.selectionRects === true) {
       try {
         const sr = readSelectionCaretRects(ctrl.getFrame(), vc, out.charHeightPt);
         if (sr) out.selectionRects = sr;

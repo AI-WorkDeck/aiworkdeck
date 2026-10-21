@@ -10,7 +10,8 @@
 // text to the drop position.
 //
 // HOW:
-//   1. Whenever get_cursor_rect reports a non-collapsed selection with native
+//   1. Explicit get_cursor_rect({selectionRects:true}) reads a non-collapsed
+//      selection with native
 //      start/end caret geometry (selectionRects), we map those bounds into
 //      canvas client rects (single-line box or 3-band multi-line polygon).
 //   2. On capture-phase mousedown on #qtcanvas inside the selection bounds
@@ -140,6 +141,7 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
   let cachedSelectionBoxes = []
   let cachedLineHeight = 18
   let pointerDown = false
+  let selectionPointer = null
   let dragState = null
   let refreshTimer = 0
   let refreshSeq = 0
@@ -153,7 +155,7 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
   }
 
   function updateFromCursorRaw(raw) {
-    if (disposed || dragState) return
+    if (disposed || pointerDown || dragState) return
     if (!raw || raw.collapsed !== false || !raw.selectionRects) {
       cachedSelectionBoxes = []
       if (!pointerDown && canvas.style.cursor === 'default') canvas.style.cursor = ''
@@ -173,7 +175,7 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
     refreshTimer = setTimeout(() => {
       refreshTimer = 0
       if (disposed || pointerDown || dragState) return
-      Promise.resolve(execute('get_cursor_rect', {}))
+      Promise.resolve(execute('get_cursor_rect', { selectionRects: true }))
         .then((raw) => {
           if (!disposed && seq === refreshSeq && !pointerDown && !dragState) {
             updateFromCursorRaw(raw)
@@ -242,6 +244,7 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
   function onMouseDown(ev) {
     if (disposed || forwarded.has(ev) || ev.target !== canvas) return
     pointerDown = true
+    selectionPointer = ev.button === 0 && !ev.ctrlKey && !ev.metaKey ? { x: ev.clientX, y: ev.clientY } : null
     clearTimeout(refreshTimer)
     refreshTimer = 0
     if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey || ev.detail > 1) {
@@ -271,6 +274,7 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
   function onMouseMove(ev) {
     if (disposed || forwarded.has(ev)) return
     if (!dragState) {
+      if (selectionPointer && (ev.buttons & 1)) selectionPointer = { x: ev.clientX, y: ev.clientY }
       if (!pointerDown && ev.target === canvas) {
         const hit = hitSelectionRects(ev.clientX, ev.clientY, cachedSelectionBoxes)
         if (hit && canvas.style.cursor !== 'default') canvas.style.cursor = 'default'
@@ -305,6 +309,7 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
   function onMouseUp(ev) {
     if (disposed || forwarded.has(ev)) return
     pointerDown = false
+    selectionPointer = null
     if (!dragState) {
       if (ev.target === canvas && ev.button === 0) {
         refreshSelection(60)
@@ -357,6 +362,22 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
     })()
   }
 
+  function onWheel(ev) {
+    invalidate()
+    if (disposed || !pointerDown || !selectionPointer || dragState || ev.ctrlKey) return
+    // Qt scrolls without updating the active selection when the pointer stays
+    // still. A changed coordinate defeats its same-position mousemove filter;
+    // finish at the actual pointer so the endpoint stays under the mouse.
+    for (const dx of [1, 0]) {
+      const move = new win.MouseEvent('mousemove', {
+        bubbles: true, clientX: selectionPointer.x + dx, clientY: selectionPointer.y,
+        button: 0, buttons: 1, shiftKey: ev.shiftKey, altKey: ev.altKey, view: win,
+      })
+      forwarded.add(move)
+      canvas.dispatchEvent(move)
+    }
+  }
+
   function onKeyDown() {
     if (dragState) {
       dragState = null
@@ -367,6 +388,7 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
 
   function onBlur() {
     pointerDown = false
+    selectionPointer = null
     if (dragState) {
       dragState = null
       hideIndicator()
@@ -390,7 +412,7 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
   doc.addEventListener('mousemove', onMouseMove, true)
   doc.addEventListener('mouseup', onMouseUp, true)
   doc.addEventListener('keydown', onKeyDown, true)
-  canvas.addEventListener('wheel', invalidate, { passive: true })
+  canvas.addEventListener('wheel', onWheel, { passive: true })
   win.addEventListener('resize', onResize)
   win.addEventListener('blur', onBlur)
 
@@ -405,7 +427,7 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
       doc.removeEventListener('mousemove', onMouseMove, true)
       doc.removeEventListener('mouseup', onMouseUp, true)
       doc.removeEventListener('keydown', onKeyDown, true)
-      canvas.removeEventListener('wheel', invalidate)
+      canvas.removeEventListener('wheel', onWheel)
       win.removeEventListener('resize', onResize)
       win.removeEventListener('blur', onBlur)
       dropIndicator.remove()
