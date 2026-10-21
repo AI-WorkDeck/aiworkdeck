@@ -133,7 +133,15 @@ function Run-Native([string]$Executable, [string[]]$Arguments, [string]$Log) {
         -RedirectStandardOutput "$Root\$Log.log" -RedirectStandardError "$Root\$Log.stderr.log"
     if ($process.ExitCode -ne 0) { throw "$Log exited $($process.ExitCode); inspect its stdout/stderr logs" }
 }
+# Continue independent checks after installation; any failed stage still fails the job.
+$stageFailures = @()
+try {
 Run-Native "$Resources\jre\bin\java.exe" @('-Dfile.encoding=UTF-8','-Dstdout.encoding=UTF-8','-Dstderr.encoding=UTF-8','-Djava.awt.headless=true','-cp',"$Root;$Resources\backend\app.jar;$Resources\backend\lib\*",'DependencyProbe',$Root,$Resources,$Version) 'probe'
+} catch {
+    if (-not (Test-Path "$Root\installed.ready")) { throw }
+    $stageFailures += "core: $_"
+}
+try {
 Run-Native "$Resources\python\python.exe" @('-I','-m','venv',"$Root\dpia-venv") 'dpia-venv'
 $python = "$Root\dpia-venv\Scripts\python.exe"
 $env:PYTHONIOENCODING = 'utf-8'
@@ -151,7 +159,13 @@ $after | Set-Content "$Root\dpia-after.json" -Encoding utf8
 if (@(($after | ConvertFrom-Json).checks | Where-Object { $_.status -ne 'ready' }).Count) { throw 'DPIA preparation remains incomplete' }
 $env:AWD_DPIA_TEST_PYTHON = $python
 Run-Native 'C:\Program Files\nodejs\node.exe' @('--test',"$Root\dpia-workbench\tests\lifecycle.test.mjs") 'dpia-lifecycle'
+} catch { $stageFailures += "dpia: $_" }
+try {
 & "$Root\source\desktop\scripts\dependency-clean-windows\real-models.ps1" -Resources $Resources -Repo "$Root\source" -Output "$Root\real-models" -ProbeClasses $Root *> "$Root\real-models.log"
+} catch { $stageFailures += "models: $_" }
+@{failures=$stageFailures} | ConvertTo-Json | Set-Content "$Root\stages.json" -Encoding utf8
+if ($stageFailures.Count) { throw ($stageFailures -join '; ') }
+
 '@ | Set-Content "$root\probe.ps1" -Encoding utf8
     $powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
     $savedModulePath = $env:PSModulePath
