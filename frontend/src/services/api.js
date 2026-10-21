@@ -4536,3 +4536,14 @@ export function getPluginDevTrust(pluginId) {
 export function setPluginDevTrust(pluginId, trusted) {
   return request({ url: `/api/plugins/${encodeURIComponent(pluginId)}/dev-trust`, method: 'POST', data: { trusted }, logBody: false })
 }
+
+// Explicit OCR fallback preference and authenticated per-task decisions.
+export const getOcrRouting = () => request({ url: '/api/ocr/routing', method: 'GET' })
+export const setOcrRouting = data => request({ url: '/api/ocr/routing', method: 'PUT', data })
+export const chooseOcrRouting = data => request({ url: '/api/ocr/routing/choice', method: 'POST', data })
+
+// Snapshot scope is held only in the originating UI task, so a late cancellation targets its account/server.
+export const cancelOcrRouting = (data, scope) => request({
+  url: scope ? scope.baseUrl.replace(/\/$/, '') + '/api/ocr/routing/cancel' : '/api/ocr/routing/cancel',
+  method: 'POST', data, header: scope?.headers, logBody: false,
+})

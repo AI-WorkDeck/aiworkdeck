@@ -90,7 +90,7 @@ class PdfToolsPageOpsTest {
         // 页级操作一个都不该碰它们（收尾只建文件，刷文件树由编排器按 @ToolMeta(refreshFiles) 发）。
         // 哪天有人在这些工具里加了 sendReloadFileAction，这里会当场 NPE——这是有意的绊线。
         tools = new PdfTools(new PdfEditService(), fileService, repository,
-                null, null, null, resolver, null);
+                null, null, null, resolver, null, null, mock(com.checkba.service.ocr.OcrRoutingService.class), mock(com.checkba.service.ocr.PdfCloudOcrService.class));
 
         ProjectContextHolder.setProjectId(String.valueOf(PROJECT_ID));
     }

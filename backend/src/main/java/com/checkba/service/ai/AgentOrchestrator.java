@@ -4013,7 +4013,10 @@ public class AgentOrchestrator {
      * 而这里的语义（后台没东西在跑、在等用户操作）与反问完全相同。
      */
     private void stopForComponent(RunGuard guard, String projectId, Long userId, String persistedPrefix) {
-        String notice = LangText.of(
+        boolean ocrChoice = editorBridgeService.consumeOcrRouteWait(guard.conversationId);
+        String notice = ocrChoice ? LangText.of(
+                "\n\n> 已显示扫描件识别方式，请选择云端识别或本地处理。确认后会继续原任务。",
+                "\n\n> Choose cloud OCR or local processing in the displayed options. The original task will continue after your choice.") : LangText.of(
                 "\n\n> 这一步需要先安装本机组件，已在界面上请你确认下载。装好后会自动继续这一步。",
                 "\n\n> This step needs a local component first; you have been asked to confirm the download. "
                         + "It will continue automatically once the component is installed.");

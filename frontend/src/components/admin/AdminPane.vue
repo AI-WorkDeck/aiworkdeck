@@ -530,6 +530,8 @@
               </view>
           </SettingsSection>
 
+          <OcrRoutingSettings :key="'ocr-routing-' + identityCurrentId" />
+
           <!-- 花费闸门。原属已撤销的「平台服务」分区，官方版全部外部服务统一平台代采后
                那个分区已无实际作用；这张卡是其中仍然真实的功能，随通知一起搬来本分区末尾
                （刻意放在最后，减少与本分区其它改动的冲突面）。
@@ -1009,6 +1011,7 @@ import PersonalFavoritesPanel from '@/components/userprofile/PersonalFavoritesPa
 import PersonalTodosPanel from '@/components/userprofile/PersonalTodosPanel.vue'
 import PersonalSettingsPanel from '@/components/userprofile/PersonalSettingsPanel.vue'
 import TeamPanel from '@/components/admin/TeamPanel.vue'
+import OcrRoutingSettings from '@/components/admin/OcrRoutingSettings.vue'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import ExternalDependenciesPanel from '@/components/admin/ExternalDependenciesPanel.vue'
 import MemoryBrowser from '@/components/MemoryBrowser.vue'
@@ -1043,6 +1046,7 @@ export function resolveAdminNavKey(key) {
 export default {
   name: 'AdminPane',
   components: {
+    OcrRoutingSettings,
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
     TeamPanel, OptionalComponentCard, MemoryBrowser, ExternalDependenciesPanel,

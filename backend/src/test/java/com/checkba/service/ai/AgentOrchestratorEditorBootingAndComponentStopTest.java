@@ -254,4 +254,19 @@ class AgentOrchestratorEditorBootingAndComponentStopTest {
                 .execute(eq("write_docx"), any(), any());
         assertTrue(sseData.stream().anyMatch(d -> d.contains("装好后会自动继续")), sseData.toString());
     }
+    @Test
+    void ocrChoiceUsesTheSameStopProtocolWithAccurateNotice() {
+        when(toolRegistry.execute(eq("pdf_to_word"), any(), any()))
+                .thenReturn(new ToolRegistry.ToolResult("选择云端或本地后继续", null, true));
+        when(bridge.consumeComponentWait("conv-ocr")).thenReturn(true);
+        when(bridge.consumeOcrRouteWait("conv-ocr")).thenReturn(true);
+        ScriptModel model = run("conv-ocr", AiMessage.from(List.of(
+                ToolExecutionRequest.builder().id("t1").name("pdf_to_word").arguments("{\"fileId\":7}").build())),
+                AiMessage.from("<final>不应再次调用模型</final>"));
+        assertEquals(1, model.calls.get());
+        assertTrue(sseData.stream().anyMatch(d -> d.contains("选择云端识别或本地处理")), sseData.toString());
+        assertFalse(sseData.stream().anyMatch(d -> d.contains("请你确认下载")), sseData.toString());
+        assertTrue(bubbleEnd().contains("component_required"));
+    }
+
 }
