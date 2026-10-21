@@ -144,7 +144,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     $savedModulePath = $env:PSModulePath
     try {
         Remove-Item Env:PSModulePath -ErrorAction SilentlyContinue
-        $child = Start-Process $powershell -Credential $credential -LoadUserProfile -PassThru -ArgumentList "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File $root\probe.ps1 $root $resources $version"
+        $child = Start-Process $powershell -Credential $credential -LoadUserProfile -PassThru -ArgumentList "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File $root\probe.ps1 $root $resources $version" -RedirectStandardOutput "$root\child.stdout.log" -RedirectStandardError "$root\child.stderr.log"
     } finally { $env:PSModulePath = $savedModulePath }
     $deadline = (Get-Date).AddMinutes(3)
     while (-not (Test-Path "$root\before.json")) {
@@ -158,8 +158,10 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     $denied = Start-Process $msiexec -Credential $credential -LoadUserProfile -PassThru -ArgumentList "/i $node /qn /norestart ALLUSERS=1 /L*v $root\node-standard-user.log"
     if (-not $denied.WaitForExit(120000)) { & taskkill.exe /PID $denied.Id /T /F | Out-Null; throw 'Non-admin MSI did not fail within two minutes' }
     $denied.Refresh()
-    @{exitCode=$denied.ExitCode;expected='Machine-wide MSI cannot silently elevate standard account'} | ConvertTo-Json | Set-Content "$root\non-admin.json"
+    $denial = @(Select-String -Path "$root\node-standard-user.log" -Pattern 'Error 1925|do not have sufficient privileges|installation is forbidden by system policy|requires elevation' -ErrorAction SilentlyContinue | ForEach-Object { $_.Line })
+    @{exitCode=$denied.ExitCode;permissionEvidence=$denial;expected='Machine-wide MSI cannot silently elevate standard account'} | ConvertTo-Json | Set-Content "$root\non-admin.json"
     if ($denied.ExitCode -in @(0,3010)) { throw 'Unexpected standard-user machine-wide install success; isolation assumption invalid' }
+    if ($denied.ExitCode -ne 1625 -and $denial.Count -eq 0) { throw 'Non-admin MSI failed without permission evidence; inspect node-standard-user.log rather than claiming elevation was denied' }
     foreach ($entry in @(@($node,'node'),@($lo,'libreoffice'))) {
         $process = Start-Process $msiexec -PassThru -ArgumentList "/i $($entry[0]) /qn /norestart ALLUSERS=1 /L*v $root\$($entry[1])-install.log"
         Wait-ProcessChecked $process 600 "$($entry[1]) official MSI" @(0,3010) | Out-Null
