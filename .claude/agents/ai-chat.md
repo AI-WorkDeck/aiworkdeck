@@ -36,6 +36,14 @@ MemoryPipelineService对OFFICE跳过自动摘要及后台同步，避免将Syste
 - `chat_suggestion` 是本机业务记录，不接遥测：记录建议 ID、源消息、真实 clientRequestId 与 accepted/edited/dismissed；后端从 inbox 已接收文字判采纳或修改，不信客户端自报。删会话/回退同步清理反馈，每小时清理 30 天前记录，最近 3 条同用户同会话反馈供后续建议调整。反馈不是事实正确性判定、不是自动训练；中英隐私说明与界面一致。Web/Office 暂无该入口。
 - 回归：`ChatSuggestionServiceTest` + `ChatModelFactoryTest`；`node tests/chat-presentation-ui/chat-suggestions.mjs` 使用真正 ChatInterface、SSE 和键盘与合成模型/HTTP，覆盖 Tab/IME、修改、失败重试、迟到/换会话/身份、开关与 320px 双主题。合成响应不能证明真实模型建议质量或正式客户端表现。
 
+## 文档流式写入后的书面汇报（dev-board#1392，2026-10-21）
+
+正常结束的文档正文流若确有正文、却缺少非空 `<final>`，`AgentOrchestrator` 补一次 `documentSummaryOnly` 回合：不下发工具，输出先缓冲验证，再统一发为聊天 final；原生或 XML 工具、协议产物与截断输出不执行，改发未能生成完整说明的提示。错误不重试总结；原取消、提问、审批与正文截断分支优先。标志随重启快照保存，新插话清除。服务端发出正文不代表编辑器保存/回读成功，汇报提示保留该证据边界。
+
+`useAgentStream` 在 `doc_stream_end` 先冲正文尾部缓冲、再解除正文抑制并删除临时占位；同轮提前来的 final 也删除占位，异步编辑器失败仍追加可见通知。`chatTimeline` 在占位删除后回退文本索引，防短总结落在旧位置。历史裸文档正文去重未在本次扩展；旧会话无 final 不会被自动补写。
+
+验证：`AgentOrchestratorDocumentSummaryTest`、`AgentStreamHandlerDocumentFinalTest`、`frontend/tests/project-home/doc-stream-summary.test.mjs` 与 `frontend/tests/chat-presentation-ui/doc-stream-summary.mjs`（真实 ChatInterface + 合成 SSE）。现场与验收边界见 `doc/verification/2026-10-21-doc-stream-summary-1392.md`；未发正式包，不代表用户客户端实模复测。
+
 ## 试用回合归属（dev-board#1166，2026-10-10）
 
 `launchTurn` 在入执行队列前把当前账户指纹写入 `RunGuard`，收尾原样交给 `TrialTurnMeter`；不得到异步上报时才取当前账户。换账户则放弃旧回合，发送与账户切换共享锁；server 未接 per-user 试用上报前停用机器级计量。接线测试 `AgentOrchestratorTrialHookTest` 验证入队捕获与收尾传递，账户/缓存契约见 licensing-billing。
