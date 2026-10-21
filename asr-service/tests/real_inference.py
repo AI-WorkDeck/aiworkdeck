@@ -143,7 +143,7 @@ def main():
             record = dict(language=language, voice=voice, source=text, audioSeconds=duration, rms=rms,
                           ttsSeconds=tts_seconds, asrSeconds=asr_seconds, transcription=result)
             report['samples'].append(record)
-            (output / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2))
+            (output / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
             print(json.dumps(record, ensure_ascii=False), flush=True)
     print('PASS: real local TTS, audio validation, missing-model 409 and same-process ASR recovery', flush=True)
 
