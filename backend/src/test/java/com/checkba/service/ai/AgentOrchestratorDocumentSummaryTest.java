@@ -257,7 +257,7 @@ class AgentOrchestratorDocumentSummaryTest {
         run(model);
         assertEquals(3, model.calls.get());
         assertTrue(eventText("error").contains("修改说明生成失败"));
-        assertTrue(persisted().contains("信件正文"));
+        assertEquals(1, persisted().split("信件正文", -1).length - 1, "error history must retain the document body once");
         assertFalse(eventText("text_delta").contains("半句"));
         verify(toolRegistry, times(1)).execute(any(), any(), any());
     }
@@ -312,6 +312,18 @@ class AgentOrchestratorDocumentSummaryTest {
         AgentOrchestrator.RunGuard restored = new AgentOrchestrator.RunGuard("c", "r", 1);
         ReflectionTestUtils.invokeMethod(orchestrator, "restoreRestartGuard", restored, snapshot);
         assertTrue(restored.documentSummaryOnly);
+    }
+
+    @Test
+    void summaryAccountFailureKeepsBodyAndAccountAction() {
+        ScriptModel model = new ScriptModel(List.of(startStream(), AiMessage.from("信件正文。"), AiMessage.from("半句")));
+        model.lastError = new com.checkba.service.account.AccountException(
+                com.checkba.service.account.AccountException.Kind.CONFLICT, "Credits 不足", "no_credits");
+        run(model);
+        assertEquals(3, model.calls.get());
+        assertTrue(eventText("error").contains("no_credits"));
+        assertTrue(persisted().contains("信件正文"));
+        assertTrue(persisted().contains("Credits 不足"));
     }
 
 }
