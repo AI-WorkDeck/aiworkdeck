@@ -22,6 +22,7 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import javax.sql.DataSource;
 import java.io.BufferedReader;
@@ -81,7 +82,11 @@ class LocalProjectFileChangeHttpTest {
 
     @AfterAll
     static void clearOwnAuthRegistration() {
+        // DirtiesContext 会关闭仓储；四个静态入口都不能继续指向本次上下文。
         AuthController.registerLocalIdentityService(null);
+        AuthController.registerUserSessionService(null);
+        AuthController.registerDeviceTokenService(null);
+        ReflectionTestUtils.setField(AuthController.class, "staticUserService", null);
     }
 
     @Test
