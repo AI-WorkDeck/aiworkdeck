@@ -52,7 +52,7 @@ try {
     await ok('set_selection', { anchor: locSrc.matches[0].anchorId })
     await ok('clear_anchors', {})
     await pause(120)
-    const srcRaw = await ok('get_cursor_rect', {})
+    const srcRaw = await ok('get_cursor_rect', { selectionRects: true })
     assert.equal(srcRaw.collapsed, false)
     assert.ok(srcRaw.selectionRects?.start && srcRaw.selectionRects?.end, 'get_cursor_rect must return selectionRects for active selection')
     const startPt = await caretClientPoint(srcRaw.selectionRects.start)

@@ -400,7 +400,7 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
       return { success: false, available: false, reason: 'composing', error: 'composing', message: '请先完成当前输入，再生成或采用建议。' }
     if (action === 'get_cursor_rect') {
       const r = await executeWithReview(action, params, callOpts)
-      selectionDrag?.updateFromCursorRaw(r)
+      if (params?.selectionRects === true || r?.collapsed) selectionDrag?.updateFromCursorRaw(r)
       return r
     }
     if (/^(get_|list_)/.test(action) || action === 'stash_selection_for_drag' || action === 'capture_writing_context' || action === 'set_review_balloons' || (action === 'set_revision_view' && !params?.mode)) return executeWithReview(action, params, callOpts)
@@ -454,10 +454,7 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
       // 在原位置落字）。不带这个标记的 insert_at_cursor 仍是「塌到选区末尾追加」——
       // AI 与插件管线依赖那条语义（先 select 再 insert_at_cursor 表示「插在后面」）。
       commit: (text) => endpoint.executor.executeCommand('insert_at_cursor', { text, replaceSelection: true }),
-      getCursorRaw: () => endpoint.executor.executeCommand('get_cursor_rect', {}).then((r) => {
-        selectionDrag?.updateFromCursorRaw(r)
-        return r
-      }),
+      getCursorRaw: () => endpoint.executor.executeCommand('get_cursor_rect', {}),
       // Control keys: the overlay swallows keystrokes (it IS the focused input),
       // so Enter/Backspace/arrows must be forwarded to the worker explicitly.
       // The worker actions (insert_paragraph/delete_backward/move_cursor) have
