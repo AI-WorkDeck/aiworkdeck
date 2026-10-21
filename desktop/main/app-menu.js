@@ -19,6 +19,7 @@
 const { app, Menu, ipcMain, dialog } = require('electron')
 const { t, onAppLanguageChange } = require('./app-language')
 const { isReloadLocked } = require('./reload-guard')
+const { showAboutWindow } = require('./about-window')
 
 // 菜单里的应用名写死，**不要用 app.name**：desktop/package.json 没有顶层 productName，
 // Electron 于是拿 name 字段当 app.name，菜单会显示「关于 aiworkdeck-desktop」。
@@ -182,7 +183,7 @@ function buildTemplate() {
   template.push({
     label: APP_DISPLAY_NAME,
     submenu: [
-      { role: 'about', label: t({ zh: '关于 ', en: 'About ' }) + APP_DISPLAY_NAME },
+      { label: t({ zh: '关于 ', en: 'About ' }) + APP_DISPLAY_NAME, click: () => showAboutWindow(getWindow()) },
       ...(pushedItems('app').length ? [{ type: 'separator' }, ...pushedItems('app')] : []),
       { type: 'separator' },
       { role: 'services', label: t({ zh: '服务', en: 'Services' }) },
@@ -266,52 +267,9 @@ function rebuild() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(buildTemplate()))
 }
 
-/**
- * 原生「关于」面板的版权与许可行（AGPL §0 Appropriate Legal Notices）。
- *
- * macOS 的 { role: 'about' } 打开的是系统面板，内容取自 .app 的 Info.plist；
- * setAboutPanelOptions 可以在运行期覆盖，且 Windows/Linux 上 Electron 会用同一份
- * 数据自绘一个面板。credits 只在 macOS 生效，Windows/Linux 靠 applicationVersion
- * 那行带出许可信息，两边都不落空。
- *
- * 版本号取 app.getVersion()（打包态 = desktop/package.json 的 version，单一来源）。
- */
-function applyAboutPanel() {
-  const copyright = [
-    '版权所有 2026 北京京微资易科技有限公司及 AI WorkDeck 贡献者',
-    'Copyright 2026 Beijing Jingwei Ziyi Technology Co., Ltd. and AI WorkDeck contributors',
-    '',
-    '本软件依 GNU Affero General Public License v3.0 或更高版本发布，不提供任何担保。',
-    'Released under the GNU AGPL v3.0 or later, with ABSOLUTELY NO WARRANTY.',
-    '',
-    '源代码 / Source code: https://github.com/AI-WorkDeck/aiworkdeck',
-    '许可证全文 / Full license: https://github.com/AI-WorkDeck/aiworkdeck/blob/master/LICENSE',
-    '商标说明 / Trademark notice: https://github.com/AI-WorkDeck/aiworkdeck/blob/master/legal/TRADEMARKS.md',
-    '',
-    '「AI WorkDeck」为北京京微资易科技有限公司的商标，再分发修改版时不得使用该名称作为产品名。',
-  ].join('\n')
-  try {
-    app.setAboutPanelOptions({
-      applicationName: APP_DISPLAY_NAME,
-      applicationVersion: app.getVersion(),
-      version: app.getVersion(),
-      // dev-board BUG-49：copyright 与 credits 曾经被设成同一份文本，macOS
-      // 原生「关于」面板会分别渲染标准版权行与 Credits 区块，两处内容一样
-      // 就是视觉上重复了一遍。不设置 credits，AGPL 许可告示（源码/许可证/
-      // 商标说明链接）仍完整保留在 copyright 里，只出现一次。
-      copyright,
-      website: 'https://github.com/AI-WorkDeck/aiworkdeck',
-    })
-  } catch (e) {
-    // 面板文案不是功能，拿不到就算了，绝不让它挡住菜单初始化
-    console.warn('[app-menu] setAboutPanelOptions 失败:', e && e.message)
-  }
-}
-
 function initAppMenu(mainWindowGetter, opts) {
   getWindow = mainWindowGetter
   destroyAllBrowserViews = (opts && opts.destroyAllBrowserViews) || (() => {})
-  applyAboutPanel()
   rebuild()
   // 语言切换只影响骨架文案；业务菜单的文案由渲染层重新下发（它自己也在换 i18n）。
   onAppLanguageChange(() => rebuild())
@@ -322,4 +280,4 @@ function initAppMenu(mainWindowGetter, opts) {
   })
 }
 
-module.exports = { initAppMenu, applyAboutPanel }
+module.exports = { initAppMenu }

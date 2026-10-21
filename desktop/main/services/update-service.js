@@ -123,7 +123,7 @@ function createUpdateService(ctx, hooks = {}) {
   // ctx: { packaged, dataDir, appVersion }
   // hooks: { onEvent(evt), extractTar(archive, destDir) => Promise, onLog }
   const state = {
-    phase: hooks.initialError ? 'error' : 'idle', // idle | checking | downloading | ready | error
+    phase: hooks.initialError ? 'error' : 'idle', // idle | checking | downloading | preparing | ready | error
     checkedAt: null,
     effectiveVersion: overlay.effectiveVersion(ctx),
     appVersion: ctx.appVersion,
@@ -255,6 +255,9 @@ function createUpdateService(ctx, hooks = {}) {
           if (Date.now() - lastProgressAt >= 250 || received === installer.size) { lastProgressAt = Date.now(); emit('progress') }
         } })
       if (r.size !== installer.size || r.sha256 !== installer.sha256.toLowerCase()) throw new Error('完整安装包 sha256 校验失败')
+      state.phase = 'preparing'
+      state.progress = null
+      emit('preparing', { version: installer.version })
       await hooks.prepareInstaller(file, installer.version)
       state.available = { version: installer.version, kind: 'installer' }
       state.majorAvailable = null
@@ -315,9 +318,7 @@ function createUpdateService(ctx, hooks = {}) {
           await downloadPatch(channel)
         } else if (state.phase !== 'ready') {
           state.phase = 'idle'
-          if (!state.majorAvailable) {
-            emit('up-to-date')
-          }
+          emit(state.majorAvailable ? 'major-available' : 'up-to-date')
         }
         return snapshot()
       } catch (e) {

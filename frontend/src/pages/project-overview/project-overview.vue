@@ -114,6 +114,7 @@
       </view>
 
       <view class="header-right">
+        <DesktopUpdateIndicator />
         <!-- 授权标识 chip（试用版 / 宽限预警）与余额不足 chip 已并进右上角账户入口的下拉
              （dev-board#1047 起不再单独占顶栏，spec 2026-09-29 §5.3；入口位置见 dev-board#1062）。 -->
         <!-- 顶部工具区（IDE 风格）：整理 / 分屏 / 浏览器 / 摘录 / AI / 工具 -->
@@ -2166,15 +2167,6 @@
       <BackendHealthStatus />
       <MobileBackupConsent v-if="isDesktopApp" />
       <MobileReceiveStatus v-if="isDesktopApp" :project-id="hasNamedProject ? projectId : null" @received="onVersionReloadFiles([])" />
-      <view
-        v-if="isDesktopApp && appUpdateStatusVisible"
-        class="status-item status-update"
-        :class="{ 'status-clickable': appUpdate.phase === 'ready' || appUpdate.phase === 'error' || !!appUpdate.majorAvailable }"
-        @tap="onStatusUpdateTap"
-      >
-        <view class="status-dot" :class="appUpdateDotClass"></view>
-        <text>{{ appUpdateStatusLabel }}</text>
-      </view>
       <view class="status-spacer"></view>
       <view v-if="activeFileLeft" class="status-item status-file">
         <text>{{ activeFileLeft.name }}</text>
@@ -2214,6 +2206,7 @@ import FileTree from '@/components/FileTree.vue'
 import QuickOpenPanel from '@/components/QuickOpenPanel.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 import AppMenuBar from '@/components/AppMenuBar.vue'
+import DesktopUpdateIndicator from '@/components/DesktopUpdateIndicator.vue'
 import FilePreview from '@/components/FilePreview.vue'
 import QuickLookDialog from '@/components/QuickLookDialog.vue'
 import VariablePanel from '@/components/VariablePanel.vue'
@@ -2427,6 +2420,7 @@ export default {
     QuickOpenPanel,
     CommandPalette,
     AppMenuBar,
+    DesktopUpdateIndicator,
     FileTree,
     FilePreview,
     QuickLookDialog,
@@ -2715,15 +2709,6 @@ export default {
       switcherProjects: [],
       switcherLoadFailed: false, // 拉取最近项目失败：与"确实没有其他最近项目"的空态区分开，不能吞成同一句文案
       versionWorkStatus: { enabled: false, working: false, changedCount: 0, onDraft: null }, // 底部状态栏工作状态点（顶栏胶囊已去掉）
-      // 应用内静默自动更新状态（左下角状态栏实时显示下载进度，就绪后一键/弹窗确认自动替换重启）
-      appUpdate: {
-        phase: 'idle',
-        available: null,
-        majorAvailable: null,
-        progress: null,
-        error: null,
-        promptedVersion: null,
-      },
       // 协作（团队案件库）状态：{linked, serverUrl, pendingUpload, remoteAhead, offline}
       collabCloud: null,
       collabDialogVisible: false,
@@ -2879,40 +2864,6 @@ export default {
     // ---------- Credits 余额 chip（dev-board#187） ----------
     walletChipVisible() {
       return this.wallet.loaded && this.wallet.connected
-    },
-    appUpdateStatusVisible() {
-      const u = this.appUpdate || {}
-      return u.phase === 'checking' || u.phase === 'downloading' || (u.phase === 'ready' && !!u.available) || !!u.majorAvailable
-    },
-    appUpdateDotClass() {
-      const u = this.appUpdate || {}
-      if (u.phase === 'ready' && u.available) return 'mint'
-      if (u.phase === 'downloading' || u.phase === 'checking') return 'amber'
-      if (u.majorAvailable) return 'amber'
-      return 'mint'
-    },
-    appUpdateStatusLabel() {
-      const u = this.appUpdate || {}
-      if (u.phase === 'ready' && u.available) {
-        const ver = u.available.version ? ` v${u.available.version}` : ''
-        return `新版本${ver} 已就绪 · 点击重启更新`
-      }
-      if (u.phase === 'downloading') {
-        const p = u.progress
-        const ver = (p && p.version) ? ` v${p.version}` : ''
-        if (p && p.total > 0) {
-          const pct = Math.min(100, Math.max(0, Math.round((p.received / p.total) * 100)))
-          return `正在后台下载更新${ver} (${pct}%)`
-        }
-        return `正在后台下载更新${ver}…`
-      }
-      if (u.phase === 'checking') {
-        return this.$t('shell.menuCheckingUpdate')
-      }
-      if (u.majorAvailable) {
-        return this.$t('admin.majorReleased', { version: u.majorAvailable.major })
-      }
-      return ''
     },
     // ---------- rail 日程徽标（dev-board#899） ----------
     // 读 taskStore 的响应式缓存：弹窗/面板/AI 以外的写操作都经 taskStore 就地更新，
@@ -3644,13 +3595,6 @@ export default {
     }
     this._desktopOpenInternalUnsub = null
 
-    try {
-      if (this._desktopUpdateUnsub) this._desktopUpdateUnsub()
-    } catch (e) {
-      // ignore
-    }
-    this._desktopUpdateUnsub = null
-
     // WPS iframe：内部链接 postMessage 监听清理
     try {
       if (this._wpsInternalMsgHandler && typeof window !== 'undefined') {
@@ -4278,7 +4222,6 @@ export default {
     }
     this._openWorkbenchMounted = true
     this.maybeRegisterOpenWorkbench()
-    this.initDesktopAutoUpdateListener()
   },
   watch: {
     projectId() { this.cancelFileTreePdfExport() },
@@ -8096,62 +8039,7 @@ export default {
         if (chat.unread) return this.$t('workbench.statusDone')
         return ''
     },
-    initDesktopAutoUpdateListener() {
-        if (!this.isDesktopApp || !host.update) return
-        const applyState = (st) => {
-            if (!st || typeof st !== 'object') return
-            this.appUpdate.phase = st.phase || 'idle'
-            this.appUpdate.available = st.available || null
-            this.appUpdate.majorAvailable = st.majorAvailable || null
-            this.appUpdate.progress = st.progress || null
-            this.appUpdate.error = st.error || null
-            if (st.phase === 'ready' && st.available && st.available.version) {
-                const ver = st.available.version
-                if (this.appUpdate.promptedVersion !== ver && this.isActiveOverviewInstance()) {
-                    this.appUpdate.promptedVersion = ver
-                    this.promptUpdateRestartModal(ver)
-                }
-            }
-        }
-        try {
-            if (typeof host.update.status === 'function') {
-                Promise.resolve(host.update.status()).then(applyState).catch(() => {})
-            }
-            if (typeof host.update.onEvent === 'function' && !this._desktopUpdateUnsub) {
-                this._desktopUpdateUnsub = host.update.onEvent((payload) => {
-                    applyState(payload)
-                })
-            }
-        } catch (e) {
-            // ignore
-        }
-    },
-    promptUpdateRestartModal(version) {
-        if (!host.update || typeof host.update.restart !== 'function') return
-        uni.showModal({
-            title: this.$t('admin.restartAppTitle'),
-            content: this.$t('admin.restartAppContent', {
-                version: version || this.$t('admin.newVersionFallback'),
-            }),
-            confirmText: this.$t('admin.restartNowButton'),
-            cancelText: this.$t('common.close'),
-            success: (res) => {
-                if (res && res.confirm) {
-                    host.update.restart()
-                }
-            },
-        })
-    },
-    onStatusUpdateTap() {
-        const u = this.appUpdate || {}
-        if (u.phase === 'ready' && u.available) {
-            this.promptUpdateRestartModal(u.available.version)
-            return
-        }
-        if (u.majorAvailable && host.shell && host.shell.openExternal) {
-            host.shell.openExternal(u.majorAvailable.page || 'https://www.aiworkdeck.com')
-        }
-    },
+
   }
 }
 </script>

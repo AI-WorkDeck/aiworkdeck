@@ -13,6 +13,12 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 - **desktop-build.yml**（发版主 workflow）：触发 = workflow_dispatch / tag `v*` / PR 改动 desktop|backend|frontend|pptx-service 路径（pptx-service 于 2026-09-09 补入，PR#766：它的源码与 requirements.lock 原样进包，re-vendor 类 PR 必须跑打包冒烟）。矩阵：tag 或手动 = mac+win；**普通 PR 只跑 windows**（mac runner 1h+）。每平台步骤顺序（**不可乱**，PR#176）：build:h5 → build:zetaoffice → fetch-lowa-assets（LOWA_BASE_URL=自建 zh-CN 引擎 24.2.8-zhcn-r2）→ desktop npm test → mvn package(-Djavacpp.platform) + prepare-backend(jar+jlink JRE) → CPython 运行时 `prepare-python-service.js --runtime-only 1`（**0.38.0 起四个 Python 服务不再随包**，见下「Python 运行时 pack」） → **(mac)sign-mac-natives.sh → 冒烟（backend /api/admin/wizard 120s；四个 Python 服务的冒烟移到 pack-release.yml 的 runtime 腿）** → electron-builder（mac 签名+公证，先抬 maxfiles/ulimit 524288 防 EMFILE；win 走 Azure Artifact Signing，tag/手动才签，见 4.3）→ 失败时 notarytool history/log 打印 Apple 拒因 → upload-artifact（dmg/exe + windows 腿单独产的 patch/*）。**发布收口在独立的 `release` job**（`needs: [build]`；`always()` 避免 tag 上 PR 专属祖先 job 的跳过传播，再显式检查 `!cancelled()`、`needs.build.result == 'success'` 和 tag，build 任一矩阵腿失败则不发布；`sync-mirror` 同样显式要求 release 成功，dev-board#74/#1399）：下载两平台 artifact 合并后统一跑 softprops/action-gh-release 附 dmg/exe/patch + 双语 body。
 - **star-history.yml**（周一 cron）：重画 star SVG 强推 star-history 分支。
 
+## 关于窗口与更新准备状态（dev-board#1401/#1402）
+
+`app-menu.js` 的关于入口使用 `about-window.js` 独立本地窗口，原生 About 的固定 copyright 区无法容纳完整双语许可文案。新窗口正文可换行/滚动、版本仅显示一次；保留版权、AGPL、源码/许可证/商标链接与说明。无脚本、sandbox/contextIsolation 开启，只允许三个固定法律链接交给系统浏览器，重复打开复用窗口。浅色/深色从 `design/tokens/awd-palette.json` 生成 --awd-* 角色令牌快照，测试逐项对拍；更新色源须同步该快照。验证：`desktop/tests/about-window.test.js`，真实窗口用 Electron 运行 `desktop/tests/about-window.electron.js`（独立 profile，不启动产品后端）。
+
+完整更新字节与哈希校验后、`prepareInstaller` 返回前，`update-service.js` 必须广播 `preparing`，只有原生准备成功才 `ready`。前端顶部/设置均覆盖该阶段；主页面就绪不自动弹重启确认，用户点击沿用已有保存/退出守卫。缺平台安装包退回手动下载时也必须广播最终 idle/major-available 快照，不能停在 checking。
+
 ## 发版链路
 
 - **Mac 原生升级的 JRE 权限（dev-board#1368，验收总卡 #1367）**：jlink 产出的 `jre/legal/` 中部分许可证为 `0444`。真实签名升级 run `39217849923` 已证明 ShipIt 在复制候选包后、验签/接管文件前清除 quarantine 时对 `java.xml/bcel.md` 报 `EACCES`，重试三次后放弃。`desktop/scripts/after-pack.js` 现在只给该目录内普通文件补 owner-write，保留内容、其他权限和符号链接，发生在外层 app 签名前；不可在验收时 chmod 已签名候选包来掩盖问题。`after-pack.test.js` 包含 macOS 真实 xattr 红绿复现；修复后仍须重打签名候选并跑 `full-upgrade-mac-smoke.yml`，原成功交接 ShipIt 的 0.65 baseline 可保留。该 smoke 在 ShipIt 明确终止重试时立即失败并保存原因，避免再空等十分钟。
