@@ -3401,10 +3401,17 @@ try {
             const el = [...container.querySelectorAll('*')].find((e) =>
               e.children.length === 0 && e.offsetParent !== null && e.innerText && e.innerText.trim() === lbl)
             if (!el) return null
+            // 已安装/Marketplace 各自滚动；offsetParent 非空不代表列表项在视口内。
+            // 先滚到真实可点击处，再命中测试，避免点击落到另一分组或编辑区。
+            el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
             const r = el.getBoundingClientRect()
-            return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+            const x = r.x + r.width / 2
+            const y = r.y + r.height / 2
+            const hit = document.elementFromPoint(x, y)
+            return { x, y, hit: hit === el || el.contains(hit) }
           }, containerSel, label)
           if (!box) throw new Error(`找不到文本(${containerSel} 内): ` + label)
+          if (!box.hit) throw new Error(`文本被遮挡(${containerSel} 内): ` + label)
           await j13Page.mouse.click(box.x, box.y)
           await sleep(500)
         }
