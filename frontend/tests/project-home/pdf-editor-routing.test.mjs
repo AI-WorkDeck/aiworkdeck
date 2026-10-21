@@ -18,3 +18,12 @@ test('PDF always uses the PDF preview, including files with the legacy editor id
 test('Writer and Calc retain their editor routing', () => {
   for (const fileType of ['docx', 'odt', 'xlsx']) assert.equal(vm.useLibreEditor({ fileType }), true)
 })
+
+test('QTA reaches media preview even with a legacy editor id', () => {
+  for (const fileType of ['qta', 'QTA']) {
+    const file = { id: 42, name: 'recording.qta', fileType, wpsFileId: 'local-42' }
+    assert.equal(vm.isFileTypeSupported(file), true)
+    assert.equal(vm.isEditorOpenableFile(file), false)
+    assert.equal(vm.useLibreEditor(file), false)
+  }
+})

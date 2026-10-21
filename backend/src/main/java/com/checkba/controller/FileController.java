@@ -78,6 +78,9 @@ public class FileController {
     @Autowired
     private com.checkba.service.ProjectFileAccessService fileAccess;
 
+    @Autowired
+    private com.checkba.service.meeting.MeetingAudioTranscoder audioTranscoder;
+
     @Autowired(required = false)
     @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
     private java.util.concurrent.Executor taskExecutor;
@@ -164,6 +167,107 @@ public class FileController {
         } catch (Exception e) {
             log.warn("发送版本变更信号失败: project={}", projectId, e);
         }
+    }
+
+    private static final long AUDIO_PREVIEW_MAX_BYTES = 512L * 1024 * 1024;
+
+    /** QTA 只在本机转换为浏览器可播放的副本；原文件下载接口仍返回原件。 */
+    @GetMapping("/{fileId}/audio-preview")
+    public ResponseEntity<Resource> audioPreview(
+            @PathVariable("fileId") Long fileId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader) {
+        ProjectFile file = projectFileRepository.findById(fileId).orElse(null);
+        if (file == null) return ResponseEntity.notFound().build();
+        if (!isAuthorizedForFile(null, sessionHeader, file)) {
+            return previewError(403, com.checkba.service.ProjectFileAccessService.UNAVAILABLE_MESSAGE);
+        }
+        if (!"qta".equalsIgnoreCase(file.getFileType())) {
+            return previewError(400, com.checkba.service.LangText.of(
+                    "此预览转换仅用于 QTA 音频", "This preview conversion only supports QTA audio"));
+        }
+        java.nio.file.Path workDir = null;
+        try {
+            workDir = java.nio.file.Files.createTempDirectory("awd-qta-preview-");
+            var input = workDir.resolve("source.qta");
+            Resource sourceResource = getStorageService().load(file.getFilePath());
+            if (sourceResource.isFile() && sourceResource.contentLength() > AUDIO_PREVIEW_MAX_BYTES) {
+                cleanupAudioPreview(workDir);
+                return audioPreviewTooLarge();
+            }
+            long copied;
+            try (var source = sourceResource.getInputStream(); var destination = java.nio.file.Files.newOutputStream(input)) {
+                // 长度未知或元数据过期也不能无限复制；含 end 的范围最多读上限加一字节。
+                copied = org.springframework.util.StreamUtils.copyRange(source, destination, 0, AUDIO_PREVIEW_MAX_BYTES);
+            }
+            if (copied > AUDIO_PREVIEW_MAX_BYTES) {
+                cleanupAudioPreview(workDir);
+                return audioPreviewTooLarge();
+            }
+            var output = audioTranscoder.toPreviewMp3(input.toFile(), workDir);
+            var cleanupDir = workDir;
+            var stream = new java.io.FilterInputStream(java.nio.file.Files.newInputStream(output.toPath())) {
+                @Override public void close() throws IOException {
+                    try { super.close(); } finally { cleanupAudioPreview(cleanupDir); }
+                }
+            };
+            // XHR 先完整获取 MP3 再播放，InputStreamResource 不做 Range，流关闭时删除临时副本。
+            return ResponseEntity.ok().contentType(MediaType.parseMediaType("audio/mpeg"))
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .contentLength(output.length()).body(new InputStreamResource(stream));
+        } catch (java.util.concurrent.TimeoutException e) {
+            cleanupAudioPreview(workDir);
+            return previewError(504, com.checkba.service.LangText.of(
+                    "准备 QTA 音频预览超时。请将录音导出为 M4A 后打开；原文件未修改。",
+                    "QTA audio preview preparation timed out. Export the recording as M4A and open it again. The original file is unchanged."));
+        } catch (Exception | LinkageError e) {
+            cleanupAudioPreview(workDir);
+            // JavaCV tryLoad 把 Loader 的 LinkageError 包在 IOException 内；不能按外层类型误报磁盘。
+            if (hasNativeLinkageFailure(e)) {
+                return previewError(503, com.checkba.service.LangText.of(
+                        "内置音频组件未能加载。请重新安装 AI WorkDeck 后重试；也可先将录音导出为 M4A。",
+                        "The built-in audio component could not load. Reinstall AI WorkDeck and try again, or export the recording as M4A."));
+            }
+            boolean codecFailure = e instanceof org.bytedeco.javacv.FrameGrabber.Exception
+                    || e instanceof org.bytedeco.javacv.FrameRecorder.Exception;
+            if (!codecFailure && (e instanceof IOException || e instanceof StorageException)) {
+                return previewError(500, com.checkba.service.LangText.of(
+                        "无法读取录音或写入临时预览文件。请检查文件是否仍存在、磁盘空间和文件访问权限，再重新打开。",
+                        "Could not read the recording or write its temporary preview. Check that the file still exists, disk space and file permissions, then open it again."));
+            }
+            log.warn("QTA preview failed for file {}: {}", fileId, e.toString());
+            return previewError(422, com.checkba.service.LangText.of(
+                    "无法预览这份 QTA 录音。文件可能损坏或包含无法安全选择的多层音轨。请在语音备忘录中分离录音层，分别导出为 M4A 后打开；原文件未修改。",
+                    "This QTA recording could not be previewed. It may be damaged or contain layered tracks that cannot be selected safely. Separate the recording layers in Voice Memos and export each as M4A. The original file is unchanged."));
+        }
+    }
+
+    private static boolean hasNativeLinkageFailure(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof LinkageError) return true;
+        }
+        return false;
+    }
+
+    private ResponseEntity<Resource> audioPreviewTooLarge() {
+        return previewError(413, com.checkba.service.LangText.of(
+                "QTA 预览暂时支持不超过 512 MB 的录音。请先分段或导出为 M4A 后打开；原文件未修改。",
+                "QTA preview currently supports recordings up to 512 MB. Split the recording or export it as M4A. The original file is unchanged."));
+    }
+
+    private ResponseEntity<Resource> previewError(int status, String message) {
+        return ResponseEntity.status(status).contentType(new MediaType("text", "plain", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(new org.springframework.core.io.ByteArrayResource(message.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private void cleanupAudioPreview(java.nio.file.Path dir) {
+        if (dir == null) return;
+        for (String name : List.of("source.qta", "meeting-audio.mp3")) {
+            try { java.nio.file.Files.deleteIfExists(dir.resolve(name)); }
+            catch (IOException e) { log.warn("Could not remove temporary audio preview: {}", e.toString()); }
+        }
+        try { java.nio.file.Files.deleteIfExists(dir); }
+        catch (IOException e) { log.warn("Could not remove temporary audio preview directory: {}", e.toString()); }
     }
 
     /**

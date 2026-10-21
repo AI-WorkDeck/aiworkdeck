@@ -552,7 +552,7 @@ export const fileOpenTabsMethods = {
         // 视频
         'mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi',
         // 音频
-        'mp3', 'wav', 'm4a', 'flac', 'aac',
+        'mp3', 'wav', 'm4a', 'flac', 'aac', 'qta',
         // 文本文件
         'txt', 'md', 'markdown', 'json', 'xml', 'html', 'css', 'js', 'java', 'py', 'sh', 'sql', 'log',
         // 压缩包（FilePreview 条目预览 + 解压）
@@ -582,7 +582,7 @@ export const fileOpenTabsMethods = {
           // Video
           'mp4','webm','ogg','mov','mkv','avi',
           // Audio
-          'mp3','wav','m4a','flac','aac'
+          'mp3','wav','m4a','flac','aac','qta'
       ]
       if (mediaTypes.includes(type)) return false
 

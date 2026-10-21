@@ -260,6 +260,13 @@ mtime+size 指纹没变，缓存里那句「请先转写」会永久生效且不
 真实 APAC 仍未实测，不承诺全部 Apple QTA 变体。回归 `MeetingAudioTranscoderQtaTest`、
 `MeetingQtaTranscriptionTest` 使用合成 QuickTime 多音轨和本机原生库，云端协作者全 mock；
 夹具来源与限制在 `backend/src/test/resources/fixtures/media/two-track-audio.md`。
+**QTA 预览（dev-board#1378）**：工作台打开判据与 `mediaTypes.js` 均接受 QTA；`MediaPlayer` 通过带会话头的
+`GET /api/files/{id}/audio-preview` 获取本机生成的 MP3 blob，不直播 QTA 原件、不走转写云端。
+端点先用 `ProjectFileAccessService` 检查读权限；临时原件/MP3 在错误或响应流关闭时清理，下载原件接口不变。
+预览复用上述安全选轨，44.1kHz、最多双声道；源文件复制上限512 MB（长度未知也有界），超限提示分段或导出M4A。
+多层拒绝、组件缺失、磁盘读写、超时分别显示提示；JavaCV的编解码异常本身也是IOException，须优先区分，native加载失败沿cause链识别LinkageError。
+前端请求超时5分钟，转码逐帧检查4分钟期限/线程中断（不是对原生调用阻塞的强制终止）。
+压缩包内 QTA 需先解压为项目文件；临时 blob 不走伪造项目ID。回归 `FileControllerQtaPreviewTest`、`tests/media/qtaPreview.test.mjs`。
 依据：[Apple QTA/AAC/APAC](https://developer.apple.com/videos/play/wwdc2025/251/)、
 [Apple 分层录音](https://support.apple.com/en-ie/guide/ipad/ipadb372d34f/27/ipados/27)、
 [听悟功能说明](https://help.aliyun.com/zh/tingwu/features)。
