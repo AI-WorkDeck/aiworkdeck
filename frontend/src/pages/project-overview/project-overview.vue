@@ -2519,7 +2519,7 @@ export default {
 
       // 布局状态
       sidebarWidth: 260, // 侧边栏宽度
-      sidebarCollapsed: false,
+      sidebarCollapsed: true,
       isCompactLayout: false,
       leftPaneKey: null, // Initialize to null to prevent premature loading
       // 「语音」面板内部的 tab（语音合成 / 会议录音）。刻意不持久化：
@@ -3744,7 +3744,7 @@ export default {
     // rail 图标顺序（dev-board#204）：同为本机习惯，跟停靠位一起在首帧前恢复
     this.loadRailOrder()
     // 左栏收起状态（dev-board#727）：同为本机习惯，不带 projectId
-    this.sidebarCollapsed = loadSidebarCollapsed(uni)
+    this.sidebarCollapsed = loadSidebarCollapsed(uni, !this.hasNamedProject)
     this.initThemeSwitch()
 
     // 存储键：有项目按项目分，无项目落 global_*（此前无项目态写的是 project_null_*）
