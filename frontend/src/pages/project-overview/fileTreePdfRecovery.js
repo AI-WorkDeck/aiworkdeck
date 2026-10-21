@@ -10,7 +10,8 @@ function targetTab(vm, file) {
 }
 
 function loadFailed(editor) {
-  return editor.docLoadFailed || (editor.isError && !['saveFailed', 'movedSaveFailed'].includes(editor.statusKey))
+  const loading = ['loadingDoc', 'booting', 'reloading'].includes(editor.statusKey)
+  return (editor.docLoadFailed && !loading) || (editor.isError && !['saveFailed', 'movedSaveFailed'].includes(editor.statusKey))
 }
 
 export async function resumePdfExport(vm, file, { timeoutMs = 300000, pollMs = 100, retry = false } = {}) {
@@ -38,7 +39,7 @@ export async function resumePdfExport(vm, file, { timeoutMs = 300000, pollMs = 1
       const editor = vm._libreRefs?.[key]
       if (editor && String(editor.file?.id) === String(file.id)) {
         if (loadFailed(editor) || ['desktopOnly', 'unsupported'].includes(editor.statusKey)) throw new Error('editor failed')
-        if (editor.ready && editor.executor && !editor._reloading && !editor.loadingOverlayVisible) {
+        if (editor.ready && editor.executor && !editor.docLoadFailed && !editor._loadInFlight && !editor._reloading && !editor.loadingOverlayVisible) {
           const executor = editor.executor
           const stillCurrent = () => current() && vm._libreRefs?.[key] === editor && editor.executor === executor && String(editor.file?.id) === String(file.id)
           vm.pdfRecovery = { name: file.name, phase: 'exporting' }

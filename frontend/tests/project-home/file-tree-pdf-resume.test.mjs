@@ -92,3 +92,17 @@ test('failed editor gets a local retry without replacing a dirty editor', async 
   assert.equal(await vm.retryFileTreePdfExport(), true)
   assert.equal(reloads, 1)
 })
+
+test('retry waits while the real editor retains its failed-load save guard', async () => {
+  const { vm, editor, calls } = setup({ existing: true })
+  Object.assign(editor, { ready: true, docLoadFailed: true, dirty: false, statusKey: 'loadFailed', isError: true })
+  editor.retryLoad = () => {
+    editor.statusKey = 'loadingDoc'; editor.isError = false; editor._loadInFlight = true
+    setTimeout(() => {
+      editor.docLoadFailed = false; editor.statusKey = 'ready'; editor._loadInFlight = false
+    }, 10)
+  }
+  vm._libreRefs['left:7'] = editor
+  assert.equal(await resumePdfExport(vm, file, { retry: true, pollMs: 1 }), true)
+  assert.equal(calls.filter(c => c[0] === 'export').length, 1)
+})
