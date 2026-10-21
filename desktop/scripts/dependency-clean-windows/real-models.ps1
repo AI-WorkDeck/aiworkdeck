@@ -37,11 +37,15 @@ function Run-Checked([string]$Exe, [string[]]$Arguments, [string]$Label, [int]$S
     }) -join ' '
     $p = Start-Process -FilePath $Exe -ArgumentList $quoted -WorkingDirectory $Output -PassThru -NoNewWindow `
         -RedirectStandardOutput (Join-Path $Output "$Label.stdout.log") -RedirectStandardError (Join-Path $Output "$Label.stderr.log")
+    # Windows PowerShell 5.1 otherwise loses ExitCode for redirected async processes.
+    # https://github.com/PowerShell/PowerShell/issues/5421
+    $processHandle = $p.Handle
     if (-not $p.WaitForExit($Seconds * 1000)) {
         & "$env:SystemRoot\System32\taskkill.exe" /PID $p.Id /T /F | Out-Null
         throw "$Label exceeded $Seconds seconds"
     }
     $p.WaitForExit()
+    if ($null -eq $p.ExitCode) { throw "$Label returned no exit code" }
     if ($p.ExitCode -ne 0) { throw "$Label exited $($p.ExitCode); inspect $Output logs" }
 }
 $values = @{
@@ -64,6 +68,12 @@ try {
         $previous[$key] = [Environment]::GetEnvironmentVariable($key,'Process')
         [Environment]::SetEnvironmentVariable($key,$values[$key],'Process')
     }
+    # Prove both success and failure detection before downloading the large runtimes.
+    Run-Checked $python @('-c','import time; time.sleep(.2)') 'exit-code-zero' 10
+    $rejected = $false
+    try { Run-Checked $python @('-c','import time,sys; time.sleep(.2); sys.exit(7)') 'exit-code-seven' 10 }
+    catch { if ("$_" -match 'exit-code-seven exited 7;') { $rejected = $true } else { throw } }
+    if (-not $rejected) { throw 'Native exit-code failure was not detected' }
     $config = Get-Content (Join-Path $Repo 'backend\src\main\resources\application.yml') -Raw
     $keyPem = [regex]::Match($config, '(?s)-----BEGIN PUBLIC KEY-----.*?-----END PUBLIC KEY-----').Value -replace '(?m)^\s+', ''
     if (-not $keyPem) { throw 'Missing published pack verification key' }
