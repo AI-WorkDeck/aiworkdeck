@@ -613,6 +613,7 @@
                   <text v-else-if="update.phase === 'downloading'" class="comp-sub">
                     {{ update.progress?.component === 'installer' ? $t('admin.downloadingInstaller') : (update.progress && update.progress.component ? $t('admin.downloadingPatchComp', { name: update.progress.component }) : $t('admin.downloadingPatch')) }}
                   </text>
+                  <text v-else-if="update.phase === 'preparing'" class="comp-sub">{{ $t('shell.updatePreparing') }}</text>
                   <text v-else-if="update.phase === 'ready'" class="comp-sub">
                     {{ $t('admin.updateReady', { version: update.available && update.available.version }) }}
                   </text>
@@ -636,7 +637,7 @@
                   <button
                     v-else
                     class="comp-btn"
-                    :disabled="update.phase === 'checking' || update.phase === 'downloading'"
+                    :disabled="['checking', 'downloading', 'preparing'].includes(update.phase)"
                     @tap="handleUpdateCheck"
                   >
                     {{ $t('admin.checkUpdateButton') }}

@@ -20,6 +20,8 @@ export default {
   catalogSaved: 'File saved',
 
   // project-list.vue: header and empty states
+  listPurpose: 'Find and switch projects. Browse project files in Explorer.',
+  busyOpeningFile: 'Opening file…',
   myProjects: 'My Projects',
   pullFromTeamLibrary: 'Pull a Case File from the Team Case Library',
   // Lands on the Personal group of the unified Settings page (merged 2026-08-20; key kept)
@@ -33,7 +35,7 @@ export default {
   emptyTitle: 'No projects yet',
   localEmptyTitle: 'No local projects yet',
   clientEmptyTitle: 'No shared case files yet',
-  emptyHint: 'Create a project or open an existing folder using the buttons above.',
+  emptyHint: 'Open a folder to start a project, or open a file on its own.',
   webEmptyHint: 'Create a project using the button above to start organizing your work.',
   // project-list.vue: view toggle and list-view column headers
   gridView: 'Grid view',

@@ -7,35 +7,22 @@
   <view class="project-list-pane" :class="{ 'is-client': isClientUser }">
     <view class="project-list-container">
       <view class="main-content">
-        <view v-if="SHOW_CLOUD_ACCEPT && !isClientUser && projects.length > 0" class="content-header">
-          <view class="header-actions">
-            <!-- 「从团队案件库取一份案卷」：被邀请的同事取回案卷的唯一入口（dev-board#444 邀请话术第 2 步指的就是它）。 -->
-            <template v-if="SHOW_CLOUD_ACCEPT && !isClientUser && projects.length > 0">
-              <button class="btn-secondary-small" @tap="openCloudAccept">{{ $t('projects.pullFromTeamLibrary') }}</button>
-            </template>
-          </view>
-        </view>
-
-        <!-- 新建：紧凑操作行，紧跟在页头下方——「已经有一堆案卷、想再开一个」与
-             「零项目新用户」共用同一个入口，不必等滚到列表底部才看得见。
-             桌面端就是「打开一个已有文件夹」与「新建一个项目文件夹」两件事——本产品的
-             项目 == 磁盘上的一个文件夹（localRoot），「单独打开一个文件」已去掉：它造出的是
-             个没有归属的临时项目，律师下次找不到它在哪。浏览器版没有系统文件夹对话框，
-             降级为托管空白项目。 -->
+        <!-- 打开文件夹为主入口；需要新目录时可在系统选择器中创建。
+             浏览器没有本机目录选择器，保留托管项目的创建入口。 -->
         <view v-if="!isClientUser" class="create-section">
           <view class="create-row">
             <template v-if="isDesktop">
-              <view class="create-card create-card-primary" :class="{ 'is-busy': busy }" @tap="onCreateFolder">
-                <svg class="create-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path v-for="(d, gi) in ICONS.folderPlus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-                <text class="create-title">{{ $t('account.createFolderTitle') }}</text>
-              </view>
-              <view class="create-card create-card-secondary" :class="{ 'is-busy': busy }" @tap="onOpenFolder">
+              <view class="create-card create-card-primary" :class="{ 'is-busy': busy }" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" @tap="onOpenFolder" @keydown.enter.prevent="onOpenFolder" @keydown.space.prevent="onOpenFolder">
                 <svg class="create-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path v-for="(d, gi) in ICONS.folderOpen" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
                 <text class="create-title">{{ $t('account.openFolderTitle') }}</text>
+              </view>
+              <view class="create-card create-card-secondary" :class="{ 'is-busy': busy }" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" @tap="onOpenFile" @keydown.enter.prevent="onOpenFile" @keydown.space.prevent="onOpenFile">
+                <svg class="create-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path v-for="(d, gi) in ICONS.files" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <text class="create-title">{{ $t('common.openFile') }}</text>
               </view>
             </template>
             <view v-else class="create-card create-card-primary" @tap="goToNewProject">
@@ -45,10 +32,20 @@
               <text class="create-title">{{ $t('projects.newProject') }}</text>
             </view>
           </view>
-          <text v-if="busy" class="create-busy-hint">{{ busyText }}</text>
+          <text v-if="busy" class="create-busy-hint" role="status" aria-live="polite">{{ busyText }}</text>
+        </view>
+
+        <view v-if="SHOW_CLOUD_ACCEPT && !isClientUser && projects.length > 0" class="content-header">
+          <view class="header-actions">
+            <!-- 「从团队案件库取一份案卷」：被邀请的同事取回案卷的唯一入口（dev-board#444 邀请话术第 2 步指的就是它）。 -->
+            <template v-if="SHOW_CLOUD_ACCEPT && !isClientUser && projects.length > 0">
+              <button class="btn-secondary-small" @tap="openCloudAccept">{{ $t('projects.pullFromTeamLibrary') }}</button>
+            </template>
+          </view>
         </view>
 
         <view class="panel-projects">
+          <text v-if="!isClientUser" class="project-list-purpose">{{ $t('projects.listPurpose') }}</text>
           <!-- 事项概览条（dev-board#898，spec 2026-09-25-task-calendar-redesign E2）：取代原来那张
                「N 全部项目」大统计卡。后三格可点，进日程页并滚到对应分组。
                CLIENT 看不到事项（TaskController 拒客户），整条不渲染。 -->
@@ -203,27 +200,6 @@
       </view>
     </view>
 
-    <!-- 新建项目文件夹：命名弹窗（与原 newproject 页同一套流程） -->
-    <view v-if="namingVisible" class="naming-mask" @tap.self="namingVisible = false">
-      <view class="naming-dialog">
-        <text class="naming-title">{{ $t('account.createFolderDialogTitle') }}</text>
-        <text class="naming-location">{{ $t('account.locationLabel', { path: namingParentDir }) }}</text>
-        <input
-          class="naming-input"
-          type="text"
-          :placeholder="$t('account.folderNamePlaceholder')"
-          :value="namingName"
-          :focus="namingVisible"
-          @input="e => { namingName = e.detail && e.detail.value }"
-          @confirm="confirmCreateFolder"
-        />
-        <view class="naming-actions">
-          <button class="awd-btn awd-btn-secondary" @tap="namingVisible = false">{{ $t('common.cancel') }}</button>
-          <button class="awd-btn awd-btn-primary" :disabled="!namingNameValid || busy" @tap="confirmCreateFolder">{{ $t('account.createBtn') }}</button>
-        </view>
-      </view>
-    </view>
-
     <InviteMemberDialog
       v-model:visible="showInviteModal"
       :project-id="currentInviteProjectId"
@@ -261,7 +237,7 @@ import { roleLabel, ROLE_LABELS } from '@/config/memberRoles.js'
 import { getCurrentUser } from '@/utils/auth.js'
 import { isDesktopHost, host } from '@/services/host.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
-import { openFolderFlow, createFolderFlow } from '@/utils/ideOpen.js'
+import { openFolderFlow, openFileFlow } from '@/utils/ideOpen.js'
 import { ICONS } from '@/config/icons.js'
 import { readLocalMode } from '@/services/accountProfile.js'
 import { isSoloLocalProject } from '@/utils/soloLocalProject.js'
@@ -327,10 +303,6 @@ export default {
       // 老版本壳没有 fs 命名空间时该降级到浏览器路径而不是给出点不动的按钮
       return isDesktopHost() && !!(host.fs && host.fs.showOpenDialog)
     },
-    namingNameValid() {
-      const n = (this.namingName || '').trim()
-      return !!n && !n.includes('/') && !n.includes('\\') && n !== '.' && n !== '..'
-    },
     // CLIENT 看得见别人分享给他的案卷（ProjectService.getUserProjects 把成员身份的项目
     // 也算进去），但建项目/取案卷/删除/重命名/邀请全部对他隐藏。
     // 角色在一次会话里不会变，computed 无响应式依赖只算一次正合适。
@@ -365,7 +337,7 @@ export default {
       return !!u && u.role === 'CLIENT'
     },
     anyDialogOpen() {
-      return this.namingVisible || this.showInviteModal || this.showCloudAccept
+      return this.showInviteModal || this.showCloudAccept
     },
   },
   data() {
@@ -391,18 +363,15 @@ export default {
       searchQuery: '',
       sort: { ...DEFAULT_SORT },
 
-      // 新建项目文件夹（原 newproject 页的流程，随新建入口一起搬过来）
+      // 本机文件或文件夹打开过程共用忙碌状态
       busy: false,
       busyText: '',
-      namingVisible: false,
-      namingParentDir: '',
-      namingName: '',
 
       loadProjectsSeq: 0,
     }
   },
   watch: {
-    // 本面板的弹窗（命名 / 加人 / 取案卷）是全屏浮层：桌面端 BrowserView 是原生层，
+    // 本面板的弹窗（加人 / 取案卷）是全屏浮层：桌面端 BrowserView 是原生层，
     // 不让它藏起来弹窗会被网页盖住「点了没反应」。经 overlayState 交给工作台那一处 watcher。
     anyDialogOpen(open) {
       setGlobalOverlay(!!open, this._overlayHolder)
@@ -710,29 +679,14 @@ export default {
       uni.navigateTo({ url })
     },
 
-    // ---- 新建入口（桌面）：与 utils/ideOpen.js 共用同一套流程 ----
+    // ---- 打开入口（桌面）：ideOpen 的协调器负责切项目前经 leaveWorkbench 落盘 ----
     async onOpenFolder() {
       if (this.busy) return
       await this.withBusy(this.$t('account.busyOpeningFolder'), () => openFolderFlow())
     },
-    async onCreateFolder() {
+    async onOpenFile() {
       if (this.busy) return
-      const res = await host.fs.showOpenDialog({
-        title: this.$t('account.selectLocationTitle'),
-        buttonLabel: this.$t('account.selectHereBtn'),
-        properties: ['openDirectory', 'createDirectory'],
-      })
-      if (!res || res.canceled || !res.filePaths || !res.filePaths.length) return
-      this.namingParentDir = res.filePaths[0]
-      this.namingName = ''
-      this.namingVisible = true
-    },
-    async confirmCreateFolder() {
-      if (!this.namingNameValid || this.busy) return
-      const parentDir = this.namingParentDir
-      const name = this.namingName.trim()
-      this.namingVisible = false
-      await this.withBusy(this.$t('account.busyCreatingProject'), () => createFolderFlow(parentDir, name))
+      await this.withBusy(this.$t('projects.busyOpeningFile'), () => openFileFlow())
     },
     async withBusy(busyText, flow) {
       this.busy = true

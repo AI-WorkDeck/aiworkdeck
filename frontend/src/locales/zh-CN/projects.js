@@ -20,6 +20,8 @@ export default {
   catalogSaved: '文件已保存',
 
   // project-list.vue：页头与空态
+  listPurpose: '查找和切换项目；项目内的文件请在资源管理器中查看。',
+  busyOpeningFile: '正在打开文件…',
   myProjects: '我的项目',
   pullFromTeamLibrary: '从团队案件库取一份案卷',
   // 落点是统一「设置」页的「个人」组（2026-08-20 个人中心并入设置，键名不动免得动调用点）
@@ -33,7 +35,7 @@ export default {
   emptyTitle: '暂无项目',
   localEmptyTitle: '暂无本机项目',
   clientEmptyTitle: '暂无共享案卷',
-  emptyHint: '从上方新建项目，或打开已有文件夹。',
+  emptyHint: '打开文件夹开始项目，也可以单独打开文件。',
   webEmptyHint: '从上方新建项目，开始整理工作资料。',
   // project-list.vue：视图切换与列表视图列名
   gridView: '方块视图',
