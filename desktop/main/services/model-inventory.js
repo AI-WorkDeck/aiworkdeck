@@ -7,7 +7,7 @@ const path = require('path')
 // Inventory sizes are captured only after the downloader succeeds, then checked without reading GBs.
 const MARKER = '.aiworkdeck-complete'
 const HF = {
-  'asr-models': ['Systran/faster-whisper-medium', ['config.json', 'tokenizer.json', 'vocabulary.json', 'model.bin']],
+  'asr-models': ['Systran/faster-whisper-medium', ['config.json', 'tokenizer.json', 'model.bin']],
   'kokoro-models': ['hexgrad/Kokoro-82M-v1.1-zh', ['config.json', 'kokoro-v1_1-zh.pth',
     'voices/zf_001.pt', 'voices/zm_010.pt', 'voices/af_maple.pt', 'voices/bf_vale.pt']],
 }
@@ -33,7 +33,16 @@ function inventory(id, dir) {
     root = path.join(hub, 'snapshots', revision)
     required = files
     json(path.join(root, 'config.json'))
-    if (id === 'asr-models') { json(path.join(root, 'tokenizer.json')); json(path.join(root, 'vocabulary.json')) }
+    if (id === 'asr-models') {
+      json(path.join(root, 'tokenizer.json'))
+      // CTranslate2 prefers the JSON string array, then the legacy one-token-per-line text.
+      const vocab = fs.existsSync(path.join(root, 'vocabulary.json')) ? 'vocabulary.json' : 'vocabulary.txt'
+      if (vocab.endsWith('.json')) {
+        const tokens = json(path.join(root, vocab))
+        if (!Array.isArray(tokens) || !tokens.length || tokens.some(token => typeof token !== 'string')) throw new Error('invalid ASR vocabulary')
+      } else if (!fs.readFileSync(path.join(root, vocab), 'utf8').trim()) throw new Error('empty ASR vocabulary')
+      required = [...files, vocab]
+    }
   } else if (id === 'mineru-models') {
     const config = json(path.join(dir, 'mineru.json'))
     root = config['models-dir']?.pipeline

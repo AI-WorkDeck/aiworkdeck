@@ -25,8 +25,8 @@ class ModelPresenceTest {
         Files.writeString(ref, revision);
         var files = new ArrayList<Map<String, Object>>();
         for (String name : List.of("config.json", "tokenizer.json", "vocabulary.json", "model.bin")) {
-            Files.writeString(modelRoot.resolve(name), "{}");
-            files.add(Map.of("path", snapshot + "/" + name, "size", 2));
+            Files.writeString(modelRoot.resolve(name), name.equals("vocabulary.json") ? "[\"!\",\"<|endoftext|>\"]" : "{}");
+            files.add(Map.of("path", snapshot + "/" + name, "size", Files.size(modelRoot.resolve(name))));
         }
         Files.writeString(dir.resolve(".aiworkdeck-complete"), new ObjectMapper().writeValueAsString(
                 Map.of("schema", 1, "id", "asr-models", "revision", revision, "root", snapshot, "files", files)));
@@ -68,4 +68,27 @@ class ModelPresenceTest {
         assertFalse(new ModelPresence(root.toString()).installed("asr-models"));
         assertFalse(new ModelPresence(root.toString()).installed("../asr-models"));
     }
+    @Test void realTextVocabularyIsAcceptedAndMissingOrMalformedVocabularyRejected() throws Exception {
+        Path model = fixture();
+        Files.delete(model.resolve("vocabulary.json"));
+        Files.writeString(model.resolve("vocabulary.txt"), "!\n<|endoftext|>\n<|startoftranscript|>\n");
+        Path marker = root.resolve("asr/.aiworkdeck-complete");
+        Files.writeString(marker, "2026-10-21T01:02:03.000Z");
+        ModelPresence presence = new ModelPresence(root.toString());
+        assertTrue(presence.installed("asr-models"));
+        Files.writeString(model.resolve("vocabulary.json"), "{}");
+        assertFalse(presence.installed("asr-models"));
+        Files.writeString(model.resolve("vocabulary.json"), "[\"!\"] trailing");
+        assertFalse(presence.installed("asr-models"));
+        Files.delete(model.resolve("vocabulary.json"));
+        Files.delete(model.resolve("vocabulary.txt"));
+        assertFalse(presence.installed("asr-models"));
+    }
+
+    @Test void downloadedOfficialModelInventoryIsAcceptedWhenProvided() {
+        String modelRoot = System.getenv("AWD_TEST_ASR_MODELS_ROOT");
+        org.junit.jupiter.api.Assumptions.assumeTrue(modelRoot != null, "Set AWD_TEST_ASR_MODELS_ROOT for real model validation");
+        assertTrue(new ModelPresence(modelRoot).installed("asr-models"));
+    }
+
 }
