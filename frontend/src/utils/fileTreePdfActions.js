@@ -34,3 +34,22 @@ export function canMergeItemsToPdf(items, viewMode = 'files') {
   if (viewMode === 'recycle' || !Array.isArray(items) || items.length < 2) return false
   return items.every((item) => item && !item.isFolder && !item.readOnly && MERGEABLE_TO_PDF_EXTENSIONS.has(resolveFileExtension(item)))
 }
+
+// A persistent recovery action reuses the normal file-open route; it never replaces an open editor's bytes.
+export function pdfConversionRecoveryOptions({ error, items, t, openFile, exportFile }) {
+  const office = (items || []).find(item => ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(resolveFileExtension(item)))
+  const guidance = office ? t(items.length > 1 ? 'fileTree.pdfRecoveryMerge' : 'fileTree.pdfRecoveryExport') : ''
+  return {
+    title: t('fileTree.convertToPdfFailed'),
+    content: [(error && error.message) || t('fileTree.convertToPdfFailed'), guidance].filter(Boolean).join('\n\n'),
+    showCancel: !!office,
+    confirmText: t(office ? (items.length === 1 ? 'fileTree.pdfExportBuiltIn' : 'fileTree.pdfOpenEditor') : 'common.confirm'),
+    cancelText: t('common.cancel'),
+    success: result => {
+      if (result.confirm && office) {
+        if (items.length === 1) exportFile(office)
+        else openFile(office)
+      }
+    },
+  }
+}

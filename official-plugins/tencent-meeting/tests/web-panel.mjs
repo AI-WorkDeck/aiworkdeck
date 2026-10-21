@@ -155,3 +155,17 @@ test('incomplete meeting material is labelled, errors render as text, and export
   assert.equal(p.calls.filter((call) => call.action === 'export').length, 0); assert.equal(p.chats.length, 0);
   await p.switch({ projectId: 2 }); assert.equal(p.$('completeness').hidden, true); assert.equal(p.$('completeness').textContent, '');
 });
+
+test('missing Node guidance is visible and checking again recovers without login', async (t) => {
+  let installed = false;
+  const p = await panel({ invoke: ({ action }) => action === 'status' && !installed
+    ? { cliAvailable: false, loggedIn: false, message: '已找到腾讯会议 CLI，但未找到 Node.js。请安装后重新检查连接。' } : undefined });
+  t.after(() => p.dom.window.close());
+  await p.click('refresh');
+  assert.match(p.$('connection-status').textContent, /未找到 Node.js/);
+  assert.equal(p.$('login').disabled, true);
+  installed = true;
+  await p.click('refresh');
+  assert.match(p.$('connection-status').textContent, /Synthetic User/);
+  assert.equal(p.calls.filter(call => call.action === 'login').length, 0);
+});

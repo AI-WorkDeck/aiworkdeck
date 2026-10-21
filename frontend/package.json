@@ -113,6 +113,7 @@
     "test:team": "node --test tests/team/*.test.mjs",
     "test:member-invite": "node --test tests/member-invite/*.test.mjs",
     "test:identity": "node --test tests/identity/*.test.mjs",
+    "test:external-dependencies": "node --test tests/external-dependencies/*.test.mjs",
     "test:optional-components": "node --test tests/optional-components/*.test.mjs",
     "test:window-chrome": "node --test tests/window-chrome/*.test.mjs",
     "test:desensitize": "node --test tests/desensitize/*.test.mjs",

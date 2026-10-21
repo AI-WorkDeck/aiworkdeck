@@ -82,6 +82,32 @@ class PptxServiceClientTest {
         ex.close();
     }
 
+    @Test
+    void localOcrUsesDedicatedEndpoint() {
+        server.createContext("/api/pdf/ocr-markdown-local", ex -> {
+            String body = readBody(ex.getRequestBody());
+            assertTrue(body.contains("synthetic.pdf"));
+            respond(ex, 200, "{\"data\":{\"markdown\":\"Synthetic recognized text\"}}");
+        });
+        startServer();
+        assertEquals("Synthetic recognized text", client.ocrPdfToMarkdown("synthetic.pdf"));
+    }
+
+    @Test
+    void legacyRuntime404StopsWithoutCallingUnsafeLegacyOcr() {
+        var legacyRequests = new java.util.concurrent.atomic.AtomicInteger();
+        server.createContext("/api/pdf/ocr-markdown-local", ex -> respond(ex, 404, "not found"));
+        server.createContext("/api/pdf/ocr-markdown", ex -> {
+            legacyRequests.incrementAndGet();
+            respond(ex, 200, "{\"data\":{\"markdown\":\"legacy cloud result\"}}");
+        });
+        startServer();
+        var failure = assertThrows(PptxServiceClient.LocalOcrUnsupportedException.class,
+                () -> client.ocrPdfToMarkdown("synthetic.pdf"));
+        assertTrue(failure.getMessage().contains("更新"), failure.getMessage());
+        assertEquals(0, legacyRequests.get(), "Never use the old runtime endpoint after 404");
+    }
+
     // ==== 修复 5：FAILED 分支的 error_message 一路带到调用方 ====
 
     /** 走完 create/outline/descriptions 三步，让第 4 步（等待描述生成任务）返回 FAILED。 */

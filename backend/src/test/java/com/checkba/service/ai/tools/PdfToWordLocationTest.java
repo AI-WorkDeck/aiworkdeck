@@ -29,7 +29,7 @@ class PdfToWordLocationTest {
             when(files.findFile(9L)).thenReturn(Optional.of(file(9, null, true)));
             String key = EditorBridgeService.pdfToWordKey(1L, generated.getParentId());
             when(bridge.generatedInRun(key)).thenReturn(2L);
-            var tools = new PdfTools(null, files, null, bridge, null, null, null, null);
+            var tools = new PdfTools(null, files, null, bridge, null, null, null, null, null, mock(com.checkba.service.ocr.OcrRoutingService.class), mock(com.checkba.service.ocr.PdfCloudOcrService.class));
             ProjectContextHolder.setProjectId("42");
             try { assertFalse(tools.pdf_to_word(1L, requested, false).startsWith("错误")); verify(bridge).generatedInRun(key); }
             finally { ProjectContextHolder.clear(); }
@@ -40,7 +40,7 @@ class PdfToWordLocationTest {
         when(files.getFile(1L)).thenReturn(file(1, 7L, false));
         var foreign = file(9, null, true); foreign.setProjectId(99L);
         when(files.findFile(9L)).thenReturn(Optional.of(foreign));
-        var tools = new PdfTools(null, files, null, bridge, null, null, null, null);
+        var tools = new PdfTools(null, files, null, bridge, null, null, null, null, null, mock(com.checkba.service.ocr.OcrRoutingService.class), mock(com.checkba.service.ocr.PdfCloudOcrService.class));
         ProjectContextHolder.setProjectId("42");
         try { assertTrue(tools.pdf_to_word(1L, 9L, false).contains("不属于本项目")); verifyNoInteractions(bridge); }
         finally { ProjectContextHolder.clear(); }

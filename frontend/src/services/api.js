@@ -1050,6 +1050,10 @@ export function uninstallMarketSkill(skillId) {
 // 四个可选组件的一次性快照（后端 PackController.optionalComponents）。
 // 这条端点**不发网络请求**（体积取内存/落盘快照，0 = 未知），首次登录面板可以放心在
 // 登录后立刻调它；要精确体积再按需打 packInfo。
+export function checkExternalDependencies() {
+  return request({ url: "/api/external-dependencies", method: "GET", timeout: 25000 });
+}
+
 export function optionalComponents() {
   return request({
     url: '/api/packs/optional-components',
@@ -4532,3 +4536,14 @@ export function getPluginDevTrust(pluginId) {
 export function setPluginDevTrust(pluginId, trusted) {
   return request({ url: `/api/plugins/${encodeURIComponent(pluginId)}/dev-trust`, method: 'POST', data: { trusted }, logBody: false })
 }
+
+// Explicit OCR fallback preference and authenticated per-task decisions.
+export const getOcrRouting = () => request({ url: '/api/ocr/routing', method: 'GET' })
+export const setOcrRouting = data => request({ url: '/api/ocr/routing', method: 'PUT', data })
+export const chooseOcrRouting = data => request({ url: '/api/ocr/routing/choice', method: 'POST', data })
+
+// Snapshot scope is held only in the originating UI task, so a late cancellation targets its account/server.
+export const cancelOcrRouting = (data, scope) => request({
+  url: scope ? scope.baseUrl.replace(/\/$/, '') + '/api/ocr/routing/cancel' : '/api/ocr/routing/cancel',
+  method: 'POST', data, header: scope?.headers, logBody: false,
+})

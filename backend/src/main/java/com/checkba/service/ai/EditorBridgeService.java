@@ -255,6 +255,7 @@ public class EditorBridgeService {
         dispatchedBulkInserts.remove(conversationId);
         generatedThisRun.remove(conversationId);
         componentWaits.remove(conversationId);
+        ocrRouteWaits.remove(conversationId);
     }
 
     /**
@@ -650,6 +651,20 @@ public class EditorBridgeService {
         } catch (Exception e) {
             log.error("Failed to send component_required for pack " + packId, e);
         }
+    }
+
+    private final java.util.Set<String> ocrRouteWaits = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    public boolean consumeOcrRouteWait(String conversationId) {
+        return conversationId != null && ocrRouteWaits.remove(conversationId);
+    }
+
+    /** OCR route choice shares the component wait terminal state and safe continuation. */
+    public void sendOcrRouteRequiredAction(Map<String, Object> fields) {
+        String conversationId = currentConversationId.get();
+        if (conversationId == null) return;
+        ocrRouteWaits.add(conversationId);
+        sendClientAction("ocr_route_required", conversationId, fields);
+        componentWaits.add(conversationId);
     }
 
     /** 埋点：服务端往返（action 是原语枚举名，params 内容不采集） */

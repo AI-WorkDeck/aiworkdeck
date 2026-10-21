@@ -17,7 +17,9 @@ export default {
 
   sizeUnknown: 'Checking size…',
   stateNotInstalled: 'Not installed',
-  stateReady: 'Ready',
+  stateReady: 'Installed (not run yet)',
+  stateServiceStarted: 'Service started (function not yet verified)',
+  errorServiceUnavailable: 'The component service could not start. Check the installation and retry.',
   stateDownloadingRuntime: 'Downloading runtime {percent}%',
   stateDownloadingModel: 'Downloading model {percent}%',
   stateStartingService: 'Starting the component…',
@@ -27,8 +29,11 @@ export default {
   stateFinalizingRuntime: 'Finishing up…',
   errorStalled: 'No progress for a long time, so we stopped waiting. Please retry; if it keeps failing, check the backend log under ~/.aiworkdeck/logs.',
   errorBackendRestarted: 'The background service restarted and interrupted the download. Please retry.',
-  stateFailed: 'Download failed: {msg}',
+  stateFailed: 'Preparation failed: {msg}',
   progressTotal: 'Overall {done}/{count} ({percent}%)',
+  cancelDownload: 'Cancel download',
+  checkStartup: 'Check startup',
+  verifyRepair: 'Verify and repair',
   retry: 'Retry',
 
   chatTitle: 'A component is required',
@@ -52,7 +57,7 @@ export default {
 
   backgroundDownload: 'Download in background',
   backgroundStarted: 'Downloading in the background. Track progress in Settings → Components.',
-  backgroundDone: '{name} is ready to use.',
+  backgroundDone: '{name} is installed and started. You can try using it.',
   backgroundFailed: '{name} failed to download: {msg}',
 
   asrRuntimeMissingAction: 'Download on-device speech recognition',

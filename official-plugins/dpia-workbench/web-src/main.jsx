@@ -4,9 +4,16 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { Workbench } from 'dpia-upstream-client';
 import { createHostAdapter } from './host-adapter.mjs';
+import { EnvironmentPanel } from './environment-panel.jsx';
 
 const root = createRoot(document.getElementById('app'));
 const h = React.createElement;
+function WorkbenchFrame({ adapter, events }) {
+  const [open, setOpen] = React.useState(false);
+  return h(React.Fragment, null,
+    h(EnvironmentPanel, { adapter, events, open, setOpen }),
+    h(Workbench, { ...adapter, openEnvironment: () => setOpen(true) }));
+}
 function message(text, error = false) {
   root.render(h('main', { className: 'boot-message', role: error ? 'alert' : 'status' }, text));
 }
@@ -34,6 +41,6 @@ async function start() {
   awd.events.on('project.switched', discard);
   awd.events.on('account.changed', discard);
   document.addEventListener('click', onExternalLink, true);
-  root.render(h(Workbench, adapter));
+  root.render(h(WorkbenchFrame, { adapter, events: awd.events }));
 }
 start().catch((error) => message(error.message, true));

@@ -19,8 +19,7 @@ public interface AgentToolComponent {
      * 而绝大多数用户机器上没有 Docker，模型把它当成"读图/OCR 的备选路子"调用，
      * 撞上 "Cannot run program docker" 后自己得出「OCR 环境不可用」的错误结论。
      *
-     * <p>实现必须自己缓存探测结果并且<b>绝不抛异常</b>：本方法在 ToolRegistry
-     * 的 @PostConstruct 里调用，抛出去就是后端起不来。
+     * <p>实现必须自己缓存探测结果并且<b>绝不抛异常</b>：本方法在每轮获取工具规格时调用，探测应有短缓存和超时，避免阻塞对话。
      */
     default boolean isAvailable() {
         return true;
@@ -29,8 +28,7 @@ public interface AgentToolComponent {
     /**
      * 本组件里此刻<b>确定</b>用不了的工具名（dev-board#750）。默认空集。
      *
-     * <p>与 {@link #isAvailable()} 的分工：那一个是**进程级**的（@PostConstruct 探一次，
-     * 例如本机有没有 Docker），这一个是**运行期**的——账户连没连、凭证配没配会在用户手里
+     * <p>与 {@link #isAvailable()} 的分工：那一个是**组件级**的（如 Docker 沙箱整体可用性，短缓存可恢复），这一个是**工具级**的——账户连没连、凭证配没配会在用户手里
      * 随时变，探一次没用。粒度也不同：这里按工具名，因为同一个组件里常常一半工具依赖外部
      * 服务、另一半是纯本地的（{@code WebTools} 的 search_web 要账户，browse_url 不要；
      * {@code LegalTools} 的 law_* 要账户，read_document 不要）。

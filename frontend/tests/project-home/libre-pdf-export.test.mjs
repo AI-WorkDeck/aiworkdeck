@@ -126,3 +126,18 @@ test('桌面端：用户取消不提示；存盘中断提示失败', async () =>
   assert.equal(cb.toasts.length, 1)
   assert.match(cb.toasts[0], /^editor\.pdfExportFailed/)
 })
+
+
+test('cancelled recovery drops late PDF bytes before opening Save As', async () => {
+  let resolve, current = true
+  const { vm, clicks, toasts } = setup()
+  vm.executor = { executeCommand: () => new Promise(r => { resolve = r }) }
+  const task = vm.exportPdf({ isCurrent: () => current })
+  await tick()
+  current = false
+  resolve(PDF)
+  assert.equal(await task, false)
+  assert.equal(clicks.length, 0)
+  assert.deepEqual(toasts, [])
+  assert.equal(vm._pdfExporting, false)
+})

@@ -46,6 +46,26 @@ class DpiaWorkbenchToolsTest {
         assertFalse(JSON.readTree(plugin.dpia_workbench_task("{}")).path("ok").asBoolean());
         assertTrue(requests.isEmpty());
     }
+    @Test void environmentCheckIsAuthorizedAndIndependentOfNodeAndPayloadPaths() throws Exception {
+        var commands = new ArrayList<List<String>>();
+        plugin.setEnvironmentCheck(new DpiaEnvironment((cmd, env) -> {
+            commands.add(cmd); return new DpiaEnvironment.Result(-1, "", "无法启动程序");
+        }, "Windows 11"));
+        host.allowed = false;
+        assertFalse(call("environmentCheck", "{}").path("ok").asBoolean());
+        assertTrue(commands.isEmpty());
+        host.allowed = true; host.settings.put("nodePath", "/trusted/node");
+        JsonNode result = call("environmentCheck", "{\"nodePath\":\"evil\",\"pythonPath\":\"evil\",\"sofficePath\":\"evil\"}");
+        assertTrue(result.path("ok").asBoolean()); assertFalse(result.path("value").path("ready").asBoolean());
+        assertEquals("/trusted/node", commands.getFirst().getFirst());
+        assertTrue(commands.stream().flatMap(List::stream).noneMatch("evil"::equals));
+        assertTrue(requests.isEmpty(), "Node RPC must not be used for readiness");
+        host.context = new ToolCall(9L, "agent", 1L, null);
+        int count = commands.size();
+        assertFalse(call("environmentCheck", "{}").path("ok").asBoolean());
+        assertEquals(count, commands.size());
+    }
+
     @Test void scopesUseHostIdentityAndActionCannotBeOverridden() throws Exception {
         assertTrue(call("list", "{\"userId\":999,\"projectId\":888,\"root\":\"/other\",\"action\":\"erase\"}").path("ok").asBoolean());
         assertEquals(dataRoot.resolve("u1/p9").toString(), request.command().getLast());
@@ -215,6 +235,10 @@ class DpiaWorkbenchToolsTest {
                 assertTrue(receipt.path("value").path("running").asBoolean(), "Acknowledgement must not claim the tool stopped");
                 assertEquals("session-1", host.cancel);
                 assertFalse(task.isDone(), "The process can still be completing its current tool");
+                ui.setEnvironmentCheck(new DpiaEnvironment((cmd, env) -> new DpiaEnvironment.Result(-1, "", "missing"), "Windows 11"));
+                Future<String> readiness = pool.submit(() -> ui.dpia_workbench_action("environmentCheck", "{}"));
+                assertTrue(JSON.readTree(readiness.get(1, TimeUnit.SECONDS)).path("ok").asBoolean(), "readiness must bypass the active task lock");
+                assertFalse(task.isDone());
             } finally { release.countDown(); }
             assertTrue(JSON.readTree(task.get(5, TimeUnit.SECONDS)).path("ok").asBoolean());
         }

@@ -23,7 +23,9 @@ export const componentDownloads = createComponentDownloadManager({
   packInfo,
   // 前端自己判出的失败（停滞、后端重启）要按界面语言取文案，缺 t 会退回中文兜底
   t,
-  modelDownload: (id) => host.model.download(id),
+  modelStatus: () => host.model.status(),
+  modelCancel: (id) => host.model.cancel(id),
+  modelDownload: (id, options) => host.model.download(id, options),
   onModelProgress: (cb) => host.model.onProgress(cb),
   ensureService: (name) => host.services.ensure(name),
   // 没有入口在前台盯着时的全局提示。uni-toast 挂在 document.body 上，

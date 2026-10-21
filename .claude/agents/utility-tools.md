@@ -348,6 +348,22 @@ AwdDialog 队列非空时持有 `overlayState` 的 `'awd-dialog'`（`utils/dialo
 
 **文件存储位置（PR-C）**：`service/storage/StorageLocationService.java` + `GET /api/storage/location`、`POST /api/storage/location`（迁移，需 stage.unlimited）、`POST /api/storage/location/reset`（恢复默认，不需权益）。搬的是**全局存储根**（项目文件与缓存区文件的落盘位置），因为缓存区文件就是项目文件。迁移策略：**复制 → 校验文件数与字节数（含源侧复查）→ 落配置 → 换指针，原目录保留为备份绝不删**；任一步失败清掉本次复制的副本并保持原路径。目标必须是空目录或不存在，且与源不互相嵌套——**嵌套判断在 `toRealPath()` 之后做**，纯词法比较挡不住指向源内部的软链（会把源复制进它自己，在数据根里造出几百个垃圾目录）。**源侧要复查**：只比「复制前的源」与「复制后的目标」，迁移期间自动保存进已复制目录的文件两边数字仍相等，会被静默留在旧根。源目录不可访问时拒绝迁移（否则 copyTree 会把源建出来，「0 个文件迁移成功」）。配置落 `~/.aiworkdeck/storage-location.json`（不落 DB：存储根必须在 JPA 起来之前就确定）。`ProjectStorageResolver.globalRoot` 因此改为 volatile + `relocate()`；能热切是因为 DB 存的是逻辑路径、git 的 gitDir/workTree 每次现算。
 
+**资源管理器 Office 转 PDF（dev-board#1385）**：`ProjectFilePdfService` 的 Office 路径只接受
+`LibreOfficePdfConverter` 的完整排版输出；原 POI/PDFBox 抽正文重画/过滤缺字的备用分支已删除。
+缺 LO、启动失败、超时、非零退出、无产物或无效 PDF 都阻断且不创建项目文件；图片转 PDF 与已有 PDF 合卷仍用内置 PDFBox。
+`FileTree` 单文件错误提供「使用内置引擎导出 PDF」，经 `file-export-pdf` → `fileTreePdfRecovery.js` 打开或激活普通可见标签，等待实际加载就绪后调用既有 `exportPdf({isCurrent})`，不替换或保存已打开的脏内容。保存失败不阻断当前内容导出；加载失败重试时必须等待异步加载完成，不能提前清编辑器的保存闸。
+过程条可取消/就地重试，切项目、关标签、换 executor 都作废旧任务；系统另存为由用户选位置，只有 download-done 才表示保存成功。多文件仍先分别导出再合卷，不虚报自动合并。
+发现器接受 `external.libreoffice.executable`、`LIBREOFFICE_PATH`、`SOFFICE_PATH`，支持完整执行文件/安装目录/app bundle，
+其次 Mac 系统/用户 Applications、Homebrew/常见 bin，Windows ProgramFiles/ProgramW6432/x86/LOCALAPPDATA 和 PATH。
+显式覆盖无效时不悄悄切另一套安装。独立 profile、参数数组无 shell、输出丢弃防管道阻塞、默认120秒等待后终止子进程。
+组件管理可注入同一 bean 的 `probe()`：只执行最多5秒 `--version`，返回 `Readiness(status, executable, message)`，
+状态 AVAILABLE/MISSING/NOT_EXECUTABLE/FAILED/TIMED_OUT。转换成功仅证明生成了有效 PDF，不能据此承诺任意专有字体像素级相同。
+桌面后端 spawnEnv 将真实包/开发目录的 `frontend/dist/zetaoffice/cjk-kai.ttf` 注入 `EXTERNAL_PDF_EDIT_CJK_FONT_PATH`，
+保留用户已有变量；`PdfEditService` 先验证可嵌入中文，实际替换/页码写入前再验证全部目标字形，失败不改原件。
+回归：`ProjectFilePdfFidelityTest`（合成中文/表格/页眉脚/分页，真实native有安装才跑）、`LibreOfficePdfConverterTest`、
+`PdfEditFontSafetyTest`（AWD_TEST_CJK_FONT 指向实际随包字体才跑嵌入项）、`backend-pdf-font.test.js`、
+`file-tree-pdf-recovery.test.mjs` 和真实H5 `pdf-conversion-recovery-ui.mjs`（只mock服务错误，不联系用户后端）。
+
 **文件预览/插入**：`FilePreview.vue`（docx/pdf/pptx/压缩包分流见 project-overview ~:5110-5157；PDF 走 Chromium 原生引擎渲染，标准 annotation 可见；watch `file.wpsFileId` 在 AI 改完 PDF 后自动重拉字节——reload_file 是 Object.assign 原地更新，file 对象引用不变，别删这个 watch）、`FilePickerDialog.vue`、`FileStagingArea.vue`（原 `FileLinkDropZone.vue` 已删：文件关联的落点改成编辑器画布本身，见 ai-doc-bridge.md「EvidenceLink 契约 → 前端」）；`FilePreview.vue` 还吃 `locator` prop（EvidenceLink 定位，详见下一条）；图片插入走 `libreofficeExecutorClient.js` insertImage → office_thread.js；desktop `file-service.js` + IPC `checkba:fs-read-file`（含敏感路径拦截+大小上限）；后端 `FileController.java`（download/upload/text/compare）、`ProjectFileController.java`（列表/folder/archive/批量/回收站/tags）、`DocFileLinkController.java`（doc-links）。
 
 **回收站「彻底删除」送系统废纸篓（dev-board#1051）**：桌面壳（`host.fs.trashItems` 存在，`FileTree.vue` 计算属性 `trashesToSystem`）下，单个与批量彻底删除（批量即「清空回收站」，没有单独端点）都走 `FileTree.permDeleteOne`：`GET /api/projects/{pid}/files/{id}/permanent/disk-paths`（仅 `security.local-mode`；物理路径经 `ProjectStorageResolver` 解析，与 `local-path` 同源；落在另一路径之下的子路径已折叠掉）→ 主进程 IPC `fs:trashItems`（`desktop/main/file-service.js` 的 `trashItems`，逐个 `shell.trashItem`，本来就不在算成功；只收已规范化的绝对路径，拒绝文件系统根、主目录及其祖先）→ **全部成功才** `DELETE .../permanent?diskHandled=true`（仅 local-mode 认，只清行不碰磁盘）。送废纸篓有一项失败就不清行，行留在回收站。非桌面壳原路（后端 `Files.delete`）。`ProjectFileService` 里磁盘半边（`collectPhysicalTargets`，缓存区目录与被活着的同名行占着的路径不在其中）与行半边（`purgeRows`）拆开，`diskPathsForPurge` 与后端直删共用同一份判定。护栏：`ProjectFileServiceTrashPurgeTest`、`ProjectFileControllerTrashDiskPathsTest`、`desktop/tests/trash-items.test.js`、`frontend/tests/project-home/file-tree-perm-delete-system-trash.test.mjs`。
@@ -570,3 +586,13 @@ FileTree 的节点/根/空白落点先认包内载荷，先同步快照与 claim
 `preventDefault()` 再启动 Electron 拖拽，避免两套拖拽竞争宿主输入。原生启动成功不等于结束；
 启动失败必须结束本次包内身份并提示，旧请求迟到失败不得清理或提示覆盖新手势。
 回归：`archive-entry-preview`、`archive-media-lifecycle`、`file-tree-archive-drop`、desktop `file-drag`。
+
+### 扫描 PDF 转 Word 的依赖与数据去向（dev-board#1387）
+
+本地路径按 `pptx-runtime` → `mineru-runtime` + `mineru-models` 准备，复用 `component_required` 停轮/装好后续跑。专用 `/api/pdf/ocr-markdown-local` 强制 local_only，旧资源包404不回退旧端点。Python一般解析默认本地、失败不暗转云；明确配置的其它云解析入口保留。
+
+本地不可用或失败时，`OcrRoutingService` 按当前用户的明确偏好继续：默认ask；已保存cloud允许调用既有 `OcrService` 的阿里云/计费通道；local进入既有组件准备卡。没有同意时发 `ocr_route_required`（复用同一component等待终态，编排器显示选择方式而非误说下载）。用户点击 `/api/ocr/routing/choice` 后前端自动续原会话；服务端随机decision绑定用户、会话、项目、文件及文件指纹，30分钟有效，严格重检会话归属与文件权限。用户可只选本次或记住；设置「账户与用量→扫描件识别」可更改。provider默认值、密钥、AI跨境同意、模型工具参数都不算此选择。云失败重新展示重试/本地选择，不自动无限重试；逐页全部完成才生成Word，单页失败/空白结果不产残缺文件，重试可能重复消耗已识别页的费用。OCR产物明确为内容转换而非保真布局。
+
+取消选择调用 `/api/ocr/routing/cancel` 撤回本任务 decision，保留到期前的取消记录，迟到 choice 不得重新授权；取消不修改用户此前记住的偏好。原 run 和已续跑 run 被取消后不能借保存的 cloud 偏好继续，新任务须重新选择。前端成功交接只清 UI，不误撤权；取消失败显示重试，并保留原账户/服务端请求范围。逐页渲染前、上传前和结果导出前重检取消及权限，最后一页请求期间取消也不生成迟到 Word；已发出的 HTTP 无法撤回，已识别页面可能已计费。纯白页不上传、不计费，但仍执行取消检查。
+
+验证：`PdfOcrDependenciesTest`、`OcrRoutingServiceTest`、`PdfCloudOcrServiceTest`、`AgentOrchestratorEditorBootingAndComponentStopTest`；前端 `tests/optional-components/ocr-routing.test.mjs` 与真实ChatInterface/SSE浏览器 `tests/chat-presentation-ui/ocr-routing.mjs`。合成输入/传输替身不等于真实付费调用、模型推理或安装包更新。线上pptx-runtime1.0.1无专用local端点，后续需另行构建签名发布；当前版本本地路径会明确不可用，但用户可选择已披露的云端OCR继续，无需等待本地新包。
