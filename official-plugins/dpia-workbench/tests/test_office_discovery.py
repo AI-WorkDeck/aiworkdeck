@@ -29,10 +29,37 @@ class OfficeDiscoveryTest(unittest.TestCase):
                     self.assertEqual(render.office(), str(gui))
 
     def test_windows_path_uses_console_entry(self):
-        with patch.dict(render.os.environ, {}, clear=True), \
-                patch.object(sys, 'platform', 'win32'), \
-                patch.object(render.shutil, 'which', side_effect=lambda name: 'cli-path' if name == 'soffice.com' else 'gui-path'):
-            self.assertEqual(render.office(), 'cli-path')
+        with tempfile.TemporaryDirectory() as folder:
+            cli, exe = Path(folder) / 'soffice.com', Path(folder) / 'soffice.exe'
+            for file in (cli, exe):
+                file.touch(); file.chmod(0o755)
+            with patch.dict(render.os.environ, {'Path': f';"{folder}";'}, clear=True), \
+                    patch.object(sys, 'platform', 'win32'):
+                self.assertEqual(render.office(), str(cli))
+
+    def test_windows_portable_path_exe_precedes_default_console(self):
+        with tempfile.TemporaryDirectory() as folder:
+            portable = Path(folder) / 'portable'
+            program = Path(folder) / 'system/LibreOffice/program'
+            portable.mkdir(); program.mkdir(parents=True)
+            exe, cli = portable / 'soffice.exe', program / 'soffice.com'
+            exe.touch(); exe.chmod(0o755); cli.touch()
+            with patch.dict(render.os.environ, {'PATH': str(portable), 'PROGRAMFILES': str(Path(folder) / 'system')}, clear=True), \
+                    patch.object(sys, 'platform', 'win32'), \
+                    patch.object(render.shutil, 'which', side_effect=lambda name: str(exe) if name == 'soffice' else None):
+                self.assertEqual(render.office(), str(exe))
+
+    def test_windows_first_path_exe_precedes_later_path_console(self):
+        with tempfile.TemporaryDirectory() as folder:
+            first, second = Path(folder) / 'first', Path(folder) / 'second'
+            first.mkdir(); second.mkdir()
+            exe, cli = first / 'soffice.exe', second / 'soffice.com'
+            for file in (exe, cli):
+                file.touch(); file.chmod(0o755)
+            with patch.dict(render.os.environ, {'PATH': f'"{first}";{second}', 'PROGRAMFILES': folder}, clear=True), \
+                    patch.object(sys, 'platform', 'win32'), \
+                    patch.object(render.shutil, 'which', side_effect=lambda name: str(cli) if name == 'soffice.com' else str(exe)):
+                self.assertEqual(render.office(), str(exe))
 
 
 if __name__ == '__main__':
