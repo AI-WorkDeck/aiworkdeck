@@ -719,9 +719,9 @@
 </template>
 
 <script>
-import { getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess, convertFileToPdf, mergeFilesToPdf, getFileLocalPath, getApiBaseUrl } from '@/services/api.js'
+import { subscribeLocalProjectFileChanges, getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess, convertFileToPdf, mergeFilesToPdf, getFileLocalPath, getApiBaseUrl } from '@/services/api.js'
 import { getAuthHeaders } from '@/utils/auth.js'
-import { host } from '@/services/host.js'
+import { host, isDesktopHost } from '@/services/host.js'
 import { showDialog } from '@/utils/dialog.js'
 import { findTopmostDeletedAncestor, summarizeDeleteResults, collapseToTopmostSelected, computeDisplayFiles } from '@/utils/fileTreeRecycle.js'
 import { groupByParent, buildTreeFromGroups } from '@/utils/fileTreeBuild.js'
@@ -731,7 +731,7 @@ import { warmDragImage, applyDragImage } from '@/utils/dragImage.js'
 import { readArchiveEntryDrag, isArchiveEntryDrag } from '@/utils/archiveEntryDrag.js'
 import { importArchiveEntry } from '@/services/api.js'
 import { nativeEvent, nativeDataTransfer, isExternalFileDrag, compatibleDropEffect, claimExternalDrop, captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
-import { prefetchLocalFilePath, startExternalFileDrag } from '@/utils/fileLocalDrag.js'
+import { prefetchLocalFilePath, startExternalFileDrag, clearLocalPathCache } from '@/utils/fileLocalDrag.js'
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
 import { canConvertItemToPdf, canMergeItemsToPdf, pdfConversionRecoveryOptions } from '@/utils/fileTreePdfActions.js'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
@@ -801,6 +801,7 @@ export default {
   data() {
     return {
       files: [],
+      fileLoadRequest: 0,
       fileAccessRequest: 0,
       fileAccessBusy: false,
       loading: false,
@@ -817,6 +818,8 @@ export default {
       dragOverIndex: -1, // H5拖拽悬停索引
       draggedIndex: -1, // H5拖拽源索引（仅用于"是不是原地放下"的快速判断，实际
                          // 移动谁必须靠下面的 draggedFileId 重新按 id 查，见 handleDrop）
+      dragSequence: 0,
+      draggedFileIds: [], // Snapshot the full selection for this drag, including checkbox selection.
       draggedFileId: null, // H5拖拽源文件 id：dragstart 时记下，drop 时按 id（而不是
                             // 下标）在（可能已经因为后台重载而重排过的）displayFiles
                             // 里重新定位，防止把并发上传触发的 loadFiles() 期间
@@ -1101,6 +1104,7 @@ export default {
     projectId: {
       immediate: true,
       handler() {
+        this.subscribeLocalFileChanges()
         this.fileAccessRequest++
         this.fileAccessBusy = false
         // 「展开更多」的渲染上限与引用角标都是按项目的，换项目必须归零
@@ -1132,6 +1136,8 @@ export default {
     }
   },
   mounted() {
+    this._fileChangesMounted = true
+    this.subscribeLocalFileChanges()
     // 预加载拖拽 ghost 小徽标（dragstart 现场加载来不及，见 utils/dragImage.js）
     warmDragImage()
     // uni <view> drops native dblclick fields; delegate from the actual DOM root.
@@ -1159,6 +1165,10 @@ export default {
     if (typeof window !== 'undefined') window.addEventListener('keydown', this._onTagDialogKeydown, true)
   },
   beforeUnmount() {
+    this._fileChangesMounted = false
+    this._fileChangesStop?.()
+    this._fileChangesStop = null
+    this.fileLoadRequest++
     this.fileAccessRequest++
     this.$el?.removeEventListener?.('dblclick', this.onFileDoubleClick)
     if (this._marqueeRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._marqueeRaf)
@@ -1168,6 +1178,15 @@ export default {
     if (typeof window !== 'undefined') window.removeEventListener('keydown', this._onTagDialogKeydown, true)
   },
   methods: {
+    subscribeLocalFileChanges() {
+      this._fileChangesStop?.()
+      this._fileChangesStop = null
+      if (!this._fileChangesMounted || !this.projectId || !isDesktopHost()) return
+      const projectId = this.projectId
+      this._fileChangesStop = subscribeLocalProjectFileChanges(projectId, () => {
+        if (this._fileChangesMounted && String(this.projectId) === String(projectId)) return this.loadFiles()
+      })
+    },
     async handleFileClientAccess(item) {
       this.closeContextMenu()
       if (!item || item.isFolder || item.readOnly || this.viewMode === 'recycle' || this.fileAccessBusy) return
@@ -1249,12 +1268,15 @@ export default {
       this.loadFiles()
     },
     async loadFiles() {
+      const requestId = ++this.fileLoadRequest
+      const current = () => requestId === this.fileLoadRequest
       if (!this.projectId) {
         console.warn('FileTree: projectId 未设置，无法加载文件列表')
         return
       }
 
       this.loading = true
+      clearLocalPathCache()
       // 整树重载：窗口化上限回到初始值，引用角标整批重拉（旧值会被覆盖而不是叠加）
       this.revealCounts = {}
       this.refCounts = {}
@@ -1266,12 +1288,16 @@ export default {
         }
         if (this.viewMode === 'recycle') {
            this.files = [] // Clear existing
-           this.recycleBin = await getRecycleBinFiles(projectId)
+           const recycleBin = await getRecycleBinFiles(projectId)
+           if (!current()) return
+           this.recycleBin = recycleBin
            // Recycle mode usually displays `recycleBin` data, not `files`.
            // Ensure the template uses `recycleBin`.
         } else if (this.showTree) {
           // 加载完整文件树
-          this.allFiles = await getProjectFiles(projectId, null, true)
+          const allFiles = await getProjectFiles(projectId, null, true)
+          if (!current()) return
+          this.allFiles = allFiles
 
           // 过滤掉系统文件夹（在 allFiles 层面过滤，确保所有地方都不会显示）
           const hiddenNames = new Set(['.stagezone', '__staging_area__'])
@@ -1281,17 +1307,20 @@ export default {
         } else {
           // 只加载当前文件夹下的文件
           let files = await getProjectFiles(projectId, this.parentId)
+          if (!current()) return
 
           // 过滤掉系统文件夹
           const hiddenNames = new Set(['.stagezone', '__staging_area__'])
           this.files = files.filter(f => !hiddenNames.has(f.name))
         }
+        clearLocalPathCache()
         this.scheduleRefCountsFetch({ reload: true })
         // 插件事件通道（规范 v2.7）：文件清单刷新的单一汇聚点——SSE refresh_files、
         // 窗口 focus 兜底、用户增删改、目录/项目切换全部流经这里；PluginPane 按订阅转发
         uni.$emit('awd:files-changed', { projectId })
         console.log('加载文件列表成功:', this.files)
       } catch (error) {
+        if (!current()) return
         // 完整打印错误信息，包括堆栈、响应数据等
         console.error('加载文件列表失败:', error)
         console.error('错误详情:', {
@@ -1310,7 +1339,7 @@ export default {
           duration: 3000
         })
       } finally {
-        this.loading = false
+        if (current()) this.loading = false
       }
     },
     // Old handleItemClick removed
@@ -2869,8 +2898,12 @@ export default {
     },
     handleDragStart(e, item, index) {
       console.log('拖拽开始:', index)
+      this.dragSequence++
       this.draggedIndex = index
       this.draggedFileId = (item && item.id != null) ? item.id : null
+      const selectedIds = this.currentSelectedIds()
+      this.draggedFileIds = selectedIds.some(id => String(id) === String(item?.id))
+        ? selectedIds.slice() : (item?.id != null ? [item.id] : [])
       this.recordDragStartPoint(e)
 
       // Fallback: Global variable for environments where dataTransfer is cleared
@@ -2953,6 +2986,51 @@ export default {
       }
     },
     // #endif
+    async moveDraggedSelection(targetParentId) {
+      const projectId = this.projectId
+      const sequence = this.dragSequence
+      const nodes = this.checkTreeNodes()
+      const ids = this.draggedFileIds.slice()
+      const byId = new Map(nodes.map(file => [String(file.id), file]))
+      try {
+        if (ids.some(id => !byId.has(String(id)))) throw new Error(this.$t('fileTree.moveFailed'))
+        const roots = collapseToTopmostSelected(ids, nodes).roots
+        // Reject the entire drop into any selected folder or its descendants.
+        const selected = new Set(roots.map(String))
+        const seen = new Set()
+        let parent = targetParentId
+        while (parent != null && !seen.has(String(parent))) {
+          if (selected.has(String(parent))) throw new Error(this.$t('fileTree.dropInvalidTarget'))
+          seen.add(String(parent))
+          parent = byId.get(String(parent))?.parentId
+        }
+        const moving = roots.filter(id => !parentIdsEqual(byId.get(String(id)).parentId, targetParentId))
+        if (!moving.length) return
+        const result = await batchMoveFiles(Number(projectId), moving, targetParentId)
+        const moved = result?.data?.files || []
+        const occupied = moving.filter(id => !moved.some(file => String(file.id) === String(id) && parentIdsEqual(file.parentId, targetParentId))).length
+        if (String(this.projectId) !== String(projectId)) return
+        if (sequence === this.dragSequence) {
+          this.multiSelectedIds = []
+          this.selectedFileId = null
+          this.clearChecked()
+        }
+        uni.showToast({
+          title: occupied > 0
+            ? (occupied === 1 ? this.$t('workbenchOps.fileMoveOccupied') : this.$t('workbenchOps.filesMoveOccupiedCount', { count: occupied }))
+            : this.$t(targetParentId == null ? 'fileTree.moveToRootSuccess' : 'fileTree.moveSuccess'),
+          icon: occupied > 0 ? 'none' : 'success'
+        })
+      } catch (error) {
+        if (String(this.projectId) === String(projectId)) {
+          uni.showToast({ title: error.message || this.$t('fileTree.moveFailed'), icon: 'none' })
+        }
+      } finally {
+        if (sequence === this.dragSequence) this.handleDragEnd()
+        // A rejected batch may already have moved bytes; always read back its final state.
+        if (String(this.projectId) === String(projectId)) await this.loadFiles()
+      }
+    },
     handleDragOver(e, index) {
       e.preventDefault()
       const dt = nativeDataTransfer(e)
@@ -3012,7 +3090,7 @@ export default {
 
       // Case 1: Internal FileTree Drag (Reordering)
       if (this.draggedIndex !== -1) {
-          if (this.draggedIndex === index) {
+          if (String(this.draggedFileId) === String(targetItem.id)) {
             this.dragOverIndex = -1
             this.draggedIndex = -1
             this.draggedFileId = null
@@ -3021,6 +3099,11 @@ export default {
           // 误拖（位移 < 8px，dev-board#916/#989）：不移入、不提示，只清高亮。
           // 冒泡到容器的那次由 onTreeDrop 的 isNodeDropTarget 挡掉。
           if (this.isAccidentalDrag(e)) { this.dragOverIndex = -1; return }
+
+          if (this.draggedFileIds.length > 1) {
+            await this.moveDraggedSelection(targetParentId)
+            return
+          }
 
           try {
             // BUGFIX（原用 displayFiles[this.draggedIndex]，仍会撞上同一类竞态）：
@@ -3127,6 +3210,7 @@ export default {
       this.draggedFileId = null
     },
     handleDragEnd() {
+      this.draggedFileIds = []
       this.draggedIndex = -1
       this.draggedFileId = null
       this.dragOverIndex = -1
@@ -3178,6 +3262,10 @@ export default {
       if (this.draggedIndex !== -1) {
           // 误拖（位移 < 8px，dev-board#916/#989）：不移动、不提示（高亮已在上面清掉）
           if (this.isAccidentalDrag(e)) return
+          if (this.draggedFileIds.length > 1) {
+            await this.moveDraggedSelection(targetParentId)
+            return
+          }
           try {
             // 同 handleDrop 的 BUGFIX：按 dragstart 时记下的 id 重新定位，不用可能
             // 已经因后台重载而过期的下标。
@@ -3346,7 +3434,7 @@ export default {
         // 已在根目录：原地不动，不发请求也不提示
         const draggedItem = this.displayFiles.find(f => f.id === this.draggedFileId)
         // （parentId 的 0 与 null 都是根，同 utils/fileTreeBuild.js 的 normalizeParentId）
-        if (draggedItem && (Number(draggedItem.parentId) === 0 || parentIdsEqual(draggedItem.parentId, null))) return
+        if (this.draggedFileIds.length <= 1 && draggedItem && (Number(draggedItem.parentId) === 0 || parentIdsEqual(draggedItem.parentId, null))) return
         await this.onRootDrop(e)
         return
       }
