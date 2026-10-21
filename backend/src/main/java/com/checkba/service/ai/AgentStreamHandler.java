@@ -391,11 +391,11 @@ public class AgentStreamHandler implements ReasoningStreamingHandler {
     // <walkthrough>...</walkthrough> -> Hide ALL
     // <title>...</title> -> Hide ALL
     // <artifact>...</artifact> -> Hide ALL
-    // <final>Content</final> -> Hide TAGS, Show CONTENT
+    // <final>Content</final> -> Chat summary only; hide from the document stream.
     
     // We maintain a stack of open hidden tags.
     // If stack is empty, we are in "Display Mode" (mostly). 
-    // But we still need to strip <final> and </final> tags themselves.
+    // Final reports use the same hidden-block rule as other chat-only content.
     
     private boolean isInsideHiddenTag = false;
     private String currentHiddenTagName = null;
@@ -403,7 +403,7 @@ public class AgentStreamHandler implements ReasoningStreamingHandler {
     // Tags that should hide their content completely
     private static final java.util.Set<String> HIDDEN_CONTENT_TAGS = java.util.Set.of(
         "thinking", "process", "tool_code", "tool_output", 
-        "question", "walkthrough", "title", "artifact",
+        "question", "walkthrough", "title", "artifact", "final",
         "bubble_type" // Also hide bubble control tags
     );
     
@@ -465,8 +465,6 @@ public class AgentStreamHandler implements ReasoningStreamingHandler {
                         }
                         // If it's an end tag of a hidden block, typically we shouldn't see it if we are not inside one?
                         // Unless it's unbalanced. Just ignore/strip it.
-                    } else if ("final".equals(tagName)) {
-                        // <final> or </final> -> Just strip the tag, content is allowed
                     } else {
                         // Unknown tag (maybe <b> or markdown formatting?)
                         // If it's not a protocol tag, we might want to keep it?

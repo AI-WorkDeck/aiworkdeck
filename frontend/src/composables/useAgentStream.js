@@ -298,11 +298,20 @@ export function useAgentStream() {
         status: '',
         rawLog: '',
         isStreaming: false,
+        isEditorStreaming: false,
         // 用户点停止后的提示条文案。刻意不并进 content：content 是「模型正文」，
         // 会触发 isReady/hasContent/「用到文档」操作 chip 的判定，系统提示写进去
         // 会让一个空产出的回合长出可插入文档的操作项（dev-board#212）。
         stopNotice: ''
     })
+
+    const clearDocStreamingPlaceholder = (bubble) => {
+        if (bubble && bubble.content === t('agentStream.docStreamingPlaceholder')) {
+            bubble.content = ''
+            // 占位符也可能已被时间线记录；清正文时同步撤掉那段文本索引。
+            captureChatTimeline(bubble)
+        }
+    }
 
     // displayContent = 「显示内容 ≠ 发送内容」通道（契约 D）：content 永远是模型看到的原文，
     // displayContent 为空则回退 content。渲染侧一律 displayContent || content，
@@ -1634,13 +1643,17 @@ export function useAgentStream() {
             let streamEndPayload = {}
             try { streamEndPayload = JSON.parse(dataStr) || {} } catch (e) { streamEndPayload = {} }
             const streamBubble = currentAssistantBubble.value
+            // 先冲掉正文尾部缓冲（仍处于抑制态），再开放后续总结；结束信号不代表编辑器写入成功。
+            flushRemainingBuffer()
+            streamBubble.isEditorStreaming = false
+            clearDocStreamingPlaceholder(streamBubble)
             let docStreamFailureShown = false
             const surfaceDocStreamFailure = (reason) => {
                 if (!reason || !streamBubble || docStreamFailureShown) return
                 docStreamFailureShown = true
                 const notice = t('agentStream.docStreamFailedNotice', { reason: String(reason) })
                 // 占位符是"正在写入"的谎言，直接换掉；其余情况追加一行
-                if (streamBubble.content === t('agentStream.docStreamingPlaceholder')) {
+                if (!streamBubble.content || streamBubble.content === t('agentStream.docStreamingPlaceholder')) {
                     streamBubble.content = notice
                 } else {
                     streamBubble.content = (streamBubble.content || '') + '\n\n' + notice
@@ -1659,15 +1672,18 @@ export function useAgentStream() {
                         console.error('[SSE] doc_stream_end handler failed', e)
                         surfaceDocStreamFailure((e && e.message) || String(e))
                     })
-                } else if (streamEndPayload.wrote === false) {
-                    // 消费端根本没接这条（旧实现）时，后端这一路仍然能报出"没写进去"
-                    surfaceDocStreamFailure(t('agentStream.docStreamReasonNoBody'))
                 }
+            }
+            // 即使没有编辑器消费者，后端确认的空正文也必须报告。
+            if (streamEndPayload.wrote === false) {
+                surfaceDocStreamFailure(t('agentStream.docStreamReasonNoBody'))
             }
         } else if (evt === 'cancelled') {
             // 处理取消事件
             console.log('[SSE] Received cancelled event')
             flushRemainingBuffer()
+            clearDocStreamingPlaceholder(currentAssistantBubble.value)
+            currentAssistantBubble.value.isEditorStreaming = false
             currentAssistantBubble.value.isStreaming = false
             const thinking = currentAssistantBubble.value.thinking
             if (thinking.status === 'thinking') {
@@ -1684,6 +1700,8 @@ export function useAgentStream() {
         } else if (evt === 'bubble_end' || evt === 'error') {
             // Flush any remaining content in parserBuffer before ending
             flushRemainingBuffer()
+            clearDocStreamingPlaceholder(currentAssistantBubble.value)
+            currentAssistantBubble.value.isEditorStreaming = false
             currentAssistantBubble.value.isStreaming = false
             const thinking = currentAssistantBubble.value.thinking
             if (thinking.status === 'thinking') {
@@ -2386,6 +2404,7 @@ export function useAgentStream() {
         } else if (tagName === 'final') {
             if (isClose) activeTag = null
             else {
+                clearDocStreamingPlaceholder(bubble)
                 settleRootThinking(bubble)
                 if (bubble.content && !bubble.content.endsWith('\n\n')) bubble.content += '\n\n'
                 activeTag = 'final'
