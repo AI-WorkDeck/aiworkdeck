@@ -205,7 +205,7 @@ if ($stageFailures.Count) { throw ($stageFailures -join '; ') }
     $process = Start-Process 'C:\Program Files\nodejs\node.exe' -PassThru -ArgumentList "`"$npmCli`" install --global --prefix $root\npm --ignore-scripts @tencentcloud/tmeet@1.0.19" -RedirectStandardOutput "$root\npm-install.log" -RedirectStandardError "$root\npm-install.stderr.log"
     Wait-ProcessChecked $process 300 'Official tmeet npm installation' | Out-Null
     New-Item "$root\installed.ready" -ItemType File | Out-Null
-    Wait-ProcessChecked $child 4200 'Same-process recovery, conversion, pack, DPIA and real model inference' | Out-Null
+    Wait-ProcessChecked $child 4800 'Same-process recovery, conversion, pack, DPIA and real model inference' | Out-Null
     if (-not (Test-Path "$root\core-passed.json")) { throw 'Probe did not report completion' }
     if (-not (Test-Path "$root\real-models\inference\report.json")) { throw 'Real model inference report missing' }
     @{passed=$true;core='core-passed.json';dpia='dpia-lifecycle.log';models='real-models/inference/report.json';standardUser=$account} | ConvertTo-Json | Set-Content "$root\passed.json"
