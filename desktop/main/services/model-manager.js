@@ -65,7 +65,7 @@ function stagedFetchScript(ctx) {
 
 // kokoro / asr 的模型下载源（dev-board#583），按顺序尝试：
 //   modelscope —— model-fetch.py 从 ModelScope 同名仓直下，落成标准 HF 缓存布局；
-//   hf         —— huggingface_hub.snapshot_download 走 hf-mirror.com。
+//   hf         —— model-fetch.py 校验 HF 元数据，huggingface_hub 逐文件下载走 hf-mirror.com。
 // 为什么 ModelScope 在前：hf-mirror 只代理元数据，大文件 302 到 HF 官方 CDN
 // （cas-bridge.xethub.hf.co），国内无代理网络连不上，报 LocalEntryNotFoundError。
 // hf 留作回落给海外用户（ModelScope 在海外可能慢或不通）。
@@ -89,7 +89,7 @@ function hfRepoSpec(ctx, service, repo, source) {
   }
   return {
     cmd: pyBin(ctx.resourcesPath),
-    args: ['-c', `from huggingface_hub import snapshot_download; snapshot_download('${repo}')`],
+    args: [stagedFetchScript(ctx), '--source', 'hf', '--repo', repo, '--hf-home', dir],
     env: {
       ...base,
       HF_ENDPOINT: process.env.CHECKBA_HF_ENDPOINT || 'https://hf-mirror.com',
@@ -252,7 +252,7 @@ class ModelManager {
     }))
   }
 
-  async download(id, { repair = false } = {}) {
+  async download(id, { repair = false, beforeStart } = {}) {
     const c = this.component(id)
     // 模型下载器本身就跑在这个服务的 venv 里（modelscope / huggingface_hub 都在 lib/ 下）：
     // 运行时 pack 没装的话，spawn 出去只会 ModuleNotFoundError，用户看到的是一句看不懂的
@@ -265,23 +265,6 @@ class ModelManager {
     this.errors.delete(id)
 
     const dir = this.dirOf(id)
-    fs.mkdirSync(dir, { recursive: true })
-    fs.rmSync(path.join(dir, MARKER), { force: true })
-    if (id === 'mineru-models') {
-      // MinerU skips whole configured directories even when a child weight was removed.
-      // Explicit repair must let its downloader inspect the cache again, retaining other settings.
-      const configPath = path.join(dir, 'mineru.json')
-      try {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
-        if (config['models-dir']) delete config['models-dir'].pipeline
-        fs.writeFileSync(configPath, JSON.stringify(config))
-      } catch (e) {
-        if (e.code !== 'ENOENT') {
-          // Keep an unreadable/invalid configuration for diagnosis; the downloader creates a fresh one.
-          fs.renameSync(configPath, configPath + '.repair-backup')
-        }
-      }
-    }
     const sources = sourcesFor(c)
     const attempts = [] // 失败过的来源：{ source, detail, raw }
 
@@ -381,8 +364,33 @@ class ModelManager {
         } else settleFailure(idx, error || `download exited ${code ?? signal}: ${lastLine}`, errLine || lastLine)
       })
     }
-    runAttempt(0)
-    return { ok: true }
+    try {
+      if (beforeStart) await beforeStart()
+      if (job.stopped) return { ok: false, cancelled: true, message: t({ zh: '已取消下载', en: 'Download cancelled' }) }
+      fs.mkdirSync(dir, { recursive: true })
+      fs.rmSync(path.join(dir, MARKER), { force: true })
+      if (id === 'mineru-models') {
+        // MinerU skips whole configured directories even when a child weight was removed.
+        // Explicit repair must let its downloader inspect the cache again, retaining other settings.
+        const configPath = path.join(dir, 'mineru.json')
+        try {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+          if (config['models-dir']) delete config['models-dir'].pipeline
+          fs.writeFileSync(configPath, JSON.stringify(config))
+        } catch (e) {
+          if (e.code !== 'ENOENT') {
+            // Keep an unreadable/invalid configuration for diagnosis; the downloader creates a fresh one.
+            fs.renameSync(configPath, configPath + '.repair-backup')
+          }
+        }
+      }
+      runAttempt(0)
+      return { ok: true }
+    } catch (e) {
+      const message = String(e.message || e)
+      finish('error', message)
+      return { ok: false, message }
+    }
   }
 
   async cancel(id) {

@@ -9,10 +9,11 @@ LocalEntryNotFoundError。ModelScope 上同名仓的大文件由 cdn-lfs-cn-*.mo
 为什么落成 HF 缓存布局：运行侧（asr/kokoro 服务，在 runtime pack 里）以 HF_HUB_OFFLINE=1
 按 repo id 读 HF_HOME，只认 hub/models--{org}--{name}/{refs/main, snapshots/<rev>/...}。
 
-只用标准库（pack 里没有 modelscope SDK；asr pack 连 requests 都没有），certifi 有就用
+ModelScope 路径只用标准库（pack 里没有 modelscope SDK；asr pack 连 requests 都没有），certifi 有就用
 （python-build-standalone 在 macOS 上找不到系统 CA）。
 
 用法：python model-fetch.py --repo Systran/faster-whisper-medium --hf-home <dir>
+HF 回落通过 --source hf 选择；校验每个缓存/下载文件的上游大小和摘要后才发布 refs/main。
 进度：父进程按目录字节数算，这里只把字节写进目录；stdout 最后一行给人看。
 """
 import argparse
@@ -232,6 +233,61 @@ def fetch_repo(repo, hf_home):
     return rev, len(files)
 
 
+def fetch_hf_repo(repo, hf_home):
+    """Verify upstream metadata before trusting HF's existence-only cache fast path."""
+    from huggingface_hub import HfApi, hf_hub_download
+    info = HfApi().model_info(repo, files_metadata=True)
+    revision = str(info.sha or "")
+    if not HEX40.fullmatch(revision) or not info.siblings:
+        raise ChecksumError("HuggingFace returned no verifiable model revision/files")
+    cache = os.path.join(hf_home, "hub")
+    storage = os.path.join(cache, "models--" + repo.replace("/", "--"))
+    for entry in info.siblings:
+        rel = entry.rfilename
+        if (not isinstance(rel, str) or not rel or "\\" in rel or ":" in rel
+                or any(part in ("", ".", "..") for part in rel.split("/"))):
+            raise ValueError("Unsafe model path in source metadata")
+        size = entry.size
+        lfs = entry.lfs
+        digest = str((lfs.sha256 if lfs else entry.blob_id) or "")
+        if not isinstance(size, int) or size < 0 or not (HEX64 if lfs else HEX40).fullmatch(digest):
+            raise ChecksumError(f"{rel}: missing upstream size or checksum")
+        snap = os.path.join(storage, "snapshots", revision, *rel.split("/"))
+
+        def verified(file):
+            if os.path.commonpath([os.path.realpath(cache), os.path.realpath(file)]) != os.path.realpath(cache):
+                raise ValueError("Cached model file escapes its cache directory")
+            if not os.path.isfile(file):
+                return False
+            if os.path.getsize(file) != size:
+                return False
+            hasher = hashlib.sha256() if lfs else hashlib.sha1(f"blob {size}\0".encode("ascii"))
+            with open(file, "rb") as stream:
+                for chunk in iter(lambda: stream.read(CHUNK), b""):
+                    hasher.update(chunk)
+            return hasher.hexdigest() == digest
+
+        if verified(snap):
+            continue
+        # A bad snapshot pointer must go too: on Windows it may be a regular copy,
+        # which the SDK leaves untouched even with force_download=True. Valid blobs stay reusable.
+        if os.path.lexists(snap):
+            os.remove(snap)
+        cached_blob = os.path.join(storage, "blobs", digest)
+        downloaded = hf_hub_download(repo, rel, revision=revision, cache_dir=cache,
+                                     force_download=not verified(cached_blob))
+        if not verified(downloaded):
+            raise ChecksumError(f"{rel}: downloaded content does not match upstream checksum")
+        log(f"HuggingFace verified {rel}")
+    refs = os.path.join(storage, "refs")
+    os.makedirs(refs, exist_ok=True)
+    tmp = os.path.join(refs, "main.tmp")
+    with open(tmp, "w") as stream:
+        stream.write(revision)
+    os.replace(tmp, os.path.join(refs, "main"))
+    return revision, len(info.siblings)
+
+
 def _classify(e):
     if isinstance(e, OSError) and getattr(e, "errno", None) == 28:
         return "disk"
@@ -245,12 +301,14 @@ def _classify(e):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True)
+    ap.add_argument("--source", choices=("modelscope", "hf"), default="modelscope")
     ap.add_argument("--hf-home", default=os.environ.get("HF_HOME"))
     args = ap.parse_args(argv)
     if not args.hf_home:
         ap.error("--hf-home (or HF_HOME) is required")
     try:
-        rev, n = fetch_repo(args.repo, args.hf_home)
+        downloader = fetch_hf_repo if args.source == "hf" else fetch_repo
+        rev, n = downloader(args.repo, args.hf_home)
     except Exception as e:  # noqa: BLE001 —— 最后一行给父进程归类、给人看
         log("hosts contacted: " + ", ".join(HOSTS))
         log(f"error[{_classify(e)}]: {type(e).__name__}: {e}")
