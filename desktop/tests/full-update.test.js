@@ -10,7 +10,7 @@ const crypto = require('crypto')
 const { EventEmitter } = require('events')
 const { prepareMac, createFullUpdate, deferWindowsLaunch, lockPath, windowsPowerShellEnv } = require('../main/services/full-update')
 const { finalize } = require('../scripts/finalize-update-manifest')
-function root(t) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'full-update-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); return dir }
+function root(t) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'full-update-')); t.after(() => fs.promises.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })); return dir }
 function get(url) { return new Promise((resolve, reject) => http.get(url, (res) => { const chunks = []; res.on('data', (b) => chunks.push(b)); res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) })); res.on('error', reject) }).on('error', reject)) }
 function commands(calls, version = '0.12.0') {
   return async (cmd, args) => {
@@ -288,9 +288,19 @@ test('Windows真实helper：生产spawn完成握手，父进程退出后继续�
   const timer = setTimeout(() => child.kill(), 75000)
   const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve) }).finally(() => clearTimeout(timer))
   assert.equal(code, 0, stderr)
-  assert.ok(Number.isInteger(JSON.parse(stdout).helperPid), 'Real helper acknowledged before parent exited')
+  const { helperPid } = JSON.parse(stdout)
+  assert.ok(Number.isInteger(helperPid) && helperPid > 0, 'Real helper acknowledged before parent exited')
   const end = Date.now() + 30000
-  while ((!fs.existsSync(file + '.error') || fs.existsSync(file) || fs.existsSync(file + '.job')) && Date.now() < end) await new Promise(resolve => setTimeout(resolve, 100))
+  // The helper removes its lock in finally, before PowerShell exits and releases
+  // redirected log handles. File disappearance alone is not process completion.
+  for (;;) {
+    try { process.kill(helperPid, 0) } catch (error) {
+      if (error.code === 'ESRCH') break
+      throw error
+    }
+    assert.ok(Date.now() < end, `Update helper ${helperPid} did not exit within 30 seconds`)
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
   assert.match(fs.readFileSync(file + '.error', 'utf8'), /Invalid installer signature/, 'Helper continued executing after its parent exited')
   assert.equal(fs.existsSync(file), false)
   assert.equal(fs.existsSync(file + '.job'), false)

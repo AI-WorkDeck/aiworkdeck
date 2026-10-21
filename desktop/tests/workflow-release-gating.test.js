@@ -125,8 +125,10 @@ test('desktop-build.yml：镜像同步必须排在 release 之后（它是从 Gi
 // 0.38.0 起四个 Python 服务改走 native pack（设计 §3）：安装包链路里不再装 pip
 // 依赖、不再打 pysvc.tar.gz。dev-board#74 那条「缓存 key 必须覆盖各服务源码」的
 // 门禁随之作废——被它守着的步骤已经整体不在这条 workflow 里了。
-test('desktop-build.yml：安装包链路里不再有任何 pysvc 痕迹（四个服务改走 native pack）', () => {
-  const yml = fs.readFileSync(path.join(workflowsDir, 'desktop-build.yml'), 'utf8')
+test('desktop-build.yml：安装包构建步骤不再打包 pysvc（四个服务改走 native pack）', () => {
+  // Change detection may legitimately name pysvc-runtime.js; only packaging steps
+  // must stay free of the obsolete bundled service archive.
+  const yml = JSON.stringify(loadWorkflow('desktop-build.yml').jobs.build.steps)
   for (const sym of ['pysvc', 'pack-pysvc.js']) {
     assert.ok(!yml.includes(sym), `desktop-build.yml 仍引用 ${sym}`)
   }

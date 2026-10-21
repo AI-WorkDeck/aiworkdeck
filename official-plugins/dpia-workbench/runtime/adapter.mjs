@@ -40,6 +40,10 @@ function writable(run, name) {
 
 export class WorkDeckAdapter {
   constructor(root, host, { python = process.env.DSH_DPIA_PYTHON || 'python3' } = {}) {
+    // This dedicated worker and every upstream Python child exchange UTF-8 JSON/files.
+    // Set both: UTF8 controls default file encoding; IOENCODING controls redirected stdio.
+    process.env.PYTHONUTF8 = '1';
+    process.env.PYTHONIOENCODING = 'utf-8';
     this.store = new WorkbenchStore(root, { python });
     this.store.assets.python = () => python;
     this.python = python;

@@ -610,3 +610,5 @@ Windows 下从 pwsh→Node 再启动 powershell.exe 会继承不兼容 PSModuleP
 `.aiworkdeck-complete` 使用 schema1 文件清单；启动只检查结构/大小，完整旧时间戳安装可本地迁移，不强制重新下载。显式修复逐文件核对上游摘要，正确缓存保留；HF SDK 仅凭文件存在会复用坏缓存，普通 snapshot 副本即使 force_download 也可能不替换，确认损坏后须移除该 pointer 再下载并校验，不能盲目重写完成清单。ModelScope 失败回落 HF 也走这条链。
 `ModelManager.download({beforeStart})` 在等待关联服务停止之前取得任务所有权，期间取消会阻止迟到下载启动。取消/超时等待子进程 close 后才解锁，避免重试写入竞态。HTTP health 仅证明服务身份和基础启动，界面不称业务能力已验证；真实 OCR/ASR/TTS 仍需独立业务测试。
 回归：`desktop/tests/model-manager.test.js`、`model-fetch.test.py`（真实 SDK 需安装包 Python/lib；普通环境可显式 skip 该项，不把 skip 算通过）。
+
+**真实 ASR 词表格式（2026-10-21，dev-board#1395）**：官方 `Systran/faster-whisper-medium` 实际下载包含 `vocabulary.txt`；不能强制要求 `vocabulary.json`。桌面清单和后端 `ModelPresence` 同步按 CTranslate2 的 JSON 优先、文本备用规则校验；存在但格式错误的 JSON 不静默回退。真实 Mac ARM64 中英 Kokoro→Whisper 推理、缺模型409后同进程恢复已由子代理与主任务分别运行；脚本 `asr-service/tests/real_inference.py` 只接受准备好的运行时/缓存和合成短句。隔离 HOME/临时目录，HF offline+死代理不等于操作系统断网；不据此声称 Windows 或完整 Electron 用户流程通过。

@@ -10,6 +10,12 @@
 - EDPB 英文模板及非官方中文工作译本适用上游 NOTICE 的单独说明，不能据此称为我方原创或改证。
 - React、ReactDOM、scheduler 的 MIT 许可全文由构建脚本收入 `web/THIRD_PARTY_NOTICES.txt`。
 
+我方 `runtime/adapter.mjs` 在创建工作台前，统一为独立工作进程及其 Python 子进程设置
+`PYTHONUTF8=1` 和 `PYTHONIOENCODING=utf-8`。这保证上游默认文本读写及 JSON 标准流
+在 Windows 上使用 UTF-8；覆盖继承的旧编码设置，不修改用户系统环境或上游评估逻辑。
+回归用真实 Python 读取、写回和输出合成中文，并验证继承 `PYTHONUTF8=0`、
+`PYTHONIOENCODING=cp1252` 时仍正确；Windows 实际生命周期结果以对应验收产物为准。
+
 上游唯一源码补丁：`runtime/upstream/report-task.mjs` 的两处渲染进程调用，在
 `AWD_DPIA_PYTHON_RENDERER` 标记下使用配置的 Python 执行我方 LibreOffice/PDFium 适配器。
 未改评估校验、来源摘要、版本采用或正式报告门槛。UI 的 DSH 加载、调用、下载与主题转换

@@ -26,7 +26,7 @@ function fixtureCode(id) {
       put(prefix + 'refs/main', 'a'.repeat(40));
       const files = asr ? ['config.json','tokenizer.json','vocabulary.json','model.bin']
         : ['config.json','kokoro-v1_1-zh.pth','voices/zf_001.pt','voices/zm_010.pt','voices/af_maple.pt','voices/bf_vale.pt'];
-      for (const file of files) put(prefix + 'snapshots/' + 'a'.repeat(40) + '/' + file, file.endsWith('.json') ? '{}' : Buffer.alloc(550));
+      for (const file of files) put(prefix + 'snapshots/' + 'a'.repeat(40) + '/' + file, file === 'vocabulary.json' ? '["!","<|endoftext|>"]' : file.endsWith('.json') ? '{}' : Buffer.alloc(550));
     }
   `
 }
@@ -438,4 +438,24 @@ test('service-stop failure settles download ownership and remains retryable', as
   assert.match(result.message, /service busy/)
   assert.equal(mm.active.size, 0)
   assert.equal(events.filter(e => e.phase === 'error').length, 1)
+})
+
+test('ASR accepts upstream text vocabulary and records the selected format; missing or malformed vocab stays unavailable', async (t) => {
+  const root = tmpDataDir(); t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const mm = makeManager(root, fixtureCode('asr-models'), [])
+  await mm.download('asr-models'); await waitFor(() => mm.isInstalled('asr-models'))
+  const snapshot = path.join(mm.dirOf('asr-models'), 'hub/models--Systran--faster-whisper-medium/snapshots', 'a'.repeat(40))
+  fs.unlinkSync(path.join(snapshot, 'vocabulary.json'))
+  fs.writeFileSync(path.join(snapshot, 'vocabulary.txt'), '!\n<|endoftext|>\n<|startoftranscript|>\n')
+  saveInventory('asr-models', mm.dirOf('asr-models'))
+  assert.equal(mm.isInstalled('asr-models'), true)
+  const marker = JSON.parse(fs.readFileSync(path.join(mm.dirOf('asr-models'), '.aiworkdeck-complete'), 'utf8'))
+  assert.ok(marker.files.some(f => f.path.endsWith('/vocabulary.txt')))
+  fs.writeFileSync(path.join(snapshot, 'vocabulary.json'), '{}')
+  assert.equal(mm.isInstalled('asr-models'), false, 'malformed preferred JSON must not fall back silently')
+  fs.writeFileSync(path.join(snapshot, 'vocabulary.json'), '["!"] trailing')
+  assert.equal(mm.isInstalled('asr-models'), false, 'trailing content in preferred JSON must be rejected')
+  fs.unlinkSync(path.join(snapshot, 'vocabulary.json'))
+  fs.unlinkSync(path.join(snapshot, 'vocabulary.txt'))
+  assert.equal(mm.isInstalled('asr-models'), false)
 })
