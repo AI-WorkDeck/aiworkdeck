@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/desktop-build.yml'
+      - '.github/workflows/dependency-clean-windows.yml'
       - 'desktop/**'
       - 'backend/**'
       # Installers bundle the built frontend (frontend/dist), so frontend-only
@@ -47,9 +48,35 @@ jobs:
       - name: Enforce minor-release boundaries
         run: bash desktop/scripts/patch-gate.sh "$GITHUB_REF_NAME"
 
+  dependency-scope:
+    name: Detect dependency acceptance changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      required: ${{ steps.scope.outputs.required }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/dependency-paths
+          if grep -Eq '^(desktop/scripts/dependency-clean-windows/|[.]github/workflows/dependency-clean-windows.yml|backend/src/main/java/com/checkba/(service/(LibreOfficePdfConverter|tmeet/|pack/|ocr/|ai/tools/PythonTools)|controller/ExternalDependenciesController)|desktop/main/services/(model-manager|model-fetch|pysvc-runtime)|official-plugins/dpia-workbench/runtime/)' /tmp/dependency-paths; then
+            echo 'required=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'required=false' >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build (${{ matrix.os }})
-    needs: [patch-gate]
+    needs: [patch-gate, dependency-scope]
     # patch-gate 只在 tag 上运行；非 tag（PR / 手动触发）时它被 skip，
     # build 必须照常跑，所以放行 success 与 skipped 两种结果
     if: always() && (needs.patch-gate.result == 'success' || needs.patch-gate.result == 'skipped')
@@ -590,6 +617,24 @@ jobs:
             desktop/release/*.exe
             desktop/release/patch/*
           if-no-files-found: error
+
+      - name: Preserve unsigned PR installer for isolated dependency acceptance
+        if: github.event_name == 'pull_request' && runner.os == 'Windows' && needs.dependency-scope.outputs.required == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-pr-dependency-installer
+          path: desktop/release/*.exe
+          retention-days: 3
+          if-no-files-found: error
+
+  clean-windows-dependencies:
+    name: Fresh Windows dependency acceptance
+    needs: [build, dependency-scope]
+    if: github.event_name == 'pull_request' && needs.dependency-scope.outputs.required == 'true'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/dependency-clean-windows.yml
 
   # 发布收口：GitHub Release 在这一个单点 job 里创建，不放在上面的 matrix job
   # 里（dev-board#74 稳定性审计）。build 用 fail-fast:false，mac 腿在公证抖动
