@@ -632,7 +632,9 @@ jobs:
   clean-windows-dependencies:
     name: Fresh Windows dependency acceptance
     needs: [build, dependency-scope]
-    if: github.event_name == 'pull_request' && needs.dependency-scope.outputs.required == 'true'
+    # The tag-only patch gate is skipped on PRs. Explicit status evaluation keeps
+    # that transitive skip from suppressing acceptance after a successful build.
+    if: always() && !cancelled() && needs.build.result == 'success' && needs.dependency-scope.result == 'success' && github.event_name == 'pull_request' && needs.dependency-scope.outputs.required == 'true'
     permissions:
       contents: read
       actions: read

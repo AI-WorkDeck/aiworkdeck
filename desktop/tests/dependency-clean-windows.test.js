@@ -31,4 +31,9 @@ test('expensive acceptance is gated by changes instead of all PRs or a branch na
   assert.match(workflow, /git diff --name-only "\$BASE_SHA" "\$HEAD_SHA"/)
   assert.match(workflow, /needs\.dependency-scope\.outputs\.required == 'true'/)
   assert.doesNotMatch(workflow, /startsWith\(github\.head_ref, 'codex\/clean-windows/)
+  const yaml = require('js-yaml').load(workflow)
+  const acceptance = yaml.jobs['clean-windows-dependencies']
+  assert.match(acceptance.if, /always\(\)/, 'PR skip of tag-only patch gate must not propagate to acceptance')
+  assert.match(acceptance.if, /needs\.build\.result == 'success'/, 'failed builds still cannot be accepted')
+  assert.match(acceptance.if, /!cancelled\(\)/)
 })
