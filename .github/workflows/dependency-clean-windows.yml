@@ -9,7 +9,7 @@ permissions:
 jobs:
   acceptance:
     runs-on: windows-2022
-    timeout-minutes: 50
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:

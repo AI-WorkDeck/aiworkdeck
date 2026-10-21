@@ -68,7 +68,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/dependency-paths
-          if grep -Eq '^(desktop/scripts/dependency-clean-windows/|[.]github/workflows/dependency-clean-windows.yml|backend/src/main/java/com/checkba/(service/(LibreOfficePdfConverter|tmeet/|pack/|ocr/|ai/tools/PythonTools)|controller/ExternalDependenciesController)|desktop/main/services/(model-manager|model-fetch|pysvc-runtime)|official-plugins/dpia-workbench/runtime/)' /tmp/dependency-paths; then
+          if grep -Eq '^(desktop/scripts/dependency-clean-windows/|[.]github/workflows/dependency-clean-windows.yml|backend/src/main/java/com/checkba/(service/(LibreOfficePdfConverter|tmeet/|pack/|ocr/|ai/tools/PythonTools)|controller/ExternalDependenciesController)|desktop/main/services/(model-manager|model-inventory|model-fetch|pysvc-runtime)|asr-service/|kokoro-service/|official-plugins/dpia-workbench/runtime/)' /tmp/dependency-paths; then
             echo 'required=true' >> "$GITHUB_OUTPUT"
           else
             echo 'required=false' >> "$GITHUB_OUTPUT"
