@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static com.aiworkdeck.plugins.dpia.DpiaEnvironment.*;
 
 class DpiaEnvironmentTest {
+    @org.junit.jupiter.api.io.TempDir Path directory;
     static String python(boolean missing) {
         return "{\"checks\":[" + String.join(",", List.of("python", "python-docx", "pypdf", "pypdfium2", "reportlab", "font").stream()
             .map(id -> "{\"id\":\"" + id + "\",\"label\":\"" + id + "\",\"status\":\"" + (missing && id.equals("python-docx") ? "needs_attention" : "ready") + "\",\"message\":\"" + (missing ? "缺少库，请安装 requirements.txt" : "可用") + "\"}").toList()) + "]}";
@@ -47,6 +48,45 @@ class DpiaEnvironmentTest {
     @Test void unsupportedPlatformNeverStartsAProcess() {
         var check = new DpiaEnvironment((cmd,env) -> { fail("must not launch"); return null; }, "Solaris");
         assertEquals(false,check.check(Path.of("/plugin"), key -> null,Map.of()).get("supported"));
+    }
+    @Test void pythonProbeForcesUtf8DespiteInheritedEncodingSettings() {
+        for (String font : List.of("", "/setting/font.ttf")) {
+            var check = new DpiaEnvironment((cmd, env) -> {
+                if (cmd.get(0).equals("python3")) {
+                    Map<String, String> effective = new HashMap<>(Map.of("PYTHONUTF8", "0", "PYTHONIOENCODING", "cp1252"));
+                    effective.putAll(env);
+                    assertEquals("1", effective.get("PYTHONUTF8"));
+                    assertEquals("utf-8", effective.get("PYTHONIOENCODING"));
+                    assertEquals("1", effective.get("PYTHONDONTWRITEBYTECODE"));
+                    if (!font.isEmpty()) assertEquals(font, effective.get("DSH_DPIA_PDF_FONT"));
+                    return new Result(0, python(false), null);
+                }
+                return new Result(0, cmd.get(0).equals("node") ? "v22.0.0" : "LibreOffice 25", null);
+            }, "Windows 11");
+            var response = check.check(Path.of("/plugin"), key -> key.equals("pdfFontPath") ? font : null,
+                    Map.of("PYTHONUTF8", "0", "PYTHONIOENCODING", "cp1252"));
+            assertEquals(true, response.get("ready"));
+            assertEquals("可用", item(response, "python").get("message"));
+        }
+    }
+    @Test void windowsOfficePrefersConsoleLauncherAndRetainsExeFallback() throws Exception {
+        Path program = java.nio.file.Files.createDirectories(directory.resolve("LibreOffice/program"));
+        Path exe = java.nio.file.Files.writeString(program.resolve("soffice.exe"), "");
+        Path console = java.nio.file.Files.writeString(program.resolve("soffice.com"), "");
+        exe.toFile().setExecutable(true); console.toFile().setExecutable(true);
+        var commands = new ArrayList<List<String>>();
+        var check = new DpiaEnvironment((cmd, env) -> { commands.add(cmd); return new Result(1,"",null); }, "Windows 11");
+        for (var env : List.of(Map.of("Path", "\"" + program + "\""), Map.of("ProgramFiles", directory.toString()))) {
+            commands.clear(); check.check(directory, key -> null, env);
+            assertEquals(console.toString(), commands.get(2).get(0));
+        }
+        commands.clear(); check.check(directory, key -> key.equals("sofficePath") ? exe.toString() : null, Map.of("Path", program.toString()));
+        assertEquals(exe.toString(), commands.get(2).get(0));
+        java.nio.file.Files.delete(console);
+        for (var env : List.of(Map.of("Path", program.toString()), Map.of("ProgramFiles", directory.toString()))) {
+            commands.clear(); check.check(directory, key -> null, env);
+            assertEquals(exe.toString(), commands.get(2).get(0));
+        }
     }
     @Test void realRuntimeWithExplicitPaths() {
         String python = System.getenv("AWD_DPIA_TEST_PYTHON");

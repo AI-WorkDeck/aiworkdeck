@@ -132,7 +132,7 @@ Run-Native "$Resources\python\python.exe" @('-I','-m','venv',"$Root\dpia-venv") 
 $python = "$Root\dpia-venv\Scripts\python.exe"
 $env:PYTHONIOENCODING = 'utf-8'
 $env:DSH_DPIA_PDF_FONT = "$Resources\frontend\dist\zetaoffice\cjk-kai.ttf"
-$env:AWD_DPIA_SOFFICE = 'C:\Program Files\LibreOffice\program\soffice.exe'
+$env:AWD_DPIA_SOFFICE = $null
 $check = "$Root\dpia-workbench\runtime\environment-check.py"
 Run-Native $python @($check) 'dpia-before'
 $before = Get-Content "$Root\dpia-before.log" -Raw -Encoding UTF8

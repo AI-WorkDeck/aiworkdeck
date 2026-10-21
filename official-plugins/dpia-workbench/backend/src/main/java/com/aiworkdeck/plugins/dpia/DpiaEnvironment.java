@@ -35,7 +35,8 @@ final class DpiaEnvironment {
         checks.add(item("node", "Node.js", nodeReady, nodeReady ? n.output().trim() + " 可用" : failure(n, "需要 Node.js 20 或更新版本；安装当前 LTS 后，在插件设置填写 node 可执行文件路径。")));
         String python = setting(settings, env, "pythonPath", "AWD_DPIA_PYTHON", env.getOrDefault("DSH_DPIA_PYTHON", "python3"));
         String font = setting(settings, env, "pdfFontPath", "DSH_DPIA_PDF_FONT", null);
-        Map<String, String> child = font == null ? Map.of("PYTHONDONTWRITEBYTECODE", "1") : Map.of("PYTHONDONTWRITEBYTECODE", "1", "DSH_DPIA_PDF_FONT", font);
+        Map<String, String> child = new HashMap<>(Map.of("PYTHONDONTWRITEBYTECODE", "1", "PYTHONUTF8", "1", "PYTHONIOENCODING", "utf-8"));
+        if (font != null) child.put("DSH_DPIA_PDF_FONT", font);
         Result p = probe.run(List.of(python, root.resolve("runtime/environment-check.py").toString()), child);
         boolean parsed = false;
         if (p.failure() == null && p.exitCode() == 0) {
@@ -77,14 +78,20 @@ final class DpiaEnvironment {
     // Matches runtime/render.py: PATH first, then existing macOS/Windows defaults.
     private String findOffice(Map<String, String> env) {
         boolean windows = os.toLowerCase(Locale.ROOT).startsWith("windows");
+        List<String> binaries = windows ? List.of("soffice.com", "soffice.exe") : List.of("soffice");
         for (String part : env.getOrDefault("PATH", env.getOrDefault("Path", "")).split(windows ? ";" : ":")) {
             if (part.isBlank()) continue;
-            Path file = Path.of(part.replaceAll("^\"|\"$", ""), windows ? "soffice.exe" : "soffice");
-            if (Files.isRegularFile(file) && Files.isExecutable(file)) return file.toString();
+            for (String binary : binaries) {
+                Path file = Path.of(part.replaceAll("^\"|\"$", ""), binary);
+                if (Files.isRegularFile(file) && Files.isExecutable(file)) return file.toString();
+            }
         }
-        Path fallback = windows ? Path.of(env.getOrDefault("PROGRAMFILES", env.getOrDefault("ProgramFiles", "C:/Program Files")), "LibreOffice/program/soffice.exe")
-                : Path.of("/Applications/LibreOffice.app/Contents/MacOS/soffice");
-        return Files.isRegularFile(fallback) ? fallback.toString() : "soffice";
+        for (String binary : binaries) {
+            Path fallback = windows ? Path.of(env.getOrDefault("PROGRAMFILES", env.getOrDefault("ProgramFiles", "C:/Program Files")), "LibreOffice/program", binary)
+                    : Path.of("/Applications/LibreOffice.app/Contents/MacOS/soffice");
+            if (Files.isRegularFile(fallback)) return fallback.toString();
+        }
+        return "soffice";
     }
     static Result run(List<String> command, Map<String, String> environment) {
         Process process = null;

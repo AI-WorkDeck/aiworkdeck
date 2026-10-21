@@ -36,6 +36,24 @@ class LibreOfficePdfConverterTest {
         assertEquals(app, LibreOfficePdfConverter.findExecutable("Windows 11", dir.toString(), Map.of("ProgramFiles(x86)", dir.resolve("Other Drive/Program Files").toString()), null));
         assertEquals(app, LibreOfficePdfConverter.findExecutable("Windows 11", dir.toString(), Map.of("Path", "\"" + app.getParent() + "\""), null));
     }
+    @Test void windowsPrefersConsoleLauncherInInstallDirectoryAndPath() throws Exception {
+        Path gui = executable("Program Files/LibreOffice/program/soffice.exe", "");
+        Path cli = executable("Program Files/LibreOffice/program/soffice.com", "");
+        assertEquals(cli, LibreOfficePdfConverter.findExecutable("Windows 11", dir.toString(), Map.of("ProgramFiles", dir.resolve("Program Files").toString()), null));
+        assertEquals(cli, LibreOfficePdfConverter.findExecutable("Windows 11", dir.toString(), Map.of("Path", "\"" + gui.getParent() + "\""), null));
+    }
+    @Test void windowsDirectoryOverridePrefersConsoleButExplicitFileIsRespected() throws Exception {
+        Path gui = executable("Custom Office/program/soffice.exe", "");
+        Path cli = executable("Custom Office/program/soffice.com", "");
+        assertEquals(cli, LibreOfficePdfConverter.findExecutable("Windows 11", dir.toString(), Map.of(), dir.resolve("Custom Office").toString()));
+        assertEquals(cli, LibreOfficePdfConverter.findExecutable("Windows 11", dir.toString(), Map.of("LIBREOFFICE_PATH", cli.getParent().toString()), null));
+        assertEquals(gui, LibreOfficePdfConverter.findExecutable("Windows 11", dir.toString(), Map.of(), gui.toString()));
+    }
+    @Test void windowsFallsBackToExeWhenConsoleLauncherIsMissing() throws Exception {
+        Path gui = executable("Legacy Office/program/soffice.exe", "");
+        assertEquals(gui, LibreOfficePdfConverter.findExecutable("Windows 11", dir.toString(), Map.of(), dir.resolve("Legacy Office").toString()));
+        assertEquals(gui, LibreOfficePdfConverter.findExecutable("Windows 11", dir.toString(), Map.of("PATH", gui.getParent().toString()), null));
+    }
     @Test void macCustomAppBundleAndPath() throws Exception {
         Path app = executable("User Apps/LibreOffice.app/Contents/MacOS/soffice", "");
         assertEquals(app, LibreOfficePdfConverter.findExecutable("Mac OS X", dir.toString(), Map.of(), dir.resolve("User Apps/LibreOffice.app").toString()));

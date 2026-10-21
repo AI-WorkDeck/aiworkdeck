@@ -10,6 +10,10 @@ import { join } from 'node:path';
 import { WorkDeckAdapter } from '../runtime/adapter.mjs';
 
 function fixture(t) {
+  const encoding = Object.fromEntries(['PYTHONUTF8', 'PYTHONIOENCODING'].map(key => [key, process.env[key]]));
+  t.after(() => { for (const [key, value] of Object.entries(encoding)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  } });
   const root = mkdtempSync(join(tmpdir(), 'awd-dpia-adapter-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const sessions = new Map(), calls = [];
@@ -29,6 +33,26 @@ function fixture(t) {
   const adapter = new WorkDeckAdapter(root, host);
   return { adapter, root, calls, sessions, host, setAccept: value => { accept = value; } };
 }
+
+test('adapter enforces UTF-8 files and protocol despite inherited legacy Python encoding', t => {
+  const previous = Object.fromEntries(['PYTHONUTF8', 'PYTHONIOENCODING'].map(key => [key, process.env[key]]));
+  t.after(() => { for (const [key, value] of Object.entries(previous)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  } });
+  process.env.PYTHONUTF8 = '0';
+  process.env.PYTHONIOENCODING = 'cp1252';
+  const root = mkdtempSync(join(tmpdir(), 'awd-dpia-encoding-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const adapter = new WorkDeckAdapter(root, async () => { throw Error('No host operation expected'); });
+  const source = join(root, 'synthetic.json'), output = join(root, 'roundtrip.json');
+  writeFileSync(source, JSON.stringify({ title: '合成评估与合同材料' }), 'utf8');
+  const result = spawnSync(adapter.python, ['-c',
+    'import sys,json;from pathlib import Path; value=json.loads(Path(sys.argv[1]).read_text());Path(sys.argv[2]).write_text(json.dumps(value,ensure_ascii=False));print(json.dumps({"utf8Mode":sys.flags.utf8_mode,"title":value["title"]},ensure_ascii=False))',
+    source, output], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { utf8Mode: 1, title: '合成评估与合同材料' });
+  assert.deepEqual(JSON.parse(readFileSync(output, 'utf8')), { title: '合成评估与合同材料' });
+});
 
 async function started(f) {
   const c = await f.adapter.run({ action: 'create', title: '合成评估' });
