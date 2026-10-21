@@ -580,6 +580,7 @@
                   :busy="optional.state.activeCount > 0"
                   @install="onInstallComponent"
                   @retry="onInstallComponent"
+                  @cancel="onCancelComponent"
                 />
                 <view v-if="item.phase === 'ready'" class="comp-actions">
                   <button class="comp-btn danger" @tap="handleComponentRemove(item)">
@@ -1664,11 +1665,20 @@ export default {
      * 旧的「下载 / 启用」两个按钮的语义都并进了这里——分开摆只会让用户在
      * 「下完了为什么还不能用」上多绕一圈。
      */
-    async onInstallComponent(packId) {
+    async onInstallComponent(packId, options) {
       const item = this.optional.state.items.find((i) => i.packId === packId)
       // 在途数由应用级下载管理记（首次登录面板、AI 对话发起的也算）：一次只装一个
       if (!item || this.optional.state.activeCount > 0) return
-      await this.optional.installOne(item)
+      await this.optional.installOne(item, options)
+    },
+    async onCancelComponent(packId) {
+      const item = this.optional.state.items.find((i) => i.packId === packId)
+      if (!item?.modelId || item.phase !== 'model') return
+      try {
+        const result = await host.model.cancel(item.modelId)
+        if (result?.ok === false) throw new Error(result.error || this.$t('components.errorServiceUnavailable'))
+      }
+      catch (e) { uni.showToast({ title: e.message || String(e), icon: 'none' }) }
     },
     /** 卸载 = 删模型 + 删 pack 目录（规范 §6：确认框注明可释放体积） */
     handleComponentRemove(item) {

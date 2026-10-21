@@ -24,11 +24,20 @@
       <view class="oc-progress-fill" :style="{ width: (item.percent || 0) + '%' }" />
     </view>
     <view class="oc-actions">
+      <view v-if="!selectable && item.phase === 'model'" class="oc-btn" @tap="$emit('cancel', item.packId)">
+        {{ $t('components.cancelDownload') }}
+      </view>
+      <view v-if="!selectable && item.phase === 'ready' && item.modelId" class="oc-btn" :class="{ disabled: busy }" @tap="$emit('retry', item.packId, { repairModel: true })">
+        {{ $t('components.verifyRepair') }}
+      </view>
+      <view v-if="!selectable && item.phase === 'ready' && !item.serviceStarted" class="oc-btn" :class="{ disabled: busy }" @tap="$emit('install', item.packId)">
+        {{ $t('components.checkStartup') }}
+      </view>
       <view v-if="!selectable && item.phase === 'idle'" class="oc-btn primary" :class="{ disabled: busy }" @tap="$emit('install', item.packId)">
         {{ $t('components.installOne') }}
       </view>
       <view v-if="item.phase === 'failed'" class="oc-btn" @tap="$emit('retry', item.packId)">
-        {{ $t('components.retry') }}
+        {{ $t(item.repairRequired ? 'components.verifyRepair' : 'components.retry') }}
       </view>
     </view>
   </view>
@@ -45,7 +54,7 @@ export default {
     selectable: { type: Boolean, default: false },
     busy: { type: Boolean, default: false },
   },
-  emits: ['toggle', 'install', 'retry'],
+  emits: ['toggle', 'install', 'retry', 'cancel'],
   computed: {
     title() {
       return this.$t('components.' + this.item.localeKey + '.name')
@@ -80,7 +89,7 @@ export default {
         case 'runtime': return this.runtimeLine(p)
         case 'model': return this.$t('components.stateDownloadingModel', { percent: p })
         case 'starting': return this.$t('components.stateStartingService')
-        case 'ready': return this.$t('components.stateReady')
+        case 'ready': return this.$t(this.item.serviceStarted ? 'components.stateServiceStarted' : 'components.stateReady')
         case 'failed': return this.$t('components.stateFailed', { msg: this.failureText })
         default: return this.$t('components.stateNotInstalled')
       }

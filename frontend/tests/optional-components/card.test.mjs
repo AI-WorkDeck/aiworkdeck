@@ -63,15 +63,16 @@ test('状态行按 phase 分档，失败带原因', () => {
   assert.match(card({ ...kokoro, phase: 'runtime', percent: 42 }).stateLine, /运行时 42%/)
   assert.match(card({ ...kokoro, phase: 'model', percent: 7 }).stateLine, /模型 7%/)
   assert.match(card({ ...kokoro, phase: 'starting' }).stateLine, /正在启动/)
-  assert.match(card({ ...kokoro, phase: 'ready' }).stateLine, /已就绪/)
+  assert.match(card({ ...kokoro, phase: 'ready' }).stateLine, /已安装/)
+  assert.match(card({ ...kokoro, phase: 'ready', serviceStarted: true }).stateLine, /服务已启动.*待使用验证/)
   assert.match(card({ ...kokoro, phase: 'failed', error: '镜像不可达' }).stateLine, /镜像不可达/)
 })
 
 // ==================== 两个宿主复用的前提：卡片只抛事件、不发请求 ====================
 
-test('复选抛 toggle(packId, checked)，声明的三个 emit 齐备', () => {
+test('复选抛 toggle(packId, checked)，声明的安装和取消 emit 齐备', () => {
   const component = new Function(script.replace('export default', 'return'))()
-  assert.deepEqual(component.emits, ['toggle', 'install', 'retry'])
+  assert.deepEqual(component.emits, ['toggle', 'install', 'retry', 'cancel'])
   const seen = []
   const vm = Object.assign({}, component.methods, {
     item: { ...kokoro, selected: false },

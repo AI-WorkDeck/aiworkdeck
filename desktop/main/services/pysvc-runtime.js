@@ -110,4 +110,52 @@ async function extractTar(archive, destDir) {
   throw lastErr || new Error('no tar available')
 }
 
-module.exports = { PACK_ID_BY_SERVICE, resolveServiceRoot, libDirFor, appDirFor, extractTar }
+// Readiness identifies the expected HTTP API; it does not prove model inference succeeds.
+function checkServiceHealth(service, port, timeoutMs = 2500) {
+  if (!PACK_ID_BY_SERVICE[service] || !Number.isInteger(port) || port < 1 || port > 65535) return Promise.resolve(false)
+  const endpoint = '/health'
+  return new Promise((resolve) => {
+    let settled = false
+    let req
+    const done = (ok) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      req?.destroy()
+      resolve(ok)
+    }
+    const timer = setTimeout(() => done(false), timeoutMs)
+    req = require('http').get({ hostname: '127.0.0.1', port, path: endpoint }, (res) => {
+      if (res.statusCode !== 200) { res.resume(); return done(false) }
+      let body = ''
+      res.on('data', (part) => {
+        body += part.toString()
+        if (body.length > 256 * 1024) done(false)
+      })
+      res.on('error', () => done(false))
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(body)
+          if (service === 'mineru-service') return done(data.status === 'healthy' && typeof data.version === 'string')
+          if (service === 'pptx-service') return done(data.status === 'ok' && data.message === 'Banana Slides API is running')
+          done(data.status === 'ok' && data.service === service)
+        } catch (_) { done(false) }
+      })
+    })
+    req.on('error', () => done(false))
+  })
+}
+
+// A TCP listener can precede its HTTP routes during startup. Retry within one fixed budget.
+async function waitForServiceHealth(service, port, timeoutMs = 10000, intervalMs = 250) {
+  const deadline = Date.now() + timeoutMs
+  do {
+    if (await checkServiceHealth(service, port, Math.min(2500, Math.max(1, deadline - Date.now())))) return true
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) return false
+    await new Promise(resolve => setTimeout(resolve, Math.min(intervalMs, remaining)))
+  } while (Date.now() < deadline)
+  return false
+}
+
+module.exports = { PACK_ID_BY_SERVICE, resolveServiceRoot, libDirFor, appDirFor, extractTar, checkServiceHealth, waitForServiceHealth }
