@@ -109,8 +109,10 @@ $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.
 if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Probe must run without administrator token' }
 $env:USERPROFILE = [Environment]::GetFolderPath('UserProfile')
 if ($env:USERPROFILE -notlike '*awd-dependency-test*') { throw 'Probe did not receive a fresh user profile' }
-$env:APPDATA = [Environment]::GetFolderPath('ApplicationData','Create')
-$env:LOCALAPPDATA = [Environment]::GetFolderPath('LocalApplicationData','Create')
+# A new non-interactive profile has no shell-folder registration yet.
+$env:APPDATA = Join-Path $env:USERPROFILE 'AppData\Roaming'
+$env:LOCALAPPDATA = Join-Path $env:USERPROFILE 'AppData\Local'
+New-Item -ItemType Directory -Force -Path $env:APPDATA,$env:LOCALAPPDATA | Out-Null
 # Start-Process -Credential inherits the runner's TEMP, even with LoadUserProfile.
 # A normal sign-in instead owns its temporary directory. Record and reproduce that boundary.
 @{inheritedTemp=$env:TEMP;inheritedTmp=$env:TMP;profile=$env:USERPROFILE} | ConvertTo-Json | Set-Content "$Root\child-profile.json"
