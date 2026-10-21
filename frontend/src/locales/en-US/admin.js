@@ -30,7 +30,7 @@ export default {
   external_docker_windows: "Windows: prepare WSL 2 or supported virtualization as described in the official guide, then install and start Docker Desktop. Save your work before any required system restart.",
   external_docker_other: "Install Docker, start its service and ensure your account can connect.",
   external_tmeet: "Tencent Meeting CLI",
-  external_tmeet_purpose: "Query and manage Tencent Meeting. After this program check, authorize your account in the Tencent Meeting feature.",
+  external_tmeet_purpose: "Query and manage Tencent Meeting. This checks the base CLI. After installation or changing the plugin path, use Check connection in the Tencent Meeting plugin and authorize your account.",
   external_tmeet_mac: "Mac: follow Tencent’s official guide. For npm installation, install Node.js LTS (includes npm) first.",
   external_tmeet_windows: "Windows: follow Tencent’s official guide. For npm installation, install Node.js LTS (includes npm) first. If this process cannot see the new PATH yet, save your work and restart the app.",
   external_tmeet_other: "Follow Tencent’s official CLI guide. The npm installation method requires Node.js.",

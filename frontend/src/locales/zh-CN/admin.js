@@ -30,7 +30,7 @@ export default {
   external_docker_windows: "Windows：按官方指引准备 WSL 2 或相应虚拟化功能，完成安装并启动 Docker Desktop。系统要求重启时请先保存工作。",
   external_docker_other: "安装 Docker 并启动其服务，确认当前账户可以连接。",
   external_tmeet: "腾讯会议 CLI",
-  external_tmeet_purpose: "查询与管理腾讯会议。程序检测通过后，仍需在腾讯会议功能中完成账户授权。",
+  external_tmeet_purpose: "查询与管理腾讯会议。这里检查基础 CLI；安装或调整插件路径后，在腾讯会议插件中点击「检查连接」，并完成账户授权。",
   external_tmeet_mac: "Mac：按腾讯官方指引安装；使用 npm 方式时先安装 Node.js LTS（包含 npm），再执行官网的安装步骤。",
   external_tmeet_windows: "Windows：按腾讯官方指引安装；使用 npm 方式时先安装 Node.js LTS（包含 npm）。如果旧进程尚未取得新路径，可保存工作后重启应用。",
   external_tmeet_other: "按腾讯官方指引安装 CLI；npm 安装方式需要 Node.js。",
