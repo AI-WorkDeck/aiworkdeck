@@ -774,6 +774,11 @@ export default {
       type: [Number, String],
       required: true
     },
+    // 仅已确认的本机文件夹项目订阅磁盘变化；托管项目和文件选择器默认不订阅。
+    watchLocalFiles: {
+      type: Boolean,
+      default: false
+    },
     parentId: {
       type: Number,
       default: null
@@ -1101,6 +1106,9 @@ export default {
     }
   },
   watch: {
+    watchLocalFiles() {
+      this.subscribeLocalFileChanges()
+    },
     projectId: {
       immediate: true,
       handler() {
@@ -1181,10 +1189,10 @@ export default {
     subscribeLocalFileChanges() {
       this._fileChangesStop?.()
       this._fileChangesStop = null
-      if (!this._fileChangesMounted || !this.projectId || !isDesktopHost()) return
+      if (!this._fileChangesMounted || !this.watchLocalFiles || !this.projectId || !isDesktopHost()) return
       const projectId = this.projectId
       this._fileChangesStop = subscribeLocalProjectFileChanges(projectId, () => {
-        if (this._fileChangesMounted && String(this.projectId) === String(projectId)) return this.loadFiles()
+        if (this._fileChangesMounted && this.watchLocalFiles && String(this.projectId) === String(projectId)) return this.loadFiles()
       })
     },
     async handleFileClientAccess(item) {
