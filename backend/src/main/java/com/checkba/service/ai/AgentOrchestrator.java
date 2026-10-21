@@ -2858,6 +2858,9 @@ public class AgentOrchestrator {
                     && !hasDocumentSummary(content)) {
                 guard.documentSummaryOnly = true;
                 appendBoundedExecutionLog(executionLog, content + "\n");
+                // The body is now in the durable execution log; do not append it again on error/steering.
+                // The separate trace still retains the complete SSE recovery events.
+                guard.takeStreamSnapshot();
                 messages.add(dev.langchain4j.data.message.UserMessage.from(LangText.of(
                         "[系统提醒] 文档正文生成已结束，但你尚未给用户书面汇报。请仅用 <final> 简要说明本次调整、原因与尚未验证的事项。不要重写正文或调用工具。正文已发往编辑器不代表已保存或已回读核验；不得声称未验证的成功。",
                         "[System reminder] Document text generation ended without a written report to the user. Reply only with <final>, briefly describing the changes, reasons and anything unverified. Do not repeat the document or call tools. Sending text to the editor does not prove it was saved or read back; do not claim unverified success.")));
@@ -2940,7 +2943,9 @@ public class AgentOrchestrator {
                 try {
                     markRunState(guard, AgentRunStateService.RunStatus.ERROR);
                     sendRunEvent(guard, "error", accountErrorPayload(accountError));
-                    saveAssistantMessageQuietly(guard, projectId, userId, accountError.getMessage());
+                    saveAssistantMessageQuietly(guard, projectId, userId, summaryOnly
+                            ? executionLog + "<final>" + accountError.getMessage() + "</final>"
+                            : accountError.getMessage());
                 } finally {
                     closeSse(guard);
                     endRun(guard);
