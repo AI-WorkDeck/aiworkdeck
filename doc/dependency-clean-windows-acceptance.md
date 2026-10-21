@@ -4,7 +4,7 @@
 
 PR 的 Desktop Build 在相关依赖、DPIA runtime 或本验收脚本改动时上传 `windows-pr-dependency-installer`，再调用 `dependency-clean-windows.yml`。不发布或签名，无部署凭据；无关 PR 不增加这一轮下载安装。旧 PR1171 的 run39532309387 未上传安装器，不能据其构建绿灯声称做过本验收；本流程必须重新构建同一 PR 的源码并运行。
 
-验收使用全新的 GitHub `windows-2022`（Windows Server）主机，**不是 Windows 11 消费版裸机**。保存 ImageOS/ImageVersion、镜像清单入口、原 PATH 和预装工具路径。先正规卸载 runner Node MSI，再把产品可发现位置里的遗留 Node、LibreOffice、Docker 目录隔离；其他开发工具没有全部卸载。真实新建标准账户、验证非管理员 token 和新 profile，测试子进程 PATH 只有 Windows 系统目录，清除 Python/Node/Java/依赖覆盖变量。宿主的模块路径不注入 Windows PowerShell 子进程；不改永久系统策略。只能在 GitHub 托管一次性 runner 运行。
+验收使用全新的 GitHub `windows-2022`（Windows Server）主机，**不是 Windows 11 消费版裸机**。保存 ImageOS/ImageVersion、镜像清单入口、原 PATH 和预装工具路径。先正规卸载 runner Node MSI，再把产品可发现位置里的遗留 Node、LibreOffice、Docker 目录隔离；其他开发工具没有全部卸载。真实新建标准账户、验证非管理员 token 和新 profile，非交互账户没有桌面登录初始化的 shell-folder 注册，显式在其已验证 USERPROFILE 下创建 AppData/Temp，避免继承 runner 管理员 TEMP；Java 先实际创建、写入并删除临时文件。测试子进程 PATH 只有 Windows 系统目录，清除 Python/Node/Java/依赖覆盖变量。宿主的模块路径不注入 Windows PowerShell 子进程；不改永久系统策略。只能在 GitHub 托管一次性 runner 运行。
 
 | 阶段 | 实际执行与判据 | 不代表 |
 |---|---|---|
@@ -25,6 +25,6 @@ PR 的 Desktop Build 在相关依赖、DPIA runtime 或本验收脚本改动时�
 - LibreOffice 25.8.4.2：`https://downloadarchive.documentfoundation.org/libreoffice/old/25.8.4.2/win/x86_64/LibreOffice_25.8.4.2_Win_x86-64.msi.sha256`，SHA256 `b2b23d91bda5ad6e97b38008b082060a55d2a3c7c269b2c0e78daca865133d48`。
 - `@tencentcloud/tmeet@1.0.19`：npm 官方 registry 元数据的 repository 为 `https://github.com/TencentCloud/tencentmeeting-cli`；脚本核对该 repository 与固定 integrity，并由 npm 校验 tarball。与产品现有安装指引一致；不进行用户授权登录。
 
-`clean-windows-dependency-evidence` 仅保留合成文档、页图、SVG、状态、安装/测试日志。新账户密码只存当前进程内存，不写脚本、日志、Actions 输出或 artifact；不上传用户 profile、安装器、npm/venv、packs、任何凭据。`core-passed.json` 只表示 Java/转换/pack 完成，`passed.json` 还要求 DPIA 子进程成功及真实模型推理报告生成。模型证据仅收集顶层 JSON/日志与 inference 下合成 WAV/报告，不上传模型缓存。失败日志仍上传，不能以存在部分产物标成功。
+`clean-windows-dependency-evidence` 仅保留合成文档、页图、SVG、状态、安装/测试日志。新账户密码只存当前进程内存，不写脚本、日志、Actions 输出或 artifact；不上传用户 profile、安装器、npm/venv、packs、任何凭据。`core-passed.json` 只表示 Java/转换/pack 完成，`passed.json` 还要求 DPIA 子进程成功及真实模型推理报告生成。模型证据仅收集顶层 JSON/日志与 inference 下合成 WAV/报告，不上传模型缓存。系统安装完成后，转换/组件、DPIA 与模型三个阶段独立留证；任一失败仍使整个验收失败。失败日志仍上传，不能以存在部分产物标成功。
 
 本机只能验证 Java 编译、工作流/脚本静态契约；Windows 结果必须以实际 Actions run 与 artifact 为准。本流程未调用 release、签名、mirror、发布包或部署。

@@ -31,6 +31,10 @@ public class DependencyProbe {
     }
     public static void main(String[] args) throws Exception {
         Path root = Path.of(args[0]), resources = Path.of(args[1]);
+        Path temporary = Files.createTempFile("awd-standard-user-", ".txt");
+        Files.writeString(temporary, "synthetic temporary-directory write check");
+        write(root, "temporary-directory.json", Map.of("path", System.getProperty("java.io.tmpdir"), "writable", true));
+        Files.delete(temporary);
         var lo = new LibreOfficePdfConverter();
         var docker = new PythonTools(null, null, null, null);
         var tmeet = new TmeetCliService(root.resolve("npm/tmeet.cmd").toString());
