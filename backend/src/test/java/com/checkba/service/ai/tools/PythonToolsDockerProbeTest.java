@@ -12,7 +12,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PythonToolsDockerProbeTest {
-    static class StubTools extends PythonTools {
+    // Instance-bound fixture must not be discovered as an independent production tool.
+    class StubTools extends PythonTools {
         long now;
         int probes;
         boolean missing = true;
