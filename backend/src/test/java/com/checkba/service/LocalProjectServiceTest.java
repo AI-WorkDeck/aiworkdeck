@@ -480,7 +480,7 @@ class LocalProjectServiceTest {
             }
         }).when(probed).reconcileProject(anyLong());
 
-        LocalRootWatchService watch = new LocalRootWatchService(projectRepository, probed);
+        LocalRootWatchService watch = new LocalRootWatchService(projectRepository, probed, mock(LocalProjectFileChangeService.class));
         try {
             assertTrue(watch.ensureWatch(projectId, folder.normalize().toString()),
                     "watcher 必须真的挂上项目文件夹（挂不上是硬失败，不是慢）");

@@ -19,6 +19,8 @@ export function clearLocalPathCache(fileId) {
 
 export function cacheLocalFilePath(fileId, filePath, now = Date.now()) {
   if (fileId == null || typeof filePath !== 'string' || !filePath) return ''
+  // 同步解析或移动后的新路径优先于尚未返回的预取。
+  inflightPrefetch.delete(String(fileId))
   localPathCache.set(String(fileId), { path: filePath, ts: now })
   return filePath
 }
@@ -43,6 +45,7 @@ export function prefetchLocalFilePath(fileId, fetchLocalPath) {
   const p = Promise.resolve()
     .then(() => fetchLocalPath(fileId))
     .then((res) => {
+      if (inflightPrefetch.get(key) !== p) return ''
       const data = res && res.data ? res.data : res
       const filePath = data && data.exists !== false && typeof data.path === 'string' ? data.path : ''
       if (filePath) cacheLocalFilePath(key, filePath)
@@ -50,7 +53,7 @@ export function prefetchLocalFilePath(fileId, fetchLocalPath) {
     })
     .catch(() => '')
     .finally(() => {
-      inflightPrefetch.delete(key)
+      if (inflightPrefetch.get(key) === p) inflightPrefetch.delete(key)
     })
   inflightPrefetch.set(key, p)
   return p
@@ -204,6 +207,12 @@ export function startExternalFileDrag(itemOrItems, options = {}) {
   let htmlCancelled = false
   const resultOf = res => {
     if (res && res.ok === false) {
+      if (res.reason === 'not-found') {
+        for (const item of items) {
+          // 迟到的失败不能抹掉移动后已经解析的新路径。
+          if (paths.includes(getCachedLocalFilePath(item.id))) clearLocalPathCache(item.id)
+        }
+      }
       if (htmlCancelled) cleanup()
       return res
     }
