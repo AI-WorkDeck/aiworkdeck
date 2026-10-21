@@ -2285,6 +2285,11 @@ export function getFileBytesUrl(fileId) {
   return `${baseUrl}/api/files/${fileId}/download`
 }
 
+// QTA 的本机兼容音频副本；不替代下载原件的 URL。
+export function getFileAudioPreviewUrl(fileId) {
+  return `${getApiBaseUrl()}/api/files/${fileId}/audio-preview`
+}
+
 // 覆盖写一份项目文件字节的 URL（POST /api/files/{id}/upload，multipart "file" 或
 // octet-stream），与 getFileBytesUrl 同一数字主键契约。
 export function getFileWriteUrl(fileId) {
