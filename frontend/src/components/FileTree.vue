@@ -733,7 +733,7 @@ import { importArchiveEntry } from '@/services/api.js'
 import { nativeEvent, nativeDataTransfer, isExternalFileDrag, compatibleDropEffect, claimExternalDrop, captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
 import { prefetchLocalFilePath, startExternalFileDrag } from '@/utils/fileLocalDrag.js'
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
-import { canConvertItemToPdf, canMergeItemsToPdf } from '@/utils/fileTreePdfActions.js'
+import { canConvertItemToPdf, canMergeItemsToPdf, pdfConversionRecoveryOptions } from '@/utils/fileTreePdfActions.js'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
 import TagChip from '@/components/TagChip.vue'
 import TagSelector from '@/components/TagSelector.vue'
@@ -2490,11 +2490,11 @@ export default {
         })
       } catch (e) {
         console.error('转 PDF 失败:', e)
-        uni.showToast({
-          title: (e && e.message) || this.$t('fileTree.convertToPdfFailed'),
-          icon: 'none',
-          duration: 3000
-        })
+        uni.hideLoading()
+        uni.showModal(pdfConversionRecoveryOptions({
+          error: e, items: [item], t: (key) => this.$t(key),
+          openFile: (file) => this.$emit('file-open', file),
+        }))
       } finally {
         if (typeof uni !== 'undefined' && typeof uni.hideLoading === 'function') {
           uni.hideLoading()
@@ -2525,11 +2525,11 @@ export default {
         })
       } catch (e) {
         console.error('合并为 PDF 失败:', e)
-        uni.showToast({
-          title: (e && e.message) || this.$t('fileTree.mergeToPdfFailed'),
-          icon: 'none',
-          duration: 3000
-        })
+        uni.hideLoading()
+        uni.showModal(pdfConversionRecoveryOptions({
+          error: e, items, t: (key) => this.$t(key),
+          openFile: (file) => this.$emit('file-open', file),
+        }))
       } finally {
         if (typeof uni !== 'undefined' && typeof uni.hideLoading === 'function') {
           uni.hideLoading()
