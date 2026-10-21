@@ -1528,6 +1528,8 @@ public class ProjectFileService {
      * 通过读取旧文件、写入新位置、删除旧文件来实现
      */
     private void movePhysicalFile(String oldPath, String newPath) throws Exception {
+        // 同目录排序没有路径变化，不能把原文件复制到自身后再删除。
+        if (Objects.equals(oldPath, newPath)) return;
         try {
             // 读取旧文件
             var resource = storageServiceFactory.getStorageService().load(oldPath);

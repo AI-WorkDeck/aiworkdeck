@@ -62,7 +62,8 @@ class LocalRootWatchServiceTest {
     @Test
     void ensureWatchReportsWhetherItActuallyWatches(@TempDir Path dir) {
         LocalRootWatchService svc = new LocalRootWatchService(
-                mock(com.checkba.repository.ProjectRepository.class), mock(LocalProjectService.class));
+                mock(com.checkba.repository.ProjectRepository.class), mock(LocalProjectService.class),
+                mock(LocalProjectFileChangeService.class));
         try {
             assertFalse(svc.ensureWatch(1L, dir.resolve("并不存在的目录").toString()),
                     "目录不可达时不能自称在监听");
@@ -90,7 +91,9 @@ class LocalRootWatchServiceTest {
     void noiseOnlyChangesDoNotTriggerReconcile(@TempDir Path dir) throws Exception {
         com.checkba.repository.ProjectRepository repo = mock(com.checkba.repository.ProjectRepository.class);
         LocalProjectService projectService = mock(LocalProjectService.class);
-        LocalRootWatchService svc = new LocalRootWatchService(repo, projectService);
+        org.mockito.Mockito.when(projectService.reconcileProject(1L))
+                .thenReturn(new LocalProjectService.ReconcileResult(0, false, false, 0, false));
+        LocalRootWatchService svc = new LocalRootWatchService(repo, projectService, mock(LocalProjectFileChangeService.class));
         try {
             assertTrue(svc.ensureWatch(1L, dir.toString()));
 
