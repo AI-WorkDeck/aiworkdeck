@@ -69,8 +69,9 @@
     <!-- file 判空不能省：预热备胎（file=null）也会走到 ready，工具栏挂上去就会
          对着一个隐藏的空白实例白跑 get_ui_state/list_styles/list_fonts。 -->
     <EditorToolbar
-      v-if="ready && file && !loadingOverlayVisible && docKind === 'writer'"
+      v-if="ready && file && !loadingOverlayVisible && (docKind === 'writer' || docKind === 'calc' || docKind === 'impress')"
       ref="toolbar"
+      :doc-kind="docKind"
       :executor="executor"
       :refresh-key="uiRefreshKey"
       :review-open="reviewOpen"
@@ -734,9 +735,9 @@ export default {
     // 一律薄转发到工具栏/审阅面板已有的方法，不在这层复制业务逻辑——
     // 菜单和工具栏点同一个按钮必须是同一条代码路径，否则两边会各自漂。
 
-    /** 这个实例现在能接命令吗（引擎起来了、装着真文档、是 Writer）。 */
+    /** 这个实例现在能接命令吗（引擎起来了、装着真文档、是 Writer/Calc/Impress）。 */
     menuReady() {
-      return !!(this.ready && this.file && this.docKind === 'writer')
+      return !!(this.ready && this.file && (this.docKind === 'writer' || this.docKind === 'calc' || this.docKind === 'impress'))
     },
     /** 供菜单读勾选态。工具栏没挂（非 Writer / 未就绪）时全 false。 */
     menuState() {
