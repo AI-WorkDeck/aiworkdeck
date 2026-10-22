@@ -254,7 +254,7 @@
     state.self = data.self || data.currentUser || {
       id: data.currentUserId || 1,
       displayName: data.currentUserName || '当前律师',
-      departmentName: data.currentDepartment || '争议解决部',
+      departmentName: data.currentDepartment || '争议解决',
       role: '主办律师 / 利冲委员'
     };
 
@@ -858,7 +858,7 @@
   function collectIntakePayload() {
     const title = $('intake-title').value.trim();
     const practiceArea = $('intake-practice-area').value;
-    const departmentName = $('intake-department').value.trim() || '争议解决部';
+    const departmentName = $('intake-department').value.trim() || '争议解决';
     const leadLawyerName = $('intake-lead-lawyer').value.trim() || (state.self?.displayName || '主办律师');
     const feeMode = $('intake-fee-mode').value;
     const clientName = $('intake-client-name').value.trim();
