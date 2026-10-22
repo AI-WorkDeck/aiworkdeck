@@ -3,31 +3,31 @@
 <template>
   <section class="dd-workspace">
     <header class="workspace-header">
-      <div><h2>受邀尽调</h2><p>按律师清单准备材料，逐项提交并查看反馈。</p></div>
-      <button class="secondary" @click="adding = !adding">加入项目</button>
+      <div><h2>{{ $t('ddWorkflow.client.workspaceTitle') }}</h2><p>{{ $t('ddWorkflow.client.workspaceHint') }}</p></div>
+      <button class="secondary" @click="adding = !adding">{{ $t('ddWorkflow.client.joinProject') }}</button>
     </header>
-    <div class="notification-bar"><span>{{ notifications.length ? `${notifications.length} 条未读消息` : '项目消息会显示在这里' }}</span><button v-if="notificationPermission === 'default'" class="text-button" @click="enableNotifications">开启系统提醒</button><small v-else-if="notificationPermission !== 'granted'">系统提醒未开启，仍可在这里查收</small></div>
+    <div class="notification-bar"><span>{{ notifications.length ? $t('ddWorkflow.client.unreadMessages', { count: notifications.length }) : $t('ddWorkflow.client.noMessages') }}</span><button v-if="notificationPermission === 'default'" class="text-button" @click="enableNotifications">{{ $t('ddWorkflow.client.enableNotifications') }}</button><small v-else-if="notificationPermission !== 'granted'">{{ $t('ddWorkflow.client.notificationsDisabled') }}</small></div>
     <div v-if="notifications.length" class="notification-list"><button v-for="n in notifications" :key="`${n.connectionId}:${n.id}`" class="text-button" @click="openNotification(n)">{{ n.title }}</button></div>
     <form v-if="adding || !connections.length" class="join-panel" @submit.prevent="join">
-      <label for="dd-invite">律师发送的邀请码</label>
-      <div class="join-row"><input id="dd-invite" v-model="code" autocomplete="off" placeholder="输入邀请码" :disabled="joining" @confirm="join" /><button :disabled="joining || !code.trim()" @click="join">{{ joining ? '正在加入…' : '加入项目' }}</button></div>
-      <select v-if="cloudConnections.length" v-model="cloudConnectionId" aria-label="案件库"><option value="">官方案件库</option><option v-for="c in cloudConnections" :key="c.id" :value="c.id">{{ c.displayName || c.serverUrl }}</option></select>
-      <p>项目加入后保留在这个标签页，您仍可使用 AI WorkDeck 的其他功能。</p>
+      <label for="dd-invite">{{ $t('ddWorkflow.client.invitationLabel') }}</label>
+      <div class="join-row"><input id="dd-invite" v-model="code" autocomplete="off" :placeholder="$t('ddWorkflow.client.invitationPlaceholder')" :disabled="joining" @confirm="join" /><button :disabled="joining || !code.trim()" @click="join">{{ joining ? $t('ddWorkflow.client.joining') : $t('ddWorkflow.client.joinProject') }}</button></div>
+      <select v-if="cloudConnections.length" v-model="cloudConnectionId" :aria-label="$t('ddWorkflow.client.caseLibrary')"><option value="">{{ $t('ddWorkflow.client.officialCaseLibrary') }}</option><option v-for="c in cloudConnections" :key="c.id" :value="c.id">{{ c.displayName || c.serverUrl }}</option></select>
+      <p>{{ $t('ddWorkflow.client.personalWorkspaceHint') }}</p>
     </form>
-    <p v-if="error" class="error" role="alert">{{ error }} <button class="text-button" @click="load">重试</button></p>
-    <p v-if="loading" class="empty" role="status">正在读取受邀项目…</p>
+    <p v-if="error" class="error" role="alert">{{ error }} <button class="text-button" @click="load">{{ $t('ddWorkflow.retry') }}</button></p>
+    <p v-if="loading" class="empty" role="status">{{ $t('ddWorkflow.client.loadingProjects') }}</p>
     <div v-if="connections.length" class="workspace-body">
       <aside class="project-list">
-        <label for="dd-project">受邀项目</label>
+        <label for="dd-project">{{ $t('ddWorkflow.client.invitedProjects') }}</label>
         <select id="dd-project" :value="selectedId" @change="selectConnection($event.target.value)"><option v-for="c in connections" :key="c.id" :value="c.id">{{ c.name }}</option></select>
-        <div class="list-heading"><span>律师已发布的清单</span><button class="text-button" @click="loadRequests">刷新</button></div>
-        <p v-if="requestsLoading" class="empty">正在读取清单…</p>
-        <p v-else-if="!requests.length" class="empty">律师确认并发布后，清单会显示在这里。</p>
-        <button v-for="request in requests" :key="request.id" class="request-row" :class="{ selected: String(requestId) === String(request.id) }" @click="requestId = request.id"><span>{{ request.name }}</span><small v-if="request.status === 'ARCHIVED'">已归档</small></button>
-        <button class="text-button remove" @click="leave">移除本机连接</button>
+        <div class="list-heading"><span>{{ $t('ddWorkflow.client.publishedChecklists') }}</span><button class="text-button" @click="loadRequests">{{ $t('ddWorkflow.refresh') }}</button></div>
+        <p v-if="requestsLoading" class="empty">{{ $t('ddWorkflow.client.loadingChecklist') }}</p>
+        <p v-else-if="!requests.length" class="empty">{{ $t('ddWorkflow.client.awaitingPublication') }}</p>
+        <button v-for="request in requests" :key="request.id" class="request-row" :class="{ selected: String(requestId) === String(request.id) }" @click="requestId = request.id"><span>{{ request.name }}</span><small v-if="request.status === 'ARCHIVED'">{{ $t('ddWorkflow.requestStatus.ARCHIVED') }}</small></button>
+        <button class="text-button remove" @click="leave">{{ $t('ddWorkflow.client.removeConnection') }}</button>
       </aside>
       <DdClientChecklist v-if="requestId && selected" :key="`${selected.id}:${requestId}`" :request-id="requestId" :project-id="selected.projectId" :connection-id="selected.id" />
-      <div v-else class="empty detail-empty">请选择一份清单开始准备材料。</div>
+      <div v-else class="empty detail-empty">{{ $t('ddWorkflow.client.chooseChecklist') }}</div>
     </div>
   </section>
 </template>
