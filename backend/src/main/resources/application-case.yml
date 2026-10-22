@@ -5,7 +5,8 @@
 #                          AI 对话、反馈收件箱、手机影像中转。
 #   application-prod.yml   团队服务器（MySQL，restart-backend.sh 在用）。
 #   application-case.yml   本文件。团队案件库：只做 git smart-HTTP 托管 + 项目/成员/
-#                          设备令牌。不跑 AI、不收反馈、不做手机中转。
+#                          设备令牌与尽调协作。执行限定尽调 AI 任务；不承载通用
+#                          AI 对话、不收反馈、不做手机中转。
 #
 # 为什么不复用 cloud profile + 环境变量覆盖（决策记录）：
 #   1. 两个实例跑在同一台机器上、同一份 backend.jar。复用意味着任何一次为 addin 改
@@ -91,10 +92,13 @@ storage:
     template-path: /data/aiworkdeck-case/store/template.docx
 
 ai:
+  model:
+    # Due diligence jobs use the publishing lawyer's existing per-user platform key.
+    provider: awd-cloud
   subagent:
     max-parallel: ${AI_SUBAGENT_MAX_PARALLEL:8}
   packs:
-    # 案件库不跑 AI，也就不需要原生资源包。关掉总开关 = 安装、自动补下载、
+    # 尽调AI使用现有云端通道，不需要原生资源包。关掉总开关 = 安装、自动补下载、
     # 封禁表同步全部旁路，这台机器不会为了 pack 去连官网。
     enabled: false
 

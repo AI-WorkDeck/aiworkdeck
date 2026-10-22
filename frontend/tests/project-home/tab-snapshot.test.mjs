@@ -28,7 +28,7 @@ const artifact = { id: 'artifact-3', artifactId: 3, tabType: 'markdown', fileTyp
 const merge = { id: 'merge-review_1_a.docx', tabType: 'merge-review', fileType: 'merge-review', name: '合并', mergeSpec: { path: 'a.docx' } }
 const history = { id: 'commit-history_1', tabType: 'commit-history', name: '历史', historyFocus: 'remote', historyFocusSha: 'abc', historyFocusToken: 4 }
 const diff = { id: 'diff-1-2-99', tabType: 'diff', fileType: 'diff', name: 'a ↔ b', diffSource: { id: 1, name: 'a' }, diffTarget: { id: 2, name: 'b' } }
-const dd = { id: 'dd-7', requestId: 7, name: '清单', type: 'dd-request', fileType: 'dd', isFolder: false }
+const dd = { id: 'dd-7', requestId: 7, name: '清单', type: 'dd-request', tabType: 'dd-request', fileType: 'dd', isFolder: false }
 
 // ---------------- 序列化 ----------------
 
@@ -59,7 +59,7 @@ test('serializeTab：认不出来的 tabType、插件标签、没有 url 的网�
   assert.equal(serializeTab({ id: 'web_2', tabType: 'web', url: '' }), null)
   assert.equal(serializeTab({ id: 9, isFolder: true }), null)
   assert.equal(serializeTab({ id: 'abc', name: '非数字 id 的无类型标签' }), null)
-  assert.deepEqual(serializeTab(dd), { id: 'dd-7', requestId: 7, name: '清单', type: 'dd-request', fileType: 'dd', isFolder: false })
+  assert.deepEqual(serializeTab(dd), { id: 'dd-7', requestId: 7, name: '清单', type: 'dd-request', tabType: 'dd-request', fileType: 'dd', isFolder: false })
 })
 
 // ---------------- 恢复 ----------------

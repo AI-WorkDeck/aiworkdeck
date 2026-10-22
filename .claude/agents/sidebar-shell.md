@@ -13,6 +13,10 @@ description: 侧边栏与工作台外壳领域。任务涉及左侧 rail/左栏�
 
 `ProjectListPane` 桌面顶部顺序为打开文件夹（主按钮）、打开文件（次按钮），然后团队案件库。用说明文字交代该面板查找/切换已有项目，具体文件在资源管理器；不再有独立新建目录弹窗，目录选择器既有 `createDirectory` 支持新建，浏览器仍保留托管项目创建。复用 `ideOpen` / `localOpenCoordinator`，切换前保存，取消不换项目，单文件走隐藏 loose-files 工作区。CLIENT 仍隐藏这些操作；协作入口不删。回归 `desktop-update-indicator.test.mjs`、`project-list-open-actions.test.mjs` 与导航契约。
 
+## 客户协作标签与账号边界（dev-board#1421）
+
+`ddClientTab.js` 打开全局单例 `tabType:'dd-client'`；静态 rail 的 `dd-client` 与欢迎页 `open-client-workspace` 事件共用这一入口，无项目态也可见。客户在标签内输入邀请码，只建立独立项目连接，不写主会话或改变 `currentUser.role`。两侧编辑区挂 `DdClientWorkspace`，快照仅保存标签元数据，不保存连接凭据；`fileKind` 排除其文档上下文。工作台每 15 秒查询已连接项目通知（非活跃页面实例不查询），卸载停止；客户 rail 显示未读数，律师云端尽调 rail/侧栏显示提交与申诉通知。`panelSwitching` 对当前云端/CLIENT 的 `dd-files` 保留原 key，只有已不适用的旧偏好才迁回 files。
+
 ## 工作台视觉层次（dev-board#1365）
 
 `project-overview.scss` 的 `--awd-workbench-header-height` 统一资源管理器标题、中间标签栏和右侧 dock 页签的实际盒高（37px，含边线）；不要单独缩矮右侧 tab。`--awd-workbench-divider` 使用现有弱分隔令牌，rail 与左栏共用底色，内容区用 surface 区分。FileTree 的奇偶行底色必须保留以便逐行定位；悬停、选中与拖入提示仍独立。用户明确要求斑马纹不能因视觉简化而直接取消。
@@ -98,7 +102,7 @@ filelink 点击定位、多 target 弹窗、method 小条；契约见 ai-doc-bri
   **齿轮与头像都不在 rail 上了**（2026-08-19）；插件广场按钮也不在了，它升成了
   LEFT_SIDEBAR_PLUGINS 数组里的一项（key `market`）。
 - sidebar-left：sidebar-header（标题=leftPaneTitle）、sidebar-content 按 leftPaneKey 分支
-  （files→FileTree、dd-files→DdFilesPanel（现在只有 CLIENT 走得到）、
+  （files→FileTree、dd-files→DdFilesPanel（CLIENT 或云端轨道律师）、
   **home→ProjectHomePane compact**、**voice→内联 tab 宿主**（EasyVoicePane /
   MeetingRecordingPanel）、desensitize、search、version、market→MarketSidebarPanel、
   litigation-visual、动态插件→PluginPane）、拖拽手柄。

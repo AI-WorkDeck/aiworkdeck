@@ -182,8 +182,8 @@ test('无项目态存储键落 global_*，不再写出 project_null_*', () => {
   assert.equal(workbenchStorageKey('12', 'leftPaneKey'), 'project_12_leftPaneKey')
 })
 
-test('无项目态 rail 只留全局面板：项目 / 日程 / 插件中心 / 剪贴板', () => {
-  assert.deepEqual([...NO_PROJECT_PANE_KEYS].sort(), ['calendar', 'clipboard', 'market', 'projects'])
+test('无项目态 rail 只留全局面板：项目 / 日程 / 插件中心 / 剪贴板 / 客户协作', () => {
+  assert.deepEqual([...NO_PROJECT_PANE_KEYS].sort(), ['calendar', 'clipboard', 'dd-client', 'market', 'projects'])
   assert.equal(NO_PROJECT_DEFAULT_PANE, 'projects')
   for (const k of ['files', 'search', 'version', 'voice', 'desensitize', 'litigation-visual', 'home', 'insight', 'favorites', 'dev', 'staging', 'plugin-foo']) {
     assert.equal(isPaneAllowedWithoutProject(k), false, k + ' 要项目，无项目态不许挂载')
@@ -279,12 +279,10 @@ test('portal 形态：案件库地址没取到时如实提示，不打开任何�
   assert.equal(vm.errorText, 'welcome.portalUnavailable')
 })
 
-test('访问码：登录页用 login 形态（原样）；欢迎标签桌面端用 portal 形态、不显示服务器地址栏', () => {
-  assert.match(read('pages/login/login.vue'), /<ClientAccessCodeForm \/>/)
+test('欢迎页访问码入口打开客户协作标签，不改主账号或外开浏览器', () => {
   const welcome = read('components/welcome/WelcomePane.vue')
-  assert.match(welcome, /<ClientAccessCodeForm\s+v-if="isDesktop"\s+mode="portal"[\s\S]*?:portal-base="caseServerUrl"/)
-  assert.match(welcome, /<ClientAccessCodeForm v-else compact autofocus \/>/)
-  assert.match(welcome, /getOfficialCloud\(\)/, '门户根地址取官方案件库地址（cloud.collab.base-url）')
-  assert.ok(!/showServerField|show-server-field|serverInput|submitRemote/.test(CLIENT_FORM), '服务器地址栏与远端兑换那条路已撤')
-  assert.match(CLIENT_FORM, /import \{ openExternalUrl \} from '@\/utils\/externalLink\.js'/)
+  assert.match(welcome, /data-action="access-code" @tap="\$emit\('open-client-workspace'\)"/)
+  assert.doesNotMatch(welcome, /<ClientAccessCodeForm|mode="portal"|clientLogin|saveSession/)
+  const workbench = read('pages/project-overview/project-overview.vue')
+  assert.equal((workbench.match(/@open-client-workspace="openDdClientTab"/g) || []).length, 2)
 })
