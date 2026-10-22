@@ -300,17 +300,21 @@ export default {
 </script>
 <style lang="scss" scoped>
 .dd-workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; color: var(--awd-text); background: var(--awd-surface); font-size: var(--awd-panel-fs); }
-.dd-workspace button { margin: 0; padding: 6px 10px; min-height: 32px; line-height: 1.4; font: inherit; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); color: var(--awd-text); background: var(--awd-surface); cursor: pointer; }
-.dd-workspace button::after { border: 0; }
-.dd-workspace button:disabled { opacity: .5; cursor: default; }
+.dd-workspace button { margin: 0; padding: 0 12px; min-height: 32px; line-height: 1.4; font: inherit; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); color: var(--awd-text); background: var(--awd-surface); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background var(--awd-motion-fast), border-color var(--awd-motion-fast); }
+.dd-workspace button::after { border: 0; display: none; }
+.dd-workspace button:disabled, .dd-workspace button[disabled] { opacity: .48; cursor: not-allowed; background: var(--awd-surface); color: var(--awd-text-3); }
 .dd-workspace button:hover:not(:disabled) { background: var(--awd-surface-2); }
-.dd-workspace button.primary { background: var(--awd-accent); border-color: var(--awd-accent); color: var(--awd-text-on-accent); }
+.dd-workspace button.primary { background: var(--awd-accent); border-color: var(--awd-accent); color: var(--awd-text-on-accent); font-weight: 500; }
+.dd-workspace button.primary:hover:not(:disabled) { background: var(--awd-accent-hover); border-color: var(--awd-accent-hover); }
+.dd-workspace button.primary:disabled, .dd-workspace button.primary[disabled] { background: var(--awd-accent); border-color: var(--awd-accent); color: var(--awd-text-on-accent); opacity: .48; }
 .dd-workspace :focus-visible { outline: 2px solid var(--awd-accent-text); outline-offset: 2px; }
-.dd-workspace input, .dd-workspace textarea { box-sizing: border-box; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); padding: 8px 10px; color: var(--awd-text); background: var(--awd-surface); font: inherit; width: 100%; }
-.dd-workspace textarea { min-height: 80px; line-height: 1.7; }
+.dd-workspace input, .dd-workspace textarea { box-sizing: border-box; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); color: var(--awd-text); background: var(--awd-surface); font: inherit; width: 100%; }
+.dd-workspace input { height: var(--awd-control-height); padding: 0 10px; line-height: var(--awd-control-height); }
+.dd-workspace textarea { padding: 8px 10px; min-height: 80px; line-height: 1.7; }
+.dd-workspace :deep(.uni-input-placeholder), .dd-workspace :deep(.uni-textarea-placeholder) { color: var(--awd-text-3); }
 .dd-header { padding: 16px 20px; border-bottom: 1px solid var(--awd-border); display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 .dd-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
-.dd-workspace .dd-title { font-size: 17px; font-weight: 600; width: min(380px, 100%); border-color: transparent; padding: 4px 0; }
+.dd-workspace .dd-title { font-size: var(--awd-font-size-title); font-weight: 600; width: min(380px, 100%); border-color: transparent; padding: 0 4px; }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .muted { color: var(--awd-text-2); font-size: var(--awd-panel-fs-meta); line-height: 1.7; }
 .badge { display: inline-block; align-self: flex-start; padding: 3px 7px; border-radius: var(--awd-radius-sm); background: var(--awd-surface-3); color: var(--awd-text-2); font-size: var(--awd-panel-fs-meta); line-height: 1.4; white-space: nowrap; }

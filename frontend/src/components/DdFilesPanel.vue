@@ -103,19 +103,22 @@ export default {
 <style scoped lang="scss">
 .dd-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; color: var(--awd-text); font-size: var(--awd-panel-fs); }
 .dd-panel-head { min-height: var(--awd-panel-sec-h); display: flex; align-items: center; gap: 6px; padding: 0 var(--awd-panel-pad-x); font-weight: 600; }
-.dd-panel button { margin: 0; font: inherit; line-height: 1.4; padding: 5px 8px; min-height: 30px; border-radius: var(--awd-radius-sm); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); cursor: pointer; }
-.dd-panel button::after { border: 0; }
-.dd-panel button:disabled { opacity: .5; cursor: default; }
+.dd-panel button { margin: 0; font: inherit; line-height: 1.4; padding: 0 10px; min-height: 30px; border-radius: var(--awd-radius-sm); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.dd-panel button::after { border: 0; display: none; }
+.dd-panel button:disabled, .dd-panel button[disabled] { opacity: .48; cursor: not-allowed; background: var(--awd-surface); color: var(--awd-text-3); }
 .dd-panel button:focus-visible, .dd-panel input:focus-visible { outline: 2px solid var(--awd-accent-text); outline-offset: 2px; }
-.dd-panel .primary { color: var(--awd-text-on-accent); background: var(--awd-accent); border-color: var(--awd-accent); width: 100%; }
+.dd-panel .primary { color: var(--awd-text-on-accent); background: var(--awd-accent); border-color: var(--awd-accent); width: 100%; font-weight: 500; }
+.dd-panel .primary:disabled, .dd-panel .primary[disabled] { color: var(--awd-text-on-accent); background: var(--awd-accent); border-color: var(--awd-accent); opacity: .48; }
+.dd-panel .import-button { width: 100%; margin-top: 6px; }
 .dd-panel .icon-button { margin-left: auto; border-color: transparent; background: transparent; }
 .dd-notifications { padding: 0 var(--awd-panel-pad-x) 10px; border-bottom: 1px solid var(--awd-border-subtle); }
-.dd-notifications button { width: 100%; text-align: left; margin-top: 6px; background: var(--awd-accent-soft); color: var(--awd-accent-text); font-size: var(--awd-panel-fs-meta); }
+.dd-notifications button { width: 100%; text-align: left; justify-content: flex-start; margin-top: 6px; background: var(--awd-accent-soft); color: var(--awd-accent-text); font-size: var(--awd-panel-fs-meta); }
 .dd-create { padding: 6px var(--awd-panel-pad-x) 12px; border-bottom: 1px solid var(--awd-border-subtle); }
 .hint, .muted, .list-meta { color: var(--awd-text-2); font-size: var(--awd-panel-fs-meta); }
 .hint { display: block; line-height: 1.6; margin-top: 8px; }
 .create-form { padding-top: 8px; }
-.create-form input { width: 100%; box-sizing: border-box; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-surface); padding: 6px 8px; min-height: 32px; }
+.create-form input { width: 100%; box-sizing: border-box; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-surface); color: var(--awd-text); font: inherit; height: 32px; padding: 0 8px; line-height: 32px; }
+.dd-panel :deep(.uni-input-placeholder) { color: var(--awd-text-3); }
 .actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
 .dd-lists { min-height: 0; flex: 1; overflow: auto; padding: 6px var(--awd-panel-pad-x); }
 .dd-list { margin-bottom: 4px; border: 1px solid transparent; border-radius: var(--awd-radius-sm); }
