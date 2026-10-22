@@ -211,8 +211,20 @@ public class DdService {
     /**
      * 客户上传文件
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public DdItem uploadFile(Long itemId, MultipartFile file, Long userId) throws IOException {
+        ProjectFile stored = storeAttachment(itemId, file, userId);
+        DdItem item = ddItemRepository.findById(itemId).orElseThrow();
+        item.setUploadedFileId(stored.getId());
+        item.setUploadedAt(LocalDateTime.now());
+        item.setUploadedBy(userId);
+        item.setStatus("UPLOADED");
+        return ddItemRepository.save(item);
+    }
+
+    /** Stores one immutable attachment; the workflow commits its submission after every attachment succeeds. */
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectFile storeAttachment(Long itemId, MultipartFile file, Long userId) throws IOException {
         DdItem item = ddItemRepository.findById(itemId)
                 .orElseThrow(() -> new IllegalArgumentException("清单项不存在"));
         // 已通过的条目不再收材料：要换文件得律师先撤回通过（dev-board#1057）。
@@ -287,7 +299,7 @@ public class DdService {
         if (!StringUtils.hasText(rawName) || ".".equals(rawName) || "..".equals(rawName)) {
             rawName = "upload";
         }
-        String fileName = System.currentTimeMillis() + "_" + rawName;
+        String fileName = UUID.randomUUID() + "_" + truncateToColumnWidth(rawName, 256);
 
         String storagePath = "projects/" + projectId + "/client_uploads/" + fileName;
 
@@ -298,10 +310,11 @@ public class DdService {
         // 重试一次多漏一个）。
         String displayName = truncateToColumnWidth(originalFilename, 256);
 
-        // Physical Save
-        storageServiceFactory.getStorageService().save(storagePath, file.getInputStream());
-
         try {
+            // A storage failure may leave a partial object too; clean it up with DB failures.
+            try (var input = file.getInputStream()) {
+                storageServiceFactory.getStorageService().save(storagePath, input);
+            }
             // 6. Create ProjectFile record in the target folder
             ProjectFile projectFile = new ProjectFile();
             projectFile.setProjectId(projectId);
@@ -318,14 +331,20 @@ public class DdService {
             projectFile.setUpdatedAt(LocalDateTime.now());
             projectFile = projectFileRepository.save(projectFile);
 
-            // 7. Update DdItem
-            item.setUploadedFileId(projectFile.getId());
-            item.setUploadedAt(LocalDateTime.now());
-            item.setUploadedBy(userId);
-            item.setStatus("UPLOADED");
-
-            return ddItemRepository.save(item);
-        } catch (RuntimeException e) {
+            // A later attachment or submission failure must also remove already-written storage bytes.
+            if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+                org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCompletion(int status) {
+                            if (status != STATUS_COMMITTED) {
+                                try { storageServiceFactory.getStorageService().delete(storagePath); }
+                                catch (Exception ex) { log.warn("DD rollback storage cleanup failed: {}", storagePath, ex); }
+                            }
+                        }
+                    });
+            }
+            return projectFile;
+        } catch (RuntimeException | IOException e) {
             // 落库失败（列宽超限之外的原因也算，比如瞬时 DB 故障）：物理对象已经写盘，
             // 必须补偿删除，否则每次重试都在存储里多留一个孤儿。
             try {

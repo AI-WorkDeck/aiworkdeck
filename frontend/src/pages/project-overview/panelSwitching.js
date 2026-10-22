@@ -10,7 +10,8 @@ import { isPaneAllowedWithoutProject, workbenchStorageKey } from './noProjectShe
 
 export const panelSwitchingMethods = {
     toggleLeftPane(key) {
-      key = migrateLeftPaneKey(key)
+      // A visible cloud/client DD entry is current, not a stale hidden-pane preference.
+      if (key !== 'dd-files' || (!this.isClientView && !this.ddCloudTrack)) key = migrateLeftPaneKey(key)
       // 无项目态（dev-board#1047）：只有全局面板能开。项目面板不挂载——它们带着
       // projectId=null 空转会打出 /api/projects/null/... 请求。菜单 / 命令面板 / 旧存量值
       // 都可能把一个项目面板的 key 送进来，这里是唯一的闸。
@@ -61,6 +62,8 @@ export const panelSwitchingMethods = {
         // 插件中心，正在改的催款函不该凭空没了。lastActiveIdsByMode 仍照记，
         // 关标签时的兜底（fileOpenTabs.js）与存量本地存储都还读它。
       }
+
+      if (key === 'dd-client') this.openDdClientTab()
 
       const plugin = this.dynamicPlugins.find(p => p.key === key)
       if (plugin && !plugin.sidebarView) this.openPluginTab(plugin.pluginId)
