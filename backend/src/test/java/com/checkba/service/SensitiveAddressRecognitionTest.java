@@ -23,6 +23,9 @@ class SensitiveAddressRecognitionTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
+        "注册地址：中国（上海）自由贸易试验区世纪大道100号|注册地址：XXXX",
+        "注册地址：北京市朝阳区建国路88号东侧|注册地址：XX市XX区XXXX",
+        "注册地址：北京市朝阳区建国路88号院内|注册地址：XX市XX区XXXX",
         "注册地址：北京市朝阳区建国路88号SOHO现代城A座3层301室|注册地址：XX市XX区XXXX",
         "住所：北京市海淀区中关村大街27号（集中办公区）|住所：XX市XX区XXXX",
         "通讯地址：广东省深圳市南山区科技园科苑路15号 A栋 1201室|通讯地址：XX省XX市XX区XXXX",
@@ -60,6 +63,8 @@ class SensitiveAddressRecognitionTest {
     @CsvSource(delimiter = '|', value = {
         "双方应当按注册地址送达通知，地址变更应书面告知。",
         "注册地址：待补充；通讯地址：另行通知。",
+        "注册地址：未知；住所：待核实。",
+        "注册地址：北京市朝阳区建国路88号的地址应另行通知。",
         "本合同适用于广东省，双方应按约履行。",
         "北京市朝阳区人民法院依法审理本案。",
         "甲方：北京市朝阳区星河科技有限公司。",
@@ -106,6 +111,21 @@ class SensitiveAddressRecognitionTest {
     @Test void fieldNeverCrossesLineOrConsumesFollowingFields() {
         String input = "注册地址：北京市朝阳区建国路88号\n电话：13800001111\n地址：\n双方应履行合同。";
         assertEquals("注册地址：XX市XX区XXXX\n电话：13800001111\n地址：\n双方应履行合同。", service.replaceSensitiveData(input, "ADDRESS"));
+    }
+
+    @Test void boundedAddressFieldsPreserveFollowingFieldsAndRestoreExactly() {
+        String input = "注册地址：中国（上海）自由贸易试验区世纪大道100号 联系人：李明；"
+                + "住所：北京市朝阳区建国路88号东侧 电话：13800001111。"
+                + "注册地址：北京市朝阳区建国路88号院内；双方应当履行合同。";
+        var engine = new SensitiveTextEngine(List.of("ADDRESS"), true, List.of(), List.of());
+        String masked = engine.apply(input);
+        assertEquals(3, engine.counts().get("ADDRESS"));
+        assertFalse(masked.contains("世纪大道"));
+        assertFalse(masked.contains("建国路"));
+        assertTrue(masked.contains(" 联系人：李明；"));
+        assertTrue(masked.contains(" 电话：13800001111。"));
+        assertTrue(masked.endsWith("；双方应当履行合同。"));
+        assertEquals(input, SensitiveTextEngine.apply(masked, SensitiveTextEngine.restoreEdits(masked, engine.recovery())));
     }
 
     @Test void textPreviewGenerationAndDistinctReversibleTokensAgree() throws Exception {
