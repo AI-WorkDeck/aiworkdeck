@@ -95,10 +95,33 @@ function localFilePath(file, fs) {
   } catch (_) { return '' }
 }
 
+// macOS App Sandbox 容器路径（如微信 ~/Library/Containers/com.tencent.xinWeChat/Data/...）
+// 受 TCC kTCCServiceSystemPolicyAllFiles（「完全磁盘访问权限」）保护：
+// - 未授予完全磁盘访问权限时，后端 import-local 的 stat/open 会被内核以 EPERM 拒绝；
+// - 在 drop 同步阶段同时预读 File 字节快照（若 Chromium 持有拖拽期临时读句柄则可走字节暂存兜底），
+//   若直读与字节兜底均被 TCC 拒绝，则明确回传 importDropPermissionDenied 并唤起拖拽授权浮窗。
+export function isSandboxContainerPath(filePath) {
+  return typeof filePath === 'string' && /\/Library\/(?:Group )?Containers\//i.test(filePath)
+}
+
+export function isPermissionDeniedImportError(err) {
+  const msg = String((err && err.message) || err || '')
+  return /EPERM|EACCES|Operation not permitted|Permission denied|无权读取|完全磁盘访问权限|Full Disk Access/i.test(msg)
+}
+
+function notifyPermissionRequiredForDrop(payload) {
+  try {
+    if (typeof uni !== 'undefined' && uni && typeof uni.$emit === 'function') {
+      uni.$emit('awd:open-permission-onboarding', payload)
+    }
+  } catch (_) { /* ignore */ }
+}
+
 function captureLocalFile(file, fs, remaining = MAX_DROP_BYTES) {
   if (capturedFiles.has(file)) return capturedFiles.get(file)
   const path = localFilePath(file, fs)
-  const source = { path }
+  const sandboxContainer = isSandboxContainerPath(path)
+  const source = { path, sandboxContainer }
   if (!path) {
     if (!fs) source.error = 'importDesktopOnly'
     else if (!fs.stageDroppedFile || !fs.releaseDroppedFile || directoryFiles.has(file) || file?.size === 0 || typeof file?.arrayBuffer !== 'function') source.error = 'importDropUnreadable'
@@ -109,6 +132,19 @@ function captureLocalFile(file, fs, remaining = MAX_DROP_BYTES) {
       try { source.bytes = Promise.resolve(file.arrayBuffer()).then(bytes => ({ bytes }), () => ({ error: 'importDropUnreadable' })) }
       catch (_) { source.error = 'importDropUnreadable' }
     }
+  } else if (
+    sandboxContainer &&
+    fs &&
+    fs.stageDroppedFile &&
+    fs.releaseDroppedFile &&
+    !directoryFiles.has(file) &&
+    Number.isSafeInteger(file?.size) &&
+    file.size > 0 &&
+    file.size <= remaining &&
+    typeof file?.arrayBuffer === 'function'
+  ) {
+    try { source.bytes = Promise.resolve(file.arrayBuffer()).then(bytes => ({ bytes }), () => ({ error: 'importDropUnreadable' })) }
+    catch (_) { /* fallback remains optional when path is present */ }
   }
   if (file && typeof file === 'object') capturedFiles.set(file, source)
   return source
@@ -118,10 +154,39 @@ function captureLocalFile(file, fs, remaining = MAX_DROP_BYTES) {
 // bytes can be staged; callers never pass a destination path to the desktop.
 export async function importDroppedFile(file, fs, importPath) {
   const source = captureLocalFile(file, fs)
-  const fail = code => { const error = new Error(code); error.dropCode = code; throw error }
+  const fail = (code, extra = {}) => {
+    const error = new Error(code)
+    error.dropCode = code
+    Object.assign(error, extra)
+    throw error
+  }
   let staged
   try {
-    if (source.path) return await importPath(source.path)
+    if (source.path) {
+      try {
+        return await importPath(source.path)
+      } catch (pathErr) {
+        if (source.bytes) {
+          const read = await source.bytes
+          if (read && !read.error && (read.bytes instanceof ArrayBuffer) && read.bytes.byteLength === file.size) {
+            try { staged = await fs.stageDroppedFile({ name: file.name, bytes: read.bytes }) }
+            catch (_) { staged = null }
+            if (staged?.ok && staged.token && staged.path) {
+              return await importPath(staged.path)
+            }
+          }
+        }
+        if (source.sandboxContainer || isPermissionDeniedImportError(pathErr)) {
+          notifyPermissionRequiredForDrop({
+            focus: 'fullDiskAccess',
+            reason: 'wechat-drop',
+            sourcePath: source.path,
+          })
+          fail('importDropPermissionDenied', { permissionId: 'fullDiskAccess', cause: pathErr })
+        }
+        throw pathErr
+      }
+    }
     if (source.error) fail(source.error)
     const read = await source.bytes
     if (read.error) fail(read.error)

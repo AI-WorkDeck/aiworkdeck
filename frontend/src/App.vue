@@ -6,6 +6,7 @@ import { openLocalRootPath, openLocalFilePath } from '@/utils/ideOpen.js'
 import { track } from '@/utils/telemetryClient.js'
 import { host, isDesktopHost } from '@/services/host.js'
 import { mountFeedbackWidget } from '@/utils/feedbackWidget.js'
+import { mountPermissionOnboarding } from '@/utils/permissionOnboarding.js'
 import { mountRecordingIndicator } from '@/utils/recordingIndicator.js'
 import { initWindowChrome, refreshDragStrip } from '@/utils/windowChrome.js'
 import { mountGlobalBack, refreshGlobalBack } from '@/utils/globalBack.js'
@@ -41,6 +42,8 @@ export default {
     try { uni.$on(APP_LANGUAGE_EVENT, syncLanguageMirrors) } catch (e) { /* ignore */ }
     // 常驻反馈浮窗：挂在页面树之外，全应用一个实例（见 utils/feedbackWidget.js）
     mountFeedbackWidget()
+    // macOS 系统权限引导：首启自动排查关键权限，支持一键打开系统设置并弹出拖拽授权浮窗（dev-board#1433）
+    mountPermissionOnboarding()
     // 弹窗开着时键盘不许溜进被遮住的编辑器（dev-board#883）：自绘弹窗只有遮罩没有
     // 焦点圈，Tab 会把焦点送进编辑器 webview，字写进背景文档（见 utils/modalFocusGuard.js）
     installModalFocusGuard()

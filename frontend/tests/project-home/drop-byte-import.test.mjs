@@ -82,3 +82,55 @@ test('unavailable directory promise before an items-only File cannot misclassify
   assert.deepEqual(files, [file])
   assert.equal(await importDroppedFile(file, fs, async () => 'imported'), 'imported')
 })
+
+test('WeChat macOS sandbox container path pre-captures bytes during drop and falls back to staged import if backend direct read is blocked by TCC', async () => {
+  const fs = desktop()
+  const wechatPath = '/Users/tester/Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support/com.tencent.xinWeChat/MessageTemp/contract.pdf'
+  fs.getPathForFile = () => wechatPath
+  const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]).buffer
+  let reads = 0
+  const file = {
+    name: 'contract.pdf',
+    size: 4,
+    arrayBuffer() {
+      reads++
+      return Promise.resolve(bytes)
+    },
+  }
+  captureDroppedFiles({ files: [file] }, fs)
+  assert.equal(reads, 1, '微信沙盒容器路径应在 drop 同步阶段启动字节预读')
+
+  const importedPaths = []
+  const result = await importDroppedFile(file, fs, async (targetPath) => {
+    importedPaths.push(targetPath)
+    if (targetPath === wechatPath) {
+      throw new Error('源文件不存在或不是普通文件: ' + wechatPath)
+    }
+    return { id: 99, path: targetPath }
+  })
+
+  assert.equal(result.id, 99)
+  assert.deepEqual(importedPaths, [wechatPath, '/tmp/awd-test/fixture.txt'])
+  assert.deepEqual(fs.calls.map(c => c[0]), ['stage', 'release'])
+})
+
+test('WeChat macOS sandbox container path surfaces importDropPermissionDenied when both direct read and byte read are blocked by TCC', async () => {
+  const fs = desktop()
+  const wechatPath = '/Users/tester/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/msg/file/evidence.docx'
+  fs.getPathForFile = () => wechatPath
+  const file = {
+    name: 'evidence.docx',
+    size: 0,
+    arrayBuffer() {
+      return Promise.reject(new Error('NotReadableError'))
+    },
+  }
+  captureDroppedFiles({ files: [file] }, fs)
+  await assert.rejects(
+    importDroppedFile(file, fs, async () => {
+      throw new Error('源文件不存在或不是普通文件: ' + wechatPath)
+    }),
+    (err) => err && err.dropCode === 'importDropPermissionDenied' && err.permissionId === 'fullDiskAccess'
+  )
+})
+

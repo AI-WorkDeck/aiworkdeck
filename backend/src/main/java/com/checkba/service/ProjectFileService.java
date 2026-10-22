@@ -530,6 +530,7 @@ public class ProjectFileService {
     public ProjectFile importLocalFile(Long projectId, Long parentId, String sourcePath, Long userId) {
         java.nio.file.Path source = resolveImportSource(projectId, userId, sourcePath);
         if (!java.nio.file.Files.isRegularFile(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            throwIfSourceAccessDenied(source, sourcePath);
             // 目录与不存在的路径都落在这里：这个入口一次只收一个普通文件（目录走 importLocalPath）
             throw new IllegalArgumentException(LangText.of("源文件不存在或不是普通文件: ", "Source file does not exist or is not a regular file: ") + sourcePath);
         }
@@ -655,7 +656,32 @@ public class ProjectFileService {
         if (java.nio.file.Files.isDirectory(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
             return importLocalDirectory(projectId, parentId, source, userId);
         }
+        throwIfSourceAccessDenied(source, sourcePath);
         throw new IllegalArgumentException(LangText.of("源文件不存在或不是普通文件: ", "Source file does not exist or is not a regular file: ") + sourcePath);
+    }
+
+    private static void throwIfSourceAccessDenied(java.nio.file.Path source, String sourcePath) {
+        try {
+            java.nio.file.Files.readAttributes(
+                    source,
+                    java.nio.file.attribute.BasicFileAttributes.class,
+                    java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        } catch (java.nio.file.AccessDeniedException e) {
+            throw new IllegalArgumentException(LangText.of(
+                    "无权读取源文件（请在 macOS「系统设置 → 隐私与安全性 → 完全磁盘访问权限」中开启 AI WorkDeck）: ",
+                    "Permission denied reading source file (grant Full Disk Access to AI WorkDeck in macOS System Settings): ")
+                    + sourcePath);
+        } catch (java.nio.file.FileSystemException e) {
+            String reason = e.getReason() != null ? e.getReason() : e.getMessage();
+            if (reason != null && (reason.contains("Operation not permitted") || reason.contains("Permission denied"))) {
+                throw new IllegalArgumentException(LangText.of(
+                        "无权读取源文件（请在 macOS「系统设置 → 隐私与安全性 → 完全磁盘访问权限」中开启 AI WorkDeck）: ",
+                        "Permission denied reading source file (grant Full Disk Access to AI WorkDeck in macOS System Settings): ")
+                        + sourcePath);
+            }
+        } catch (Exception ignored) {
+            // NoSuchFileException 等按原有的「源文件不存在或不是普通文件」处理
+        }
     }
 
     /**

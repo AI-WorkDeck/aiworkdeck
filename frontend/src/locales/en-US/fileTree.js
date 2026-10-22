@@ -156,6 +156,7 @@ export default {
   importFileFailedRetry: 'Failed to import the file, please try again',
   importFailed: 'Import failed',
   importDropUnreadable: 'The source did not provide a readable file. Save it to your computer, then drag it from its folder.',
+  importDropPermissionDenied: 'Permission denied reading from the WeChat sandbox container. Grant Full Disk Access to drag files directly from WeChat.',
   importDropPrepareFailed: 'Could not prepare the dropped file. Save it to your computer and try again.',
   importDropTooLarge: 'Files without a local path are limited to 100 MB per drop. Save them to your computer first.',
   importDesktopOnly: 'Drag-in import is desktop only',
