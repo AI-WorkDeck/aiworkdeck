@@ -749,6 +749,15 @@
                 </text>
               </view>
               <text v-else class="etb-hint">{{ $t('editor.toolbar.impressNoShapes') }}</text>
+              <template v-if="(impressState.shapes || []).length > 0">
+                <text class="etb-pg-sec">{{ $t('editor.toolbar.impressShapeTextSection') }}</text>
+                <view class="etb-inline-row">
+                  <input class="etb-input" v-model="impressShapeTextInput" :placeholder="$t('editor.toolbar.impressShapeTextPh')"
+                         @focus="impressShapeTextFocused = true" @blur="impressShapeTextFocused = false"
+                         @confirm="updateImpressShapeText" @click.stop />
+                  <text class="etb-form-b ok sm" @tap.stop="updateImpressShapeText">{{ $t('editor.toolbar.impressShapeTextApply') }}</text>
+                </view>
+              </template>
               <view class="etb-menu-sep"></view>
               <text class="etb-pg-sec">{{ $t('editor.toolbar.impressFillSection') }}</text>
               <view class="etb-pg-swatches">
@@ -795,7 +804,7 @@
               <text class="etb-field-t">{{ $t('editor.toolbar.impressTableGroup') }}</text>
               <text class="etb-caret">⌄</text>
             </view>
-            <view v-if="menu === 'impressTable'" class="etb-menu w260 pad etb-prop-card" :style="popStyle(260, true)" @tap.stop>
+            <view v-if="menu === 'impressTable'" class="etb-menu w280 pad etb-prop-card" :style="popStyle(280, true)" @tap.stop>
               <view class="etb-pg-head">
                 <text class="etb-pg-title">{{ $t('editor.toolbar.impressTableTitle') }}</text>
               </view>
@@ -807,6 +816,22 @@
               <text class="etb-pg-sec">{{ $t('editor.toolbar.tableHeaderFill') }}</text>
               <view class="etb-pg-swatches">
                 <view v-for="c in TABLE_FILL_SWATCHES.filter(x => x !== 'none')" :key="'itf-' + c" class="etb-chip" :style="{ background: c }" @tap.stop="styleImpressTable({ headerFill: c, headerBold: true })"></view>
+              </view>
+              <view class="etb-menu-sep"></view>
+              <text class="etb-pg-sec">{{ $t('editor.toolbar.impressTableCellSection') }}</text>
+              <view class="etb-margin-grid">
+                <view class="etb-margin-cell">
+                  <text class="etb-pg-u">{{ $t('editor.toolbar.impressTableCellRow') }}</text>
+                  <input class="etb-num" type="number" v-model="impressTableCellForm.row" @click.stop />
+                </view>
+                <view class="etb-margin-cell">
+                  <text class="etb-pg-u">{{ $t('editor.toolbar.impressTableCellCol') }}</text>
+                  <input class="etb-num" type="number" v-model="impressTableCellForm.col" @click.stop />
+                </view>
+              </view>
+              <view class="etb-inline-row">
+                <input class="etb-input" v-model="impressTableCellForm.text" :placeholder="$t('editor.toolbar.impressTableCellTextPh')" @confirm="setImpressTableCell" @click.stop />
+                <text class="etb-form-b ok sm" @tap.stop="setImpressTableCell">{{ $t('editor.toolbar.impressTableCellWrite') }}</text>
               </view>
               <text v-if="impressErr" class="etb-err">{{ impressErr }}</text>
             </view>
@@ -908,21 +933,32 @@
     </view>
   </view>
 
-  <!-- Excel (calc) 专属名称框、工作表胶囊与公式栏（ElyOffice apps/ely-table/src/bars.rs） -->
+  <!-- Excel (calc) 专属名称框、工作表标签栏、公式栏与快捷函数（ElyOffice apps/ely-table/src/bars.rs） -->
   <view v-if="isCalc" class="etb-calc-bar" @tap="closeMenus">
-    <view class="etb-calc-sheet-pill" @tap.stop="openCalcMenu('calcSheet')">
-      <text class="etb-calc-sheet-name">{{ calcState.sheet || 'Sheet1' }}</text>
-      <text class="etb-caret">⌄</text>
+    <view class="etb-calc-sheet-tabs">
+      <text v-for="sh in calcSheetsList" :key="sh" class="etb-calc-sheet-tab"
+            :class="{ on: sh === (calcState.sheet || 'Sheet1') }"
+            @tap.stop="switchCalcSheet(sh)">{{ sh }}</text>
     </view>
     <text class="etb-calc-sheet-add" :title="$t('editor.toolbar.calcSheetAdd')" @tap.stop="addCalcSheet">+</text>
+    <view class="etb-calc-sheet-pill" :title="$t('editor.toolbar.calcSheetTitle')" @tap.stop="openCalcMenu('calcSheet')">
+      <text class="etb-caret">⌄</text>
+    </view>
     <view class="etb-sep"></view>
     <input class="etb-calc-name-box" v-model="calcAddressInput" :title="$t('editor.toolbar.calcNameBoxTitle')"
            @focus="calcAddressFocused = true" @blur="calcAddressFocused = false"
            @confirm="submitCalcAddress" @keydown.enter.prevent="submitCalcAddress" />
     <text class="etb-calc-fx">fx</text>
+    <text class="etb-calc-fx-btn ok" :title="$t('editor.toolbar.apply')" @tap.stop="submitCalcFormula">✓</text>
+    <text class="etb-calc-fx-btn" :title="$t('editor.toolbar.cancel')" @tap.stop="cancelCalcFormula">✕</text>
     <input class="etb-calc-formula-input" v-model="calcFormulaInput" :placeholder="$t('editor.toolbar.calcFormulaPh')"
            @focus="calcFormulaFocused = true" @blur="calcFormulaFocused = false"
            @confirm="submitCalcFormula" @keydown.enter.prevent="submitCalcFormula" @keydown.esc.prevent="cancelCalcFormula" />
+    <view class="etb-calc-fn-chips">
+      <text v-for="fn in CALC_QUICK_FNS" :key="fn.fn" class="etb-calc-fn-chip"
+            :title="$t('editor.toolbar.' + fn.label) + ' (' + fn.fn + ')'"
+            @tap.stop="insertCalcQuickFormula(fn.fn)">{{ $t('editor.toolbar.' + fn.label) }}</text>
+    </view>
   </view>
 
   <!-- 查找替换：自建面板，不走 LO 的 .uno:SearchDialog——真机审计实证那个对话框
@@ -1123,6 +1159,13 @@ const CALC_CHART_TYPES = [
   { k: 'line', label: 'calcChartLine' },
   { k: 'pie', label: 'calcChartPie' },
 ]
+const CALC_QUICK_FNS = [
+  { fn: 'SUM', label: 'calcFnSum' },
+  { fn: 'AVERAGE', label: 'calcFnAvg' },
+  { fn: 'COUNT', label: 'calcFnCount' },
+  { fn: 'MAX', label: 'calcFnMax' },
+  { fn: 'MIN', label: 'calcFnMin' },
+]
 const IMPRESS_LAYOUTS = [
   { code: 0, label: 'impressLayoutTitleSlide' },
   { code: 1, label: 'impressLayoutTitleContent' },
@@ -1187,6 +1230,8 @@ export default {
       // PPT (impress) 状态与表单
       impressErr: '',
       impressNotesInput: '', impressNotesFocused: false,
+      impressShapeTextInput: '', impressShapeTextFocused: false,
+      impressTableCellForm: { row: 1, col: 1, text: '' },
       selectedShapeIndexOverride: null,
       shapeGeomForm: { left: 50, top: 50, width: 200, height: 100 },
       // 查找替换
@@ -1206,6 +1251,7 @@ export default {
     PAGE_NUM_PATTERNS: () => PAGE_NUM_PATTERNS, TABLE_BORDER_OPTIONS: () => TABLE_BORDER_OPTIONS,
     TABLE_FILL_SWATCHES: () => TABLE_FILL_SWATCHES, TABLE_VALIGNS: () => TABLE_VALIGNS,
     CALC_NUM_FORMATS: () => CALC_NUM_FORMATS, CALC_CHART_TYPES: () => CALC_CHART_TYPES,
+    CALC_QUICK_FNS: () => CALC_QUICK_FNS,
     IMPRESS_LAYOUTS: () => IMPRESS_LAYOUTS, SHAPE_SWATCHES: () => SHAPE_SWATCHES,
     CN_FONT_SIZES: () => CN_FONT_SIZES, PT_FONT_SIZES: () => PT_FONT_SIZES,
     showCnSizes: () => !isEnglish(),
@@ -1214,6 +1260,12 @@ export default {
     isCalc() { return this.docKind === 'calc' },
     isImpress() { return this.docKind === 'impress' },
     calcState() { return (this.state && this.state.calc) || {} },
+    calcSheetsList() {
+      const list = (this.calcState && Array.isArray(this.calcState.sheets) && this.calcState.sheets.length)
+        ? this.calcState.sheets
+        : [(this.calcState && this.calcState.sheet) || 'Sheet1']
+      return list
+    },
     impressState() { return (this.state && this.state.impress) || {} },
     impressShape() {
       const shapes = (this.impressState && this.impressState.shapes) || []
@@ -1379,13 +1431,20 @@ export default {
         }
         if (r.impress) {
           if (!this.impressNotesFocused) this.impressNotesInput = r.impress.notesText != null ? String(r.impress.notesText) : ''
-          const sh = r.impress.selectedShape || (Array.isArray(r.impress.shapes) && r.impress.shapes[0])
+          const shapes = Array.isArray(r.impress.shapes) ? r.impress.shapes : []
+          const overrideHit = this.selectedShapeIndexOverride != null
+            ? shapes.find((s) => s.index === this.selectedShapeIndexOverride)
+            : null
+          const sh = overrideHit || r.impress.selectedShape || shapes[0]
           if (sh) {
             this.shapeGeomForm = {
               left: sh.left != null ? sh.left : 50,
               top: sh.top != null ? sh.top : 50,
               width: sh.width != null ? sh.width : 200,
               height: sh.height != null ? sh.height : 100,
+            }
+            if (!this.impressShapeTextFocused) {
+              this.impressShapeTextInput = sh.text != null ? String(sh.text) : ''
             }
           }
         }
@@ -1400,7 +1459,12 @@ export default {
       await this.refresh()
       return res
     },
-    ui(name) { this.closeMenus(); return this.call('ui_command', { name }).then((r) => this.after(r)) },
+    ui(name) {
+      this.closeMenus()
+      const payload = { name }
+      if (this.isImpress && this.activeShapeName) payload.shapeName = this.activeShapeName
+      return this.call('ui_command', payload).then((r) => this.after(r))
+    },
     run(action) { this.closeMenus(); return this.call(action, {}).then((r) => this.after(r)) },
     toggleMenu(name) {
       const opening = this.menu !== name
@@ -1725,7 +1789,11 @@ export default {
     // 用户实测反馈「没选中内容字号栏就不能操作」）。设完把键盘焦点还给画布，
     // 用户点完字号直接接着打字，不用再点一下文档。
     charFormat(params) {
-      return this.call('format_selection', Object.assign({ atCursor: true }, params)).then(async (r) => {
+      const payload = Object.assign({ atCursor: true }, params)
+      if (this.isImpress && this.activeShapeName && !payload.shapeName) {
+        payload.shapeName = this.activeShapeName
+      }
+      return this.call('format_selection', payload).then(async (r) => {
         await this.after(r, !(r && r.atCursor))
         this.$emit('focus-editor')
         return r
@@ -2003,7 +2071,11 @@ export default {
       this.calcErr = ''
       const res = await this.call(action, params || {})
       if (!res || res.success !== true) {
-        this.calcErr = (res && res.message) || this.$t('editor.toolbar.opFailed')
+        const msg = (res && (res.message || res.error)) || this.$t('editor.toolbar.opFailed')
+        this.calcErr = msg
+        if (!this.menu) {
+          try { uni.showToast({ title: msg, icon: 'none' }) } catch (e) {}
+        }
         return null
       }
       if (closeOnOk) this.closeMenus()
@@ -2119,18 +2191,22 @@ export default {
       return this.runCalcOp('sheet_freeze_panes', { cols, rows }, true)
     },
     freezeCalcAtCurrent() {
-      return this.runCalcOp('sheet_freeze_panes', {
-        cols: (this.calcState && this.calcState.col) || 0,
-        rows: (this.calcState && this.calcState.row) || 0,
-      }, true)
+      const c = Number((this.calcState && this.calcState.col) || 0)
+      const r = Number((this.calcState && this.calcState.row) || 0)
+      const cols = (c === 0 && r === 0) ? 1 : c
+      const rows = (c === 0 && r === 0) ? 1 : r
+      return this.runCalcOp('sheet_freeze_panes', { cols, rows }, true)
     },
     switchCalcSheet(name) {
       if (!name) return null
       return this.runCalcOp('sheet_manage_sheets', { action: 'activate', name })
     },
     addCalcSheet() {
-      const count = ((this.calcState && this.calcState.sheets) ? this.calcState.sheets.length : 1) + 1
-      return this.runCalcOp('sheet_manage_sheets', { action: 'add', name: 'Sheet' + count })
+      const sheets = (this.calcState && Array.isArray(this.calcState.sheets)) ? this.calcState.sheets : []
+      const existing = new Set(sheets)
+      let idx = sheets.length + 1
+      while (existing.has('Sheet' + idx)) idx++
+      return this.runCalcOp('sheet_manage_sheets', { action: 'add', name: 'Sheet' + idx })
     },
     renameCalcSheet() {
       const newName = String(this.calcRenameText || '').trim()
@@ -2181,6 +2257,25 @@ export default {
       this.calcFormulaInput = (this.calcState && this.calcState.formula != null) ? String(this.calcState.formula) : ''
       this.$emit('focus-editor')
     },
+    insertCalcQuickFormula(fnName) {
+      const fn = String(fnName || 'SUM').toUpperCase()
+      const addr = String((this.calcState && this.calcState.address) || 'A1')
+      const selRange = String((this.calcState && this.calcState.range) || '')
+      let refRange = 'A1:A10'
+      if (selRange && selRange.indexOf(':') !== -1) {
+        refRange = selRange
+      } else {
+        const m = /^([A-Z]+)(\d+)$/i.exec(addr)
+        if (m) {
+          const colLet = m[1].toUpperCase()
+          const rowNum = Number(m[2]) || 1
+          if (rowNum > 1) refRange = colLet + '1:' + colLet + (rowNum - 1)
+          else refRange = colLet + '2:' + colLet + '10'
+        }
+      }
+      this.calcFormulaInput = '=' + fn + '(' + refRange + ')'
+      return this.submitCalcFormula()
+    },
 
     // ---- PPT (impress) 顶栏与 ElyOffice PropertyGroup 卡片方法 ----
     openImpressSlideMenu() {
@@ -2200,7 +2295,11 @@ export default {
       this.impressErr = ''
       const res = await this.call(action, params || {})
       if (!res || res.success !== true) {
-        this.impressErr = (res && res.message) || this.$t('editor.toolbar.opFailed')
+        const msg = (res && (res.message || res.error)) || this.$t('editor.toolbar.opFailed')
+        this.impressErr = msg
+        if (!this.menu) {
+          try { uni.showToast({ title: msg, icon: 'none' }) } catch (e) {}
+        }
         return null
       }
       if (closeOnOk) this.closeMenus()
@@ -2292,7 +2391,7 @@ export default {
       return this.runImpressOp('slide_set_hyperlink', { slideNumber: cur, shapeName, searchText, url }, true)
     },
     selectImpressShapeTarget(sh) {
-      if (!sh) return
+      if (!sh) return null
       this.selectedShapeIndexOverride = sh.index
       this.shapeGeomForm = {
         left: sh.left != null ? sh.left : 50,
@@ -2300,6 +2399,26 @@ export default {
         width: sh.width != null ? sh.width : 200,
         height: sh.height != null ? sh.height : 100,
       }
+      this.impressShapeTextInput = sh.text != null ? String(sh.text) : ''
+      const cur = (this.impressState && this.impressState.slideNumber) || 1
+      const shapeName = sh.name || sh.shapeName || ''
+      if (shapeName) {
+        return this.call('slide_goto', { slideNumber: cur, shapeName }).then((r) => {
+          this.refresh()
+          return r
+        })
+      }
+      return null
+    },
+    updateImpressShapeText() {
+      const cur = (this.impressState && this.impressState.slideNumber) || 1
+      const shapeName = this.activeShapeName
+      this.impressShapeTextFocused = false
+      return this.runImpressOp('slide_set_shape_text', {
+        slideNumber: cur,
+        shapeName,
+        text: this.impressShapeTextInput != null ? String(this.impressShapeTextInput) : '',
+      })
     },
     formatImpressShape(patch) {
       const cur = (this.impressState && this.impressState.slideNumber) || 1
@@ -2331,6 +2450,21 @@ export default {
       const params = Object.assign({ slideNumber: cur }, patch)
       if (tbl && (tbl.name || tbl.shapeName)) params.shapeName = tbl.name || tbl.shapeName
       return this.runImpressOp('slide_table_set_style', params)
+    },
+    setImpressTableCell() {
+      const cur = (this.impressState && this.impressState.slideNumber) || 1
+      const shapes = (this.impressState && this.impressState.shapes) || []
+      const tbl = (this.impressShape && this.impressShape.isTable ? this.impressShape : null) || shapes.find((s) => s && s.isTable)
+      const row = Math.max(0, (Number(this.impressTableCellForm.row) || 1) - 1)
+      const col = Math.max(0, (Number(this.impressTableCellForm.col) || 1) - 1)
+      const params = {
+        slideNumber: cur,
+        row,
+        col,
+        text: this.impressTableCellForm.text != null ? String(this.impressTableCellForm.text) : '',
+      }
+      if (tbl && (tbl.name || tbl.shapeName)) params.shapeName = tbl.name || tbl.shapeName
+      return this.runImpressOp('slide_table_set_cell', params)
     },
     saveImpressNotes() {
       const cur = (this.impressState && this.impressState.slideNumber) || 1
@@ -2529,18 +2663,31 @@ export default {
 .etb-inline-row { display: flex; align-items: center; gap: 6px; }
 .etb-inline-row .etb-input { flex: 1; min-width: 0; }
 .etb-pg-chip.danger, .etb-form-b.danger { border-color: var(--awd-danger); color: var(--awd-danger-text); background: var(--awd-danger-soft); }
-.etb-calc-bar { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; flex-shrink: 0;
+.etb-calc-bar { display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 8px; flex-shrink: 0;
   background: var(--awd-surface); border-bottom: 1px solid var(--awd-border); }
-.etb-calc-sheet-pill { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px;
+.etb-calc-sheet-tabs { display: flex; align-items: center; gap: 3px; max-width: 240px; overflow-x: auto; flex-shrink: 0; }
+.etb-calc-sheet-tab { padding: 2px 8px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm);
+  background: var(--awd-bg); font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.etb-calc-sheet-tab:hover { border-color: var(--awd-mint); color: var(--awd-accent-text); }
+.etb-calc-sheet-tab.on { border-color: var(--awd-mint); background: var(--awd-accent-soft); color: var(--awd-accent-text); font-weight: 600; }
+.etb-calc-sheet-pill { display: flex; align-items: center; justify-content: center; gap: 4px; height: 22px; padding: 0 6px;
   border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-bg); cursor: pointer; flex-shrink: 0; }
 .etb-calc-sheet-pill:hover { border-color: var(--awd-mint); color: var(--awd-accent-text); }
 .etb-calc-sheet-name { font-size: var(--awd-panel-fs-meta); font-weight: 600; color: var(--awd-text); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .etb-calc-sheet-add { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px;
   border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); font-size: var(--awd-panel-fs); color: var(--awd-text-2); cursor: pointer; flex-shrink: 0; }
 .etb-calc-sheet-add:hover { border-color: var(--awd-mint); color: var(--awd-accent-text); background: var(--awd-accent-soft); }
-.etb-calc-name-box { width: 76px; height: 22px; padding: 0 6px; box-sizing: border-box; font-size: var(--awd-panel-fs-meta); font-family: monospace;
+.etb-calc-name-box { width: 72px; height: 22px; padding: 0 6px; box-sizing: border-box; font-size: var(--awd-panel-fs-meta); font-family: monospace;
   color: var(--awd-text); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-bg); flex-shrink: 0; text-align: center; }
 .etb-calc-fx { font-size: var(--awd-panel-fs-meta); font-style: italic; font-weight: 600; font-family: Georgia, serif; color: var(--awd-text-3); padding: 0 2px; flex-shrink: 0; }
-.etb-calc-formula-input { flex: 1; min-width: 0; height: 22px; padding: 0 8px; box-sizing: border-box; font-size: var(--awd-panel-fs);
+.etb-calc-fx-btn { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+  border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); background: var(--awd-bg); cursor: pointer; flex-shrink: 0; }
+.etb-calc-fx-btn:hover { border-color: var(--awd-mint); color: var(--awd-accent-text); }
+.etb-calc-fx-btn.ok:hover { background: var(--awd-accent-soft); }
+.etb-calc-formula-input { flex: 1; min-width: 80px; height: 22px; padding: 0 8px; box-sizing: border-box; font-size: var(--awd-panel-fs);
   color: var(--awd-text); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-bg); }
+.etb-calc-fn-chips { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.etb-calc-fn-chip { padding: 1px 6px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm);
+  background: var(--awd-bg); font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); cursor: pointer; white-space: nowrap; }
+.etb-calc-fn-chip:hover { border-color: var(--awd-mint); background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 </style>
