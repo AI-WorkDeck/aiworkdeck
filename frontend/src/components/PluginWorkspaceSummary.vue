@@ -658,7 +658,8 @@ export default {
   watch: {
     'plugin.pluginId': {
       immediate: true,
-      handler(val) {
+      handler(val, oldVal) {
+        if (oldVal === 'project-im') this.notifyImSidebar(false)
         if (val === 'lawfirm-management') {
           this.loadLawFirmSummary()
         } else if (val === 'project-im') {
@@ -666,8 +667,9 @@ export default {
         }
       },
     },
-    projectId() {
+    projectId(_value, oldValue) {
       if (this.plugin && this.plugin.pluginId === 'project-im') {
+        this.notifyImSidebar(false, oldValue)
         this.loadImData()
       } else if (this.plugin && this.plugin.pluginId === 'lawfirm-management') {
         this.loadLawFirmSummary()
@@ -684,6 +686,11 @@ export default {
       if (!payload || payload.pluginId !== this.plugin.pluginId) return
       if (payload.projectId != null && String(payload.projectId) !== String(this.projectId)) return
       if (payload.pluginId === 'project-im') {
+        this.notifyImSidebar(true)
+        if (payload.directoryOpen === true) {
+          this.directoryOpen = true
+          this.$nextTick(() => this.$el.querySelector('.pws-directory-toggle')?.focus())
+        }
         if (payload.activeConversationId !== undefined) {
           this.activeConversationId = payload.activeConversationId || ''
         }
@@ -706,8 +713,10 @@ export default {
     }
     uni.$on(ORG_CHANGED_EVENT, this._onOrgOrAccountChanged)
     uni.$on(ACCOUNT_CHANGED_EVENT, this._onOrgOrAccountChanged)
+    if (this.plugin.pluginId === 'project-im') this.notifyImSidebar(true)
   },
   beforeUnmount() {
+    if (this.plugin.pluginId === 'project-im') this.notifyImSidebar(false)
     if (this._onImDirectoryChanged) uni.$off('awd:im-directory-changed', this._onImDirectoryChanged)
     if (this._onPluginStateSynced) uni.$off('awd:plugin-state-synced', this._onPluginStateSynced)
     if (this._onOrgOrAccountChanged) {
@@ -716,6 +725,9 @@ export default {
     }
   },
   methods: {
+    notifyImSidebar(visible, projectId = this.projectId) {
+      uni.$emit('awd:plugin-sidebar-command', { pluginId: 'project-im', command: 'host-sidebar', projectId, visible })
+    },
     async loadLawFirmSummary() {
       try {
         const res = await getLawFirmOverview(this.projectId ? { projectId: this.projectId } : {})

@@ -228,6 +228,22 @@ test('opening directory from chat preserves the active conversation and draft', 
   assert.equal(p.$('draft').value, '待发送内容');
   assert.equal(p.dom.window.document.activeElement, p.$('directory').querySelector('summary'));
 });
+test('plugin navigation hides only for a matching visible host sidebar and returns when it leaves', async (t) => {
+  const p = await panel(); close(t, p); await p.select(); p.write('保留草稿');
+  await p.events['sidebar.command']({ command: 'host-sidebar', projectId: 2, visible: true });
+  assert.equal(p.$('workspace').classList.contains('host-sidebar'), false);
+  await p.events['sidebar.command']({ command: 'host-sidebar', projectId: 1, visible: true });
+  assert.equal(p.$('workspace').classList.contains('host-sidebar'), true);
+  await p.click('directory-home');
+  assert.equal(p.calls.filter((c) => c.method === 'sidebar.sync').at(-1).directoryOpen, true);
+  assert.equal(p.$('workspace').classList.contains('chat-open'), true);
+  assert.equal(p.$('draft').value, '保留草稿');
+  await p.events['sidebar.command']({ command: 'host-sidebar', projectId: 1, visible: false });
+  assert.equal(p.$('workspace').classList.contains('host-sidebar'), false);
+  await p.events['sidebar.command']({ command: 'host-sidebar', projectId: 1, visible: true });
+  await p.switch();
+  assert.equal(p.$('workspace').classList.contains('host-sidebar'), false);
+});
 
 async function agentPanel(options = {}) {
   const agent = { scope: 'project', scopeKey: 'project-uuid', name: '合成项目助手', title: '合成项目助手群' };

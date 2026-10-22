@@ -23,17 +23,26 @@ const directory = {
   projectColleagues: [{ id: '7', name: '我自己', roleLabel: '负责人' }, { id: '23', name: '项目同事', roleLabel: '项目成员' }],
 }
 async function mount(t, agents = [], projectReason = '') {
-  const events = []
+  const events = [], hostEvents = [], listeners = new Map()
+  const uni = {
+    $on(name, callback) { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(callback) },
+    $off(name, callback) { listeners.get(name)?.delete(callback) },
+    $emit(name, payload) { hostEvents.push({ name, payload }); for (const callback of listeners.get(name) || []) callback(payload) },
+    showToast() {},
+  }
   const options = new Function('ICONS', 'getPluginGlyphPaths', 'getTeam', 'getProjectMembers', 'getCurrentUser', 'requestPluginIm', 'getLawFirmOverview', 'loadImDirectory', 'addImFriend', 'ORG_CHANGED_EVENT', 'ACCOUNT_CHANGED_EVENT', 'uni', script)(
     {}, () => [], async () => ({}), async () => [], async () => ({}),
     async (_plugin, _project, action) => ({ code: 0, data: action === 'agentScopes' ? { agents, projectReason } : { conversations: [{ id: 'c1', title: '已有项目会话', type: 'GROUP', role: 'OWNER' }] } }),
-    async () => ({}), async () => structuredClone(directory), () => ({}), 'org-changed', 'account-changed', { $on() {}, $off() {}, $emit() {}, showToast() {} })
+    async () => ({}), async () => structuredClone(directory), () => ({}), 'org-changed', 'account-changed', uni)
   const host = document.createElement('div'); document.body.append(host)
-  const app = Vue.createApp({ ...options, template }, { plugin: { pluginId: 'project-im' }, projectId: 1, onQuickAction: (action) => events.push(action) })
-  const vm = app.mount(host)
+  const component = { ...options, template }, props = Vue.reactive({ plugin: { pluginId: 'project-im' }, projectId: 1 })
+  let vm
+  const app = Vue.createApp({ render: () => Vue.h(component, { ...props, ref: (value) => { vm = value }, onQuickAction: (action) => events.push(action) }) })
+  app.config.globalProperties.$t = (key) => key
+  app.mount(host)
   t.after(() => { app.unmount(); host.remove() })
   await new Promise(resolve => setImmediate(resolve)); await Vue.nextTick()
-  return { host, vm, events }
+  return { host, vm, events, hostEvents, props, uni }
 }
 test('host sidebar renders conversations first and reveals actual project/team/firm contacts only on request', async (t) => {
   const { host, vm, events } = await mount(t)
@@ -71,4 +80,20 @@ test('host explains an unavailable project assistant without hiding permitted te
   assert.match(host.querySelector('.pws-conv-list').textContent, /已有项目会话/)
   host.querySelector('.pws-agent-entry').click(); await Vue.nextTick()
   assert.equal(events.at(-1).scope, 'team')
+})
+test('host sidebar visibility follows matching sync and restores fallback for the old project or plugin', async (t) => {
+  const { host, props, hostEvents, uni } = await mount(t)
+  assert.deepEqual(hostEvents.at(-1).payload, { pluginId: 'project-im', command: 'host-sidebar', projectId: 1, visible: true })
+  uni.$emit('awd:plugin-state-synced', { pluginId: 'project-im', projectId: 1, directoryOpen: true }); await Vue.nextTick()
+  assert.ok(host.querySelector('.pws-directory-section'))
+  assert.equal(document.activeElement, host.querySelector('.pws-directory-toggle'))
+  props.projectId = 2; await Vue.nextTick()
+  assert.deepEqual(hostEvents.at(-1).payload, { pluginId: 'project-im', command: 'host-sidebar', projectId: 1, visible: false })
+  const count = hostEvents.length
+  uni.$emit('awd:plugin-state-synced', { pluginId: 'project-im', projectId: 1 })
+  assert.equal(hostEvents.length, count + 1, 'stale project sync receives no visibility acknowledgement')
+  uni.$emit('awd:plugin-state-synced', { pluginId: 'project-im', projectId: 2 })
+  assert.equal(hostEvents.at(-1).payload.visible, true)
+  props.plugin = { pluginId: 'other-plugin' }; await Vue.nextTick()
+  assert.deepEqual(hostEvents.at(-1).payload, { pluginId: 'project-im', command: 'host-sidebar', projectId: 2, visible: false })
 })

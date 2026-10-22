@@ -7,19 +7,35 @@ import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(new URL('../../../frontend/package.json', import.meta.url));
 const puppeteer = require('puppeteer-core');
+const { parse } = require('@vue/compiler-sfc');
+const { descriptor } = parse(readFileSync(new URL('../../../frontend/src/components/PluginWorkspaceSummary.vue', import.meta.url), 'utf8'));
+const hostStyles = parse(readFileSync(new URL('../../../frontend/src/App.vue', import.meta.url), 'utf8')).descriptor.styles.map(s => s.content).join('\n');
+const summaryTemplate = descriptor.template.content.replace(/<(\/?)(view|scroll-view)\b/g, '<$1div').replace(/<(\/?)text\b/g, '<$1span').replace(/@tap/g, '@click');
+const summaryScript = descriptor.script.content.replace(/^import .*$/gm, '').replace('export default', 'return');
+const summaryBridge = `window.mountSummary = function(element, uni, request) {
+  const options = new Function('ICONS','getPluginGlyphPaths','getTeam','getProjectMembers','getCurrentUser','requestPluginIm','getLawFirmOverview','loadImDirectory','addImFriend','ORG_CHANGED_EVENT','ACCOUNT_CHANGED_EVENT','uni',${JSON.stringify(summaryScript)})(
+    {},()=>[],async()=>({}),async()=>[],async()=>({}),request,async()=>({}),async()=>({me:{id:9},organization:null,firm:null,projectColleagues:[],friends:[],capabilities:{}}),()=>({}),'org-changed','account-changed',uni);
+  const app=Vue.createApp({...options,template:${JSON.stringify(summaryTemplate)}},{plugin:{pluginId:'project-im'},projectId:1,onQuickAction:payload=>uni.$emit('awd:plugin-sidebar-command',payload)});
+  app.mount(element);return app;
+};`;
 const executablePath = process.env.IM_BROWSER_EXECUTABLE || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 // Synthetic service responses exercise the actual plugin, SDK, opaque iframe and native browser input.
-const host = `<!doctype html><meta charset="utf-8"><style>html,body,iframe{margin:0;width:100%;height:100%;border:0}</style><iframe sandbox="allow-scripts allow-forms" src="/index.html"></iframe><script>
+const host = `<!doctype html><meta charset="utf-8"><style>${hostStyles}html,body{margin:0;width:100%;height:100%}body{display:flex;font-size:13px}iframe{flex:1;width:0;min-width:0;height:100%;border:0}#host-sidebar{width:250px;flex-shrink:0;overflow:auto}${descriptor.styles.map(s => s.content).join('\n')}</style><aside id="host-sidebar" hidden></aside><iframe sandbox="allow-scripts allow-forms" src="/index.html"></iframe><script src="/vue.js"></script><script src="/summary.js"></script><script>
 const frame=document.querySelector('iframe');window.calls=[];
 const agent={scope:'project',scopeKey:'project-uuid',name:'项目助手',title:'合成测试项目'};
 const group={id:'group',title:'合成测试项目',type:'GROUP',role:'OWNER',agent:{...agent,private:false}};
 const privateChat={id:'private',title:'项目助手私聊',type:'AGENT_DIRECT',role:'OWNER',agent:{...agent,private:true}};
 let conversations=[],messages=[],status=null,attempts=0;
+const listeners=new Map();let summaryApp=null;
+const uni={$on(name,cb){if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(cb)},$off(name,cb){listeners.get(name)?.delete(cb)},$emit(name,payload){for(const cb of listeners.get(name)||[])cb(payload)},showToast(){}};
+uni.$on('awd:plugin-sidebar-command',data=>frame.contentWindow.postMessage({awd:1,type:'event',event:'sidebar.command',data},'*'));
+window.setSidebarVisible=visible=>{const el=document.getElementById('host-sidebar');if(summaryApp){summaryApp.unmount();summaryApp=null}el.hidden=!visible;if(visible)summaryApp=mountSummary(el,uni,async(_plugin,_project,action)=>({code:0,data:action==='agentScopes'?{agents:[agent]}:{conversations}}))};
 frame.onload=()=>frame.contentWindow.postMessage({awd:1,type:'init',context:{projectId:1,pluginId:'project-im',theme:'light'}},'*');
 addEventListener('message',e=>{if(e.source!==frame.contentWindow||e.data?.type!=='call')return;
 const {seq,method,params={}}=e.data;calls.push({method,...params});let result={};
 if(method==='im.request'&&params.action==='agentReply'&&window.rejectAdmissions){frame.contentWindow.postMessage({awd:1,type:'result',seq,ok:false,error:{code:'BUSY',message:'合成测试：助手繁忙，请稍后重试'}},'*');return;}
 if(method==='context.get')result={projectId:1,pluginId:'project-im'};
+if(method==='sidebar.sync')uni.$emit('awd:plugin-state-synced',{pluginId:'project-im',...params});
 if(method==='im.directory')result={me:{id:9},organization:null,firm:null,projectColleagues:[],friends:[]};
 if(method==='im.request'){const p=params.params||{};switch(params.action){
 case 'self':result={id:9,displayName:'合成律师'};break;
@@ -38,6 +54,8 @@ test('assistant group, retry and private chat work through native browser input 
   const server = createServer((req, res) => {
     let text, type = 'text/html';
     if (req.url === '/') text = host;
+    else if (req.url === '/vue.js') { text = readFileSync(require.resolve('vue/dist/vue.global.prod.js')); type = 'text/javascript'; }
+    else if (req.url === '/summary.js') { text = summaryBridge; type = 'text/javascript'; }
     else if (req.url === '/awd-plugin-sdk.js') { text = readFileSync(new URL('../../../sdk/plugin-sdk/awd-plugin-sdk.js', import.meta.url)); type = 'text/javascript'; }
     else if (['/index.html', '/panel.js', '/panel.css'].includes(req.url)) { text = readFileSync(new URL('../web' + req.url, import.meta.url)); type = req.url.endsWith('.js') ? 'text/javascript' : req.url.endsWith('.css') ? 'text/css' : type; }
     else { res.writeHead(404); res.end(); return; }
@@ -52,6 +70,18 @@ test('assistant group, retry and private chat work through native browser input 
   await frame.waitForFunction(() => !document.getElementById('active-chat').hidden);
   assert.match(await frame.$eval('#chat-subtitle', el => el.textContent), /群成员可见/);
   assert.equal(await frame.$eval('#directory', el => el.open), false);
+  await page.evaluate(() => setSidebarVisible(true));
+  await frame.waitForFunction(() => document.getElementById('workspace').classList.contains('host-sidebar'));
+  assert.equal(await frame.$eval('#sidebar', el => getComputedStyle(el).display), 'none');
+  assert.equal(await page.$$eval('.pws-conv-item', els => els.length), 1);
+  await frame.click('#directory-home');
+  await page.waitForSelector('.pws-directory-section');
+  assert.equal(await frame.$eval('#workspace', el => el.classList.contains('chat-open')), true);
+  await page.setViewport({ width: 470, height: 760 });
+  assert.equal(await frame.$eval('#back', el => getComputedStyle(el).display), 'none');
+  assert.equal(await frame.$eval('#chat', el => getComputedStyle(el).display), 'block');
+  await page.setViewport({ width: 1120, height: 760 });
+  await page.click('.pws-directory-toggle');
   await frame.type('#draft', '单人测试：请回复这条消息。'); await frame.focus('#draft'); await page.keyboard.press('Enter');
   await frame.waitForFunction(() => document.getElementById('agent-status').textContent.includes('模型连接失败'));
   await frame.click('#agent-status button');
@@ -59,7 +89,10 @@ test('assistant group, retry and private chat work through native browser input 
   assert.match(await frame.$eval('#messages', el => el.textContent), /项目助手 · AI 助手/);
   assert.equal(await page.evaluate(() => calls.filter(c => c.action === 'send').length), 1);
   assert.deepEqual(await page.evaluate(() => calls.filter(c => c.action === 'agentReply').map(c => c.params.messageId)), [1, 1]);
-  if (process.env.IM_SCREENSHOT_DIR) { mkdirSync(process.env.IM_SCREENSHOT_DIR, { recursive: true }); await page.screenshot({ path: process.env.IM_SCREENSHOT_DIR + '/assistant-group.png' }); }
+  if (process.env.IM_SCREENSHOT_DIR) { mkdirSync(process.env.IM_SCREENSHOT_DIR, { recursive: true }); await page.screenshot({ path: process.env.IM_SCREENSHOT_DIR + '/assistant-workspace.png' }); }
+  await page.evaluate(() => setSidebarVisible(false));
+  await frame.waitForFunction(() => !document.getElementById('workspace').classList.contains('host-sidebar'));
+  assert.notEqual(await frame.$eval('#sidebar', el => getComputedStyle(el).display), 'none');
   await frame.click('#agent-private');
   await frame.waitForFunction(() => document.getElementById('chat-subtitle').textContent.includes('仅你可见'));
   assert.match(await frame.$eval('#agent-info-summary', el => el.textContent), /使用平台 AI 额度.*当前项目资料在云端回复/);
