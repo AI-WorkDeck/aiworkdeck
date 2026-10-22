@@ -21,7 +21,7 @@
         </span>
         <div>
           <strong class="brand-title">律所业务与决策管理中心</strong>
-          <span id="self-badge" class="self-badge">正在加载身份与部门…</span>
+          <span id="self-badge" class="self-badge">正在加载身份与业务分类…</span>
         </div>
       </div>
       <div class="header-actions">
@@ -43,7 +43,7 @@
         <span id="badge-finance-count" class="tab-count">0</span>
       </button>
       <button type="button" id="tab-dashboard" role="tab" data-tab="dashboard" aria-selected="false" aria-controls="panel-dashboard" class="tab-btn">
-        <span>决策与团队看板</span>
+        <span>决策与业务看板</span>
       </button>
     </nav>
   </header>
@@ -81,8 +81,8 @@
               </select>
             </label>
             <label>
-              <span>所属业务部门</span>
-              <input id="intake-department" name="departmentName" type="text" value="争议解决部" placeholder="例如：争议解决部 / 资本市场部">
+              <span>业务分类</span>
+              <input id="intake-department" name="departmentName" type="text" value="争议解决" placeholder="例如：争议解决 / 资本市场">
             </label>
             <label>
               <span>拟任主办负责人</span>
@@ -308,7 +308,7 @@
             <thead>
               <tr>
                 <th>申请单号 / 发票号</th>
-                <th>关联案件与部门</th>
+                <th>关联案件与业务分类</th>
                 <th>发票类型</th>
                 <th>购买方与税号</th>
                 <th>含税金额 / 税额</th>
@@ -344,26 +344,26 @@
       </article>
     </section>
 
-    <!-- Tab 4: 决策与团队看板 -->
+    <!-- Tab 4: 决策与业务看板；统计维度不作为协作层级 -->
     <section id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard" class="tab-panel" hidden>
       <div id="dashboard-kpis" class="kpi-grid"></div>
 
       <article class="card">
         <header class="card-header">
           <div>
-            <h2>各业务部门表现对比（忙闲负荷 · 创收 · 开票 · 回收率）</h2>
-            <p class="hint">打通工作台在办项目与财务台账，横向对比各业务部案件饱和度、签约创收、已开票、实收回款与回收率</p>
+            <h2>各业务分类表现对比（忙闲负荷 · 创收 · 开票 · 回收率）</h2>
+            <p class="hint">汇总工作台在办项目与财务台账，按业务分类对比案件饱和度、签约创收、已开票、实收回款与回收率</p>
           </div>
         </header>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>业务部门</th>
-                <th>部门负责人</th>
-                <th>活跃律师单元（Unit）</th>
+                <th>业务分类</th>
+                <th>主办律师</th>
+                <th>活跃律师</th>
                 <th>在办案件数</th>
-                <th>部门平均负荷与忙闲状态</th>
+                <th>平均负荷与忙闲状态</th>
                 <th>签约合同总额</th>
                 <th>已开票金额</th>
                 <th>已到账实收</th>
@@ -379,19 +379,19 @@
       <article class="card">
         <header class="card-header">
           <div>
-            <h2>团队负责人（合伙人）表现画像</h2>
-            <p class="hint">聚合各合伙人/团队负责人主办案件规模、团队负荷均值、实收创收、回收率、利冲一次通过率与立案效率</p>
+            <h2>主办律师业务统计</h2>
+            <p class="hint">按主办律师汇总案件规模、工作负荷、实收创收、回收率、利冲一次通过率与立案效率</p>
           </div>
         </header>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>团队负责人</th>
-                <th>所属业务部门</th>
-                <th>团队人数</th>
+                <th>主办律师</th>
+                <th>业务分类</th>
+                <th>项目协作人数</th>
                 <th>主办案件数</th>
-                <th>团队负荷均值</th>
+                <th>主办律师负荷</th>
                 <th>签约合同总额</th>
                 <th>已开票金额</th>
                 <th>实收回款额</th>
@@ -408,7 +408,7 @@
       <article class="card">
         <header class="card-header">
           <div>
-            <h2>桌面端律师单元（Unit）Workload 忙闲雷达与创收明细</h2>
+            <h2>律师工作负荷与创收明细</h2>
             <p class="hint">按主办案件、协办案件、待办/逾期任务与近30日工作台活跃时长综合计算个体负荷指数（空闲 / 适中 / 饱和 / 超负荷）</p>
           </div>
         </header>
@@ -418,7 +418,7 @@
               <tr>
                 <th>律师姓名</th>
                 <th>执业角色</th>
-                <th>所属部门</th>
+                <th>业务分类</th>
                 <th>主办案件</th>
                 <th>协办案件</th>
                 <th>待办 / 临期逾期事项</th>

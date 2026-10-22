@@ -12,7 +12,7 @@
           <input
             v-model="searchKeyword"
             class="pws-search-input"
-            placeholder="搜索组织、律所、朋友或对话…"
+            placeholder="搜索会话或联系人…"
           />
           <text v-if="searchKeyword" class="pws-search-clear" @tap="searchKeyword = ''">×</text>
         </view>
@@ -23,14 +23,11 @@
           <view class="pws-quick-btn" @tap="emitCommand('open-join-chat')">
             <text>邀请码加入</text>
           </view>
-          <view class="pws-quick-btn" @tap="toggleAddFriendForm">
-            <text>{{ showAddFriend ? '收起' : '+ 加朋友' }}</text>
-          </view>
         </view>
 
         <!-- 内联添加朋友表单 -->
         <view v-if="showAddFriend" class="pws-friend-form">
-          <text class="pws-form-title">添加外部协作朋友 / 客户联系人</text>
+          <text class="pws-form-title">添加外部联系人</text>
           <input v-model="friendDraft.name" class="pws-form-input" placeholder="姓名（如：王律师 / 李法务）" maxlength="40" />
           <input v-model="friendDraft.org" class="pws-form-input" placeholder="所属律所或单位（选填）" maxlength="60" />
           <view class="pws-form-tags">
@@ -52,6 +49,71 @@
       </view>
 
       <scroll-view scroll-y class="pws-scroll">
+        <view v-if="filteredAgents.length || projectAgentReason" class="pws-section pws-agent-section">
+          <button v-for="agent in filteredAgents" :key="agent.scope + ':' + agent.scopeKey" class="pws-agent-entry" @tap="openAgent(agent)">
+            <text class="pws-agent-badge">AI</text>
+            <text class="pws-agent-name">{{ agent.name || (agentScopeLabel(agent.scope) + '助手') }}</text>
+            <text class="pws-contact-badge">{{ agentScopeLabel(agent.scope) }}</text>
+          </button>
+          <text v-if="projectAgentReason" class="pws-dir-empty-text">{{ projectAgentReason }}</text>
+        </view>
+        <!-- 会话是默认入口；通讯录按需展开。 -->
+        <view class="pws-section pws-conv-section">
+          <view class="pws-sec-bar">
+            <text class="pws-sec-label">对话列表</text>
+            <view class="pws-sec-right">
+              <text class="pws-sec-count">{{ filteredConversations.length }}</text>
+              <view class="pws-icon-action" title="刷新会话" @tap="loadImData">
+                <svg :class="{ spinning: loadingIm }" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path v-for="(d, gi) in ICONS.refresh" :key="gi" :d="d" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </view>
+            </view>
+          </view>
+
+          <view class="pws-conv-filters">
+            <view
+              v-for="tab in CONV_FILTERS"
+              :key="tab.key"
+              class="pws-filter-pill"
+              :class="{ active: convFilter === tab.key }"
+              @tap="convFilter = tab.key"
+            >
+              <text>{{ tab.label }}</text>
+            </view>
+          </view>
+
+          <view v-if="filteredConversations.length === 0" class="pws-conv-empty">
+            <text class="pws-conv-empty-title">{{ searchKeyword ? '没有匹配的对话' : '暂无活跃对话' }}</text>
+            <text class="pws-conv-empty-desc">新建会话或用邀请码加入。需要联系同事与客户时，展开下方通讯录。</text>
+
+          </view>
+
+          <view v-else class="pws-conv-list">
+            <view
+              v-for="c in filteredConversations"
+              :key="c.id"
+              class="pws-conv-item"
+              :class="{ active: activeConversationId === c.id }"
+              @tap="selectConversation(c)"
+            >
+              <view class="pws-conv-avatar" :class="c.type === 'DIRECT' ? 'direct' : 'group'">
+                <text>{{ c.agent ? 'AI' : (c.type === 'DIRECT' ? '私' : '群') }}</text>
+              </view>
+              <view class="pws-conv-main">
+                <view class="pws-conv-top">
+                  <text class="pws-conv-title">{{ c.title }}</text>
+                  <text v-if="c.unreadCount" class="pws-conv-unread">{{ c.unreadCount > 99 ? '99+' : c.unreadCount }}</text>
+                </view>
+                <text class="pws-conv-sub">{{ conversationLabel(c) }}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+        <button class="pws-directory-toggle" :aria-expanded="String(directoryOpen || !!kw)" @tap="directoryOpen = !directoryOpen">
+          <text>通讯录</text><text class="pws-sec-sub">律所 · 团队 · 项目</text>
+        </button>
+        <view v-if="directoryOpen || kw">
         <!-- ===== 组织身份卡（飞书式租户切换入口）=====
              官网模型：一人一队、一队一所。切换团队 / 律所在「设置 › 团队」完成（TeamPanel 负责确认与半途失败提示），
              这里只展示当前身份与能否切换的原因，并跳转过去；完成后 awd:org-changed 触发本栏重拉。 -->
@@ -83,16 +145,28 @@
           </view>
         </view>
 
-        <!-- ===== 第一层级：通讯录（我的组织 / 我的律所 / 我的朋友） ===== -->
-        <view class="pws-section">
-          <view class="pws-sec-bar" @tap="emitCommand('focus-directory')">
-            <text class="pws-sec-label">通讯录</text>
-            <text class="pws-sec-sub">组织 · 律所 · 朋友</text>
+        <!-- ===== 第一层级：通讯录（我的团队 / 我的律所 / 其他联系人） ===== -->
+        <view class="pws-section pws-directory-section">
+
+          <view class="pws-dir-group">
+            <button class="pws-dir-head pws-project-toggle" :aria-expanded="String(dirExpanded.project || !!kw)" @tap="toggleDirGroup('project')">
+              <text class="pws-chevron" :class="{ open: dirExpanded.project || kw }">›</text>
+              <view class="pws-dir-title-wrap"><text class="pws-dir-title">当前项目</text><text class="pws-dir-subtitle">项目成员</text></view>
+              <text class="pws-dir-count">{{ filteredProjectMembers.length }}</text>
+            </button>
+            <view v-if="dirExpanded.project || kw" class="pws-dir-body">
+              <button v-for="m in filteredProjectMembers" :key="'project-' + m.id" class="pws-contact-row pws-project-contact" @tap="startContactChat(m, 'project')">
+                <view class="pws-contact-avatar org"><text>{{ avatarChar(m.name) }}</text></view>
+                <view class="pws-contact-main"><text class="pws-contact-name">{{ m.name }}</text><text class="pws-contact-meta">{{ m.roleLabel || '项目成员' }}</text></view>
+                <text class="pws-contact-badge">发消息</text>
+              </button>
+              <text v-if="!filteredProjectMembers.length" class="pws-dir-empty-text">{{ kw ? '没有匹配的项目成员' : '项目中暂无其他成员。' }}</text>
+            </view>
           </view>
 
-          <!-- 1) 我的组织 -->
+          <!-- 1) 我的团队 -->
           <view class="pws-dir-group">
-            <view class="pws-dir-head" @tap="toggleDirGroup('org')">
+            <view class="pws-dir-head" role="button" tabindex="0" :aria-expanded="String(dirExpanded.org || !!kw)" @tap="toggleDirGroup('org')" @keydown.enter.prevent="toggleDirGroup('org')" @keydown.space.prevent="toggleDirGroup('org')">
               <text class="pws-chevron" :class="{ open: dirExpanded.org }">›</text>
               <view class="pws-dir-icon org">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -100,12 +174,12 @@
                 </svg>
               </view>
               <view class="pws-dir-title-wrap">
-                <text class="pws-dir-title">我的组织</text>
+                <text class="pws-dir-title">我的团队</text>
                 <text class="pws-dir-subtitle">{{ directory.organization ? directory.organization.name : '尚未加入团队' }}</text>
               </view>
               <text class="pws-dir-count">{{ filteredOrgMembers.length }}</text>
             </view>
-            <view v-if="dirExpanded.org" class="pws-dir-body">
+            <view v-if="dirExpanded.org || kw" class="pws-dir-body">
               <view
                 v-for="m in filteredOrgMembers"
                 :key="'org-' + m.id + '-' + m.name"
@@ -139,7 +213,7 @@
 
           <!-- 2) 我的律所 -->
           <view class="pws-dir-group">
-            <view class="pws-dir-head" @tap="toggleDirGroup('firm')">
+            <view class="pws-dir-head" role="button" tabindex="0" :aria-expanded="String(dirExpanded.firm || !!kw)" @tap="toggleDirGroup('firm')" @keydown.enter.prevent="toggleDirGroup('firm')" @keydown.space.prevent="toggleDirGroup('firm')">
               <text class="pws-chevron" :class="{ open: dirExpanded.firm }">›</text>
               <view class="pws-dir-icon firm">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -152,7 +226,7 @@
               </view>
               <text class="pws-dir-count">{{ filteredFirmTeams.length }}</text>
             </view>
-            <view v-if="dirExpanded.firm" class="pws-dir-body">
+            <view v-if="dirExpanded.firm || kw" class="pws-dir-body">
               <view
                 v-for="t in filteredFirmTeams"
                 :key="'firm-' + t.id + '-' + t.name"
@@ -180,9 +254,9 @@
             </view>
           </view>
 
-          <!-- 3) 我的朋友 -->
+          <!-- 3) 其他联系人 -->
           <view class="pws-dir-group">
-            <view class="pws-dir-head" @tap="toggleDirGroup('friends')">
+            <view class="pws-dir-head" role="button" tabindex="0" :aria-expanded="String(dirExpanded.friends || !!kw)" @tap="toggleDirGroup('friends')" @keydown.enter.prevent="toggleDirGroup('friends')" @keydown.space.prevent="toggleDirGroup('friends')">
               <text class="pws-chevron" :class="{ open: dirExpanded.friends }">›</text>
               <view class="pws-dir-icon friends">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -190,12 +264,12 @@
                 </svg>
               </view>
               <view class="pws-dir-title-wrap">
-                <text class="pws-dir-title">我的朋友</text>
+                <text class="pws-dir-title">其他联系人</text>
                 <text class="pws-dir-subtitle">个人通讯录 · 项目客户</text>
               </view>
               <text class="pws-dir-count">{{ filteredFriends.length }}</text>
             </view>
-            <view v-if="dirExpanded.friends" class="pws-dir-body">
+            <view v-if="dirExpanded.friends || kw" class="pws-dir-body">
               <view
                 v-for="fr in filteredFriends"
                 :key="'fr-' + fr.id + '-' + fr.name"
@@ -208,7 +282,7 @@
                 <view class="pws-contact-main">
                   <view class="pws-contact-line">
                     <text class="pws-contact-name">{{ fr.name }}</text>
-                    <text class="pws-contact-badge">{{ fr.roleLabel || '外部朋友' }}</text>
+                    <text class="pws-contact-badge">{{ fr.roleLabel || '外部联系人' }}</text>
                   </view>
                   <text class="pws-contact-meta">{{ fr.org || fr.note || (fr.source === 'project' ? '当前项目客户' : '') }}</text>
                 </view>
@@ -216,73 +290,14 @@
                   <text>发消息</text>
                 </view>
               </view>
-              <text v-if="!filteredFriends.length" class="pws-dir-empty-text">{{ kw ? '没有匹配的朋友' : '还没有朋友。朋友只保存在本机当前账户下，切换团队或律所不影响。' }}</text>
+              <text v-if="!filteredFriends.length" class="pws-dir-empty-text">{{ kw ? '没有匹配的联系人' : '还没有其他联系人。手动添加的联系人只保存在本机当前账户下，切换团队或律所不影响。' }}</text>
               <view class="pws-dir-foot-btn" @tap="toggleAddFriendForm">
-                <text>+ 添加外部朋友或客户联系人</text>
+                <text>+ 添加外部联系人</text>
               </view>
             </view>
           </view>
         </view>
 
-        <!-- ===== 第二层级：对话列表（置于通讯录下方） ===== -->
-        <view class="pws-section pws-conv-section">
-          <view class="pws-sec-bar">
-            <text class="pws-sec-label">对话列表</text>
-            <view class="pws-sec-right">
-              <text class="pws-sec-count">{{ filteredConversations.length }}</text>
-              <view class="pws-icon-action" title="刷新会话" @tap="loadImData">
-                <svg :class="{ spinning: loadingIm }" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path v-for="(d, gi) in ICONS.refresh" :key="gi" :d="d" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </view>
-            </view>
-          </view>
-
-          <view class="pws-conv-filters">
-            <view
-              v-for="tab in CONV_FILTERS"
-              :key="tab.key"
-              class="pws-filter-pill"
-              :class="{ active: convFilter === tab.key }"
-              @tap="convFilter = tab.key"
-            >
-              <text>{{ tab.label }}</text>
-            </view>
-          </view>
-
-          <view v-if="filteredConversations.length === 0" class="pws-conv-empty">
-            <text class="pws-conv-empty-title">{{ searchKeyword ? '没有匹配的对话' : '暂无活跃对话' }}</text>
-            <text class="pws-conv-empty-desc">点击上方通讯录中的组织成员、律所团队或朋友即可直接发起对话，也可新建群聊或凭邀请码加入。</text>
-            <view class="pws-conv-empty-actions">
-              <view class="pws-quick-btn primary" @tap="emitCommand('open-new-chat')">
-                <text>新建会话</text>
-              </view>
-              <view class="pws-quick-btn" @tap="emitCommand('open-join-chat')">
-                <text>邀请码加入</text>
-              </view>
-            </view>
-          </view>
-
-          <view v-else class="pws-conv-list">
-            <view
-              v-for="c in filteredConversations"
-              :key="c.id"
-              class="pws-conv-item"
-              :class="{ active: activeConversationId === c.id }"
-              @tap="selectConversation(c)"
-            >
-              <view class="pws-conv-avatar" :class="c.type === 'DIRECT' ? 'direct' : 'group'">
-                <text>{{ c.type === 'DIRECT' ? '私' : '群' }}</text>
-              </view>
-              <view class="pws-conv-main">
-                <view class="pws-conv-top">
-                  <text class="pws-conv-title">{{ c.title }}</text>
-                  <text v-if="c.unreadCount" class="pws-conv-unread">{{ c.unreadCount > 99 ? '99+' : c.unreadCount }}</text>
-                </view>
-                <text class="pws-conv-sub">{{ c.type === 'DIRECT' ? '私聊' : '群聊' }} · {{ roleName(c.role) }}</text>
-              </view>
-            </view>
-          </view>
         </view>
       </scroll-view>
     </template>
@@ -501,10 +516,12 @@ export default {
     return {
       lawfirmOverview: null,
       searchKeyword: '',
+      directoryOpen: false,
       dirExpanded: {
-        org: true,
-        firm: true,
-        friends: true,
+        project: true,
+        org: false,
+        firm: false,
+        friends: false,
       },
       showAddFriend: false,
       friendDraft: {
@@ -515,16 +532,21 @@ export default {
       // 只放真实数据：organization / firm 为 null 表示没有，界面给空态与入口
       directory: {
         accountKey: 'local',
+        projectColleagues: [],
         organization: null,
         firm: null,
         friends: [],
         capabilities: {},
       },
       orgMenuOpen: false,
+      agents: [],
+      projectAgentReason: '',
       conversations: [],
       activeConversationId: '',
       convFilter: 'all',
       loadingIm: false,
+      imLoadSequence: 0,
+      directoryLoadSequence: 0,
       bqtView: 'cases',
       bqtStatus: '',
       activeStageKey: 'checklist',
@@ -598,6 +620,12 @@ export default {
       if (!this.directory.organization) return '加入团队后，团队可以并入律所。'
       return cap.isTeamOwner ? '本团队尚未并入律所。你可以创建律所或用律所邀请码并入。' : '本团队尚未并入律所，由团队负责人操作。'
     },
+    filteredProjectMembers() {
+      const meId = this.directory.me && this.directory.me.id
+      const list = (this.directory.projectColleagues || []).filter(m => String(m.id) !== String(meId))
+      if (!this.kw) return list
+      return list.filter(m => (m.name + ' ' + (m.roleLabel || '')).toLowerCase().includes(this.kw))
+    },
     filteredOrgMembers() {
       const list = ((this.directory.organization && this.directory.organization.members) || []).filter(m => !m.isMe)
       if (!this.kw) return list
@@ -613,12 +641,15 @@ export default {
       if (!this.kw) return list
       return list.filter(f => (f.name + ' ' + (f.org || '') + ' ' + (f.roleLabel || '')).toLowerCase().includes(this.kw))
     },
+    filteredAgents() {
+      return this.agents.filter(agent => (!this.kw || [agent.name, agent.title, this.agentScopeLabel(agent.scope)].filter(Boolean).join(' ').toLowerCase().includes(this.kw)) && !this.conversations.some(c => c.agent && !c.agent.private && c.type !== 'AGENT_DIRECT' && c.agent.scope === agent.scope && c.agent.scopeKey === agent.scopeKey))
+    },
     filteredConversations() {
       let list = this.conversations || []
       if (this.convFilter === 'unread') {
         list = list.filter(c => Number(c.unreadCount) > 0)
       } else if (this.convFilter === 'GROUP' || this.convFilter === 'DIRECT') {
-        list = list.filter(c => c.type === this.convFilter)
+        list = list.filter(c => c.type === this.convFilter || (this.convFilter === 'DIRECT' && c.type === 'AGENT_DIRECT'))
       }
       if (!this.kw) return list
       return list.filter(c => String(c.title || '').toLowerCase().includes(this.kw))
@@ -651,10 +682,13 @@ export default {
     }
     this._onPluginStateSynced = (payload) => {
       if (!payload || payload.pluginId !== this.plugin.pluginId) return
+      if (payload.projectId != null && String(payload.projectId) !== String(this.projectId)) return
       if (payload.pluginId === 'project-im') {
         if (payload.activeConversationId !== undefined) {
           this.activeConversationId = payload.activeConversationId || ''
         }
+        if (Array.isArray(payload.agents)) this.agents = payload.agents
+        if (typeof payload.projectReason === 'string') this.projectAgentReason = payload.projectReason
         if (Array.isArray(payload.conversations)) {
           this.conversations = payload.conversations
         }
@@ -713,6 +747,7 @@ export default {
       this.dirExpanded[key] = !this.dirExpanded[key]
     },
     toggleAddFriendForm() {
+      this.directoryOpen = true
       this.showAddFriend = !this.showAddFriend
     },
     openOrgSettings() {
@@ -741,29 +776,42 @@ export default {
       this.showAddFriend = false
       this.dirExpanded.friends = true
       this.emitCommand('refresh-directory', { reason: 'manual' })
-      uni.showToast({ title: '已添加到「我的朋友」', icon: 'none' })
+      uni.showToast({ title: '已添加到「其他联系人」', icon: 'none' })
     },
     async loadDirectoryOnly() {
+      const sequence = ++this.directoryLoadSequence, projectId = this.projectId
       const dir = await loadImDirectory({
         projectId: this.projectId,
         deps: { getTeam, getProjectMembers, getCurrentUser },
       })
-      this.directory = dir
+      if (sequence === this.directoryLoadSequence && projectId === this.projectId) this.directory = dir
     },
     async loadImData() {
+      const projectId = this.projectId, sequence = ++this.imLoadSequence
+      this.agents = []
+      this.projectAgentReason = ''
       this.loadingIm = true
       try {
         await this.loadDirectoryOnly()
+        if (sequence !== this.imLoadSequence || projectId !== this.projectId) return
         if (this.projectId) {
           const res = await requestPluginIm('project-im', this.projectId, 'list', {})
+          if (sequence !== this.imLoadSequence || projectId !== this.projectId) return
           if (res && res.code === 0 && res.data && Array.isArray(res.data.conversations)) {
             this.conversations = res.data.conversations
           }
+          try {
+            const scopes = await requestPluginIm('project-im', projectId, 'agentScopes', {})
+            if (sequence === this.imLoadSequence && this.projectId === projectId && scopes?.code === 0 && Array.isArray(scopes.data?.agents)) {
+              this.agents = scopes.data.agents
+              this.projectAgentReason = typeof scopes.data.projectReason === 'string' ? scopes.data.projectReason : ''
+            }
+          } catch { if (sequence === this.imLoadSequence && this.projectId === projectId) this.agents = [] }
         }
       } catch (e) {
         // 离线或未连接云账户时保留通讯录可用
       } finally {
-        this.loadingIm = false
+        if (sequence === this.imLoadSequence) this.loadingIm = false
       }
     },
     emitCommand(command, extra = {}) {
@@ -771,6 +819,14 @@ export default {
         pluginId: this.plugin.pluginId,
         command,
       }, extra))
+    },
+    agentScopeLabel(scope) { return { project: '项目', team: '团队', firm: '律所' }[scope] || '' },
+    openAgent(agent) {
+      this.emitCommand('open-agent', { scope: agent.scope, scopeKey: agent.scopeKey, title: agent.title || agent.name, private: false })
+    },
+    conversationLabel(c) {
+      if (c.agent) return c.agent.private || c.type === 'AGENT_DIRECT' ? '云端助手私聊 · 仅你可见' : '云端助手群聊 · 群成员可见'
+      return (c.type === 'DIRECT' ? '私聊' : '群聊') + ' · ' + this.roleName(c.role)
     },
     selectConversation(c) {
       if (!c) return
@@ -826,6 +882,20 @@ export default {
 </script>
 
 <style scoped>
+.pws-agent-entry { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; margin: 0; border: 0; border-radius: 0; text-align: left; background: transparent; color: var(--awd-text); font: inherit; line-height: 1.5; }
+.pws-agent-entry::after { border: 0; }
+.pws-agent-entry:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: -2px; }
+.pws-agent-badge { border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); padding: 5px; color: var(--awd-accent); font-size: 11px; }
+.pws-agent-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--awd-panel-fs); font-weight: 600; }
+
+.pws-directory-toggle, .pws-project-toggle, .pws-project-contact {
+  width: 100%; margin: 0; border: 0; border-radius: 0; background: transparent;
+  color: var(--awd-text); text-align: left; line-height: 1.5; font: inherit;
+}
+.pws-directory-toggle::after, .pws-project-toggle::after, .pws-project-contact::after { border: 0; }
+.pws-directory-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: var(--awd-panel-fs); }
+.pws-directory-toggle:focus-visible, .pws-project-toggle:focus-visible, .pws-project-contact:focus-visible, .pws-dir-head:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: -2px; }
+
 .lawfirm-summary-card { display: flex; flex-direction: column; gap: 10px; margin: 10px 8px 6px; padding: 10px; border-radius: var(--awd-radius-md); background: var(--awd-surface-2); border: 1px solid var(--awd-border-subtle); }
 .lawfirm-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .lawfirm-stat-item { padding: 8px; border-radius: var(--awd-radius-sm); background: var(--awd-surface); border: 1px solid var(--awd-border-subtle); }

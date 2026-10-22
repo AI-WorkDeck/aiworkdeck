@@ -8,7 +8,7 @@
 export default {
   navTeam: 'Team',
 
-  subtitle: 'Roll the firm-wide usage picture up for whoever runs it',
+  subtitle: 'Collaborate across law firms, teams and projects; review usage by team',
   privacyLine: 'Team stats upload counts and anonymous project codes only, never document content, file names, or conversations',
   needAccountTitle: 'No account connected',
   needAccountDesc: 'Teams live on your AI WorkDeck account. Connect one under "Account & Usage", then come back.',
@@ -18,7 +18,7 @@ export default {
 
   createTitle: 'Create a team',
   createDesc: 'You become the owner and can invite colleagues by phone number.',
-  teamNamePlaceholder: 'Team name, e.g. Smith & Partners',
+  teamNamePlaceholder: 'Team name, e.g. M&A Team',
   createButton: 'Create team',
   createFailedEmpty: 'Team name cannot be empty',
   joinTitle: 'Join with a code',
@@ -164,7 +164,7 @@ export default {
 
   // ---- Law Firm Decision-Maker Dashboard (TeamPanel.vue) ----
   lawfirmDashboardTitle: 'Law Firm Executive & Management Committee Dashboard',
-  lawfirmDashboardDesc: '3D revenue, billing and conflict governance across Practice Departments, Team Leads, and Minimal Combat Units.',
+  lawfirmDashboardDesc: 'Review revenue and risk by practice category, lead lawyer and individual lawyer. Open the law firm workbench for details.',
   lawfirmSeedDemoBtn: 'Seed Wufangzhai Demo',
   lawfirmOpenPluginBtn: 'Open Law Firm Workbench',
   lawfirmKpiActiveMatters: 'Active Matters',
@@ -173,10 +173,10 @@ export default {
   lawfirmKpiBilled: 'Total Billed',
   lawfirmKpiCollected: 'Total Collected',
   lawfirmKpiCollectionRate: 'Firm Collection Rate',
-  lawfirmDimDepartments: 'By Practice Dept',
-  lawfirmDimTeamLeads: 'By Team Lead',
-  lawfirmDimUnits: 'By Combat Unit',
-  lawfirmColName: 'Unit / Dept Name',
+  lawfirmDimDepartments: 'By Practice Category',
+  lawfirmDimTeamLeads: 'By Lead Lawyer',
+  lawfirmDimUnits: 'By Lawyer',
+  lawfirmColName: 'Name',
   lawfirmColHead: 'Lead / Members',
   lawfirmColMatters: 'Matters',
   lawfirmColContracted: 'Contracted',
