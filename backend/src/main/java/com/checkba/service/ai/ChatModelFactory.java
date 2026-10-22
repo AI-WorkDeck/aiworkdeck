@@ -377,7 +377,10 @@ public class ChatModelFactory {
      */
     public ResolvedTarget resolveTarget(String modelId, boolean logFallback) {
         AiModelProperties.Provider provider = resolveProvider();
-        String targetModel = (modelId == null || modelId.isEmpty()) ? "default" : modelId;
+        boolean isAuto = SmartModelRouter.isAutoModel(modelId);
+        String targetModel = (modelId == null || modelId.isEmpty())
+                ? "default"
+                : (isAuto ? resolveDefaultModel() : modelId);
 
         // 平台通道必须先于白名单短路判定：白名单模型走的是 BYOK 的 OpenRouter key，
         // 而平台通道用的是官网 provision 的 key，两者不能混
@@ -392,7 +395,7 @@ public class ChatModelFactory {
         // （qwen/qwen3.7-flash）本身就在白名单里——OLLAMA 档下每一次辅助调用都在走云端。
         if (isExplicitLocalProvider()) {
             String local = resolveOllamaModelName();
-            if (logFallback && !"default".equals(targetModel) && AllowedModels.isAllowed(targetModel)) {
+            if (logFallback && !"default".equals(targetModel) && !isAuto && AllowedModels.isAllowed(targetModel)) {
                 log.warn("供应商为本地 OLLAMA，忽略云端模型 '{}'，改用本地模型 {}", targetModel, local);
             }
             return new ResolvedTarget(AiModelProperties.Provider.OLLAMA, local);
@@ -659,19 +662,36 @@ public class ChatModelFactory {
 
     /** 该模型本轮要带的思考强度；null = 不带（名单外/未配置）。 */
     String reasoningEffortFor(String modelId) {
-        com.checkba.config.AiReasoningProperties p = reasoningProperties;
-        return p == null ? null : p.effortFor(modelId);
+        return reasoningEffortFor(modelId, null);
     }
 
-    private dev.langchain4j.model.chat.StreamingChatLanguageModel getOrCreatePlatformStreamingModel(String modelId) {
+    /**
+     * 该模型本轮要带的思考强度（支持智能路由按轮覆盖）；仅对 {@link com.checkba.config.AiReasoningProperties#listed(String)}
+     * 名单内的思考型模型生效，名单外或未配置时恒返回 null。
+     */
+    String reasoningEffortFor(String modelId, String effortOverride) {
+        com.checkba.config.AiReasoningProperties p = reasoningProperties;
+        if (p == null || !p.listed(modelId)) {
+            return null;
+        }
+        if (effortOverride != null && !effortOverride.isBlank()) {
+            return effortOverride.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        return p.effortFor(modelId);
+    }
+
+    private dev.langchain4j.model.chat.StreamingChatLanguageModel getOrCreatePlatformStreamingModel(
+            String modelId, String reasoningEffortOverride) {
         recordModelUse("AWD_CLOUD", modelId, true);
         String apiKey = platformApiKey();
-        String cacheKey = "awd_cloud_stream:" + platformAiChannel.keyFingerprint() + ":" + modelId;
+        String effort = reasoningEffortFor(modelId, reasoningEffortOverride);
+        String cacheKey = "awd_cloud_stream:" + platformAiChannel.keyFingerprint() + ":" + modelId
+                + (effort != null ? ":" + effort : "");
         return streamingModelCache.computeIfAbsent(cacheKey, k -> {
-            log.info("Creating new AWD Cloud StreamingChatModel for: {}", modelId);
+            log.info("Creating new AWD Cloud StreamingChatModel for: {} (effort={})", modelId, effort);
             AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();
             return streamingModel(apiKey, config.getBaseUrl(), modelId, config.getTimeout(),
-                    config.getMaxRequestsPerHost(), reasoningEffortFor(modelId), providerRoutingFor(modelId));
+                    config.getMaxRequestsPerHost(), effort, providerRoutingFor(modelId));
         });
     }
 
@@ -694,22 +714,29 @@ public class ChatModelFactory {
     private final Map<String, dev.langchain4j.model.chat.StreamingChatLanguageModel> streamingModelCache = boundedCache();
 
     public dev.langchain4j.model.chat.StreamingChatLanguageModel getStreamingChatModel(String modelId) {
+        return getStreamingChatModel(modelId, null);
+    }
+
+    public dev.langchain4j.model.chat.StreamingChatLanguageModel getStreamingChatModel(
+            String modelId, String reasoningEffortOverride) {
         // 判定顺序与 getChatModel 共用同一份实现（resolveTarget），不许在这里再抄一遍：
         // 两份会漂移，而漂移的表现是「同步路和流式路发给不同的模型」。
         // OLLAMA 档的流式实现没有三参 generate，AGENT/PLAN 模式会在编排层抛异常。
         ResolvedTarget target = resolveTarget(modelId, true);
         return switch (target.channel()) {
-            case AWD_CLOUD -> getOrCreatePlatformStreamingModel(target.modelId());
+            case AWD_CLOUD -> getOrCreatePlatformStreamingModel(target.modelId(), reasoningEffortOverride);
             case OLLAMA -> getOrCreateOllamaStreamingModel(target.modelId());
-            default -> getOrCreateOpenRouterStreamingModel(target.modelId());
+            default -> getOrCreateOpenRouterStreamingModel(target.modelId(), reasoningEffortOverride);
         };
     }
 
-    private dev.langchain4j.model.chat.StreamingChatLanguageModel getOrCreateOpenRouterStreamingModel(String modelId) {
+    private dev.langchain4j.model.chat.StreamingChatLanguageModel getOrCreateOpenRouterStreamingModel(
+            String modelId, String reasoningEffortOverride) {
         recordModelUse("OPENROUTER", modelId, true);
-        String cacheKey = "openrouter_stream:" + modelId;
+        String effort = reasoningEffortFor(modelId, reasoningEffortOverride);
+        String cacheKey = "openrouter_stream:" + modelId + (effort != null ? ":" + effort : "");
         return streamingModelCache.computeIfAbsent(cacheKey, k -> {
-            log.info("Creating new OpenRouter StreamingChatModel for: {}", modelId);
+            log.info("Creating new OpenRouter StreamingChatModel for: {} (effort={})", modelId, effort);
             AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();
             
             String apiKey = resolveOpenRouterApiKey();
@@ -717,7 +744,7 @@ public class ChatModelFactory {
             requireByokKey(apiKey);
             
             return streamingModel(apiKey, baseUrl, modelId, config.getTimeout(),
-                    config.getMaxRequestsPerHost(), reasoningEffortFor(modelId), providerRoutingFor(modelId));
+                    config.getMaxRequestsPerHost(), effort, providerRoutingFor(modelId));
         });
     }
 

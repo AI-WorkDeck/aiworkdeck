@@ -12,6 +12,19 @@
 -->
 <template>
   <view class="model-dropdown" :class="placement" role="listbox">
+    <view v-if="groups.length"
+          class="model-auto-option"
+          :class="{ active: currentModelId === 'auto' }"
+          role="option" tabindex="0" :aria-selected="currentModelId === 'auto' ? 'true' : 'false'"
+          @keydown.enter.stop="onOptionKey($event, autoOption)"
+          @keydown.space.stop="onOptionKey($event, autoOption)"
+          @tap.stop="$emit('select', autoOption)">
+      <view class="model-auto-row">
+        <text class="model-auto-name">{{ $t('chat.autoModelName') }}</text>
+        <text class="model-auto-badge">{{ $t('chat.autoModelBadge') }}</text>
+      </view>
+      <text class="model-auto-desc">{{ $t('chat.autoModelDesc') }}</text>
+    </view>
     <view v-for="g in groups" :key="g.key" class="model-group">
       <view class="model-group-head">
         <text class="model-group-vendor">{{ g.vendor }}</text>
@@ -81,6 +94,13 @@ export default {
     return { levelCount: PRICE_LEVEL_COUNT }
   },
   computed: {
+    autoOption() {
+      return {
+        id: 'auto',
+        name: this.$t('chat.autoModelName'),
+        vision: true,
+      }
+    },
     display() {
       return normalizePriceDisplay(this.priceDisplay)
     },
@@ -159,6 +179,51 @@ export default {
 /* 向上展开 (对话中) */
 .model-dropdown.up {
   bottom: calc(100% + 4px);
+}
+
+/* ===== 智能模式（Auto）置顶入口 ===== */
+.model-auto-option {
+  padding: 8px 14px;
+  cursor: pointer;
+  color: var(--awd-text);
+  transition: background 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-bottom: 1px solid var(--awd-border-subtle);
+}
+.model-auto-option:hover {
+  background: var(--awd-accent-soft);
+}
+.model-auto-option.active {
+  color: var(--awd-accent-text);
+  font-weight: 500;
+  background: var(--awd-accent-wash);
+}
+.model-auto-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.model-auto-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+.model-auto-badge {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex: none;
+}
+.model-auto-desc {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--awd-text-2);
+  font-weight: 400;
 }
 
 /* ===== 按厂商分组，国际档在后并标注需国际网络 ===== */

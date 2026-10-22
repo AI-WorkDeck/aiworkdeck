@@ -7,6 +7,16 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## 智能模型路由（Smart Mode / Auto，2026-10-22，dev-board#1434）
+
+- 前端 `ModelSelectorDropdown.vue` 顶部置顶「智能模式（Auto）」（`.model-auto-option`，`modelId = 'auto'`）；本地存储未显式持久化有效具体模型时默认选中 `'auto'`，用户在下拉中显式选定任意具体模型后持久化该模型。当处于 `'auto'` 模式且可用清单中存在任一 `vision: true` 模型时，`currentModelVision` 为 `true`，允许直接上传图片并由后端路由到视觉模型。
+- 后端 `SmartModelRouter` 在 `AgentOrchestrator.handleUserMessageInScope` 中紧随 `skillRouter.activateForTurn` 之后、上下文组装之前执行 0ms 规则路由（不额外发起 LLM/Jev 预判调用），综合 `mode`（`ASK`/`AGENT`/`PLAN`）、已激活技能（`legal-opinion-review`/`contract-review`/`due-diligence` 等）、图片多模态、`contextItems` 文档/目录规模、活跃文档与消息意图，将 `'auto'` 路由为三档目标模型并按需动态调整 `reasoning.effort`（`low`/`medium`/`high`）：
+  - **极速档（`FAST`）**：纯文本寒暄/机械微调/极短问答 → `deepseek/deepseek-v4-flash`（视觉按区域选 `qwen/qwen3.7-flash` 或 `google/gemini-3.6-flash`），`reasoningEffort = "low"`。
+  - **主力均衡档（`BALANCED`）**：常规法律问答、单文档条款修订、工具编排 → `deepseek/deepseek-v4-pro`（带图选 `moonshotai/kimi-k2.6`），`reasoningEffort = "medium"`。
+  - **深度旗舰档（`DEEP`）**：`PLAN` 模式、`legal-opinion-review`、`contract-review`、多文档/目录尽调、长文起草或复杂架构推理 → 国际区选 `anthropic/claude-sonnet-5`；境内区按深度推理/意见书选 `moonshotai/kimi-k3`（`reasoningEffort = "high"`），按合同审查/多文档/长文或带图选 `qwen/qwen3.8-max`。
+- 实际路由的模型写入 `RunGuard.activeModelId` 与 `reasoningEffortOverride`（随重启快照保存；触发跨模型 failover 时自动清除 override），并向前端推送 SSE `model_routed` 事件（`requestedModel`、`effectiveModel`、`effectiveModelName`、`tier`、`routed`），前端在智能模式下更新选择器按钮显示为 `智能 · {模型名}`。
+- 回归：`SmartModelRouterTest`、`ChatModelFactoryTest`、`AgentSkillUpdateEventTest` 及 `frontend/tests/chat-presentation-ui/model-pricing.mjs`。
+
 ## Jev 折叠入口（dev-board#1366）
 
 `DecisionAssistControl.vue` 在空会话和已有会话的输入区均默认收成「了解并使用 Jev」；原生 `details/summary` 支持鼠标与 Enter/Space，摘要始终显示启用状态。展开仅改变显示，不代表同意启用；原开关继续通过 `toggle` 和既有按用户隔离的偏好控制下一次发送，费用、数据范围与本地模型说明保留在展开区。回归：`frontend/tests/chat-presentation-ui/decision-assist.mjs`，使用真实 ChatInterface 和合成 HTTP，不代表调用真实 Jev。
@@ -1056,7 +1066,7 @@ ChatInterface.handleSubmit（~:927）→ useAgentStream.sendMessage（确保 SSE
 
 **account_action_required**：付费工具或异步 PPT 任务需要登录/充值的非终态通知，JSON 包含 `code`、`message` 与 `reason`，并带 `kind` 或 `gatewayKind`。前端打开相应弹框，不据此结束聊天流；模型自身的账户失败仍走终态 `error`。
 
-connected / bubble_start / text_delta / **reasoning_delta**（思考型模型的 reasoning 增量，`{"content":"…"}`，只进思考卡、不进正文；随消息落 `reasoning` 列，state_recovery 的 `events` 里按序带着它，重连/切回后原样重放，见「思考记录的持久化与断线恢复」）/ artifact / token_usage / bubble_end（status: finished|paused|awaiting_approval|awaiting_input；外加 **documentEdited**，见下）/ error / cancelled / **file_change**（见下）/ client_action / title_update / doc_stream_data（旧名 wps_stream_data 已于 dev-board#816 摘除，出站单名）/ doc_stream_end（编辑器流式写入收尾，前端据此落盘并报失败）/ state_recovery（断线重连快照）/ run_state / plan_update / **skill_update** / background_task_start / background_task_complete / task_progress / heartbeat / subtask_progress / **pass_progress**（整篇分段过卷进度，dev-board#422）/ **context_notice**（附件降级/截断/丢弃 + 上下文超窗，见下）/ inbox_updated / input_applied / **superseded**（本连接已被同会话的另一个客户端实例接管，见下）/ **provider_retry**（首字节前只收到保活、后端已换一家供应商重发，`{"from":"<供应商显示名或 unknown>"}`，只驱动思考卡副文案，dev-board#1061）/ **ask_user**（ask_user 工具的结构化提问，带版本号 `v`，紧跟在同一问题的 `<question kind="ask_user">` 标记之后、`bubble_end status=awaiting_input` 之前，见上文「向用户提问 ask_user 工具」）。前端分派均在 useAgentStream.handleEvent。超限 paused 契约见 PR#172。
+connected / bubble_start / **model_routed**（智能模式 Auto 下后端 0ms 路由器完成档位/模型分派后立即发出的非终态通知，`{"requestedModel":"auto","modelId":"…","modelName":"…","tier":"FAST|BALANCED|DEEP","reason":"…"}`，前端据此在气泡头部/思考卡展示本次实际命中模型，dev-board#1434）/ text_delta / **reasoning_delta**（思考型模型的 reasoning 增量，`{"content":"…"}`，只进思考卡、不进正文；随消息落 `reasoning` 列，state_recovery 的 `events` 里按序带着它，重连/切回后原样重放，见「思考记录的持久化与断线恢复」）/ artifact / token_usage / bubble_end（status: finished|paused|awaiting_approval|awaiting_input；外加 **documentEdited**，见下）/ error / cancelled / **file_change**（见下）/ client_action / title_update / doc_stream_data（旧名 wps_stream_data 已于 dev-board#816 摘除，出站单名）/ doc_stream_end（编辑器流式写入收尾，前端据此落盘并报失败）/ state_recovery（断线重连快照）/ run_state / plan_update / **skill_update** / background_task_start / background_task_complete / task_progress / heartbeat / subtask_progress / **pass_progress**（整篇分段过卷进度，dev-board#422）/ **context_notice**（附件降级/截断/丢弃 + 上下文超窗，见下）/ inbox_updated / input_applied / **superseded**（本连接已被同会话的另一个客户端实例接管，见下）/ **provider_retry**（首字节前只收到保活、后端已换一家供应商重发，`{"from":"<供应商显示名或 unknown>"}`，只驱动思考卡副文案，dev-board#1061）/ **ask_user**（ask_user 工具的结构化提问，带版本号 `v`，紧跟在同一问题的 `<question kind="ask_user">` 标记之后、`bubble_end status=awaiting_input` 之前，见上文「向用户提问 ask_user 工具」）。前端分派均在 useAgentStream.handleEvent。超限 paused 契约见 PR#172。
 
 **`error` 事件有两种载荷**（2026-09-29，dev-board#1046 登录后置）：编排器捕获 `AccountException` 的两处
 （主循环 catch、故障转移取模型失败）发 JSON `{message, code, kind, reason?}`（`AgentOrchestrator.accountErrorPayload`，
