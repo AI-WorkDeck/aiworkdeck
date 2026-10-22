@@ -1896,4 +1896,50 @@ class ContextAssemblerServiceTest {
         assertFalse(oSystem.contains("当前模型不支持视觉输入"));
         assertFalse(oSystem.contains("以下正文由文字识别"));
     }
+
+    @Test
+    @DisplayName("活跃文档携带 selectionText（dev-board#1430）：<active_selection> 落在 volatile 段不破稳定前缀，且末位追加中英文选区提醒")
+    void activeSelectionInjectsVolatileBlockAndTailReminderWithoutDirtyingStablePrefix() {
+        when(legalTools.read_document("123")).thenReturn("第一条 定义\n第八条 违约金按合同总额百分之三十计算。");
+
+        AiAgentController.ContextItem withoutSel = new AiAgentController.ContextItem();
+        withoutSel.setId("123");
+        withoutSel.setName("技术服务合同.docx");
+        withoutSel.setFileType("docx");
+
+        AiAgentController.ContextItem withSel = new AiAgentController.ContextItem();
+        withSel.setId("123");
+        withSel.setName("技术服务合同.docx");
+        withSel.setFileType("docx");
+        withSel.setSelectionText("第八条 违约金按合同总额百分之三十计算。");
+
+        List<ChatMessage> m1 = assembler.assemble("conv-sel", "run-1", "把违约金改成百分之十",
+                null, withoutSel, null, null, "88", AgentMode.AGENT, 1L, null);
+        List<ChatMessage> m2 = assembler.assemble("conv-sel", "run-2", "把违约金改成百分之十",
+                null, withSel, null, null, "88", AgentMode.AGENT, 1L, null);
+
+        String sep = ContextAssemblerService.SYSTEM_VOLATILE_SEPARATOR;
+        String sys1 = ((SystemMessage) m1.get(0)).text();
+        String sys2 = ((SystemMessage) m2.get(0)).text();
+        String stable1 = sys1.substring(0, sys1.indexOf(sep));
+        String stable2 = sys2.substring(0, sys2.indexOf(sep));
+        String volatile2 = sys2.substring(sys2.indexOf(sep) + sep.length());
+
+        assertEquals(stable1, stable2, "选区变化不得破坏 system prompt 稳定缓存前缀");
+        assertTrue(volatile2.contains("<active_selection id=\"123\" name=\"技术服务合同.docx\"><![CDATA[\n第八条 违约金按合同总额百分之三十计算。\n]]></active_selection>"),
+                "volatile 段应注入 <active_selection> 原文");
+
+        String user2 = com.checkba.service.ai.context.ChatMessageText.of(m2.get(m2.size() - 1));
+        assertTrue(user2.contains("[当前选区]"), "中文末位提醒应包含 [当前选区]");
+        assertTrue(user2.contains("第八条 违约金按合同总额百分之三十计算。"), "末位提醒应带出选中片段");
+        assertTrue(user2.contains("doc_find_replace"), "LOWA Writer 选区提醒应指路 doc_find_replace / doc_replace_selection");
+
+        // EN 模式核对
+        when(appLanguageService.isEnglish()).thenReturn(true);
+        List<ChatMessage> mEn = assembler.assemble("conv-sel-en", "run-3", "lower it to 10%",
+                null, withSel, null, null, "88", AgentMode.AGENT, 1L, null);
+        String userEn = com.checkba.service.ai.context.ChatMessageText.of(mEn.get(mEn.size() - 1));
+        assertTrue(userEn.contains("[Active selection]"), "英文末位提醒应包含 [Active selection]");
+        assertTrue(userEn.contains("doc_find_replace"), "英文末位提醒应指路 doc_find_replace");
+    }
 }

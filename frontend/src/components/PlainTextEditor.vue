@@ -309,6 +309,9 @@ export default {
         EditorView.lineWrapping,
         syntaxHighlighting(getPtxHighlightStyle()),
         EditorView.updateListener.of((update) => {
+          if ((update.selectionSet || update.docChanged) && typeof uni !== 'undefined' && uni && typeof uni.$emit === 'function') {
+            uni.$emit('awd:selection-changed', { fileId: this.file && this.file.id })
+          }
           if (!update.docChanged) return
           if (!this._applyingRemote) this.onUserEdit()
           if (this.reviewActive) this.scheduleReviewStats()
