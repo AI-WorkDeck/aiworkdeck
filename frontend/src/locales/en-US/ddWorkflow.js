@@ -247,6 +247,9 @@ export default {
     },
     "serverErrors": {
       "invalidCode": "Enter a valid invitation code.",
+      "accessCodeInvalid": "This invitation code is invalid. Check the code and retry.",
+      "accessCodeRevoked": "This invitation code has been revoked. Ask your lawyer for a new one.",
+      "accessCodeExpired": "This invitation code has expired. Ask your lawyer for a new one.",
       "caseLibraryUnavailable": "This site has no case library yet. Choose a connected team case library.",
       "invitationInvalid": "The invitation code is invalid, expired or revoked. Check the code and retry.",
       "incompleteCaseResponse": "The case library returned incomplete information. Please retry later.",
