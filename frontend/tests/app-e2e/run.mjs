@@ -1250,12 +1250,12 @@ try {
     await page.waitForSelector('.sidebar-left', { timeout: 10000 })
     const widthBefore = await page.$eval('.sidebar-left', (el) => el.getBoundingClientRect().width)
     if (widthBefore <= 0) throw new Error('测试起点应为左栏展开状态，实际宽度: ' + widthBefore)
-    await mouseClickSel('.left-rail [title="收起左侧栏"]')
+    await mouseClickSel('.sidebar-collapse-tab[title="收起左侧栏"]')
     await page.waitForFunction(
       () => document.querySelector('.sidebar-left')?.getBoundingClientRect().width === 0,
       { timeout: 8000 },
     )
-    await mouseClickSel('.left-rail [title="展开左侧栏"]')
+    await mouseClickSel('.top-bar-btn[title="展开左侧栏"]')
     await page.waitForFunction(
       () => (document.querySelector('.sidebar-left')?.getBoundingClientRect().width || 0) > 0,
       { timeout: 8000 },

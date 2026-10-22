@@ -3,11 +3,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { createI18n } from 'vue-i18n'
+import zh from '../../src/locales/zh-CN/ddWorkflow.js'
+import en from '../../src/locales/en-US/ddWorkflow.js'
+const translate = (locale = 'zh-CN') => createI18n({ legacy: true, locale, messages: { 'zh-CN': { ddWorkflow: zh }, 'en-US': { ddWorkflow: en } } }).global.t
 const source = readFileSync(new URL('../../src/components/dd/DdClientChecklist.vue', import.meta.url), 'utf8')
-function fixture(api = {}) {
+function fixture(api = {}, locale = 'zh-CN') {
   const body = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
   const options = new Function('ddClientRead', 'ddClientWrite', 'ddClientUpload', 'ddClientDownload', body)(api.read || (async () => []), api.write || (async () => {}), api.upload || (async () => {}), async () => {})
-  const vm = { ...options.data(), requestId: 1, projectId: 2, connectionId: 'client-one' }
+  const vm = { ...options.data(), $t: translate(locale), requestId: 1, projectId: 2, connectionId: 'client-one' }
   for (const [key, fn] of Object.entries(options.methods)) vm[key] = fn.bind(vm)
   for (const [key, fn] of Object.entries(options.computed)) Object.defineProperty(vm, key, { get: fn.bind(vm) })
   return vm
@@ -72,7 +76,7 @@ test('category parents are not counted as materials, while preserved parent subm
   assert.equal(vm.isCategory(parent), false); assert.equal(vm.actionableItems.length, 2)
 })
 
-function transportFixture(onSend) {
+function transportFixture(onSend, locale = 'zh-CN') {
   const serviceSource = readFileSync(new URL('../../src/services/ddClient.js', import.meta.url), 'utf8')
     .replace(/^import .*$/gm, '').replace(/export /g, '')
   class Xhr {
@@ -81,8 +85,8 @@ function transportFixture(onSend) {
     setRequestHeader(name, value) { this.headers[name] = value }
     send(body) { this.body = body; onSend(this) }
   }
-  return new Function('getApiBaseUrl', 'getCloudAccountGeneration', 'getAuthHeaders', 'getSessionId', 'isClientPortalBuild', 'XMLHttpRequest', serviceSource + '\nreturn { ddClientUpload };')(
-    () => 'http://127.0.0.1:1234', () => 0, () => ({ 'X-Session-Id': 'local', 'Content-Type': 'application/json' }), () => 'local', () => false, Xhr,
+  return new Function('getApiBaseUrl', 'getCloudAccountGeneration', 'getAuthHeaders', 'getSessionId', 'isClientPortalBuild', 'XMLHttpRequest', 't', 'getAppLanguage', 'zhDdWorkflow', serviceSource + '\nreturn { ddClientUpload };')(
+    () => 'http://127.0.0.1:1234', () => 0, () => ({ 'X-Session-Id': 'local', 'Content-Type': 'application/json' }), () => 'local', () => false, Xhr, translate(locale), () => locale, zh,
   )
 }
 test('desktop upload reports progress, leaves multipart boundary to the browser and keeps the global session', async () => {
@@ -94,6 +98,7 @@ test('desktop upload reports progress, leaves multipart boundary to the browser 
   await api.ddClientUpload({ connectionId: 'bound', projectId: 4, requestId: 5 }, 7, [new File(['synthetic'], 'proof.pdf')], 'retry-1', true, value => progress.push(value))
   assert.equal(sent.headers['Content-Type'], undefined)
   assert.equal(sent.headers['X-Session-Id'], 'local')
+  assert.equal(sent.headers['X-App-Language'], 'zh-CN')
   assert.equal(sent.body.getAll('files').length, 1)
   assert.equal(sent.body.get('aiConsent'), 'true')
   assert.equal(sent.timeout, 180000); assert.deepEqual(progress, [50])
@@ -130,9 +135,9 @@ test('portal refresh restores only invitation sessions and forgetting removes th
       : { name: 'Synthetic project' } }
   }
   function load(portal = true) {
-    return new Function('getApiBaseUrl', 'getCloudAccountGeneration', 'getAuthHeaders', 'getSessionId', 'isClientPortalBuild', 'sessionStorage', 'fetch',
+    return new Function('getApiBaseUrl', 'getCloudAccountGeneration', 'getAuthHeaders', 'getSessionId', 'isClientPortalBuild', 'sessionStorage', 'fetch', 't', 'getAppLanguage', 'zhDdWorkflow',
       source + '\nreturn { connectDdClient, listDdClientConnections, removeDdClientConnection, ddClientRead };')(
-      () => 'https://case.example', () => 0, () => ({ 'X-Session-Id': 'personal' }), () => 'personal', () => portal, sessionStorage, fetch)
+      () => 'https://case.example', () => 0, () => ({ 'X-Session-Id': 'personal' }), () => 'personal', () => portal, sessionStorage, fetch, translate(), () => 'zh-CN', zh)
   }
   const first = load(); const invitation = await first.connectDdClient('code')
   assert.equal(invitation.session, undefined)
@@ -142,4 +147,29 @@ test('portal refresh restores only invitation sessions and forgetting removes th
   await load(false).listDdClientConnections(); assert.equal(sessions.at(-1), 'personal')
   await refreshed.removeDdClientConnection(invitation.id)
   assert.deepEqual(await load().listDdClientConnections(), [])
+})
+
+
+test('client status labels and submit notices use the selected language', async () => {
+  const vm = fixture({}, 'en-US'); const item = { id: 7, status: 'PENDING' }; vm.request = { status: 'PUBLISHED' }
+  assert.equal(vm.statusLabel(item), 'To prepare')
+  vm.submissions[7] = { reviewStatus: 'UPLOADED', aiStatus: 'PASSED' }
+  assert.equal(vm.statusLabel(item), 'Document checks passed')
+  vm.submissions[7].reviewStatus = 'APPROVED'
+  assert.equal(vm.statusLabel(item), 'Confirmed by lawyer')
+  vm.submissions[7] = { reviewStatus: 'UPLOADED', aiStatus: 'MANUAL_REQUIRED' }
+  assert.equal(vm.statusLabel(item), 'Awaiting lawyer confirmation')
+  vm.submissions[7].appealedAt = '2026-10-21T10:00:00'
+  assert.equal(vm.statusLabel(item), 'Lawyer reviewing appeal')
+  vm.load = async () => {}; vm.loadHistory = async () => {}; vm.addFiles([new File(['test'], 'proof.pdf')])
+  await vm.upload(item)
+  assert.equal(vm.notice, 'Documents submitted. You can follow the checks here.')
+})
+
+test('English upload error and language header preserve the same retry semantics', async () => {
+  let sent; let sends = 0
+  const api = transportFixture(xhr => { sent = xhr; sends++; xhr.ontimeout() }, 'en-US')
+  await assert.rejects(api.ddClientUpload({ connectionId: 'bound', requestId: 5 }, 7, [], 'retry-en', false), /upload timed out.*files are retained/i)
+  assert.equal(sent.headers['X-App-Language'], 'en-US'); assert.equal(sent.headers['X-Session-Id'], 'local')
+  assert.equal(sent.body.get('idempotencyKey'), 'retry-en'); assert.equal(sends, 1)
 })
