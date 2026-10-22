@@ -246,6 +246,10 @@ export default {
   // ---- 上下文层：当前文档 chip / 附件跨轮 / 上限与降级（dev-board#793 K14、#801 K21）----
   activeDocChipLabel: '当前文档',
   activeDocChipTitle: '这份文档会随本条消息一起给 AI。点 × 可让这一轮不带它。',
+  activeSelectionChipLabel: '已选中',
+  activeSelectionChipPreview: '「{text}」',
+  activeSelectionChipCount: '（{n}字）',
+  activeSelectionChipTitle: '已选中片段：{text}（随本条消息传给 AI，优先修订该片段；点 × 本轮忽略选区）',
   carriedAttachmentTitle: '{name}（上一轮带过，本轮仍会带上；点一下确认沿用，点 × 移除）',
   carriedAttachmentHint: '虚线标签是上轮附件，下一条继续使用，点 × 移除',
   contextFileCapReached: '本轮最多带 {max} 份材料（含图片），请先移除一些再添加',

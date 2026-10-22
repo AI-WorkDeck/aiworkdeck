@@ -456,6 +456,13 @@
                   <text class="active-doc-name">{{ activeDocChip.name }}</text>
                   <text class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
                </view>
+               <!-- 当前文档选区 chip（dev-board#1430）：选中正文后自动浮出，可直接对选区提修订意见 -->
+               <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
+                  <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
+                  <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
+                  <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
+                  <text class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
+               </view>
                <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
                <text v-if="visionNotice" class="input-images-note">{{ $t(visionNotice) }}</text>
                <!-- 上一轮带过的附件（虚线标签）会继续带上：常驻一句说清楚，不靠用户自己去悬停（BUG-19） -->
@@ -713,6 +720,13 @@
               <text class="active-doc-name">{{ activeDocChip.name }}</text>
               <text class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
            </view>
+           <!-- 当前文档选区 chip（dev-board#1430）：选中正文后自动浮出，可直接对选区提修订意见 -->
+           <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
+              <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
+              <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
+              <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
+              <text class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
+           </view>
            <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
            <text v-if="visionNotice" class="input-images-note">{{ $t(visionNotice) }}</text>
            <!-- 上一轮带过的附件（虚线标签）会继续带上：常驻一句说清楚，不靠用户自己去悬停（BUG-19） -->
@@ -899,6 +913,7 @@ import { createComponentRequiredHandler, shouldAutoResend } from '@/composables/
 import { pendingInboxItems } from '@/composables/agentInboxState.mjs'
 import { saveLastConversation } from '@/utils/lastConversation.js'
 import { isContextEligibleTab } from '@/pages/project-overview/activeTabContext.js'
+import { buildActiveSelectionChip } from '@/pages/project-overview/activeSelectionContext.js'
 import { isCurrentDocSentinel } from '@/utils/chatFileChange.js'
 import { canDragCreatedFile, startCreatedFileDrag, endCreatedFileDrag } from '@/utils/generatedFileDrag.js'
 import { warmDragImage } from '@/utils/dragImage.js'
@@ -953,6 +968,10 @@ export default {
     activeTabPane: {
       type: String,
       default: null // 'left' | 'right' | null
+    },
+    activeSelection: {
+      type: [Object, String],
+      default: null
     },
     // 插件镜像会话只读态（dev-board#298）：非空 = 当前会话是插件同步过来的镜像，
     // 值是来源文案（如「Word 插件」，由宿主用 utils/conversationSource.js 算好传入）。
@@ -1394,6 +1413,22 @@ export default {
     })
 
     const dismissActiveDoc = () => { activeDocDismissed.value = true }
+
+    // 当前文档选区 chip（dev-board#1430）：选中正文时自动浮出，点 × 仅本轮不带，重选或换标签即复位。
+    const activeSelectionDismissed = ref(false)
+    watch(
+      [
+        () => (typeof props.activeSelection === 'string' ? props.activeSelection : props.activeSelection?.text),
+        () => (props.activeSelection && typeof props.activeSelection === 'object' ? props.activeSelection.fileId : null),
+        () => props.activeTab && props.activeTab.id,
+      ],
+      () => { activeSelectionDismissed.value = false }
+    )
+    const activeSelectionChip = computed(() => {
+      if (activeSelectionDismissed.value) return null
+      return buildActiveSelectionChip(props.activeSelection, activeDocChip.value)
+    })
+    const dismissActiveSelection = () => { activeSelectionDismissed.value = true }
 
     /**
      * 一条 context_notice 的人话（dev-board#801 K21 ⑦）。
@@ -2347,6 +2382,7 @@ export default {
       //
       // chip 被用户摘掉时 activeDocChip 为 null，本轮就真的不带——
       // 「帮我查一下最新的司法解释」这类与文档无关的提问不该每轮都拖着几万字的合同。
+      const selectionChip = activeSelectionChip.value
       const activeContext = chipTab ? {
         id: chipTab.id,
         name: chipTab.name,
@@ -2354,7 +2390,8 @@ export default {
         wpsFileId: props.activeTab.wpsFileId,
         pane: props.activeTabPane,
         // 没能落盘：告诉后端别用磁盘上那份旧正文，改走 readHint 分支
-        staleBody: !activeDocFlushed
+        staleBody: !activeDocFlushed,
+        ...(selectionChip ? { selectionText: selectionChip.text } : {})
       } : null
       const attempt = beginChatSubmission(submissionTracker, {
         prompt,
@@ -3954,18 +3991,43 @@ export default {
     // 外部面板（如股东大会核查）注入预设 prompt：强制 AGENT 模式发送
     // （skill 注入依赖 prompt 文本内的触发词；ASK 模式会跳过注入）。
     // 返回本次会话 ID，供调用方把业务对象绑定到该会话。
-    const sendExternalPrompt = async (prompt) => {
+    const sendExternalPrompt = async (prompt, options = {}) => {
       if (!prompt) return null
       if (isStreaming.value) {
         uni.showToast({ title: t('chat.busyToast'), icon: 'none' })
         return null
+      }
+      let activeContext = null
+      const selectionText = options && typeof options.selectionText === 'string' ? options.selectionText.trim() : ''
+      const chipTab = activeDocChip.value || (props.activeTab && isContextEligibleTab(props.activeTab)
+        ? { id: String(props.activeTab.id), name: props.activeTab.name || '' }
+        : null)
+      if (chipTab && (selectionText || (options && options.fileId != null))) {
+        let activeDocFlushed = true
+        if (typeof props.flushActiveDocument === 'function') {
+          try {
+            activeDocFlushed = await props.flushActiveDocument(chipTab.id, { timeoutMs: 1500 }) !== false
+          } catch (e) {
+            activeDocFlushed = false
+          }
+        }
+        activeContext = {
+          id: chipTab.id,
+          name: chipTab.name,
+          fileType: props.activeTab ? props.activeTab.fileType : '',
+          wpsFileId: props.activeTab ? props.activeTab.wpsFileId : null,
+          pane: props.activeTabPane,
+          staleBody: !activeDocFlushed,
+          ...(selectionText ? { selectionText } : {})
+        }
       }
       await sendMessage({
         prompt,
         projectId: props.projectId,
         modelId: currentModelId.value,
         mode: 'AGENT',
-        skillIds: currentSkillIds()
+        skillIds: currentSkillIds(),
+        ...(activeContext ? { activeContext } : {})
       })
       scrollToBottom()
       return currentConversationId.value
@@ -4165,6 +4227,8 @@ export default {
        fileListFromBubble,
        activeDocChip,
        dismissActiveDoc,
+       activeSelectionChip,
+       dismissActiveSelection,
        visionNotice,
        contextNoticeText,
        isUploadingPasted,
@@ -5318,6 +5382,15 @@ export default {
   line-height: 1;
 }
 .active-doc-remove:hover { color: var(--awd-text); }
+.active-selection-chip {
+  border-style: solid;
+  border-color: var(--awd-accent-soft);
+  background: var(--awd-accent-wash);
+}
+.active-selection-count {
+  flex-shrink: 0;
+  color: var(--awd-text-3);
+}
 
 /* 历史里那一轮带过的附件（K14 ④）：只在历史气泡上出现——
    手打输入那条路的附件是正文里的内联标签，再挂一排就是显示两遍。 */

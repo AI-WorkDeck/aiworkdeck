@@ -760,6 +760,7 @@ export default {
     aiScopeSelection: '当前选中的内容',
     aiScopeDocument: '全文',
     aiDefaultRequirement: '统一为规范、整齐的正式文书格式（标题层级清晰、正文首行缩进 2 字符、行距与段间距一致）',
+    aiSelectionRevisePrompt: '请针对文档《{name}》中我选中的以下片段进行修订：\n「{selection}」\n修订要求：{instruction}\n请直接定位并在原位置修订该片段（保留修订痕迹），其余无关段落保持不变。',
   },
   systemFonts: {
     title: '编辑器字体',

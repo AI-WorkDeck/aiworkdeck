@@ -741,9 +741,17 @@ public class AiAgentController {
          * 模型会拿着改动之前的版本给结论。置 true 即只带壳，让模型走编辑器桥读实时正文。
          */
         private boolean staleBody;
+        /**
+         * 可选：用户在当前活跃文档中选中的文本片段（dev-board#1430）。
+         * 非空时注入 volatileText 的 <active_selection> 并追加末位提醒，
+         * 让模型直接针对该选区就地修订或解释，无需先花一轮工具调用去探测选区。
+         */
+        private String selectionText;
 
         public boolean isStaleBody() { return staleBody; }
         public void setStaleBody(boolean staleBody) { this.staleBody = staleBody; }
+        public String getSelectionText() { return selectionText; }
+        public void setSelectionText(String selectionText) { this.selectionText = selectionText; }
 
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }

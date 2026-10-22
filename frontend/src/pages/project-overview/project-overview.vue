@@ -1659,6 +1659,7 @@
                 :history-badge="historyBadge"
                 :active-tab="currentActiveTab"
                 :active-tab-pane="focusedPane"
+                :active-selection="activeSelection"
                 :drag-active="dragOverAiPanel"
                 :flush-active-document="flushActiveDocumentForChat"
                 :external-read-only="pluginReadOnlyLabel"
@@ -2223,6 +2224,7 @@ import { claimRestartStartup, createRestartRecovery } from './restartRecovery.js
 import { flushActiveDocument } from './flushActiveDocument.js'
 import { isTabVisibleInPane } from './tabVisibility.js'
 import { pickActiveContextTab, isContextEligibleTab } from './activeTabContext.js'
+import { readActiveSelection } from './activeSelectionContext.js'
 import { nativeDataTransfer, captureDroppedFiles, isExternalFileDrag, compatibleDropEffect } from '@/utils/fileTreeExternalDrop.js'
 import { consumePluginImDrag } from '@/utils/pluginImDrag.js'
 import { addPluginImFileToAi } from '@/utils/pluginImAi.js'
@@ -2754,6 +2756,7 @@ export default {
       submitGuideMode: 'guide',
       collabRefreshToken: 0, // 自增一次 = 让版本面板重拉自己的那份状态
       focusedPane: 'left', // 'left' | 'right'
+      activeSelection: null, // 当前活跃文档的选区快照 { fileId, text }（dev-board#1430）
 
       // 「依据」窗格（dev-board#182）。窗格是工作台级的（停右栏或左栏），绑「当前活跃的
       // writer 文档」；光标邻域与实体索引只读同步，打开窗格不发起在线核验。
@@ -3561,6 +3564,10 @@ export default {
       uni.$off(AI_PROMPT_EVENT, this._onEditorAiPrompt)
       this._onEditorAiPrompt = null
     }
+    if (this._onEditorSelectionChanged) {
+      uni.$off('awd:selection-changed', this._onEditorSelectionChanged)
+      this._onEditorSelectionChanged = null
+    }
     if (this._onEntitlementsChanged) {
       uni.$off('awd:entitlements-changed', this._onEntitlementsChanged)
       this._onEntitlementsChanged = null
@@ -4014,6 +4021,11 @@ export default {
       this.onEditorAiPrompt(payload)
     }
     uni.$on(AI_PROMPT_EVENT, this._onEditorAiPrompt)
+    this._onEditorSelectionChanged = (payload) => {
+      if (!this.isActiveOverviewInstance()) return
+      this.refreshActiveSelection(payload)
+    }
+    uni.$on('awd:selection-changed', this._onEditorSelectionChanged)
     this.setupResponsiveListener()
     // IDE 化：窗口重新聚焦时刷新文件树——外部改动（Finder 增删改）都发生在
     // 用户切出去的时候，后端 watcher 已把数据库对齐，聚焦拉一次即可见。
@@ -4332,7 +4344,7 @@ export default {
     activeFileLeft(f) { this.onActiveOfficeFileChanged('left', f); this.touchWebKeepAlive('left', f); this.prefetchInsightIndex(f) },
     activeFileRight(f) { this.onActiveOfficeFileChanged('right', f); this.touchWebKeepAlive('right', f); this.prefetchInsightIndex(f) },
     focusedPane() { this.syncLibreExecutor(); this.notifyRestartRecovery(); this.syncFileTreeSelectionWithActiveTab() },
-    currentActiveTab() { this.notifyRestartRecovery() },
+    currentActiveTab() { this.notifyRestartRecovery(); this.refreshActiveSelection() },
     // 关闭 tab 后清掉文件已不在左列表的过继备胎条目（closeFile 已 flush）
     'leftFiles.length'() { this.pruneClosedLibreSpares() },
     'rightFiles.length'() { this.pruneClosedLibreSpares() },
@@ -5297,12 +5309,43 @@ export default {
     // 插件启动面板（PluginGuidePane）的一键动作：把 manifest.guide.quickActions 里那句
     // prompt 以 AGENT 模式发进 AI 对话——与股东大会/诉讼可视化同一条 resolveChatInterface 路。
     // prompt 里含 skill 触发词才会命中注入（由插件作者在 manifest 里写对），这里只负责发出去。
+    async refreshActiveSelection(payload = null) {
+      const tab = this.currentActiveTab
+      if (!tab || tab.id == null) {
+        this._selectionReadSeq = (this._selectionReadSeq || 0) + 1
+        this.activeSelection = null
+        return
+      }
+      if (payload && payload.fileId != null && String(payload.fileId) !== String(tab.id)) {
+        return
+      }
+      const seq = this._selectionReadSeq = (this._selectionReadSeq || 0) + 1
+      const targetId = tab.id
+      const text = await readActiveSelection(this._libreRefs, this._plainTextRefs, {
+        side: this.focusedPane,
+        fileId: targetId,
+      })
+      if (seq !== this._selectionReadSeq) return
+      const curTab = this.currentActiveTab
+      if (!curTab || String(curTab.id) !== String(targetId)) {
+        this.activeSelection = null
+        return
+      }
+      this.activeSelection = text ? { fileId: targetId, text } : null
+    },
+
     async onEditorAiPrompt(payload) {
       const prompt = payload && payload.prompt
       if (!prompt) return
+      if (payload && payload.selectionText && payload.fileId != null) {
+        this.activeSelection = { fileId: payload.fileId, text: String(payload.selectionText) }
+      }
       const chat = await this.resolveChatInterface()
       if (!chat) return
-      await chat.sendExternalPrompt(prompt)
+      await chat.sendExternalPrompt(prompt, {
+        fileId: payload && payload.fileId,
+        selectionText: payload && payload.selectionText,
+      })
     },
 
     async onPluginQuickAction({ prompt }) {

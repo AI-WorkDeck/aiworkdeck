@@ -244,6 +244,10 @@ export default {
   // ---- Context layer: active-document chip / carried attachments / limits and downgrades ----
   activeDocChipLabel: 'Current document',
   activeDocChipTitle: 'This document is sent to the AI with your message. Click x to leave it out of this turn.',
+  activeSelectionChipLabel: 'Selected',
+  activeSelectionChipPreview: '“{text}”',
+  activeSelectionChipCount: '({n} chars)',
+  activeSelectionChipTitle: 'Selected excerpt: {text} (sent to the AI with your message so revisions target this excerpt first; click x to omit it for this turn)',
   carriedAttachmentTitle: '{name} (carried over from the previous turn and still attached; click to keep it, click x to remove)',
   carriedAttachmentHint: 'Dashed tags are attachments from your last message and will be sent again with the next one. Click x to remove.',
   contextFileCapReached: 'Up to {max} items (images included) per turn. Remove some before adding more.',
