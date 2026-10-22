@@ -957,16 +957,11 @@
           </SettingsSection>
         </scroll-view>
 
-        <!-- 团队（dev-board#496）。接在链尾：这条 v-if/v-else-if 长链的链头是
-             activeNav === 'ai'，动链头会拿到「v-else 没有相邻 v-if」的编译错。 -->
         <scroll-view v-else-if="activeNav === 'memory'" scroll-y class="config-scroll">
           <SettingsSection :title="$t('chat.memoryTitle')" :description="$t('chat.memorySubtitle')">
               <!-- 内嵌编辑，不再是「点一个按钮才弹窗」——设置页打开即可直接改（dev-board#879）。 -->
               <MemoryBrowser inline :open="true" :project-id="projectId" />
           </SettingsSection>
-        </scroll-view>
-        <scroll-view v-else-if="activeNav === 'team'" scroll-y class="config-scroll">
-          <TeamPanel @go-account="onNavTap({ key: 'account' })" />
         </scroll-view>
         <scroll-view v-else-if="activeNav === 'permissions'" scroll-y class="config-scroll">
           <SettingsSection :title="$t('admin.permissionsSectionTitle')" :description="$t('admin.permissionsSectionSubtitle')">
@@ -1002,6 +997,11 @@
               </view>
             </view>
           </SettingsSection>
+        </scroll-view>
+        <!-- 团队（dev-board#496）。接在链尾：这条 v-if/v-else-if 长链的链头是
+             activeNav === 'ai'，动链头会拿到「v-else 没有相邻 v-if」的编译错。 -->
+        <scroll-view v-else-if="activeNav === 'team'" scroll-y class="config-scroll">
+          <TeamPanel @go-account="onNavTap({ key: 'account' })" />
         </scroll-view>
       </view>
     </view>
