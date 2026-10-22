@@ -596,3 +596,19 @@ FileTree 的节点/根/空白落点先认包内载荷，先同步快照与 claim
 取消选择调用 `/api/ocr/routing/cancel` 撤回本任务 decision，保留到期前的取消记录，迟到 choice 不得重新授权；取消不修改用户此前记住的偏好。原 run 和已续跑 run 被取消后不能借保存的 cloud 偏好继续，新任务须重新选择。前端成功交接只清 UI，不误撤权；取消失败显示重试，并保留原账户/服务端请求范围。逐页渲染前、上传前和结果导出前重检取消及权限，最后一页请求期间取消也不生成迟到 Word；已发出的 HTTP 无法撤回，已识别页面可能已计费。纯白页不上传、不计费，但仍执行取消检查。
 
 验证：`PdfOcrDependenciesTest`、`OcrRoutingServiceTest`、`PdfCloudOcrServiceTest`、`AgentOrchestratorEditorBootingAndComponentStopTest`；前端 `tests/optional-components/ocr-routing.test.mjs` 与真实ChatInterface/SSE浏览器 `tests/chat-presentation-ui/ocr-routing.mjs`。合成输入/传输替身不等于真实付费调用、模型推理或安装包更新。线上pptx-runtime1.0.1无专用local端点，后续需另行构建签名发布；当前版本本地路径会明确不可用，但用户可选择已披露的云端OCR继续，无需等待本地新包。
+
+
+### 顶栏账户菜单与原生网页（dev-board#1417）
+
+账户菜单也必须参与 `overlayState`：`AccountEntry` 以每实例 holder 持有，关闭、退出登录与卸载释放；工作台原有 watcher 统一执行 BrowserView 隐藏/恢复。不能只调高 CSS z-index，也不能在组件内另开显隐控制器。真实原生合成验证入口 `frontend/tests/project-home/shell-native-ui.mjs`；窗口级截图与 `win.getBrowserViews()` 同时核对，单独 `win.capturePage()` 只含渲染层，不能作为网页遮挡的视觉证据。
+
+
+## 可选本地软件检测与安装引导（dev-board#1416，2026-10-21）
+
+`ExternalDependenciesPanel` 明确软件均可选，按用途显示；AVAILABLE 是已安装且探测成功，Docker 的 DAEMON_UNAVAILABLE 是已找到 CLI 但服务未就绪，不要求重装。MISSING 只说未找到可用程序，不断言磁盘上未安装。腾讯会议桌面 App 不等于 CLI。`TmeetCliService.probeCliStatus` 区分 AVAILABLE/MISSING/RUNTIME_MISSING/FAILED/TIMED_OUT，探测仅 `--version`，不读授权。
+
+`TmeetCliLocator` 在 Unix 检查 Node shebang，解析配置、脚本同目录、PATH、用户 `.local/bin`、Homebrew 的 Node 绝对路径；运行、授权与检测共用前缀，不加载 shell 配置。本机 `env PATH=/usr/bin:/bin ~/.local/bin/tmeet --version` 确认原有 npm 入口因找不到 Node 返回127；修复夹具验证脚本旁 Node 在精简 PATH 下被使用；另用编译后的生产定位器在同一精简 PATH 执行本机 `--version` 返回0，未读取授权或安装软件。Windows 仍保留参数数组与 shim/包路径校验。
+
+安装指引核验来源（2026-10-21）：腾讯官方 https://github.com/TencentCloud/tencentmeeting-cli#安装 的 `npm install -g @tencentcloud/tmeet`，前置 Node.js LTS；LibreOffice https://www.libreoffice.org/download/ 保留官方选择系统/架构的下载页；Docker https://docs.docker.com/desktop/setup/install/mac-install/ 与 https://docs.docker.com/desktop/setup/install/windows-install/ 的 main/{arm64,amd64} 官方安装包链接（Windows ARM 按官方标明抢先体验）。打开页面/复制命令不表示安装完成，回到页面重新检测。所有按钮只响应用户点击，不后台下载或安装。
+
+回归：`TmeetCliLocatorTest`、`TmeetCliServiceTest`、`ExternalDependenciesControllerTest`、`PythonToolsDockerProbeTest`、`LibreOfficePdfConverterTest`；`tests/external-dependencies/preparation.test.mjs` 与 `preparation-ui.mjs`。UI/API 与剪贴板均用替身；不代表 Windows 真安装、Docker 服务启动或腾讯账户授权已实测。

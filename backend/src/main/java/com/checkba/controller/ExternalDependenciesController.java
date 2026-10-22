@@ -40,7 +40,7 @@ public class ExternalDependenciesController {
         return ResponseEntity.ok(Map.of("code", 0, "platform", platform, "dependencies", List.of(
                 status("libreoffice", () -> libreOffice.probe().status()),
                 status("docker", pythonTools::refreshDockerStatus),
-                status("tmeet", () -> tmeet.isCliAvailable() ? "AVAILABLE" : "MISSING_OR_FAILED"))));
+                status("tmeet", tmeet::probeCliStatus))));
     }
 
     static Map<String, String> status(String id, java.util.function.Supplier<String> probe) {
