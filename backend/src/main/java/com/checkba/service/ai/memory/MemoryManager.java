@@ -327,18 +327,25 @@ public class MemoryManager {
     }
 
     /**
-     * 剥离存量 {@code legacy-memory-entry} Markdown frontmatter 包装，还原纯净记忆正文。
+     * 剥离存量 {@code legacy-memory-entry} 或 Markdown 主题文件 YAML frontmatter 包装，还原纯净记忆正文。
      */
     public static String cleanMemoryValue(String rawValue) {
         if (rawValue == null) {
             return "";
         }
-        String trimmed = rawValue.trim();
-        if (!trimmed.startsWith("---\nsource: legacy-memory-entry\n")) {
+        String trimmed = rawValue.replace("\r\n", "\n").trim();
+        if (!trimmed.startsWith("---\n")) {
             return trimmed;
         }
         int closingFence = trimmed.indexOf("\n---\n", 4);
         if (closingFence < 0) {
+            return trimmed;
+        }
+        String frontmatter = trimmed.substring(4, closingFence);
+        if (!frontmatter.contains("source: legacy-memory-entry")
+                && !frontmatter.contains("description:")
+                && !frontmatter.contains("name:")
+                && !frontmatter.contains("type:")) {
             return trimmed;
         }
         String rest = trimmed.substring(closingFence + 5).trim();
