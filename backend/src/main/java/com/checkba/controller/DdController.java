@@ -6,6 +6,9 @@ package com.checkba.controller;
 import com.checkba.model.entity.DdComment;
 import com.checkba.model.entity.DdItem;
 import com.checkba.model.entity.DdRequest;
+import com.checkba.model.entity.DdSubmission;
+import com.checkba.model.entity.DdNotification;
+import com.checkba.service.DdWorkflowService;
 import com.checkba.service.DdService;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
@@ -26,6 +29,7 @@ import java.util.Map;
 public class DdController {
 
     private final DdService ddService;
+    private final DdWorkflowService workflow;
     private final ProjectMemberService projectMemberService;
     private final com.checkba.service.ProjectFileAccessService fileAccess;
 
@@ -43,11 +47,15 @@ public class DdController {
     }
 
     private Long requireMemberByRequest(String sessionId, Long requestId) {
-        return requireMemberByProject(sessionId, ddService.getProjectIdByRequestId(requestId));
+        Long userId = requireMemberByProject(sessionId, ddService.getProjectIdByRequestId(requestId));
+        workflow.requireVisibleRequest(requestId, userId);
+        return userId;
     }
 
     private Long requireMemberByItem(String sessionId, Long itemId) {
-        return requireMemberByProject(sessionId, ddService.getProjectIdByItemId(itemId));
+        Long userId = requireMemberByProject(sessionId, ddService.getProjectIdByItemId(itemId));
+        workflow.requireVisibleItem(itemId, userId);
+        return userId;
     }
 
     // ==================== 客户白名单（dev-board#1050） ====================
@@ -84,7 +92,9 @@ public class DdController {
 
     private Long requireStaffByProject(String sessionId, Long projectId) {
         Long userId = requireMemberByProject(sessionId, projectId);
-        if (fileAccess.isClient(projectId, userId)) throw new ClientForbiddenException();
+        if (fileAccess.isClient(projectId, userId) || !projectMemberService.hasWritePermission(projectId, userId)) {
+            throw new ClientForbiddenException();
+        }
         return userId;
     }
 
@@ -101,8 +111,8 @@ public class DdController {
     public List<DdRequest> getRequests(
             @PathVariable Long projectId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireMemberByProject(sessionId, projectId);
-        return ddService.getRequests(projectId);
+        Long userId = requireMemberByProject(sessionId, projectId);
+        return workflow.visibleRequests(projectId, userId);
     }
 
     // 创建请求
@@ -127,6 +137,7 @@ public class DdController {
         Map<String, Object> result = new HashMap<>();
         result.put("request", request);
         result.put("items", items);
+        result.put("submissionsByItem", workflow.currentSubmissions(items));
         // 驳回条目的最近一条理由（itemId → 理由），客户视角直接显示在条目上（dev-board#1057）
         result.put("rejectReasons", ddService.rejectReasons(items));
         return result;
@@ -138,8 +149,8 @@ public class DdController {
             @PathVariable Long requestId,
             @RequestBody CreateRequestDto dto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireStaffByRequest(sessionId, requestId);
-        return ddService.addItems(requestId, dto.getContent());
+        Long userId = requireStaffByRequest(sessionId, requestId);
+        return workflow.addItems(requestId, dto.getContent(), userId);
     }
 
     // 更新请求信息（名称）
@@ -148,8 +159,8 @@ public class DdController {
             @PathVariable Long requestId,
             @RequestBody UpdateRequestDto dto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireStaffByRequest(sessionId, requestId);
-        return ddService.updateRequest(requestId, dto.getName());
+        Long userId = requireStaffByRequest(sessionId, requestId);
+        return workflow.rename(requestId, dto.getName(), userId);
     }
 
     // 创建单个项
@@ -158,8 +169,8 @@ public class DdController {
             @PathVariable Long requestId,
             @RequestBody AddItemDto dto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireStaffByRequest(sessionId, requestId);
-        return ddService.addItem(requestId, dto.getParentId());
+        Long userId = requireStaffByRequest(sessionId, requestId);
+        return workflow.addItem(requestId, dto.getParentId(), userId);
     }
 
     // 移动项（修改层级/父节点）
@@ -168,8 +179,8 @@ public class DdController {
             @PathVariable Long itemId,
             @RequestBody MoveItemDto dto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireStaffByItem(sessionId, itemId);
-        return ddService.moveItem(itemId, dto.getParentId());
+        Long userId = requireStaffByItem(sessionId, itemId);
+        return workflow.moveItem(itemId, dto.getParentId(), userId);
     }
 
     // 客户上传文件
@@ -179,7 +190,7 @@ public class DdController {
             @RequestParam("file") MultipartFile file,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) throws IOException {
         Long userId = requireMemberByItem(sessionId, itemId);
-        return ddService.uploadFile(itemId, file, userId);
+        return workflow.uploadLegacy(itemId, file, userId);
     }
 
     // 律师审核状态更新
@@ -189,7 +200,7 @@ public class DdController {
             @RequestBody UpdateStatusDto dto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = requireStaffByItem(sessionId, itemId);
-        return ddService.updateItemStatus(itemId, dto.getStatus(), dto.getReason(), userId);
+        return workflow.review(itemId, dto.getStatus(), dto.getReason(), dto.getSubmissionId(), dto.getRevision(), userId);
     }
 
     // 更新项信息（标题/描述）
@@ -198,8 +209,8 @@ public class DdController {
             @PathVariable Long itemId,
             @RequestBody UpdateInfoDto dto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireStaffByItem(sessionId, itemId);
-        return ddService.updateItemInfo(itemId, dto.getTitle(), dto.getDescription());
+        Long userId = requireStaffByItem(sessionId, itemId);
+        return workflow.updateItem(itemId, dto.getTitle(), dto.getDescription(), userId);
     }
 
     // 添加评论
@@ -209,7 +220,7 @@ public class DdController {
             @RequestBody CommentDto dto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = requireMemberByItem(sessionId, itemId);
-        return ddService.addComment(itemId, userId, dto.getContent());
+        return workflow.comment(itemId, dto.getContent(), userId);
     }
 
     // 获取评论
@@ -251,7 +262,7 @@ public class DdController {
             @PathVariable Long itemId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = requireStaffByItem(sessionId, itemId);
-        ddService.deleteItem(itemId, userId);
+        workflow.deleteItem(itemId, userId);
         return ResponseEntity.ok().build();
     }
 
@@ -260,7 +271,7 @@ public class DdController {
             @PathVariable Long requestId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = requireStaffByRequest(sessionId, requestId);
-        ddService.deleteRequest(requestId, userId);
+        workflow.deleteRequest(requestId, userId);
         return ResponseEntity.ok().build();
     }
 
@@ -272,6 +283,95 @@ public class DdController {
         Long userId = requireStaffByRequest(sessionId, requestId);
         return ddService.copyRequest(requestId, userId);
     }
+
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> onWorkflowError(org.springframework.web.server.ResponseStatusException e) {
+        return ResponseEntity.status(e.getStatusCode()).body(Map.of("code", e.getStatusCode().value(),
+                "message", e.getReason() == null ? "请求失败" : e.getReason()));
+    }
+
+    @PostMapping("/requests/{requestId}/prepare-materials")
+    public Map<String, Object> prepareMaterials(@PathVariable Long requestId,
+                            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        workflow.prepareMaterials(requestId, requireStaffByRequest(sessionId, requestId));
+        return Map.of("prepared", true);
+    }
+
+    @PostMapping("/requests/{requestId}/publish")
+    public DdRequest publish(@PathVariable Long requestId, @RequestBody(required = false) PublishDto dto,
+                            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = requireStaffByRequest(sessionId, requestId);
+        return workflow.publish(requestId, dto != null && dto.isAiReviewEnabled(), userId);
+    }
+
+    @PostMapping("/requests/{requestId}/archive")
+    public DdRequest archive(@PathVariable Long requestId,
+                            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return workflow.archive(requestId, requireStaffByRequest(sessionId, requestId));
+    }
+
+    @PostMapping("/items/{itemId}/submissions")
+    public DdSubmission submit(@PathVariable Long itemId,
+            @RequestParam(value = "files", required = false) List<MultipartFile> files,
+            @RequestParam(value = "files[]", required = false) List<MultipartFile> bracketFiles,
+            @RequestParam("idempotencyKey") String idempotencyKey,
+            @RequestParam(value = "aiConsent", defaultValue = "false") boolean aiConsent,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) throws IOException {
+        return workflow.submit(itemId, files == null ? bracketFiles : files, idempotencyKey, aiConsent,
+                requireMemberByItem(sessionId, itemId));
+    }
+
+    @PostMapping("/items/{itemId}/explanation")
+    public DdSubmission explain(@PathVariable Long itemId, @RequestBody ExplanationDto dto,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return workflow.explain(itemId, dto.getType(), dto.getReason(), dto.getIdempotencyKey(),
+                requireMemberByItem(sessionId, itemId));
+    }
+
+    @PostMapping("/items/{itemId}/appeal")
+    public DdSubmission appeal(@PathVariable Long itemId, @RequestBody AppealDto dto,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return workflow.appeal(itemId, dto.getSubmissionId(), dto.getReason(), requireMemberByItem(sessionId, itemId));
+    }
+
+    @GetMapping("/items/{itemId}/submissions")
+    public List<Map<String, Object>> history(@PathVariable Long itemId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return workflow.history(itemId, requireMemberByItem(sessionId, itemId));
+    }
+
+    @GetMapping("/items/{itemId}/submissions/{submissionId}/files/{fileId}")
+    public ResponseEntity<org.springframework.core.io.Resource> submissionFile(
+            @PathVariable Long itemId, @PathVariable Long submissionId, @PathVariable Long fileId,
+            @RequestParam(value = "token", required = false) String token,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = requireMemberByItem(org.springframework.util.StringUtils.hasText(sessionId) ? sessionId : token, itemId);
+        com.checkba.model.entity.ProjectFile file = workflow.submissionFile(itemId, submissionId, fileId, userId);
+        String name = file.getName() == null ? "file" : file.getName();
+        return ResponseEntity.ok().contentType(org.springframework.http.MediaTypeFactory.getMediaType(name)
+                        .orElse(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.inline().filename(name, java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .body(ddService.loadStored(file));
+    }
+
+    @GetMapping("/notifications")
+    public List<DdNotification> notifications(@RequestParam Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return workflow.inbox(projectId, requireMemberByProject(sessionId, projectId));
+    }
+
+    @PostMapping("/notifications/{notificationId}/read")
+    public DdNotification markNotificationRead(@PathVariable Long notificationId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "未登录");
+        return workflow.markRead(notificationId, userId);
+    }
+
+    @Data static class PublishDto { private boolean aiReviewEnabled; }
+    @Data static class ExplanationDto { private String type; private String reason; private String idempotencyKey; }
+    @Data static class AppealDto { private Long submissionId; private String reason; }
 
     static class CreateRequestDto {
         private String name;
@@ -293,6 +393,12 @@ public class DdController {
         private String status;
         /** 驳回理由（status=REJECTED 时必填），落成一条「驳回：」前缀的留言。 */
         private String reason;
+        private Long submissionId;
+        private Long revision;
+        public Long getSubmissionId() { return submissionId; }
+        public void setSubmissionId(Long value) { submissionId = value; }
+        public Long getRevision() { return revision; }
+        public void setRevision(Long value) { revision = value; }
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
         public String getReason() { return reason; }

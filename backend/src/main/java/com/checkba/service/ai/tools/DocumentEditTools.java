@@ -42,6 +42,9 @@ public class DocumentEditTools implements AgentToolComponent {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.service.document.DocumentGeneratorSettings documentGeneratorSettings;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.DdOriginalGuard ddOriginalGuard;
+
     private final ProjectFileService projectFileService;
     private final ProjectFileRepository projectFileRepository;
     private final EditorBridgeService editorBridgeService;
@@ -904,6 +907,7 @@ public class DocumentEditTools implements AgentToolComponent {
                     (long) bytes.length, null,
                     "project_" + source.getProjectId() + "_ai_" + System.currentTimeMillis(),
                     AGENT_USER_ID, ProjectFileService.ConflictPolicy.RENAME);
+            if (ddOriginalGuard != null) ddOriginalGuard.requireMutableTree(created);
             java.nio.file.Path target = storageResolver.resolve(created.getFilePath());
             java.nio.file.Files.createDirectories(target.getParent());
             java.nio.file.Files.move(temp, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);

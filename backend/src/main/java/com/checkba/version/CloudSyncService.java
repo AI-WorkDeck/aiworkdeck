@@ -1187,6 +1187,14 @@ public class CloudSyncService {
             }
             path = "/projects/" + remote.getRemoteProjectId() + (m.group(2) == null ? "" : m.group(2));
         }
+        if (!m.matches()) {
+            // Bind resource ids to this project even when the device token can access other cases.
+            String remaining = query == null ? "" : java.util.Arrays.stream(query.split("&"))
+                    .filter(part -> !part.isBlank() && !"projectId".equals(java.net.URLDecoder.decode(
+                            part.split("=", 2)[0], java.nio.charset.StandardCharsets.UTF_8)))
+                    .collect(java.util.stream.Collectors.joining("&"));
+            query = "projectId=" + remote.getRemoteProjectId() + (remaining.isBlank() ? "" : "&" + remaining);
+        }
         String url = conn.getServerUrl() + "/api/dd" + path
                 + (query == null || query.isBlank() ? "" : "?" + query);
         return httpRaw(method, url, body, contentType, conn.getDeviceToken());
