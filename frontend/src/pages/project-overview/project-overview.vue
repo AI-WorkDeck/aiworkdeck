@@ -655,7 +655,8 @@
 
         <view v-if="!sidebarCollapsed" class="sidebar-content">
           <FileTree
-            v-if="hasNamedProject && leftPaneKey === 'files'"
+            v-if="hasNamedProject"
+            v-show="leftPaneKey === 'files'"
             ref="fileTree"
             :project-id="projectId"
             :watch-local-files="canWatchLocalProjectFiles"
@@ -686,7 +687,7 @@
           <!-- 项目（dev-board#1047）：全部案卷的列表，原 pages/project-list 整页的内容本体。
                有无项目两态都在；点卡片走注入的 leaveWorkbench 进带 id 的工作台。 -->
           <ProjectListPane
-            v-else-if="leftPaneKey === 'projects'"
+            v-if="leftPaneKey === 'projects'"
             :current-project-id="hasNamedProject ? projectId : null"
             @project-renamed="onProjectRenamedFromPane"
             @activate-current-project="showCurrentProjectFiles"
@@ -4033,6 +4034,9 @@ export default {
     if (typeof window !== 'undefined') {
       this._localFocusRefresh = () => {
         if (!this.isActiveOverviewInstance()) return
+        const now = Date.now()
+        if (this._lastFocusRefreshAt && now - this._lastFocusRefreshAt < 2000) return
+        this._lastFocusRefreshAt = now
         if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
           this.$refs.fileTree.loadFiles()
         }

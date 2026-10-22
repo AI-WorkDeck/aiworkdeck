@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Data;
@@ -21,6 +22,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "project_file_tag", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"file_id", "tag_id"})
+}, indexes = {
+    @Index(name = "idx_pft_file_id", columnList = "file_id")
 })
 @Data
 @EqualsAndHashCode(onlyExplicitlyIncluded = true) // 仅用 id：join 实体最易被放进 Set 去重，字段型 hashCode 在 save 前后会变
