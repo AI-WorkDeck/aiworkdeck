@@ -1315,33 +1315,19 @@ export default {
       })
     },
     async loadFiles() {
+      const requestId = ++this.fileLoadRequest
+      const current = () => requestId === this.fileLoadRequest
       if (!this.projectId) {
         console.warn('FileTree: projectId 未设置，无法加载文件列表')
         return
       }
-      // 合并同一组件并发触发的重复 loadFiles（如 focus + SSE 同时到达）：
-      // 在途请求完成前不重复打接口，若有新请求排入则结束后静默补拉一次。
-      if (this._loadFilesPromise) {
-        this._loadFilesQueued = true
-        return this._loadFilesPromise
-      }
-      this._loadFilesPromise = this._doLoadFiles().finally(() => {
-        this._loadFilesPromise = null
-        if (this._loadFilesQueued) {
-          this._loadFilesQueued = false
-          this.loadFiles()
-        }
-      })
-      return this._loadFilesPromise
-    },
-    async _doLoadFiles() {
-      const requestId = ++this.fileLoadRequest
-      const current = () => requestId === this.fileLoadRequest
       // 仅当当前还没有任何可展示条目（冷启动首屏且无内存快照）时才置 loading=true，
       // 已经有目录树展示时（如从别的窗口/页面切回触发 focus 刷新、后台 SSE 刷新）保持既有树不闪烁，
       // 待新数据返回后原地无感替换（dev-board#1427）。
-      const hasVisibleItems = this.displayFiles.length > 0
-      if (!hasVisibleItems) {
+      const visibleCount = Array.isArray(this.displayFiles)
+        ? this.displayFiles.length
+        : ((this.files && this.files.length) || (this.allFiles && this.allFiles.length) || 0)
+      if (visibleCount === 0) {
         this.loading = true
       }
       clearLocalPathCache()
@@ -1367,7 +1353,7 @@ export default {
           this.allFiles = (allFiles || []).filter(f => !hiddenNames.has(f.name))
 
           this.files = this.buildTreeView(this.allFiles, this.parentId)
-          this.saveSnapshotToCache()
+          if (typeof this.saveSnapshotToCache === 'function') this.saveSnapshotToCache()
         } else {
           // 只加载当前文件夹下的文件
           let files = await getProjectFiles(projectId, this.parentId)
@@ -1376,7 +1362,7 @@ export default {
           // 过滤掉系统文件夹
           const hiddenNames = new Set(['.stagezone', '__staging_area__'])
           this.files = (files || []).filter(f => !hiddenNames.has(f.name))
-          this.saveSnapshotToCache()
+          if (typeof this.saveSnapshotToCache === 'function') this.saveSnapshotToCache()
         }
         clearLocalPathCache()
         this.scheduleRefCountsFetch({ reload: true })
