@@ -1774,6 +1774,14 @@ app.whenReady().then(() => {
   // 「跟随系统」时用户在系统设置里切深浅，渲染层靠 matchMedia 跟上，原生窗控靠这里
   try { nativeTheme.on('updated', () => syncTitleBarOverlay()) } catch (e) { /* ignore */ }
   initLocalFileService()
+  try {
+    require('./permissions-service').initPermissionsService({
+      ipcMain,
+      getMainWindow: () => (quitInProgress ? null : mainWindow),
+    })
+  } catch (e) {
+    console.error('[permissions-service]', e)
+  }
   // IDE 化应用菜单（File 全套 + 最近打开；动作发回渲染层处理）
   try {
     require('./app-menu').initAppMenu(() => quitInProgress ? null : mainWindow, { destroyAllBrowserViews: () => views.destroyAll() })
