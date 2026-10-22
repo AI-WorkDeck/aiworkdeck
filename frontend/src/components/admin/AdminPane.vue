@@ -957,14 +957,49 @@
           </SettingsSection>
         </scroll-view>
 
-        <!-- 团队（dev-board#496）。接在链尾：这条 v-if/v-else-if 长链的链头是
-             activeNav === 'ai'，动链头会拿到「v-else 没有相邻 v-if」的编译错。 -->
         <scroll-view v-else-if="activeNav === 'memory'" scroll-y class="config-scroll">
           <SettingsSection :title="$t('chat.memoryTitle')" :description="$t('chat.memorySubtitle')">
               <!-- 内嵌编辑，不再是「点一个按钮才弹窗」——设置页打开即可直接改（dev-board#879）。 -->
               <MemoryBrowser inline :open="true" :project-id="projectId" />
           </SettingsSection>
         </scroll-view>
+        <scroll-view v-else-if="activeNav === 'permissions'" scroll-y class="config-scroll">
+          <SettingsSection :title="$t('admin.permissionsSectionTitle')" :description="$t('admin.permissionsSectionSubtitle')">
+            <template #actions>
+              <view class="awd-set-row-spread-actions">
+                <button class="comp-btn" @tap="loadPermissionsStatus">{{ $t('admin.permissionsRefreshBtn') }}</button>
+                <button class="comp-btn" @tap="openPermissionGuideModal">{{ $t('admin.permissionsOpenWizardBtn') }}</button>
+              </view>
+            </template>
+            <view
+              v-for="perm in permissionDisplayRows"
+              :key="perm.id"
+              class="provider-card"
+            >
+              <view class="provider-header telemetry-switch-row">
+                <view class="telemetry-switch-info">
+                  <text class="provider-name">
+                    {{ perm.title }}
+                    <text v-if="perm.requiredForWeChatDrop" style="font-size: 12px; color: #2E5A50; margin-left: 8px;">
+                      ({{ $t('admin.permissionsTagWeChatRequired') }})
+                    </text>
+                  </text>
+                  <text class="telemetry-switch-desc">{{ perm.description }}</text>
+                </view>
+                <view class="awd-set-row-spread-actions" style="align-items: center; gap: 10px;">
+                  <text :style="{ fontSize: '12px', fontWeight: '600', color: perm.status === 'granted' ? '#256F46' : '#B86E14' }">
+                    {{ perm.status === 'granted' ? '✓ ' + $t('admin.permissionsStatusGranted') : $t('admin.permissionsStatusMissing') }}
+                  </text>
+                  <button class="comp-btn" @tap="onRequestPermissionRow(perm)">
+                    {{ perm.status === 'granted' ? $t('admin.permissionsReopenBtn') : $t('admin.permissionsGrantBtn') }}
+                  </button>
+                </view>
+              </view>
+            </view>
+          </SettingsSection>
+        </scroll-view>
+        <!-- 团队（dev-board#496）。接在链尾：这条 v-if/v-else-if 长链的链头是
+             activeNav === 'ai'，动链头会拿到「v-else 没有相邻 v-if」的编译错。 -->
         <scroll-view v-else-if="activeNav === 'team'" scroll-y class="config-scroll">
           <TeamPanel @go-account="onNavTap({ key: 'account' })" />
         </scroll-view>
@@ -1023,6 +1058,7 @@ import MemoryBrowser from '@/components/MemoryBrowser.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import { componentDownloads } from '@/services/componentDownloads.js'
+import { openPermissionOnboarding, normalizePermissionItems } from '@/utils/permissionOnboarding.js'
 
 /**
  * 缓存里的登录用户是不是管理员。isAdmin 由 /api/auth/me 下发（桌面单机=全员管理员；
@@ -1115,6 +1151,7 @@ export default {
         { key: 'ai', label: this.$t('admin.navAi'), group: 'system' },
         { key: 'updates', label: this.$t('admin.navUpdates'), group: 'system', desktopOnly: true },
         { key: 'components', label: this.$t('admin.navComponents'), group: 'system', desktopOnly: true },
+        { key: 'permissions', label: this.$t('admin.navPermissions'), group: 'system', desktopOnly: true, macOnly: true },
         // 能力升级（dev-board#497）：能力槽切换 + 从 GitHub 装能力包。桌面端才有意义
         //（落盘到本机 plugins/ 目录、进程型引擎跑在本机）
         { key: 'capabilities', label: this.$t('admin.navCapabilities'), group: 'system', desktopOnly: true },
@@ -1263,6 +1300,10 @@ export default {
       identityCandidates: [],
       identityCurrentId: null,
       identityBusy: false,
+      permissionsState: {
+        supported: false,
+        items: [],
+      },
     }
   },
   computed: {
@@ -1276,6 +1317,34 @@ export default {
     },
     isDesktop() {
       return !!(host.model)
+    },
+    permissionsSupported() {
+      return !!(this.permissionsState && this.permissionsState.supported)
+    },
+    permissionDisplayRows() {
+      const normalized = normalizePermissionItems(this.permissionsState && this.permissionsState.items)
+      const metaById = {
+        fullDiskAccess: {
+          title: this.$t('admin.permFullDiskAccessTitle'),
+          description: this.$t('admin.permFullDiskAccessDesc'),
+        },
+        screenRecording: {
+          title: this.$t('admin.permScreenRecordingTitle'),
+          description: this.$t('admin.permScreenRecordingDesc'),
+        },
+        microphone: {
+          title: this.$t('admin.permMicrophoneTitle'),
+          description: this.$t('admin.permMicrophoneDesc'),
+        },
+        accessibility: {
+          title: this.$t('admin.permAccessibilityTitle'),
+          description: this.$t('admin.permAccessibilityDesc'),
+        },
+      }
+      return normalized.map((item) => ({
+        ...item,
+        ...(metaById[item.id] || { title: item.id, description: '' }),
+      }))
     },
     stageUnlimited() {
       return isEnabled(FEATURES.STAGE_UNLIMITED)
@@ -1297,6 +1366,7 @@ export default {
     visibleNavItems() {
       return this.navItems.filter((n) => {
         if (n.desktopOnly && !this.isDesktop) return false
+        if (n.macOnly && !this.permissionsSupported) return false
         if (n.group === 'system' && !this.isAdminUser) return false
         return true
       })
@@ -1523,9 +1593,23 @@ export default {
           if (evt && evt.state) this.update = { ...this.update, ...evt.state }
         })
       }
+      if (host.permissions && typeof host.permissions.getStatus === 'function') {
+        this.loadPermissionsStatus()
+        if (typeof host.permissions.onUpdated === 'function') {
+          this._permissionsUnsub = host.permissions.onUpdated((st) => {
+            if (st && typeof st === 'object') {
+              this.permissionsState = { ...this.permissionsState, ...st }
+            }
+          })
+        }
+      }
     }
   },
   beforeUnmount() {
+    if (this._permissionsUnsub) {
+      this._permissionsUnsub()
+      this._permissionsUnsub = null
+    }
     // 记忆改为内嵌后本组件不再持有全局 overlay（dev-board#879）；弹窗态的
     // MemoryBrowser 自己按实例键释放，这里不能再无条件清空别的浮层的持有。
     if (this._onWalletRefresh) {
@@ -1552,6 +1636,33 @@ export default {
     /** 「关于」区块的外链。与页内其他外链同一条出口：桌面端走系统浏览器。 */
     openLegalLink(url) {
       openExternalUrl(url)
+    },
+    async loadPermissionsStatus() {
+      if (!host.permissions || typeof host.permissions.getStatus !== 'function') return
+      try {
+        const st = await host.permissions.getStatus()
+        if (st && typeof st === 'object') {
+          this.permissionsState = { ...this.permissionsState, ...st }
+        }
+      } catch (e) {
+        console.warn('loadPermissionsStatus failed', e)
+      }
+    },
+    openPermissionGuideModal() {
+      openPermissionOnboarding({ reason: 'settings' })
+    },
+    async onRequestPermissionRow(perm) {
+      if (!perm || !perm.id || !host.permissions) return
+      try {
+        if (perm.status === 'granted' && typeof host.permissions.openSettings === 'function') {
+          await host.permissions.openSettings(perm.id, { showFloatingHelper: true })
+        } else if (typeof host.permissions.request === 'function') {
+          await host.permissions.request(perm.id, { showFloatingHelper: true })
+        }
+        await this.loadPermissionsStatus()
+      } catch (e) {
+        console.warn('onRequestPermissionRow failed', e)
+      }
     },
     // ---------- 数据统计 ----------
     async loadTelemetry() {

@@ -303,6 +303,21 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
   // 国际站人机验证托管页挂 <webview> 用（dev-board#863）：getConfig() 返回 { preload }。
   captchaEmbed: {
     getConfig: () => ipcRenderer.invoke('checkba:captcha-embed')
+  },
+  // macOS 系统权限引导与拖拽授权浮窗（dev-board#1433）：
+  // 排查完全磁盘访问（微信沙盒容器拖入必需）、屏幕录制、麦克风、辅助功能，
+  // 打开对应系统设置页并弹出可原生拖出 AI WorkDeck.app 的悬浮小窗。
+  permissions: {
+    getStatus: () => ipcRenderer.invoke('checkba:permissions-status'),
+    request: (id, opts) => ipcRenderer.invoke('checkba:permissions-request', { id, ...(opts && typeof opts === 'object' ? opts : {}) }),
+    openSettings: (id, opts) => ipcRenderer.invoke('checkba:permissions-open-settings', { id, ...(opts && typeof opts === 'object' ? opts : {}) }),
+    startAppDrag: () => ipcRenderer.invoke('checkba:permissions-start-app-drag'),
+    closeHelper: () => ipcRenderer.invoke('checkba:permissions-close-helper'),
+    onUpdated: (handler) => {
+      const listener = (_evt, data) => handler && handler(data)
+      ipcRenderer.on('checkba:permissions-updated', listener)
+      return () => ipcRenderer.removeListener('checkba:permissions-updated', listener)
+    }
   }
 })
 

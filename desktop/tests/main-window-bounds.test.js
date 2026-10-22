@@ -65,7 +65,7 @@ test('工作区尺寸在 new BrowserWindow 之前就取好', () => {
 // 收得住的接收者：这些都不是主窗口，给它们设几何是正常的。
 // 主窗口的别名（mainWindow / win / …）一律不在名单里——加了新别名就会红，
 // 这是刻意的：请先想清楚是谁触发这次回写。
-const GEOMETRY_RECEIVERS_OK = new Set(['view', 'views', 'ocrSelectWin', 'confirmWin', 'verifyWin'])
+const GEOMETRY_RECEIVERS_OK = new Set(['view', 'views', 'ocrSelectWin', 'confirmWin', 'verifyWin', 'helperWindow'])
 const GEOMETRY_SETTERS = 'setBounds|setSize|setContentBounds|setContentSize'
   + '|setMinimumSize|setMaximumSize|maximize|unmaximize|setFullScreen'
 
