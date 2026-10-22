@@ -28,6 +28,10 @@ public final class ChineseAddressRecognizer {
     private static final Pattern INTRO = Pattern.compile("^(?:我们|你们|他们|她们|我|公司|本公司|该公司|企业|项目|甲方|乙方|本人|他|她)(?:在|于|迁至|住在)");
     private static final Pattern ORGANIZATION = Pattern.compile("(?:有限公司|有限责任公司|人民法院|人民政府|委员会)");
     private static final Pattern TAIL = Pattern.compile("(?:[A-Za-z0-9][A-Za-z0-9\\-—/]{0,20})?(?:[（(][\\p{IsHan}A-Za-z0-9\\-]{1,30}[）)])?");
+    // Explicit address fields can contain trade-zone prefixes and locative suffixes that
+    // are not administrative levels. Require postal detail and a plausible address ending.
+    private static final Pattern FIELD_POSTAL_DETAIL = Pattern.compile("[0-9零一二三四五六七八九十百甲乙丙丁]+(?:号|栋|幢|座|单元|楼|层|室|弄)");
+    private static final Pattern FIELD_ADDRESS = Pattern.compile("[\\p{IsHan}A-Za-z0-9（）()\\-—/]+(?:号|院|栋|幢|座|单元|楼|层|室|弄|[东南西北]侧|院内|院外|附近|[0-9]|[）)])$");
     private static final Pattern SUFFIX = Pattern.compile("(?:特别行政区|自治区|自治州|自治县|自治旗|地区|省|市|区|县|旗|盟)$");
 
     private ChineseAddressRecognizer() {}
@@ -55,7 +59,7 @@ public final class ChineseAddressRecognizer {
         // A boundary candidate must not absorb a label or sentence prefix before a later address.
         // The dedicated field/context/province passes already start after those words.
         var root = PROVINCE.matcher(candidate);
-        if (FIELD.matcher(candidate).find() || (root.find() && root.start() > 0)) return;
+        if (FIELD.matcher(candidate).find() || (!field && root.find() && root.start() > 0)) return;
         int adminEnd = administrativeEnd(candidate, null);
         var lead = CONTEXT.matcher(candidate);
         if (lead.find() && lead.end() <= adminEnd) return;
@@ -65,9 +69,11 @@ public final class ChineseAddressRecognizer {
             var tail = TAIL.matcher(candidate).region(end, candidate.length());
             if (tail.lookingAt()) end = tail.end();
         }
-        // An organization name or ordinary sentence after a place is not a postal address.
-        // Requiring the full bounded candidate also avoids masking just the first half of an address.
-        if (end != candidate.length() || end == 0) return;
+        // Body text must match the whole postal grammar; explicit fields also accept
+        // bounded address variants without leaving their unrecognized suffix exposed.
+        boolean boundedFieldAddress = field && FIELD_POSTAL_DETAIL.matcher(candidate).find()
+                && FIELD_ADDRESS.matcher(candidate).matches();
+        if ((end != candidate.length() || end == 0) && !boundedFieldAddress) return;
         if (!field && adminEnd == end) {
             List<String> levels = new ArrayList<>();
             administrativeEnd(candidate, levels);
