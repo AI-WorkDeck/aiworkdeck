@@ -5,6 +5,11 @@ description: 授权与计费领域。任务涉及解锁门（试用码/账户 Ke
 
 # 授权与计费 领域地图
 
+## 设置账户状态（dev-board#1415，2026-10-21）
+
+`AdminPane` 的账户状态区分 loading / ready / error：只有成功取得明确的 `connected:false` 才显示登录入口；请求失败保留已确认身份并给重试，不当作退出登录。并发状态请求按代次接收，旧未连接回包不能盖过登录后的新状态。账户/钱包块必须显式按 connected 显示，不能用紧跟手机同步 `v-if=isDesktop` 的 `v-else`（这会在桌面隐藏整个账户块）。
+验证：`tests/account/admin-account-state.test.mjs` 真模板 SSR 与加载方法；`admin-account-ui.mjs` 实际设置路由、合成 API 的初始等待/连接/账户事件失败/重试/退出。用户截图发生时的请求失败原因无法仅凭截图还原；模板错误与失败误判路径各自有回归，不混为一个根因。
+
 ## 受限网络兼容验证（dev-board#1330，2026-10-17）
 
 国内阿里云/国际 Turnstile 浏览器控件被网络拦截时，桌面登录卡与官网注册/重置表单可手动选「使用兼容验证」。短信本来就由官网服务器发送；兼容入口替换的是人机验证，不是短信供应商。官网 `POST /api/auth/captcha-challenge` 接收 `{phone|email,purpose:login|reset}`，返回 `{id,image,expiresAt}`；图片为服务端栅格化的 PNG data URL，无答案明文。桌面 `/api/account/captcha-challenge` 经机器账户闸代理；插件匿名桥 `/api/auth/account-login/captcha-challenge` 受桥接开关与独立图片签发限频，不能扣短信发送桶，也不信任客户端提供的 IP 字段。

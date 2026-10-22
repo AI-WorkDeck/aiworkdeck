@@ -6,8 +6,8 @@ import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 const src = readFileSync(new URL('../../src/components/admin/ExternalDependenciesPanel.vue', import.meta.url), 'utf8')
 const script = src.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'globalThis.component =')
-function setup(check, open = async () => {}) {
-  const sandbox = { SettingsSection: {}, checkExternalDependencies: check, openExternalUrlChecked: open, window: { addEventListener() {}, removeEventListener() {} } }
+function setup(check, open = async () => {}, uni = {}) {
+  const sandbox = { uni, SettingsSection: {}, checkExternalDependencies: check, openExternalUrlChecked: open, window: { addEventListener() {}, removeEventListener() {} } }
   vm.runInNewContext(script, sandbox)
   const component = sandbox.component
   const instance = { ...component.data(), $t: key => key, alive: true }
@@ -55,4 +55,25 @@ test('leaving settings prevents late response replacing state; duplicate checks 
 test('blocked browser exposes a retryable error without pretending installation started', async () => {
   const { instance } = setup(async () => {}, async () => { throw new Error('browser blocked') })
   await instance.open('https://example.invalid/'); assert.equal(instance.awaitingReturn, false); assert.equal(instance.error, 'browser blocked')
+})
+
+test('installed software points to use or startup instead of reinstalling', () => {
+  const { instance } = setup(async () => {})
+  instance.statuses = { libreoffice: 'AVAILABLE', docker: 'DAEMON_UNAVAILABLE', tmeet: 'RUNTIME_MISSING' }
+  assert.equal(instance.nextStep('libreoffice'), 'admin.externalReady')
+  assert.equal(instance.nextStep('docker'), 'admin.externalDockerStart')
+  assert.equal(instance.statusLabel('docker'), 'admin.externalDockerStopped')
+  assert.equal(instance.statusLabel('tmeet'), 'admin.externalRuntimeMissing')
+  assert.equal(instance.nextStep('tmeet'), 'admin.externalNodeRequired')
+})
+test('copying install command copies exact official npm command and surfaces clipboard failure', () => {
+  let copied, fail = false
+  const { instance } = setup(async () => {}, async () => {}, {
+    setClipboardData(options) { copied = options.data; if (fail) options.fail(); else options.success() },
+    showToast() {},
+  })
+  instance.copyInstallCommand()
+  assert.equal(copied, 'npm install -g @tencentcloud/tmeet')
+  fail = true; instance.copyInstallCommand()
+  assert.equal(instance.error, 'admin.externalCopyFailed')
 })

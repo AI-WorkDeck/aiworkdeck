@@ -146,7 +146,7 @@ export default {
         const res = await getSensitiveOptions()
         this.availableStrategies = Array.isArray(res) ? res : res?.data || []
         this.selectedStrategies = this.availableStrategies.filter(s => ['COMPANY', 'CHINESE_NAME', 'PHONE', 'ID_CARD',
-          'UNIFIED_SOCIAL_CREDIT', 'LAWYER_LICENSE', 'EMAIL', 'BANK_CARD'].includes(s.value)).map(s => s.value)
+          'UNIFIED_SOCIAL_CREDIT', 'LAWYER_LICENSE', 'EMAIL', 'BANK_CARD', 'ADDRESS'].includes(s.value)).map(s => s.value)
       } catch (e) { this.error = this.$t('panels.deFetchStrategiesFailed') }
     },
     chooseOperation(operation) {

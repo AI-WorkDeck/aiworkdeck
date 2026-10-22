@@ -190,6 +190,17 @@ class TmeetCliLocatorTest {
     // ==================== macOS / Linux ====================
 
     @Test
+    void unixNpmScriptUsesAdjacentNodeWhenGuiPathOmitsIt() throws IOException {
+        Path bin = Files.createDirectories(root.resolve("home/.local/bin"));
+        Path script = Files.writeString(bin.resolve("tmeet"), "#!/usr/bin/env node\nconsole.log('version')");
+        Path node = Files.writeString(bin.resolve("node"), "");
+        script.toFile().setExecutable(true);
+        node.toFile().setExecutable(true);
+        var result = TmeetCliLocator.resolve("", false, key -> "PATH".equals(key) ? "/usr/bin:/bin" : null, root.resolve("home").toString());
+        assertEquals(List.of(node.toString(), script.toString()), result.command());
+    }
+
+    @Test
     void unixConfiguredExecutableWins() throws IOException {
         Path exe = root.resolve("bin dir/my tmeet");
         Files.createDirectories(exe.getParent());

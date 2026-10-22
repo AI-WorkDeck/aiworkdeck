@@ -15,7 +15,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * tmeet CLI 跨平台发现与命令前缀解析。
  *
  * macOS/Linux：tmeet 是可直接执行文件（配置 TMEET_PATH、PATH、~/.local/bin、
- * /opt/homebrew/bin、/usr/local/bin），命令前缀就是该文件的绝对路径。
+ * /opt/homebrew/bin、/usr/local/bin）；原生程序直接执行，npm 的 Node 脚本解析为
+ * Node 绝对路径 + 脚本绝对路径，避免桌面 GUI 的 PATH 缺少 Node。
  *
  * Windows：npm 全局/项目安装的是 tmeet.cmd shim，绝不能把动态参数交给
  * cmd.exe/.bat/.cmd 转发。定位 shim 相邻的
@@ -42,9 +43,13 @@ final class TmeetCliLocator {
 
     /** 无法定位或定位到不可安全执行的入口（路径逃逸、缺 Node 等），message 给出可操作的指引。 */
     static class UnresolvableException extends RuntimeException {
-        UnresolvableException(String message) {
+        private final String status;
+        UnresolvableException(String message) { this("FAILED", message); }
+        UnresolvableException(String status, String message) {
             super(message);
+            this.status = status;
         }
+        String status() { return status; }
     }
 
     static Resolution resolve(String configuredCliPath, boolean windows,
@@ -71,22 +76,19 @@ final class TmeetCliLocator {
         if (!configured.isEmpty()) {
             Path p = Path.of(configured);
             if (isExecutableFile(p)) {
-                return new Resolution(List.of(p.toAbsolutePath().normalize().toString()),
-                        p.toAbsolutePath().normalize().toString());
+                return unixResolution(p);
             }
         }
         if (envCli != null && !envCli.isBlank()) {
             Path p = Path.of(envCli.trim());
             if (isExecutableFile(p)) {
-                return new Resolution(List.of(p.toAbsolutePath().normalize().toString()),
-                        p.toAbsolutePath().normalize().toString());
+                return unixResolution(p);
             }
         }
         for (String dir : pathDirs()) {
             Path p = Path.of(dir, "tmeet");
             if (isExecutableFile(p)) {
-                return new Resolution(List.of(p.toAbsolutePath().normalize().toString()),
-                        p.toAbsolutePath().normalize().toString());
+                return unixResolution(p);
             }
         }
         List<Path> common = List.of(
@@ -95,11 +97,39 @@ final class TmeetCliLocator {
                 Path.of("/usr/local/bin/tmeet"));
         for (Path p : common) {
             if (isExecutableFile(p)) {
-                return new Resolution(List.of(p.toAbsolutePath().toString()), p.toAbsolutePath().toString());
+                return unixResolution(p);
             }
         }
         // 兜底交给运行时 PATH（保持旧 resolveCliPath 行为：不因未安装而抛错）
         return new Resolution(List.of("tmeet"), "tmeet");
+    }
+
+    private Resolution unixResolution(Path executable) {
+        Path script = executable.toAbsolutePath().normalize();
+        String header;
+        try (var input = Files.newInputStream(script)) {
+            header = new String(input.readNBytes(160), java.nio.charset.StandardCharsets.UTF_8).split("\n", 2)[0];
+        } catch (IOException error) {
+            throw new UnresolvableException("腾讯会议 CLI 无法读取，请检查安装路径与权限");
+        }
+        if (!header.startsWith("#!") || !header.matches(".*(?:/|\\s)node(?:\\s.*)?")) {
+            return new Resolution(List.of(script.toString()), script.toString());
+        }
+        // npm 的入口使用 /usr/bin/env node；GUI 的 PATH 往往没有 npm/Node 所在目录。
+        // 直接解析 Node，不启动登录 shell，也不执行用户的 shell 配置。
+        List<Path> nodes = new ArrayList<>();
+        String configuredNode = value("TMEET_NODE_PATH");
+        if (configuredNode != null) nodes.add(Path.of(configuredNode));
+        nodes.add(script.getParent().resolve("node"));
+        for (String dir : pathDirs()) nodes.add(Path.of(dir, "node"));
+        nodes.add(Path.of(userHome, ".local", "bin", "node"));
+        nodes.add(Path.of("/opt/homebrew/bin/node"));
+        nodes.add(Path.of("/usr/local/bin/node"));
+        for (Path node : nodes) {
+            if (isExecutableFile(node)) return new Resolution(
+                    List.of(node.toAbsolutePath().normalize().toString(), script.toString()), script.toString());
+        }
+        throw new UnresolvableException("RUNTIME_MISSING", "腾讯会议 CLI 已安装，但未找到 Node.js；请安装 Node.js LTS 或设置 TMEET_NODE_PATH");
     }
 
     // ==================== Windows ====================
@@ -131,7 +161,7 @@ final class TmeetCliLocator {
                 return fromShim(shim);
             }
         }
-        throw new UnresolvableException(
+        throw new UnresolvableException("MISSING",
                 "未找到 tmeet CLI（Windows 下需 npm 安装 @tencentcloud/tmeet，"
                         + "或通过 tmeet.cli.path / TMEET_PATH 指定 tmeet.cmd 或包内 JS 入口）");
     }
@@ -218,7 +248,7 @@ final class TmeetCliLocator {
                 if (Files.isRegularFile(p)) return p.toAbsolutePath().normalize();
             }
         }
-        throw new UnresolvableException(
+        throw new UnresolvableException("RUNTIME_MISSING",
                 "未找到 node.exe（请安装 Node.js，或用 TMEET_NODE_PATH 指定 node.exe 路径）");
     }
 

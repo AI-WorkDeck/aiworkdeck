@@ -34,6 +34,8 @@ description: 插件系统领域（具体插件实现）。任务涉及尽调/脱
 - `SensitiveChineseNameRecognitionTest` 验证正例、普通正文误报、复姓、同文复用及复敏；原 `SensitiveChineseNameOfflineTest` 继续守住无姓名正文与 DOCX 不变。前端 `test:desensitize` 验证默认勾选与双语文案。
 - 规则不保证穷尽所有姓名，少见姓名、民族姓名、英文姓名与无上下文歧义词需人工复核。不得把合成样例通过率表述为真实材料准确率。
 
+**地址默认识别（2026-10-21，dev-board#1420）**：`ADDRESS` 在 `DesensitizePane.fetchOptions` 默认勾选，真实本地识别走 `service/sensitive/ChineseAddressRecognizer`，不再只靠 `SensitiveType.ADDRESS` 的旧字段正则。注册地址/住所/通讯地址以及有明确行政层级或门牌的正文地址，共用预览、TXT、DOCX、PDF 检测链；不跨文本行/段落，后续联系人、法定代表人等字段及常见叙述动词截断候选；`ChineseNameRecognizer` 的地址保护区也共用该范围，避免漏掉同一行的联系人姓名。MASK 只留原文行政层级（如 `XX省XX市XX区XXXX`），无行政层级的详细地址为 `XXXX`；TOKEN 把此层级写进完整唯一编号，不能拆成编号外的前缀，否则复敏会残留掩码。PDF 仍为不可逆黑框，图片/扫描内容不做自动识别。引擎版本 `SensitiveService.VERSION` 与 skill 元数据为 2.3.0，不代表桌面包已发版。`SensitiveAddressRecognitionTest` 覆盖合成字段/正文、混合楼宇/门牌、边界/负例、TXT预览生成一致、DOCX跨run/表格、唯一编号与复敏/再次处理；不能用这些样本宣称穷尽所有地址。罕见地名、外文地址、跨行地址须在预览中人工核查。
+
 **脱敏编辑流程（2026-09-10，dev-board#557/#558）**：生成后 `open-file` 打开副本，左栏保留面板；结果区「复敏这份结果」选择本次副本并复用内存中的加密映射，密码须重新输入，跨次使用可导入 `.awd-recovery`。切文档标签不自动改变面板处理目标，需「导入当前」明确选择。`prepareFile` 由工作台注入 `sensitiveWorkflow.saveSensitiveInput`，预览/生成/复敏前等待目标编辑器保存，错误或未就绪阻止处理；生成前刚保存了修改则要求重新预览。普通 AI 对话可能附带历史/项目上下文，面板提示其不是隔离会话，不自动触发 AI，也不把恢复密码/映射交给 AI。前端测试用 `node --test frontend/tests/desensitize/*.test.mjs`。
 
 

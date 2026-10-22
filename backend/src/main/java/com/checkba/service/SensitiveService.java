@@ -32,8 +32,8 @@ import java.nio.file.Path;
 @Service
 @Slf4j
 public class SensitiveService {
-    public static final String VERSION = "2.2.0";
-    public static final String DESCRIPTION = "本地规则脱敏：公司、中文姓名、统一社会信用代码、律师执业证号等自动识别，补充词语、预览与编号替换；校验失败的证件号单独提示不处理；编辑副本后凭加密映射和密码复敏。引擎随桌面端更新，不调用大模型。";
+    public static final String VERSION = "2.3.0";
+    public static final String DESCRIPTION = "本地规则脱敏：公司、中文姓名、注册地址及正文地址、统一社会信用代码、律师执业证号等自动识别，地址仅保留行政层级，支持补充词语、预览与编号替换；校验失败的证件号单独提示不处理；编辑副本后凭加密映射和密码复敏。引擎随桌面端更新，不调用大模型。";
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.service.document.DocumentGeneratorSettings documentGeneratorSettings;
 

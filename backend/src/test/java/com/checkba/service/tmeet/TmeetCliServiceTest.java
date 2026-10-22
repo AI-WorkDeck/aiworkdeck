@@ -59,6 +59,28 @@ class TmeetCliServiceTest {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource({"true,0,AVAILABLE", "true,1,FAILED", "false,0,TIMED_OUT"})
+    void readinessKeepsFailureAndTimeoutDistinct(boolean finished, int exitCode, String expected) throws Exception {
+        Process process = mock(Process.class);
+        when(process.waitFor(5, TimeUnit.SECONDS)).thenReturn(finished);
+        when(process.exitValue()).thenReturn(exitCode);
+        when(process.isAlive()).thenReturn(!finished);
+        when(process.descendants()).thenAnswer(inv -> java.util.stream.Stream.empty());
+        try (var builders = mockCommands(process)) {
+            assertEquals(expected, service().probeCliStatus());
+            assertEquals(1, builders.constructed().size());
+        }
+    }
+
+    @Test
+    void missingRuntimeIsNotReportedAsMissingCli() {
+        var service = service();
+        doThrow(new TmeetCliLocator.UnresolvableException("RUNTIME_MISSING", "Node unavailable"))
+                .when(service).resolveCommandPrefix();
+        assertEquals("RUNTIME_MISSING", service.probeCliStatus());
+    }
+
     @Test
     void versionProbeTimeoutKillsProcess() throws Exception {
         Process process = mock(Process.class);

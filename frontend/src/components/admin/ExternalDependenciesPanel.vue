@@ -12,10 +12,24 @@
         <text class="external-status" aria-live="polite">{{ statusLabel(id) }}</text>
       </view>
       <text class="external-copy">{{ $t(`admin.external_${id}_purpose`) }}</text>
-      <text class="external-copy">{{ $t(`admin.external_${id}_${platform}`) }}</text>
+      <text class="external-copy external-next-step">{{ nextStep(id) }}</text>
       <view class="external-actions">
+        <button v-if="id === 'libreoffice'" class="external-btn" @click="open('https://www.libreoffice.org/download/')">{{ $t('admin.externalDownloadPage') }}</button>
+        <template v-if="id === 'docker' && platform === 'mac'">
+          <button class="external-btn" @click="open('https://desktop.docker.com/mac/main/arm64/Docker.dmg')">{{ $t('admin.externalDownloadApple') }}</button>
+          <button class="external-btn" @click="open('https://desktop.docker.com/mac/main/amd64/Docker.dmg')">{{ $t('admin.externalDownloadIntel') }}</button>
+        </template>
+        <template v-if="id === 'docker' && platform === 'windows'">
+          <button class="external-btn" @click="open('https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe')">{{ $t('admin.externalDownloadWindows') }}</button>
+          <button class="external-btn" @click="open('https://desktop.docker.com/win/main/arm64/Docker%20Desktop%20Installer.exe')">{{ $t('admin.externalDownloadWindowsArm') }}</button>
+        </template>
         <button class="external-btn" @click="open(links[id])">{{ $t('admin.externalOfficialGuide') }}</button>
         <button v-if="id === 'tmeet'" class="external-btn" @click="open('https://nodejs.org/en/download/')">{{ $t('admin.externalNodeDownload') }}</button>
+      </view>
+      <view v-if="id === 'tmeet'" class="external-command">
+        <text class="external-copy">{{ $t('admin.externalCommandHint') }}</text>
+        <text class="external-copy external-command-text">npm install -g @tencentcloud/tmeet</text>
+        <button class="external-btn" @click="copyInstallCommand">{{ $t('admin.externalCopyCommand') }}</button>
       </view>
     </view>
     <text class="external-copy">{{ $t('admin.externalInstallNote') }}</text>
@@ -49,9 +63,23 @@ export default {
       const key = {
         AVAILABLE: 'externalAvailable', MISSING: 'externalMissing', EXECUTABLE_MISSING: 'externalMissing',
         DAEMON_UNAVAILABLE: 'externalDockerStopped', TIMED_OUT: 'externalTimedOut', PROBE_TIMEOUT: 'externalTimedOut',
-        NOT_EXECUTABLE: 'externalNotExecutable', FAILED: 'externalFailed', MISSING_OR_FAILED: 'externalMissingOrFailed',
+        RUNTIME_MISSING: 'externalRuntimeMissing', NOT_EXECUTABLE: 'externalNotExecutable', FAILED: 'externalFailed', MISSING_OR_FAILED: 'externalMissingOrFailed',
       }[status] || 'externalUnchecked'
       return this.$t(`admin.${key}`)
+    },
+    nextStep(id) {
+      if (this.statuses[id] === 'AVAILABLE') return this.$t(id === 'tmeet' ? 'admin.externalTmeetReady' : 'admin.externalReady')
+      if (id === 'docker' && this.statuses[id] === 'DAEMON_UNAVAILABLE') return this.$t('admin.externalDockerStart')
+      if (this.statuses[id] === 'RUNTIME_MISSING') return this.$t('admin.externalNodeRequired')
+      if (['FAILED', 'NOT_EXECUTABLE', 'TIMED_OUT', 'PROBE_TIMEOUT', 'MISSING_OR_FAILED'].includes(this.statuses[id])) return this.$t('admin.externalRepair')
+      return this.$t(`admin.external_${id}_${this.platform}`)
+    },
+    copyInstallCommand() {
+      uni.setClipboardData({
+        data: 'npm install -g @tencentcloud/tmeet',
+        success: () => uni.showToast({ title: this.$t('admin.externalCommandCopied'), icon: 'none' }),
+        fail: () => { this.error = this.$t('admin.externalCopyFailed') },
+      })
     },
     async check() {
       if (!this.alive) return
@@ -87,6 +115,9 @@ export default {
 .external-title { font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-text); }
 .external-status, .external-copy { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); line-height: 1.6; }
 .external-copy { display: block; margin-top: 6px; }
+.external-command { margin-top: 8px; }
+.external-command .external-btn { display: inline-flex; }
+.external-command-text { user-select: text; font-family: monospace; margin-bottom: 8px; }
 .external-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .external-btn { margin: 0; padding: 4px 10px; border: 1px solid var(--awd-border-strong); border-radius: var(--awd-radius-md); font-size: var(--awd-panel-fs-meta); color: var(--awd-text); background: var(--awd-surface); cursor: pointer; }
 .external-btn:hover { background: var(--awd-panel-hover); }

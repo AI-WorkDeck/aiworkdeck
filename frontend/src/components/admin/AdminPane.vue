@@ -249,7 +249,11 @@
           </SettingsSection>
 
           <!-- 未连接：主动作是就地登录（登录后置，dev-board#1046）；粘 Key 退成高级入口 -->
-          <SettingsSection v-if="!account.connected" :title="$t('admin.navAccount')" :description="$t('admin.accountSectionSubtitle')">
+          <SettingsSection v-if="accountLoadState !== 'ready'" :title="$t('admin.navAccount')">
+              <text class="account-intro" role="status">{{ $t(accountLoadState === 'error' ? 'admin.accountStatusFailed' : 'admin.accountStatusLoading') }}</text>
+              <button v-if="accountLoadState === 'error'" class="comp-btn" @tap="loadAccount">{{ $t('admin.accountStatusRetry') }}</button>
+          </SettingsSection>
+          <SettingsSection v-if="accountLoadState === 'ready' && !account.connected" :title="$t('admin.navAccount')" :description="$t('admin.accountSectionSubtitle')">
               <text class="account-intro">
                 {{ $t('account.loginDialog.reason.settings') }}
               </text>
@@ -298,7 +302,7 @@
           </SettingsSection>
 
           <!-- 手机端同步（登录后置，dev-board#1046）：原来没登录时静默不工作，现在如实说 + 给登录入口 -->
-          <SettingsSection v-if="isDesktop" :title="$t('account.accountEntry.mobileSyncTitle')" :description="$t('account.accountEntry.mobileSyncDesc')">
+          <SettingsSection v-if="isDesktop && accountLoadState === 'ready'" :title="$t('account.accountEntry.mobileSyncTitle')" :description="$t('account.accountEntry.mobileSyncDesc')">
               <text class="account-intro">
                 {{ account.connected ? $t('account.accountEntry.mobileSyncOn') : $t('account.accountEntry.mobileSyncNeedsLogin') }}
               </text>
@@ -308,7 +312,7 @@
           </SettingsSection>
 
           <!-- 已连接：账户信息 + 余额 + 本地用量明细 -->
-          <template v-else>
+          <template v-if="accountLoadState === 'ready' && account.connected">
             <!-- 会员钱包卡（dev-board#183）：余额 + 充值 + 等级/成长值/升档进度。
                  原「余额」小指标行（account-metrics）已收进本卡，别再加回去。 -->
             <SettingsSection :title="$t('admin.walletCardTitle')" :description="$t('admin.walletCardSubtitle')">
@@ -1223,6 +1227,7 @@ export default {
       // 账户与用量（商业化 PR-B）
       // status 是纯本地读盘（不含余额），余额与额度都在 usage 的 platform 段
       account: { connected: false, displayName: '', keyMasked: '' },
+      accountLoadState: 'loading',
       // 官网那份资料（Spec §5 的 GET /api/account/profile）。source 决定头像点下去写哪儿：
       // ACCOUNT=写官网（唯一权威源），LOCAL=自建服务器，仍写本机 /api/users/avatar。
       accountProfile: { source: PROFILE_SOURCE.LOCAL, accountId: '', displayNameIsDefault: false },
@@ -2305,18 +2310,24 @@ export default {
     // ---------- 账户与用量 ----------
     // 拉状态；已连接才继续拉用量（未连接时后端没有可查的账户）
     async loadAccount() {
+      const requestId = this._accountRequestId = (this._accountRequestId || 0) + 1
+      this.accountLoadState = 'loading'
       try {
         const s = await getAccountStatus()
+        if (requestId !== this._accountRequestId) return
+        if (!s || typeof s.connected !== 'boolean') throw new Error('Invalid account status')
         this.platformAiAvailable = !!(s && s.platformAiAvailable)
         this.account = {
           connected: !!(s && s.connected),
           displayName: (s && s.displayName) || '',
           keyMasked: (s && s.keyMasked) || '',
         }
+        this.accountLoadState = 'ready'
       } catch (e) {
-        // 旧后端没有该端点 / 请求失败：按未连接展示引导，不弹错打断
-        this.account = { connected: false, displayName: '', keyMasked: '' }
-        this.platformAiAvailable = false
+        if (requestId !== this._accountRequestId) return
+        // 读取失败不是退出登录；保留身份，提供重试而不是要求用户重新登录。
+        this.accountLoadState = 'error'
+        return
       }
       if (this.account.connected) {
         await this.loadAccountUsage()

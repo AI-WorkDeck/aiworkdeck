@@ -98,12 +98,13 @@ public enum SensitiveType {
         "保留区号和后4位"
     ),
     
+    /** 实际识别使用 ChineseAddressRecognizer；此模式保留字段候选的兼容表示。 */
     ADDRESS(
         "ADDRESS",
         "地址",
         "(?:地址|住所地|住所|住址|注册地址|联系地址)[：:\\h]+(?<value>[^\\r\\n，。；;]{6,80})",
-        "[地址]",
-        "完整遮蔽地址字段"
+        "XX省XX市XX区XXXX",
+        "识别地址字段与正文地址，仅保留原有行政层级；编号模式可凭恢复包复敏"
     ),
     
     PASSWORD(
@@ -357,7 +358,7 @@ public enum SensitiveType {
                 break;
                 
             case ADDRESS:
-                return "[地址]";
+                return com.checkba.service.sensitive.ChineseAddressRecognizer.mask(original);
                 
             case PASSWORD:
                 return "******";
