@@ -343,6 +343,8 @@
             </svg>
           </view>
           <text v-else class="rail-icon">{{ p.icon }}</text>
+          <text v-if="p.key === 'dd-client' && ddClientUnread > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddClientUnread })">{{ ddClientUnread > 99 ? '99+' : ddClientUnread }}</text>
+          <text v-if="p.key === 'dd-files' && ddLawyerNotifications.length > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddLawyerNotifications.length })">{{ ddLawyerNotifications.length > 99 ? '99+' : ddLawyerNotifications.length }}</text>
           <!-- 日程徽标（dev-board#899）：当前项目 逾期 + 今天 的未完成事项数，0 不显；有逾期时转朱砂红 -->
           <text
             v-if="p.key === 'plugin-calendar' && railScheduleCount > 0"
@@ -689,10 +691,18 @@
             @project-renamed="onProjectRenamedFromPane"
             @activate-current-project="showCurrentProjectFiles"
           />
+          <view v-else-if="leftPaneKey === 'dd-client'" class="dd-client-entry">
+            <text>{{ $t('ddWorkflow.clientWorkspaceHint') }}</text>
+            <button @tap="openDdClientTab">{{ $t('ddWorkflow.openClientWorkspace') }}</button>
+          </view>
           <DdFilesPanel
+            ref="ddFilesPanel"
             v-else-if="leftPaneKey === 'dd-files'"
             :project-id="projectId"
             :current-user="currentUser"
+            :can-write="canWriteProject"
+            :notifications="ddLawyerNotifications"
+            @notification-read="readDdLawyerNotification"
             @open-request="handleOpenDdRequest"
           />
           <ShareholderMeetingPanel
@@ -1151,11 +1161,20 @@
                       :key="activeFileLeft.id"
                       :version-spec="activeFileLeft.versionSpec"
                     />
+                    <DdClientWorkspace v-else-if="activeFileLeft.tabType === 'dd-client'" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileLeft)"
+                      :key="activeFileLeft.id"
                       :request-id="activeFileLeft.requestId"
+                      :focus-item-id="activeFileLeft.focusItemId"
                       :project-id="projectId"
                       :client-view="isClientView"
+                      :can-write="canWriteProject"
+                      @changed="onDdRequestChanged"
+                      @deleted="onDdRequestDeleted"
+                      @invite-client="showInviteModal = true"
+                      @reload-files="onVersionReloadFiles"
+                      @open-file="openFile"
                     />
                     <MarketDetailPane
                       v-else-if="activeFileLeft.tabType === 'market-detail'"
@@ -1207,6 +1226,7 @@
                       @open-file="onWelcomeOpenFile"
                       @open-url="openBrowserTab($event)"
                       @open-projects-pane="openProjectsPane"
+                      @open-client-workspace="openDdClientTab"
                       @update:show-on-startup="setShowWelcomeOnStartup"
                     />
                     <!-- 「日程」标签（dev-board#1048）：单例，全局视图（projectId 恒传 null，跨项目事项，
@@ -1388,11 +1408,20 @@
                       :key="activeFileRight.id"
                       :version-spec="activeFileRight.versionSpec"
                     />
+                    <DdClientWorkspace v-else-if="activeFileRight.tabType === 'dd-client'" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileRight)"
+                      :key="activeFileRight.id"
                       :request-id="activeFileRight.requestId"
+                      :focus-item-id="activeFileRight.focusItemId"
                       :project-id="projectId"
                       :client-view="isClientView"
+                      :can-write="canWriteProject"
+                      @changed="onDdRequestChanged"
+                      @deleted="onDdRequestDeleted"
+                      @invite-client="showInviteModal = true"
+                      @reload-files="onVersionReloadFiles"
+                      @open-file="openFile"
                     />
                     <MarketDetailPane
                       v-else-if="activeFileRight.tabType === 'market-detail'"
@@ -1441,6 +1470,7 @@
                       @open-file="onWelcomeOpenFile"
                       @open-url="openBrowserTab($event)"
                       @open-projects-pane="openProjectsPane"
+                      @open-client-workspace="openDdClientTab"
                       @update:show-on-startup="setShowWelcomeOnStartup"
                     />
                     <!-- 「日程」标签：见左窗格同名注释 -->
@@ -2347,6 +2377,10 @@ import { openFeedbackWidget } from '@/utils/feedbackWidget.js'
 import DdFilesPanel from '@/components/DdFilesPanel.vue'
 import ShareholderMeetingPanel from '@/components/ShareholderMeetingPanel.vue'
 import DdRequestEditor from '@/components/DdRequestEditor.vue'
+import DdClientWorkspace from '@/components/dd/DdClientWorkspace.vue'
+import { ddClientTabMethods } from './ddClientTab.js'
+import { pollDdClientNotifications } from '@/services/ddClient'
+import { getDdNotifications, readDdNotification } from '@/services/ddWorkflow'
 import ChatInterface from '@/components/ChatInterface.vue'
 import { panelSwitchingMethods } from './panelSwitching.js'
 import { menuCommandsMethods } from './menuCommands.js'
@@ -2432,6 +2466,7 @@ export default {
     DdFilesPanel,
     ShareholderMeetingPanel,
     DdRequestEditor,
+    DdClientWorkspace,
     InviteMemberDialog,
     CollabDialog,
     SubmitDraftGuide,
@@ -2656,6 +2691,8 @@ export default {
 
       // Invite Modal (Refactored)
       showInviteModal: false,
+      ddClientUnread: 0,
+      ddLawyerNotifications: [],
 
       // 网核关联拖拽（将截图证据块拖到 WPS 文档中插入标记）
       webLinkDrag: {
@@ -3466,6 +3503,8 @@ export default {
     this.unbindTabsWheel()
     this._comparisonDisposed = true
     clearInterval(this._mergeElapsedTimer)
+    this._ddClientPollStopped = true
+    clearTimeout(this._ddClientPollTimer)
     this.disposeRestartRecovery()
     unregisterQuitSave(this)
     if (this._onPluginOpenSettings) uni.$off('awd:plugin-open-settings', this._onPluginOpenSettings)
@@ -3870,6 +3909,8 @@ export default {
     }
   },
   mounted() {
+    this._ddClientPollStopped = false
+    this.pollDdClientInbox()
     registerQuitSave(this, async () => {
       const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs)
       this.flushTabSnapshot()
@@ -4417,6 +4458,7 @@ export default {
     // 「依据」实体详情标签（dev-board#541）
     ...insightEntityTabMethods,
     ...welcomeTabMethods,
+    ...ddClientTabMethods,
     ...calendarTabMethods,
     ...pluginWorkspaceTabMethods,
     ...tmeetTabMethods,
@@ -5101,6 +5143,41 @@ export default {
        }
        return false
     },
+    async pollDdClientInbox() {
+      if (this._ddClientPollStopped) return
+      try {
+        if (this.isActiveOverviewInstance()) {
+          const result = await pollDdClientNotifications({ onOpen: () => this.openDdClientTab() })
+          if (!this._ddClientPollStopped) this.ddClientUnread = result.unread || 0
+          if (this.ddCloudTrack && !this.isClientView) {
+            const projectId = this.projectId
+            const notices = await getDdNotifications(projectId)
+            if (!this._ddClientPollStopped && String(projectId) === String(this.projectId)) this.ddLawyerNotifications = (notices || []).filter(notice => !notice.readAt)
+          } else this.ddLawyerNotifications = []
+        }
+      } catch { /* The workspace keeps its own actionable connection errors. */ }
+      finally { if (!this._ddClientPollStopped) this._ddClientPollTimer = setTimeout(() => this.pollDdClientInbox(), 15000) }
+    },
+    async readDdLawyerNotification(id) {
+      try {
+        await readDdNotification(id, this.projectId)
+        this.ddLawyerNotifications = this.ddLawyerNotifications.filter(notice => String(notice.id) !== String(id))
+      } catch { /* Keep unread until the read acknowledgement succeeds. */ }
+    },
+    onDdRequestChanged(request) {
+      this.$refs.ddFilesPanel?.fetchRequests()
+      for (const tab of [...this.leftFiles, ...this.rightFiles]) {
+        if (this.isDdRequest(tab) && String(tab.requestId) === String(request?.id)) tab.name = request.name
+      }
+    },
+    onDdRequestDeleted(requestId) {
+      this.$refs.ddFilesPanel?.fetchRequests()
+      for (const pane of ['left', 'right']) {
+        const tabs = this[pane === 'left' ? 'leftFiles' : 'rightFiles']
+        const tab = tabs.find(t => this.isDdRequest(t) && String(t.requestId) === String(requestId))
+        if (tab) this.closeFile(tab.id, pane)
+      }
+    },
     isDdRequest(file) {
       return file && file.type === 'dd-request'
     },
@@ -5112,8 +5189,10 @@ export default {
       const file = {
         id: 'dd-' + req.id,
         requestId: req.id,
+        focusItemId: req.focusItemId || null,
         name: req.name,
         type: 'dd-request',
+        tabType: 'dd-request',
         fileType: 'dd',
         isFolder: false
       }

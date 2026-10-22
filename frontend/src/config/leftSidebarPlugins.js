@@ -79,6 +79,11 @@ export const LEFT_SIDEBAR_PLUGINS = [
     ]
   },
   {
+    key: 'dd-client',
+    label: t('ddWorkflow.clientWorkspace'),
+    svgPaths: [{ d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }, { d: 'M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0' }, { d: 'M16 11l2 2 4-4' }]
+  },
+  {
     key: 'files',
     label: t('config.sidebar.files'),
     svgPaths: [

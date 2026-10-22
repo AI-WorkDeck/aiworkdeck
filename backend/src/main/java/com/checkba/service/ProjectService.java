@@ -75,7 +75,7 @@ public class ProjectService {
             "ProjectMember", "ProjectFile", "ProjectVariable", "ProjectProfileField",
             "ProjectMemory", "ProjectInvitation", "ProjectRemote", "ProjectTask",
             "ProjectAiMessage", "EvidenceLink", "WorkSession",
-            "ContractReviewRun", "ContractReviewStandard");
+            "ContractReviewRun", "ContractReviewStandard", "DdSubmission", "DdNotification", "DdAiJob", "DdMaterialMirror", "DdRequest");
 
     /**
      * 项目建好了（dev-board#438）。{@code VersionLifecycleService} 监听它自动开启版本记录——
@@ -311,6 +311,11 @@ public class ProjectService {
         Path memoryGitDir = memoryRepoService.gitDir(memoryRepoKey);
         Path memoryWorkTree = memoryRepoService.workTree(memoryRepoKey);
 
+        // Whole-project deletion is authorized by its existing controller. Remove evidence references
+        // in this transaction before storage deletion; any failure rolls the references back too.
+        entityManager.createQuery("delete from DdSubmission s where s.projectId = :pid")
+                .setParameter("pid", id).executeUpdate();
+
         // Cloud bytes must disappear before their accounting records. A failed deletion remains retryable.
         if (officialCloud) {
             Set<String> keys = new HashSet<>();
@@ -328,6 +333,12 @@ public class ProjectService {
         } catch (IOException e) {
             throw new IllegalStateException(LangText.of("版本文件未能完整删除，请重试", "Version files could not be fully deleted; please retry"), e);
         }
+
+        entityManager.createQuery("delete from DdComment c where c.ddItemId in "
+                        + "(select i.id from DdItem i where i.ddRequestId in (select r.id from DdRequest r where r.projectId = :pid))")
+                .setParameter("pid", id).executeUpdate();
+        entityManager.createQuery("delete from DdItem i where i.ddRequestId in (select r.id from DdRequest r where r.projectId = :pid)")
+                .setParameter("pid", id).executeUpdate();
 
         // evidence_link_target 没有 project_id 列，只能先按 link id 级联，再删 evidence_link 本身。
         entityManager.createQuery(
