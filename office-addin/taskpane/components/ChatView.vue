@@ -180,6 +180,7 @@
           <span>{{ t('skillsTitle') }}</span>
           <button class="panel-close" @click="skillsOpen = false">x</button>
         </div>
+        <div class="panel-builtin-note">{{ t('skillsBuiltinNotice') }}</div>
         <div v-if="!skillList.length" class="panel-empty">{{ t('noSkillsAvailable') }}</div>
         <label v-for="s in skillList" :key="s.id" class="skill-item">
           <input
@@ -734,6 +735,7 @@ const quickPrompts = computed(() => {
   const host = detectHost()
   const list = [{ label: t('quickSummarizeLabel'), text: t('quickSummarizeText') }]
   if (host === 'word') {
+    list.push({ label: t('quickContractReviewLabel'), text: t('quickContractReviewText') })
     list.push({ label: t('quickCommentsLabel'), text: t('quickCommentsText') })
     list.push({ label: t('quickProofreadLabel'), text: t('quickProofreadText') })
   }
@@ -1578,6 +1580,15 @@ textarea:focus {
 }
 
 .banner.conn { color: var(--awd-text-secondary); }
+
+.panel-builtin-note {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--awd-text-secondary);
+  background: var(--awd-bone);
+  border-bottom: 1px solid var(--awd-border);
+}
 </style>
 
 <!-- v-html 注入的 Markdown 内容拿不到 scoped 属性，样式放非 scoped 块（.md 前缀限定作用面） -->

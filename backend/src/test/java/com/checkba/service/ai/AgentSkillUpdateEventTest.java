@@ -168,11 +168,13 @@ class AgentSkillUpdateEventTest {
     @DisplayName("生效的 skill 随 skill_update 下发：id / name / source 三个字段是跨端契约")
     void emitsActiveSkillsWithSource() {
         // runId 由编排器现签（UUID），桩不能再按 conversationId 匹配
+        SkillDefinition builtin = skill("contract-review", "合同审查");
+        builtin.setBuiltinWorkflow(true);
         when(skillRouter.activeSkills(anyString())).thenReturn(List.of(
                 new SkillRouter.ActiveSkill(skill("litigation-visual", "诉讼可视化"),
                         "诉讼可视化", SkillRouter.SOURCE_MANUAL),
-                new SkillRouter.ActiveSkill(skill("listing-pathway", "上市路径选择"),
-                        "上市路径选择", SkillRouter.SOURCE_AUTO)));
+                new SkillRouter.ActiveSkill(builtin,
+                        "合同审查", SkillRouter.SOURCE_AUTO)));
 
         run("conv-skill", AgentMode.AGENT, List.of("litigation-visual"));
 
@@ -180,8 +182,9 @@ class AgentSkillUpdateEventTest {
         assertNotNull(data, "每轮都必须发 skill_update：" + sseEvents);
         assertTrue(data.contains("\"id\":\"litigation-visual\""), data);
         assertTrue(data.contains("\"source\":\"manual\""), data);
-        assertTrue(data.contains("\"name\":\"上市路径选择\""), data);
+        assertTrue(data.contains("\"name\":\"合同审查\""), data);
         assertTrue(data.contains("\"source\":\"auto\""), data);
+        assertTrue(data.contains("\"builtinWorkflow\":true"), data);
     }
 
     @Test
