@@ -339,7 +339,7 @@
          </view>
       </view>
 
-      <view v-if="loading" class="tree-loading">
+      <view v-if="loading && displayFiles.length === 0" class="tree-loading">
         <text>{{ $t('fileTree.loading') }}</text>
       </view>
       <view v-else-if="displayFiles.length === 0" class="tree-empty">
@@ -752,6 +752,11 @@ import {
 // 空白区落根的最小拖动位移（dev-board#989）
 const DRAG_MOVE_THRESHOLD_PX = 8
 
+// 按项目缓存最近一次加载的文件树快照与展开态（dev-board#1427）：
+// 从其他页面/面板切回工作台或收起再展开侧栏导致 FileTree 重新挂载时，首帧直接从内存快照恢复展示，
+// 后台静默重拉对齐（Stale-While-Revalidate），消除切回界面时闪现「加载中…」并丢失目录展开态的问题。
+const projectFileTreeSnapshotCache = new Map()
+
 // 移动接口失败时会在服务端把 parentId 回滚再照常返回成功（物理文件被占用，常见于
 // Windows 上文件正被 Word/编辑器打开，见 ProjectFileService.moveSingleFileWithPhysical）——
 // 前端只能靠比对响应里的 parentId 与本次请求的目标 parentId 识别"其实没移成"。
@@ -980,6 +985,15 @@ export default {
       const map = { name: this.$t('fileTree.sortName'), date: this.$t('fileTree.sortModifiedTime'), type: this.$t('fileTree.sortType') }
       return map[this.sortMode] || this.$t('fileTree.sortLabelDefault')
     },
+    // 全量文件按 id 建 Map（O(N) 一次构建），供 getItemPadding 等高频路径 O(1) 反查父节点，
+    // 避免 30,000 文件项目在每行渲染时跑 allFiles.find 退化成 O(渲染行数 × N)。
+    allFilesById() {
+      const map = new Map()
+      for (const f of (this.allFiles || [])) {
+        if (f && f.id != null) map.set(f.id, f)
+      }
+      return map
+    },
     displayFiles() {
       // 回收站视图不做系统文件夹/暂存区过滤：标题按 recycleBin.length 计数，藏掉的行
       // 会变成看不见也删不掉的幽灵计数（dev-board#1019），见 utils/fileTreeRecycle.js
@@ -1111,20 +1125,35 @@ export default {
     },
     projectId: {
       immediate: true,
-      handler() {
+      handler(newVal, oldVal) {
         this.subscribeLocalFileChanges()
         this.fileAccessRequest++
         this.fileAccessBusy = false
-        // 「展开更多」的渲染上限与引用角标都是按项目的，换项目必须归零
-        this.revealCounts = {}
-        this.refCounts = {}
+        const key = newVal != null ? String(newVal) : ''
+        const prevKey = oldVal != null ? String(oldVal) : ''
+        if (key !== prevKey) {
+          this.refCounts = {}
+          const cached = key ? projectFileTreeSnapshotCache.get(key) : null
+          if (cached && Array.isArray(cached.allFiles) && cached.allFiles.length > 0) {
+            this.allFiles = cached.allFiles
+            this.expandedFolders = new Set(cached.expandedFolderIds || [])
+            this.revealCounts = { ...(cached.revealCounts || {}) }
+            this.files = this.showTree
+              ? this.buildTreeView(this.allFiles, this.parentId)
+              : (cached.files || [])
+          } else {
+            this.allFiles = []
+            this.files = []
+            this.expandedFolders = new Set()
+            this.revealCounts = {}
+          }
+        }
         this.loadFiles()
         // 到期徽标的数据（taskStore 有缓存与在途合并，工作台 onLoad 已预热时不会重发）
         if (this.projectId) loadProjectTasks(this.projectId).catch(() => {})
       }
     },
     parentId: {
-      immediate: true,
       handler() {
         this.loadFiles()
       }
@@ -1275,19 +1304,47 @@ export default {
       this.viewMode = 'files'
       this.loadFiles()
     },
+    saveSnapshotToCache() {
+      if (!this.projectId || this.viewMode === 'recycle') return
+      const key = String(this.projectId)
+      projectFileTreeSnapshotCache.set(key, {
+        allFiles: this.allFiles,
+        files: this.files,
+        expandedFolderIds: Array.from(this.expandedFolders || []),
+        revealCounts: { ...(this.revealCounts || {}) }
+      })
+    },
     async loadFiles() {
-      const requestId = ++this.fileLoadRequest
-      const current = () => requestId === this.fileLoadRequest
       if (!this.projectId) {
         console.warn('FileTree: projectId 未设置，无法加载文件列表')
         return
       }
-
-      this.loading = true
+      // 合并同一组件并发触发的重复 loadFiles（如 focus + SSE 同时到达）：
+      // 在途请求完成前不重复打接口，若有新请求排入则结束后静默补拉一次。
+      if (this._loadFilesPromise) {
+        this._loadFilesQueued = true
+        return this._loadFilesPromise
+      }
+      this._loadFilesPromise = this._doLoadFiles().finally(() => {
+        this._loadFilesPromise = null
+        if (this._loadFilesQueued) {
+          this._loadFilesQueued = false
+          this.loadFiles()
+        }
+      })
+      return this._loadFilesPromise
+    },
+    async _doLoadFiles() {
+      const requestId = ++this.fileLoadRequest
+      const current = () => requestId === this.fileLoadRequest
+      // 仅当当前还没有任何可展示条目（冷启动首屏且无内存快照）时才置 loading=true，
+      // 已经有目录树展示时（如从别的窗口/页面切回触发 focus 刷新、后台 SSE 刷新）保持既有树不闪烁，
+      // 待新数据返回后原地无感替换（dev-board#1427）。
+      const hasVisibleItems = this.displayFiles.length > 0
+      if (!hasVisibleItems) {
+        this.loading = true
+      }
       clearLocalPathCache()
-      // 整树重载：窗口化上限回到初始值，引用角标整批重拉（旧值会被覆盖而不是叠加）
-      this.revealCounts = {}
-      this.refCounts = {}
       try {
         // 确保 projectId 是数字类型
         const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
@@ -1305,13 +1362,12 @@ export default {
           // 加载完整文件树
           const allFiles = await getProjectFiles(projectId, null, true)
           if (!current()) return
-          this.allFiles = allFiles
-
           // 过滤掉系统文件夹（在 allFiles 层面过滤，确保所有地方都不会显示）
           const hiddenNames = new Set(['.stagezone', '__staging_area__'])
-          this.allFiles = this.allFiles.filter(f => !hiddenNames.has(f.name))
+          this.allFiles = (allFiles || []).filter(f => !hiddenNames.has(f.name))
 
           this.files = this.buildTreeView(this.allFiles, this.parentId)
+          this.saveSnapshotToCache()
         } else {
           // 只加载当前文件夹下的文件
           let files = await getProjectFiles(projectId, this.parentId)
@@ -1319,7 +1375,8 @@ export default {
 
           // 过滤掉系统文件夹
           const hiddenNames = new Set(['.stagezone', '__staging_area__'])
-          this.files = files.filter(f => !hiddenNames.has(f.name))
+          this.files = (files || []).filter(f => !hiddenNames.has(f.name))
+          this.saveSnapshotToCache()
         }
         clearLocalPathCache()
         this.scheduleRefCountsFetch({ reload: true })
@@ -2040,6 +2097,7 @@ export default {
       // 重新构建树形视图
       if (this.showTree && this.allFiles.length > 0) {
         this.files = this.buildTreeView(this.allFiles, this.parentId)
+        this.saveSnapshotToCache()
         this.scheduleRefCountsFetch()
       }
     },
@@ -2053,6 +2111,7 @@ export default {
       const key = this.windowParentKey(folderId)
       const current = this.revealCounts[key] || 100
       this.revealCounts = { ...this.revealCounts, [key]: current + 200 }
+      this.saveSnapshotToCache()
       this.scheduleRefCountsFetch()
     },
     // 「被引用 N 次」角标：树刷新/展开更多后，对当前渲染的文件 id 分批拉取引用计数。
@@ -2073,13 +2132,14 @@ export default {
     },
     // 计算项目的缩进（用于树形结构）
     getItemPadding(item) {
-      if (!this.showTree) return '0'
-      // 计算层级深度
+      if (!this.showTree || !item) return '0'
+      // 走 allFilesById Map O(1) 反查父节点，避免每行渲染 O(N) 线性扫描 30,000 个节点
+      const byId = this.allFilesById
       let depth = 0
       let current = item
-      while (current && current.parentId !== null) {
+      while (current && current.parentId !== null && current.parentId !== undefined && current.parentId !== 0 && depth < 30) {
         depth++
-        current = this.allFiles.find(f => f.id === current.parentId)
+        current = byId.get(current.parentId)
         if (!current) break
       }
       return `${depth * 24}rpx`

@@ -127,3 +127,21 @@ test('欢迎首屏缺省收起，显式收展选择优先，存储故障也保�
   assert.equal(loadSidebarCollapsed({ getStorageSync() { throw new Error('unavailable') } }, true), true)
   assert.equal(loadSidebarCollapsed(fakeStorage(), false), false, '项目文件树保持默认展开')
 })
+
+test('FileTree 切回工作台或切左栏面板时不闪现「加载中…」且 getItemPadding 走 O(1) Map 查找（dev-board#1427）', () => {
+  const overviewSrc = read('pages/project-overview/project-overview.vue')
+  const fileTreeSrc = read('components/FileTree.vue')
+
+  const sidebarIdx = overviewSrc.indexOf('v-if="!sidebarCollapsed" class="sidebar-content"')
+  assert.ok(sidebarIdx > 0, '左栏内容区存在')
+  const sidebarSlice = overviewSrc.slice(sidebarIdx, sidebarIdx + 400)
+  assert.match(sidebarSlice, /<FileTree[\s\S]*?v-show="leftPaneKey === 'files'"/,
+    'FileTree 在左栏切换其它面板时使用 v-show 保活，避免每次切回销毁重建树与闪现加载态')
+
+  assert.match(fileTreeSrc, /v-if="loading && displayFiles\.length === 0"\s+class="tree-loading"/,
+    '已有可展示条目时后台静默刷新不得把整个目录树替换成「加载中…」')
+  assert.match(fileTreeSrc, /projectFileTreeSnapshotCache/,
+    'FileTree 维护按项目缓存的树快照，重新挂载首帧立即展示')
+  assert.match(fileTreeSrc, /allFilesById\(\)/,
+    'FileTree 提供 allFilesById Map 供 getItemPadding O(1) 反查父节点')
+})
