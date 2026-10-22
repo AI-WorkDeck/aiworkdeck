@@ -367,6 +367,8 @@ public class AgentOrchestrator {
         // LLM 往返轮数与首轮 promptTokens（埋点 ai.turn；只由当前轮次记账）
         int llmRounds;
         boolean promptTokensRecorded;
+        /** 智能模式（auto）按轮路由出的思考强度覆盖（"low"/"medium"/"high"，非智能模式为 null）。 */
+        volatile String reasoningEffortOverride;
     }
 
     /**
@@ -1369,6 +1371,44 @@ public class AgentOrchestrator {
     }
 
     /**
+     * SSE {@code model_routed}：当用户选择「智能模式（auto）」时，把本轮实际选中的模型与档位
+     * 推给前端（载荷 {@code {"requestedModel","effectiveModel","effectiveModelName","tier","routed"}}），
+     * 让模型选择器按钮即时展示「智能 · 模型名」。推送失败只打日志，不中断对话。
+     */
+    private void sendModelRouted(RunGuard guard, SmartModelRouter.RouteDecision decision) {
+        if (decision == null || !decision.routed()) {
+            return;
+        }
+        try {
+            java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+            payload.put("requestedModel", decision.requestedModel());
+            payload.put("effectiveModel", decision.effectiveModelId());
+            payload.put("effectiveModelName", decision.effectiveModelName());
+            payload.put("tier", decision.tier() != null ? decision.tier().name() : null);
+            payload.put("routed", true);
+            sendRunEvent(guard, "model_routed", SKILL_UPDATE_MAPPER.writeValueAsString(payload));
+        } catch (Exception e) {
+            log.warn("Failed to push model_routed for {}", guard.conversationId, e);
+        }
+    }
+
+    /**
+     * 按本轮 {@link RunGuard#reasoningEffortOverride} 取流式模型。
+     * 非智能模式（override 为空）时直接走单参 {@link ChatModelFactory#getStreamingChatModel(String)}，
+     * 保持既有单测的 Mockito 单参桩与 verify 计数完全兼容；智能模式有覆盖且两参返回非空时用两参版本。
+     */
+    private StreamingChatLanguageModel resolveStreamingModel(String modelId, RunGuard guard) {
+        String effort = guard == null ? null : guard.reasoningEffortOverride;
+        if (effort != null && !effort.isBlank()) {
+            StreamingChatLanguageModel overridden = chatModelFactory.getStreamingChatModel(modelId, effort);
+            if (overridden != null) {
+                return overridden;
+            }
+        }
+        return chatModelFactory.getStreamingChatModel(modelId);
+    }
+
+    /**
      * 编排循环的线程池（{@code taskExecutor}，核心 16 / 最大 32 / 有界队列 200）。
      *
      * <p>刻意不走构造器注入：本类的构造器由 {@code @RequiredArgsConstructor} 从 final 字段生成，
@@ -1419,6 +1459,27 @@ public class AgentOrchestrator {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ToolDecisionPolicy toolDecisionPolicy;
+
+    /**
+     * 智能模式路由器（dev-board#1434）。默认提供无状态实例，故各单元测试直接
+     * {@code new AgentOrchestrator(...)} 时无需额外注入即可工作；同样不走构造器。
+     */
+    private volatile SmartModelRouter smartModelRouter = new SmartModelRouter();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSmartModelRouter(SmartModelRouter smartModelRouter) {
+        if (smartModelRouter != null) {
+            this.smartModelRouter = smartModelRouter;
+        }
+    }
+
+    /** 出网区域探测服务（dev-board#1434 智能路由区分 GLOBAL / INTERNATIONAL 用）。为空时按 GLOBAL 保守路由。 */
+    private volatile NetworkRegionService networkRegionService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setNetworkRegionService(NetworkRegionService networkRegionService) {
+        this.networkRegionService = networkRegionService;
+    }
 
     /**
      * 处理用户消息 (入口)。
@@ -1595,7 +1656,7 @@ public class AgentOrchestrator {
                         try {
                             requireInboxExecutionAccess(conversationId, row.getId(), userId);
                             if (!restartAccountMatches(cp)) throw new SecurityException("Account changed during restart");
-                            runLoop(chatModelFactory.getStreamingChatModel(cp.path("modelId").asText()), messages,
+                            runLoop(resolveStreamingModel(cp.path("modelId").asText(), guard), messages,
                                     conversationId, String.valueOf(projectId), userId, cp.path("modelId").asText(),
                                     cp.path("depth").asInt(), executionLog,
                                     AgentMode.valueOf(cp.path("mode").asText()), guard);
@@ -1690,6 +1751,7 @@ public class AgentOrchestrator {
         json.put("decisionAttempted", guard.decisionAttempted);
         json.put("decisionAbandoned", guard.decisionAbandoned);
         json.put("assistedDisclosure", guard.assistedDisclosure);
+        json.put("reasoningEffortOverride", guard.reasoningEffortOverride);
         json.put("platformUsed", guard.platformUsed.get());
         json.put("trialReported", guard.trialReported.get());
         return json;
@@ -1731,6 +1793,7 @@ public class AgentOrchestrator {
         guard.decisionAttempted = json.path("decisionAttempted").asBoolean();
         guard.decisionAbandoned = json.path("decisionAbandoned").asBoolean();
         guard.assistedDisclosure = json.path("assistedDisclosure").asBoolean();
+        guard.reasoningEffortOverride = json.path("reasoningEffortOverride").asText(null);
         guard.platformUsed.set(json.path("platformUsed").asBoolean());
         guard.trialReported.set(json.path("trialReported").asBoolean());
     }
@@ -1983,8 +2046,9 @@ public class AgentOrchestrator {
             }
             // 把本轮真正生效的清单告诉前端（自动命中的那枚在面板里会闪一下）。
             // 空列表也发：前端靠它把上一轮的 chip 清掉。
-            sendSkillUpdate(guard,
-                    skillsEffective ? skillRouter.activeSkills(guard.runId) : List.of());
+            List<com.checkba.service.ai.skill.SkillRouter.ActiveSkill> effectiveSkills =
+                    skillsEffective ? skillRouter.activeSkills(guard.runId) : List.of();
+            sendSkillUpdate(guard, effectiveSkills);
 
             // A clarification does not authorize editing whichever file is open now.
             if (clarification != null && clarification.targetFileId() != null
@@ -2009,6 +2073,42 @@ public class AgentOrchestrator {
             }
             timings.mark("skills");
 
+            // 1.4 智能模式（auto）零延迟确定性路由（dev-board#1434）：
+            // 放在 Skill 激活之后、ContextAssembler 之前——既能利用本轮命中的 Skill（如 contract-review /
+            // legal-opinion-review）精准分档，又能在图片多模态装配前把有效模型切换为对应的视觉模型。
+            java.util.List<AiAgentController.ContextItem> resolvedContextItems = request.getContextItems() != null
+                    ? request.getContextItems()
+                    : convertFileIdsToContextItems(request.getFileIds());
+            AllowedModels.Region networkRegion = networkRegionService != null
+                    ? networkRegionService.effectiveRegion()
+                    : AllowedModels.Region.GLOBAL;
+            SmartModelRouter.RouteDecision routeDecision =
+                    (smartModelRouter != null ? smartModelRouter : new SmartModelRouter()).route(
+                            request.getModel(),
+                            request.getMessage(),
+                            agentMode,
+                            resolvedContextItems,
+                            request.getActiveContext(),
+                            effectiveSkills,
+                            networkRegion);
+            String effectiveModelId = routeDecision.effectiveModelId();
+            guard.reasoningEffortOverride = routeDecision.reasoningEffort();
+            if (routeDecision.routed()) {
+                log.info("[SmartRouter] conv={} routed '{}' -> model={} (tier={}, effort={}, region={})",
+                        conversationId, request.getModel(), effectiveModelId,
+                        routeDecision.tier(), routeDecision.reasoningEffort(), networkRegion);
+                sendModelRouted(guard, routeDecision);
+                if (guard.decisionContext != null && !guard.decisionAttempted && !guard.decisionAbandoned) {
+                    try {
+                        guard.decisionContext = new DecisionAssistContext(true, request.getProjectId(), userId,
+                                conversationId, effectiveModelId,
+                                chatModelFactory.resolveTarget(effectiveModelId, false).channel());
+                    } catch (Exception ignored) {
+                        guard.abandonDecision();
+                    }
+                }
+            }
+
             // 2. Build Context & History Message Stack (Spec v1.8)
             log.info("Assembling full message context for conversation: {}", conversationId);
             // TODO: Get taskListId/planId from session if available
@@ -2020,15 +2120,14 @@ public class AgentOrchestrator {
                 conversationId,
                 guard.runId,
                 request.getMessage(),
-                request.getContextItems() != null ? request.getContextItems() :
-                    convertFileIdsToContextItems(request.getFileIds()),
+                resolvedContextItems,
                 request.getActiveContext(), // NEW: Pass active document context
                 taskListId,
                 planId,
                 projectId,
                 agentMode,
                 userId,
-                request.getModel(),
+                effectiveModelId,
                 ledger
             );
             ledger.persistTo(userMessageId);
@@ -2048,14 +2147,14 @@ public class AgentOrchestrator {
             }
 
             // 3. 获取流式模型
-            log.info("Getting streaming model: {}", request.getModel());
-            StreamingChatLanguageModel model = chatModelFactory.getStreamingChatModel(request.getModel());
+            log.info("Getting streaming model: {}", effectiveModelId);
+            StreamingChatLanguageModel model = resolveStreamingModel(effectiveModelId, guard);
             
             timings.mark("model");
             timings.done(log);
 
             if (model == null) {
-                throw new RuntimeException("Could not create streaming model for ID: " + request.getModel());
+                throw new RuntimeException("Could not create streaming model for ID: " + effectiveModelId);
             }
 
             // 4. Start Loop
@@ -2088,7 +2187,7 @@ public class AgentOrchestrator {
                 log.info("[ToolVisibility] conv={} 本轮不下发 {} 个当前用不了的工具：{}",
                         conversationId, guard.unusableTools.size(), guard.unusableTools);
             }
-            runLoop(model, messages, conversationId, projectId, userId, request.getModel(), 0, executionLog, agentMode, guard);
+            runLoop(model, messages, conversationId, projectId, userId, effectiveModelId, 0, executionLog, agentMode, guard);
 
         } catch (com.checkba.service.account.AccountException e) {
             // 账户/额度类失败不是「内部错误」，而是用户可自行处理的状态
@@ -3566,8 +3665,9 @@ public class AgentOrchestrator {
             return false;
         }
 
-        // 换模型等于换了一条通道，重试预算重新计
+        // 换模型等于换了一条通道，重试预算重新计；原模型的思考强度覆盖不再套在新模型上
         guard.llmRetries = 0;
+        guard.reasoningEffortOverride = null;
         sendTextDelta(guard, String.format(
                 LangText.of("\n\n> 模型「%s」%s，已自动切换到备用模型「%s」继续本轮任务。\n\n",
                         "\n\n> Model \"%s\" %s; automatically switched to fallback model \"%s\" to continue this round.\n\n"),

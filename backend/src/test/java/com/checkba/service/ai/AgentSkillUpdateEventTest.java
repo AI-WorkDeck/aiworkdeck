@@ -360,4 +360,36 @@ class AgentSkillUpdateEventTest {
     private static ToolSpecification spec(String name) {
         return ToolSpecification.builder().name(name).description(name).build();
     }
+
+    @Test
+    @DisplayName("智能模式（auto）：按轮确定性路由模型与思考强度，并推送 SSE model_routed 事件")
+    void autoModelEmitsModelRoutedEventAndUsesRoutedModelAndEffort() {
+        when(skillRouter.activeSkills(anyString())).thenReturn(List.of(
+                new SkillRouter.ActiveSkill(skill("legal-opinion-review", "法律意见书审查"),
+                        "法律意见书审查", SkillRouter.SOURCE_AUTO)));
+        when(chatModelFactory.getStreamingChatModel("moonshotai/kimi-k3", "high"))
+                .thenReturn(new OneShotModel());
+
+        AiAgentController.AgentChatRequest request = new AiAgentController.AgentChatRequest();
+        request.setProjectId(1L);
+        request.setConversationId("conv-auto-route");
+        request.setMessage("对这份法律意见书做全面实质审查");
+        request.setModel("auto");
+        request.setMode(AgentMode.AGENT.name());
+        orchestrator.handleUserMessage(request, 7L);
+
+        verify(chatModelFactory).getStreamingChatModel("moonshotai/kimi-k3", "high");
+        String routedPayload = null;
+        for (int i = 0; i < sseEvents.size(); i++) {
+            if ("model_routed".equals(sseEvents.get(i))) {
+                routedPayload = sseData.get(i);
+                break;
+            }
+        }
+        assertNotNull(routedPayload, "智能模式必须推送 model_routed 事件：" + sseEvents);
+        assertTrue(routedPayload.contains("\"requestedModel\":\"auto\""), routedPayload);
+        assertTrue(routedPayload.contains("\"effectiveModel\":\"moonshotai/kimi-k3\""), routedPayload);
+        assertTrue(routedPayload.contains("\"effectiveModelName\":\"Kimi K3\""), routedPayload);
+        assertTrue(routedPayload.contains("\"tier\":\"DEEP\""), routedPayload);
+    }
 }

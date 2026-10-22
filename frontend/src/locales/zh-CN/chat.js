@@ -400,4 +400,9 @@ export default {
   reviewInProgress: '修订中 · {hunks} 处改动 · {comments} 条批注',
   reviewFileMissing: '找不到这份计划的项目文件，请在卡片内修订',
   reviewConversationSwitchFailed: '无法切回这份计划所在的对话，修订版未发送',
+  // 智能模式（dev-board#1434）
+  autoModelName: '智能模式（Auto）',
+  autoModelBadge: '推荐',
+  autoModelDesc: '按任务难度与模态自动匹配极速、均衡或旗舰模型，兼顾响应速度与专业质量',
+  autoModelRoutedLabel: '智能 · {name}',
 }
