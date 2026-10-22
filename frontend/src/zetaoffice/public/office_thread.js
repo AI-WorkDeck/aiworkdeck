@@ -2459,6 +2459,15 @@ function nativeKeyDoc() { return isCalcDoc() || isImpressDoc(); }
 const NATIVE_ARROWS = { left: 'LEFT', right: 'RIGHT', up: 'UP', down: 'DOWN' };
 const NATIVE_UI_KEYS = { line_start: 'HOME', line_end: 'END', line_start_sel: 'HOME', line_end_sel: 'END', page_up: 'PAGEUP', page_down: 'PAGEDOWN', escape: 'ESCAPE' };
 let keyRobot = null;
+let nativeKeyRefreshTimer = 0;
+function scheduleNativeKeySelectionRefresh() {
+  if (typeof setTimeout !== 'function') return;
+  if (nativeKeyRefreshTimer) clearTimeout(nativeKeyRefreshTimer);
+  nativeKeyRefreshTimer = setTimeout(function () {
+    nativeKeyRefreshTimer = 0;
+    try { post('sel_changed', { cursorRectRaw: EXEC.get_cursor_rect(), documentSeq: docSeq }); } catch (e) {}
+  }, 60);
+}
 // keys: [{key:'RETURN'|..., shift, ch}]；key 缺省 = 纯字符（KeyCode 0）。
 function postNativeKeys(keys) {
   if (!keyRobot) keyRobot = css.awt.Toolkit.create(context);
@@ -2470,6 +2479,7 @@ function postNativeKeys(keys) {
     keyRobot.keyPress(ev);
     keyRobot.keyRelease(ev);
   }
+  scheduleNativeKeySelectionRefresh();
   return { success: true, native: true, keys: keys.length };
 }
 // 全屏标志在引擎处理完投递的 Esc 之后才翻（异步，时点不定），所以 1.5 秒内每
@@ -2840,6 +2850,40 @@ function activeCalcSelection() {
   }
   const rowCount = endRow - row + 1;
   const colCount = endCol - col + 1;
+  let merged = false, hasFrozenPanes = false, autoFilter = false, isProtected = false;
+  let rowHeightPt = null, colWidthPt = null;
+  try {
+    if (selRange && typeof selRange.getIsMerged === 'function') merged = !!selRange.getIsMerged();
+    else if (cell && typeof cell.getIsMerged === 'function') merged = !!cell.getIsMerged();
+  } catch (e) {}
+  try {
+    if (ctrl && typeof ctrl.hasFrozenPanes === 'function') hasFrozenPanes = !!ctrl.hasFrozenPanes();
+  } catch (e) {}
+  try {
+    const dbs = xModel && typeof xModel.getPropertyValue === 'function' ? xModel.getPropertyValue('DatabaseRanges') : null;
+    const afName = '__awd_af_' + sheetIdx;
+    if (dbs && typeof dbs.hasByName === 'function' && dbs.hasByName(afName)) {
+      const dbRange = dbs.getByName(afName);
+      autoFilter = !!(dbRange && dbRange.getPropertyValue && dbRange.getPropertyValue('AutoFilter'));
+    }
+  } catch (e) {}
+  try {
+    if (sheet && typeof sheet.isProtected === 'function') isProtected = !!sheet.isProtected();
+  } catch (e) {}
+  try {
+    if (sheet && typeof sheet.getRows === 'function') {
+      const rObj = sheet.getRows().getByIndex(row);
+      const h = Number(rObj.getPropertyValue('Height'));
+      if (h > 0) rowHeightPt = hmmToPt(h);
+    }
+  } catch (e) {}
+  try {
+    if (sheet && typeof sheet.getColumns === 'function') {
+      const cObj = sheet.getColumns().getByIndex(col);
+      const w = Number(cObj.getPropertyValue('Width'));
+      if (w > 0) colWidthPt = hmmToPt(w);
+    }
+  } catch (e) {}
   return {
     sheet: sheet,
     sheetName: sheetName,
@@ -2859,6 +2903,12 @@ function activeCalcSelection() {
     cellName: address,
     range: range,
     rangeName: range,
+    merged: merged,
+    hasFrozenPanes: hasFrozenPanes,
+    autoFilter: autoFilter,
+    protected: isProtected,
+    rowHeightPt: rowHeightPt,
+    colWidthPt: colWidthPt,
   };
 }
 function activeCalcRangeName() {
@@ -4801,6 +4851,34 @@ const EXEC = {
   // [verified] replace selection if any, else insert at cursor. '\n' in the new
   // text becomes a paragraph break (insertTextAtCursor).
   replace_selection(p) {
+    const rawText = String((p && p.text) || '');
+    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const selInfo = activeCalcSelection();
+      const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+      if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+      const rows = (lines.length ? lines : ['']).map(function (ln) { return ln.split('\t'); });
+      const r = EXEC.sheet_write_cells({
+        sheet: selInfo.sheetName || undefined,
+        startCell: selInfo.address || 'A1',
+        rows: rows,
+      });
+      return Object.assign({}, r, { text: rawText });
+    }
+    if (typeof isImpressDoc === 'function' && isImpressDoc()) {
+      const ctx = activeImpressContext(p && p.shapeName);
+      if (ctx && ctx.selectedShape && ctx.selectedShapeName) {
+        const r = EXEC.slide_set_shape_text({
+          slideNumber: ctx.slideNumber,
+          shapeName: ctx.selectedShapeName,
+          text: rawText,
+        });
+        return Object.assign({}, r, { text: rawText });
+      }
+      if (!rawText) return { success: true, text: '' };
+      const keys = [];
+      for (let i = 0; i < rawText.length; i++) keys.push({ ch: rawText[i] });
+      return Object.assign(postNativeKeys(keys), { text: rawText });
+    }
     const vc = ctrl.getViewCursor();
     // One paste may contain hundreds of paragraphs. Batch native layout and
     // JS modify callbacks for the entire replacement, including tracked edits.
@@ -4903,6 +4981,37 @@ const EXEC = {
   },
   // [verified] current selection text (anchor, not integer offset).
   get_selection() {
+    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const selInfo = activeCalcSelection();
+      let text = '';
+      try {
+        if (selInfo.sheet && (selInfo.rowCount > 1 || selInfo.colCount > 1)) {
+          const maxR = Math.min(selInfo.endRow, selInfo.row + 99);
+          const maxC = Math.min(selInfo.endCol, selInfo.col + 49);
+          const lines = [];
+          for (let r = selInfo.row; r <= maxR; r++) {
+            const cols = [];
+            for (let c = selInfo.col; c <= maxC; c++) {
+              try {
+                const v = readCellOut(selInfo.sheet.getCellByPosition(c, r));
+                cols.push(v == null ? '' : String(v));
+              } catch (e) { cols.push(''); }
+            }
+            lines.push(cols.join('\t'));
+          }
+          text = lines.join('\n');
+        } else if (selInfo.cell) {
+          const v = readCellOut(selInfo.cell);
+          text = v != null && v !== '' ? String(v) : String(selInfo.cell.getString() || '');
+        }
+      } catch (e) {}
+      return { success: true, text: text, hasSelection: text.length > 0 };
+    }
+    if (typeof isImpressDoc === 'function' && isImpressDoc()) {
+      const ctx = activeImpressContext();
+      const text = ctx && ctx.selectedShape ? shapeText(ctx.selectedShape) : '';
+      return { success: true, text: text, hasSelection: text.length > 0 };
+    }
     const sel = ctrl.getSelection();
     let text = '';
     try {
@@ -5265,21 +5374,63 @@ const EXEC = {
     const url = UI_COMMANDS[name];
     if (!url) return { success: false, message: 'ui_command not allowed: ' + (p.name || '') };
     const alignMap = { align_left: 'left', align_center: 'center', align_right: 'right', align_justify: 'justify' };
-    if (typeof isCalcDoc === 'function' && isCalcDoc() && alignMap[name] && typeof EXEC !== 'undefined' && typeof EXEC.sheet_format_cells === 'function') {
-      const rangeName = typeof activeCalcRangeName === 'function' ? activeCalcRangeName() : 'A1';
-      const hAlign = alignMap[name] === 'justify' ? 'standard' : alignMap[name];
-      try { EXEC.sheet_format_cells({ range: rangeName, hAlign: hAlign }); } catch (e) {}
+    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const selInfo = activeCalcSelection();
+      const rangeName = selInfo.range || 'A1';
+      const cell = selInfo.cell || selInfo.selRange;
+      const cf = cell ? cellFormat(cell) : {};
+      if (name === 'bold' && typeof EXEC.sheet_format_cells === 'function') {
+        EXEC.sheet_format_cells({ range: rangeName, bold: !cf.bold });
+        return { success: true, name: name };
+      }
+      if (name === 'italic' && typeof EXEC.sheet_format_cells === 'function') {
+        EXEC.sheet_format_cells({ range: rangeName, italic: !cf.italic });
+        return { success: true, name: name };
+      }
+      if (name === 'underline' && typeof EXEC.sheet_format_cells === 'function') {
+        EXEC.sheet_format_cells({ range: rangeName, underline: !cf.underline });
+        return { success: true, name: name };
+      }
+      if (name === 'strikeout') {
+        const nextStrike = !cf.strikeout;
+        const target = selInfo.selRange || selInfo.cell;
+        if (target && typeof target.setPropertyValue === 'function') {
+          try { target.setPropertyValue('CharStrikeout', nextStrike ? css.awt.FontStrikeout.SINGLE : css.awt.FontStrikeout.NONE); } catch (e) {}
+        } else {
+          dispatchUno(url);
+        }
+        return { success: true, name: name };
+      }
+      if (alignMap[name] && typeof EXEC.sheet_format_cells === 'function') {
+        const hAlign = alignMap[name] === 'justify' ? 'standard' : alignMap[name];
+        EXEC.sheet_format_cells({ range: rangeName, hAlign: hAlign });
+        return { success: true, name: name };
+      }
     } else if (typeof isImpressDoc === 'function' && isImpressDoc() && typeof EXEC !== 'undefined' && typeof EXEC.slide_format_text === 'function') {
-      const ctx = typeof activeImpressContext === 'function' ? activeImpressContext() : null;
+      const ctx = typeof activeImpressContext === 'function' ? activeImpressContext(p && p.shapeName) : null;
       if (ctx && ctx.selectedShape && ctx.selectedShapeName) {
-        try {
-          const cur = typeof shapeCharFormat === 'function' ? shapeCharFormat(ctx.selectedShape) : {};
-          if (name === 'bold') EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, bold: !cur.bold });
-          else if (name === 'italic') EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, italic: !cur.italic });
-          else if (name === 'underline') EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, underline: cur.underline ? 'none' : 'single' });
-          else if (name === 'strikeout') EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, strikethrough: !cur.strikeout });
-          else if (alignMap[name]) EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, alignment: alignMap[name] });
-        } catch (e) {}
+        const cur = (typeof shapeCharFormat === 'function' ? shapeCharFormat(ctx.selectedShape) : null) || {};
+        if (name === 'bold') {
+          EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, bold: !cur.bold });
+          return { success: true, name: name };
+        }
+        if (name === 'italic') {
+          EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, italic: !cur.italic });
+          return { success: true, name: name };
+        }
+        if (name === 'underline') {
+          EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, underline: cur.underline ? 'none' : 'single' });
+          return { success: true, name: name };
+        }
+        if (name === 'strikeout') {
+          const curStrike = !!(cur.strikethrough != null ? cur.strikethrough : cur.strikeout);
+          EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, strikethrough: !curStrike });
+          return { success: true, name: name };
+        }
+        if (alignMap[name]) {
+          EXEC.slide_format_text({ slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, alignment: alignMap[name] });
+          return { success: true, name: name };
+        }
       }
     }
     dispatchUno(url);
@@ -5467,7 +5618,7 @@ const EXEC = {
     };
     if (isCalcDoc()) {
       const selInfo = activeCalcSelection();
-      const cell = selInfo.cell || selInfo.range;
+      const cell = selInfo.cell || selInfo.selRange;
       const cf = cell ? cellFormat(cell) : {};
       const ch = {
         bold: !!cf.bold,
@@ -10698,6 +10849,7 @@ const EXEC = {
     }
     ensureShapeNames(r0.page);
     let name = ''; try { name = shape.getName(); } catch (e) {}
+    try { if (ctrl && ctrl.select) ctrl.select(shape); } catch (e) {}
     return { success: true, shapeName: name };
   },
   // [幻灯片·写] 插入形状：矩形/椭圆/线条走对应 UNO 服务；三角形走 CustomShape +
@@ -10739,6 +10891,7 @@ const EXEC = {
     }
     ensureShapeNames(r0.page);
     let name = ''; try { name = shape.getName(); } catch (e) {}
+    try { if (ctrl && ctrl.select) ctrl.select(shape); } catch (e) {}
     return { success: true, shapeName: name };
   },
   // [幻灯片·写] 按 shapeName 精确删除一个形状。
@@ -10815,7 +10968,10 @@ const EXEC = {
     } else {
       try { cur = xText.createTextCursor(); cur.gotoStart(false); cur.gotoEnd(true); }
       catch (e) { return slideFail('选中形状全部文字失败: ' + errStr(e)); }
-      if ((cur.getString() || '').length === 0) return slideFail('该形状没有文字，无法格式化');
+      if ((cur.getString() || '').length === 0) {
+        if (rs.shape && typeof rs.shape.setPropertyValue === 'function') cur = rs.shape;
+        else return slideFail('该形状没有文字，无法格式化');
+      }
     }
     const applied = {};
     if (p.fontName != null) { setCharProp(cur, 'CharFontName', String(p.fontName)); applied.fontName = String(p.fontName); }
@@ -10953,6 +11109,7 @@ const EXEC = {
     }
     ensureShapeNames(r0.page);
     let name = ''; try { name = shape.getName(); } catch (e) {}
+    try { if (ctrl && ctrl.select) ctrl.select(shape); } catch (e) {}
     return { success: true, shapeName: name, rows: rowCount, cols: colCount };
   },
   // [幻灯片·看] 读一张表格形状为二维数组。不传 shapeName 要求该页只有一张表格。
