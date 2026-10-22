@@ -7,6 +7,16 @@ description: 侧边栏与工作台外壳领域。任务涉及左侧 rail/左栏�
 
 职责边界：工作台整体布局、左侧 rail 与左栏、面板切换状态机、页面路由。各面板内部逻辑归 utility-tools / plugin-system；右栏聊天内容归 ai-chat；编辑器归 doc-editor。
 
+## 账户浮层、左栏收起入口与 AI 首屏（dev-board#1417/#1418/#1419）
+
+`AccountEntry.vue` 的账户下拉通过每实例独立 holder 加入 `overlayState`；menuOpen 同步持有/释放，退出账户或卸载也释放。原生 BrowserView 无法被 DOM z-index 盖住，仍由工作台唯一 `desktopOverlayActive` watcher 隐藏/恢复，不能让组件直接操作主进程显隐。别的浮层未关闭时不恢复网页。
+
+左栏收起入口从 rail 底部移至展开左栏右缘靠顶部的 14×32px 窄左箭头卡；收起后卡片消失，rail 同项点击和顶栏开关继续收展。三条路径仍走 `toggleSidebar`，保留持久化及布局重算，不改变拖拽宽度。
+
+每次 `onLoad` 进入有项目的工作台，默认调用一次既有 `toggleAiPanel` 显示 AI；无项目欢迎态仍不挂 AI。本地免登项目同样可发现入口，不等待账户请求。当前代码没有 AI 关闭状态持久化读取；默认开启不在 `onShow`、账户刷新或焦点恢复中执行，用户本次手动关闭后保持关闭；重新打开/切换项目再默认开启。深链会话先标记不恢复旧会话，不能让首开恢复抢掉指定会话。懒挂载 + v-show 保活契约不变。
+
+回归：`ai-panel-default-open`、`sidebar-collapse`、`account-entry-account-changed`。`tests/project-home/shell-native-ui.mjs` 使用临时 profile、真实账户组件/浮层 watcher/BrowserView 注册表和合成原生网页验证遮挡、恢复与并存浮层，并保留 OS 窗口截图；不连接产品后端，也不等于正式客户端或 Windows 验收。`SHELL_UI_BASELINE=1` 从修复前基线 `9121174e1`（可用 `SHELL_UI_BASELINE_REF` 覆盖）读取旧账户组件作病灶对照。
+
 ## 更新状态与项目打开入口（dev-board#1401/#1403）
 
 工作台顶栏右侧工具组左边挂 `components/DesktopUpdateIndicator.vue`，直接消费 `host.update` 的 `{type,state}` 事件，挂载先订阅后取快照，旧快照不得覆盖更新的事件。检查/下载/原生准备持续显示；下载百分比只取真实字节，`preparing` 不显示虚构进度，`ready` 才允许点击原有 `host.update.restart()` 保存退出链。失败保留详情和重试；退出取消后恢复可点击。详情浮层用独立 holder 接入 `overlayState`，避免被 BrowserView 盖住，卸载必须退订及释放。菜单检查完成、后台就绪、工作台重挂载都不自动弹重启框；旧 `appUpdate` 底栏与自动提示已移除。
@@ -146,8 +156,8 @@ desensitize(文件脱敏) → litigation-visual(门控) → calendar(日历)**�
 「暂存区」（都是围绕本机改动/存档的动作），不该跟文件树/搜索这类常驻浏览面板
 混排。定义照 `DD_FILES_PLUGIN` 的先例独立导出成 `VERSION_PLUGIN`，进
 `OFF_RAIL_PLUGINS`（`getLeftSidebarPlugin('version')` 与 `leftPaneTitle` 兜底照常能查到），
-rail 底部（spacer 之后由模板单独渲染）现在是**暂存区 → 版本记录 → 收起左栏 → 成员堆叠 → 反馈**
-（暂存区 / 版本 / 成员在无项目态不渲染，无项目态只剩收起 / 反馈；dev-board#1047 一度在末尾加过账户入口与设置齿轮，
+rail 底部（spacer 之后由模板单独渲染）现在是**暂存区 → 版本记录 → 成员堆叠 → 反馈**
+（暂存区 / 版本 / 成员在无项目态不渲染，无项目态只剩反馈；dev-board#1047 一度在末尾加过账户入口与设置齿轮，
 dev-board#1062 撤回、账户入口回到顶栏右上角），最初的三项是**暂存区 → 版本记录 → 成员堆叠**，
 版本记录夹在中间；`toggleLeftPane('version')` 语义、面板本身一行未动。
 
@@ -966,7 +976,7 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
 | 区域 | 有项目 | 无项目 |
 |---|---|---|
 | rail 上半 | 现状 | 只剩全局面板：**项目**、插件中心、日程（+ 被停到左栏的剪贴板）；动态插件不上 rail |
-| rail 底部 | 暂存区 / 版本 / 收起 / 成员 / 反馈 | 收起 / 反馈（账户入口与设置齿轮 dev-board#1062 撤出 rail） |
+| rail 底部 | 暂存区 / 版本 / 成员 / 反馈 | 反馈（账户入口与设置齿轮 dev-board#1062 撤出 rail） |
 | 左栏面板 | 现状 | 只挂 `projects` / `calendar`（读全局事项）/ `market` / `clipboard`；`toggleLeftPane` 第一行就拦项目面板的 key（菜单、命令面板、存量 storage 都可能送进来），默认面板 `projects` |
 | 中央 | 标签 | 标签；「启动时显示欢迎页」开着就自动开欢迎标签，关着停在空态（一行提示 + 「打开欢迎页」链接） |
 | 右栏 AI | 现状 | **不渲染**（`v-if="aiPanelMounted && hasProject"`，`toggleAiPanel` / `resolveChatInterface` 直接返回并提示）——会话按项目隔离 |
@@ -1289,8 +1299,8 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
   它做三件事：`showAiPanel` 为 false 时先走既有的 `toggleAiPanel()`（顺带刷 AI 上下文 +
   拉历史，不能绕过去直接改标志位）→ 有界轮询 ~3s（30×100ms）等 `$refs.chatInterface`
   暴露 `sendExternalPrompt` → 真等不到才 toast。**别再各写各的
-  `if (!$refs.chatInterface) toast('AI 面板未就绪')`**：AI 面板默认收起，那条分支
-  在真实使用里几乎必中，而且它不告诉人该怎么办。现有三个调用方：
+  `if (!$refs.chatInterface) toast('AI 面板未就绪')`**：AI 面板首次挂载尚未完成时，那条分支
+  会误报未就绪，而且它不告诉人该怎么办。现有三个调用方：
   `handleShareholderMeetingStart` / `handleMeetingMinutesStart` / `handleLitigationStart`。
 - **rail 上加/改 key 之后自查 `panelSwitching.js`**：`toggleLeftPane` 与
   `lastActiveIdsByMode` 全按 key 工作（`data()` 里那两个字面量种子只写了

@@ -55,9 +55,15 @@ public final class SensitiveTextEngine {
                 if (!excluded.contains(value)) hits.add(new Hit(span.start(), span.end(), "CHINESE_NAME", value));
             }
         }
+        if (strategies.contains("ADDRESS")) {
+            for (var span : ChineseAddressRecognizer.find(text)) {
+                String value = text.substring(span.start(), span.end());
+                if (!excluded.contains(value)) hits.add(new Hit(span.start(), span.end(), "ADDRESS", value));
+            }
+        }
         for (SensitiveType type : SensitiveType.values()) {
             if (!type.isAutoDetect() || !strategies.contains(type.getCode())) continue;
-            if (type == SensitiveType.CHINESE_NAME) continue; // Context rules return just the name span.
+            if (type == SensitiveType.CHINESE_NAME || type == SensitiveType.ADDRESS) continue; // Context rules return just the name span.
             Matcher matcher = type.getPattern().matcher(text);
             while (matcher.find()) {
                 int start = matcher.start(), end = matcher.end();
@@ -133,7 +139,7 @@ public final class SensitiveTextEngine {
         List<Edit> edits = new ArrayList<>();
         for (Hit hit : accepted) {
             SensitiveType type = SensitiveType.fromCode(hit.code);
-            String label = type == null ? "自定义" : type.getLabel();
+            String label = type == null ? "自定义" : type == SensitiveType.ADDRESS ? type.mask(hit.value) : type.getLabel();
             String replacement;
             if (reversible) {
                 replacement = valueTokens.computeIfAbsent(hit.value, value -> {
