@@ -132,7 +132,7 @@ public class LocalRootWatchService {
                         // 「浏览到项目目录后 .awd/tree.json 被写」的完整因果链未坐实（没在真机上抓到
                         // 是哪一次对账/哪条写路径落的盘），不能据此宣称该现象已根治。
                         Path changed = event.path();
-                        if (changed != null && LocalProjectService.isIgnoredEntryName(changed.getFileName().toString())) {
+                        if (changed != null && LocalProjectService.isIgnoredWatchPath(root, changed)) {
                             return;
                         }
                         scheduleReconcile(projectId);

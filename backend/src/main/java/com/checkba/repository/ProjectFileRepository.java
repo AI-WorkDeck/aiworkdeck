@@ -110,9 +110,18 @@ public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> 
      * 新建文件/文件夹此前靠拉整个同级列表在内存里求 max（每次新建都是一次 O(同级文件数)
      * 的读取），同一文件夹下连续新建 N 个就是累计 O(N^2)——300 张截图落进同一目录时
      * 累计读取达数万行。改成单条聚合查询后单次新建是一次索引扫描。
+     * 拆成 root（parent_id IS NULL）和 child（parent_id = :parentId）两条查询，避免
+     * (:parentId IS NULL AND ... OR ...) 导致 H2 优化器无法命中 (project_id, parent_id) 复合索引而退化为全表扫描。
      */
-    @org.springframework.data.jpa.repository.Query("SELECT MAX(pf.sortOrder) FROM ProjectFile pf WHERE pf.projectId = :projectId AND (:parentId IS NULL AND pf.parentId IS NULL OR pf.parentId = :parentId) AND pf.isDeleted = false")
-    Integer maxSortOrder(Long projectId, Long parentId);
+    @org.springframework.data.jpa.repository.Query("SELECT MAX(pf.sortOrder) FROM ProjectFile pf WHERE pf.projectId = :projectId AND pf.parentId IS NULL AND pf.isDeleted = false")
+    Integer maxRootSortOrder(Long projectId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT MAX(pf.sortOrder) FROM ProjectFile pf WHERE pf.projectId = :projectId AND pf.parentId = :parentId AND pf.isDeleted = false")
+    Integer maxChildSortOrder(Long projectId, Long parentId);
+
+    default Integer maxSortOrder(Long projectId, Long parentId) {
+        return parentId == null ? maxRootSortOrder(projectId) : maxChildSortOrder(projectId, parentId);
+    }
 
     /**
      * 一批项目各自的「最近一次文件活动时间」（排除已删除），返回 [projectId, maxUpdatedAt]。

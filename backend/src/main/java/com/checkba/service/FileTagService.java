@@ -68,7 +68,22 @@ public class FileTagService {
         if (fileIds == null || fileIds.isEmpty()) {
             return Collections.emptyMap();
         }
-        List<FileTag> allFileTags = fileTagRepository.findByFileIdIn(fileIds);
+        // 大型本地文件夹项目可有 30,000 个文件，而绝大多数文件未打标签；
+        // 先检查关联表是否为空，并按 500 个 ID 分片查询，避免拼出 30,000 个占位符的巨型 IN 查询。
+        if (fileTagRepository.count() == 0) {
+            return Collections.emptyMap();
+        }
+        List<FileTag> allFileTags;
+        int chunkSize = 500;
+        if (fileIds.size() <= chunkSize) {
+            allFileTags = fileTagRepository.findByFileIdIn(fileIds);
+        } else {
+            allFileTags = new java.util.ArrayList<>();
+            for (int i = 0; i < fileIds.size(); i += chunkSize) {
+                List<Long> chunk = fileIds.subList(i, Math.min(i + chunkSize, fileIds.size()));
+                allFileTags.addAll(fileTagRepository.findByFileIdIn(chunk));
+            }
+        }
         if (allFileTags.isEmpty()) {
             return Collections.emptyMap();
         }

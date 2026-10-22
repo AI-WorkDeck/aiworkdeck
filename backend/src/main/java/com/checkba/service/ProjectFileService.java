@@ -2463,7 +2463,7 @@ public class ProjectFileService {
      * 通知版本记录：项目文件发生了变更。
      * 版本记录是保险不是主流程——任何异常只记日志，绝不阻断文件操作。
      */
-    private void signalChange(Long projectId, Long userId) {
+    void signalChange(Long projectId, Long userId) {
         if (projectId == null) return;
         // 埋点：仅计数，不带任何文件/项目信息
         telemetryService.record("file.changed", null);
