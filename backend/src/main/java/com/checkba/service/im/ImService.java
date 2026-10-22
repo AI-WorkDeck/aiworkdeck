@@ -24,13 +24,16 @@ public class ImService {
     public static final String FILE_UNAVAILABLE = "抱歉文件还在准备中，请联系您的律师。";
     static final long MAX_CONVERSATION_BYTES = 100L * 1024 * 1024;
     public static final Set<String> ACTIONS = Set.of("self", "list", "create", "invite", "join",
-            "members", "removeMember", "leave", "messages", "send", "read", "upload", "download", "fileAccess");
+            "members", "removeMember", "leave", "messages", "send", "read", "upload", "download", "fileAccess",
+            "agentScopes", "ensureAgent", "agentInfo", "agentReply");
     private final ImConversationRepository conversations;
     private final ImMemberRepository members;
     private final ImInvitationRepository invitations;
     private final ImMessageRepository messages;
     private final ImAttachmentRepository attachments;
     private final UserRepository users;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private ImAgentService agents;
 
     /** The conversation row lock serializes membership, invitations, sends and quota accounting. */
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
@@ -39,10 +42,18 @@ public class ImService {
         Map<String,Object> p = params == null ? Map.of() : params;
         if (!ACTIONS.contains(action)) throw bad("不支持的沟通操作");
         if ("self".equals(action)) return Map.of("id", userId, "displayName", displayName(userId));
+        if ("agentScopes".equals(action)) return agentService().scopes(userId);
+        if ("ensureAgent".equals(action)) {
+            ImConversation c = agentService().ensure(userId, p);
+            return view(c, requireMember(c.getId(), userId));
+        }
         if ("list".equals(action)) {
             List<Map<String,Object>> rows = new ArrayList<>();
             for (ImMember member : members.findByUserId(userId)) {
-                conversations.findById(member.getConversationId()).ifPresent(c -> rows.add(view(c, member)));
+                conversations.findById(member.getConversationId()).ifPresent(c -> {
+                    try { authorizeAgent(c, userId); rows.add(view(c, member)); }
+                    catch (IllegalArgumentException revoked) { /* Revoked scope membership is not a chat-list capability. */ }
+                });
             }
             rows.sort(Comparator.comparing(r -> String.valueOf(r.get("lastMessageAt")), Comparator.reverseOrder()));
             return Map.of("conversations", rows);
@@ -51,10 +62,12 @@ public class ImService {
         if ("join".equals(action)) return join(userId, p);
         ImConversation conversation = lock(required(p, "conversationId", 36));
         ImMember member = requireMember(conversation.getId(), userId);
+        authorizeAgent(conversation, userId);
         return switch (action) {
             case "invite" -> invite(conversation, member, p);
-            case "members" -> Map.of("members", members.findByConversationId(conversation.getId()).stream()
-                    .map(m -> Map.of("id", m.getUserId(), "displayName", displayName(m.getUserId()), "role", m.getRole())).toList());
+            case "members" -> memberViews(conversation);
+            case "agentInfo" -> view(conversation, member);
+            case "agentReply" -> agentService().reply(conversation, userId, p);
             case "removeMember" -> remove(conversation, member, number(p, "userId", -1));
             case "leave" -> leave(conversation, member);
             case "messages" -> listMessages(conversation, member, p);
@@ -79,6 +92,7 @@ public class ImService {
 
     private Object invite(ImConversation c, ImMember me, Map<String,Object> p) {
         requireOwner(me);
+        ImAgentService.requireInvitable(c);
         if ("DIRECT".equals(c.getType()) && members.countByConversationId(c.getId()) >= 2) throw bad("私聊已有两位参与人");
         String role = required(p, "role", 16);
         if (!Set.of("MEMBER", "CLIENT").contains(role)) throw bad("邀请角色无效");
@@ -96,6 +110,7 @@ public class ImService {
         String hash = sha(required(p, "code", 64).getBytes(StandardCharsets.UTF_8));
         String conversationId = invitations.conversationIdForHash(hash).orElseThrow(() -> bad("邀请码无效或已过期"));
         ImConversation c = lock(conversationId);
+        ImAgentService.requireInvitable(c);
         // Reload under the conversation lock: two redeemers cannot both consume a code.
         ImInvitation invite = invitations.findById(hash).orElseThrow(() -> bad("邀请码无效或已过期"));
         if (invite.getUsedAt() != null || !invite.getExpiresAt().isAfter(Instant.now())) throw bad("邀请码无效或已过期");
@@ -116,6 +131,9 @@ public class ImService {
     }
 
     private Object leave(ImConversation c, ImMember me) {
+        if (c.getAgentScope() != null && (Boolean.TRUE.equals(c.getAgentPrivate())
+                || ("project".equals(c.getAgentScope()) && "OWNER".equals(me.getRole()))))
+            throw bad("此助手会话需要保留，可关闭面板后随时重新打开");
         if ("OWNER".equals(me.getRole()) && members.countByConversationId(c.getId()) > 1) throw bad("请先移除其他成员，再退出会话");
         invitations.deleteByConversationIdAndIssuedBy(c.getId(), me.getUserId());
         members.delete(me);
@@ -131,7 +149,10 @@ public class ImService {
                 : messages.findByConversationIdAndIdLessThanOrderByIdDesc(c.getId(), before, PageRequest.of(0, limit));
         List<ImMessage> rows = new ArrayList<>(page.getContent());
         rows.sort(Comparator.comparing(ImMessage::getId));
-        return Map.of("messages", rows.stream().map(m -> messageView(m, me)).toList(), "hasMore", page.hasNext());
+        Map<String,Object> result = new LinkedHashMap<>();
+        result.put("messages", rows.stream().map(m -> messageView(m, me)).toList()); result.put("hasMore", page.hasNext());
+        result.put("agentStatus", c.getAgentScope() == null ? null : agentService().status(c.getId()));
+        return result;
     }
 
     private Object send(ImConversation c, ImMember me, Map<String,Object> p) {
@@ -153,6 +174,7 @@ public class ImService {
         }
         ImMessage message = new ImMessage(); message.setUid(UUID.randomUUID().toString());
         message.setConversationId(c.getId()); message.setSenderId(me.getUserId()); message.setClientMessageId(clientId);
+        message.setActorType("HUMAN");
         message.setText(text); message.setAttachmentId(attachmentId.isBlank() ? null : attachmentId);
         message.setCreatedAt(Instant.now()); messages.saveAndFlush(message);
         c.setLastMessageAt(message.getCreatedAt()); conversations.save(c);
@@ -221,6 +243,23 @@ public class ImService {
         return attachmentView(file, me);
     }
 
+    private ImAgentService agentService() {
+        if (agents == null) throw bad("当前服务尚未开通沟通助手");
+        return agents;
+    }
+    private void authorizeAgent(ImConversation conversation, Long userId) {
+        if (conversation.getAgentScope() != null) agentService().authorize(conversation, userId);
+    }
+    private Map<String,Object> memberViews(ImConversation conversation) {
+        List<Map<String,Object>> rows = new ArrayList<>();
+        for (ImMember member : members.findByConversationId(conversation.getId())) {
+            rows.add(Map.of("id", member.getUserId(), "displayName", displayName(member.getUserId()), "role", member.getRole(), "actorType", "HUMAN"));
+        }
+        int humanCount = rows.size();
+        if (conversation.getAgentScope() != null) rows.add(Map.of("id", "agent:" + conversation.getId(), "displayName", conversation.getAgentName(), "role", "AGENT", "actorType", "AGENT"));
+        return Map.of("members", rows, "humanCount", humanCount);
+    }
+
     private ImConversation lock(String id) { return conversations.lockById(id).orElseThrow(() -> bad("会话不存在或无权访问")); }
     private ImMember requireMember(String id, Long userId) { return members.findByConversationIdAndUserId(id, userId).orElseThrow(() -> bad("会话不存在或无权访问")); }
     private void requireOwner(ImMember member) { if (!"OWNER".equals(member.getRole())) throw bad("只有会话负责人可以执行此操作"); }
@@ -234,14 +273,19 @@ public class ImService {
         member.setRole(role); member.setJoinedAt(Instant.now()); return members.save(member);
     }
     private Map<String,Object> view(ImConversation c, ImMember member) {
-        return Map.of("id", c.getId(), "title", c.getTitle(), "type", c.getType(), "role", member.getRole(),
+        Map<String,Object> result = new LinkedHashMap<>(Map.of("id", c.getId(), "title", c.getTitle(), "type", c.getType(), "role", member.getRole(),
                 "createdAt", c.getCreatedAt(), "lastMessageAt", c.getLastMessageAt(), "lastReadId", member.getLastReadId(),
-                "unreadCount", messages.countByConversationIdAndIdGreaterThanAndSenderIdNot(c.getId(), member.getLastReadId(), member.getUserId()));
+                "unreadCount", messages.countByConversationIdAndIdGreaterThanAndSenderIdNot(c.getId(), member.getLastReadId(), member.getUserId())));
+        if (c.getAgentScope() != null) result.put("agent", ImAgentService.agentView(c));
+        return result;
     }
     private Map<String,Object> messageView(ImMessage m, ImMember me) {
         Map<String,Object> result = new LinkedHashMap<>(); result.put("id", m.getId()); result.put("uid", m.getUid());
         result.put("clientMessageId", m.getClientMessageId()); result.put("senderId", m.getSenderId());
-        result.put("senderName", displayName(m.getSenderId())); result.put("text", m.getText()); result.put("createdAt", m.getCreatedAt());
+        boolean agent = "AGENT".equals(m.getActorType()); result.put("actorType", agent ? "AGENT" : "HUMAN");
+        result.put("senderName", agent ? m.getAgentName() : displayName(m.getSenderId()));
+        if (agent) result.put("agentName", m.getAgentName());
+        result.put("text", m.getText()); result.put("createdAt", m.getCreatedAt());
         if (m.getAttachmentId() != null) {
             // Fetch only metadata: a page of 100 messages must not hydrate 100 attachment blobs.
             var metadata = attachments.metadata(m.getAttachmentId(), m.getConversationId());

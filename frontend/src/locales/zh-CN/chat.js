@@ -208,7 +208,7 @@ export default {
   memoryScopeUser: '个人',
   memoryScopeProject: '项目',
   memoryScopeTeam: '团队',
-  memoryScopeFirm: '机构',
+  memoryScopeFirm: '律所',
   memoryUnavailable: '不可用',
   memoryLoading: '正在加载记忆…',
   memoryRetry: '重试',

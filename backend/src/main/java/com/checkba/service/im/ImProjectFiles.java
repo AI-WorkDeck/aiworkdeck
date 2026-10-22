@@ -45,6 +45,41 @@ public class ImProjectFiles implements ImProjectActionHandler {
         return Set.of("import", "binding", "export", "sendFile").contains(action);
     }
 
+    /** Reuse the identity carried with the project in Git, including after a clone gets a new local DB ID. */
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public String ensureIdentity(Long userId, Long projectId, String accountScope) {
+        if (userId == null || projectId == null || !access.hasReadPermission(projectId, userId))
+            throw new IllegalArgumentException("没有当前项目的访问权限");
+        gateway.assertAccountScope(accountScope);
+        projects.lockForImWrite(projectId).orElseThrow(() -> new IllegalArgumentException("项目不存在"));
+        String uid = identity(userId, projectId, accountScope);
+        gateway.assertAccountScope(accountScope);
+        return uid;
+    }
+
+    /** Replying with existing private context must never create project files. */
+    public String readIdentity(Long userId, Long projectId, String accountScope) {
+        if (userId == null || projectId == null || !access.hasReadPermission(projectId, userId))
+            throw new IllegalArgumentException("没有当前项目的访问权限");
+        gateway.assertAccountScope(accountScope);
+        var file = files.findByRelativePath(projectId, "项目沟通/项目标识.json")
+                .orElseThrow(() -> new IllegalArgumentException("项目尚未建立沟通标识"));
+        String uid = uuid(parse(read(file, 64 * 1024)).get("projectUid"));
+        gateway.assertAccountScope(accountScope);
+        return uid;
+    }
+
+    private String identity(Long userId, Long projectId, String accountScope) {
+        var identityFile = files.findByRelativePath(projectId, "项目沟通/项目标识.json");
+        if (identityFile.isPresent()) return uuid(parse(read(identityFile.get(), 64 * 1024)).get("projectUid"));
+        if (!access.hasWritePermission(projectId, userId) || fileAccess.isClient(projectId, userId))
+            throw new IllegalArgumentException("请先由项目内部成员打开项目沟通，建立项目标识");
+        var project = projects.findById(projectId).orElseThrow(() -> new IllegalArgumentException("项目不存在"));
+        String uid = catalog.ensureProjectUid(project);
+        writeJson(accountScope, projectId, userId, "项目沟通", "项目标识.json", Map.of("schemaVersion", 1, "projectUid", uid));
+        return uid;
+    }
+
     @Override @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Object execute(Long userId, Long projectId, String action, Map<String, Object> params) {
         if (projectId == null || userId == null || !("sendFile".equals(action)
@@ -78,15 +113,7 @@ public class ImProjectFiles implements ImProjectActionHandler {
             String uid = uuid(manifest.get("projectUid"));
             return Map.of("projectUid", uid, "conversationId", conversationId, "path", path);
         }
-        var project = projects.findById(projectId).orElseThrow(() -> new IllegalArgumentException("项目不存在"));
-        String identityPath = "项目沟通/项目标识.json";
-        var identityFile = files.findByRelativePath(projectId, identityPath);
-        String uid;
-        if (identityFile.isPresent()) uid = uuid(parse(read(identityFile.get(), 64 * 1024)).get("projectUid"));
-        else {
-            uid = catalog.ensureProjectUid(project);
-            writeJson(accountScope, projectId, userId, "项目沟通", "项目标识.json", Map.of("schemaVersion", 1, "projectUid", uid));
-        }
+        String uid = identity(userId, projectId, accountScope);
         Map<String, Object> manifest = Map.of("schemaVersion", 1, "projectUid", uid,
                 "conversationId", conversationId, "createdAt", Instant.now().toString());
         writeJson(accountScope, projectId, userId, dir, "会话关联.json", manifest);
