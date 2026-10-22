@@ -29,11 +29,14 @@ import java.util.regex.Pattern;
 @Service
 public class MemoryDocumentService {
     public static final String INDEX_PATH = "remember.md";
+    public static final int MAX_INDEX_HOOK_CHARS = 120;
     private static final int MAX_CONTENT_CHARS = 128 * 1024;
     private static final String LINKS_START = "<!-- memory-topics:start -->";
     private static final String LINKS_END = "<!-- memory-topics:end -->";
     private static final Pattern HEADING = Pattern.compile("(?m)^#\\s+(.+?)\\s*$");
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^\\]]*]\\(([^)]+)\\)");
+    private static final Pattern INLINE_MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)]\\([^)]*\\)");
+    private static final Pattern FRONTMATTER_DESCRIPTION = Pattern.compile("(?m)^description:\\s*(.+?)\\s*$");
 
     private final MemoryDocumentRepository documents;
     private final MemoryDocumentSpaceRepository spaces;
@@ -219,8 +222,24 @@ public class MemoryDocumentService {
                 current.setRevision(Math.max(current.getRevision() + 1, documentRevision(entry)));
                 current.setUpdatedAt(LocalDateTime.now());
                 documents.save(current);
+                if (!INDEX_PATH.equals(path)) {
+                    refreshIndex(space, entry.getUserId());
+                }
             }
             return toView(current, true, true);
+        }
+        if (path.startsWith("legacy/") && entry.getMemoryKey() != null && !entry.getMemoryKey().isBlank()) {
+            String normalizedTitle = entry.getMemoryKey().trim();
+            for (MemoryDocument doc : documents.findBySpaceIdAndDeletedFalseOrderByPathAsc(space.getId())) {
+                if (doc.getPath().startsWith("legacy/")
+                        && !Objects.equals(doc.getSourceMemoryUid(), entry.getUid())
+                        && normalizedTitle.equals(doc.getTitle())) {
+                    doc.setDeleted(true);
+                    doc.setRevision(doc.getRevision() + 1);
+                    doc.setUpdatedAt(LocalDateTime.now());
+                    documents.save(doc);
+                }
+            }
         }
         return writeLocal(space, entry.getUserId(), path, content, 0, entry.getUid());
     }
@@ -297,12 +316,16 @@ public class MemoryDocumentService {
         }
         if (document.getSourceMemoryUid() == null) document.setSourceMemoryUid(UUID.randomUUID().toString());
         documents.saveAndFlush(document);
-        syncLegacyIndex(document, space);
+        syncLegacyIndex(document, space, sourceMemoryUid != null);
         if (!INDEX_PATH.equals(path)) refreshIndex(space, userId);
         return toView(document, true, true);
     }
 
     private void syncLegacyIndex(MemoryDocument document, MemoryDocumentSpace space) {
+        syncLegacyIndex(document, space, false);
+    }
+
+    private void syncLegacyIndex(MemoryDocument document, MemoryDocumentSpace space, boolean fromLegacyEntry) {
         MemoryEntry entry = legacyEntries.findFirstByUid(document.getSourceMemoryUid()).orElseGet(MemoryEntry::new);
         boolean derived = entry.getId() == null;
         entry.setUid(document.getSourceMemoryUid());
@@ -315,8 +338,10 @@ public class MemoryDocumentService {
             entry.setImportanceScore(0.7);
             entry.setIsProtected(false);
         }
-        entry.setMemoryKey(document.getTitle());
-        entry.setMemoryValue(document.getContent());
+        if (!fromLegacyEntry || derived) {
+            entry.setMemoryKey(document.getTitle());
+            entry.setMemoryValue(document.getContent());
+        }
         Map<String, Object> metadata = entry.getMetadata() == null
                 ? new LinkedHashMap<>() : new LinkedHashMap<>(entry.getMetadata());
         metadata.put("documentPath", document.getPath());
@@ -459,9 +484,92 @@ public class MemoryDocumentService {
         StringBuilder links = new StringBuilder(LINKS_START).append('\n');
         for (MemoryDocument topic : topics) {
             links.append("- [").append(linkLabel(topic.getTitle())).append("](")
-                    .append(topic.getPath()).append(")\n");
+                    .append(topic.getPath()).append(")");
+            String hook = extractSummaryHook(topic.getTitle(), topic.getContent());
+            if (!hook.isBlank()) {
+                links.append(" — ").append(hook);
+            }
+            links.append('\n');
         }
         return links.append(LINKS_END).toString();
+    }
+
+    /**
+     * 提取细项文档的一句话高密度摘要（Index Hook），用于拼入 {@code remember.md} 总表：
+     * <ol>
+     *   <li>优先读取 YAML frontmatter 中的 {@code description:} 字段（对齐 Claude Code 记忆索引规范）；</li>
+     *   <li>若无 frontmatter 描述，则跳过标题行与注释后提取正文首段第一行作为摘要钩子；</li>
+     *   <li>单行化、剥离内联 Markdown 链接语法并截断至 {@link #MAX_INDEX_HOOK_CHARS} 字符。</li>
+     * </ol>
+     */
+    public static String extractSummaryHook(String title, String content) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+        String normalized = content.replace("\r\n", "\n").trim();
+        String rawHook = null;
+        String body = normalized;
+        if (normalized.startsWith("---\n")) {
+            int closingFence = normalized.indexOf("\n---\n", 4);
+            if (closingFence >= 0) {
+                String frontmatter = normalized.substring(4, closingFence);
+                Matcher descMatcher = FRONTMATTER_DESCRIPTION.matcher(frontmatter);
+                if (descMatcher.find()) {
+                    rawHook = stripQuotes(descMatcher.group(1).trim());
+                }
+                body = normalized.substring(closingFence + 5).trim();
+            }
+        }
+        if (rawHook == null || rawHook.isBlank()) {
+            for (String line : body.split("\n")) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()
+                        || trimmed.startsWith("#")
+                        || trimmed.startsWith("<!--")
+                        || trimmed.startsWith("```")
+                        || "---".equals(trimmed)) {
+                    continue;
+                }
+                if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+                    trimmed = trimmed.substring(2).trim();
+                }
+                if (!trimmed.isEmpty()) {
+                    rawHook = trimmed;
+                    break;
+                }
+            }
+        }
+        if (rawHook == null || rawHook.isBlank()) {
+            return "";
+        }
+        String cleaned = cleanHookText(rawHook);
+        if (cleaned.isEmpty() || (title != null && cleaned.equalsIgnoreCase(title.trim()))) {
+            return "";
+        }
+        return truncateHook(cleaned, MAX_INDEX_HOOK_CHARS);
+    }
+
+    private static String cleanHookText(String text) {
+        String withoutLinks = INLINE_MARKDOWN_LINK.matcher(text).replaceAll("$1");
+        return withoutLinks.replaceAll("\\s+", " ").trim();
+    }
+
+    private static String stripQuotes(String value) {
+        if (value == null || value.length() < 2) {
+            return value == null ? "" : value;
+        }
+        if ((value.startsWith("\"") && value.endsWith("\""))
+                || (value.startsWith("'") && value.endsWith("'"))) {
+            return value.substring(1, value.length() - 1).trim();
+        }
+        return value;
+    }
+
+    private static String truncateHook(String text, int maxChars) {
+        if (text == null || text.length() <= maxChars) {
+            return text == null ? "" : text;
+        }
+        return text.substring(0, Math.max(1, maxChars - 1)).trim() + "…";
     }
 
     private List<OrganizationIndex> organizationIndexes(Long userId) {
@@ -536,11 +644,32 @@ public class MemoryDocumentService {
     }
 
     private static String legacyMarkdown(MemoryEntry e) {
-        return "---\nsource: legacy-memory-entry\nuid: " + e.getUid()
-                + "\ntype: " + nullToEmpty(e.getMemoryType())
-                + "\nprotected: " + Boolean.TRUE.equals(e.getIsProtected()) + "\n---\n\n# "
-                + (e.getMemoryKey() == null || e.getMemoryKey().isBlank() ? "历史记忆" : e.getMemoryKey())
-                + "\n\n" + nullToEmpty(e.getMemoryValue());
+        String key = e.getMemoryKey() == null || e.getMemoryKey().isBlank() ? "历史记忆" : e.getMemoryKey().trim();
+        String rawValue = nullToEmpty(e.getMemoryValue()).trim();
+        String firstLine = rawValue.lines()
+                .map(String::trim)
+                .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                .findFirst()
+                .orElse("");
+        String hook = truncateHook(cleanHookText(firstLine), MAX_INDEX_HOOK_CHARS);
+        StringBuilder sb = new StringBuilder("---\nsource: legacy-memory-entry\nuid: ")
+                .append(e.getUid())
+                .append("\nname: ").append(sanitizeYamlScalar(key));
+        if (!hook.isBlank()) {
+            sb.append("\ndescription: ").append(sanitizeYamlScalar(hook));
+        }
+        sb.append("\ntype: ").append(nullToEmpty(e.getMemoryType()))
+                .append("\nprotected: ").append(Boolean.TRUE.equals(e.getIsProtected()))
+                .append("\n---\n\n# ").append(key)
+                .append("\n\n").append(rawValue);
+        return sb.toString();
+    }
+
+    private static String sanitizeYamlScalar(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace("\r", " ").replace("\n", " ").trim();
     }
 
     private static String documentPath(MemoryEntry entry) {
@@ -551,7 +680,12 @@ public class MemoryDocumentService {
 
     private static String documentContent(MemoryEntry entry) {
         Object path = entry.getMetadata() == null ? null : entry.getMetadata().get("documentPath");
-        return path == null ? legacyMarkdown(entry) : nullToEmpty(entry.getMemoryValue());
+        String value = nullToEmpty(entry.getMemoryValue());
+        if (path == null || (String.valueOf(path).startsWith("legacy/")
+                && !value.startsWith("---\nsource: legacy-memory-entry\n"))) {
+            return legacyMarkdown(entry);
+        }
+        return value;
     }
 
     private static long documentRevision(MemoryEntry entry) {

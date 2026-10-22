@@ -163,6 +163,26 @@ public class ProjectMemory {
             sb.append("- 关键日期:\n");
             keyDates.forEach((k, v) -> sb.append("  - ").append(k).append(": ").append(v).append("\n"));
         }
+        if (keyVariables != null && !keyVariables.isEmpty()) {
+            sb.append("- 关键事实与变量:\n");
+            keyVariables.forEach((k, v) -> sb.append("  - ").append(k).append(": ").append(v).append("\n"));
+        }
+        if (checkConclusions != null && !checkConclusions.isEmpty()) {
+            sb.append("- 核心决策与核查结论:\n");
+            for (Map<String, String> item : checkConclusions) {
+                if (item == null) continue;
+                String topic = item.getOrDefault("topic", item.getOrDefault("key", ""));
+                String conclusion = item.getOrDefault("conclusion", item.getOrDefault("value", ""));
+                if (topic != null && !topic.isBlank() && conclusion != null && !conclusion.isBlank()) {
+                    sb.append("  - ").append(topic).append(": ").append(conclusion).append("\n");
+                } else if (conclusion != null && !conclusion.isBlank()) {
+                    sb.append("  - ").append(conclusion).append("\n");
+                }
+            }
+        }
+        if (legalRefs != null && !legalRefs.isEmpty()) {
+            sb.append("- 核心法规引用: ").append(String.join("；", legalRefs)).append("\n");
+        }
         
         return sb.toString();
     }

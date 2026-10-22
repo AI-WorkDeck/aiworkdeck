@@ -30,7 +30,8 @@ public class TodoTools implements AgentToolComponent {
           "避免只更新状态占一轮；依赖结果的操作仍等待结果，不得省略依据核验或最终回读；" +
           "3) 同一时刻只允许一项 in_progress；" +
           "4) 计划变化时（增删任务）也用本工具整表覆写；" +
-          "5) 1-2 步的简单任务不要用。" +
+          "5) 1-2 步的简单任务不要用；" +
+          "6) 收尾回写自检（开卡→工作→回写闭环）：如果本轮任务中产生了用户新确认的跨项目偏好（L3）或已核实的项目关键决策/事实/结论（L2），在将最后一项标为 completed 收尾时顺手调用 save_memory 落盘（无新知识则不写）。" +
           "清单会实时显示给用户作为进度面板，只管本轮执行进度——跨对话持续的截止日与里程碑用 task_create 等事项工具。")
     @ToolMeta(displayName = "更新任务清单", category = "planning")
     public String todo_write(
