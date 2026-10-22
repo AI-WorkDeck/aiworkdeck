@@ -755,6 +755,7 @@ export default {
     aiScopeSelection: 'the current selection',
     aiScopeDocument: 'the whole document',
     aiDefaultRequirement: 'a clean, consistent formal document format (clear heading levels, 2-character first-line indent for body text, consistent line and paragraph spacing)',
+    aiSelectionRevisePrompt: 'Please revise the following selected excerpt in the document "{name}":\n"{selection}"\nRevision instructions: {instruction}\nLocate and revise this excerpt in place (with tracked changes), leaving unrelated paragraphs unchanged.',
   },
   systemFonts: {
     title: 'Editor Fonts',

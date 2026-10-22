@@ -956,6 +956,17 @@ public class ContextAssemblerService {
                           .append("\" name=\"").append(attrSafe(activeContext.getName()))
                           .append("\">").append(readHint).append("</active_document>\n");
             }
+            String rawSelection = activeContext.getSelectionText();
+            if (rawSelection != null && !rawSelection.isBlank()) {
+                String trimmedSelection = rawSelection.trim();
+                String normalizedSelection = truncateAtCharBoundary(trimmedSelection,
+                        Math.min(trimmedSelection.length(), 2000));
+                volatileText.append("\n\n## Active Selection\n");
+                volatileText.append("<active_selection id=\"").append(activeContext.getId())
+                            .append("\" name=\"").append(attrSafe(activeContext.getName())).append("\"><![CDATA[\n");
+                volatileText.append(fenceSafe(normalizedSelection));
+                volatileText.append("\n]]></active_selection>\n");
+            }
             } // end non-image active document
         }
 
@@ -1809,7 +1820,7 @@ public class ContextAssemblerService {
             return activeDocumentReminderEn(activeContext, capability, officeHost);
         }
         String docLabel = activeDocDisplayName(activeContext.getName());
-        return switch (capability) {
+        String baseReminder = switch (capability) {
             case OFFICE -> switch (officeHost) {
                 // 末位只留判据句与测试钉住的几个名字，完整工具目录在 system 的「文档工具」片段里（dev-board#1073）
                 case EXCEL -> "\n\n[系统提醒] 用户此刻在表格软件（Microsoft Excel 或 WPS 表格）中打开着工作簿" + docLabel + "，"
@@ -1872,6 +1883,57 @@ public class ContextAssemblerService {
                         + "**不要**把报告正文写进当前文档。被当作材料、依据引用的文件是输入，不是写入目标。";
             };
         };
+        return baseReminder + activeSelectionReminder(activeContext, capability, officeHost, false);
+    }
+
+    /**
+     * 当前文档选区的末位提醒（dev-board#1430）：无选区时返回空串（保持存量行为零变化）。
+     */
+    private String activeSelectionReminder(com.checkba.controller.ai.AiAgentController.ContextItem activeContext,
+                                           ClientCapabilityService.Capability capability,
+                                           ClientCapabilityService.OfficeHost officeHost,
+                                           boolean english) {
+        if (activeContext == null || activeContext.getSelectionText() == null || activeContext.getSelectionText().isBlank()) {
+            return "";
+        }
+        String trimmed = activeContext.getSelectionText().trim();
+        String excerpt = truncateAtCharBoundary(trimmed, Math.min(trimmed.length(), 2000));
+        if (english) {
+            String toolHint = switch (capability) {
+                case OFFICE -> switch (officeHost) {
+                    case EXCEL -> "operate on the selected cells via office_excel_* tools";
+                    case POWERPOINT -> "operate on the selected slide text via office_ppt_* tools";
+                    default -> "use office_replace_text (targeting this selected excerpt) so the revision lands in-place as native Word tracked changes without spending a round discovering the selection";
+                };
+                case NONE -> "focus your analysis or suggested revision on this selected excerpt";
+                default -> switch (lowaDocKind(activeContext)) {
+                    case "sheet" -> "operate on this selected content via sheet_* tools";
+                    case "slide" -> "operate on this selected content via slide_* tools";
+                    case "text" -> "use text_find_replace to revise this selected excerpt directly in-place";
+                    default -> "use doc_find_replace or doc_replace_selection to revise this selected excerpt directly in-place with tracked changes — do NOT spend a round calling doc_get_cursor_context to rediscover the selection";
+                };
+            };
+            return "\n[Active selection] The user currently has the following excerpt selected in the active document (also in <active_selection>): \""
+                    + excerpt + "\". When the user gives revision feedback, asks to polish/rewrite, or does not specify another section, target this selected excerpt by default — "
+                    + toolHint + ".";
+        }
+        String toolHint = switch (capability) {
+            case OFFICE -> switch (officeHost) {
+                case EXCEL -> "优先调用 office_excel_* 工具针对该选中区域操作";
+                case POWERPOINT -> "优先调用 office_ppt_* 工具针对该选中内容操作";
+                default -> "优先调用 office_replace_text（以该选中片段为原文）直接就地修订（以 Word 原生修订呈现），无需再调工具确认选区";
+            };
+            case NONE -> "请围绕该选中片段作答或给出修改建议";
+            default -> switch (lowaDocKind(activeContext)) {
+                case "sheet" -> "优先调用 sheet_* 工具针对该选中内容操作";
+                case "slide" -> "优先调用 slide_* 工具针对该选中内容操作";
+                case "text" -> "优先调用 text_find_replace 直接替换该选中片段";
+                default -> "优先调用 doc_find_replace 或 doc_replace_selection 直接对该选中片段做就地修订（修订留痕），**无需**再调 doc_get_cursor_context 探测选区";
+            };
+        };
+        return "\n[当前选区] 用户已在当前文档中选中以下片段（完整内容亦见 <active_selection>）：「"
+                + excerpt + "」。当用户提出修改意见、润色要求或未指明其他段落时，默认针对这段选中内容操作——"
+                + toolHint + "。";
     }
 
     /**
@@ -2462,7 +2524,7 @@ All doc_* editing and reading tools act directly on this document. You need NOT 
                                             ClientCapabilityService.Capability capability,
                                             ClientCapabilityService.OfficeHost officeHost) {
         String docLabel = activeDocDisplayNameEn(activeContext.getName());
-        return switch (capability) {
+        String baseReminder = switch (capability) {
             case OFFICE -> switch (officeHost) {
                 case EXCEL -> "\n\n[System reminder] The user currently has the workbook " + docLabel
                         + " open in Microsoft Excel or WPS Spreadsheets; the active worksheet's content is inlined in the system prompt's "
@@ -2542,6 +2604,7 @@ All doc_* editing and reading tools act directly on this document. You need NOT 
                         + "material or evidence is an input, not a write target.";
             };
         };
+        return baseReminder + activeSelectionReminder(activeContext, capability, officeHost, true);
     }
     void setMemoryDocumentServiceForTest(MemoryDocumentService service) {
         this.memoryDocumentService = service;

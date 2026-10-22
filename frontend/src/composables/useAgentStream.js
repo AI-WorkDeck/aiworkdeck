@@ -849,7 +849,10 @@ export function useAgentStream() {
             // 磁盘上那份正文已经不是用户眼前看到的那份，让后端只带壳、
             // 由模型走编辑器桥读实时正文，别拿旧版本给结论。
             // 重新生成保留身份，由调用侧重新标明正文状态。
-            staleBody: activeContext.staleBody === true
+            staleBody: activeContext.staleBody === true,
+            ...(typeof activeContext.selectionText === 'string' && activeContext.selectionText.trim()
+                ? { selectionText: activeContext.selectionText.trim() }
+                : {})
         } : null
 
         if (!continuingRun) {
