@@ -62,7 +62,7 @@ public class TmeetCliService {
     }
 
     /**
-     * 所有 CLI 执行（含登录）共用的命令前缀：macOS/Linux 为可执行文件绝对路径，
+     * 所有 CLI 执行（含登录）共用的命令前缀：macOS/Linux 原生程序直接执行，npm 脚本显式使用 Node，
      * Windows 为 node.exe + 包内 JS 绝对路径，绝不经 cmd.exe/bat 转发动态参数。
      */
     protected List<String> resolveCommandPrefix() {
@@ -78,9 +78,14 @@ public class TmeetCliService {
         return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows");
     }
 
-    public boolean isCliAvailable() {
+    public boolean isCliAvailable() { return "AVAILABLE".equals(probeCliStatus()); }
+
+    /** Local readiness only: never queries credentials or starts authorization. */
+    public String probeCliStatus() {
+        List<String> prefix = null;
         try {
-            List<String> command = new ArrayList<>(resolveCommandPrefix());
+            prefix = resolveCommandPrefix();
+            List<String> command = new ArrayList<>(prefix);
             command.add("--version");
             Process process = new ProcessBuilder(command)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
@@ -88,7 +93,7 @@ public class TmeetCliService {
                     .start();
             try {
                 boolean finished = process.waitFor(5, TimeUnit.SECONDS);
-                return finished && process.exitValue() == 0;
+                return !finished ? "TIMED_OUT" : process.exitValue() == 0 ? "AVAILABLE" : "FAILED";
             } finally {
                 if (process.isAlive()) {
                     process.descendants().forEach(ProcessHandle::destroyForcibly);
@@ -97,10 +102,13 @@ public class TmeetCliService {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return false;
+            return "TIMED_OUT";
+        } catch (TmeetCliLocator.UnresolvableException e) {
+            return e.status();
+        } catch (java.io.IOException e) {
+            return prefix != null && prefix.size() == 1 && "tmeet".equals(prefix.get(0)) ? "MISSING" : "FAILED";
         } catch (Exception e) {
-            log.warn("检测 tmeet CLI 失败: {}", e.getMessage());
-            return false;
+            return "FAILED";
         }
     }
 

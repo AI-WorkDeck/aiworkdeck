@@ -394,22 +394,6 @@
           </view>
         </view>
 
-        <!-- 左栏收起/展开（dev-board#727）：用户反馈左栏「窗口建议」占地方、常显却用得少，
-             要求 rail 上就地能收起。与顶栏同功能按钮（:154-164）、Alt+Ctrl+B 走的是
-             同一个 toggleSidebar；这里只是把入口挪到左栏本体旁边、伸手可及。 -->
-        <view
-          class="rail-btn"
-          :class="{ active: !sidebarCollapsed }"
-          :title="sidebarCollapsed ? $t('workbench.expandSidebar') : $t('workbench.collapseSidebar')"
-          @tap="toggleSidebar"
-        >
-          <view class="rail-icon-wrapper">
-            <svg class="rail-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path v-for="(d, gi) in GLYPHS.panelLeft" :key="gi" :d="d" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-icon-path" />
-            </svg>
-          </view>
-        </view>
-
         <!-- Project Members Stack -->
         <view class="rail-members-container" v-if="hasNamedProject && projectMembers && projectMembers.length > 0">
            <view class="members-stack-icon">
@@ -556,6 +540,21 @@
 
       <!-- 左侧文件树（可收起） -->
       <view class="sidebar-left" ref="sidebarLeft" :class="{ collapsed: sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '0px' : sidebarWidth + 'px' }">
+        <view
+          v-if="!sidebarCollapsed"
+          class="sidebar-collapse-tab"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('workbench.collapseSidebar')"
+          :title="$t('workbench.collapseSidebar')"
+          @tap.stop="toggleSidebar"
+          @keydown.enter.prevent="toggleSidebar"
+          @keydown.space.prevent="toggleSidebar"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M14 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </view>
         <!-- 批量菜单遮罩：用于点击空白关闭下拉（不弹中间） -->
         <view v-if="showBatchMenu" class="batch-menu-mask" @tap="closeBatchMenu"></view>
         <!-- 左栏标题的唯一出处。此前各面板还各画各的 header，于是「诉讼可视化」
@@ -3663,8 +3662,7 @@ export default {
       this._restartProjectReady = this.loadProjectInfo()
 
       // 概览页的 AI 对话列表点进来时带着 conversationId：把那条历史会话真打开。
-      // 右侧 AI 面板默认收起（showAiPanel: false）且 ChatInterface 挂在 v-if 里，
-      // 所以先开面板、再等它挂载完调 loadHistoryChat（它要 $refs.chatInterface）——
+      // 深链先开面板、再等它挂载完调 loadHistoryChat（它要 $refs.chatInterface）——
       // 与上面 openFileId 同一手法，不另造一套时序。
       if (query.conversationId) {
         const pendingConversationId = String(query.conversationId)
@@ -3673,6 +3671,9 @@ export default {
         if (!this.showAiPanel) this.toggleAiPanel()
         setTimeout(() => this.loadHistoryChat({ conversationId: pendingConversationId }), 600)
       }
+      // 每次进入项目默认展示 AI（dev-board#1419）；只在 onLoad 打开一次，
+      // 不在 onShow 或账户刷新中重开，尊重本次访问中的手动关闭。
+      if (!this.showAiPanel) this.toggleAiPanel()
 
     } else {
       // 无项目态（dev-board#1047）：启动的落点。不建暂存区、不拉成员与协作状态；
@@ -6283,7 +6284,7 @@ export default {
           // Auto-load recent chat history when panel opens
           this.fetchChatHistory()
           // 刷新后第一次打开面板 = 恢复上次那段对话的唯一时机（dev-board#779 K7④）：
-          // 面板默认收起且 ChatInterface 挂在 v-if 上，onLoad 时它还不存在。
+          // 首次打开在 onLoad 中安排，等下一帧 ChatInterface 挂载后再恢复。
           this.restoreLastConversation()
         }
       })
