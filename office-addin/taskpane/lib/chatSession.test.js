@@ -34,7 +34,7 @@ globalThis.Word = {
   run: async (cb) => cb({ document: { body: { load() {}, text: '' } }, sync: async () => {} })
 }
 
-const { activateSession, messages, stop } = await import('./chatSession.js')
+const { activateSession, messages, stop, skillList } = await import('./chatSession.js')
 const { createConversation } = await import('./api.js')
 // 会话 ID 的存储键除了项目与宿主，还按**文档**分一层（dev-board#717）：同项目里的两份
 // Word 必须拿到各自的 conversationId，否则跨文档读写按会话下发时两个窗格分不开。
@@ -152,6 +152,36 @@ test('自愈只针对空会话：有历史消息的会话 403 不重签（那是
     // 历史消息还在，会话 ID 没被丢
     assert.equal(store.get(convKey(11)), 'conv-history-1')
     assert.ok(messages.value.length >= 1)
+  } finally {
+    await stop()
+    f.restore()
+  }
+})
+
+test('懒人模式：refreshCatalogs 过滤 builtinWorkflow，仅保留额外扩展技能供手动勾选', async () => {
+  store.set(convKey(15), 'conv-skills-1')
+  const f = stubFetch((url) => {
+    if (url.includes('/api/ai/models')) return jsonReply({ models: [], defaultModel: '' })
+    if (url.includes('/api/skills/list')) {
+      return jsonReply([
+        { id: 'contract-review', name: '合同审查', enabled: true, activation: 'auto', builtinWorkflow: true },
+        { id: 'evidence-linked-report', name: '证据整理与核查闭环', enabled: true, activation: 'auto', builtinWorkflow: true },
+        { id: 'legal-opinion-review', name: '法律意见书核查', enabled: true, activation: 'auto', builtinWorkflow: true },
+        { id: 'redaction', name: '敏感信息脱敏', enabled: true, activation: 'auto', builtinWorkflow: false }
+      ])
+    }
+    if (url.includes('/api/ai/history')) return jsonReply([])
+    if (url.includes('/api/agent/connect/conv-skills-1')) return sseOkResponse()
+    if (url.includes('/api/agent/cancel/')) return jsonReply({})
+    throw new Error(`未预期的请求: ${url}`)
+  })
+  try {
+    await activateSession({
+      settings: { serverUrl: 'https://cloud.example.skills', token: 'awdt_t4' },
+      projectId: '15'
+    })
+    await new Promise(r => setTimeout(r, 20))
+    assert.deepEqual(skillList.value.map(s => s.id), ['redaction'])
   } finally {
     await stop()
     f.restore()

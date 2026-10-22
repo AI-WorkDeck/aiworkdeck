@@ -202,8 +202,12 @@ public class SkillRegistry {
         return langs.contains(lang);
     }
 
-    /** skill 是否为"仅手动"（不参与触发词自动匹配） */
+    /** skill 是否为"仅手动"（不参与触发词自动匹配）；工程内置工作流（builtin_workflow）恒为自动匹配 */
     public boolean isManual(String skillId) {
+        SkillDefinition skill = skills.get(skillId);
+        if (skill != null && skill.isBuiltinWorkflow()) {
+            return false;
+        }
         maybeRefreshDisabledState();
         return manualSkillIds.contains(skillId);
     }
@@ -224,8 +228,17 @@ public class SkillRegistry {
      * @throws IllegalArgumentException skillId 不在已注册列表中
      */
     public synchronized void setActivationMode(String skillId, ActivationMode mode) {
-        if (!skills.containsKey(skillId)) {
+        SkillDefinition skill = skills.get(skillId);
+        if (skill == null) {
             throw new IllegalArgumentException("Unknown skill: " + skillId);
+        }
+        if (skill.isBuiltinWorkflow()) {
+            disabledSkillIds.remove(skillId);
+            manualSkillIds.remove(skillId);
+            persist(DISABLED_KEY, disabledSkillIds);
+            persist(MANUAL_KEY, manualSkillIds);
+            log.info("Skill {} is a builtin workflow, keeping activation mode AUTO", skillId);
+            return;
         }
         if (mode == ActivationMode.DISABLED) {
             disabledSkillIds.add(skillId);
@@ -264,8 +277,12 @@ public class SkillRegistry {
         }
     }
 
-    /** skill 是否启用（默认启用，禁用名单持久化在 system_setting，带 TTL 缓存） */
+    /** skill 是否启用（默认启用，禁用名单持久化在 system_setting，带 TTL 缓存；工程内置工作流恒启用） */
     public boolean isEnabled(String skillId) {
+        SkillDefinition skill = skills.get(skillId);
+        if (skill != null && skill.isBuiltinWorkflow()) {
+            return true;
+        }
         maybeRefreshDisabledState();
         return !disabledSkillIds.contains(skillId);
     }
@@ -275,8 +292,15 @@ public class SkillRegistry {
      * @throws IllegalArgumentException skillId 不在已注册列表中
      */
     public synchronized void setEnabled(String skillId, boolean enabled) {
-        if (!skills.containsKey(skillId)) {
+        SkillDefinition skill = skills.get(skillId);
+        if (skill == null) {
             throw new IllegalArgumentException("Unknown skill: " + skillId);
+        }
+        if (skill.isBuiltinWorkflow()) {
+            disabledSkillIds.remove(skillId);
+            persist(DISABLED_KEY, disabledSkillIds);
+            log.info("Skill {} is a builtin workflow, keeping enabled", skillId);
+            return;
         }
         if (enabled) {
             disabledSkillIds.remove(skillId);
@@ -467,6 +491,10 @@ public class SkillRegistry {
         Boolean enabledByDefault = asBoolean(raw.get("enabled_by_default"));
         if (enabledByDefault != null) {
             skill.setEnabledByDefault(enabledByDefault);
+        }
+        Boolean builtinWorkflow = asBoolean(raw.get("builtin_workflow"));
+        if (builtinWorkflow != null) {
+            skill.setBuiltinWorkflow(builtinWorkflow);
         }
         String promptFile = asString(raw.get("prompt"));
         if (promptFile != null && !promptFile.isBlank()) {

@@ -42,6 +42,9 @@
           </view>
         </view>
         <scroll-view scroll-y class="msb-list">
+        <view v-if="installedTab === 'skill'" class="msb-builtin-note">
+          <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
+        </view>
         <view v-if="!activeInstalledRows.length" class="msb-empty">
           <text>{{ searchText ? activeInstalledEmptyText : $t('market.noInstalledYet') }}</text>
         </view>
@@ -92,6 +95,9 @@
 
         <scroll-view scroll-y class="msb-list">
         <template v-if="marketTab === 'skill'">
+          <view class="msb-builtin-note">
+            <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
+          </view>
           <view v-if="marketLoading" class="msb-empty"><text>{{ $t('market.loadingEllipsis') }}</text></view>
           <view v-else-if="marketError" class="msb-empty msb-error">
             <text>{{ $t('market.marketUnavailablePrefixed', { error: marketError }) }}</text>
@@ -263,6 +269,7 @@ export default {
       const rows = []
       // Voice UI is an installed plugin. Its legacy AI skills stay in the Skill tab.
       for (const s of this.skills) {
+        if (s.builtinWorkflow) continue
         const mode = s.activationMode || (s.enabled ? 'auto' : 'disabled')
         // 面板型（背后挂着左栏面板）在列表里也按插件标注：用户看到的是一个面板，
         // 说它是「Skill · 自动触发」只会让人对不上号。判据见 leftSidebarPlugins.js。
@@ -981,6 +988,20 @@ export default {
       color: var(--awd-warning-text);
       font-size: var(--awd-panel-fs-meta);
     }
+  }
+}
+
+.msb-builtin-note {
+  margin: 6px var(--awd-panel-pad-x) 4px;
+  padding: 7px 9px;
+  border-radius: var(--awd-radius-sm);
+  background: var(--awd-accent-wash);
+  border: 1px solid var(--awd-accent-soft);
+
+  text {
+    font-size: var(--awd-panel-fs-meta);
+    color: var(--awd-text-2);
+    line-height: 1.45;
   }
 }
 </style>

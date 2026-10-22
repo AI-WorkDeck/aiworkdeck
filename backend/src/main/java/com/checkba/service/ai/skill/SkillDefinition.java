@@ -108,6 +108,18 @@ public class SkillDefinition {
      */
     private boolean enabledByDefault = true;
 
+    /**
+     * 是否为工程内置的高频核心工作流（懒人模式，dev-board#1431；skill.yml: builtin_workflow）。
+     *
+     * <p>为 true 的高频默认能力（合同审查、证据整理与闭环报告、法律意见书核查）已固化为工程内置工作流：
+     * <ul>
+     *   <li>永远处于启用 + 自动匹配状态（不受 disabled / manual 名单覆写，无需用户管理或钉选）；</li>
+     *   <li>不在对话输入框的手动 Skill 选择器、已安装 Skill 启停列表或在线 Skill 广场中作为可选项暴露，降低用户选择负担；</li>
+     *   <li>命中时随 {@code skill_update} 携带 {@code builtinWorkflow: true}，供前端提示「内置工作流已自动接管」。</li>
+     * </ul>
+     */
+    private boolean builtinWorkflow = false;
+
     /** 展示用作者名（skill.yml: author），如 "AI WorkDeck" */
     private String author;
 
@@ -178,6 +190,8 @@ public class SkillDefinition {
     public void setCategory(String category) { this.category = category; }
     public boolean isEnabledByDefault() { return enabledByDefault; }
     public void setEnabledByDefault(boolean enabledByDefault) { this.enabledByDefault = enabledByDefault; }
+    public boolean isBuiltinWorkflow() { return builtinWorkflow; }
+    public void setBuiltinWorkflow(boolean builtinWorkflow) { this.builtinWorkflow = builtinWorkflow; }
     public String getAuthor() { return author; }
     public void setAuthor(String author) { this.author = author; }
     public String getAuthorUrl() { return authorUrl; }

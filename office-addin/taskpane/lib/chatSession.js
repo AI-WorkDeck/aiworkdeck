@@ -464,8 +464,8 @@ async function refreshCatalogs() {
     }
   }).catch(() => {})
   fetchSkills(settings).then((list) => {
-    // 只给用户看「已启用且非 disabled 生效方式」的；勾选态剔除已消失的
-    const usable = list.filter((s) => s && s.enabled !== false && s.activation !== 'disabled')
+    // 只给用户看「非内置高频工作流、已启用且非 disabled 生效方式」的；勾选态剔除已消失的
+    const usable = list.filter((s) => s && !s.builtinWorkflow && s.enabled !== false && s.activation !== 'disabled')
     skillList.value = usable
     selectedSkillIds.value = selectedSkillIds.value.filter((id) => usable.some((s) => s.id === id))
   }).catch(() => {})
