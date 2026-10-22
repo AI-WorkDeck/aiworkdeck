@@ -61,11 +61,13 @@ export default {
 </script>
 <style scoped lang="scss">
 .dd-import { padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
-.dd-import input, .dd-import textarea { border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); padding: 8px; width: 100%; box-sizing: border-box; background: var(--awd-surface); color: var(--awd-text); font: inherit; }
-.dd-import textarea { height: 160px; }
-.dd-import button { margin: 0; padding: 6px 8px; border-radius: var(--awd-radius-sm); font: inherit; line-height: 1.4; background: var(--awd-surface); color: var(--awd-text); border: 1px solid var(--awd-border); }
-.dd-import button::after { border: 0; }
-.dd-import button:disabled { opacity: .5; }
+.dd-import input, .dd-import textarea { border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); width: 100%; box-sizing: border-box; background: var(--awd-surface); color: var(--awd-text); font: inherit; }
+.dd-import input { height: var(--awd-control-height); padding: 0 8px; line-height: var(--awd-control-height); }
+.dd-import textarea { padding: 8px; height: 160px; line-height: 1.6; }
+.dd-import :deep(.uni-input-placeholder), .dd-import :deep(.uni-textarea-placeholder) { color: var(--awd-text-3); }
+.dd-import button { margin: 0; padding: 0 10px; min-height: 30px; border-radius: var(--awd-radius-sm); font: inherit; line-height: 1.4; background: var(--awd-surface); color: var(--awd-text); border: 1px solid var(--awd-border); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.dd-import button::after { border: 0; display: none; }
+.dd-import button:disabled, .dd-import button[disabled] { opacity: .48; cursor: not-allowed; background: var(--awd-surface); color: var(--awd-text-3); }
 .dd-import :focus-visible { outline: 2px solid var(--awd-accent-text); outline-offset: 2px; }
 .hint, .status { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); line-height: 1.7; }
 .status { color: var(--awd-accent-text); background: var(--awd-accent-soft); padding: 8px; border-radius: var(--awd-radius-sm); }
