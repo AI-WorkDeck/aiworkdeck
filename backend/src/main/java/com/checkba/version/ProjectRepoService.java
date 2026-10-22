@@ -218,9 +218,22 @@ public class ProjectRepoService {
     /** Office（Word/WPS）打开文档时落在同目录的锁文件，绝不该进版本历史（dev-board#463）。 */
     private static final String EXCLUDE_RULE_OFFICE_LOCK = "~$*";
     private static final String EXCLUDE_RULE_NESTED_METADATA = "/*/**/.awd/";
+    /** 重型依赖与虚拟环境目录，与 LocalProjectService.isIgnoredDirectoryName 对齐（dev-board#1427）。 */
+    private static final List<String> DEFAULT_EXCLUDE_RULES = List.of(
+            EXCLUDE_RULE_OFFICE_LOCK,
+            EXCLUDE_RULE_NESTED_METADATA,
+            "node_modules/",
+            "bower_components/",
+            "__pycache__/",
+            "site-packages/",
+            "venv/",
+            "virtualenv/",
+            ".venv/",
+            "Pods/"
+    );
 
     /**
-     * 幂等地把排除规则写进 {@code $GIT_DIR/info/exclude}（dev-board#463）。
+     * 幂等地把排除规则写进 {@code $GIT_DIR/info/exclude}（dev-board#463 / dev-board#1427）。
      *
      * <p>写在 gitDir 而不是工作区的 .gitignore：gitDir 恒在
      * {@code {globalRoot}/repos/project-{id}.git}，律师自己的文件夹里不会多出一个
@@ -234,7 +247,7 @@ public class ProjectRepoService {
      * 只有它能覆盖已经存在的老仓库与另外两条建仓路径。init 里额外调一次是因为
      * 它自己不走 open，规则必须早于那笔 {@code add(".")}。
      *
-     * <p>同时排除任意层级子文件夹的 .awd，保留当前根的清单。只追加缺失规则，不动已有行；
+     * <p>同时排除任意层级子文件夹的 .awd 及重型依赖目录，保留当前根的清单。只追加缺失规则，不动已有行；
      * 写失败只记日志——版本记录是保险，
      * 不能因为一条排除规则写不下去就让开仓/提交整个失败。
      */
@@ -244,9 +257,12 @@ public class ProjectRepoService {
         Path exclude = gitDir.resolve("info").resolve("exclude");
         try {
             String current = Files.exists(exclude) ? Files.readString(exclude) : "";
+            Set<String> existingLines = current.lines()
+                    .map(String::trim)
+                    .collect(java.util.stream.Collectors.toSet());
             StringBuilder missing = new StringBuilder();
-            for (String rule : List.of(EXCLUDE_RULE_OFFICE_LOCK, EXCLUDE_RULE_NESTED_METADATA)) {
-                if (current.lines().noneMatch(line -> line.trim().equals(rule))) {
+            for (String rule : DEFAULT_EXCLUDE_RULES) {
+                if (!existingLines.contains(rule)) {
                     missing.append(rule).append("\n");
                 }
             }

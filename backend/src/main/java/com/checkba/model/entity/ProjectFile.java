@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
@@ -22,7 +23,12 @@ import java.util.Objects;
  * - 文件和文件夹共用一张表，通过 isFolder 字段区分
  */
 @Entity
-@Table(name = "project_file")
+@Table(name = "project_file", indexes = {
+        @Index(name = "idx_pf_project_parent", columnList = "project_id, parent_id"),
+        @Index(name = "idx_pf_project_deleted_sort", columnList = "project_id, is_deleted, sort_order"),
+        @Index(name = "idx_pf_parent", columnList = "parent_id"),
+        @Index(name = "idx_pf_file_path", columnList = "file_path")
+})
 public class ProjectFile {
 
     @Id
