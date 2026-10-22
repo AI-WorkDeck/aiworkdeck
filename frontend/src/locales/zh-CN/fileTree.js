@@ -156,6 +156,7 @@ export default {
   importFileFailedRetry: '文件导入失败，请重试',
   importFailed: '导入失败',
   importDropUnreadable: '来源未提供可读取的文件，请先保存到本机，再从文件夹拖入',
+  importDropPermissionDenied: '无权直接读取微信沙盒目录中的文件，请开启「完全磁盘访问权限」后再从微信直接拖入',
   importDropPrepareFailed: '无法接收拖入的文件，请先保存到本机后重试',
   importDropTooLarge: '无本机路径的文件一次最多接收 100 MB，请先保存到本机再拖入',
   importDesktopOnly: '拖入导入仅桌面端支持',
