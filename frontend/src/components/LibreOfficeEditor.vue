@@ -202,7 +202,7 @@ import { StaleQueue } from '@/utils/evidenceStaleQueue.js'
 import { createAnchorChecker, resolveKeepText } from '@/composables/useEvidenceAnchors.js'
 import { EVIDENCE_CHANGED_EVENT } from '@/utils/evidenceEvents.js'
 import { DOC_MUTATED_EVENT } from '@/utils/docEvents.js'
-import { buildAiFormatPrompt, AI_PROMPT_EVENT } from '@/utils/paragraphFormat.js'
+import { buildAiFormatPrompt, buildAiSelectionRevisePrompt, AI_PROMPT_EVENT } from '@/utils/paragraphFormat.js'
 import { getResolvedTheme, APP_THEME_EVENT } from '@/utils/appTheme.js'
 import { isEnglish } from '@/utils/appLanguage.js'
 import { stampApplication } from '@/utils/docxAppProps.js'
@@ -872,6 +872,23 @@ export default {
         scope: payload && payload.scope,
       }, (k, v) => this.$t(k, v))
       uni.$emit(AI_PROMPT_EVENT, { prompt, fileId: this.file && this.file.id })
+    },
+    // 右键菜单「AI 修订选中内容…」（dev-board#1430）：带上选区原文与修订意见发进 AI 对话。
+    onWritingRevise(payload) {
+      const selectedText = String((payload && payload.text) || '').trim()
+      const instruction = String((payload && payload.instruction) || '').trim()
+      if (!selectedText || !instruction) return
+      const prompt = buildAiSelectionRevisePrompt({
+        fileName: this.file && this.file.name,
+        selectedText,
+        instruction,
+      }, (k, v) => this.$t(k, v))
+      if (!prompt) return
+      uni.$emit(AI_PROMPT_EVENT, {
+        prompt,
+        fileId: this.file && this.file.id,
+        selectionText: selectedText,
+      })
     },
     menuOpenFind() {
       const tb = this.$refs.toolbar
@@ -1553,6 +1570,7 @@ export default {
         openSettings: (opts) => { if (this.openSettingsTab) this.openSettingsTab(opts || {}) },
         openAccount: () => requireAccount({ reason: 'gateway', force: true }),
         openRecharge: () => requireRecharge(),
+        onRevise: (payload) => this.onWritingRevise(payload),
       })
       this._writingHost.start()
       this._inlineReviewHost = createInlineReviewHost({

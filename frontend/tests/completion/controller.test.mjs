@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { JSDOM } from 'jsdom'
 import { attachWritingAssistance } from '../../src/composables/zetaOfficeCompletion.js'
+import { createWritingAssistanceHost } from '../../src/composables/writingAssistanceHost.js'
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
 const debounce = () => new Promise(resolve => setTimeout(resolve, 10))
@@ -783,4 +784,64 @@ test('直接关闭保存失败显示失败且仍按原状态补全，迟到失�
   await suggestions(h)
   assert.ok(h.doc.querySelector('[role="option"]'))
   assert.doesNotMatch(h.panel().textContent, /旧保存失败/)
+})
+
+test('右键菜单融入「AI 修订选中内容…」：默认收起不抢焦点，点开输入回车即发 revise 请求并收起卡片', async t => {
+  const h = harness(t)
+  h.setContext({ available: false, hasSelection: true, selectedText: '违约金按合同总额百分之三十计算', token: 'sel-revise' })
+  h.canvas.dispatchEvent(new h.dom.window.MouseEvent('contextmenu', { bubbles: true, clientX: 160, clientY: 140 }))
+  await tick()
+  assert.equal(h.panel().hidden, false)
+  assert.equal(h.panel().dataset.mode, 'context')
+  assert.equal(h.doc.activeElement, h.input, '默认收起时不抢 IME 焦点')
+  const toggleBtn = h.button('AI 修订选中内容…')
+  assert.ok(toggleBtn, '右键菜单应显示 AI 修订选中内容… 入口')
+  const form = h.panel().querySelector('.awd-wa-revise-form')
+  assert.ok(form && form.hidden === true, '默认不展开内联输入框')
+
+  toggleBtn.click()
+  assert.equal(form.hidden, false, '点击后内联展开修订输入框')
+  assert.equal(toggleBtn.getAttribute('aria-expanded'), 'true', '展开后切换按钮标记 aria-expanded=true')
+  const input = h.panel().querySelector('.awd-wa-revise-input')
+  assert.equal(h.doc.activeElement, input, '展开后自动聚焦到修订意见输入框')
+
+  input.value = '违约金比例下调为百分之十，语气更中性'
+  input.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+  await tick()
+
+  const req = h.messages.find(m => m.action === 'revise')
+  assert.ok(req, '应向宿主发送 revise 请求')
+  assert.deepEqual(req.data, {
+    text: '违约金按合同总额百分之三十计算',
+    instruction: '违约金比例下调为百分之十，语气更中性',
+  })
+  h.respond('revise', { ok: true })
+  await tick()
+  assert.equal(h.panel().hidden, true, '发送后右键菜单收起')
+
+  // 验证 writingAssistanceHost 的 revise 分发
+  const revisedPayloads = []
+  const host = createWritingAssistanceHost({
+    projectId: 9,
+    fileId: 42,
+    userId: 'u1',
+    writable: true,
+    execute: async () => ({ success: true }),
+    send() {},
+    storage: { get: () => null, set() {} },
+    api: { list: async () => ({ items: [] }) },
+    onRevise: (payload) => revisedPayloads.push(payload),
+  })
+  host.start()
+  await host.handle({
+    __lo: 'lo-relay',
+    type: 'writing-request',
+    id: 99,
+    session: host.session,
+    action: 'revise',
+    data: { text: '违约金按合同总额百分之三十计算', instruction: '改为百分之十' },
+  })
+  assert.deepEqual(revisedPayloads, [
+    { text: '违约金按合同总额百分之三十计算', instruction: '改为百分之十', fileId: 42, projectId: 9 },
+  ])
 })

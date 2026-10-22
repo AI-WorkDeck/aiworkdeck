@@ -125,3 +125,15 @@ export function buildAiFormatPrompt({ fileName, requirement, scope }, t) {
     requirement: req || t('editor.format.aiDefaultRequirement'),
   })
 }
+
+// 右键菜单「AI 修订选中内容」：拼一句指明选中片段与修订要求的话，交给工作台发进 AI 对话（dev-board#1430）。
+export function buildAiSelectionRevisePrompt({ fileName, selectedText, instruction }, t) {
+  const name = String(fileName || '').trim()
+  const sel = String(selectedText || '').trim()
+  const req = String(instruction || '').trim()
+  return t('editor.format.aiSelectionRevisePrompt', {
+    name: name || t('editor.format.aiPromptDocFallback'),
+    selection: sel,
+    instruction: req,
+  })
+}

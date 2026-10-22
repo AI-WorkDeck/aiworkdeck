@@ -52,6 +52,29 @@ export const WRITING_ASSISTANCE_CSS = `
 .awd-writing-assistance .awd-wa-query-more::after { content:'›'; float:right; }
 .awd-writing-assistance .awd-wa-query-more[aria-expanded="true"]::after { content:'⌄'; }
 .awd-writing-assistance .awd-wa-query-notice { padding:7px 10px 2px; }
+.awd-writing-assistance .awd-wa-revise-toggle {
+  display:block; width:100%; margin-top:4px; padding-top:7px;
+  border-top:1px solid var(--wa-divider); border-radius:0 0 5px 5px;
+  color:var(--wa-muted);
+}
+.awd-writing-assistance .awd-wa-revise-toggle::after { content:'›'; float:right; }
+.awd-writing-assistance .awd-wa-revise-toggle[aria-expanded="true"]::after { content:'⌄'; }
+.awd-writing-assistance .awd-wa-revise-form {
+  display:flex; align-items:center; gap:5px; margin-top:4px; padding:2px 2px 0;
+}
+.awd-writing-assistance .awd-wa-revise-input {
+  flex:1 1 auto; min-width:0; height:28px; padding:4px 8px;
+  border:1px solid var(--wa-border); border-radius:5px;
+  background:var(--wa-muted-surface); color:var(--wa-text);
+  font-size:12px; line-height:18px; outline:none;
+}
+.awd-writing-assistance .awd-wa-revise-input:focus { border-color:var(--wa-accent); }
+.awd-writing-assistance .awd-wa-revise-submit {
+  flex:none; height:28px; padding:0 10px;
+  border:1px solid var(--wa-border); border-radius:5px;
+  background:var(--wa-selected); color:var(--wa-accent);
+  font-size:12px; font-weight:600; line-height:26px; text-align:center;
+}
 .awd-writing-assistance .awd-wa-option { display:block; width:100%; overflow-wrap:anywhere; }
 .awd-writing-assistance small { display:block; color:var(--wa-muted); font-size:11px; }
 .awd-writing-assistance .awd-wa-copy { white-space:pre-wrap; overflow-wrap:anywhere; padding:8px; max-height:28vh; overflow:auto; }

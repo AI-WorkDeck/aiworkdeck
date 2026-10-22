@@ -8,7 +8,7 @@ const preferenceListeners = new Map()
 
 /** Host-scoped vocabulary and explicit lookup. Dependencies stay injectable for isolation tests. */
 export function createWritingAssistanceHost({ projectId, fileId, userId, execute, send, api, storage, writable, language, active = true,
-  openSettings = null, openAccount = null, openRecharge = null, semantic = null, onState = null,
+  openSettings = null, openAccount = null, openRecharge = null, onRevise = null, semantic = null, onState = null,
   timers = { set: (fn, ms) => setTimeout(fn, ms), clear: id => clearTimeout(id) } }) {
   const session = `${projectId}:${fileId}:${Date.now()}:${Math.random().toString(36).slice(2)}`
   semantic?.bindSession(session)
@@ -158,6 +158,14 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
         if (!writable) throw new Error('Read-only document')
         // This branch is only reached by the selected-text context menu's explicit action.
         return completionDetails(await api.lookup(projectId, { kind: data.kind, text: data.text }))
+      case 'revise': {
+        if (!writable) throw new Error('Read-only document')
+        const text = String(data?.text || '').trim()
+        const instruction = String(data?.instruction || '').trim()
+        if (!text || !instruction) throw new Error('Invalid revision request')
+        if (onRevise) await onRevise({ text, instruction, fileId, projectId })
+        return { ok: true }
+      }
       default: throw new Error('Unknown writing action')
     }
   }
