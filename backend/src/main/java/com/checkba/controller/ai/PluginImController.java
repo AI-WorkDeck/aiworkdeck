@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/plugins/{id}/im")
@@ -37,12 +38,15 @@ public class PluginImController {
         Map<String,Object> body = ImController.readBody(request, mapper);
         Map<String,Object> params = ImController.params(body);
         String action = ImService.string(body, "action");
+        if ("agentReply".equals(action) && !plugin.getPermissions().contains("ai"))
+            throw new IllegalArgumentException("插件未获得 AI 权限");
         Long projectId = projectId(body.get("projectId"));
         for (ImProjectActionHandler handler : projectHandlers) {
             if (handler.supports(action)) {
-                String permission = "sendFile".equals(action) ? "file_read" : "file_write";
+                String permission = ("sendFile".equals(action) || Set.of("agentScopes", "ensureAgent", "agentReply").contains(action))
+                        ? "file_read" : "file_write";
                 if (!plugin.getPermissions().contains(permission)) throw new IllegalArgumentException("插件未获得文件权限：" + permission);
-                if ("sendFile".equals(action) && !plugin.getPermissions().contains("file_write"))
+                if (Set.of("sendFile", "agentScopes", "ensureAgent").contains(action) && !plugin.getPermissions().contains("file_write"))
                     throw new IllegalArgumentException("项目引用需 file_write 权限保存跨设备标识");
                 return Map.of("code", 0, "data", handler.execute(userId, projectId, action, params));
             }

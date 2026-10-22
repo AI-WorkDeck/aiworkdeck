@@ -1,6 +1,6 @@
 # AI WorkDeck 隐私说明
 
-更新日期：2026-10-21
+更新日期：2026-10-22
 
 本说明描述 AI WorkDeck 桌面应用及 Office/WPS 插件的两件事：
 
@@ -13,15 +13,15 @@
 
 # 第一部分：平台服务
 
-## 一、AI 对话不经过我们的服务器
+## 一、桌面端主对话直连模型服务商
 
-无论选哪一档 AI 提供商，对话内容都由**你的机器直接发往所选模型提供商**：
+桌面端主对话按你选择的 AI 提供商，由**你的机器直接发往所选模型提供商**：
 
 - **本地 Ollama**：内容只在本机处理，零外发；
 - **自备 Key**（OpenRouter 等）：你的机器直连该服务商；
 - **「AI WorkDeck 云端」**：我们的服务器只参与密钥签发与用量结算，对话内容仍由你的机器直连模型服务商。
 
-因此在**桌面端的 AI 调用中**，文档正文、合同内容、AI 对话文本不流经 AI WorkDeck 的服务器。你主动开启文件云端备份、共享项目或发起跨设备传输时，适用下文列明的云端存储与中转规则。**共享案件库的尽调处理也会在服务器执行**，见下文“尽调协作”。**Office/WPS 插件不适用这一句**：插件内当前文档的正文会发往我们托管的插件云后端做 AI 处理，见下文「跨文件参考与修改（Office/WPS 插件）」与「你主动触发的云端中转」。选用云端模型时内容会发往该第三方服务商，涉及执业保密义务的场合请据此判断；当前使用的模型与提供商在产品内可见，可随时更换或停用。
+因此在**桌面端主对话的 AI 调用中**，文档正文、合同内容、AI 对话文本不流经 AI WorkDeck 的服务器。你主动开启文件云端备份、共享项目或发起跨设备传输时，适用下文列明的云端存储与中转规则。**共享案件库的尽调处理也会在服务器执行**，见下文“尽调协作”。**Office/WPS 插件和项目沟通内的云端助手不适用这一句**：前者将当前文档正文发往我们托管的插件云后端，后者将会话及本次授权的资料发往官方协作服务做 AI 处理，分别见下文「跨文件参考与修改（Office/WPS 插件）」与「沟通助手」。选用云端模型时内容会发往该第三方服务商，涉及执业保密义务的场合请据此判断；当前使用的模型与提供商在产品内可见，可随时更换或停用。
 
 **下一句建议（桌面端，可关闭）。** 默认开启；仅当当前可见对话正常结束且输入框为空时，用你当前选择的模型生成一条下一步指令建议，会增加少量模型用量。请求只使用本机已有的最近 6 条会话消息的有限正文（每条至多 2,000 字符，剔除工具过程和思考），不另外读取附件或文档，最多等待 15 秒；使用本地模型时不改走云端。建议不是自动执行：你可以点击后修改，或在空输入框内按 Tab 发送。输入区的「下一句建议」开关按本机、服务器和用户保存；关闭后不再发起新的建议请求，已发出的模型请求可能仍完成。
 
@@ -82,6 +82,8 @@
 **包晴天插件（可选）。** 安装并启用后，插件在你登录、浏览案源或管理笔记时，由本机直接访问包晴天服务（uat.bqt.com）。发送验证码和登录会向包晴天提交你填写的手机号、区号和验证码；新增、修改、发布或删除笔记会向包晴天提交对应内容或状态。新建图文或视频笔记时，你主动选择的图片、视频和独立封面会经本机插件上传到包晴天指定的腾讯云 COS 存储；上传签名和分片缓存仅在本机后端内存中暂存，不写入插件配置。会话仅保留在本机后端内存，按 AI WorkDeck 用户隔离，退出插件登录或重启后端即清除。笔记保存在包晴天平台，受其用户协议与隐私政策约束；本插件不上传项目文件正文，也不向 Marketplace 回传笔记或案源。工作区页面操作不主动调用模型；本插件的工具桥仅供页面加密调用，不开放 AI 对话中的明文业务调用。公开发布与删除由你明确操作；关闭未保存的编辑页可能丢失本页草稿。
 
 **项目沟通 IM 插件（可选，需支持此功能的宿主与服务端）。** 你启用并使用聊天后，会话名称、成员身份和角色、邀请记录、消息正文、已读位置以及你主动发送的文件，会传送并保存在所连接的 AI WorkDeck 协作服务中，用于跨设备和多人通信。当前实现不提供端到端加密；会话成员能够读取会话内容，服务运营方也具备管理存储的技术能力。退出或被移出会话会撤销后续访问，不会删除其他成员已有的聊天记录、下载副本或项目归档；消息和附件当前没有自动到期删除规则，需要删除服务端数据时请联系平台。国际站没有可用协作服务时，不会自动改用大陆节点。
+
+**沟通助手。** 项目、团队、律所的助手明确标为 AI，不占真人成员名额。群内回答对群成员可见，助手仅使用本群讨论、向全群开放的附件及对应层级的共享记忆；不会自动读取提问者的个人记忆或下属项目。与项目助手私聊时，宿主会将当前用户有权读取的项目档案、项目记忆索引、文件清单及有数量和长度上限的材料正文，经同一协作服务交给官方云端模型；私聊及这些材料不会自动发布到群内。助手请求、回答和运行状态保存在该会话中，遵循上述聊天保存规则。沟通助手使用提问者的平台 AI 额度，不使用桌面端选择的本地模型或自备密钥；没有可用额度时不借用服务器密钥。资料会经过 AI WorkDeck 协作服务和 OpenRouter，再到实际模型提供商；第三方处理与保存规则适用下文已有的 OpenRouter 说明。撤销本地项目权限会阻止新的资料提取，但不会追溯收回已经提交的本轮资料快照或删除原有聊天；团队、律所会话每次按相应层级成员身份核验。单人助手群和私聊发送后会请求回答，多人群需明确唤起。撤销附件开放阻止后续读取，不能撤回已生成的回答或他人保存的副本；助手当前只读，不自行修改文件或代替成员作出业务决定。
 
 聊天成员身份独立于项目权限，进群不会自动开放项目库。只有你主动保存文件、关联项目或归档聊天时，相关内容才写进当前项目，并按该项目已有的访问和 Git 同步规则保存；聊天默认不自动归档到 Git。把材料加入 AI 后，只有你发起 AI 请求时才按既有模型通道处理。插件页面不接触账户密钥或设备令牌。
 
@@ -201,11 +203,11 @@
 
 # AI WorkDeck Privacy Note
 
-Last updated: 2026-10-21
+Last updated: 2026-10-22
 
 ## Part 1 — Platform services
 
-**AI conversations never pass through our servers.** Whichever provider tier you choose, conversation content goes straight from your machine to the model provider: with local Ollama it stays on the device; with your own key you connect to that provider directly; with the "AI WorkDeck cloud" tier our servers only issue the key and settle usage, while the conversation itself still goes from your machine to the model provider. During **desktop AI calls**, document text, contract content, and AI conversation text therefore do not flow through AI WorkDeck servers. Cloud file backup, shared projects, and cross-device transfers that you explicitly enable follow the storage and relay rules below. **Due diligence processing in a shared case server also runs on that server**, as described under “Due diligence collaboration” below. **The Office/WPS add-in is an exception to this sentence:** the text of the current document in the add-in is sent to our hosted add-in backend for AI processing; see "Cross-file reference and editing (Office/WPS add-in)" and "Cloud relays you trigger yourself" below. Content sent to a cloud model does reach that third-party provider — judge accordingly where a duty of confidentiality applies. The model and provider in use are visible in the product and can be changed or disabled at any time.
+**The main desktop AI conversation connects directly to the model provider.** Whichever provider tier you choose for that conversation, its content goes straight from your machine to the model provider: with local Ollama it stays on the device; with your own key you connect to that provider directly; with the "AI WorkDeck cloud" tier our servers only issue the key and settle usage, while the conversation itself still goes from your machine to the model provider. During **main desktop AI conversation calls**, document text, contract content, and AI conversation text therefore do not flow through AI WorkDeck servers. Cloud file backup, shared projects, and cross-device transfers that you explicitly enable follow the storage and relay rules below. **Due diligence processing in a shared case server also runs on that server**, as described under “Due diligence collaboration” below. **The Office/WPS add-in and cloud assistants in Project Communication are exceptions:** the former sends current document text to our hosted add-in backend; the latter sends conversation content and authorized materials to our collaboration service for AI processing. See "Cross-file reference and editing (Office/WPS add-in)" and "Conversation assistants" below. Content sent to a cloud model does reach that third-party provider — judge accordingly where a duty of confidentiality applies. The model and provider in use are visible in the product and can be changed or disabled at any time.
 
 **Next-message suggestions (desktop, optional).** On by default. Only after the visible conversation finishes normally, while its input is empty, your selected model proposes one next message, adding a small amount of model usage. A request uses bounded text from up to six existing local messages (at most 2,000 characters each, excluding tool-process markup and reasoning), without separately reading attachments or documents, and waits at most 15 seconds. Local models never fall back to cloud providers. Nothing executes automatically: click a suggestion to edit it, or press Tab in the empty input to send it. The “Next message” switch is stored per user and server on this device. Turning it off stops new requests; an already submitted model request may still finish.
 
@@ -247,6 +249,8 @@ When a lawyer imports a checklist, generates an example or requests a report, th
 **Baoqingtian plugin (optional).** When you sign in, browse case leads or manage notes, the plugin connects directly from your device to Baoqingtian (uat.bqt.com). Requesting a verification code and signing in sends your entered phone number, country code and verification code to that service. Creating, editing, publishing or deleting a note sends the corresponding content or status. When creating an image or video note, the images, video and separate cover you select are uploaded by the local plugin to Baoqingtian’s designated Tencent Cloud COS storage. Upload signatures and buffered file chunks remain temporarily in local backend memory and are not written to plugin settings. Sessions remain only in the local backend memory, separated by AI WorkDeck user, and are cleared on plugin sign-out or backend restart. Notes are stored by Baoqingtian under its terms and privacy policy. The plugin does not upload project document contents or send notes or leads to the Marketplace. Workspace actions do not initiate model requests. The plugin tool bridge is reserved for encrypted workspace calls and does not accept plaintext business actions from AI chat. Publishing and deletion require your explicit action; closing an unsaved editor may discard its local edits.
 
 **Project IM plugin (optional; requires a compatible host and collaboration server).** Conversation titles, member identities and roles, invitations, messages, read positions and files you choose to send are transmitted to and retained by your connected AI WorkDeck collaboration service for multi-user, cross-device communication. This implementation does not provide end-to-end encryption. Conversation members can read the content, and the service operator has technical access to its storage. Leaving or removal revokes subsequent access but does not erase other members' history, downloaded copies or project archives. Messages and attachments currently have no automatic expiration; contact the platform to request server-side deletion. An unavailable international service never silently falls back to a mainland endpoint.
+
+**Conversation assistants.** Project, team and firm assistants are explicitly identified as AI and do not count as human members. Shared replies use that conversation's discussion, attachments made available to the whole group and shared memory at the selected scope; they do not automatically read a caller's personal memory or child projects. In a private project-assistant conversation, the host sends authorized project profile fields, the project memory index, a file list and bounded document excerpts through the same collaboration service to the official cloud model. Private history and material are not automatically posted to a group. Requests, answers and run status follow the conversation's retention rules. Calls use the requesting member's platform AI credits, independently of the desktop's local model or own-key selection; unavailable credits never fall back to a server key. Materials pass through AI WorkDeck's collaboration service and OpenRouter to the inference provider, subject to the OpenRouter and provider rules described above. Revoking local project access prevents new material extraction, but does not recall the current material snapshot already submitted or remove existing chat history. Team and firm membership is checked on each operation for those scoped conversations. Private and one-person assistant conversations request a reply after sending; multi-person groups require explicit invocation. Revoking an attachment prevents subsequent reads but cannot retract generated answers or saved copies. These assistants are read-only and do not modify files or make business decisions for members.
 
 Chat membership does not grant project access. Files and chat records enter a project only when you choose to save or archive them; the project's existing access and Git synchronization rules then apply. Chats are not automatically archived to Git. Materials added to AI are processed through the existing model channel when you send an AI request. Account keys and device tokens are never exposed to the plugin page.
 

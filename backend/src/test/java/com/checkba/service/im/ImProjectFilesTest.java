@@ -106,6 +106,34 @@ class ImProjectFilesTest {
         assertEquals(projectUid,first.get("projectUid"));
     }
 
+    @Test void assistantIdentityUsesGitMarkerAfterCloneChangesDatabaseUid() {
+        assertEquals(projectUid, service.ensureIdentity(2L, 1L, "account-A"));
+        when(catalog.ensureProjectUid(any())).thenReturn(UUID.randomUUID().toString());
+        assertEquals(projectUid, service.ensureIdentity(2L, 1L, "account-A"));
+        verify(catalog, times(1)).ensureProjectUid(any());
+        verify(gateway, never()).executeWithinScope(any(), anyString(), anyString(), anyMap());
+    }
+
+    @Test void readonlyMemberCanReuseIdentityButCannotCreateIt() {
+        when(access.hasWritePermission(1L, 2L)).thenReturn(false);
+        assertThrows(IllegalArgumentException.class, () -> service.ensureIdentity(2L, 1L, "account-A"));
+        when(access.hasWritePermission(1L, 2L)).thenReturn(true);
+        service.ensureIdentity(2L, 1L, "account-A");
+        when(access.hasWritePermission(1L, 2L)).thenReturn(false);
+        assertEquals(projectUid, service.ensureIdentity(2L, 1L, "account-A"));
+    }
+
+    @Test void privateReplyIdentityReadNeverCreatesFiles() {
+        assertThrows(IllegalArgumentException.class, () -> service.readIdentity(2L, 1L, "account-A"));
+        assertTrue(content.isEmpty());
+        service.ensureIdentity(2L, 1L, "account-A");
+        when(access.hasWritePermission(1L, 2L)).thenReturn(false);
+        clearInvocations(storage, files, catalog);
+        assertEquals(projectUid, service.readIdentity(2L, 1L, "account-A"));
+        verify(storage, never()).save(anyString(), any());
+        verifyNoInteractions(catalog);
+    }
+
     @Test void exportStartsAtOldestAndArchivesEveryPageWithMessageUids() throws Exception {
         Map<String,Object> a=Map.of("id",1,"uid",UUID.randomUUID().toString(),"text","first");
         Map<String,Object> b=Map.of("id",2,"uid",UUID.randomUUID().toString(),"text","last");

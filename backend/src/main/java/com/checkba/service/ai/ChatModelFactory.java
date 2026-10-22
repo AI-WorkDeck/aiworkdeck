@@ -278,6 +278,30 @@ public class ChatModelFactory {
                 .maxTokens(maxOutputTokens).logRequests(false).logResponses(false).build();
     }
 
+    /** Explicit account-billed server work must never inherit the server's BYOK/local default. */
+    public PlatformChatModel getPlatformChatModel(java.time.Duration timeout, Integer maxOutputTokens) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("Platform request deadline expired");
+        }
+        Long userId = PlatformAiUserScope.current();
+        if (userId == null || (!localMode && platformAiChannel.usesMachineKey(userId))) {
+            throw new com.checkba.service.account.AccountException(
+                    com.checkba.service.account.AccountException.Kind.CONFLICT,
+                    "本次沟通助手未绑定可用的用户平台额度，请连接AI WorkDeck账户后重试");
+        }
+        long started = System.nanoTime();
+        String modelId = resolvePlatformModel("default", true);
+        String key = platformApiKey(); // Per-user credits, identity and usage baseline; failure is terminal.
+        ChatLanguageModel model = OpenAiChatModel.builder().apiKey(key)
+                .baseUrl(aiModelProperties.getOpenRouter().getBaseUrl()).modelName(modelId)
+                .timeout(remainingTimeout(timeout, started)).maxRetries(0).maxTokens(maxOutputTokens)
+                .logRequests(false).logResponses(false).build();
+        recordModelUse(AiModelProperties.Provider.AWD_CLOUD.name(), modelId, false);
+        return new PlatformChatModel(model, modelId);
+    }
+
+    public record PlatformChatModel(ChatLanguageModel model, String modelId) {}
+
     /** One explicit writing request: bounded transport, no cache, no provider fallback. */
     public OpenRouterStreamingChatModel getWritingModel(java.time.Duration timeout) {
         return createWritingModel(timeout, false, null);

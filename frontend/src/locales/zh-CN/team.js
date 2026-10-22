@@ -12,7 +12,7 @@ export default {
   navTeam: '团队',
 
   // ---- 三态外壳 ----
-  subtitle: '把律所的使用情况汇总给管理者看',
+  subtitle: '律所、团队、项目三级协作，使用统计按团队汇总',
   privacyLine: '团队统计只上传计数与匿名项目编号，不含文档内容、文件名与对话',
   needAccountTitle: '尚未连接账户',
   needAccountDesc: '团队挂在 AI WorkDeck 账户上。到「账户与用量」连接账户后再回来。',
@@ -23,7 +23,7 @@ export default {
   // ---- 无团队 ----
   createTitle: '创建团队',
   createDesc: '创建后你是负责人，可以按手机号邀请同事加入。',
-  teamNamePlaceholder: '团队名称，例如某某律师事务所',
+  teamNamePlaceholder: '团队名称，例如并购团队',
   createButton: '创建团队',
   createFailedEmpty: '团队名称不能为空',
   joinTitle: '用邀请码加入',
@@ -177,7 +177,7 @@ export default {
 
   // ---- 律所决策者看板（TeamPanel.vue） ----
   lawfirmDashboardTitle: '律所决策者与管委会看板',
-  lawfirmDashboardDesc: '业务部门、团队负责人、最小作战单元三维创收与风控汇总，支持穿透至律所管理工作台。',
+  lawfirmDashboardDesc: '按业务分类、主办律师与律师个人汇总创收和风控情况，可进入律所管理工作台查看明细。',
   lawfirmSeedDemoBtn: '填充五芳斋演示数据',
   lawfirmOpenPluginBtn: '打开律所管理工作台',
   lawfirmKpiActiveMatters: '在办案件数',
@@ -186,10 +186,10 @@ export default {
   lawfirmKpiBilled: '累计开票额',
   lawfirmKpiCollected: '累计实收到账',
   lawfirmKpiCollectionRate: '全所综合回款率',
-  lawfirmDimDepartments: '按业务部门',
-  lawfirmDimTeamLeads: '按团队负责人',
-  lawfirmDimUnits: '按最小作战单元',
-  lawfirmColName: '组织/单元名称',
+  lawfirmDimDepartments: '按业务分类',
+  lawfirmDimTeamLeads: '按主办律师',
+  lawfirmDimUnits: '按律师',
+  lawfirmColName: '名称',
   lawfirmColHead: '负责人/核心成员',
   lawfirmColMatters: '在办案件',
   lawfirmColContracted: '签约额',

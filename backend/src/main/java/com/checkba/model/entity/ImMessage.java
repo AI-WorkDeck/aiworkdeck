@@ -15,4 +15,6 @@ public class ImMessage {
  @Column(nullable=false,length=8000) private String text;
  @Column(length=36) private String attachmentId;
  @Column(nullable=false) private java.time.Instant createdAt;
+ @Column(length=16) private String actorType;
+ @Column(length=128) private String agentName;
 }

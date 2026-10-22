@@ -254,7 +254,7 @@
     state.self = data.self || data.currentUser || {
       id: data.currentUserId || 1,
       displayName: data.currentUserName || '当前律师',
-      departmentName: data.currentDepartment || '争议解决部',
+      departmentName: data.currentDepartment || '争议解决',
       role: '主办律师 / 利冲委员'
     };
 
@@ -282,7 +282,7 @@
   function renderHeader() {
     const self = state.self || {};
     const name = self.displayName || self.name || '当前律师';
-    const dept = self.departmentName || self.department || '律所业务部';
+    const dept = self.departmentName || self.department || '综合业务';
     const role = self.role || self.title || '执业律师';
     $('self-badge').textContent = `${name} · ${dept} · ${role}`;
 
@@ -360,7 +360,7 @@
       const meta = node('div', null, 'item-meta');
       meta.append(
         node('span', `业务领域：${PRACTICE_LABELS[item.practiceArea] || item.practiceAreaLabel || item.practiceArea || '综合业务'}`),
-        node('span', `部门：${item.departmentName || '未分配'}`),
+        node('span', `业务分类：${item.departmentName || '未填写'}`),
         node('span', `主办：${item.leadLawyerName || item.applicantName || '未指定'}`),
         node('span', `委托人：${item.clientName || '-'}`),
         node('span', `对方当事人：${item.counterpartyName || '无'}`),
@@ -724,20 +724,20 @@
 
     kpiContainer.append(
       makeKpi('在办正式案件 / 累计收案', `${activeMatters} 件 / ${totalIntakes} 件`, '工作台与立项中心全所实时汇总'),
-      makeKpi('活跃律师单元（Unit）与平均负荷', `${unitCount} 名 · 负荷 ${avgWi}`, '综合主办、协办、待办与近30日工时'),
+      makeKpi('活跃律师与平均负荷', `${unitCount} 名 · 负荷 ${avgWi}`, '综合主办、协办、待办与近30日工时'),
       makeKpi('全所签约合同总额', formatYuanFromCents(totalContracted), `折合 ${formatWanFromCents(totalContracted)}`),
       makeKpi('已开票总额与开票率', formatYuanFromCents(totalBilled), `全所开票率 ${formatPercent(billingRate)}`),
       makeKpi('已到账实收与回收率', formatYuanFromCents(totalCollected), `账单回收率 ${formatPercent(billedColRate)} · 合同回款率 ${formatPercent(contractColRate)}`),
       makeKpi('待收账款（AR）与账龄结构', formatYuanFromCents(totalAr), `<30天 ${formatYuanFromCents(bucket0To30)} | 30-90天 ${formatYuanFromCents(bucket30To90)} | >90天 ${formatYuanFromCents(bucketOver90)}`)
     );
 
-    // 1. 业务部门表
+    // 1. 业务分类统计（沿用 departmentName 台账字段，不代表团队层级）
     const deptTbody = $('dept-table');
     deptTbody.replaceChildren();
     const departments = d.departments || [];
     if (departments.length === 0) {
       const tr = node('tr');
-      const td = node('td', '暂无部门统计数据。', 'hint');
+      const td = node('td', '暂无业务分类统计数据。', 'hint');
       td.colSpan = 10;
       tr.append(td);
       deptTbody.append(tr);
@@ -757,7 +757,7 @@
 
         tr.append(
           node('td', dept.departmentName || dept.name || '-'),
-          node('td', dept.headLawyerName || dept.leadName || '部门合伙人'),
+          node('td', dept.headLawyerName || dept.leadName || '主办律师'),
           node('td', `${dept.unitCount ?? dept.lawyerCount ?? 0} 人`),
           node('td', `${dept.activeMatterCount ?? dept.activeCaseCount ?? dept.caseCount ?? dept.matterCount ?? 0} 件`),
           wiTd,
@@ -771,13 +771,13 @@
       }
     }
 
-    // 2. 团队负责人（合伙人）表
+    // 2. 主办律师统计（teamLeads 按主办律师归组，不代表团队层级）
     const leadTbody = $('lead-table');
     leadTbody.replaceChildren();
     const leads = d.teamLeads || [];
     if (leads.length === 0) {
       const tr = node('tr');
-      const td = node('td', '暂无团队负责人画像数据。', 'hint');
+      const td = node('td', '暂无主办律师统计数据。', 'hint');
       td.colSpan = 11;
       tr.append(td);
       leadTbody.append(tr);
@@ -808,13 +808,13 @@
       }
     }
 
-    // 3. 桌面端个体（Unit）表
+    // 3. 律师个人统计（units 的每一行对应一位用户）
     const unitTbody = $('unit-table');
     unitTbody.replaceChildren();
     const units = d.units || [];
     if (units.length === 0) {
       const tr = node('tr');
-      const td = node('td', '暂无桌面端律师单元（Unit）负荷数据。', 'hint');
+      const td = node('td', '暂无律师工作负荷数据。', 'hint');
       td.colSpan = 10;
       tr.append(td);
       unitTbody.append(tr);
@@ -858,7 +858,7 @@
   function collectIntakePayload() {
     const title = $('intake-title').value.trim();
     const practiceArea = $('intake-practice-area').value;
-    const departmentName = $('intake-department').value.trim() || '争议解决部';
+    const departmentName = $('intake-department').value.trim() || '争议解决';
     const leadLawyerName = $('intake-lead-lawyer').value.trim() || (state.self?.displayName || '主办律师');
     const feeMode = $('intake-fee-mode').value;
     const clientName = $('intake-client-name').value.trim();
@@ -936,7 +936,7 @@
     } else {
       await loadOverview(epoch);
     }
-    notice('已加载典型律所全流程样板数据（含红黄绿利冲案例、站内信放行单、数电票与团队看板）。');
+    notice('已加载典型律所全流程样板数据（含红黄绿利冲案例、站内信放行单、数电票与业务看板）。');
   }));
 
   $('refresh-data').addEventListener('click', () => runAction($('refresh-data'), async (epoch) => {

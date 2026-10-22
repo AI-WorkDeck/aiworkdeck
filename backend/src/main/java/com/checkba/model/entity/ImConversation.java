@@ -13,4 +13,9 @@ public class ImConversation {
  @Column(nullable=false) private Long ownerId;
  @Column(nullable=false) private java.time.Instant createdAt;
  private java.time.Instant lastMessageAt;
+ @Column(length=16) private String agentScope;
+ @Column(length=160) private String agentScopeKey;
+ @Column(length=128) private String agentName;
+ private Boolean agentPrivate;
+ @Column(length=64,unique=true) private String agentBindingKey;
 }

@@ -118,6 +118,16 @@ public class TokenUsageService {
         if (platform) scheduleReconcile(entity.getId(), userId);
     }
 
+    /** Explicit platform calls keep their dispatched channel even when the server defaults to BYOK. */
+    @Transactional
+    public void recordPlatformUsage(Long projectId, Long userId, String model,
+                                    dev.langchain4j.model.output.TokenUsage usage, String conversationId) {
+        if (usage == null) return;
+        recordDecisionUsage(projectId, userId, conversationId, model,
+                usage.inputTokenCount() == null ? 0 : usage.inputTokenCount(),
+                usage.outputTokenCount() == null ? 0 : usage.outputTokenCount(), null, true);
+    }
+
     /** 当前是否走平台通道。供应商解析失败按 BYOK 处理——记账问题不该拖垮对话。 */
     private boolean isPlatformChannel() {
         try {

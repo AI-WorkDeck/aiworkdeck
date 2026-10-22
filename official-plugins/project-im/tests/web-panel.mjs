@@ -180,13 +180,14 @@ test('directory shows only host-provided org data; no team gives an empty state 
   const p = await panel({ call: ({ method, action }) => method === 'im.directory' && action === 'get' ? { organization: null, firm: null, friends: [], capabilities: {} } : undefined }); close(t, p); await tick();
   assert.match(p.$('org-switcher').textContent, /尚未加入团队/);
   assert.doesNotMatch(p.$('directory-groups').textContent, /张维|陈远航|民商事/);
-  await p.named('切换组织');
+  await p.named('团队与律所设置');
   assert.ok(p.calls.some((c) => c.method === 'im.directory' && c.action === 'openOrgSettings'));
 });
 test('team / firm switch refreshes the directory without dropping the open chat or its draft', async (t) => {
   let org = { id: 't1', name: '旧团队', myRoleLabel: '成员', members: [{ id: 'a', name: '旧同事', roleLabel: '成员' }] };
   const p = await panel({ call: ({ method, action }) => method === 'im.directory' && action === 'get'
     ? { organization: org, firm: null, friends: [], capabilities: { hasTeam: true, canSwitchTeam: true } } : undefined }); close(t, p); await tick();
+  p.$('directory-groups').querySelectorAll('.dir-group-toggle')[1].click();
   assert.match(p.$('directory-groups').textContent, /旧同事/);
   await p.select(); p.write('切换前的草稿');
   org = { id: 't2', name: '新团队', myRoleLabel: '成员', members: [{ id: 'b', name: '新同事', roleLabel: '成员' }] };
@@ -194,10 +195,241 @@ test('team / firm switch refreshes the directory without dropping the open chat 
   assert.match(p.$('org-switcher').textContent, /新团队/);
   assert.match(p.$('directory-groups').textContent, /新同事/); assert.doesNotMatch(p.$('directory-groups').textContent, /旧同事/);
   assert.equal(p.$('active-chat').hidden, false); assert.equal(p.$('draft').value, '切换前的草稿');
-  assert.match(p.$('notice').textContent, /已有会话按会话成员身份保留/);
+  assert.match(p.$('notice').textContent, /通讯录和可访问会话已更新/);
 });
 test('team owner sees why switching team is blocked', async (t) => {
   const p = await panel({ call: ({ method, action }) => method === 'im.directory' && action === 'get'
     ? { organization: { name: '我的团队', myRoleLabel: '负责人', members: [] }, firm: { name: '合成所', isHead: true, teams: [] }, friends: [], capabilities: { hasTeam: true, isTeamOwner: true } } : undefined }); close(t, p); await tick();
   assert.match(p.$('org-switcher').textContent, /总部团队不能退出律所/);
+});
+
+test('conversation-first layout keeps directory secondary, shows real project members and uses only three scope names', async (t) => {
+  const p = await panel({ call: ({ method }) => method === 'im.directory' ? {
+    me: { id: '9' },
+    projectColleagues: [{ id: '9', name: '我自己', roleLabel: '负责人' }, { id: '12', name: '合成项目同事', roleLabel: '项目成员' }],
+    organization: { name: '合成团队', members: [] }, firm: { name: '合成律所', teams: [] }, friends: [],
+  } : undefined }); close(t, p);
+  assert.equal(p.$('directory').open, false);
+  assert.ok(p.$('conversations').compareDocumentPosition(p.$('directory')) & p.dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.equal(p.$('welcome-directory'), null);
+  assert.doesNotMatch(p.dom.window.document.body.textContent, /我的组织|切换组织|我的朋友/);
+  p.$('directory').open = true;
+  assert.match(p.$('directory-groups').textContent, /当前项目.*合成项目同事.*我的团队.*我的律所/s);
+  assert.doesNotMatch(p.$('directory-groups').textContent, /我自己/);
+  p.$('search').value = '合成项目同事'; p.$('search').dispatchEvent(new p.dom.window.Event('input'));
+  await p.named('发消息');
+  assert.ok(p.calls.some((c) => c.action === 'create' && c.params.title === '合成项目同事'));
+});
+test('opening directory from chat preserves the active conversation and draft', async (t) => {
+  const p = await panel(); close(t, p); await p.select(); p.write('待发送内容');
+  await p.click('directory-home');
+  assert.equal(p.$('directory').open, true);
+  assert.equal(p.$('active-chat').hidden, false);
+  assert.equal(p.$('draft').value, '待发送内容');
+  assert.equal(p.dom.window.document.activeElement, p.$('directory').querySelector('summary'));
+});
+test('plugin navigation hides only for a matching visible host sidebar and returns when it leaves', async (t) => {
+  const p = await panel(); close(t, p); await p.select(); p.write('保留草稿');
+  await p.events['sidebar.command']({ command: 'host-sidebar', projectId: 2, visible: true });
+  assert.equal(p.$('workspace').classList.contains('host-sidebar'), false);
+  await p.events['sidebar.command']({ command: 'host-sidebar', projectId: 1, visible: true });
+  assert.equal(p.$('workspace').classList.contains('host-sidebar'), true);
+  await p.click('directory-home');
+  assert.equal(p.calls.filter((c) => c.method === 'sidebar.sync').at(-1).directoryOpen, true);
+  assert.equal(p.$('workspace').classList.contains('chat-open'), true);
+  assert.equal(p.$('draft').value, '保留草稿');
+  await p.events['sidebar.command']({ command: 'host-sidebar', projectId: 1, visible: false });
+  assert.equal(p.$('workspace').classList.contains('host-sidebar'), false);
+  await p.events['sidebar.command']({ command: 'host-sidebar', projectId: 1, visible: true });
+  await p.switch();
+  assert.equal(p.$('workspace').classList.contains('host-sidebar'), false);
+});
+
+async function agentPanel(options = {}) {
+  const agent = { scope: 'project', scopeKey: 'project-uuid', name: '合成项目助手', title: '合成项目助手群' };
+  const group = { id: 'agent-group', title: agent.title, type: 'GROUP', role: 'OWNER', agent: { ...agent, private: false } };
+  const privateChat = { id: 'agent-private', title: agent.name, type: 'AGENT_DIRECT', role: 'OWNER', agent: { ...agent, private: true } };
+  const conversations = [group, c1, c2], messages = []; let status = null, nextId = 30;
+  const p = await panel({ call: async (entry) => {
+    const custom = await options.call?.(entry); if (custom !== undefined) return custom;
+    if (entry.method !== 'im.request') return;
+    const { action, params } = entry;
+    if (action === 'agentScopes') return { agents: [agent] };
+    if (action === 'ensureAgent') { if (params.private && !conversations.includes(privateChat)) conversations.push(privateChat); return params.private ? privateChat : group; }
+    if (action === 'list') return { conversations };
+    if (action === 'members' && params.conversationId.startsWith('agent-')) return {
+      humanCount: options.humanCount || 1,
+      members: [{ id: 9, role: 'OWNER', displayName: '合成用户', actorType: 'HUMAN' }, ...(options.humanCount === 2 ? [{ id: 10, role: 'MEMBER', displayName: '合成同事', actorType: 'HUMAN' }] : []), { id: null, displayName: agent.name, actorType: 'AGENT' }],
+    };
+    if (action === 'messages' && params.conversationId.startsWith('agent-')) return { messages, agentStatus: status, hasMore: false };
+    if (action === 'send') { const message = { id: nextId++, senderId: 9, actorType: 'HUMAN', text: params.text, clientMessageId: params.clientMessageId }; messages.push(message); return message; }
+    if (action === 'agentReply') { status = { status: 'queued', messageId: params.messageId }; return { accepted: true, ...status }; }
+  } });
+  return { ...p, group, privateChat, messages, setStatus: (next) => { status = next; } };
+}
+test('project assistant opens its shared conversation by default and responds automatically for one human', async (t) => {
+  const p = await agentPanel(); close(t, p);
+  assert.equal(p.$('active-chat').hidden, false);
+  assert.equal(p.$('chat-title').textContent, '合成项目助手群');
+  assert.match(p.$('chat-subtitle').textContent, /群成员可见/);
+  assert.equal(p.$('agents').children.length, 0, 'existing assistant group is not duplicated as a shortcut');
+  assert.equal(p.calls.find((c) => c.action === 'ensureAgent').params.private, false);
+  await p.click('members-button');
+  assert.match(p.$('dialog-body').textContent, /合成项目助手 · AI 助手/);
+  assert.equal([...p.$('dialog-body').querySelectorAll('.member-row button')].some((b) => b.textContent === '移除'), false);
+  assert.doesNotMatch(p.$('dialog-body').textContent, /退出会话/);
+  await p.click('close-dialog'); p.write('这个项目下一步做什么？'); await p.submit();
+  const send = p.calls.find((c) => c.action === 'send'), reply = p.calls.find((c) => c.action === 'agentReply');
+  assert.ok(send); assert.equal(reply.params.messageId, 30);
+  assert.match(p.$('agent-status').textContent, /等待助手回复/);
+  assert.doesNotMatch(p.$('messages').textContent, /AI 助手/);
+});
+test('multi-human shared group waits for an explicit assistant request', async (t) => {
+  const p = await agentPanel({ humanCount: 2 }); close(t, p);
+  p.write('先与同事讨论'); await p.submit();
+  assert.equal(p.calls.filter((c) => c.action === 'agentReply').length, 0);
+  await p.click('agent-reply');
+  assert.deepEqual(p.calls.filter((c) => c.action === 'agentReply').map((c) => c.params.messageId), [30]);
+});
+test('assistant failures retry the same message without resending user content, completed replies identify AI', async (t) => {
+  const p = await agentPanel(); close(t, p); p.write('请概括进度'); await p.submit();
+  p.setStatus({ status: 'failed', messageId: 30, error: '模型暂不可用 <script>bad</script>' }); await p.poll();
+  assert.match(p.$('agent-status').textContent, /模型暂不可用/); assert.equal(p.$('agent-status').querySelector('script'), null);
+  await p.named('重试助手回复');
+  assert.equal(p.calls.filter((c) => c.action === 'send').length, 1);
+  assert.deepEqual(p.calls.filter((c) => c.action === 'agentReply').map((c) => c.params.messageId), [30, 30]);
+  p.messages.push({ id: 31, senderId: 0, actorType: 'AGENT', senderName: '合成项目助手', text: '基于群内信息的回复' });
+  p.setStatus({ status: 'completed', messageId: 30 }); await p.poll();
+  assert.equal(p.$('agent-status').hidden, true);
+  assert.match(p.$('messages').textContent, /合成项目助手 · AI 助手.*基于群内信息的回复/s);
+});
+test('assistant private chat is separately scoped and has no invitation or shared file controls', async (t) => {
+  const p = await agentPanel({ humanCount: 2 }); close(t, p); await p.click('agent-private');
+  assert.match(p.$('chat-subtitle').textContent, /仅你可见/);
+  assert.equal(p.$('members-button').hidden, true); assert.equal(p.$('project-bar').hidden, true);
+  assert.equal(p.dom.window.document.querySelector('.composer-tools').hidden, true);
+  assert.equal(p.calls.filter((c) => c.action === 'ensureAgent').at(-1).params.private, true);
+  p.write('只与助手聊'); await p.submit();
+  assert.equal(p.calls.filter((c) => c.action === 'agentReply').length, 1);
+  assert.equal(p.calls.some((c) => c.action === 'invite'), false);
+});
+test('cloud quota and project context disclosure appears before sending and keeps detail collapsible', async (t) => {
+  const p = await agentPanel(); close(t, p);
+  assert.match(p.$('chat-subtitle').textContent, /云端助手群聊/);
+  assert.equal(p.$('agent-info').hidden, false);
+  assert.match(p.$('agent-info-summary').textContent, /使用平台 AI 额度.*本群公开材料/);
+  await p.click('agent-private');
+  assert.match(p.$('chat-subtitle').textContent, /云端助手私聊.*仅你可见/);
+  assert.match(p.$('agent-info-summary').textContent, /你可读的当前项目资料在云端回复/);
+  assert.match(p.$('agent-info-detail').textContent, /项目概况、文件目录及部分材料正文会随提问发送；不使用本机选择的模型/);
+  assert.equal(p.$('agent-info').querySelector('details').open, false);
+  assert.equal(p.calls.some((c) => c.action === 'send'), false);
+  await p.select(1); assert.equal(p.$('agent-info').hidden, true);
+});
+test('project scope reason remains visible while a permitted team assistant can be opened', async (t) => {
+  const team = { scope: 'team', scopeKey: 'team:one', name: '团队助手', title: '合成团队' };
+  const reason = '请由项目负责人先创建项目助手群。';
+  const p = await agentPanel({ call: ({ action }) => {
+    if (action === 'agentScopes') return { agents: [team], projectReason: reason };
+    if (action === 'ensureAgent') return { id: 'agent-team', title: team.title, type: 'GROUP', role: 'MEMBER', agent: { ...team, private: false } };
+  } }); close(t, p);
+  assert.match(p.$('agents').textContent, /团队助手/);
+  assert.match(p.$('agents').textContent, /请由项目负责人先创建项目助手群/);
+  assert.match(p.$('conversations').textContent, /合成客户沟通/);
+  assert.equal(p.calls.some((c) => c.action === 'ensureAgent'), false);
+  p.$('agents').querySelector('button').click(); await tick(); await tick();
+  assert.equal(p.$('chat-title').textContent, team.title);
+  assert.equal(p.calls.filter((c) => c.action === 'ensureAgent').at(-1).params.scopeKey, team.scopeKey);
+  assert.match(p.$('agents').textContent, /请由项目负责人先创建项目助手群/);
+});
+test('assistant scope and enrollment failures preserve ordinary messaging; disconnected account never looks ready', async (t) => {
+  for (const action of ['agentScopes', 'ensureAgent', 'self']) {
+    const p = await agentPanel({ call: (c) => { if (c.action === action) throw Error(action === 'ensureAgent' ? '请使用邀请码加入该项目助手群' : '服务连接失败'); } }); close(t, p);
+    assert.match(p.$('notice').textContent, action === 'ensureAgent' ? /邀请码/ : /服务连接失败/);
+    assert.equal(p.$('active-chat').hidden, true);
+    if (action === 'self') {
+      assert.equal(p.$('agents').children.length, 0);
+      assert.equal(p.calls.some((c) => c.action === 'ensureAgent'), false);
+    } else {
+      assert.match(p.$('conversations').textContent, /合成客户沟通/);
+      await p.select(1); p.write('普通会话仍可发送'); await p.submit();
+      assert.ok(p.calls.some((c) => c.action === 'send'));
+    }
+  }
+});
+test('late default assistant enrollment cannot replace a conversation chosen by the user', async (t) => {
+  let release;
+  const p = await agentPanel({ call: ({ action }) => action === 'ensureAgent' ? new Promise((resolve) => { release = resolve; }) : undefined }); close(t, p);
+  await p.select(1); assert.equal(p.$('chat-title').textContent, c1.title);
+  release(p.group); await tick(); await tick();
+  assert.equal(p.$('chat-title').textContent, c1.title);
+});
+
+test('a rejected assistant admission retains retry after polling without relabeling the sent message as failed', async (t) => {
+  let fail = true;
+  const p = await agentPanel({ call: ({ action }) => { if (action === 'agentReply' && fail) throw Error('助手暂时繁忙'); } }); close(t, p);
+  p.write('消息已发送，助手可稍后回复'); await p.submit();
+  assert.match(p.$('agent-status').textContent, /助手暂时繁忙/);
+  assert.doesNotMatch(p.$('messages').textContent, /发送未确认/);
+  await p.poll(); assert.match(p.$('agent-status').textContent, /重试助手回复/);
+  fail = false; await p.named('重试助手回复');
+  assert.equal(p.calls.filter((c) => c.action === 'send').length, 1);
+  assert.deepEqual(p.calls.filter((c) => c.action === 'agentReply').map((c) => c.params.messageId), [30, 30]);
+});
+test('an assistant reply failure after switching conversations cannot replace the new chat status', async (t) => {
+  let reject;
+  const p = await agentPanel({ call: ({ action }) => action === 'agentReply' ? new Promise((_, fail) => { reject = fail; }) : undefined }); close(t, p);
+  p.write('旧会话消息'); await p.submit(); await p.select(1);
+  reject(Error('旧会话回复失败')); await tick();
+  assert.equal(p.$('chat-title').textContent, c1.title);
+  assert.equal(p.$('agent-status').hidden, true);
+  assert.doesNotMatch(p.$('notice').textContent, /旧会话回复失败/);
+});
+
+for (const olderStatus of ['queued', 'completed']) test(`older ${olderStatus} turn cannot erase a later rejected reply or its retry source`, async (t) => {
+  let rejectSecond = true;
+  const p = await agentPanel({ call: ({ action, params }) => {
+    if (action === 'agentReply' && params.messageId === 31 && rejectSecond) throw Error('助手正在回复，请稍后再试');
+  } }); close(t, p);
+  p.write('第一条问题'); await p.submit();
+  p.setStatus({ status: olderStatus, messageId: 30 }); await p.poll();
+  p.write('第二条需要保留的问题'); await p.submit();
+  assert.equal(p.calls.filter((c) => c.action === 'send').length, 2, 'normal messages remain sendable');
+  assert.match(p.$('agent-status').textContent, /重试助手回复/);
+  await p.poll();
+  assert.match(p.$('agent-status').textContent, /重试助手回复/, 'old server status must not erase the rejected newer reply');
+  p.setStatus({ status: 'completed', messageId: 30 }); await p.poll();
+  assert.match(p.$('agent-status').textContent, /第二条需要保留的问题/);
+  rejectSecond = false; await p.named('重试助手回复');
+  assert.deepEqual(p.calls.filter((c) => c.action === 'agentReply').map((c) => c.params.messageId), [30, 31, 31]);
+  assert.equal(p.calls.filter((c) => c.action === 'send').length, 2);
+  await p.poll();
+  assert.doesNotMatch(p.$('agent-status').textContent, /重试助手回复|助手正在回复，请稍后再试/);
+  p.setStatus({ status: 'completed', messageId: 31 }); await p.poll();
+  assert.equal(p.$('agent-status').hidden, true);
+});
+test('each rejected reply keeps its own retry even after another failed source is accepted', async (t) => {
+  let fail = true;
+  const p = await agentPanel({ call: ({ action }) => { if (action === 'agentReply' && fail) throw Error('暂时无法连接助手'); } }); close(t, p);
+  p.write('第一条失败问题'); await p.submit(); p.write('第二条失败问题'); await p.submit();
+  await p.poll(); assert.equal(p.$('agent-status').querySelectorAll('button').length, 2);
+  fail = false; p.$('agent-status').querySelector('button').click(); await tick(); await tick();
+  p.setStatus({ status: 'completed', messageId: 30 }); await p.poll();
+  assert.match(p.$('agent-status').textContent, /第二条失败问题/);
+  assert.doesNotMatch(p.$('agent-status').textContent, /第一条失败问题/);
+  await p.named('重试助手回复');
+  assert.deepEqual(p.calls.filter((c) => c.action === 'agentReply').map((c) => c.params.messageId), [30, 31, 30, 31]);
+  assert.equal(p.calls.filter((c) => c.action === 'send').length, 2);
+});
+test('a second human message sent while admission is pending retains an assistant retry', async (t) => {
+  let release, pending = true;
+  const p = await agentPanel({ call: ({ action, params }) => action === 'agentReply' && params.messageId === 30 && pending
+    ? new Promise((resolve) => { release = resolve; }) : undefined }); close(t, p);
+  p.write('第一条正在申请回复'); await p.submit(); p.write('第二条等待重试'); await p.submit();
+  assert.equal(p.calls.filter((c) => c.action === 'send').length, 2);
+  assert.match(p.$('agent-status').textContent, /第二条等待重试/);
+  pending = false; release({ accepted: true, status: 'completed', messageId: 30 }); await tick(); await tick();
+  await p.poll(); await p.named('重试助手回复');
+  assert.deepEqual(p.calls.filter((c) => c.action === 'agentReply').map((c) => c.params.messageId), [30, 31]);
+  assert.equal(p.calls.filter((c) => c.action === 'send').length, 2);
 });
