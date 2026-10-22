@@ -40,6 +40,10 @@ class ProjectDeleteCloudQuotaTest {
         when(quota.isEnabled()).thenReturn(true);
         when(factory.getStorageService()).thenReturn(storage);
         when(entityManager.find(Project.class, 1L, LockModeType.PESSIMISTIC_WRITE)).thenReturn(new Project());
+        var releaseOriginals = mock(jakarta.persistence.Query.class);
+        String releaseQuery = "delete from DdSubmission s where s.projectId = :pid";
+        when(entityManager.createQuery(releaseQuery)).thenReturn(releaseOriginals);
+        when(releaseOriginals.setParameter("pid", 1L)).thenReturn(releaseOriginals);
         var file = new ProjectFile(); file.setFilePath("projects/1/a.txt"); file.setIsFolder(false);
         when(files.findByProjectId(1L)).thenReturn(List.of(file));
         doThrow(new StorageException("disk unavailable")).when(storage).delete("projects/1/a.txt");
@@ -47,7 +51,17 @@ class ProjectDeleteCloudQuotaTest {
         assertThrows(StorageException.class, () -> service.deleteProject(1L));
         verify(quota).lockProjectForWrite(1L);
         verify(projects, never()).deleteById(anyLong());
-        verify(entityManager, never()).createQuery(anyString());
+        // Only transactional original references may be released before physical deletion.
+        // Project/file accounting and every other cleanup query must wait for storage success.
+        verify(entityManager).find(Project.class, 1L, LockModeType.PESSIMISTIC_WRITE);
+        verify(entityManager).createQuery(releaseQuery);
+        verifyNoMoreInteractions(entityManager);
+        var deletionOrder = inOrder(releaseOriginals, storage);
+        deletionOrder.verify(releaseOriginals).setParameter("pid", 1L);
+        deletionOrder.verify(releaseOriginals).executeUpdate();
+        deletionOrder.verify(storage).delete("projects/1/a.txt");
+        verify(files).findByProjectId(1L);
+        verifyNoMoreInteractions(files);
         verify(resolver, never()).invalidate(anyLong());
     }
 }

@@ -99,6 +99,15 @@ public class DdItem {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    private Long currentSubmissionId;
+    // Mutations use a database row lock; nullable supports pre-existing rows without destructive migration.
+    private Long revision = 0L;
+
+    public Long getCurrentSubmissionId() { return currentSubmissionId; }
+    public void setCurrentSubmissionId(Long value) { currentSubmissionId = value; }
+    public Long getRevision() { return revision == null ? 0L : revision; }
+    public void setRevision(Long value) { revision = value; }
+
     public Long getId() {
         return id;
     }

@@ -27,6 +27,9 @@ import java.util.UUID;
 @Service
 public class ProjectFileService {
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DdOriginalGuard ddOriginalGuard;
+
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProjectFileService.class);
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -1034,7 +1037,8 @@ public class ProjectFileService {
         purgeRows(file);
     }
 
-    private static void requireManagedFile(ProjectFile file) {
+    private void requireManagedFile(ProjectFile file) {
+        if (ddOriginalGuard != null) ddOriginalGuard.requireMutableTree(file);
         if (StringUtils.hasText(file.getExternalPath())) throw new IllegalArgumentException(LangText.of(
                 "独立文件请在 Finder 或资源管理器中移动、改名或删除",
                 "Move, rename or delete standalone files in Finder or File Explorer"));

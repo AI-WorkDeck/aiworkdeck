@@ -43,8 +43,8 @@ import java.util.regex.Pattern;
  * 放给 DdController 走本机——清单/清单项 id 在本机与案件库是两个 id 空间，前端对放进案件库的
  * 案卷必须带 projectId（api.js 的 dd 系列统一带）。
  *
- * <p>鉴权与 CloudController 的项目级端点同口径：成员且不是客户。转发用这台机器连案件库的
- * 设备令牌，案件库那一侧再按律师在案件库上的角色判一次。
+ * <p>鉴权与 CloudController 的项目级端点同口径：成员且不是客户，修改另需本机写权限。
+ * 转发使用连接人的设备令牌，远端权限不能代替本机当前成员的权限。
  */
 @Component
 public class DdCloudProxyFilter extends OncePerRequestFilter implements Ordered {
@@ -105,8 +105,14 @@ public class DdCloudProxyFilter extends OncePerRequestFilter implements Ordered 
         }
 
         String method = request.getMethod();
+        boolean writable = projectMemberService.hasWritePermission(projectId, userId);
+        if (!writable && !List.of("GET", "HEAD", "OPTIONS").contains(method)) {
+            writeJson(response, 403, Map.of("code", 1,
+                    "message", LangText.of("只读成员无法修改尽调清单", "Read-only members cannot modify due diligence checklists")));
+            return;
+        }
         try {
-            if ("GET".equals(method) && suffix.matches("^/projects/\\d+/?$")) {
+            if (writable && "GET".equals(method) && suffix.matches("^/projects/\\d+/?$")) {
                 migrationService.migratePending(projectId);
             }
             byte[] body = request.getInputStream().readAllBytes();

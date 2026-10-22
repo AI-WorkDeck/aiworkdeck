@@ -9,6 +9,8 @@ import com.checkba.service.ProjectMemberService;
 import com.checkba.version.CloudSyncService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -87,6 +89,7 @@ class DdCloudProxyFilterTest {
     @DisplayName("转发时剥掉本机的 projectId 与 token，其余查询串原样；列表读先触发迁移")
     void forwardsWithCleanQueryAndMigratesOnList() throws Exception {
         when(cloud.hasRemoteBinding(7L)).thenReturn(true);
+        when(pms.hasWritePermission(7L, 1L)).thenReturn(true);
         when(pms.hasReadPermission(7L, 1L)).thenReturn(true);
         when(cloud.proxyDd(anyLong(), any(), any(), any(), any(), any()))
                 .thenReturn(new CloudSyncService.RawResponse(200, "application/json", null, "[]".getBytes()));
@@ -102,4 +105,40 @@ class DdCloudProxyFilterTest {
             assertEquals(SourceCodeNoticeFilter.SOURCE_URL, resp.getHeader(SourceCodeNoticeFilter.HEADER));
         }
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"POST", "PUT", "PATCH", "DELETE"})
+    @DisplayName("本机只读成员不能借用连接人的设备令牌修改远端清单")
+    void readOnlyMemberCannotProxyMutation(String method) throws Exception {
+        when(cloud.hasRemoteBinding(7L)).thenReturn(true);
+        when(pms.hasReadPermission(7L, 1L)).thenReturn(true);
+        when(pms.hasWritePermission(7L, 1L)).thenReturn(false);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession(any())).thenReturn(1L);
+            MockHttpServletResponse resp = new MockHttpServletResponse();
+            assertNull(run(true, method, "/api/dd/requests/5/publish", "projectId=7", resp).getRequest());
+            assertEquals(403, resp.getStatus());
+        }
+        verify(cloud, never()).proxyDd(anyLong(), any(), any(), any(), any(), any());
+        verify(migration, never()).migratePending(anyLong());
+    }
+
+    @Test
+    @DisplayName("只读成员可查看清单，但读取不能触发会写入远端的旧清单迁移")
+    void readOnlyListDoesNotMigrate() throws Exception {
+        when(cloud.hasRemoteBinding(7L)).thenReturn(true);
+        when(pms.hasReadPermission(7L, 1L)).thenReturn(true);
+        when(cloud.proxyDd(anyLong(), any(), any(), any(), any(), any()))
+                .thenReturn(new CloudSyncService.RawResponse(200, "application/json", null, "[]".getBytes()));
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession(any())).thenReturn(1L);
+            MockHttpServletResponse resp = new MockHttpServletResponse();
+            run(true, "GET", "/api/dd/projects/7", null, resp);
+            assertEquals(200, resp.getStatus());
+            assertEquals("[]", resp.getContentAsString());
+        }
+        verify(cloud).proxyDd(7L, "GET", "/projects/7", "", new byte[0], null);
+        verify(migration, never()).migratePending(anyLong());
+    }
+
 }

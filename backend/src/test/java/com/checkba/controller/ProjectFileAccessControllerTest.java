@@ -39,7 +39,7 @@ class ProjectFileAccessControllerTest {
         ReflectionTestUtils.setField(downloads, "projectFileRepository", files);
         ReflectionTestUtils.setField(downloads, "fileAccess", access);
         ReflectionTestUtils.setField(downloads, "documentTextService", text);
-        mvc = MockMvcBuilders.standaloneSetup(downloads, new DdController(dd, members, access),
+        mvc = MockMvcBuilders.standaloneSetup(downloads, new DdController(dd, mock(com.checkba.service.DdWorkflowService.class), members, access),
                 new ProjectFileController(service, members, access, null, null, null, null)).build();
     }
     @Test void clientCannotBypassTreeByDirectDownloadTextLocalPathCompareOrDd() throws Exception {

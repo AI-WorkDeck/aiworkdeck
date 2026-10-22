@@ -28,6 +28,8 @@ public class LocalFileStorageService implements StorageService {
 
     private final ProjectStorageResolver storageResolver;
     private final Path templateDoc;
+    @Autowired(required = false)
+    private com.checkba.service.DdOriginalGuard ddOriginalGuard;
 
     @Autowired
     public LocalFileStorageService(ProjectStorageResolver storageResolver) {
@@ -39,6 +41,7 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String save(String fileId, InputStream inputStream) throws StorageException {
         Path filePath = resolveFilePath(fileId);
+        requireMutable(fileId, filePath);
         
         try {
             if (storageResolver.isExternalFileKey(fileId)) {
@@ -93,6 +96,7 @@ public class LocalFileStorageService implements StorageService {
         if (Files.exists(filePath)) {
             return;
         }
+        requireMutable(fileId, filePath);
         if (storageResolver.isExternalFileKey(fileId)) throw new StorageException("原文件已不存在，请重新打开文件");
         try {
             Files.createDirectories(filePath.getParent());
@@ -118,6 +122,7 @@ public class LocalFileStorageService implements StorageService {
     public void delete(String fileId) throws StorageException {
         rejectExternalStructureChange(fileId);
         Path filePath = resolveFilePath(fileId);
+        requireMutable(fileId, filePath);
         
         try {
             if (Files.exists(filePath)) {
@@ -136,6 +141,8 @@ public class LocalFileStorageService implements StorageService {
     public void moveNew(String fromId, String toId) throws StorageException {
         rejectExternalStructureChange(fromId);
         rejectExternalStructureChange(toId);
+        requireMutable(fromId, resolveFilePath(fromId));
+        requireMutable(toId, resolveFilePath(toId));
         try {
             Path target = resolveFilePath(toId);
             Files.createDirectories(target.getParent());
@@ -159,6 +166,8 @@ public class LocalFileStorageService implements StorageService {
         rejectExternalStructureChange(toId);
         Path from = resolveFilePath(fromId);
         Path to = resolveFilePath(toId);
+        requireMutable(fromId, from);
+        requireMutable(toId, to);
         try {
             Files.createDirectories(to.getParent());
             try {
@@ -180,6 +189,10 @@ public class LocalFileStorageService implements StorageService {
     private Path resolveFilePath(String fileId) {
         String relative = (fileId.contains("/") || fileId.contains("\\")) ? fileId : fileId + ".docx";
         return storageResolver.resolve(relative);
+    }
+
+    private void requireMutable(String key, Path path) {
+        if (ddOriginalGuard != null) ddOriginalGuard.requireMutablePath(key, path);
     }
 
     private void rejectExternalStructureChange(String key) {
@@ -218,6 +231,7 @@ public class LocalFileStorageService implements StorageService {
     @Override
     public String append(String fileId, InputStream inputStream) throws StorageException {
         Path filePath = resolveFilePath(fileId);
+        requireMutable(fileId, filePath);
 
         try {
             if (storageResolver.isExternalFileKey(fileId)) {
