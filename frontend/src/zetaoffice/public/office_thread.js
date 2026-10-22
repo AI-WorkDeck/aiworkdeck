@@ -4852,7 +4852,7 @@ const EXEC = {
   // text becomes a paragraph break (insertTextAtCursor).
   replace_selection(p) {
     const rawText = String((p && p.text) || '');
-    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+    if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
       const selInfo = activeCalcSelection();
       const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
       if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
@@ -4981,7 +4981,7 @@ const EXEC = {
   },
   // [verified] current selection text (anchor, not integer offset).
   get_selection() {
-    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+    if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
       const selInfo = activeCalcSelection();
       let text = '';
       try {
@@ -5374,7 +5374,7 @@ const EXEC = {
     const url = UI_COMMANDS[name];
     if (!url) return { success: false, message: 'ui_command not allowed: ' + (p.name || '') };
     const alignMap = { align_left: 'left', align_center: 'center', align_right: 'right', align_justify: 'justify' };
-    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+    if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
       const selInfo = activeCalcSelection();
       const rangeName = selInfo.range || 'A1';
       const cell = selInfo.cell || selInfo.selRange;
@@ -8034,7 +8034,7 @@ const EXEC = {
       try { ctrl.select(shape); } catch (e) {}
       return { success: true, bytes: u8.length, width: w, height: h, slideNumber: r0.index + 1, slideIndex: r0.index, shapeName: shapeName, shapeIndex: r0.page.getCount() - 1 };
     }
-    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+    if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
       const selInfo = activeCalcSelection();
       const sheet = selInfo.sheet;
       if (!sheet) return { success: false, message: '无法获取当前工作表' };
