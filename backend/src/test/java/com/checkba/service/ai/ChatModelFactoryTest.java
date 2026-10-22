@@ -556,6 +556,30 @@ class ChatModelFactoryTest {
         assertNull(((OpenRouterStreamingChatModel) factory.getStreamingChatModel("moonshotai/kimi-k3")).reasoningEffort());
     }
 
+    @Test
+    @DisplayName("智能路由按轮思考强度覆盖：名单内模型按 override 分别缓存实例，名单外模型仍为 null")
+    void reasoningEffortOverrideRespectsAllowlistAndSeparatesCacheEntries() {
+        com.checkba.config.AiReasoningProperties reasoning = new com.checkba.config.AiReasoningProperties();
+        reasoning.setModels(java.util.List.of("moonshotai/kimi-k3", "deepseek/deepseek-v4-pro"));
+        factory.setReasoningPropertiesForTest(reasoning);
+        properties.setProvider(AiModelProperties.Provider.OPENROUTER);
+
+        OpenRouterStreamingChatModel defaultK3 =
+                (OpenRouterStreamingChatModel) factory.getStreamingChatModel("moonshotai/kimi-k3");
+        OpenRouterStreamingChatModel highK3 =
+                (OpenRouterStreamingChatModel) factory.getStreamingChatModel("moonshotai/kimi-k3", "high");
+        assertEquals("medium", defaultK3.reasoningEffort());
+        assertEquals("high", highK3.reasoningEffort());
+
+        OpenRouterStreamingChatModel unlistedFlash =
+                (OpenRouterStreamingChatModel) factory.getStreamingChatModel("deepseek/deepseek-v4-flash", "low");
+        assertNull(unlistedFlash.reasoningEffort(), "名单外模型即便传入 override 也不带 reasoning 字段");
+
+        ChatModelFactory.ResolvedTarget autoTarget = factory.resolveTarget("auto", false);
+        assertEquals(AiModelProperties.Provider.OPENROUTER, autoTarget.channel());
+        assertEquals(factory.resolveDefaultModel(), autoTarget.modelId());
+    }
+
     // ==================== 平台通道「AI WorkDeck 云端」（PR-B） ====================
 
     @Test

@@ -397,4 +397,9 @@ export default {
   reviewInProgress: 'Revising · {hunks} change(s) · {comments} comment(s)',
   reviewFileMissing: 'Cannot find the project file for this plan. Revise it in the card instead.',
   reviewConversationSwitchFailed: 'Could not switch back to the conversation of this plan. The revision was not sent.',
+  // Smart Mode (dev-board#1434)
+  autoModelName: 'Smart Mode (Auto)',
+  autoModelBadge: 'Recommended',
+  autoModelDesc: 'Automatically routes between fast, balanced, and flagship models based on task complexity and modality',
+  autoModelRoutedLabel: 'Auto · {name}',
 }
