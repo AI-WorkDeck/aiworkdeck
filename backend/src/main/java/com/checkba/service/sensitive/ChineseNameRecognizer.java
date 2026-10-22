@@ -41,8 +41,6 @@ final class ChineseNameRecognizer {
             + "先生|女士|律师|法官|经理|董事|教授|医生|书记|老师|同学|"
             + "王府井|马鞍山|张家口|景德镇|秦皇岛|石家庄|唐山|郑州|梅州|乐山|昆山)"
             + "|[已将应向由与及和的于在系为是男女省市区县镇村路街]$");
-    private static final Pattern ADDRESS = Pattern.compile(
-            "(?:注册地址|联系地址|地址|住址|住所地?|所在地)[：:\\h]*(?:为|是)?[^\\r\\n，。；;]{2,100}");
     private static final Pattern NON_PERSON_SUFFIX = Pattern.compile(
             "(?:省|市|区|县|镇|村|路|街|公司|集团|有限|股份|科技|实业|银行|医院|法院|事务所)");
     private static final Pattern PERSON_BEFORE_COMPANY = Pattern.compile("^(?:原告|被告|申请人|被申请人)([\\p{IsHan}]{2,4})(?:诉|与|向)");
@@ -59,8 +57,7 @@ final class ChineseNameRecognizer {
             int start = company.start() + organizationStart(company.group());
             protectedText.set(start, company.end());
         }
-        var address = ADDRESS.matcher(text);
-        while (address.find()) protectedText.set(address.start(), address.end());
+        for (var address : ChineseAddressRecognizer.find(text)) protectedText.set(address.start(), address.end());
         return protectedText;
     }
 

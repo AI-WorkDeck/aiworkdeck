@@ -14,6 +14,7 @@ import { parse, compileTemplate } from 'vue/compiler-sfc'
 import * as VueRuntime from 'vue'
 import * as SsrRuntime from 'vue/server-renderer'
 import { renderToString } from 'vue/server-renderer'
+import { setGlobalOverlay, globalOverlayActive } from '../../src/utils/overlayState.js'
 import { ICONS } from '../../src/config/icons.js'
 
 const ACCOUNT_CHANGED_EVENT = 'awd:account-changed'
@@ -49,7 +50,7 @@ function buildComponent() {
     .replace(/^import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export\s+default/, 'return')
   // eslint-disable-next-line no-new-func
-  const options = new Function('ICONS', 'ACCOUNT_CHANGED_EVENT', script)(ICONS, ACCOUNT_CHANGED_EVENT)
+  const options = new Function('ICONS', 'ACCOUNT_CHANGED_EVENT', 'setGlobalOverlay', script)(ICONS, ACCOUNT_CHANGED_EVENT, setGlobalOverlay)
   return { ...options, ssrRender }
 }
 
@@ -206,4 +207,40 @@ test('宿主摆放：账户入口在顶栏 header-right、「活动记录」右�
   assert.ok(rail.length > 0)
   assert.doesNotMatch(rail, /<AccountEntry|AccountRailEntry/)
   assert.doesNotMatch(rail, /GLYPHS\.settings|goToSystemSettings/)
+})
+
+// Exercise the actual component watchers with Vue reactivity, including overlapping holders.
+function mountReactiveEntry() {
+  const vm = VueRuntime.reactive({ ...Entry.data(), loggedIn: true, $emit() {} })
+  for (const [name, fn] of Object.entries(Entry.computed)) Object.defineProperty(vm, name, { get: () => fn.call(vm) })
+  for (const [name, fn] of Object.entries(Entry.methods)) vm[name] = fn.bind(vm)
+  Entry.created.call(vm)
+  const stops = Object.entries(Entry.watch).map(([name, watcher]) => VueRuntime.watch(
+    () => vm[name], (typeof watcher === 'function' ? watcher : watcher.handler).bind(vm),
+    typeof watcher === 'function' ? {} : watcher,
+  ))
+  return { vm, unmount() { Entry.beforeUnmount.call(vm); stops.forEach(stop => stop()) } }
+}
+
+test('account dropdown holds native browser overlay through open/close, sign-out and unmount', async () => {
+  installBus()
+  const first = mountReactiveEntry()
+  const second = mountReactiveEntry()
+  try {
+    first.vm.onTap(); await VueRuntime.nextTick()
+    assert.equal(globalOverlayActive.value, true, 'native browser must hide while account menu is open')
+    second.vm.onTap(); await VueRuntime.nextTick()
+    first.vm.emitAndClose('settings'); await VueRuntime.nextTick()
+    assert.equal(globalOverlayActive.value, true, 'closing one instance cannot expose another menu')
+    second.vm.onAccountChanged({ connected: false }); await VueRuntime.nextTick()
+    assert.equal(globalOverlayActive.value, false, 'sign-out releases the holder')
+    second.vm.onAccountChanged({ connected: true }); second.vm.onTap(); await VueRuntime.nextTick()
+    setGlobalOverlay(true, 'test-other-dialog')
+    second.unmount(); await VueRuntime.nextTick()
+    assert.equal(globalOverlayActive.value, true, 'unmount must not dismiss another dialog')
+    setGlobalOverlay(false, 'test-other-dialog')
+    assert.equal(globalOverlayActive.value, false, 'unmount leaves no stale holder')
+  } finally {
+    first.unmount(); second.unmount(); setGlobalOverlay(false, 'test-other-dialog')
+  }
 })

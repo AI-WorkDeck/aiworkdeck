@@ -39,7 +39,7 @@ class ExternalDependenciesControllerTest {
         when(users.findById(7L)).thenReturn(Optional.of(user)); when(admins.isAdmin(user)).thenReturn(true);
         when(lo.probe()).thenThrow(new IllegalArgumentException("private installation path"));
         when(python.refreshDockerStatus()).thenReturn("DAEMON_UNAVAILABLE", "AVAILABLE");
-        when(tmeet.isCliAvailable()).thenReturn(false, true);
+        when(tmeet.probeCliStatus()).thenReturn("RUNTIME_MISSING", "AVAILABLE");
         try (var auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("user")).thenReturn(7L);
             var first = controller.check("user").getBody(); var second = controller.check("user").getBody();
@@ -47,7 +47,8 @@ class ExternalDependenciesControllerTest {
             assertTrue(first.toString().contains("DAEMON_UNAVAILABLE"));
             assertTrue(second.toString().contains("AVAILABLE"));
             assertFalse(first.toString().contains("private installation path"));
-            verify(python, times(2)).refreshDockerStatus(); verify(tmeet, times(2)).isCliAvailable();
+            verify(python, times(2)).refreshDockerStatus(); verify(tmeet, times(2)).probeCliStatus();
+            assertTrue(first.toString().contains("RUNTIME_MISSING"));
         }
     }
 }
