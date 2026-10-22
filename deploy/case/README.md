@@ -1,12 +1,12 @@
 # 官方案件库部署（case.aiworkdeck.com）
 
 dev-board#441。「案件库」= 团队服务器 = **另一个完整的 AI WorkDeck 后端实例**，
-跑的是同一份 `backend.jar`，只是换了 profile。它对外只提供两件事：
+跑的是同一份 `backend.jar`，只是换了 profile。它对外提供以下能力：
 
 - **git smart-HTTP**（`GitHttpController`，`/git/{repo}.git/*`）——案卷仓库的托管；
 - **一小撮 API**——换设备令牌、建项目、成员、`prepare-remote`、云端同步状态。
 
-它**不**跑 AI 对话、不收用户反馈、不做手机影像中转。浏览器页面只有一个例外：
+案件库不承载通用 AI 对话、不收用户反馈、不做手机影像中转。尽调工作流（dev-board#1421）会执行清单拆分、示例生成和材料核验，使用发起律师的独立 AI 通道及额度；自动核验另需客户同意。`application-case.yml` 的 `ai.model.provider: awd-cloud` 不能省略，禁止回退使用机器共享密钥。浏览器页面只有一个例外：
 `/client/` **客户门户**（dev-board#1050）——律师的客户凭访问码进来看尽调清单、传材料，
 见第六节之后的「客户门户构建与同步」。
 
@@ -392,7 +392,7 @@ du -sh /data/aiworkdeck-case/store/repos              # 盘占用（长得最快
 律师在桌面端给放进案件库的案卷「生成访问码」时，码由**案件库**签发（桌面经
 `POST /api/cloud/projects/{id}/invite/client` 代理），发给客户的链接是
 `https://case.aiworkdeck.com/client/#code=<码>`。客户用浏览器打开 → 门户页 →
-`POST /api/auth/client-login` → 项目列表（只有被分享的那一份）→ 工作台里只有「尽调清单」。
+`POST /api/auth/client-login` → 尽调协作页。桌面端安装完整应用，在欢迎页或左侧“客户协作”入口打开标签页；邀请码建立独立的项目连接，不调用全局 `saveSession`，不将个人工作台切成 CLIENT。可保存多个邀请项目并切换，桌面令牌由 `DdClientConnectionService` 加密保管，门户令牌仅保留在当前标签页的 sessionStorage。
 
 **构建**（本地 worktree，与后端 jar 同一个提交）：
 
@@ -423,7 +423,7 @@ vhost 里 `/client/` 的 location 用 `root /opt/aiworkdeck/case/web` 而不是 
 门户只加一个静态前缀，律师用的 h5、编辑器、设置页一概不上这台机器；根路径与任何其他路径
 继续 404，不给探测面。门户包里的入口收口只是体验，**真闸在后端**：CLIENT 在案件库上
 文件树（`ProjectFileController`）、git（`GitAccessService`）、尽调写端点（`DdController`
-客户白名单，只许读清单 / 传文件 / 留言）一律被拒；`/api/auth/client-login` 有 nginx 限频 +
+客户白名单，只许读已发布清单 / 传文件和补传 / 说明 / 申诉 / 留言 / 读取自己的通知）一律被拒；`/api/auth/client-login` 有 nginx 限频 +
 `AuthAbuseGuard` 失败锁定；访问码 30 天有效，重新生成即续期。
 
 **验收**：
@@ -447,3 +447,11 @@ vhost 里 `/client/` 的 location 用 `root /opt/aiworkdeck/case/web` 而不是 
   案件库对普通用户是连不上的**。
 - 8G 共机的内存余量是纸面推算（addin `MemoryMax=2560M` + case `2048M` + PG + MySQL +
   Next.js），上线前需要在机器上 `free -m` / `systemd-cgtop` 实核一次。
+
+## 尽调发布与验收（dev-board#1421）
+
+- 律师草稿确认后调用 `POST /api/dd/requests/{id}/publish`；草稿对客户不可见。发布写入站内通知，应用在线时可通过用户已授权的系统 Notification 提醒；没有声称已接通短信或离线 APNs 推送。
+- 每次提交多文件作为一个不可变版本保存。律师审核必须携带 `submissionId` 和 `revision`，旧审核返回409；AI结论不覆盖律师结论。撤销邀请、跨项目ID和只读成员写操作必须被拒。
+- 桌面律师的 `/api/dd` 经 `DdCloudProxyFilter` 转发至绑定案件库。`DdProjectScopeFilter` 校验转发项目与请求、条目、任务、通知的归属，不能仅凭转发账号有权限就放行其他案卷。
+- 底稿通过 `/api/projects/{localId}/dd-materials/import` 拉取原版本，映射远端文件ID至本地文件ID；报告仅引用律师确认的当前版本，并记录文档书签和 evidence link。旧单文件材料通过 `prepare-materials` 迁入v1，不提前发布、不重复通知。
+- 部署前运行 `ClientPortalRoundTripTest` 和 `Dd*`；发布后用专用合成项目验“发布→客户上传→驳回/申诉→补传→律师确认→底稿→报告依据”。不能把脚本或测试替身视为真实模型/真实手机相机已验。
