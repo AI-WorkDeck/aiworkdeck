@@ -247,6 +247,9 @@ export default {
     },
     "serverErrors": {
       "invalidCode": "请输入有效的邀请码",
+      "accessCodeInvalid": "访问码无效",
+      "accessCodeRevoked": "访问码已失效",
+      "accessCodeExpired": "访问码已过期，请联系律师重新发送",
       "caseLibraryUnavailable": "本站暂未提供案件库，请选择已连接的团队案件库",
       "invitationInvalid": "邀请码无效、已过期或已撤销，请核对后重试",
       "incompleteCaseResponse": "案件库返回的信息不完整，请稍后重试",
