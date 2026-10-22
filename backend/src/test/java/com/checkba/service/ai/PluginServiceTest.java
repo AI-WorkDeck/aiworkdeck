@@ -760,7 +760,7 @@ class PluginServiceTest {
         service.init();
         var plugin = service.getPlugin("project-im");
         assertNotNull(plugin);
-        assertEquals(List.of("im","file_read","file_write"),plugin.getPermissions());
+        assertEquals(List.of("im","ai","file_read","file_write"),plugin.getPermissions());
         assertEquals("web/index.html",plugin.getFrontendEntry());
         assertTrue(service.hasWebEntry("project-im"));
         assertNotNull(service.resolveWebFile(dest.toFile(),"awd-plugin-sdk.js"));
