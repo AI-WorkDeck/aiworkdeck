@@ -82,13 +82,14 @@ public class MemoryTools implements AgentToolComponent {
           "1) 如果用户表达了跨项目的个人偏好、称谓、行文风格或审校习惯 → 传 type=preference, scope=user 写入 L3 个人长期记忆（preference 未传 scope 时自动归入 user）；" +
           "2) 如果用户拍板了项目决策、交易结构，或经底稿/法规核实确认了核心案件事实、关键金额/日期、重大核查结论 → 传 scope=project（默认）或 file 写入 L2 项目情景与证据账本，关键法条、金额、日期与拍板结论将 isProtected 设为 true；" +
           "3) 如果仅是文书草稿中未经核实的单方陈述、一次性闲聊或与既有记忆完全重复的内容 → 不要调用本工具（防噪纪律）。" +
+          "结构化写法（总表 Hook + 细项展开）：value 的第一行应写一句高密度结论摘要（系统会自动提取为 remember.md 总表索引的「— 一句话摘要」触发钩子），换行后补充展开内容（Why/事实依据/底稿出处 + How to apply/适用条件与执行方式）。" +
           "它与 query_memory 是「记一条 / 找一条」的默认入口；要整理、批量改或按文件编辑记忆文件本身" +
           "（含团队/律所共享记忆）时，改用 memory_list / memory_read / memory_write 等 memory_* 工具。")
     @ToolMeta(displayName = "保存记忆", category = "memory")
     public String save_memory(
             @P("记忆类型: decision(决策)/conclusion(结论)/fact(事实)/reference(法律引用)/preference(偏好)") String type,
-            @P("记忆标题或关键词，用于后续检索") String key,
-            @P("记忆内容，详细描述需要保存的信息") String value,
+            @P("记忆标题或关键词，用于后续检索与 remember.md 总表标题") String key,
+            @P("记忆内容：首行写一句话高密度结论摘要（自动进入 remember.md 总表索引钩子），换行写展开细节（Why/依据 + How to apply/适用规则）") String value,
             @P("是否为法律关键信息需要特别保护（如法条引用、金额、日期等），受保护信息在压缩时不会丢失") boolean isProtected,
             @P("记忆作用域(可选，preference默认user，其余默认project): user(L3用户级，跨项目的个人偏好与习惯)/project(L2项目级)/conversation(L1仅本对话)/file(L2绑定文件)/global(L3通用领域知识)") String scope,
             @P("来源文件ID(可选)，scope=file 时必填，将记忆绑定到具体文件") Long sourceFileId
@@ -563,11 +564,13 @@ public class MemoryTools implements AgentToolComponent {
     }
 
     @Tool("创建或整篇更新 Markdown 长期记忆。更新前必须 memory_read 并传回读取到的 revision；新文件 expectedRevision 传 0。"
+            + "主题文件推荐采用二级渐进披露结构：顶部可选 YAML frontmatter（description 写一句话高密度摘要与触发条件，系统会自动同步到 remember.md 总表索引的「— 一句话摘要」），"
+            + "正文包含 `# 标题`、核心结论、`Why:`（背景/依据/判例）与 `How to apply:`（何时适用与具体执行方式）。"
             + "只是记下一条决策、事实或偏好时用 save_memory（不用管路径与 revision）；本工具用于整理或重写某个记忆文件。")
     @ToolMeta(displayName = "写入记忆文件", category = "memory")
     public String memory_write(@P("记忆范围: user/project/team/firm") String scope,
-                               @P("相对 Markdown 路径") String path,
-                               @P("完整 Markdown 正文") String content,
+                               @P("相对 Markdown 路径，例如 topics/style.md") String path,
+                               @P("完整 Markdown 正文（可在 frontmatter 的 description 字段或首段写一句话摘要供 remember.md 总表索引提取，正文展开结论、Why 与 How to apply）") String content,
                                @P("乐观锁版本；新文件为 0，更新为 memory_read 返回的 revision") long expectedRevision) {
         try {
             MemorySpaceView space = resolveDocumentSpace(scope);

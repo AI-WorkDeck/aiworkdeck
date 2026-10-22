@@ -302,11 +302,41 @@ class MemoryDocumentServiceTest {
         String indexContent = service.read(18L, projectSpaceId, "remember.md").content();
         assertFalse(indexContent.contains("(" + firstView.path() + ")"),
                 "旧版本 legacy 链接应从 remember.md 索引中退场: " + indexContent);
-        assertTrue(indexContent.contains("[交易对价](" + secondView.path() + ")"),
-                "新版本 legacy 链接应保留在 remember.md 索引中: " + indexContent);
+        assertTrue(indexContent.contains("[交易对价](" + secondView.path() + ") — 经补充协议调整为 6000 万元"),
+                "新版本 legacy 链接及一句话摘要钩子应保留在 remember.md 索引中: " + indexContent);
         assertEquals("经补充协议调整为 6000 万元",
                 legacyEntries.findFirstByUid(second.getUid()).orElseThrow().getMemoryValue(),
                 "MemoryEntry.memoryValue 不应被 legacy frontmatter 污染");
+    }
+
+    @Test
+    void indexRendersClaudeStyleOneLineSummaryHookWhileKeepingExpandedDetailInTopicFile() {
+        String userSpace = space(service.listSpaces(19L, null), "user").id();
+        String topicContent = """
+                ---
+                name: redline-granularity
+                description: 仅对实质风险点下修订，纯措辞润色一律用批注提示，避免满屏红线
+                type: preference
+                ---
+
+                # 修订颗粒度规范
+
+                在对客户合同进行审阅时，仅对实质权利义务失衡或合规红线直接下修订。
+                **Why:** 客户法务反馈满屏措辞级红线会掩盖核心商业条款争议。
+                **How to apply:** 遇到表述不够凝练但无歧义的条款，保持原文不动，在重点争议处用批注建议。
+                """;
+        service.write(19L, userSpace, "topics/redline-granularity.md", topicContent, 0);
+
+        String indexContent = service.read(19L, userSpace, "remember.md").content();
+        assertTrue(indexContent.contains(
+                "- [修订颗粒度规范](topics/redline-granularity.md) — 仅对实质风险点下修订，纯措辞润色一律用批注提示，避免满屏红线"),
+                "remember.md 应渲染『[标题](路径) — 一句话高密度摘要』索引行: " + indexContent);
+        assertFalse(indexContent.contains("客户法务反馈满屏措辞级红线"),
+                "remember.md 总表只放一句话钩子，不应把 Why/How to apply 展开细节直接塞进总表: " + indexContent);
+
+        String detailContent = service.read(19L, userSpace, "topics/redline-granularity.md").content();
+        assertTrue(detailContent.contains("**Why:**") && detailContent.contains("**How to apply:**"),
+                "细项文件应完整保留展开背景与适用规则");
     }
 
     @Test
