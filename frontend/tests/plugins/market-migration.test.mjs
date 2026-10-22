@@ -15,3 +15,24 @@ test('voice has only one plugin switch; AI skills stay separate after uninstall 
     assert.equal(rows.some(row => row.group), false)
   }
 })
+
+test('builtinWorkflow skills are hidden from installedRows in lazy mode', () => {
+  const rows = compute.call(
+    {
+      plugins: [],
+      skills: [
+        { id: 'contract-review', name: '合同审查', enabled: true, builtinWorkflow: true },
+        { id: 'evidence-linked-report', name: '证据整理与核查闭环', enabled: true, builtinWorkflow: true },
+        { id: 'custom-skill', name: 'Custom Skill', enabled: true, builtinWorkflow: false },
+      ],
+      searchText: '',
+      $t: value => value,
+    },
+    () => false,
+    () => false,
+    {},
+    {},
+    {},
+  )
+  assert.deepEqual(rows.map(r => r.id), ['custom-skill'])
+})

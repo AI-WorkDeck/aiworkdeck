@@ -87,7 +87,8 @@ export default {
   enabledTag: '已启用',
   disabledTag: '已停用',
   sectionSkillSub: '提示词能力：在对话中生效，可设置生效方式',
-  noLocalSkills: '本机还没有 Skill',
+  builtinWorkflowsMarketNotice: '懒人模式已开启：合同审查、证据整理、文件整理、法律意见书核查已内置到工程主流程，对话中根据任务自动启用，无需在此安装或勾选。',
+  noLocalSkills: '本机还没有额外扩展 Skill',
   noLocalSkillsHint: '去「Skill 广场」装一个，或把 Skill 目录（含 skill.yml）放进本机 Skill 目录 ~/.aiworkdeck/skills/ 后点「重新扫描」',
   fromPlugin: '来自插件 {pluginId}',
 

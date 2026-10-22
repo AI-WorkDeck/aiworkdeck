@@ -93,6 +93,10 @@
             </view>
           </view>
 
+          <view class="builtin-workflow-banner">
+            <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
+          </view>
+
           <view v-if="marketError" class="empty">
             <svg class="empty-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, i) in ICONS.offline" :key="i" :d="d" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
@@ -318,6 +322,9 @@
             <text class="section-title">{{ $t('market.sectionSkillTitle') }}</text>
             <text class="section-sub">{{ $t('market.sectionSkillSub') }}</text>
           </view>
+          <view class="builtin-workflow-banner">
+            <text>{{ $t('market.builtinWorkflowsMarketNotice') }}</text>
+          </view>
           <view v-if="conversationSkills.length === 0" class="empty">
             <svg class="empty-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, i) in ICONS.skill" :key="i" :d="d" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
@@ -470,13 +477,13 @@ export default {
     },
     /** The voice panel has a real plugin lifecycle; AI skills retain their own activation mode. */
     panelSkills() {
-      return this.skills.filter(s => isPanelSkill(s.id) && !isVoiceGroupMember(s.id) && !s.sourcePluginId)
+      return this.skills.filter(s => !s.builtinWorkflow && isPanelSkill(s.id) && !isVoiceGroupMember(s.id) && !s.sourcePluginId)
     },
     conversationSkills() {
-      return this.skills.filter(s => !isPanelSkill(s.id) || isVoiceGroupMember(s.id) || s.sourcePluginId)
+      return this.skills.filter(s => !s.builtinWorkflow && (!isPanelSkill(s.id) || isVoiceGroupMember(s.id) || s.sourcePluginId))
     },
     installedCount() {
-      return this.plugins.length + this.skills.length
+      return this.plugins.length + this.skills.filter(s => !s.builtinWorkflow).length
     },
     /** 分类导航带计数，空分类不占位（与官网 catCount 过滤一致） */
     visibleCategories() {
@@ -1711,5 +1718,19 @@ $gray-light: var(--awd-surface-3);
   font-size: var(--awd-font-size-reading);
   font-weight: 600;
   color: var(--awd-text);
+}
+
+.builtin-workflow-banner {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: var(--awd-radius-md);
+  background: var(--awd-accent-wash);
+  border: 1px solid var(--awd-accent-soft);
+
+  text {
+    font-size: var(--awd-font-size-body);
+    color: var(--awd-text-2);
+    line-height: 1.5;
+  }
 }
 </style>
