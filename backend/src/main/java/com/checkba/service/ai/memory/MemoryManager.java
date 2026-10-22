@@ -81,39 +81,274 @@ public class MemoryManager {
     // ==================== 记忆条目操作 ====================
 
     /**
-     * 保存记忆条目
+     * 保存记忆条目（统一接入三级记忆归口、幂等防噪与 L2/L3 核心画像自动聚合）。
      */
     @Transactional
     public MemoryEntry saveMemory(MemoryEntry entry) {
-        log.info("Saving memory: projectId={}, type={}, key={}, protected={}",
-                entry.getProjectId(), entry.getMemoryType(), entry.getMemoryKey(), entry.getIsProtected());
-        
-        MemoryEntry saved = memoryEntryRepository.save(entry);
-        
+        log.info("Saving memory: projectId={}, type={}, key={}, protected={}, scope={}",
+                entry.getProjectId(), entry.getMemoryType(), entry.getMemoryKey(),
+                entry.getIsProtected(), entry.getScope());
+
+        MemoryEntry target = resolveIdempotentOrUpsertTarget(entry);
+        MemoryEntry saved = memoryEntryRepository.save(target);
+        MemoryEntry effective = saved != null ? saved : target;
+
         // 同时创建向量嵌入用于语义检索
         try {
-            String textToEmbed = buildEmbeddingText(entry);
+            String textToEmbed = buildEmbeddingText(effective);
             Embedding embedding = embeddingModel.embed(textToEmbed).content();
-            
+
             TextSegment segment = TextSegment.from(textToEmbed);
-            segment.metadata().put("memoryId", saved.getId().toString());
-            segment.metadata().put("projectId", String.valueOf(entry.getProjectId()));
-            segment.metadata().put("memoryType", entry.getMemoryType());
-            if (entry.getScope() != null) {
-                segment.metadata().put("scope", entry.getScope());
+            if (effective.getId() != null) {
+                segment.metadata().put("memoryId", effective.getId().toString());
             }
-            
+            segment.metadata().put("projectId", String.valueOf(effective.getProjectId()));
+            segment.metadata().put("memoryType", effective.getMemoryType());
+            if (effective.getScope() != null) {
+                segment.metadata().put("scope", effective.getScope());
+            }
+
             memoryEmbeddingStore.add(embedding, segment);
-            log.debug("Memory embedding created for id={}", saved.getId());
+            log.debug("Memory embedding created for id={}", effective.getId());
         } catch (Exception e) {
-            log.warn("Failed to create embedding for memory id={}: {}", saved.getId(), e.getMessage());
+            log.warn("Failed to create embedding for memory id={}: {}",
+                    effective.getId(), e.getMessage());
         }
 
-        if (memoryDocumentService != null) {
+        // L3 用户偏好与 L2 项目核心信息卡自动联动聚合
+        syncTieredCoreMemory(effective);
+
+        if (memoryDocumentService != null && saved != null) {
             memoryDocumentService.migrateLegacyEntry(saved);
         }
-        
+
         return saved;
+    }
+
+    /**
+     * 幂等防噪与 L3 同键覆写：
+     * <ul>
+     *   <li>L3 用户级记忆（{@code scope=user}）：同一 {@code userId + memoryKey} 更新时原位覆写，
+     *       避免同一偏好在跨项目画像与 {@code remember.md} 索引中累积陈旧重复项；</li>
+     *   <li>L2/L1 项目与会话记忆（{@code scope=project/file/conversation}）：
+     *       若 {@code memoryKey + memoryValue} 完全相同则复用既有记录并刷新访问计数（防重复噪音）；
+     *       若 {@code memoryKey} 相同但 {@code memoryValue} 发生变化，仍新增记录以保留证据账本的时序演进与
+     *       {@link #findSupersededInfo} 更新信号。</li>
+     * </ul>
+     */
+    private MemoryEntry resolveIdempotentOrUpsertTarget(MemoryEntry entry) {
+        if (entry == null || entry.getId() != null
+                || (entry.getUid() != null && !entry.getUid().isBlank())
+                || entry.getMemoryKey() == null || entry.getMemoryKey().isBlank()) {
+            return entry;
+        }
+        String key = entry.getMemoryKey().trim();
+        String incomingValue = cleanMemoryValue(entry.getMemoryValue());
+        try {
+            if (MemoryEntry.MemoryScope.USER.equals(entry.getScope()) && entry.getUserId() != null) {
+                List<MemoryEntry> existingUserEntries = memoryEntryRepository.findByUserIdAndScope(
+                        entry.getUserId(), MemoryEntry.MemoryScope.USER, PageRequest.of(0, 50));
+                if (existingUserEntries != null) {
+                    for (MemoryEntry existing : existingUserEntries) {
+                        if (existing == null || isIndexDocumentEntry(existing) || existing.getMemoryKey() == null) {
+                            continue;
+                        }
+                        if (key.equals(existing.getMemoryKey().trim())) {
+                            existing.setMemoryValue(entry.getMemoryValue());
+                            if (entry.getMemoryType() != null) {
+                                existing.setMemoryType(entry.getMemoryType());
+                            }
+                            if (Boolean.TRUE.equals(entry.getIsProtected())) {
+                                existing.setIsProtected(true);
+                            }
+                            if (entry.getImportanceScore() != null) {
+                                existing.setImportanceScore(Math.max(
+                                        existing.getImportanceScore() != null ? existing.getImportanceScore() : 0.7,
+                                        entry.getImportanceScore()));
+                            }
+                            existing.setLastAccessedAt(LocalDateTime.now());
+                            existing.setAccessCount((existing.getAccessCount() == null ? 0 : existing.getAccessCount()) + 1);
+                            return existing;
+                        }
+                    }
+                }
+            } else if (entry.getProjectId() != null && isProjectScope(entry.getScope())) {
+                List<MemoryEntry> sameKeyEntries = memoryEntryRepository.findByProjectIdAndMemoryKeyIn(
+                        entry.getProjectId(), List.of(key));
+                if (sameKeyEntries != null) {
+                    String targetScope = normalizeScope(entry.getScope());
+                    for (MemoryEntry existing : sameKeyEntries) {
+                        if (existing == null || isIndexDocumentEntry(existing)) {
+                            continue;
+                        }
+                        if (Objects.equals(targetScope, normalizeScope(existing.getScope()))
+                                && Objects.equals(entry.getSourceFileId(), existing.getSourceFileId())
+                                && Objects.equals(incomingValue, cleanMemoryValue(existing.getMemoryValue()))) {
+                            if (Boolean.TRUE.equals(entry.getIsProtected())) {
+                                existing.setIsProtected(true);
+                            }
+                            if (entry.getImportanceScore() != null) {
+                                existing.setImportanceScore(Math.max(
+                                        existing.getImportanceScore() != null ? existing.getImportanceScore() : 0.7,
+                                        entry.getImportanceScore()));
+                            }
+                            existing.setLastAccessedAt(LocalDateTime.now());
+                            existing.setAccessCount((existing.getAccessCount() == null ? 0 : existing.getAccessCount()) + 1);
+                            return existing;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Idempotent memory lookup skipped: {}", e.getMessage());
+        }
+        return entry;
+    }
+
+    /**
+     * 将单条结构化记忆联动沉淀至 L3（{@link UserMemory}）或 L2（{@link ProjectMemory}）核心画像。
+     */
+    private void syncTieredCoreMemory(MemoryEntry entry) {
+        if (entry == null || entry.getMemoryKey() == null || entry.getMemoryKey().isBlank()
+                || isIndexDocumentEntry(entry)) {
+            return;
+        }
+        String key = entry.getMemoryKey().trim();
+        String value = cleanMemoryValue(entry.getMemoryValue());
+        if (value.isBlank()) {
+            return;
+        }
+        try {
+            if (MemoryEntry.MemoryScope.USER.equals(entry.getScope()) && entry.getUserId() != null) {
+                if (userMemoryRepository != null) {
+                    updateUserPreference(entry.getUserId(), key, value);
+                }
+            } else if (MemoryEntry.MemoryScope.PROJECT.equals(normalizeScope(entry.getScope()))
+                    && entry.getProjectId() != null && projectMemoryRepository != null) {
+                consolidateIntoProjectMemory(entry.getProjectId(), entry.getMemoryType(), key, value);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to sync tiered core memory for key={}: {}", key, e.getMessage());
+        }
+    }
+
+    private void consolidateIntoProjectMemory(Long projectId, String memoryType, String key, String value) {
+        synchronized (projectMemorySaveLock) {
+            ProjectMemory pm = projectMemoryRepository.findByProjectId(projectId)
+                    .orElseGet(() -> ProjectMemory.builder().projectId(projectId).build());
+            String normalizedKey = key.toLowerCase(Locale.ROOT).replaceAll("[\\s_\\-：:]", "");
+            boolean matchedScalar = true;
+            switch (normalizedKey) {
+                case "projectname", "项目名称", "项目名", "案件名称" -> pm.setProjectName(value);
+                case "projecttype", "项目类型", "交易类型", "案件类型" -> pm.setProjectType(value);
+                case "listedcompany", "上市公司", "上市公司名称" -> pm.setListedCompany(value);
+                case "targetcompany", "标的公司", "目标公司", "标的企业" -> pm.setTargetCompany(value);
+                case "transactionstructure", "交易结构", "交易方案" -> pm.setTransactionStructure(value);
+                case "transactionamount", "交易金额", "交易对价", "标的金额" -> {
+                    try {
+                        String digits = value.replaceAll("[^\\d.]", "");
+                        if (!digits.isBlank()) {
+                            pm.setTransactionAmount(new java.math.BigDecimal(digits));
+                        }
+                    } catch (Exception ignored) {
+                    }
+                    putKeyVariable(pm, key, value);
+                }
+                default -> matchedScalar = false;
+            }
+
+            String type = memoryType == null ? MemoryEntry.MemoryType.FACT : memoryType.toLowerCase(Locale.ROOT);
+            if (MemoryEntry.MemoryType.REFERENCE.equals(type)) {
+                List<String> refs = pm.getLegalRefs() != null
+                        ? new ArrayList<>(pm.getLegalRefs()) : new ArrayList<>();
+                String refItem = value.contains(key) ? value : (key + ": " + value);
+                refs.remove(refItem);
+                refs.add(0, refItem);
+                if (refs.size() > 20) {
+                    refs = new ArrayList<>(refs.subList(0, 20));
+                }
+                pm.setLegalRefs(refs);
+            } else if (MemoryEntry.MemoryType.DECISION.equals(type) || MemoryEntry.MemoryType.CONCLUSION.equals(type)) {
+                List<Map<String, String>> conclusions = pm.getCheckConclusions() != null
+                        ? new ArrayList<>(pm.getCheckConclusions()) : new ArrayList<>();
+                conclusions.removeIf(item -> item != null && key.equals(item.get("topic")));
+                Map<String, String> item = new LinkedHashMap<>();
+                item.put("topic", key);
+                item.put("conclusion", value);
+                item.put("type", type);
+                conclusions.add(0, item);
+                if (conclusions.size() > 20) {
+                    conclusions = new ArrayList<>(conclusions.subList(0, 20));
+                }
+                pm.setCheckConclusions(conclusions);
+            } else if (!matchedScalar) {
+                if (key.contains("日期") || key.contains("基准日") || key.contains("交割日")
+                        || key.contains("签约日") || key.contains("截止日")) {
+                    Map<String, String> dates = pm.getKeyDates() != null
+                            ? new LinkedHashMap<>(pm.getKeyDates()) : new LinkedHashMap<>();
+                    dates.put(key, value);
+                    pm.setKeyDates(dates);
+                } else {
+                    putKeyVariable(pm, key, value);
+                }
+            }
+            projectMemoryRepository.save(pm);
+        }
+    }
+
+    private static void putKeyVariable(ProjectMemory pm, String key, String value) {
+        Map<String, String> vars = pm.getKeyVariables() != null
+                ? new LinkedHashMap<>(pm.getKeyVariables()) : new LinkedHashMap<>();
+        vars.remove(key);
+        vars.put(key, value);
+        while (vars.size() > 30) {
+            String oldestKey = vars.keySet().iterator().next();
+            vars.remove(oldestKey);
+        }
+        pm.setKeyVariables(vars);
+    }
+
+    /**
+     * 判断该条目是否为 {@code remember.md} 空间索引的派生行（索引已由 {@code # Markdown 记忆索引} 单独注入，
+     * 不应重复混入证据账本或用户偏好列表）。
+     */
+    public static boolean isIndexDocumentEntry(MemoryEntry entry) {
+        if (entry == null) {
+            return false;
+        }
+        if (entry.getMetadata() != null) {
+            Object docPath = entry.getMetadata().get("documentPath");
+            if ("remember.md".equals(docPath)) {
+                return true;
+            }
+        }
+        String val = entry.getMemoryValue();
+        return val != null && val.contains("<!-- memory-topics:start -->");
+    }
+
+    /**
+     * 剥离存量 {@code legacy-memory-entry} Markdown frontmatter 包装，还原纯净记忆正文。
+     */
+    public static String cleanMemoryValue(String rawValue) {
+        if (rawValue == null) {
+            return "";
+        }
+        String trimmed = rawValue.trim();
+        if (!trimmed.startsWith("---\nsource: legacy-memory-entry\n")) {
+            return trimmed;
+        }
+        int closingFence = trimmed.indexOf("\n---\n", 4);
+        if (closingFence < 0) {
+            return trimmed;
+        }
+        String rest = trimmed.substring(closingFence + 5).trim();
+        if (rest.startsWith("# ")) {
+            int firstNewline = rest.indexOf('\n');
+            if (firstNewline >= 0) {
+                rest = rest.substring(firstNewline + 1).trim();
+            }
+        }
+        return rest;
     }
 
     /**
@@ -256,14 +491,21 @@ public class MemoryManager {
      * 关键词候选检索（内部使用：不做衰减排序，不更新 lastAccessedAt）
      */
     private List<MemoryEntry> fetchKeywordCandidates(Long projectId, String query, String memoryType, int fetchLimit) {
+        List<MemoryEntry> raw;
         if (query == null || query.isBlank()) {
             // 没有查询时返回最重要的记忆
-            return memoryEntryRepository.findTopImportantMemories(projectId, PageRequest.of(0, fetchLimit));
+            raw = memoryEntryRepository.findTopImportantMemories(projectId, PageRequest.of(0, fetchLimit));
+        } else {
+            // 关键词搜索
+            raw = memoryEntryRepository.searchByKeywordAndType(
+                    projectId, query, memoryType, PageRequest.of(0, fetchLimit));
         }
-
-        // 关键词搜索
-        return memoryEntryRepository.searchByKeywordAndType(
-                projectId, query, memoryType, PageRequest.of(0, fetchLimit));
+        if (raw == null || raw.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return raw.stream()
+                .filter(e -> !isIndexDocumentEntry(e))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -337,14 +579,38 @@ public class MemoryManager {
     // ==================== 作用域记忆操作 ====================
 
     /**
-     * 获取用户级记忆（跨项目生效：偏好、常用表达、行文习惯）
+     * 获取用户级记忆（L3 跨项目生效：偏好、常用表达、行文习惯）。
+     * 自动过滤 {@code remember.md} 索引行并按 {@code memoryKey} 去重保留最新值。
      */
     public List<MemoryEntry> retrieveUserMemories(Long userId, int limit) {
-        if (userId == null) {
+        if (userId == null || limit <= 0) {
             return Collections.emptyList();
         }
-        return memoryEntryRepository.findByUserIdAndScope(
-                userId, MemoryEntry.MemoryScope.USER, PageRequest.of(0, limit));
+        List<MemoryEntry> raw = memoryEntryRepository.findByUserIdAndScope(
+                userId, MemoryEntry.MemoryScope.USER, PageRequest.of(0, Math.max(limit * 3, limit)));
+        if (raw == null || raw.isEmpty()) {
+            raw = memoryEntryRepository.findByUserIdAndScope(
+                    userId, MemoryEntry.MemoryScope.USER, PageRequest.of(0, limit));
+        }
+        if (raw == null || raw.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Set<String> seenKeys = new HashSet<>();
+        List<MemoryEntry> deduped = new ArrayList<>();
+        for (MemoryEntry entry : raw) {
+            if (entry == null || isIndexDocumentEntry(entry)) {
+                continue;
+            }
+            String key = entry.getMemoryKey() == null ? "" : entry.getMemoryKey().trim();
+            if (!key.isEmpty() && !seenKeys.add(key)) {
+                continue;
+            }
+            deduped.add(entry);
+            if (deduped.size() >= limit) {
+                break;
+            }
+        }
+        return deduped;
     }
 
     /**

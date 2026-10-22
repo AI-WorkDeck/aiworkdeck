@@ -1016,7 +1016,7 @@ public class ContextAssemblerService {
                     if (mem.getMemoryKey() != null) {
                         volatileText.append(mem.getMemoryKey()).append(": ");
                     }
-                    volatileText.append(mem.getMemoryValue()).append("\n");
+                    volatileText.append(MemoryManager.cleanMemoryValue(mem.getMemoryValue())).append("\n");
                 }
             }
         }
