@@ -973,7 +973,7 @@ public class LawFirmManagementService {
         StringBuilder sb = new StringBuilder();
         // UTF-8 BOM 兼容 Excel / 金蝶 / 用友直接打开
         sb.append('\uFEFF');
-        sb.append("单据类型,单据编号,关联立项号,案件名称,业务部门,主办律师,客户或付款方,纳税人识别号,票据类型或收款方式,含税金额(元),不含税金额(元),税额(元),已核销回款(元),待收账款(元),单据状态,外部ERP凭证号,业务日期\n");
+        sb.append("单据类型,单据编号,关联立项号,案件名称,业务分类,主办律师,客户或付款方,纳税人识别号,票据类型或收款方式,含税金额(元),不含税金额(元),税额(元),已核销回款(元),待收账款(元),单据状态,外部ERP凭证号,业务日期\n");
 
         List<LawFirmInvoice> invoices = invoiceRepository.findAllByOrderByCreatedAtDescIdDesc();
         for (LawFirmInvoice inv : invoices) {
@@ -1279,12 +1279,12 @@ public class LawFirmManagementService {
         unitList.sort(Comparator.comparing((Map<String, Object> u) -> (Long) u.get("contractedCents")).reversed()
                 .thenComparing((Map<String, Object> u) -> (Integer) u.get("workloadIndex"), Comparator.reverseOrder()));
 
-        // Team Leads 聚合（按主办合伙人/团队负责人聚合）
+        // Team Leads 兼容字段：按主办律师聚合，不代表团队层级
         Map<String, List<LawFirmMatterIntake>> intakesByLead = intakes.stream()
                 .filter(i -> !"REJECTED_CONFLICT".equalsIgnoreCase(i.getStatus()))
                 .collect(Collectors.groupingBy(i -> {
                     Long lid = i.getLeadLawyerUserId() != null ? i.getLeadLawyerUserId() : i.getApplicantUserId();
-                    String lname = firstNonBlank(i.getLeadLawyerName(), i.getApplicantName(), "团队负责人");
+                    String lname = firstNonBlank(i.getLeadLawyerName(), i.getApplicantName(), "主办律师");
                     return (lid != null ? lid : 0L) + "::" + lname;
                 }, LinkedHashMap::new, Collectors.toList()));
 
@@ -1292,7 +1292,7 @@ public class LawFirmManagementService {
         for (Map.Entry<String, List<LawFirmMatterIntake>> entry : intakesByLead.entrySet()) {
             String[] parts = entry.getKey().split("::", 2);
             Long leadId = Long.parseLong(parts[0]);
-            String leadName = parts.length > 1 ? parts[1] : "团队负责人";
+            String leadName = parts.length > 1 ? parts[1] : "主办律师";
             List<LawFirmMatterIntake> leadIntakes = entry.getValue();
             String deptName = leadIntakes.stream()
                     .map(LawFirmMatterIntake::getDepartmentName)
@@ -1429,7 +1429,7 @@ public class LawFirmManagementService {
                     .map(LawFirmMatterIntake::getLeadLawyerName)
                     .filter(s -> s != null && !s.isBlank())
                     .findFirst()
-                    .orElse(deptUnits.isEmpty() ? "部门合伙人" : String.valueOf(deptUnits.get(0).get("userName")));
+                    .orElse(deptUnits.isEmpty() ? "主办律师" : String.valueOf(deptUnits.get(0).get("userName")));
             long activeCount = deptIntakes.stream().filter(i -> !"CLOSED".equalsIgnoreCase(i.getStatus())).count();
             long ar = Math.max(0L, billed - collected);
             double billedColRate = ratePercent(collected, billed);

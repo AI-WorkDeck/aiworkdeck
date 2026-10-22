@@ -712,6 +712,66 @@ class ChatModelFactoryTest {
     }
 
     @Test
+    void explicitPlatformModelUsesTheCallingUsersKeyEvenWhenServerDefaultsToByok() throws Exception {
+        setDbProvider("OPENROUTER");
+        when(systemSettingService.get(eq("ai.defaultModel"), any())).thenReturn("deepseek/deepseek-v4-flash");
+        when(systemSettingService.get(eq("external.openrouter.apiKey"), any())).thenReturn("synthetic-machine-key");
+        when(platformAiChannel.apiKey()).thenAnswer(invocation -> {
+            assertEquals(72L, PlatformAiUserScope.current()); return "synthetic-user-72-key";
+        });
+        var authorization = new java.util.concurrent.atomic.AtomicReference<String>();
+        var body = new java.util.concurrent.atomic.AtomicReference<String>();
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            body.set(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            byte[] reply = ("{\"id\":\"synthetic\",\"object\":\"chat.completion\",\"created\":1,"
+                    + "\"model\":\"deepseek/deepseek-v4-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"synthetic reply\"},\"finish_reason\":\"stop\"}],"
+                    + "\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":2,\"total_tokens\":12}}")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, reply.length); exchange.getResponseBody().write(reply); exchange.close();
+        });
+        server.start();
+        try {
+            properties.getOpenRouter().setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
+            var target = PlatformAiUserScope.call(72L, () -> factory.getPlatformChatModel(java.time.Duration.ofSeconds(2), 1800));
+            assertEquals("deepseek/deepseek-v4-flash", target.modelId());
+            assertEquals("synthetic reply", target.model().generate(dev.langchain4j.data.message.UserMessage.from("synthetic prompt")).content().text());
+            assertEquals("Bearer synthetic-user-72-key", authorization.get());
+            assertTrue(body.get().contains(target.modelId()));
+            assertEquals(AiModelProperties.Provider.OPENROUTER, factory.resolveProvider());
+            verify(creditsGate).ensureCredits(72L); verify(usageAccountant).ensureBaselineAsync(72L);
+            verify(systemSettingService, never()).get(eq("external.openrouter.apiKey"), any());
+            verify(systemSettingService, never()).set(anyString(), anyString());
+        } finally { server.stop(0); }
+    }
+
+    @Test
+    void explicitPlatformModelRejectsMissingIdentityAndMachineKeyFallback() {
+        setDbProvider("OPENROUTER");
+        assertThrows(com.checkba.service.account.AccountException.class,
+                () -> factory.getPlatformChatModel(java.time.Duration.ofSeconds(1), 100));
+        when(platformAiChannel.usesMachineKey(72L)).thenReturn(true);
+        assertThrows(com.checkba.service.account.AccountException.class,
+                () -> PlatformAiUserScope.call(72L, () -> factory.getPlatformChatModel(java.time.Duration.ofSeconds(1), 100)));
+        verify(platformAiChannel, never()).apiKey(); verifyNoInteractions(creditsGate, usageAccountant);
+        verify(systemSettingService, never()).get(eq("external.openrouter.apiKey"), any());
+    }
+
+    @Test
+    void explicitPlatformCreditsFailureCannotFallbackToTheServerKey() {
+        setDbProvider("OPENROUTER");
+        doThrow(new com.checkba.service.account.AccountException(
+                com.checkba.service.account.AccountException.Kind.CONFLICT, "synthetic no credits"))
+                .when(creditsGate).ensureCredits(72L);
+        assertThrows(com.checkba.service.account.AccountException.class,
+                () -> PlatformAiUserScope.call(72L, () -> factory.getPlatformChatModel(java.time.Duration.ofSeconds(1), 100)));
+        verify(platformAiChannel, never()).apiKey(); verifyNoInteractions(usageAccountant);
+        verify(systemSettingService, never()).get(eq("external.openrouter.apiKey"), any());
+    }
+
+    @Test
     @DisplayName("限时辅助调用终止本地慢HTTP等待")
     void boundedAuxiliaryModelTimesOutHttp() throws Exception {
         var executor = java.util.concurrent.Executors.newSingleThreadExecutor();

@@ -60,4 +60,37 @@ class ImPluginControllerTest {
   assertThrows(IllegalArgumentException.class,()->ImController.readBody(oversized,mapper));
   assertThrows(IllegalArgumentException.class,()->ImController.readBody(request("null"),mapper));
  }
+ @Test void agentReplyRequiresAiAndReadPermissionsWithoutGrantingWriteAccess() throws Exception {
+  ImProjectActionHandler handler=mock(ImProjectActionHandler.class);when(handler.supports("agentReply")).thenReturn(true);
+  when(handlers.iterator()).thenAnswer(i->List.of(handler).iterator());
+  try(var auth=mockStatic(AuthController.class)) {
+   auth.when(()->AuthController.getUserIdFromSession("session")).thenReturn(5L);
+   String json="{\"action\":\"agentReply\",\"projectId\":123,\"params\":{\"messageId\":4}}";
+   enable("im","file_read");
+   assertThrows(IllegalArgumentException.class,()->controller.action("project-im",request(json),"session"));
+   enable("im","ai");
+   assertThrows(IllegalArgumentException.class,()->controller.action("project-im",request(json),"session"));
+   verifyNoInteractions(gateway);
+   verify(handler,never()).execute(any(),any(),any(),any());
+   enable("im","ai","file_read");
+   when(handler.execute(5L,123L,"agentReply",Map.of("messageId",4))).thenReturn(Map.of("accepted",true));
+   assertEquals(Map.of("accepted",true),controller.action("project-im",request(json),"session").get("data"));
+  }
+ }
+ @Test void assistantIdentityInitializationRequiresPluginWritePermission() throws Exception {
+  ImProjectActionHandler handler=mock(ImProjectActionHandler.class);
+  when(handler.supports(anyString())).thenReturn(true);
+  when(handlers.iterator()).thenAnswer(i->List.of(handler).iterator());
+  try(var auth=mockStatic(AuthController.class)) {
+   auth.when(()->AuthController.getUserIdFromSession("session")).thenReturn(5L);
+   for(String action:List.of("agentScopes","ensureAgent")) {
+    String json="{\"action\":\""+action+"\",\"projectId\":123,\"params\":{}}";
+    enable("im","file_read");
+    assertThrows(IllegalArgumentException.class,()->controller.action("project-im",request(json),"session"));
+    enable("im","file_read","file_write");
+    when(handler.execute(5L,123L,action,Map.of())).thenReturn(Map.of("ok",true));
+    assertEquals(Map.of("ok",true),controller.action("project-im",request(json),"session").get("data"));
+   }
+  }
+ }
 }
