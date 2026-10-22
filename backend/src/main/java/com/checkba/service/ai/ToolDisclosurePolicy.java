@@ -298,13 +298,16 @@ public class ToolDisclosurePolicy {
         CATEGORY_KEYWORDS.put("revision", List.of("修订", "批注", "接受", "拒绝", "评论",
                 "comment", "revision", "track changes"));
         CATEGORY_KEYWORDS.put("template", List.of("模板", "套用", "template"));
-        CATEGORY_KEYWORDS.put("evidence", List.of("证据", "依据", "evidence"));
+        CATEGORY_KEYWORDS.put("evidence", List.of("证据", "依据", "证据整理", "整理证据", "证据目录", "证据清单",
+                "evidence", "organize evidence"));
         // 不收单独的「目录」：它在中文里也是「文件夹」（「项目目录下有什么」），误中就白付整个 format 类目
         // 四十个规格；只收明确指文档目录的短语。
         CATEGORY_KEYWORDS.put("format", List.of("格式", "字体", "字号", "段落", "页眉", "页脚", "脚注", "排版",
                 "插入目录", "生成目录", "更新目录", "font", "format", "heading"));
-        // 不收「整理」：「整理一下录音 / 要点」远比「整理文件夹」常见，而建文件夹、批量移动、移入回收站本来就在核心集。
-        CATEGORY_KEYWORDS.put("files", List.of("移动", "重命名", "文件夹", "rename", "move", "folder"));
+        // 不收「整理」：「整理一下录音 / 要点」远比「整理文件夹」常见，而建文件夹、批量移动、移入回收站本来就在核心集；
+        // 但明确指文件归档的「文件整理」「整理文件」「归档」直接预先放回 files 全集（含单文件移动与重命名）。
+        CATEGORY_KEYWORDS.put("files", List.of("移动", "重命名", "文件夹", "文件整理", "整理文件", "归档",
+                "rename", "move", "folder", "organize files", "file organization"));
         // 「法》」「条例》」：用户一写书名号引一部法（《公司法》《劳动合同法》《著作权法实施条例》）就是在查法条，
         // 比「法规」「法条」这类泛称命中得准。
         CATEGORY_KEYWORDS.put("legal", List.of("法规", "法条", "条文", "司法解释", "法》", "条例》"));

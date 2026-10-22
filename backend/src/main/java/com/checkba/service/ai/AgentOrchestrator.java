@@ -1355,11 +1355,17 @@ public class AgentOrchestrator {
     private void sendSkillUpdate(RunGuard guard,
                                  List<com.checkba.service.ai.skill.SkillRouter.ActiveSkill> active) {
         try {
-            List<java.util.Map<String, String>> skills = active.stream()
-                    .map(a -> java.util.Map.of(
-                            "id", a.definition().getId(),
-                            "name", a.displayName(),
-                            "source", a.source()))
+            List<java.util.Map<String, Object>> skills = active.stream()
+                    .map(a -> {
+                        java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+                        item.put("id", a.definition().getId());
+                        item.put("name", a.displayName());
+                        item.put("source", a.source());
+                        if (a.definition().isBuiltinWorkflow()) {
+                            item.put("builtinWorkflow", true);
+                        }
+                        return item;
+                    })
                     .toList();
             sendRunEvent(guard, "skill_update",
                     SKILL_UPDATE_MAPPER.writeValueAsString(java.util.Map.of("skills", skills)));

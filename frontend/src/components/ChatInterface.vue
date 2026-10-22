@@ -485,8 +485,8 @@
               <view v-if="skillChips.length" class="skill-chip-row">
                  <view v-for="chip in skillChips" :key="chip.id"
                        class="skill-chip"
-                       :class="{ auto: chip.source === 'auto', flash: chip.justActivated }">
-                    <text class="skill-chip-name">{{ chip.name }}</text>
+                       :class="{ auto: chip.source === 'auto', 'is-builtin': chip.builtinWorkflow, flash: chip.justActivated }">
+                    <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.name }) : chip.name }}</text>
                     <text v-if="chip.source === 'manual'" class="skill-chip-remove"
                           @tap.stop="removeSelectedSkill(chip.id)">×</text>
                  </view>
@@ -534,6 +534,17 @@
                        </svg>
                        <text v-if="selectedSkillIds.length && !skillDisabledByMode" class="skill-count">{{ selectedSkillIds.length }}</text>
                        <view v-if="showSkillDropdown" class="skill-dropdown down" role="listbox">
+                          <view class="skill-builtin-section">
+                             <view class="skill-builtin-head">
+                                <text class="skill-builtin-title">{{ $t('chat.builtinWorkflowsHeader') }}</text>
+                                <text class="skill-builtin-badge">{{ $t('chat.builtinWorkflowBadge') }}</text>
+                             </view>
+                             <text class="skill-builtin-sub">{{ $t('chat.builtinWorkflowsSub') }}</text>
+                             <view class="skill-builtin-pills">
+                                <text v-for="bw in builtinQuickWorkflows" :key="bw.id" class="skill-builtin-pill" @tap.stop="applyBuiltinWorkflow(bw)">{{ bw.title }}</text>
+                             </view>
+                          </view>
+                          <view class="skill-divider"></view>
                           <view class="skill-dropdown-head">
                              <text class="skill-dropdown-title">{{ $t('chat.skillPickerTitle') }}</text>
                              <text class="skill-dropdown-hint">{{ skillDisabledByMode ? $t('chat.skillAskDisabled') : $t('chat.skillPickerHint') }}</text>
@@ -571,6 +582,20 @@
                     </button>
                  </view>
               </view>
+          </view>
+          <view class="builtin-workflows-bar">
+             <view class="builtin-workflows-header">
+                <text class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsHeader') }}</text>
+                <text class="builtin-workflows-badge">{{ $t('chat.builtinWorkflowBadge') }}</text>
+             </view>
+             <view class="builtin-workflows-grid">
+                <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                      class="builtin-workflow-card"
+                      @tap="applyBuiltinWorkflow(bw)">
+                   <text class="builtin-workflow-name">{{ bw.title }}</text>
+                   <text class="builtin-workflow-desc">{{ bw.desc }}</text>
+                </view>
+             </view>
           </view>
           <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" :suggestion="visibleSuggestion"
             @toggle="chatSuggestions.toggle" @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
@@ -749,8 +774,8 @@
           <view v-if="skillChips.length" class="skill-chip-row">
              <view v-for="chip in skillChips" :key="chip.id"
                    class="skill-chip"
-                   :class="{ auto: chip.source === 'auto', flash: chip.justActivated }">
-                <text class="skill-chip-name">{{ chip.name }}</text>
+                   :class="{ auto: chip.source === 'auto', 'is-builtin': chip.builtinWorkflow, flash: chip.justActivated }">
+                <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.name }) : chip.name }}</text>
                 <text v-if="chip.source === 'manual'" class="skill-chip-remove"
                       @tap.stop="removeSelectedSkill(chip.id)">×</text>
              </view>
@@ -798,6 +823,17 @@
                    </svg>
                    <text v-if="selectedSkillIds.length && !skillDisabledByMode" class="skill-count">{{ selectedSkillIds.length }}</text>
                    <view v-if="showSkillDropdown" class="skill-dropdown up" role="listbox">
+                      <view class="skill-builtin-section">
+                         <view class="skill-builtin-head">
+                            <text class="skill-builtin-title">{{ $t('chat.builtinWorkflowsHeader') }}</text>
+                            <text class="skill-builtin-badge">{{ $t('chat.builtinWorkflowBadge') }}</text>
+                         </view>
+                         <text class="skill-builtin-sub">{{ $t('chat.builtinWorkflowsSub') }}</text>
+                         <view class="skill-builtin-pills">
+                            <text v-for="bw in builtinQuickWorkflows" :key="bw.id" class="skill-builtin-pill" @tap.stop="applyBuiltinWorkflow(bw)">{{ bw.title }}</text>
+                         </view>
+                      </view>
+                      <view class="skill-divider"></view>
                       <view class="skill-dropdown-head">
                          <text class="skill-dropdown-title">{{ $t('chat.skillPickerTitle') }}</text>
                          <text class="skill-dropdown-hint">{{ skillDisabledByMode ? $t('chat.skillAskDisabled') : $t('chat.skillPickerHint') }}</text>
@@ -1726,12 +1762,14 @@ export default {
 
     // 已安装 Skill 为 0 时不显示选择器，避免输入区堆无用控件。
     // available=false 的一律不列：那些在当前应用语言下永远不会生效，能勾但不生效比看不见更糟。
+    // builtinWorkflow=true 的高频内置工作流（合同审查、证据整理、法律意见书核查等）走懒人模式自动接管，
+    // 不出现在手动勾选清单里，降低用户选择负担。
     const loadAvailableSkills = async () => {
       try {
         const res = await getSkills()
         const list = Array.isArray(res) ? res : (res?.data || [])
         availableSkills.value = list.filter(
-          s => s.activationMode !== 'disabled' && s.enabled !== false && s.available !== false
+          s => !s.builtinWorkflow && s.activationMode !== 'disabled' && s.enabled !== false && s.available !== false
         )
         // 列表变了（管理员停用/卸载）就把选不中的清掉，别留一个永远不生效的 chip
         selectedSkillIds.value = selectedSkillIds.value.filter(
@@ -1741,6 +1779,50 @@ export default {
         // Skill 列表拉取失败不该影响对话，静默降级为"无可选 Skill"
         console.warn('[ChatInterface] 加载 Skill 列表失败:', e)
         availableSkills.value = []
+      }
+    }
+
+    const builtinQuickWorkflows = computed(() => [
+      {
+        id: 'contract-review',
+        title: t('chat.builtinWorkflowContractTitle'),
+        desc: t('chat.builtinWorkflowContractDesc'),
+        prompt: t('chat.builtinWorkflowContractPrompt')
+      },
+      {
+        id: 'evidence-linked-report',
+        title: t('chat.builtinWorkflowEvidenceTitle'),
+        desc: t('chat.builtinWorkflowEvidenceDesc'),
+        prompt: t('chat.builtinWorkflowEvidencePrompt')
+      },
+      {
+        id: 'file-organization',
+        title: t('chat.builtinWorkflowFileOrgTitle'),
+        desc: t('chat.builtinWorkflowFileOrgDesc'),
+        prompt: t('chat.builtinWorkflowFileOrgPrompt')
+      },
+      {
+        id: 'legal-opinion-review',
+        title: t('chat.builtinWorkflowOpinionTitle'),
+        desc: t('chat.builtinWorkflowOpinionDesc'),
+        prompt: t('chat.builtinWorkflowOpinionPrompt')
+      }
+    ])
+
+    const applyBuiltinWorkflow = (bw) => {
+      if (!bw || !bw.prompt) return
+      showSkillDropdown.value = false
+      if (currentModeId.value === 'ASK' && !isLocalOnlyProvider.value) {
+        const agentMode = availableModes.value.find(m => m.id === 'AGENT')
+        if (agentMode) selectMode(agentMode)
+      }
+      inputPrompt.value = bw.prompt
+      if (richInput.value) {
+        const existingTags = Array.from(richInput.value.querySelectorAll('[data-file-id]'))
+          .map(el => el.outerHTML)
+          .join(' ')
+        richInput.value.innerHTML = (existingTags ? existingTags + ' ' : '') + escapeHtml(bw.prompt)
+        richInput.value.focus()
       }
     }
 
@@ -1775,7 +1857,8 @@ export default {
       if (!n) return
       try {
         if (typeof uni !== 'undefined' && uni.showToast) {
-          uni.showToast({ title: t('chat.skillAutoLoadedToast', { name: n.name }), icon: 'none', duration: 2500 })
+          const toastKey = n.builtinWorkflow ? 'chat.builtinWorkflowAutoToast' : 'chat.skillAutoLoadedToast'
+          uni.showToast({ title: t(toastKey, { name: n.name }), icon: 'none', duration: 2500 })
         }
       } catch (e) { /* toast 失败不影响对话 */ }
     })
@@ -4304,6 +4387,8 @@ export default {
        toggleSkillSelection,
        removeSelectedSkill,
        goToSkillManagement,
+       builtinQuickWorkflows,
+       applyBuiltinWorkflow,
        // Artifact
        handleArtifactOpenTab: (art) => emit('artifact-open-tab', art),
        handleArtifactApprove: async (art) => {
@@ -5868,6 +5953,127 @@ export default {
 .skill-manage:hover {
   background: var(--awd-surface-2);
   color: var(--awd-accent-text);
+}
+
+/* 懒人模式：内置高频能力（免选即用） */
+.skill-chip.is-builtin {
+  background: var(--awd-accent-soft);
+  border-style: solid;
+  border-color: var(--awd-accent);
+}
+
+.skill-builtin-section {
+  padding: 8px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  row-gap: 4px;
+  background: var(--awd-accent-wash);
+}
+.skill-builtin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 6px;
+}
+.skill-builtin-title {
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  color: var(--awd-accent-text);
+}
+.skill-builtin-badge {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+  padding: 1px 6px;
+  border-radius: var(--awd-radius-sm);
+  flex-shrink: 0;
+}
+.skill-builtin-sub {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  line-height: 1.4;
+  white-space: normal;
+}
+.skill-builtin-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+.skill-builtin-pill {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  padding: 2px 8px;
+  border-radius: var(--awd-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.skill-builtin-pill:hover {
+  border-color: var(--awd-accent);
+  background: var(--awd-accent-soft);
+}
+
+.builtin-workflows-bar {
+  width: 100%;
+  max-width: 680px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--awd-radius-dialog);
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border-subtle);
+  box-sizing: border-box;
+}
+.builtin-workflows-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.builtin-workflows-title {
+  font-size: var(--awd-panel-fs-meta);
+  font-weight: 600;
+  color: var(--awd-text-2);
+}
+.builtin-workflows-badge {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+  padding: 1px 7px;
+  border-radius: var(--awd-radius-sm);
+}
+.builtin-workflows-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.builtin-workflow-card {
+  display: flex;
+  flex-direction: column;
+  row-gap: 2px;
+  padding: 7px 10px;
+  border-radius: var(--awd-radius-md);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.builtin-workflow-card:hover {
+  border-color: var(--awd-accent);
+  background: var(--awd-accent-wash);
+}
+.builtin-workflow-name {
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  color: var(--awd-text);
+}
+.builtin-workflow-desc {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Model dropdown mask overlay */

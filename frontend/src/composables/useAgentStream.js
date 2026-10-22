@@ -1235,10 +1235,16 @@ export function useAgentStream() {
                     id: s.id,
                     name: s.name || s.id,
                     source: s.source === 'manual' ? 'manual' : 'auto',
+                    builtinWorkflow: !!s.builtinWorkflow,
                     justActivated: freshAuto.some(f => f.id === s.id)
                 }))
                 if (freshAuto.length) {
-                    skillNotice.value = { id: freshAuto[0].id, name: freshAuto[0].name || freshAuto[0].id, at: Date.now() }
+                    skillNotice.value = {
+                        id: freshAuto[0].id,
+                        name: freshAuto[0].name || freshAuto[0].id,
+                        builtinWorkflow: !!freshAuto[0].builtinWorkflow,
+                        at: Date.now()
+                    }
                     clearSkillFlash()
                     // 高亮只持续几秒：chip 本身留着（它这轮确实生效着），闪的只是"刚加载"这件事
                     skillFlashTimer = setTimeout(() => {

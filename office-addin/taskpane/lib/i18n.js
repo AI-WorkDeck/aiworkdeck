@@ -135,6 +135,9 @@ export const ZH = {
   quickProofreadText:
     '请分段过卷校对全文的错别字与病句，以修订模式逐处修改，不改变原意；'
     + '每处理完一段就落笔，处理完再继续下一段，直到全文过完。',
+  quickContractReviewLabel: '审查当前合同',
+  quickContractReviewText:
+    '请按内置合同审查流程审查当前合同，识别核心风险条款，并以修订或批注方式给出修改建议。',
 
   // ---- ChatView.vue：消息气泡 ----
   thinkingProcess: '思考过程',
@@ -176,7 +179,8 @@ export const ZH = {
 
   // ---- ChatView.vue：技能面板 ----
   skillsTitle: '技能',
-  noSkillsAvailable: '服务器上还没有可用技能',
+  skillsBuiltinNotice: '合同审查、证据整理、文件整理、法律意见书核查已内置到系统主流程，根据对话自动生效，无需手动勾选。',
+  noSkillsAvailable: '暂无额外扩展技能',
 
   // ---- ChatView.vue：附件面板 ----
   attachFilesTitle: '附加项目文件',
@@ -621,6 +625,9 @@ export const EN = {
     'Please proofread the whole document for typos and awkward phrasing section by section, '
     + 'making edits in track-changes mode without changing the meaning; apply the edits for each '
     + 'section before moving on to the next, until the whole document is covered.',
+  quickContractReviewLabel: 'Review this contract',
+  quickContractReviewText:
+    'Please review the current contract using the built-in contract review workflow, identify key risk clauses, and apply revision suggestions as tracked changes or comments.',
 
   // ---- ChatView.vue：消息气泡 ----
   thinkingProcess: 'Thinking',
@@ -660,7 +667,8 @@ export const EN = {
 
   // ---- ChatView.vue：技能面板 ----
   skillsTitle: 'Skills',
-  noSkillsAvailable: 'No skills available on the server yet',
+  skillsBuiltinNotice: 'Contract review, evidence organization, file organization, and legal opinion verification are built into the core workflow and activate automatically.',
+  noSkillsAvailable: 'No extra extension skills installed',
 
   // ---- ChatView.vue：附件面板 ----
   attachFilesTitle: 'Attach project files',

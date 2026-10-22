@@ -424,4 +424,31 @@ class SkillMarketServiceTest {
         assertEquals(0, list.get(0).getPriceCents(), "负数按未知");
         assertEquals(0, list.get(1).getPriceCents(), "超上限只可能是畸形值，不能当真价展示");
     }
+
+    @Test
+    @DisplayName("#1431 懒人模式：builtin_workflow:true 的工程内置工作流从在线广场列表隐去，且拒绝卸载")
+    void builtinWorkflowHiddenFromMarketAndCannotUninstall() throws IOException {
+        Path skillsDir = tempDir.resolve("skills");
+        Path builtinDir = skillsDir.resolve("contract-review");
+        Files.createDirectories(builtinDir);
+        Files.writeString(builtinDir.resolve("skill.yml"), """
+                id: contract-review
+                name: 合同审查
+                builtin_workflow: true
+                triggers: [合同审查]
+                """);
+        Files.writeString(builtinDir.resolve("prompt.md"), "内置审查工作流");
+        StubMarketService service = newService(skillsDir, new PluginService());
+        service.responses.put(REGISTRY_URL, """
+                [{ "id": "contract-review", "name": "合同审查", "triggers": ["合同审查"] },
+                 { "id": "listing-pathway", "name": "上市路径选择", "triggers": ["上市路径"] }]""");
+
+        List<SkillMarketService.MarketSkillView> list = service.listMarket();
+        assertEquals(1, list.size(), "内置高频工作流不应作为广场外部 Skill 重复出现");
+        assertEquals("listing-pathway", list.get(0).getId());
+
+        assertThrows(IllegalStateException.class, () -> service.uninstall("contract-review"),
+                "内置高频工作流不可被卸载");
+        assertTrue(Files.isDirectory(builtinDir));
+    }
 }

@@ -75,6 +75,8 @@ public class SkillController {
          * 否则英文界面下用户能勾中一个 zh-only 的 skill，勾了却永远不生效，也没有任何提示。
          */
         private boolean available;
+        /** 是否为工程内置的高频核心工作流（懒人模式，dev-board#1431）；前端据此从手动选择器与启停管理列表中隐去，改为展示「内置高频能力」感知入口 */
+        private boolean builtinWorkflow;
         /** 依赖的原生资源包 id（skill.yml: requires_pack）；不依赖资源包时为 null */
         private String packId;
         /**
@@ -234,6 +236,7 @@ public class SkillController {
         view.setLicense(skill.getLicense());
         view.setCredits(skill.getCredits());
         view.setAvailable(skillRegistry.isAvailable(skill));
+        view.setBuiltinWorkflow(skill.isBuiltinWorkflow());
         String packId = skill.getRequiresPack();
         if (packId != null && !packId.isBlank()) {
             view.setPackId(packId);
