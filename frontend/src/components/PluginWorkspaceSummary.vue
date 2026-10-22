@@ -885,7 +885,7 @@ export default {
 .pws-agent-entry { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; margin: 0; border: 0; border-radius: 0; text-align: left; background: transparent; color: var(--awd-text); font: inherit; line-height: 1.5; }
 .pws-agent-entry::after { border: 0; }
 .pws-agent-entry:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: -2px; }
-.pws-agent-badge { border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); padding: 5px; color: var(--awd-accent); font-size: 11px; }
+.pws-agent-badge { border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); padding: 5px; color: var(--awd-accent); font-size: var(--awd-panel-fs-meta); }
 .pws-agent-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--awd-panel-fs); font-weight: 600; }
 
 .pws-directory-toggle, .pws-project-toggle, .pws-project-contact {
