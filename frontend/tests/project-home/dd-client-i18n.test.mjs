@@ -100,3 +100,16 @@ test('known fixed server errors are translated without rewriting unfamiliar deta
   assert.equal(api.ddClientErrorMessage('客户原样说明'), '客户原样说明')
   assert.equal(serviceFixture('zh-CN').ddClientErrorMessage('无权访问该清单'), '无权访问该清单')
 })
+
+test('portal invitation failures localize real access-code responses and keep Chinese intact', async () => {
+  const responses = [
+    ['访问码无效', 'This invitation code is invalid. Check the code and retry.'],
+    ['访问码已失效', 'This invitation code has been revoked. Ask your lawyer for a new one.'],
+    ['访问码已过期，请联系律师重新发送', 'This invitation code has expired. Ask your lawyer for a new one.'],
+  ]
+  for (const [message, english] of responses) {
+    const fetch = async () => ({ status: 200, json: async () => ({ code: 1, message }) })
+    await assert.rejects(serviceFixture('en-US', fetch).connectDdClient('invalid-code'), { message: english })
+    await assert.rejects(serviceFixture('zh-CN', fetch).connectDdClient('invalid-code'), { message })
+  }
+})
