@@ -27,7 +27,7 @@
     if (error?.code === 'unknown_method') return '当前客户端不支持项目沟通，请升级至 0.61.0 或更新版本。';
     return typeof error?.message === 'string' && error.message.trim() ? error.message.slice(0, 500) : '操作未完成，请检查连接后重试。草稿仍保留在当前会话。';
   }
-  function syncHostSidebar() {
+  function syncHostSidebar(extra = {}) {
     if (!state.context?.projectId) return;
     awd.call('sidebar.sync', {
       projectId: state.context.projectId,
@@ -36,6 +36,7 @@
       agents: state.agents,
       projectReason: state.projectAgentReason,
       directory: state.directory,
+      ...extra,
     }).catch(() => {});
   }
   // 通讯录只展示宿主给的真实数据（im.directory）；拿不到就显示空态与去设置的入口，绝不编造联系人。
@@ -600,12 +601,15 @@
   }
   const controlIds = ['new-chat', 'join-chat', 'refresh', 'add-friend', 'directory-home'];
   async function reload() {
+    $('workspace').classList.remove('host-sidebar');
+    state.context = null;
     const epoch = ++state.epoch; clearTimeout(state.timer); clearChat();
     state.drafts.clear(); state.pending.clear(); state.imports.clear(); state.agentFailures.clear(); state.conversations = []; state.agents = []; state.projectAgentReason = ''; state.self = null; state.directory = null; renderList();
     for (const id of controlIds) if ($(id)) $(id).disabled = true;
     try {
       const context = await awd.call('context.get', {}); if (epoch !== state.epoch) return; state.context = context;
       if (!context.projectId) { notice('请先选择一个项目，再使用项目沟通。'); return; }
+      syncHostSidebar();
       const self = await request('self'); if (epoch !== state.epoch) return; state.self = self;
       await loadDirectory(epoch); if (epoch !== state.epoch) return;
       await refreshList(epoch); if (epoch !== state.epoch) return; notice();
@@ -639,6 +643,10 @@
   async function handleSidebarCommand(payload = {}) {
     const cmd = payload?.command;
     if (!cmd) return;
+    if (cmd === 'host-sidebar') {
+      if (String(payload.projectId) === String(state.context?.projectId)) $('workspace').classList.toggle('host-sidebar', payload.visible === true);
+      return;
+    }
     if (cmd === 'select-conversation') {
       const targetId = payload.conversationId;
       let target = state.conversations.find((c) => String(c.id) === String(targetId));
@@ -682,6 +690,7 @@
     }
   }
   function openDirectory() {
+    if ($('workspace').classList.contains('host-sidebar')) { syncHostSidebar({ directoryOpen: true }); return; }
     renderDirectory();
     $('directory').open = true;
     $('workspace').classList.remove('chat-open');

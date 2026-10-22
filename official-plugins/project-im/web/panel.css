@@ -127,6 +127,9 @@ dialog label input,dialog label select{margin-top:5px}
   .composer-tools .hint{width:100%}
 }
 @media(prefers-reduced-motion:no-preference){button{transition:background .12s ease}}
+#workspace.host-sidebar{grid-template-columns:minmax(0,1fr)}
+#workspace.host-sidebar #sidebar,#workspace.host-sidebar #back{display:none}
+#workspace.host-sidebar #chat{display:block}
 
 #agents{margin:0 0 10px;padding-bottom:10px;border-bottom:1px solid var(--awd-border,var(--fallback-border))}
 .agent-entry{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:transparent;padding:8px 0}
