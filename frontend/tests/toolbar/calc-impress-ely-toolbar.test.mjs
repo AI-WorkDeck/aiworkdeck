@@ -288,6 +288,33 @@ test('Calc (Excel) 模式：公式栏、名称框、工作表切换与 ElyOffice
     action: 'set_view_options',
     params: { showGrid: false },
   })
+
+  // 快捷函数按钮（Σ 求和 / 平均值）：选中区域 B3:D5 时直接生成 =SUM(B3:D5) 并写入当前格 B3
+  vm.calls.length = 0
+  await vm.insertCalcQuickFormula('SUM')
+  assert.deepEqual(vm.calls[0], {
+    action: 'sheet_write_cells',
+    params: { startCell: 'B3', rows: [['=SUM(B3:D5)']] },
+  })
+
+  // 新建工作表防重名：当已有 ['Sheet1', 'Sheet3'] 时，自动跳过已存在的 Sheet3 生成 Sheet4
+  vm.state.calc.sheets = ['Sheet1', 'Sheet3']
+  vm.calls.length = 0
+  await vm.addCalcSheet()
+  assert.deepEqual(vm.calls[0], {
+    action: 'sheet_manage_sheets',
+    params: { action: 'add', name: 'Sheet4' },
+  })
+
+  // A1 单元格处点「冻结至当前行列」默认冻结首行首列 (1, 1) 而非取消冻结 (0, 0)
+  vm.state.calc.col = 0
+  vm.state.calc.row = 0
+  vm.calls.length = 0
+  await vm.freezeCalcAtCurrent()
+  assert.deepEqual(vm.calls[0], {
+    action: 'sheet_freeze_panes',
+    params: { cols: 1, rows: 1 },
+  })
 })
 
 test('Impress (PPT) 模式：幻灯片导航、版式/画幅、插入元素、形状与表格 PropertyGroup 卡片及演讲者备注闭环', async () => {
@@ -387,6 +414,40 @@ test('Impress (PPT) 模式：幻灯片导航、版式/画幅、插入元素、�
     action: 'slide_write_notes',
     params: { slideNumber: 2, text: '更新后的演讲者备注' },
   })
+
+  // 切换目标形状：同步选中画布形状 (slide_goto)，且顶栏 B / 字号操作自动带上 activeShapeName
+  vm.calls.length = 0
+  await vm.selectImpressShapeTarget(vm.impressState.shapes[1])
+  assert.deepEqual(vm.calls[0], {
+    action: 'slide_goto',
+    params: { slideNumber: 2, shapeName: 'Table 1' },
+  })
+  assert.equal(vm.activeShapeName, 'Table 1')
+
+  vm.calls.length = 0
+  await vm.ui('bold')
+  assert.deepEqual(vm.calls[0], {
+    action: 'ui_command',
+    params: { name: 'bold', shapeName: 'Table 1' },
+  })
+
+  // 形状文字直接修改与表格单元格内容写入
+  await vm.selectImpressShapeTarget(vm.impressState.shapes[0])
+  vm.calls.length = 0
+  vm.impressShapeTextInput = '新标题内容'
+  await vm.updateImpressShapeText()
+  assert.deepEqual(vm.calls[0], {
+    action: 'slide_set_shape_text',
+    params: { slideNumber: 2, shapeName: 'Title 1', text: '新标题内容' },
+  })
+
+  vm.calls.length = 0
+  vm.impressTableCellForm = { row: 2, col: 3, text: '达成率 98%' }
+  await vm.setImpressTableCell()
+  assert.deepEqual(vm.calls[0], {
+    action: 'slide_table_set_cell',
+    params: { slideNumber: 2, shapeName: 'Table 1', row: 1, col: 2, text: '达成率 98%' },
+  })
 })
 
 test('Calc / Impress 查找与单步替换：replaceCurrent 走 find_replace(replaceAll:false)', async () => {
@@ -410,6 +471,10 @@ test('office_thread.js：CHROME_URLS 覆盖 Calc/Impress 原生工具栏且 get_
   assert.ok(WORKER_SRC.includes('private:resource/toolbar/slideviewtoolbar'), 'CHROME_URLS 应包含 Impress slideviewtoolbar')
   assert.ok(WORKER_SRC.includes('function activeCalcSelection()'), 'office_thread.js 应提供 activeCalcSelection 辅助函数')
   assert.ok(WORKER_SRC.includes('function activeImpressContext('), 'office_thread.js 应提供 activeImpressContext 辅助函数')
+  assert.ok(WORKER_SRC.includes('selRange.getIsMerged()'), 'activeCalcSelection 应真实读回 merged 状态')
+  assert.ok(WORKER_SRC.includes('ctrl.hasFrozenPanes()'), 'activeCalcSelection 应真实读回 hasFrozenPanes 状态')
+  assert.ok(WORKER_SRC.includes('sheet.isProtected()'), 'activeCalcSelection 应真实读回 protected 状态')
+  assert.ok(WORKER_SRC.includes('scheduleNativeKeySelectionRefresh()'), 'postNativeKeys 后应延迟触发选区与公式栏状态刷新')
 })
 
 test('zh-CN 与 en-US 的 editor.toolbar 新增 Calc / Impress 国际化键集合严格对齐', () => {
