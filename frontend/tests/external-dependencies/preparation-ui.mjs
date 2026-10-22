@@ -38,14 +38,24 @@ page.on('request', async request => {
 try {
   await page.goto(base + '/#/pages/admin/admin?nav=components', { waitUntil: 'networkidle0' })
   await page.waitForSelector('.external-item', { visible: true, timeout: 30000 })
-  assert.match(await page.$eval('body', el => el.textContent), /Docker 未启动/)
+  assert.match(await page.$eval('body', el => el.textContent), /Docker 服务未就绪/)
   const guide = await page.$('.external-actions .external-btn')
   await guide.click()
   assert.equal((await page.evaluate(() => window.__externalLinks)).length, 1)
   assert.equal(checks, 1, 'opening guide does not claim installation')
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-  await page.waitForFunction(() => [...document.querySelectorAll('.external-item')].some(el => el.textContent.includes('Docker Desktop') && el.textContent.includes('程序可启动')))
+  await page.waitForFunction(() => [...document.querySelectorAll('.external-item')].some(el => el.textContent.includes('Docker Desktop') && el.textContent.includes('已安装，可使用')))
   assert.equal(checks, 2)
+  await page.evaluate(() => {
+    window.__copiedCommand = null
+    uni.setClipboardData = options => { window.__copiedCommand = options.data; options.success?.() }
+    uni.showToast = () => {}
+  })
+  await page.click('.external-command .external-btn')
+  assert.equal(await page.evaluate(() => window.__copiedCommand), 'npm install -g @tencentcloud/tmeet')
+  await page.evaluate(() => [...document.querySelectorAll('.external-btn')].find(el => el.textContent.includes('Windows 安装包（x64）')).click())
+  assert.equal((await page.evaluate(() => window.__externalLinks)).at(-1), 'https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe')
+  assert.equal(checks, 2, 'download button does not report installation success')
   await page.screenshot({ path: out + '/prepared.png', fullPage: true })
   assert.deepEqual(errors, [])
   fs.writeFileSync(out + '/report.json', JSON.stringify({ checks, errors, scope: 'real settings UI; synthetic API, no installation or network' }, null, 2))

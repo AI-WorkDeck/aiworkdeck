@@ -57,6 +57,7 @@ public class DdAiGateway {
                         .header("Authorization", "Bearer " + credentials.apiKey())
                         .post(RequestBody.create(body, MediaType.parse("application/json"))).build();
                 OkHttpClient client = new OkHttpClient.Builder().callTimeout(Duration.ofMinutes(3))
+                        .readTimeout(Duration.ofMinutes(3))
                         .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build();
                 try (okhttp3.Response response = client.newCall(request).execute()) {
                     if (!response.isSuccessful() || response.body() == null)

@@ -83,6 +83,9 @@
 <script>
 import { ICONS } from '@/config/icons.js'
 import { ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { setGlobalOverlay } from '@/utils/overlayState.js'
+
+let accountEntrySequence = 0
 
 export default {
   name: 'AccountEntry',
@@ -125,17 +128,28 @@ export default {
     },
   },
   watch: {
+    menuOpen: {
+      flush: 'sync',
+      handler(open) {
+        if (this._overlayHolder) setGlobalOverlay(open, this._overlayHolder)
+      },
+    },
+    signedIn(connected) {
+      if (!connected) this.menuOpen = false
+    },
     // 宿主重拉授权状态后跟上了：以 prop 为准，本地覆盖作废
     loggedIn() {
       this.connectedOverride = null
     },
   },
   created() {
+    this._overlayHolder = `account-entry-${++accountEntrySequence}`
     // 页面栈多实例：按引用订阅 / 退订，每个实例只管自己
     this._onAccountChanged = (payload) => this.onAccountChanged(payload)
     try { uni.$on(ACCOUNT_CHANGED_EVENT, this._onAccountChanged) } catch (e) { /* 非 uni 环境 */ }
   },
   beforeUnmount() {
+    if (this._overlayHolder) setGlobalOverlay(false, this._overlayHolder)
     try { uni.$off(ACCOUNT_CHANGED_EVENT, this._onAccountChanged) } catch (e) { /* ignore */ }
   },
   methods: {

@@ -60,7 +60,7 @@ test('saveSidebarCollapsed 把非布尔值归一成布尔再写入', () => {
 })
 
 // ======================================================================
-// 接线核实：toggleSidebar 是三条入口（顶栏图标、rail 新按钮、Alt+Ctrl+B、
+// 接线核实：toggleSidebar 是三条入口（顶栏图标、左栏窄卡、Alt+Ctrl+B、
 // 再点同一个 rail 面板图标）唯一共用的出口，必须同时落盘与触发工作台 resize，
 // 否则收起状态在刷新/重开项目后又弹回来，或编辑器/iframe 不跟着重排。
 // ======================================================================
@@ -104,15 +104,16 @@ test('panelSwitching.js 的同 key 收展分支复用 toggleSidebar，不再各�
     '不应该在这里再自己翻转一次，出口只有一个')
 })
 
-test('rail 底部渲染了收起/展开按钮，@tap 绑的是 toggleSidebar', () => {
+test('收起入口移到展开左栏的右缘；rail 底部不再重复占位', () => {
   const src = read('pages/project-overview/project-overview.vue')
   const versionIdx = src.indexOf("@tap=\"toggleLeftPane('version')\"")
   const membersIdx = src.indexOf('Project Members Stack')
-  assert.ok(versionIdx > 0 && membersIdx > versionIdx, '定位版本记录按钮与成员堆叠区块失败')
-  const between = src.slice(versionIdx, membersIdx)
-  assert.match(between, /@tap="toggleSidebar"/, '版本记录按钮与成员堆叠之间必须有一个走 toggleSidebar 的 rail-btn')
-  assert.match(between, /class="rail-btn"/, '新按钮必须复用现有 .rail-btn 样式，不新起一套')
-  assert.match(between, /GLYPHS\.panelLeft/, '图标复用顶栏同功能按钮的 GLYPHS.panelLeft')
+  assert.doesNotMatch(src.slice(versionIdx, membersIdx), /@tap="toggleSidebar"/)
+  const sidebar = src.slice(src.indexOf('<view class="sidebar-left"'), src.indexOf('class="sidebar-header"'))
+  assert.match(sidebar, /class="sidebar-collapse-tab"/)
+  assert.match(sidebar, /v-if="!sidebarCollapsed"/)
+  assert.match(sidebar, /@tap(?:\.stop)?="toggleSidebar"/)
+  assert.match(sidebar, /M14 6l-6 6 6 6/)
 })
 
 
