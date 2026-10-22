@@ -277,6 +277,39 @@ class MemoryDocumentServiceTest {
     }
 
     @Test
+    void supersededLegacyTopicUpdatesIndexWithoutDuplicateLinksAndPreservesCleanEntryValue() {
+        Project project = project(18L, "并购项目");
+        when(projectMembers.hasReadPermission(project.getId(), 18L)).thenReturn(true);
+        when(projectMembers.hasWritePermission(project.getId(), 18L)).thenReturn(true);
+
+        MemoryEntry first = MemoryEntry.builder()
+                .projectId(project.getId()).userId(18L).scope(MemoryEntry.MemoryScope.PROJECT)
+                .memoryType(MemoryEntry.MemoryType.DECISION)
+                .memoryKey("交易对价").memoryValue("首期估值 5000 万元").build();
+        first.setUid(UUID.randomUUID().toString());
+        first = legacyEntries.saveAndFlush(first);
+        MemoryFileView firstView = service.migrateLegacyEntry(first);
+
+        MemoryEntry second = MemoryEntry.builder()
+                .projectId(project.getId()).userId(18L).scope(MemoryEntry.MemoryScope.PROJECT)
+                .memoryType(MemoryEntry.MemoryType.DECISION)
+                .memoryKey("交易对价").memoryValue("经补充协议调整为 6000 万元").build();
+        second.setUid(UUID.randomUUID().toString());
+        second = legacyEntries.saveAndFlush(second);
+        MemoryFileView secondView = service.migrateLegacyEntry(second);
+
+        String projectSpaceId = space(service.listSpaces(18L, project.getId()), "project").id();
+        String indexContent = service.read(18L, projectSpaceId, "remember.md").content();
+        assertFalse(indexContent.contains("(" + firstView.path() + ")"),
+                "旧版本 legacy 链接应从 remember.md 索引中退场: " + indexContent);
+        assertTrue(indexContent.contains("[交易对价](" + secondView.path() + ")"),
+                "新版本 legacy 链接应保留在 remember.md 索引中: " + indexContent);
+        assertEquals("经补充协议调整为 6000 万元",
+                legacyEntries.findFirstByUid(second.getUid()).orElseThrow().getMemoryValue(),
+                "MemoryEntry.memoryValue 不应被 legacy frontmatter 污染");
+    }
+
+    @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void organizationCallsRunOutsideDatabaseTransactions() {
         when(organizations.listSpaces(3L)).thenAnswer(invocation -> {

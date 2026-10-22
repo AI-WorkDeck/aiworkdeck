@@ -9,6 +9,7 @@ import com.checkba.model.entity.ProjectMemory;
 import com.checkba.service.ai.context.ProjectContextHolder;
 import com.checkba.service.ai.memory.AgenticRetriever;
 import com.checkba.service.ai.memory.MemoryManager;
+import com.checkba.service.ai.memory.MemoryTier;
 import com.checkba.service.ai.memory.ProjectMemoryExtractor;
 import com.checkba.service.ai.memory.document.MemoryDocumentService;
 import com.checkba.service.ai.memory.document.MemoryFileView;
@@ -76,8 +77,11 @@ public class MemoryTools implements AgentToolComponent {
     /**
      * 保存结构化记忆
      */
-    @Tool("保存重要信息到记忆中。用于存储关键决策、结论、事实、法律引用、用户偏好等需要长期保留的信息。" +
-          "通过 scope 参数指定记忆归属：用户个人习惯用 user，项目事实用 project（默认），通用法律知识用 global。" +
+    @Tool("保存重要信息到三级记忆系统中。用于存储关键决策、结论、事实、法律引用、用户偏好等需要长期保留的信息。" +
+          "触发条件（如果……则写）：" +
+          "1) 如果用户表达了跨项目的个人偏好、称谓、行文风格或审校习惯 → 传 type=preference, scope=user 写入 L3 个人长期记忆（preference 未传 scope 时自动归入 user）；" +
+          "2) 如果用户拍板了项目决策、交易结构，或经底稿/法规核实确认了核心案件事实、关键金额/日期、重大核查结论 → 传 scope=project（默认）或 file 写入 L2 项目情景与证据账本，关键法条、金额、日期与拍板结论将 isProtected 设为 true；" +
+          "3) 如果仅是文书草稿中未经核实的单方陈述、一次性闲聊或与既有记忆完全重复的内容 → 不要调用本工具（防噪纪律）。" +
           "它与 query_memory 是「记一条 / 找一条」的默认入口；要整理、批量改或按文件编辑记忆文件本身" +
           "（含团队/律所共享记忆）时，改用 memory_list / memory_read / memory_write 等 memory_* 工具。")
     @ToolMeta(displayName = "保存记忆", category = "memory")
@@ -86,7 +90,7 @@ public class MemoryTools implements AgentToolComponent {
             @P("记忆标题或关键词，用于后续检索") String key,
             @P("记忆内容，详细描述需要保存的信息") String value,
             @P("是否为法律关键信息需要特别保护（如法条引用、金额、日期等），受保护信息在压缩时不会丢失") boolean isProtected,
-            @P("记忆作用域(可选，默认project): user(用户级，跨项目的个人偏好与习惯)/project(项目级)/conversation(仅本对话)/file(绑定文件)/global(通用领域知识)") String scope,
+            @P("记忆作用域(可选，preference默认user，其余默认project): user(L3用户级，跨项目的个人偏好与习惯)/project(L2项目级)/conversation(L1仅本对话)/file(L2绑定文件)/global(L3通用领域知识)") String scope,
             @P("来源文件ID(可选)，scope=file 时必填，将记忆绑定到具体文件") Long sourceFileId
     ) {
         log.info("Tool: save_memory called type={}, key={}, protected={}, scope={}", type, key, isProtected, scope);
@@ -95,9 +99,8 @@ public class MemoryTools implements AgentToolComponent {
         String conversationId = ProjectContextHolder.getConversationId();
         Long userId = ProjectContextHolder.getUserId();
 
-        // 归一化作用域，非法值回落到项目级
-        String normalizedScope = (scope != null && MemoryEntry.MemoryScope.isValid(scope))
-                ? scope.toLowerCase() : MemoryEntry.MemoryScope.PROJECT;
+        // 归一化作用域：未传 scope 且 type=preference 时自动归入 user（L3），非法显式值回落到 project（L2）
+        String normalizedScope = MemoryTier.resolveDefaultScope(scope, type, userId);
 
         // 用户级/通用知识不强依赖项目上下文，其余作用域必须有项目ID
         boolean projectFree = MemoryEntry.MemoryScope.USER.equals(normalizedScope)
@@ -132,9 +135,10 @@ public class MemoryTools implements AgentToolComponent {
                     .build();
 
             memoryManager.saveMemory(entry);
+            MemoryTier tier = MemoryTier.fromScopeAndType(normalizedScope, type);
 
-            return String.format("✓ 记忆已保存\n- 类型: %s\n- 作用域: %s\n- 关键词: %s\n- 受保护: %s",
-                    type, normalizedScope, key, isProtected ? "是" : "否");
+            return String.format("✓ 记忆已保存\n- 层级: %s (%s)\n- 类型: %s\n- 作用域: %s\n- 关键词: %s\n- 受保护: %s",
+                    tier.code(), tier.labelZh(), type, normalizedScope, key, isProtected ? "是" : "否");
         } catch (Exception e) {
             log.error("Failed to save memory: {}", e.getMessage(), e);
             return "错误：保存记忆时出错: " + e.getMessage();

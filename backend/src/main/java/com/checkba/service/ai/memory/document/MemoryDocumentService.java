@@ -222,6 +222,19 @@ public class MemoryDocumentService {
             }
             return toView(current, true, true);
         }
+        if (path.startsWith("legacy/") && entry.getMemoryKey() != null && !entry.getMemoryKey().isBlank()) {
+            String normalizedTitle = entry.getMemoryKey().trim();
+            for (MemoryDocument doc : documents.findBySpaceIdAndDeletedFalseOrderByPathAsc(space.getId())) {
+                if (doc.getPath().startsWith("legacy/")
+                        && !Objects.equals(doc.getSourceMemoryUid(), entry.getUid())
+                        && normalizedTitle.equals(doc.getTitle())) {
+                    doc.setDeleted(true);
+                    doc.setRevision(doc.getRevision() + 1);
+                    doc.setUpdatedAt(LocalDateTime.now());
+                    documents.save(doc);
+                }
+            }
+        }
         return writeLocal(space, entry.getUserId(), path, content, 0, entry.getUid());
     }
 
@@ -297,12 +310,16 @@ public class MemoryDocumentService {
         }
         if (document.getSourceMemoryUid() == null) document.setSourceMemoryUid(UUID.randomUUID().toString());
         documents.saveAndFlush(document);
-        syncLegacyIndex(document, space);
+        syncLegacyIndex(document, space, sourceMemoryUid != null);
         if (!INDEX_PATH.equals(path)) refreshIndex(space, userId);
         return toView(document, true, true);
     }
 
     private void syncLegacyIndex(MemoryDocument document, MemoryDocumentSpace space) {
+        syncLegacyIndex(document, space, false);
+    }
+
+    private void syncLegacyIndex(MemoryDocument document, MemoryDocumentSpace space, boolean fromLegacyEntry) {
         MemoryEntry entry = legacyEntries.findFirstByUid(document.getSourceMemoryUid()).orElseGet(MemoryEntry::new);
         boolean derived = entry.getId() == null;
         entry.setUid(document.getSourceMemoryUid());
@@ -315,8 +332,10 @@ public class MemoryDocumentService {
             entry.setImportanceScore(0.7);
             entry.setIsProtected(false);
         }
-        entry.setMemoryKey(document.getTitle());
-        entry.setMemoryValue(document.getContent());
+        if (!fromLegacyEntry || derived) {
+            entry.setMemoryKey(document.getTitle());
+            entry.setMemoryValue(document.getContent());
+        }
         Map<String, Object> metadata = entry.getMetadata() == null
                 ? new LinkedHashMap<>() : new LinkedHashMap<>(entry.getMetadata());
         metadata.put("documentPath", document.getPath());
@@ -551,7 +570,12 @@ public class MemoryDocumentService {
 
     private static String documentContent(MemoryEntry entry) {
         Object path = entry.getMetadata() == null ? null : entry.getMetadata().get("documentPath");
-        return path == null ? legacyMarkdown(entry) : nullToEmpty(entry.getMemoryValue());
+        String value = nullToEmpty(entry.getMemoryValue());
+        if (path == null || (String.valueOf(path).startsWith("legacy/")
+                && !value.startsWith("---\nsource: legacy-memory-entry\n"))) {
+            return legacyMarkdown(entry);
+        }
+        return value;
     }
 
     private static long documentRevision(MemoryEntry entry) {
