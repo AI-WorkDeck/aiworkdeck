@@ -148,6 +148,10 @@ export function useAgentStream() {
         if (skillFlashTimer) { clearTimeout(skillFlashTimer); skillFlashTimer = null }
     }
 
+    // STATE: 智能模式（auto）下后端本轮确定性路由出的目标模型（model_routed 事件更新）
+    // null | { requestedModel, effectiveModel, effectiveModelName, tier, routed }
+    const routedModelInfo = ref(null)
+
     // STATE: 任务待续跑——步数超限暂停（bubble_end status=paused）或上次进程被杀
     // （run_state status=INTERRUPTED）。前端据此渲染一键「继续」按钮
     const agentPaused = ref(null) // null | { reason: 'max_depth' | 'process_interrupted' | ... }
@@ -422,6 +426,7 @@ export function useAgentStream() {
         clearSkillFlash()
         activeSkills.value = []
         skillNotice.value = null
+        routedModelInfo.value = null
         agentPaused.value = null
         agentRunStatus.value = null
         agentAwaitingInput.value = false
@@ -1246,6 +1251,25 @@ export function useAgentStream() {
                 }
             } catch (e) {
                 console.error('Failed to parse skill_update', e)
+            }
+            return
+        }
+
+        // 智能模式路由结果（dev-board#1434）：与 skill_update 同理在起跑时即发出，放在气泡守卫之前。
+        if (evt === 'model_routed') {
+            try {
+                const d = JSON.parse(dataStr)
+                if (d && d.effectiveModel) {
+                    routedModelInfo.value = {
+                        requestedModel: d.requestedModel || 'auto',
+                        effectiveModel: d.effectiveModel,
+                        effectiveModelName: d.effectiveModelName || d.effectiveModel,
+                        tier: d.tier || null,
+                        routed: !!d.routed,
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to parse model_routed', e)
             }
             return
         }
@@ -2820,6 +2844,7 @@ export function useAgentStream() {
         // 本轮生效的 Skill 与「刚自动加载了一个技能」的轻提示
         activeSkills,
         skillNotice,
+        routedModelInfo,
         // 已结束的后台任务不再自动销毁（完成态要保留可查），供任务面板做「关闭」按钮
         dismissBackgroundTask: (taskId) => {
             if (taskId && backgroundTasks.value[taskId]) delete backgroundTasks.value[taskId]

@@ -1003,6 +1003,7 @@ export default {
       linkStatus,
       activeSkills,
       skillNotice,
+      routedModelInfo,
       reattachSSE,
       rollbackToMessage,
       currentConversationId,
@@ -1482,16 +1483,36 @@ export default {
     })
 
     const applyModelSelection = (id) => {
+      if (id === 'auto') {
+        currentModelId.value = 'auto'
+        const routedName = routedModelInfo.value?.effectiveModelName
+        currentModelName.value = routedName
+          ? t('chat.autoModelRoutedLabel', { name: routedName })
+          : t('chat.autoModelName')
+        return
+      }
       const hit = availableModels.value.find(m => m.id === id)
       currentModelId.value = hit ? hit.id : (id || '')
       currentModelName.value = hit ? hit.name : (id || t('chat.selectModel'))
     }
+
+    watch(routedModelInfo, (info) => {
+      if (currentModelId.value === 'auto') {
+        currentModelName.value = info?.effectiveModelName
+          ? t('chat.autoModelRoutedLabel', { name: info.effectiveModelName })
+          : t('chat.autoModelName')
+      }
+    })
 
     // 当前模型能不能直接读图。**三态**：true 支持 / false 不支持 / null 未知。
     // 「未知」不许并到 false：拉不到模型目录时 availableModels 是空数组而 currentModelId
     // 还留着上次的值，applyModelSelection 也允许选中清单外的旧 id——把 undefined 当不支持，
     // 就会在这两种情况下对所有模型误报「不支持读图」。未知一律不提示。
     const currentModelVision = computed(() => {
+      if (currentModelId.value === 'auto') {
+        if (!availableModels.value.length) return null
+        return availableModels.value.some(m => m.vision === true)
+      }
       const hit = availableModels.value.find(m => m.id === currentModelId.value)
       if (!hit || typeof hit.vision !== 'boolean') return null
       return hit.vision
@@ -1556,8 +1577,15 @@ export default {
           : list[0].id
 
         const saved = readPersistedModelId()
-        if (saved && list.some(m => m.id === saved)) {
+        if (saved === 'auto' || (saved && list.some(m => m.id === saved))) {
           applyModelSelection(saved)
+          return
+        }
+
+        if (!saved) {
+          // 首次使用（未持久化过具体模型）时默认开启智能模式（auto），免除选模负担
+          applyModelSelection('auto')
+          persistModelId('auto')
           return
         }
 

@@ -213,6 +213,16 @@ try {
   assert.match(fn[1], /Charged price = vendor USD list price × exchange rate 6\.75 × platform multiplier 1\.20 \(live rate, updated/)
   await shot('charged-cny-up-420-en')
 
+  // 置顶「智能模式（Auto）」入口渲染
+  const autoOpt = await page.$eval('.model-dropdown .model-auto-option', el => ({
+    name: el.querySelector('.model-auto-name')?.textContent.trim(),
+    badge: el.querySelector('.model-auto-badge')?.textContent.trim(),
+    desc: el.querySelector('.model-auto-desc')?.textContent.trim(),
+  }))
+  assert.equal(autoOpt.name, 'Smart Mode (Auto)')
+  assert.equal(autoOpt.badge, 'Recommended')
+  assert.ok(autoOpt.desc.length > 10)
+
   // 选中一个模型仍然走 ChatInterface.selectModel（持久化 + 关闭下拉）
   await page.evaluate(() => {
     const el = [...document.querySelectorAll('.model-dropdown .model-option')].find(e => e.textContent.includes('Kimi K3'))
@@ -220,6 +230,17 @@ try {
   })
   await page.waitForFunction(() => window.chatState.currentModelId === 'moonshotai/kimi-k3' && !document.querySelector('.model-dropdown'))
   assert.equal(await page.evaluate(() => window.fixtureStorage.ai_selected_model), 'moonshotai/kimi-k3')
+
+  // 重新打开下拉并切回智能模式（Auto）
+  await page.$eval('.model-selector', el => el.dispatchEvent(new CustomEvent('tap', { bubbles: true })))
+  await page.waitForSelector('.model-dropdown .model-auto-option')
+  await page.evaluate(() => {
+    const el = document.querySelector('.model-dropdown .model-auto-option')
+    el.dispatchEvent(new CustomEvent('tap', { bubbles: true }))
+  })
+  await page.waitForFunction(() => window.chatState.currentModelId === 'auto' && !document.querySelector('.model-dropdown'))
+  assert.equal(await page.evaluate(() => window.fixtureStorage.ai_selected_model), 'auto')
+  assert.equal(await page.evaluate(() => window.chatState.currentModelName), 'Smart Mode (Auto)')
 
   assert.deepEqual(errors, [])
   console.log(`PASS: charged CNY / list USD, both placements, alignment, 4 tiers, footnote, en-US, select. Shots in ${shots}`)
