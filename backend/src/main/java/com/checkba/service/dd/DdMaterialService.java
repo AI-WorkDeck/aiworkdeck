@@ -167,6 +167,7 @@ public class DdMaterialService {
                 说明材料记载的事实、相互一致或冲突、尚待核实的问题。不得把“未取得材料”写成“不存在该事项”，不得把AI核验或律师收件确认写成已完成所有专业核查。
                 每个段落最多800字，必须逐条提供支持陈述的原文引用；最多8段。返回
                 {"paragraphs":[{"text":"正文","citations":[{"fileId":数字,"quote":"从原文逐字摘录的片段"}]}]}。
+                每条quote只复制一处连续短句，尽量不跨行，不能拼接、调序或概括；需要多处依据就提供多条citations。quote解码后必须是原文的连续子串。
                 无法依据材料判断时用“尚待核实”并说明缺口，不能虚构引用。
                 """, json.writeValueAsString(Map.of("item", title, "requirements", item.path("description").asText(""), "files", texts)));
             JsonNode rows = response.path("paragraphs");

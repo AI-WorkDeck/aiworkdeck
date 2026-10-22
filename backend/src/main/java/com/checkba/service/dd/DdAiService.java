@@ -207,6 +207,8 @@ public class DdAiService {
                 返回 {"verdict":"PASSED|FAILED|MANUAL_REQUIRED","summary":"给客户的具体原因与下一步",
                 "checks":[{"requirement":"核验要求","status":"PASS|FAIL|UNKNOWN","reason":"判断依据",
                 "fileId":数字,"quote":"从该文件原文逐字摘录的依据"}]}。
+                每条quote只复制原文中一处连续的短句，尽量不跨行；不能拼接、调序、概括或插入省略号。主体、日期、上下级关系分开检查，各自引用对应短句。
+                quote解码后必须是文件原文的连续子串。确需跨行时使用JSON换行转义，不能把反斜杠和字母n作为引文文字。
                 PASSED必须至少三项检查全为PASS并有确切原文依据；明确不符合要求才FAILED；未要求的字段不得擅自变成必交条件。
                 """, json.writeValueAsString(Map.of("title", item.getTitle(), "requirements", Objects.toString(item.getDescription(), ""), "files", texts)));
             result = validateReview(result, texts, json);

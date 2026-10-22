@@ -45,11 +45,12 @@ public class DdAiGateway {
             var credentials = models.decisionCredentials(null, models.resolveProvider());
             if (credentials == null) throw new DdProcessingException("参考图需要图像生成服务，请在设置中选择 AI WorkDeck 云端或 OpenRouter");
             String model = EXAMPLE_MODEL;
-            String prompt = "制作一张尽调资料准备说明参考图，中文，清楚整洁的文书示意。材料类型：" + title
-                    + "。提交要求：" + Objects.toString(requirements, "")
-                    + "。仅示意字段布局、页序、应包含的内容。所有名称均使用‘示例公司’，所有号码均使用占位符。"
-                    + "醒目标注‘示例 · 非真实证照 · 请提交贵司实际材料’。不要国徽、真实机关印章、真实签名、可用证件号码或二维码。"
-                    + "组织架构图可画部门框线；营业执照只画字段说明框；章程或工商底档画封面与目录页示意。";
+            String prompt = "仅为一种材料制作一张可供客户照着准备文件的中文示例，材料名称：‘" + title
+                    + "’。这一项的提交要求：‘" + Objects.toString(requirements, "") + "’。"
+                    + "画面只展示上述材料，不拼贴、不加入其他证照或文档类型。采用白纸文书样式、深灰文字、细线和少量墨绿色强调，清楚整洁，避免海报式大标题、阴影和装饰。"
+                    + "页面标题直接使用材料名称。按提交要求展示应包含的字段、内容和页序；关系图使用上下层级和连接线，不能把所有层级画成平级。"
+                    + "所有公司名称使用‘示例公司’，号码与日期使用清楚的占位符。保持文字简短可读。"
+                    + "页眉和页脚醒目标注‘仅供准备参考 · 请提交贵司实际材料’。仅画说明框和示意内容，不绘制国徽、机关印章、签名或二维码。";
             try {
                 // OpenRouter's dedicated image API returns bytes, so no remote image URL is fetched.
                 String body = json.writeValueAsString(Map.of("model", model, "prompt", prompt, "n", 1));

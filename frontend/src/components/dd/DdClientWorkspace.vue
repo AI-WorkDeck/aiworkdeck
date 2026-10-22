@@ -11,7 +11,7 @@
     <form v-if="adding || !connections.length" class="join-panel" @submit.prevent="join">
       <label for="dd-invite">律师发送的邀请码</label>
       <div class="join-row"><input id="dd-invite" v-model="code" autocomplete="off" placeholder="输入邀请码" :disabled="joining" @confirm="join" /><button :disabled="joining || !code.trim()" @click="join">{{ joining ? '正在加入…' : '加入项目' }}</button></div>
-      <select v-if="cloudConnections.length" v-model="cloudConnectionId" aria-label="案件库"><option value="">官方案件库</option><option v-for="c in cloudConnections" :key="c.id" :value="c.id">{{ c.displayName || c.username || c.serverUrl }}</option></select>
+      <select v-if="cloudConnections.length" v-model="cloudConnectionId" aria-label="案件库"><option value="">官方案件库</option><option v-for="c in cloudConnections" :key="c.id" :value="c.id">{{ c.displayName || c.serverUrl }}</option></select>
       <p>项目加入后保留在这个标签页，您仍可使用 AI WorkDeck 的其他功能。</p>
     </form>
     <p v-if="error" class="error" role="alert">{{ error }} <button class="text-button" @click="load">重试</button></p>
