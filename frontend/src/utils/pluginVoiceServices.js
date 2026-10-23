@@ -113,7 +113,12 @@ export function createPluginVoiceServices({ projectId, permissions, isCurrent, a
         return String(state.projectId) === String(projectId()) || !recorder.isRecordingActive()
           ? clone(state) : { status: state.status, projectId: null, seconds: 0, level: 0 }
       }
-      if (operation === 'devices') return recorder.listAudioInputDevices()
+      if (operation === 'devices') {
+        const devices = await recorder.listAudioInputDevices()
+        // MediaDeviceInfo fields are prototype getters; the plugin bridge copies
+        // own enumerable properties only. Send plain records so names and IDs survive.
+        return devices.map(({ deviceId, label, kind, groupId }) => ({ deviceId, label, kind, groupId }))
+      }
       if (operation === 'list') return api.getMeetingRecordings(projectId())
       if (operation === 'start') {
         allowed('file_write'); await cloudGate(signal)
