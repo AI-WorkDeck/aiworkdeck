@@ -191,6 +191,8 @@ PDFParser 调 PDFBox2 已删除的 `PDDocument.load` 会抛 `NoSuchMethodError`�
 回归：`ContentSearchServiceTagFilterTest`、`search-panel-tag-filter.test.mjs`、
 `plugins/business-services.test.mjs`；`plugins/tag-filter-browser.mjs` 以构建后的 opaque iframe
 和真实宿主服务桥配合合成 API 验证媒体筛选、键盘、打开结果、刷新及失败重试，不能替代正式客户端验收。
+搜索插件清单同步升至 `1.0.1`；`PluginBundledInstaller` 仅在更高版本时替换宿主安装的旧包，
+只更新 web 文件会使原 `1.0.0` 用户继续读旧界面。`PluginBundledInstallerTest` 使用实际随包清单和资源验证旧版更新。
 
 **标签类型维度（2026-08-20，dev-board#63）**：`Tag.type` = `NORMAL`/`PARTY`（当事人）/
 `ISSUE`（争议焦点），**可空且 null 视同 NORMAL**（存量行零迁移）——前端判断一律走
