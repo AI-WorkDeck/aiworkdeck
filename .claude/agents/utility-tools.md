@@ -171,7 +171,7 @@ PDFParser 调 PDFBox2 已删除的 `PDDocument.load` 会抛 `NoSuchMethodError`�
 `options.signal` → `uni.request` 的 `RequestTask.abort()`，以 `AbortError` 拒绝且不打「网络请求失败」
 日志），`beforeUnmount` 收尾。守护：`ContentSearchServiceCacheTest`、
 `frontend/tests/project-home/search-panel-debounce-abort.test.mjs`。
-标签筛选区默认折叠、按命中频次排序——**那不是排版偏好，是给一个数据 bug 兜底**：
+标签筛选区曾默认折叠、按命中频次排序，作为历史数据膨胀的界面兜底：
 `/api/files/{id}/upload` 同时是编辑器自动保存的落点，挂在 legacy 分支上的
 `AutoTaggingService.autoTagFile` 因此每存一次盘就跑一次 LLM，每轮 5 个措辞不同的新词，
 而 `getOrCreateSystemTag` 只按精确字符串去重（实测单个文件积到 338 个标签）。
@@ -180,11 +180,19 @@ PDFParser 调 PDFBox2 已删除的 `PDDocument.load` 会抛 `NoSuchMethodError`�
 `maintenance.autoTagDedup.done` 标志）：**按文件保留最早 5 条自动标签关联、删掉后续重复批次，
 自动标签不超过 5 个的文件一行不动**（健康安装零变化），再清掉零引用的自动标签；
 手工标签一律不碰。改这段前先读它的 javadoc——那是一段会在每台存量机器上自动跑一次的删数据代码。
-标签筛选区**默认折叠**（`tagsOpen:false`）：自动打标签能给一个项目攒出上百个词，
-平铺出来的标签墙会把搜索框和结果一起挤出屏幕。展开后按「已选优先 → 本次结果命中文件数
-降序 → 名称」排（计数在 `updateVisibleTags` 里顺带数出来，没搜过就退回按名称排），
-超过 24 个截断给「显示全部 N 个」，超过 12 个再加一个过滤框；**折叠态仍常驻显示已选标签**——
-否则「搜不到东西」的原因被藏起来了。根因不在这个面板，见下面的自动打标签条目。
+**标签检索（dev-board#1446）**：`TagFilter.vue` 为搜索与资源管理器共用的筛选控件，
+默认展开，名称过滤框常驻，候选列表限高 144px 滚动，避免标签墙挤走结果；已选项在折叠时仍显示。
+组内按「已选 → 命中文件数 → 名称」排序，零结果不移除项目里的其他候选标签。多选统一 AND，
+界面明确显示「同时包含所选标签」。空关键词允许纯标签搜索，统计只显示文件数。
+`pluginBusinessServices` 的 search/query 与组件均不再硬编码格式白名单；后端标签检索支持所有格式，
+图片/音视频带关键词时只匹配文件名，显式 fileTypes 仍须生效，文件夹/已删除/无权限文件不进入结果。
+`awd:files-changed` 刷新标签与当前查询；请求序号、取消、项目切换和卸载守卫保留。
+搜索失败显示持续的重试提示并隐藏旧结果；标签加载失败保留已选条件。
+回归：`ContentSearchServiceTagFilterTest`、`search-panel-tag-filter.test.mjs`、
+`plugins/business-services.test.mjs`；`plugins/tag-filter-browser.mjs` 以构建后的 opaque iframe
+和真实宿主服务桥配合合成 API 验证媒体筛选、键盘、打开结果、刷新及失败重试，不能替代正式客户端验收。
+搜索插件清单同步升至 `1.0.1`；`PluginBundledInstaller` 仅在更高版本时替换宿主安装的旧包，
+只更新 web 文件会使原 `1.0.0` 用户继续读旧界面。`PluginBundledInstallerTest` 使用实际随包清单和资源验证旧版更新。
 
 **标签类型维度（2026-08-20，dev-board#63）**：`Tag.type` = `NORMAL`/`PARTY`（当事人）/
 `ISSUE`（争议焦点），**可空且 null 视同 NORMAL**（存量行零迁移）——前端判断一律走
@@ -193,8 +201,7 @@ PDFParser 调 PDFBox2 已删除的 `PDDocument.load` 会抛 `NoSuchMethodError`�
 含改回 NORMAL）。同名唯一约束不分型：`TagService.getOrCreateTag` 撞同名不同型时**复用不改型**
 （改型是用户在标签管理里的决定）。新建默认色按类型（PARTY `#B45309` / ISSUE `#9B1C31` /
 NORMAL `#3B82F6`，`tagTypes.js` 与 TagService 两处同值）。分组展示在 TagSelector（可选列表三组）
-与 SearchPanel（展开态三个 `.tag-subsec-head` 分组头，**只是 shownTags 的按型切片渲染**，
-过滤/截断/排序仍是那一份全局逻辑，别按组各写一套）。AI 工具 `service/ai/tools/TagTools.java`
+与 TagFilter（当事人、争议焦点、其他标签三组，共用过滤与排序）。AI 工具 `service/ai/tools/TagTools.java`
 三件：`tag_list`（描述里强制先查再打、防同义词膨胀）/ `tag_file`（`ToolFileGuard` 校验归属，
 幂等）/ `tag_remove_from_file`（只解关联）；接线同步 `RealToolBeans` 与前端 `toolDisplayNames.js`。
 `AutoTaggingService` 刻意不产类型标签（当事人/争点判定不适合挂在每次自动保存的便宜档链路上）。

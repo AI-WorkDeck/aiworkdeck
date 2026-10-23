@@ -56,6 +56,21 @@ class PluginBundledInstallerTest {
         assertEquals("1.1.0", Files.readString(plugins.resolve("search/web/index.html")));
         assertThrows(IllegalArgumentException.class, () -> installer.install("search"));
     }
+    @Test void shippedSearchBundleReplacesTheOriginalInstalledVersion() throws Exception {
+        installer.installDefaults();
+        Path shipped = Path.of("../official-plugins/search");
+        Files.copy(shipped.resolve("manifest.json"), source.resolve("search/manifest.json"), StandardCopyOption.REPLACE_EXISTING);
+        try (var paths = Files.walk(shipped.resolve("web"))) {
+            for (Path file : paths.toList()) {
+                Path target = source.resolve("search").resolve(shipped.relativize(file));
+                if (Files.isDirectory(file)) Files.createDirectories(target);
+                else Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+        installer.installDefaults();
+        assertNotEquals("1.0.0", settings.get("plugin.bundled.search"));
+        assertEquals(Files.readString(shipped.resolve("web/index.html")), Files.readString(plugins.resolve("search/web/index.html")));
+    }
     @Test void invalidUpdateKeepsWorkingPluginAndTemporaryDirectoriesAreOutsideScanRoot() throws Exception {
         installer.installDefaults(); bundle("1.1.0"); Files.delete(source.resolve("search/web/index.html"));
         assertThrows(IllegalArgumentException.class, () -> installer.installDefaults());

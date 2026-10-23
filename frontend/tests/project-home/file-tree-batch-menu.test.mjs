@@ -31,7 +31,7 @@ const IMPORT_NAMES = [
   'batchCopyFiles', 'getApiBaseUrl', 'getContributedTemplates', 'createFileFromContributedTemplate',
   'getSessionId', 'host', 'findTopmostDeletedAncestor', 'summarizeDeleteResults', 'collapseToTopmostSelected',
   'groupByParent', 'buildTreeFromGroups', 'evidenceRefCounts', 'createRefCountsFetcher',
-  'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagSelector',
+  'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagFilter', 'TagSelector',
   'TagManager', 'ExplorerCreateMenu', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
   'createTag', 'createTask', 'importLocalFile',
   'nativeDataTransfer', 'isExternalFileDrag', 'claimExternalDrop', 'isTranscribableMediaItem',

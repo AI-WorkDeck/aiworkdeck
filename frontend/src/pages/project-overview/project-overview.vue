@@ -662,6 +662,7 @@
             v-if="hasNamedProject"
             v-show="leftPaneKey === 'files'"
             ref="fileTree"
+            enable-tag-view
             :project-id="projectId"
             :watch-local-files="canWatchLocalProjectFiles"
             :selection-mode="fileBatchMode"
