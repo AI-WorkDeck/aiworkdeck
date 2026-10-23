@@ -1081,6 +1081,8 @@ export const fileOpenTabsMethods = {
     // 顶掉，律师只看得见最后一条、还以为只更新了一份。多文件时改为静音逐份重载、
     // 最后聚合成一句。单文件语义一个字不改（仍是原来的逐文件 toast）。
     async onVersionReloadFiles(affectedFileIds) {
+      // 文件树切栏后仍保留挂载，版本操作须主动刷新清单；不等待请求，避免延迟编辑器换入新内容。
+      this.$refs?.fileTree?.loadFiles()
       if (!Array.isArray(affectedFileIds) || !affectedFileIds.length) return
       const idSet = new Set(affectedFileIds)
       const openIds = new Set()
