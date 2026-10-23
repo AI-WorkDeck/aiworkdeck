@@ -68,15 +68,18 @@ export function createPluginBusinessServices({ api, projectId, permissions, isCu
             const diagram = (Array.isArray(rows) ? rows : rows?.data || []).find(row => String(row.folderId) === String(params.folderId))
             if (!diagram || !['奇川风', '歸藏风', '白描'].includes(params.mode) || params.confirmOverwrite !== true) fail('invalid_params', 'Unknown diagram or missing overwrite confirmation')
             if (controller.signal.aborted || !isCurrent()) fail('cancelled', 'Request cancelled')
-            const pendingSaves = []
-            actions.emit?.('awd:litviz-restyling', { projectId: projectId(), folderId: diagram.folderId, pendingSaves })
-            await Promise.all(pendingSaves)
-            if (controller.signal.aborted || !isCurrent()) fail('cancelled', 'Request cancelled')
+            const restyleProjectId = projectId()
             try {
-              result = await api.restyleLitigationDiagram(projectId(), diagram.folderId, params.mode, true)
-              if (isCurrent()) actions.emit?.('awd:litviz-restyled', { projectId: projectId(), folderId: diagram.folderId, svgFileId: diagram.svgFileId, kind: 'restyle' })
+              const pendingSaves = []
+              actions.emit?.('awd:litviz-restyling', { projectId: restyleProjectId, folderId: diagram.folderId, pendingSaves })
+              await Promise.all(pendingSaves)
+              if (controller.signal.aborted || !isCurrent()) fail('cancelled', 'Request cancelled')
+              result = await api.restyleLitigationDiagram(restyleProjectId, diagram.folderId, params.mode, true)
+              actions.emit?.('awd:litviz-restyled', { projectId: restyleProjectId, folderId: diagram.folderId, svgFileId: diagram.svgFileId, kind: 'restyle' })
             } catch (error) {
-              if (isCurrent()) actions.emit?.('awd:litviz-restyled', { projectId: projectId(), folderId: diagram.folderId, kind: 'restyle', failed: true })
+              // Release the original drawing's save barrier even if this plugin
+              // was disabled or switched projects while waiting for its saves.
+              actions.emit?.('awd:litviz-restyled', { projectId: restyleProjectId, folderId: diagram.folderId, kind: 'restyle', failed: true })
               throw error
             }
           }
