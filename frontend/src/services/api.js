@@ -4482,6 +4482,11 @@ export function requestPluginIm(pluginId, projectId, action, params) {
   })
 }
 
+export const requestPluginNotifications = (pluginId, action, params = {}) => request({
+  url: `/api/plugins/${encodeURIComponent(pluginId)}/notifications`,
+  method: 'POST', data: { action, params }, logBody: false
+})
+
 export const requestPluginLawFirm = (pluginId, projectId, action, params = {}) => request({
   url: `/api/plugins/${encodeURIComponent(pluginId)}/lawfirm`,
   method: 'POST',

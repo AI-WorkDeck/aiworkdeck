@@ -261,7 +261,44 @@ public class DdWorkflowService {
 
     public List<DdNotification> inbox(Long projectId, Long userId) {
         requireMember(projectId, userId);
-        return notifications.findTop100ByProjectIdAndRecipientIdOrderByCreatedAtDesc(projectId, userId);
+        return notificationStates(notifications.findTop100ByProjectIdAndRecipientIdOrderByCreatedAtDesc(projectId, userId), userId);
+    }
+
+    /** Recipient-scoped aggregation; revoked projects and unpublished/deleted requests never leak titles. */
+    public List<DdNotification> accountInbox(Long userId) {
+        if (userId == null) throw forbidden("请先登录");
+        return notificationStates(notifications.findTop200ByRecipientIdOrderByCreatedAtDesc(userId), userId);
+    }
+
+    private List<DdNotification> notificationStates(List<DdNotification> rows, Long userId) {
+        List<DdNotification> result = new ArrayList<>();
+        for (DdNotification notification : rows) {
+            if (!Objects.equals(notification.getRecipientId(), userId)
+                    || !permissions.hasReadPermission(notification.getProjectId(), userId)) continue;
+            DdRequest request = requests.findById(notification.getRequestId()).orElse(null);
+            if (request == null || !Objects.equals(request.getProjectId(), notification.getProjectId())) continue;
+            boolean client = fileAccess.isClient(request.getProjectId(), userId);
+            if (client && !published(request)) continue;
+            String state = "none";
+            if ("PUBLISHED".equals(notification.getKind())) {
+                List<DdItem> checklist = items.findByDdRequestIdOrderBySortOrderAsc(request.getId());
+                boolean needsMaterial = checklist.stream()
+                        .filter(item -> item.getCurrentSubmissionId() != null || item.getUploadedFileId() != null
+                                || checklist.stream().noneMatch(child -> Objects.equals(child.getParentId(), item.getId())))
+                        .anyMatch(item -> Set.of("PENDING", "REJECTED").contains(item.getStatus()));
+                state = "PUBLISHED".equals(request.getStatus()) && needsMaterial ? "pending" : "done";
+            } else if (notification.getItemId() != null) {
+                DdItem item = items.findById(notification.getItemId()).orElse(null);
+                boolean current = item != null && Objects.equals(item.getDdRequestId(), request.getId())
+                        && Objects.equals(item.getCurrentSubmissionId(), notification.getSubmissionId());
+                boolean needsAction = current && "PUBLISHED".equals(request.getStatus())
+                        && (client ? "REJECTED".equals(item.getStatus())
+                            : permissions.hasWritePermission(request.getProjectId(), userId) && "UPLOADED".equals(item.getStatus()));
+                state = needsAction ? "pending" : "done";
+            }
+            notification.setActionState(state); result.add(notification);
+        }
+        return result;
     }
 
     @Transactional

@@ -20,6 +20,12 @@ declare namespace awd {
   interface Drag extends File { dragToken: string; dragType: string; expiresAt: number; hostHandle?: boolean }
   interface Target { path: string; locator?: string; relation?: string; method?: string; note?: string }
   interface EvidenceLink { anchor: { selection: true } | { quote: string }; docPath?: string; targets: Target[] }
+  interface NotificationInput {
+    /** Stable across retries; a different payload needs a new key. */
+    eventKey: string; title: string; body?: string; kind?: string; actionState?: 'none' | 'pending';
+    /** Opens only this plugin. The target never executes a business decision. */
+    target?: { kind: 'plugin'; pluginId: string; view?: string; recordId?: string };
+  }
   interface SDK {
     readonly version: string;
     context: Context | null;
@@ -35,6 +41,10 @@ declare namespace awd {
     tools: { invoke(name: string, args?: Params, options?: CallOptions): Promise<string> };
     chat: { send(prompt: string, options?: CallOptions): Promise<unknown>; addFile(path: string, options?: CallOptions): Promise<unknown> };
     im: { request<T = unknown>(action: string, params?: Params, options?: CallOptions): Promise<T> };
+    notifications: {
+      publish<T = unknown>(notification: NotificationInput, options?: CallOptions): Promise<T>;
+      resolve<T = unknown>(eventKey: string, state?: 'done' | 'cancelled', options?: CallOptions): Promise<T>;
+    };
     lawfirm: { request<T = unknown>(action: string, params?: Params, options?: CallOptions): Promise<T> };
     storage: { get<T = Json>(key: string, options?: CallOptions): Promise<T | null>; set(key: string, value: Json, options?: CallOptions): Promise<unknown> };
     settings: {

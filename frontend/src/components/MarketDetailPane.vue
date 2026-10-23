@@ -326,6 +326,7 @@ const PERMISSION_LABELS = {
   file_write: t('market.permFileWrite'),
   network: t('market.permNetwork'),
   im: t('market.permIm'),
+  notifications: t('market.permNotifications'),
   editor: t('market.permEditor'),
   ai: t('market.permAi'),
   speech: t('market.permSpeech'),

@@ -130,3 +130,9 @@ node scripts/plugin-dev.mjs submissions --endpoint https://YOUR-PORTAL/api/plugi
 侧栏服务事件：`calendar.changed` 需 tasks、`favorites.changed` 需 file_read、`clipboard.changed` 需 clipboard，收到后重新读取授权数据。`speech.progress` 需 speech，只转发本机 Kokoro/ASR 组件进度。事件不携带平台凭据；账户/项目变更必须丢弃旧请求和缓存。新宿主能力目前尚未发版。
 
 宿主固定服务、权限与取消语义详见 [SERVICES.md](SERVICES.md)。
+
+## 消息中心通知（SDK 1.7）
+
+声明 `notifications` 后，使用 `awd.notifications.publish({eventKey,title,body?,actionState?,target?})` 向当前账号发布持久通知；业务真正完成后调用 `awd.notifications.resolve(eventKey, 'done')`。已读不代表业务确认。通知目标只能打开本插件，禁止任意 URL、执行代码或指定其他收件人。
+
+完整约束、受控跨成员 Java SPI、客户身份和导航契约见 [消息中心接口](../../docs/message-center/README.md)。旧宿主应按 `unknown_method`/不可用提示降级，不能用 `ui.toast` 冒充持久消息已投递。

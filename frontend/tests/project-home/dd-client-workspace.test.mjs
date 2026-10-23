@@ -35,6 +35,44 @@ test('switching an item retains selected files and retry identity', async () => 
   await vm.selectItem({ id: 8 }); assert.deepEqual(vm.pendingFiles, [])
   await vm.selectItem({ id: 7 }); assert.deepEqual(vm.pendingFiles, [file]); assert.equal(vm.uploadKey, key); assert.equal(vm.reason, 'Existing draft')
 })
+
+test('a message opens its exact item once and polling does not override the next user selection', async () => {
+  const vm = fixture(); vm.items = [{ id: 7 }, { id: 8 }]; vm.focusItemId = '8'; vm.filter = 'done'; vm.query = 'hidden'
+  vm.focusRequestedItem(); assert.equal(vm.selectedId, 8); assert.equal(vm.filter, 'all'); assert.equal(vm.query, '')
+  await vm.selectItem(vm.items[0]); vm.focusRequestedItem(); assert.equal(vm.selectedId, 7)
+  vm.focusItemId = 999; vm.focusRequestedItem(); assert.equal(vm.selectedId, 7)
+})
+
+function navigationFixture(read) {
+  const workspace = readFileSync(new URL('../../src/components/dd/DdClientWorkspace.vue', import.meta.url), 'utf8')
+  const body = workspace.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
+  const options = new Function('DdClientChecklist', 'ddNotificationPermission', 'ddClientRead', body)(null, () => 'unavailable', read)
+  const vm = { ...options.data(), $t: translate(), navigationTarget: null }
+  for (const [key, fn] of Object.entries(options.methods)) vm[key] = fn.bind(vm)
+  for (const [key, fn] of Object.entries(options.computed)) Object.defineProperty(vm, key, { get: fn.bind(vm) })
+  vm.connections = [{ id: 'client-one', projectId: 2 }, { id: 'client-two', projectId: 3 }]
+  return vm
+}
+
+test('message navigation requires the saved connection/project pair and an available request', async () => {
+  const seen = []; const vm = navigationFixture(async (scope, path) => { seen.push([scope, path]); return [{ id: 4 }, { id: 5 }] })
+  vm.navigationTarget = { connectionId: 'client-one', projectId: 3, requestId: 5, itemId: 8 }
+  await vm.applyNavigationTarget(); assert.equal(seen.length, 0); assert.ok(vm.error)
+  vm.navigationTarget = { connectionId: 'client-one', projectId: 2, requestId: '5', itemId: 8 }
+  await vm.applyNavigationTarget(); assert.equal(vm.requestId, 5); assert.equal(vm.focusItemId, 8)
+  assert.deepEqual(seen[0], [{ connectionId: 'client-one', projectId: 2 }, '/projects'])
+})
+
+test('a late navigation request cannot replace the newest message target', async () => {
+  const pending = []; const vm = navigationFixture(() => new Promise(resolve => pending.push(resolve)))
+  vm.navigationTarget = { connectionId: 'client-one', projectId: 2, requestId: 4, itemId: 7 }
+  const old = vm.applyNavigationTarget()
+  vm.navigationTarget = { connectionId: 'client-two', projectId: 3, requestId: 5, itemId: 8 }
+  const current = vm.applyNavigationTarget()
+  pending[1]([{ id: 5 }]); await current
+  pending[0]([{ id: 4 }]); await old
+  assert.equal(vm.selectedId, 'client-two'); assert.equal(vm.requestId, 5); assert.equal(vm.focusItemId, 8)
+})
 test('a late response for another request cannot populate the active checklist', async () => {
   const pending = []; const vm = fixture({ read: () => new Promise(resolve => pending.push(resolve)) })
   const first = vm.load(); vm.requestId = 3; const second = vm.load()

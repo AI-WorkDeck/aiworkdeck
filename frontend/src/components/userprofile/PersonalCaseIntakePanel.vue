@@ -9,6 +9,7 @@
     >
       <template #actions>
         <view class="intake-top-actions">
+          <button class="intake-btn primary" :disabled="busy" @tap="onOpenCloudWorkflow">律所云端利冲协作</button>
           <button class="intake-btn primary" @tap="openNewIntakeForm">
             {{ $t('account.caseIntakeNewBtn') }}
           </button>
@@ -20,6 +21,7 @@
           </button>
         </view>
       </template>
+      <text class="field-label">下方为本机收案与财务台账；本机征询记录不表示已送达同事。指定委员、本人确认和终审请进入律所云端利冲协作。</text>
 
       <!-- 顶部子视图切换胶囊 -->
       <view class="intake-subnav">
@@ -265,6 +267,7 @@
 
       <!-- 子视图 2：利冲审查与协同放行 -->
       <view v-else-if="activeSubView === 'clearance'" class="subview-body">
+        <text class="block-desc">本页操作只登记本机历史核查结果，不代表其他律师或云端指定委员已确认。本人确认请进入上方「律所云端利冲协作」。</text>
         <!-- 待我放行的冲突案件征询 -->
         <view class="clearance-block">
           <text class="block-title">{{ $t('account.caseMyClearanceTitle') }}</text>
@@ -583,6 +586,16 @@ export default {
     this.loadOverview()
   },
   methods: {
+    async onOpenCloudWorkflow() {
+      this.busy = true
+      try {
+        await ensureLawFirmPlugin()
+        uni.$emit('awd:market-changed')
+        uni.$emit('awd:open-lawfirm-plugin', { tab: 'conflicts' })
+      } catch (e) {
+        uni.showToast({ title: e?.message || '打开律所协作失败', icon: 'none' })
+      } finally { this.busy = false }
+    },
     unwrapData(res) {
       if (!res) return null
       if (res.data && typeof res.data === 'object') return res.data
