@@ -19,6 +19,8 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @DataJpaTest(showSql=false)
 @AutoConfigureTestDatabase(replace=AutoConfigureTestDatabase.Replace.NONE)
@@ -27,16 +29,48 @@ import static org.junit.jupiter.api.Assertions.*;
  "spring.datasource.driver-class-name=org.h2.Driver", "spring.datasource.username=sa", "spring.datasource.password=",
  "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect", "spring.jpa.hibernate.ddl-auto=create-drop"
 })
-@Import(ImService.class)
+@Import({ImService.class, com.checkba.service.ProjectMemberService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class ImServiceTest {
  @Autowired ImService service;
  @Autowired UserRepository users;
  @Autowired ImInvitationRepository invitations;
  @Autowired ImMessageRepository messages;
+ @Autowired ProjectRepository projects;
+ @Autowired ProjectMemberRepository projectMembers;
  Long owner, colleague, client, stranger;
 
- @BeforeEach void setup() { owner=user("负责人"); colleague=user("跨律所律师"); client=user("客户"); stranger=user("局外人"); }
+ @BeforeEach void setup() { ReflectionTestUtils.setField(service,"agents",mock(ImAgentService.class)); owner=user("负责人"); colleague=user("跨律所律师"); client=user("客户"); stranger=user("局外人"); }
+ @Test void projectGroupUsesRealMembershipAndRevocationClosesAllConversationPaths() {
+  var project=new com.checkba.model.entity.Project(); project.setName("合成项目群"); project.setProjectType("TEST"); project.setListedCompanyName("合成公司"); project.setTargetCompanyName("合成标的"); project.setUserId(owner);
+  long projectId=projects.saveAndFlush(project).getId();
+  var member=new com.checkba.model.entity.ProjectMember(); member.setProjectId(projectId); member.setUserId(client); member.setRole("CLIENT");
+  member=projectMembers.saveAndFlush(member);
+  var group=call(client,"projectGroup",Map.of("projectId",projectId)); String id=group.get("id").toString();
+  assertEquals(projectId,group.get("projectId")); assertEquals("CLIENT",group.get("role"));
+  assertEquals("project:"+projectId,((Map<?,?>)group.get("agent")).get("scopeKey")); assertEquals(false,group.get("canRequestAgent"));
+  assertEquals(id,call(owner,"ensureAgent",Map.of("scope","project","scopeKey","project:"+projectId,"private",false)).get("id"));
+  assertEquals(3,((List<?>)call(owner,"members",Map.of("conversationId",id)).get("members")).size());
+  assertEquals(id,call(owner,"projectGroup",Map.of("projectId",projectId)).get("id"));
+  assertThrows(IllegalArgumentException.class,()->call(stranger,"projectGroup",Map.of("projectId",projectId)));
+  assertThrows(IllegalArgumentException.class,()->call(owner,"invite",Map.of("conversationId",id,"role","CLIENT")));
+  send(client,id,"customer-note","合成客户问题");
+  projectMembers.delete(member); projectMembers.flush();
+  assertTrue(((List<?>)call(client,"list",Map.of()).get("conversations")).isEmpty());
+  for(String action:List.of("messages","members","send","read"))
+   assertThrows(IllegalArgumentException.class,()->call(client,action,Map.of("conversationId",id,"clientMessageId","revoked","text","x")));
+ }
+ @Test void projectGroupCreationRacesResolveToOneGroup() throws Exception {
+  var project=new com.checkba.model.entity.Project(); project.setName("并发项目群"); project.setProjectType("TEST"); project.setListedCompanyName("合成公司"); project.setTargetCompanyName("合成标的"); project.setUserId(owner);
+  long projectId=projects.saveAndFlush(project).getId();
+  var member=new com.checkba.model.entity.ProjectMember(); member.setProjectId(projectId); member.setUserId(client); member.setRole("CLIENT"); projectMembers.saveAndFlush(member);
+  ExecutorService workers=Executors.newFixedThreadPool(2); CountDownLatch start=new CountDownLatch(1);
+  try {
+   Future<Object> a=workers.submit(()->{start.await();return call(owner,"projectGroup",Map.of("projectId",projectId)).get("id");});
+   Future<Object> b=workers.submit(()->{start.await();return call(client,"projectGroup",Map.of("projectId",projectId)).get("id");}); start.countDown();
+   assertEquals(a.get(20,TimeUnit.SECONDS),b.get(20,TimeUnit.SECONDS));
+  } finally {workers.shutdownNow();}
+ }
  Long user(String name) {
   User u=new User(); u.setUsername("im-test-"+UUID.randomUUID()); u.setPassword("not-a-credential");
   u.setDisplayName(name); u.setRole("USER"); u.setSubscriptionType("FREE");

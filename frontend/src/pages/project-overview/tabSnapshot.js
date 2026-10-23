@@ -31,7 +31,7 @@ export const TAB_SNAPSHOT_SUFFIX = 'tabs'
 export const TAB_SNAPSHOT_THROTTLE_MS = 300
 
 /** 全局单例标签：一个工作台里至多一个，恢复时跨两窗格按 id 去重 */
-export const SINGLETON_TAB_TYPES = ['dd-client', 'welcome', 'calendar', 'admin-settings', 'market-detail', 'commit-history', 'insight-entity', 'plugin']
+export const SINGLETON_TAB_TYPES = ['message-center', 'dd-client', 'welcome', 'calendar', 'admin-settings', 'market-detail', 'commit-history', 'insight-entity', 'plugin']
 
 /** 只在有项目时才有意义的标签（文件标签另判） */
 const PROJECT_ONLY_KINDS = ['file', 'dd-request', 'diff', 'version-compare', 'version-text-diff', 'commit-history', 'insight-entity', 'plugin']
@@ -81,6 +81,7 @@ const SERIALIZERS = {
   plugin: (t) => (typeof t.pluginId === 'string' && t.pluginId ? {
     id: `plugin-${t.pluginId}`, tabType: 'plugin', pluginId: t.pluginId, name: str(t.name),
   } : null),
+  'message-center': (t) => ({ id: 'message-center', tabType: 'message-center', name: str(t.name) }),
   'dd-client': (t) => ({ id: 'dd-client', tabType: 'dd-client', name: str(t.name) }),
   welcome: (t) => ({ id: t.id, tabType: 'welcome', name: str(t.name) }),
   calendar: (t) => ({ id: t.id, tabType: 'calendar', name: str(t.name) }),
@@ -284,6 +285,7 @@ function storageOf(vm) {
 
 // 名字随语言走的单例标签：恢复时按当前语言重取，不用快照里存的旧语言文案
 const LOCALIZED_NAME_KEYS = {
+  'message-center': 'messageCenter.title',
   'dd-client': 'ddWorkflow.clientWorkspace',
   welcome: 'welcome.tabName',
   calendar: 'calendar.tabName',

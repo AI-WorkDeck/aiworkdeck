@@ -46,6 +46,9 @@ class ImAgentServiceTest {
     @Autowired ImAttachmentRepository attachments;
     @Autowired ImAgentTurnRepository turns;
     @Autowired UserRepository users;
+    @Autowired ProjectRepository projectRepository;
+    com.checkba.service.ProjectMemberService projectPermissions;
+    Set<String> projectAccess;
     @Autowired PlatformTransactionManager transactions;
     MemoryOrganizationGateway memory;
     ChatModelFactory models;
@@ -74,6 +77,10 @@ class ImAgentServiceTest {
         agent=new ImAgentService(conversations,members,messages,attachments,turns,users,memory,models,usage,transactions,
                 new ProjectFileTextExtractor(null,null,null,null,null),jobs::add);
         ReflectionTestUtils.setField(im,"agents",agent);
+        projectPermissions=mock(com.checkba.service.ProjectMemberService.class); projectAccess=new HashSet<>();
+        when(projectPermissions.hasReadPermission(anyLong(),anyLong())).thenAnswer(call -> projectAccess.contains(call.getArgument(0)+":"+call.getArgument(1)));
+        ReflectionTestUtils.setField(im,"projectPermissions",projectPermissions);
+        ReflectionTestUtils.setField(agent,"projectPermissions",projectPermissions);
     }
 
     Long user(String name) {
@@ -95,6 +102,76 @@ class ImAgentServiceTest {
         String aid=(String)uploaded.get("id");
         if(visible)call(owner,"fileAccess",Map.of("conversationId",id,"attachmentId",aid,"clientVisible",true));
         call(owner,"send",Map.of("conversationId",id,"clientMessageId",UUID.randomUUID().toString(),"attachmentId",aid));return aid;
+    }
+
+    Long boundProject() {
+        Project p=new Project(); p.setName("真实权限项目"); p.setProjectType("TEST"); p.setListedCompanyName("合成公司"); p.setTargetCompanyName("合成标的"); p.setUserId(owner);
+        Long id=projectRepository.saveAndFlush(p).getId(); projectAccess.add(id+":"+owner); projectAccess.add(id+":"+client);
+        when(projectPermissions.isClient(id,client)).thenReturn(true); return id;
+    }
+    String bindPrivate(Long projectId) {
+        String id=(String)ensure(owner,"project",project,true).get("id");
+        var bound=call(owner,"ensureAgent",Map.of("scope","project","scopeKey",project,"title","绑定私聊","private",true,"projectId",projectId));
+        assertEquals(id,bound.get("id")); assertEquals(projectId,bound.get("projectId"));
+        assertNull(conversations.findById(id).orElseThrow().getProjectId());
+        assertEquals(projectId,conversations.findById(id).orElseThrow().getAgentProjectId()); return id;
+    }
+
+    @Test void realProjectGroupIncludesAssistantAndClientsCanOnlyReadSharedReplies() {
+        Long projectId=boundProject(); String id=(String)call(owner,"projectGroup",Map.of("projectId",projectId)).get("id");
+        assertEquals(id,ensure(owner,"project","project:"+projectId,false).get("id"));
+        var clientGroup=call(client,"projectGroup",Map.of("projectId",projectId)); assertEquals(false,clientGroup.get("canRequestAgent"));
+        assertEquals("project:"+projectId,((Map<?,?>)clientGroup.get("agent")).get("scopeKey"));
+        file(id,"内部草案.txt","不可外发的内部材料",false); file(id,"共同材料.txt","共同可见的资料",true);
+        long clientMessage=send(client,id,"客户的真人消息"); assertThrows(IllegalArgumentException.class,()->reply(client,id,clientMessage));
+        long source=send(owner,id,"请分析共同材料"); reply(owner,id,source); jobs.remove().run();
+        assertTrue(prompt.get().contains("共同可见的资料")); assertFalse(prompt.get().contains("不可外发的内部材料"));
+        assertEquals("AGENT",history(client,id).get(history(client,id).size()-1).get("actorType"));
+    }
+
+    @Test void revokedBoundProjectBeforeGenerationNeverCallsModel() {
+        Long projectId=boundProject(); String id=(String)call(owner,"projectGroup",Map.of("projectId",projectId)).get("id");
+        long source=send(owner,id,"权限可撤销"); reply(owner,id,source); projectAccess.remove(projectId+":"+owner); jobs.remove().run();
+        assertEquals("failed",turns.findById(source).orElseThrow().getStatus()); verify(models,never()).getPlatformChatModel(any(),anyInt());
+    }
+
+    @Test void oldPrivateChatCanBindOnceAndRevocationBeforeGenerationBlocksModelAndEveryAction() {
+        Long projectId=boundProject(); String id=bindPrivate(projectId); long source=send(owner,id,"私有资料问题");
+        call(owner,"agentReply",Map.of("conversationId",id,"messageId",source,"projectContext","仅本人的授权资料"));
+        projectAccess.remove(projectId+":"+owner); jobs.remove().run();
+        assertEquals("failed",turns.findById(source).orElseThrow().getStatus()); verify(models,never()).getPlatformChatModel(any(),anyInt());
+        assertThrows(IllegalArgumentException.class,()->history(owner,id));
+        assertThrows(IllegalArgumentException.class,()->ensure(owner,"project",project,true));
+    }
+
+    @Test void boundPrivateRevocationDuringGenerationPreventsDeliveryAndCannotRebind() {
+        Long projectId=boundProject(); String id=bindPrivate(projectId); Long other=boundProject();
+        assertThrows(IllegalArgumentException.class,()->call(owner,"ensureAgent",Map.of("scope","project","scopeKey",project,"title","改绑","private",true,"projectId",other)));
+        assertEquals(projectId,conversations.findById(id).orElseThrow().getAgentProjectId());
+        when(model.generate(any(ChatMessage[].class))).thenAnswer(call -> {projectAccess.remove(projectId+":"+owner);return Response.from(AiMessage.from("不得送达"));});
+        long source=send(owner,id,"私聊问题"); reply(owner,id,source); jobs.remove().run();
+        assertEquals("failed",turns.findById(source).orElseThrow().getStatus());
+        assertEquals(1,messages.findByConversationIdAndIdGreaterThanOrderByIdAsc(id,0,org.springframework.data.domain.PageRequest.of(0,100)).getTotalElements());
+    }
+
+    @Test void boundPrivateDowngradeWhileQueuedNeverCallsModel() {
+        Long projectId=boundProject(); String id=bindPrivate(projectId); long source=send(owner,id,"私有资料问题");
+        call(owner,"agentReply",Map.of("conversationId",id,"messageId",source,"projectContext","排队前的内部材料"));
+        when(projectPermissions.isClient(projectId,owner)).thenReturn(true); jobs.remove().run();
+        assertEquals("failed",turns.findById(source).orElseThrow().getStatus()); verify(models,never()).getPlatformChatModel(any(),anyInt());
+        assertEquals(false,call(owner,"agentInfo",Map.of("conversationId",id)).get("canRequestAgent"));
+        assertThrows(IllegalArgumentException.class,()->reply(owner,id,source));
+    }
+
+    @Test void boundPrivateDowngradeDuringGenerationNeverDeliversReply() {
+        Long projectId=boundProject(); String id=bindPrivate(projectId);
+        when(model.generate(any(ChatMessage[].class))).thenAnswer(call -> {
+            when(projectPermissions.isClient(projectId,owner)).thenReturn(true);
+            return Response.from(AiMessage.from("不得向降权后的用户交付"));
+        });
+        long source=send(owner,id,"私有资料问题"); reply(owner,id,source); jobs.remove().run();
+        assertEquals("failed",turns.findById(source).orElseThrow().getStatus());
+        assertEquals(1,history(owner,id).size());
     }
 
     @Test void projectGroupIsUniqueAndKnowingUuidDoesNotGrantMembership() {

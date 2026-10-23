@@ -147,6 +147,7 @@ export default {
     "titles": "Enter a title for every item."
   },
   "client": {
+    "messageUnavailable": "This invited project or checklist is no longer available. Refresh and try again.",
     "workspaceTitle": "Invited due diligence",
     "workspaceHint": "Prepare documents from your lawyer’s checklist, submit each item and follow the feedback.",
     "joinProject": "Join project",

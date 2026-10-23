@@ -140,7 +140,7 @@
 import { ddClientRead, ddClientWrite, ddClientUpload, ddClientDownload } from '@/services/ddClient.js'
 export default {
   name: 'DdClientChecklist',
-  props: { requestId: { type: [String, Number], required: true }, projectId: { type: [String, Number], required: true }, connectionId: { type: String, default: '' } },
+  props: { requestId: { type: [String, Number], required: true }, projectId: { type: [String, Number], required: true }, connectionId: { type: String, default: '' }, focusItemId: { type: [String, Number], default: null } },
   data: () => ({ request: null, items: [], submissions: {}, rejectReasons: {}, selectedId: null, history: [], loading: false, historyLoading: false, error: '', notice: '', filter: 'all', query: '', pendingFiles: [], aiConsent: false, busy: false, uploadProgress: null, formMode: '', explanationType: 'UNAVAILABLE', reason: '', uploadKey: '', reasonKey: '', reasonFingerprint: '', drafts: {}, generation: 0, historyGeneration: 0, poll: null, filters: [{ id: 'all', labelKey: 'ddWorkflow.client.filters.all' }, { id: 'todo', labelKey: 'ddWorkflow.client.filters.todo' }, { id: 'review', labelKey: 'ddWorkflow.client.filters.review' }, { id: 'done', labelKey: 'ddWorkflow.client.filters.done' }] }),
   computed: {
     scope() { return { connectionId: this.connectionId, requestId: this.requestId, projectId: this.projectId } },
@@ -149,10 +149,20 @@ export default {
     needsWork() { return this.actionableItems.filter(i => this.statusClass(i) === 'todo').length },
     visibleItems() { return this.items.filter(i => (this.filter === 'all' || this.statusClass(i) === this.filter) && `${i.title} ${i.description || ''}`.includes(this.query)) },
   },
-  watch: { requestId() { this.reset() }, connectionId() { this.reset() } },
+  watch: { focusItemId() { this.focusRequestedItem() }, requestId() { this.reset() }, connectionId() { this.reset() } },
   mounted() { this.load(); this.poll = setInterval(() => { if (!this.busy && this.items.some(i => ['QUEUED', 'RUNNING'].includes(this.current(i)?.aiStatus))) this.load(true) }, 5000) },
   beforeUnmount() { this.generation++; this.historyGeneration++; clearInterval(this.poll) },
   methods: {
+    focusRequestedItem() {
+      const key = `${this.connectionId}:${this.requestId}:${this.focusItemId}`
+      if (this._appliedFocusKey === key) return
+      const item = this.items.find(i => String(i.id) === String(this.focusItemId))
+      if (item) {
+        this._appliedFocusKey = key
+        this.filter = 'all'; this.query = ''
+        if (this.selectedId !== item.id) this.selectItem(item)
+      }
+    },
     reset() { this.generation++; this.historyGeneration++; this.items = []; this.submissions = {}; this.history = []; this.selectedId = null; this.pendingFiles = []; this.drafts = {}; this.aiConsent = false; this.uploadKey = ''; this.reasonKey = ''; this.reasonFingerprint = ''; this.reason = ''; this.formMode = ''; this.load() },
     pendingAppeal(s) { return !!s?.appealedAt && s.reviewStatus === 'UPLOADED' && (!s.reviewedAt || new Date(s.appealedAt) > new Date(s.reviewedAt)) },
     isCategory(item) { return !this.current(item) && !item.currentSubmissionId && !item.uploadedFileId && this.items.some(child => String(child.parentId) === String(item.id)) },
@@ -178,7 +188,7 @@ export default {
     canAppeal(item) { const s = this.current(item); return this.canSubmit(item) && !!s && (s.reviewStatus === 'REJECTED' || ['FAILED', 'MANUAL_REQUIRED'].includes(s.aiStatus)) && !this.pendingAppeal(s) },
     async load(quiet = false) {
       const generation = ++this.generation; if (!quiet) { this.loading = true; this.error = '' }
-      try { const data = await ddClientRead(this.scope, `/requests/${this.requestId}`); if (generation !== this.generation) return; this.request = data.request; this.items = data.items || []; this.submissions = data.submissionsByItem || {}; this.rejectReasons = data.rejectReasons || {}; if (this.selectedId == null && this.items.length) this.selectItem(this.items.find(i => this.statusClass(i) === 'todo') || this.items[0]) }
+      try { const data = await ddClientRead(this.scope, `/requests/${this.requestId}`); if (generation !== this.generation) return; this.request = data.request; this.items = data.items || []; this.submissions = data.submissionsByItem || {}; this.rejectReasons = data.rejectReasons || {}; this.focusRequestedItem(); if (this.selectedId == null && this.items.length) this.selectItem(this.items.find(i => this.statusClass(i) === 'todo') || this.items[0]) }
       catch (e) { if (generation === this.generation) this.error = e.message }
       finally { if (generation === this.generation) this.loading = false }
     },

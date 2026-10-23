@@ -23,6 +23,7 @@ export const panelSwitchingMethods = {
         branch: key === 'staging' ? 'staging'
           : (this.leftPaneKey === key ? 'collapse_toggle' : 'switch')
       })
+      if (key === 'messages') { this.openMessageCenterTab(); return }
       if (key === 'staging') {
         // Toggle staging visibility
         if (this.showStagingArea) {

@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="panel.css">
   <script src="awd-plugin-sdk.js"></script>
   <script src="panel.js" defer></script>
+  <script src="workflow.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -49,6 +50,7 @@
   </header>
 
   <div id="notice" role="status" aria-live="polite">正在连接律所管理引擎…</div>
+  <p class="hint" style="padding:0 20px">收案、财务和样板数据属于本机台账。本机征询记录不表示同事已收到消息。需要本人确认时，请使用「利冲审查中心」中的律所云端协作。</p>
 
   <main id="workspace">
     <!-- Tab 1: 收案与立项 -->
@@ -57,7 +59,7 @@
         <article class="card">
           <header class="card-header">
             <div>
-              <h2>新建收案与利冲申请</h2>
+              <h2>新建本机收案记录</h2>
               <p class="hint">依据《律师法》第39、50条及《全国律协执业行为规范》第50–56条自动检索全所在办、历史及关联主体冲突</p>
             </div>
           </header>
@@ -137,7 +139,7 @@
             </label>
             <div class="form-actions field-span-2">
               <button type="button" id="btn-preview-conflict">实时利冲与合规预检</button>
-              <button type="button" id="btn-submit-intake" class="primary">提交收案申请并启动利冲流</button>
+              <button type="button" id="btn-submit-intake" class="primary">保存本机收案与核查记录</button>
             </div>
           </form>
 
@@ -148,7 +150,7 @@
           <header class="card-header">
             <div>
               <h2>我的收案申请与利冲五步进展</h2>
-              <p class="hint">实时同步个人中心「收案与利冲」分栏，追踪从申请、自动检索、站内信放行到委员终审立案全流程</p>
+              <p class="hint">与个人中心「收案与利冲」共享本机台账。以下进展为本机登记，跨账户征询及本人终审请使用云端协作。</p>
             </div>
           </header>
           <div id="intake-list" class="stack-list"></div>
@@ -158,12 +160,43 @@
 
     <!-- Tab 2: 利冲审查中心 -->
     <section id="panel-conflict" role="tabpanel" aria-labelledby="tab-conflict" class="tab-panel" hidden>
+      <article class="card" id="cloud-workflow">
+        <header class="card-header"><div><h2>律所云端利冲协作</h2><p class="hint">管理员指定委员，由本人接受；关联律师与指定委员分别确认。仅发送你明确提交的信息，本机旧台账不会自动上传。</p></div><button type="button" id="workflow-refresh">连接并刷新</button></header>
+        <p id="workflow-status" role="status" aria-live="polite">连接后可查看本人待办和已提交申请。</p>
+        <div id="workflow-content" hidden>
+          <div class="form-grid">
+            <label><span>核验同所账户</span><input id="workflow-identifier" type="text" placeholder="同事账户手机号或邮箱"></label>
+            <button type="button" id="workflow-lookup">核验并加入选择列表</button>
+          </div>
+          <div id="workflow-admin" hidden class="form-grid">
+            <label><span>指定利冲委员</span><select id="workflow-appointee" aria-label="委员候选账户"></select></label>
+            <button type="button" id="workflow-appoint">发送委员指派</button>
+          </div>
+          <div id="workflow-appointments" class="stack-list"></div>
+          <details><summary>发起新的利冲协作申请</summary>
+            <form id="workflow-form" class="form-grid">
+              <label><span>案件名称</span><input id="workflow-title" type="text" maxlength="256" required></label>
+              <label><span>业务领域</span><select id="workflow-practice" required></select></label>
+              <label><span>委托人名称</span><input id="workflow-client" type="text" maxlength="256" required></label>
+              <label><span>对方当事人名称</span><input id="workflow-counterparty" type="text" maxlength="256"></label>
+              <label><span>主办律师账户</span><select id="workflow-lead" required></select></label>
+              <label><span>已接受指派的终审委员</span><select id="workflow-committee" required></select></label>
+              <label><span>需要人工征询的关联律师（可选）</span><select id="workflow-related"><option value="">不另行指定</option></select></label>
+              <label class="field-span-2"><span>仅向该律师发送的关联案件摘要</span><textarea id="workflow-summary" maxlength="2000" placeholder="如涉及本机案件，只填写对方核查所必需的信息；请勿粘贴无关客户材料。"></textarea></label>
+              <label class="field-span-2"><input id="workflow-consent" type="checkbox" required>将以上申请信息发送至本所云端协作，向关联律师及所选委员发出通知。系统仅检索本所已经主动提交的云端申请。</label>
+              <button id="workflow-submit" type="submit" class="primary">发送利冲协作申请</button>
+              <button id="workflow-revise" type="button" hidden>重新编辑同一申请</button>
+            </form>
+          </details>
+          <div id="workflow-records" class="stack-list"></div>
+        </div>
+      </article>
       <div class="split-grid">
         <article class="card">
           <header class="card-header">
             <div>
-              <h2>待我放行的利冲征询（关联案件承办律师）</h2>
-              <p class="hint">命中潜在利益冲突时，系统已自动建立站内信（IM）协同会话。请核实保密边界后作出放行或拒绝决定</p>
+              <h2>本机历史征询记录</h2>
+              <p class="hint">以下仅为本机台账与演示记录，不表示已向其他设备送达。跨账户确认请使用上方云端协作。</p>
             </div>
           </header>
           <div id="pending-clearances" class="stack-list"></div>
@@ -172,8 +205,8 @@
         <article class="card">
           <header class="card-header">
             <div>
-              <h2>全所利冲审查队列与委员会终审</h2>
-              <p class="hint">利冲委员核验关联律师放行结论、信息隔离墙（Ethical Wall）承诺及当事人书面豁免函后，终审通过并正式立案</p>
+              <h2>本机收案核查台账</h2>
+              <p class="hint">保留本机核查结论与建项功能。此处登记不代表云端指定委员已作出终审决定。</p>
             </div>
           </header>
           <div id="committee-queue" class="stack-list"></div>

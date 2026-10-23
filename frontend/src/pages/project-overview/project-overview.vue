@@ -302,7 +302,7 @@
           v-for="p in LEFT_SIDEBAR_PLUGINS"
           :key="p.key"
           class="rail-btn"
-          :class="{ active: (leftPaneKey === p.key && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
+          :class="{ active: (p.key === 'messages' && (focusedPane === 'right' ? activeFileRight : activeFileLeft)?.tabType === 'message-center') || (leftPaneKey === p.key && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
           :title="p.label"
           :draggable="!isClientView"
           @tap="onRailBtnTap(p.key)"
@@ -343,6 +343,7 @@
             </svg>
           </view>
           <text v-else class="rail-icon">{{ p.icon }}</text>
+          <text v-if="p.key === 'messages' && (messageCenterUnread > 0 || messageCenterBadgePartial)" class="rail-badge" :title="messageCenterBadgePartial ? $t('messageCenter.sourcesUnavailable') : $t('messageCenter.unreadCount', { count: messageCenterUnread })" :aria-label="messageCenterBadgePartial ? $t('messageCenter.sourcesUnavailable') : $t('messageCenter.unreadCount', { count: messageCenterUnread })">{{ messageCenterUnread > 99 ? '99+' : messageCenterUnread > 0 ? messageCenterUnread : '·' }}</text>
           <text v-if="p.key === 'dd-client' && ddClientUnread > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddClientUnread })">{{ ddClientUnread > 99 ? '99+' : ddClientUnread }}</text>
           <text v-if="p.key === 'dd-files' && ddLawyerNotifications.length > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddLawyerNotifications.length })">{{ ddLawyerNotifications.length > 99 ? '99+' : ddLawyerNotifications.length }}</text>
           <!-- 日程徽标（dev-board#899）：当前项目 逾期 + 今天 的未完成事项数，0 不显；有逾期时转朱砂红 -->
@@ -1162,7 +1163,8 @@
                       :key="activeFileLeft.id"
                       :version-spec="activeFileLeft.versionSpec"
                     />
-                    <DdClientWorkspace v-else-if="activeFileLeft.tabType === 'dd-client'" />
+                    <MessageCenterPane v-else-if="activeFileLeft.tabType === 'message-center'" :current-project-id="projectId" :initial-conversation-id="activeFileLeft.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
+                    <DdClientWorkspace v-else-if="activeFileLeft.tabType === 'dd-client'" :navigation-target="activeFileLeft.ddClientTarget || null" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileLeft)"
                       :key="activeFileLeft.id"
@@ -1409,7 +1411,8 @@
                       :key="activeFileRight.id"
                       :version-spec="activeFileRight.versionSpec"
                     />
-                    <DdClientWorkspace v-else-if="activeFileRight.tabType === 'dd-client'" />
+                    <MessageCenterPane v-else-if="activeFileRight.tabType === 'message-center'" :current-project-id="projectId" :initial-conversation-id="activeFileRight.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
+                    <DdClientWorkspace v-else-if="activeFileRight.tabType === 'dd-client'" :navigation-target="activeFileRight.ddClientTarget || null" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileRight)"
                       :key="activeFileRight.id"
@@ -2382,6 +2385,8 @@ import ShareholderMeetingPanel from '@/components/ShareholderMeetingPanel.vue'
 import DdRequestEditor from '@/components/DdRequestEditor.vue'
 import DdClientWorkspace from '@/components/dd/DdClientWorkspace.vue'
 import { ddClientTabMethods } from './ddClientTab.js'
+import MessageCenterPane from '@/components/messages/MessageCenterPane.vue'
+import { messageCenterTabMethods } from './messageCenterTab.js'
 import { pollDdClientNotifications } from '@/services/ddClient'
 import { getDdNotifications, readDdNotification } from '@/services/ddWorkflow'
 import ChatInterface from '@/components/ChatInterface.vue'
@@ -2470,6 +2475,7 @@ export default {
     ShareholderMeetingPanel,
     DdRequestEditor,
     DdClientWorkspace,
+    MessageCenterPane,
     InviteMemberDialog,
     CollabDialog,
     SubmitDraftGuide,
@@ -2694,6 +2700,8 @@ export default {
 
       // Invite Modal (Refactored)
       showInviteModal: false,
+      messageCenterUnread: null,
+      messageCenterBadgePartial: false,
       ddClientUnread: 0,
       ddLawyerNotifications: [],
 
@@ -3507,6 +3515,7 @@ export default {
     this.unbindTabsWheel()
     this._comparisonDisposed = true
     clearInterval(this._mergeElapsedTimer)
+    this.stopMessageCenterBadge()
     this._ddClientPollStopped = true
     clearTimeout(this._ddClientPollTimer)
     this.disposeRestartRecovery()
@@ -3807,6 +3816,9 @@ export default {
       if (!this.hasProject && this.showWelcomeOnStartup && !restored) this.openWelcomeTab()
       // 深链文件须等标签恢复完成，避免新标签被旧快照覆盖。
       if (query?.openFileId) this.openPendingLocalFile(Number(query.openFileId))
+      if (query?.inviteMembers === '1' && this.hasProject) this.showInviteModal = true
+      if (query?.tab === 'messages') this.openMessageCenterTab()
+      if (query?.messageId) this.resolveMessageTarget(query.messageId)
       // 日历薄壳页 / 提醒通知转进来时带 ?tab=calendar&focus=&group=（dev-board#1048）
       if (query && query.tab === 'calendar') {
         this.openCalendarTab({ focus: query.focus || '', group: query.group || '' })
@@ -3928,6 +3940,7 @@ export default {
     // mounted 绑定了全局（ipcRenderer/window 级）监听；全局事件只让最近展示的实例
     // 处理，否则一次事件触发 N 份副作用（与 PR#148 剪贴板重复入库同源）
     if (typeof window !== 'undefined') window.__checkbaActiveOverviewVm = this
+    this.startMessageCenterBadge()
     // 本机事项提醒（dev-board#899）：模块级单例、幂等
     startTaskReminders()
     // 当日事项摘要 toast（每天一次，顺带写入 taskStore.global.summary，左栏「项目」面板的概览条读它）。
@@ -4475,6 +4488,7 @@ export default {
     ...insightEntityTabMethods,
     ...welcomeTabMethods,
     ...ddClientTabMethods,
+    ...messageCenterTabMethods,
     ...calendarTabMethods,
     ...pluginWorkspaceTabMethods,
     ...tmeetTabMethods,
@@ -7621,7 +7635,7 @@ export default {
       }
       if (opts && opts.tab) {
         setTimeout(() => {
-          uni.$emit('awd:lawfirm-tab', opts.tab)
+          uni.$emit('awd:lawfirm-tab', { tab: opts.tab, ...(opts.recordId ? { recordId: opts.recordId } : {}) })
         }, 120)
       }
     },

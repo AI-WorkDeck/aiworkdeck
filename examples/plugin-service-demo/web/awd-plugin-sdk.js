@@ -236,7 +236,7 @@
 
   var awd = {
     /** SDK 版本，与桥协议版本无关 */
-    version: '1.6.0',
+    version: '1.7.0',
     /** 握手拿到的上下文；ready() 之前为 null */
     context: null,
     /** 等待宿主握手，resolve 值即 awd.context */
@@ -273,6 +273,10 @@
     },
     im: {
       request: function (action, params, options) { return call('im.request', { action: action, params: params || {} }, options); }
+    },
+    notifications: {
+      publish: function (notification, options) { return call('notifications.publish', notification || {}, options); },
+      resolve: function (eventKey, state, options) { return call('notifications.resolve', { eventKey: eventKey, state: state || 'done' }, options); }
     },
     lawfirm: {
       request: function (action, params, options) { return call('lawfirm.request', { action: action, params: params || {} }, options); }
