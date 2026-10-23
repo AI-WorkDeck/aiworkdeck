@@ -582,8 +582,11 @@
               <view
                 v-if="!fileBatchMode"
                 class="icon-btn mini"
-                @tap="onFileTreeQuickAction('newFile')"
-                :title="$t('workbench.newDoc')"
+                data-create-trigger role="button" tabindex="0" aria-haspopup="menu"
+                @click.stop="onFileTreeQuickAction('newFile', $event)"
+                @keydown.enter.prevent="onFileTreeQuickAction('newFile', $event)"
+                @keydown.space.prevent="onFileTreeQuickAction('newFile', $event)"
+                :title="$t('fileTree.newItem')" :aria-label="$t('fileTree.newItem')"
               >
                 <svg class="mini-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path v-for="(d, gi) in GLYPHS.filePlus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -683,6 +686,7 @@
             @view-tasks="onFileTreeViewTasks"
             :transcribe-enabled="meetingRecorderEnabled"
             @transcribe-audio="onTranscribeAudio"
+            @create-recording="onCreateRecording"
           />
           <!-- 项目（dev-board#1047）：全部案卷的列表，原 pages/project-list 整页的内容本体。
                有无项目两态都在；点卡片走注入的 leaveWorkbench 进带 id 的工作台。 -->
@@ -2386,6 +2390,7 @@ import { pollDdClientNotifications } from '@/services/ddClient'
 import { getDdNotifications, readDdNotification } from '@/services/ddWorkflow'
 import ChatInterface from '@/components/ChatInterface.vue'
 import { panelSwitchingMethods } from './panelSwitching.js'
+import explorerRecordingMixin from './explorerRecording.js'
 import { menuCommandsMethods } from './menuCommands.js'
 import { agentClientActionMethods } from './agentClientActions.js'
 import { librePoolMethods } from './librePool.js'
@@ -2436,6 +2441,7 @@ import DocumentLinkPreview from '@/components/DocumentLinkPreview.vue'
 const WEB_KEEPALIVE_MAX = 5
 
 export default {
+  mixins: [explorerRecordingMixin],
   // 工作台里渲染的组件（协作抽屉、加人弹窗……）要跳出工作台时，也得走同一个出口：
   // 先落盘再 reLaunch。组件拿不到页面实例，只能靠注入（check:nav 钉着）。
   // 要去的是设置页时不用离开：工作台里设置是一个标签（dev-board#582），组件走 openSettingsTab。
@@ -5507,15 +5513,15 @@ export default {
       } catch (e) {}
       uni.reLaunch({ url: '/pages/login/login' })
     },
-    onFileTreeQuickAction(actionKey) {
+    onFileTreeQuickAction(actionKey, event) {
       const tree = this.$refs.fileTree
       if (!tree) return
-      if (actionKey === 'newFolder' && typeof tree.showCreateFolderDialog === 'function') {
-        tree.showCreateFolderDialog()
+      if (actionKey === 'newFolder' && typeof tree.handleCreateFolder === 'function') {
+        tree.handleCreateFolder()
         return
       }
-      if (actionKey === 'newFile' && typeof tree.handleCreateWord === 'function') {
-        tree.handleCreateWord()
+      if (actionKey === 'newFile' && typeof tree.openCreateMenu === 'function') {
+        tree.openCreateMenu(event)
         return
       }
       if (actionKey === 'recycleBin') {
