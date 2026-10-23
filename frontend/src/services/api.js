@@ -749,10 +749,11 @@ export function setPluginEnabled(pluginId, enabled) {
 }
 
 // 在线插件广场：拉取官网注册表列表（仅含已审核签名的插件）
-export function getPluginMarket() {
+export function getPluginMarket({ accountPrompt = true } = {}) {
   return request({
     url: '/api/plugins/market/list',
-    method: 'GET'
+    method: 'GET',
+    accountPrompt,
   });
 }
 

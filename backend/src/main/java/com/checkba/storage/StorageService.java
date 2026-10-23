@@ -46,10 +46,11 @@ public interface StorageService {
     Resource load(String fileId) throws StorageException;
 
     /**
-     * 新建文档时物化一个初始文件（本地实现从 docs/template.docx 复制，缺模板则建空文件）。
+     * 新建文档时物化一个初始文件（本地实现为 PPTX/XLSX 生成空白文件，
+     * DOCX 从配置模板复制，缺模板则生成有效的空白 DOCX）。
      *
      * <p>只有「创建」路径可以调用；已存在则原样不动（幂等）。
-     * 默认空实现：不支持模板物化的实现保持 no-op（调用方 {@code load} 失败时 catch 掉记一行日志）。
+     * 默认空实现：不支持模板物化的实现保持 no-op。
      */
     default void createFromTemplate(String fileId) throws StorageException {
         // no-op：见 javadoc
