@@ -48,7 +48,7 @@ const IMPORT_NAMES = [
   'collapseToTopmostSelected', 'computeDisplayFiles',
   'groupByParent', 'buildTreeFromGroups', 'evidenceRefCounts', 'createRefCountsFetcher',
   'warmDragImage', 'applyDragImage', 'FileTypeIcon', 'TagChip', 'TagFilter', 'TagSelector',
-  'TagManager', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
+  'TagManager', 'ExplorerCreateMenu', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
   'createTag', 'createTask', 'importLocalFile', 'getProjectFileAccess', 'updateProjectFileAccess',
   'isArchiveEntryDrag', 'readArchiveEntryDrag', 'importArchiveEntry',
   'nativeEvent', 'nativeDataTransfer', 'isExternalFileDrag', 'compatibleDropEffect', 'claimExternalDrop', 'captureDroppedFiles', 'importDroppedFile',

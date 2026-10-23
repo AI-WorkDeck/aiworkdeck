@@ -12,11 +12,14 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import org.apache.poi.xslf.usermodel.XMLSlideShow;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.Locale;
 
 /**
  * 本地文件系统存储服务实现
@@ -100,7 +103,20 @@ public class LocalFileStorageService implements StorageService {
         if (storageResolver.isExternalFileKey(fileId)) throw new StorageException("原文件已不存在，请重新打开文件");
         try {
             Files.createDirectories(filePath.getParent());
-            if (Files.exists(templateDoc)) {
+            String fileName = filePath.getFileName().toString().toLowerCase(Locale.ROOT);
+            if (fileName.endsWith(".xlsx")) {
+                try (XSSFWorkbook workbook = new XSSFWorkbook();
+                     OutputStream out = Files.newOutputStream(filePath)) {
+                    workbook.createSheet("Sheet1");
+                    workbook.write(out);
+                }
+            } else if (fileName.endsWith(".pptx")) {
+                try (XMLSlideShow presentation = new XMLSlideShow();
+                     OutputStream out = Files.newOutputStream(filePath)) {
+                    presentation.createSlide();
+                    presentation.write(out);
+                }
+            } else if (Files.exists(templateDoc)) {
                 Files.copy(templateDoc, filePath, StandardCopyOption.REPLACE_EXISTING);
                 log.info("从模板创建新文件: fileId={}, path={}", fileId, filePath);
             } else {

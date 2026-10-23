@@ -3,10 +3,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { isPluginUpdateAvailable } from '../../src/utils/marketUpdates.js'
 const source = readFileSync(new URL('../../src/components/MarketSidebarPanel.vue', import.meta.url), 'utf8')
 const start = source.indexOf('    installedRows() {') + '    installedRows() {'.length
 const end = source.indexOf('\n    },', start)
-const compute = new Function('isPanelSkill', 'isVoiceGroupMember', 'ICONS', 'CATEGORY_GLYPHS', 'ACTIVATION_STATE', source.slice(start, end))
+const compute = new Function('isPluginUpdateAvailable', `return function(isPanelSkill, isVoiceGroupMember, ICONS, CATEGORY_GLYPHS, ACTIVATION_STATE) {${source.slice(start, end)}}`)(isPluginUpdateAvailable)
 test('voice has only one plugin switch; AI skills stay separate after uninstall too', () => {
   for (const plugins of [[{ id: 'voice', name: 'Voice', enabled: false }], []]) {
     const rows = compute.call({ plugins, skills: [{ id: 'text-to-speech', enabled: true }, { id: 'meeting-recorder', enabled: true }], searchText: '', $t: value => value }, () => true, id => ['text-to-speech', 'meeting-recorder'].includes(id), {}, {}, {})

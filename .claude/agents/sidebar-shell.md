@@ -71,6 +71,16 @@ flushDirtyEditors），单测见 `frontend/tests/project-home/flush-dirty-editor
 
 `onCompareDialogConfirm` 先保存本次两份文档已打开且待保存的 Office 实例，最后重查 dirty/saving；失败保留对话框重试，不保存无关文档。等待期间取消、换比较对象或切项目，不打开过期比对。回归 `compare-flush-before-diff.test.mjs`。差异数等待 Monaco `onDidUpdateDiff` 更新，不能只在 `nextTick` 读取尚未完成的结果（dev-board#1104）；关闭标签释放监听。
 
+## 资源管理器新建菜单（dev-board#1444/#1445）
+
+顶部新建由 `FileTree.openCreateMenu` 打开 `ExplorerCreateMenu.vue`：Word / PPT / Excel / 录音。空白处右键的新建文件带 Office 子菜单，文件夹直接建 `Untitled Folder`（同目录重名从 `Untitled Folder 2` 递增），不弹命名框；Office 文档保留命名框与 Word 插件模板入口。工具栏使用选中项对应目录，空白右键使用当前浏览层级；打开菜单时捕获落点，回收站不提供新建。
+
+子菜单按实际尺寸贴近主项，靠右边缘时向左翻转、垂直限制在视口内；`utils/menuAim.js` 判断鼠标到子菜单近侧上下角的安全三角区，穿越其他行时暂不关闭，停留 350ms 或离开三角区后切换。这是 [safe polygon/menu aim](https://floating-ui.com/docs/useHover#safepolygon) 思路，没有固定“三角形比例”；按鼠标与实际菜单位置计算。支持键盘方向键、Enter、Escape 和焦点返回。浮层按每实例 holder 接入 `overlayState`，由工作台统一隐藏原生 BrowserView，关闭/卸载必须释放。
+
+录音由 `explorerRecording.js` 接收可信宿主点击，打开 voice 插件录音 tab、检查原有转写告知并调用全局 recorder。沿用 `recording-focus` 排队消息，不引用已经移出工作台的旧面板 ref；插件自行发起的录音仍走原有确认。插件未启用引导现有详情页；已有录音只定位，启动中离页通过 signal 取消，真正开始后切面板不断录。用户首次麦克风授权仍由系统处理。
+
+空白 PPTX/XLSX 在 `LocalFileStorageService.createFromTemplate` 按扩展名生成一张幻灯片／一个工作表，不能复用 Word 模板。`BlankOfficeTemplateTest` 实际重新解析文件。前端回归：`file-tree-new-file-naming`、`file-tree-create-target`、`menu-aim`、`meeting-recorder/explorer-recording`；`tests/project-home/explorer-create-ui.mjs` 用隔离浏览器和合成 HTTP 验实际工作台入口、三格式创建、目录编号、子菜单斜向路径和键盘操作，不代表正式客户端与真实麦克风权限已验。
+
 ## 文档标签与左栏独立（2026-09-10，dev-board#555/#556）
 
 `fileOpenTabs.activateTab` 不得修改 `leftPaneKey` 或 `sidebarCollapsed`；文件树已挂载时仍可同步选中项。
