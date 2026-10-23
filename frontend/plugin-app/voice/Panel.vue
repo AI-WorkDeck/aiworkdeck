@@ -25,10 +25,11 @@ export default {
     if (this._gone) return
     this.ready = true
     this._off = window.awd.events.on('sidebar.command', event => { if (event.command === 'recording-focus') { this.focusMeetingId = event.meetingId; this.tab = 'recording' } })
+    this._offStopped = window.awd.events.on('speech.stopped', () => uni.$emit('awd:meeting-recording-stopped'))
     const poll = () => refreshRecorder().catch(() => {})
     poll(); this._timer = setInterval(poll, 500)
   },
-  beforeUnmount() { this._gone = true; this._off?.(); clearInterval(this._timer); this.clearHighlight() },
+  beforeUnmount() { this._gone = true; this._off?.(); this._offStopped?.(); clearInterval(this._timer); this.clearHighlight() },
   methods: {
     downloadAudio: payload => voice('download', payload),
     importText(callback) { voice('importText', {}, { timeoutMs: 120000 }).then(callback).catch(() => {}) },

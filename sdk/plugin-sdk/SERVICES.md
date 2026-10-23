@@ -12,7 +12,7 @@
 ```js
 const result = await awd.services.request(service, operation, params, {
   signal: abortController.signal, // 可选 AbortSignal
-  timeoutMs: 60000,              // 可选，1–120000 毫秒，默认 60000
+  timeoutMs: 60000,              // 可选，1–300000 毫秒，默认 60000
   requestId: 'my-unique-request' // 可选，当前插件会话内唯一，最多 128 字符
 });
 ```

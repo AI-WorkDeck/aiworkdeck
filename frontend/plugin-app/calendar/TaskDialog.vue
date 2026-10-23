@@ -653,7 +653,8 @@ export default {
 .task-dialog-mask {
   position: fixed;
   inset: 0;
-  z-index: 5000;
+  // Keep the built-in Uni confirmation (999) above the plugin editor.
+  z-index: 500;
   background: var(--awd-overlay);
   display: flex;
   align-items: center;
@@ -662,7 +663,8 @@ export default {
 
 .task-dialog {
   width: 560px;
-  max-width: calc(100vw - 48px);
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-dialog);
@@ -672,6 +674,7 @@ export default {
 }
 
 .td-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -740,6 +743,8 @@ export default {
 }
 
 .td-body {
+  min-height: 0;
+  overflow-y: auto;
   padding: 16px 20px 6px;
   display: flex;
   flex-direction: column;
@@ -934,6 +939,7 @@ export default {
 }
 
 .td-footer {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1012,5 +1018,15 @@ export default {
     color: var(--awd-accent-text);
     background: var(--awd-accent-wash);
   }
+}
+/* The plugin dialog is constrained by its sidebar iframe, not the workbench. */
+@media (max-width: 600px) {
+  .td-header, .td-body, .td-footer { padding-left: 12px; padding-right: 12px; }
+  .td-cols { flex-direction: column; }
+  .td-type-row { flex-wrap: wrap; }
+  .td-footer { flex-wrap: wrap; }
+  .td-spacer { display: none; }
+  .td-hint { flex-basis: 100%; order: 1; }
+  .td-btn { flex-shrink: 0; padding: 0 10px; }
 }
 </style>

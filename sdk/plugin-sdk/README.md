@@ -74,7 +74,7 @@ iframe 里，是 opaque origin，拿不到宿主的真实 origin。来源校验�
 
 ## SDK 1.6：宿主服务、连接与调用生命周期
 
-`awd.call(method, params, options)` 和全部异步便利方法接受可选的最后一个 `options`：`{signal, timeoutMs}`。默认 60 秒，范围 1–120000 毫秒；`ai.request(prompt, options)` 将其与 `system/purpose` 放在同一个对象。超时返回 `code=timeout`，取消返回 `code=aborted` / `name=AbortError`，并清除等待项与监听器；迟到响应不再生效。一般调用取消只停止等待，不能保证撤销已经完成的宿主写入。`services.request` 另向宿主发送取消请求，是否中止实际工作取决于宿主操作实现。
+`awd.call(method, params, options)` 和全部异步便利方法接受可选的最后一个 `options`：`{signal, timeoutMs}`。默认 60 秒，范围 1–300000 毫秒；`ai.request(prompt, options)` 将其与 `system/purpose` 放在同一个对象。超时返回 `code=timeout`，取消返回 `code=aborted` / `name=AbortError`，并清除等待项与监听器；迟到响应不再生效。一般调用取消只停止等待，不能保证撤销已经完成的宿主写入。`services.request` 另向宿主发送取消请求，是否中止实际工作取决于宿主操作实现。
 
 | API | 桥方法与参数 |
 | --- | --- |

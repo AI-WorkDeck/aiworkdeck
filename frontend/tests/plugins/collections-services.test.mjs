@@ -202,3 +202,21 @@ test('calendar file/member output contains only selector metadata', async () => 
   assert.deepEqual(await s.request('calendar', 'files', { projectId: 8 }), [{ id: 80, name: 'Contract', parentId: 1 }])
   assert.deepEqual((await s.request('calendar', 'members', { projectId: 8 })).data, [{ userId: 1, displayName: 'Member', role: 'OWNER' }])
 })
+
+// Existing deleted links remain visible as deleted chips in TaskDialog. Editing
+// another field must preserve them; only newly associated IDs need a live file.
+test('calendar edits retain verified existing soft-deleted file associations', async () => {
+  for (const links of [{ files: [{ fileId: 79, fileName: null }] }, { fileId: 79 }]) {
+    const s = setup({ getProjectTasks: async () => envelope({ tasks: [{ id: 31, projectId: 7, ...links }] }) })
+    await s.request('calendar', 'update', { id: 31, data: { title: 'Revised', fileIds: [79, 70] } })
+    assert.deepEqual(s.calls, [['updateTask', '31', { title: 'Revised', fileIds: [79, 70] }]])
+    await rejects(s.request('calendar', 'update', { id: 31, data: { fileIds: [79, 80] } }), 'permission_denied')
+    await rejects(s.request('calendar', 'create', { data: { projectId: 7, title: 'New', fileIds: [79] } }), 'permission_denied')
+  }
+})
+
+test('scoped calendar retains directory metadata instead of SDK flat file projection', async () => {
+  const tree = [{ id: 70, name: 'Contract', parentId: 71 }, { id: 71, name: 'Evidence', isFolder: true }, { id: 72, name: '__staging_area__', isFolder: true }, { id: 73, name: 'Hidden', parentId: 72 }]
+  const s = setup({ getProjectFiles: async () => tree })
+  assert.deepEqual(await s.request('calendar', 'files', { projectId: 7 }), tree)
+})

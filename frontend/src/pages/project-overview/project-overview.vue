@@ -3190,6 +3190,7 @@ export default {
     // 当前左栏选中的动态插件（rail key = plugin-<id>）；决定走 iframe 还是启动面板
     pluginBusinessActions() {
       return {
+        activeFileId: () => ((this.focusedPane === 'left' ? this.activeFileLeft : this.activeFileRight) || this.activeFileLeft)?.id,
         insertContent: payload => this.insertPlainTextToWps(payload),
         previewImage: url => this.openImagePreview(url),
         copyText: text => this.insertClipboardAndCopy(text),
@@ -3200,6 +3201,7 @@ export default {
         prepareInsight: id => this.prepareInsightDocument(id),
         insightEntities: payload => this.onInsightEntities(payload),
         insightHover: payload => this.openInsightHoverCard(payload),
+        insightOpenDoc: payload => this.openInsightDocFile(payload),
         openBrowser: url => this.openBrowserTab(url),
         openConversation: async conversation => {
           if (!await this.resolveChatInterface()) return false
