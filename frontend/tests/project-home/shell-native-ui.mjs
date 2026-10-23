@@ -28,15 +28,15 @@ const overlayStart = page.indexOf('    desktopOverlayActive(open) {')
 const overlayWatcher = page.slice(overlayStart, page.indexOf('\n    },', overlayStart)) + '\n}'
 const toggleStart = page.indexOf('    toggleSidebar() {')
 const toggle = page.slice(toggleStart, page.indexOf('\n    },', toggleStart)) + '\n}'
-const tabStart = page.indexOf('        <view\n          v-if="!sidebarCollapsed"\n          class="sidebar-collapse-tab"')
+const tabStart = page.indexOf('      <view v-if="!sidebarCollapsed" class="sidebar-collapse-anchor">')
 if (tabStart < 0) throw new Error('sidebar collapse tab missing')
-const tab = page.slice(tabStart, page.indexOf('</view>', tabStart) + 7)
-const tabRender = compile(`<div class="sidebar-left" :style="{width: sidebarCollapsed ? '0px' : '260px'}">${tab}<div v-if="!sidebarCollapsed" class="sidebar-header">资源管理器</div><div v-if="!sidebarCollapsed" style="padding:16px">合成测试项目</div></div>`, { mode: 'function' }).code
+const tab = page.slice(tabStart, page.indexOf('      <!-- IDE 工作台', tabStart))
+const tabRender = compile(`<div class="sidebar-left" :style="{width: sidebarCollapsed ? '0px' : '260px'}"><div v-if="!sidebarCollapsed" class="sidebar-header">资源管理器</div><div v-if="!sidebarCollapsed" style="padding:16px">合成测试项目</div></div>${tab}`, { mode: 'function' }).code
 const css = sass.compileString(component.styles[0].content).css + sass.compileString(read('src/pages/project-overview/project-overview.scss')).css
 const translations = { 'workbench.accountMenu': '账户菜单', 'workbench.settingsTabName': '设置', 'account.logoutBtn': '退出登录', 'calendar.mySchedule': '我的日程', 'workbench.walletMenuLabel': '账户与用量', 'workbench.collapseSidebar': '收起左侧栏' }
 fs.copyFileSync(require.resolve('vue/dist/vue.global.js'), path.join(out, 'vue.js'))
 fs.writeFileSync(path.join(out, 'index.html'), `<!doctype html><meta charset="utf-8"><style>${css}
-:root {--awd-radius-sm:4px;--awd-bg:#f1efe6;--awd-surface:#fffdf9;--awd-surface-2:#e4efeb;--awd-text:#262923;--awd-text-2:#63685f;--awd-text-3:#858b80;--awd-border:#d9d8cc;--awd-border-subtle:#e5e4d9;--awd-accent:#2e6056;--awd-accent-text:#2e6056;--awd-text-on-accent:white;--awd-workbench-header-height:37px;}body{margin:0;background:var(--awd-bg);font:14px system-ui}view{display:block}#top{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--awd-border)}#sidebar{position:absolute;left:46px;top:49px;height:calc(100vh - 49px)}.sidebar-left{height:100%}#rail{position:absolute;top:80px;left:8px}#account{margin-left:auto}#blank{padding:70px 340px;color:#999}
+:root {--awd-radius-sm:4px;--awd-bg:#f1efe6;--awd-surface:#fffdf9;--awd-surface-2:#e4efeb;--awd-text:#262923;--awd-text-2:#63685f;--awd-text-3:#858b80;--awd-border:#d9d8cc;--awd-border-subtle:#e5e4d9;--awd-accent:#2e6056;--awd-accent-text:#2e6056;--awd-text-on-accent:white;--awd-workbench-header-height:37px;}body{margin:0;background:var(--awd-bg);font:14px system-ui}view{display:block}#top{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--awd-border)}#sidebar{display:flex;position:absolute;left:46px;top:49px;height:calc(100vh - 49px)}.sidebar-left{height:100%}#rail{position:absolute;top:80px;left:8px}#account{margin-left:auto}#blank{padding:70px 340px;color:#999}
 </style><div id="top">AI WorkDeck · 合成隔离测试<div id="account"></div></div><button id="rail">▣</button><div id="sidebar"></div><div id="blank">原生网页打开时，账户菜单应完整显示。</div>
 <script src="./vue.js"></script><script>
 const {ref, computed, watch} = Vue;
@@ -68,7 +68,8 @@ ipcMain.on('visible',(_,visible)=>views.setAllVisible(visible));
 const run=code=>win.webContents.executeJavaScript(code);const pause=()=>new Promise(r=>setTimeout(r,150));
 await win.loadFile(path.join(out,'index.html'));
 const {view}=views.ensure('foreground');await view.webContents.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent('<body style="background:#dce9f5;font:24px system-ui;padding:36px">原生浏览器合成网页<input id="draft" value="保留输入内容"><script>window.persisted=42</script>'));
-views.setBounds('foreground',{x:310,y:90,width:790,height:640});views.attach('foreground');win.showInactive();await new Promise(r=>setTimeout(r,800));
+const browserX=await run("Math.ceil(document.querySelector('.sidebar-collapse-anchor').getBoundingClientRect().right)");
+views.setBounds('foreground',{x:browserX,y:90,width:1100-browserX,height:640});views.attach('foreground');win.showInactive();await new Promise(r=>setTimeout(r,800));
 const screenshot=async name=>{fs.writeFileSync(path.join(out,name+'-renderer.png'),(await win.capturePage()).toPNG());for(let attempt=0;attempt<10;attempt++){const sources=await desktopCapturer.getSources({types:['window'],thumbnailSize:{width:2200,height:1600}});const own=sources.find(s=>s.name==='AWD Shell Native QA '+process.pid);if(own&&!own.thumbnail.isEmpty()){fs.writeFileSync(path.join(out,name+'.png'),own.thumbnail.toPNG());return;}await new Promise(r=>setTimeout(r,300));}throw new Error('Native window capture unavailable: '+name);};
 await screenshot('01-browser');
 const card=await run("(()=>{const r=document.querySelector('.sidebar-collapse-tab').getBoundingClientRect();return {width:r.width,height:r.height,right:r.right}})()");assert.ok(card.width<=18&&card.height<=36,JSON.stringify(card));

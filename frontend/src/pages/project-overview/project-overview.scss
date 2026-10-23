@@ -1401,19 +1401,36 @@ $color-accent: var(--awd-mint); // Mint Green
   }
 }
 
+.sidebar-collapse-anchor {
+  position: relative;
+  flex: 0 0 14px;
+  width: 14px;
+  background: var(--awd-surface);
+  z-index: 12;
+
+  &::before {
+    content: "";
+    display: block;
+    height: var(--awd-workbench-header-height);
+    box-sizing: border-box;
+    background: var(--awd-bg);
+    border-bottom: 1px solid var(--awd-workbench-divider);
+  }
+}
+
 .sidebar-collapse-tab {
   position: absolute;
   top: calc(var(--awd-workbench-header-height) + 12px);
-  right: 0;
-  width: 14px;
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
   height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 12;
   border: 1px solid var(--awd-border);
-  border-right: 0;
-  border-radius: var(--awd-radius-sm) 0 0 var(--awd-radius-sm);
+  border-left: 0;
+  border-radius: 0 var(--awd-radius-sm) var(--awd-radius-sm) 0;
   background: var(--awd-surface);
   color: var(--awd-text-3);
   cursor: pointer;

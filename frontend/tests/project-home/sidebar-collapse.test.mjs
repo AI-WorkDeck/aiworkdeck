@@ -104,12 +104,12 @@ test('panelSwitching.js 的同 key 收展分支复用 toggleSidebar，不再各�
     '不应该在这里再自己翻转一次，出口只有一个')
 })
 
-test('收起入口移到展开左栏的右缘；rail 底部不再重复占位', () => {
+test('收起入口位于左栏裁剪区外侧；rail 底部不再重复占位', () => {
   const src = read('pages/project-overview/project-overview.vue')
   const versionIdx = src.indexOf("@tap=\"toggleLeftPane('version')\"")
   const membersIdx = src.indexOf('Project Members Stack')
   assert.doesNotMatch(src.slice(versionIdx, membersIdx), /@tap="toggleSidebar"/)
-  const sidebar = src.slice(src.indexOf('<view class="sidebar-left"'), src.indexOf('class="sidebar-header"'))
+  const sidebar = src.slice(src.indexOf('<view v-if="!sidebarCollapsed" class="sidebar-collapse-anchor"'), src.indexOf('<!-- IDE 工作台'))
   assert.match(sidebar, /class="sidebar-collapse-tab"/)
   assert.match(sidebar, /v-if="!sidebarCollapsed"/)
   assert.match(sidebar, /@tap(?:\.stop)?="toggleSidebar"/)

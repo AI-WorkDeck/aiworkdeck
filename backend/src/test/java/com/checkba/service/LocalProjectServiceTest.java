@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -54,6 +55,8 @@ class LocalProjectServiceTest {
 
     private LocalProjectService svc;
     private ProjectFileService projectFileService;
+    private ProjectMemberService memberService;
+    private ProjectStorageResolver resolver;
     private Path globalRoot;
 
     @BeforeEach
@@ -61,7 +64,7 @@ class LocalProjectServiceTest {
         globalRoot = tmp.resolve("appdata");
         StorageProperties props = new StorageProperties();
         props.getLocal().setRootPath(globalRoot.toAbsolutePath().toString());
-        ProjectStorageResolver resolver = new ProjectStorageResolver(props, projectRepository);
+        resolver = new ProjectStorageResolver(props, projectRepository);
 
         // ProjectFileService 的非仓库协作者全部无害化：RAG/存储/版本信号与导入语义无关
         com.checkba.storage.StorageServiceFactory storageFactory = mock(com.checkba.storage.StorageServiceFactory.class);
@@ -79,7 +82,7 @@ class LocalProjectServiceTest {
 
         projectFileService.setStorageResolverForTest(resolver);
 
-        ProjectMemberService memberService = mock(ProjectMemberService.class);
+        memberService = mock(ProjectMemberService.class);
         when(memberService.hasReadPermission(anyLong(), anyLong())).thenReturn(true);
 
         svc = new LocalProjectService(projectRepository, projectMemberRepository,
@@ -202,6 +205,53 @@ class LocalProjectServiceTest {
         assertFalse(opened.reused());
         assertTrue(svc.openLocalFolder(child.toString(), false, null, null, 1L).reused(),
                 "已确认的项目重开不必重复询问");
+    }
+
+    @Test
+    void exactFolderBecomingVisibleDuringNestedScanIsReused(@TempDir Path folder) {
+        Project existing = svc.openLocalFolder(folder.toString(), false, "同一项目", null, 1L).project();
+        long countBefore = projectRepository.count();
+        // Both the owner and an authorized collaborator must follow the ordinary reuse path.
+        for (Long userId : List.of(1L, 2L)) {
+            LocalProjectService raced = serviceWithDelayedExactLookup(existing);
+            var opened = raced.openLocalFolder(folder.toString(), false, null, null, userId);
+            assertTrue(opened.reused());
+            assertEquals(existing.getId(), opened.project().getId());
+            verify(memberService).hasReadPermission(existing.getId(), userId);
+        }
+        assertEquals(countBefore, projectRepository.count());
+    }
+
+    @Test
+    void exactFolderBecomingVisibleDuringNestedScanStillChecksPermission(@TempDir Path folder) throws Exception {
+        Project existing = svc.openLocalFolder(folder.toString(), false, "private project name", null, 1L).project();
+        when(memberService.hasReadPermission(existing.getId(), 2L)).thenReturn(false);
+        Files.writeString(folder.resolve("未导入.txt"), "private contents");
+        long countBefore = projectRepository.count();
+        long filesBefore = projectFileRepository.count();
+
+        LocalProjectService raced = serviceWithDelayedExactLookup(existing);
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> raced.openLocalFolder(folder.toString(), false, null, null, 2L));
+
+        assertFalse(error instanceof LocalProjectService.NestedFolderConfirmationRequired);
+        assertFalse(error.getMessage().contains("private project name"));
+        verify(memberService).hasReadPermission(existing.getId(), 2L);
+        assertEquals(countBefore, projectRepository.count());
+        assertEquals(filesBefore, projectFileRepository.count(), "拒绝权限后不得导入文件");
+        assertEquals("private contents", Files.readString(folder.resolve("未导入.txt")));
+    }
+
+    private LocalProjectService serviceWithDelayedExactLookup(Project existing) {
+        // Deterministically reproduce a registration committed between the exact lookup and list query.
+        ProjectRepository delayed = mock(ProjectRepository.class,
+                org.mockito.AdditionalAnswers.delegatesTo(projectRepository));
+        doReturn(Optional.empty()).doAnswer(invocation -> projectRepository.findByLocalRoot(invocation.getArgument(0)))
+                .when(delayed).findByLocalRoot(existing.getLocalRoot());
+        return new LocalProjectService(delayed, projectMemberRepository,
+                projectFileRepository, projectFileService, memberService, resolver,
+                mock(org.springframework.context.ApplicationEventPublisher.class),
+                mock(com.checkba.service.telemetry.TelemetryService.class), transactionManager);
     }
 
     @Test
