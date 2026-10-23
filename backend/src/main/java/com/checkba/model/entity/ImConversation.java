@@ -18,4 +18,8 @@ public class ImConversation {
  @Column(length=128) private String agentName;
  private Boolean agentPrivate;
  @Column(length=64,unique=true) private String agentBindingKey;
+ /** Authoritative case-library project; never a desktop-local numeric id. */
+ @Column(unique=true) private Long projectId;
+ /** Verified cloud project association for a private assistant; never a desktop-local ID. */
+ private Long agentProjectId;
 }

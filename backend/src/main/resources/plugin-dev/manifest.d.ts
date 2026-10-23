@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-export type Permission = 'file_read' | 'file_write' | 'network' | 'editor' | 'ai' | 'im' | 'lawfirm' | 'speech' | 'tasks' | 'clipboard';
+export type Permission = 'file_read' | 'file_write' | 'network' | 'editor' | 'ai' | 'im' | 'notifications' | 'lawfirm' | 'speech' | 'tasks' | 'clipboard';
 export type Dock = 'left' | 'right' | 'bottom';
 export interface ViewDeclaration {
   id: string; name: string; entry: string; placement: 'sidebar' | 'workspace'; scope: 'project' | 'global'; defaultDock?: Dock; allowedDocks?: Dock[];

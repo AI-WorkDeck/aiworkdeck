@@ -3,7 +3,8 @@
 
 package com.checkba.service.collab;
 
-/** 一个人在「律所 → 团队 → 律师」结构里的位置。两个键都可能为空（没加入任何团队）。 */
-public record OrgMembership(String teamId, String firmId) {
+/** 真实账户的团队/律所归属；firmAdmin 仅由权威目录按总部 OWNER/ADMIN 判定。 */
+public record OrgMembership(String teamId, String firmId, boolean firmAdmin) {
+    public OrgMembership(String teamId, String firmId) { this(teamId, firmId, false); }
     public static final OrgMembership NONE = new OrgMembership(null, null);
 }

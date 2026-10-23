@@ -19,7 +19,7 @@ function harness() {
 }
 
 test('iframe is gated until authority is captured; stale props cannot authorize even first call', async () => {
-  assert.match(source, /v-if="url && \(!isWebPlugin \|\| authorizationReady\)"/)
+  assert.match(source, /v-(?:else-)?if="url && \(!isWebPlugin \|\| authorizationReady\)"/)
   const h = harness(); h.rows = [{ ...record(), permissions: [] }]
   await h.vm.initializeAuthorization()
   await h.call()

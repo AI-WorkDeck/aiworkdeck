@@ -179,6 +179,25 @@ class DdWorkflowServiceTest {
         assertEquals(0, submissions.count()); assertTrue(objects.isEmpty());
     }
 
+    @Test void messageCenterProjectsLiveWorkflowStateAndReadNeverCompletesWork() throws Exception {
+        publish(false);
+        var published = workflow.accountInbox(CLIENT).get(0);
+        assertEquals("pending", published.getActionState());
+        workflow.markRead(published.getId(), CLIENT);
+        assertEquals("pending", workflow.accountInbox(CLIENT).get(0).getActionState());
+        DdSubmission submission = submit("message-center", false);
+        assertEquals("done", workflow.accountInbox(CLIENT).get(0).getActionState());
+        var received = workflow.accountInbox(LAWYER).get(0);
+        assertEquals("pending", received.getActionState());
+        workflow.markRead(received.getId(), LAWYER);
+        assertEquals("pending", workflow.accountInbox(LAWYER).get(0).getActionState());
+        workflow.review(itemId, "REJECTED", "请补充清晰版本", submission.getId(), items.findById(itemId).orElseThrow().getRevision(), LAWYER);
+        assertEquals("done", workflow.accountInbox(LAWYER).get(0).getActionState());
+        assertTrue(workflow.accountInbox(CLIENT).stream().anyMatch(n -> "REVIEW".equals(n.getKind()) && "pending".equals(n.getActionState())));
+        when(permissions.hasReadPermission(projectId, CLIENT)).thenReturn(false);
+        assertTrue(workflow.accountInbox(CLIENT).isEmpty());
+    }
+
     @Test void twoAttachmentsAndRetryPreserveBytesAndHistory() throws Exception {
         publish(false);
         DdSubmission first = workflow.submit(itemId, List.of(file("第一页"), file("第二页")), "retry", false, CLIENT);

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ImConversationRepository extends JpaRepository<ImConversation, String> {
  java.util.Optional<ImConversation> findByAgentBindingKey(String agentBindingKey);
+ java.util.Optional<ImConversation> findByProjectId(Long projectId);
  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
  @org.springframework.data.jpa.repository.Query("select c from ImConversation c where c.id=:id")
  java.util.Optional<ImConversation> lockById(String id);

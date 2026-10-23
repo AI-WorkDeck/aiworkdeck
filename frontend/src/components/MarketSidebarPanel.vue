@@ -516,7 +516,7 @@ export default {
     async installPluginRow(row) {
       if (this.pluginBusyId) return
       const m = row.raw
-      const labels = { file_read: 'permFileRead', file_write: 'permFileWrite', network: 'permNetwork', im: 'permIm', editor: 'permEditor', ai: 'permAi', speech: 'permSpeech', tasks: 'permTasks', clipboard: 'permClipboard', lawfirm: 'permLawfirm' }
+      const labels = { file_read: 'permFileRead', file_write: 'permFileWrite', network: 'permNetwork', im: 'permIm', notifications: 'permNotifications', editor: 'permEditor', ai: 'permAi', speech: 'permSpeech', tasks: 'permTasks', clipboard: 'permClipboard', lawfirm: 'permLawfirm' }
       const perms = (m.permissions || []).map(p => labels[p] ? this.$t(`market.${labels[p]}`) : p).join(this.$t('market.listSeparator')) || this.$t('market.noSensitiveCapability')
       const ok = await new Promise(resolve => {
         uni.showModal({

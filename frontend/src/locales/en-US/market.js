@@ -94,6 +94,7 @@ export default {
   permFileRead: 'Read Files',
   permFileWrite: 'Write Files',
   permIm: 'Chats, conversation members and attachments',
+  permNotifications: 'Inbox notifications',
   permNetwork: 'Network Access',
   permEditor: 'Editor',
   listSeparator: ', ',

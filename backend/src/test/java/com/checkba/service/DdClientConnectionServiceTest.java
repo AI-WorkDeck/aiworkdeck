@@ -28,6 +28,7 @@ class DdClientConnectionServiceTest {
     String authResponse = "{\"code\":0,\"data\":{\"sessionId\":\"secret-session\",\"projectId\":42,\"projectName\":\"Example\"}}";
     String projectResponse = "{\"id\":42,\"name\":\"Project name\"}";
     Runnable beforeSend = () -> {};
+    final List<String> imRequests = new ArrayList<>();
     @BeforeEach void setup() {
         when(account.accountFingerprintOrNull()).thenReturn("account-a");
         when(official.officialBaseUrl()).thenReturn("https://case.example.test");
@@ -37,6 +38,12 @@ class DdClientConnectionServiceTest {
             @Override protected Reply send(String base, String session, String method, String path, RequestBody body) {
                 sent.add(method + " " + base + path);
                 beforeSend.run();
+                if (path.equals("/api/im/action")) {
+                    try { okio.Buffer buffer = new okio.Buffer(); body.writeTo(buffer); imRequests.add(buffer.readUtf8()); }
+                    catch (java.io.IOException e) { throw new RuntimeException(e); }
+                    return new Reply(200, "application/json", null,
+                            "{\"code\":0,\"data\":{\"id\":\"bound-group\",\"projectId\":42}}".getBytes(StandardCharsets.UTF_8));
+                }
                 String response = path.equals("/api/auth/client-login")
                     ? authResponse
                     : path.equals("/api/projects/42") ? projectResponse
@@ -106,5 +113,23 @@ class DdClientConnectionServiceTest {
         String id = connect();
         beforeSend = () -> when(account.accountFingerprintOrNull()).thenReturn("account-b");
         assertThrows(ResponseStatusException.class, () -> service.proxy(1L, id, "GET", "/projects", null, null));
+    }
+    @Test void customerChatUsesBoundProjectAndCannotUseOtherChatOrMutation() {
+        String id=connect();
+        service.im(1L,id,"messages",Map.of("conversationId","bound-group","projectId",999L));
+        assertTrue(imRequests.get(0).contains("\"projectId\":42"));
+        assertFalse(imRequests.get(1).contains("999"));
+        int size=imRequests.size();
+        assertThrows(ResponseStatusException.class,()->service.im(1L,id,"messages",Map.of("conversationId","foreign")));
+        assertEquals(size+1,imRequests.size());
+        for(String action:List.of("create","invite","join","fileAccess","removeMember"))
+            assertThrows(ResponseStatusException.class,()->service.im(1L,id,action,Map.of()));
+        assertThrows(ResponseStatusException.class,()->service.im(2L,id,"messages",Map.of()));
+    }
+    @Test void changedAccountDuringCustomerChatCannotReturnPreviousConnectionData() {
+        String id=connect();
+        beforeSend=()->when(account.accountFingerprintOrNull()).thenReturn("account-b");
+        assertThrows(ResponseStatusException.class,()->service.im(1L,id,"messages",Map.of()));
+        assertEquals(1,imRequests.size());
     }
 }

@@ -25,7 +25,7 @@ public class ImService {
     static final long MAX_CONVERSATION_BYTES = 100L * 1024 * 1024;
     public static final Set<String> ACTIONS = Set.of("self", "list", "create", "invite", "join",
             "members", "removeMember", "leave", "messages", "send", "read", "upload", "download", "fileAccess",
-            "agentScopes", "ensureAgent", "agentInfo", "agentReply");
+            "agentScopes", "ensureAgent", "agentInfo", "agentReply", "projectGroup");
     private final ImConversationRepository conversations;
     private final ImMemberRepository members;
     private final ImInvitationRepository invitations;
@@ -34,6 +34,10 @@ public class ImService {
     private final UserRepository users;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private ImAgentService agents;
+    @org.springframework.beans.factory.annotation.Autowired
+    private ProjectRepository projects;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.service.ProjectMemberService projectPermissions;
 
     /** The conversation row lock serializes membership, invitations, sends and quota accounting. */
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
@@ -44,6 +48,12 @@ public class ImService {
         if ("self".equals(action)) return Map.of("id", userId, "displayName", displayName(userId));
         if ("agentScopes".equals(action)) return agentService().scopes(userId);
         if ("ensureAgent".equals(action)) {
+            if (p.containsKey("private") && !(p.get("private") instanceof Boolean)) throw bad("private必须为布尔值");
+            String key = string(p, "scopeKey");
+            if ("project".equals(string(p, "scope")) && !Boolean.TRUE.equals(p.get("private")) && key.matches("project:[1-9][0-9]{0,18}")) {
+                try { return projectGroup(userId, Map.of("projectId", Long.parseLong(key.substring(8)))); }
+                catch (NumberFormatException invalid) { throw bad("项目标识无效"); }
+            }
             ImConversation c = agentService().ensure(userId, p);
             return view(c, requireMember(c.getId(), userId));
         }
@@ -59,6 +69,7 @@ public class ImService {
             return Map.of("conversations", rows);
         }
         if ("create".equals(action)) return create(userId, p);
+        if ("projectGroup".equals(action)) return projectGroup(userId, p);
         if ("join".equals(action)) return join(userId, p);
         ImConversation conversation = lock(required(p, "conversationId", 36));
         ImMember member = requireMember(conversation.getId(), userId);
@@ -90,8 +101,37 @@ public class ImService {
         return view(c, addMember(c.getId(), userId, "OWNER"));
     }
 
+    /** Entering a project group grants no project rights. Every subsequent action rechecks its ACL. */
+    private Object projectGroup(Long userId, Map<String,Object> p) {
+        long projectId = number(p, "projectId", -1);
+        if (projectPermissions == null || projectId <= 0 || !projectPermissions.hasReadPermission(projectId, userId))
+            throw bad("项目不存在或无权访问");
+        Project project = projects.lockForImWrite(projectId).orElseThrow(() -> bad("项目不存在或无权访问"));
+        if (!projectPermissions.hasReadPermission(projectId, userId) || project.getUserId() == null)
+            throw bad("项目不存在或无权访问");
+        ImConversation c = conversations.findByProjectId(projectId).orElse(null);
+        if (c == null) {
+            c = new ImConversation(); c.setId(UUID.randomUUID().toString()); c.setType("GROUP");
+            String title = Objects.toString(project.getName(), "项目") + " · 项目群";
+            c.setTitle(title.substring(0, Math.min(128, title.length()))); c.setOwnerId(project.getUserId());
+            c.setProjectId(projectId); c.setCreatedAt(Instant.now()); c.setLastMessageAt(c.getCreatedAt());
+            conversations.save(c); addMember(c.getId(), project.getUserId(), "OWNER");
+        }
+        c = lock(c.getId());
+        if (c.getAgentScope() == null) {
+            c.setAgentScope("project"); c.setAgentScopeKey("project:" + projectId); c.setAgentName("项目助手"); c.setAgentPrivate(false);
+            c.setAgentBindingKey(sha(("project\nproject:" + projectId + "\nshared").getBytes(StandardCharsets.UTF_8)));
+            conversations.saveAndFlush(c);
+        }
+        ImMember member = members.findByConversationIdAndUserId(c.getId(), userId).orElse(null);
+        if (member == null) member = addMember(c.getId(), userId,
+                Objects.equals(c.getOwnerId(), userId) ? "OWNER" : projectPermissions.isClient(projectId, userId) ? "CLIENT" : "MEMBER");
+        return view(c, member);
+    }
+
     private Object invite(ImConversation c, ImMember me, Map<String,Object> p) {
         requireOwner(me);
+        if (c.getProjectId() != null) throw bad("请通过项目成员邀请加入项目群，群聊邀请码不授予项目权限");
         ImAgentService.requireInvitable(c);
         if ("DIRECT".equals(c.getType()) && members.countByConversationId(c.getId()) >= 2) throw bad("私聊已有两位参与人");
         String role = required(p, "role", 16);
@@ -248,6 +288,8 @@ public class ImService {
         return agents;
     }
     private void authorizeAgent(ImConversation conversation, Long userId) {
+        if (conversation.getProjectId() != null && !projectPermissions.hasReadPermission(conversation.getProjectId(), userId))
+            throw bad("项目不存在或已退出项目");
         if (conversation.getAgentScope() != null) agentService().authorize(conversation, userId);
     }
     private Map<String,Object> memberViews(ImConversation conversation) {
@@ -276,7 +318,16 @@ public class ImService {
         Map<String,Object> result = new LinkedHashMap<>(Map.of("id", c.getId(), "title", c.getTitle(), "type", c.getType(), "role", member.getRole(),
                 "createdAt", c.getCreatedAt(), "lastMessageAt", c.getLastMessageAt(), "lastReadId", member.getLastReadId(),
                 "unreadCount", messages.countByConversationIdAndIdGreaterThanAndSenderIdNot(c.getId(), member.getLastReadId(), member.getUserId())));
-        if (c.getAgentScope() != null) result.put("agent", ImAgentService.agentView(c));
+        if (c.getAgentScope() != null) {
+            result.put("agent", ImAgentService.agentView(c));
+            result.put("canRequestAgent", (c.getProjectId() == null && c.getAgentProjectId() == null) || !client(member));
+        }
+        Long projectId = c.getProjectId() != null ? c.getProjectId() : c.getAgentProjectId();
+        if (projectId != null) {
+            result.put("projectId", projectId);
+            result.put("projectKey", "project:" + projectId);
+            projects.findById(projectId).ifPresent(project -> result.put("projectName", Objects.toString(project.getName(), "项目")));
+        }
         return result;
     }
     private Map<String,Object> messageView(ImMessage m, ImMember me) {
@@ -311,7 +362,9 @@ public class ImService {
         return result;
     }
     private boolean client(ImMember me) {
-        return "CLIENT".equals(me.getRole()) || users.findById(me.getUserId()).map(User::getRole).filter("CLIENT"::equals).isPresent();
+        return "CLIENT".equals(me.getRole()) || users.findById(me.getUserId()).map(User::getRole).filter("CLIENT"::equals).isPresent()
+                || conversations.findById(me.getConversationId()).map(c -> c.getProjectId() != null ? c.getProjectId() : c.getAgentProjectId())
+                    .map(projectId -> projectPermissions == null || projectPermissions.isClient(projectId, me.getUserId())).orElse(false);
     }
     private boolean canRead(ImMember me, Long uploadedBy, boolean clientVisible) {
         return !client(me) || me.getUserId().equals(uploadedBy) || clientVisible;

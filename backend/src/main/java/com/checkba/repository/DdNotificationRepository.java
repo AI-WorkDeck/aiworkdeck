@@ -10,4 +10,5 @@ import java.util.List;
 public interface DdNotificationRepository extends JpaRepository<DdNotification, Long> {
     List<DdNotification> findTop100ByProjectIdAndRecipientIdOrderByCreatedAtDesc(Long projectId, Long recipientId);
     boolean existsByRecipientIdAndEventKey(Long recipientId, String eventKey);
+    List<DdNotification> findTop200ByRecipientIdOrderByCreatedAtDesc(Long recipientId);
 }

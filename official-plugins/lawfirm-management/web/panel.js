@@ -377,7 +377,7 @@
       }
 
       if (item.imConversationId) {
-        card.append(node('p', `联动站内信会话 ID：${item.imConversationId}（已同步发送利冲征询通知）`, 'hint'));
+        card.append(node('p', `本机征询会话 ID：${item.imConversationId}（不表示已向其他设备送达）`, 'hint'));
       }
 
       const stepsWrap = node('div', null, 'progress-steps');
@@ -421,7 +421,7 @@
           card.append(node('p', `法规依据：${clr.conflictRuleCitation}`, 'hint'));
         }
         if (clr.imConversationId) {
-          card.append(node('p', `站内信会话已建立：${clr.imConversationId}`, 'hint'));
+          card.append(node('p', `本机征询会话：${clr.imConversationId}（仅本机记录）`, 'hint'));
         }
         if (clr.comment) {
           card.append(node('p', `放行备注：${clr.comment}`));
@@ -429,7 +429,7 @@
 
         const commentInput = node('input', null, 'clearance-comment-input');
         commentInput.type = 'text';
-        commentInput.placeholder = '填写放行/保密隔离意见（选填，将同步回写站内信会话）';
+        commentInput.placeholder = '登记本机核查意见（选填，仅回写本机征询记录）';
         commentInput.value = clr.comment || '';
         card.append(commentInput);
 
@@ -446,15 +446,15 @@
             });
             if (epoch !== state.epoch) return;
             await loadOverview(epoch);
-            notice(`已提交利冲征询结论：${label}`);
+            notice(`已保存本机核查记录：${label}`);
           }));
           return btn;
         };
 
         actions.append(
-          makeDecisionBtn('同意放行', 'APPROVED', false, ''),
-          makeDecisionBtn('附条件放行（启用信息隔离墙）', 'APPROVED_WITH_WALL', true, 'primary'),
-          makeDecisionBtn('拒绝放行', 'REJECTED', false, 'danger')
+          makeDecisionBtn('本机登记放行', 'APPROVED', false, ''),
+          makeDecisionBtn('本机登记附条件放行', 'APPROVED_WITH_WALL', true, 'primary'),
+          makeDecisionBtn('本机登记拒绝放行', 'REJECTED', false, 'danger')
         );
         card.append(actions);
         clearanceContainer.append(card);
@@ -518,12 +518,12 @@
 
       const commentInput = node('input', null, 'committee-comment-input');
       commentInput.type = 'text';
-      commentInput.placeholder = '利冲委员会终审意见（选填）';
+      commentInput.placeholder = '本机核查结论（选填）';
       commentInput.value = intake.committeeComment || '';
       card.append(commentInput);
 
       const actions = node('div', null, 'action-row');
-      const approveBtn = node('button', '终审通过并正式立案', 'primary');
+      const approveBtn = node('button', '本机登记通过并建项', 'primary');
       approveBtn.type = 'button';
       approveBtn.addEventListener('click', () => runAction(approveBtn, async (epoch) => {
         await request('committeeReview', {
@@ -535,10 +535,10 @@
         });
         if (epoch !== state.epoch) return;
         await loadOverview(epoch);
-        notice(`案件「${intake.title}」已终审通过并完成正式立案。`);
+        notice(`案件「${intake.title}」已在本机登记通过并建项；云端终审状态另行查看。`);
       }));
 
-      const rejectBtn = node('button', '驳回立项', 'danger');
+      const rejectBtn = node('button', '本机登记驳回', 'danger');
       rejectBtn.type = 'button';
       rejectBtn.addEventListener('click', () => runAction(rejectBtn, async (epoch) => {
         await request('committeeReview', {

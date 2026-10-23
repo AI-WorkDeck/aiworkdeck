@@ -151,6 +151,7 @@
         :request-id="requestId"
         :project-id="selected.projectId"
         :connection-id="selected.id"
+        :focus-item-id="focusItemId"
       />
       <div v-else class="empty detail-empty">{{ $t('ddWorkflow.client.chooseChecklist') }}</div>
     </div>
@@ -163,7 +164,9 @@ import { isClientPortalBuild } from '@/utils/clientPortal.js'
 import { connectDdClient, listDdClientConnections, removeDdClientConnection, ddClientRead, ddClientWrite, ddClientIdentity, pollDdClientNotifications, ddNotificationPermission, enableDdNotifications } from '@/services/ddClient.js'
 export default {
   name: 'DdClientWorkspace', components: { DdClientChecklist },
-  data: () => ({ code: '', connections: [], selectedId: '', requestId: null, requests: [], adding: false, joining: false, loading: false, requestsLoading: false, error: '', cloudConnections: [], cloudConnectionId: '', generation: 0, identity: '', identityTimer: null, notificationTimer: null, notifications: [], notificationPermission: ddNotificationPermission() }),
+  props: { navigationTarget: { type: Object, default: null } },
+  watch: { navigationTarget() { this.applyNavigationTarget() } },
+  data: () => ({ code: '', connections: [], selectedId: '', requestId: null, focusItemId: null, requests: [], adding: false, joining: false, loading: false, requestsLoading: false, error: '', cloudConnections: [], cloudConnectionId: '', generation: 0, identity: '', identityTimer: null, notificationTimer: null, notifications: [], notificationPermission: ddNotificationPermission() }),
   computed: { selected() { return this.connections.find(c => c.id === this.selectedId) } },
   mounted() {
     this.identity = ddClientIdentity(); this.load(); this.refreshNotifications(); this.notificationTimer = setInterval(() => this.refreshNotifications(), 15000)
@@ -173,6 +176,19 @@ export default {
   },
   beforeUnmount() { this.generation++; clearInterval(this.identityTimer); clearInterval(this.notificationTimer) },
   methods: {
+    async applyNavigationTarget() {
+      const target = this.navigationTarget
+      if (!target || !this.connections.length) return
+      const connection = this.connections.find(c => c.id === target.connectionId)
+      if (!connection || String(connection.projectId) !== String(target.projectId)) { this.error = this.$t('ddWorkflow.client.messageUnavailable'); return }
+      const generation = this.generation
+      this.selectedId = connection.id; this.requestId = null; this.focusItemId = null
+      await this.loadRequests()
+      if (generation !== this.generation || target !== this.navigationTarget) return
+      const request = this.requests.find(r => String(r.id) === String(target.requestId))
+      if (!request) { this.error = this.$t('ddWorkflow.client.messageUnavailable'); return }
+      this.requestId = request.id; this.focusItemId = target.itemId || null
+    },
     async refreshNotifications() { try { const result = await pollDdClientNotifications({ onOpen: n => this.openNotification(n) }); this.notifications = result.notifications; this.notificationPermission = ddNotificationPermission() } catch {} },
     async enableNotifications() { this.notificationPermission = await enableDdNotifications(); await this.refreshNotifications() },
     async openNotification(n) {
@@ -183,7 +199,7 @@ export default {
     },
     async load() {
       const generation = ++this.generation; this.loading = true; this.error = ''
-      try { const rows = await listDdClientConnections(); if (generation !== this.generation) return; this.connections = rows; if (!rows.some(c => c.id === this.selectedId)) this.selectedId = rows[0]?.id || ''; await this.loadRequests() }
+      try { const rows = await listDdClientConnections(); if (generation !== this.generation) return; this.connections = rows; if (!rows.some(c => c.id === this.selectedId)) this.selectedId = rows[0]?.id || ''; await this.loadRequests(); if (generation === this.generation) await this.applyNavigationTarget() }
       catch (e) { if (generation === this.generation) this.error = e.message }
       finally { if (generation === this.generation) this.loading = false }
     },

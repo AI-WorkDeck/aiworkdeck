@@ -145,7 +145,8 @@ public class HttpAccountDirectoryClient implements AccountDirectoryClient {
     private static OrgMembership membership(JsonNode node) {
         String teamId = text(node, "teamId");
         String firmId = text(node, "firmId");
-        return teamId == null && firmId == null ? OrgMembership.NONE : new OrgMembership(teamId, firmId);
+        return teamId == null && firmId == null ? OrgMembership.NONE : new OrgMembership(teamId, firmId,
+                firmId != null && node.path("firmAdmin").isBoolean() && node.path("firmAdmin").booleanValue());
     }
 
     private static String text(JsonNode node, String field) {
