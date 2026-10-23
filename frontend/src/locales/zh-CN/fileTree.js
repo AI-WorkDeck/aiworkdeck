@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 文件树（FileTree.vue）：右键菜单/批量操作/确认弹窗/拖拽提示/本机文件导入
 export default {
+  newItem: "新建",
+  newFileMenu: "新建文件",
+  newRecording: "录音",
+  defaultPresentationName: "新建演示文稿",
+  defaultSpreadsheetName: "新建工作簿",
+  recordingPluginRequired: "请先在插件详情中安装或启用“语音”，再开始录音。",
+  recordingNoticeRequired: "开始录音前，请先确认录音面板中的转写告知。",
+
   externalDragFailed: '所选内容无法拖出，请确认选中的是本机现有文件后再试。',
   clientAccessTitle: "客户访问权限",
   clientAccessExplain: "文件默认仅内部成员可读，需逐个开放给客户。客户本人上传的文件始终可以自行读取。",

@@ -39,7 +39,8 @@ for (const [name, next] of [
       '装/卸/启停改变的是全局安装状态，不广播左栏与工作台会停在旧状态')
     // 广播必须在成功路径上（catch 之前），失败不该谎报变更
     const idx = fn.indexOf('this.notifyMarketChanged()')
-    const catchIdx = fn.indexOf('} catch (e)')
+    // Nested enable recovery may catch a failure after installation has committed.
+    const catchIdx = fn.indexOf('\n      } catch (e)')
     assert.ok(catchIdx < 0 || idx < catchIdx, '广播要留在 try 的成功路径里')
   })
 }

@@ -40,6 +40,7 @@ function harness() {
     filterPluginsByEnabledSkills: rows => rows,
     rescanPlugins: async () => ({ pluginCount: response.length }), rescanSkills: async () => ({ skillCount: 0 }),
     getSkillMarket: async () => ({ skills: [] }), getPluginMarket: async () => ({ plugins: [] }),
+    refreshPluginUpdates: async () => ({ accountConnected: false }),
     installMarketPlugin: async () => { response = [plugin({ enabled: false })] },
     isAccountLoginRetry: () => false,
   }
