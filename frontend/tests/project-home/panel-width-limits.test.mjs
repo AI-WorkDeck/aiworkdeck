@@ -123,7 +123,7 @@ test('真实 resize 方法：截图临时 1px → 恢复 1440px 后资源管理�
   const start = page.indexOf('    handleResponsiveResize() {')
   const end = page.indexOf('    // 左栏面板切换方法组', start)
   const window = { innerWidth: 1440 }
-  const layout = { clientWidth: 1440, querySelector: () => ({ offsetWidth: 51 }) }
+  const layout = { clientWidth: 1440, querySelector: selector => ({ offsetWidth: selector === '.left-rail' ? 51 : 14 }) }
   const { handleResponsiveResize } = new Function('window', 'fitPanelWidths', 'return {' + page.slice(start, end) + '}')(window, fitPanelWidths)
   for (const showAiPanel of [false, true]) {
     const vm = { $refs: { sidebarLeft: { parentElement: layout } }, sidebarCollapsed: false,
@@ -135,5 +135,11 @@ test('真实 resize 方法：截图临时 1px → 恢复 1440px 后资源管理�
     assert.equal(vm.sidebarWidth, 260)
     assert.equal(vm.aiPanelWidth, 360)
     assert.equal(vm.isCompactLayout, false)
+    window.innerWidth = layout.clientWidth = 700
+    vm.sidebarWidth = 600
+    vm.aiPanelWidth = 400
+    handleResponsiveResize.call(vm)
+    assert.ok(51 + 14 + vm.sidebarWidth + (showAiPanel ? vm.aiPanelWidth : 0) + EDITOR_MIN_WIDTH <= 700,
+      '窄窗回夹必须为外缘把手留出空间，不能挤占编辑区最小宽度')
   }
 })

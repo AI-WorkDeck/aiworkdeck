@@ -261,6 +261,8 @@ export const tabDragSplitMethods = {
       if (container) {
         this.resizing.containerWidth = container.clientWidth || 0
         if (target === 'left' && typeof container.querySelector === 'function') {
+          const collapseAnchor = container.querySelector('.sidebar-collapse-anchor')
+          this.resizing.containerWidth -= collapseAnchor?.offsetWidth || 0
           const rail = container.querySelector('.left-rail')
           this.resizing.railWidth = rail ? rail.offsetWidth : 0
           const aiPanel = container.querySelector('.side-panel-ai')
