@@ -2515,12 +2515,10 @@ export default {
    dev-board#543 走查实测）。
    这里刻意不设 z-index：会造出层叠上下文，把工具栏下拉那些 fixed 弹层框住（同
    .etb-wrap 那条）。 */
-/* BUG-13：包一层 wrap 才能把两端渐隐遮罩绝对定位对齐到横滚容器的可见区域
-   （横滚容器自己就在滚，直接在它里面塞 fixed/absolute 兄弟节点对不上它的滚动
-   窗口边界）。这里的 height:100% 不能写成 auto：外层那一行是 align-items:center，
-   不会把 flex 子项拉满高度，必须显式取那一行（定高 38px）的高度，横滚容器自己
-   那句 calc(100% - 8px) 才有一个「百分之百」可以算。 */
-.etb-scroll-wrap { flex: 1; min-width: 0; height: 100%; position: relative; }
+/* wrap 给两端渐隐提供定位参照；定高 100% 给 scroll 的百分比高度提供基准。
+   它也必须居中内部 scroll：外层 .etb 的居中只作用于 wrap，普通块布局会让
+   左侧按钮贴顶，比右侧常驻区高 6px（dev-board#1443）。 */
+.etb-scroll-wrap { display: flex; align-items: center; flex: 1; min-width: 0; height: 100%; position: relative; }
 .etb-scroll { white-space: nowrap; height: calc(100% - 8px); margin-bottom: -4px; }
 .etb-row { display: flex; align-items: center; gap: 2px; }
 /* 两端渐隐：宽度 16px，指向内侧（真实内容那一边）淡出，pointer-events:none 不
