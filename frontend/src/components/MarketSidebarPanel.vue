@@ -80,8 +80,18 @@
         <text class="msb-sec-chevron" :class="{ open: sections.market }">›</text>
         <text class="msb-sec-title">{{ $t('market.tabMarketplace') }}</text>
         <text class="msb-sec-count">{{ skillRows.length + pluginRows.length }}</text>
+        <text v-if="pluginUpdateState.count" class="msb-update-count" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count }}</text>
+        <view class="msb-sec-spacer"></view>
+        <component :is="'button'" type="button" class="msb-sec-action msb-check-updates" :title="$t('market.checkForUpdates')" :aria-label="$t('market.checkForUpdates')" :disabled="marketPluginLoading" @click.stop="checkForUpdates">
+          <svg class="msb-sec-action-icon" :class="{ spinning: marketPluginLoading }" viewBox="0 0 24 24" fill="none">
+            <path v-for="(d, gi) in ICONS.refresh" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </component>
       </view>
       <view v-if="sections.market" class="msb-section-content">
+        <view v-if="marketPluginLoading || marketPluginError" class="msb-update-status" :class="{ 'msb-error': marketPluginError }" role="status">
+          <text>{{ marketPluginLoading ? $t('market.checkingUpdates') : $t('market.checkingUpdatesFailed') + ' ' + marketPluginError }}</text>
+        </view>
         <view class="msb-tabs">
           <view class="msb-tab" :class="{ active: marketTab === 'skill' }" @tap="marketTab = 'skill'">
             <text>{{ $t('market.sectionSkillTitle') }}</text>
@@ -164,7 +174,8 @@
               <text v-if="row.desc" class="msb-row-desc">{{ row.desc }}</text>
               <text class="msb-row-meta">{{ row.meta }}</text>
             </view>
-            <view v-if="row.installed" class="msb-row-state ok"><text>{{ $t('market.installedShort') }}</text></view>
+            <component :is="'button'" type="button" v-if="row.updatable" class="msb-row-install msb-row-update" :title="$t('market.updateToVersion', { version: row.raw.version })" @click.stop="openDetail(row)"><text>{{ $t('market.update') }}</text></component>
+            <view v-else-if="row.installed" class="msb-row-state ok"><text>{{ $t('market.installedShort') }}</text></view>
             <view
               v-else-if="row.canInstall"
               class="msb-row-install"
@@ -192,7 +203,9 @@
 // 插件广场左栏面板（VS Code 扩展栏形态）：搜索 + 已安装/Skill 广场/插件广场
 // 两个独立滚动分组的紧凑列表；点行在中栏开详情 tab（emit open-detail），行内快捷安装。
 // 数据与安装链路复用 MarketPane 同一组 services/api.js 封装。
-import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
+import { installBundledPlugin, getPlugins, getSkills, getSkillMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
+import { pluginUpdates, refreshPluginUpdates } from '@/composables/usePluginUpdates.js'
+import { isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
 import { ICONS } from '@/config/icons.js'
 import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { isPanelSkill, isVoiceGroupMember } from '@/config/leftSidebarPlugins.js'
@@ -248,11 +261,9 @@ export default {
       plugins: [],
       skills: [],
       marketSkills: [],
-      marketPlugins: [],
+      pluginUpdateState: pluginUpdates,
       marketLoading: false,
       marketError: '',
-      marketPluginLoading: false,
-      marketPluginError: '',
       marketBusyId: '',
       pluginBusyId: '',
       rescanning: false,
@@ -261,6 +272,9 @@ export default {
     }
   },
   computed: {
+    marketPlugins() { return this.pluginUpdateState.catalog },
+    marketPluginLoading() { return this.pluginUpdateState.checking },
+    marketPluginError() { return this.pluginUpdateState.error },
     ICONS() {
       return ICONS
     },
@@ -304,6 +318,8 @@ export default {
         })
       }
       for (const p of this.plugins) {
+        const latest = (this.marketPlugins || []).find(item => item.id === p.id)
+        const updatable = isPluginUpdateAvailable(latest, p)
         rows.push({
           kind: 'plugin',
           id: p.id,
@@ -312,8 +328,8 @@ export default {
           avatarUrl: typeof getPluginAvatarUrl === 'function' ? getPluginAvatarUrl(p.id) : null,
           glyph: typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(p.id) : ICONS.blocks,
           meta: p.version ? ('v' + p.version) : '',
-          stateLabel: p.enabled ? this.$t('market.enabledTag') : this.$t('market.disabledTag'),
-          stateClass: p.enabled ? 'ok' : 'off',
+          stateLabel: updatable ? this.$t('market.updateAvailable') : (p.enabled ? this.$t('market.enabledTag') : this.$t('market.disabledTag')),
+          stateClass: updatable ? 'update' : (p.enabled ? 'ok' : 'off'),
           raw: p,
         })
       }
@@ -395,6 +411,7 @@ export default {
           glyph: typeof getPluginGlyphPaths === 'function' ? getPluginGlyphPaths(m.id) : ICONS.blocks,
           meta: metaParts.join(' · ') || this.$t('market.pluginLabel'),
           installed: installedIds.has(m.id) || !!m.installed,
+          updatable: isPluginUpdateAvailable(m, this.plugins.find(p => p.id === m.id)),
           paidState: state,
           canInstall: canInstall(state),
           raw: m,
@@ -442,9 +459,7 @@ export default {
       else await this.installPluginRow(fresh)
     },
     async reloadAll() {
-      this.loadInstalled()
-      this.loadMarketSkills()
-      this.loadMarketPlugins()
+      await Promise.all([this.loadInstalled(), this.loadMarketSkills(), this.loadMarketPlugins()])
     },
     async loadInstalled() {
       try {
@@ -471,23 +486,15 @@ export default {
       }
     },
     async loadMarketPlugins() {
-      this.marketPluginLoading = true
-      this.marketPluginError = ''
-      try {
-        const [remote, bundled] = await Promise.allSettled([getPluginMarket(), getBundledPlugins()])
-        const res = remote.status === 'fulfilled' ? remote.value : null
-        const local = bundled.status === 'fulfilled' ? bundled.value?.plugins || [] : []
-        const localIds = new Set(local.map(item => item.id))
-        this.marketPlugins = [...local, ...(res?.plugins || []).filter(item => !localIds.has(item.id))]
-        if (remote.status === 'rejected' && !local.length) throw remote.reason
-        if (typeof res?.accountConnected === 'boolean') this.accountConnected = res.accountConnected
-      } catch (e) {
-        console.warn('在线插件广场不可用:', e)
-        this.marketPluginError = e?.message || this.$t('market.networkUnavailable')
-        this.marketPlugins = []
-      } finally {
-        this.marketPluginLoading = false
-      }
+      const state = await refreshPluginUpdates(true)
+      this.accountConnected = state.accountConnected
+    },
+    async checkForUpdates() {
+      if (this.marketPluginLoading) return
+      this.marketTab = 'plugin'
+      this.sections.market = true
+      await Promise.all([this.loadInstalled(), this.loadMarketPlugins()])
+      if (!this.marketPluginError) uni.showToast({ title: this.$t('market.updatesChecked'), icon: 'none' })
     },
     async installSkillRow(row) {
       if (this.marketBusyId) return
@@ -706,6 +713,45 @@ export default {
 
 .msb-sec-spacer {
   flex: 1;
+}
+
+.msb-update-count {
+  min-width: 14px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
+  font-size: var(--awd-panel-fs-meta);
+  text-align: center;
+}
+
+.msb-update-status {
+  padding: 4px var(--awd-panel-pad-x);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  overflow-wrap: anywhere;
+}
+
+.msb-check-updates {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  &::after { border: 0; }
+  &:focus-visible { outline: 2px solid var(--awd-accent); }
+}
+
+.msb-row-update {
+  margin: 0;
+  line-height: 18px;
+  &::after { border: 0; }
+  &:focus-visible { outline: 2px solid var(--awd-accent-text); outline-offset: 2px; }
+}
+
+.msb-row-state.update {
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+  font-weight: 600;
 }
 
 .msb-sec-action {

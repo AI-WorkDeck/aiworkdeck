@@ -13,7 +13,7 @@ const body = source.match(/<script>([\s\S]*?)<\/script>/)[1]
 function makeVm(overrides = {}) {
   const calls = { emits: [], renames: [], dialogs: [], deletes: [], focused: 0, scrolled: 0 }
   const stubs = {
-    FileTypeIcon: {}, TagChip: {}, TagFilter: {}, TagSelector: {}, TagManager: {}, ICONS: {},
+    FileTypeIcon: {}, TagChip: {}, TagFilter: {}, TagSelector: {}, TagManager: {}, ExplorerCreateMenu: {}, ICONS: {},
     renameFile: async (...args) => { calls.renames.push(args); return { name: args[2] } },
     deleteFile: async (...args) => calls.deletes.push(args),
     showDialog: async options => { calls.dialogs.push(options); return { confirm: false } },

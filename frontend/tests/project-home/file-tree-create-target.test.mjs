@@ -23,7 +23,7 @@ const IMPORT_NAMES = [
   'TagManager', 'AwdDatePicker', 'ICONS', 'getProjectTags', 'addTagToFile', 'removeTagFromFile',
   'createTag', 'createTask', 'importLocalFile',
   'nativeDataTransfer', 'isExternalFileDrag', 'claimExternalDrop', 'isTranscribableMediaItem',
-  'showDialog',
+  'showDialog', 'ExplorerCreateMenu',
 ]
 
 function makeVm() {
@@ -83,7 +83,6 @@ test('新建文档与新建文件夹用同一个落点', async () => {
   const vm = makeVm()
   vm.allFiles = [folder, doc]
   vm.handleItemClick(folder, {})
-  vm.newFolderName = '子目录'
   await vm.handleCreateFolder()
   await vm.createBlankWord()
   assert.equal(vm.calls.createFolder[0][1], vm.calls.createFile[0][1])
@@ -94,7 +93,6 @@ test('选中的文件夹已进回收站时退回当前浏览层级', async () =>
   vm.allFiles = [folder, doc]
   vm.handleItemClick(folder, {})
   vm.recycleBin = [folder]
-  vm.newFolderName = '子目录'
   await vm.handleCreateFolder()
   await vm.createBlankWord()
   assert.equal(vm.calls.createFile[0][1], null)

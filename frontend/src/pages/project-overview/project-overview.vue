@@ -343,6 +343,7 @@
             </svg>
           </view>
           <text v-else class="rail-icon">{{ p.icon }}</text>
+          <text v-if="p.key === 'market' && pluginUpdateState.count > 0" class="rail-badge" :aria-label="$t('market.updateAvailableCount', { count: pluginUpdateState.count })" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count > 99 ? '99+' : pluginUpdateState.count }}</text>
           <text v-if="p.key === 'dd-client' && ddClientUnread > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddClientUnread })">{{ ddClientUnread > 99 ? '99+' : ddClientUnread }}</text>
           <text v-if="p.key === 'dd-files' && ddLawyerNotifications.length > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddLawyerNotifications.length })">{{ ddLawyerNotifications.length > 99 ? '99+' : ddLawyerNotifications.length }}</text>
           <!-- 日程徽标（dev-board#899）：当前项目 逾期 + 今天 的未完成事项数，0 不显；有逾期时转朱砂红 -->
@@ -582,8 +583,11 @@
               <view
                 v-if="!fileBatchMode"
                 class="icon-btn mini"
-                @tap="onFileTreeQuickAction('newFile')"
-                :title="$t('workbench.newDoc')"
+                data-create-trigger role="button" tabindex="0" aria-haspopup="menu"
+                @click.stop="onFileTreeQuickAction('newFile', $event)"
+                @keydown.enter.prevent="onFileTreeQuickAction('newFile', $event)"
+                @keydown.space.prevent="onFileTreeQuickAction('newFile', $event)"
+                :title="$t('fileTree.newItem')" :aria-label="$t('fileTree.newItem')"
               >
                 <svg class="mini-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path v-for="(d, gi) in GLYPHS.filePlus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -684,6 +688,7 @@
             @view-tasks="onFileTreeViewTasks"
             :transcribe-enabled="meetingRecorderEnabled"
             @transcribe-audio="onTranscribeAudio"
+            @create-recording="onCreateRecording"
           />
           <!-- 项目（dev-board#1047）：全部案卷的列表，原 pages/project-list 整页的内容本体。
                有无项目两态都在；点卡片走注入的 leaveWorkbench 进带 id 的工作台。 -->
@@ -789,7 +794,7 @@
           <!-- 动态插件左栏工作区：飞书式双栏导航（通讯录/对话列表/阶段切换/快捷动作），与中栏工作区标签联动 -->
           <PluginPane
             v-else-if="activeDynamicPlugin && activeDynamicPlugin.sidebarView"
-            :key="activeDynamicPlugin.pluginId + ':' + activeDynamicPlugin.sidebarView.id"
+            :key="activeDynamicPlugin.pluginId + ':' + activeDynamicPlugin.version + ':' + activeDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeDynamicPlugin.sidebarView.url"
             :plugin-id="activeDynamicPlugin.pluginId"
@@ -1096,6 +1101,7 @@
                   >
                     <PluginPane
                       v-if="entry.plugin.hasFrontend"
+                      :key="entry.plugin.pluginId + ':' + entry.plugin.version"
                       :url="entry.plugin.workspaceView?.url || entry.plugin.frontendEntry"
                       :business-actions="pluginBusinessActions"
                       :plugin-id="entry.plugin.pluginId"
@@ -1351,6 +1357,7 @@
                   >
                     <PluginPane
                       v-if="entry.plugin.hasFrontend"
+                      :key="entry.plugin.pluginId + ':' + entry.plugin.version"
                       :url="entry.plugin.workspaceView?.url || entry.plugin.frontendEntry"
                       :business-actions="pluginBusinessActions"
                       :plugin-id="entry.plugin.pluginId"
@@ -1579,7 +1586,7 @@
                 <view class="tools-content">
                   <PluginPane
             v-if="activeBottomDynamicPlugin && activeBottomDynamicPlugin.sidebarView"
-            :key="activeBottomDynamicPlugin.pluginId + ':' + activeBottomDynamicPlugin.sidebarView.id"
+            :key="activeBottomDynamicPlugin.pluginId + ':' + activeBottomDynamicPlugin.version + ':' + activeBottomDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeBottomDynamicPlugin.sidebarView.url"
             :plugin-id="activeBottomDynamicPlugin.pluginId"
@@ -1689,7 +1696,7 @@
 
             <PluginPane
             v-if="activeRightDynamicPlugin && activeRightDynamicPlugin.sidebarView"
-            :key="activeRightDynamicPlugin.pluginId + ':' + activeRightDynamicPlugin.sidebarView.id"
+              :key="activeRightDynamicPlugin.pluginId + ':' + activeRightDynamicPlugin.version + ':' + activeRightDynamicPlugin.sidebarView.id"
             :business-actions="pluginBusinessActions"
             :url="activeRightDynamicPlugin.sidebarView.url"
             :plugin-id="activeRightDynamicPlugin.pluginId"
@@ -2255,6 +2262,7 @@ import DrawioEditor from '@/components/DrawioEditor.vue'
 import PlainTextEditor from '@/components/PlainTextEditor.vue'
 // 插件广场 VS Code 形态：左栏列表面板 + 中栏详情 tab（整页 MarketPane 仅存于 admin 独立页）
 import MarketSidebarPanel from '@/components/MarketSidebarPanel.vue'
+import { pluginUpdates, startPluginUpdateChecks } from '@/composables/usePluginUpdates.js'
 import MarketDetailPane from '@/components/MarketDetailPane.vue'
 import ProjectHomePane from '@/components/project-home/ProjectHomePane.vue'
 import AdminPane from '@/components/admin/AdminPane.vue'
@@ -2387,6 +2395,7 @@ import { pollDdClientNotifications } from '@/services/ddClient'
 import { getDdNotifications, readDdNotification } from '@/services/ddWorkflow'
 import ChatInterface from '@/components/ChatInterface.vue'
 import { panelSwitchingMethods } from './panelSwitching.js'
+import explorerRecordingMixin from './explorerRecording.js'
 import { menuCommandsMethods } from './menuCommands.js'
 import { agentClientActionMethods } from './agentClientActions.js'
 import { librePoolMethods } from './librePool.js'
@@ -2437,6 +2446,7 @@ import DocumentLinkPreview from '@/components/DocumentLinkPreview.vue'
 const WEB_KEEPALIVE_MAX = 5
 
 export default {
+  mixins: [explorerRecordingMixin],
   // 工作台里渲染的组件（协作抽屉、加人弹窗……）要跳出工作台时，也得走同一个出口：
   // 先落盘再 reLaunch。组件拿不到页面实例，只能靠注入（check:nav 钉着）。
   // 要去的是设置页时不用离开：工作台里设置是一个标签（dev-board#582），组件走 openSettingsTab。
@@ -2839,6 +2849,7 @@ export default {
         right: { 'files': null, 'dd-files': null }
       },
       dynamicPlugins: [],
+      pluginUpdateState: pluginUpdates,
       dynamicPluginsLoaded: false,
       stagingPinned: false, // Added: keeps staging area open via sidebar button
       stagingManuallyCollapsed: false, // Track if user explicitly collapsed staging area
@@ -3508,6 +3519,7 @@ export default {
     this.unbindTabsWheel()
     this._comparisonDisposed = true
     clearInterval(this._mergeElapsedTimer)
+    this._stopPluginUpdateChecks?.()
     this._ddClientPollStopped = true
     clearTimeout(this._ddClientPollTimer)
     this.disposeRestartRecovery()
@@ -3918,6 +3930,7 @@ export default {
     }
   },
   mounted() {
+    this._stopPluginUpdateChecks = startPluginUpdateChecks()
     this._ddClientPollStopped = false
     this.pollDdClientInbox()
     registerQuitSave(this, async () => {
@@ -5508,15 +5521,15 @@ export default {
       } catch (e) {}
       uni.reLaunch({ url: '/pages/login/login' })
     },
-    onFileTreeQuickAction(actionKey) {
+    onFileTreeQuickAction(actionKey, event) {
       const tree = this.$refs.fileTree
       if (!tree) return
-      if (actionKey === 'newFolder' && typeof tree.showCreateFolderDialog === 'function') {
-        tree.showCreateFolderDialog()
+      if (actionKey === 'newFolder' && typeof tree.handleCreateFolder === 'function') {
+        tree.handleCreateFolder()
         return
       }
-      if (actionKey === 'newFile' && typeof tree.handleCreateWord === 'function') {
-        tree.handleCreateWord()
+      if (actionKey === 'newFile' && typeof tree.openCreateMenu === 'function') {
+        tree.openCreateMenu(event)
         return
       }
       if (actionKey === 'recycleBin') {
@@ -7565,6 +7578,7 @@ export default {
               // 左栏面板 key 是 plugin-<id>，桥要的是原始 id（握手上下文 + KV 分区键），
               // 两者别混用
               pluginId: p.id,
+              version: p.version,
               label: migratedLabelKeys.has(p.id) ? this.$t(migratedLabelKeys.get(p.id)) : p.name,
               // registry 的 icon 字段是 emoji（全站禁 emoji，一律不当图片渲染），
               // 且 /static/plugin_default.png 并不存在（会 404 成 HTML=破图）。所以

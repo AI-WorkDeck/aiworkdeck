@@ -140,6 +140,16 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 
 ## 安装/卸载链路
 
+### 插件更新提示（dev-board#1442）
+
+- `utils/marketUpdates.js` 区分已安装版本与市场版本、严格比较 SemVer，并合并远端与随应用提供的目录。在线同 ID 以远端为准，不能让旧 bundled 条目遮住新版本；确定未安装且随包更新时可选随包，已有独立安装不走 bundled 覆盖。离线时保留已知更新，未安装项可退回随包安装源。
+- `composables/usePluginUpdates.js` 是插件更新计数的共享状态：工作台挂载即检查，之后每 30 分钟及窗口恢复焦点时检查（焦点检查间隔至少 5 分钟），不依赖市场面板挂载。检查只读取目录；更新仍由用户点击。入口和 Marketplace 分组显示数字角标，手动检查失败持续提示，不把离线当成全部最新。
+- 后台/手动检查完成广播 `awd:market-update-checked`，仅刷新已打开详情的版本元数据，不卸载正文或覆盖未保存设置；初次加载/更新期间不打断当前操作。安装、卸载、启停沿用原有两个 market-changed 事件刷新本地版本、角标与工作台入口。在途检查遇到安装变更会补一次读取，避免旧结果复活角标。工作台 PluginPane 的 key 包含版本，升级后已打开插件重新装载。
+- `MarketPluginView.installedVersion/installed/updatable` 只由本机扫描判定，不采信 registry 中的同名状态字段。详情显示“已安装版本 / 最新版本”，不再把云端版本显示成本地版本。
+- 更新确认新版声明能力，仍走原验签安装；后端成功后默认禁用。仅原来启用的插件，在读回实际版本及权限与确认快照相同后恢复启用；版本或权限变化、回读失败、恢复失败都保持禁用并提示核对，原停用项不自动启用。
+- 安装先在插件根内隐藏暂存目录下载、验签及逐文件校验，再验证 manifest 的 ID/版本与签名清单相符；替换保留旧目录直到新版本扫描成功。替换/扫描失败恢复旧文件及原启用态，不先删除唯一旧副本。
+- 验证：`node --test frontend/tests/plugins/market-updates.test.mjs frontend/tests/plugin-sdk/market-update-detail.test.mjs frontend/tests/project-home/market-*.test.mjs`；JDK 21 下 `PluginMarketServiceTest` 覆盖版本判定、签名及失败回滚。
+
 - 安装：前端 POST /api/skills/market/install {id} → admin 校验 → `requireValidId`（正则 `^[a-z0-9][a-z0-9-]{1,49}$`，兼防路径穿越）→ 下载 bundle → 写 `{ai.skills.dir}/{id}/` 两文件 → `rescan()`。**重装即覆盖更新**。
 - 卸载：来自插件的 skill 拒绝卸载（走插件管理）；canonical 路径校验防符号链接逃逸，只删 skills 正下方子目录。
 - **安装目标目录 == 内置 skill 扫描目录**（默认 `backend/skills/`），在线安装的与内置的（listing-pathway）并列共存、同一套扫描/启停。

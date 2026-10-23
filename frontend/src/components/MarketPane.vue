@@ -162,7 +162,8 @@
 
         <!-- ============ 插件广场：经平台审核并签名，安装时验签，见 docs/PLUGIN_DISTRIBUTION.md ============ -->
         <template v-else-if="activeTab === 'plugin'">
-          <view v-if="marketPluginError" class="empty">
+          <text v-if="marketPluginError && marketPlugins.length" class="card-update-message">{{ $t('market.pluginMarketErrorHint', { error: marketPluginError }) }}</text>
+          <view v-if="marketPluginError && !marketPlugins.length" class="empty">
             <svg class="empty-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, i) in ICONS.offline" :key="i" :d="d" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
@@ -193,22 +194,29 @@
                   </view>
                   <text class="card-title">{{ m.name || m.id }}</text>
                   <text class="card-id">{{ m.id }} · v{{ m.version || '1.0.0' }} · {{ formatSize(m.size) }} · {{ priceTag(m) }}</text>
+                  <text v-if="installedPluginVersion(m)" class="card-note">{{ $t('market.installedVersion') }} v{{ installedPluginVersion(m) }} · {{ $t('market.latestVersion') }} v{{ m.version }}</text>
                 </view>
                 <view class="card-actions">
-                  <view
-                    v-if="marketAction(m) === 'install' && (!m.installed || m.updatable)"
+                  <component
+                    :is="'button'"
+                    v-if="marketAction(m, pluginUpdateAvailable(m)) === 'install' && (!m.installed || pluginUpdateAvailable(m))"
+                    type="button"
                     class="act-primary"
                     :class="{ 'is-busy': !!pluginBusyId }"
-                    @tap="installPlugin(m)"
-                  >{{ pluginBusyId === m.id ? $t('market.installingShort') : (m.updatable ? $t('market.update') : $t('market.install')) }}</view>
-                  <view v-else-if="marketAction(m) === 'buy'" class="act-primary" @tap="openPurchase('plugin', m.id)">{{ $t('market.buy') }}</view>
-                  <view v-else-if="marketAction(m) === 'need-account'" class="act-primary" @tap="loginThenInstall('plugin', m)">{{ $t('market.needAccount') }}</view>
+                    :disabled="!!pluginBusyId"
+                    @click="installPlugin(m)"
+                  >{{ pluginBusyId === m.id ? $t(m.installed ? 'market.updatingEllipsis' : 'market.installingShort') : (pluginUpdateAvailable(m) ? $t('market.updateToVersion', { version: m.version }) : $t('market.install')) }}</component>
+                  <view v-else-if="marketAction(m, pluginUpdateAvailable(m)) === 'buy'" class="act-primary" @tap="openPurchase('plugin', m.id)">{{ $t('market.buy') }}</view>
+                  <view v-else-if="marketAction(m, pluginUpdateAvailable(m)) === 'need-account'" class="act-primary" @tap="loginThenInstall('plugin', m)">{{ $t('market.needAccount') }}</view>
+                  <view v-if="marketAction(m, pluginUpdateAvailable(m)) === 'buy'" class="act-remove" :class="{ 'is-busy': !!pluginBusyId }" @tap="refreshPluginPurchase(m)">{{ $t('market.alreadyPurchasedRefresh') }}</view>
                   <view v-if="m.installed" class="act-remove" @tap="uninstallPlugin(m)">{{ $t('market.uninstallBtn') }}</view>
                 </view>
               </view>
 
               <text class="card-desc">{{ m.description || $t('market.noDescription') }}</text>
               <text class="card-caps">{{ capabilityLine(m) }}</text>
+              <text v-if="pluginActionErrors[m.id]" class="card-update-message" role="alert">{{ pluginActionErrors[m.id] }}</text>
+              <text v-if="pluginActionHints[m.id]" class="card-update-message" role="status">{{ pluginActionHints[m.id] }}</text>
 
               <view class="card-foot">
                 <text class="foot-author">{{ m.authorDisplayName || m.author || $t('market.anonymousAuthor') }}</text>
@@ -266,7 +274,7 @@
                 <AwdSwitch
                   class="plugin-switch"
                   :checked="p.enabled"
-                  :disabled="switching"
+                  :disabled="switching || !!pluginBusyId || !!p.revokedReason || !!p.incompatibleReason"
                   @change="onToggle(p, $event)"
                 />
               </view>
@@ -276,6 +284,7 @@
                    否则用户只看到一个翻不动的开关 -->
               <text v-if="p.revokedReason" class="card-blocked">{{ $t('market.revokedPrefix') }}{{ p.revokedReason }}</text>
               <text v-else-if="p.incompatibleReason" class="card-blocked">{{ p.incompatibleReason }}</text>
+              <text v-if="pluginActionHints[p.id]" class="card-update-message" role="status">{{ pluginActionHints[p.id] }}</text>
               <text class="card-caps">{{ capabilityLine(p) }}</text>
 
               <view class="tool-list" v-if="p.tools && p.tools.length">
@@ -373,8 +382,9 @@
 </template>
 
 <script>
-import { getPlugins, setPluginEnabled, rescanPlugins, getSkills, setSkillActivation, rescanSkills, getSkillMarket, installMarketSkill, uninstallMarketSkill, getPluginMarket, installMarketPlugin, uninstallMarketPlugin } from '@/services/api.js'
+import { getPlugins, setPluginEnabled, rescanPlugins, getSkills, setSkillActivation, rescanSkills, getSkillMarket, installMarketSkill, uninstallMarketSkill, getPluginMarket, installMarketPlugin, uninstallMarketPlugin, getBundledPlugins, installBundledPlugin } from '@/services/api.js'
 import { canInstall, paidState, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
+import { mergePluginCatalog, isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
 import { requireAccount, isAccountLoginRetry } from '@/utils/requireAccount.js'
 import { refreshEntitlements } from '@/composables/useEntitlement.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
@@ -458,6 +468,8 @@ export default {
       marketPluginLoading: false,
       marketPluginError: '',
       pluginBusyId: '',
+      pluginActionErrors: {},
+      pluginActionHints: {},
       // 是否已连接官网账户；随广场列表响应下发（付费未购项据此在「购买」与「需连接账户」之间选）
       accountConnected: false,
       loading: false,
@@ -520,10 +532,7 @@ export default {
   },
   methods: {
     reloadAll() {
-      this.loadPlugins()
-      this.loadSkills()
-      this.loadMarket()
-      this.loadPluginMarket()
+      return Promise.all([this.loadPlugins(), this.loadSkills(), this.loadMarket(), this.loadPluginMarket()])
     },
     tabCount(key) {
       if (key === 'skill') return this.marketSkills.length
@@ -558,10 +567,10 @@ export default {
     },
     /**
      * 卡片主按钮形态：'install'（免费 / 已购 / 已安装，行为不变）｜'buy'｜'need-account'。
-     * 已安装项一律走 install 分支，更新与卸载不受付费状态影响。
+     * 插件更新同样需要当前账户的购买权益；卸载和已安装 Skill 保持原有行为。
      */
-    marketAction(m) {
-      if (m.installed) return 'install'
+    marketAction(m, updating = false) {
+      if (m.installed && !updating) return 'install'
       const state = paidState(m, this.accountConnected)
       return state === 'buy' || state === 'need-account' ? state : 'install'
     },
@@ -586,18 +595,40 @@ export default {
       if (kind === 'skill') await this.installSkill(fresh)
       else await this.installPlugin(fresh)
     },
+    async refreshPluginPurchase(plugin) {
+      if (this.pluginBusyId) return
+      this.pluginBusyId = plugin.id
+      try {
+        await refreshEntitlements(true)
+        await this.loadPluginMarket()
+      } finally {
+        this.pluginBusyId = ''
+      }
+      const fresh = this.marketPlugins.find(p => p.id === plugin.id)
+      if (fresh && canInstall(paidState(fresh, this.accountConnected))) await this.installPlugin(fresh)
+      else uni.showToast({ title: this.$t('market.purchaseNotFoundHint'), icon: 'none' })
+    },
     formatSize(bytes) {
       if (!bytes) return this.$t('market.unknownSize')
       if (bytes < 1024) return bytes + ' B'
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
       return (bytes / 1024 / 1024).toFixed(2) + ' MB'
     },
+    installedPluginVersion(plugin) {
+      return this.plugins.find(p => p.id === plugin.id)?.version || plugin.installedVersion || ''
+    },
+    pluginUpdateAvailable(plugin) {
+      return isPluginUpdateAvailable(plugin, this.plugins.find(p => p.id === plugin.id))
+    },
     async loadPluginMarket() {
       this.marketPluginLoading = true
       this.marketPluginError = ''
       try {
-        const res = await getPluginMarket()
-        this.marketPlugins = res?.plugins || []
+        const [res, bundled] = await Promise.all([
+          getPluginMarket().catch(e => { this.marketPluginError = e?.message || this.$t('market.networkUnavailable'); return null }),
+          getBundledPlugins().catch(() => null),
+        ])
+        this.marketPlugins = mergePluginCatalog(res?.plugins || [], bundled?.plugins || [])
         if (typeof res?.accountConnected === 'boolean') this.accountConnected = res.accountConnected
       } catch (e) {
         // 注册表不可达只在区块内提示，不影响本地插件与 Skill
@@ -609,38 +640,70 @@ export default {
       }
     },
     async installPlugin(plugin) {
-      if (this.pluginBusyId) return
+      if (this.pluginBusyId || this.marketAction(plugin, true) !== 'install') return
+      const installed = this.plugins.find(p => p.id === plugin.id)
+      const isUpdate = !!installed || plugin.installed === true
+      if (isUpdate && !this.pluginUpdateAvailable(plugin)) return
+      const wasEnabled = installed?.enabled === true
+      const confirmedVersion = plugin.version
+      const confirmedPermissions = [...new Set(plugin.permissions || [])].sort().join('\n')
+      this.pluginBusyId = plugin.id
       const perms = (plugin.permissions || []).map(p => this.permissionLabel(p)).join(this.$t('market.listSeparator')) || this.$t('market.noSensitiveCapability')
       const ok = await new Promise(resolve => {
         uni.showModal({
-          title: this.$t('market.confirmInstallPluginTitle'),
-          content: this.$t('market.confirmInstallPluginContent', {
+          title: this.$t(isUpdate ? 'market.confirmUpdatePluginTitle' : 'market.confirmInstallPluginTitle'),
+          content: this.$t(isUpdate ? 'market.confirmUpdatePluginContent' : 'market.confirmInstallPluginContent', {
             name: plugin.name || plugin.id,
             version: plugin.version,
             author: plugin.authorDisplayName || plugin.author || this.$t('market.unknownAuthor'),
             perms,
           }),
-          confirmText: this.$t('market.install'),
+          confirmText: this.$t(isUpdate ? 'market.update' : 'market.install'),
           cancelText: this.$t('market.cancelBtn'),
           success: r => resolve(r.confirm),
           fail: () => resolve(false)
         })
       })
-      if (!ok) return
-
-      this.pluginBusyId = plugin.id
+      if (!ok) { this.pluginBusyId = ''; return }
+      this.pluginActionErrors[plugin.id] = ''
+      this.pluginActionHints[plugin.id] = ''
       try {
-        await installMarketPlugin(plugin.id)
-        uni.showToast({ title: this.$t('market.installedEnableHint'), icon: 'none' })
-        await this.loadPlugins()
-        await this.loadPluginMarket()
+        await (plugin.bundled ? installBundledPlugin(plugin.id) : installMarketPlugin(plugin.id))
+        if (installed) Object.assign(installed, { enabled: false, version: '' })
+        if (isUpdate && wasEnabled) {
+          try {
+            const installedRes = await getPlugins()
+            const installedList = Array.isArray(installedRes) ? installedRes : installedRes?.data
+            const actual = Array.isArray(installedList) ? installedList.find(p => p.id === plugin.id) : null
+            if (actual && installed) Object.assign(installed, actual)
+            if (!actual || actual.version !== confirmedVersion
+              || [...new Set(actual.permissions || [])].sort().join('\n') !== confirmedPermissions) {
+              this.pluginActionHints[plugin.id] = this.$t('market.updateConfirmationChangedHint')
+            }
+          } catch (e) {
+            this.pluginActionHints[plugin.id] = this.$t('market.updateVerificationFailedHint') + (e?.message ? ' ' + e.message : '')
+          }
+          if (!this.pluginActionHints[plugin.id]) {
+            try {
+              await setPluginEnabled(plugin.id, true)
+              installed.enabled = true
+            } catch (e) {
+              this.pluginActionHints[plugin.id] = this.$t('market.updatedDisabledHint') + (e?.message ? ' ' + e.message : '')
+            }
+          }
+        }
+        await this.reloadAll()
         this.notifyMarketChanged()
+        uni.showToast({ title: this.pluginActionHints[plugin.id] || this.$t(isUpdate ? 'market.updatedToast' : 'market.installedEnableHint'), icon: 'none' })
       } catch (e) {
         console.error('安装插件失败:', e)
         // 后端 4011（价格没查到的降级路径）：api.js 已就地弹过登录层；登录成功就重拉列表，
         // 按钮按新账户的已购状态刷新，toast 里是「已登录，请再操作一次」
         if (isAccountLoginRetry(e)) await this.loadPluginMarket()
-        uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+        this.pluginActionErrors[plugin.id] = isUpdate
+          ? this.$t('market.updateFailed') + (e?.message ? ' ' + e.message : '')
+          : (e?.message || this.$t('market.installFailedNeedAdmin'))
+        uni.showToast({ title: this.pluginActionErrors[plugin.id], icon: 'none' })
       } finally {
         this.pluginBusyId = ''
       }
@@ -679,10 +742,12 @@ export default {
     },
     // AwdSwitch 直接抛布尔值
     async onToggle(plugin, enabled) {
+      if (this.switching || this.pluginBusyId || plugin.revokedReason || plugin.incompatibleReason) return
       this.switching = true
       try {
         await setPluginEnabled(plugin.id, enabled)
         plugin.enabled = enabled
+        this.pluginActionHints[plugin.id] = ''
         uni.showToast({ title: enabled ? this.$t('market.enabledToast') : this.$t('market.disabledToggleToast'), icon: 'none' })
         this.notifyMarketChanged()
       } catch (e) {
@@ -1405,6 +1470,9 @@ $gray-light: var(--awd-surface-3);
 }
 
 .act-primary {
+  margin: 0;
+  font-family: inherit;
+  line-height: 1.5;
   font-size: var(--awd-panel-fs);
   font-weight: 600;
   text-align: center;
@@ -1417,6 +1485,7 @@ $gray-light: var(--awd-surface-3);
   transition: background 0.2s;
 
   &:hover { background: var(--awd-accent-hover); }
+  &:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
 
   &.is-busy {
     opacity: 0.5;
@@ -1464,6 +1533,14 @@ $gray-light: var(--awd-surface-3);
 }
 
 /* 工具数与声明能力：一行正文，敏感能力靠文案而非配色喊话 */
+.card-update-message {
+  display: block;
+  margin-top: 8px;
+  font-size: var(--awd-panel-fs-sec);
+  line-height: 1.5;
+  color: var(--awd-warning-text);
+}
+
 .card-caps {
   font-size: var(--awd-panel-fs);
   line-height: 1.6;
