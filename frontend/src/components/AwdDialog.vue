@@ -145,7 +145,8 @@ export default {
       try {
         const active = document.activeElement
         const stillInDialog = active && active.closest && active.closest('.awd-dlg-mask')
-        if (!stillInDialog && prev && prev.isConnected && typeof prev.focus === 'function') prev.focus()
+        // A newly opened menu/dialog may already own focus while this one closes.
+        if (!stillInDialog && (!active || active === document.body) && prev && prev.isConnected && typeof prev.focus === 'function') prev.focus()
       } catch (e) { /* ignore */ }
     }, 0)
   },
