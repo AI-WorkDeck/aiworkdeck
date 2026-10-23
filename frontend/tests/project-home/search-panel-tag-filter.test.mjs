@@ -88,6 +88,19 @@ test('tag-only result stats omit zero text matches and each result shows its tag
   assert.match(html, /1<\/text>[^<]*个文件/)
 })
 
+test('filename results stay visible during slow and failed full-text searches', async () => {
+  for (const loading of [true, false]) {
+    const html = await render('SearchPanel', { projectId: 1 }, {
+      hasSearched: true, searchedQuery: '锦江', loading, searchPhase: 'content',
+      searchError: loading ? '' : zh.searchContentFailed,
+      results: { totalMatches: 0, totalFiles: 1, results: [{ fileId: 4, fileName: '锦江.txt', fileType: 'txt', matchCount: 0, tags: [] }] }
+    })
+    assert.match(html, /锦江.txt/)
+    assert.ok(html.includes(loading ? zh.searchingContent : zh.searchContentFailed))
+    assert.ok(!html.includes(zh.noResults))
+  }
+})
+
 test('filtering never excludes other project tags, even after zero results', async () => {
   const calls = []
   const vm = vmFor(component('SearchPanel', { searchProjectContent: async (_id, payload) => { calls.push(payload); return emptyResult } }), {

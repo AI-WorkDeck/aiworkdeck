@@ -45,7 +45,7 @@ test('先发请求的迟到失败不许在新结果已经渲染之后弹错误�
   const options = loadOptions(
     { searchProjectContent: () => (++calls === 1 ? gates.A.promise : gates.B.promise) },
     { showToast: (o) => toasts.push(o) })
-  const vm = makeVm(options, { projectId: 1 })
+  const vm = makeVm(options, { projectId: 1, selectedTagIds: [1] })
 
   const first = vm.performSearch()   // 勾标签 A
   const second = vm.performSearch()  // 立刻再勾标签 B
@@ -66,7 +66,7 @@ test('最新一次请求失败照常提示', async () => {
   const options = loadOptions(
     { searchProjectContent: () => Promise.reject(new Error('boom')) },
     { showToast: (o) => toasts.push(o) })
-  const vm = makeVm(options, { projectId: 1 })
+  const vm = makeVm(options, { projectId: 1, selectedTagIds: [1] })
 
   await vm.performSearch()
 

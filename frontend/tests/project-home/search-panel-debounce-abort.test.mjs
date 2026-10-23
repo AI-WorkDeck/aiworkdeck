@@ -111,6 +111,8 @@ test('被取消的请求静默收尾：不弹「搜索失败」、不关掉新�
   assert.equal(vm.loading, true, '新请求还在路上，加载态要保持')
 
   api.calls[1].resolve(RESULT)
+  await Promise.resolve()
+  api.calls[2].resolve(RESULT)
   await second
   assert.equal(vm.loading, false)
   assert.equal(vm.results.totalMatches, 1)
