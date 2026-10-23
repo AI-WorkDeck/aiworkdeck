@@ -1472,6 +1472,19 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 8个业务包为search/voice/desensitize/litigation-visual/calendar/favorites/clipboard/insight；tmeet由已有tencent-meeting包承接。布局从manifest contributes.views解析，动态PluginPane承载sidebar/workspace，global无项目可开，project受项目/CLIENT门控。源在frontend/plugin-app，构建npm run build:plugins；npm run build:h5先构建8包。业务服务桥分pluginBusinessServices/pluginCollectionServices/pluginVoiceServices/pluginInsightServices，账号与本机设备仍在宿主。日历深链转插件workspace视图，保留task/file/focus过滤。核心保留home/projects/files/dev/market/version/staging/members及受限CLIENT dd-files，详见PLUGIN_SPEC §17盘点。验证除了单元测试还需真实Uni+opaque sandbox：ES模块静态资产需要仅plugin-web路由ACAO:*；不增加allow-same-origin或unsafe-eval。
 
 
+## 文件标签浏览（dev-board#1446）
+
+主资源管理器给 FileTree 传 `enable-tag-view`，顶部「文件夹 / 标签」切换；选择器等复用方默认关闭。
+标签视图跨折叠目录列出已标记文件，显示原父目录，多选标签 AND，不改文件实际位置和文件夹展开状态。
+共用 `TagFilter.vue` 的限高分组、名称过滤和常驻已选项，搜索契约见 utility-tools.md。
+过滤改变时清空选择；后台刷新移除命中项时清除隐藏选择，并关闭含失效目标的右键菜单。
+`fileOpenTabs.syncFileTreeSelectionToActive` 不能重新选中筛选外文件；批量操作取当前可见选择。
+标签列表按一个根窗口分页，键盘跨第 100 项必须同步扩展根窗口，不再按文件原父目录计数。
+右键加减标签同步 allFiles、当前列表与快照并发 `awd:files-changed`；项目标签管理关闭后重载文件及弹窗目标，
+后续加减标签以最新文件数据为准，防止已删除标签被旧弹窗重新带回。项目切换/卸载丢弃迟到的标签加载。
+回归 `file-tree-tag-filter` / `file-tab-focus`；`file-tag-filter-ui.mjs` 在真实 Uni H5 配合合成 API
+验证右键变更、鼠标/键盘、220/260/420px 与双主题，尚非正式 Electron 安装包验收。
+
 ## Finder 式图片快览（dev-board#1359，2026-10-19）
 
 图片单击只选中；已有普通图片预览标签时单击/上下键安全替换当前图片，不增加标签、不覆盖编辑文档。

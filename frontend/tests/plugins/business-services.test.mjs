@@ -18,7 +18,7 @@ test('search scopes to mounted project and forwards only documented input', asyn
   const { services, calls } = fixture()
   await services.request('search', 'query', { projectId: 99, query: 'case', url: '/api/admin', tagIds: [1, 'bad'], fileTypes: ['exe'] })
   assert.equal(calls[0][0], 12)
-  assert.deepEqual(calls[0][1], { query: 'case', caseSensitive: false, wholeWord: false, useRegex: false, tagIds: [1], fileTypes: ['docx', 'pdf', 'pptx', 'xlsx', 'txt', 'md'] })
+  assert.deepEqual(calls[0][1], { query: 'case', caseSensitive: false, wholeWord: false, useRegex: false, tagIds: [1] })
   await assert.rejects(services.request('http', 'get', {}), { code: 'unknown_service' })
   await assert.rejects(services.request('search', 'delete', {}), { code: 'unknown_operation' })
 })
@@ -67,4 +67,20 @@ test('view contributions reject escaped entries, unknown placement, duplicate id
   assert.deepEqual(views.map(v => v.id), ['main', 'global'])
   assert.equal(views[0].url, 'search/web/index.html')
   assert.equal(isGlobalPlugin({ views }), true)
+})
+
+test('the packaged search bridge includes tagged media and archives, with or without a keyword', async () => {
+  const files = ['photo.png', 'voice.mp3', 'recording.mp4', 'archive.zip'].map((fileName, i) => ({
+    fileId: i + 1, fileName, fileType: fileName.split('.').pop(), tags: [{ id: 7 }]
+  }))
+  const { services } = fixture({ api: { searchProjectContent: async (_projectId, params) => {
+    const results = files.filter(file => (!params.fileTypes || params.fileTypes.includes(file.fileType))
+      && file.fileName.includes(params.query)
+      && params.tagIds.every(id => file.tags.some(tag => tag.id === id)))
+    return { totalMatches: 0, totalFiles: results.length, results }
+  } } })
+  const tagged = await services.request('search', 'query', { query: '', tagIds: [7] })
+  assert.deepEqual(tagged.results.map(file => file.fileName), files.map(file => file.fileName))
+  const keyword = await services.request('search', 'query', { query: 'photo', tagIds: [7] })
+  assert.deepEqual(keyword.results.map(file => file.fileName), ['photo.png'])
 })

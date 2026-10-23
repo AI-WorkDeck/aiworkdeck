@@ -183,3 +183,18 @@ test('openFile, closeFile, and special tabs strictly synchronize FileTree select
   assert.equal(tree.selectedFileId, null)
   assert.deepEqual(tree.multiSelectedIds, [])
 })
+
+
+test('activating a document outside the tag filter clears highlight without changing the filter', () => {
+  const vm = workspace()
+  vm.leftFiles = [{ id: 101, name: 'outside.txt' }]
+  vm.activeFileIdLeft = 101
+  let revealed = false
+  const tree = { isTagView: true, displayFiles: [{ id: 202 }], selectedFileId: 202, multiSelectedIds: [202], revealFile() { revealed = true } }
+  vm.$refs.fileTree = tree
+  vm.syncFileTreeSelectionWithActiveTab()
+  assert.equal(revealed, false)
+  assert.equal(tree.selectedFileId, null)
+  assert.deepEqual(tree.multiSelectedIds, [])
+  assert.equal(tree.isTagView, true)
+})
