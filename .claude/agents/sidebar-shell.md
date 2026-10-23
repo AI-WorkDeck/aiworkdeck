@@ -1462,7 +1462,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 ## 嵌套文件夹打开（dev-board#1305）
 
-`LocalProjectService.openLocalFolder` 在新项目与已有同账号项目有父子目录关系时，先抛 `NestedFolderConfirmationRequired`；`ProjectController` 返回 `code:0`、`data.requiresNestedConfirmation` 与 `overlappingProjectNames`，此时没有创建目录、项目或导入文件。共用入口 `ideOpen.launchProject` 展示「继续打开 / 取消」，确认后带 `allowNested:true` 重试同一路径，创建/打开所选目录的独立项目。已登记的相同目录照常复用，不重复提示；跨账号重叠仍拒绝且不泄漏项目名；案件库 clone 的非空与嵌套限制未放开。
+`LocalProjectService.openLocalFolder` 在新项目与已有同账号项目有父子目录关系时，先抛 `NestedFolderConfirmationRequired`；`ProjectController` 返回 `code:0`、`data.requiresNestedConfirmation` 与 `overlappingProjectNames`，此时没有创建目录、项目或导入文件。共用入口 `ideOpen.launchProject` 展示「继续打开 / 取消」，确认后带 `allowNested:true` 重试同一路径，创建/打开所选目录的独立项目。已登记的相同目录照常复用，不重复提示；精确查询与列表查询之间并发登记的同一路径也须排除出嵌套判断，复用权限仍由锁内 `resolveProject` 校验（dev-board#1466，确定性 H2 时序回归覆盖所有者、授权协作者与无权限账号）；跨账号重叠仍拒绝且不泄漏项目名；案件库 clone 的非空与嵌套限制未放开。
 
 父子项目引用同一批真实文件，编辑、删除、退回版本彼此可见；数据库文件行和根 `.awd` 清单分别属于各项目。版本层排除子目录 `.awd` 并保护旧历史，详见 version-control.md。验证覆盖取消不落盘、两个方向、重开幂等、各项目独立索引与对账、前端系统打开/新建/菜单共用流程。
 
