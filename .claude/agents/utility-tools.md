@@ -289,6 +289,15 @@ mtime+size 指纹没变，缓存里那句「请先转写」会永久生效且不
 **不承诺静音免扣**（结算在官网网关）；EMPTY 提示按落库 `gatewayTaskId` 判断，不能按当前
 档位推断那次任务是否收费。回归：`node --test frontend/tests/meeting-recorder/*.test.mjs`、
 `MeetingTranscriptParserTest` / `MeetingTranscriptionServiceTest`。
+**语音插件麦克风过桥（dev-board#1447）**：独立语音面板通过
+`plugin-app/voice/meetingRecorder.js` → `pluginVoiceServices.js` 的 `devices` 获取设备。
+原生 `MediaDeviceInfo` 的字段是原型 getter，直接交给 `clonePluginData` 会变成空对象，
+导致名称全退为「麦克风 N」、设备 ID 丢失并回退默认输入。宿主返回前须显式映射
+`{ deviceId, label, kind, groupId }` 普通对象；不要扩大通用克隆器的原型访问范围，
+也不要为修名称在后台打开麦克风。回归 `tests/plugins/voice-insight-services.test.mjs`
+使用原型 getter 设备对象，覆盖过桥后的名称、所选设备 ID 与未授权空名称。
+`node frontend/tests/plugins/voice-devices-browser.mjs` 用 Chromium 假麦克风产生原生设备对象，
+经过真实业务桥进入打包语音 iframe，验证名称和所选输入；不使用用户麦克风或真实项目。
 **空录音与读不出的结果（BUG-57）**：静音结果的 AudioInfo 也可能嵌在 `Transcription.AudioInfo`
 （同层只允许空 `AudioSegments`），同样落 `EMPTY`。平台档网关已 `completed` 但本机读不出结果时，
 FAILED 文案按网关回的 `billing.chargedCents`：>0 写「已结算 N Credits、不会自动退还、重试可能再计费」；
