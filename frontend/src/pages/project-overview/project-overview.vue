@@ -2197,7 +2197,7 @@
       </view>
       <BackendHealthStatus />
       <MobileBackupConsent v-if="isDesktopApp" />
-      <MobileReceiveStatus v-if="isDesktopApp" :project-id="hasNamedProject ? projectId : null" @received="onVersionReloadFiles([])" />
+      <MobileReceiveStatus v-if="isDesktopApp" :project-id="hasNamedProject ? projectId : null" @received="$refs.fileTree && $refs.fileTree.loadFiles()" />
       <view class="status-spacer"></view>
       <view v-if="activeFileLeft" class="status-item status-file">
         <text>{{ activeFileLeft.name }}</text>
