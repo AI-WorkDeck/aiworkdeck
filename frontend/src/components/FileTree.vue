@@ -142,6 +142,8 @@
       </view>
     </view>
 
+    <ExplorerCreateMenu ref="createMenu" @select="onCreateMenuSelect" @close="createMenuOpen = false" />
+
     <!-- 右键上下文菜单 -->
     <view
       v-if="contextMenu.visible"
@@ -309,6 +311,7 @@
     <view
       class="tree-content"
       :class="{ 'external-drag-over': externalDragActive || stagingDragOver, 'view-mode-recycle': viewMode === 'recycle' }"
+      @contextmenu.prevent="onBlankContextMenu"
       @mousedown="onMarqueeStart" @mousemove="onMarqueeMove" @mouseup="onMarqueeEnd" @tap="closeContextMenu"
       @dragenter="onTreeDragEnter" @dragover="onTreeDragOver" @dragleave="onTreeDragLeave" @drop="onTreeDrop"
     >
@@ -380,7 +383,7 @@
           @mouseenter="onItemPrimeDrag(item)"
           @mousedown="onItemPrimeDrag(item)"
           @tap="handleItemClick(item, $event)"
-          @contextmenu.prevent="handleContextMenu(item, $event)"
+          @contextmenu.prevent.stop="handleContextMenu(item, $event)"
           @dragstart="handleDragStart($event, item, index)"
           @dragover.prevent="handleDragOver($event, index)"
           @drop="handleDrop($event, index)"
@@ -513,7 +516,7 @@
           }"
           :data-file-id="item.id"
           @tap="handleItemClick(item, $event)"
-          @contextmenu.prevent="handleContextMenu(item, $event)"
+          @contextmenu.prevent.stop="handleContextMenu(item, $event)"
           @touchstart="handleTouchStart($event, index)"
           @touchmove="handleTouchMove($event, index)"
           @touchend="handleTouchEnd($event, index)"
@@ -665,11 +668,11 @@
     <!-- 底部工具栏 -->
     <view v-if="showFooterActions" class="tree-footer">
        <view class="footer-row">
-        <button class="btn-new-folder" @tap="showCreateFolderDialog">
+        <button class="btn-new-folder" @tap="handleCreateFolder()">
           {{ $t('fileTree.newFolder') }}
         </button>
-        <button class="btn-new-word" @tap="handleCreateWord">
-          {{ $t('fileTree.newWord') }}
+        <button class="btn-new-word" data-create-trigger @click.stop="openCreateMenu">
+          {{ $t('fileTree.newItem') }}
         </button>
       </view>
     </view>
@@ -735,6 +738,7 @@ import { prefetchLocalFilePath, startExternalFileDrag, clearLocalPathCache } fro
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
 import { canConvertItemToPdf, canMergeItemsToPdf, pdfConversionRecoveryOptions } from '@/utils/fileTreePdfActions.js'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
+import ExplorerCreateMenu from '@/components/ExplorerCreateMenu.vue'
 import TagChip from '@/components/TagChip.vue'
 import TagSelector from '@/components/TagSelector.vue'
 import TagManager from '@/components/TagManager.vue'
@@ -769,6 +773,7 @@ function parentIdsEqual(a, b) {
 export default {
   name: 'FileTree',
   components: {
+    ExplorerCreateMenu,
     FileTypeIcon,
     TagChip,
     TagSelector,
@@ -817,7 +822,9 @@ export default {
       loading: false,
       selectedFileId: null,
       showRenameDialog: false,
-      newFolderName: '',
+      creatingItem: false,
+      createMenuOpen: false,
+      createMenuParentId: null,
       renameValue: '',
       renamingFile: null,
       // 拖拽相关
@@ -1132,6 +1139,7 @@ export default {
         const key = newVal != null ? String(newVal) : ''
         const prevKey = oldVal != null ? String(oldVal) : ''
         if (key !== prevKey) {
+          this.$refs?.createMenu?.close()
           this.refCounts = {}
           const cached = key ? projectFileTreeSnapshotCache.get(key) : null
           if (cached && Array.isArray(cached.allFiles) && cached.allFiles.length > 0) {
@@ -1155,6 +1163,7 @@ export default {
     },
     parentId: {
       handler() {
+        this.$refs?.createMenu?.close()
         this.loadFiles()
       }
     },
@@ -1283,6 +1292,7 @@ export default {
       return !!target?.closest?.('input, textarea, select, button, a, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="button"], [role="dialog"], .awd-dialog-mask, .dialog-overlay, .context-menu, .tree-footer')
     },
     focusTree(event) {
+      if (this.createMenuOpen) return
       // A row's default mousedown can move focus back to body after our handler.
       // Refocus on click too, without cancelling mousedown/native drag initiation.
       const e = this.treeInputEvent(event, event?.type === 'click' ? 'click' : 'mousedown')
@@ -1412,77 +1422,64 @@ export default {
       }
       return this.parentId
     },
-    // 命名框走应用内对话框 AwdDialog（utils/dialog.js 的 showDialog）：它挂在 <body> 下、
-    // 不在 .file-tree 根节点内，方向键不会被本组件的 handleKeyDown 抢去折叠文件夹/改选中项
-    // （选中项就是新建落点）；Esc 取消、Enter 确认、打开时全选输入框由 AwdDialog 负责。
-    // 以前这里是内联的 awd-dialog-mask，上述键盘行为一样都没有（BUG-27 复核）。
-    async showCreateFolderDialog(initial = '') {
-      const r = await showDialog({
-        title: this.$t('fileTree.newFolder'),
-        editable: true,
-        content: initial,
-        placeholderText: this.$t('fileTree.folderNamePlaceholder'),
-      })
-      if (!r || !r.confirm) return
-      this.newFolderName = r.content || ''
-      // 名字不合法：提示后带着用户刚填的内容重开，让他接着改
-      if ((await this.handleCreateFolder()) === false) {
-        return this.showCreateFolderDialog(this.newFolderName)
-      }
+    openCreateMenu(event) {
+      if (this.viewMode === 'recycle' || this.creatingItem) return
+      const e = nativeEvent(event) || event
+      const trigger = e?.target?.closest?.('[data-create-trigger]') || event?.currentTarget
+      const rect = trigger?.getBoundingClientRect?.()
+      this.closeContextMenu()
+      this.createMenuParentId = this.createTargetParentId()
+      this.createMenuOpen = true
+      this.$refs.createMenu.open({ x: rect?.left ?? e?.clientX ?? 0, y: rect?.bottom ?? e?.clientY ?? 0, trigger })
     },
-    async handleCreateFolder() {
-      if (!this.newFolderName.trim()) {
-        uni.showToast({
-          title: this.$t('fileTree.folderNamePlaceholder'),
-          icon: 'none'
-        })
-        return false
+    onBlankContextMenu(event) {
+      const e = nativeEvent(event) || event
+      // Only the blank area owns this menu; file rows retain their existing actions.
+      if (this.viewMode === 'recycle' || e?.target?.closest?.('.tree-item, .tree-toolbar, button, input')) return
+      e?.preventDefault?.()
+      e?.stopPropagation?.()
+      this.closeContextMenu()
+      this.createMenuParentId = this.parentId
+      this.createMenuOpen = true
+      this.$refs.createMenu.open({ x: e?.clientX ?? 0, y: e?.clientY ?? 0, mode: 'context', trigger: this.$el })
+    },
+    onCreateMenuSelect(kind) {
+      const parentId = this.createMenuParentId
+      if (kind === 'folder') return this.handleCreateFolder(parentId)
+      if (kind === 'recording') { this.$emit('create-recording'); return }
+      if (kind === 'docx') return this.handleCreateWord(parentId)
+      if (kind === 'pptx' || kind === 'xlsx') return this.openCreateFileDialog(undefined, kind, parentId)
+    },
+    uniqueCreateName(base, extension, parentId) {
+      const names = new Set([...(this.allFiles || []), ...(this.files || [])].filter(f => f && parentIdsEqual(f.parentId || null, parentId || null)).map(f => f.name.toLocaleLowerCase()))
+      let name = base + extension
+      let number = extension ? 1 : 2
+      while (names.has(name.toLocaleLowerCase())) {
+        name = extension ? `${base} (${number++})${extension}` : `${base} ${number++}`
       }
-
-      // 检查是否使用了系统保留名称
-      const reservedNames = ['.stagezone', '__staging_area__']
-      if (reservedNames.includes(this.newFolderName.trim())) {
-        uni.showToast({
-          title: this.$t('fileTree.reservedNameNotAllowed'),
-          icon: 'none'
-        })
-        return false
-      }
-
-      if (!this.projectId) {
-        uni.showToast({
-          title: this.$t('fileTree.projectIdMissingCreateFolder'),
-          icon: 'none'
-        })
-        return
-      }
-
+      return name
+    },
+    async handleCreateFolder(parentId = this.createTargetParentId()) {
+      if (this.creatingItem || !this.projectId || this.viewMode === 'recycle') return
+      this.creatingItem = true
+      const projectId = Number(this.projectId)
       try {
-        // 确保 projectId 是数字类型
-        const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
-        if (isNaN(projectId)) {
-          throw new Error(this.$t('fileTree.projectIdInvalid'))
-        }
-        const parentId = this.createTargetParentId()
-        await createFolder(projectId, parentId, this.newFolderName.trim())
-        this.newFolderName = ''
+        const name = this.uniqueCreateName('Untitled Folder', '', parentId)
+        await createFolder(projectId, parentId, name)
+        if (Number(this.projectId) !== projectId) return
+        if (parentId != null && this.showTree) this.expandedFolders.add(parentId)
         await this.loadFiles()
-        uni.showToast({
-          title: this.$t('fileTree.createSuccess'),
-          icon: 'success'
-        })
+        uni.showToast({ title: this.$t('fileTree.createSuccess'), icon: 'success' })
       } catch (error) {
-        console.error('创建文件夹失败:', error)
-        uni.showToast({
-          title: error.message || this.$t('fileTree.createFailed'),
-          icon: 'none'
-        })
+        uni.showToast({ title: error.message || this.$t('fileTree.createFailed'), icon: 'none' })
+      } finally {
+        this.creatingItem = false
       }
     },
     // 「新建 Word」入口（规范 v2.9 P4）：装了带模板的插件时先给选择，「空白文档」永远第一项；
-    // 没有贡献模板/清单拉取失败则与老行为逐字一致（直接建空白，只是现在会先弹命名对话框——
-    // BUG-27：此前静默用英文默认名 newdocument.docx，与「新建文件夹」的命名体验不一致）。
-    async handleCreateWord() {
+    // 没有贡献模板或清单拉取失败时，直接进入空白文档命名框。
+    async handleCreateWord(targetParentId = this.createTargetParentId()) {
+      const projectId = this.projectId
       let templates = []
       try {
         const res = await getContributedTemplates()
@@ -1491,22 +1488,24 @@ export default {
       } catch (e) {
         templates = []
       }
+      if (this.projectId !== projectId) return
       if (!templates.length) {
-        return this.openCreateFileDialog()
+        return this.openCreateFileDialog(undefined, 'docx', targetParentId)
       }
       // actionsheet 项数有限：只列前 5 份，更多模板走 AI 对话（list_contributed_templates）
       const shown = templates.slice(0, 5)
       uni.showActionSheet({
         itemList: [this.$t('fileTree.blankDocOption'), ...shown.map(t => t.name || t.id)],
         success: async (r) => {
+          if (this.projectId !== projectId) return
           if (r.tapIndex === 0) {
-            this.openCreateFileDialog()
+            this.openCreateFileDialog(undefined, 'docx', targetParentId)
             return
           }
           const t = shown[r.tapIndex - 1]
           try {
             const res2 = await createFileFromContributedTemplate(
-              t.pluginId, t.id, Number(this.projectId), this.createTargetParentId() || null, null)
+              t.pluginId, t.id, Number(projectId), targetParentId || null, null)
             const body2 = res2 && res2.code !== undefined ? res2 : (res2 && res2.data) || {}
             if (body2.code !== 0) {
               throw new Error(body2.message || this.$t('fileTree.templateCreateFailed'))
@@ -1523,26 +1522,30 @@ export default {
       })
     },
 
-    // 「新建文件」命名对话框（BUG-27）：与「新建文件夹」同一个 AwdDialog（键盘行为见
-    // showCreateFolderDialog 的注释），默认填好本地化默认名（打开即全选，直接打字就是改名），
-    // Esc/取消不创建任何文件；确认后走 createBlankWord(name) 落地。
-    async openCreateFileDialog(initial) {
+    // Keep document naming in AwdDialog; folders are created directly.
+    async openCreateFileDialog(initial, type = 'docx', targetParentId = this.createTargetParentId()) {
+      const projectId = this.projectId
+      const defaultNameKey = type === 'pptx' ? 'fileTree.defaultPresentationName' : type === 'xlsx' ? 'fileTree.defaultSpreadsheetName' : 'fileTree.defaultDocumentName'
       const r = await showDialog({
         title: this.$t('fileTree.newFileDialogTitle'),
         editable: true,
-        content: initial === undefined ? this.$t('fileTree.defaultDocumentName') : initial,
+        content: initial === undefined ? this.$t(defaultNameKey) : initial,
         placeholderText: this.$t('fileTree.fileNamePlaceholder'),
       })
-      if (!r || !r.confirm) return
+      if (!r || !r.confirm || this.projectId !== projectId) return
       const name = (r.content || '').trim()
       if (!name) {
         uni.showToast({ title: this.$t('fileTree.fileNamePlaceholder'), icon: 'none' })
-        return this.openCreateFileDialog('')
+        return this.openCreateFileDialog('', type, targetParentId)
       }
-      return this.createBlankWord(name)
+      return this.createBlankOffice(type, name, targetParentId)
     },
 
-    async createBlankWord(desiredName) {
+    createBlankWord(desiredName) {
+      return this.createBlankOffice('docx', desiredName)
+    },
+    async createBlankOffice(type, desiredName, targetParentId = this.createTargetParentId()) {
+      if (!['docx', 'pptx', 'xlsx'].includes(type) || this.creatingItem) return
       if (!this.projectId) {
         uni.showToast({
           title: this.$t('fileTree.projectIdMissingCreateFile'),
@@ -1558,40 +1561,25 @@ export default {
           throw new Error(this.$t('fileTree.projectIdInvalid'))
         }
 
-        // Auto Rename Logic: Check displayFiles for collisions
-        const ext = '.docx'
+        const ext = '.' + type
         // desiredName 来自命名对话框，用户可能已经带了 .docx 后缀，去重避免出现 "xx.docx.docx"
         let baseName = (desiredName || this.$t('fileTree.defaultDocumentName')).trim()
         if (baseName.toLowerCase().endsWith(ext)) {
           baseName = baseName.slice(0, -ext.length)
         }
         if (!baseName) baseName = this.$t('fileTree.defaultDocumentName')
-        let name = baseName + ext
-        let counter = 1
-
-        // 落点与「新建文件夹」同一个：选中的文件夹（或选中文件所在的文件夹），没选中才是当前层级
-        // （dev-board#885：此前这里只认 parentId，树模式下恒为根，选中文件夹也落到根目录）。
-        const targetParentId = this.createTargetParentId()
-        const existingNames = new Set(this.displayFiles.map(f => f.name))
-        // 目标文件夹折叠着时它的子项不在 displayFiles 里，同名要从全量里补上，否则后端按 FAIL 拒收
-        for (const f of (this.allFiles || [])) {
-          if (f && (f.parentId ?? null) === (targetParentId ?? null)) existingNames.add(f.name)
-        }
-        while (existingNames.has(name)) {
-           name = `${baseName} (${counter})${ext}`
-           counter++
-        }
-
-        // 创建Word文件（wpsFileId 由服务端生成，dev-board#1035）
+        const name = this.uniqueCreateName(baseName, ext, targetParentId)
+        this.creatingItem = true
         await createFile(
           projectId,
           targetParentId,
           name,
-          'docx',
+          type,
           null, // fileSize
           null // filePath
         )
 
+        if (Number(this.projectId) !== Number(projectId)) return
         if (targetParentId != null && this.showTree && this.expandedFolders) {
           this.expandedFolders.add(targetParentId)
         }
@@ -1601,9 +1589,11 @@ export default {
           icon: 'success'
         })
       } catch (error) {
-        console.error('创建Word文件失败:', error)
+        console.error('创建Office文件失败:', error)
         // 使用模态对话框显示错误
         this.showErrorModal(error.message || this.$t('fileTree.createFileFailedRetry'), this.$t('fileTree.createFailed'))
+      } finally {
+        this.creatingItem = false
       }
     },
     handleRenameConfirm(event) {
@@ -2767,7 +2757,7 @@ export default {
     async handleKeyDown(event) {
       const e = this.treeInputEvent(event, 'keydown')
       if (!e || e.defaultPrevented || e.isComposing || e.keyCode === 229 || this.renamingId != null) return
-      if (this.isTreeControlTarget(e.target) || this.showFolderSelector || this.showTagEditDialog || this.showTagManager || this.showRenameDialog || this.contextMenu.visible) return
+      if (this.isTreeControlTarget(e.target) || this.showFolderSelector || this.showTagEditDialog || this.showTagManager || this.showRenameDialog || this.contextMenu.visible || this.createMenuOpen) return
       if (this.keyboardDeletePending || e.altKey || e.shiftKey) return
       const key = e.key
       const deleting = key === 'Delete' || key === 'Backspace'
