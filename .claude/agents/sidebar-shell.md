@@ -1394,7 +1394,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 ### 工作台底栏手机收件（dev-board#1171）
 
-`MobileReceiveStatus` 位于底栏 spacer 之前，桌面态常驻（含无项目态），点击展开本机收件详情；不依赖左栏面板或当前项目。设备完整 ID 与当前项目编号/本地路径用于和手机核对同名项目；列表为全设备最近 100 件本次运行记录。新收到且保存完成的当前项目资料抛 `received`，由工作台 `onVersionReloadFiles` 刷新文件树。后端定时取件、状态生命周期和验证边界见 mobile-sync.md 的 #1171 节。
+`MobileReceiveStatus` 位于底栏 spacer 之前，桌面态常驻（含无项目态），点击展开本机收件详情；不依赖左栏面板或当前项目。设备完整 ID 与当前项目编号/本地路径用于和手机核对同名项目；列表为全设备最近 100 件本次运行记录。新收到且保存完成的当前项目资料抛 `received`，工作台直接调用已挂载的 `fileTree.loadFiles()` 刷新目录（dev-board#1437）。不能接到 `onVersionReloadFiles([])`：它只重载指定的已打开文档，空编号数组会直接返回。树未挂载时跳过，重新挂载会拉取最新目录；不重载正在编辑的文档。后端定时取件、状态生命周期和验证边界见 mobile-sync.md 的 #1171 节。回归除 `tests/media/mobile-receive.test.mjs` 的事件绑定外，`tests/mobile-receive/ui.mjs` 必须验证保存后目录自动出现、展开日期文件夹能看到照片；只验证收件提示不代表资源管理器已刷新。
 
 ## PDF 路由（2026-10-10，dev-board#1178）
 
