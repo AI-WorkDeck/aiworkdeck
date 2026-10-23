@@ -3,18 +3,43 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { compile } from '@vue/compiler-dom'
+import * as Vue from 'vue'
 import zh from '../../src/locales/zh-CN/workbench.js'
 const source = readFileSync(new URL('../../src/components/MobileReceiveStatus.vue', import.meta.url), 'utf8')
 const script = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
-function create(load) {
+function create(load, onEmit = () => {}) {
   const component = new Function('getMobileReceiveStatus', 'checkMobileReceive', 'setTimeout', 'clearTimeout', script)(load, async () => {}, () => 1, () => {})
   const events = []
-  const vm = { ...component.data(), projectId: 42, $emit: (...args) => events.push(args), $t: (key, params = {}) => key.split('.').slice(1).reduce((o, k) => o[k], zh).replace(/\{(\w+)\}/g, (_, k) => params[k]) }
+  const vm = { ...component.data(), projectId: 42, $emit: (...args) => { events.push(args); onEmit(...args) }, $t: (key, params = {}) => key.split('.').slice(1).reduce((o, k) => o[k], zh).replace(/\{(\w+)\}/g, (_, k) => params[k]) }
   for (const [key, fn] of Object.entries(component.methods)) vm[key] = fn.bind(vm)
   for (const [key, fn] of Object.entries(component.computed)) Object.defineProperty(vm, key, { get: () => fn.call(vm) })
   return { vm, events }
 }
 const row = (phase, key = 42, id = 1) => ({ id, phase, fileName: '录音.m4a', project: { key: String(key), name: '同名项目' } })
+function workbenchReceiptHandler(refs) {
+  const workbench = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
+  const tag = workbench.match(/<MobileReceiveStatus\b[^>]*\/>/)[0]
+  const render = new Function('Vue', compile(tag).code)({ ...Vue, resolveComponent: () => 'MobileReceiveStatus' })
+  return render({
+    isDesktopApp: true, hasNamedProject: true, projectId: 42, $refs: refs,
+    onVersionReloadFiles() { assert.fail('Receiving a photo must not reload open documents') },
+  }, []).props.onReceived
+}
+test('saved receipt refreshes the file tree through the actual workbench event binding', async () => {
+  let phase = 'receiving', reloads = 0
+  const receive = workbenchReceiptHandler({ fileTree: { loadFiles() { reloads++ } } })
+  const { vm } = create(async () => ({ active: true, items: [row(phase)] }), event => {
+    if (event === 'received') receive()
+  })
+  await vm.refresh(); assert.equal(reloads, 0)
+  phase = 'saved'
+  await vm.refresh(); assert.equal(reloads, 1)
+  await vm.refresh(); assert.equal(reloads, 1)
+})
+test('receiving with the file tree unmounted is safe', () => {
+  assert.doesNotThrow(() => workbenchReceiptHandler({})())
+})
 test('only actual saved receipts refresh the matching project, once', async () => {
   let phase = 'receiving'
   const { vm, events } = create(async () => ({ active: true, items: [row(phase), row('saved', 43, 2)] }))
