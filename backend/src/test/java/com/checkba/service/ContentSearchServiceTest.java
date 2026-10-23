@@ -53,7 +53,7 @@ class ContentSearchServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(fileAccess.canRead(any(), eq(9L))).thenReturn(true);
+        when(fileAccess.readFilterForProject(PROJECT_ID, 9L)).thenReturn(file -> true);
         projectFileRepository = mock(ProjectFileRepository.class);
         fileTagRepository = mock(FileTagRepository.class);
         tagRepository = mock(TagRepository.class);

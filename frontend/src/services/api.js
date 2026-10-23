@@ -3476,6 +3476,7 @@ export function searchProjectContent(projectId, payload, opts = {}) {
     url: `/api/projects/${projectId}/search`,
     method: 'POST',
     data: payload,
+    timeout: payload.filenameOnly ? 60000 : 300000,
     header: { 'Content-Type': 'application/json' },
     signal: opts.signal
   })

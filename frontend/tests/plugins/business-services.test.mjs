@@ -18,9 +18,17 @@ test('search scopes to mounted project and forwards only documented input', asyn
   const { services, calls } = fixture()
   await services.request('search', 'query', { projectId: 99, query: 'case', url: '/api/admin', tagIds: [1, 'bad'], fileTypes: ['exe'] })
   assert.equal(calls[0][0], 12)
-  assert.deepEqual(calls[0][1], { query: 'case', caseSensitive: false, wholeWord: false, useRegex: false, tagIds: [1] })
+  assert.deepEqual(calls[0][1], { query: 'case', filenameOnly: false, caseSensitive: false, wholeWord: false, useRegex: false, tagIds: [1] })
   await assert.rejects(services.request('http', 'get', {}), { code: 'unknown_service' })
   await assert.rejects(services.request('search', 'delete', {}), { code: 'unknown_operation' })
+})
+test('filename-only searches preserve the host project and cannot expand permissions', async () => {
+  const { services, calls } = fixture()
+  await services.request('search', 'query', { projectId: 99, query: '锦江', filenameOnly: true })
+  assert.equal(calls[0][0], 12)
+  assert.equal(calls[0][1].filenameOnly, true)
+  await services.request('search', 'query', { query: '锦江', filenameOnly: 'true' })
+  assert.equal(calls[1][1].filenameOnly, false)
 })
 test('permission and no-project checks happen before any data access', async () => {
   for (const override of [{ permissions: () => [] }, { projectId: () => null }]) {

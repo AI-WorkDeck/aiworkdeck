@@ -43,7 +43,7 @@ class ContentSearchServiceTagFilterTest {
         tags = mock(TagRepository.class);
         text = mock(DocumentTextService.class);
         access = mock(ProjectFileAccessService.class);
-        when(access.canRead(any(), eq(USER_ID))).thenReturn(true);
+        when(access.readFilterForProject(PROJECT_ID, USER_ID)).thenReturn(file -> true);
         firstTag = tag(FIRST_TAG_ID, "证据");
         when(tags.findAllById(any())).thenReturn(List.of(firstTag, tag(SECOND_TAG_ID, "待核对")));
         service = new ContentSearchService(files, fileTags, tags, text, null, access);
@@ -142,7 +142,7 @@ class ContentSearchServiceTagFilterTest {
         ProjectFile visible = file(2L, "公开.png", "png");
         givenFiles(hidden, visible);
         givenLinks(link(1L, FIRST_TAG_ID), link(2L, FIRST_TAG_ID));
-        when(access.canRead(hidden, USER_ID)).thenReturn(false);
+        when(access.readFilterForProject(PROJECT_ID, USER_ID)).thenReturn(file -> file != hidden);
 
         assertEquals(List.of(2L), ids(service.searchContent(PROJECT_ID, request("", FIRST_TAG_ID), USER_ID)));
         verify(fileTags).findByFileIdIn(List.of(2L));

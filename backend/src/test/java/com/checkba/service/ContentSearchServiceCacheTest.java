@@ -114,7 +114,7 @@ class ContentSearchServiceCacheTest {
 
     @BeforeEach
     void setUp() {
-        when(fileAccess.canRead(any(), eq(9L))).thenReturn(true);
+        when(fileAccess.readFilterForProject(PROJECT_ID, 9L)).thenReturn(file -> true);
         projectFileRepository = mock(ProjectFileRepository.class);
         FileTagRepository fileTagRepository = mock(FileTagRepository.class);
         TagRepository tagRepository = mock(TagRepository.class);

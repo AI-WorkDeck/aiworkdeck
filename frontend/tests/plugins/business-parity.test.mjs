@@ -47,6 +47,19 @@ test('sensitive adapter preserves the original five minute processing window', a
   } finally { globalThis.window = previous }
 })
 
+test('search adapter gives the full scan five minutes and preserves cancellation', async () => {
+  const requests = [], previous = globalThis.window
+  globalThis.window = { awd: { services: { request: async (...args) => { requests.push(args); return {} } } } }
+  try {
+    const api = await import('../../plugin-app/adapters/api.js')
+    const controller = new AbortController()
+    await api.searchProjectContent(1, { query: '锦江', filenameOnly: true }, { signal: controller.signal })
+    await api.searchProjectContent(1, { query: '锦江' }, { signal: controller.signal })
+    assert.deepEqual(requests.map(args => args[3].timeoutMs), [60000, 300000])
+    assert.ok(requests.every(args => args[3].signal === controller.signal))
+  } finally { globalThis.window = previous }
+})
+
 test('sensitive import current reads the focused non-LOWA document through the real host wiring', async () => {
   const workbench = source('../../src/pages/project-overview/project-overview.vue')
   const plugin = source('../../src/components/PluginPane.vue')
