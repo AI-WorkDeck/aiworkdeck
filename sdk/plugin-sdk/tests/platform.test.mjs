@@ -83,7 +83,7 @@ test('timeout discards late reply; old host error is preserved instead of fake s
 test('pre-aborted calls and invalid timeouts send nothing', async t => {
   const h = harness(t), controller = new AbortController(); controller.abort()
   await assert.rejects(h.awd.services.request('search', 'query', {}, { signal: controller.signal }), error => error.code === 'aborted')
-  for (const timeoutMs of [0, -1, Infinity, '5', 120001]) await assert.rejects(h.awd.files.list({ timeoutMs }), error => error.code === 'invalid_params')
+  for (const timeoutMs of [0, -1, Infinity, '5', 300001]) await assert.rejects(h.awd.files.list({ timeoutMs }), error => error.code === 'invalid_params')
   assert.equal(h.sent.length, 0); assert.equal(h.timers.size, 0)
 })
 
@@ -123,4 +123,43 @@ test('all distributed SDK copies are identical and safe to embed in website temp
     assert.equal(await readFile(new URL(copy, import.meta.url), 'utf8'), source)
   }
   assert.equal(source.includes('`'), false); assert.equal(source.includes('${'), false)
+})
+
+test('five-minute services survive two minutes, settle normally, and cancel only at their own deadline', async () => {
+  let clock = 0, nextId = 0, listener
+  const timers = new Map(), sent = []
+  const parent = { postMessage: message => sent.push(message) }
+  const window = { parent, addEventListener: (_name, callback) => { listener = callback } }
+  vm.runInNewContext(source, { window,
+    setTimeout: (callback, delay) => { const id = ++nextId; timers.set(id, { at: clock + delay, callback }); return id },
+    clearTimeout: id => timers.delete(id),
+  })
+  const advance = async duration => {
+    clock += duration
+    for (const [id, timer] of [...timers]) if (timer.at <= clock) { timers.delete(id); timer.callback() }
+    await Promise.resolve(); await Promise.resolve()
+  }
+  const reply = (message, result) => listener({ source: parent, data: { awd: 1, type: 'result', seq: message.seq, ok: true, result } })
+  let completed = false
+  const pending = window.awd.services.request('sensitive', 'preview', {}, { timeoutMs: 300000, requestId: 'slow-preview' }).then(value => { completed = true; return value })
+  await advance(120001)
+  assert.equal(completed, false)
+  assert.equal(sent.filter(message => message.method === 'services.cancel').length, 0)
+  reply(sent[0], { preview: 'complete' })
+  assert.deepEqual(await pending, { preview: 'complete' })
+  assert.equal(timers.size, 0)
+  const expiring = window.awd.services.request('sensitive', 'redact', {}, { timeoutMs: 300000, requestId: 'slow-redact' })
+  const rejected = assert.rejects(expiring, error => error.code === 'timeout')
+  await advance(299999)
+  assert.equal(sent.filter(message => message.method === 'services.cancel').length, 0)
+  await advance(1); await rejected
+  const cancellation = sent.filter(message => message.method === 'services.cancel')
+  assert.equal(cancellation.length, 1)
+  assert.equal(cancellation[0].params.requestId, 'slow-redact')
+  reply(cancellation[0], {})
+  const normal = window.awd.settings.open()
+  const defaultExpired = assert.rejects(normal, error => error.code === 'timeout')
+  await advance(59999); assert.equal(timers.size, 1)
+  await advance(1); await defaultExpired
+  assert.equal(timers.size, 0)
 })

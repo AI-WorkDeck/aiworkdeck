@@ -186,8 +186,8 @@
     var opts = options || {};
     return new Promise(function (resolve, reject) {
       var timeoutMs = opts.timeoutMs == null ? 60000 : opts.timeoutMs;
-      if (typeof timeoutMs !== 'number' || !isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000) {
-        reject(bridgeError('invalid_params', 'timeoutMs must be between 1 and 120000 ms'));
+      if (typeof timeoutMs !== 'number' || !isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > 300000) {
+        reject(bridgeError('invalid_params', 'timeoutMs must be between 1 and 300000 ms'));
         return;
       }
       var signal = opts.signal;

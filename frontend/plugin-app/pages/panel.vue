@@ -23,7 +23,7 @@ export default {
       window.awd.services.request('sensitive', 'choose', {}, { timeoutMs: 120000 }).then(callback).catch(e => window.awd.ui.toast(e.message))
     },
     activeFile(callback) { window.awd.services.request('sensitive', 'active', {}).then(file => { if (file) callback(file) }) },
-    selectScope(callback) { window.awd.services.request('litigation', 'scope', {}, { timeoutMs: 120000 }).then(callback) },
+    selectScope(callback) { window.awd.services.request('litigation', 'scope', {}, { timeoutMs: 120000 }).then(scope => { if (scope) callback(scope) }) },
     startDrawing({ prompt }) { return window.awd.chat.send(prompt) },
     async openFile(file) {
       const service = { search: 'search', desensitize: 'sensitive', 'litigation-visual': 'litigation' }[__BUSINESS_PLUGIN__]

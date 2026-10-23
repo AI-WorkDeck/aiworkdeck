@@ -19,6 +19,8 @@ const clone = value => JSON.parse(JSON.stringify(value))
 // a plugin cancels its requests, not the user's background recording/download.
 export function createPluginVoiceServices({ projectId, permissions, isCurrent, actions }) {
   let sourceFileId = null
+  const installResults = new Map()
+  let lastStop = null
   const allowed = permission => { if (!permissions().includes(permission)) error('permission_denied', permission + ' is required') }
   const check = signal => { if (signal.aborted || !isCurrent()) error('cancelled', 'Request cancelled') }
   const confirm = async (content, signal) => {
@@ -83,9 +85,15 @@ export function createPluginVoiceServices({ projectId, permissions, isCurrent, a
           const item = items.find(item => item.packId === params.packId)
           if (!item) error('invalid_params', 'Unknown speech component')
           // The manager owns the long-running job; callers poll its real state.
-          componentDownloads.installOne(item).catch(() => {})
+          const result = { ok: null, error: '' }
+          installResults.set(item.packId, result)
+          componentDownloads.installOne(item).then(ok => { result.ok = ok; result.error = item.error || '' })
         }
-        return clone(items.map(item => ({ ...item, installing: componentDownloads.isInstalling(item.packId) })))
+        return clone(items.map(item => {
+          const installing = componentDownloads.isInstalling(item.packId)
+          const result = installResults.get(item.packId)
+          return { ...item, installing, installResult: result?.ok ?? null, installError: result?.error || '' }
+        }))
       }
       if (operation === 'probe') return api.probeLocalAsr()
       if (operation === 'requireAccount') return requireAccount({ reason: 'meeting' })
@@ -110,8 +118,9 @@ export function createPluginVoiceServices({ projectId, permissions, isCurrent, a
       if (!projectId()) error('no_project', 'A project is required')
       if (operation === 'recordingState') {
         const state = recorder.recorderState
-        return String(state.projectId) === String(projectId()) || !recorder.isRecordingActive()
+        const visible = String(state.projectId) === String(projectId()) || !recorder.isRecordingActive()
           ? clone(state) : { status: state.status, projectId: null, seconds: 0, level: 0 }
+        return { ...visible, lastStop: lastStop && String(lastStop.projectId) === String(projectId()) ? clone(lastStop) : null }
       }
       if (operation === 'devices') {
         const devices = await recorder.listAudioInputDevices()
@@ -131,7 +140,13 @@ export function createPluginVoiceServices({ projectId, permissions, isCurrent, a
       if (['pause', 'resume', 'stop'].includes(operation)) {
         allowed('file_write')
         if (String(recorder.recorderState.projectId) !== String(projectId())) error('permission_denied', 'Recording belongs to another project')
-        return recorder[operation === 'pause' ? 'pauseRecording' : operation === 'resume' ? 'resumeRecording' : 'stopRecording']()
+        if (operation === 'stop') {
+          const stopped = { meetingId: recorder.recorderState.meetingId, projectId: recorder.recorderState.projectId }
+          const meeting = await recorder.stopRecording()
+          if (recorder.recorderState.status !== 'stopping') lastStop = { ...stopped, meeting }
+          return meeting
+        }
+        return recorder[operation === 'pause' ? 'pauseRecording' : 'resumeRecording']()
       }
       if (!['get', 'audio', 'minutes', 'transcribe', 'update', 'export', 'delete'].includes(operation)) error('unknown_operation', 'Unknown voice operation')
       const row = await meeting(params.id, signal)

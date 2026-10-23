@@ -18,6 +18,7 @@ export const componentDownloads = {
   async installOne(item) {
     await voice('componentInstall', { packId: item.packId })
     do { await new Promise(resolve => setTimeout(resolve, 1000)); await load() } while (item.installing)
-    return item.installed === true
+    if (item.installResult === false) item.error = item.installError
+    return item.installResult === true
   },
 }

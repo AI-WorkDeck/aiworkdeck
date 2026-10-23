@@ -449,3 +449,11 @@ Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings
 平台 billing.status/checkout 未指定 connectionId 时，前端请求须完全省略该 query 键（Uni 会把 undefined 序列化为空字符串，导致后端误选自有连接）；显式连接 ID 原样传递。平台 billing.status 在机器级权限校验后主动刷新权益，并提供 refreshed 标记；失败可保留本账户离线缓存，不能当成新支付确认。结账入口按 SiteProfileService 与界面语言生成。自有订阅仍只有固定状态/结账接口，不是宿主支付处理器。SDK 类型、示例与官网镜像须同步。验证入口与证据边界见 `docs/plugin-services-validation.md`；`PluginServicesFixtureApplication` 只在 test classpath，精确映射合成域名，不得搬入生产或放宽 SSRF。
 
 官方 desktop local-mode 的 ai.request 云调用仍固定当前账户；BYOK 选路集成测试须在服务端模式解释。插件自己的 BYO connections 独立。测试启动器连接恢复应与生产保持一致（不能禁用默认 retryOnConnectionFailure 后把合成服务闲置断连误报为产品故障），并关闭 mobile.relay 后台同步。
+
+## 八项业务插件迁移行为契约（2026-10-23，dev-board#1448）
+
+八项为搜索、语音、脱敏、诉讼可视化、日程、收藏夹、剪贴板、解析依据。迁移前后对照和实际验证边界见 `doc/verification/2026-10-23-plugin-parity-1448.md`。宿主活动标签ID通过 `pluginBusinessActions.activeFileId` 供脱敏使用，不等同只允许LOWA的 `getPluginActiveEditor`；归属继续由业务服务查当前项目。依据打开文件走 `insightOpenDoc → openInsightDocFile` 保留右窗行为，项目审查标准不依赖活动文档，坐标只接受编辑器已换算的宿主坐标。
+
+`awd:litviz-restyled` 成功信号按项目转 `files.changed`；顶部 `awd:meeting-recording-stopped` 转权限为speech的空 `speech.stopped`，iframe再唤醒原面板列表监听。绘图换风格等待保存也要纳入try/catch，取消时向原项目发结束信号释放保存屏障。脱敏原API为300000ms，适配器和SDK上限一致，SDK默认仍60000ms。录音停止可等待用户确认付费转写，超出单次RPC时继续查询真实状态；宿主按项目和meetingId保存原停止结果（包括失败时null），不能再次stop或把旧结果当新结果。
+
+日程读取完整目录元数据，不能用SDK对外扁平文件投影；更新时可保留已验证原事项中的软删关联，新关联仍查可见文件。插件TaskDialog在窄iframe中滚动/换行，遮罩低于Uni确认框；动态引用图标必须构建期导入，不能请求后端根/static。随附UI修复必须同步构建并提高插件版本，`PluginBundledInstaller` 仅升级更高版本且带 `.awd-bundled` 的安装，不覆盖独立市场安装或用户卸载记录。

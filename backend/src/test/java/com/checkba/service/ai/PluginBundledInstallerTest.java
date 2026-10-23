@@ -77,6 +77,31 @@ class PluginBundledInstallerTest {
         assertEquals("1.0.0", Files.readString(plugins.resolve("search/web/index.html")));
         try (var entries = Files.list(plugins)) { assertEquals(List.of("search"), entries.map(p -> p.getFileName().toString()).toList()); }
     }
+    @Test void fixedBusinessBundlesUpgradeExistingOriginalInstallations() throws Exception {
+        for (String id : List.of("voice", "calendar", "desensitize", "litigation-visual", "insight")) {
+            Path shipped = Path.of("../official-plugins").resolve(id);
+            String manifest = Files.readString(shipped.resolve("manifest.json"));
+            var original = cn.hutool.json.JSONUtil.parseObj(manifest);
+            String version = original.getStr("version");
+            assertTrue(com.checkba.util.Semver.compare(version, "1.0.0") > 0, id + " must upgrade the original installation");
+            original.set("version", "1.0.0");
+            Files.createDirectories(source.resolve(id).resolve("web"));
+            Files.writeString(source.resolve(id).resolve("manifest.json"), original.toString());
+            Files.writeString(source.resolve(id).resolve("web/index.html"), "old plugin");
+            installer.installDefaults();
+            Files.copy(shipped.resolve("manifest.json"), source.resolve(id).resolve("manifest.json"), StandardCopyOption.REPLACE_EXISTING);
+            try (var paths = Files.walk(shipped.resolve("web"))) {
+                for (Path file : paths.toList()) {
+                    Path target = source.resolve(id).resolve(shipped.relativize(file));
+                    if (Files.isDirectory(file)) Files.createDirectories(target);
+                    else Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+            installer.installDefaults();
+            assertEquals(version, settings.get("plugin.bundled." + id));
+            assertEquals(Files.readString(shipped.resolve("web/index.html")), Files.readString(plugins.resolve(id).resolve("web/index.html")));
+        }
+    }
     @Test void symlinkPayloadIsRejectedWithoutReplacingExistingInstallation() throws Exception {
         installer.installDefaults(); bundle("1.1.0");
         Path outside = temp.resolve("outside"); Files.writeString(outside, "not a plugin resource");

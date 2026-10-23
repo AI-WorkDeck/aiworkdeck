@@ -23,7 +23,7 @@ const pick = (value, keys) => Object.fromEntries(keys.filter(key => value[key] !
 const writable = project => ['OWNER', 'MANAGER', 'ADMIN', 'PARTICIPANT'].includes(project.myRole)
 const modal = options => new Promise(resolve => uni.showModal({ ...options, success: res => resolve(!!res.confirm), fail: () => resolve(false) }))
 
-export function createPluginCollectionServices({ projectId, permissions, isCurrent, listFiles, openFile, actions = {} }) {
+export function createPluginCollectionServices({ projectId, permissions, isCurrent, openFile, actions = {} }) {
   const favorites = new Map()
   const clipboard = new Map()
   let purchasing = false
@@ -54,7 +54,8 @@ export function createPluginCollectionServices({ projectId, permissions, isCurre
     const filesFor = async pid => {
       need('file_read')
       await visibleProject(pid)
-      return scoped ? rows(await wait(listFiles())) : rows(await wait(getProjectFiles(pid, null, true)))
+      // Calendar selectors need directory nodes to label paths and hide system subtrees.
+      return rows(await wait(getProjectFiles(pid, null, true)))
     }
     const image = async (kind, itemId) => {
       const path = kind === 'favorites' ? '/api/favorites/' + id(itemId) + '/image' : '/api/clipboard/' + id(itemId) + '/file'
@@ -137,11 +138,13 @@ export function createPluginCollectionServices({ projectId, permissions, isCurre
       }
       if (!['create', 'update', 'delete'].includes(operation)) fail('unknown_method')
       let pid = params.data?.projectId
+      let existingFileIds = []
       if (operation !== 'create') {
         const result = scoped ? await wait(getProjectTasks(mountedProject)) : await wait(getCalendarTasks())
         const task = tasks(result).find(task => String(task.id) === id(params.id))
         if (!task) fail('not_found')
         pid = task.projectId
+        existingFileIds = Array.isArray(task.files) && task.files.length ? task.files.map(file => file.fileId) : task.fileId == null ? [] : [task.fileId]
       }
       await visibleProject(pid, true)
       if (operation === 'delete') return envelope(await wait(deleteTask(id(params.id))))
@@ -149,7 +152,12 @@ export function createPluginCollectionServices({ projectId, permissions, isCurre
       if (body.fileIds !== undefined) {
         if (!Array.isArray(body.fileIds)) fail('invalid_params')
         const files = await filesFor(pid)
-        if (body.fileIds.some(fid => !files.some(f => String(f.id) === id(fid) && !f.isFolder && !f.isDir))) fail('permission_denied')
+        // Keep existing deleted links when editing an unrelated field. They come
+        // from the verified task, never from the iframe's claimed associations.
+        if (body.fileIds.some(fid => {
+          const fileId = id(fid)
+          return !existingFileIds.some(existing => String(existing) === fileId) && !files.some(f => String(f.id) === fileId && !f.isFolder && !f.isDir)
+        })) fail('permission_denied')
       }
       check()
       return envelope(operation === 'create'
