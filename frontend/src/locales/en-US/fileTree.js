@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // File tree (FileTree.vue): context menu, batch actions, confirm dialogs, drag hints, local import
 export default {
+  newItem: "New",
+  newFileMenu: "New File",
+  newRecording: "Recording",
+  defaultPresentationName: "New presentation",
+  defaultSpreadsheetName: "New workbook",
+  recordingPluginRequired: "Install or enable Voice in plugin details before starting a recording.",
+  recordingNoticeRequired: "Please acknowledge the transcription notice in the recording panel before starting.",
+
   externalDragFailed: 'Could not drag the selection out. Make sure all selected items are existing local files and try again.',
   clientAccessTitle: "Client file access",
   clientAccessExplain: "Files are internal by default and must be shared individually. Clients can always read their own uploads.",
