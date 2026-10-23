@@ -528,6 +528,8 @@ public class LocalProjectService {
         for (Project other : projectRepository.findByLocalRootIsNotNull()) {
             if (!StringUtils.hasText(other.getLocalRoot())) continue;
             Path otherRoot = Paths.get(other.getLocalRoot());
+            // Another open may register this exact root after the first lookup; resolveProject checks access.
+            if (root.equals(otherRoot)) continue;
             if (!root.startsWith(otherRoot) && !otherRoot.startsWith(root)) continue;
             // Parent access also exposes every child file. Confirmation cannot grant account access.
             if (!java.util.Objects.equals(other.getUserId(), userId)) {

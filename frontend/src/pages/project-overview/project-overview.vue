@@ -544,21 +544,6 @@
 
       <!-- 左侧文件树（可收起） -->
       <view class="sidebar-left" ref="sidebarLeft" :class="{ collapsed: sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '0px' : sidebarWidth + 'px' }">
-        <view
-          v-if="!sidebarCollapsed"
-          class="sidebar-collapse-tab"
-          role="button"
-          tabindex="0"
-          :aria-label="$t('workbench.collapseSidebar')"
-          :title="$t('workbench.collapseSidebar')"
-          @tap.stop="toggleSidebar"
-          @keydown.enter.prevent="toggleSidebar"
-          @keydown.space.prevent="toggleSidebar"
-        >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M14 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </view>
         <!-- 批量菜单遮罩：用于点击空白关闭下拉（不弹中间） -->
         <view v-if="showBatchMenu" class="batch-menu-mask" @tap="closeBatchMenu"></view>
         <!-- 左栏标题的唯一出处。此前各面板还各画各的 header，于是「诉讼可视化」
@@ -843,6 +828,24 @@
 
         <!-- 拖拽手柄 -->
         <view class="resize-handle" :title="$t('workbench.resizePanel')" @touchstart="startResize('left', $event)" @mousedown="startResize('left', $event)"></view>
+      </view>
+
+      <!-- 外缘把手独立于侧栏裁剪区，保留窄幅空间以免遮挡编辑器和原生浏览器。 -->
+      <view v-if="!sidebarCollapsed" class="sidebar-collapse-anchor">
+        <view
+          class="sidebar-collapse-tab"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('workbench.collapseSidebar')"
+          :title="$t('workbench.collapseSidebar')"
+          @tap.stop="toggleSidebar"
+          @keydown.enter.prevent="toggleSidebar"
+          @keydown.space.prevent="toggleSidebar"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M14 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </view>
       </view>
 
       <!-- IDE 工作台：中(编辑) + 右(AI) + 底(工具) -->
@@ -5701,7 +5704,8 @@ export default {
       const layout = sidebar?.parentElement
       if (!layout?.clientWidth) return
       const rail = layout.querySelector('.left-rail')
-      const fit = fitPanelWidths(layout.clientWidth, rail?.offsetWidth || 0,
+      const collapseAnchor = layout.querySelector('.sidebar-collapse-anchor')
+      const fit = fitPanelWidths(layout.clientWidth - (collapseAnchor?.offsetWidth || 0), rail?.offsetWidth || 0,
         this.sidebarCollapsed ? 0 : this.sidebarWidth, this.showAiPanel ? this.aiPanelWidth : 0)
       if (!this.sidebarCollapsed) this.sidebarWidth = fit.left
       if (this.showAiPanel) this.aiPanelWidth = fit.right

@@ -764,6 +764,7 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
 - **awd-\* 类名约定**（King IDE 品牌清零后的通用弹窗/按钮样式，PR#171）：awd-dialog/-mask/-header/-title/-body/-footer、awd-btn/-primary/-secondary/-danger、awd-field/awd-input。**没有集中定义**——在 project-overview.vue（~:10180-10300）、ChatInterface.vue（~:2869 起）、FileTree.vue 各自 scoped 重复定义；改样式要多处同步。
 - 外壳布局类：.header-tools:6904、.rail-btn:7009、.sidebar-left:7403/7905、.workbench:7455、.bottom-panel:7283/7510、.compact-mode:7478、.is-resizing:7927。
 - **面板拖拽的跟手守卫是三件一套，删一件拖拽就会退化**（2026-08-20）：① `.is-resizing` 禁 transition；② `.is-resizing :deep(iframe)/:deep(webview)` 关 pointer-events——光标滑进嵌入文档父窗口就收不到 mousemove，拖拽会冻住；③ 桌面端浏览器 BrowserView 是原生层 CSS 管不到，靠 `desktopOverlayActive` 里那条 `resizing.active` 在拖拽期间隐藏。另外 `startResize/stopResize`（tabDragSplit.js）会锁/还原 body 的 cursor 与 user-select。编辑器窗格 `.editor-pane`/`.pane-content` 已拉平成方角（圆角卡片残留会在标签栏下沿与分栏缝露出底色弧口），别再给它们加 border-radius。
+- **左栏收起把手（dev-board#1459）**：`.sidebar-collapse-anchor` 是 `.sidebar-left` 与 `.workbench` 之间的 14px 同级节点，与工作区同底色且不加分隔线；把手从分隔线向右凸出，不进入侧栏内容、滚动条或编辑器工具栏区域。拖拽与窗口回夹均扣除实测把手宽度，保留编辑区最小宽度。侧栏继续 `overflow:hidden`，宽度拖拽手柄仍在栏内 `right:0`，不要为显示收起按钮而放开整个侧栏的裁剪。
 - **面板拖拽的上限按「面板所在容器的实测宽」算，不按整窗宽算**（2026-09-05，dev-board#459）：
   原来两支都是 `Math.floor(window.innerWidth * 0.75)`，可 `.side-panel-ai` 的父容器
   `.workbench-main` 只拿到「整窗 − rail − 左栏」。`.side-panel{flex-shrink:0}` 让面板不肯
@@ -1461,7 +1462,7 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 ## 嵌套文件夹打开（dev-board#1305）
 
-`LocalProjectService.openLocalFolder` 在新项目与已有同账号项目有父子目录关系时，先抛 `NestedFolderConfirmationRequired`；`ProjectController` 返回 `code:0`、`data.requiresNestedConfirmation` 与 `overlappingProjectNames`，此时没有创建目录、项目或导入文件。共用入口 `ideOpen.launchProject` 展示「继续打开 / 取消」，确认后带 `allowNested:true` 重试同一路径，创建/打开所选目录的独立项目。已登记的相同目录照常复用，不重复提示；跨账号重叠仍拒绝且不泄漏项目名；案件库 clone 的非空与嵌套限制未放开。
+`LocalProjectService.openLocalFolder` 在新项目与已有同账号项目有父子目录关系时，先抛 `NestedFolderConfirmationRequired`；`ProjectController` 返回 `code:0`、`data.requiresNestedConfirmation` 与 `overlappingProjectNames`，此时没有创建目录、项目或导入文件。共用入口 `ideOpen.launchProject` 展示「继续打开 / 取消」，确认后带 `allowNested:true` 重试同一路径，创建/打开所选目录的独立项目。已登记的相同目录照常复用，不重复提示；精确查询与列表查询之间并发登记的同一路径也须排除出嵌套判断，复用权限仍由锁内 `resolveProject` 校验（dev-board#1466，确定性 H2 时序回归覆盖所有者、授权协作者与无权限账号）；跨账号重叠仍拒绝且不泄漏项目名；案件库 clone 的非空与嵌套限制未放开。
 
 父子项目引用同一批真实文件，编辑、删除、退回版本彼此可见；数据库文件行和根 `.awd` 清单分别属于各项目。版本层排除子目录 `.awd` 并保护旧历史，详见 version-control.md。验证覆盖取消不落盘、两个方向、重开幂等、各项目独立索引与对账、前端系统打开/新建/菜单共用流程。
 
