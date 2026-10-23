@@ -160,7 +160,7 @@ class ContentSearchToolsTest {
         com.checkba.storage.StorageServiceFactory factory = Mockito.mock(com.checkba.storage.StorageServiceFactory.class);
         when(factory.getStorageService()).thenReturn(storage);
         com.checkba.service.ProjectFileAccessService fileAccess = Mockito.mock(com.checkba.service.ProjectFileAccessService.class);
-        when(fileAccess.canRead(txt, 9L)).thenReturn(true);
+        when(fileAccess.readFilterForProject(7L, 9L)).thenReturn(file -> file == txt);
         ToolContextHolder.set(new ToolContext(7L, null, 9L, null));
         ContentSearchService realSearch = new ContentSearchService(realRepo,
                 Mockito.mock(com.checkba.repository.FileTagRepository.class),

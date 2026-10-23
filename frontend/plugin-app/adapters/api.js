@@ -3,7 +3,9 @@
 // Build-time replacement for the host's authenticated API module. This bundle
 // contains no session headers, API base URL, HTTP proxy, or desktop preload API.
 import { request } from './bridge.js'
-export const searchProjectContent = (_projectId, payload, options) => request('search', 'query', payload, options)
+export const searchProjectContent = (_projectId, payload, options) => request('search', 'query', payload, {
+  ...options, timeoutMs: payload.filenameOnly ? 60000 : 300000,
+})
 export const getProjectTags = () => request('search', 'tags', {})
 export const getSensitiveOptions = () => request('sensitive', 'options', {})
 export const previewSensitiveFile = payload => request('sensitive', 'preview', payload, { timeoutMs: 300000 })

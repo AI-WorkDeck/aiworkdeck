@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /** File visibility is always subordinate to current project membership. */
 @Service
@@ -42,6 +43,16 @@ public class ProjectFileAccessService {
         return !isClient(file.getProjectId(), userId)
                 || Objects.equals(file.getUserId(), userId)
                 || Boolean.TRUE.equals(file.getClientVisible());
+    }
+
+    /** Resolve project membership and role once for a single list/search request, never across requests. */
+    public Predicate<ProjectFile> readFilterForProject(Long projectId, Long userId) {
+        boolean readable = projectId != null && userId != null && members.hasReadPermission(projectId, userId);
+        boolean client = readable && isClient(projectId, userId);
+        return file -> readable && file != null && Objects.equals(projectId, file.getProjectId())
+                && !Boolean.TRUE.equals(file.getIsDeleted())
+                && (!client || Objects.equals(file.getUserId(), userId)
+                    || Boolean.TRUE.equals(file.getClientVisible()));
     }
 
     public void requireRead(ProjectFile file, Long userId) {

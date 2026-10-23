@@ -47,8 +47,11 @@
       />
 
       <!-- Search Stats -->
-      <view class="search-stats" v-if="hasSearched">
-         <text v-if="loading">{{ $t('files.searching') }}</text>
+      <view class="search-stats" v-if="hasSearched" role="status" aria-live="polite">
+         <view v-if="loading" class="search-progress">
+           <text>{{ $t(searchPhase === 'content' ? 'files.searchingContent' : 'files.searching') }}</text>
+           <component :is="'button'" type="button" class="search-retry" @click.stop="stopWaiting()">{{ $t('files.searchStopWaiting') }}</component>
+         </view>
          <view v-else-if="searchError" class="search-error" role="alert">
            <text>{{ searchError }}</text>
            <component :is="'button'" type="button" class="search-retry" @click.stop="performSearch()">{{ $t('files.archiveRetry') }}</component>
@@ -64,7 +67,7 @@
     </view>
 
     <!-- Results List -->
-    <scroll-view scroll-y class="results-list" v-if="!loading && !searchError && results.results && results.results.length > 0">
+    <scroll-view scroll-y class="results-list" v-if="results.results && results.results.length > 0">
       <view class="file-group" v-for="file in results.results" :key="file.fileId">
         <!-- File Header -->
         <view class="file-header" @tap.stop="onFileHeader(file)">
@@ -148,6 +151,8 @@ export default {
       searchQuery: '',
       searchedQuery: '',
       searchError: '',
+      searchPhase: '',
+      isComposing: false,
       isSearchFocused: false,
       loading: false,
       hasSearched: false,
@@ -179,12 +184,20 @@ export default {
   mounted() {
     this.fetchTags()
     uni.$on?.('awd:files-changed', this.onFilesChanged)
+    // Uni's input event does not preserve native isComposing in every build.
+    // Listen on its DOM root so intermediate pinyin never starts a full scan.
+    const input = this.$refs?.searchInput
+    this._compositionRoot = input?.$el || input
+    this._compositionRoot?.addEventListener?.('compositionstart', this.onCompositionStart, true)
+    this._compositionRoot?.addEventListener?.('compositionend', this.onCompositionEnd, true)
   },
   beforeUnmount() {
     this._unmounted = true
     this._searchSeq = (this._searchSeq || 0) + 1
     this._tagsSeq = (this._tagsSeq || 0) + 1
     uni.$off?.('awd:files-changed', this.onFilesChanged)
+    this._compositionRoot?.removeEventListener?.('compositionstart', this.onCompositionStart, true)
+    this._compositionRoot?.removeEventListener?.('compositionend', this.onCompositionEnd, true)
     // 面板关掉后不许再有待发的防抖或在途请求（后端还在为它逐个抽文件）
     if (this.debounceTimer) clearTimeout(this.debounceTimer)
     this.debounceTimer = null
@@ -202,6 +215,8 @@ export default {
       this.searchQuery = ''
       this.searchedQuery = ''
       this.searchError = ''
+      this.searchPhase = ''
+      this.isComposing = false
       this.selectedTagIds = []
       this.allProjectTags = []
       this.tagCounts = {}
@@ -252,8 +267,20 @@ export default {
       }
       this.tagCounts = counts
     },
-    onSearchInput() {
+    onCompositionStart() {
+      this.isComposing = true
       if (this.debounceTimer) clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+    },
+    onCompositionEnd(event) {
+      this.isComposing = false
+      if (typeof event?.target?.value === 'string') this.searchQuery = event.target.value
+      this.onSearchInput()
+    },
+    onSearchInput(event) {
+      if (this.debounceTimer) clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+      if (this.isComposing || event?.isComposing) return
       this.debounceTimer = setTimeout(() => {
         this.debounceTimer = null
         this.performSearch(true)
@@ -266,6 +293,7 @@ export default {
       }
     },
     async performSearch(syncInput = false) {
+      if (this.isComposing) return
       // Uni batches v-model updates. Read the native value when the debounced
       // query actually runs, so a fast paste/type is searched in full.
       const root = this.$refs?.searchInput?.$el || this.$refs?.searchInput
@@ -279,20 +307,34 @@ export default {
       // 旧请求不只是丢结果，还要真的断开（v0.49.0 BUG-12：否则连续输入在后端叠成长队）
       if (this._searchAbort) this._searchAbort.abort()
       this._searchAbort = null
-
-      // Allow search if query is non-empty OR if tags are selected
-      this.loading = true
+      this.results = { totalMatches: 0, totalFiles: 0, results: [] }
+      this.tagCounts = {}
       this.searchError = ''
+      this.searchPhase = ''
+      this.loading = false
+      if (!this.searchQuery.trim() && !this.selectedTagIds.length) {
+        this.hasSearched = false
+        this.searchedQuery = ''
+        return
+      }
+      this.loading = true
       this.hasSearched = true
       const controller = (this._searchAbort = new AbortController())
       const query = this.searchQuery
+      this.searchedQuery = query
+      const payload = { query, ...this.searchOptions, tagIds: [...this.selectedTagIds] }
 
       try {
-        const response = await searchProjectContent(this.projectId, {
-          query,
-          ...this.searchOptions,
-          tagIds: [...this.selectedTagIds]
-        }, { signal: controller.signal })
+        if (query.trim()) {
+          this.searchPhase = 'names'
+          const names = await searchProjectContent(this.projectId, { ...payload, filenameOnly: true }, { signal: controller.signal })
+          if (seq !== this._searchSeq || controller.signal.aborted) return
+          this.results = names
+          this.updateTagCounts(names.results)
+          this.collapsedFiles = {}
+          this.searchPhase = 'content'
+        }
+        const response = await searchProjectContent(this.projectId, payload, { signal: controller.signal })
 
         if (seq !== this._searchSeq) return // 已有更新的搜索发起，丢弃本次陈旧结果
 
@@ -309,7 +351,7 @@ export default {
         console.error('Search failed:', e)
         // 失败提示同样按 seq 收口：陈旧请求的迟到失败不该盖在新结果上弹「搜索失败」
         if (seq === this._searchSeq) {
-          this.searchError = this.$t('files.searchFailed')
+          this.searchError = this.$t(this.searchPhase === 'content' ? 'files.searchContentFailed' : 'files.searchFailed')
           uni.showToast({ title: this.searchError, icon: 'none' })
         }
       } finally {
@@ -318,6 +360,15 @@ export default {
           this._searchAbort = null
         }
       }
+    },
+    stopWaiting() {
+      if (this.debounceTimer) clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+      this._searchSeq = (this._searchSeq || 0) + 1
+      this._searchAbort?.abort()
+      this._searchAbort = null
+      this.loading = false
+      this.searchError = this.$t(this.searchPhase === 'content' ? 'files.searchContentStopped' : 'files.searchStopped')
     },
     refreshSearch() {
       this.performSearch()
@@ -473,15 +524,17 @@ $brand-mint: var(--awd-mint);
   }
 }
 
+.search-progress,
 .search-error {
   display: flex;
   align-items: center;
   gap: var(--awd-panel-gap);
   min-width: 0;
   width: 100%;
-  color: var(--awd-danger-text);
 }
 
+.search-error { color: var(--awd-danger-text); }
+.search-progress > text,
 .search-error > text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .search-retry {
   flex-shrink: 0;
