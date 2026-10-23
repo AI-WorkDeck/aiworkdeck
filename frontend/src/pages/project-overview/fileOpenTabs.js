@@ -528,7 +528,7 @@ export const fileOpenTabsMethods = {
       if (tabType === 'admin-settings') return GLYPHS.settings
       if (tabType === 'commit-history') return GLYPHS.history
       if (tabType === 'welcome') return GLYPHS.welcome
-      if (tabType === 'dd-client' || tabType === 'dd-request') return GLYPHS.docText
+      if (tabType === 'message-center' || tabType === 'dd-client' || tabType === 'dd-request') return GLYPHS.docText
       if (tabType === 'calendar') return GLYPHS.calendar
       if (tabType === 'tmeet-transcript') return GLYPHS.tmeet
       return fileGlyph(type)

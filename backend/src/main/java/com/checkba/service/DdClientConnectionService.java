@@ -87,6 +87,42 @@ public class DdClientConnectionService {
         write(owner, rows);
     }
 
+    /** Reuses the invitation identity; it never converts a case-library client into a desktop account. */
+    public Object im(Long userId, String id, String action, Map<String,Object> params) {
+        if (!Set.of("projectGroup", "self", "messages", "send", "read", "members", "download").contains(action)) throw denied();
+        String owner = scope(userId);
+        Connection connection;
+        synchronized (this) {
+            connection = read(owner).stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow(() -> denied());
+        }
+        Map<String,Object> group = map(imReply(send(connection.serverUrl(), connection.session(), "POST", "/api/im/action",
+                jsonBody(Map.of("action", "projectGroup", "params", Map.of("projectId", connection.projectId()))))));
+        requireConnected(userId, owner, id);
+        if (number(group.get("projectId")) != connection.projectId() || !(group.get("id") instanceof String)) throw denied();
+        if ("projectGroup".equals(action)) return group;
+        Map<String,Object> bound = new LinkedHashMap<>(params == null ? Map.of() : params);
+        if (bound.containsKey("conversationId") && !Objects.equals(group.get("id"), bound.get("conversationId"))) throw denied();
+        bound.put("conversationId", group.get("id")); bound.remove("projectId"); bound.remove("connectionId");
+        Object result = imReply(send(connection.serverUrl(), connection.session(), "POST", "/api/im/action",
+                jsonBody(Map.of("action", action, "params", bound))));
+        requireConnected(userId, owner, id);
+        return result;
+    }
+
+    private Object imReply(Reply response) {
+        Map<String,Object> envelope = object(response);
+        if (!(envelope.get("code") instanceof Number code) || code.intValue() != 0)
+            throw bad(Objects.toString(envelope.get("message"), "项目群暂不可用，请稍后重试"));
+        return envelope.get("data");
+    }
+
+    public List<Map<String,Object>> notifications(Long userId, String id) {
+        Reply reply = proxy(userId, id, "GET", "/notifications", null, null);
+        if (reply.status() != 200) throw bad("受邀项目通知暂不可用");
+        try { return JSON.readValue(reply.body(), new TypeReference<List<Map<String,Object>>>() {}); }
+        catch (IOException e) { throw bad("案件库返回的通知无法读取"); }
+    }
+
     /** A closed operation set: callers cannot choose an origin, query, method or arbitrary file API. */
     public Reply proxy(Long userId, String id, String method, String path, Long requestId, RequestBody body) {
         String owner = scope(userId);

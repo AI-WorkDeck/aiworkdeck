@@ -560,9 +560,9 @@ test('3. Responding to a conflict clearance request with ethical wall and Commit
   assert.match(pendingHtml, /全国律协《律师执业行为规范》第五十一条/);
   assert.match(pendingHtml, /im-conv-conflict-2/);
 
-  // Click "附条件放行（启用信息隔离墙）"
+  // Register a conditional clearance in the legacy local ledger.
   const wallBtn = [...p.$('pending-clearances').querySelectorAll('button')].find((b) =>
-    b.textContent.includes('附条件放行（启用信息隔离墙）')
+    b.textContent.includes('本机登记附条件放行')
   );
   assert.ok(wallBtn, 'Expected ethical wall clearance button');
   wallBtn.click();
@@ -574,13 +574,13 @@ test('3. Responding to a conflict clearance request with ethical wall and Commit
   assert.equal(clearanceCall.params.params.decision, 'APPROVED_WITH_WALL');
   assert.equal(clearanceCall.params.params.ethicalWallApplied, true);
 
-  // Verify intake in committee queue moved to PENDING_COMMITTEE_REVIEW and click "终审通过并正式立案"
+  // Keep the legacy local project-creation flow available.
   assert.match(p.$('committee-queue').textContent, /待利冲委员终审/);
   const cards = [...p.$('committee-queue').querySelectorAll('.item-card')];
   const targetCard = cards.find((c) => c.textContent.includes('LF-2026-0002'));
   assert.ok(targetCard);
   const approveBtn = [...targetCard.querySelectorAll('button')].find((b) =>
-    b.textContent.includes('终审通过并正式立案')
+    b.textContent.includes('本机登记通过并建项')
   );
   approveBtn.click();
   await tick();

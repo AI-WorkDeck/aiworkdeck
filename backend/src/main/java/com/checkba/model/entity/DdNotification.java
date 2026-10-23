@@ -26,4 +26,14 @@ public class DdNotification {
     @Column(length = 512, nullable = false) private String title;
     @Column(nullable = false) private LocalDateTime createdAt;
     private LocalDateTime readAt;
+    /** Derived from the current checklist state, never from the read receipt. */
+    @Transient private String actionState = "none";
+
+    /** Additive JSON fields: the producer's time zone, never the receiving desktop's, locates the timestamp. */
+    @Transient public String getCreatedAtIso() {
+        return createdAt == null ? null : createdAt.atZone(java.time.ZoneId.systemDefault()).toInstant().toString();
+    }
+    @Transient public String getReadAtIso() {
+        return readAt == null ? null : readAt.atZone(java.time.ZoneId.systemDefault()).toInstant().toString();
+    }
 }

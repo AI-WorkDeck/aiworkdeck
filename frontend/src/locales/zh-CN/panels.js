@@ -326,6 +326,9 @@ export default {
   pgWorkspaceRetry: '重新加载',
   pgDefaultIntro: '{name} 已安装。在右侧 AI 对话里描述你的需求即可使用。',
   ppVerifying: '正在核验插件状态…',
+  ppCommunicationUpdate: '当前项目沟通插件仍是 {version}。请在插件中心更新后使用律所、团队、项目通讯录；统一聊天和通知也可从「消息中心」打开。',
+  ppLawfirmWorkflowUpdate: '当前律所管理插件为 {version}，尚不支持本人确认和跨设备利冲协作。请在插件中心更新到 0.1.2 或更高版本后处理此消息。',
+  ppOpenPluginUpdate: '打开插件更新',
   ppAuthorizationChanged: '插件状态已改变或无法核验。请先切换到其他侧栏面板，再重新打开；若仍无法加载，请在插件中心确认插件已启用。',
   ppLoadFailed: '无法加载插件：未配置入口地址',
 

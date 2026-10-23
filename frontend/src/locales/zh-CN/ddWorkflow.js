@@ -147,6 +147,7 @@ export default {
     "titles": "请填写每个清单项的名称。"
   },
   "client": {
+    "messageUnavailable": "该消息对应的受邀项目或清单已不可访问，请刷新后重试。",
     "workspaceTitle": "受邀尽调",
     "workspaceHint": "按律师清单准备材料，逐项提交并查看反馈。",
     "joinProject": "加入项目",

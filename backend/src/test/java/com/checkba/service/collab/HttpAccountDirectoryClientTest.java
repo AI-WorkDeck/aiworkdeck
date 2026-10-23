@@ -166,6 +166,15 @@ class HttpAccountDirectoryClientTest {
     }
 
     @Test
+    void firmAdministrationRequiresAnExplicitBooleanAndAFirm() {
+        String privileged=FOUND_BODY.replace("\"firmId\":\"firm-1\"", "\"firmId\":\"firm-1\",\"firmAdmin\":true");
+        assertTrue(stubbed(200,privileged).lookupByIdentifier("acc-me","13800138000").requester().firmAdmin());
+        String forged=privileged.replace("\"firmAdmin\":true","\"firmAdmin\":\"true\"");
+        assertFalse(stubbed(200,forged).lookupByIdentifier("acc-me","13800138000").requester().firmAdmin());
+        assertFalse(stubbed(200,privileged.replace("\"firmId\":\"firm-1\"","\"firmId\":null")).lookupByIdentifier("acc-me","13800138000").requester().firmAdmin());
+    }
+
+    @Test
     @DisplayName("found:false：account 为 null，requester 仍然解回来（拒绝理由靠它算）")
     void parsesTheNotFoundShape() {
         DirectoryReply r = stubbed(200,

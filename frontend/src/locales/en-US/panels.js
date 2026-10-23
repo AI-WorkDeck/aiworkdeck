@@ -327,6 +327,9 @@ export default {
   pgWorkspaceRetry: 'Reload',
   pgDefaultIntro: '{name} is installed. Describe what you need in the AI chat on the right to use it.',
   ppVerifying: 'Verifying plugin status…',
+  ppCommunicationUpdate: 'Project communication {version} is still installed. Update the plugin for the Firm, Team and Project directory. Chats and notifications are also available in Message center.',
+  ppLawfirmWorkflowUpdate: 'Law firm management {version} does not support personal confirmation and shared conflict workflows. Update the plugin to 0.1.2 or later before handling this message.',
+  ppOpenPluginUpdate: 'Open plugin updates',
   ppAuthorizationChanged: 'Plugin status changed or could not be verified. Switch to another sidebar panel, then open this one again. If it still fails, confirm the plugin is enabled in the Plugin Center.',
   ppLoadFailed: 'Unable to load the plugin: entry URL not configured',
 

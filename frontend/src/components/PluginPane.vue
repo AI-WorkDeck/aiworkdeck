@@ -2,8 +2,12 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <view class="plugin-pane">
+    <view v-if="legacyProjectCommunication || legacyLawfirmWorkflow" class="plugin-error plugin-update" role="status">
+      <text>{{ $t(legacyLawfirmWorkflow ? 'panels.ppLawfirmWorkflowUpdate' : 'panels.ppCommunicationUpdate', { version: installedPluginVersion }) }}</text>
+      <button type="button" @click="openPluginUpdate">{{ $t('panels.ppOpenPluginUpdate') }}</button>
+    </view>
     <iframe
-      v-if="url && (!isWebPlugin || authorizationReady)"
+      v-else-if="url && (!isWebPlugin || authorizationReady)"
       :key="sessionGeneration"
       ref="pluginFrame"
       :src="url"
@@ -48,7 +52,7 @@
 // v2.7 实验 API：x- 前缀方法只对本机 dev 免签直装的插件开放（devInstalled prop），
 // 广场装的插件调用一律 experimental_not_allowed——运行时闸是真保证，受理扫描只是辅助。
 import {
-  getPlugins, getProjectFiles, getFileText, getAiConversations, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm,
+  getPlugins, getProjectFiles, getFileText, getAiConversations, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm, requestPluginNotifications,
   requestPluginLawFirm,
   createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks,
   getTeam, getProjectMembers, getCurrentUser, searchProjectContent, getProjectTags,
@@ -174,6 +178,8 @@ export default {
       // 换插件时自增，回响应前比对，代次对不上就丢弃。
       sessionGeneration: 0,
       authorizationReady: false,
+      installedPluginVersion: '',
+      lawfirmWorkflowRequested: false,
       authorizationInvalid: false
     }
   },
@@ -204,6 +210,14 @@ export default {
     }
   },
   computed: {
+    legacyProjectCommunication() {
+      return this.pluginId === 'project-im' && this.authorizationReady && /^0\.[01]\./.test(this.installedPluginVersion)
+    },
+    legacyLawfirmWorkflow() {
+      if (this.pluginId !== 'lawfirm-management' || !this.authorizationReady || !this.lawfirmWorkflowRequested) return false
+      const [major, minor, patch] = this.installedPluginVersion.split('.').map(Number)
+      return major === 0 && (minor === 0 || (minor === 1 && patch < 2))
+    },
     // 只有走 /api/plugin-web/ 的 Web 插件才 sandbox + 握手。
     // 绑定 null 会让 Vue 移除该属性，绝对 URL 形态因此与改造前逐字节一致。
     isWebPlugin() {
@@ -254,10 +268,13 @@ export default {
       if (this.pluginId && this.pluginId !== 'lawfirm-management') return
       const tab = typeof payload === 'string' ? payload : (payload && payload.tab) || ''
       if (!tab) return
+      this.lawfirmWorkflowRequested = tab === 'conflicts'
+      const navigation = { tab }
+      if (payload && typeof payload.recordId === 'string') navigation.recordId = payload.recordId
       if (this._subscribedEvents && this._subscribedEvents.has('lawfirm.navigate')) {
-        this.forwardEvent('lawfirm.navigate', { tab })
+        this.forwardEvent('lawfirm.navigate', navigation)
       } else {
-        this._pendingLawfirmTab = tab
+        this._pendingLawfirmTab = navigation
       }
     }
     uni.$on('awd:lawfirm-tab', this._onLawfirmTab)
@@ -300,6 +317,7 @@ export default {
     this.resetEventChannel()
   },
   methods: {
+    openPluginUpdate() { uni.$emit('awd:plugin-open-settings', { pluginId: this.pluginId }) },
     // Capture authority before rendering code. Never adopt new privileges into a running iframe.
     async initializeAuthorization() {
       this.authorizationReady = false
@@ -320,6 +338,7 @@ export default {
           return
         }
         this._authorizationSnapshot = record
+        this.installedPluginVersion = String(record.version || '')
         this.authorizationReady = true
       } catch (_) {
         if (generation === this.sessionGeneration && !this._authorizationDestroyed) this.invalidateAuthorization()
@@ -573,6 +592,21 @@ export default {
           }
         }
 
+        case 'notifications.publish':
+        case 'notifications.resolve': {
+          if (!this.hasPermission('notifications')) return this.denied('notifications')
+          const generation = this.sessionGeneration
+          try {
+            const res = await requestPluginNotifications(this.pluginId, method.split('.')[1], params)
+            if (generation !== this.sessionGeneration) return this.staleContext()
+            if (!res || res.code !== 0) return { ok: false, error: { code: 'invoke_failed', message: res?.message || '消息通知请求失败' } }
+            uni.$emit('awd:message-center-changed')
+            return { ok: true, result: res.data }
+          } catch (e) {
+            return { ok: false, error: { code: 'invoke_failed', message: e?.message || '消息中心暂不可用' } }
+          }
+        }
+
         case 'im.request': {
           if (!this.hasPermission('im')) return this.denied('im')
           const action = typeof params.action === 'string' ? params.action.trim() : ''
@@ -787,7 +821,7 @@ export default {
           if (method === 'events.subscribe' && this._pendingLawfirmTab && this._subscribedEvents.has('lawfirm.navigate')) {
             const pending = this._pendingLawfirmTab
             this._pendingLawfirmTab = ''
-            setTimeout(() => this.forwardEvent('lawfirm.navigate', { tab: pending }), 0)
+            setTimeout(() => this.forwardEvent('lawfirm.navigate', pending), 0)
           }
           if (method === 'events.subscribe' && this._subscribedEvents.has('sidebar.command') && this._pendingSidebarCommand) {
             const pending = this._pendingSidebarCommand
@@ -1176,6 +1210,13 @@ export default {
   border: none;
 }
 
+.plugin-update {
+  flex-direction: column;
+  gap: 16px;
+  padding: 32px;
+  line-height: 1.7;
+  button { background: var(--awd-accent); color: var(--awd-on-accent, #fff); border: 0; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
+}
 .plugin-error {
   padding: var(--awd-panel-gap-lg) var(--awd-panel-pad-x);
   text-align: center;

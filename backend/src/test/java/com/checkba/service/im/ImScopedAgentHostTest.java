@@ -3,6 +3,11 @@
 package com.checkba.service.im;
 
 import com.checkba.model.entity.Project;
+import com.checkba.model.entity.ProjectRemote;
+import com.checkba.model.entity.CloudConnection;
+import com.checkba.repository.ProjectRemoteRepository;
+import com.checkba.version.OfficialCloudService;
+import org.springframework.test.util.ReflectionTestUtils;
 import com.checkba.repository.ProjectRepository;
 import com.checkba.service.ProjectMemberService;
 import org.junit.jupiter.api.*;
@@ -26,11 +31,50 @@ class ImScopedAgentHostTest {
         when(projectFiles.ensureIdentity(7L, 2L, "qa-account")).thenReturn(uid);
         when(projectFiles.readIdentity(7L, 2L, "qa-account")).thenReturn(uid);
         when(gateway.captureAccountScope()).thenReturn("qa-account");
+        when(gateway.executeWithinScope(eq(7L),eq("qa-account"),eq("ensureAgent"),anyMap())).thenReturn(Map.of("id","private-chat"));
     }
     void info(boolean privateChat, String scope, String key) {
         when(gateway.executeWithinScope(7L, "qa-account", "agentInfo", Map.of("conversationId", "chat")))
                 .thenReturn(Map.of("agent", Map.of("private", privateChat, "scope", scope, "scopeKey", key)));
     }
+    void bindOfficialProject() {
+        ProjectRemoteRepository remotes=mock(ProjectRemoteRepository.class); OfficialCloudService official=mock(OfficialCloudService.class);
+        ProjectRemote remote=new ProjectRemote(); remote.setProjectId(2L); remote.setConnectionId(11L); remote.setRemoteProjectId("77");
+        CloudConnection connection=new CloudConnection(); connection.setId(11L); connection.setUserId(7L); connection.setAccountFingerprint("qa-account");
+        when(remotes.findByProjectId(2L)).thenReturn(Optional.of(remote)); when(official.connectOfficial(7L)).thenReturn(connection);
+        ReflectionTestUtils.setField(host,"projectRemotes",remotes); ReflectionTestUtils.setField(host,"officialCloud",official);
+        when(gateway.executeWithinScope(7L,"qa-account","projectGroup",Map.of("projectId",77L)))
+                .thenReturn(Map.of("id","bound-project-group","projectId",77L,"agent",Map.of("scope","project","scopeKey","project:77","private",false)));
+        when(gateway.executeWithinScope(7L,"qa-account","agentScopes",Map.of())).thenReturn(Map.of("agents",List.of()));
+    }
+    @Test void boundProjectCatalogueAndSharedEnsureReuseTheActualProjectGroup() {
+        bindOfficialProject();
+        var catalogue=(Map<?,?>)host.execute(7L,2L,"agentScopes",Map.of()); var scope=(Map<?,?>)((List<?>)catalogue.get("agents")).get(0);
+        assertEquals("project:77",scope.get("scopeKey")); assertEquals(uid,scope.get("legacyScopeKey")); assertEquals(2L,scope.get("localProjectId"));
+        var group=(Map<?,?>)host.execute(7L,2L,"ensureAgent",Map.of("scope","project","scopeKey","project:77","private",false));
+        assertEquals("bound-project-group",group.get("id")); assertEquals(2L,group.get("localProjectId"));
+        verify(gateway,never()).executeWithinScope(any(),anyString(),eq("ensureAgent"),anyMap()); verify(projectFiles,never()).ensureIdentity(any(),any(),any());
+        assertThrows(IllegalArgumentException.class,()->host.execute(7L,2L,"ensureAgent",Map.of("scope","project","scopeKey","project:999","private",false)));
+    }
+    @Test void privateFromBoundGroupReusesVerifiedMarkerAndAddsOnlyMappedCloudAssociation() {
+        bindOfficialProject(); host.execute(7L,2L,"ensureAgent",Map.of("scope","project","scopeKey","project:77","private",true,"projectId",2L));
+        verify(gateway).executeWithinScope(7L,"qa-account","ensureAgent",Map.of("scope","project","scopeKey",uid,"private",true,"title","合成并购项目","projectId",77L));
+        assertThrows(IllegalArgumentException.class,()->host.execute(7L,2L,"ensureAgent",Map.of("scope","project","scopeKey","project:2","private",true)));
+    }
+    @Test void privateBoundReplyRequiresBothMarkerAndCurrentOfficialProjectMapping() {
+        bindOfficialProject(); when(gateway.executeWithinScope(7L,"qa-account","agentInfo",Map.of("conversationId","chat")))
+                .thenReturn(Map.of("projectId",88L,"agent",Map.of("scope","project","scopeKey",uid,"private",true)));
+        assertThrows(IllegalArgumentException.class,()->host.execute(7L,2L,"agentReply",Map.of("conversationId","chat","messageId",41)));
+        verifyNoInteractions(context); verify(gateway,never()).executeWithinScope(any(),anyString(),eq("agentReply"),anyMap());
+    }
+    @Test void projectReadOnlyMemberCanUseBoundSharedGroupWithoutCreatingLocalMarker() {
+        bindOfficialProject(); when(projectFiles.readIdentity(7L,2L,"qa-account")).thenThrow(new IllegalArgumentException("no marker"));
+        when(projectFiles.ensureIdentity(7L,2L,"qa-account")).thenThrow(new IllegalArgumentException("readonly"));
+        var result=(Map<?,?>)host.execute(7L,2L,"agentScopes",Map.of());
+        assertEquals("project:77",((Map<?,?>)((List<?>)result.get("agents")).get(0)).get("scopeKey"));
+        assertThrows(IllegalArgumentException.class,()->host.execute(7L,2L,"ensureAgent",Map.of("scope","project","scopeKey","project:77","private",true)));
+    }
+
     @Test void sharedReplyNeverReadsOrForwardsPrivateProjectContext() {
         info(false, "project", uid);
         host.execute(7L, 2L, "agentReply", Map.of("conversationId", "chat", "messageId", 41,
