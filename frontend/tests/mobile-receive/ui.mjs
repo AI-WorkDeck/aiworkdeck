@@ -10,7 +10,7 @@ fs.mkdirSync(out, { recursive: true })
 const browser = await puppeteer.launch({ executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--no-sandbox'] })
 const page = await browser.newPage()
 await page.setViewport({ width: 1440, height: 1000 })
-let phase = 'pending', checks = 0
+let phase = 'pending', checks = 0, fileLoads = 0
 const project = { id: 42, name: '同名测试项目', projectName: '同名测试项目', userId: 7, localRoot: '/synthetic/项目甲', projectType: 'BLANK' }
 const errors = []
 page.on('pageerror', e => errors.push(e.message))
@@ -27,9 +27,17 @@ page.on('request', async req => {
   if (url.pathname === '/api/mobile-receive/status') body = {
     active: true, checking: phase === 'receiving', deviceId: 'test-desktop-device-1171', deviceName: '测试桌面', lastCheckedAt: Date.now(),
     project: { key: '42', name: project.name, path: project.localRoot },
-    items: [42, 43].map((key, i) => ({ id: i + 1, fileName: `录音${i + 1}.m4a`, project: { key: String(key), name: project.name, path: '/synthetic/项目' + key }, phase, updatedAt: Date.now(), message: phase === 'failed' ? 'save' : '', savedPath: `现场录音/2026-10-10/录音${i + 1}.m4a` }))
+    items: [42, 43].map((key, i) => ({ id: i + 1, fileName: i === 0 ? '手机测试照片.jpg' : '录音2.m4a', project: { key: String(key), name: project.name, path: '/synthetic/项目' + key }, phase, updatedAt: Date.now(), message: phase === 'failed' ? 'save' : '', savedPath: i === 0 ? '现场影像/2026-10-23/手机测试照片.jpg' : '现场录音/2026-10-10/录音2.m4a' }))
   }
   else if (url.pathname === '/api/mobile-receive/check') { checks++; phase = 'receiving'; body = { code: 0 } }
+  else if (url.pathname === '/api/projects/42/files') {
+    fileLoads++
+    body = phase === 'saved' ? [
+      { id: 9001, projectId: 42, name: '现场影像', isFolder: true, parentId: null },
+      { id: 9002, projectId: 42, name: '2026-10-23', isFolder: true, parentId: 9001 },
+      { id: 9003, projectId: 42, name: '手机测试照片.jpg', isFolder: false, parentId: 9002, fileType: 'jpg' },
+    ] : []
+  }
   else if (url.pathname === '/api/projects/42') body = project
   else if (url.pathname === '/api/projects/my') body = [project]
   else if (url.pathname === '/api/auth/me') body = { id: 7, username: 'test' }
@@ -59,12 +67,21 @@ try {
   assert.match(await page.$eval('.receive-panel', e => e.textContent), /接收失败/)
   assert.doesNotMatch(await page.$eval('.receive-panel', e => e.textContent), /workbench\.mobileReceive/)
   await page.screenshot({ path: out + '/failed.png' })
+  const fileLoadsBeforeReceipt = fileLoads
   phase = 'saved'
   await page.waitForFunction(() => document.querySelector('.receive-trigger').textContent.includes('已保存 2 件'), { timeout: 8000 })
-  assert.match(await page.$eval('.receive-panel', e => e.textContent), /现场录音\/2026-10-10\/录音1.m4a/)
+  assert.match(await page.$eval('.receive-panel', e => e.textContent), /现场影像\/2026-10-23\/手机测试照片\.jpg/)
   await page.screenshot({ path: out + '/saved.png' })
   await page.click('.receive-close')
   assert.equal(await page.$('.receive-panel'), null)
+  await page.waitForSelector('.tree-item[data-file-id="9001"]', { visible: true, timeout: 8000 })
+  assert.ok(fileLoads > fileLoadsBeforeReceipt, '收件完成后必须重新拉取文件树')
+  await page.click('.tree-item[data-file-id="9001"] .tree-expand-icon-wrapper')
+  await page.waitForSelector('.tree-item[data-file-id="9002"]', { visible: true })
+  await page.click('.tree-item[data-file-id="9002"] .tree-expand-icon-wrapper')
+  await page.waitForSelector('.tree-item[data-file-id="9003"]', { visible: true })
+  assert.match(await page.$eval('.tree-item[data-file-id="9003"]', e => e.textContent), /手机测试照片\.jpg/)
+  await page.screenshot({ path: out + '/saved-file-tree.png' })
   await page.goto('about:blank')
   await page.goto(base + '/#/pages/project-overview/project-overview', { waitUntil: 'networkidle0' })
   await page.waitForSelector('.page-project-overview.no-project')
@@ -77,5 +94,5 @@ try {
   await page.setViewport({ width: 900, height: 700 })
   await page.screenshot({ path: out + '/no-project-dark.png' })
   assert.deepEqual(errors, [])
-  console.log(JSON.stringify({ passed: true, checks, screenshotDirectory: out, unrelatedPageErrors: errors }, null, 2))
+  console.log(JSON.stringify({ passed: true, checks, fileLoads, screenshotDirectory: out, unrelatedPageErrors: errors }, null, 2))
 } finally { await browser.close() }
