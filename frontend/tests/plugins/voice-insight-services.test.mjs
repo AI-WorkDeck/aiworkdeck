@@ -39,6 +39,34 @@ test('voice permission and cross-project recording controls fail before side eff
   await assert.rejects(cross.wrapper.request('voice', 'pause'), { code: 'permission_denied' })
   assert.deepEqual(cross.calls, [])
 })
+function mediaDevice(fields) {
+  // MediaDeviceInfo exposes prototype getters, not own enumerable properties.
+  return Object.create(Object.defineProperties({}, Object.fromEntries(
+    Object.entries(fields).map(([key, value]) => [key, { get: () => value, enumerable: true }]),
+  )))
+}
+test('microphone names and IDs survive the plugin bridge and select the requested input', async () => {
+  const inputs = [
+    { deviceId: 'default', label: 'Default - MacBook Pro Microphone', kind: 'audioinput', groupId: 'built-in' },
+    { deviceId: 'usb-mic', label: 'USB Conference Microphone', kind: 'audioinput', groupId: 'usb' },
+  ]
+  const nativeDevices = inputs.map(mediaDevice)
+  assert.deepEqual(Object.keys(nativeDevices[1]), [])
+  const f = voiceFixture({ recorder: { listAudioInputDevices: async () => nativeDevices } })
+  const devices = structuredClone(clonePluginData(await f.wrapper.request('voice', 'devices')))
+  assert.deepEqual(devices, inputs)
+  assert.deepEqual(f.calls, [], 'listing devices must not start recording')
+  await f.wrapper.request('voice', 'start', { deviceId: devices[1].deviceId })
+  assert.equal(f.calls[0][0], 'start')
+  assert.equal(f.calls[0][1], 12)
+  assert.equal(f.calls[0][2], 'usb-mic')
+})
+test('microphone labels hidden by browser permission remain empty across the bridge', async () => {
+  const input = { deviceId: 'default', label: '', kind: 'audioinput', groupId: '' }
+  const f = voiceFixture({ recorder: { listAudioInputDevices: async () => [mediaDevice(input)] } })
+  assert.deepEqual(structuredClone(clonePluginData(await f.wrapper.request('voice', 'devices'))), [input])
+  assert.deepEqual(f.calls, [])
+})
 test('late trusted recording confirmation cannot start after disposal', async () => {
   let confirm
   const f = voiceFixture({ showDialog: () => new Promise(resolve => { confirm = resolve }) })
