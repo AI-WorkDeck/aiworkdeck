@@ -7,7 +7,7 @@ declare global { interface Window { awd: awd.SDK } }
 declare namespace awd {
   type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
   type Params = Record<string, unknown>;
-  interface CallOptions { signal?: AbortSignal; /** 1–120000 ms; default 60000. */ timeoutMs?: number }
+  interface CallOptions { signal?: AbortSignal; /** 1–300000 ms; default 60000. */ timeoutMs?: number }
   interface RequestOptions extends CallOptions { requestId?: string }
   interface SettingsOptions extends CallOptions { scope?: 'user' | 'project'; projectId?: number | string }
   interface ConnectionSummary { id: string; label?: string; connected?: boolean; needsReconnect?: boolean; [key: string]: unknown }

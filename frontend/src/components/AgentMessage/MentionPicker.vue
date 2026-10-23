@@ -29,7 +29,7 @@
           <text v-if="item.roleLabel || item.role" class="mp-path">{{ item.roleLabel || item.role }}</text>
         </template>
         <template v-else>
-          <image class="mp-icon" :src="item.isDir ? '/static/folder-closed.png' : '/static/document.png'" mode="aspectFit" />
+          <image class="mp-icon" :src="item.isDir ? folderIcon : documentIcon" mode="aspectFit" />
           <text class="mp-name">{{ item.name }}</text>
           <text v-if="item.dirLabel" class="mp-path">{{ item.dirLabel }}</text>
         </template>
@@ -57,6 +57,8 @@
 // 缺省为空数组，chat 的两处调用不传，行为不变。title/hint/emptyText/placement 同理可选。
 import { matchProjectFiles } from '@/utils/aiContextFiles.js'
 import { matchMembers, memberName } from '@/components/calendar/mentionText.js'
+import folderIcon from '@/static/folder-closed.png'
+import documentIcon from '@/static/document.png'
 
 export default {
   name: 'MentionPicker',
@@ -74,7 +76,7 @@ export default {
   },
   emits: ['select'],
   data() {
-    return { activeIndex: 0 }
+    return { activeIndex: 0, folderIcon, documentIcon }
   },
   computed: {
     matches() {

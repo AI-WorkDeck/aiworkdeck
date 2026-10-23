@@ -17,7 +17,7 @@ export default {
   methods: {
     executor() { const docFileId = this.context?.docFileId; return (action, params) => insight('execute', { docFileId, action, params }) },
     prepare: docFileId => insight('prepare', { docFileId }),
-    entities: payload => insight('entities', payload),
+    entities(payload) { if (payload.docFileId) insight('entities', payload).catch(() => {}) },
     openUrl: url => insight('openUrl', { url }),
     settings: () => insight('openSettings'),
     hover: payload => insight('openHover', { payload }),

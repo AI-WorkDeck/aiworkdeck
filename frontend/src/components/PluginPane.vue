@@ -97,6 +97,7 @@ const AI_REQUEST_MAX_CHARS = 16000
  */
 const PLUGIN_EVENTS = {
   'speech.progress': { permission: 'speech', throttleMs: 100 },
+  'speech.stopped': { permission: 'speech', throttleMs: 0 },
   'calendar.changed': { permission: 'tasks', throttleMs: 300 },
   'favorites.changed': { permission: 'file_read', throttleMs: 300 },
   'clipboard.changed': { permission: 'clipboard', throttleMs: 300 },
@@ -241,13 +242,16 @@ export default {
     // 事件源（v2.7）：FileTree.loadFiles 成功后与编辑器选区变化时各发一个应用级事件，
     // 这里按插件的订阅集合转发进 iframe（未订阅不推，见 forwardEvent）
     if (this.hasPermission('speech') && host.model?.onProgress) this._unsubscribeSpeech = host.model.onProgress(event => { if (['kokoro-models', 'asr-models'].includes(event?.id)) this.forwardEvent('speech.progress', event) })
-    this._collectionEvents = [['awd:clipboard-saved', 'clipboard.changed'], ['awd:entitlements-changed', 'clipboard.changed'], ['awd:favorites-changed', 'favorites.changed']].map(([source, event]) => {
+    this._collectionEvents = [['awd:clipboard-saved', 'clipboard.changed'], ['awd:entitlements-changed', 'clipboard.changed'], ['awd:favorites-changed', 'favorites.changed'], ['awd:meeting-recording-stopped', 'speech.stopped']].map(([source, event]) => {
       const callback = () => this.forwardEvent(event, {})
       uni.$on(source, callback)
       return () => uni.$off(source, callback)
     })
     this._unsubscribeTasks = subscribeTaskChanges(event => { if (['created', 'updated', 'deleted'].includes(event.kind)) this.forwardEvent('calendar.changed', {}) })
     this._onFilesChanged = () => this.forwardEvent('files.changed', {})
+    this._onDiagramChanged = event => {
+      if (event && String(event.projectId) === String(this.projectId) && !event.failed) this.forwardEvent('files.changed', {})
+    }
     this._onSelectionChanged = () => this.forwardEvent('selection.changed', {})
     // v2.9：设置变更只推给设置所属的插件——别的插件订阅了也收不到别人的
     this._onPluginSettingsChanged = (e) => {
@@ -262,6 +266,7 @@ export default {
       }
     }
     uni.$on('awd:files-changed', this._onFilesChanged)
+    uni.$on('awd:litviz-restyled', this._onDiagramChanged)
     uni.$on('awd:selection-changed', this._onSelectionChanged)
     uni.$on('awd:plugin-settings-changed', this._onPluginSettingsChanged)
     this._onLawfirmTab = (payload) => {
@@ -308,6 +313,7 @@ export default {
     window.removeEventListener('message', this.onMessage)
     if (this._onThemeChanged) { uni.$off(APP_THEME_EVENT, this._onThemeChanged); this._onThemeChanged = null }
     if (this._onFilesChanged) { uni.$off('awd:files-changed', this._onFilesChanged); this._onFilesChanged = null }
+    if (this._onDiagramChanged) { uni.$off('awd:litviz-restyled', this._onDiagramChanged); this._onDiagramChanged = null }
     if (this._onSelectionChanged) { uni.$off('awd:selection-changed', this._onSelectionChanged); this._onSelectionChanged = null }
     if (this._onPluginSettingsChanged) { uni.$off('awd:plugin-settings-changed', this._onPluginSettingsChanged); this._onPluginSettingsChanged = null }
     if (this._onLawfirmTab) { uni.$off('awd:lawfirm-tab', this._onLawfirmTab); this._onLawfirmTab = null }
@@ -404,15 +410,15 @@ export default {
     businessServices() {
       if (!this._businessServices) {
         const generation = this.sessionGeneration
-        const actions = { ...this.businessActions, emit: (name, data) => uni.$emit(name, data), activeFileId: () => this.activeEditor()?.fileId, download: ({ content, name, type }) => {
+        const actions = { activeFileId: () => this.activeEditor()?.fileId, ...this.businessActions, emit: (name, data) => uni.$emit(name, data), download: ({ content, name, type }) => {
           const url = URL.createObjectURL(new Blob([content], { type }))
           const link = document.createElement('a')
           try { link.href = url; link.download = name; document.body.appendChild(link); link.click() }
           finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000) }
         } }
         const voice = createPluginVoiceServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions })
-        const collections = createPluginCollectionServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles(), openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
-        const insight = createPluginInsightServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles(), openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
+        const collections = createPluginCollectionServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
+        const insight = createPluginInsightServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles() })
         this._businessServices = createPluginBusinessServices({
           delegates: { ...Object.fromEntries(['calendar', 'favorites', 'clipboard'].map(service => [service, (operation, params, signal) => collections.request(service, operation, params, signal)])), voice: (operation, params, signal) => voice.request(operation, params, signal), insight: (operation, params, signal) => insight.request(operation, params, signal) },
           api: { searchProjectContent, getProjectTags, getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile,

@@ -5,7 +5,7 @@ import * as reviews from '@/services/contractReview.js'
 const fail = (code, message) => { throw Object.assign(new Error(message), { code }) }
 const unwrap = data => data && 'code' in data && 'data' in data ? data.data : data
 const OPS = ['context', 'get', 'parse', 'entity', 'refreshEntity', 'prepare', 'execute', 'entities', 'openUrl', 'openSettings', 'openHover', 'openDoc', 'standards', 'saveStandard', 'confirmStandard', 'review', 'runReview']
-export function createPluginInsightServices({ projectId, permissions, isCurrent, actions, openFile, listFiles }) {
+export function createPluginInsightServices({ projectId, permissions, isCurrent, actions, listFiles }) {
   return { async request(operation, params, signal) {
     const allowed = permission => { if (!permissions().includes(permission)) fail('permission_denied', permission + ' is required') }
     const check = () => { if (signal.aborted || !isCurrent()) fail('cancelled', 'Request cancelled') }
@@ -14,12 +14,13 @@ export function createPluginInsightServices({ projectId, permissions, isCurrent,
     if (!OPS.includes(operation)) fail('unknown_operation', 'Unknown insight operation')
     const context = actions.insightContext()
     if (operation === 'context') return context
+    const projectOnly = ['standards', 'saveStandard', 'confirmStandard'].includes(operation)
     const docFileId = context.docFileId
     const checkDocument = () => {
       check()
       if (!docFileId || String(actions.insightContext().docFileId) !== String(docFileId) || (params.docFileId != null && String(params.docFileId) !== String(docFileId))) fail('stale_document', 'Document changed')
     }
-    checkDocument()
+    if (!projectOnly) checkDocument()
     if (['parse', 'refreshEntity', 'saveStandard', 'confirmStandard', 'runReview', 'prepare'].includes(operation)) {
       allowed('file_write')
       if (!context.canWrite) fail('permission_denied', 'Document is read only')
@@ -67,21 +68,22 @@ export function createPluginInsightServices({ projectId, permissions, isCurrent,
     }
     if (operation === 'openSettings') { actions.openAccount(); return { opened: true } }
     if (operation === 'openHover') {
+      const x = params.payload?.x, y = params.payload?.y
+      if (x == null || y == null || !Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) return { opened: false }
       const data = unwrap(await getDocInsight(projectId(), docFileId)); checkDocument()
       const entity = (data?.entities || []).find(row => String(row.id) === String(params.payload?.entity?.id))
       if (!entity) fail('not_found', 'Entity not found in this document')
-      const x = Number(params.payload?.x), y = Number(params.payload?.y)
-      actions.insightHover({ entity, x: Number.isFinite(x) ? x : 0, y: Number.isFinite(y) ? y : 0 }); return { opened: true }
+      actions.insightHover({ entity, x: Number(x), y: Number(y) }); return { opened: true }
     }
     if (operation === 'openDoc') {
       const file = (await listFiles()).find(file => String(file.id) === String(params.fileId)); checkDocument()
       if (!file) fail('not_found', 'File not found in this project')
-      openFile(file); return { opened: true }
+      actions.insightOpenDoc({ fileId: file.id }); return { opened: true }
     }
     if (operation === 'standards') return reviews.listReviewStandards(projectId())
     if (operation === 'review') return reviews.getContractReview(projectId(), docFileId)
     if (operation === 'runReview') return reviews.runContractReview(projectId(), { docFileId, standardId: params.standardId, version: params.version })
-    const standards = await reviews.listReviewStandards(projectId()); checkDocument()
+    const standards = await reviews.listReviewStandards(projectId()); check()
     if (params.id && !(standards || []).some(row => String(row.id) === String(params.id))) fail('not_found', 'Review standard not found')
     if (operation === 'confirmStandard') return reviews.confirmReviewStandard(projectId(), params.id, params.version)
     if (JSON.stringify(params).length > 100000) fail('invalid_params', 'Review standard is too large')
