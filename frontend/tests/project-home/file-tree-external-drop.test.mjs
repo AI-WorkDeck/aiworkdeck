@@ -877,6 +877,7 @@ test('#1381 reload invalidates drag paths and ignores a late pre-move listing', 
     const vm = { ...options.data(), projectId: 42, parentId: null, showTree: false,
       $t: key => key, scheduleRefCountsFetch() {},
     }
+    vm.loadFilesRequest = options.methods.loadFilesRequest.bind(vm)
     const load = options.methods.loadFiles.bind(vm)
     cacheLocalFilePath(801, '/old/甲.txt')
     const oldLoad = load()

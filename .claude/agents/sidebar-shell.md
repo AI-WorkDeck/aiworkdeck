@@ -75,6 +75,8 @@ flushDirtyEditors），单测见 `frontend/tests/project-home/flush-dirty-editor
 
 顶部新建由 `FileTree.openCreateMenu` 打开 `ExplorerCreateMenu.vue`：Word / PPT / Excel / 录音。空白处右键的新建文件带 Office 子菜单，文件夹直接建 `Untitled Folder`（同目录重名从 `Untitled Folder 2` 递增），不弹命名框；Office 文档保留命名框与 Word 插件模板入口。工具栏使用选中项对应目录，空白右键使用当前浏览层级；打开菜单时捕获落点，回收站不提供新建。
 
+新建文件夹成功后通过 `revealFile` 定位到新条目（dev-board#1469）；标签视图切回文件夹视图。定位成功同步 `activeFolderId`，后续新建文档落在当前选中的新目录。定位时既展开父目录，也补足目标和父目录所在的每目录 100 项渲染窗口，然后在当前 FileTree 实例内滚动，不能只刷新列表后提示成功。`loadFiles` 保留最新请求的 Promise，创建定位等待当前请求与下一帧标签选中态同步；旧请求被通知/聚焦刷新作废时不能提前定位或提示成功。创建或刷新期间切换项目，不选择旧项目的新条目。回归 `file-tree-created-folder-visible.test.mjs`；`created-folder-visible-ui.mjs` 用真实 Uni 工作台、合成 API 验证 148 个同级文件夹后的根目录/子目录创建、选中与可见滚动、继续在新目录创建文档，不代表用户客户端或真实落盘已验。
+
 子菜单按实际尺寸贴近主项，靠右边缘时向左翻转、垂直限制在视口内；`utils/menuAim.js` 判断鼠标到子菜单近侧上下角的安全三角区，穿越其他行时暂不关闭，停留 350ms 或离开三角区后切换。这是 [safe polygon/menu aim](https://floating-ui.com/docs/useHover#safepolygon) 思路，没有固定“三角形比例”；按鼠标与实际菜单位置计算。支持键盘方向键、Enter、Escape 和焦点返回。浮层按每实例 holder 接入 `overlayState`，由工作台统一隐藏原生 BrowserView，关闭/卸载必须释放。
 
 录音由 `explorerRecording.js` 接收可信宿主点击，打开 voice 插件录音 tab、检查原有转写告知并调用全局 recorder。沿用 `recording-focus` 排队消息，不引用已经移出工作台的旧面板 ref；插件自行发起的录音仍走原有确认。插件未启用引导现有详情页；已有录音只定位，启动中离页通过 signal 取消，真正开始后切面板不断录。用户首次麦克风授权仍由系统处理。

@@ -1394,7 +1394,12 @@ export default {
         revealCounts: { ...(this.revealCounts || {}) }
       })
     },
-    async loadFiles() {
+    loadFiles() {
+      const pending = this.loadFilesRequest()
+      this._fileLoadPromise = pending
+      return pending
+    },
+    async loadFilesRequest() {
       const requestId = ++this.fileLoadRequest
       const current = () => requestId === this.fileLoadRequest
       if (!this.projectId) {
@@ -1542,11 +1547,24 @@ export default {
       const projectId = Number(this.projectId)
       try {
         const name = this.uniqueCreateName('Untitled Folder', '', parentId)
-        await createFolder(projectId, parentId, name)
+        const created = await createFolder(projectId, parentId, name)
         if (Number(this.projectId) !== projectId) return
         if (parentId != null && this.showTree) this.expandedFolders.add(parentId)
-        await this.loadFiles()
-        uni.showToast({ title: this.$t('fileTree.createSuccess'), icon: 'success' })
+        let refresh = this.loadFiles()
+        for (;;) {
+          await refresh
+          // 刷新广播下一帧同步标签选中态；若通知又发起刷新，继续等当前请求。
+          await this.$nextTick()
+          if (Number(this.projectId) !== projectId) return
+          if (!this._fileLoadPromise || refresh === this._fileLoadPromise) break
+          refresh = this._fileLoadPromise
+        }
+        if (this.isTagView) this.setTagView(false)
+        const createdId = created.id || created.data?.id
+        if (this.revealFile(createdId)) {
+          this.activeFolderId = this.selectedFileId
+          uni.showToast({ title: this.$t('fileTree.createSuccess'), icon: 'success' })
+        }
       } catch (error) {
         uni.showToast({ title: error.message || this.$t('fileTree.createFailed'), icon: 'none' })
       } finally {
@@ -2789,8 +2807,21 @@ export default {
       // 重新构建树形视图
       if (this.showTree && this.allFiles.length > 0) {
         this.files = this.buildTreeView(this.allFiles, this.parentId)
-        this.scheduleRefCountsFetch()
       }
+
+      // 目标和父目录都可能排在每目录前 100 项之外；先补足渲染窗口，再查 DOM 滚动。
+      const revealIds = new Set([targetFile.id, ...parentIds].map(String))
+      const counts = new Map()
+      for (const file of this.displayFiles) {
+        const key = this.windowParentKey(this.isTagView ? null : file.parentId)
+        const count = (counts.get(key) || 0) + 1
+        counts.set(key, count)
+        if (revealIds.has(String(file.id)) && count > (this.revealCounts[key] || 100)) {
+          this.revealCounts[key] = count
+        }
+      }
+      this.saveSnapshotToCache()
+      this.scheduleRefCountsFetch()
 
       // 设置选中状态（单选模式）
       this.selectedFileId = targetFile.id
@@ -2800,7 +2831,7 @@ export default {
       // 延迟滚动到目标元素
       this.$nextTick(() => {
         try {
-          const el = document.querySelector(`.tree-item[data-file-id="${targetFile.id}"]`)
+          const el = this.$el?.querySelector?.(`.tree-item[data-file-id="${targetFile.id}"]`)
           if (el && el.scrollIntoView) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' })
           }
