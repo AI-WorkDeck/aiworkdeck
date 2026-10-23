@@ -171,6 +171,15 @@ PDFParser 调 PDFBox2 已删除的 `PDDocument.load` 会抛 `NoSuchMethodError`�
 `options.signal` → `uni.request` 的 `RequestTask.abort()`，以 `AbortError` 拒绝且不打「网络请求失败」
 日志），`beforeUnmount` 收尾。守护：`ContentSearchServiceCacheTest`、
 `frontend/tests/project-home/search-panel-debounce-abort.test.mjs`。
+大项目搜索（dev-board#1468）：先发 `filenameOnly:true`，同步匹配文件名，不读正文、
+不进入全文线程池，再发完整查询。两阶段都走同一项目权限和标签/格式过滤；
+`ProjectFileAccessService.readFilterForProject` 只在本次请求解析一次项目权限/客户身份，
+逐文件仍核对项目、删除状态、所有者和客户可见标记，不能跨请求缓存权限。
+名字结果在全文等待、失败或停止等待时仍可打开，必须明确其尚非完整结果；新查询清空旧结果。
+全文 HTTP 与插件 SDK 两层均为 300 秒，名字阶段 60 秒；输入法 composition 期间不启动查询，
+停止等待还要清除输入防抖。HTTP abort 仅终止等待，当前同步后端扫描不保证立即中断。
+正文解析失败不能吞掉已匹配的文件名。搜索插件版本与构建产物一起更新，保证随附安装器升级旧副本。
+回归：`ContentSearchServiceAccessSnapshotTest`、`search-panel-progress.test.mjs`，另验实际打包插件桥。
 标签筛选区曾默认折叠、按命中频次排序，作为历史数据膨胀的界面兜底：
 `/api/files/{id}/upload` 同时是编辑器自动保存的落点，挂在 legacy 分支上的
 `AutoTaggingService.autoTagFile` 因此每存一次盘就跑一次 LLM，每轮 5 个措辞不同的新词，

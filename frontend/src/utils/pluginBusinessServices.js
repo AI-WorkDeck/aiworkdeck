@@ -123,6 +123,7 @@ export function createPluginBusinessServices({ api, projectId, permissions, isCu
         }
         const result = operation === 'tags' ? await api.getProjectTags(projectId(), { signal: controller.signal }) : await api.searchProjectContent(projectId(), {
           query: params.query,
+          filenameOnly: params.filenameOnly === true,
           caseSensitive: params.caseSensitive === true,
           wholeWord: params.wholeWord === true,
           useRegex: params.useRegex === true,

@@ -12,6 +12,7 @@ import java.util.List;
 @Data
 public class SearchRequest {
     private String query;
+    private boolean filenameOnly = false;
     private boolean caseSensitive = false;
     private boolean wholeWord = false;
     private boolean useRegex = false;

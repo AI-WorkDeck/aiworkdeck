@@ -152,7 +152,7 @@ public class ContentSearchService {
         // 标签筛选支持所有文件格式及文件名匹配，显式选择的文件类型仍须生效。
         List<ProjectFile> files = projectFileRepository.findByProjectIdAndIsDeletedFalseOrderBySortOrderAsc(projectId)
             .stream()
-            .filter(f -> fileAccess.canRead(f, userId))
+            .filter(fileAccess.readFilterForProject(projectId, userId))
             .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()) && !"folder".equals(f.getFileType()))
             .filter(f -> hasTagFilter || isSearchableType(f.getFileType()))
             .filter(f -> matchesTypeFilter(f, request.getFileTypes()))
@@ -187,28 +187,39 @@ public class ContentSearchService {
         // 构建搜索模式 (仅当有查询词时)
         Pattern searchPattern = hasQuery ? buildSearchPattern(query, request) : null;
 
-        // 逐文件并行：抽取（先查缓存）+ 匹配。按文件原顺序收集，结果顺序不随线程调度变化。
-        List<Future<FileSearchResult>> futures = new ArrayList<>(files.size());
-        for (ProjectFile file : files) {
-            futures.add(searchPool.submit(() -> searchOneFile(file, hasQuery, query, queryLower,
-                    searchPattern, request, fileTagsMap)));
-        }
-        for (int i = 0; i < futures.size(); i++) {
-            FileSearchResult fileResult;
-            try {
-                fileResult = futures.get(i).get();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                futures.forEach(f -> f.cancel(true));
-                break;
-            } catch (ExecutionException e) {
-                // searchOneFile 自己已经兜住 Throwable，走到这里只会是池子被关等极端情况
-                log.warn("Failed to search file {}: {}", files.get(i).getName(), e.getMessage());
-                continue;
+        if (request.isFilenameOnly()) {
+            // 文件名先返回，不读正文，也不排在此前尚未完成的全文任务后面。
+            for (ProjectFile file : files) {
+                FileSearchResult fileResult = searchOneFile(file, hasQuery, query, queryLower,
+                        searchPattern, request, fileTagsMap);
+                if (fileResult != null) {
+                    results.add(fileResult);
+                    totalMatches += fileResult.getMatchCount();
+                }
             }
-            if (fileResult != null) {
-                results.add(fileResult);
-                totalMatches += fileResult.getMatchCount();
+        } else {
+            // 逐文件并行：抽取（先查缓存）+ 匹配。按文件原顺序收集，结果顺序不随线程调度变化。
+            List<Future<FileSearchResult>> futures = new ArrayList<>(files.size());
+            for (ProjectFile file : files) {
+                futures.add(searchPool.submit(() -> searchOneFile(file, hasQuery, query, queryLower,
+                        searchPattern, request, fileTagsMap)));
+            }
+            for (int i = 0; i < futures.size(); i++) {
+                FileSearchResult fileResult;
+                try {
+                    fileResult = futures.get(i).get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    futures.forEach(f -> f.cancel(true));
+                    break;
+                } catch (ExecutionException e) {
+                    log.warn("Failed to search file {}: {}", files.get(i).getName(), e.getMessage());
+                    continue;
+                }
+                if (fileResult != null) {
+                    results.add(fileResult);
+                    totalMatches += fileResult.getMatchCount();
+                }
             }
         }
 
@@ -223,27 +234,27 @@ public class ContentSearchService {
     }
 
     /**
-     * 单个文件的搜索：文件名匹配 + 内容匹配。不命中返回 null。在 {@link #searchPool} 里跑。
+     * 单个文件的搜索：文件名匹配 + 内容匹配。不命中返回 null；仅文件名搜索不进线程池。
      */
     private FileSearchResult searchOneFile(ProjectFile file, boolean hasQuery, String query, String queryLower,
                                            Pattern searchPattern, SearchRequest request,
                                            Map<Long, List<Tag>> fileTagsMap) {
-        try {
-            List<MatchInfo> matches = new ArrayList<>();
-            boolean fileNameMatches = false;
+        List<MatchInfo> matches = new ArrayList<>();
+        boolean fileNameMatches = false;
 
-            // 1. 检查文件名是否匹配
-            String fileName = file.getName();
-            if (hasQuery && fileName != null) {
-                if (request.isCaseSensitive()) {
-                    fileNameMatches = fileName.contains(query);
-                } else {
-                    fileNameMatches = fileName.toLowerCase().contains(queryLower);
-                }
+        // 1. 检查文件名是否匹配
+        String fileName = file.getName();
+        if (hasQuery && fileName != null) {
+            if (request.isCaseSensitive()) {
+                fileNameMatches = fileName.contains(query);
+            } else {
+                fileNameMatches = fileName.toLowerCase().contains(queryLower);
             }
+        }
 
+        try {
             // 2. 仅对可抽取正文的格式搜索内容；图片、音视频等只匹配文件名。
-            if (hasQuery && isSearchableType(file.getFileType())) {
+            if (hasQuery && !request.isFilenameOnly() && isSearchableType(file.getFileType())) {
                 String content = extractContent(file);
                 if (content != null && !content.isEmpty()) {
                     matches = findMatches(content, searchPattern, query);
@@ -252,27 +263,25 @@ public class ContentSearchService {
                     log.debug("[Search] File {} has no extractable content", file.getName());
                 }
             }
-
-            // 3. 如果文件名匹配或内容匹配，或者没有查询词（纯标签过滤），都加入结果
-            if (!hasQuery || fileNameMatches || !matches.isEmpty()) {
-                return FileSearchResult.builder()
-                    .fileId(file.getId())
-                    .wpsFileId(file.getWpsFileId())
-                    .fileName(file.getName())
-                    .filePath(file.getFilePath())
-                    .fileType(file.getFileType())
-                    .matchCount(matches.size())
-                    .matches(matches.size() > MAX_MATCHES_PER_FILE
-                        ? matches.subList(0, MAX_MATCHES_PER_FILE)
-                        : matches)
-                    .tags(fileTagsMap.getOrDefault(file.getId(), Collections.emptyList()))
-                    .build();
-            }
         } catch (Throwable e) {
-            // Throwable 而非 Exception：某些格式解析库在 classpath 不兼容时抛的是
-            // Error（如 NoSuchMethodError），一旦漏挡就会打断整个搜索请求、
-            // 连带丢掉本该找到的其它文件命中。
-            log.warn("Failed to search file {}: {}", file.getName(), e.getMessage(), e);
+            // 解析库的 Error（如 NoSuchMethodError）也只影响正文，不能丢掉已匹配的文件名。
+            log.warn("Failed to search file content {}: {}", file.getName(), e.getMessage(), e);
+        }
+
+        // 3. 如果文件名匹配或内容匹配，或者没有查询词（纯标签过滤），都加入结果
+        if (!hasQuery || fileNameMatches || !matches.isEmpty()) {
+            return FileSearchResult.builder()
+                .fileId(file.getId())
+                .wpsFileId(file.getWpsFileId())
+                .fileName(file.getName())
+                .filePath(file.getFilePath())
+                .fileType(file.getFileType())
+                .matchCount(matches.size())
+                .matches(matches.size() > MAX_MATCHES_PER_FILE
+                    ? matches.subList(0, MAX_MATCHES_PER_FILE)
+                    : matches)
+                .tags(fileTagsMap.getOrDefault(file.getId(), Collections.emptyList()))
+                .build();
         }
         return null;
     }
