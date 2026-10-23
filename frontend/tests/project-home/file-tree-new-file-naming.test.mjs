@@ -59,6 +59,7 @@ function makeVm({ templates = [], replies = [] } = {}) {
   vm.allFiles = []
   vm.$t = (k) => k
   vm.$emit = () => {}
+  vm.$nextTick = callback => callback?.()
   vm.loadFiles = async () => {}
   vm.showErrorModal = (msg) => { throw new Error('unexpected error modal: ' + msg) }
   vm.calls = calls
