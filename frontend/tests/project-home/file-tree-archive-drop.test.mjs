@@ -10,7 +10,7 @@ const body = source.match(/<script>([\s\S]*?)<\/script>/)[1]
   .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*$/gm, '').replace('export default {', 'return {')
 function harness(failure = false) {
   const calls = [], toasts = []
-  const stubs = { FileTypeIcon: {}, TagChip: {}, TagSelector: {}, TagManager: {}, ExplorerCreateMenu: {},
+  const stubs = { FileTypeIcon: {}, TagChip: {}, TagFilter: {}, TagSelector: {}, TagManager: {}, ExplorerCreateMenu: {},
     readArchiveEntryDrag, isArchiveEntryDrag, nativeEvent, nativeDataTransfer, claimExternalDrop,
     importArchiveEntry: async (...args) => { calls.push(args); if (failure) throw new Error('extract failed') },
   }

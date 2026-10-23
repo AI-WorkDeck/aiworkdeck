@@ -16,17 +16,17 @@ function loadOptions(api, uni) {
     .replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export\s+default/, 'return')
   const factory = new Function(
-    'searchProjectContent', 'getProjectTags', 'FileTypeIcon',
+    'searchProjectContent', 'getProjectTags', 'FileTypeIcon', 'TagFilter',
     'TAG_TYPE_PARTY', 'TAG_TYPE_ISSUE', 'TAG_TYPE_NORMAL', 'normalizeTagType',
     'uni', body)
-  return factory(api.searchProjectContent, () => Promise.resolve([]), {},
+  return factory(api.searchProjectContent, () => Promise.resolve([]), {}, {},
     'PARTY', 'ISSUE', 'NORMAL', () => 'NORMAL', uni)
 }
 
 function makeVm(options, props) {
   const vm = Object.assign({}, options.data(), props)
   for (const [k, fn] of Object.entries(options.methods)) vm[k] = fn.bind(vm)
-  for (const [k, fn] of Object.entries(options.computed))
+  for (const [k, fn] of Object.entries(options.computed || {}))
     Object.defineProperty(vm, k, { get: fn.bind(vm) })
   vm.$t = (k) => k
   return vm

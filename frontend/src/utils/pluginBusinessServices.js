@@ -124,7 +124,6 @@ export function createPluginBusinessServices({ api, projectId, permissions, isCu
           wholeWord: params.wholeWord === true,
           useRegex: params.useRegex === true,
           tagIds: Array.isArray(params.tagIds) ? params.tagIds.filter(x => Number.isSafeInteger(x) && x > 0).slice(0, 200) : [],
-          fileTypes: ['docx', 'pdf', 'pptx', 'xlsx', 'txt', 'md'],
         }, { signal: controller.signal })
         if (controller.signal.aborted || !isCurrent()) fail('cancelled', 'Request cancelled')
         return result
