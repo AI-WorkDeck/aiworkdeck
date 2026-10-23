@@ -99,10 +99,13 @@ public class ContentSearchService {
         if (userId == null) throw new IllegalArgumentException("请先登录");
         String query = request.getQuery() != null ? request.getQuery().trim() : "";
         boolean hasQuery = !query.isEmpty();
-        boolean isTagOnlySearch = !hasQuery && request.getTagIds() != null && !request.getTagIds().isEmpty();
+        List<Long> tagIds = request.getTagIds() == null
+                ? Collections.emptyList() : request.getTagIds().stream().distinct().toList();
+        boolean hasTagFilter = !tagIds.isEmpty();
+        boolean isTagOnlySearch = !hasQuery && hasTagFilter;
         
         log.info("[Search] projectId={}, query='{}', hasQuery={}, isTagOnlySearch={}, tagIds={}", 
-            projectId, query, hasQuery, isTagOnlySearch, request.getTagIds());
+            projectId, query, hasQuery, isTagOnlySearch, tagIds);
 
         if (!hasQuery && !isTagOnlySearch) {
             return SearchResult.builder()
@@ -116,22 +119,22 @@ public class ContentSearchService {
 
         // 0. Resolve allowed file IDs if tags are specified
         Set<Long> allowedFileIds = null;
-        if (request.getTagIds() != null && !request.getTagIds().isEmpty()) {
-            List<FileTag> fileTags = fileTagRepository.findByTagIdIn(request.getTagIds());
+        if (hasTagFilter) {
+            List<FileTag> fileTags = fileTagRepository.findByTagIdIn(tagIds);
             
             // AND logic: File must have ALL selected tags
             // Group by fileId and count matches
             Map<Long, Long> fileTagCounts = fileTags.stream()
                 .collect(Collectors.groupingBy(FileTag::getFileId, Collectors.counting()));
             
-            int requiredCount = request.getTagIds().size();
+            int requiredCount = tagIds.size();
             allowedFileIds = fileTagCounts.entrySet().stream()
                 .filter(entry -> entry.getValue() == requiredCount)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
             
             log.info("[Search] Tag filter (AND logic): Found matches for tagIds {}. allowedFileIds size: {}", 
-                request.getTagIds(), allowedFileIds.size());
+                tagIds, allowedFileIds.size());
 
             // If tags selected but no files match, return empty early
             if (allowedFileIds.isEmpty()) {
@@ -146,13 +149,13 @@ public class ContentSearchService {
         final Set<Long> finalAllowedFileIds = allowedFileIds;
         
         // 获取项目所有可搜索文件
-        // 如果是纯标签搜索，不过滤文件类型（允许搜索所有已被打标签的文件，包括图片等）
+        // 标签筛选支持所有文件格式及文件名匹配，显式选择的文件类型仍须生效。
         List<ProjectFile> files = projectFileRepository.findByProjectIdAndIsDeletedFalseOrderBySortOrderAsc(projectId)
             .stream()
             .filter(f -> fileAccess.canRead(f, userId))
-            .filter(f -> !"folder".equals(f.getFileType()))
-            .filter(f -> isTagOnlySearch || isSearchableType(f.getFileType()))
-            .filter(f -> isTagOnlySearch || matchesTypeFilter(f, request.getFileTypes()))
+            .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()) && !"folder".equals(f.getFileType()))
+            .filter(f -> hasTagFilter || isSearchableType(f.getFileType()))
+            .filter(f -> matchesTypeFilter(f, request.getFileTypes()))
             .filter(f -> finalAllowedFileIds == null || finalAllowedFileIds.contains(f.getId()))
             .collect(Collectors.toList());
         
@@ -239,8 +242,8 @@ public class ContentSearchService {
                 }
             }
 
-            // 2. 提取内容并搜索 (仅当有查询词时)
-            if (hasQuery) {
+            // 2. 仅对可抽取正文的格式搜索内容；图片、音视频等只匹配文件名。
+            if (hasQuery && isSearchableType(file.getFileType())) {
                 String content = extractContent(file);
                 if (content != null && !content.isEmpty()) {
                     matches = findMatches(content, searchPattern, query);

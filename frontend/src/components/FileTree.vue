@@ -306,9 +306,21 @@
       </view>
     </view>
 
+    <view v-if="enableTagView && viewMode !== 'recycle'" class="file-browse-controls" @mousedown.stop>
+      <view class="file-browse-tabs" role="group" :aria-label="$t('files.tagViewFolders')">
+        <component :is="'button'" type="button" class="file-browse-tab" :class="{ active: !tagView }" :aria-pressed="!tagView" @click="setTagView(false)">{{ $t('files.tagViewFolders') }}</component>
+        <component :is="'button'" type="button" class="file-browse-tab" :class="{ active: tagView }" :aria-pressed="tagView" @click="setTagView(true)">{{ $t('files.tagViewTags') }}</component>
+      </view>
+      <TagFilter v-if="isTagView" :tags="projectTags" :model-value="selectedTagIds" :counts="tagFileCounts" :loading="tagsLoading" :error="tagsError" @update:model-value="setTagFilter" @retry="refreshProjectTags" />
+      <view v-if="isTagView" class="tag-view-summary" aria-live="polite">
+        <text v-if="!selectedTagIds.length">{{ $t('files.tagViewAllTagged') }}</text>
+        <text>{{ $t('files.tagViewFileCount', { count: displayFiles.length }) }}</text>
+      </view>
+    </view>
+
     <view
       class="tree-content"
-      :class="{ 'external-drag-over': externalDragActive || stagingDragOver, 'view-mode-recycle': viewMode === 'recycle' }"
+      :class="{ 'external-drag-over': externalDragActive || stagingDragOver, 'view-mode-recycle': viewMode === 'recycle', 'view-mode-tags': isTagView }"
       @mousedown="onMarqueeStart" @mousemove="onMarqueeMove" @mouseup="onMarqueeEnd" @tap="closeContextMenu"
       @dragenter="onTreeDragEnter" @dragover="onTreeDragOver" @dragleave="onTreeDragLeave" @drop="onTreeDrop"
     >
@@ -344,7 +356,7 @@
       </view>
       <view v-else-if="displayFiles.length === 0" class="tree-empty">
         <view class="empty-content">
-          <text>{{ $t('fileTree.noFiles') }}</text>
+          <text>{{ $t(isTagView ? 'files.tagViewNoFiles' : 'fileTree.noFiles') }}</text>
         </view>
         <!-- Root Drop Zone for empty folders -->
         <!-- #ifdef H5 -->
@@ -452,6 +464,7 @@
                  {{ $t('fileTree.referencedCount', { count: refCounts[item.id] }) }}
                </text>
             </text>
+            <text v-if="isTagView && renamingId !== item.id" class="tag-file-location" :title="tagFileLocation(item)">{{ tagFileLocation(item) }}</text>
             <!-- 最近到期徽标（dev-board#900）：这份文件未完成事项里最早的那条 -->
             <text
               v-if="!item.isFolder && renamingId !== item.id && viewMode !== 'recycle' && fileDueIndex[item.id] && fileDueIndex[item.id].text"
@@ -584,6 +597,7 @@
                  {{ $t('fileTree.referencedCount', { count: refCounts[item.id] }) }}
                </text>
             </text>
+            <text v-if="isTagView && renamingId !== item.id" class="tag-file-location" :title="tagFileLocation(item)">{{ tagFileLocation(item) }}</text>
             <!-- 最近到期徽标（dev-board#900）：这份文件未完成事项里最早的那条 -->
             <text
               v-if="!item.isFolder && renamingId !== item.id && viewMode !== 'recycle' && fileDueIndex[item.id] && fileDueIndex[item.id].text"
@@ -736,6 +750,7 @@ import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioA
 import { canConvertItemToPdf, canMergeItemsToPdf, pdfConversionRecoveryOptions } from '@/utils/fileTreePdfActions.js'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
 import TagChip from '@/components/TagChip.vue'
+import TagFilter from '@/components/TagFilter.vue'
 import TagSelector from '@/components/TagSelector.vue'
 import TagManager from '@/components/TagManager.vue'
 import { taskStore, loadProjectTasks } from '@/utils/taskStore.js'
@@ -771,6 +786,7 @@ export default {
   components: {
     FileTypeIcon,
     TagChip,
+    TagFilter,
     TagSelector,
     TagManager
   },
@@ -779,6 +795,7 @@ export default {
       type: [Number, String],
       required: true
     },
+    enableTagView: { type: Boolean, default: false },
     // 仅已确认的本机文件夹项目订阅磁盘变化；托管项目和文件选择器默认不订阅。
     watchLocalFiles: {
       type: Boolean,
@@ -920,6 +937,11 @@ export default {
       showTagManager: false,
       showTagEditDialog: false,
       projectTags: [],
+      tagView: false,
+      selectedTagIds: [],
+      tagsLoading: false,
+      tagsError: '',
+      tagsRequest: 0,
       targetFileForTags: null,
       editingFileId: null // ID of file currently editing tags for
     }
@@ -994,12 +1016,30 @@ export default {
       }
       return map
     },
+    isTagView() {
+      return this.enableTagView && this.tagView && this.viewMode !== 'recycle'
+    },
+    taggedFiles() {
+      // Traverse collapsed folders without changing the user's folder expansion state.
+      const files = this.buildTreeView(this.allFiles, this.parentId, true)
+      return computeDisplayFiles({ files, viewMode: 'files', recycleBin: this.recycleBin, hiddenFileIds: this.hiddenFileIds })
+        .filter(file => !file.isFolder && file.tags?.length)
+    },
+    tagFileCounts() {
+      const counts = {}
+      for (const file of this.taggedFiles) {
+        for (const id of new Set(file.tags.map(tag => String(tag.id)))) counts[id] = (counts[id] || 0) + 1
+      }
+      return counts
+    },
     displayFiles() {
       // 回收站视图不做系统文件夹/暂存区过滤：标题按 recycleBin.length 计数，藏掉的行
       // 会变成看不见也删不掉的幽灵计数（dev-board#1019），见 utils/fileTreeRecycle.js
       return computeDisplayFiles({
         viewMode: this.viewMode,
-        files: this.files,
+        files: this.isTagView
+          ? this.taggedFiles.filter(file => this.selectedTagIds.every(id => file.tags.some(tag => String(tag.id) === String(id))))
+          : this.files,
         recycleBin: this.recycleBin,
         hiddenFileIds: this.hiddenFileIds
       })
@@ -1012,13 +1052,13 @@ export default {
       const list = this.displayFiles
       const totalByParent = new Map()
       for (const item of list) {
-        const key = this.windowParentKey(item.parentId)
+        const key = this.windowParentKey(this.isTagView ? null : item.parentId)
         totalByParent.set(key, (totalByParent.get(key) || 0) + 1)
       }
       const emittedByParent = new Map()
       const result = []
       for (const item of list) {
-        const key = this.windowParentKey(item.parentId)
+        const key = this.windowParentKey(this.isTagView ? null : item.parentId)
         const emitted = emittedByParent.get(key) || 0
         const limit = this.revealCounts[key] || WINDOW_INITIAL
         if (emitted >= limit) {
@@ -1026,7 +1066,7 @@ export default {
             result.push({
               __loadMore: true,
               id: `__loadmore_${key}`,
-              parentId: item.parentId,
+              parentId: this.isTagView ? null : item.parentId,
               remaining: totalByParent.get(key) - limit
             })
           }
@@ -1120,6 +1160,27 @@ export default {
     }
   },
   watch: {
+    displayFiles(files) {
+      if (!this.isTagView) return
+      const visible = new Set(files.map(file => String(file.id)))
+      if (this.contextMenu.visible && (
+        !visible.has(String(this.contextMenu.targetItem?.id)) ||
+        this.contextMenu.selectionIds?.some(id => !visible.has(String(id)))
+      )) this.closeContextMenu()
+      const checked = Object.fromEntries(Object.entries(this.checkedMap).filter(([id]) => visible.has(id)))
+      if (Object.keys(checked).length !== this.checkedIds.length) {
+        this.checkedMap = checked
+        this.$emit('checked-change', this.checkedIds)
+      }
+      this.multiSelectedIds = this.multiSelectedIds.filter(id => visible.has(String(id)))
+      if (this.selectedFileId != null && !visible.has(String(this.selectedFileId))) {
+        this.selectedFileId = null
+        this.activeFolderId = null
+      }
+    },
+    showTagManager(open, previous) {
+      if (!open && previous) this.loadFiles()
+    },
     watchLocalFiles() {
       this.subscribeLocalFileChanges()
     },
@@ -1133,6 +1194,15 @@ export default {
         const prevKey = oldVal != null ? String(oldVal) : ''
         if (key !== prevKey) {
           this.refCounts = {}
+          this.tagView = false
+          this.selectedTagIds = []
+          this.projectTags = []
+          this.tagsError = ''
+          this.tagsRequest++
+          this.tagsLoading = false
+          this.showTagEditDialog = false
+          this.showTagManager = false
+          this.targetFileForTags = null
           const cached = key ? projectFileTreeSnapshotCache.get(key) : null
           if (cached && Array.isArray(cached.allFiles) && cached.allFiles.length > 0) {
             this.allFiles = cached.allFiles
@@ -1183,7 +1253,6 @@ export default {
     if (!this.selectionMode) {
       this.clearChecked()
     }
-    this.refreshProjectTags() // Tag Management
 
     // Listen for global drag events to show/hide root drop zone
     // 具名 handler + Vue3 的 beforeUnmount（beforeDestroy 在 Vue3 不触发，导致监听泄漏）；
@@ -1203,6 +1272,7 @@ export default {
   },
   beforeUnmount() {
     this._fileChangesMounted = false
+    this.tagsRequest++
     this._fileChangesStop?.()
     this._fileChangesStop = null
     this.fileLoadRequest++
@@ -1363,6 +1433,13 @@ export default {
           const hiddenNames = new Set(['.stagezone', '__staging_area__'])
           this.files = (files || []).filter(f => !hiddenNames.has(f.name))
           if (typeof this.saveSnapshotToCache === 'function') this.saveSnapshotToCache()
+        }
+        if (this.viewMode !== 'recycle') {
+          if (this.targetFileForTags) {
+            this.targetFileForTags = this.allFiles.find(file => String(file.id) === String(this.targetFileForTags.id)) || null
+            if (!this.targetFileForTags) this.showTagEditDialog = false
+          }
+          this.refreshProjectTags()
         }
         clearLocalPathCache()
         this.scheduleRefCountsFetch({ reload: true })
@@ -2007,7 +2084,7 @@ export default {
     // 见 tests/evidence/treeBuild.test.mjs）：此前每递归一层都对全量 allFiles 做一次
     // filter+sort，千节点树、多层展开时是 O(N × 展开文件夹数)；现在先一次 O(N) 按
     // parentId 分组，递归只在分组表里取子集。
-    buildTreeView(allFiles, parentId) {
+    buildTreeView(allFiles, parentId, expandAll = false) {
       const byParent = groupByParent(allFiles)
       const compareFn = (a, b) => {
          // 文件夹始终置顶
@@ -2042,7 +2119,7 @@ export default {
 
          return this.sortOrder === 'desc' ? -result : result
       }
-      return buildTreeFromGroups(byParent, parentId, compareFn, id => this.expandedFolders.has(id))
+      return buildTreeFromGroups(byParent, parentId, compareFn, id => expandAll || this.expandedFolders.has(id))
     },
     setSortMode(mode) {
       this.sortMode = mode
@@ -2118,7 +2195,7 @@ export default {
     },
     // 计算项目的缩进（用于树形结构）
     getItemPadding(item) {
-      if (!this.showTree || !item) return '0'
+      if (this.isTagView || !this.showTree || !item) return '0'
       // 走 allFilesById Map O(1) 反查父节点，避免每行渲染 O(N) 线性扫描 30,000 个节点
       const byId = this.allFilesById
       let depth = 0
@@ -2508,7 +2585,10 @@ export default {
 
     /** 当前多选：批量选择态读勾选（checkedMap），否则读 ⌘ 加选（multiSelectedIds） */
     currentSelectedIds() {
-      return this.selectionMode ? this.checkedIds : this.multiSelectedIds
+      const ids = this.selectionMode ? this.checkedIds : this.multiSelectedIds
+      if (!this.isTagView) return ids
+      const visible = new Set(this.displayFiles.map(file => String(file.id)))
+      return ids.filter(id => visible.has(String(id)))
     },
 
     /** 右键菜单是否作用于多项（决定显示「已选 N 项」与只留批量项） */
@@ -2754,9 +2834,9 @@ export default {
       this.lastClickItemId = null
       this.lastClickTime = 0
       // Reveal a row beyond the per-folder rendering limit before scrolling to it.
-      const siblings = this.displayFiles.filter(f => String(f.parentId) === String(item.parentId))
+      const siblings = this.isTagView ? this.displayFiles : this.displayFiles.filter(f => String(f.parentId) === String(item.parentId))
       const needed = siblings.findIndex(f => String(f.id) === String(item.id)) + 1
-      const key = this.windowParentKey(item.parentId)
+      const key = this.windowParentKey(this.isTagView ? null : item.parentId)
       if (needed > (this.revealCounts[key] || 100)) this.revealCounts[key] = needed
       this.$nextTick(() => {
         const rows = this.$el?.querySelectorAll?.('.tree-item[data-file-id]') || []
@@ -3693,14 +3773,62 @@ export default {
     },
 
     // Tag Methods
+    setTagView(value) {
+      this.tagView = value
+      this.resetTagSelection()
+      if (value) this.refreshProjectTags()
+    },
+    setTagFilter(ids) {
+      this.selectedTagIds = ids
+      this.resetTagSelection()
+    },
+    resetTagSelection() {
+      // A hidden selection must never leak into a later batch delete/move.
+      this.clearChecked()
+      this.multiSelectedIds = []
+      this.selectedFileId = null
+      this.activeFolderId = null
+      this.closeContextMenu()
+      this.$emit('multi-select-change', [])
+      this.scheduleRefCountsFetch()
+    },
+    tagFileLocation(file) {
+      const names = []
+      const seen = new Set()
+      let parentId = file.parentId
+      while (parentId != null && !seen.has(String(parentId))) {
+        seen.add(String(parentId))
+        const parent = this.allFilesById.get(parentId) || this.allFilesById.get(Number(parentId))
+        if (!parent) break
+        names.unshift(parent.name)
+        parentId = parent.parentId
+      }
+      return names.join(' / ') || this.$t('files.tagViewRoot')
+    },
     async refreshProjectTags() {
       if (!this.projectId) return
+      const projectId = this.projectId
+      const request = ++this.tagsRequest
+      this.tagsLoading = true
+      this.tagsError = ''
       try {
-        const res = await getProjectTags(this.projectId)
+        const res = await getProjectTags(projectId)
+        if (request !== this.tagsRequest || String(projectId) !== String(this.projectId)) return
         this.projectTags = res.data || res || []
+        const selected = this.selectedTagIds.filter(id => this.projectTags.some(tag => String(tag.id) === String(id)))
+        if (selected.length !== this.selectedTagIds.length) this.setTagFilter(selected)
       } catch (e) {
-        console.error('Failed to load project tags', e)
+        if (request === this.tagsRequest) this.tagsError = this.$t('files.loadFailed')
+      } finally {
+        if (request === this.tagsRequest) this.tagsLoading = false
       }
+    },
+    applyFileTags(file, tags) {
+      for (const item of [...this.allFiles, ...this.files, file]) {
+        if (String(item.id) === String(file.id)) item.tags = tags
+      }
+      this.saveSnapshotToCache()
+      uni.$emit('awd:files-changed', { projectId: this.projectId })
     },
     // Esc 关标签弹窗，逐层退：标签管理（上层）→ 新建标签子表单（等于点取消）→ 管理标签。
     // 输入框里有字也照关（等于取消）；AwdDialog（删除标签的确认框）开着时让它先处理，
@@ -3730,10 +3858,12 @@ export default {
     async handleAddTag(tag) {
        if (!this.targetFileForTags) return
        try {
-         await addTagToFile(this.projectId, this.targetFileForTags.id, tag.id)
-         // Optimistic update
-         if (!this.targetFileForTags.tags) this.$set(this.targetFileForTags, 'tags', [])
-         this.targetFileForTags.tags.push(tag)
+         const file = this.targetFileForTags
+         const projectId = this.projectId
+         await addTagToFile(projectId, file.id, tag.id)
+         if (String(projectId) !== String(this.projectId)) return
+         const currentFile = this.allFiles.find(item => String(item.id) === String(file.id)) || file
+         this.applyFileTags(file, [...(currentFile.tags || []).filter(t => String(t.id) !== String(tag.id)), tag])
        } catch (e) {
          uni.showToast({ title: 'Failed to add tag', icon: 'none' })
        }
@@ -3747,13 +3877,17 @@ export default {
        if (!this.targetFileForTags || !tagName) return
        try {
          // 1. Create Tag
-         const res = await createTag(this.projectId, { name: tagName, color: tagColor, type: tagType })
+         const projectId = this.projectId
+         const fileId = this.targetFileForTags.id
+         const res = await createTag(projectId, { name: tagName, color: tagColor, type: tagType })
          const newTag = res.data || res
+         if (String(projectId) !== String(this.projectId)) return
 
          // 2. Refresh available tags
          await this.refreshProjectTags()
 
-         // 3. Add to file
+         // 3. Add only to the file for which creation started.
+         if (String(projectId) !== String(this.projectId) || String(fileId) !== String(this.targetFileForTags?.id)) return
          await this.handleAddTag(newTag)
 
        } catch (e) {
@@ -3764,10 +3898,12 @@ export default {
     async handleRemoveTag(tag) {
        if (!this.targetFileForTags) return
        try {
-         await removeTagFromFile(this.projectId, this.targetFileForTags.id, tag.id)
-         // Optimistic update
-         const idx = this.targetFileForTags.tags.findIndex(t => t.id === tag.id)
-         if (idx > -1) this.targetFileForTags.tags.splice(idx, 1)
+         const file = this.targetFileForTags
+         const projectId = this.projectId
+         await removeTagFromFile(projectId, file.id, tag.id)
+         if (String(projectId) !== String(this.projectId)) return
+         const currentFile = this.allFiles.find(item => String(item.id) === String(file.id)) || file
+         this.applyFileTags(file, (currentFile.tags || []).filter(t => String(t.id) !== String(tag.id)))
 
        } catch (e) {
          uni.showToast({ title: 'Failed to remove tag', icon: 'none' })
@@ -3905,6 +4041,25 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.file-browse-controls { flex-shrink: 0; min-width: 0; }
+.file-browse-tabs { display: flex; gap: var(--awd-space-1); margin: var(--awd-panel-gap) var(--awd-panel-pad-x); }
+.file-browse-tab {
+  flex: 1; min-width: 0; margin: 0; padding: 0 var(--awd-space-2);
+  font-size: var(--awd-font-size-body); line-height: var(--awd-control-height);
+  border: 1px solid var(--awd-border); border-radius: var(--awd-panel-radius);
+  background: transparent; color: var(--awd-text-2); cursor: pointer;
+  &::after { border: 0; }
+  &.active { background: var(--awd-accent-soft); color: var(--awd-accent-text); border-color: var(--awd-accent); }
+  &:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
+}
+.tag-view-summary {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--awd-space-1);
+  padding: var(--awd-space-2) var(--awd-panel-pad-x); font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2);
+  border-bottom: 1px solid var(--awd-border);
+}
+.view-mode-tags .tree-item-content { height: auto; min-height: 48px; flex-wrap: wrap; gap: 0 var(--awd-space-1); padding-block: var(--awd-space-1); }
+.tag-file-location { flex-basis: 100%; padding-left: 32px; box-sizing: border-box; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
+
 .file-tree {
   height: 100%;
   display: flex;

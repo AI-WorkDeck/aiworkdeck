@@ -282,6 +282,12 @@ export const fileOpenTabsMethods = {
         const tree = this.$refs && this.$refs.fileTree
         if (!tree) return
         if (active && !this.isBrowserTab(active) && active.id != null && !active.tabType) {
+          // Activating a document outside the tag filter must not silently select a hidden file.
+          if (tree.isTagView && !tree.displayFiles.some(file => String(file.id) === String(active.id))) {
+            tree.selectedFileId = null
+            tree.multiSelectedIds = []
+            return
+          }
           if (typeof tree.revealFile === 'function') {
             const revealed = tree.revealFile(active.id)
             if (!revealed) {
