@@ -10,6 +10,16 @@ import { hoverViewportMetrics, hitTestRevision } from '../../src/composables/zet
 import { fixture } from './_revision-fixture.mjs'
 import { preflight, startServer, launchBrowser, loadPuppeteer, openEditor } from './_boot.mjs'
 
+// Run the component's actual methods against the real executor. TOOLBAR_SOURCE
+// can point to the baseline .vue; neither command order is copied into this test.
+const toolbarSource = fs.readFileSync(process.env.TOOLBAR_SOURCE || new URL('../../src/components/EditorToolbar.vue', import.meta.url), 'utf8')
+const toolbarScript = toolbarSource.match(/<script>([\s\S]*?)<\/script>/)[1]
+const toolbarOptions = new Function(
+  'bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host',
+  'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel',
+  toolbarScript.replace(/^import .*$/gm, '').replace('export default', 'return'),
+)(() => () => {}, () => () => {}, () => false, {}, [], [], {}, {})
+
 const zip = await JSZip.loadAsync(Uint8Array.from(await fixture(false)))
 const paragraphs = Array.from({ length: 60 }, (_, p) => '<w:p>' + Array.from({ length: 10 }, (_, n) => {
   const id = p * 10 + n, type = n % 2 ? 'del' : 'ins', tag = type === 'del' ? 'delText' : 't'
@@ -46,11 +56,39 @@ try {
   const start = performance.now()
   await ok('load_document', { name: 'synthetic-revisions.docx', bytes })
   const loadMs = Math.round(performance.now() - start)
-  // The real toolbar's bootstrap, including a resize after it becomes visible.
-  await ok('get_ui_state')
-  await Promise.all([ok('list_styles'), ok('list_fonts')])
-  await ok('set_chrome', { all: false })
-  await ok('set_view_options', { formattingMarks: false, ruler: false })
+  const elapsed = () => Math.round(performance.now() - start)
+  const toolbarCommands = [], catalogReads = new Set()
+  let chromeApplied = false, viewApplied = false, layoutReadyMs = null, catalogsReadyMs = null
+  const toolbar = {
+    ...toolbarOptions.data(), ...toolbarOptions.methods, docKind: 'writer',
+    viewPrefs: { formattingMarks: false, ruler: false },
+    $emit(event) {
+      if (event === 'ui-state' && chromeApplied && viewApplied && this.state.success && layoutReadyMs == null) layoutReadyMs = elapsed()
+    },
+    executor: { async executeCommand(action, params) {
+      const commandStart = performance.now()
+      const result = await ok(action, params)
+      toolbarCommands.push({ action, elapsedMs: elapsed(), durationMs: Math.round(performance.now() - commandStart) })
+      if (action === 'set_chrome') chromeApplied = true
+      if (action === 'set_view_options') viewApplied = true
+      if (action === 'list_styles' || action === 'list_fonts') {
+        catalogReads.add(action)
+        if (catalogReads.size === 2) catalogsReadyMs = elapsed()
+      }
+      return result
+    } },
+  }
+  for (const [name, get] of Object.entries(toolbarOptions.computed)) Object.defineProperty(toolbar, name, { get: () => get.call(toolbar) })
+  await toolbar.bootstrap()
+  const toolbarCompleteMs = elapsed()
+  assert.equal(toolbar.chromeHidden, true)
+  assert.equal(toolbar.viewPrefsReady, true)
+  assert.equal(toolbar.state.view.formattingMarks, false)
+  assert.equal(toolbar.state.view.ruler, false)
+  assert.ok(toolbar.fontList.length > 0 && toolbar.styleList.length > 0, 'real font and style catalogs remain populated')
+  assert.ok(layoutReadyMs != null && catalogsReadyMs != null, 'both real layout and catalog milestones must have completed')
+  console.log('open timing milestones', JSON.stringify({ loadMs, layoutReadyMs, catalogsReadyMs, toolbarCompleteMs, toolbarCommands }))
+  // Resizing after the toolbar becomes visible must still avoid hover scans.
   await page.setViewport({ width: 1440, height: 840 })
   await new Promise(resolve => setTimeout(resolve, 600))
   assert.equal(actions.filter(a => a === 'list_revisions').length, 0, 'opening/resizing must not scan hover metadata before pointer intent')
@@ -63,7 +101,27 @@ try {
   }
   assert.ok(paper > 100000 && ink > 1000, 'real first screen must contain both paper and text')
   const openMs = Math.round(performance.now() - start)
-  const layout = await ok('get_review_layout')
+  let layout = await ok('get_review_layout')
+  const firstLayoutMs = elapsed()
+  const layoutSummary = value => ({ available: value.available, mode: value.mode, documentSeq: value.documentSeq,
+    revision: value.revision, pages: value.pages?.length, items: value.items?.length, truncated: value.truncated,
+    pending: value.pending, unread: value.unread, lastRevisionIndex: value.items?.filter(i => i.kind === 'revision').at(-1)?.data.index })
+  const firstLayout = layoutSummary(layout)
+  console.log('open layout snapshot', JSON.stringify({ elapsedMs: firstLayoutMs, ...firstLayout }))
+  // Native pagination continues after the first page is usable. Wait for its
+  // real completion before testing a late index; first-screen time stays above.
+  const layoutComplete = value => value.available && value.truncated === false
+    && value.pending === 0 && value.unread === 0
+    && value.items.filter(i => i.kind === 'revision').at(-1)?.data.index > 400
+  const layoutDeadline = performance.now() + 5000
+  while (!layoutComplete(layout) && performance.now() < layoutDeadline) {
+    await new Promise(resolve => setTimeout(resolve, 100))
+    layout = await ok('get_review_layout', { fresh: false })
+  }
+  const paginationReadyMs = elapsed(), paginationWaitMs = paginationReadyMs - firstLayoutMs
+  const finalLayout = layoutSummary(layout)
+  console.log('open pagination ready', JSON.stringify({ elapsedMs: paginationReadyMs, waitMs: paginationWaitMs, ...finalLayout }))
+  assert.ok(layoutComplete(layout), 'native pagination must complete within 5 seconds: ' + JSON.stringify(finalLayout))
   const last = layout.items.filter(i => i.kind === 'revision').at(-1)
   assert.ok(last && last.data.index > 400, 'exercise a late revision, not just the first one')
   const hitStart = performance.now()
@@ -117,5 +175,7 @@ try {
   assert.deepEqual(texts.original,expected(1),'rejecting all revisions restores every original paragraph')
   assert.deepEqual(texts.final,expected(0),'accepting all revisions preserves every target paragraph')
   assert.ok((xml.match(/<w:ins\b/g)||[]).length>=300 && (xml.match(/<w:del\b/g)||[]).length>=300)
-  console.log(JSON.stringify({ loadMs, openMs, hitMs, paperPixels: paper, inkPixels: ink, revisionTextRoundTrip: true }))
+  console.log(JSON.stringify({ loadMs, layoutReadyMs, catalogsReadyMs, toolbarCompleteMs, toolbarCommands,
+    openMs, firstLayoutMs, firstLayout, paginationReadyMs, paginationWaitMs, finalLayout,
+    hitMs, paperPixels: paper, inkPixels: ink, revisionTextRoundTrip: true }))
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)) }

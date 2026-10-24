@@ -1406,7 +1406,19 @@ export default {
     async adoptAndLoad() {
       if (await this.probeGuestAlive()) { this.finishDocLoad(); return }
       this.appendLog('备胎探活失败 → 丢弃并冷启动 / spare probe failed, cold boot instead')
-      await this.remountEditor() // onEndpointReady 会接着装载当前文档
+      const retryPreview = this._previewSkippedForWarmEngine
+      this._previewSkippedForWarmEngine = false
+      const remount = this.remountEditor() // 同步清掉 _endpointUp；就绪后会装载当前文档
+      // 字节若早于探活结果到达，预览曾被热引擎跳过。复用它补回冷启动预览；
+      // 尚在下载的原回调会自行预览，不在这里重复排队。
+      const bytes = this._bytesPromise, seq = this._docLoadSeq, fileId = this.file?.id
+      const generation = this._checkpointGeneration
+      if (retryPreview && bytes) bytes.then(buf => {
+        if (this._backendHealthDisposed || seq !== this._docLoadSeq || bytes !== this._bytesPromise
+          || fileId !== this.file?.id || generation !== documentCheckpointGeneration(this.projectId, fileId)) return
+        this.tryDocxPreview(buf)
+      })
+      await remount
     },
     // 最便宜的只读探活：命中就是 6ms 级；guest 死了/冻住就在 3s 预算上失败，
     // 不拖着用户等 relay 的默认预算。
@@ -1592,6 +1604,7 @@ export default {
       const f = this.file
       const fileId = f && f.id // 数字主键（dev-board#1035）
       if (!fileId) return
+      this._previewSkippedForWarmEngine = false
       const t0 = Date.now()
       this._checkpointGeneration = documentCheckpointGeneration(this.projectId, fileId)
       this._bytesPromise = this.fetchArrayBuffer(getFileBytesUrl(fileId), (loaded, total) => {
@@ -1607,15 +1620,22 @@ export default {
     // 同 FilePreview.renderDocx 的配置）。失败静默回落进度卡片。
     async tryDocxPreview(buf, force = false) {
       if (!buf || buf.byteLength === 0 || this.previewReady) return
+      // 热备胎已能直接装载，不再同时用 docx-preview 解包并布局同一份文档。
+      // 冷启动继续提供预览；失败后的显式只读预览不受此条件限制。
+      if (!force && this._endpointUp) { this._previewSkippedForWarmEngine = true; return }
       if (!force && (this.ready || this.previewFailed)) return
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
       if (t !== 'docx' && t !== 'doc') return
+      const seq = this._docLoadSeq, fileId = this.file?.id
+      const generation = documentCheckpointGeneration(this.projectId, fileId)
+      const current = () => !this._backendHealthDisposed && seq === this._docLoadSeq && fileId === this.file?.id
+        && generation === documentCheckpointGeneration(this.projectId, fileId)
       try {
         const { renderAsync } = await import('docx-preview')
         await this.$nextTick() // 过继路径上 overlay 可能刚重新显示，等 ref 挂上
         const ref = this.$refs.docxPreviewHost
         const container = ref && (ref.$el || ref)
-        if (!container || (!force && this.ready)) return
+        if (!container || !current() || (!force && (this._endpointUp || this.ready))) return
         container.innerHTML = ''
         await renderAsync(buf, container, null, {
           className: 'docx',
@@ -1625,11 +1645,12 @@ export default {
           breakPages: true,
           experimental: true,
         })
-        if (!force && this.ready) return
+        if (!current() || (!force && this.ready)) return
         this.previewReady = true
         this.appendLog('只读预览就绪（引擎继续后台启动）')
         return true
       } catch (e) {
+        if (!current()) return
         this.previewFailed = true
         this.appendLog('docx 预览渲染失败（保留进度面板）: ' + (e && e.message ? e.message : e))
         if (force) throw e

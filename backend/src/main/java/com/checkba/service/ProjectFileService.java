@@ -106,6 +106,15 @@ public class ProjectFileService {
         return projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId);
     }
 
+    /** 按需读取标签快照中的文件，范围约束由数据库执行，不扫描完整文件树。 */
+    public List<ProjectFile> getFilesByIds(Long projectId, List<Long> fileIds) {
+        if (projectId == null) {
+            throw new IllegalArgumentException(LangText.of("项目 ID 不能为空", "Project ID must not be empty"));
+        }
+        if (fileIds.isEmpty()) return List.of();
+        return projectFileRepository.findByProjectIdAndIdInAndIsDeletedFalse(projectId, fileIds);
+    }
+
     /**
      * 创建文件夹
      */

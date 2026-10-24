@@ -1542,3 +1542,9 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - **Codex 式首启权限排查与拖拽授权浮窗**：桌面主进程 `desktop/main/permissions-service.js` 提供 `fullDiskAccess`（探测 `/Library/Preferences/com.apple.TimeMachine.plist` 与微信容器可读性）、`screenRecording`、`microphone`、`accessibility` 四项状态检测，打开对应 `x-apple.systempreferences:com.apple.preference.security?Privacy_*` 页，并通过 JXA `CGWindowListCopyWindowInfo` 追踪系统设置窗口位置，在旁侧贴靠置顶无边框拖拽引导浮窗（`showHelperWindow` + `desktop/preload/permission-helper-preload.js`），支持通过 `webContents.startDrag({ file: appBundlePath, icon })` 将 `AI WorkDeck.app` 直接拖入系统设置列表，后台 800ms 轮询授权成功后自动收起浮窗并广播 `checkba:permissions-updated`。
 - **前端全局引导与设置页入口**：`App.vue` 挂载独立根实例 `mountPermissionOnboarding()`（`PermissionOnboardingModal.vue` + `utils/permissionOnboarding.js`），macOS 桌面端首次启动存在未授权推荐项时自动弹出，并在 `AdminPane.vue`「系统 → 系统权限」提供常驻体检与一键开启入口。所有调起原生 `.app` 拖拽的 `dragstart` 必须先同步 `e.preventDefault()` 再调 `startAppDrag`。
 - **验证**：`desktop/tests/permissions-service.test.js`、`frontend/tests/project-home/drop-byte-import.test.mjs`、`frontend/tests/project-home/permission-onboarding.test.mjs`。
+
+## 项目标签恢复的加载范围（dev-board#1473）
+
+`tabSnapshot.snapshotFileIds` 收集左右窗格真实文件和比对两侧的去重 ID；`fetchTabSnapshotFileIndex(ids)` 经 `getProjectFilesByIds` 每批最多 200 个，调用现有 `GET /api/projects/{id}/files?tree=true&ids=…`。该分支仅查询当前项目未删除的指定文件，不读取整棵文件树或 tags；目录仍由宿主过滤。空快照不请求，任一批失败沿用原有保留标签的错误兜底，不能把部分返回当成完整存在性索引误删标签。文件树展示继续使用 tree/parent 路径，鉴权规则不变；切换仍须先 `flushDirtyEditors`。回归：`tab-snapshot.test.mjs`、`tab-file-lookup.test.mjs` 与后端 `ProjectFileControllerIdsTest`。
+
+宿主 `onLoad` 必须在恢复前以具名 `uni.getStorageSync/setStorageSync` 包装注入 `$tabStorage`。H5 构建按方法名改写 API 引用，裸 `uni` 及普通 JS 方法组读到的全局 `uni` 可能只有空壳；不能改成 `$tabStorage = uni`。回归同时覆盖无绑定、裸绑定负对照；实际编译产物和 Electron 项目切换验收见 `doc/verification/2026-10-24-startup-project-word-performance.md`。
