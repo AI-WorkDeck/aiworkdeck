@@ -33,6 +33,13 @@ import org.springframework.context.event.EventListenerMethodProcessor;
 import org.springframework.context.support.GenericApplicationContext;
 
 import java.time.Duration;
+import java.net.ConnectException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -128,21 +135,33 @@ class StartupDataInitializerTest {
             assertTrue(release.await(15, TimeUnit.SECONDS));
             return null;
         }).when(providers).onStartup();
+        final int port;
+        try (var reservation = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))) {
+            port = reservation.getLocalPort();
+        }
+        var client = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(500)).build();
+        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/"))
+                .timeout(Duration.ofSeconds(2)).GET().build();
         var app = application(constructed);
         app.addListeners((ApplicationListener<WebServerInitializedEvent>) event -> {
             verify(skills).init();
+            assertEquals(port, event.getWebServer().getPort());
             webServerStarted.set(true);
         });
         var executor = Executors.newSingleThreadExecutor();
-        var startup = executor.submit(() -> run(app, localMode));
+        var startup = executor.submit(() -> run(app, localMode, port));
         ConfigurableApplicationContext context = null;
         try {
             assertTrue(entered.await(10, TimeUnit.SECONDS));
             assertFalse(webServerStarted.get(), "business connections must not precede provider/job/plugin recovery");
+            assertThrows(ConnectException.class, () -> client.send(request, HttpResponse.BodyHandlers.ofString()),
+                    "the actual HTTP connector must refuse connections until necessary initialization completes");
             verifyNoInteractions(jobs, plugins, skills);
             release.countDown();
             context = startup.get(10, TimeUnit.SECONDS);
             assertTrue(webServerStarted.get());
+            assertEquals(404, client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode(),
+                    "the same isolated HTTP connector must now respond (this fixture has no business routes)");
             var ordered = inOrder(providers, jobs, plugins, skills);
             ordered.verify(providers).onStartup();
             ordered.verify(jobs).recoverOrphans();
@@ -191,8 +210,12 @@ class StartupDataInitializerTest {
     }
 
     private ConfigurableApplicationContext run(SpringApplication app, boolean localMode) {
+        return run(app, localMode, 0);
+    }
+
+    private ConfigurableApplicationContext run(SpringApplication app, boolean localMode, int port) {
         return app.run("--spring.config.name=startup-phase-test-empty", "--server.address=127.0.0.1",
-                "--server.port=0", "--security.local-mode=" + localMode,
+                "--server.port=" + port, "--security.local-mode=" + localMode,
                 "--spring.main.banner-mode=off", "--logging.level.root=ERROR");
     }
 
