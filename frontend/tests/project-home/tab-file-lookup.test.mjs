@@ -3,6 +3,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { tabSnapshotMethods } from '../../src/pages/project-overview/tabSnapshot.js'
+import { workbenchStorageKey } from '../../src/pages/project-overview/noProjectShell.js'
 
 const api = readFileSync(new URL('../../src/services/api.js', import.meta.url), 'utf8')
 const source = api.slice(api.indexOf('export async function getProjectFilesByIds('), api.indexOf('// 创建文件夹'))
@@ -59,4 +61,58 @@ test('older servers ignoring ids still restore nested file metadata', async () =
   })
   const files = await lookup(7, ['8'])
   assert.deepEqual(files.find(file => file.id === 8), nested)
+})
+
+test('real workbench onLoad binds its compiled uni storage before snapshot reads and writes', async () => {
+  const page = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
+  const start = page.indexOf('  onLoad(query) {')
+  const end = page.indexOf('  onShow() {', start)
+  assert.ok(start >= 0 && end > start)
+  const stored = new Map(), lookups = []
+  const storage = { getStorageSync: key => stored.get(key), setStorageSync: (key, value) => stored.set(key, structuredClone(value)) }
+  // H5 rewrites named API references to imports, but leaves bare uni as an empty
+  // facade. Model that distinction while executing the actual host lifecycle.
+  const compiledOnLoad = page.slice(start, end)
+    .replace(/\buni\.getStorageSync\b/g, 'compiledStorage.getStorageSync')
+    .replace(/\buni\.setStorageSync\b/g, 'compiledStorage.setStorageSync')
+  const dependencies = { uni: { $on() {} }, compiledStorage: storage, loadSiteLinks() {}, syncRecentToMenuFetching() {}, loadShowWelcomeOnStartup: () => false,
+    getCurrentUser: () => null, loadSidebarCollapsed: () => false, workbenchStorageKey,
+    isPaneAllowedWithoutProject: () => true, NO_PROJECT_DEFAULT_PANE: 'projects', migrateLeftPaneKey: value => value,
+    window: { addEventListener() {} },
+  }
+  const onLoad = new Function(...Object.keys(dependencies), `return ({${compiledOnLoad}}).onLoad`)(...Object.values(dependencies))
+  const nested = { id: 8, parentId: 2, name: 'nested.txt', fileType: 'txt' }
+  const host = () => {
+    const vm = { ...tabSnapshotMethods, projectId: null, hasProject: true, hasNamedProject: true,
+      leftFiles: [], rightFiles: [], activeFileIdLeft: null, activeFileIdRight: null, splitMode: false, focusedPane: 'left',
+      initRestartRecovery() {}, loadLicenseMode() {}, loadWalletBalance() {}, loadProjectInfo() {}, toggleAiPanel() {},
+      loadRealUserInfo() {}, loadPanelDocks() {}, loadRailOrder() {}, initThemeSwitch() {}, normalizeDockSelections() {},
+      bindClipboardListener() {}, loadDynamicPlugins() {}, loadEnabledSkills() {}, maybeRegisterOpenWorkbench() {},
+      scheduleTabSnapshotSave() {},
+      async fetchTabSnapshotFileIndex(ids) { lookups.push(ids); return new Map([['8', nested]]) },
+      restoreTabSnapshot() { this.restoring = tabSnapshotMethods.restoreTabSnapshot.call(this); return this.restoring },
+    }
+    return vm
+  }
+  const previousUni = globalThis.uni
+  globalThis.uni = {}
+  try {
+    const first = host()
+    onLoad.call(first, { id: '7' })
+    await first.restoring
+    first.leftFiles.push(nested)
+    first.activeFileIdLeft = nested.id
+    first.writeTabSnapshot()
+    assert.deepEqual(stored.get('project_7_tabs')?.left.map(file => file.id), [8], 'production lifecycle must make snapshot writes reach real storage')
+
+    const reopened = host()
+    onLoad.call(reopened, { id: '7' })
+    await reopened.restoring
+    assert.deepEqual(lookups, [['8']])
+    assert.equal(reopened.leftFiles[0]?.id, 8)
+    assert.equal(reopened.activeFileIdLeft, 8)
+  } finally {
+    if (previousUni === undefined) delete globalThis.uni
+    else globalThis.uni = previousUni
+  }
 })
