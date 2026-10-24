@@ -74,6 +74,7 @@ export const menuCommandsMethods = {
       // 要手动把它补回来，否则版本记录会从这份清单里消失。
       views: (this.LEFT_SIDEBAR_PLUGINS || [])
         .map((p) => ({ key: p.key, label: p.label }))
+        .concat(this.hasNamedProject && !this.isClientView && this.explorerSearchPlugin ? [{ key: this.explorerSearchPlugin.key, label: this.explorerSearchPlugin.label }] : [])
         .concat(this.VERSION_PLUGIN && !this.isLooseWorkspace ? [{ key: this.VERSION_PLUGIN.key, label: this.VERSION_PLUGIN.label }] : []),
       flags: this.buildMenuFlags(),
     })

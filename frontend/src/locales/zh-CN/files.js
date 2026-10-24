@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 文件预览/选择/暂存/搜索/标签组件文案
 export default {
+  backToFiles: '返回文件目录',
   archiveContents: '压缩包内容',
   archivePreview: '文件预览',
   archiveSelectEntry: '选择文件，在这里预览',

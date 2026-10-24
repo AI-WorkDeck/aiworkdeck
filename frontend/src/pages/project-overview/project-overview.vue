@@ -295,14 +295,14 @@
       <!-- Cursor 风格：最左常驻栏（Activity Bar） -->
       <view class="left-rail">
         <!-- rail 的顺序就是 config/leftSidebarPlugins.js 里数组的顺序（项目概览 →
-             资源管理器 → 搜索 → 插件中心 → 语音 → 脱敏 → 门控项）。
+             资源管理器 → 插件中心 → 语音 → 脱敏 → 门控项）。
              2026-08-19 起「项目概览」和「插件中心」也在这个数组里：它们走的都是
              普通的 toggleLeftPane 语义，单独硬编码成 rail 按钮只会让顺序有两个出处。 -->
         <view
           v-for="p in LEFT_SIDEBAR_PLUGINS"
           :key="p.key"
           class="rail-btn"
-          :class="{ active: (p.key === 'messages' && (focusedPane === 'right' ? activeFileRight : activeFileLeft)?.tabType === 'message-center') || (leftPaneKey === p.key && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
+          :class="{ active: (p.key === 'messages' && (focusedPane === 'right' ? activeFileRight : activeFileLeft)?.tabType === 'message-center') || ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
           :title="p.label"
           :draggable="!isClientView"
           @tap="onRailBtnTap(p.key)"
@@ -553,7 +553,7 @@
              面板内部的分组头里，例外随之取消。 -->
         <view v-if="!sidebarCollapsed" class="sidebar-header">
           <view class="sidebar-title-row">
-            <text v-if="!fileBatchMode" class="sidebar-title">{{ leftPaneTitle }}</text>
+            <text v-if="!fileBatchMode || leftPaneKey === 'plugin-search'" class="sidebar-title">{{ leftPaneTitle }}</text>
             <view
               v-else
               class="btn-select-all"
@@ -563,8 +563,25 @@
             </view>
           </view>
 
-          <view v-if="leftPaneKey === 'files'" class="sidebar-actions-row">
+          <view v-if="isExplorerPane" class="sidebar-actions-row">
             <view class="sidebar-actions">
+              <view
+                v-if="hasNamedProject && explorerSearchPlugin && (!fileBatchMode || leftPaneKey === 'plugin-search')"
+                class="icon-btn mini explorer-search-toggle"
+                :class="{ active: leftPaneKey === 'plugin-search' }"
+                role="button" tabindex="0"
+                :aria-pressed="leftPaneKey === 'plugin-search'"
+                :title="leftPaneKey === 'plugin-search' ? $t('files.backToFiles') : $t('config.sidebar.search')"
+                :aria-label="leftPaneKey === 'plugin-search' ? $t('files.backToFiles') : $t('config.sidebar.search')"
+                @click.stop="toggleExplorerSearch"
+                @keydown.enter.prevent="toggleExplorerSearch"
+                @keydown.space.prevent="toggleExplorerSearch"
+              >
+                <svg class="mini-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path v-for="(d, gi) in (leftPaneKey === 'plugin-search' ? GLYPHS.arrowLeft : GLYPHS.search)" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </view>
+              <template v-if="leftPaneKey === 'files'">
               <!-- 1. 新建文件 (普通模式) -->
               <view
                 v-if="!fileBatchMode"
@@ -639,6 +656,7 @@
                   <path v-for="(d, gi) in GLYPHS.trash" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </view>
+              </template>
             </view>
           </view>
         </view>
@@ -3268,7 +3286,14 @@ export default {
       if (!this.leftPaneKey) return null
       return this.dynamicPlugins.find(p => p.key === this.leftPaneKey) || null
     },
+    isExplorerPane() {
+      return this.leftPaneKey === 'files' || this.leftPaneKey === 'plugin-search'
+    },
+    explorerSearchPlugin() {
+      return this.dynamicPlugins.find(p => p.pluginId === 'search' && p.sidebarView) || null
+    },
     leftPaneTitle() {
+      if (this.isExplorerPane) return this.$t('config.sidebar.files')
       if (this.leftPaneKey === 'market') return this.$t('workbench.pluginMarket')
       // 停靠到左栏的工具面板（变量库/收藏夹/剪贴板）在 leftSidebarPlugins 里查不到，
       // 会掉进兜底显示成「资源管理器」——从注册表取它的 labelKey（dev-board#180）
