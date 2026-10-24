@@ -3,6 +3,8 @@
 package com.checkba.controller;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.availability.ApplicationAvailability;
+import org.springframework.boot.availability.ReadinessState;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,13 +21,19 @@ import java.util.Map;
 @ConditionalOnProperty(name = "security.local-mode", havingValue = "true")
 public class DesktopHealthController {
     private final DataSource dataSource;
+    private final ApplicationAvailability availability;
 
-    public DesktopHealthController(DataSource dataSource) {
+    public DesktopHealthController(DataSource dataSource, ApplicationAvailability availability) {
         this.dataSource = dataSource;
+        this.availability = availability;
     }
 
     @GetMapping("/api/desktop/health")
     public ResponseEntity<Map<String, String>> health() {
+        // A listening server/database can precede repository validation, runners and ready listeners.
+        if (availability.getReadinessState() != ReadinessState.ACCEPTING_TRAFFIC) {
+            return ResponseEntity.status(503).body(Map.of("status", "DOWN"));
+        }
         // Desktop Hikari acquisition is bounded to 2s; no business transactions or project locks.
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
