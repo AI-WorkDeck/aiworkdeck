@@ -173,6 +173,8 @@ export default {
     "loadingChecklist": "正在读取清单…",
     "awaitingPublication": "律师确认并发布后，清单会显示在这里。",
     "removeConnection": "移除本机连接",
+    "materialList": "材料清单",
+    "backToMaterials": "返回材料清单",
     "chooseChecklist": "请选择一份清单开始准备材料。",
     "checklistTitle": "尽调清单",
     "progressSummary": "{completed} / {total} 项已通过 · {pending} 项待准备",
