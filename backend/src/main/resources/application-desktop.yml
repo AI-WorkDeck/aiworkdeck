@@ -15,6 +15,12 @@ server:
 spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  data:
+    jpa:
+      repositories:
+        # 与异步 EntityManagerFactory 初始化配合；上下文刷新时仍校验全部仓库，
+        # 不把查询解析推迟到用户首次操作。健康接口须等应用完整就绪再放行。
+        bootstrap-mode: deferred
   datasource:
     driver-class-name: org.h2.Driver
     # H2 文件库：~/.aiworkdeck/local.mv.db

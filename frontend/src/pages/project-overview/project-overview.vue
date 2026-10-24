@@ -963,11 +963,8 @@
 
             <!-- 编辑器区域（会被底部工具面板压缩） -->
             <view class="editors-container">
-              <!-- 三方合并借走的隐藏引擎实例（librePool.acquireLibreHiddenInstance）必须挂在
-                   这里、v-if/v-else 之外：备胎那块 v-for 在下面的 .editors-grid 里，而
-                   .editors-grid 只在左栏开着文档时才渲染——律师在版本面板里点「取回最新稿」
-                   时左栏常常一份文档都没开，隐藏实例根本不会 mount，acquire 只能空转 180 秒
-                   后降级成整份三选一（2026-09-14 真机走查抓到的阻断缺陷）。
+              <!-- 三方合并借走的隐藏引擎实例（librePool.acquireLibreHiddenInstance）
+                   独立于可见标签与空态：律师在版本面板里点「取回最新稿」时可能没有文档。
                    .editors-container 本身 position:relative 且有尺寸，绝对定位的
                    .libre-spare-standby 在这里照样有画布可 boot（display:none 不行，见 scss）。 -->
               <view
@@ -1001,8 +998,9 @@
                 </view>
               </view>
 
-              <!-- 编辑器视图 -->
-              <view v-else class="editors-grid">
+              <!-- 空态覆盖在常驻网格上：预热实例必须在首开文件前就 mount，
+                   关掉最后一个非文档标签也不能拆掉它；过继沿用原容器与 key。 -->
+              <view class="editors-grid">
                 <!-- 左/主 窗格 -->
                 <view
                   class="editor-pane pane-left"
