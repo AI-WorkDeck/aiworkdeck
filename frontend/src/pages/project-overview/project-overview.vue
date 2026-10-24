@@ -2326,6 +2326,7 @@ import {
   saveProjectVariable,
   getProjectVariables,
   getProjectFiles,
+  getProjectFilesByIds,
   batchCopyFiles,
   exportAiDocx,
   getProjectMembers,
@@ -4774,10 +4775,10 @@ export default {
       this.taskDialog.visible = false
       this.openFile(file)
     },
-    // 标签快照恢复前核对文件还在不在（dev-board#1049）：一次 GET 整棵树（回收站里的不在其中），
+    // 标签快照恢复前只核对引用的文件（回收站里的不在其中），
     // Map<String(id), file>。只在快照里真有文件 / 对比标签时才调。
-    async fetchTabSnapshotFileIndex() {
-      const resp = await getProjectFiles(this.projectId, null, true)
+    async fetchTabSnapshotFileIndex(ids) {
+      const resp = await getProjectFilesByIds(this.projectId, ids)
       const files = Array.isArray(resp) ? resp : ((resp && resp.data) || [])
       const index = new Map()
       for (const f of files) {

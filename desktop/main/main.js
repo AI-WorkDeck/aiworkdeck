@@ -1802,15 +1802,17 @@ app.whenReady().then(() => {
   } catch (e) { /* ignore */ }
   // 增量更新：清理非本大版本的 overlay 残留（全量升级后安装器不会替我们清）
   try { require('./services/overlay').cleanupStaleMajors(overlayCtx()) } catch (e) { console.error('[overlay]', e) }
-  // 桌面端启动时自动拉起本机服务（Java 后端 9696 + 已装 runtime pack 的 Python 服务）。
-  // 0.38.0 起没有 pysvc 解压这一步：四个 Python 服务的 descriptor 各自判 pack 在不在场，
-  // 不在场就不启动（用户在「可选组件」面板下载后 host.services.ensure 拉起）。
+  // 主窗口只等待 Java 后端真正 HTTP 就绪；已装 Python 组件不参与首屏关键路径。
+  // 四个 Python 服务会在主页面加载后启动，避免模型加载与 Java/H5 首启争抢资源。
   Promise.resolve()
     .then(() => {
       services = createServices()
       return services.allocatePorts()
     })
-    .then(() => services.startEager())
+    .then(() => services.start('backend').then(
+      (backend) => ({ backend }),
+      (e) => ({ backend: { ok: false, error: String(e && e.message ? e.message : e) } })
+    ))
     .then(async (results) => {
       // 增量更新自愈（设计 §6）：overlay 生效时后端起不来 → 记账，连续 2 次
       // 自动回滚到上一版本/内置并当场重试一次；启动健康则清零计数并清理旧版本
@@ -1833,6 +1835,16 @@ app.whenReady().then(() => {
       mainWindowStartupReady = true
       createMainWindow()
       retireFirstLaunchSplash()
+      const startupServices = services
+      mainWindow.webContents.once('did-finish-load', () => {
+        // 退出期间页面可能才加载完；不要把已停止的组件重新拉起。
+        if (quitInProgress || startupServices.closing) return
+        startupServices.startEager(['backend']).then((optionalResults) => {
+          for (const [name, result] of Object.entries(optionalResults)) {
+            if (!result.ok && !result.disabled) console.error(`[${name}]`, result.error || 'failed to start')
+          }
+        }).catch((e) => console.error('[startup] optional services failed', e))
+      })
       // 应用内更新检查（P1）：启动 2 分钟后静默首查，之后每 6 小时一次
       try {
         const { createUpdateService } = require('./services/update-service')
@@ -1880,11 +1892,6 @@ app.whenReady().then(() => {
         } catch (err) {
           // ignore
         }
-      }
-      const p = results['pptx-service']
-      if (p && !p.ok) {
-        // pptx 失败不阻塞主流程：功能触发时后端会报服务不可达，日志见 ~/.aiworkdeck/logs
-        console.error('[pptx-service]', p.error || 'failed to start')
       }
     })
     .catch((err) => {

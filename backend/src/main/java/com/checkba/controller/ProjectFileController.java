@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -109,12 +110,14 @@ public class ProjectFileController {
      * 获取文件列表（指定父文件夹）
      * GET /api/projects/{projectId}/files?parentId=xxx
      * GET /api/projects/{projectId}/files?tree=true 获取完整文件树
+     * GET /api/projects/{projectId}/files?ids=1,2 仅获取指定存活文件，不加载标签
      */
     @GetMapping
-    public List<ProjectFile> getFiles(
+    public ResponseEntity<?> getFiles(
             @PathVariable Long projectId,
             @RequestParam(required = false) Long parentId,
             @RequestParam(required = false) Boolean tree,
+            @RequestParam(required = false) String ids,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = getUserIdFromSession(sessionId);
         if (userId == null) {
@@ -122,6 +125,28 @@ public class ProjectFileController {
         }
         
         checkFileTreeAccess(projectId, userId);
+
+        // 恢复标签只需少量文件；参数校验放在权限闸后，空列表不能退回整棵树。
+        if (ids != null) {
+            if (ids.isBlank()) return ResponseEntity.ok(Collections.emptyList());
+            String[] values = ids.split(",", -1);
+            if (values.length > 200) {
+                return ResponseEntity.badRequest().body(Map.of("code", 400, "message",
+                        com.checkba.service.LangText.of("一次最多查询 200 个文件", "At most 200 file IDs are allowed")));
+            }
+            List<Long> fileIds = new ArrayList<>(values.length);
+            try {
+                for (String value : values) {
+                    long id = Long.parseLong(value.trim());
+                    if (id <= 0) throw new NumberFormatException();
+                    fileIds.add(id);
+                }
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest().body(Map.of("code", 400, "message",
+                        com.checkba.service.LangText.of("文件 ID 必须为正整数", "File IDs must be positive integers")));
+            }
+            return ResponseEntity.ok(projectFileService.getFilesByIds(projectId, fileIds));
+        }
 
         // 如果请求完整文件树
         List<ProjectFile> files;
@@ -138,7 +163,7 @@ public class ProjectFileController {
             files.forEach(f -> f.setTags(tagsMap.getOrDefault(f.getId(), Collections.emptyList())));
         }
         
-        return files;
+        return ResponseEntity.ok(files);
     }
     
     @ExceptionHandler(com.checkba.service.ProjectFileAccessService.FileAccessDeniedException.class)
