@@ -1546,3 +1546,5 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 ## 项目标签恢复的加载范围（dev-board#1473）
 
 `tabSnapshot.snapshotFileIds` 收集左右窗格真实文件和比对两侧的去重 ID；`fetchTabSnapshotFileIndex(ids)` 经 `getProjectFilesByIds` 每批最多 200 个，调用现有 `GET /api/projects/{id}/files?tree=true&ids=…`。该分支仅查询当前项目未删除的指定文件，不读取整棵文件树或 tags；目录仍由宿主过滤。空快照不请求，任一批失败沿用原有保留标签的错误兜底，不能把部分返回当成完整存在性索引误删标签。文件树展示继续使用 tree/parent 路径，鉴权规则不变；切换仍须先 `flushDirtyEditors`。回归：`tab-snapshot.test.mjs`、`tab-file-lookup.test.mjs` 与后端 `ProjectFileControllerIdsTest`。
+
+宿主 `onLoad` 必须在恢复前以具名 `uni.getStorageSync/setStorageSync` 包装注入 `$tabStorage`。H5 构建按方法名改写 API 引用，裸 `uni` 及普通 JS 方法组读到的全局 `uni` 可能只有空壳；不能改成 `$tabStorage = uni`。回归同时覆盖无绑定、裸绑定负对照；实际编译产物和 Electron 项目切换验收见 `doc/verification/2026-10-24-startup-project-word-performance.md`。
