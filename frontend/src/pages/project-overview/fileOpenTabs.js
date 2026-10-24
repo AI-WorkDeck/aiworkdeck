@@ -268,6 +268,8 @@ export const fileOpenTabsMethods = {
      * 避免出现「打开了新标签页，左侧却还高亮着另一个文件」的错位。
      */
     syncFileTreeSelectionWithActiveTab(fallbackFile = null) {
+      // 搜索结果可打开文档，但不展开/滚动隐藏的目录，返回时保留原来的浏览位置。
+      if (this.leftPaneKey === 'plugin-search') return
       const pane = (this.splitMode && this.focusedPane === 'right') ? 'right' : 'left'
       const activeId = pane === 'right' ? this.activeFileIdRight : this.activeFileIdLeft
       const list = pane === 'right' ? this.rightFiles : this.leftFiles

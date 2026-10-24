@@ -4433,6 +4433,11 @@ $color-accent: var(--awd-mint); // Mint Green
   color: var(--awd-text-2);
 }
 
+.icon-btn.mini.explorer-search-toggle:focus-visible {
+  outline: var(--awd-focus-width) solid var(--awd-accent-text) !important;
+  outline-offset: var(--awd-focus-offset);
+}
+
 .icon-btn.mini:hover .mini-icon-svg,
 .icon-btn.mini.active .mini-icon-svg {
   color: var(--awd-accent-text);
