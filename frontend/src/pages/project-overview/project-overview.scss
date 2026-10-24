@@ -674,6 +674,9 @@ $color-accent: var(--awd-mint); // Mint Green
 /* 工作区空态（dev-board#203）：品牌图标坐在一块带浅描边与柔和投影的白色圆角砖上，
    背后铺一圈极淡的品牌绿光晕；标题 + 一句引导副文案，重心略高于几何中心。 */
 .empty-workspace {
+  position: absolute;
+  inset: 0;
+  z-index: 2; // 高于聚焦窗格（1），空态链接可点，备胎保持原尺寸。
   flex: 1;
   width: 100%;
   height: 100%;

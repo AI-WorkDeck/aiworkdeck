@@ -23,13 +23,14 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * - memoryExecutor：记忆写侧管线专用，慢且非交互，隔离出去防止拖垮交互路径。
  *
  * 注意：自定义任何 Executor bean 都会让 Boot 的 TaskExecutionAutoConfiguration 退避，
- * 所以 taskExecutor 必须在这里显式声明（同时挂 applicationTaskExecutor 别名，
- * 供 Spring MVC 异步请求等框架内部使用方解析）。
+ * 所以交互池必须在这里显式声明。applicationTaskExecutor 是正式 bean 名，taskExecutor
+ * 保留为 @Async 调用方的别名：Boot 的 JPA 异步初始化按多线程池 Map 的正式名称查找，
+ * 仅提供 applicationTaskExecutor 别名会让桌面模式的 EntityManagerFactory 仍在主线程初始化。
  */
 @Configuration
 public class AsyncExecutorConfig {
 
-    @Bean(name = {"taskExecutor", "applicationTaskExecutor"})
+    @Bean(name = {"applicationTaskExecutor", "taskExecutor"})
     public ThreadPoolTaskExecutor taskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(16);

@@ -556,6 +556,10 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
 
 `PgVectorConfig` 对非 PostgreSQL JDBC 数据源直接构造既有内存向量存储；H2 不得先调用模型 `dimension()` 或构建 PG 连接再降级。PostgreSQL 仍动态探测并缓存模型维度。`PgVectorConfigTest` 验证 H2 零模型/PG 调用、两个存储的独立检索及 PostgreSQL 原有建库参数。
 
+桌面 profile 的 JPA 仓库使用 `bootstrap-mode: deferred`，配合异步 EntityManagerFactory 初始化；上下文刷新仍校验全部仓库，不使用全局 lazy 或将查询校验转嫁给首次操作。`AsyncExecutorConfig` 的交互池以 `applicationTaskExecutor` 为正式 bean 名、`taskExecutor` 为兼容别名：Spring Boot 3.2.4 在多个 `AsyncTaskExecutor` 存在时从 Map 按正式名称选择 JPA bootstrap executor，仅把框架名称设为别名会静默失去异步初始化。不得改池大小或复用 memory/context 池来补这个接线问题。`AsyncExecutorConfigTest` 覆盖实际三池 Map、Boot customizer 选择、别名同实例及三种 `@Async` 调用。延后仓库初始化会使 HTTP 端口和 `SELECT 1` 早于业务初始化完成；启动验收须分别记录 HTTP 健康、Spring Ready 事件与 `ACCEPTING_TRAFFIC`，并验证首次身份、项目及文件读写，不把提前可连通算作完整提速。诊断入口的事件耗时与并发区间不能简单相加成墙钟收益；正式 A/B 仍用出货入口、冻结 JAR 和隔离数据目录。
+
+`DesktopHealthController` 只有在 `ApplicationAvailability` 为 `ACCEPTING_TRAFFIC` 且有界数据库探测成功时返回 UP；必要 runner、同步 ready listener 尚未结束或应用正在关闭时返回 503。不要在最高优先级 Ready listener 中提前置位。`DesktopStartupReadinessTest` 使用真实 HTTP 监听与门闩验证未完成/失败启动；其专用配置用 `@TestConfiguration`，避免污染全应用扫描。既有补丁健康判定、回退与退出流程仍消费同一接口。
+
 ## 验证（改本领域自身时）
 
 - 写作辅助（dev-board#538）：CI 跑 `frontend npm run test:completion`（本地提取/排序、资料转换、宿主范围与客体交互）；`test:lowa-completion` 与 `test:writing-ui` 需真实 LOWA 载荷，覆盖位置令牌、中文输入、明确查询预览、资料插入与撤销。第三方响应使用测试资料，不在回归中自动消费查询额度。
