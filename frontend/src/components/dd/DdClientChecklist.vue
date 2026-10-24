@@ -7,13 +7,15 @@
         <h2>{{ request?.name || $t('ddWorkflow.client.checklistTitle') }}</h2>
         <p>{{ $t('ddWorkflow.client.progressSummary', { completed: progress, total: actionableItems.length, pending: needsWork }) }}</p>
       </div>
-      <button type="button" class="quiet" :disabled="loading" @click="load">{{ $t('ddWorkflow.refresh') }}</button>
+      <button type="button" class="quiet" :disabled="loading || busy" @click="load">{{ $t('ddWorkflow.refresh') }}</button>
     </header>
 
     <p v-if="error" class="message error" role="alert">{{ error }}</p>
     <p v-if="notice" class="message notice-msg" role="status">{{ notice }}</p>
     <p v-if="request && request.status !== 'PUBLISHED'" class="message">{{ $t(request.status === 'COMPLETED' ? 'ddWorkflow.client.completedChecklist' : 'ddWorkflow.client.archivedChecklist') }}</p>
 
+    <div class="material-layout" :class="{ 'show-details': showDetails }">
+    <div class="material-list">
     <div class="filter-bar">
       <div class="filter-pills">
         <button
@@ -36,17 +38,23 @@
     <p v-if="loading && !items.length" class="empty">{{ $t('ddWorkflow.client.loadingChecklist') }}</p>
     <p v-else-if="!visibleItems.length" class="empty">{{ $t(filter === 'todo' ? 'ddWorkflow.client.nothingToPrepare' : 'ddWorkflow.client.noMatchingItems') }}</p>
 
-    <article v-for="item in visibleItems" :key="item.id" class="item" :class="{ expanded: selectedId === item.id }">
-      <button type="button" class="item-heading" :aria-expanded="selectedId === item.id" @click="selectItem(item)">
-        <span class="item-title">
-          <small v-if="item.level">{{ parentTitle(item) }}</small>
-          {{ item.title }}
-        </span>
+    <nav :aria-label="$t('ddWorkflow.client.materialList')">
+      <button v-for="item in visibleItems" :key="item.id" type="button" class="item-heading"
+        :class="{ selected: selectedId === item.id }" :aria-current="selectedId === item.id ? 'true' : undefined"
+        :disabled="busy && selectedId !== item.id" @click="selectItem(item)">
+        <span class="item-title"><small v-if="item.level">{{ parentTitle(item) }}</small>{{ item.title }}</span>
         <span class="status" :class="statusClass(item)">{{ statusLabel(item) }}</span>
-        <span class="expand-toggle" aria-hidden="true">{{ selectedId === item.id ? '−' : '+' }}</span>
       </button>
+    </nav>
+    </div>
 
-      <div v-if="selectedId === item.id" class="item-body">
+    <article v-for="item in selectedItem ? [selectedItem] : []" :key="item.id" class="item material-detail" @focusin="showDetails = true">
+      <header class="detail-heading">
+        <button type="button" class="back-to-list quiet" @click="showDetails = false">{{ $t('ddWorkflow.client.backToMaterials') }}</button>
+        <h3>{{ item.title }}</h3>
+        <span class="status" :class="statusClass(item)">{{ statusLabel(item) }}</span>
+      </header>
+      <div class="item-body">
         <p v-if="item.description" class="requirement">{{ item.description }}</p>
         <button
           v-if="item.exampleFileId && !isCategory(item)"
@@ -87,8 +95,8 @@
           <div class="drop-zone" @dragover.prevent @drop.prevent="addFiles($event.dataTransfer.files)">
             <span class="drop-title">{{ $t('ddWorkflow.client.dropFiles') }}</span>
             <div class="upload-buttons">
-              <button type="button" class="primary" @click="pick(false)">{{ $t('ddWorkflow.client.chooseFiles') }}</button>
-              <button type="button" class="quiet camera" @click="pick(true)">{{ $t('ddWorkflow.client.takePhoto') }}</button>
+              <button type="button" class="primary" :disabled="busy" @click="pick(false)">{{ $t('ddWorkflow.client.chooseFiles') }}</button>
+              <button type="button" class="quiet camera" :disabled="busy" @click="pick(true)">{{ $t('ddWorkflow.client.takePhoto') }}</button>
             </div>
             <small>{{ $t('ddWorkflow.client.fileTypesHint') }}</small>
           </div>
@@ -119,14 +127,14 @@
 
           <div v-if="formMode" class="reason-form">
             <div v-if="formMode === 'explanation'" class="select-wrap">
-              <select v-model="explanationType" :aria-label="$t('ddWorkflow.client.explanationType')">
+              <select v-model="explanationType" :disabled="busy" :aria-label="$t('ddWorkflow.client.explanationType')">
                 <option value="UNAVAILABLE">{{ $t('ddWorkflow.client.unavailable') }}</option>
                 <option value="NOT_APPLICABLE">{{ $t('ddWorkflow.client.notApplicable') }}</option>
               </select>
               <span class="select-chevron" aria-hidden="true">▾</span>
             </div>
             <label :for="`dd-reason-${item.id}`" class="reason-label">{{ $t(formMode === 'appeal' ? 'ddWorkflow.client.appealReason' : 'ddWorkflow.client.explanationReason') }}</label>
-            <textarea :id="`dd-reason-${item.id}`" v-model="reason" rows="3" maxlength="2000" />
+            <textarea :id="`dd-reason-${item.id}`" v-model="reason" :disabled="busy" rows="3" maxlength="2000" />
             <button type="button" class="primary submit-btn" :disabled="busy || !reason.trim()" @click="submitReason(item)">
               {{ $t(busy ? 'ddWorkflow.client.submitting' : formMode === 'appeal' ? 'ddWorkflow.client.submitAppeal' : 'ddWorkflow.client.submitExplanation') }}
             </button>
@@ -134,24 +142,27 @@
         </div>
       </div>
     </article>
+    </div>
   </section>
 </template>
 <script>
 import { ddClientRead, ddClientWrite, ddClientUpload, ddClientDownload } from '@/services/ddClient.js'
 export default {
   name: 'DdClientChecklist',
+  emits: ['busy-change'],
   props: { requestId: { type: [String, Number], required: true }, projectId: { type: [String, Number], required: true }, connectionId: { type: String, default: '' }, focusItemId: { type: [String, Number], default: null } },
-  data: () => ({ request: null, items: [], submissions: {}, rejectReasons: {}, selectedId: null, history: [], loading: false, historyLoading: false, error: '', notice: '', filter: 'all', query: '', pendingFiles: [], aiConsent: false, busy: false, uploadProgress: null, formMode: '', explanationType: 'UNAVAILABLE', reason: '', uploadKey: '', reasonKey: '', reasonFingerprint: '', drafts: {}, generation: 0, historyGeneration: 0, poll: null, filters: [{ id: 'all', labelKey: 'ddWorkflow.client.filters.all' }, { id: 'todo', labelKey: 'ddWorkflow.client.filters.todo' }, { id: 'review', labelKey: 'ddWorkflow.client.filters.review' }, { id: 'done', labelKey: 'ddWorkflow.client.filters.done' }] }),
+  data: () => ({ request: null, items: [], submissions: {}, rejectReasons: {}, selectedId: null, showDetails: false, operationGeneration: 0, history: [], loading: false, historyLoading: false, error: '', notice: '', filter: 'all', query: '', pendingFiles: [], aiConsent: false, busy: false, uploadProgress: null, formMode: '', explanationType: 'UNAVAILABLE', reason: '', uploadKey: '', reasonKey: '', reasonFingerprint: '', drafts: {}, generation: 0, historyGeneration: 0, poll: null, filters: [{ id: 'all', labelKey: 'ddWorkflow.client.filters.all' }, { id: 'todo', labelKey: 'ddWorkflow.client.filters.todo' }, { id: 'review', labelKey: 'ddWorkflow.client.filters.review' }, { id: 'done', labelKey: 'ddWorkflow.client.filters.done' }] }),
   computed: {
+    selectedItem() { return this.items.find(item => item.id === this.selectedId) || null },
     scope() { return { connectionId: this.connectionId, requestId: this.requestId, projectId: this.projectId } },
     actionableItems() { return this.items.filter(i => !this.isCategory(i)) },
     progress() { return this.actionableItems.filter(i => this.statusClass(i) === 'done').length },
     needsWork() { return this.actionableItems.filter(i => this.statusClass(i) === 'todo').length },
     visibleItems() { return this.items.filter(i => (this.filter === 'all' || this.statusClass(i) === this.filter) && `${i.title} ${i.description || ''}`.includes(this.query)) },
   },
-  watch: { focusItemId() { this.focusRequestedItem() }, requestId() { this.reset() }, connectionId() { this.reset() } },
+  watch: { focusItemId() { this.focusRequestedItem() }, projectId() { this.reset() }, requestId() { this.reset() }, connectionId() { this.reset() } },
   mounted() { this.load(); this.poll = setInterval(() => { if (!this.busy && this.items.some(i => ['QUEUED', 'RUNNING'].includes(this.current(i)?.aiStatus))) this.load(true) }, 5000) },
-  beforeUnmount() { this.generation++; this.historyGeneration++; clearInterval(this.poll) },
+  beforeUnmount() { this.operationGeneration++; this.setBusy(false); this.generation++; this.historyGeneration++; clearInterval(this.poll) },
   methods: {
     focusRequestedItem() {
       const key = `${this.connectionId}:${this.requestId}:${this.focusItemId}`
@@ -160,10 +171,10 @@ export default {
       if (item) {
         this._appliedFocusKey = key
         this.filter = 'all'; this.query = ''
-        if (this.selectedId !== item.id) this.selectItem(item)
+        this.selectItem(item)
       }
     },
-    reset() { this.generation++; this.historyGeneration++; this.items = []; this.submissions = {}; this.history = []; this.selectedId = null; this.pendingFiles = []; this.drafts = {}; this.aiConsent = false; this.uploadKey = ''; this.reasonKey = ''; this.reasonFingerprint = ''; this.reason = ''; this.formMode = ''; this.load() },
+    reset() { this.operationGeneration++; this.setBusy(false); this.uploadProgress = null; this.notice = ''; this.showDetails = false; this.generation++; this.historyGeneration++; this.items = []; this.submissions = {}; this.history = []; this.selectedId = null; this.pendingFiles = []; this.drafts = {}; this.aiConsent = false; this.uploadKey = ''; this.reasonKey = ''; this.reasonFingerprint = ''; this.reason = ''; this.formMode = ''; this.load() },
     pendingAppeal(s) { return !!s?.appealedAt && s.reviewStatus === 'UPLOADED' && (!s.reviewedAt || new Date(s.appealedAt) > new Date(s.reviewedAt)) },
     isCategory(item) { return !this.current(item) && !item.currentSubmissionId && !item.uploadedFileId && this.items.some(child => String(child.parentId) === String(item.id)) },
     current(item) { return this.submissions[item.id] || null },
@@ -188,13 +199,14 @@ export default {
     canAppeal(item) { const s = this.current(item); return this.canSubmit(item) && !!s && (s.reviewStatus === 'REJECTED' || ['FAILED', 'MANUAL_REQUIRED'].includes(s.aiStatus)) && !this.pendingAppeal(s) },
     async load(quiet = false) {
       const generation = ++this.generation; if (!quiet) { this.loading = true; this.error = '' }
-      try { const data = await ddClientRead(this.scope, `/requests/${this.requestId}`); if (generation !== this.generation) return; this.request = data.request; this.items = data.items || []; this.submissions = data.submissionsByItem || {}; this.rejectReasons = data.rejectReasons || {}; this.focusRequestedItem(); if (this.selectedId == null && this.items.length) this.selectItem(this.items.find(i => this.statusClass(i) === 'todo') || this.items[0]) }
+      try { const data = await ddClientRead(this.scope, `/requests/${this.requestId}`); if (generation !== this.generation) return; this.request = data.request; this.items = data.items || []; this.submissions = data.submissionsByItem || {}; this.rejectReasons = data.rejectReasons || {}; this.focusRequestedItem(); if (this.selectedId == null && this.items.length) this.selectItem(this.items.find(i => this.statusClass(i) === 'todo') || this.items[0], false) }
       catch (e) { if (generation === this.generation) this.error = e.message }
       finally { if (generation === this.generation) this.loading = false }
     },
-    async selectItem(item) {
+    async selectItem(item, open = true) {
+      if (this.selectedId === item.id) { if (open) this.showDetails = true; return }
       if (this.busy) return
-      if (this.selectedId === item.id) { this.saveDraft(); this.selectedId = null; this.historyGeneration++; return }
+      if (open) this.showDetails = true
       if (this.selectedId != null) this.saveDraft()
       this.selectedId = item.id; this.history = []
       const draft = this.drafts[item.id] || {}
@@ -222,17 +234,33 @@ export default {
     },
     addFiles(files) { if (this.busy) return; this.pendingFiles = [...this.pendingFiles, ...Array.from(files || [])]; this.uploadKey = crypto.randomUUID() },
     removeFile(index) { this.pendingFiles.splice(index, 1); this.uploadKey = crypto.randomUUID() },
+    setBusy(value) { this.busy = value; this.$emit('busy-change', value) },
     async upload(item) {
       if (this.busy || !this.pendingFiles.length || !this.canSubmit(item)) return
-      this.busy = true; this.uploadProgress = 0; this.error = ''; this.notice = ''
-      try { await ddClientUpload(this.scope, item.id, this.pendingFiles, this.uploadKey || (this.uploadKey = crypto.randomUUID()), this.aiConsent, progress => { this.uploadProgress = progress }); this.pendingFiles = []; this.uploadKey = ''; delete this.drafts[item.id]; this.notice = this.$t('ddWorkflow.client.submittedNotice'); await this.load(); await this.loadHistory(item.id) }
-      catch (e) { this.error = e.message } finally { this.busy = false; this.uploadProgress = null }
+      const generation = this.operationGeneration; const scope = this.scope
+      this.setBusy(true); this.uploadProgress = 0; this.error = ''; this.notice = ''
+      try {
+        await ddClientUpload(scope, item.id, this.pendingFiles, this.uploadKey || (this.uploadKey = crypto.randomUUID()), this.aiConsent, progress => { if (generation === this.operationGeneration) this.uploadProgress = progress })
+        if (generation !== this.operationGeneration) return
+        this.pendingFiles = []; this.uploadKey = ''; delete this.drafts[item.id]; this.notice = this.$t('ddWorkflow.client.submittedNotice')
+        await this.load(); if (generation === this.operationGeneration) await this.loadHistory(item.id)
+      } catch (e) { if (generation === this.operationGeneration) this.error = e.message }
+      finally { if (generation === this.operationGeneration) { this.setBusy(false); this.uploadProgress = null } }
     },
     async submitReason(item) {
       if (this.busy || !this.reason.trim() || !this.canSubmit(item) || (this.formMode === 'appeal' && !this.canAppeal(item))) return
-      this.busy = true; this.error = ''; this.notice = ''
-      try { const appeal = this.formMode === 'appeal'; const fingerprint = `${item.id}:${this.explanationType}:${this.reason.trim()}`; if (this.reasonFingerprint !== fingerprint) { this.reasonKey = crypto.randomUUID(); this.reasonFingerprint = fingerprint }; const payload = appeal ? { submissionId: this.current(item)?.id, reason: this.reason.trim() } : { type: this.explanationType, reason: this.reason.trim(), idempotencyKey: this.reasonKey }; await ddClientWrite(this.scope, `/items/${item.id}/${appeal ? 'appeal' : 'explanation'}`, payload); this.formMode = ''; this.reason = ''; this.reasonKey = ''; this.reasonFingerprint = ''; delete this.drafts[item.id]; this.notice = this.$t('ddWorkflow.client.reasonSubmittedNotice'); await this.load(); await this.loadHistory(item.id) }
-      catch (e) { this.error = e.message } finally { this.busy = false }
+      const generation = this.operationGeneration; const scope = this.scope
+      this.setBusy(true); this.error = ''; this.notice = ''
+      try {
+        const appeal = this.formMode === 'appeal'; const fingerprint = `${item.id}:${this.explanationType}:${this.reason.trim()}`
+        if (this.reasonFingerprint !== fingerprint) { this.reasonKey = crypto.randomUUID(); this.reasonFingerprint = fingerprint }
+        const payload = appeal ? { submissionId: this.current(item)?.id, reason: this.reason.trim() } : { type: this.explanationType, reason: this.reason.trim(), idempotencyKey: this.reasonKey }
+        await ddClientWrite(scope, `/items/${item.id}/${appeal ? 'appeal' : 'explanation'}`, payload)
+        if (generation !== this.operationGeneration) return
+        this.formMode = ''; this.reason = ''; this.reasonKey = ''; this.reasonFingerprint = ''; delete this.drafts[item.id]; this.notice = this.$t('ddWorkflow.client.reasonSubmittedNotice')
+        await this.load(); if (generation === this.operationGeneration) await this.loadHistory(item.id)
+      } catch (e) { if (generation === this.operationGeneration) this.error = e.message }
+      finally { if (generation === this.operationGeneration) this.setBusy(false) }
     },
     async download(path, name) { this.error = ''; try { await ddClientDownload(this.scope, path, name) } catch (e) { this.error = e.message } },
     formatDate(value) { return value ? String(value).replace('T', ' ').slice(0, 16) : '' },
@@ -241,6 +269,8 @@ export default {
 </script>
 <style scoped lang="scss">
 .checklist {
+  container: dd-checklist / inline-size;
+  box-sizing: border-box;
   min-width: 0;
   overflow: auto;
   padding: var(--awd-space-6);
@@ -443,9 +473,16 @@ p {
   overflow: hidden;
 }
 
-.item.expanded {
-  border-color: var(--awd-mint);
-}
+.material-layout { display: grid; grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.4fr); gap: var(--awd-space-4); align-items: start; }
+.material-list, .material-detail { min-width: 0; }
+.material-list { position: sticky; top: 0; }
+.detail-heading { padding: var(--awd-space-4); display: flex; flex-wrap: wrap; align-items: center; gap: var(--awd-space-3); }
+.detail-heading h3 { flex: 1; margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: var(--awd-font-size-body); }
+.checklist .back-to-list { display: none; }
+.checklist .item-heading.selected { background: var(--awd-accent-soft); border-color: var(--awd-mint); }
+.material-list .filter-bar { gap: var(--awd-space-2); }
+.material-list .search-input { width: 100%; }
+.material-list nav { display: flex; flex-direction: column; gap: var(--awd-space-2); }
 
 .checklist button.item-heading {
   display: flex;
@@ -454,10 +491,11 @@ p {
   gap: var(--awd-space-3);
   text-align: left;
   background: transparent;
-  border: 0;
-  border-radius: 0;
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  flex-wrap: wrap;
   color: var(--awd-text);
-  padding: var(--awd-space-4) var(--awd-space-5);
+  padding: var(--awd-space-3);
 }
 
 .checklist button.item-heading:hover:not(:disabled) {
@@ -465,7 +503,9 @@ p {
 }
 
 .item-title {
-  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  flex: 1 1 120px;
   line-height: 1.5;
   font-weight: 600;
   font-size: var(--awd-font-size-body);
@@ -504,17 +544,6 @@ p {
   color: var(--awd-info-text);
 }
 
-.expand-toggle {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--awd-bg);
-  color: var(--awd-text-2);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
 .item-body {
   border-top: 1px solid var(--awd-border-subtle);
   padding: var(--awd-space-5);
@@ -525,6 +554,7 @@ p {
 
 .requirement {
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   line-height: 1.7;
 }
 
@@ -674,6 +704,7 @@ p {
 
 .alternative-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--awd-space-5);
   font-size: var(--awd-font-size-body);
 }
@@ -722,6 +753,15 @@ p {
 .message.error {
   background: var(--awd-danger-soft);
   color: var(--awd-danger-text);
+}
+
+@container dd-checklist (max-width: 700px) {
+  .material-layout { display: block; }
+  .material-list { position: static; }
+  .material-detail { display: none; }
+  .show-details .material-list { display: none; }
+  .show-details .material-detail { display: block; }
+  .checklist .back-to-list { display: inline-flex; flex-basis: 100%; justify-content: flex-start; }
 }
 
 @media (max-width: 700px) {
