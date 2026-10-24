@@ -1,0 +1,387 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import Foundation
+import CoreFoundation
+import CryptoKit
+import SQLite3
+import Darwin
+
+// A deliberately isolated, single-owner prototype. Never opens or migrates H2.
+struct Failure: Error {
+    let code: String
+    let message: String
+    init(_ code: String, _ message: String) { self.code = code; self.message = message }
+}
+func require(_ condition: Bool, _ code: String, _ message: String) throws {
+    if !condition { throw Failure(code, message) }
+}
+func string(_ p: [String: Any], _ key: String) throws -> String {
+    guard let value = p[key] as? String, !value.isEmpty else { throw Failure("INVALID_ARGUMENT", "Missing string: \(key)") }
+    return value
+}
+func integer(_ p: [String: Any], _ key: String) throws -> Int64 {
+    guard let n = p[key] as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID(),
+          n.doubleValue > 0, n.doubleValue <= 9_007_199_254_740_991,
+          n.doubleValue == Double(n.int64Value) else { throw Failure("INVALID_ARGUMENT", "Invalid positive integer: \(key)") }
+    return n.int64Value
+}
+func digest(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+func now() -> String { ISO8601DateFormatter().string(from: Date()) }
+func checkedPOSIX(_ result: Int32, _ action: String) throws {
+    if result != 0 { throw Failure("IO_ERROR", "\(action): \(String(cString: strerror(errno)))") }
+}
+func syncDirectory(_ path: String) throws {
+    let fd = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+    try require(fd >= 0, "IO_ERROR", "Cannot open directory for sync")
+    defer { close(fd) }
+    try checkedPOSIX(fsync(fd), "Directory sync")
+}
+func noSymlink(_ path: String, directory: Bool) throws {
+    var info = stat()
+    try require(lstat(path, &info) == 0, "NOT_FOUND", "Path does not exist")
+    let kind = info.st_mode & S_IFMT
+    try require(kind == (directory ? S_IFDIR : S_IFREG), "UNSAFE_PATH", "Only real \(directory ? "directories" : "files") are allowed")
+    if !directory { try require(info.st_nlink == 1, "UNSAFE_PATH", "Hard-linked files are outside this prototype") }
+}
+func existsWithoutFollowing(_ path: String) throws -> Bool {
+    var info = stat()
+    if lstat(path, &info) == 0 { return true }
+    try require(errno == ENOENT, "IO_ERROR", "Cannot inspect path")
+    return false
+}
+func ensureDirectory(_ path: String) throws {
+    if try existsWithoutFollowing(path) { try noSymlink(path, directory: true) }
+    else { try checkedPOSIX(mkdir(path, 0o700), "Create directory") }
+}
+
+final class Database {
+    var handle: OpaquePointer?
+    init(_ path: String) throws {
+        guard sqlite3_open_v2(path, &handle, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK else {
+            throw Failure("DATABASE_ERROR", "Cannot open prototype SQLite database")
+        }
+        sqlite3_busy_timeout(handle, 1000)
+        try execute("PRAGMA journal_mode=WAL")
+        try execute("PRAGMA synchronous=FULL")
+        try execute("PRAGMA foreign_keys=ON")
+        try execute("CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQUE, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
+        try execute("CREATE TABLE IF NOT EXISTS files(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQUE, project_id INTEGER NOT NULL REFERENCES projects(id), name TEXT NOT NULL, size INTEGER NOT NULL, generation TEXT NOT NULL, live INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, UNIQUE(project_id,name))")
+        try execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        try execute("CREATE TABLE IF NOT EXISTS pending(file_id INTEGER PRIMARY KEY REFERENCES files(id), stage TEXT NOT NULL, expected TEXT, generation TEXT NOT NULL, size INTEGER NOT NULL, updated_at TEXT NOT NULL)")
+    }
+    deinit { sqlite3_close(handle) }
+    func query(_ sql: String, _ values: [Any?] = []) throws -> [[String: Any]] {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK else { throw Failure("DATABASE_ERROR", String(cString: sqlite3_errmsg(handle))) }
+        defer { sqlite3_finalize(statement) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        for (offset, value) in values.enumerated() {
+            let i = Int32(offset + 1)
+            let result: Int32
+            if let n = value as? Int64 { result = sqlite3_bind_int64(statement, i, n) }
+            else if let n = value as? Int { result = sqlite3_bind_int64(statement, i, Int64(n)) }
+            else if let s = value as? String {
+                try require(!s.contains("\0"), "INVALID_ARGUMENT", "Text metadata must not contain U+0000")
+                result = sqlite3_bind_text(statement, i, s, -1, transient)
+            }
+            else { result = sqlite3_bind_null(statement, i) }
+            guard result == SQLITE_OK else { throw Failure("DATABASE_ERROR", "Cannot bind query parameter") }
+        }
+        var rows: [[String: Any]] = []
+        while true {
+            let result = sqlite3_step(statement)
+            if result == SQLITE_DONE { return rows }
+            guard result == SQLITE_ROW else { throw Failure("DATABASE_ERROR", String(cString: sqlite3_errmsg(handle))) }
+            var row: [String: Any] = [:]
+            for i in 0..<sqlite3_column_count(statement) {
+                let key = String(cString: sqlite3_column_name(statement, i))
+                switch sqlite3_column_type(statement, i) {
+                case SQLITE_INTEGER: row[key] = sqlite3_column_int64(statement, i)
+                case SQLITE_TEXT: row[key] = String(cString: sqlite3_column_text(statement, i))
+                default: row[key] = NSNull()
+                }
+            }
+            rows.append(row)
+        }
+    }
+    func execute(_ sql: String, _ values: [Any?] = []) throws { _ = try query(sql, values) }
+    func transaction(_ body: () throws -> Void) throws {
+        try execute("BEGIN IMMEDIATE")
+        do { try body(); try execute("COMMIT") }
+        catch { try? execute("ROLLBACK"); throw error }
+    }
+    var lastID: Int64 { sqlite3_last_insert_rowid(handle) }
+}
+
+final class Store {
+    let root: String
+    let storage: String
+    let db: Database
+    let lockFD: Int32
+    var blocked = false
+    let launchTime = DispatchTime.now().uptimeNanoseconds
+    init(profile: String) throws {
+        try require(profile.hasPrefix("/"), "UNSAFE_PROFILE", "An absolute isolated profile is required")
+        let raw = URL(fileURLWithPath: profile).standardizedFileURL
+        try require(raw.path == raw.resolvingSymlinksInPath().path, "UNSAFE_PROFILE", "Profile must not contain symlinks")
+        root = raw.path
+        storage = root + "/storage/projects"
+        let fm = FileManager.default
+        let marker = root + "/.awd-local-data-prototype"
+        if try existsWithoutFollowing(root) {
+            try noSymlink(root, directory: true)
+            let children = try fm.contentsOfDirectory(atPath: root)
+            try require(children.isEmpty || (try existsWithoutFollowing(marker)), "UNSAFE_PROFILE", "Refusing a nonempty profile without the prototype marker")
+        } else { try fm.createDirectory(atPath: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]) }
+        if try !existsWithoutFollowing(marker) { try Data("isolated-native-data-prototype-v1\n".utf8).write(to: URL(fileURLWithPath: marker), options: .withoutOverwriting) }
+        try noSymlink(marker, directory: false)
+        try require(try String(contentsOfFile: marker, encoding: .utf8) == "isolated-native-data-prototype-v1\n", "UNSAFE_PROFILE", "Invalid prototype profile marker")
+        lockFD = open(root + "/owner.lock", O_RDWR | O_CREAT | O_NOFOLLOW, 0o600)
+        try require(lockFD >= 0, "UNSAFE_PROFILE", "Cannot open ownership lock")
+        try require(flock(lockFD, LOCK_EX | LOCK_NB) == 0, "PROFILE_BUSY", "Another process owns this prototype profile")
+        try ensureDirectory(root + "/storage")
+        try ensureDirectory(storage)
+        let dbPath = root + "/local.sqlite"
+        for suffix in ["", "-wal", "-shm"] {
+            if try existsWithoutFollowing(dbPath + suffix) { try noSymlink(dbPath + suffix, directory: false) }
+        }
+        db = try Database(dbPath)
+        try recover()
+    }
+    deinit { flock(lockFD, LOCK_UN); close(lockFD) }
+    func project(_ id: Int64) throws -> [String: Any] {
+        guard let row = try db.query("SELECT * FROM projects WHERE id=?", [id]).first else { throw Failure("NOT_FOUND", "Project does not exist") }
+        return row
+    }
+    func projectPath(_ id: Int64) throws -> String {
+        _ = try project(id)
+        try checkStorage()
+        let path = storage + "/\(id)"
+        try noSymlink(path, directory: true)
+        return path
+    }
+    func checkStorage() throws {
+        try noSymlink(root, directory: true)
+        try noSymlink(root + "/storage", directory: true)
+        try noSymlink(storage, directory: true)
+    }
+    func file(_ projectID: Int64, _ fileID: Int64, includePending: Bool = false) throws -> [String: Any] {
+        guard let row = try db.query("SELECT * FROM files WHERE project_id=? AND id=?" + (includePending ? "" : " AND live=1"), [projectID, fileID]).first else { throw Failure("NOT_FOUND", "File does not exist in this project") }
+        return row
+    }
+    func filePath(_ row: [String: Any]) throws -> String {
+        let name = row["name"] as! String
+        try validateName(name)
+        return try projectPath(row["project_id"] as! Int64) + "/" + name
+    }
+    func validateName(_ name: String) throws {
+        try require(!name.isEmpty && name.utf8.count <= 240 && name != "." && name != ".." && !name.hasPrefix(".awd") && !name.hasPrefix(".native-") && !name.contains("/") && !name.contains("\\") && !name.contains("\0"), "UNSAFE_PATH", "Use a single safe file name")
+    }
+    func readBytes(_ path: String) throws -> Data {
+        try noSymlink(path, directory: false)
+        let fd = open(path, O_RDONLY | O_NOFOLLOW)
+        try require(fd >= 0, "IO_ERROR", "Cannot read file")
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        var info = stat()
+        try checkedPOSIX(fstat(fd, &info), "Read file attributes")
+        try require(info.st_size <= 32 * 1024 * 1024, "UNSUPPORTED", "Prototype reads are limited to 32 MiB")
+        return try handle.readToEnd() ?? Data()
+    }
+    func fileDTO(_ row: [String: Any]) -> [String: Any] {
+        let projectID = row["project_id"] as! Int64
+        let name = row["name"] as! String
+        return ["id": row["id"]!, "uid": row["uid"]!, "projectId": projectID, "parentId": NSNull(), "name": name,
+                "filePath": "projects/\(projectID)/\(name)", "fileType": (name as NSString).pathExtension,
+                "isFolder": false, "fileSize": row["size"]!, "generation": row["generation"]!, "updatedAt": row["updated_at"]!, "tags": []]
+    }
+    func projectDTO(_ row: [String: Any]) -> [String: Any] {
+        ["id": row["id"]!, "uid": row["uid"]!, "name": row["name"]!, "projectType": "BLANK", "myRole": "OWNER",
+         "createdAt": row["created_at"]!, "updatedAt": row["updated_at"]!, "lastActivityAt": row["updated_at"]!]
+    }
+    func decoded(_ p: [String: Any]) throws -> Data {
+        guard let encoded = p["contentBase64"] as? String, let data = Data(base64Encoded: encoded), data.count <= 32 * 1024 * 1024 else { throw Failure("INVALID_ARGUMENT", "contentBase64 must contain at most 32 MiB") }
+        return data
+    }
+    func writeStage(_ data: Data, _ path: String) throws {
+        let fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        try require(fd >= 0, "IO_ERROR", "Cannot create staged file")
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        try handle.write(contentsOf: data)
+        try checkedPOSIX(fsync(fd), "Staged file sync")
+    }
+    func complete(_ fileID: Int64, _ pending: [String: Any], _ projectID: Int64) throws {
+        try db.transaction {
+            try db.execute("UPDATE files SET generation=?,size=?,live=1,updated_at=? WHERE id=?", [pending["generation"], pending["size"], pending["updated_at"], fileID])
+            try db.execute("UPDATE projects SET updated_at=? WHERE id=?", [pending["updated_at"], projectID])
+            try db.execute("DELETE FROM pending WHERE file_id=?", [fileID])
+        }
+    }
+    func publish(_ row: [String: Any], _ pending: [String: Any]) throws {
+        let target = try filePath(row)
+        let parent = (target as NSString).deletingLastPathComponent
+        let stageName = pending["stage"] as! String
+        try require(stageName.hasPrefix(".native-") && !stageName.contains("/") && !stageName.contains("\\"), "RECOVERY_CONFLICT", "Invalid journal stage")
+        let stage = parent + "/" + stageName
+        let expected = pending["expected"] as? String
+        let newGeneration = pending["generation"] as! String
+        let exists = FileManager.default.fileExists(atPath: target)
+        if exists {
+            let current = digest(try readBytes(target))
+            if current == newGeneration {
+                try complete(row["id"] as! Int64, pending, row["project_id"] as! Int64)
+                try? FileManager.default.removeItem(atPath: stage)
+                return
+            }
+            try require(expected != nil && current == expected, "CONFLICT", "File changed outside this save; original preserved")
+            try require(access(target, W_OK) == 0, "IO_ERROR", "File is not writable")
+        } else { try require(expected == nil, "NOT_FOUND", "Original file disappeared; refusing to recreate it") }
+        try require(digest(try readBytes(stage)) == newGeneration, "RECOVERY_CONFLICT", "Staged content hash does not match journal")
+        // Darwin's exclusive rename creates without overwriting an unrelated file.
+        if expected == nil {
+            try checkedPOSIX(renamex_np(stage, target, UInt32(RENAME_EXCL)), "Publish new file")
+        } else { try checkedPOSIX(rename(stage, target), "Atomic replace") }
+        try syncDirectory(parent)
+        if ProcessInfo.processInfo.environment["AWD_LOCAL_DATA_TEST_FAULT"] == "afterRename" { _exit(77) }
+        try complete(row["id"] as! Int64, pending, row["project_id"] as! Int64)
+    }
+    func recover() throws {
+        for pending in try db.query("SELECT * FROM pending ORDER BY file_id") {
+            guard let row = try db.query("SELECT * FROM files WHERE id=?", [pending["file_id"]]).first else { throw Failure("RECOVERY_CONFLICT", "Journal references missing file") }
+            try publish(row, pending)
+        }
+    }
+    func save(_ row: [String: Any], _ data: Data, expected: String?) throws -> [String: Any] {
+        let target = try filePath(row)
+        if let expected = expected {
+            try require(digest(try readBytes(target)) == expected, "CONFLICT", "File changed since it was read")
+            try require(access(target, W_OK) == 0, "IO_ERROR", "File is not writable")
+        } else { try require(!FileManager.default.fileExists(atPath: target), "CONFLICT", "File name already exists") }
+        let stageName = ".native-" + UUID().uuidString + ".pending"
+        let stage = (target as NSString).deletingLastPathComponent + "/" + stageName
+        let newGeneration = digest(data)
+        var journaled = false
+        do {
+            try writeStage(data, stage)
+            if expected != nil {
+                var info = stat()
+                try checkedPOSIX(lstat(target, &info), "Read original permissions")
+                try checkedPOSIX(chmod(stage, info.st_mode & 0o777), "Preserve file permissions")
+            }
+            try syncDirectory((target as NSString).deletingLastPathComponent)
+            try db.execute("INSERT INTO pending(file_id,stage,expected,generation,size,updated_at) VALUES(?,?,?,?,?,?)", [row["id"], stageName, expected, newGeneration, data.count, now()])
+            journaled = true
+            if ProcessInfo.processInfo.environment["AWD_LOCAL_DATA_TEST_FAULT"] == "afterJournal" { _exit(77) }
+            let pending = try db.query("SELECT * FROM pending WHERE file_id=?", [row["id"]]).first!
+            try publish(row, pending)
+        } catch {
+            if journaled {
+                // The disk may have changed before a failed database commit. Never guess success.
+                blocked = true
+                throw Failure("RECOVERY_REQUIRED", "Save outcome is unresolved. Close and restart this profile before further operations.")
+            }
+            try? FileManager.default.removeItem(atPath: stage)
+            throw error
+        }
+        let result = try file(row["project_id"] as! Int64, row["id"] as! Int64)
+        return fileDTO(result)
+    }
+    func call(_ method: String, _ p: [String: Any]) throws -> Any {
+        if method == "health" {
+            return ["ready": !blocked, "protocolVersion": 1, "backend": "swift-sqlite-isolated-prototype", "profile": root,
+                    "capabilities": ["projects", "flat-files", "atomic-save", "ui-settings"],
+                    "unavailable": ["h2-migration", "ai", "git-versions", "cloud-acl", "watcher", "folders", "external-files"],
+                    "elapsedMs": Double(DispatchTime.now().uptimeNanoseconds - launchTime) / 1_000_000]
+        }
+        try require(!blocked, "RECOVERY_REQUIRED", "A previous save has an unresolved outcome; restart required")
+        switch method {
+        case "projects.list": return try db.query("SELECT * FROM projects ORDER BY id").map(projectDTO)
+        case "projects.get": return try projectDTO(project(integer(p, "projectId")))
+        case "projects.create":
+            try checkStorage()
+            let name = try string(p, "name")
+            try require(name.utf8.count <= 240, "INVALID_ARGUMENT", "Project name is too long")
+            var id: Int64 = 0
+            var path: String?
+            var createdDirectory = false
+            do {
+                try db.transaction {
+                    let timestamp = now()
+                    try db.execute("INSERT INTO projects(uid,name,created_at,updated_at) VALUES(?,?,?,?)", [UUID().uuidString, name, timestamp, timestamp])
+                    id = db.lastID
+                    path = storage + "/\(id)"
+                    try require(!FileManager.default.fileExists(atPath: path!), "CONFLICT", "Project storage already exists")
+                    try FileManager.default.createDirectory(atPath: path!, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+                    createdDirectory = true
+                    try syncDirectory(storage)
+                }
+            } catch { if createdDirectory, let path = path { try? FileManager.default.removeItem(atPath: path) }; throw error }
+            return try projectDTO(project(id))
+        case "files.list":
+            let id = try integer(p, "projectId")
+            _ = try projectPath(id)
+            return try db.query("SELECT * FROM files WHERE project_id=? AND live=1 ORDER BY id", [id]).map(fileDTO)
+        case "files.read":
+            let row = try file(integer(p, "projectId"), integer(p, "fileId"))
+            let path = try filePath(row)
+            let bytes = try readBytes(path)
+            var result = fileDTO(row)
+            result["generation"] = digest(bytes)
+            result["fileSize"] = bytes.count
+            result["contentBase64"] = bytes.base64EncodedString()
+            result["physicalPath"] = path
+            return result
+        case "files.create":
+            let projectID = try integer(p, "projectId")
+            _ = try projectPath(projectID)
+            let name = try string(p, "name")
+            try validateName(name)
+            let data = try decoded(p)
+            try require(try db.query("SELECT id FROM files WHERE project_id=? AND name=?", [projectID, name]).isEmpty, "CONFLICT", "File name already exists")
+            try db.execute("INSERT INTO files(uid,project_id,name,size,generation,updated_at) VALUES(?,?,?,?,?,?)", [UUID().uuidString, projectID, name, 0, "", now()])
+            let id = db.lastID
+            do { return try save(file(projectID, id, includePending: true), data, expected: nil) }
+            catch { if !blocked { try? db.execute("DELETE FROM files WHERE id=? AND live=0", [id]) }; throw error }
+        case "files.save":
+            let row = try file(integer(p, "projectId"), integer(p, "fileId"))
+            return try save(row, decoded(p), expected: string(p, "expectedGeneration"))
+        case "settings.get", "settings.set":
+            let key = try string(p, "key")
+            try require(key.hasPrefix("local.ui.") && key.utf8.count <= 128, "UNSUPPORTED", "Only local.ui.* settings are owned by this prototype")
+            if method == "settings.set" {
+                guard let value = p["value"], JSONSerialization.isValidJSONObject([value]) else { throw Failure("INVALID_ARGUMENT", "Expected a JSON setting value") }
+                let data = try JSONSerialization.data(withJSONObject: [value], options: [.sortedKeys])
+                try require(data.count <= 65536, "INVALID_ARGUMENT", "Setting value is too large")
+                try db.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [key, String(data: data, encoding: .utf8)!])
+            }
+            guard let row = try db.query("SELECT value FROM settings WHERE key=?", [key]).first else { return NSNull() }
+            return (try JSONSerialization.jsonObject(with: Data((row["value"] as! String).utf8)) as! [Any])[0]
+        default: throw Failure("UNSUPPORTED", "Method is not implemented by this prototype: \(method)")
+        }
+    }
+}
+
+func output(_ object: [String: Any]) {
+    do {
+        let bytes = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .fragmentsAllowed])
+        FileHandle.standardOutput.write(bytes)
+        FileHandle.standardOutput.write(Data([10]))
+    } catch { FileHandle.standardError.write(Data("Cannot encode response\n".utf8)); exit(1) }
+}
+do {
+    try require(CommandLine.arguments.count == 3 && CommandLine.arguments[1] == "--profile", "INVALID_ARGUMENT", "Usage: awd-local-data --profile /absolute/isolated/profile")
+    let store = try Store(profile: CommandLine.arguments[2])
+    while let line = readLine() {
+        var requestID: Any = NSNull()
+        do {
+            try require(line.utf8.count <= 45 * 1024 * 1024, "INVALID_ARGUMENT", "Request is too large")
+            guard let request = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { throw Failure("INVALID_ARGUMENT", "Expected request object") }
+            requestID = request["id"] ?? NSNull()
+            let result = try store.call(string(request, "method"), request["params"] as? [String: Any] ?? [:])
+            output(["id": requestID, "result": result])
+        } catch let error as Failure { output(["id": requestID, "error": ["code": error.code, "message": error.message]]) }
+        catch { output(["id": requestID, "error": ["code": "IO_ERROR", "message": String(describing: error)]]) }
+    }
+} catch let error as Failure {
+    output(["id": NSNull(), "error": ["code": error.code, "message": error.message]])
+    exit(1)
+} catch { output(["id": NSNull(), "error": ["code": "STARTUP_ERROR", "message": String(describing: error)]]); exit(1) }
