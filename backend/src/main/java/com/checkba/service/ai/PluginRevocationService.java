@@ -3,7 +3,8 @@
 
 package com.checkba.service.ai;
 
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,7 @@ public class PluginRevocationService {
         this.pluginService = pluginService;
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
         // 启动时异步拉一次，避免注册表慢响应拖住应用启动（编译目标 Java 17，不用虚拟线程）
         Thread t = new Thread(this::sync, "plugin-revocation-init");

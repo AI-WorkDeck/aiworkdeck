@@ -179,7 +179,7 @@ admin 同 PluginDevController 口径）+ `service/ai/tools/CapabilityTools`（�
 2. project-overview.vue 计算属性（~:1581）合并静态列表与 dynamicPlugins。
 3. 动态插件：`loadDynamicPlugins()`（~:6261）调 `GET /api/plugins/list`，映射成 `{key:'plugin-<id>', pluginId, label, icon, isDynamic, permissions, frontendEntry}`。`frontendEntry` 经 `api.js` 的 `resolvePluginEntryUrl(id, entry)`：相对路径 → `<apiBase>/api/plugin-web/<id>/<entry>`，绝对 URL 原样。**`key` 是 `plugin-<id>`，`pluginId` 才是原始 id**——桥的握手上下文与 KV 分区键用后者，混用会让插件存储串到别的键上。
 4. 面板分发（~:531-563）按 leftPaneKey：dd-files→DdFilesPanel、desensitize→DesensitizePane、easyvoice→EasyVoicePane、search→SearchPanel、files→文件树、动态→PluginPane、其余→占位符。
-5. 后端 PluginService：@PostConstruct 扫 `plugins/`（可配 `ai.plugins.dir`），读 manifest.json → PluginMetadata；有 backendJars 时独立 URLClassLoader 加载，扫 langchain4j @Tool 类注册进 ToolRegistry。`POST /api/plugins/rescan` 热重扫。
+5. 后端 PluginService：由 `StartupDataInitializer` 在普通 Bean 构造完成后、WebServer 接收请求前扫描 `plugins/`（可配 `ai.plugins.dir`），读 manifest.json → PluginMetadata；有 backendJars 时独立 URLClassLoader 加载，扫 langchain4j @Tool 类注册进 ToolRegistry。`POST /api/plugins/rescan` 热重扫。
 
 ## skill 文件格式（docs/SKILL_SPEC.md、docs/PLUGIN_SPEC.md）
 

@@ -137,6 +137,7 @@ export function buildCjkAliasConf(availableByCategory, systemFamilies) {
  * @param {string}   [options.houseProfileUrl='./house-default.js'] HOUSE 画像包装脚本
  *   （scripts/sync-house-profile.mjs 从后端 house-default.json 生成，留下
  *   self.HOUSE_DEFAULT_JSON），必须先于 worker 载入。
+ * @param {boolean}  [options.initialDocument=false] wait for the host's real file instead of creating a blank model.
  * @param {string}   [options.fontUrl] optional same-origin CJK font to inject.
  * @param {string[]} [options.fontUrls] optional same-origin CJK fonts (one per
  *        typeface category: sans/serif/kai/fangsong); merged with fontUrl.
@@ -157,6 +158,7 @@ export function bootZetaOffice(options = {}) {
     zetaJsUrl = './zeta.js',
     workerScriptUrl = './office_thread.js',
     houseProfileUrl = './house-default.js',
+    initialDocument = false,
     fontUrl,
     fontUrls,
     // UI language for the LibreOffice chrome (issue #66 follow-up). The engine
@@ -332,7 +334,8 @@ export function bootZetaOffice(options = {}) {
       // with "The URL ... is invalid" and the office thread never starts.
       const absBase = new URL(sofficeBaseUrl, globalThis.location ? globalThis.location.href : undefined).href
       Module.mainScriptUrlOrBlob = new Blob(
-        [langShim + "importScripts('" + absBase + "soffice.js');"], { type: 'text/javascript' })
+        [(initialDocument === true ? 'self.__awdInitialDocument = true;' : '')
+          + langShim + "importScripts('" + absBase + "soffice.js');"], { type: 'text/javascript' })
     }
     globalThis.Module = Module
 

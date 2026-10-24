@@ -8,7 +8,8 @@ import com.checkba.model.entity.TelemetryEvent;
 import com.checkba.repository.TelemetryDailyRollupRepository;
 import com.checkba.repository.TelemetryEventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -95,7 +96,7 @@ public class TelemetryUploadService {
                 HttpResponse.BodyHandlers.discarding()).statusCode();
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
         // 启动时异步补算昨日 + 尝试补传，绝不拖慢应用启动
         Thread t = new Thread(this::sync, "telemetry-upload-init");

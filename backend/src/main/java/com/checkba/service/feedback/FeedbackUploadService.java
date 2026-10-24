@@ -8,7 +8,8 @@ import com.checkba.model.entity.UserFeedback;
 import com.checkba.repository.UserFeedbackRepository;
 import com.checkba.service.telemetry.InstallIdentityService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -104,7 +105,7 @@ public class FeedbackUploadService {
         return enabled && !uploadUrl.isEmpty();
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
         if (!isConfigured()) return;
         Thread t = new Thread(this::flush, "feedback-upload-init");
