@@ -158,6 +158,9 @@ jobs:
       - name: Test project-home page
         working-directory: frontend
         run: npm run test:project-home
+      - name: Test editor opening and preview fallback
+        working-directory: frontend
+        run: npm run test:editor-open
       - name: Test media player pure logic (cues / CC 状态 / 快捷键 / 取源)
         working-directory: frontend
         run: npm run test:media

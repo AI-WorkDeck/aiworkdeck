@@ -3,7 +3,7 @@
 # （或环境变量 SPRING_PROFILES_ACTIVE=desktop）
 #
 # 设计目标：零外部依赖启动——不需要 PostgreSQL，数据落在用户主目录的 H2 文件库。
-# 向量检索由 PgVectorConfig 自动降级为内存存储（PG 不可达时的既有回退路径）。
+# 向量检索由 PgVectorConfig 直接使用内存存储，不在启动时探测 PG 或向量模型。
 
 # 单机模式只服务本机 Electron 壳（渲染层固定连 localhost:9696）。
 # 这里显式钉死回环：本 profile 同时开了 allow-all-users，一旦监听到 0.0.0.0，

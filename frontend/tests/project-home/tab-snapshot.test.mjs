@@ -15,6 +15,7 @@ import {
   restore,
   mergeRestored,
   snapshotNeedsFileCheck,
+  snapshotFileIds,
   tabSnapshotMethods,
 } from '../../src/pages/project-overview/tabSnapshot.js'
 
@@ -218,7 +219,7 @@ test('restoreTabSnapshot：文件核对走宿主的 fetchTabSnapshotFileIndex，
   const vm = fakeVm()
   vm.store.set('project_7_tabs', serialize([doc(1), doc(2), calendar], [], 1, null, {}))
   let fetched = 0
-  vm.fetchTabSnapshotFileIndex = async () => { fetched++; return new Map([['1', { id: 1, name: 'f1.docx', fileType: 'docx' }]]) }
+  vm.fetchTabSnapshotFileIndex = async (ids) => { assert.deepEqual(ids, ['1', '2']); fetched++; return new Map([['1', { id: 1, name: 'f1.docx', fileType: 'docx' }]]) }
   vm.activeFileIdLeft = 99 // activeTabsByMode 的旧记忆（指向一个已经不在标签条里的 id）
   const restored = await vm.restoreTabSnapshot()
   assert.equal(restored, true)
@@ -247,4 +248,13 @@ test('restoreTabSnapshot：只有全局标签的快照不发文件清单那个 G
   await vm.restoreTabSnapshot()
   assert.equal(fetched, 0)
   assert.deepEqual(vm.leftFiles.map((t) => t.id), ['welcome', 'web_1_abc'])
+})
+
+
+test('snapshotFileIds: only valid file references, both diff sides, deduplicated across panes', () => {
+  const snap = { left: [doc(1), diff, web, { id: 'other', tabType: 'diff', diffSource: { id: 3 }, diffTarget: { id: 'broken' } }],
+    right: [doc('1'), doc(2), settings, null, { id: 0 }] }
+  assert.deepEqual(snapshotFileIds(snap), ['1', '2', '3'])
+  assert.deepEqual(snapshotFileIds(null), [])
+  assert.deepEqual(snapshotFileIds({ left: [welcome, calendar] }), [])
 })

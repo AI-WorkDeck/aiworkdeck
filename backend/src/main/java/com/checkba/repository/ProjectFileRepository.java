@@ -57,6 +57,9 @@ public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> 
      * 根据项目 ID 查询所有文件（排除已删除）
      */
     List<ProjectFile> findByProjectIdAndIsDeletedFalseOrderBySortOrderAsc(Long projectId);
+
+    /** 少量标签恢复只读取给定 ID，不加载完整项目文件清单。 */
+    List<ProjectFile> findByProjectIdAndIdInAndIsDeletedFalse(Long projectId, List<Long> fileIds);
     
     @org.springframework.data.jpa.repository.Query("SELECT pf FROM ProjectFile pf WHERE pf.projectId = :projectId AND pf.isDeleted = false ORDER BY pf.sortOrder ASC")
     List<ProjectFile> findByProjectIdOrderBySortOrderAsc(Long projectId);
