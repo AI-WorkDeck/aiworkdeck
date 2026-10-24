@@ -43,6 +43,7 @@ export const librePoolMethods = {
         const key = pane + ':' + fileId
         this.getLibreExecutorMap()[key] = executor
         this.syncLibreExecutor()
+        this.scheduleLibreSpare() // 从前台装载完成重计，留出首次绘制的时间。
         console.log('[ProjectOverview] LibreOffice editor ready (' + key + ') — agent commands routed to LibreOffice')
     },
     // 实例注册表（非响应式）：executor 按 'pane:fileId' 存，供活跃实例指针
@@ -176,6 +177,11 @@ export const librePoolMethods = {
         // Web 态没有保活语境（页面刷新即丢），不值这个内存。
         if (!isDesktopHost() || (useConservativeLibrePool() && this.hasLibreDocumentInstance())) return
         if (this.libreSpares.some(sp => !sp.file && !sp.hidden)) return // 已有空闲备胎
+        // 直接冷开也让前台文档先完成，避免 4 秒计时器同时启动第二套引擎。
+        if (this.hasLoadingLibreDocumentInstance()) {
+            this.scheduleLibreSpare()
+            return
+        }
         this._libreSpareSeq = (this._libreSpareSeq || 0) + 1
         this.libreSpares.push({ key: this._libreSpareSeq, file: null })
         console.log('[ProjectOverview] LibreOffice spare booting (#' + this._libreSpareSeq + ')')
@@ -188,6 +194,19 @@ export const librePoolMethods = {
             (f.id === activeId || this.libreLruKeys.includes(pane + ':' + f.id)))
         return mounted('left', this.leftFiles, this.activeFileIdLeft) ||
             (this.splitMode && mounted('right', this.rightFiles, this.activeFileIdRight))
+    },
+    hasLoadingLibreDocumentInstance() {
+        const refs = this._libreRefs || {}
+        const loading = (pane, files, activeId) => files.some(file => {
+            const key = pane + ':' + file.id
+            if (!this.useLibreEditor(file) || (file.id !== activeId && !this.libreLruKeys.includes(key))) return false
+            const ed = refs[key]
+            if (!ed) return true // 模板已应挂载、ref 尚未注册的间隙也不能补胎。
+            const status = String(ed.statusKey || '')
+            return !ed.ready && !status.endsWith('Failed') && status !== 'desktopOnly' && status !== 'unsupported'
+        })
+        return loading('left', this.leftFiles, this.activeFileIdLeft) ||
+            (this.splitMode && loading('right', this.rightFiles, this.activeFileIdRight))
     },
     maybeAdoptLibreSpare(file) {
         if (!file || !this.useLibreEditor(file)) return
@@ -217,7 +236,6 @@ export const librePoolMethods = {
         }
         if (sp.file) {
             this.onLibreReady(executor, 'left', sp.file.id)
-            this.scheduleLibreSpare() // 过继完成、引擎空闲——补一个新备胎
         } else {
             console.log('[ProjectOverview] LibreOffice spare warm (blank ready)')
         }
