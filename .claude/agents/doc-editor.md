@@ -51,6 +51,8 @@ Writer 的 `ShowTextBoundaries` 与格式标记联动：打开 ¶ 时会把文�
 
 ## 关键文件
 
+**打开编辑器的重复工作（dev-board#1474）**：`LibreOfficeEditor.tryDocxPreview` 的自动预览只在引擎尚未就绪时开始，避免热备胎过继时与 `load_document` 同时解包、布局同一 DOCX；动态加载预览模块后再次核验。冷启动预览与失败后的显式 `force` 只读预览仍保留；热备胎探活失败转冷启动时，复用已下载且曾跳过预览的字节补回预览，文件、装载世代、检查点或缓存已失效则不重放，尚在下载的原回调只执行一次。`EditorToolbar.bootstrap` 先隐藏原生外壳、应用视图偏好并回读真实状态，再拉样式/字体清单；清单尚未返回不阻止视图按钮启用。设置偏好失败仍回读一次状态，不用默认值冒充引擎真实状态。`tests/toolbar/open-critical-path.test.mjs` 覆盖三文种顺序、慢清单、视图失败、热/冷启动预览及模块加载中的就绪竞争；保存、失败诊断与保活预算不变。
+
 **复杂文档首开与修订悬停（dev-board#1135）**：`zetaOfficeReviewHover` 启动、文档变化、滚动和 resize 只失效缓存，不读取修订；真实鼠标停留 160ms 后才读几何，命中后通过 `list_revisions({index, locate:false, documentSeq, revision})` 读取单条元数据。worker 用原生 indexed access，先检查文档与修订世代，不带 index 的原清单契约不变。编辑及视图命令期间由 `editor-main` 配对 suspend/resume，恢复不主动扫描。不要恢复首开/resize 时全量 list_revisions：600 处修订本地实测这一步约 5.3 秒，会阻塞首次工具栏初始化。回归 `test:lowa-open-revisions` 使用有头真实引擎验证首屏、鼠标悬停和导出修订保留；私有文档仅本地测量，不入库。
 
 **引擎构建与分发**

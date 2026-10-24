@@ -163,14 +163,24 @@ export function serialize(leftFiles, rightFiles, activeLeft, activeRight, splitS
   }
 }
 
-/** 快照里有没有需要核对「文件还在不在」的标签（没有就不必发那一个 GET） */
+/** 只核对快照里的文件与比对两侧；不为恢复几个标签重复下载整个项目。 */
+export function snapshotFileIds(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return []
+  const ids = new Set()
+  const add = (id) => { if (isNumericId(id)) ids.add(String(id).trim()) }
+  for (const tab of [].concat(Array.isArray(snapshot.left) ? snapshot.left : [], Array.isArray(snapshot.right) ? snapshot.right : [])) {
+    const kind = tabKind(tab)
+    if (kind === 'file') add(tab.id)
+    if (kind === 'diff') {
+      add(tab.diffSource?.id)
+      add(tab.diffTarget?.id)
+    }
+  }
+  return [...ids]
+}
+
 export function snapshotNeedsFileCheck(snapshot) {
-  if (!snapshot || typeof snapshot !== 'object') return false
-  const all = [].concat(Array.isArray(snapshot.left) ? snapshot.left : [], Array.isArray(snapshot.right) ? snapshot.right : [])
-  return all.some((t) => {
-    const k = tabKind(t)
-    return k === 'file' || k === 'diff'
-  })
+  return snapshotFileIds(snapshot).length > 0
 }
 
 const FRESH_FILE_FIELDS = ['name', 'fileType', 'wpsFileId', 'filePath']
@@ -337,7 +347,7 @@ export const tabSnapshotMethods = {
 
   /**
    * onLoad 调一次。返回是否恢复出了至少一个标签。
-   * 文件核对用宿主的 fetchTabSnapshotFileIndex()（一次 GET 整棵树 → Map<String(id), file>），
+   * 文件核对用宿主的 fetchTabSnapshotFileIndex(ids)（仅查快照引用的文件 → Map<String(id), file>），
    * 拉失败就不核对（文件标签原样保留，打开时编辑器自己会报「文件不存在」）。
    */
   async restoreTabSnapshot() {
@@ -353,7 +363,7 @@ export const tabSnapshotMethods = {
       let index = null
       if (this.hasProject && snapshotNeedsFileCheck(snap) && typeof this.fetchTabSnapshotFileIndex === 'function') {
         try {
-          index = await this.fetchTabSnapshotFileIndex()
+          index = await this.fetchTabSnapshotFileIndex(snapshotFileIds(snap))
         } catch (e) {
           index = null
         }

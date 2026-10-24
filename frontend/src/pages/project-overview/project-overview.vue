@@ -2326,6 +2326,7 @@ import {
   saveProjectVariable,
   getProjectVariables,
   getProjectFiles,
+  getProjectFilesByIds,
   batchCopyFiles,
   exportAiDocx,
   getProjectMembers,
@@ -3851,6 +3852,11 @@ export default {
     // 登录态下启用剪贴板记录（仅记录本应用能感知到的 paste / 复制按钮）
     this.bindClipboardListener()
 
+    // H5 按方法名编译 uni API；传裸 uni 或在方法组读全局 uni 都会拿到空壳。
+    this.$tabStorage = {
+      getStorageSync: (key) => uni.getStorageSync(key),
+      setStorageSync: (key, value) => uni.setStorageSync(key, value),
+    }
     // 标签快照（dev-board#1049）：恢复上次的标签条、激活标签与分屏（快照优先于上面 activeTabsByMode
     // 的旧记忆）。恢复完再决定要不要开欢迎页、要不要开日程深链——
     // 无项目态启动时「启动时显示欢迎页」只在什么都没恢复出来时生效（同 VS Code 的 startupEditor：
@@ -4774,10 +4780,10 @@ export default {
       this.taskDialog.visible = false
       this.openFile(file)
     },
-    // 标签快照恢复前核对文件还在不在（dev-board#1049）：一次 GET 整棵树（回收站里的不在其中），
+    // 标签快照恢复前只核对引用的文件（回收站里的不在其中），
     // Map<String(id), file>。只在快照里真有文件 / 对比标签时才调。
-    async fetchTabSnapshotFileIndex() {
-      const resp = await getProjectFiles(this.projectId, null, true)
+    async fetchTabSnapshotFileIndex(ids) {
+      const resp = await getProjectFilesByIds(this.projectId, ids)
       const files = Array.isArray(resp) ? resp : ((resp && resp.data) || [])
       const index = new Map()
       for (const f of files) {

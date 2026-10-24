@@ -2029,6 +2029,21 @@ export function getProjectFiles(projectId, parentId = null, tree = false) {
   });
 }
 
+// 标签恢复只需要少量文件元数据，不加载整棵文件树与标签关联。
+export async function getProjectFilesByIds(projectId, ids) {
+  const files = []
+  for (let start = 0; start < ids.length; start += 200) {
+    const batch = ids.slice(start, start + 200).map(encodeURIComponent).join(',')
+    const result = await request({
+      // 旧后端忽略 ids 时仍返回完整树，避免把子目录文件误判为已删除。
+      url: `/api/projects/${projectId}/files?tree=true&ids=${batch}`,
+      method: 'GET',
+    })
+    files.push(...result)
+  }
+  return files
+}
+
 // 创建文件夹
 export function createFolder(projectId, parentId, name) {
   return request({

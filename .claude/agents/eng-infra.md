@@ -550,6 +550,12 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
   `startEager` 逐个 `await` 也一样是白等：各服务端口已在 `allocatePorts` 统一分配好，
   互相没有启动时序依赖，串行只是把首启时间累加，已改 `Promise.all` 且保留单服务失败互不影响。
 
+## 桌面首屏关键路径（dev-board#1472）
+
+主窗口等待 Java HTTP 健康及补丁失败回滚完成，不等待已装的 PPTX/MinerU/Kokoro/ASR 服务。`main/main.js` 先单独 `start('backend')`，主页面 `did-finish-load` 后再 `startEager(['backend'])`；可选服务失败只记自身错误，不重建窗口。首次页面加载和 JVM 初始化不再与模型加载争抢资源；退出/管理器关闭时不启动迟到组件。按需 `host.services.ensure` 沿用服务串行队列。`startup-readiness.test.js` 执行实际启动链与管理器调度，验证后端等待、可选服务不阻塞、回滚前不加载旧前端及退出护栏；这些合成测试不等于正式安装包的墙钟提速实测。旧补丁的同步目录清理仍在关键路径，未安装可选 pack 的机器也仍需单独测量 Java/H5 启动耗时。
+
+`PgVectorConfig` 对非 PostgreSQL JDBC 数据源直接构造既有内存向量存储；H2 不得先调用模型 `dimension()` 或构建 PG 连接再降级。PostgreSQL 仍动态探测并缓存模型维度。`PgVectorConfigTest` 验证 H2 零模型/PG 调用、两个存储的独立检索及 PostgreSQL 原有建库参数。
+
 ## 验证（改本领域自身时）
 
 - 写作辅助（dev-board#538）：CI 跑 `frontend npm run test:completion`（本地提取/排序、资料转换、宿主范围与客体交互）；`test:lowa-completion` 与 `test:writing-ui` 需真实 LOWA 载荷，覆盖位置令牌、中文输入、明确查询预览、资料插入与撤销。第三方响应使用测试资料，不在回归中自动消费查询额度。

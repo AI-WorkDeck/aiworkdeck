@@ -58,6 +58,8 @@ public class PgVectorConfig {
      */
     @Bean(name = "memoryEmbeddingStore")
     public EmbeddingStore<TextSegment> memoryEmbeddingStore(EmbeddingModel embeddingModel) {
+        // H2 桌面模式不支持 PgVector，直接使用原有内存存储，避免无用的模型/PG 连接重试。
+        if (!jdbcUrl.startsWith("jdbc:postgresql:")) return new InMemoryEmbeddingStore<>();
         // 从 JDBC URL 提取主机和数据库信息
         // jdbc:postgresql://localhost:5432/checkba
         String host = "localhost";
@@ -119,6 +121,7 @@ public class PgVectorConfig {
      */
     @Bean(name = "projectDocEmbeddingStore")
     public EmbeddingStore<TextSegment> projectDocEmbeddingStore(EmbeddingModel embeddingModel) {
+        if (!jdbcUrl.startsWith("jdbc:postgresql:")) return new InMemoryEmbeddingStore<>();
         String host = "localhost";
         int port = 5432;
         String database = "checkba";

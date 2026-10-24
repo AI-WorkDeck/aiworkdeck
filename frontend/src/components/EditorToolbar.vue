@@ -1407,17 +1407,18 @@ export default {
       this.viewPrefsReady = false
       this.state = EMPTY()
       if (!this.executor) return
-      await this.refresh()
+      // 首先完成可编辑布局；样式/字体清单只供下拉菜单使用，不能挡住原生外壳隐藏。
+      // applyViewPrefs 会回读真实工具栏状态，无需在视图设置前再读一次。
+      await this.applyChrome(true)
+      const view = await this.applyViewPrefs()
+      if (!view || !view.success) await this.refresh()
+      this.viewPrefsReady = true
       const [st, fo] = await Promise.all([
         this.isWriter ? this.call('list_styles', {}) : Promise.resolve({ styles: [] }),
         this.call('list_fonts', {}),
       ])
       this.styleList = (st && st.styles) || []
       this.fontList = (fo && fo.families) || []
-      // 自建工具栏现已覆盖 Writer / Calc / Impress，LO 原生菜单栏与工具栏统一退场。
-      await this.applyChrome(true)
-      await this.applyViewPrefs()
-      this.viewPrefsReady = true
     },
     async refresh() {
       const r = await this.call('get_ui_state', {})
