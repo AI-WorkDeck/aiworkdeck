@@ -1196,6 +1196,7 @@ export default {
     // executor 契约、worker、自动保存链路——完全共用。
     mountEditor(info) {
       const mountEl = document.getElementById(this.hostId)
+      this._initialDocument = this.file?.fileSize > 0
       if (!mountEl) { this.appendLog('host element missing'); return }
       // 深浅主题初值随 URL 进客体页（editor.html 据此防白闪）；后续切换走
       // pushTheme 的 lo-relay 推送
@@ -1203,6 +1204,8 @@ export default {
         if (info && info.url) {
           info = Object.assign({}, info, {
             url: info.url + (info.url.indexOf('?') >= 0 ? '&' : '?') + 'theme=' + getResolvedTheme()
+              // A cold nonempty file can be the first model; spares and new files still boot blank.
+              + (this._initialDocument ? '&initialDocument=1' : '')
           })
         }
       } catch (e) { /* ignore */ }
@@ -1766,13 +1769,16 @@ export default {
         // 署名仍然要下发（dev-board#881）：worker 的修订作者只由 load_document 设置，
         // 这条分支不发 load_document，引擎就一直端着 boot 时的空作者，用户在新建文档里
         // 打的每一个字都署引擎兜底「未知作者」，审阅面板「我」这一桶恒为 0。
-        // 不带 bytes 的 load_document 只记 authorName、不动文档（redline-author.mjs 组 2）。
+        // 此处明确传空 bytes；其他只补署名的调用仍不带 bytes、不动文档。
         if (seq !== (this._docLoadSeq || 0)) throw new Error('装载已被更晚的一次尝试取代 / load superseded')
-        // 署名下发失败不算装载失败（空白文档照样可编辑，只是署名退回引擎兜底）。
-        const blankAuthor = currentAuthorName()
-        if (blankAuthor) {
-          try { await this.executor.executeCommand('load_document', { authorName: blankAuthor }) }
-          catch (e) { this.appendLog('修订署名下发失败 / redline author push failed: ' + (e && e.message ? e.message : e)) }
+        // Explicit empty bytes also initialize a blank model if this cold instance
+        // originally expected content. Author-only updates never create a model.
+        try {
+          const blank = await this.executor.executeCommand('load_document', { bytes, name, authorName: currentAuthorName() })
+          if (!blank?.success && this._initialDocument) throw new Error(blank?.message || 'Blank document initialization failed')
+        } catch (e) {
+          if (this._initialDocument) throw e // This instance has no booted blank model to keep.
+          this.appendLog('修订署名下发失败 / redline author push failed: ' + (e && e.message ? e.message : e))
         }
         assertCurrentGeneration()
         this._checkpointGeneration = generation

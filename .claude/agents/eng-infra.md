@@ -552,6 +552,9 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
 
 ## 桌面首屏关键路径（dev-board#1472）
 
+
+必要的数据库回调由 `StartupDataInitializer`（`SmartInitializingSingleton`）统一在普通 Bean 构造后、WebServer 开始接收请求前执行：外部服务档位回填 → 插件孤儿任务恢复 → 内置插件安装/禁用状态读取与插件加载 → 技能扫描。`PluginService` 加载可执行插件前必须完成旧任务恢复，禁用状态必须先于 JAR 执行；`ToolRegistry` 保留活的插件工具 supplier。这里不改变各回调原有异常处理。反馈补传/反馈处理状态同步、匿名统计/团队统计补传、插件封禁同步与资源包安装/更新定时器改在 `ApplicationReadyEvent` 启动，避免后台线程在对象构造期间提前触发 JPA 等待；原定时重试及用户主动操作保留。非 desktop 的同步 JPA 也沿用同一必要阶段。`StartupDataInitializerTest` 用真实 Spring 生命周期处理器验证构造期间零数据/后台回调、阶段顺序及 Ready 后启动，并用真实 Tomcat 验证必要阶段阻塞/失败时未开始接收业务；测试不代表墙钟收益，性能仍需冻结产物 A/B。
+
 主窗口等待 Java HTTP 健康及补丁失败回滚完成，不等待已装的 PPTX/MinerU/Kokoro/ASR 服务。`main/main.js` 先单独 `start('backend')`，主页面 `did-finish-load` 后再 `startEager(['backend'])`；可选服务失败只记自身错误，不重建窗口。首次页面加载和 JVM 初始化不再与模型加载争抢资源；退出/管理器关闭时不启动迟到组件。按需 `host.services.ensure` 沿用服务串行队列。`startup-readiness.test.js` 执行实际启动链与管理器调度，验证后端等待、可选服务不阻塞、回滚前不加载旧前端及退出护栏；这些合成测试不等于正式安装包的墙钟提速实测。旧补丁的同步目录清理仍在关键路径，未安装可选 pack 的机器也仍需单独测量 Java/H5 启动耗时。
 
 `PgVectorConfig` 对非 PostgreSQL JDBC 数据源直接构造既有内存向量存储；H2 不得先调用模型 `dimension()` 或构建 PG 连接再降级。PostgreSQL 仍动态探测并缓存模型维度。`PgVectorConfigTest` 验证 H2 零模型/PG 调用、两个存储的独立检索及 PostgreSQL 原有建库参数。

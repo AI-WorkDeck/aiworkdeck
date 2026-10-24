@@ -5,7 +5,8 @@ package com.checkba.service.team;
 
 import com.checkba.service.LocalIdentityService;
 import com.checkba.service.account.AccountService;
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -62,7 +63,7 @@ public class TeamUsageUploadService {
         this.projectNameNotice = projectNameNotice;
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
         Thread t = new Thread(this::sync, "team-usage-upload-init");
         t.setDaemon(true);
