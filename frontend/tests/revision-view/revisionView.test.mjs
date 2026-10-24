@@ -140,9 +140,9 @@ test('工具栏重挂（bootstrap）先清空状态，不端着上一份文档�
   revisionView = 'all'
   vm.calls.length = 0
   await vm.bootstrap()
-  assert.deepEqual(seen, [undefined, 'all'], 'bootstrap 先 EMPTY() 读新文档，再在应用视图偏好后刷新')
+  assert.deepEqual(seen, [undefined], 'bootstrap 先 EMPTY()，应用视图偏好后一次回读新文档状态')
   assert.deepEqual(vm.calls.filter(c => ['get_ui_state', 'set_view_options'].includes(c.action)).map(c => c.action),
-    ['get_ui_state', 'set_view_options', 'get_ui_state'])
+    ['set_view_options', 'get_ui_state'])
   assert.equal(vm.state.view.revisionView, 'all')
 })
 
