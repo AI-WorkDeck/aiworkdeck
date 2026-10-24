@@ -5,6 +5,14 @@ description: 侧边栏与工作台外壳领域。任务涉及左侧 rail/左栏�
 
 # 侧边栏与工作台外壳 领域地图
 
+## 资源管理器内的搜索（dev-board#1471）
+
+搜索入口在资源管理器标题栏、新建之前；`plugin-search` 仍是搜索态的面板 key，旧 `search` 别名和菜单调用继续走原路。`isExplorerPane` 将 files / plugin-search 统一为资源管理器标题与 rail 高亮，顶部按钮可返回文件目录。FileTree 继续用 v-show 保活，搜索期间不重建树；`syncFileTreeSelectionWithActiveTab` 在搜索态跳过隐藏树定位，打开结果不改变返回目录的位置。搜索本体仍为原 PluginPane + search 插件，启停、全文、标签、打开文件及取消请求契约不变；SearchPanel 挂载时聚焦输入框。
+
+独立搜索图标在 `panelDocking.applyPanelDocks` 最后过滤，不能从 dynamicPlugins 删除，也不能只滤 base 数组（停靠 extras 会补回来）。搜索按钮遵循插件可用性；禁用/卸载仍按动态插件加载链回落 files。
+
+回归：`frontend/tests/project-home/explorer-search.test.mjs`（真实模板/事件、菜单、停靠回补、旧 key、隐藏树定位），搜索业务与打包浏览器测试仍使用原入口。
+
 职责边界：工作台整体布局、左侧 rail 与左栏、面板切换状态机、页面路由。各面板内部逻辑归 utility-tools / plugin-system；右栏聊天内容归 ai-chat；编辑器归 doc-editor。
 
 ## 账户浮层、左栏收起入口与 AI 首屏（dev-board#1417/#1418/#1419）

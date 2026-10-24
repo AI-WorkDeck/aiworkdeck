@@ -9,6 +9,9 @@ import { track } from '@/utils/telemetryClient.js'
 import { isPaneAllowedWithoutProject, workbenchStorageKey } from './noProjectShell.js'
 
 export const panelSwitchingMethods = {
+    toggleExplorerSearch() {
+      this.toggleLeftPane(this.leftPaneKey === 'plugin-search' ? 'files' : 'plugin-search')
+    },
     toggleLeftPane(key) {
       // A visible cloud/client DD entry is current, not a stale hidden-pane preference.
       if (key !== 'dd-files' || (!this.isClientView && !this.ddCloudTrack)) key = migrateLeftPaneKey(key)

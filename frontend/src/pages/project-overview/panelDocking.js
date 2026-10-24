@@ -73,7 +73,8 @@ export const panelDockingMethods = {
     const extras = this.panelDocks.left
       .filter((p) => !known.has(p.key))
       .map((p) => ({ key: p.key, label: p.label || this.$t(p.labelKey), svgPaths: p.svgPaths }))
-    return [...kept, ...extras]
+    // 项目搜索由资源管理器标题栏打开；保留插件与停靠状态，只移除 rail 入口。
+    return [...kept, ...extras].filter(p => p.key !== 'plugin-search')
   },
 
   /**

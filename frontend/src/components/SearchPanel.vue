@@ -188,6 +188,8 @@ export default {
     // Listen on its DOM root so intermediate pinyin never starts a full scan.
     const input = this.$refs?.searchInput
     this._compositionRoot = input?.$el || input
+    const nativeInput = this._compositionRoot?.matches?.('input') ? this._compositionRoot : this._compositionRoot?.querySelector?.('input')
+    nativeInput?.focus?.()
     this._compositionRoot?.addEventListener?.('compositionstart', this.onCompositionStart, true)
     this._compositionRoot?.addEventListener?.('compositionend', this.onCompositionEnd, true)
   },
