@@ -5,7 +5,6 @@ package com.checkba.service.ai.skill;
 
 import com.checkba.service.SystemSettingService;
 import com.checkba.service.ai.PluginService;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
@@ -116,7 +115,6 @@ public class SkillRegistry {
      */
     static final List<String> VOICE_MERGED_SKILL_IDS = List.of("text-to-speech", "meeting-recorder");
 
-    @PostConstruct
     public void init() {
         loadDisabledState();
         scan();

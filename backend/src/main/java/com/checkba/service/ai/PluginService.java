@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -136,7 +135,7 @@ public class PluginService {
      * 既有测试则停留 null，rescan() 判空跳过。
      *
      * <p>为什么必须在这里连上：插件携带的 skill 目录是 loadPlugins() 扫出来的，
-     * SkillRegistry 只在自己 @PostConstruct 与 rescan() 时来拉一次。装完/启用完插件
+     * SkillRegistry 只在启动数据初始化阶段与 rescan() 时来拉一次。装完/启用完插件
      * 只重扫了插件侧，skill 侧不动——工具注册上了、skill 却要等下次重启才出现，
      * 用户看到的就是「广场装完、插件开了，但让它干活它不认」。
      */
@@ -447,7 +446,6 @@ public class PluginService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private PluginBundledInstaller bundledInstaller;
 
-    @PostConstruct
     public void init() {
         if (bundledInstaller != null) bundledInstaller.installDefaults();
         loadDisabledState();

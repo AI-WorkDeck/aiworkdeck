@@ -3835,9 +3835,12 @@ function installContextMenuInterceptor(controller) {
 // seed scaffolding text here — earlier dev-prototype seed text would otherwise
 // show through whenever a real load was skipped/failed, looking like the editor
 // loaded the wrong content.
-function bootDoc() {
+function bootDoc(initialDocument = false) {
   context = zetajs.getUnoComponentContext();
   desktop = css.frame.Desktop.create(context);
+  // The relay is usable without a model. A cold file loads directly through the
+  // normal load_document path; ui_ready belongs to that successful first model.
+  if (initialDocument) { log('等待首个真实文档 / waiting for first document'); return; }
   xModel = desktop.loadComponentFromURL('private:factory/swriter', '_default', 0, []);
   ctrl = xModel.getCurrentController();
   installReviewCommentInterceptor(ctrl);
@@ -6321,7 +6324,12 @@ const EXEC = {
     // Empty body = a brand-new / unsaved document (the backend streams 200 + 0
     // bytes for it). That is NOT an error: keep the blank boot doc as-is. The
     // host also guards this, but defend here too.
-    if (!u8 || u8.length === 0) return { success: true, empty: true, name: name, kind: docKindOf() };
+    // An author-only update must not create a model while real bytes are in flight.
+    if (!u8) return { success: true, empty: true, name: name, kind: docKindOf() };
+    if (u8.length === 0) {
+      if (!xModel) bootDoc();
+      return { success: true, empty: true, name: name, kind: docKindOf() };
+    }
     // zeta.js marshals JS→UNO sequences ONLY from plain Arrays (translateToEmbind
     // gates on Array.isArray), and sequence<byte> elements are SIGNED — so go
     // through an Int8Array view, then Array.from. Passing the typed array itself
@@ -6358,6 +6366,7 @@ const EXEC = {
       }
       // _default keeps modified components alive. Close only after successful
       // replacement: 33 retained models exhausted LOWA's 1 GiB heap (#1121).
+      if (!previous) post('ui_ready');
       if (previous && previous !== loaded) {
         try { previous.setModified(false); previous.close(true); }
         catch (e) { log('load_document: previous model close failed: ' + errStr(e)); }
@@ -11492,6 +11501,12 @@ function execCommand(reqId, action, params) {
     if (action === 'get_review_context' && result && result.success) result.cursorRectRaw = EXEC.get_cursor_rect();
     post('result', { reqId: reqId, result: result });
   };
+  // Early cursor/zoom queries must not touch UNO model/controller before the
+  // first import. A rejected import stays retryable and never exposes a blank.
+  if (!xModel && !['load_document', 'set_app_theme', 'set_host_context_menu', 'set_style_profile'].includes(action)) {
+    finish({ success: false, code: 'DOCUMENT_NOT_READY', message: 'Document is not loaded yet' });
+    return;
+  }
   INFLIGHT[reqId] = true;
   let result;
   try {
@@ -11535,6 +11550,6 @@ Module.zetajs.then(function (pZetajs) {
       default: log('unknown cmd: ' + e.data.cmd);
     }
   };
-  bootDoc();
+  bootDoc(self.__awdInitialDocument === true);
   post('thr_running');
 });

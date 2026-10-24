@@ -170,3 +170,22 @@ test('a download still pending when the spare dies starts only one cold preview'
   assert.deepEqual(events, ['import', 'render'])
   assert.equal(vm.previewReady, true)
 })
+
+for (const [name, file, expected] of [
+  ['nonempty cold file', { id: 1, fileSize: 500 }, '1'],
+  ['spare', null, null], ['new blank file', { id: 1, fileSize: 0 }, null],
+  ['unknown size', { id: 1 }, null],
+]) {
+  test(`${name}: guest initial-model intent is fixed when the instance is mounted`, () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'document')
+    globalThis.document = { getElementById: () => ({ appendChild() {} }) }
+    try {
+      const options = component('LibreOfficeEditor', { getResolvedTheme: () => 'light' })
+      let url
+      const vm = { file, hostId: 'test', createIframe(info) { url = info.url; return { style: {} } } }
+      options.methods.mountEditor.call(vm, { kind: 'iframe', url: 'http://127.0.0.1/editor.html?lowa=/lowa/' })
+      assert.equal(new URL(url).searchParams.get('initialDocument'), expected)
+      assert.equal(new URL(url).searchParams.get('theme'), 'light')
+    } finally { descriptor ? Object.defineProperty(globalThis, 'document', descriptor) : delete globalThis.document }
+  })
+}

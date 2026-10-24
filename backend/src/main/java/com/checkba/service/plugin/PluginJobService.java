@@ -14,7 +14,6 @@ import com.checkba.service.LangText;
 import com.checkba.service.ai.EditorBridgeService;
 import com.checkba.service.ai.PlatformAiUserScope;
 import com.checkba.service.evidence.Ulid;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,8 +81,7 @@ public class PluginJobService {
         JobState(PluginJob job) { this.job = job; }
     }
 
-    @PostConstruct
-    void recoverOrphans() {
+    public void recoverOrphans() {
         try {
             List<PluginJob> orphans = repo.findByStatusIn(List.of(PluginJob.STATUS_QUEUED, PluginJob.STATUS_RUNNING));
             for (PluginJob j : orphans) {
