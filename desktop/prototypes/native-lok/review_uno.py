@@ -1,13 +1,14 @@
 # SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""URL-bound, read-only review details and typed display state over an owned LOK bridge.
+"""URL-bound review details and typed review state over an owned LOK bridge.
 
 Run only with an explicitly isolated/read-only pyuno runtime. Never bootstraps soffice.
 Display transitions mirror office_thread.js applyRevisionView/withViewOnlyChange:
 typed short RedlineDisplayType writes verified through the readable model
 ShowChanges, controller ViewSettings ShowChangesInMargin for balloons, modified
 enablement preserved around the change, and AwdReviewSidebarWidth reserved (280)
-only for a user entering balloons from another mode. RecordChanges is never written.
+only for a user entering balloons from another mode. Display transitions never
+write RecordChanges; tracking has a separate, verified operation.
 """
 import argparse
 import json
@@ -202,8 +203,39 @@ def undo_step(model, kind, expected):
     return {'applied': True, 'state': after}
 
 
+def apply_tracking(model, enabled, initialize):
+    previous = model.getPropertyValue('RecordChanges')
+    if not isinstance(previous, bool):
+        raise RuntimeError('RecordChanges is not readable as a boolean')
+    changed = previous != enabled
+    if changed:
+        model.setPropertyValue('RecordChanges', enabled)
+    actual = model.getPropertyValue('RecordChanges')
+    if not isinstance(actual, bool) or actual != enabled:
+        raise RuntimeError('RecordChanges was not applied')
+    # The host calls initialization only for a newly opened, undisclosed model.
+    # Match product retarget semantics without clearing revisions or undo. A
+    # user's later preference change must remain a saveable document mutation.
+    if initialize:
+        model.setModified(False)
+    elif changed:
+        model.setModified(True)
+    modified = model.isModified()
+    if (not isinstance(modified, bool) or (initialize and modified)
+            or (not initialize and changed and not modified)):
+        raise RuntimeError('Tracking modified state was not applied')
+    return {'enabled': actual, 'changed': changed, 'modified': modified}
+
+
 def dispatch(method, params, model, uno_mod):
     ctrl = model.getCurrentController()
+    if method == 'tracking':
+        enabled, initialize = params.get('enabled'), params.get('initialize', False)
+        if not isinstance(enabled, bool) or not isinstance(initialize, bool):
+            raise ValueError('enabled and initialize must be booleans')
+        if initialize and not enabled:
+            raise ValueError('Initial tracking must be enabled')
+        return apply_tracking(model, enabled, initialize)
     if method == 'undo_state':
         return undo_state(model)
     if method == 'undo_step':

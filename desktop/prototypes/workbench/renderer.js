@@ -32,7 +32,8 @@ async function flush(){
  await input.flush();const saved=await api.save();status.textContent=saved.dirty?'待保存':'已保存';if(saved.dirty)throw Error('保存期间有新输入，请完成后再试');
 }
 api.onFlush(async()=>{if(input)await input.suspend();try{await flush()}catch(error){input?.resume();throw error}});
-function controls(enabled){for(const id of ['save','undo','redo','view-mode'])document.getElementById(id).disabled=!enabled;document.querySelector('#show-history').disabled=!enabled||!model?.historyAvailable}
+function controls(enabled){enabled=enabled&&model?.trackingReady===true;for(const id of ['save','undo','redo','view-mode','tracking'])document.getElementById(id).disabled=!enabled;document.querySelector('#show-history').disabled=!enabled||!model?.historyAvailable}
+function showTracking(){const button=document.querySelector('#tracking');button.setAttribute('aria-pressed',String(model.recordChanges));button.textContent='跟踪修订：'+(model.recordChanges?'开':'关')}
 async function activate(ids){
  if(opening)return;opening=true;controls(false);
  cancelReview();
@@ -43,10 +44,14 @@ async function activate(ids){
 }
 async function mountModel(next){
  cancelReview(true);
+ if(next.trackingReady!==true||typeof next.recordChanges!=='boolean'){
+  input?.dispose();input=null;model=null;controls(false);throw Error('修订跟踪初始化未确认，无法编辑');
+ }
  model=next;firstPaint=false;viewport.scrollTop=0;canvas.width=1;canvas.height=1;
+ showTracking();
  const factory=window.AWDDocumentInput?.createDocumentInput||window.createDocumentInput;
  if(!factory)throw Error('文档输入组件未加载');
- input=factory({canvas,request,viewport:size,writeClipboard:api.writeClipboard,onSave:()=>flush().catch(message),onError:message,onChanged:change=>{status.textContent='待保存';schedulePaint();if(change?.action==='command')refreshReview().catch(message)},onEnsureVisible:rect=>{if(rect.y*size().scale<viewport.scrollTop||rect.y*size().scale>viewport.scrollTop+viewport.clientHeight-40)viewport.scrollTop=Math.max(0,rect.y*size().scale-80)}});
+ input=factory({canvas,request,viewport:size,writeClipboard:api.writeClipboard,onSave:()=>flush().catch(message),onError:message,onChanged:change=>{if(model!==next)return;status.textContent='待保存';schedulePaint();if(change?.action==='command')refreshReview().catch(message);else if(['input_text','input_key'].includes(change?.action))scheduleReviewRefresh()},onEnsureVisible:rect=>{if(rect.y*size().scale<viewport.scrollTop||rect.y*size().scale>viewport.scrollTop+viewport.clientHeight-40)viewport.scrollTop=Math.max(0,rect.y*size().scale-80)}});
  input.setDocument(model);for(const event of model.initialCallbacks||[])input.handleCallback(event);await paint();controls(true);
  refreshReview().catch(message);
 }
@@ -80,8 +85,13 @@ function cancelReview(clear=false){
  for(const button of list.querySelectorAll('button'))button.disabled=true;
  if(clear){list.textContent='';document.querySelector('#revision-count').textContent='尚未读取修订'}
 }
+function scheduleReviewRefresh(){
+ if(!model?.trackingReady)return;
+ cancelReview();const owner=model;
+ reviewTimer=setTimeout(()=>{if(model===owner&&owner.trackingReady)refreshReview().catch(message)},200);
+}
 async function refreshReview(){
- if(!model)return;
+ if(!model?.trackingReady)return;
  cancelReview();
  const generation=reviewGeneration,epoch=model.documentEpoch;
  const alive=()=>model&&epoch===model.documentEpoch&&generation===reviewGeneration;
@@ -162,6 +172,26 @@ async function history(){
 document.querySelector('#save').onclick=()=>flush().catch(message);
 for(const [id,command]of [['undo','.uno:Undo'],['redo','.uno:Redo']])document.getElementById(id).onclick=async()=>{try{await input.flush();await request('command',{command,arguments:'{}'});status.textContent='待保存';await paint();await refreshReview()}catch(error){message(error)}};
 document.querySelector('#view-mode').onchange=async event=>{try{await input.flush();const next=await request('review_view',{mode:event.target.value});if(next.widthTwips)model.widthTwips=next.widthTwips;if(next.heightTwips)model.heightTwips=next.heightTwips;await paint();await refreshReview()}catch(error){message(error)}};
+document.querySelector('#tracking').onclick=async()=>{
+ const owner=model,editor=input;if(!owner?.trackingReady)return;
+ const enabled=!owner.recordChanges;let dispatched=false;controls(false);
+ try{
+  // suspend preserves the composition guard and drains confirmed input first.
+  await editor.suspend();if(model!==owner)return;
+  cancelReview();owner.trackingReady=false;dispatched=true;
+  const result=await request('review_tracking',{documentEpoch:owner.documentEpoch,enabled});
+  if(model!==owner)return;
+  if(result.documentEpoch!==owner.documentEpoch||result.enabled!==enabled)throw Error('修订跟踪状态未确认');
+  owner.recordChanges=result.enabled;owner.trackingReady=true;showTracking();
+  if(result.changed)status.textContent='待保存';
+ }catch(error){
+  if(model!==owner)return;
+  if(dispatched){owner.trackingReady=false;cancelReview()}
+  message(error);
+ }finally{
+  if(model===owner){controls(true);if(owner.trackingReady){editor.resume();refreshReview().catch(message)}}
+ }
+};
 document.querySelector('#show-revisions').onclick=()=>{document.querySelector('#revisions').hidden=false;document.querySelector('#versions').hidden=true};
 document.querySelector('#show-history').onclick=()=>{document.querySelector('#revisions').hidden=true;document.querySelector('#versions').hidden=false;history().catch(message)};
 document.querySelector('#create-version').onclick=async()=>{try{await api.createVersion(document.querySelector('#version-title').value);await history();status.textContent='版本已保存'}catch(error){message(error)}finally{input?.resume()}};
@@ -169,6 +199,7 @@ api.onEvent(event=>{
  if(event.type==='callback'&&model&&event.documentEpoch===model.documentEpoch){
   input?.handleCallback?.(event);
   if(event.callbackType===0)schedulePaint();
+  if(event.callbackType===30||event.callbackType===31)scheduleReviewRefresh();
   if(event.callbackType===13){const dimensions=String(event.payload).split(',').map(Number);if(dimensions.length===2&&dimensions.every(Number.isFinite)){model.widthTwips=dimensions[0];model.heightTwips=dimensions[1];schedulePaint()}}
  }else if(event.type==='document-closed'){cancelReview(true);input?.dispose();input=null;model=null;controls(false)}
  else if(event.type==='document-opened'){mounting=mountModel(event.model);mounting.catch(message)}
