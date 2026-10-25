@@ -52,12 +52,18 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
             "NON_KEYWORDS", "AUTO_SERVER", "AUTO_SERVER_PORT", "IFEXISTS", "DB_CLOSE_ON_EXIT", "LOCK_TIMEOUT");
 
     public interface Callbacks {
+        /** Pending durable writes must be recovered even when the experiment is disabled. */
+        default boolean requiresRecovery(ConfigurableEnvironment environment, Path databaseFile) throws Exception { return false; }
+        /** Runs before any legacy DDL when a journal exists, otherwise before business initialization. */
+        default void onPersistencePrepared(ConfigurableEnvironment environment, DataSource dataSource,
+                                           LocalCoreStore store, Path databaseFile) throws Exception {}
         /** Own resources until returning their handle; clean up locally if preparation throws. */
         AutoCloseable onCorePrepared(ConfigurableEnvironment environment, DataSource dataSource,
                                      LocalCoreStore store, LocalCoreOwnership ownership) throws Exception;
         default void onJpaHandoff(ConfigurableApplicationContext context) throws Exception {}
         /** All synchronous Ready listeners have returned; this is separate from JPA ownership. */
         default void onReady(ConfigurableApplicationContext context) throws Exception {}
+        default void onReady(ConfigurableApplicationContext context, boolean recordedSchema) throws Exception { onReady(context); }
     }
 
     private final Callbacks callbacks;
@@ -68,7 +74,9 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
     private Path databaseFile;
     private boolean candidate;
     private boolean readyEventSeen;
-    private boolean readyCompleted;
+    private volatile boolean readyCompleted;
+    private boolean persistencePrepared;
+    private boolean handedOff;
     private volatile HikariDataSource pool;
     private volatile LocalCoreOwnership ownership;
     private AutoCloseable coreResource;
@@ -110,18 +118,32 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
         String address = env.getProperty("server.address", "").trim();
         if (!env.acceptsProfiles(Profiles.of("desktop"))
                 || !env.getProperty("security.local-mode", Boolean.class, false)
-                || !env.getProperty("desktop.local-core.enabled", Boolean.class, false)
                 || !(address.equals("127.0.0.1") || address.equalsIgnoreCase("localhost"))) return;
         build = env.getProperty("AWD_BACKEND_BUILD", System.getenv("AWD_BACKEND_BUILD"));
-        if (build == null || build.isBlank() || build.length() > 256 || build.contains("\n") || build.contains("\r")) return;
+        boolean enabled = env.getProperty("desktop.local-core.enabled", Boolean.class, false)
+                && build != null && !build.isBlank() && build.length() <= 256 && !build.contains("\n") && !build.contains("\r");
 
         HikariDataSource proposed = null;
         LocalCoreStore store;
+        boolean recovery = false;
+        boolean inspectingRecovery = false;
+        boolean early = false;
         try {
             Binder binder = Binder.get(env);
             DataSourceProperties properties = binder.bind("spring.datasource", DataSourceProperties.class)
                     .orElseGet(DataSourceProperties::new);
-            if (properties.getJndiName() != null || (properties.getType() != null && properties.getType() != HikariDataSource.class)) return;
+            // Discover a journal before rejecting configuration. Parsing a file location does not
+            // approve URL options or open a connection (INIT must never execute during discovery).
+            Path discoveredFile = h2FileLocation(env.getProperty("spring.datasource.hikari.jdbc-url", properties.getUrl()));
+            if (discoveredFile != null) {
+                inspectingRecovery = true;
+                recovery = callbacks.requiresRecovery(env, discoveredFile);
+                inspectingRecovery = false;
+            }
+            if (properties.getJndiName() != null || (properties.getType() != null && properties.getType() != HikariDataSource.class)) {
+                if (recovery) throw new IllegalStateException("Pending local content requires a supported database configuration");
+                return;
+            }
             proposed = properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
             binder.bind("spring.datasource.hikari", Bindable.ofInstance(proposed));
             databaseFile = h2File(proposed.getJdbcUrl());
@@ -129,23 +151,38 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
                     || proposed.getDataSourceJNDI() != null || !proposed.getDataSourceProperties().isEmpty()
                     || !"org.h2.Driver".equals(proposed.getDriverClassName())
                     || (proposed.getConnectionInitSql() != null && !proposed.getConnectionInitSql().isBlank())) {
+                if (recovery) throw new IllegalStateException("Pending local content requires a supported database configuration");
                 proposed.close(); return;
             }
-            candidate = true;
-            if (!Files.isRegularFile(databaseFile)) { proposed.close(); return; }
+            candidate = enabled;
+            if (!candidate && !recovery) { proposed.close(); return; }
+            if (!Files.isRegularFile(databaseFile)) {
+                if (recovery) throw new IllegalStateException("Pending local content database is unavailable");
+                proposed.close(); return;
+            }
             // Check before the FIRST connection. IFEXISTS forbids accidental creation; disabling
             // AUTO_SERVER prevents attaching to another JVM and lets H2's file lock exclude even
             // unmodified legacy processes. The original environment remains unchanged on fallback.
             proposed.setJdbcUrl(exclusiveExistingFileUrl(proposed.getJdbcUrl()));
-            if (!new LocalCoreSchemaProof(proposed, build).isCurrent()) { proposed.close(); return; }
+            var proof = new LocalCoreSchemaProof(proposed, enabled ? build : "recovery");
+            early = enabled && proof.isCurrent();
+            if (recovery && !proof.isRecordedSchema())
+                throw new IllegalStateException("Pending local content requires its recorded database schema");
             store = new LocalCoreStore(proposed, storageRoot(env));
         } catch (Exception unavailable) {
             if (proposed != null) proposed.close();
+            if (recovery || inspectingRecovery) throw unavailable;
             // Keep the established startup path; never include JDBC URLs or credentials in logs.
             log.info("Local core eligibility unavailable; using legacy initialization");
             return;
         }
         pool = proposed;
+        // A new build uses legacy DDL, but retains this exclusive pool. It must not later expose the
+        // new write protocol through an AUTO_SERVER connection that another JVM can attach to.
+        if (!early && !recovery) return;
+        callbacks.onPersistencePrepared(env, pool, store, databaseFile);
+        persistencePrepared = true;
+        if (!early) return;
         ownership = new LocalCoreOwnership();
         // This must precede creation of any EntityManagerFactory, including an asynchronous one.
         env.getPropertySources().addFirst(new MapPropertySource("localCoreSchemaSafety", Map.of(
@@ -175,18 +212,31 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
 
     /** Call synchronously as the FIRST action of StartupDataInitializer.afterSingletonsInstantiated. */
     public void beforeJpaBusinessInitialization(ConfigurableApplicationContext ctx, Duration drainTimeout) {
-        if (ownership == null) return;
-        if (ctx != context || closed || ctx.getBean(DataSource.class) != pool)
-            throw new IllegalStateException("JPA must share the early core DataSource");
+        // A brand-new database was created by the legacy path without an exclusive pool. Record its
+        // proof at readiness; only a subsequent exclusive launch may expose the content protocol.
+        if (pool == null || (!candidate && !persistencePrepared) || handedOff) return;
+        DataSource source = ctx.getBean(DataSource.class);
+        if (ctx != context || closed || (pool != null && source != pool))
+            throw new IllegalStateException("JPA must share the local core DataSource");
         EntityManagerFactory factory = ctx.getBean(EntityManagerFactory.class);
-        if (!(factory instanceof EntityManagerFactoryInfo info) || info.getDataSource() != pool)
-            throw new IllegalStateException("JPA must use the early core DataSource");
+        if (!(factory instanceof EntityManagerFactoryInfo info) || info.getDataSource() != source)
+            throw new IllegalStateException("JPA must use the local core DataSource");
         // A deferred FactoryBean proxy does not mean its native factory has finished. Wait before
         // DRAINING so that an indefinitely blocked EMF still leaves the early JDBC core usable.
         Objects.requireNonNull(info.getNativeEntityManagerFactory(), "Native EntityManagerFactory");
         if (closed) throw new IllegalStateException("Local core bootstrap is closed");
         try {
-            ownership.drainAndHandoff(drainTimeout, () -> callbacks.onJpaHandoff(ctx));
+            if (!persistencePrepared) {
+                try (var connection = source.getConnection()) {
+                    if (!databaseFile.equals(h2File(connection.getMetaData().getURL())))
+                        throw new IllegalStateException("Local core database changed during initialization");
+                }
+                callbacks.onPersistencePrepared(environment, source, new LocalCoreStore(source, storageRoot(environment)), databaseFile);
+                persistencePrepared = true;
+            }
+            if (ownership == null) callbacks.onJpaHandoff(ctx);
+            else ownership.drainAndHandoff(drainTimeout, () -> callbacks.onJpaHandoff(ctx));
+            handedOff = true;
         } catch (Exception failure) {
             throw new IllegalStateException("Local core ownership handoff failed", failure);
         }
@@ -194,24 +244,38 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
 
     private void completeReady() throws Exception {
         if (closed) return;
-        if (ownership != null && ownership.state() != LocalCoreOwnership.State.JPA)
+        if ((pool != null && (candidate || persistencePrepared) && !handedOff)
+                || (ownership != null && ownership.state() != LocalCoreOwnership.State.JPA))
             throw new IllegalStateException("Application became ready before local core handoff");
-        if (candidate && ownership == null) {
+        boolean recordedSchema = false;
+        if (candidate || persistencePrepared) {
             DataSource source = context.getBean(DataSource.class);
             try {
                 boolean sameFile;
                 try (var connection = source.getConnection()) {
                     sameFile = databaseFile.equals(h2File(connection.getMetaData().getURL()));
                 }
-                if (sameFile) new LocalCoreSchemaProof(source, build).recordAfterLegacyInitialization();
+                if (sameFile) {
+                    String proofBuild = build != null && !build.isBlank() && build.length() <= 256
+                            && !build.contains("\n") && !build.contains("\r") ? build : "recovery";
+                    var proof = new LocalCoreSchemaProof(source, proofBuild);
+                    if (ownership == null) proof.recordAfterLegacyInitialization();
+                    recordedSchema = proof.isCurrent();
+                }
             } catch (Exception unsupported) {
+                if (persistencePrepared && callbacks.requiresRecovery(environment, databaseFile)) throw unsupported;
                 // A valid legacy installation may contain objects outside the proof's supported set.
                 log.info("Legacy initialization completed without a reusable local core schema proof");
             }
+            if (!recordedSchema && (ownership != null
+                    || (persistencePrepared && callbacks.requiresRecovery(environment, databaseFile))))
+                throw new IllegalStateException("Active local content schema proof could not be verified");
         }
+        if (candidate || persistencePrepared) callbacks.onReady(context, recordedSchema);
         readyCompleted = true;
-        if (candidate) callbacks.onReady(context);
     }
+
+    public boolean isFullReady() { return readyCompleted && !closed; }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private static final class StoredLocation { public String root; public String movedAt; }
@@ -230,11 +294,10 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
     }
 
     static Path h2File(String url) {
-        if (url == null || !url.startsWith("jdbc:h2:file:")) return null;
+        Path location = h2FileLocation(url);
+        if (location == null) return null;
         String[] parts = url.substring("jdbc:h2:file:".length()).split(";", -1);
         try {
-            Path base = Path.of(parts[0]);
-            if (!base.isAbsolute()) return null;
             Set<String> seen = new HashSet<>();
             for (int i = 1; i < parts.length; i++) {
                 int equals = parts[i].indexOf('=');
@@ -242,7 +305,15 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
                 String key = parts[i].substring(0, equals).toUpperCase(Locale.ROOT);
                 if (!URL_OPTIONS.contains(key) || !seen.add(key)) return null;
             }
-            return Path.of(base.toString() + ".mv.db").normalize();
+            return location;
+        } catch (RuntimeException invalid) { return null; }
+    }
+
+    private static Path h2FileLocation(String url) {
+        if (url == null || !url.startsWith("jdbc:h2:file:")) return null;
+        try {
+            Path base = Path.of(url.substring("jdbc:h2:file:".length()).split(";", -1)[0]);
+            return base.isAbsolute() ? Path.of(base + ".mv.db").normalize() : null;
         } catch (RuntimeException invalid) { return null; }
     }
 

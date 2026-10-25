@@ -605,7 +605,11 @@ Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Ac
 
 完整 UI 曾暴露 HTTP/1.1 六连接饥饿：六个非早期接口在网关等完整后端，使文件树在浏览器排队约4秒，真正读取仅约13ms。`backend-request-gate.js` 在主窗 session 的 onBeforeRequest 中排队这些请求，保留早期 GET/HEAD 与 OPTIONS 通道；能力清单只来自 build 校验成功的 core 健康响应。未知旧后端保持原传输；换 launch、端口、退出或到截止时取消待发请求，不重放到新进程。不要同时给同一 session 安装第二个 onBeforeRequest listener。实际隔离 UI 文件树4019→150ms只属诊断，不替代正常负载正式对照。
 
-当前候选接通项目/身份/文件读取，保存和版本/AI 写入的完整交接尚未完成；轻量保存 journal 的单元和骤停测试不能替代 HTTP、Git 与旧项目迁移验收。正式默认引擎仍为 LOWA，原生样板的性能不能视为全产品性能。
+候选的 `LocalCoreContentHttp` 在 CORE/JPA 两阶段提供同一带版本的 GET/HEAD/PUT 与 receipt GET/DELETE 协议。下载快照绑定实际字节的 SHA、文件 UID 与本机身份；上传完整收完后才取得项目版本锁、publication 锁和短数据库事务。持久操作 UUID/回执/取消栅栏阻止重复与迟到写入，任何不确定结果不得降级为旧无条件 POST。客户端先探测数字 `coreContentProtocol=1`，元数据跟随准确的 ArrayBuffer，在模型装入成功后绑定；重载先解决或取消旧保存。早期能力一旦已发布，交接后不能因 schema proof 失效静默撤回。
+
+保存 journal 位于原 H2 文件旁；即使关闭开关或构建标识变化，存在 journal 时也必须在 legacy DDL 之前恢复并验证记录过的 schema。`LocalCoreVersionHandoff` 保留既有 HEAD，未建库时以首个 before image 建初始版本，原件始终保留最新内容；版本确认后才 ack。feature-off/recovery-only 同样必须完成实际 EMF 和交接才可 full-ready。通知在项目锁释放后执行，失败的本进程回执重试可以重试通知，非持久通知 outbox。DDL 中途崩溃造成 proof 不匹配会保守拒绝启动，不能称已自动恢复所有升级窗口。
+
+隔离的完整 Spring/JPA/H2/HTTP/JGit 联调已覆盖阻塞实际 EMF 时读写/取消、交权后相同路由、CORS、版本基线以及关闭开关/变更构建标识的骤停恢复；变更构建仅为同 JAR 改标识，并非另一二进制/DDL 兼容验证。当前仍默认关闭轻量候选，默认文档引擎仍为 LOWA；完整原生体验和正常负载对照未通过前不得据样板性能切换默认。
 
 `desktop/main/services/backend-supervisor.js` 在服务启动完成后每 10s 检查后端，连续三次失败后按 5/15/45s 退避尝试恢复，最多三次；连续健康 5min 才重置预算。只恢复 `ServiceManager` 创建的 child，复用外部后端同样检查 `/api/desktop/health`，503/超时不能退回 wizard 假报健康；仅明确404且wizard识别成功时标记 `degraded/external-health-unverified`（旧版健康未知），不接管。原来按端口杀陈旧后端的路径已移除。后端初启 HTTP 就绪宽限 120s（Windows ARM 转译延长），运行期使用 `/api/desktop/health`（DB 检查+本次 child 的 build），不以 TCP 通等价健康。dev prod profile 兼容 `/api/admin/wizard`。健康检查固定本次 spawn 指纹，后台下载激活 overlay 不会触发运行中的旧版本被误判并自动换件。
 

@@ -42,13 +42,26 @@ public final class LocalCoreSchemaProof {
     }
 
     public boolean isCurrent() throws SQLException {
+        return matchesRecordedSchema(true);
+    }
+
+    /** Recovery may run on a new build, but only against the unchanged, previously recorded schema. */
+    public boolean isRecordedSchema() throws SQLException {
+        return matchesRecordedSchema(false);
+    }
+
+    private boolean matchesRecordedSchema(boolean sameBuild) throws SQLException {
         try (Connection c = dataSource.getConnection()) {
             Shape shape = inspect(c);
             if (!shape.compatible()) return false;
             try (var s = c.prepareStatement("SELECT \"value\" FROM system_setting WHERE config_key=?")) {
                 s.setString(1, KEY);
                 try (ResultSet r = s.executeQuery()) {
-                    return r.next() && proof(shape).equals(r.getString(1)) && !r.next();
+                    if (!r.next()) return false;
+                    String recorded = r.getString(1);
+                    boolean matches = sameBuild ? proof(shape).equals(recorded)
+                            : recorded != null && recorded.matches(CONTRACT + "\\n[^\\r\\n]{1,256}\\n" + shape.digest());
+                    return matches && !r.next();
                 }
             }
         }

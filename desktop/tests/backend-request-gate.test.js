@@ -48,6 +48,20 @@ test('writes to a read route wait, and a different origin or port is unaffected'
   assert.deepEqual(write, [{ cancel: false }])
 })
 
+test('only an explicit verified content capability releases its narrow write and receipt routes', t => {
+  const { send, launch } = fixture(t)
+  const path = '/api/local-core/projects/1/files/2/content'
+  assert.deepEqual(send(path, 'PUT'), [])
+  launch.coreContentProtocol = 1
+  for (const method of ['GET', 'HEAD', 'PUT']) assert.deepEqual(send(path, method), [{ cancel: false }])
+  assert.deepEqual(send(path + '/receipts/12345678-1234-1234-1234-123456789abc'), [{ cancel: false }])
+  assert.deepEqual(send(path + '/receipts/12345678-1234-1234-1234-123456789abc', 'DELETE'), [{ cancel: false }])
+  for (const [url, method] of [[path, 'DELETE'], [path + '/receipts/not-an-id', 'GET'],
+    [path.replace('/1/', '/0/'), 'PUT'], [path + '/other', 'PUT'], ['/api/files/2/upload', 'POST']]) {
+    assert.deepEqual(send(url, method), [])
+  }
+})
+
 for (const change of ['launch', 'port', 'exit', 'signal', 'closing', 'deadline']) {
   test(`pending requests are cancelled on ${change} without replay into another backend`, t => {
     const { send, launch, state } = fixture(t)

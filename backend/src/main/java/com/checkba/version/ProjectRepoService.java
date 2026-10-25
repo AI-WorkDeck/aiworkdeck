@@ -46,9 +46,20 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.DataOutputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileTime;
+import java.security.DigestInputStream;
+import java.security.DigestOutputStream;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,12 +67,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * 每项目一个 Git 仓库的薄封装。只认识 Git 概念，不认识「工作段」——
@@ -302,6 +315,175 @@ public class ProjectRepoService {
         } catch (Exception e) {
             throw new VersionException("开启版本记录失败: project=" + projectId, e);
         }
+    }
+
+    /**
+     * Synchronous core handoff primitive. The caller holds the project repository lock and has
+     * already checked identity, policy and the journal. Only the Git index receives before-images;
+     * working files remain untouched. An existing HEAD is never changed by this operation.
+     */
+    public String initWithCoreBaseline(long projectId, String authorName, String authorEmail,
+                                       String batchId, Map<String, Path> beforeImages) {
+        return initWithCoreBaseline(projectId, authorName, authorEmail, batchId, beforeImages, () -> {});
+    }
+
+    public String initWithCoreBaseline(long projectId, String authorName, String authorEmail,
+                                       String batchId, Map<String, Path> beforeImages, Runnable beforeStaging) {
+        requireVersionRecordingSupported(projectId);
+        Path git = gitDir(projectId);
+        Path marker = git.resolveSibling(git.getFileName() + ".core-baseline.pending");
+        try {
+            requireNoSymlinks(git);
+            if (Files.exists(git, LinkOption.NOFOLLOW_LINKS)) {
+                try (Repository repo = coreBaselineRepository(projectId)) {
+                    ObjectId head = repo.resolve(Constants.HEAD);
+                    if (head != null) {
+                        try (var walk = new RevWalk(repo)) { walk.parseCommit(head); }
+                        return head.name();
+                    }
+                    if (!repo.getRefDatabase().getRefsByPrefix(Constants.R_REFS).isEmpty())
+                        throw new IOException("An unborn repository with existing refs cannot be initialized");
+                }
+            }
+            if (batchId == null || !batchId.matches("[A-Za-z0-9_-]{1,128}") || beforeImages == null || beforeImages.isEmpty())
+                throw new IOException("Invalid core baseline batch");
+            Path work = workTree(projectId).toAbsolutePath().normalize();
+            if (git.startsWith(work) || work.startsWith(git))
+                throw new IOException("Core baseline metadata must be outside the working tree");
+            var images = new TreeMap<String, Path>();
+            var fingerprints = new TreeMap<String, LocalVersionObjectStore.ObjectRef>();
+            for (var image : beforeImages.entrySet()) {
+                String relative = image.getKey();
+                if (relative == null || relative.isBlank() || Path.of(relative).isAbsolute() || relative.startsWith("/") || relative.indexOf('\\') >= 0
+                        || relative.indexOf('\0') >= 0)
+                    throw new IOException("Invalid core baseline path");
+                for (String part : relative.split("/", -1)) {
+                    if (part.isEmpty() || part.equals(".") || part.equals("..") || part.equalsIgnoreCase(".git"))
+                        throw new IOException("Invalid core baseline path");
+                }
+                requireRegularSnapshot(image.getValue());
+                requireRegularSnapshot(workTree(projectId).resolve(relative));
+                try (InputStream input = Files.newInputStream(image.getValue(), LinkOption.NOFOLLOW_LINKS)) {
+                    fingerprints.put(relative, LocalVersionObjectStore.fingerprint(input));
+                }
+                images.put(relative, image.getValue());
+            }
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (var out = new DataOutputStream(new DigestOutputStream(OutputStream.nullOutputStream(), digest))) {
+                out.writeLong(projectId);
+                for (var image : fingerprints.entrySet()) {
+                    byte[] path = image.getKey().getBytes(StandardCharsets.UTF_8);
+                    out.writeInt(path.length); out.write(path);
+                    out.writeUTF(image.getValue().sha256()); out.writeLong(image.getValue().size());
+                }
+            }
+            byte[] expectedMarker = ("awd-core-baseline-v1\n" + batchId + "\n"
+                    + HexFormat.of().formatHex(digest.digest()) + "\n").getBytes(StandardCharsets.UTF_8);
+            if (Files.exists(marker, LinkOption.NOFOLLOW_LINKS)) {
+                requireRegularSnapshot(marker);
+                try (InputStream input = Files.newInputStream(marker, LinkOption.NOFOLLOW_LINKS)) {
+                    if (!java.util.Arrays.equals(expectedMarker, input.readNBytes(expectedMarker.length + 1)))
+                        throw new IOException("Core baseline batch does not match pending initialization");
+                }
+            } else {
+                if (Files.exists(git, LinkOption.NOFOLLOW_LINKS))
+                    throw new IOException("Unmarked unborn repository cannot receive a core baseline");
+                Files.createDirectories(git.getParent());
+                Path temporary = Files.createTempFile(git.getParent(), ".core-baseline-", ".tmp");
+                try {
+                    try (var channel = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
+                        ByteBuffer bytes = ByteBuffer.wrap(expectedMarker);
+                        while (bytes.hasRemaining()) channel.write(bytes);
+                        channel.force(true);
+                    }
+                    Files.move(temporary, marker, StandardCopyOption.ATOMIC_MOVE);
+                    syncDirectory(git.getParent());
+                } finally { Files.deleteIfExists(temporary); }
+            }
+            beforeStaging.run();
+            // This marker owns only an uncommitted private repository. Rebuild its interrupted
+            // creation/index safely; an unmarked receive repository or any existing ref was rejected.
+            if (Files.exists(git, LinkOption.NOFOLLOW_LINKS)) {
+                try (var paths = Files.walk(git)) {
+                    for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.delete(path);
+                }
+            }
+            String head;
+            try (Repository repo = coreBaselineRepository(projectId)) {
+                repo.create(true);
+                ensureExcludes(projectId);
+                VersionObjectFilters.install(repo, objectStore, projectId, maxTrackedFileSizeBytes);
+                try (Git command = new Git(repo)) {
+                    stageAll(command);
+                    var index = repo.lockDirCache();
+                    try {
+                        var editor = index.editor();
+                        for (var image : images.entrySet()) {
+                            var entry = index.getEntry(image.getKey());
+                            if (entry == null) continue; // Keep .gitignore and the existing excludes authoritative.
+                            requireRegularSnapshot(work.resolve(image.getKey()));
+                            if (entry.getFileMode() != org.eclipse.jgit.lib.FileMode.REGULAR_FILE
+                                    && entry.getFileMode() != org.eclipse.jgit.lib.FileMode.EXECUTABLE_FILE)
+                                throw new IOException("Core baseline target is not a regular indexed file");
+                            MessageDigest contentHash = MessageDigest.getInstance("SHA-256");
+                            ObjectId blob;
+                            requireRegularSnapshot(image.getValue());
+                            try (var input = new DigestInputStream(Files.newInputStream(image.getValue(), LinkOption.NOFOLLOW_LINKS), contentHash)) {
+                                blob = VersionObjectFilters.insertSnapshot(repo, image.getKey(), input);
+                            }
+                            if (!fingerprints.get(image.getKey()).sha256().equals(HexFormat.of().formatHex(contentHash.digest())))
+                                throw new IOException("Core baseline image changed while reading");
+                            editor.add(new org.eclipse.jgit.dircache.DirCacheEditor.PathEdit(image.getKey()) {
+                                @Override public void apply(org.eclipse.jgit.dircache.DirCacheEntry item) {
+                                    item.setObjectId(blob);
+                                    item.setLength(0); item.setLastModified(Instant.EPOCH);
+                                }
+                            });
+                        }
+                        if (!editor.commit()) throw new IOException("Core baseline index could not be published");
+                    } finally { index.unlock(); }
+                    head = command.commit().setMessage(com.checkba.service.LangText.of("初始版本", "Initial version")
+                                    + "\n\nX-AWD-Kind: session\n" + OBJECT_FORMAT_TRAILER)
+                            .setAuthor(authorName, authorEmail).setAllowEmpty(true).call().getName();
+                }
+            }
+            Files.delete(marker);
+            syncDirectory(git.getParent());
+            return head;
+        } catch (Exception error) {
+            throw new VersionException("初始化修改前版本失败: project=" + projectId, error);
+        }
+    }
+
+    private Repository coreBaselineRepository(long projectId) throws IOException {
+        return new VersionObjectRepository(new FileRepositoryBuilder()
+                .setGitDir(gitDir(projectId).toFile()).setWorkTree(workTree(projectId).toFile()).setup());
+    }
+
+    /** Read-only HEAD check for handoff; unlike open(), it does not add exclude rules to an unborn repo. */
+    String coreBaselineHead(long projectId) throws IOException {
+        requireNoSymlinks(gitDir(projectId));
+        if (!Files.exists(gitDir(projectId), LinkOption.NOFOLLOW_LINKS)) return null;
+        try (Repository repo = coreBaselineRepository(projectId); var walk = new RevWalk(repo)) {
+            ObjectId head = repo.resolve(Constants.HEAD);
+            return head == null ? null : walk.parseCommit(head).name();
+        }
+    }
+
+    private static void requireNoSymlinks(Path path) throws IOException {
+        if (path == null || !path.isAbsolute() || !path.equals(path.normalize())) throw new IOException("Invalid snapshot path");
+        for (Path current = path; current != null; current = current.getParent()) {
+            if (Files.isSymbolicLink(current)) throw new IOException("Symbolic snapshot path is not supported");
+        }
+    }
+
+    private static void requireRegularSnapshot(Path path) throws IOException {
+        requireNoSymlinks(path);
+        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Snapshot file is unavailable");
+    }
+
+    private static void syncDirectory(Path path) throws IOException {
+        try (var channel = FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) { channel.force(true); }
     }
 
     private static final String KIND_TRAILER = "X-AWD-Kind: ";

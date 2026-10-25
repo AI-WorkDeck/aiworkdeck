@@ -53,7 +53,11 @@ function installBackendRequestGate(session, { getState }) {
     if (!matchers) { callback({ cancel: false }); return }
     if (invalid(state, launch)) { callback({ cancel: true }); return }
     const method = details.method.toUpperCase()
-    if (method === 'OPTIONS' || ((method === 'GET' || method === 'HEAD') &&
+    const content = launch.coreContentProtocol === 1 &&
+      (/^\/api\/local-core\/projects\/[1-9][0-9]*\/files\/[1-9][0-9]*\/content$/.test(url.pathname)
+        ? ['GET', 'HEAD', 'PUT'].includes(method)
+        : ['GET', 'DELETE'].includes(method) && /^\/api\/local-core\/projects\/[1-9][0-9]*\/files\/[1-9][0-9]*\/content\/receipts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(url.pathname))
+    if (content || method === 'OPTIONS' || ((method === 'GET' || method === 'HEAD') &&
         matchers.some(pattern => pattern.test(url.pathname)))) {
       callback({ cancel: false }); return
     }
