@@ -55,10 +55,24 @@ async function probeBackend(port, timeoutMs = 1500) {
     build: String(response?.body?.build || '') }
 }
 
-async function probeBackendHealth(port, timeoutMs = 5000, expectedBuild = '') {
+async function probeBackendHealth(port, timeoutMs = 5000, expectedBuild = '', legacyHealth) {
   const response = await requestBackendJson(port, '/api/desktop/health', timeoutMs)
+  if (response?.status === 404 && legacyHealth) return legacyHealth()
   return !!(response?.status === 200 && response.body?.status === 'UP' &&
     (!expectedBuild || response.body.build === expectedBuild))
+}
+
+async function probeBackendStartupHealth(port, timeoutMs = 5000, expectedBuild = '', legacyHealth, onCoreReadPaths) {
+  const response = await requestBackendJson(port, '/api/desktop/startup-health', timeoutMs)
+  // Only an explicitly absent route identifies a legacy backend. DOWN/hangs never downgrade.
+  if (response?.status === 404) return legacyHealth ? legacyHealth() : probeBackendHealth(port, timeoutMs, expectedBuild)
+  const healthy = !!(response?.status === 200 && response.body?.status === 'UP' &&
+    ['core', 'full'].includes(response.body.phase) && (!expectedBuild || response.body.build === expectedBuild))
+  if (healthy && expectedBuild && response.body.phase === 'core' &&
+      require('./backend-request-gate').coreReadMatchers(response.body.coreReadPaths)) {
+    onCoreReadPaths?.([...response.body.coreReadPaths])
+  }
+  return healthy
 }
 
 // 复用服务也检查真实健康；只有明确 404 才识别旧版，503/超时绝不降级。
@@ -271,7 +285,9 @@ function spec(ctx, javaCmd) {
   // 打包模式：工作目录必须可写（resources 目录只读）
   const cwd = ctx.packaged ? ctx.dataDir : path.join(ctx.projectRoot, 'backend')
   if (ctx.packaged) fs.mkdirSync(cwd, { recursive: true })
-  return { cmd: javaCmd, args: javaLaunchArgs(ctx), env: spawnEnv(ctx), cwd }
+  const bootOverlay = { context: { packaged: ctx.packaged, dataDir: ctx.dataDir, appVersion: ctx.appVersion },
+    current: require('./overlay').readCurrent(ctx) }
+  return { cmd: javaCmd, args: javaLaunchArgs(ctx), env: spawnEnv(ctx), cwd, bootOverlay }
 }
 
 // 系统 JDK 回退候选（仅打包态、仅当捆绑 JRE 启动失败时才会被用到）
@@ -305,9 +321,12 @@ function createBackendDescriptor() {
     port: (ctx) => allocateBackendPort(ctx),
     fixedPort: true, // 注入给渲染层后不得漂移
     verifyReuse: async (_ctx, port) => (await probeBackend(port)).ours,
-    health: (ctx, port, build) => ctx.packaged
-      ? probeBackendHealth(port, 5000, build)
-      : probeBackend(port).then((result) => result.ours),
+    health: (ctx, port, build) => probeBackendHealth(port, 5000, build,
+      ctx.packaged ? undefined : () => probeBackend(port).then((result) => result.ours)),
+    startupHealth: (ctx, port, build, launch) => probeBackendStartupHealth(port, 5000, build,
+      () => probeBackendHealth(port, 5000, build,
+        ctx.packaged ? undefined : () => probeBackend(port).then((result) => result.ours)),
+      paths => { if (launch) launch.coreReadPaths = paths }),
     requestStop: async (_ctx, port, token) => {
       if (!token) return false
       const response = await requestBackendJson(port, '/api/desktop/shutdown', 5000, {
@@ -330,7 +349,7 @@ function createBackendDescriptor() {
 module.exports = {
   createBackendDescriptor, backendLayout, javaLaunchArgs,
   // 复用版本闸的可测面（backend-reuse-gate.test.js）
-  decideReuse, probeBackend, probeBackendHealth, probeExternalBackendHealth, backendBuildId,
+  decideReuse, probeBackend, probeBackendHealth, probeBackendStartupHealth, probeExternalBackendHealth, backendBuildId,
   // 端口链契约的可测面（port-chain-contract.test.js）
   DESKTOP_PORT_CHAIN, allocateBackendPort,
 }

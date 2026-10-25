@@ -245,6 +245,9 @@ jobs:
       - name: "Captcha embed + unlock site language (dev-board#863 #864)"
         working-directory: frontend
         run: npm run test:captcha && npm run test:unlock
+      - name: Test browser-safe build chunks
+        working-directory: frontend
+        run: node --test tests/build/*.test.mjs
       - name: Build H5
         working-directory: frontend
         run: npm run build:h5

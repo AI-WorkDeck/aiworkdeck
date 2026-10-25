@@ -595,6 +595,18 @@ Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Ac
 
 ## 本地后端运行期自检（dev-board#1216）
 
+### 本地轻量启动候选（dev-board#1472/#1474，默认未启用）
+
+`desktop.local-core.enabled=true` 仅用于 desktop/local-mode/loopback 的隔离候选。`LocalCoreBootstrap` 在 Spring 建容器前核验现有 H2 的同构建 schema proof；未知构建或不支持的 schema 走原初始化，完成所有同步 Ready 回调后才记 proof。使用原数据库、原 ID/UID、原文件路径，不能再旁建可写 SQLite 权威。早期池禁用 AUTO_SERVER 并要求 IFEXISTS，阻止另一个旧 JVM 同时连接；Hikari 实例交给 JPA 共用，Hibernate/schema SQL 初始化在已验证路径禁用。真正 native EMF 未完成时仍保留 CORE 读取；`StartupDataInitializer` 的首个动作排空 CORE leases，再交权给业务初始化。失败不得自动回 CORE 形成双写。
+
+独立 `LocalCoreGateway` 保持公开端口，Spring 私有 connector 使用随机端口，配置中的 server.port 和回调 URL 仍用公开端口。复用本机准入、CORS、源代码声明过滤器；文件通过现有 ResourceHttpRequestHandler 支持 HEAD/Range/416。关闭独立 Tomcat 必须 stop 后 destroy，否则容器 await 线程会使 JVM 退出不完。未知路由转交完整后端前先释放 CORE lease，不能持 lease 等待交权。
+
+`/api/desktop/startup-health` 的 UP/phase=core 只表示早期业务读取可用，原 `/api/desktop/health` 此时仍是503。phase=full 与完整健康必须等 ACCEPTING_TRAFFIC，不能只看 ApplicationReadyEvent 或 FactoryBean 代理。桌面首屏只等 startup-health；完整后端在原启动 deadline 内以最多500ms周期检测，确认完整健康后恢复10s。新路由只有明确404才兼容旧健康链，dev 的 wizard 同样不能覆盖已存在的503。健康结果、overlay 成功/失败均绑定实际 launch/process，迟到旧结果不能给新启动记成功；内部 launch 含 child，不得放入 renderer IPC。
+
+完整 UI 曾暴露 HTTP/1.1 六连接饥饿：六个非早期接口在网关等完整后端，使文件树在浏览器排队约4秒，真正读取仅约13ms。`backend-request-gate.js` 在主窗 session 的 onBeforeRequest 中排队这些请求，保留早期 GET/HEAD 与 OPTIONS 通道；能力清单只来自 build 校验成功的 core 健康响应。未知旧后端保持原传输；换 launch、端口、退出或到截止时取消待发请求，不重放到新进程。不要同时给同一 session 安装第二个 onBeforeRequest listener。实际隔离 UI 文件树4019→150ms只属诊断，不替代正常负载正式对照。
+
+当前候选接通项目/身份/文件读取，保存和版本/AI 写入的完整交接尚未完成；轻量保存 journal 的单元和骤停测试不能替代 HTTP、Git 与旧项目迁移验收。正式默认引擎仍为 LOWA，原生样板的性能不能视为全产品性能。
+
 `desktop/main/services/backend-supervisor.js` 在服务启动完成后每 10s 检查后端，连续三次失败后按 5/15/45s 退避尝试恢复，最多三次；连续健康 5min 才重置预算。只恢复 `ServiceManager` 创建的 child，复用外部后端同样检查 `/api/desktop/health`，503/超时不能退回 wizard 假报健康；仅明确404且wizard识别成功时标记 `degraded/external-health-unverified`（旧版健康未知），不接管。原来按端口杀陈旧后端的路径已移除。后端初启 HTTP 就绪宽限 120s（Windows ARM 转译延长），运行期使用 `/api/desktop/health`（DB 检查+本次 child 的 build），不以 TCP 通等价健康。dev prod profile 兼容 `/api/admin/wizard`。健康检查固定本次 spawn 指纹，后台下载激活 overlay 不会触发运行中的旧版本被误判并自动换件。
 
 start/stop/restart 共用按服务串行队列。后端端口分配后固定，恢复不能改渲染层已注入的地址。本次 spawn 随机注入 `AWD_BACKEND_CONTROL_TOKEN`，优雅停止请求为 loopback POST `/api/desktop/shutdown` + `X-AWD-Backend-Control-Token`；令牌只在进程内存/env，不写日志。停止先等待 Spring graceful 关闭，45s 后才强杀，且确认 child exit 后才能起新 JVM；尤其 Windows 不能直接把 Node `SIGTERM` 当优雅退出。应用退出总等待55s；睡眠暂停检测，唤醒30s宽限，退出移除监测。恢复不刷新窗口，保留编辑器内未保存内容。
