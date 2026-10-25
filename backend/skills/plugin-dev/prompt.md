@@ -103,10 +103,16 @@ manifest 建议：用到 v2.7 能力（doc.*/events/ai.request）时声明 `"min
 </script>
 ```
 
-## 工作区布局与验收
+## 工作区布局与 AWD Plugin UI v3.0 视觉规范
 
+- **AWD Plugin UI v3.0 自动注入**：引入 `<script src="./awd-plugin-sdk.js"></script>` 后，SDK 不仅自动把宿主的 `--awd-*` 令牌写成本页 CSS 变量并挂 `data-theme="light|dark"`，还会在 `<head>` 自动注入 `<style id="awd-plugin-ui-v3">`。插件无需手写基础样式即可直接使用以下标准组件类：
+  - **外层舞台与刊头**：`<main class="awd-plugin-stage">`（内建 `container-type: inline-size` 与最大宽 `1120px`）+ `<header class="awd-plugin-header">`（内含 `.awd-eyebrow` 大写微章、`.awd-title` 宋韵衬线标题、`.awd-subtitle` 副标题与 `.awd-header-actions` 右侧动作区）。
+  - **容器查询自适应网格**：`.awd-plugin-grid` 在侧边栏/窄分屏（`< 640px`）自动单列堆叠，在工作区宽标签页（`>= 640px`）自动切换为左 `260-320px` 筛选导航 + 右主内容区的双栏布局。
+  - **分段导航与 KPI 指标条**：二级视图切换一律用 `.awd-subnav` + `.awd-subnav-item.is-active`（`24px` 胶囊内嵌于 `32px` 槽，禁止自绘与宿主 `.tabs-bar` 撞车的伪顶栏）；顶部统计用 `.awd-kpi-grid` + `.awd-kpi-card`（`.awd-kpi-label` + `.awd-kpi-value` 等宽衬线数字）。
+  - **纸张卡片与统一控件**：内容区块装入 `.awd-card`（含 `.awd-card-header` + `.awd-card-title`）；按钮使用 `.awd-btn` / `.awd-btn-primary` / `.awd-btn-sm` / `.awd-btn-xs` / `.awd-btn-danger`；表单使用 `.awd-input` / `.awd-select` / `.awd-textarea`；状态标签使用 `.awd-badge`（`.awd-badge-accent` / `.awd-badge-gold` / `.awd-badge-info` / `.awd-badge-warning` / `.awd-badge-danger`）。
+  - **长耗时任务安全进度卡片**：超过 2 秒的 AI 推理、批量抽取或外部调用，调用 `var prog = awd.ui.progress('#progress', { title: '正在核查第 3/12 份底稿…', percent: 25, safetyNote: '本地底稿与已保存进度不受影响，可随时安全中止', onCancel: function () { ... } })` 展示阶段、百分比与安全兜底说明，完成后 `prog.clear()`。
+- **严禁独立造色**：背景、文字、边框、阴影一律消费 `var(--awd-*)` 令牌（如 `var(--awd-bg)`、`var(--awd-surface)`、`var(--awd-text)`、`var(--awd-border)`、`var(--awd-accent)`），确保浅色「宣纸墨竹」与深色「徽墨夜览」双模无缝切换。
 - 仅用 `frontendEntry` 的兼容路径会在工作区标签页打开，左栏显示基本信息和「打开工作区」入口。新宿主可通过 `contributes.views` 明确选择 sidebar 或 workspace；清单助手示例使用 sidebar。不要调用不存在的 `awd.ui.openTab()`。
-- 按工作区宽度设计表单、列表和结果；同时适配窄分屏，不要把整个主界面固定为侧栏宽度。需要和文档配合时允许用户将标签移到另一窗格。
 - 同一插件在两个窗格间共用一个标签。普通标签切换保留页面实例；关闭、禁用、卸载会结束实例，跨窗格移动也可能重建。重要业务进度需自行持久化，不能依赖 iframe 永不销毁。
 - 交付前实际走通「安装 → 启用 → 左侧入口出现 → 点击打开工作区 → 完成一个主要操作」，再检查标签切换、窄分屏、关闭重开及禁用清理。只验证安装接口成功不算交付；无法实测的部分明确说明。
 - 这是宿主工作区能力；旧客户端仍可能使用侧栏，未发版的宿主改动不能说成用户已获得。

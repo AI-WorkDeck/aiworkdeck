@@ -17,19 +17,19 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .page-project-overview {
-  --awd-workbench-header-height: 37px;
+  --awd-workbench-header-height: 36px;
   --awd-workbench-divider: var(--awd-border-subtle);
   display: flex;
   flex-direction: column;
   height: 100vh;
   background-color: var(--awd-bg);
   color: var(--awd-text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--awd-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
   overflow: hidden;
 
   &.compact-mode {
     .project-header {
-      height: 48px;
+      height: 44px;
       padding: 0 16px;
       /* 这两行必须跟着 padding 简写走。少了它们，窗口窄于 1360px（compact 的阈值）
          时简写就把顶栏让位整条吃掉，交通灯直接压在项目名上。 */
@@ -43,8 +43,8 @@ $color-accent: var(--awd-mint); // Mint Green
 
 /* ================= Header ================= */
 .project-header {
-  height: 42px;
-  background-color: var(--awd-surface);
+  height: 40px;
+  background-color: var(--awd-bg);
   border-bottom: 1px solid var(--awd-workbench-divider);
   display: flex;
   align-items: center;
@@ -138,10 +138,11 @@ $color-accent: var(--awd-mint); // Mint Green
   flex: 0 1 auto;
   min-width: 0;
   @include text-ellipsis;
+  font-family: var(--awd-font-serif);
   font-size: var(--awd-font-size-title);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--awd-accent-text); // Forest Green for title
-  letter-spacing: -0.2px;
+  letter-spacing: -0.01em;
   cursor: pointer;
 
   &:hover {
@@ -163,22 +164,22 @@ $color-accent: var(--awd-mint); // Mint Green
   border: 1px solid transparent;
 
   &.collab-chip-green {
-    background: rgba(76, 154, 106, 0.10);
-    border-color: rgba(76, 154, 106, 0.28);
+    background: var(--awd-accent-soft);
+    border-color: var(--awd-border);
     .collab-chip-dot { background: var(--awd-accent); }
     .collab-chip-text { color: var(--awd-accent-text); }
   }
 
   &.collab-chip-blue {
-    background: rgba(62, 124, 177, 0.10);
-    border-color: rgba(62, 124, 177, 0.28);
+    background: var(--awd-info-soft);
+    border-color: var(--awd-border);
     .collab-chip-dot { background: var(--awd-info); }
     .collab-chip-text { color: var(--awd-info-text); }
   }
 
   &.collab-chip-amber {
-    background: rgba(200, 164, 93, 0.12);
-    border-color: rgba(200, 164, 93, 0.3);
+    background: var(--awd-warning-soft);
+    border-color: var(--awd-border);
     .collab-chip-dot { background: var(--awd-warning); }
     .collab-chip-text { color: var(--awd-warning-text); }
   }
@@ -922,16 +923,19 @@ $color-accent: var(--awd-mint); // Mint Green
     }
   }
 }
-/* IDE 工作台（中/右 + 底部面板） */
+/* IDE 工作台（中/右 + 底部面板）——宋韵精工（Neo-Oriental Editorial）内嵌纸张工作岛形制 */
 .workbench {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: var(--awd-surface);
+  background: var(--awd-bg);
   border: none;
   border-radius: 0;
   box-shadow: none;
+  padding: 4px 6px 6px 0;
+  gap: var(--awd-island-gap, 6px);
+  box-sizing: border-box;
   overflow: hidden;
 }
 
@@ -941,14 +945,19 @@ $color-accent: var(--awd-mint); // Mint Green
   min-height: 0;
   display: flex;
   flex-direction: row;
-  gap: 0;
+  gap: var(--awd-island-gap, 6px);
   padding: 0;
   box-sizing: border-box;
 }
 
+.page-project-overview.compact-mode .workbench {
+  padding: 2px 4px 4px 0;
+  gap: 4px;
+}
+
 .page-project-overview.compact-mode .workbench-main {
   padding: 0;
-  gap: 0;
+  gap: 4px;
 }
 
 .side-panel {
@@ -957,14 +966,12 @@ $color-accent: var(--awd-mint); // Mint Green
   min-height: 0;
   min-width: 0; /* Allow flex shrinking */
   background: var(--awd-surface);
-  border: none;
-  border-left: 1px solid var(--awd-workbench-divider);
-  border-radius: 0;
-  box-shadow: none;
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-island-radius, 10px);
+  box-shadow: var(--awd-shadow-island);
   display: flex;
   flex-direction: column;
-  overflow-x: hidden; /* Prevent horizontal overflow */
-  overflow-y: visible; /* Allow vertical overflow for dropdowns */
+  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -1387,7 +1394,7 @@ $color-accent: var(--awd-mint); // Mint Green
   width: 260px;
   background: var(--awd-bg);
   border: none;
-  border-right: 1px solid var(--awd-workbench-divider);
+  border-right: none;
   border-radius: 0;
   box-shadow: none;
   display: flex;
@@ -1408,7 +1415,7 @@ $color-accent: var(--awd-mint); // Mint Green
   position: relative;
   flex: 0 0 14px;
   width: 14px;
-  background: var(--awd-surface);
+  background: var(--awd-bg);
   z-index: 12;
 
   &::before {
@@ -1794,16 +1801,16 @@ $color-accent: var(--awd-mint); // Mint Green
   background-color: var(--awd-surface-2);
 }
 
-/* 中间内容区 */
+/* 中间内容区（宋韵精工内嵌纸张工作岛） */
 .content-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   background: var(--awd-surface);
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-island-radius, 10px);
+  box-shadow: var(--awd-shadow-island);
   overflow: hidden;
 }
 
@@ -1812,7 +1819,7 @@ $color-accent: var(--awd-mint); // Mint Green
   height: var(--awd-workbench-header-height);
   box-sizing: border-box;
   flex-shrink: 0;
-  background: var(--awd-bg);
+  background: var(--awd-surface-2);
   border-bottom: 1px solid var(--awd-workbench-divider);
   backdrop-filter: none;
   display: flex;
@@ -2000,6 +2007,7 @@ $color-accent: var(--awd-mint); // Mint Green
 
   &.active {
     background: var(--awd-surface);
+    box-shadow: var(--awd-specular);
 
     .tab-icon { opacity: 1; color: var(--awd-tab-kind, var(--awd-accent-text)); }
     .tab-plugin-avatar { opacity: 1; }
@@ -2058,29 +2066,29 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .icon-btn {
-  width: 28px;
-  height: 28px;
+  width: var(--awd-control-sm, 28px);
+  height: var(--awd-control-sm, 28px);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md, 6px);
+  border: 1px solid transparent;
   cursor: pointer;
   color: var(--awd-text-2);
-  background: var(--awd-surface);
-  transition: all 0.18s ease;
+  background: transparent;
+  transition: all var(--awd-motion-fast, 140ms) ease;
 
   &:hover {
-    background-color: var(--awd-surface);
-    border-color: rgba(200, 164, 93, 0.4);
+    background-color: var(--awd-surface-2);
+    border-color: var(--awd-border);
     color: var(--awd-accent-text);
   }
 
   &.active {
-    background: linear-gradient(120deg, var(--awd-surface), var(--awd-warning-soft));
+    background: var(--awd-accent-soft);
     color: var(--awd-accent-text);
-    border-color: var(--awd-warning);
-    box-shadow: 0 4px 10px rgba(200, 164, 93, 0.16);
+    border-color: var(--awd-border);
+    box-shadow: var(--awd-shadow-btn);
   }
 
   .tool-icon {
@@ -3978,8 +3986,9 @@ $color-accent: var(--awd-mint); // Mint Green
 .awd-dialog {
   width: 618px; /* Golden Ratio approx */
   background: var(--awd-surface);
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-lg, 10px);
+  box-shadow: var(--awd-shadow-lg), var(--awd-specular);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -4000,6 +4009,7 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .awd-dialog-title {
+  font-family: var(--awd-font-serif);
   font-size: 20px;
   font-weight: 600;
   color: var(--awd-text);
@@ -4457,7 +4467,8 @@ $color-accent: var(--awd-mint); // Mint Green
   padding: 0 10px;
   gap: 2px;
   color: var(--awd-text-2);
-  font-family: 'JetBrains Mono', 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--awd-font-mono, 'JetBrains Mono', 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   z-index: 150;
 }
