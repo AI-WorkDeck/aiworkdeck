@@ -58,6 +58,13 @@ class FileControllerMovedFileGuardTest {
     @InjectMocks
     private FileController controller;
 
+    @org.junit.jupiter.api.BeforeEach
+    void wireContentService() {
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "contentService",
+                com.checkba.service.ContentServiceTestSupport.create(projectFileRepository, storageServiceFactory,
+                        projectMemberService, fileAccess, storageResolver, workSessionService));
+    }
+
     private static final String FILE_PATH = "projects/245/C4-tmp/C4-long80.docx";
 
     private ProjectFile row(boolean deleted) {

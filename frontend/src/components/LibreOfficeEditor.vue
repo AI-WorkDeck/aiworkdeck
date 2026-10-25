@@ -316,6 +316,7 @@ export default {
       backendHealthState: null,
       backendHealthRecoverySeq: 0,
       backendFailedUpload: null,
+      versionSaveBusy: false,
       // Autosave: set by the worker's modify signal, cleared when a save starts;
       // read by the host (closeFile / evict) to know if a flush is needed.
       dirty: false,
@@ -369,6 +370,7 @@ export default {
     // 状态串（就绪/加载文档中/失败）判定——statusKey 化后保留这个只读
     // 别名，zh 语言下取值与迁移前逐字节一致。改名/删除前先改该套件。
     statusText() {
+      if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       return this.$t('editor.status.' + this.statusKey)
     },
     // Calc/Impress 都没有修订（redline）机制——审阅面板对它们没有数据可展示。
@@ -391,6 +393,7 @@ export default {
     saveStateText() {
       if (!this.ready || !this.file || this.loadingOverlayVisible || this.docLoadFailed) return ''
       if (this.saving) return this.$t('editor.status.saving')
+      if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       if (this.statusKey === 'saveFailed' && this.backendSaveRetryReady()) return this.$t('workbench.backendHealth.saveRetryReady')
       if (this.statusKey === 'saveFailed' || this.statusKey === 'movedSaveFailed') return this.$t('editor.status.' + this.statusKey)
       if (this.statusKey !== 'ready') return ''
@@ -399,6 +402,7 @@ export default {
     },
     displayStatus() {
       if (this.saveStateText) return ''
+      if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       return this.statusKey === 'ready' ? '' : this.$t('editor.status.' + this.statusKey)
     },
     bootStageText() {
@@ -618,6 +622,7 @@ export default {
     },
     invalidateBackendSaveHint() {
       this.backendFailedUpload = null
+      this.versionSaveBusy = false
       this._backendSaveContext = (this._backendSaveContext || 0) + 1
     },
     backendSaveRetryReady() {
@@ -2349,6 +2354,7 @@ export default {
       const saveProjectId = this.projectId
       let uploadRecoverySeq = null
       this.backendFailedUpload = null
+      this.versionSaveBusy = false
       this.saving = true
       // 固定细栏通过 saving/dirty 显示保存状态；statusKey 保留慢保存的兼容状态。
       // 上一次的「保存失败」不能当成要恢复的状态，这次成功了就该回到就绪。
@@ -2400,6 +2406,12 @@ export default {
         this.scheduleProvenanceReload()
         return true
       } catch (e) {
+        // Only the server's explicit pre-publication busy response proves this upload
+        // cannot arrive later. Network failures and other statuses retain the write guard.
+        const notPublished = uploadRecoverySeq !== null && e?.saveNotPublished === true
+        if (notPublished) safeToOverwrite = true
+        this.versionSaveBusy = notPublished && saveContext === (this._backendSaveContext || 0) &&
+          this.projectId === saveProjectId && this.file?.id === fileId
         if (uploadRecoverySeq !== null && e?.backendUnavailable && !this._backendHealthDisposed && !this._saveDiscarded && !this._reloading &&
             saveContext === (this._backendSaveContext || 0) && this.projectId === saveProjectId && this.file?.id === fileId) {
           this.backendFailedUpload = { fileId, projectId: saveProjectId, recoverySeq: uploadRecoverySeq }
@@ -2485,7 +2497,16 @@ export default {
         xhr.open('POST', url, true)
         xhr.timeout = 60000
         Object.keys(headers).forEach((k) => { if (k.toLowerCase() !== 'content-type') xhr.setRequestHeader(k, headers[k]) })
-        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.response) : reject(Object.assign(new Error('HTTP ' + xhr.status), { status: xhr.status, backendUnavailable: xhr.status >= 500 })))
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) return resolve(xhr.response)
+          let response
+          try { response = JSON.parse(xhr.response) } catch { /* An unreadable error cannot prove no write occurred. */ }
+          const saveNotPublished = xhr.status === 423 && response?.code === -1 &&
+            response.reason === 'VERSION_BUSY' && response.writeState === 'not_started'
+          reject(Object.assign(new Error('HTTP ' + xhr.status), {
+            status: xhr.status, backendUnavailable: xhr.status >= 500, saveNotPublished,
+          }))
+        }
         xhr.onerror = () => reject(Object.assign(new Error('网络错误 / network error'), { backendUnavailable: true }))
         xhr.ontimeout = () => reject(Object.assign(new Error(this.$t('editor.saveTimeout')), { backendUnavailable: true }))
         xhr.onabort = () => reject(new Error(this.$t('editor.saveCancelled')))

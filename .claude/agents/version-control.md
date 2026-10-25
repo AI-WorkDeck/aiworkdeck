@@ -11,6 +11,16 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 
 工作台文件树以 `v-show` 保留挂载，切栏不再触发重新读清单。`onVersionReloadFiles` 必须主动调用 `fileTree.loadFiles()`，包括受影响编辑器 ID 为空的切稿/采纳/团队取回；不能等待文件树请求再重载打开中的文档，以免旧内容被自动保存回磁盘。相关可执行回归见 `frontend/tests/project-home/version-reload-files.test.mjs`；全应用 J10/J11 验证切稿隔离与两份都留后的清单。
 
+## 上传与 text_* 的内容发布协调（2026-10-25）
+
+`ProjectFileContentService` 只收拢 `FileController.uploadFile` 和 `TextFileEditTools`，继续以 JPA 为权威。云配额启用时先拒绝长度未知的请求，不读取正文或创建暂存文件；其余上传先接收完整的本次 HTTP 请求到临时文件，再经 `WorkSessionService.withFileContentWriteLock` 复用现有 `repoLock`；AI 查找替换的读、转换、写在同一把锁内。localRoot 仍共用稳定锁，不能另造 per-file 锁。等待最多 2 秒，删除后的项目拒绝发布。锁前拒绝已有事务，锁内开启自己的短事务，云配额顺序为 repo→事务→owner 行锁→发布/严格配额元数据；禁止在已有 owner 锁内反向等 repo。
+
+事务起点清理 OSIV 预检缓存后重新查询文件、项目负责人、成员角色和账户客户角色。云配额等待结束后再清理重查；负责人或配额所检查的路径/大小随后变化则拒绝本次发布，不能把旧额度结果用于新目标。可选修改时间/大小用限定 UPDATE，只改这两列且要求 id/projectId/path/未删除仍吻合；0 行或失败只记录，不把已写字节误报为回滚。云配额严格记账失败仍沿用失败响应。存储层普通覆盖本身不是跨文件系统/数据库原子事务，磁盘中途失败仍可能产生未知结果。RAG（含 CallerRunsPolicy）、版本信号和编辑器通知在锁外。索引/标签任务提交被拒绝也只记录，不把已保存字节报成失败，完成上传仍发一次版本信号。
+
+只有尚未进入发布体的锁忙碌返回 HTTP 423、`code:-1`、`reason:VERSION_BUSY`、`writeState:not_started`。409 继续专属移动/删除保护；不能把下游失败或网络结果未知标成未写。前端保持脏状态，允许手动重试。本片分片逐块仍使用 save/append 和原完成判定，**不保证整个多请求分片过程原子**；中间块不发版本变更信号。
+
+未接入此入口的 `ProjectFileService.overwriteTextContent`、rename/move/delete/permDelete、目录对账和其他内部写路仍有自己的原契约；不能据本片宣称全正文写入闭环、结构竞争已解决或数据库已移出启动。回归：`FileContentCoordinationTest`、`FileContentLockTest`、`ProjectFileContentJpaTest` 加既有上传/文本/嵌套项目版本测试。
+
 ## 嵌套本地文件夹项目
 
 确认后允许同账号父子文件夹各自作为项目；两项目中的普通文件是同一批磁盘文件，编辑、删除和版本退回相互可见。Git 仓库与数据库文件树仍按 projectId 分开，`WorkSessionService.repoLock` 对全部 localRoot 项目使用同一把稳定可重入锁，避免父项目切稿和子项目存档并发写读同一目录；托管项目仍各自加锁。本机不重叠目录的版本操作也会串行，这是避免动态父子分组时更换锁身份的最小实现。首次分类走 `hasLocalRootForVersionLock` 严格查询，查库失败或项目行尚不存在时不缓存为托管锁；保存变更保留最新作者入队重试，后台失败也释放调度标记，不丢失后续存档。普通文件解析的容错不变。

@@ -13,6 +13,8 @@ The adapter's `snapshot`, `readFile`, `saveFile`, `history`, `createVersion` and
 
 The visible prototype supplies one-document callbacks. It does not establish cross-window, AI, watcher or cloud-write parity. Unknown uploads/reverts persist a guard, block automatic retry and prevent reopening stale bytes. Cache failure must never be interpreted as confirmed authority.
 
+An upload rejected with HTTP 423 and the exact `code:-1`, `reason:VERSION_BUSY`, `writeState:not_started` contract clears only that attempted upload's guard and reports a retryable busy result. Missing fields, other statuses and errors after an accepted upload remain unknown. A pre-existing uncertain guard still prevents a new request; a later busy reply cannot clear it. The mock HTTP/real SQLite suite verifies rejection, manual retry, incomplete responses and the prior-uncertainty case.
+
 ## Tests
 
 ```sh

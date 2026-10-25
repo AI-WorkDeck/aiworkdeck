@@ -60,6 +60,7 @@ export default {
     noPendingChanges: 'No pending changes',
     saveFailed: 'Failed to save',
     movedSaveFailed: 'File was moved or renamed; changes not saved yet',
+    versionSaveBusy: 'Version history is busy; changes are not saved yet. Please retry shortly.',
     desktopOnly: 'Desktop app only',
   },
   boot: {

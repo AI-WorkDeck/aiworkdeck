@@ -242,11 +242,12 @@ Impress **没有 redline**：`slide_write_notes`/`slide_set_shape_text`/`slide_r
 txt/md/markdown 自 dev-board#37 起不进 LOWA（前端走 PlainTextEditor.vue，见 doc-editor.md「纯文本分流」），doc_* 桥对它们不适用。AI 改这类文件走 `backend/.../tools/TextFileEditTools.java`：
 
 - `text_write_file`（整篇覆盖）、`text_find_replace`（字面量替换，replaceAll 可选，返回命中数）；读取复用 `extract_file_text`。均按扩展名校验（`PLAIN_TEXT_TYPES`，与前端 fileOpenTabs.js 的同名表对齐），docx 等一律拒绝并指回 doc_*。
-- 实现：StorageService 读写（存储键 filePath 优先、回退 wpsFileId，与 DocumentTextService 同口径；UTF-8 直读直写，**不走 Tika**）+ 回写 fileSize/updatedAt + `WorkSessionService.onChangeSignal`（与 FileController.uploadFile 同款版本信号）+ SSE 单向 `client_action {action:'text_reload_file', fileId}`（EditorBridgeService.sendTextReloadFileAction）。
+- 实现：StorageService 读写（存储键只认 filePath，缺失即拒绝，不以 wpsFileId 回退；UTF-8 直读直写，**不走 Tika**）+ 回写 fileSize/updatedAt + `WorkSessionService.onChangeSignal`（与 FileController.uploadFile 同款版本信号）+ SSE 单向 `client_action {action:'text_reload_file', fileId}`（EditorBridgeService.sendTextReloadFileAction）。
 - 前端消费：agentClientActions.js `handleTextReloadFile` → `reloadPlainTextInstances(fileId)` 就地重载打开中的文本标签（丢本地未保存态）；未打开不硬拉。
 - **能力过滤刻意不收 text_ 前缀**：这是纯后端执行工具（无客户端执行器依赖，SSE 刷新是 fire-and-forget），按 ClientCapabilityService 的既有语义对所有能力档位可见（与 extract_file_text 同口径）——不要把它加进 lowaOnly，那会让 office/none 会话白白失去纯文本编辑能力。
 - 上下文侧：ContextAssemblerService 的 `lowaDocKind` 新增 `"text"` 分支（txt/md/markdown），active-document 指引/末位提醒/readHint 三处（含英文版）都指向 extract_file_text + text_*，并禁止对其调 doc_*/sheet_*/slide_*；DocumentEditTools.doc_open_file 对纯文本返回指路错误。
 - 纯文本没有修订机制：安全网是版本记录（每次写入都发 onChangeSignal）。工具无 worker action、无 EDITOR_ACTIONS 白名单项——"四件套"清单对 text_* 只剩两件：@Tool + toolDisplayNames.js 中文名（ToolDisplayNameCoverageTest 钉着）。
+- 内容发布现经 `ProjectFileContentService`，沿用当前可信 ProjectContextHolder 的项目/用户并重新检查写权限，拒绝客户和只读角色；锁内再次验证文本格式。查找替换的读取与写入一并使用版本服务原有 repoLock，未命中不发布、不发信号；版本信号与 text_reload_file 均在解锁后。入口不能在已有数据库事务内调用；详见 version-control 的上传/text_* 协调节。此切片尚未收拢 FileReview/FileTools 的 overwriteTextContent 等旁路，不能声称所有 AI 写回已统一。
 - 单测：`TextFileEditToolsTest`（命中/未命中/非文本拒绝/信号触发/跨项目拒绝）。
 
 ## 第二条桥：office_* 工具桥（Word 插件，Phase C）

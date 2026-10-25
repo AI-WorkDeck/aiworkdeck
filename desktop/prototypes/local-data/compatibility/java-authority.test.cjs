@@ -32,6 +32,10 @@ async function fixture(t, name, editor = {}) {
       return res.end(state.bytes)
     }
     if (req.url === '/api/files/91/upload?mustExist=1') {
+      if (state.uploadError) {
+        res.statusCode = state.uploadError.status
+        return send(state.uploadError.body)
+      }
       state.bytes = bytes; state.uploads++
       if (state.drop) return req.socket.destroy()
       return send({ code: 0 })
@@ -96,6 +100,49 @@ test('byte read/save routes through Java mustExist and detects stale observed by
   state.bytes = Buffer.from('external')
   await assert.rejects(adapter.saveFile(11, 91, Buffer.from('stale')), { code: 'CONFLICT' })
   assert.equal(state.uploads, 1)
+})
+
+test('explicit unpublished busy upload keeps original bytes and permits a manual retry', async t => {
+  const { adapter, state } = await fixture(t, 'busy-unpublished')
+  await adapter.readFile(11, 91)
+  state.uploadError = { status: 423, body: { code: -1, reason: 'VERSION_BUSY', writeState: 'not_started' } }
+  await assert.rejects(adapter.saveFile(11, 91, Buffer.from('retry later')), { code: 'VERSION_BUSY' })
+  assert.equal(state.bytes.toString(), 'original')
+  assert.equal((await adapter.blockedOperations()).length, 0)
+  state.uploadError = null
+  await adapter.saveFile(11, 91, Buffer.from('manual retry'))
+  assert.equal(state.bytes.toString(), 'manual retry')
+  assert.equal(state.uploads, 1)
+})
+
+test('incomplete busy responses never claim that an upload was unpublished', async t => {
+  const cases = [
+    { status: 423, body: { code: -1, reason: 'VERSION_BUSY' } },
+    { status: 423, body: { code: -1, reason: 'OTHER', writeState: 'not_started' } },
+    { status: 423, body: { code: 0, reason: 'VERSION_BUSY', writeState: 'not_started' } },
+    { status: 500, body: { code: -1, reason: 'VERSION_BUSY', writeState: 'not_started' } },
+    { status: 423, body: 'not JSON metadata' },
+  ]
+  for (const [index, uploadError] of cases.entries()) {
+    const { adapter, state } = await fixture(t, `busy-unknown-${index}`)
+    await adapter.readFile(11, 91)
+    state.uploadError = uploadError
+    await assert.rejects(adapter.saveFile(11, 91, Buffer.from('unknown')), { code: 'OUTCOME_UNKNOWN' })
+    assert.equal((await adapter.blockedOperations()).length, 1)
+  }
+})
+
+test('a prior uncertain upload stays blocked even if the backend would now return unpublished busy', async t => {
+  const { adapter, state } = await fixture(t, 'busy-after-unknown')
+  await adapter.readFile(11, 91)
+  state.drop = true
+  await assert.rejects(adapter.saveFile(11, 91, Buffer.from('unknown')), { code: 'OUTCOME_UNKNOWN' })
+  const posts = state.posts.length
+  state.drop = false
+  state.uploadError = { status: 423, body: { code: -1, reason: 'VERSION_BUSY', writeState: 'not_started' } }
+  await assert.rejects(adapter.saveFile(11, 91, Buffer.from('do not retry')), { code: 'OUTCOME_UNKNOWN' })
+  assert.equal(state.posts.length, posts)
+  assert.equal((await adapter.blockedOperations()).length, 1)
 })
 
 test('createVersion flush can call saveFile without a recursive action deadlock', async t => {

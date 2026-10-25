@@ -64,6 +64,7 @@ export default {
     noPendingChanges: '无待保存更改',
     saveFailed: '保存失败',
     movedSaveFailed: '文件已被移动或改名，改动尚未保存',
+    versionSaveBusy: '正在整理版本，改动尚未保存，请稍后重试',
     desktopOnly: '仅桌面版可用',
   },
   boot: {

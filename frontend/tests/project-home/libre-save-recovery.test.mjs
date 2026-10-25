@@ -366,3 +366,59 @@ test('重载或身份换代后迟到的上传失败不能重新挂恢复提示�
   await engine.autoSave()
   assert.equal(engine.backendFailedUpload, null)
 })
+
+test('版本忙碌只信任明确的未开始写入回执，其他HTTP错误保持未知结果', async () => {
+  const confirmed = { code: -1, reason: 'VERSION_BUSY', writeState: 'not_started' }
+  for (const [status, response, expected] of [
+    [423, confirmed, true], [423, { code: -1, reason: 'VERSION_BUSY' }, false],
+    [423, { ...confirmed, code: 0 }, false], [423, { ...confirmed, reason: 'OTHER' }, false],
+    [500, confirmed, false], [404, confirmed, false], [423, 'invalid json', false],
+  ]) {
+    let xhr
+    class Xhr { constructor() { xhr = this } open() {} setRequestHeader() {} send() {} }
+    const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getAuthHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, () => ({}), Xhr)
+    const pending = opts.methods.uploadBytes.call({ $t: k => k }, '/upload/7', new Uint8Array([1]), 'a.docx')
+    xhr.status = status
+    xhr.response = typeof response === 'string' ? response : JSON.stringify(response)
+    xhr.onload()
+    await assert.rejects(pending, error => error.saveNotPublished === expected)
+  }
+})
+
+test('真实版本忙碌回执保留正文并可重试，不遗留阻断版本恢复的未知写入', async () => {
+  let xhr
+  class Xhr { constructor() { xhr = this } open() {} setRequestHeader() {} send() {} }
+  const opts = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getAuthHeaders', 'XMLHttpRequest', body)(...Object.values(barriers), null, null, null, () => ({}), Xhr)
+  const vm = makeVm({ projectId: 'known-version-busy' })
+  vm.uploadBytes = opts.methods.uploadBytes.bind(vm)
+  const pending = vm.autoSave()
+  await tick()
+  xhr.status = 423
+  xhr.response = JSON.stringify({ code: -1, reason: 'VERSION_BUSY', writeState: 'not_started' })
+  xhr.onload()
+  await pending
+  assert.equal(vm.dirty, true)
+  assert.equal(vm._savePaused, true)
+  assert.equal(vm.statusKey, 'saveFailed')
+  assert.equal(vm.versionSaveBusy, true)
+  assert.equal(opts.computed.saveStateText.call(vm), 'editor.status.versionSaveBusy')
+  const retry = vm.retrySave()
+  await tick()
+  xhr.status = 200; xhr.response = '{"code":0}'; xhr.onload()
+  assert.equal(await retry, true)
+  assert.equal(vm.dirty, false)
+  assert.equal(vm.versionSaveBusy, false)
+  const barrier = barriers.beginCheckpointSaveBarrier(vm.projectId, vm.file.id, 'after-busy-retry')
+  assert.equal(await barrier.drained, true, 'known unpublished saves must not leave an uncertain writer')
+  barriers.endCheckpointSaveBarrier(vm.projectId, vm.file.id, 'after-busy-retry')
+})
+
+test('版本忙碌的安全回执不能抹掉更早一次网络上传的未知结果', async () => {
+  const vm = makeVm({ projectId: 'prior-uncertain-before-busy', uploadBytes: async () => { throw new Error('offline') } })
+  await vm.autoSave()
+  vm.uploadBytes = async () => { throw Object.assign(new Error('HTTP 423'), { saveNotPublished: true }) }
+  assert.equal(await vm.retrySave(), false)
+  const barrier = barriers.beginCheckpointSaveBarrier(vm.projectId, vm.file.id, 'keep-uncertain')
+  assert.equal(await barrier.drained, false)
+  barriers.endCheckpointSaveBarrier(vm.projectId, vm.file.id, 'keep-uncertain')
+})
