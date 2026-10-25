@@ -49,7 +49,15 @@ class JavaAuthority {
       method, headers, redirect: 'error', signal: AbortSignal.timeout(timeoutMs),
       body: body === undefined ? undefined : Buffer.isBuffer(body) ? body : JSON.stringify(body)
     })
-    if (!response.ok) throw problem('HTTP_ERROR', `Backend returned HTTP ${response.status}`, { status: response.status })
+    if (!response.ok) {
+      if (response.status === 423) {
+        const failure = await response.json().catch(() => null)
+        if (failure?.code === -1 && failure.reason === 'VERSION_BUSY' && failure.writeState === 'not_started') {
+          throw problem('VERSION_BUSY', '正在整理版本，改动尚未保存，请稍后重试', { status: 423, saveNotPublished: true })
+        }
+      }
+      throw problem('HTTP_ERROR', `Backend returned HTTP ${response.status}`, { status: response.status })
+    }
     return binary ? Buffer.from(await response.arrayBuffer()) : unwrap(await response.json())
   }
   async ready({ timeoutMs = 15000 } = {}) {
@@ -188,7 +196,7 @@ class JavaAuthority {
       this.refreshLater()
       return { projectId, fileId, generation: newGeneration, bytes: stored.length }
     } catch (error) {
-      if (sent && !uploadAccepted && [403, 404, 409].includes(error.status)) await this.cache.clearGuard(projectId)
+      if (sent && !uploadAccepted && ([403, 404, 409].includes(error.status) || error.saveNotPublished === true)) await this.cache.clearGuard(projectId)
       else if (sent) throw problem('OUTCOME_UNKNOWN', 'Upload may have completed; project remains blocked', { cause: error, operationId })
       throw error
     } finally { this.saves.delete(projectId) }

@@ -173,6 +173,8 @@ Writer 的 `ShowTextBoundaries` 与格式标记联动：打开 ¶ 时会把文�
 
 ## 自动保存（LibreOfficeEditor.vue）
 
+**版本操作忙时的保存重试（dev-board#1472/#1474）**：上传仅在 HTTP 423 且响应同时为 `code:-1`、`reason:VERSION_BUSY`、`writeState:not_started` 时，视为本次正文尚未发布。保留 dirty、失败状态和手动「重试保存」入口，显示版本忙提示；只将本次保存 lease 结束为安全，不清除更早未知上传留下的检查点屏障。网络错误、5xx、其他 423 和进入发布后的异常仍属结果未知。提示按文件/项目/保存代次失效；不得据此自动重载或恢复快照。回归在 `libre-save-recovery.test.mjs`。
+
 触发链：worker modified → 节流 → onDocModified 置 dirty → scheduleAutoSave（延迟 max(200, min(2500, 15000-脏龄))）→ autoSave：**命令在飞（_cmdBusy>0）或距上次命令<1.5s 且脏龄<60s 时让路 2s 重试**（防 export 冻结 Qt 事件循环，PR#182）→ saveDocument → export_document → 整文件 multipart POST /api/files/{id}/upload。失败保持 dirty 并暂停自动保存，使用既有「重试保存」入口恢复；不能再定时堆积引擎导出。flushSave 在 tab 关闭（~:5051）与 LRU 淘汰前 await。
 
 **本地服务恢复与保存（dev-board#1219）**：底栏 `BackendHealthStatus.vue` 消费 `host.backend.getHealth/onHealthChanged` 的真实快照；无API的旧壳不显示，failed且owned才允许通过既有restart手动恢复。非本壳的 `external-backend` 指引检查启动服务的应用；`startup-failed` 指引重开应用；只有健康端点明确404且wizard能识别旧服务时才用 `external-health-unverified`（degraded），提示旧版服务无法检查健康，不能显示正常或接管重启。订阅先于初始读取，事件到达后迟到的getHealth不能倒退状态，组件销毁即退订。服务健康不等于文稿已保存，恢复提示明确要求重试未保存文稿，绝不自动重载页面/编辑器。LOWA仅对 `uploadBytes` 的网络/超时/5xx标记本次上传失败，恢复后在既有保存失败行提示「服务已恢复，文稿尚未保存，请重试保存」；引擎导出、取消、404/409/权限错误不使用此提示。上传开始时捕获恢复序号，因此健康事件早于旧XHR失败也能识别；文件身份、重载/放弃换代、销毁均使旧提示失效。**不自动调用retrySave**：上传异常的uncertain结果与检查点写入围栏不能被健康检测代替，保留内存文稿由用户重试。回归见 `tests/project-home/backend-health-status.test.mjs` 与 `libre-save-recovery.test.mjs`（健康事件排序、订阅清理、手动重启防重、失败来源、恢复先后及旧上下文失效）；Chrome注入快照仅验证UI接线，不等于真实后端崩溃恢复或真实LOWA落盘验收。
