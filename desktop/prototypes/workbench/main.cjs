@@ -3,6 +3,10 @@
 // Isolated visual experiment, deliberately not imported by the product entry point.
 const {app,BrowserWindow,ipcMain,screen,clipboard}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const {exportWithInlineRevisions}=require('./review-export.cjs');
+const {createReviewUndo}=require('./review-undo.cjs');
+const {REVIEW_BATCH_SIZE,hydrateReviewBatch,requireReviewDetails}=require('./review-hydration.cjs');
 const config=JSON.parse(fs.readFileSync(process.env.AWD_PROTOTYPE_CONFIG,'utf8'));
 for(const key of ['home','appData','userData','sessionData','temp','logs','crashDumps']){
  const p=path.join(config.run,key);fs.mkdirSync(p,{recursive:true});app.setPath(key,p);
@@ -12,6 +16,7 @@ const events=[];const mark=(name,data={})=>{events.push({at:Date.now(),name,...d
 let data,engine,unoClient,authority,authorityReady,backend,seq=0,view,selected,closing=false,dirty=false,mutationVersion=0,savePromise=null,restoreSelection=null,authorityIsReady=false,documentLocked=false;
 const initialCallbacks=new Map();
 let reviewIdentity=null;
+const {verifyReviewTarget}=require('./review-match.cjs');
 // CAPI edits and multi-call UNO reads share the same native model. Keep a whole
 // operation together so a revision cannot be deleted while UNO is reading it.
 let nativeQueue=Promise.resolve();
@@ -23,6 +28,7 @@ function channel(cmd,args,framed,extraEnv={}){
  let buffer=Buffer.alloc(0),pending=new Map(),resolveReady,rejectReady,uncertain=false;
  const ready=new Promise((resolve,reject)=>{resolveReady=resolve;rejectReady=reject});
  const accept=(head,bytes)=>{
+  if(head.type==='phase'){mark('engine-phase',head);return}
   if(head.type==='engine-ready'){mark('engine-ready',head);resolveReady(head);return}
   if(head.type==='callback'){if([1,2,3,4,5,13].includes(head.callbackType))initialCallbacks.set(head.callbackType,head);emit(head);return}
   const id=framed?head.reqId:head.id;
@@ -74,7 +80,8 @@ async function paint(viewport={}){
 async function startEngine(){
  if(engine)return;
  const profile=path.join(config.run,'lo-profile');fs.mkdirSync(profile,{recursive:true});
- engine=channel(config.worker,[config.runtime,new URL('file://'+profile).href,config.run],true);await engine.ready;
+ mark('engine-spawn');
+ engine=channel(config.worker,[config.runtime,pathToFileURL(profile).href,config.run],true);await engine.ready;
 }
 async function startUno(){
  if(unoClient||!config.unoRuntime||!config.unoHost)return;
@@ -86,18 +93,39 @@ async function startUno(){
   PYTHONDONTWRITEBYTECODE:'1',PYTHONPYCACHEPREFIX:path.join(config.run,'python-cache')
  });
 }
+async function reviewCall(method,params={}){
+ await startUno();if(!unoClient)throw Error('需要原生审阅连接');
+ return unoClient.call(method,{documentUrl:pathToFileURL(selected.physicalPath).href,...params});
+}
+const reviewUndo=createReviewUndo({view:params=>reviewCall('view',params),
+ undoState:()=>reviewCall('undo_state'),undoStep:(kind,expected)=>reviewCall('undo_step',{kind,expected})});
 async function reviewSnapshot(){
- const first=await engine.call('review_snapshot',{documentEpoch:selected.documentEpoch});
- await startUno();if(!unoClient)return first;
- const details=await unoClient.call('snapshot',{documentUrl:new URL('file://'+selected.physicalPath).href});
- const last=await engine.call('review_snapshot',{documentEpoch:selected.documentEpoch});
- if(JSON.stringify(first.items)!==JSON.stringify(last.items)||details.entries.length!==last.items.length)throw Error('审阅内容已变化，请刷新');
- last.items=last.items.map((item,i)=>{
-  const full=details.entries[i];
-  if(full.author!==item.author||full.type!==item.type||full.dateTime!==item.dateTime)throw Error('修订身份不一致');
-  return {...item,...full,textAvailable:true};
- });
- last.controllerCapabilities=details.controllerCapabilities;reviewIdentity=last;return last;
+ const summary=await engine.call('review_snapshot',{documentEpoch:selected.documentEpoch});
+ reviewIdentity={...summary,hydratedCount:0,batchSize:REVIEW_BATCH_SIZE,
+  items:summary.items.map(item=>({...item,textAvailable:false,text:null}))};
+ return reviewIdentity;
+}
+async function reviewBatch(params){
+ const identity=reviewIdentity;
+ try{return await hydrateReviewBatch(params,{
+  getIdentity:()=>reviewIdentity,
+  getDocument:()=>selected&&({documentEpoch:selected.documentEpoch,documentUrl:pathToFileURL(selected.physicalPath).href}),
+  snapshot:documentEpoch=>engine.call('review_snapshot',{documentEpoch}),
+  details:async payload=>{await startUno();if(!unoClient)throw Error('需要原生审阅连接');return unoClient.call('snapshot_batch',payload)}
+ })}catch(error){
+  if(error.message.includes('STALE_REVIEW_BATCH')&&reviewIdentity===identity)reviewIdentity=null;
+  throw error;
+ }
+}
+async function verifyReviewCard(params){
+ // The worker bumps refreshEpoch on ordinary input, so the card's epoch is stale
+ // by design. Re-establish identity against a fresh CAPI snapshot plus one
+ // targeted UNO detail read, then dispatch with the fresh epoch.
+ requireReviewDetails(reviewIdentity,params.revisionId);
+ return verifyReviewTarget(params,{reviewIdentity,documentEpoch:selected.documentEpoch,
+  documentUrl:pathToFileURL(selected.physicalPath).href,
+  startUno:async()=>{await startUno();return unoClient},
+  engineCall:(method,p)=>engine.call(method,p),unoCall:(method,p)=>unoClient.call(method,p)});
 }
 async function openDocument(ids){
  if(selected)throw Error('请先保存并关闭当前文档');
@@ -109,26 +137,31 @@ async function openDocument(ids){
   const physicalPath=path.join(config.run,'opened-document.docx');
   fs.writeFileSync(physicalPath,Buffer.from(file.bytes));file={...file,physicalPath};
  }else file=await data.call('files.read',ids);
+ mark('document-read');
  await startEngine();
  initialCallbacks.clear();reviewIdentity=null;
  const model=await engine.call('open',{path:file.physicalPath});
- selected={...ids,...file,...model};dirty=false;documentLocked=false;mark('model-loaded');
+ selected={...ids,...file,...model};reviewUndo.reset();dirty=false;documentLocked=false;mark('model-loaded');
  return {documentEpoch:selected.documentEpoch,viewId:model.viewId,widthTwips:model.widthTwips,heightTwips:model.heightTwips,historyAvailable:!!authority,initialCallbacks:[...initialCallbacks.values()].filter(event=>event.documentEpoch===model.documentEpoch)};
 }
 async function closeDocument(){
  if(!selected)return;
  if(savePromise)await savePromise;
  if(dirty)throw Error('文档仍有未保存修改');
- await engine.call('close',{documentEpoch:selected.documentEpoch});selected=null;emit({type:'document-closed'});
+ await engine.call('close',{documentEpoch:selected.documentEpoch});selected=null;reviewIdentity=null;reviewUndo.reset();emit({type:'document-closed'});
 }
 async function saveDocument(){
  if(savePromise)return savePromise;
  if(!selected)throw Error('尚未打开文档');
+ reviewUndo.assertSafe();
  const identity=selected,saveVersion=mutationVersion;
  savePromise=(async()=>{
   const target=path.join(config.run,'native-export.docx');
-  await engine.call('save',{documentEpoch:identity.documentEpoch,path:target});
-  const bytes=fs.readFileSync(target);
+  await startUno();if(!unoClient)throw Error('保存前需要核验原生修订显示状态');
+  const bytes=await exportWithInlineRevisions(
+   params=>unoClient.call('view',{documentUrl:pathToFileURL(identity.physicalPath).href,...params}),
+   async()=>{await engine.call('save',{documentEpoch:identity.documentEpoch,path:target});return fs.readFileSync(target)}
+  );
   if(authority)await authority.saveFile(identity.projectId,identity.fileId,bytes);
   else {
    const saved=await data.call('files.save',{projectId:identity.projectId,fileId:identity.fileId,expectedGeneration:identity.generation,contentBase64:bytes.toString('base64')});
@@ -158,6 +191,7 @@ function handle(name,handler){
  });
 }
 app.whenReady().then(async()=>{
+ if(!config.unoHost||!config.unoRuntime)throw Error('原生编辑实验需要显式配置 unoHost 和 unoRuntime，以核验审阅和保存');
  view=new BrowserWindow({width:1280,height:900,show:false,webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
  view.setContentSize(1280,900);
  if(config.authority){
@@ -178,30 +212,56 @@ app.whenReady().then(async()=>{
  }
  handle('list',async()=>{
   if(authority){const cached=await authority.cachedSnapshot();if(cached&&!authorityIsReady)return cached;await authorityReady;return authority.snapshot()}
-  const projects=await data.call('projects.list');return {source:'authority',projects:await Promise.all(projects.map(async p=>({...p,files:await data.call('files.list',{projectId:p.id})})))};
+  const projects=await data.call('projects.list');
+  return {source:'authority',projects:await Promise.all(projects.map(async project=>{
+   const files=await data.call('files.list',{projectId:project.id});
+   const nodes=new Map(files.map(file=>[file.id,{...file,children:[]}])),roots=[];
+   for(const file of files){
+    const node=nodes.get(file.id);
+    if(file.parentId==null)roots.push(node);
+    else {const parent=nodes.get(file.parentId);if(!parent?.isFolder)throw Error('项目目录关系不完整');parent.children.push(node)}
+   }
+   return {...project,files:roots};
+  }))};
  });
  handle('write-clipboard',text=>{if(typeof text!=='string'||Buffer.byteLength(text)>8*1024*1024)throw Error('Invalid clipboard text');clipboard.writeText(text);return {written:true}});
  handle('open',ids=>nativeTask(()=>openDocument(ids)));handle('close',()=>nativeTask(closeDocument));handle('paint',viewport=>nativeTask(()=>paint(viewport)));handle('save',()=>nativeTask(saveDocument));
- const allowed=new Set(['set_viewport','input_text','input_key','input_mouse','input_barrier','review_snapshot','review_goto','review_resolve','review_view','selected_text','selection_text','command']);
+ const allowed=new Set(['set_viewport','input_text','input_key','input_mouse','input_barrier','review_snapshot','review_batch','review_goto','review_resolve','review_view','selected_text','selection_text','command']);
  handle('action',(action,params={})=>nativeTask(async()=>{
   if(!selected||!allowed.has(action))throw Error('Unsupported editor action');
+  reviewUndo.assertSafe();
   if(documentLocked&&['input_text','input_key','input_mouse','review_resolve','review_goto','command','review_view'].includes(action))throw Error('文档正在保存或恢复，请稍候');
   if(params.documentEpoch!==selected.documentEpoch)throw Error('STALE_DOCUMENT');
   if(action==='command'&&!['.uno:Undo','.uno:Redo'].includes(params.command))throw Error('Unsupported toolbar command');
-  if(['input_text','input_key','review_resolve','command'].includes(action)){dirty=true;mutationVersion++}
+  if(['input_text','input_key','command'].includes(action)){dirty=true;mutationVersion++}
+  if(action==='command')return reviewUndo.step(params.command==='.uno:Undo'?'undo':'redo');
   if(action==='review_snapshot')return reviewSnapshot();
+  if(action==='review_batch')return reviewBatch(params);
   if(action==='review_view'){
    await startUno();if(!unoClient)throw Error('需要原生审阅连接');
-   const result=await unoClient.call('view',{documentUrl:new URL('file://'+selected.physicalPath).href,mode:params.mode});
-   return {...result,...await engine.call('review_snapshot',{documentEpoch:selected.documentEpoch})};
+   const result=await unoClient.call('view',{documentUrl:pathToFileURL(selected.physicalPath).href,mode:params.mode,refresh:true});
+   const snapshot=await engine.call('review_snapshot',{documentEpoch:selected.documentEpoch});
+   selected.widthTwips=snapshot.widthTwips;selected.heightTwips=snapshot.heightTwips;
+   return {...result,...snapshot};
   }
-  const result=await engine.call(action,params);
-  if(action==='review_goto'){
-   const revision=reviewIdentity?.refreshEpoch===params.refreshEpoch&&reviewIdentity.items.find(item=>item.revisionId===params.revisionId);
-   if(!unoClient||!revision)throw Error('需要刷新完整审阅内容后核验定位');
-   return {...result,...await unoClient.call('verify_location',{documentUrl:new URL('file://'+selected.physicalPath).href,identifier:revision.identifier})};
+  if(action==='review_goto'||action==='review_resolve'){
+   if(action==='review_resolve'&&!['accept','reject'].includes(params.decision))throw Error('INVALID_REVIEW_DECISION');
+   // Re-establish identity after the inline detour: switching layout can move
+   // revision ranges and callbacks can invalidate the previous CAPI epoch.
+   const run=async()=>{
+    const verified=await verifyReviewCard(params);
+    if(action==='review_resolve'){dirty=true;mutationVersion++}
+    const result=await engine.call(action,{...params,refreshEpoch:verified.refreshEpoch});
+    if(action==='review_goto')return {...result,rects:verified.rects,...await unoClient.call('verify_location',{documentUrl:pathToFileURL(selected.physicalPath).href,identifier:verified.identifier})};
+    return result;
+   };
+   return action==='review_resolve'?reviewUndo.resolve(run):run();
   }
-  return result;
+  const key=Number(params.keyCode)&0xFFF;
+  const potentialEdit=action==='input_text'||(action==='input_key'&&params.eventType===0
+   &&!(key>=1024&&key<=1031)&&key!==1281&&key!==1285
+   &&!(key===512&&(Number(params.keyCode)&(0x2000|0x8000))));
+  return potentialEdit?reviewUndo.edit(()=>engine.call(action,params)):engine.call(action,params);
  }));
  handle('history',async()=>{if(!authority||!selected)throw Error('版本记录仅用于接续旧项目的实验');return authority.history(selected.projectId,selected.fileId)});
  handle('create-version',async title=>{if(!authority||!selected)throw Error('没有版本服务');try{return await authority.createVersion(selected.projectId,{title})}finally{documentLocked=false}});

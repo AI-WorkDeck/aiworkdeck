@@ -17,6 +17,14 @@ import unittest
 import zipfile
 
 
+LEGACY_SCHEMA = """
+CREATE TABLE projects(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQUE, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE files(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQUE, project_id INTEGER NOT NULL REFERENCES projects(id), name TEXT NOT NULL, size INTEGER NOT NULL, generation TEXT NOT NULL, live INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, UNIQUE(project_id,name));
+CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE pending(file_id INTEGER PRIMARY KEY REFERENCES files(id), stage TEXT NOT NULL, expected TEXT, generation TEXT NOT NULL, size INTEGER NOT NULL, updated_at TEXT NOT NULL);
+"""
+
+
 def encoded(data):
     return base64.b64encode(data).decode("ascii")
 
@@ -343,6 +351,61 @@ class LocalDataTests(unittest.TestCase):
         self.assertIn("error", self.client.receive())
         self.assertEqual(self.path.read_bytes(), self.original)
 
+    def prepare_last_identity(self, table):
+        self.client.close()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("UPDATE sqlite_sequence SET seq=? WHERE name=?", (9007199254740990, table))
+        self.client = self.start()
+
+    def assert_last_safe_sequence(self, table):
+        self.client.close()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            self.assertEqual(db.execute("SELECT seq FROM sqlite_sequence WHERE name=?", (table,)).fetchone()[0],
+                             9007199254740991, "failed allocation must roll back the sequence")
+
+    def test_project_creation_stops_at_safe_id_without_leftovers(self):
+        self.prepare_last_identity("projects")
+        last = self.client.result("projects.create", name="最后可用编号")
+        self.assertEqual(last["id"], 9007199254740991)
+        self.assertEqual(self.client.result("projects.get", projectId=last["id"])["uid"], last["uid"])
+        parent = self.directory / "profile" / "storage" / "projects"
+        before = sorted(path.name for path in parent.iterdir())
+        for _ in range(2):
+            self.assertError(self.client.call("projects.create", name="不能溢出"), "IDENTITY_EXHAUSTED")
+        self.assertEqual(sorted(path.name for path in parent.iterdir()), before)
+        self.assertEqual([row["id"] for row in self.client.result("projects.list")],
+                         [self.project["id"], 9007199254740991])
+        self.assert_last_safe_sequence("projects")
+
+    def test_file_creation_stops_at_safe_id_without_leftovers(self):
+        self.prepare_last_identity("files")
+        last = self.client.result("files.create", projectId=self.project["id"], name="last.txt", contentBase64=encoded(b"last"))
+        self.assertEqual(last["id"], 9007199254740991)
+        self.assertEqual(base64.b64decode(self.client.result("files.read", projectId=self.project["id"], fileId=last["id"])["contentBase64"]), b"last")
+        before = sorted(path.name for path in self.project_storage().iterdir())
+        for _ in range(2):
+            self.assertError(self.client.call("files.create", projectId=self.project["id"], name="overflow.txt",
+                                             contentBase64=encoded(b"must not appear")), "IDENTITY_EXHAUSTED")
+        self.assertEqual(sorted(path.name for path in self.project_storage().iterdir()), before)
+        self.assertEqual([row["id"] for row in self.client.result("files.list", projectId=self.project["id"])],
+                         [self.file["id"], 9007199254740991])
+        self.assert_last_safe_sequence("files")
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM pending").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM files WHERE live=0").fetchone()[0], 0)
+
+    def test_directory_creation_stops_at_safe_id_without_leftovers(self):
+        self.prepare_last_identity("files")
+        last = self.client.result("files.mkdir", projectId=self.project["id"], name="last-dir")
+        self.assertEqual(last["id"], 9007199254740991)
+        before = sorted(path.name for path in self.project_storage().iterdir())
+        for _ in range(2):
+            self.assertError(self.client.call("files.mkdir", projectId=self.project["id"], name="overflow-dir"), "IDENTITY_EXHAUSTED")
+        self.assertEqual(sorted(path.name for path in self.project_storage().iterdir()), before)
+        self.assertEqual([row["id"] for row in self.client.result("files.list", projectId=self.project["id"])],
+                         [self.file["id"], 9007199254740991])
+        self.assert_last_safe_sequence("files")
+
     def test_large_or_invalid_payload_rejected_without_overwrite(self):
         for content in ("not base64!", encoded(b"x" * (32 * 1024 * 1024 + 1))):
             self.assertError(self.client.call("files.save", projectId=self.project["id"], fileId=self.file["id"],
@@ -364,6 +427,282 @@ class LocalDataTests(unittest.TestCase):
         self.assertError(other.receive(), "DATABASE_ERROR")
         self.assertEqual(other.process.wait(timeout=10), 1)
         self.assertEqual(path.read_bytes(), b"invalid SQLite sentinel")
+
+    def mkdir(self, name, parent=None, project=None, client=None):
+        params = {"projectId": (project or self.project)["id"], "name": name}
+        if parent:
+            params["parentId"] = parent["id"]
+        return (client or self.client).result("files.mkdir", **params)
+
+    def project_storage(self, project=None):
+        return self.directory / "profile" / "storage" / "projects" / str((project or self.project)["id"])
+
+    def test_nested_tree_create_list_read_save_reopen(self):
+        docs = self.mkdir("文档")
+        nested = self.mkdir("2026", parent=docs)
+        self.assertTrue(docs["isFolder"])
+        self.assertIsNone(docs["parentId"])
+        self.assertEqual(nested["parentId"], docs["id"])
+        content = docx("嵌套目录中的文件")
+        created = self.client.result("files.create", projectId=self.project["id"], parentId=nested["id"],
+                                     name="报告.docx", contentBase64=encoded(content))
+        self.assertEqual(created["parentId"], nested["id"])
+        self.assertFalse(created["isFolder"])
+        self.assertEqual(created["filePath"], f"projects/{self.project['id']}/文档/2026/报告.docx")
+        disk = self.project_storage() / "文档" / "2026" / "报告.docx"
+        self.assertEqual(disk.read_bytes(), content)
+        listing = {row["id"]: row for row in self.client.result("files.list", projectId=self.project["id"])}
+        self.assertEqual(listing[docs["id"]]["filePath"], f"projects/{self.project['id']}/文档")
+        self.assertEqual(listing[nested["id"]]["parentId"], docs["id"])
+        self.assertEqual(listing[self.file["id"]]["filePath"], f"projects/{self.project['id']}/{self.file['name']}")
+        self.client.close()
+        reopened = self.start()
+        relisting = {row["id"]: row for row in reopened.result("files.list", projectId=self.project["id"])}
+        self.assertEqual(relisting[docs["id"]]["uid"], docs["uid"])
+        self.assertEqual(relisting[nested["id"]]["uid"], nested["uid"])
+        reread = reopened.result("files.read", projectId=self.project["id"], fileId=created["id"])
+        self.assertEqual(reread["uid"], created["uid"])
+        self.assertEqual(base64.b64decode(reread["contentBase64"]), content)
+        self.assertEqual(reread["physicalPath"], str(disk))
+        revised = docx("嵌套修订保留原位置")
+        saved = reopened.result("files.save", projectId=self.project["id"], fileId=created["id"],
+                                expectedGeneration=reread["generation"], contentBase64=encoded(revised))
+        self.assertEqual(saved["id"], created["id"])
+        self.assertEqual(saved["uid"], created["uid"])
+        self.assertEqual(saved["filePath"], created["filePath"])
+        self.assertEqual(disk.read_bytes(), revised)
+        self.assertEqual(self.path.read_bytes(), self.original)
+
+    def test_same_name_allowed_across_directories_not_within(self):
+        first = self.mkdir("甲目录")
+        second = self.mkdir("乙目录")
+        root_copy = self.client.result("files.create", projectId=self.project["id"], name="同名.txt",
+                                       contentBase64=encoded(b"root copy"))
+        in_first = self.client.result("files.create", projectId=self.project["id"], parentId=first["id"],
+                                      name="同名.txt", contentBase64=encoded(b"first copy"))
+        in_second = self.client.result("files.create", projectId=self.project["id"], parentId=second["id"],
+                                       name="同名.txt", contentBase64=encoded(b"second copy"))
+        self.assertNotEqual(in_first["uid"], in_second["uid"])
+        self.assertError(self.client.call("files.create", projectId=self.project["id"], parentId=first["id"],
+                                          name="同名.txt", contentBase64=encoded(b"dup")), "CONFLICT")
+        self.assertError(self.client.call("files.mkdir", projectId=self.project["id"], parentId=first["id"],
+                                          name="同名.txt"), "CONFLICT")
+        base = self.project_storage()
+        self.assertEqual((base / "同名.txt").read_bytes(), b"root copy")
+        self.assertEqual((base / "甲目录" / "同名.txt").read_bytes(), b"first copy")
+        self.assertEqual((base / "乙目录" / "同名.txt").read_bytes(), b"second copy")
+        self.assertEqual(root_copy["filePath"], f"projects/{self.project['id']}/同名.txt")
+
+    def test_cross_project_parent_id_rejected_without_writes(self):
+        other = self.client.result("projects.create", name="其他项目")
+        foreign = self.mkdir("外部目录", project=other)
+        self.assertError(self.client.call("files.mkdir", projectId=self.project["id"], parentId=foreign["id"],
+                                          name="逃逸目录"), "NOT_FOUND")
+        self.assertError(self.client.call("files.create", projectId=self.project["id"], parentId=foreign["id"],
+                                          name="逃逸.txt", contentBase64=encoded(b"bad")), "NOT_FOUND")
+        self.assertEqual([p.name for p in (self.project_storage(other) / "外部目录").iterdir()], [])
+        self.assertEqual([row["name"] for row in self.client.result("files.list", projectId=self.project["id"])],
+                         [self.file["name"]])
+
+    def test_directory_read_and_save_rejected(self):
+        folder = self.mkdir("目录")
+        self.assertError(self.client.call("files.read", projectId=self.project["id"], fileId=folder["id"]), "IS_DIRECTORY")
+        self.assertError(self.client.call("files.save", projectId=self.project["id"], fileId=folder["id"],
+                                          expectedGeneration="", contentBase64=encoded(b"bad")), "IS_DIRECTORY")
+        self.assertTrue((self.project_storage() / "目录").is_dir())
+
+    def test_duplicate_mkdir_and_disk_conflict_leave_no_phantom(self):
+        folder = self.mkdir("唯一目录")
+        self.assertError(self.client.call("files.mkdir", projectId=self.project["id"], name="唯一目录"), "CONFLICT")
+        unindexed = self.project_storage() / "未索引目录"
+        unindexed.mkdir()
+        self.assertError(self.client.call("files.mkdir", projectId=self.project["id"], name="未索引目录"), "CONFLICT")
+        self.assertEqual(list(unindexed.iterdir()), [])
+        names = [row["name"] for row in self.client.result("files.list", projectId=self.project["id"])
+                 if row["name"] in ("唯一目录", "未索引目录")]
+        self.assertEqual(names, ["唯一目录"])
+        self.assertEqual(folder["isFolder"], True)
+
+    def test_nested_symlink_escape_rejected_at_every_level(self):
+        folder = self.mkdir("真实目录")
+        inner = self.client.result("files.create", projectId=self.project["id"], parentId=folder["id"],
+                                   name="内部.txt", contentBase64=encoded(b"inside"))
+        base = self.project_storage()
+        real = base / "真实目录"
+        moved = base / "moved-real"
+        real.rename(moved)
+        outside = self.directory / "escape-target"
+        outside.mkdir()
+        real.symlink_to(outside, target_is_directory=True)
+        for response in (
+            self.client.call("files.read", projectId=self.project["id"], fileId=inner["id"]),
+            self.client.call("files.save", projectId=self.project["id"], fileId=inner["id"],
+                             expectedGeneration=inner["generation"], contentBase64=encoded(b"bad")),
+            self.client.call("files.mkdir", projectId=self.project["id"], parentId=folder["id"], name="新目录"),
+            self.client.call("files.create", projectId=self.project["id"], parentId=folder["id"],
+                             name="新文件.txt", contentBase64=encoded(b"bad")),
+        ):
+            self.assertError(response, "UNSAFE_PATH")
+        self.assertEqual(list(outside.iterdir()), [])
+        self.assertEqual((moved / "内部.txt").read_bytes(), b"inside")
+        names = [row["name"] for row in self.client.result("files.list", projectId=self.project["id"])]
+        self.assertNotIn("新目录", names)
+        self.assertNotIn("新文件.txt", names)
+
+    def test_parent_cycle_rejected(self):
+        first = self.mkdir("甲")
+        second = self.mkdir("乙", parent=first)
+        trapped = self.client.result("files.create", projectId=self.project["id"], parentId=second["id"],
+                                     name="循环.txt", contentBase64=encoded(b"cycle"))
+        self.client.close()
+        db = sqlite3.connect(self.directory / "profile" / "local.sqlite")
+        db.execute("UPDATE files SET parent_id=? WHERE id=?", (second["id"], first["id"]))
+        db.commit()
+        db.close()
+        reopened = self.start()
+        self.assertTrue(reopened.result("health")["ready"])
+        self.assertError(reopened.call("files.read", projectId=self.project["id"], fileId=trapped["id"]), "CYCLE_DETECTED")
+        self.assertError(reopened.call("files.create", projectId=self.project["id"], parentId=second["id"],
+                                       name="新.txt", contentBase64=encoded(b"bad")), "CYCLE_DETECTED")
+        self.assertEqual((self.project_storage() / "甲" / "乙" / "循环.txt").read_bytes(), b"cycle")
+
+    def test_newer_schema_is_not_downgraded(self):
+        self.client.close()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("PRAGMA user_version=99")
+        rejected = self.start()
+        self.assertError(rejected.receive(), "UNSUPPORTED_SCHEMA")
+        rejected.close()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 99)
+        self.assertEqual(self.path.read_bytes(), self.original)
+
+    def test_legacy_upgrade_preserves_and_recovers_pending_save(self):
+        profile = self.directory / "legacy-pending"
+        folder = profile / "storage" / "projects" / "7"
+        folder.mkdir(parents=True)
+        (profile / ".awd-local-data-prototype").write_text("isolated-native-data-prototype-v1\n")
+        old, new = b"before crash", b"durable journal after upgrade"
+        (folder / "old.txt").write_bytes(old)
+        (folder / ".native-legacy-stage").write_bytes(new)
+        with sqlite3.connect(profile / "local.sqlite") as db:
+            db.executescript(LEGACY_SCHEMA)
+            db.execute("INSERT INTO projects VALUES(7,'project-uid','old','t','t')")
+            db.execute("INSERT INTO files VALUES(42,'file-uid',7,'old.txt',?,?,1,'t')",
+                       (len(old), hashlib.sha256(old).hexdigest()))
+            db.execute("INSERT INTO pending VALUES(42,'.native-legacy-stage',?,?,?,'t')",
+                       (hashlib.sha256(old).hexdigest(), hashlib.sha256(new).hexdigest(), len(new)))
+            # The sequence may exceed the greatest surviving row after deletion.
+            db.execute("UPDATE sqlite_sequence SET seq=99 WHERE name='files'")
+        migrated = Client(BINARY, profile)
+        self.clients.append(migrated)
+        self.assertTrue(migrated.result("health")["ready"])
+        read = migrated.result("files.read", projectId=7, fileId=42)
+        self.assertEqual(read["uid"], "file-uid")
+        self.assertEqual(base64.b64decode(read["contentBase64"]), new)
+        self.assertFalse((folder / ".native-legacy-stage").exists())
+        created = migrated.result("files.mkdir", projectId=7, name="next")
+        self.assertEqual(created["id"], 100)
+        migrated.close()
+        with sqlite3.connect(profile / "local.sqlite") as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM pending").fetchone()[0], 0)
+            self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
+
+    def test_legacy_flat_profile_upgrades_preserving_identity_and_bytes(self):
+        profile = self.directory / "legacy-profile"
+        (profile / "storage" / "projects" / "7").mkdir(parents=True)
+        (profile / ".awd-local-data-prototype").write_text("isolated-native-data-prototype-v1\n")
+        content = docx("旧样板升级前内容")
+        (profile / "storage" / "projects" / "7" / "旧文档.docx").write_bytes(content)
+        db = sqlite3.connect(profile / "local.sqlite")
+        db.executescript(LEGACY_SCHEMA)
+        timestamp = "2026-01-01T00:00:00Z"
+        db.execute("INSERT INTO projects(id,uid,name,created_at,updated_at) VALUES(7,'legacy-project-uid','旧项目',?,?)",
+                   (timestamp, timestamp))
+        db.execute("INSERT INTO files(id,uid,project_id,name,size,generation,live,updated_at) VALUES(42,'legacy-file-uid',7,'旧文档.docx',?,?,1,?)",
+                   (len(content), hashlib.sha256(content).hexdigest(), timestamp))
+        db.commit()
+        db.close()
+        legacy = Client(BINARY, profile)
+        self.clients.append(legacy)
+        self.assertTrue(legacy.result("health")["ready"])
+        read = legacy.result("files.read", projectId=7, fileId=42)
+        self.assertEqual(read["id"], 42)
+        self.assertEqual(read["uid"], "legacy-file-uid")
+        self.assertIsNone(read["parentId"])
+        self.assertFalse(read["isFolder"])
+        self.assertEqual(read["filePath"], "projects/7/旧文档.docx")
+        self.assertEqual(base64.b64decode(read["contentBase64"]), content)
+        self.assertError(legacy.call("files.create", projectId=7, name="旧文档.docx",
+                                     contentBase64=encoded(b"dup")), "CONFLICT")
+        folder = legacy.result("files.mkdir", projectId=7, name="新目录")
+        nested_copy = legacy.result("files.create", projectId=7, parentId=folder["id"], name="旧文档.docx",
+                                    contentBase64=encoded(b"nested copy"))
+        self.assertEqual(nested_copy["parentId"], folder["id"])
+        self.assertEqual(nested_copy["filePath"], "projects/7/新目录/旧文档.docx")
+        self.assertEqual((profile / "storage" / "projects" / "7" / "旧文档.docx").read_bytes(), content)
+        self.assertEqual((profile / "storage" / "projects" / "7" / "新目录" / "旧文档.docx").read_bytes(), b"nested copy")
+        legacy.close()
+        db = sqlite3.connect(profile / "local.sqlite")
+        self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        row = db.execute("SELECT uid,parent_id,kind,size,generation FROM files WHERE id=42").fetchone()
+        self.assertEqual(row, ("legacy-file-uid", 0, 0, len(content), hashlib.sha256(content).hexdigest()))
+        db.close()
+        upgraded = Client(BINARY, profile)
+        self.clients.append(upgraded)
+        reread = upgraded.result("files.read", projectId=7, fileId=42)
+        self.assertEqual(base64.b64decode(reread["contentBase64"]), content)
+        self.assertGreater(upgraded.result("files.create", projectId=7, name="升级后.txt",
+                                           contentBase64=encoded(b"after upgrade"))["id"], 42)
+
+    def test_empty_legacy_table_does_not_reuse_deleted_file_ids(self):
+        profile = self.directory / "legacy-empty"
+        (profile / "storage" / "projects" / "7").mkdir(parents=True)
+        (profile / ".awd-local-data-prototype").write_text("isolated-native-data-prototype-v1\n")
+        with sqlite3.connect(profile / "local.sqlite") as db:
+            db.executescript(LEGACY_SCHEMA)
+            db.execute("INSERT INTO projects VALUES(7,'project-uid','old','t','t')")
+            db.execute("INSERT INTO files VALUES(99,'deleted-file-uid',7,'old.txt',0,'',1,'t')")
+            db.execute("DELETE FROM files")
+        migrated = Client(BINARY, profile)
+        self.clients.append(migrated)
+        self.assertTrue(migrated.result("health")["ready"])
+        self.assertEqual(migrated.result("files.list", projectId=7), [])
+        self.assertEqual(migrated.result("files.mkdir", projectId=7, name="next")["id"], 100)
+
+    def nested_crash_and_restart(self, phase):
+        folder = self.mkdir("崩溃目录")
+        nested_file = self.client.result("files.create", projectId=self.project["id"], parentId=folder["id"],
+                                         name="嵌套.docx", contentBase64=encoded(self.original))
+        path = self.project_storage() / "崩溃目录" / "嵌套.docx"
+        self.client.close()
+        crashing = self.start(phase)
+        self.assertTrue(crashing.result("health")["ready"])
+        crashing.send("files.save", projectId=self.project["id"], fileId=nested_file["id"],
+                      expectedGeneration=nested_file["generation"], contentBase64=encoded(b"nested durable replacement"))
+        self.assertEqual(crashing.process.wait(timeout=10), 77)
+        db = sqlite3.connect(self.directory / "profile" / "local.sqlite")
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM pending").fetchone()[0], 1)
+        db.close()
+        self.assertEqual(path.read_bytes(), self.original if phase == "afterJournal" else b"nested durable replacement")
+        reopened = self.start()
+        self.assertTrue(reopened.result("health")["ready"])
+        reread = reopened.result("files.read", projectId=self.project["id"], fileId=nested_file["id"])
+        self.assertEqual(reread["uid"], nested_file["uid"])
+        self.assertEqual(reread["filePath"], f"projects/{self.project['id']}/崩溃目录/嵌套.docx")
+        self.assertEqual(base64.b64decode(reread["contentBase64"]), b"nested durable replacement")
+        db = sqlite3.connect(self.directory / "profile" / "local.sqlite")
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM pending").fetchone()[0], 0)
+        self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        db.close()
+
+    def test_nested_crash_after_journal_before_rename_recovers(self):
+        self.nested_crash_and_restart("afterJournal")
+
+    def test_nested_crash_after_rename_before_metadata_recovers(self):
+        self.nested_crash_and_restart("afterRename")
 
 
 if __name__ == "__main__":

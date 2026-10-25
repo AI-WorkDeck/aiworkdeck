@@ -9,6 +9,7 @@
 #include "vendor/LibreOfficeKit/LibreOfficeKitEnums.h"
 #include <unistd.h>
 #include <cstring>
+#include <cerrno>
 #include <mutex>
 #include <vector>
 #include <chrono>
@@ -34,6 +35,7 @@ static bool transfer(int fd, void *bytes, size_t size, bool writing) {
     auto *p = static_cast<unsigned char *>(bytes);
     while (size) {
         ssize_t n = writing ? write(fd, p, size) : read(fd, p, size);
+        if (n < 0 && errno == EINTR) continue;
         if (n <= 0) return false;
         p += n; size -= n;
     }
@@ -182,7 +184,11 @@ int main(int argc, char **argv) {
                     if (connection>=0) { shutdown(connection,SHUT_RDWR); close(connection); }
                     if (doc) { doc->pClass->destroy(doc); doc=nullptr; }
                     frame(r);
-                    exit(0); // Isolated unipoll process: no external document or shared profile exists.
+                    // The owned document has been saved/closed explicitly. URP
+                    // release threads can still be draining; exit() runs global
+                    // Writer destructors concurrently with them (observed crash).
+                    // This isolated worker owns no external document or profile.
+                    _exit(0);
                 }
                 else if (!doc) { r[@"success"]=@NO; r[@"error"]=@"DOCUMENT_NOT_READY"; }
                 else if (([action hasPrefix:@"review_"] || [action hasPrefix:@"input_"] || [action isEqual:@"set_viewport"] || [action isEqual:@"close"] || q[@"documentEpoch"])

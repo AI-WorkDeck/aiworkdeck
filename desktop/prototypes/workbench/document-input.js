@@ -191,6 +191,17 @@
       if(suspended){event.preventDefault();return;}
       if (composing || event.isComposing || event.keyCode === 229) return;
       echo(null);
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && /^[zy]$/i.test(event.key)) {
+        event.preventDefault();
+        const kind = event.key.toLowerCase() === 'y' || event.shiftKey ? 'Redo' : 'Undo';
+        // Keep this in the same queue as native input. Commands do not consume
+        // an input sequence number; the next input/barrier continues that stream.
+        // Never send the raw native shortcut, which bypasses the margin guard.
+        send(enqueue('command', { command: '.uno:' + kind, arguments: '{}' }).then(result => {
+          if (result.applied) onChanged({ ...state(), action: 'command' });
+        }));
+        return;
+      }
       // Browser paste owns the text. Copy/cut need the native selected text and
       // are handled by the host clipboard adapter, never this empty input buffer.
       if ((event.metaKey || event.ctrlKey) && /^[v]$/i.test(event.key)) return;
