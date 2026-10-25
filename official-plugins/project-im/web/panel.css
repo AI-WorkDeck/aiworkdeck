@@ -61,13 +61,13 @@ p{margin:8px 0}
 #chat{min-width:0;min-height:0;overflow:hidden;background:var(--awd-bg,var(--fallback-bg))}
 #welcome{display:flex;align-items:center;justify-content:center;height:100%;padding:32px;overflow:auto}
 .welcome-copy{max-width:360px}
-.welcome-copy h1{font-size:20px;margin:0 0 12px;font-weight:600}
+.welcome-copy h1{font-family:var(--awd-font-serif,"Source Han Serif SC","Noto Serif CJK SC","Songti SC",serif);font-size:20px;margin:0 0 12px;font-weight:700}
 .welcome-copy p{line-height:1.7}
 #active-chat{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0}
 .chat-header{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 14px;border-bottom:1px solid var(--awd-border,var(--fallback-border));background:var(--awd-surface,var(--fallback-surface))}
 .chat-heading{flex:1;min-width:100px}
 .chat-heading strong,.chat-heading span{display:block;overflow-wrap:anywhere}
-.chat-heading strong{font-size:15px}
+.chat-heading strong{font-family:var(--awd-font-serif,"Source Han Serif SC","Noto Serif CJK SC","Songti SC",serif);font-size:15px}
 .chat-header-actions{display:flex;gap:6px;flex-wrap:wrap}
 #back{display:none}
 #project-bar{display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:7px 14px;border-bottom:1px solid var(--awd-border,var(--fallback-border))}

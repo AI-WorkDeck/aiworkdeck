@@ -85,3 +85,63 @@ test('未知 type 静默忽略，非本协议消息不处理', () => {
   // 协议号不对 / 来源不对的 theme 消息都不得生效
   assert.equal(env.rootEl.attrs['data-theme'], 'light')
 })
+
+test('Plugin UI v3.0：有 document.head 时自动注入 awd-plugin-ui-v3 样式，且 awd.ui.progress 可渲染与清除', () => {
+  const appendedStyles = []
+  const makeNode = (tag) => ({
+    tagName: tag.toUpperCase(),
+    id: '',
+    className: '',
+    textContent: '',
+    hidden: false,
+    attrs: {},
+    style: {},
+    children: [],
+    get firstChild() { return this.children[0] || null },
+    setAttribute(k, v) { this.attrs[k] = v },
+    appendChild(child) { this.children.push(child); return child },
+    insertBefore(child) { this.children.unshift(child); return child },
+    removeChild(child) {
+      const idx = this.children.indexOf(child)
+      if (idx >= 0) this.children.splice(idx, 1)
+    }
+  })
+  const head = makeNode('head')
+  const progressHost = makeNode('div')
+  const doc = {
+    documentElement: { setAttribute() {}, style: { setProperty() {} } },
+    body: { classList: { toggle() {} } },
+    head: {
+      get firstChild() { return head.firstChild },
+      appendChild(el) { appendedStyles.push(el); return head.appendChild(el) },
+      insertBefore(el) { appendedStyles.push(el); return head.insertBefore(el) }
+    },
+    getElementById(id) { return appendedStyles.find((el) => el.id === id) || null },
+    querySelector(sel) { return sel === '#progress' ? progressHost : null },
+    createElement: makeNode
+  }
+  const win = { parent: { postMessage() {} }, addEventListener() {} }
+  new Function('window', 'document', src)(win, doc)
+
+  assert.equal(appendedStyles.length, 1)
+  assert.equal(appendedStyles[0].id, 'awd-plugin-ui-v3')
+  assert.match(appendedStyles[0].textContent, /\.awd-plugin-stage\{container-type:inline-size/)
+
+  let cancelled = false
+  const ctrl = win.awd.ui.progress('#progress', {
+    title: '正在解析底稿（14/28）',
+    percent: 50,
+    safetyNote: '本地文件安全',
+    onCancel() { cancelled = true }
+  })
+  assert.equal(progressHost.hidden, false)
+  assert.equal(progressHost.children.length, 1)
+  assert.equal(progressHost.children[0].className, 'awd-safe-progress')
+  const foot = progressHost.children[0].children[2]
+  foot.children[1].onclick()
+  assert.equal(cancelled, true)
+
+  ctrl.clear()
+  assert.equal(progressHost.hidden, true)
+  assert.equal(progressHost.children.length, 0)
+})

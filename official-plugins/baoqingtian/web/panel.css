@@ -14,8 +14,8 @@
   --bqt-accent: var(--awd-accent, #2E5A50);
   --bqt-accent-hover: var(--awd-accent-hover, #244840);
   --bqt-accent-soft: var(--awd-accent-soft, rgba(46, 90, 80, 0.10));
-  --bqt-font: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --bqt-display: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --bqt-font: var(--awd-font-sans, "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif);
+  --bqt-display: var(--awd-font-serif, "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", serif);
   --surface: var(--bqt-surface);
   --bg: var(--bqt-bg);
   --text: var(--bqt-text);

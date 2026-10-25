@@ -266,16 +266,17 @@ export default {
   overflow-y: auto;
   box-sizing: border-box;
   padding: var(--awd-space-5) var(--awd-space-6);
-  border-radius: var(--awd-radius-dialog);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-lg, var(--awd-radius-dialog));
   background: var(--awd-surface);
   color: var(--awd-text);
-  box-shadow: var(--awd-shadow-lg);
+  box-shadow: var(--awd-shadow-lg), var(--awd-specular);
   text-align: left;
   outline: none;
   animation: awd-dlg-in var(--awd-motion-fast) cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 html[data-theme='dark'] .awd-dlg {
-  box-shadow: var(--awd-shadow-lg);
+  box-shadow: var(--awd-shadow-lg), var(--awd-specular);
 }
 
 .awd-dlg__head {
@@ -286,7 +287,7 @@ html[data-theme='dark'] .awd-dlg {
 }
 
 .awd-dlg__title {
-  font: 600 var(--awd-font-size-title)/var(--awd-line-height-ui) var(--awd-font-sans);
+  font: 600 var(--awd-font-size-title)/var(--awd-line-height-ui) var(--awd-font-serif);
   letter-spacing: -0.01em;
   color: var(--awd-text);
   word-break: break-word;

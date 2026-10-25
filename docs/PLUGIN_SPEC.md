@@ -984,3 +984,26 @@ UI 的 `dpia_workbench_action` 和 Agent 的 `dpia_workbench_task` 按可信调�
 运行依赖 Node.js、Python 文档库，PDF/页面渲染另需 LibreOffice；路径来自插件设置或系统安装。案件数据在后端用户目录按用户/项目隔离，禁用/卸载保留。模板核验只访问 EDPB 公开来源，业务材料经用户选择的宿主模型处理。GDPR/EU 方法不自动等同中国个人信息保护影响评估。
 
 本次源码和独立包交付未发布宿主 0.65.0，当前 0.64.1 必须拒载；市场签名发布与客户端升级需单独执行。安装装载、模型替身及报告测试的实际范围见插件 README，不将合成测试等同正式业务结论验收。
+
+## 19. AWD Plugin UI v3.0 视觉与交互规范（宋韵精工 · Neo-Oriental Editorial）
+
+为消除第三方与官方 Web 插件在字栈、间距、卡片质感、深浅色适配上的割裂感，`sdk/plugin-sdk/awd-plugin-sdk.js` 内置了 **AWD Plugin UI v3.0（宋韵精工）** 标准样式层（独立参考样式表位于 `sdk/plugin-sdk/awd-plugin-ui.css`）。插件引入同步 `<script src="awd-plugin-sdk.js"></script>` 后，SDK 会自动在 `<head>` 首部注入 `<style id="awd-plugin-ui-v3">`，并与宿主 `PluginPane.vue` 推送的 `--awd-*` 令牌实时联动。
+
+### 19.1 六项核心设计准则
+
+1. **零独立硬编码颜色（Zero-Hardcode Token Contract）**
+   - 插件所有表面、正文、边框、状态色与阴影必须引用宿主注入的 `--awd-*` 令牌（带宣纸浅色 fallback），严禁在业务 CSS 中写死 `#fff`、`#333` 或高饱和 Tailwind 色值，保证浅色「宣纸墨竹」与深色「徽墨夜览」一键无感切换。
+   - 新增宋韵精工建筑层次令牌：`--awd-surface-elevated`、`--awd-specular`、`--awd-shadow-island`、`--awd-shadow-card`、`--awd-shadow-btn`、`--awd-control-xs` (`24px`)、`--awd-control-sm` (`28px`)、`--awd-control-md` (`32px`)、`--awd-radius-lg` (`10px`)、`--awd-island-radius` (`10px`)、`--awd-island-gap` (`6px`)。
+2. **容器查询双态自适应（Container-Query Adaptive Layout）**
+   - 根节点使用 `.awd-plugin-stage`（内置 `container-type: inline-size; max-width: 1120px;`），主布局使用 `.awd-plugin-grid`。
+   - 当插件置于侧边栏或窄分屏（容器宽 `< 640px`）时自动单列流式排布；当插件在主工作区展开（容器宽 `>= 640px`）时自动切换为 `minmax(260px, 320px) minmax(0, 1fr)` 主从双栏布局。
+3. **宋韵刊头与二级分段导航（Editorial Header & Segmented Subnav）**
+   - 页面级标题统一使用 `.awd-plugin-header`（含 `.awd-eyebrow` 大写微章、`.awd-title` 思源宋体/宋体 `20px` 标题、`.awd-subtitle` 副标题及 `.awd-header-actions` 动作区）。
+   - 插件内部多视图切换统一使用 `.awd-subnav` + `.awd-subnav-item.is-active` 分段胶囊导航，禁止自绘与宿主工作区 `.tabs-bar` 视觉冲突的顶部页签栏。
+4. **统一控件高度契约（3-Tier Control Sizing）**
+   - 插件内所有交互控件严格对齐三档高度：紧凑芯片/小按钮 `.awd-btn-xs` (`24px`)、次要按钮 `.awd-btn-sm` (`28px`)、标准按钮/输入框 `.awd-btn` / `.awd-input` / `.awd-select` (`32px`)。
+5. **等宽数字与典籍级排版（Tabular Numerals & Editorial Hierarchy）**
+   - 凡涉及金额、股权比例、条款编号、耗时统计、文件大小（如 `.awd-kpi-value`、`.awd-badge`、表格数字列），一律开启 `font-variant-numeric: tabular-nums`。
+6. **长耗时任务安全进度反馈（Safe Progress Bar）**
+   - 超过 2 秒的文档抽取、批量核查或 AI 推理，必须通过 `awd.ui.progress(target, { title, detail, percent, safetyNote, cancelText, onCancel })` 或 `.awd-safe-progress` 展示当前阶段、进度百分比、可取消按钮及「本地底稿与已保存进度不受影响」的安全感知提示，严禁使用无反馈的全屏死锁遮罩。
+
