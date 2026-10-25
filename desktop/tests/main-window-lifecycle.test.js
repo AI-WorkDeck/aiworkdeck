@@ -31,6 +31,7 @@ function harness(platform = 'darwin') {
       this.webContents.send = (...args) => this.sent.push(args)
       this.webContents.setWindowOpenHandler = () => {}
       this.webContents.session = new EventEmitter()
+      this.webContents.session.webRequest = { onBeforeRequest(listener) { this.listener = listener } }
       windows.push(this)
     }
     isDestroyed() { return this.destroyed }
@@ -61,6 +62,7 @@ function harness(platform = 'darwin') {
         'node:os': { totalmem: () => 8 * 1024 ** 3 },
         './services/win-arch': { isWinArmEmulated: () => false },
         './reload-guard': { attachReloadGuard: () => true },
+        './services/backend-request-gate': require('../main/services/backend-request-gate'),
       }
       assert.ok(name in stubs, 'createMainWindow 里多了一个没桩的 require: ' + name)
       return stubs[name]
@@ -95,6 +97,7 @@ test('mac activation during service startup waits for the allocated backend port
   assert.equal(h.windows.length, 0)
   h.context.finishStartup()
   assert.equal(h.windows.length, 1)
+  assert.equal(typeof h.windows[0].webContents.session.webRequest.listener, 'function')
   assert.ok(h.windows[0].options.webPreferences.additionalArguments.includes('--checkba-api-base=http://127.0.0.1:9799'))
 })
 

@@ -29,7 +29,12 @@ import org.springframework.core.io.Resource;
 import org.springframework.web.servlet.resource.ResourceHttpRequestHandler;
 
 import javax.sql.DataSource;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -42,6 +47,146 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
     private final Map<String, Object> shared = new LinkedHashMap<>();
     private ObjectMapper json;
     private LocalCoreGateway gateway;
+    private LocalCoreContentService content;
+    private LocalCoreContentHttp contentHttp;
+    private volatile boolean protocolPublished;
+    private volatile com.checkba.version.WorkSessionService sessions;
+    private volatile com.checkba.version.LocalCoreVersionHandoff versions;
+    private volatile LocalCoreContentEffects effects;
+    private final Map<java.util.UUID, LocalCoreContentService.SaveRequest> savedBeforeReady = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<java.util.UUID, Boolean> notified = new java.util.concurrent.ConcurrentHashMap<>();
+
+    static Path journalDirectory(Path databaseFile) {
+        return databaseFile.resolveSibling(databaseFile.getFileName() + ".awd-content-journal");
+    }
+
+    @Override public boolean requiresRecovery(ConfigurableEnvironment environment, Path databaseFile) throws IOException {
+        Path journal = journalDirectory(databaseFile);
+        if (!Files.exists(journal, LinkOption.NOFOLLOW_LINKS)) return false;
+        if (!Files.isDirectory(journal, LinkOption.NOFOLLOW_LINKS) || !journal.equals(journal.toRealPath()))
+            throw new IOException("Local content journal is unavailable");
+        try (var files = Files.list(journal)) {
+            return files.anyMatch(path -> path.getFileName().toString().endsWith(".json"));
+        }
+    }
+
+    @Override public void onPersistencePrepared(ConfigurableEnvironment environment, DataSource database,
+                                                LocalCoreStore store, Path databaseFile) throws Exception {
+        if (content != null) throw new IllegalStateException("Local content persistence already prepared");
+        Path journal = journalDirectory(databaseFile);
+        privateDirectory(journal);
+        String identity = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(databaseFile.toRealPath().toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        long limit = org.springframework.util.unit.DataSize.parse(environment.getProperty("spring.servlet.multipart.max-file-size", "20GB")).toBytes();
+        content = new LocalCoreContentService(database, store, journal, identity, limit);
+        var recovery = content.recoverPending();
+        if (recovery.items().stream().anyMatch(item -> item.state() == LocalCoreContentService.RecoveryState.CONFLICT))
+            throw new IOException("Local content recovery needs reconciliation before business initialization");
+        // The dedicated protocol stays unavailable on cloud-quota installations; their existing
+        // upload path retains owner locking/accounting. Recovery remains mandatory if a journal exists.
+        if (!environment.getProperty("desktop.local-core.enabled", Boolean.class, false)
+                || environment.getProperty("storage.subscription-quota.enabled", Boolean.class, false)) return;
+        Path snapshots = journal.resolve("downloads"); privateDirectory(snapshots);
+        contentHttp = new LocalCoreContentHttp(database, store, content, new ObjectMapper(), snapshots, limit,
+                projectId -> publication -> publish(projectId, publication),
+                projectId -> cancellation -> cancel(projectId, cancellation), this::confirmReceipt);
+    }
+
+    private static void privateDirectory(Path path) throws IOException {
+        if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
+            if (Files.getFileStore(path.getParent()).supportsFileAttributeView("posix"))
+                Files.createDirectory(path, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+            else Files.createDirectory(path);
+        }
+        if (!Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS) || !path.equals(path.toRealPath()))
+            throw new IOException("Local content directory is unavailable");
+    }
+
+    private LocalCoreContentService.SaveReceipt publish(long projectId, LocalCoreContentService.Publication publication)
+            throws IOException, SQLException {
+        LocalCoreContentService.SaveReceipt receipt;
+        var session = sessions;
+        if (session == null) receipt = publication.run();
+        else {
+            try {
+                receipt = session.withFileContentWriteLock(projectId, () -> {
+                    try {
+                        var saved = publication.run();
+                        versions.handoffProject(content, projectId);
+                        return saved;
+                    } catch (IOException | SQLException failure) { throw new PublicationFailure(failure); }
+                });
+            } catch (PublicationFailure failure) {
+                if (failure.getCause() instanceof IOException io) throw io;
+                throw (SQLException) failure.getCause();
+            }
+        }
+        notifySaved(receipt.request());
+        return receipt;
+    }
+
+    private LocalCoreContentService.OperationResult cancel(long projectId, LocalCoreContentService.Cancellation cancellation)
+            throws IOException, SQLException {
+        LocalCoreContentService.OperationResult result;
+        var session = sessions;
+        if (session == null) result = cancellation.run();
+        else {
+            try {
+                result = session.withFileContentWriteLock(projectId, () -> {
+                    try {
+                        var cancelled = cancellation.run();
+                        if (cancelled.completed() != null) versions.handoffProject(content, projectId);
+                        return cancelled;
+                    } catch (IOException | SQLException failure) { throw new PublicationFailure(failure); }
+                });
+            } catch (PublicationFailure failure) {
+                if (failure.getCause() instanceof IOException io) throw io;
+                throw (SQLException) failure.getCause();
+            }
+        }
+        if (result.completed() != null) notifySaved(result.completed().request());
+        return result;
+    }
+
+    /** A lost response or failed version handoff retries finalization, never the document bytes. */
+    private void confirmReceipt(LocalCoreContentService.SaveReceipt receipt) throws IOException, SQLException {
+        if (notified.containsKey(receipt.request().operationId())) return;
+        var session = sessions;
+        if (session != null) {
+            try {
+                session.withFileContentWriteLock(receipt.request().projectId(), () -> {
+                    try { versions.handoffProject(content, receipt.request().projectId()); return null; }
+                    catch (IOException | SQLException failure) { throw new PublicationFailure(failure); }
+                });
+            } catch (PublicationFailure failure) {
+                if (failure.getCause() instanceof IOException io) throw io;
+                throw (SQLException) failure.getCause();
+            }
+        }
+        notifySaved(receipt.request());
+    }
+
+    private void notifySaved(LocalCoreContentService.SaveRequest request) {
+        savedBeforeReady.put(request.operationId(), request);
+        var readyEffects = effects;
+        if (readyEffects == null) return;
+        notified.computeIfAbsent(request.operationId(), operation -> {
+            readyEffects.saved(request);
+            return true;
+        });
+        savedBeforeReady.remove(request.operationId());
+    }
+
+    /** Same protocol on both sides of handoff; callers never fall back to the legacy POST for a PUT. */
+    public boolean handleContent(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        return protocolPublished && contentHttp != null && contentHttp.handle(request, response);
+    }
+
+    public int contentProtocolVersion() { return protocolPublished && contentHttp != null ? 1 : 0; }
+
+    private static final class PublicationFailure extends RuntimeException {
+        PublicationFailure(Exception cause) { super(cause); }
+    }
 
     public static void configure(SpringApplication application) {
         var wiring = new LocalCoreApplication();
@@ -70,7 +215,9 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
                 LocalIdentityService::displayNameOf);
         String build = environment.getRequiredProperty("AWD_BACKEND_BUILD");
         int publicPort = environment.getProperty("server.port", Integer.class, 8080);
+        protocolPublished = contentHttp != null; // The bootstrap verified this exact recorded schema.
         gateway = new LocalCoreGateway(publicPort, ownership, (request, response) -> {
+            if (handleContent(request, response)) return true;
             if (("GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod()))
                     && request.getRequestURI().equals("/api/desktop/health")) {
                 response.setStatus(503);
@@ -88,7 +235,9 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
                 var readPaths = new java.util.ArrayList<>(LocalCoreHttpReads.READ_PATHS);
                 readPaths.add("/api/desktop/startup-health");
                 readPaths.add("/api/desktop/health");
-                writeJson(request, response, Map.of("status", "UP", "build", build, "phase", "core", "coreReadPaths", readPaths));
+                if (contentHttp != null) readPaths.add("/api/local-core/projects/:id/files/:id/content");
+                writeJson(request, response, Map.of("status", "UP", "build", build, "phase", "core", "coreReadPaths", readPaths,
+                        "coreContentProtocol", contentHttp == null ? 0 : 1));
                 return true;
             }
             Map<String, List<String>> headers = new LinkedHashMap<>();
@@ -128,6 +277,7 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
 
     @Override public void onApplicationEvent(ApplicationContextInitializedEvent event) {
         var factory = (org.springframework.beans.factory.support.BeanDefinitionRegistry) event.getApplicationContext().getBeanFactory();
+        factory.registerBeanDefinition("localCoreApplication", new RootBeanDefinition(LocalCoreApplication.class, () -> this));
         shared.forEach((name, instance) -> {
             RootBeanDefinition definition = new RootBeanDefinition(instance.getClass());
             definition.setInstanceSupplier(() -> instance);
@@ -135,12 +285,32 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
         });
     }
 
-    @Override public void onJpaHandoff(ConfigurableApplicationContext context) {
-        // This first integration only serves reads before handoff. Content writes are not enabled yet.
+    @Override public void onJpaHandoff(ConfigurableApplicationContext context) throws Exception {
+        if (content == null) return;
+        var pending = content.beforeImagesForHandoff();
+        versions = context.getBean(com.checkba.version.LocalCoreVersionHandoff.class);
+        versions.handoff(content);
+        for (var image : pending) savedBeforeReady.put(image.request().operationId(), image.request());
+        sessions = context.getBean(com.checkba.version.WorkSessionService.class);
     }
 
-    @Override public void onReady(ConfigurableApplicationContext context) {
+    @Override public void onReady(ConfigurableApplicationContext context, boolean recordedSchema) {
+        protocolPublished = recordedSchema && contentHttp != null;
+        if (content != null) {
+            effects = context.getBean(LocalCoreContentEffects.class);
+        }
         if (gateway != null) gateway.backendReady(((ServletWebServerApplicationContext) context).getWebServer().getPort());
+        if (effects != null) {
+            savedBeforeReady.values().forEach(request -> {
+                try { notifySaved(request); }
+                catch (RuntimeException failure) {
+                    // Saved bytes and the before-image handoff are durable. A receipt retry can
+                    // retry this notification without republishing the original document.
+                    System.getLogger(LocalCoreApplication.class.getName()).log(System.Logger.Level.WARNING,
+                            "Saved local content notification deferred: fileId=" + request.fileId());
+                }
+            });
+        }
     }
 
     private void writeJson(HttpServletRequest request, HttpServletResponse response, Object body) throws Exception {

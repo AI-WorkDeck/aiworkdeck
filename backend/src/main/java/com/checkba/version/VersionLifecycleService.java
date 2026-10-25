@@ -21,9 +21,11 @@ import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.LinkOption;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
@@ -184,12 +186,46 @@ public class VersionLifecycleService {
         }
     }
 
+    record CoreBaselinePolicy(String skipReason, String authorName, String authorEmail) {}
+
+    /** Synchronous policy check under the caller's repository lock. Handoff must see failures. */
+    CoreBaselinePolicy coreBaselinePolicy(Project project, long actorId, Map<String, Long> beforeSizes) {
+        if (project.isLooseFileWorkspace()) return new CoreBaselinePolicy("LOOSE_FILES", null, null);
+        if (Boolean.TRUE.equals(project.getVersionOptOut())) return new CoreBaselinePolicy("OPT_OUT", null, null);
+        if (!autoEnable) return new CoreBaselinePolicy("AUTO_ENABLE_DISABLED", null, null);
+        if (refusedTooLarge.contains(project.getId())) return new CoreBaselinePolicy("GUARDRAIL", null, null);
+        long additionalBytes = 0;
+        try {
+            Path work = repoService.workTree(project.getId());
+            for (var before : beforeSizes.entrySet()) {
+                var attributes = Files.readAttributes(work.resolve(before.getKey()), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                if (!attributes.isRegularFile()) throw new IOException("Baseline target is not a regular file");
+                additionalBytes = Math.addExact(additionalBytes, Math.max(0L, before.getValue() - attributes.size()));
+            }
+        } catch (IOException | ArithmeticException error) {
+            throw new VersionException("无法核验修改前版本大小", error);
+        }
+        if (!withinGuardrail(project.getId(), additionalBytes)) return new CoreBaselinePolicy("GUARDRAIL", null, null);
+        var actor = userRepository.findById(actorId).orElseThrow(() -> new VersionException("版本作者已不可用"));
+        String author = UserService.signatureName(actor);
+        if (author == null || author.isBlank()) throw new VersionException("版本作者缺少有效署名");
+        return new CoreBaselinePolicy(null, author, authorEmail(project.getId(), actorId, author));
+    }
+
     /**
      * 工作区体积护栏。超过任一阈值即拒，并记进 {@link #refusedTooLarge} —— 本进程不再
      * 反复估算。遍历早停：撞到阈值立刻 TERMINATE，不会把几十 G 的目录整个走完。
      * 跳过 {@code .awd/}（我们自己写的清单，不算律师的材料）。
      */
     private boolean withinGuardrail(long projectId) {
+        return withinGuardrail(projectId, 0);
+    }
+
+    private boolean withinGuardrail(long projectId, long additionalBytes) {
+        if (additionalBytes > maxBytes) {
+            refusedTooLarge.add(projectId);
+            return false;
+        }
         Path root;
         try {
             root = repoService.workTree(projectId);
@@ -198,7 +234,7 @@ public class VersionLifecycleService {
             return false;
         }
         if (!Files.isDirectory(root)) return true;   // 还没有目录 = 空项目，随便开
-        Estimate est = estimate(root, maxBytes, maxFiles);
+        Estimate est = estimate(root, maxBytes - additionalBytes, maxFiles);
         if (!est.exceeded()) return true;
         refusedTooLarge.add(projectId);
         log.info("项目文件夹过大，不自动开启版本记录（律师仍可在版本记录面板手动开启）: "

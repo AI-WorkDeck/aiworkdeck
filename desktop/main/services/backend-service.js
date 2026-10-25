@@ -70,7 +70,7 @@ async function probeBackendStartupHealth(port, timeoutMs = 5000, expectedBuild =
     ['core', 'full'].includes(response.body.phase) && (!expectedBuild || response.body.build === expectedBuild))
   if (healthy && expectedBuild && response.body.phase === 'core' &&
       require('./backend-request-gate').coreReadMatchers(response.body.coreReadPaths)) {
-    onCoreReadPaths?.([...response.body.coreReadPaths])
+    onCoreReadPaths?.([...response.body.coreReadPaths], response.body.coreContentProtocol === 1 ? 1 : 0)
   }
   return healthy
 }
@@ -326,7 +326,7 @@ function createBackendDescriptor() {
     startupHealth: (ctx, port, build, launch) => probeBackendStartupHealth(port, 5000, build,
       () => probeBackendHealth(port, 5000, build,
         ctx.packaged ? undefined : () => probeBackend(port).then((result) => result.ours)),
-      paths => { if (launch) launch.coreReadPaths = paths }),
+      (paths, protocol) => { if (launch) { launch.coreReadPaths = paths; launch.coreContentProtocol = protocol } }),
     requestStop: async (_ctx, port, token) => {
       if (!token) return false
       const response = await requestBackendJson(port, '/api/desktop/shutdown', 5000, {

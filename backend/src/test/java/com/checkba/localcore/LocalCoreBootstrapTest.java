@@ -14,6 +14,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.availability.AvailabilityChangeEvent;
+import org.springframework.boot.availability.ReadinessState;
 import org.springframework.boot.context.event.ApplicationContextInitializedEvent;
 import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
 import org.springframework.boot.context.event.ApplicationFailedEvent;
@@ -120,8 +122,15 @@ class LocalCoreBootstrapTest {
         HikariDataSource pool;
         LocalCoreStore store;
         LocalCoreOwnership ownership;
-        int prepared, closed, handedOff, ready;
-        boolean failPrepare;
+        int prepared, closed, handedOff, ready, persistence;
+        boolean failPrepare, recovery, failRecovery, recordedSchema, readyDuringCallback;
+        @Override public boolean requiresRecovery(ConfigurableEnvironment env, Path databaseFile) { return recovery; }
+        @Override public void onPersistencePrepared(ConfigurableEnvironment env, DataSource ds, LocalCoreStore store, Path databaseFile) {
+            persistence++;
+            if (ds instanceof HikariDataSource hikari) this.pool = hikari;
+            this.store = store;
+            if (failRecovery) throw new IllegalStateException("Owned recovery failure");
+        }
         @Override public AutoCloseable onCorePrepared(ConfigurableEnvironment env, DataSource ds,
                                                       LocalCoreStore store, LocalCoreOwnership ownership) {
             prepared++;
@@ -131,15 +140,36 @@ class LocalCoreBootstrapTest {
             return () -> closed++;
         }
         @Override public void onJpaHandoff(ConfigurableApplicationContext context) {
-            assertEquals(LocalCoreOwnership.State.DRAINING, ownership.state());
+            if (ownership != null) assertEquals(LocalCoreOwnership.State.DRAINING, ownership.state());
             handedOff++;
         }
-        @Override public void onReady(ConfigurableApplicationContext context) { ready++; }
+        @Override public void onReady(ConfigurableApplicationContext context, boolean recordedSchema) {
+            ready++;
+            this.recordedSchema = recordedSchema;
+            readyDuringCallback = context.getBean(LocalCoreBootstrap.class).isFullReady();
+        }
     }
 
     @Configuration(proxyBeanMethods = false)
     @ImportAutoConfiguration(DataSourceAutoConfiguration.class)
     static class DataSourceConfiguration {}
+
+    @Configuration(proxyBeanMethods = false)
+    static class LegacyHandoffConfiguration {
+        @org.springframework.context.annotation.Bean
+        LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource source) {
+            var factory = new LocalContainerEntityManagerFactoryBean();
+            factory.setDataSource(source);
+            factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
+            factory.setManagedTypes(PersistenceManagedTypes.of());
+            factory.setJpaPropertyMap(Map.of("hibernate.hbm2ddl.auto", "none"));
+            return factory;
+        }
+        @org.springframework.context.annotation.Bean
+        SmartInitializingSingleton ownedHandoff(LocalCoreBootstrap bootstrap, ConfigurableApplicationContext context) {
+            return () -> bootstrap.beforeJpaBusinessInitialization(context, Duration.ofSeconds(2));
+        }
+    }
 
     private static SpringApplication application() {
         SpringApplication application = new SpringApplication(DataSourceConfiguration.class);
@@ -183,6 +213,97 @@ class LocalCoreBootstrapTest {
         }
         assertFalse(new LocalCoreSchemaProof(unknown.source, BUILD).isCurrent());
         assertFalse(new LocalCoreSchemaProof(schemaChanged.source, BUILD).isCurrent());
+    }
+
+    @Test void pendingJournalRecoversBeforeLegacyDdlEvenWhenDisabledOrBuildChanged() throws Exception {
+        for (Map<String, Object> change : List.of(Map.<String, Object>of("desktop.local-core.enabled", false),
+                Map.<String, Object>of("AWD_BACKEND_BUILD", "new-build"), Map.<String, Object>of("AWD_BACKEND_BUILD", ""))) {
+            Fixture fixture = new Fixture(true, true);
+            fixture.properties.putAll(change); fixture.capture.recovery = true;
+            fixture.prepare();
+            assertEquals(1, fixture.capture.persistence);
+            assertEquals(0, fixture.capture.prepared);
+            assertEquals("update", fixture.env.getProperty("spring.jpa.hibernate.ddl-auto"));
+            assertTrue(fixture.capture.pool.getJdbcUrl().contains(";AUTO_SERVER=FALSE;"));
+            assertTrue(new LocalCoreSchemaProof(fixture.capture.pool, "new-build").isRecordedSchema());
+            assertFalse(new LocalCoreSchemaProof(fixture.capture.pool, "new-build").isCurrent());
+        }
+    }
+
+    @Test void pendingJournalNeverFallsThroughOnUnknownChangedOrMissingSchemaAndRecoveryFailure() throws Exception {
+        Fixture unknown = new Fixture(true, false), changed = new Fixture(true, true), missing = new Fixture(false, false);
+        sql(changed.source, "ALTER TABLE project ADD COLUMN changed INTEGER");
+        for (Fixture fixture : List.of(unknown, changed, missing)) {
+            fixture.capture.recovery = true;
+            fixture.properties.put("desktop.local-core.enabled", false);
+            assertThrows(IllegalStateException.class, fixture::prepare);
+            assertEquals(0, fixture.capture.prepared);
+            assertEquals(0, fixture.capture.persistence);
+        }
+        assertFalse(Files.exists(missing.directory.resolve("local.mv.db")));
+        Fixture failed = new Fixture(true, true);
+        failed.capture.recovery = true; failed.capture.failRecovery = true;
+        assertThrows(IllegalStateException.class, failed::prepare);
+        assertEquals(1, failed.capture.persistence); assertEquals(0, failed.capture.prepared);
+        assertTrue(failed.capture.pool.isClosed());
+    }
+
+    @Test void pendingJournalIsDiscoveredBeforeRejectingUnsupportedConnectionConfiguration() throws Exception {
+        for (String option : List.of(";WRITE_DELAY=0", ";INIT=DROP ALL OBJECTS")) {
+            Fixture fixture = new Fixture(true, true);
+            fixture.capture.recovery = true;
+            fixture.properties.put("desktop.local-core.enabled", false);
+            fixture.properties.put("spring.datasource.url", fixture.source.getURL() + option);
+            assertThrows(IllegalStateException.class, fixture::prepare);
+            assertEquals(0, fixture.capture.persistence);
+            assertTrue(new LocalCoreSchemaProof(fixture.source, BUILD).isCurrent());
+        }
+        for (Map<String, Object> configuration : List.of(
+                Map.<String, Object>of("spring.datasource.jndi-name", "java:comp/env/owned-unavailable"),
+                Map.<String, Object>of("spring.datasource.hikari.connection-init-sql", "DROP ALL OBJECTS"))) {
+            Fixture fixture = new Fixture(true, true);
+            fixture.capture.recovery = true; fixture.properties.putAll(configuration);
+            assertThrows(IllegalStateException.class, fixture::prepare);
+            assertTrue(new LocalCoreSchemaProof(fixture.source, BUILD).isCurrent());
+        }
+    }
+
+    @Test void newBuildWithoutJournalKeepsExclusivePoolForLegacyDdlAndLaterContentProtocol() throws Exception {
+        Fixture fixture = new Fixture(true, true);
+        String url = legacyAutoServerUrl(fixture);
+        fixture.properties.put("AWD_BACKEND_BUILD", "next-build"); fixture.prepare();
+        assertEquals(0, fixture.capture.prepared); assertEquals(0, fixture.capture.persistence);
+        assertEquals("update", fixture.env.getProperty("spring.jpa.hibernate.ddl-auto"));
+        Process other = databaseProcess("probe", url);
+        try {
+            assertEquals("DENIED:90020", status(other));
+            assertTrue(other.waitFor(5, TimeUnit.SECONDS)); assertEquals(2, other.exitValue());
+        } finally { release(other); }
+    }
+
+    @Test void recoveryOnlyPoolIsSharedAndHandoffRunsOnceBeforeLegacyBusinessInitialization() throws Exception {
+        Fixture fixture = new Fixture(true, true);
+        fixture.capture.recovery = true; fixture.properties.put("desktop.local-core.enabled", false);
+        fixture.prepare();
+        GenericApplicationContext context = fixture.context();
+        new AnnotatedBeanDefinitionReader(context).register(DataSourceConfiguration.class);
+        context.registerBean("entityManagerFactory", LocalContainerEntityManagerFactoryBean.class, () -> {
+            var factory = new LocalContainerEntityManagerFactoryBean();
+            factory.setDataSource(context.getBean(DataSource.class));
+            factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
+            factory.setManagedTypes(PersistenceManagedTypes.of());
+            factory.setJpaPropertyMap(Map.of("hibernate.hbm2ddl.auto", "none"));
+            return factory;
+        });
+        context.registerBean("ownedGate", SmartInitializingSingleton.class, () -> () -> {
+            fixture.bootstrap.beforeJpaBusinessInitialization(context, Duration.ofSeconds(2));
+            fixture.bootstrap.beforeJpaBusinessInitialization(context, Duration.ofSeconds(2));
+            assertEquals(1, fixture.capture.persistence); assertEquals(1, fixture.capture.handedOff);
+        });
+        context.refresh();
+        assertSame(fixture.capture.pool, context.getBean(DataSource.class));
+        assertNull(fixture.capture.ownership);
+        context.close(); assertTrue(fixture.capture.pool.isClosed());
     }
 
     @Test void memoryServerRelativeAndExecutableJdbcOptionsAreNeverProbed() throws Exception {
@@ -300,6 +421,7 @@ class LocalCoreBootstrapTest {
     @Test void realSpringLegacyReadyRecordsProofOnlyAfterAllSynchronousReadyListenersFinish() throws Exception {
         Fixture fixture = new Fixture(true, false);
         fixture.properties.put("spring.datasource.hikari.maximum-pool-size", 1);
+        fixture.app.addPrimarySources(List.of(LegacyHandoffConfiguration.class));
         fixture.app.addListeners(fixture.bootstrap);
         fixture.app.addListeners(event -> {
             if (event instanceof ApplicationReadyEvent) {
@@ -328,6 +450,70 @@ class LocalCoreBootstrapTest {
         assertThrows(IllegalStateException.class, fixture.app::run);
         assertEquals(1, fixture.capture.prepared); assertEquals(0, fixture.capture.ready);
         assertEquals(1, fixture.capture.closed); assertTrue(fixture.capture.pool.isClosed());
+    }
+
+    @Test void recoveryOnlyCannotBecomeReadyWithoutItsVersionHandoff() throws Exception {
+        Fixture fixture = new Fixture(true, true);
+        fixture.capture.recovery = true;
+        fixture.properties.put("desktop.local-core.enabled", false);
+        fixture.app.addListeners(fixture.bootstrap);
+        assertThrows(IllegalStateException.class, fixture.app::run);
+        assertEquals(1, fixture.capture.persistence);
+        assertEquals(0, fixture.capture.handedOff);
+        assertEquals(0, fixture.capture.ready);
+        assertFalse(fixture.bootstrap.isFullReady());
+        assertTrue(fixture.capture.pool.isClosed());
+    }
+
+    @Test void earlyCoreCannotSilentlyWithdrawItsProtocolWhenALateListenerChangesSchema() throws Exception {
+        Fixture fixture = new Fixture(true, true);
+        fixture.app.addPrimarySources(List.of(LegacyHandoffConfiguration.class));
+        fixture.app.addListeners(fixture.bootstrap);
+        fixture.app.addListeners(event -> {
+            if (event instanceof ApplicationReadyEvent ready) {
+                try { sql(ready.getApplicationContext().getBean(DataSource.class), "ALTER TABLE project ADD COLUMN too_late INTEGER"); }
+                catch (Exception failure) { throw new IllegalStateException(failure); }
+            }
+        });
+        assertThrows(IllegalStateException.class, fixture.app::run);
+        assertEquals(1, fixture.capture.prepared);
+        assertEquals(1, fixture.capture.handedOff);
+        assertEquals(0, fixture.capture.ready);
+        assertFalse(fixture.bootstrap.isFullReady());
+        assertTrue(fixture.capture.pool.isClosed());
+    }
+
+    @Test void recoveryOnlyRecordsChangedLegacySchemaBeforePublishingFullReadiness() throws Exception {
+        for (String build : List.of("next-build", "")) {
+            Fixture fixture = new Fixture(true, true);
+            fixture.capture.recovery = true;
+            fixture.properties.put("desktop.local-core.enabled", false);
+            fixture.properties.put("AWD_BACKEND_BUILD", build);
+            fixture.prepare();
+            GenericApplicationContext context = fixture.context();
+            context.registerBean("entityManagerFactory", LocalContainerEntityManagerFactoryBean.class, () -> {
+                var factory = new LocalContainerEntityManagerFactoryBean();
+                factory.setDataSource(context.getBean(DataSource.class));
+                factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
+                factory.setManagedTypes(PersistenceManagedTypes.of());
+                factory.setJpaPropertyMap(Map.of("hibernate.hbm2ddl.auto", "none"));
+                return factory;
+            });
+            context.refresh();
+            sql(fixture.capture.pool, "ALTER TABLE project ADD COLUMN migrated INTEGER");
+            assertFalse(new LocalCoreSchemaProof(fixture.capture.pool, BUILD).isRecordedSchema());
+            fixture.bootstrap.beforeJpaBusinessInitialization(context, Duration.ofSeconds(2));
+            fixture.bootstrap.onApplicationEvent(new ApplicationReadyEvent(fixture.app, new String[0], context, Duration.ZERO));
+            assertFalse(fixture.bootstrap.isFullReady());
+            fixture.bootstrap.onApplicationEvent(new AvailabilityChangeEvent<>(context, ReadinessState.ACCEPTING_TRAFFIC));
+            assertTrue(fixture.capture.recordedSchema);
+            assertFalse(fixture.capture.readyDuringCallback);
+            assertTrue(fixture.bootstrap.isFullReady());
+            assertTrue(new LocalCoreSchemaProof(fixture.capture.pool, build.isEmpty() ? "recovery" : build).isCurrent());
+            assertEquals(1, fixture.capture.handedOff);
+            context.close();
+            assertFalse(fixture.bootstrap.isFullReady());
+        }
     }
 
     @Test void callbackFailureAndApplicationFailureCloseOnlyOwnedResources() throws Exception {

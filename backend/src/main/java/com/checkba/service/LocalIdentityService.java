@@ -293,19 +293,15 @@ public class LocalIdentityService {
     }
 
     private void saveSelected(Long userId) {
-        try {
-            SystemSetting setting = systemSettingRepository.findByKey(SELECTED_KEY)
-                    .orElseGet(() -> {
-                        SystemSetting fresh = new SystemSetting();
-                        fresh.setKey(SELECTED_KEY);
-                        return fresh;
-                    });
-            setting.setValue(String.valueOf(userId));
-            systemSettingRepository.save(setting);
-        } catch (Exception e) {
-            // 写不进去不致命：下次启动按同样规则重算，结果一致（只是多一次统计）
-            log.warn("本机身份持久化写入失败（不影响本次运行）: {}", e.getMessage());
-        }
+        SystemSetting setting = systemSettingRepository.findByKey(SELECTED_KEY)
+                .orElseGet(() -> {
+                    SystemSetting fresh = new SystemSetting();
+                    fresh.setKey(SELECTED_KEY);
+                    return fresh;
+                });
+        setting.setValue(String.valueOf(userId));
+        // Publish the cached identity only after its authoritative database selection is durable.
+        systemSettingRepository.save(setting);
     }
 
     // ==================== 工具 ====================
