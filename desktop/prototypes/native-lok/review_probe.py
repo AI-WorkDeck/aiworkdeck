@@ -24,8 +24,19 @@ class Worker:
         self.stderr = (out / 'worker-stderr.log').open('wb')
         self.proc = subprocess.Popen([str(worker), str(runtime), (out / 'profile').as_uri(), str(out)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.stderr, env=self.env, cwd=out, start_new_session=True)
         threading.Thread(target=self.read, daemon=True).start()
-        ready, _ = self.replies.get(timeout=60)
-        assert ready['type'] == 'engine-ready', ready
+        try:
+            ready, _ = self.replies.get(timeout=60)
+            assert ready.get('type') == 'engine-ready', ready
+        except Exception:
+            if self.proc.poll() is None:
+                self.proc.terminate()
+                try:
+                    self.proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    self.proc.kill()
+                    self.proc.wait(timeout=10)
+            self.stderr.close()
+            raise
         self.ready = ready
 
     def read_exact(self, count):
@@ -65,19 +76,26 @@ class Worker:
         return msg, data
 
     def stop(self):
+        self.cleanup_error = None
         if self.proc.poll() is None:
             try:
                 self.call('shutdown')
                 self.proc.wait(timeout=10)
+            except Exception as error:
+                self.cleanup_error = repr(error)
             finally:
                 if self.proc.poll() is None:
                     self.proc.terminate()
-                    self.proc.wait(timeout=10)
+                    try:
+                        self.proc.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        self.proc.kill()
+                        self.proc.wait(timeout=10)
         self.stderr.close()
 
 
 class UnoReview:
-    def __init__(self, worker, host, runtime, out):
+    def __init__(self, worker, host, runtime, out, script=None):
         port = worker.call('start_urp')[0]['port']
         home = runtime / 'Frameworks/LibreOfficePython.framework/Versions/3.12'
         env = dict(worker.env, PYTHONHOME=str(home),
@@ -85,7 +103,7 @@ class UnoReview:
                    URE_BOOTSTRAP='vnd.sun.star.pathname:' + str(runtime / 'Resources/fundamentalrc'))
         self.stderr = (out / 'uno-stderr.log').open('w')
         self.proc = subprocess.Popen([str(host), str(home / 'LibreOfficePython'),
-                                      str(Path(__file__).with_name('review_uno.py').resolve()), '--port', str(port)],
+                                      str(script or Path(__file__).with_name('review_uno.py').resolve()), '--port', str(port)],
                                      env=env, cwd=out, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=self.stderr, text=True)
         self.url, self.seq = (out / 'document.docx').as_uri(), 0
@@ -101,17 +119,76 @@ class UnoReview:
         return reply['result']
 
     def stop(self):
+        self.cleanup_error = None
         try:
             try:
                 self.proc.stdin.close()
             except BrokenPipeError:
                 pass
             self.proc.wait(timeout=10)
+        except Exception as error:
+            self.cleanup_error = repr(error)
         finally:
             if self.proc.poll() is None:
                 self.proc.terminate()
-                self.proc.wait(timeout=10)
+                try:
+                    self.proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    self.proc.kill()
+                    self.proc.wait(timeout=10)
             self.stderr.close()
+
+
+def verify_margin_engine(worker, review, out):
+    """Exercise the patched native layout, export and synchronous undo contract.
+
+    The host's choice of which entry requires this detour is tested separately;
+    this probe deliberately knows the two resolutions it creates here.
+    """
+    from probe import docx_projection
+    original = docx_projection(out / 'document.docx')
+    view = review.call('view', mode='balloons', refresh=True)
+    assert view['showChangesInMargin'] and view['mode'] == 'balloons', view
+    geometry = review.call('geometry')
+    assert geometry['available']
+    geometry = geometry['geometry']
+    current, _ = worker.call('review_snapshot')
+    assert len(geometry['revisions']) == 600
+    assert {str(item['id']) for item in geometry['revisions']} == {item['revisionId'] for item in current['items']}
+    assert any(item['index'] == 599 for item in geometry['revisions'])
+    assert geometry['pages'] and any(page['gutterWidth'] > 0 for page in geometry['pages'])
+    (out / 'margin-geometry.json').write_text(json.dumps(geometry, ensure_ascii=False, indent=2))
+    try:
+        review.call('view', mode='all', internal=True, refresh=True)
+        worker.call('save', path=str(out / 'margin-export.docx'))
+    finally:
+        review.call('view', mode='balloons', internal=True, refresh=True)
+    saved = docx_projection(out / 'margin-export.docx')
+    for key in ('all', 'original', 'final', 'revisions'):
+        assert saved[key] == original[key], 'Margin export changed ' + key
+    for decision, count in (('accept', 599), ('reject', 598)):
+        try:
+            review.call('view', mode='all', internal=True, refresh=True)
+            current, _ = worker.call('review_snapshot')
+            applied, _ = worker.call('review_resolve', refreshEpoch=current['refreshEpoch'],
+                                     revisionId=current['items'][0]['revisionId'], decision=decision)
+            assert applied['applied'] and applied['remainingCount'] == count
+        finally:
+            review.call('view', mode='balloons', internal=True, refresh=True)
+    for kind, count in (('undo', 599), ('undo', 600), ('redo', 599), ('redo', 598), ('undo', 599), ('undo', 600)):
+        try:
+            review.call('view', mode='all', internal=True, refresh=True)
+            applied = review.call('undo_step', kind=kind, expected=review.call('undo_state'))
+            assert applied['applied']
+        finally:
+            review.call('view', mode='balloons', internal=True, refresh=True)
+        current, _ = worker.call('review_snapshot')
+        assert len(current['items']) == count, (kind, count, len(current['items']))
+    review.call('view', mode='all', internal=True, refresh=True)
+    worker.call('save', path=str(out / 'margin-undo-export.docx'))
+    saved = docx_projection(out / 'margin-undo-export.docx')
+    for key in ('all', 'original', 'final', 'revisions'):
+        assert saved[key] == original[key], 'Margin undo/redo changed ' + key
 
 
 def main():
@@ -153,6 +230,12 @@ def main():
             details = review.call('snapshot')
             assert len(details['entries']) == 600
             result['controllerCapabilities'] = details['controllerCapabilities']
+            if all(details['controllerCapabilities'].values()):
+                verify_margin_engine(worker, review, out)
+                result['marginGeometryExportAndRepeatedUndo'] = True
+                snapshot, _ = worker.call('review_snapshot')
+                first = snapshot['items'][0]
+                details = review.call('snapshot')
         goto, _ = worker.call('review_goto', refreshEpoch=snapshot['refreshEpoch'], revisionId=first['revisionId'])
         assert '合成测试条款0' in goto['text'], goto
         result['goto'] = goto
@@ -209,6 +292,9 @@ def main():
         finally:
             worker.stop()
         result['exitCode'] = worker.proc.returncode
+        result['cleanupErrors'] = [error for error in (worker.cleanup_error, review.cleanup_error if review else None) if error]
+        result['success'] = bool(result.get('success') and result['exitCode'] == 0
+                                 and result.get('unoExitCode', 0) == 0 and not result['cleanupErrors'])
         (out / 'events.json').write_text(json.dumps(worker.events, ensure_ascii=False, indent=2))
         (out / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2))
     print(json.dumps(result, ensure_ascii=False, indent=2))

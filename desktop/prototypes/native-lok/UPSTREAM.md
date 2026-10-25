@@ -77,3 +77,71 @@ Primary API references:
 [LibreOfficeKit](https://docs.libreoffice.org/libreofficekit.html),
 [C API header](https://github.com/LibreOffice/core/blob/libreoffice-26.2.2.2/include/LibreOfficeKit/LibreOfficeKit.h),
 [function-based URP implementation](https://github.com/LibreOffice/core/blob/libreoffice-26.2.2.2/desktop/source/lib/init.cxx).
+
+## Native source build and lifetime regression, 2026-10-25
+
+The source experiment starts at the exact LibreOffice core commit
+`8221e31b3ac356a1623c672912a3d2b492f7e3d1` above, applies all 53 LibreOffice patches
+from the pinned ElyOffice `v0.1.9` source archive in filename order, then applies
+the two AI WorkDeck patches in `patches/` in filename order. Downloaded Ely
+patches and source remain in the isolated build artifact directory; their
+upstream license notices apply unchanged.
+
+- `0001-awd-review-geometry-gutter-native-port.patch` ports this repository's
+  existing LOWA page-gutter and table-margin changes to that native source.
+  It queries layout through Writer's controller and does not cap geometry at
+  500 revisions/comments. The completed native build returned all 600 revision
+  anchors in the synthetic fixture, including entry 599 and nonzero page gutters.
+  Margin-view export and two resolutions followed by repeated undo/redo preserved
+  the all/original/final text and all original revision groups on DOCX readback.
+  This does not establish the full overlay/comment UI or arbitrary DOCX parity.
+- `0002-redline-release-solar-mutex.patch` serializes `SwXRedline` destruction
+  with Writer's SolarMutex. An actual URP crash occurred in `SvtBroadcaster`
+  while `SwXRedlines::getByIndex` obtained temporary redline objects. The source
+  has listener destruction outside the mutex; other Writer UNO classes already
+  take the mutex in `release()`. Two separate patched processes completed 20
+  rounds each of 600 temporary redline reads with identical identity/text hashes
+  and normal UNO/worker exits. Reversing only this patch in the same source build
+  reproduced SIGSEGV in the first round, with the same
+  `SvtBroadcaster::Broadcast` → `SwXRedlines::getByIndex` stack. The shared
+  `libmergedlo` hash was identical; only the rebuilt Writer library differed.
+  This is a reproduced/fixed lifetime race, not proof that all native hangs or
+  crashes are eliminated. Failure reports and the controlled-build hashes remain
+  in the `2026-10-25-startup-data-migration` artifact directory.
+
+The isolated build follows Ely's `scripts/build-libreoffice.sh` configuration,
+including `--enable-mergelibs`, `--enable-release-build`, `--without-java` and
+`--disable-python`. Its UNO test client continues to use the explicit read-only
+26.2.2.2 Python runtime described above. No build result is installed, signed or
+distributed by this prototype. The original downloaded engine remains the
+baseline; its measurements must not be attributed to the new source build.
+
+The verified patched runtime is frozen separately from the source build's
+`instdir` before the negative-control rebuild. Use the frozen `runtime-patched`
+bundle for subsequent measurements; an `instdir` left by the negative control
+must not be mistaken for the patched engine. No runtime binary is committed.
+
+## Match the existing resource packaging contract
+
+A fresh source build leaves 65 dictionary extensions in `Resources/extensions`.
+The first new profile registered all of them before the main queue became ready;
+an owned-process sample placed every main-thread sample in
+`SynchronizeExtensionRepositories`. The original Ely build script explicitly
+keeps only `dict-en` and strips Python-only Lightproof assets. AI WorkDeck already
+has the same en/zh selection in
+`desktop/lowa-build/patches/apply-source-patches.py::slim_dictionaries`.
+
+The performance candidate is a **separate copy** of the patched runtime under
+`runtime-product/instdir/LibreOffice.app`, processed by that existing helper.
+The 33 retained English resource files match the original Ely package by relative
+path and SHA-256, including Hunspell, hyphenation and thesaurus data. All 3,457
+unchanged files were hash-checked; all 718 differences are confined to extensions.
+The engine libraries and fonts are unchanged. The frozen full-product WASM
+metadata actually contains no dictionary extension files and retains its Chinese
+resources; this is not a newly removed product spellcheck feature.
+
+Keep the unprocessed runtime and failed/loaded timing observations. Measure fresh
+profiles after packaging; do not seed an already-registered user profile and call
+it first launch. The ready event still waits for the native main queue. Static
+resource equality and an observed shorter registration phase do not by themselves
+establish normal-load speed or full-product parity.

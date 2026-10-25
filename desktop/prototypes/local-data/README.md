@@ -3,7 +3,7 @@
 
 # Isolated native local-data prototype
 
-This is a component experiment for macOS, not a replacement product backend. It runs Swift/Foundation with the system SQLite library, stores actual metadata and document bytes, and exposes a JSON-lines child-process protocol. It is not used by the production desktop entry point, does not open H2, and does not migrate existing projects. Windows support is unchanged.
+This is a component experiment for macOS, not a replacement product backend. It runs Swift/Foundation with the system SQLite library, stores actual metadata and document bytes, and exposes a JSON-lines child-process protocol. It is not used by the production desktop entry point and does not open H2. The [offline migration helper](migration/README.md) can populate an isolated copy from a verified H2 snapshot; it does not transfer production ownership. Windows support is unchanged.
 
 The experiment tests a concrete question: how soon can an independently owned local profile list real projects, read a document, and durably save it without starting Spring/JPA? `health` measures only that capability. It must not be presented as full-workbench readiness or as evidence that AI, versions, or collaboration still work.
 
@@ -30,8 +30,9 @@ Every input line is one UTF-8 object:
 ```json
 {"id":1,"method":"health","params":{}}
 {"id":2,"method":"projects.create","params":{"name":"Synthetic project"}}
-{"id":3,"method":"files.create","params":{"projectId":1,"name":"example.txt","contentBase64":"aGVsbG8="}}
-{"id":4,"method":"files.read","params":{"projectId":1,"fileId":1}}
+{"id":3,"method":"files.mkdir","params":{"projectId":1,"name":"contracts"}}
+{"id":4,"method":"files.create","params":{"projectId":1,"parentId":1,"name":"example.txt","contentBase64":"aGVsbG8="}}
+{"id":5,"method":"files.read","params":{"projectId":1,"fileId":2}}
 ```
 
 Every response preserves `id` and has either `result` or `error: {code,message}`. Stdout contains only protocol messages. The trusted desktop main process should hold this pipe; do not expose an unrestricted method dispatcher or physical file paths to untrusted renderer content.
@@ -42,28 +43,33 @@ Every response preserves `id` and has either `result` or `error: {code,message}`
 | `projects.list` | None | Array of SQLite projects, ordered by numeric ID |
 | `projects.get` | `projectId` | One project; missing is an error |
 | `projects.create` | `name` | Persisted numeric `id`, stable UUID `uid`, name, timestamps, local-only `myRole: OWNER` |
-| `files.list` | `projectId` | Flat list of persisted live files; no fabricated folder tree |
-| `files.create` | `projectId`, `name`, `contentBase64` | Persisted file metadata after bytes have been published |
-| `files.read` | `projectId`, `fileId` | Metadata, actual `contentBase64`, actual SHA-256 `generation`, `physicalPath` for a trusted native document adapter |
-| `files.save` | `projectId`, `fileId`, `expectedGeneration`, `contentBase64` | Metadata after successful disk and database commit |
+| `files.list` | `projectId` | Flat list of persisted live entries (files and directories) with `parentId`/`isFolder`; clients assemble the tree themselves |
+| `files.mkdir` | `projectId`, `name`, optional `parentId` | Persisted directory with stable numeric `id` and UUID `uid`, plus the real on-disk directory |
+| `files.create` | `projectId`, `name`, optional `parentId`, `contentBase64` | Persisted file metadata after bytes have been published |
+| `files.read` | `projectId`, `fileId` | Metadata, actual `contentBase64`, actual SHA-256 `generation`, `physicalPath` for a trusted native document adapter; directories return `IS_DIRECTORY` |
+| `files.save` | `projectId`, `fileId`, `expectedGeneration`, `contentBase64` | Metadata after successful disk and database commit; directories return `IS_DIRECTORY` |
 | `settings.get` | `key` | JSON value or null; only `local.ui.*` is accepted |
 | `settings.set` | `key`, `value` | Persisted JSON value; only `local.ui.*` is accepted |
 
 `files.read` hashes the actual bytes. `files.save` must pass the generation returned by that read (or the previous successful save); a stale fingerprint returns `CONFLICT`. A disappeared original returns `NOT_FOUND` and is never silently recreated. Numeric project and file IDs are both required; a file in another project cannot be addressed with a guessed ID. These are new prototype identities, not imported H2 identities. Text metadata, including project names and setting keys, rejects U+0000 before SQLite binding; it must never silently truncate or alias an existing key. Content is limited to 32 MiB; the base64 protocol copies buffers and is not a large-file streaming design.
+
+Directories are first-class entries in the same `files` table (`kind=1`) with stable numeric IDs and UUIDs; a missing `parentId` means the project root (`parent_id=0` internally). Names must be unique within one directory (`UNIQUE(project_id,parent_id,name)`); the same name in different directories is allowed. A `parentId` pointing into another project, a missing directory, or a file returns `NOT_FOUND`; a corrupted cyclic or over-deep parent chain returns `CYCLE_DETECTED`. The logical `filePath` and the physical path are resolved by walking the parent chain per access — startup never scans the whole file tree. Rename, move and delete are not implemented, so cycles cannot be created through the protocol. Reading or saving a directory returns `IS_DIRECTORY`. A failed `files.mkdir` removes the just-created on-disk directory; a failed `files.create` removes its unpublished row, so neither leaves a visible phantom entry.
+
+Old v1 profiles (flat `files` table with `UNIQUE(project_id,name)`, `user_version=0`) are migrated on open inside one SQLite transaction: rows are copied into the v2 tree table with `parent_id=0`, numeric IDs, UIDs, generations and the on-disk root bytes stay unchanged, the ID sequence is preserved, and `user_version` becomes 2. A failed migration rolls back and leaves the v1 table intact. This is prototype-schema evolution only, not an H2 import.
 
 For a save response, update the editor's generation only on success. A pipe failure or `RECOVERY_REQUIRED` leaves the outcome unknown: block further writes and close/restart the service before rereading the actual file. Do not blindly retry with a new generation or clear a save guard merely because the editor was reopened. Native editors must **export to their own temporary output and submit bytes to `files.save`**. `physicalPath` is for read access; editing it in place bypasses the generation/journal contract and is not supported by this experiment.
 
 An example successful health response includes:
 
 ```json
-{"id":1,"result":{"ready":true,"protocolVersion":1,"backend":"swift-sqlite-isolated-prototype","capabilities":["projects","flat-files","atomic-save","ui-settings"],"unavailable":["h2-migration","ai","git-versions","cloud-acl","watcher","folders","external-files"]}}
+{"id":1,"result":{"ready":true,"protocolVersion":1,"backend":"swift-sqlite-isolated-prototype","capabilities":["projects","flat-files","file-tree","atomic-save","ui-settings"],"unavailable":["h2-migration","ai","git-versions","cloud-acl","watcher","external-files"]}}
 ```
 
 Additional `profile` and `elapsedMs` fields are diagnostic. Measure process launch through the received health/first successful business response externally; do not substitute the internal elapsed field for an app measurement.
 
 ## Disk and transaction contract
 
-The profile owns `local.sqlite`, `storage/projects/{id}/{name}`, a marker and ownership lock. No arbitrary local roots, external file grants, nested folders, symlinks, or hard-linked files are supported. Existing file permissions are preserved on save. Stable path validation prevents ordinary symlink escapes; this is not a security boundary against a hostile process with the same OS account racing filesystem changes.
+The profile owns `local.sqlite`, `storage/projects/{id}/...` (a real directory tree mirroring the metadata parent chain), a marker and ownership lock. No arbitrary local roots, external file grants, rename/move/delete, or hard-linked files are supported; symlinks are rejected at every resolved path level (profile, storage, project directory, each ancestor directory, and the final file). Existing file permissions are preserved on save. Stable path validation prevents ordinary symlink escapes; this is not a security boundary against a hostile process with the same OS account racing filesystem changes.
 
 SQLite uses foreign keys, WAL and `synchronous=FULL`. For a save:
 
@@ -85,7 +91,7 @@ The contracts below were read in `ProjectController`, `ProjectFileController`, `
 | Existing responsibility | Why this prototype cannot take ownership yet |
 | --- | --- |
 | Project/file identity | H2 numeric IDs, stable file UUIDs, task/evidence/checkpoint foreign keys and frontend `Number(id)` must survive migration. New SQLite IDs cannot be reused as if they were existing H2 IDs. |
-| Storage addressing | Existing projects include both global managed storage and arbitrary `localRoot` projects. Selected external files are exact-file grants. This sample supports only its own managed, flat storage. |
+| Storage addressing | Existing projects include both global managed storage and arbitrary `localRoot` projects. Selected external files are exact-file grants. This sample supports only its own managed tree storage. |
 | Version records | Version recording defaults on; opt-out persists. The real Git directory is `{globalRoot}/repos/project-{id}.git`; worktree resolution and `.awd/tree.json` must agree. Local-root projects share a stable lock, including overlapping roots. SQLite metadata is not a Git checkpoint. |
 | Save/checkpoint/restore | Existing prepare/export/upload leases, unresolved-write guards, precise restore IDs, editor reload and must-exist movement rules must remain one coordinated protocol. Atomic native save alone does not replace that protocol. |
 | Watchers | The backend reconciles Finder changes and identity, notifies the file tree, and retains movement/deletion semantics. This sample detects content changes on read/save but does not reconcile external creates/deletes/renames or update a live UI tree. |

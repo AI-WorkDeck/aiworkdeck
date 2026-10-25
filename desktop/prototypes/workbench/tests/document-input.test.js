@@ -159,3 +159,45 @@ test('leaving freezes inputs after draining pending commits and cursor callbacks
 test('leaving during composition refuses to discard the marked text',async()=>{
  const h=harness();h.composition('compositionstart');h.text('ni', 'insertCompositionText',true);await assert.rejects(h.component.suspend(),/composition/i);assert.equal(h.component.getState().composing,true);h.composition('compositionend','你');await h.component.flush();assert.deepEqual(texts(h),['你']);h.close();
 });
+
+test('undo and redo shortcuts use the guarded host command, never raw native keys',async()=>{
+ const h=harness();
+ for(const [key,options] of [['z',{metaKey:true}],['z',{metaKey:true,shiftKey:true}],['z',{ctrlKey:true}],['y',{ctrlKey:true}]]){
+  assert.equal(h.key(key,options).defaultPrevented,true);
+  h.input.dispatchEvent(new h.window.KeyboardEvent('keyup',{key,...options}));
+ }
+ await h.component.flush();
+ assert.deepEqual(h.calls.filter(c=>c.action==='command').map(c=>c.command),['.uno:Undo','.uno:Redo','.uno:Undo','.uno:Redo']);
+ assert.equal(h.calls.filter(c=>c.action==='input_key').length,0);
+ assert.equal(h.component.getState().inputSeq,0);h.close();
+});
+
+test('confirmed text, undo, later text and save barrier stay ordered without an input sequence gap',async()=>{
+ let release;
+ const h=harness((action,p)=>action==='input_text'&&p.text==='先输入'
+  ?new Promise(resolve=>{release=()=>resolve({applied:true,lastInputSeq:p.inputSeq,documentEpoch:p.documentEpoch,viewId:2})})
+  :{applied:true,lastInputSeq:p.inputSeq,documentEpoch:p.documentEpoch,viewId:2});
+ h.text('先输入');h.key('z',{metaKey:true});h.text('继续');
+ const flushed=h.component.flush();await tick();
+ assert.equal(h.calls.some(c=>c.action==='command'),false);release();await flushed;
+ assert.deepEqual(h.calls.map(c=>[c.action,c.inputSeq]),[['input_text',1],['command',undefined],['input_text',2],['input_barrier',2]]);
+ assert.equal(h.component.getState().lastAppliedSeq,2);h.close();
+});
+
+test('undo during composition stays with the input method and sends no document command',async()=>{
+ const h=harness();h.composition('compositionstart');
+ assert.equal(h.key('z',{metaKey:true}).defaultPrevented,false);
+ assert.equal(h.key('y',{ctrlKey:true,isComposing:true,keyCode:229}).defaultPrevented,false);
+ h.composition('compositionend','');await h.component.flush();
+ assert.equal(h.calls.some(c=>c.action==='command'||c.action==='input_key'),false);h.close();
+});
+
+test('failed guarded undo blocks later queued text and saving instead of repeating the shortcut',async()=>{
+ const h=harness(async(action,p)=>{
+  if(action==='command')throw Error('unsafe undo');
+  return {applied:true,lastInputSeq:p.inputSeq,documentEpoch:p.documentEpoch,viewId:2};
+ });
+ h.key('z',{metaKey:true});h.text('不得落字');await assert.rejects(h.component.flush(),/unsafe undo/);
+ assert.equal(h.calls.filter(c=>c.action==='command').length,1);assert.deepEqual(texts(h),[]);
+ assert.equal(h.component.getState().failed,true);h.close();
+});

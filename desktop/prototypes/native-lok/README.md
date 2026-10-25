@@ -62,6 +62,30 @@ display changes, full revision text and controller capabilities. CAPI checks
 cover native-ID accept/reject, stale snapshots, duplicate input, export readback
 and rejection of inputs from a closed document epoch.
 
+## Source-built runtime packaging
+
+After applying the pinned upstream and local patches in `UPSTREAM.md`, copy the
+built app into a **new isolated** `PACK_ROOT/instdir/LibreOffice.app`. Keep the
+original build frozen. Run the existing packaging helper on that copy, from this
+repository root (`PACK_ROOT` is an absolute path to that new copy's parent):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 - "$PACK_ROOT" <<'PYTHON'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location(
+    "awd_packaging", "desktop/lowa-build/patches/apply-source-patches.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module.slim_dictionaries(sys.argv[1])
+PYTHON
+```
+
+This reuses the product's en/zh dictionary selection and removes inert Python
+Lightproof registration from a `--disable-python` build. It is not safe to apply
+to an installed/signed app or a runtime with a different supported-language
+contract. Verify that only `Contents/Resources/extensions` changed; record the
+retained resource and library hashes before functional/performance tests.
+
 ## Protocol and lifecycle
 
 Worker argv are `LO-Frameworks isolated-profile-file-URL artifact-root`.

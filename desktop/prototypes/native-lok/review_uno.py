@@ -3,24 +3,134 @@
 """URL-bound, read-only review details and typed display state over an owned LOK bridge.
 
 Run only with an explicitly isolated/read-only pyuno runtime. Never bootstraps soffice.
+Display transitions mirror office_thread.js applyRevisionView/withViewOnlyChange:
+typed short RedlineDisplayType writes verified through the readable model
+ShowChanges, controller ViewSettings ShowChangesInMargin for balloons, modified
+enablement preserved around the change, and AwdReviewSidebarWidth reserved (280)
+only for a user entering balloons from another mode. RecordChanges is never written.
 """
 import argparse
 import json
 import sys
-import uno
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, required=True)
-args = parser.parse_args()
-if not 0 < args.port < 65536:
-    raise ValueError('Invalid loopback port')
-local = uno.getComponentContext()
-resolver = local.ServiceManager.createInstanceWithContext('com.sun.star.bridge.UnoUrlResolver', local)
-remote = resolver.resolve(f'uno:socket,host=127.0.0.1,port={args.port};urp;StarOffice.ComponentContext')
-desktop = remote.ServiceManager.createInstanceWithContext('com.sun.star.frame.Desktop', remote)
+
+REVISION_VIEW_MODES = ('all', 'final', 'balloons')
+REVIEW_GEOMETRY_PROPERTIES = ('AwdReviewGeometry', 'AwdReviewSidebarWidth')
+
+# Last model successfully switched into balloons (office_thread.js balloonModel).
+balloon_model = None
 
 
-def model_for(url):
+def read_show_changes(model):
+    try:
+        return bool(model.getPropertyValue('ShowChanges'))
+    except Exception:
+        return None
+
+
+def read_show_changes_in_margin(ctrl):
+    try:
+        return bool(ctrl.getViewSettings().getPropertyValue('ShowChangesInMargin'))
+    except Exception:
+        return None
+
+
+def supports_review_geometry(ctrl):
+    try:
+        info = ctrl.getPropertySetInfo()
+    except Exception:
+        return False
+    return all(info.hasPropertyByName(name) for name in REVIEW_GEOMETRY_PROPERTIES)
+
+
+def revision_view_state(model, ctrl):
+    show_changes = read_show_changes(model)
+    in_margin = read_show_changes_in_margin(ctrl)
+    if show_changes is False:
+        mode = 'final'
+    elif in_margin is True:
+        mode = 'balloons' if balloon_model == model else 'margin'
+    else:
+        mode = 'all'
+    return {'mode': mode, 'showChanges': show_changes, 'showChangesInMargin': in_margin,
+            'marginSupported': in_margin is not None}
+
+
+def apply_revision_view(model, ctrl, mode, internal, uno_mod, refresh=False):
+    # Fail before any mutation: balloons needs both Awd review properties.
+    geometry_supported = supports_review_geometry(ctrl)
+    if mode == 'balloons' and not geometry_supported:
+        raise RuntimeError('Review balloons view requires AwdReviewGeometry and AwdReviewSidebarWidth')
+    show_changes = read_show_changes(model)
+    if show_changes is None:
+        raise RuntimeError('ShowChanges is not readable')
+    in_margin = read_show_changes_in_margin(ctrl)
+    if mode == 'balloons' and in_margin is None:
+        raise RuntimeError('ShowChangesInMargin is not readable')
+    previous = revision_view_state(model, ctrl)
+    # Pure display changes must not expire completion/review tokens or trigger
+    # autosave (withViewOnlyChange): suppress modified while switching, restore
+    # the previous enablement in finally. Never touches RecordChanges.
+    enabled = model.isSetModifiedEnabled()
+    if enabled:
+        model.disableSetModified()
+    try:
+        # Reserve the native gutter before moving deletions out of the body, and
+        # only for a user entering balloons from another mode. Internal
+        # switch-and-restore paths (export, resolution) leave the width alone.
+        if (mode == 'balloons' and not internal and previous['mode'] != 'balloons'
+                and geometry_supported
+                and ctrl.getPropertyValue('AwdReviewSidebarWidth') != 280):
+            ctrl.setPropertyValue('AwdReviewSidebarWidth', 280)
+        if mode in ('balloons', 'margin'):
+            if in_margin is not True:
+                ctrl.getViewSettings().setPropertyValue('ShowChangesInMargin', True)
+        elif in_margin is True:
+            ctrl.getViewSettings().setPropertyValue('ShowChangesInMargin', False)
+        if show_changes != (mode != 'final'):
+            uno_mod.invoke(model, 'setPropertyValue',
+                           ('RedlineDisplayType', uno_mod.Any('short', 2 if mode != 'final' else 0)))
+        global balloon_model
+        balloon_model = model if mode == 'balloons' else None
+        # Report the read-back state, not the request; Writer may normalize the
+        # enum (0 -> 1), so ShowChanges is the only honest readback judge.
+        state = revision_view_state(model, ctrl)
+        state['requested'] = mode
+        expected_margin = mode in ('balloons', 'margin')
+        if (state['mode'] != mode or (state['showChangesInMargin'] is not None
+                                     and state['showChangesInMargin'] != expected_margin)):
+            raise RuntimeError('Display mode was not applied')
+        # Export and undo detours consume layout, not just text. Writer can keep
+        # old merged deletion ranges after the property write until refresh().
+        # Keep this inside the view-only modified guard, including failures.
+        if refresh:
+            model.refresh()
+        return state
+    finally:
+        if enabled:
+            model.enableSetModified()
+
+
+def review_geometry(ctrl):
+    if not supports_review_geometry(ctrl):
+        return {'available': False}
+    try:
+        geometry = json.loads(ctrl.getPropertyValue('AwdReviewGeometry'))
+    except Exception as error:
+        raise RuntimeError(f'Review geometry is unreadable: {error}')
+    if (not isinstance(geometry, dict) or geometry.get('version') != 1
+            or geometry.get('unit') != 'twip'
+            or not isinstance(geometry.get('revisions'), list)
+            or not isinstance(geometry.get('comments'), list)
+            or not isinstance(geometry.get('pages'), list)
+            or not isinstance(geometry.get('view'), dict)):
+        raise RuntimeError('Unsupported review geometry payload')
+    return {'available': True, 'geometry': geometry}
+
+
+def model_for(desktop, url):
     components = desktop.getComponents().createEnumeration()
     matches = []
     while components.hasMoreElements():
@@ -32,19 +142,74 @@ def model_for(url):
     return matches[0]
 
 
-def dispatch(method, params):
-    doc = model_for(params['documentUrl'])
-    ctrl = doc.getCurrentController()
+def find_revision(doc, identifier):
+    redlines = doc.getRedlines()
+    matches = []
+    for i in range(redlines.getCount()):
+        candidate = redlines.getByIndex(i)
+        if str(candidate.getPropertyValue('RedlineIdentifier')) == identifier:
+            matches.append(candidate)
+    if len(matches) != 1:
+        raise RuntimeError('Revision identity is no longer unique')
+    return matches[0]
+
+
+def revision_text(revision):
+    hidden = revision.getPropertyValue('RedlineText')
+    if hidden:
+        return hidden.getString()
+    start = revision.getPropertyValue('RedlineStart')
+    end = revision.getPropertyValue('RedlineEnd')
+    cursor = start.getText().createTextCursorByRange(start)
+    cursor.gotoRange(end, True)
+    return cursor.getString()
+
+
+def detail_of(revision):
+    date = revision.getPropertyValue('RedlineDateTime')
+    return {'identifier': str(revision.getPropertyValue('RedlineIdentifier')),
+            'author': revision.getPropertyValue('RedlineAuthor'),
+            'type': revision.getPropertyValue('RedlineType'), 'text': revision_text(revision),
+            'dateTime': f'{date.Year:04}-{date.Month:02}-{date.Day:02}T{date.Hours:02}:{date.Minutes:02}:{date.Seconds:02}',
+            'successor': str(revision.getPropertyValue('RedlineSuccessorData'))}
+
+
+def undo_state(model):
+    manager = model.getUndoManager()
+    def top(titles):
+        values = [str(title) for title in titles]
+        return {'depth': len(values), 'title': values[0] if values else '', 'titles': values}
+    return {'undo': top(manager.getAllUndoActionTitles()),
+            'redo': top(manager.getAllRedoActionTitles())}
+
+
+def undo_step(model, kind, expected):
+    if kind not in ('undo', 'redo'):
+        raise ValueError('Unsupported undo operation')
+    before = undo_state(model)
+    if before != expected:
+        raise RuntimeError('Undo stack changed before dispatch')
+    if before[kind]['depth'] == 0:
+        return {'applied': False, 'state': before}
+    # XUndoManager is synchronous. A CAPI postUnoCommand acknowledgement alone
+    # only says that the command was dispatched, not that undo has completed.
+    getattr(model.getUndoManager(), kind)()
+    after = undo_state(model)
+    other = 'redo' if kind == 'undo' else 'undo'
+    if (after[kind]['titles'] != before[kind]['titles'][1:]
+            or after[other]['titles'] != before[kind]['titles'][:1] + before[other]['titles']):
+        raise RuntimeError('Undo outcome was not verified')
+    return {'applied': True, 'state': after}
+
+
+def dispatch(method, params, model, uno_mod):
+    ctrl = model.getCurrentController()
+    if method == 'undo_state':
+        return undo_state(model)
+    if method == 'undo_step':
+        return undo_step(model, params.get('kind'), params.get('expected'))
     if method == 'verify_location':
-        redlines = doc.getRedlines()
-        matches = []
-        for i in range(redlines.getCount()):
-            candidate = redlines.getByIndex(i)
-            if str(candidate.getPropertyValue('RedlineIdentifier')) == params['identifier']:
-                matches.append(candidate)
-        if len(matches) != 1:
-            raise RuntimeError('Revision identity is no longer unique')
-        revision = matches[0]
+        revision = find_revision(model, params['identifier'])
         start, end = revision.getPropertyValue('RedlineStart'), revision.getPropertyValue('RedlineEnd')
         cursor = ctrl.getViewCursor()
         text = start.getText()
@@ -53,25 +218,45 @@ def dispatch(method, params):
         if not located:
             raise RuntimeError('The native selection does not match the requested revision')
         return {'located': True, 'identifier': params['identifier']}
+    if method == 'check_revision':
+        # Click-time identity recheck for one cached revision: locate by
+        # identifier and read only that revision, never every entry's text.
+        return detail_of(find_revision(model, params['identifier']))
     if method == 'view':
-        if params['mode'] not in ('all', 'final'):
+        refresh = params.get('refresh', False)
+        if not isinstance(refresh, bool):
+            raise ValueError('refresh must be a boolean')
+        if 'mode' not in params:
+            if refresh:
+                raise ValueError('A layout refresh requires an explicit display mode')
+            # Read-only query of the actual state; never echoes a request.
+            return revision_view_state(model, ctrl)
+        mode = params['mode']
+        internal = params.get('internal', False)
+        if not isinstance(internal, bool):
+            raise ValueError('internal must be a boolean')
+        if mode not in REVISION_VIEW_MODES and not (internal and mode == 'margin'):
             raise ValueError('Unsupported display mode')
-        value = 0 if params['mode'] == 'final' else 2
-        uno.invoke(doc, 'setPropertyValue', ('RedlineDisplayType', uno.Any('short', value)))
-        actual = doc.getPropertyValue('RedlineDisplayType')
-        # Writer normalizes NONE(0) to INSERTED(1). The existing editor verifies
-        # the readable ShowChanges property, not enum equality after normalization.
-        shown = doc.getPropertyValue('ShowChanges')
-        if shown != (params['mode'] == 'all'):
-            raise RuntimeError('Display mode was not applied')
-        return {'mode': params['mode'], 'displayType': actual, 'showChanges': shown}
-    if method != 'snapshot':
+        return apply_revision_view(model, ctrl, mode, internal, uno_mod, refresh)
+    if method == 'geometry':
+        return review_geometry(ctrl)
+    if method not in ('snapshot', 'snapshot_batch'):
         raise ValueError('Unsupported review operation')
     info = ctrl.getPropertySetInfo()
     capabilities = {name: info.hasPropertyByName(name) for name in ('AwdReviewGeometry', 'AwdReviewSidebarWidth')}
     entries = []
-    redlines = doc.getRedlines()
-    for index in range(redlines.getCount()):
+    redlines = model.getRedlines()
+    total = redlines.getCount()
+    batch_start, stop = 0, total
+    if method == 'snapshot_batch':
+        batch_start, limit, expected = params.get('start'), params.get('limit'), params.get('expectedCount')
+        if (type(batch_start) is not int or batch_start < 0 or type(limit) is not int or not 1 <= limit <= 25
+                or type(expected) is not int or expected < 0):
+            raise ValueError('Invalid review batch range')
+        if expected != total or batch_start >= total:
+            raise RuntimeError('STALE_REVIEW_BATCH: Revision count changed')
+        stop = min(batch_start + limit, total)
+    for index in range(batch_start, stop):
         revision = redlines.getByIndex(index)
         text = None
         hidden = revision.getPropertyValue('RedlineText')
@@ -89,14 +274,34 @@ def dispatch(method, params):
                         'type': revision.getPropertyValue('RedlineType'), 'text': text,
                         'dateTime': f'{date.Year:04}-{date.Month:02}-{date.Day:02}T{date.Hours:02}:{date.Minutes:02}:{date.Seconds:02}',
                         'successor': str(revision.getPropertyValue('RedlineSuccessorData'))})
+        if method == 'snapshot_batch':
+            entries[-1]['index'] = index
+    if method == 'snapshot_batch':
+        if redlines.getCount() != total:
+            raise RuntimeError('STALE_REVIEW_BATCH: Revision count changed during read')
+        return {'entries': entries, 'start': batch_start, 'total': total, 'controllerCapabilities': capabilities}
     return {'entries': entries, 'controllerCapabilities': capabilities,
-            'displayType': doc.getPropertyValue('RedlineDisplayType')}
+            'displayType': model.getPropertyValue('RedlineDisplayType')}
 
 
-for line in sys.stdin:
-    request = json.loads(line)
-    try:
-        response = {'id': request['id'], 'result': dispatch(request['method'], request['params'])}
-    except Exception as error:
-        response = {'id': request['id'], 'error': str(error)}
-    print(json.dumps(response, ensure_ascii=False), flush=True)
+def main():
+    args = parser.parse_args()
+    if not 0 < args.port < 65536:
+        raise ValueError('Invalid loopback port')
+    import uno
+    local = uno.getComponentContext()
+    resolver = local.ServiceManager.createInstanceWithContext('com.sun.star.bridge.UnoUrlResolver', local)
+    remote = resolver.resolve(f'uno:socket,host=127.0.0.1,port={args.port};urp;StarOffice.ComponentContext')
+    desktop = remote.ServiceManager.createInstanceWithContext('com.sun.star.frame.Desktop', remote)
+    for line in sys.stdin:
+        request = json.loads(line)
+        try:
+            model = model_for(desktop, request['params']['documentUrl'])
+            response = {'id': request['id'], 'result': dispatch(request['method'], request['params'], model, uno)}
+        except Exception as error:
+            response = {'id': request['id'], 'error': str(error)}
+        print(json.dumps(response, ensure_ascii=False), flush=True)
+
+
+if __name__ == '__main__':
+    main()

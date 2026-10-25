@@ -5,7 +5,13 @@
 
 This small Electron host connects the isolated Swift/SQLite prototype to the native LibreOfficeKit worker. It lists real persisted projects/files, loads the selected document, displays actual native BGRA/RGBA pixels on a canvas, and submits a native DOCX export through the data service's generation-checked save. The production application never imports this folder.
 
-This remains a research surface, not an alternative production editor. It now has a scrolling native canvas with real caret/selection callbacks, a caret-positioned Chromium input, composition cancellation/commit, undo/redo and a revision list. Optional URL-bound pyuno reads complete revision text and typed all/final display modes; without it the list explicitly labels engine descriptions as summaries. Revision operations use native IDs and fresh snapshots, not enumeration positions. `input_text` uses native extended text input, not paste.
+This remains a research surface, not an alternative production editor. It now has a scrolling native canvas with real caret/selection callbacks, a caret-positioned Chromium input, composition cancellation/commit, undo/redo and a revision list. URL-bound pyuno reads complete revision text and typed all/final display modes. This editing host requires the explicit UNO client paths below: it must verify the actual display state before saving. Revision operations use native IDs, not enumeration positions: ordinary input bumps the engine's review epoch, so each locate/accept/reject first re-establishes the card's identity against a fresh CAPI snapshot plus one targeted single-revision UNO detail read (`check_revision`), never a full-revision text scan; a semantic or target change demands a refresh and blocks the operation. Location uses current geometry after earlier paragraphs change. `input_text` uses native extended text input, not paste.
+
+The list hydrates full text in batches of at most 25 revisions. Each completed batch releases the native task queue; the renderer also yields between batches, allowing document input to proceed. Summary-only cards remain disabled until their full text is available. Both native snapshots around each batch must match the list identity; late batches from another model or list are discarded. `review-ready` means all text is hydrated, not merely that summary cards exist.
+
+Verified revision resolutions are tracked through both full native undo/redo title sequences. Only those known inline actions take the margin-view detour; ordinary edits reconcile the retained history and discarded redo branch. Unknown transitions block writes. Keyboard undo/redo and toolbar undo/redo use the same synchronous UNO verification path. Titles and depth alone are not durable identities.
+
+DOCX export temporarily uses inline revision display and restores the actual previous view before publishing bytes. A failed restoration blocks publication. An actual final-view save retained the synthetic fixture's 600 revision groups and all three text projections; the display returned to final view and the process exited normally. The patched-engine probe also exercises margin-view export and repeated undo/redo; the full balloons/comment UI and move-range bookmarks remain unvalidated.
 
 An optional Java authority adapter reconnects synthetic existing H2 projects to their original IDs, files and Git versions. The Java process is the sole file writer. SQLite stores an observed project directory and unresolved-operation guards; it does not migrate H2. Version creation drains input and saving. Restore closes the native model, calls the original Java revert API, downloads the restored bytes and acknowledges a newly opened model. Clearing the directory snapshot preserves unresolved write guards.
 
@@ -23,7 +29,9 @@ Missing production capabilities include full AI command routing, the three-state
   "profile": "/absolute/fresh-artifact-directory/data-profile",
   "dataBinary": "/absolute/awd-local-data",
   "worker": "/absolute/lok-probe",
-  "runtime": "/absolute/verified-runtime.app/Contents/Frameworks"
+  "runtime": "/absolute/verified-runtime.app/Contents/Frameworks",
+  "unoHost": "/absolute/python-host",
+  "unoRuntime": "/absolute/isolated-uno-runtime.app/Contents"
 }
 ```
 
@@ -40,12 +48,13 @@ Keep the input DOCX byte-identical, reset processes/profiles, record fonts, view
 
 `authority` configuration replaces `dataBinary/profile`; see `../local-data/compatibility/README.md`. The host starts only the explicitly configured owned Java child and verifies its build/profile identity. All HOME/temp/H2/storage paths must belong to a new synthetic artifact directory. Do not point this experiment at a production profile.
 
-Full revision text requires `unoHost` (the small public-Python-ABI test host) and `unoRuntime` (the **Contents** folder of an explicitly isolated or read-only LibreOffice runtime). Never use Python from an installed application: even imports can modify sealed bytecode resources. The host sets `PYTHONDONTWRITEBYTECODE` and a task-local cache prefix. The helper connects only to this worker's random loopback URP port and binds every request to exactly one Writer model URL.
+`unoHost` is the small public-Python-ABI test host and `unoRuntime` is the **Contents** folder of an explicitly isolated or read-only LibreOffice runtime. Never use Python from an installed application: even imports can modify sealed bytecode resources. The host sets `PYTHONDONTWRITEBYTECODE` and a task-local cache prefix. The helper connects only to this worker's random loopback URP port and binds every request to exactly one Writer model URL.
 
 Functional checks:
 
 ```sh
 node --test desktop/prototypes/workbench/tests/*.test.js
+node --test desktop/prototypes/workbench/tests/*.test.cjs
 COMPAT_TEST_OUTPUT=/absolute/fresh-test-output node --test desktop/prototypes/local-data/compatibility/*.test.cjs
 ```
 
