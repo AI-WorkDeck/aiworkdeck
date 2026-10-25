@@ -215,6 +215,8 @@ import { getSemanticWritingSettings, saveSemanticWritingSettings, createSemantic
 import { getProvenance, reviewDocInsight, listWritingCompletions, learnWritingCompletions, deleteWritingCompletion, clearWritingCompletions, lookupWritingSelection, getDocInsightEntity, getWritingCompletionDetail } from '@/services/api.js'
 import { guestPointToHost } from '@/utils/insightPopup.js'
 import { alignProvenance, fileVersionBar, provenanceSummary } from '@/utils/provenanceAlign.js'
+import { localContentUrl, localContentCapability, observeLocalContentBackend, downloadLocalContent, createLocalContentSave, saveLocalContent, cancelLocalContent } from '@/utils/localContentProtocol.js'
+import { resolveDocumentSaveOperation } from '@/utils/checkpointSaveBarrier.js'
 
 let seq = 0
 
@@ -317,6 +319,7 @@ export default {
       backendHealthRecoverySeq: 0,
       backendFailedUpload: null,
       versionSaveBusy: false,
+      localSaveReason: null,
       // Autosave: set by the worker's modify signal, cleared when a save starts;
       // read by the host (closeFile / evict) to know if a flush is needed.
       dirty: false,
@@ -363,6 +366,13 @@ export default {
     }
   },
   computed: {
+    localContentSaveText() {
+      if (!this.statusKey.endsWith('Failed')) return ''
+      if (this.localSaveReason === 'OPERATION_CANCELLED') return this.$t('editor.status.contentSaveReloadRequired')
+      if (this.localSaveReason === 'CONTENT_CONFLICT') return this.$t('editor.status.contentSaveConflict')
+      if (this.localSaveReason === 'VERSION_BUSY') return this.$t('editor.status.localVersionSaveBusy')
+      return ''
+    },
     isError() {
       return this.statusKey.endsWith('Failed')
     },
@@ -370,6 +380,7 @@ export default {
     // 状态串（就绪/加载文档中/失败）判定——statusKey 化后保留这个只读
     // 别名，zh 语言下取值与迁移前逐字节一致。改名/删除前先改该套件。
     statusText() {
+      if (this.localContentSaveText) return this.localContentSaveText
       if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       return this.$t('editor.status.' + this.statusKey)
     },
@@ -393,6 +404,7 @@ export default {
     saveStateText() {
       if (!this.ready || !this.file || this.loadingOverlayVisible || this.docLoadFailed) return ''
       if (this.saving) return this.$t('editor.status.saving')
+      if (this.localContentSaveText) return this.localContentSaveText
       if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       if (this.statusKey === 'saveFailed' && this.backendSaveRetryReady()) return this.$t('workbench.backendHealth.saveRetryReady')
       if (this.statusKey === 'saveFailed' || this.statusKey === 'movedSaveFailed') return this.$t('editor.status.' + this.statusKey)
@@ -402,6 +414,7 @@ export default {
     },
     displayStatus() {
       if (this.saveStateText) return ''
+      if (this.localContentSaveText) return this.localContentSaveText
       if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       return this.statusKey === 'ready' ? '' : this.$t('editor.status.' + this.statusKey)
     },
@@ -501,7 +514,7 @@ export default {
     // 退到后台的实例停掉即时审校；切回来若正文已变就补一轮（dev-board#724）。
     active(v) { this._inlineReviewHost?.setActive(!!v); this._writingHost?.setActive(!!v) },
     docKind() { this.$emit('menu-state'); this.initWritingAssistance() },
-    canWrite() { this.initWritingAssistance() },
+    canWrite() { this.syncNativeWritePermission(); this.initWritingAssistance() },
     // 宿主 openFile(file, {locator}) 把定位符挂在 tab 对象上；已打开的标签再次被
     // 链接点中时是原地换对象，靠这个路径 watch 触发。
     'file.pendingLocator'(loc) { if (loc) this.consumeLocator() },
@@ -549,14 +562,16 @@ export default {
       if (this.file) this.prefetchBytes()
       this.startBootTrickle()
       // { kind:'webview', url, preload, partition } | { kind:'iframe', url }
-      const info = await api.getEditor()
-      this.mountEditor(info)
+      const info = await api.getEditor({ name: this.file?.name || this.file?.fileName, size: this.file?.fileSize, readOnly: !this.canWrite, empty: !this.file?.fileSize })
+      await this.mountEditor(info)
     } catch (e) {
       this.statusKey = 'initFailed'
       this.appendLog('init failed: ' + (e && e.message ? e.message : e))
     }
   },
   beforeUnmount() {
+    this._nativeSurface?.dispose()?.catch(error => this.appendLog('native close failed: ' + error.message))
+    this._nativeSurface = null
     this._backendHealthDisposed = true
     this._backendHealthUnsubscribe?.()
     this._backendHealthUnsubscribe = null
@@ -617,12 +632,14 @@ export default {
       if (snapshot.state === 'healthy' && snapshot.ok === true && ['degraded', 'restarting', 'failed'].includes(this.backendHealthState?.state)) {
         this.backendHealthRecoverySeq = (this.backendHealthRecoverySeq || 0) + 1
       }
+      observeLocalContentBackend(snapshot)
       this.backendHealthState = snapshot
       // 只更新提示。上传结果不明时即使服务恢复，也不能擅自把旧稿再次写回。
     },
     invalidateBackendSaveHint() {
       this.backendFailedUpload = null
       this.versionSaveBusy = false
+      this.localSaveReason = null
       this._backendSaveContext = (this._backendSaveContext || 0) + 1
     },
     backendSaveRetryReady() {
@@ -865,6 +882,7 @@ export default {
     // 客体窗口拿回焦点且页内无焦点时，IME 覆盖层会接住键盘（zetaOfficeImeOverlay onWindowFocus），
     // Cmd+Z 由覆盖层转成引擎的 undo。
     focusEditor() {
+      if (this._nativeSurface) { this._nativeSurface.focus(); return }
       try { if (this.webviewEl && this.webviewEl.focus) this.webviewEl.focus() } catch (e) { /* ignore */ }
     },
     // 段落面板「交给 AI 调整格式」：拼一句带文件名与需求的话，交给工作台发进 AI 对话
@@ -1128,6 +1146,9 @@ export default {
     // 引擎重启：拆掉 boot 失败的那个 webview/iframe，重新走一遍 mounted 里的
     // 建元素流程。文档字节的预取结果仍然有效（失败的是引擎不是下载），留着。
     async remountEditor() {
+      const native = this._nativeSurface
+      this._nativeSurface = null
+      const nativeClosed = native?.dispose()
       if (this._writingHost) { this._writingHost.destroy(); this._writingHost = null }
       if (this._inlineReviewHost) { this._inlineReviewHost.destroy(); this._inlineReviewHost = null }
       this.inlineReviewState = null
@@ -1158,8 +1179,9 @@ export default {
       this._stageChangedAt = Date.now()
       this.startBootTrickle()
       try {
-        const info = await host.zetaoffice.getEditor()
-        this.mountEditor(info)
+        await nativeClosed
+        const info = await host.zetaoffice.getEditor({ name: this.file?.name || this.file?.fileName, size: this.file?.fileSize, readOnly: !this.canWrite, empty: !this.file?.fileSize })
+        await this.mountEditor(info)
       } catch (e) {
         this.statusKey = 'initFailed'
         this.appendLog('init failed: ' + (e && e.message ? e.message : e))
@@ -1196,13 +1218,48 @@ export default {
       console.log('[libre-editor]', m)
       this.log = (this.log + m + '\n').split('\n').slice(-200).join('\n')
     },
+    async syncNativeWritePermission() {
+      const surface = this._nativeSurface
+      if (!surface) return
+      const request = this._nativePermissionSync = (this._nativePermissionSync || 0) + 1
+      try {
+        // setReadOnly closes its input latch synchronously, even while the
+        // native model is still loading; a grant waits for a fresh view receipt.
+        await surface.setReadOnly(this.canWrite !== true)
+      } catch (error) {
+        if (surface === this._nativeSurface && request === this._nativePermissionSync) {
+          this.appendLog('native permission update failed: ' + (error.message || String(error)))
+        }
+      }
+    },
     // 按宿主给出的容器类型挂编辑器：桌面壳是 Electron <webview>（隔离分区 +
     // preload），Web 服务器版是同源 <iframe>。两者之外的一切——relay 协议、
     // executor 契约、worker、自动保存链路——完全共用。
-    mountEditor(info) {
+    async mountEditor(info) {
       const mountEl = document.getElementById(this.hostId)
       this._initialDocument = this.file?.fileSize > 0
+      if (info.kind === 'native' && (!mountEl || this._backendHealthDisposed)) {
+        await host.zetaoffice.nativeClose(info.sessionId)
+        return
+      }
       if (!mountEl) { this.appendLog('host element missing'); return }
+      if (info.kind === 'native') {
+        let createNativeOfficeSurface
+        try { ({ createNativeOfficeSurface } = await import('@/composables/nativeOfficeSurface.js')) }
+        catch (error) { await host.zetaoffice.nativeClose(info.sessionId); throw error }
+        if (this._backendHealthDisposed) { await host.zetaoffice.nativeClose(info.sessionId); return }
+        const surface = createNativeOfficeSurface({ api: host.zetaoffice, info })
+        this._nativeSurface = surface
+        this.syncNativeWritePermission()
+        surface.element.style.width = '100%'
+        surface.element.style.height = '100%'
+        mountEl.appendChild(surface.element)
+        this.webviewEl = surface.element
+        this.subscribeHostEvents(surface.transport)
+        this.wireExecutor(surface.transport, 'native editor mounted')
+        surface.start()
+        return
+      }
       // 深浅主题初值随 URL 进客体页（editor.html 据此防白闪）；后续切换走
       // pushTheme 的 lo-relay 推送
       try {
@@ -1297,8 +1354,18 @@ export default {
         } else if (msg.type === 'open-url' && msg.url) {
           this.$emit('open-url', { url: String(msg.url), target: msg.target || null,
             fileId: this.file && this.file.id, meta: this.withHostPoint(msg.meta) })
+        } else if (msg.type === 'save-request') {
+          this.saveDocument()
+        } else if (msg.type === 'review-changed' && this._nativeSurface) {
+          const owner = this._nativeSurface
+          clearTimeout(this._reviewRefreshTimer)
+          this._reviewRefreshTimer = setTimeout(() => {
+            if (this._nativeSurface === owner && this.reviewOpen) this.reviewRefreshKey++
+          }, 1000)
         } else if (msg.type === 'modified') {
           this.onDocModified()
+        } else if (msg.type === 'save-snapshot') {
+          this.onSaveSnapshot(msg)
         } else if (msg.type === 'comment-request') {
           this.onCommentRequest(msg)
         } else if (msg.type === 'export-pdf-request') {
@@ -1615,7 +1682,7 @@ export default {
       this._previewSkippedForWarmEngine = false
       const t0 = Date.now()
       this._checkpointGeneration = documentCheckpointGeneration(this.projectId, fileId)
-      this._bytesPromise = this.fetchArrayBuffer(getFileBytesUrl(fileId), (loaded, total) => {
+      this._bytesPromise = this.fetchDocumentBytes(getFileBytesUrl(fileId), (loaded, total) => {
         this.dlLoaded = loaded
         this.dlTotal = total
       })
@@ -1750,13 +1817,13 @@ export default {
       let buf = this._bytesPromise ? await this._bytesPromise : null
       if (!buf) {
         try {
-          buf = await this.fetchArrayBuffer(url)
+          buf = await this.fetchDocumentBytes(url)
         } catch (e) {
           // 下载失败自动重试一次（弱网/瞬时超时很常见），仍失败就让异常照常
           // 抛出——finishDocLoad 的 catch 会置 docLoadFailed + statusKey='loadFailed'，
           // 走既有的失败可见路径，不静默卡住。
           this.appendLog('下载失败，重试一次 / download failed, retrying once: ' + (e && e.message ? e.message : e))
-          buf = await this.fetchArrayBuffer(url)
+          buf = await this.fetchDocumentBytes(url)
         }
       }
       assertCurrentGeneration()
@@ -1786,6 +1853,7 @@ export default {
           this.appendLog('修订署名下发失败 / redline author push failed: ' + (e && e.message ? e.message : e))
         }
         assertCurrentGeneration()
+        this._localContentMetadata = this._contentSnapshots?.get(buf) || null
         this._checkpointGeneration = generation
         this._checkpointInvalidated = false
         return false
@@ -1816,6 +1884,7 @@ export default {
       this.appendLog('  ← ' + (Date.now() - t0) + 'ms ' + JSON.stringify(res))
       if (!res || !res.success) throw Object.assign(new Error((res && res.message) || 'load_document returned no success'), { code: res?.code })
       assertCurrentGeneration()
+      this._localContentMetadata = this._contentSnapshots?.get(buf) || null
       this._checkpointGeneration = generation
       this._checkpointInvalidated = false
       if (res.kind) this.docKind = res.kind
@@ -1841,7 +1910,7 @@ export default {
     // Checkpoint restore pauses saves BEFORE the backend overwrites storage. Waiting
     // only after that overwrite cannot stop an already-uploading old document.
     async prepareCheckpointRestore(restoreId) {
-      if (!this.file || !this.executor || !this.ready || this.docLoadFailed || this._reloading || this._loadInFlight) return false
+      if (!this.file || !this.executor || !this.ready || this.docLoadFailed || this._reloading || this._pendingReload || this._loadInFlight) return false
       const fileId = this.file.id, executor = this.executor
       this._checkpointRestoreId = restoreId
       this._docLoadSeq = (this._docLoadSeq || 0) + 1
@@ -1880,7 +1949,6 @@ export default {
       this.dirty = false
     },
     async reloadFromBackend(checkpointRestoreId) {
-      this.invalidateBackendSaveHint()
       const restoreOwner = checkpointRestoreId || null
       const ownsReload = () => (this._checkpointRestoreId || null) === restoreOwner
       if (!ownsReload()) return false
@@ -1898,6 +1966,38 @@ export default {
         this.appendLog('reload skipped: 编辑器未就绪')
         return false
       }
+      if (this._pendingReload) return false
+      const pendingReload = this._pendingReload = {}
+      const fileId = this.file.id, projectId = this.projectId, executor = this.executor
+      const current = () => this._pendingReload === pendingReload && ownsReload() &&
+        this.file?.id === fileId && this.projectId === projectId && this.executor === executor && !this._backendHealthDisposed && !this._saveDiscarded
+      clearTimeout(this._saveTimer)
+      this._saveTimer = null
+      try {
+        // Keep the current model and dirty inputs until the server durably fences any old PUT.
+        // This gate prevents new exports without suppressing modified events while cancellation waits.
+        while (this.saving && current()) await new Promise(resolve => setTimeout(resolve, 100))
+        if (!current()) return false
+        const pending = this._localContentPending
+        if (pending) {
+          await cancelLocalContent(pending, { headers: getAuthHeaders() || {} })
+          resolveDocumentSaveOperation(pending.projectId, pending.fileId, pending.operationId)
+          if (this._localContentPending === pending) this._localContentPending = null
+        }
+        if (!current()) return false
+      } catch (e) {
+        if (current()) {
+          this.dirty = true
+          this._savePaused = true
+          this.localSaveReason = e?.reason || null
+          this.statusKey = 'saveFailed'
+          this.appendLog('reload blocked: previous save is unconfirmed: ' + (e?.message || e))
+        }
+        return false
+      } finally {
+        if (this._pendingReload === pendingReload) this._pendingReload = null
+      }
+      this.invalidateBackendSaveHint()
       // 清脏 + 等在途保存都拦不住「已经启动、正在 export/upload 路上」的那一笔：
       // 它读的是换文档之前的 worker 内容，等它 upload 完成就把退回结果覆盖回旧字节。
       // saving 标志只在 saveDocument 内部为真，await 它结束之后新的 modified 又能
@@ -1934,6 +2034,7 @@ export default {
         // 换完再清一次脏（retarget 里设 RecordChanges 会触发一次 modified）。
         this.docLoadFailed = false
         this._checkpointInvalidated = false
+        this._savePaused = false
         cancelAutoSave()
         // 它还把 LO 原生那套 chrome（菜单栏 / 工具栏 / 状态栏 / 标尺）重新拉了出来，
         // 而自建工具栏的 bootstrap 只在 executor 变化时跑——正常打开那条路藏过一次，
@@ -1969,6 +2070,19 @@ export default {
     },
     // Authed binary fetch — same XHR auth pattern as FilePreview.fetchAuthedBlob,
     // but ArrayBuffer (the bytes we relay into the worker).
+    async fetchDocumentBytes(url, onProgress) {
+      const fileId = this.file?.id, projectId = this.projectId
+      const protocolUrl = this.file?.fileSize > 0 ? localContentUrl(url, projectId, fileId) : null
+      if (protocolUrl && await localContentCapability(protocolUrl, { headers: getAuthHeaders() || {} })) {
+        const result = await downloadLocalContent({ url: protocolUrl, headers: getAuthHeaders() || {}, onProgress })
+        // Prefetch can outlive the engine's load sequence. Keep the stamp with its exact bytes,
+        // then bind both to the model only after that load succeeds.
+        if (!this._contentSnapshots) this._contentSnapshots = new WeakMap()
+        this._contentSnapshots.set(result.bytes, result.metadata)
+        return result.bytes
+      }
+      return this.fetchArrayBuffer(url, onProgress)
+    },
     fetchArrayBuffer(url, onProgress) {
       return new Promise((resolve, reject) => {
         const headers = getAuthHeaders() || {}
@@ -2157,13 +2271,13 @@ export default {
     },
     scheduleAutoSave() {
       clearTimeout(this._saveTimer)
-      if (this._savePaused || this._saveDiscarded || this._flushPromise) return
+      if (this._savePaused || this._saveDiscarded || this._flushPromise || this._pendingReload) return
       const elapsed = Date.now() - this._dirtySince
       const delay = Math.max(200, Math.min(2500, 15000 - elapsed))
       this._saveTimer = setTimeout(() => this.autoSave(), delay)
     },
     async autoSave() {
-      if (!this.dirty || this._savePaused || this._saveDiscarded || this._flushPromise) return
+      if (!this.dirty || this._savePaused || this._saveDiscarded || this._flushPromise || this._pendingReload) return
       if (this.saving) { this.scheduleAutoSave(); return } // a save is in flight — retry after it
       // 假死根因修复：export_document 是全文档同步序列化，跑在 office 线程上会把
       // Qt 事件循环（滚动/输入/重绘）整段冻住。AI 修订风暴期间 modify 不断，旧的
@@ -2179,7 +2293,7 @@ export default {
       }
       this.dirty = false
       this._dirtySince = 0
-      const ok = await this.saveDocument()
+      const ok = await this.saveDocument({ trackSnapshot: true })
       if (!ok && !this._saveDiscarded) {
         // 引擎超时只代表宿主停止等待，后台可能仍在导出。暂停自动重试，
         // 否则每 15 秒再排一笔，文档永远在「保存中 / 保存失败」间循环。
@@ -2203,6 +2317,7 @@ export default {
     },
     // Flush before unmount. 关闭方可给等待预算；超时返回 false，不自动丢文档。
     async flushSave({ timeoutMs } = {}) {
+      if (this._pendingReload) return false
       clearTimeout(this._saveTimer)
       if (!this._flushPromise) {
         this._flushPromise = (async () => {
@@ -2213,7 +2328,7 @@ export default {
           if (this.dirty) {
             this.dirty = false
             this._dirtySince = 0
-            const ok = await this.saveDocument()
+            const ok = await this.saveDocument({ trackSnapshot: true })
             if (!ok && !this._saveDiscarded) { this.dirty = true; this._savePaused = true }
             return ok && !this.dirty
           }
@@ -2329,9 +2444,22 @@ export default {
     // bytes) and persist via the backend upload endpoint (same fileId contract
     // as the download the document was loaded from). Autosave calls this;
     // returns true on success so autoSave can schedule failure retries.
-    async saveDocument() {
+    onSaveSnapshot(msg) {
+      const pending = this._saveSnapshot
+      if (!pending || pending.acknowledged || msg.saveSnapshotId !== pending.id || !this.saving ||
+          this._saveDiscarded || this._reloading || this._checkpointInvalidated ||
+          this.file?.id !== pending.fileId || this.projectId !== pending.projectId ||
+          (this._backendSaveContext || 0) !== pending.context ||
+          documentCheckpointGeneration(this.projectId, pending.fileId) !== pending.generation) return
+      pending.acknowledged = true
+      // This ordered worker event precedes export, after earlier queued input.
+      // Later modified events still re-dirty the document, including during upload.
+      this.dirty = false
+      this._dirtySince = 0
+    },
+    async saveDocument({ trackSnapshot = false } = {}) {
       const f = this.file
-      if (!f || !this.executor || this.saving || this._saveDiscarded) return false
+      if (!f || !this.executor || this.saving || this._saveDiscarded || this._pendingReload) return false
       const generation = documentCheckpointGeneration(this.projectId, f.id)
       const barrier = checkpointSaveBarrier(this.projectId, f.id)
       if ((barrier && !barrier.instances?.includes(this)) ||
@@ -2355,6 +2483,7 @@ export default {
       let uploadRecoverySeq = null
       this.backendFailedUpload = null
       this.versionSaveBusy = false
+      this.localSaveReason = null
       this.saving = true
       // 固定细栏通过 saving/dirty 显示保存状态；statusKey 保留慢保存的兼容状态。
       // 上一次的「保存失败」不能当成要恢复的状态，这次成功了就该回到就绪。
@@ -2363,10 +2492,29 @@ export default {
       clearTimeout(this._slowSaveTimer)
       this._slowSaveTimer = setTimeout(() => { if (this.saving) this.statusKey = 'saving' }, 2000)
       try {
+        // Resolve the exact earlier upload before exporting anything newer. Its receipt can only
+        // clear that operation's checkpoint guard, never an unrelated upload with unknown outcome.
+        if (this._localContentPending) {
+          const pending = this._localContentPending
+          if (pending.fileId !== fileId || pending.projectId !== saveProjectId || pending.generation !== generation ||
+              pending.saveContext !== saveContext) throw new Error('保存上下文已变化，请保留当前文档并重新核对')
+          lease.setOperationId(pending.operationId)
+          safeToOverwrite = false; uploadRecoverySeq = this.backendHealthRecoverySeq || 0
+          await this.uploadPendingLocalContent(pending)
+          safeToOverwrite = true; uploadRecoverySeq = null
+          if (this._reloading || this._saveDiscarded || saveContext !== (this._backendSaveContext || 0) ||
+              this.file?.id !== fileId || this.projectId !== saveProjectId) return false
+        }
         const name = f.name || (String(fileId) + '.' + String(f.fileType || 'docx'))
         this.appendLog('▶ export_document「' + name + '」…')
         const tExp = Date.now()
-        const res = await this.executor.executeCommand('export_document', { name })
+        const params = { name }
+        if (trackSnapshot) {
+          params.saveSnapshotId = this._saveSnapshotSeq = (this._saveSnapshotSeq || 0) + 1
+          this._saveSnapshot = { id: params.saveSnapshotId, fileId, projectId: saveProjectId,
+            context: saveContext, generation, acknowledged: false }
+        }
+        const res = await this.executor.executeCommand('export_document', params)
         this.appendLog('  ← export ' + (Date.now() - tExp) + 'ms')
         if (!res || !res.success) throw new Error((res && res.message) || 'export_document returned no success')
         // Structured clone across the relay hops may surface bytes as
@@ -2396,7 +2544,19 @@ export default {
         const mustExist = f.fileSize > 0 || this._savedOnce
         safeToOverwrite = false
         uploadRecoverySeq = this.backendHealthRecoverySeq || 0
-        await this.uploadBytes(getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : ''), u8, name)
+        if (this._localContentMetadata) {
+          const pending = await createLocalContentSave(this._localContentMetadata, u8)
+          Object.assign(pending, { fileId, projectId: saveProjectId, generation, saveContext })
+          if (this._reloading || this._saveDiscarded || checkpointSaveBarrier(this.projectId, fileId) ||
+              documentCheckpointGeneration(this.projectId, fileId) !== generation ||
+              saveContext !== (this._backendSaveContext || 0) || this.file?.id !== fileId ||
+              this.projectId !== saveProjectId) { safeToOverwrite = true; return false }
+          this._localContentPending = pending
+          lease.setOperationId(pending.operationId)
+          await this.uploadPendingLocalContent(pending)
+        } else {
+          await this.uploadBytes(getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : ''), u8, name)
+        }
         safeToOverwrite = true
         this._savedOnce = true
         this.appendLog('  ← saved to backend (fileId=' + fileId + ')')
@@ -2409,8 +2569,9 @@ export default {
         // Only the server's explicit pre-publication busy response proves this upload
         // cannot arrive later. Network failures and other statuses retain the write guard.
         const notPublished = uploadRecoverySeq !== null && e?.saveNotPublished === true
-        if (notPublished) safeToOverwrite = true
-        this.versionSaveBusy = notPublished && saveContext === (this._backendSaveContext || 0) &&
+        this.localSaveReason = this._localContentPending ? e?.reason || null : null
+        if (notPublished || (e?.operationFinished === true && e.operationId === this._localContentPending?.operationId)) safeToOverwrite = true
+        this.versionSaveBusy = (notPublished || e?.reason === 'VERSION_BUSY') && saveContext === (this._backendSaveContext || 0) &&
           this.projectId === saveProjectId && this.file?.id === fileId
         if (uploadRecoverySeq !== null && e?.backendUnavailable && !this._backendHealthDisposed && !this._saveDiscarded && !this._reloading &&
             saveContext === (this._backendSaveContext || 0) && this.projectId === saveProjectId && this.file?.id === fileId) {
@@ -2424,11 +2585,37 @@ export default {
         this.appendLog('save failed: ' + (e && e.message ? e.message : e))
         return false
       } finally {
+        this._saveSnapshot = null
         lease?.finish(safeToOverwrite)
         this.saving = false
         clearTimeout(this._slowSaveTimer)
         // 只收回自己挂上去的「保存中…」；失败态是 catch 里刚设的，必须留着
         if (this.statusKey === 'saving') this.statusKey = prevStatusKey
+      }
+    },
+    async uploadPendingLocalContent(pending) {
+      let saved
+      try {
+        saved = await saveLocalContent(pending, {
+          headers: getAuthHeaders() || {},
+          onXhr: (xhr, finished) => {
+            if (xhr) this._saveXhr = xhr
+            else if (this._saveXhr === finished) this._saveXhr = null
+          },
+        })
+      } catch (e) {
+        if (e?.operationFinished === true && e.operationId === pending.operationId) {
+          resolveDocumentSaveOperation(pending.projectId, pending.fileId, pending.operationId)
+        }
+        throw e
+      }
+      resolveDocumentSaveOperation(pending.projectId, pending.fileId, pending.operationId)
+      if (this._localContentPending === pending) {
+        if (pending.fileId === this.file?.id && pending.projectId === this.projectId &&
+            pending.saveContext === (this._backendSaveContext || 0)) {
+          this._localContentMetadata = { ...pending.metadata, sha256: saved.sha256, size: saved.size }
+        }
+        this._localContentPending = null
       }
     },
     // 「另存为…」（BUG-14）：目标文件已被外部移走 / 改名且对账认不出新位置时，重试保存

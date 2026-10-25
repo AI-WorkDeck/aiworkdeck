@@ -12,6 +12,7 @@
 #include <cerrno>
 #include <mutex>
 #include <vector>
+#include <set>
 #include <chrono>
 #include <thread>
 #include <dispatch/dispatch.h>
@@ -27,10 +28,13 @@ static std::atomic<int> urpFd{-1};
 static int urpListener = -1;
 static void *urpBridge = nullptr;
 struct DocumentIdentity { uint64_t epoch; int view; };
-static uint64_t documentEpoch = 0, lastInputSeq = 0;
+static uint64_t documentEpoch = 0, lastInputSeq = 0, permissionSeq = 0;
 static std::atomic<uint64_t> refreshEpoch{0};
 static DocumentIdentity *identity = nullptr;
 static NSArray *reviewSnapshot;
+static std::set<int> pressedKeys;
+static bool mouseDown = false, mouseWasWritable = false;
+static int mouseX = 0, mouseY = 0, mouseButtons = 0, mouseModifiers = 0;
 static bool transfer(int fd, void *bytes, size_t size, bool writing) {
     auto *p = static_cast<unsigned char *>(bytes);
     while (size) {
@@ -178,13 +182,21 @@ int main(int argc, char **argv) {
                 NSMutableDictionary *r = [@{@"type": @"result", @"reqId": q[@"reqId"] ?: @0, @"success": @YES} mutableCopy];
                 NSData *replyBytes = nil;
                 auto t = std::chrono::steady_clock::now();
-                if ([action isEqual:@"open"]) {
+                if ([action isEqual:@"open"] || [action isEqual:@"open_blank"]) {
+                    const bool blank = [action isEqual:@"open_blank"];
                     NSString *url = safeUrl(q[@"path"], root);
                     if (q[@"readOnly"] && !jsonBoolean(q[@"readOnly"])) { r[@"success"]=@NO; r[@"error"]=@"INVALID_READ_ONLY"; }
                     else if (!url || doc) { r[@"success"]=@NO; r[@"error"]=@"invalid local path or document already open"; }
                     else {
                         bool readOnly=[q[@"readOnly"] boolValue]; // Omitted only by older isolated probes.
-                        doc = kit->pClass->documentLoadWithOptions(kit, url.UTF8String, "Language=zh-CN");
+                        doc = kit->pClass->documentLoadWithOptions(kit, blank ? "private:factory/swriter" : url.UTF8String, "Language=zh-CN");
+                        // Give a genuine factory document its own URL before the
+                        // URL-bound UNO bridge or any editable surface can see it.
+                        // This writes only the caller's owned session directory.
+                        if (doc && blank && !doc->pClass->saveAs(doc, url.UTF8String, "docx", "TakeOwnership")) {
+                            doc->pClass->destroy(doc); doc=nullptr;
+                            r[@"success"]=@NO; r[@"error"]=@"blank document URL binding failed";
+                        }
                         if (doc && (!LIBREOFFICEKIT_DOCUMENT_HAS(doc, postWindowExtTextInputEvent) || !doc->pClass->postWindowExtTextInputEvent)) {
                             doc->pClass->destroy(doc); doc=nullptr;
                             r[@"success"]=@NO; r[@"error"]=@"runtime lacks required document API";
@@ -194,7 +206,7 @@ int main(int argc, char **argv) {
                             r[@"success"]=@NO; r[@"error"]=@"runtime lacks required read-only view API";
                         }
                         if (doc) {
-                            ++documentEpoch; ++refreshEpoch; lastInputSeq=0; reviewSnapshot=nil;
+                            ++documentEpoch; ++refreshEpoch; lastInputSeq=0; permissionSeq=0; reviewSnapshot=nil; pressedKeys.clear(); mouseDown=false;
                             // Retain each small callback context until process exit: an old queued callback must never acquire the new document's identity.
                             identity = new DocumentIdentity{documentEpoch,doc->pClass->getView(doc)};
                             doc->pClass->registerCallback(doc, callback, identity);
@@ -226,13 +238,46 @@ int main(int argc, char **argv) {
                     _exit(0);
                 }
                 else if (!doc) { r[@"success"]=@NO; r[@"error"]=@"DOCUMENT_NOT_READY"; }
-                else if (([action hasPrefix:@"review_"] || [action hasPrefix:@"input_"] || [action isEqual:@"set_viewport"] || [action isEqual:@"close"] || q[@"documentEpoch"])
+                else if ([action isEqual:@"set_read_only"] && !integerField(q[@"documentEpoch"])) {
+                    r[@"success"]=@NO; r[@"error"]=@"INVALID_PERMISSION_UPDATE";
+                }
+                else if (([action hasPrefix:@"review_"] || [action hasPrefix:@"input_"] || [action isEqual:@"set_viewport"] || [action isEqual:@"close"] || [action isEqual:@"set_read_only"] || q[@"documentEpoch"])
                     && (!q[@"documentEpoch"] || [q[@"documentEpoch"] unsignedLongLongValue] != documentEpoch)) {
                     r[@"success"]=@NO; r[@"error"]=@"STALE_DOCUMENT";
                 }
                 else if ([action isEqual:@"close"]) {
                     doc->pClass->destroy(doc); doc=nullptr; identity=nullptr; ++documentEpoch; ++refreshEpoch;
-                    lastInputSeq=0; reviewSnapshot=nil; documentReadOnly=false;
+                    lastInputSeq=0; permissionSeq=0; reviewSnapshot=nil; pressedKeys.clear(); mouseDown=false; documentReadOnly=false;
+                }
+                else if ([action isEqual:@"set_read_only"]) {
+                    if (!jsonBoolean(q[@"readOnly"]) || !integerField(q[@"documentEpoch"]) || !integerField(q[@"permissionSeq"])
+                        || [q[@"permissionSeq"] longLongValue] <= static_cast<int64_t>(permissionSeq)) {
+                        r[@"success"]=@NO; r[@"error"]=@"INVALID_PERMISSION_UPDATE";
+                    } else if (!LIBREOFFICEKIT_DOCUMENT_HAS(doc, setViewReadOnly) || !doc->pClass->setViewReadOnly) {
+                        r[@"success"]=@NO; r[@"error"]=@"runtime lacks required read-only view API";
+                    } else {
+                        const bool next=[q[@"readOnly"] boolValue];
+                        // Lock before releasing gestures: a host-side pending gate may
+                        // have intentionally rejected their queued release events.
+                        doc->pClass->setViewReadOnly(doc,identity->view,true);
+                        for (int key : pressedKeys) doc->pClass->postKeyEvent(doc,LOK_KEYEVENT_KEYUP,0,key);
+                        pressedKeys.clear();
+                        if (mouseDown) {
+                            if (mouseWasWritable) {
+                                doc->pClass->postKeyEvent(doc,LOK_KEYEVENT_KEYINPUT,0,1281); // Escape cancels a possible text drag.
+                                doc->pClass->postKeyEvent(doc,LOK_KEYEVENT_KEYUP,0,1281);
+                            }
+                            doc->pClass->postMouseEvent(doc,LOK_MOUSEEVENT_MOUSEBUTTONUP,mouseX,mouseY,1,mouseButtons,mouseModifiers);
+                            mouseDown=false;
+                        }
+                        if (!next) doc->pClass->setViewReadOnly(doc,identity->view,false);
+                        if (LIBREOFFICEKIT_DOCUMENT_HAS(doc, setAllowChangeComments) && doc->pClass->setAllowChangeComments)
+                            doc->pClass->setAllowChangeComments(doc,identity->view,!next);
+                        if (LIBREOFFICEKIT_DOCUMENT_HAS(doc, setAllowManageRedlines) && doc->pClass->setAllowManageRedlines)
+                            doc->pClass->setAllowManageRedlines(doc,identity->view,!next);
+                        documentReadOnly=next; permissionSeq=[q[@"permissionSeq"] unsignedLongLongValue];
+                        r[@"permissionSeq"]=@(permissionSeq); r[@"lastInputSeq"]=@(lastInputSeq);
+                    }
                 }
                 else if (documentReadOnly && ([action isEqual:@"input_text"] || [action isEqual:@"paste"]
                     || [action isEqual:@"command"] || [action isEqual:@"review_resolve"] || [action isEqual:@"save"]
@@ -307,9 +352,17 @@ int main(int argc, char **argv) {
                             int key=[q[@"keyCode"] intValue], base=key & 0xFFF;
                             BOOL nativeFileShortcut=(key & (0x2000|0x8000)) && (base==526 || base==527 || base==528 || base==530 || base==534);
                             if (nativeFileShortcut) { r[@"success"]=@NO; r[@"error"]=@"HOST_FILE_OPERATION_REQUIRED"; }
-                            else doc->pClass->postKeyEvent(doc,[q[@"eventType"] intValue],[q[@"charCode"] intValue],key);
+                            else {
+                                doc->pClass->postKeyEvent(doc,[q[@"eventType"] intValue],[q[@"charCode"] intValue],key);
+                                if ([q[@"eventType"] intValue] == LOK_KEYEVENT_KEYINPUT) pressedKeys.insert(key);
+                                else pressedKeys.erase(key);
+                            }
                         } else if ([action isEqual:@"input_mouse"] && [q[@"eventType"] intValue]>=0 && [q[@"eventType"] intValue]<=2) {
-                            doc->pClass->postMouseEvent(doc,[q[@"eventType"] intValue],[q[@"xTwips"] intValue],[q[@"yTwips"] intValue],[q[@"clickCount"] intValue],[q[@"buttons"] intValue],[q[@"modifier"] intValue]);
+                            mouseX=[q[@"xTwips"] intValue]; mouseY=[q[@"yTwips"] intValue];
+                            mouseButtons=[q[@"buttons"] intValue]; mouseModifiers=[q[@"modifier"] intValue];
+                            if ([q[@"eventType"] intValue] == LOK_MOUSEEVENT_MOUSEBUTTONDOWN) { mouseDown=true; mouseWasWritable=!documentReadOnly; }
+                            else if ([q[@"eventType"] intValue] == LOK_MOUSEEVENT_MOUSEBUTTONUP) mouseDown=false;
+                            doc->pClass->postMouseEvent(doc,[q[@"eventType"] intValue],mouseX,mouseY,[q[@"clickCount"] intValue],mouseButtons,mouseModifiers);
                         } else if (!barrier) { r[@"success"]=@NO; r[@"error"]=@"INVALID_INPUT"; }
                         if ([r[@"success"] boolValue]) { lastInputSeq=seq; r[@"applied"]=@YES; if (!barrier) ++refreshEpoch; }
                     }

@@ -2561,7 +2561,10 @@ export default {
       screenshotFolderTree: [],
       screenshotSaveLoading: false,
       screenshotSaveDataUrl: '', // Cached for save dialog
-      projectMembers: [], // Added
+      projectMembers: [], // 展示名单可合并云端；本机写权限只用下面的独立快照。
+      localProjectMembers: [],
+      localProjectMembersLoaded: false,
+      localProjectMembersProjectId: null,
       localMode: null, // 装机形态（local-mode），只用来判「单人本机项目」隐藏负责人一行
       isRenamingProject: false,
       // File Picker
@@ -2817,6 +2820,7 @@ export default {
 
       // Members
       currentUser: {},
+      permissionUserLoaded: false,
       pageEnterTime: 0,
 
       // Tabs 拖拽状态
@@ -3077,16 +3081,21 @@ export default {
     WPS_INTERNAL_HTTP_LINK_BASE() {
       return WPS_INTERNAL_HTTP_LINK_BASE
     },
-    // 当前用户对项目有没有写权限，与后端 ProjectMemberService.hasWritePermission 同口径
-    // （项目所有者 / ADMIN / PARTICIPANT 可写，READ_ONLY / CLIENT 只读）。成员表没加载到
-    // 或找不到自己时按可写处理——桌面单机没有成员概念，这里只挡「确知是只读」的情况。
+    // 身份、项目和本机成员角色确认后才开放写入。云端名单只用于展示，
+    // 不能用另一用户表的 id 或合并后的角色给本机文档授权。
     canWriteProject() {
       const uid = this.currentUser && this.currentUser.id
-      if (!uid) return true
-      if (this.project && Number(this.project.userId) === Number(uid)) return true
-      const me = (this.projectMembers || []).find(m => Number(m.userId) === Number(uid))
-      if (!me || !me.role) return true
-      return me.role === 'ADMIN' || me.role === 'PARTICIPANT'
+      const role = String(this.currentUser?.role || '').toUpperCase()
+      if (!this.permissionUserLoaded || !this.projectInfoLoaded || uid == null || uid === ''
+          || !Number.isSafeInteger(Number(uid)) || Number(uid) <= 0
+          || this.projectId == null || this.projectId === '' || !this.project || this.project.id == null
+          || !['USER', 'ADMIN'].includes(role)
+          || String(this.project.id) !== String(this.projectId)) return false
+      if (this.project.userId != null && String(this.project.userId) === String(uid)) return true
+      if (!this.localProjectMembersLoaded
+          || String(this.localProjectMembersProjectId) !== String(this.projectId)) return false
+      const me = (this.localProjectMembers || []).find(m => m.userId != null && String(m.userId) === String(uid))
+      return !!me && (me.role === 'ADMIN' || me.role === 'PARTICIPANT')
     },
     // ProjectController.updateProject is owner-only, stricter than document write access.
     canRenameProject() {
@@ -4052,7 +4061,6 @@ export default {
     // 加了守卫反而让页面栈里的旧实例一直挂着旧头像。
     this._onIdentityUpdated = () => {
       this.loadRealUserInfo()
-      if (this.projectId) this.loadProjectMembers()
     }
     uni.$on('awd:identity-updated', this._onIdentityUpdated)
     // UnlockHint 应用内化（dev-board#187）：解锁引导不再外跳官网，改为打开设置
@@ -4430,14 +4438,23 @@ export default {
     // loadUserInfo 的写法补一次真实接口，成功后与本地缓存合并（接口字段更全），
     // 失败静默回退本地缓存那份，绝不阻塞首屏、绝不 toast 报错。
     async loadRealUserInfo() {
+      const request = this._permissionUserRequest = (this._permissionUserRequest || 0) + 1
+      this.permissionUserLoaded = false
+      this.localProjectMembersLoaded = false
+      this._permissionMembersRequest = (this._permissionMembersRequest || 0) + 1
       try {
         const res = await getCurrentUserApi()
+        if (this._collabDisposed || request !== this._permissionUserRequest) return
         if (res && res.code === 0 && res.data) {
           this.currentUser = { ...this.currentUser, ...res.data }
+          this.permissionUserLoaded = res.data.id != null && res.data.id !== ''
+            && ['USER', 'ADMIN', 'CLIENT'].includes(String(res.data.role || '').toUpperCase())
           this.userDisplayName = this.currentUser.displayName || this.userDisplayName
+          // 身份刷新已作废旧成员请求；确认新身份后补齐同一项目的本机权限快照。
+          if (this.permissionUserLoaded) await this.loadProjectMembers()
         }
       } catch (e) {
-        // 拿不到就用本地缓存那份，不拦路
+        // 缓存仍可显示头像，但身份未确认时不授予文档写权限。
         console.error('获取用户信息失败:', e)
       }
     },
@@ -5979,7 +5996,8 @@ export default {
            return
          }
          try {
-           await this.libreOfficeExecutor.executeCommand('insert_at_cursor', { text: t })
+           const result = await this.libreOfficeExecutor.executeCommand('insert_at_cursor', { text: t })
+           if (!result || result.success === false) throw new Error(result?.message || this.$t('workbench.insertFailed'))
            uni.showToast({ title: this.$t('workbench.insertedToDoc'), icon: 'success' })
            // 焦点还给编辑器，Cmd+Z 才能撤掉这次插入（BUG-61）；存盘仍走正常自动保存节奏
            this.focusLibreEditorFor(this.libreOfficeExecutor)
@@ -6138,12 +6156,15 @@ export default {
     // --- 导航与初始化 ---
     async loadProjectInfo() {
       const projectId = this.projectId
+      const request = this._permissionProjectRequest = (this._permissionProjectRequest || 0) + 1
+      this.projectInfoLoaded = false
+      this.localProjectMembersLoaded = false
+      this._permissionMembersRequest = (this._permissionMembersRequest || 0) + 1
       try {
         const data = await getProject(projectId)
-        if (this._collabDisposed || projectId !== this.projectId) return
-        if (data) {
-          this.project = data
-        }
+        if (this._collabDisposed || projectId !== this.projectId || request !== this._permissionProjectRequest) return
+        if (!data || String(data.id) !== String(projectId)) return
+        this.project = data
         this.projectInfoLoaded = true
         if (this.isLooseWorkspace) {
           this.projectSwitcherOpen = false
@@ -6186,30 +6207,37 @@ export default {
      * · 合并后保留本机条目（它带得动本机 userId 与权限语义），role/joinedAt 以案件库为准；
      * · 云端独有条目的 id 加前缀，避免与本机 id 撞 :key；
      * · **云端条目的 userId 一律抹成 null**——它来自案件库服务器的用户表，和本机
-     *   user.id 是两个 id 空间，撞上同一个数字会让 canWriteProject / canRemoveMember
-     *   把别人的角色当成「我的角色」，把有写权限的人判成只读；
+     *   user.id 是两个 id 空间，撞上同一个数字会让 canRemoveMember
+     *   把别人的角色当成「我的角色」；文档写权限另用本机独立快照；
      * · 云端读取失败静默回落到本机名单，不让工作台因此报错。
      */
     async loadProjectMembers() {
         if (!this.projectInfoLoaded || !this.hasNamedProject) return
+        const projectId = this.projectId
+        const request = this._permissionMembersRequest = (this._permissionMembersRequest || 0) + 1
+        const current = () => !this._collabDisposed && projectId === this.projectId
+          && request === this._permissionMembersRequest
+        this.localProjectMembersLoaded = false
         let local = []
         try {
-            const res = await getProjectMembers(this.projectId)
-            local = res.data || []
+            const res = await getProjectMembers(projectId)
+            if (!current()) return
+            if (!Array.isArray(res?.data) || (res.code != null && res.code !== 0)) throw Error('Invalid project members response')
+            local = res.data
         } catch (e) {
             console.error('Failed to load project members', e)
             return
         }
-        // 本机名单先落地再去问案件库：getCloudMembers 是**走网络**的代理调用，
-        // 库连不上时它会一直等到超时，等在这里的话堆栈整段时间都是空的。
+        this.localProjectMembers = local.map(member => ({ ...member }))
+        this.localProjectMembersProjectId = projectId
+        this.localProjectMembersLoaded = true
+        // 本机名单先落地；云端网络结果只更新展示，不改变本机权限快照。
         this.projectMembers = local
         if (!(this.collabCloud && this.collabCloud.linked)) return
         try {
-            const res = await getCloudMembers(this.projectId)
+            const res = await getCloudMembers(projectId)
+            if (!current()) return
             const cloudMembers = (res && res.data && res.data.members) || []
-            // 去重键（accountId → username → 云端 awd_ 前缀）与合并规则在
-            // utils/mergeMembers.js，配单测；同一个官网账户在两张表里叫两个名字
-            // （本机 hanzewei / 案件库 awd_hanzewei）曾让一个人显示成两个人（#625）。
             this.projectMembers = mergeMembers(local, cloudMembers)
         } catch (e) {
             console.warn('[Collab] 读取案件库参与人失败，只显示本机名单', e)
@@ -7256,7 +7284,8 @@ export default {
           uni.showToast({ title: this.$t('workbench.selectReplaceContentFirst'), icon: 'none' })
           return
         }
-        await this.libreOfficeExecutor.executeCommand('replace_selection', { text: markdownToPlainText(message.content) })
+        const result = await this.libreOfficeExecutor.executeCommand('replace_selection', { text: markdownToPlainText(message.content) })
+        if (!result || result.success === false) throw new Error(result?.message || this.$t('workbench.replaceFailed'))
         uni.showToast({ title: this.$t('workbench.selectionReplaced'), icon: 'success' })
         return
       } catch (e) {
