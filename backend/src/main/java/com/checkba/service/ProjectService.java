@@ -83,6 +83,9 @@ public class ProjectService {
      */
     public record ProjectCreatedEvent(long projectId, Long userId) {}
 
+    /** 删除事务已提交，本地监听不得再为这个 ID 注册或响应迟到的打开事件。 */
+    public record ProjectDeletedEvent(long projectId) {}
+
     @Transactional
     public Project createProject(ProjectCreateRequest request, Long userId) {
         if (Project.LOOSE_FILES.equals(request.getProjectType())) {
@@ -371,6 +374,11 @@ public class ProjectService {
         // 为它报错反而会让用户以为项目没删掉。
         // 若当前在事务同步上下文中，放到 afterCommit 同步回调里执行，先把 Project/User 的悲观锁与数据库连接释放掉。
         Runnable cleanupDirs = () -> {
+            try {
+                eventPublisher.publishEvent(new ProjectDeletedEvent(id));
+            } catch (RuntimeException e) {
+                log.warn("项目已删除，通知本地监听失败: project={} ({})", id, e.toString());
+            }
             if (!officialCloud) deleteDirectoryQuietly(projectDir);
             deleteDirectoryQuietly(gitDir);
             deleteDirectoryQuietly(memoryGitDir);

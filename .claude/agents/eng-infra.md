@@ -563,6 +563,8 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
 
 `DesktopHealthController` 只有在 `ApplicationAvailability` 为 `ACCEPTING_TRAFFIC` 且有界数据库探测成功时返回 UP；必要 runner、同步 ready listener 尚未结束或应用正在关闭时返回 503。不要在最高优先级 Ready listener 中提前置位。`DesktopStartupReadinessTest` 使用真实 HTTP 监听与门闩验证未完成/失败启动；其专用配置用 `@TestConfiguration`，避免污染全应用扫描。既有补丁健康判定、回退与退出流程仍消费同一接口。
 
+`LocalRootWatchService` 的存量项目目录注册不再占住同步 Ready 回调，而由已有 `watchExecutor` 承担唯一可取消任务；已打开项目的实时对账继续使用独立 executor。项目显式打开、删除提交、停止与关闭的竞争契约见 `version-control.md` 与 `LocalRootWatchStartupTest`。不要把这项注册延后说成数据库/JPA 迁移完成，正式健康门未放宽。
+
 ## 验证（改本领域自身时）
 
 - 写作辅助（dev-board#538）：CI 跑 `frontend npm run test:completion`（本地提取/排序、资料转换、宿主范围与客体交互）；`test:lowa-completion` 与 `test:writing-ui` 需真实 LOWA 载荷，覆盖位置令牌、中文输入、明确查询预览、资料插入与撤销。第三方响应使用测试资料，不在回归中自动消费查询额度。
