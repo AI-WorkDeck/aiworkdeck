@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import * as barriers from '../../src/utils/checkpointSaveBarrier.js'
+import { observeLocalContentBackend } from '../../src/utils/localContentProtocol.js'
 // A6/C10：运行真实组件保存方法，控制导出/上传的在途顺序。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -13,9 +14,9 @@ function makeVm(extra = {}) {
   // stampApplication / documentStampApplication 是 B4 的打标链路，这里喂成「开关关着」，
   // 保存行为与打标前完全一致；打标本身另有 libre-save-generator-stamp.test.mjs。
   const options = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getFileWriteUrl',
-    'stampApplication', 'documentStampApplication', body)(...Object.values(barriers),
+    'stampApplication', 'documentStampApplication', 'observeLocalContentBackend', body)(...Object.values(barriers),
     null, null, null, id => '/upload/' + id,
-    async (bytes) => bytes, async () => null)
+    async (bytes) => bytes, async () => null, observeLocalContentBackend)
   const vm = {
     ready: true, file: { id: 7, name: '证据清单.docx' }, statusKey: 'ready',
     dirty: true, saving: false, _dirtySince: Date.now(),
@@ -93,6 +94,98 @@ test('关闭保存失败不得清掉 dirty，重试时保存当前完整内容',
   vm.uploadBytes = async () => {}
   assert.equal(await vm.retrySave(), true)
   assert.equal(vm.dirty, false)
+})
+
+// The worker takes its snapshot after queued IME commits, not when the host enqueues export.
+for (const laterEdit of [false, true]) {
+  test(`导出前排队的输入算入本次保存，导出后的新输入仍留脏：${laterEdit}`, async () => {
+    const gate = deferred()
+    let event, token
+    const vm = makeVm({
+      executor: { executeCommand: async (action, params) => {
+        token = params.saveSnapshotId
+        vm.onDocModified() // queued IME commit completes after flush starts
+        event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: token })
+        assert.equal(vm.dirty, false, 'worker snapshot includes the earlier input')
+        if (laterEdit) vm.onDocModified()
+        // A duplicate acknowledgement must not erase input after the snapshot.
+        event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: token })
+        return { success: true, bytes: [1, 2, 3] }
+      } },
+      uploadBytes: async () => gate.promise,
+    })
+    vm.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+    const pending = vm.flushSave()
+    await tick()
+    assert.ok(Number.isSafeInteger(token) && token > 0)
+    gate.resolve()
+    assert.equal(await pending, !laterEdit)
+    assert.equal(vm.dirty, laterEdit)
+    clearTimeout(vm._saveTimer)
+  })
+}
+
+test('外部导出、错误保存编号和已结束的保存回调不得清掉输入', async () => {
+  const gate = deferred()
+  let event, token
+  const vm = makeVm({ executor: { executeCommand: async (action, params) => {
+    token = params.saveSnapshotId
+    vm.onDocModified()
+    event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: token + 1 })
+    assert.equal(vm.dirty, true)
+    await gate.promise
+    return { success: false, message: 'export failed' }
+  } } })
+  vm.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+  const pending = vm.flushSave()
+  await tick(); gate.resolve()
+  assert.equal(await pending, false)
+  event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: token })
+  assert.equal(vm.dirty, true)
+  clearTimeout(vm._saveTimer)
+})
+
+for (const changed of ['file', 'project', 'context', 'checkpoint', 'reload', 'discard']) {
+  test(`导出快照回调不影响已变化的保存上下文：${changed}`, async () => {
+    const gate = deferred()
+    let event, token
+    const vm = makeVm({ projectId: 900,
+      executor: { executeCommand: async (action, params) => {
+        token = params.saveSnapshotId
+        await gate.promise
+        return { success: false }
+      } },
+    })
+    vm.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+    const pending = vm.flushSave()
+    await tick()
+    vm.onDocModified()
+    if (changed === 'file') vm.file = { id: 8 }
+    if (changed === 'project') vm.projectId = 901
+    if (changed === 'context') vm._backendSaveContext = 1
+    if (changed === 'checkpoint') vm._checkpointInvalidated = true
+    if (changed === 'reload') vm._reloading = true
+    if (changed === 'discard') vm._saveDiscarded = true
+    event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: token })
+    assert.equal(vm.dirty, true)
+    gate.resolve(); assert.equal(await pending, false)
+    clearTimeout(vm._saveTimer)
+  })
+}
+
+test('导出快照已确认但上传失败仍保留输入待重试', async () => {
+  let event
+  const vm = makeVm({
+    executor: { executeCommand: async (action, params) => {
+      event({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: params.saveSnapshotId })
+      return { success: true, bytes: [1] }
+    } },
+    uploadBytes: async () => { throw new Error('offline') },
+  })
+  vm.subscribeHostEvents({ subscribe(fn) { event = fn; return () => {} } })
+  assert.equal(await vm.flushSave(), false)
+  assert.equal(vm.dirty, true)
+  assert.equal(vm._savePaused, true)
 })
 
 test('上传请求具备超时和中止终态，不会永远保持 saving', async () => {

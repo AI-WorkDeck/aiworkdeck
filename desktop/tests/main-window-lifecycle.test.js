@@ -17,7 +17,7 @@ function section(from, to) {
 
 // Execute the shipping functions, with only Electron/OS effects replaced. No source-pattern
 // assertion can catch a stale closed callback nulling the replacement window.
-function harness(platform = 'darwin') {
+function harness(platform = 'darwin', engine = '') {
   const windows = []
   const intervals = []
   class Window extends EventEmitter {
@@ -53,7 +53,7 @@ function harness(platform = 'darwin') {
     // createMainWindow 用 nativeTheme 决定窗口的 backgroundColor（首屏白闪兜底，dev-board#731）。
     // 默认给浅色：桌面壳启动时 applyNativeTheme('light') 就是出厂值，与真实运行一致。
     nativeTheme: { shouldUseDarkColors: false },
-    process: { platform, env: {} }, __dirname: path.join(__dirname, '../main'),
+    process: { platform, env: { AWD_EDITOR_ENGINE: engine } }, __dirname: path.join(__dirname, '../main'),
     screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1400, height: 900 } }) },
     require: name => {
       // 建窗那段里现场 require 的模块在这里明确列出；来了别的就当场报死，
@@ -180,6 +180,18 @@ test('physical memory reaches the sandboxed preload through the real window argu
   h.context.finishStartup()
   const bridge = preloadBridge(h.windows[0].options.webPreferences.additionalArguments)
   assert.equal(bridge.systemMemory.totalBytes, 8 * 1024 ** 3)
+})
+
+test('native DOCX policy reaches the pool only for opted-in Mac windows', () => {
+  for (const [platform, engine, expected] of [['darwin', 'lok', 64 * 1024 * 1024], ['darwin', '', null], ['win32', 'lok', null]]) {
+    const h = harness(platform, engine)
+    h.context.finishStartup()
+    const bridge = preloadBridge(h.windows[0].options.webPreferences.additionalArguments)
+    assert.equal(bridge.zetaoffice.nativeDocxMaxBytes, expected)
+  }
+  for (const value of ['', '0', '-1', 'NaN', '1.5', '9007199254740992']) {
+    assert.equal(preloadBridge(['--checkba-native-docx-max-bytes=' + value]).zetaoffice.nativeDocxMaxBytes, null)
+  }
 })
 
 test('missing or malformed physical memory remains unknown, never zero', () => {

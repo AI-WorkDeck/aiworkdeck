@@ -12,6 +12,8 @@ const winEmulated = process.argv.includes('--checkba-win-emulated=1')
 // sandbox preload 不能直接读 os；由主进程注入物理内存，供编辑器选择预热策略。
 const systemMemoryArg = process.argv.find((a) => a.startsWith('--checkba-system-memory='))
 const systemMemoryBytes = systemMemoryArg ? Number(systemMemoryArg.slice('--checkba-system-memory='.length)) : NaN
+const nativeDocxArg = process.argv.find((a) => a.startsWith('--checkba-native-docx-max-bytes='))
+const nativeDocxMaxBytes = nativeDocxArg ? Number(nativeDocxArg.slice('--checkba-native-docx-max-bytes='.length)) : NaN
 
 contextBridge.exposeInMainWorld('checkbaDesktop', {
   apiBaseUrl,
@@ -285,7 +287,15 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
   // { url, preload, partition } for the host to mount the webview.
   // （onOpenEmbed / ⌘⇧O 覆盖层已移除：内联编辑器就是产品默认。）
   zetaoffice: {
-    getEditor: () => ipcRenderer.invoke('checkba:zetaoffice-editor')
+    nativeDocxMaxBytes: Number.isSafeInteger(nativeDocxMaxBytes) && nativeDocxMaxBytes > 0 ? nativeDocxMaxBytes : null,
+    getEditor: (options) => ipcRenderer.invoke('checkba:zetaoffice-editor', options),
+    nativeRequest: (sessionId, action, params) => ipcRenderer.invoke('checkba:native-editor-request', sessionId, action, params),
+    nativeClose: (sessionId) => ipcRenderer.invoke('checkba:native-editor-close', sessionId),
+    onNativeEvent: (sessionId, callback) => {
+      const listener = (_event, message) => { if (message?.sessionId === sessionId) callback(message.event) }
+      ipcRenderer.on('checkba:native-editor-event', listener)
+      return () => ipcRenderer.removeListener('checkba:native-editor-event', listener)
+    }
   },
   // 编辑器本机字体（仅桌面）：list({refresh}) → { platform, fonts, enabledBytes,
   // maxRecommendedBytes }；setEnabled(ids) → { ok, enabledBytes, count }。

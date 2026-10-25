@@ -36,6 +36,29 @@ function harness(request, options={}) {
 const texts = h => h.calls.filter(c => c.action === 'input_text').map(c => c.text);
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
+test('temporary command suspension restores a requested focus after Chromium blurs disabled input', async () => {
+  const h = harness();
+  try {
+    assert.equal(h.window.document.activeElement, h.input);
+    await h.component.suspend();
+    // Chromium moves focus to body when disabling an active input. jsdom needs
+    // the equivalent focus event explicitly; full-app acceptance covers Chromium.
+    h.input.dispatchEvent(new h.window.FocusEvent('blur'));
+    h.window.document.body.tabIndex = -1; h.window.document.body.focus();
+    h.component.resume();
+    assert.equal(h.window.document.activeElement, h.input);
+  } finally { h.close(); }
+});
+test('command completion does not steal focus from another editor control', async () => {
+  const h = harness();
+  try {
+    await h.component.suspend();
+    const field = h.window.document.createElement('input'); h.window.document.body.append(field); field.focus();
+    h.component.resume();
+    assert.equal(h.window.document.activeElement, field);
+  } finally { h.close(); }
+});
+
 test('read-only input keeps selection and copy but never submits edits, shortcuts or composition',async()=>{
  let saved=0,copied='',changed=0;
  const h=harness(async(action,p)=>action==='selection_text'?{text:'可复制选区'}:{applied:true,lastInputSeq:p.inputSeq,documentEpoch:p.documentEpoch,viewId:2},

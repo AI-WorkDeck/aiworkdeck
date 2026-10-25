@@ -99,6 +99,23 @@ test('replacing a remembered resolution with indistinguishable title and depth b
  assert.throws(h.helper.assertSafe,/停止写入/);
 });
 
+test('verified bookmark no-op preserves a resolution and its redo branch',async()=>{
+ const h=harness();await h.resolution();
+ const options={isNoop:result=>result.bookmarkMutations===0};
+ await h.helper.edit(async()=>({bookmarkMutations:0}),options);
+ await h.edit();await h.helper.step('undo');
+ await h.helper.edit(async()=>({bookmarkMutations:0}),options);
+ await h.helper.step('undo');
+ assert.deepEqual(h.calls.filter(c=>c[0]==='undo'),[['undo','balloons'],['undo','all']]);
+});
+
+test('a claimed bookmark no-op with a changed native stack locks writing',async()=>{
+ const h=harness();await h.resolution();
+ await assert.rejects(h.helper.edit(async()=>{h.undo.unshift('Insert bookmark');return {bookmarkMutations:0}},
+  {isNoop:result=>result.bookmarkMutations===0}),/未修改操作改变了撤销栈/);
+ assert.throws(h.helper.assertSafe,/停止写入/);
+});
+
 test('ordinary typing before tracked resolutions does not add native stack reads',async()=>{
  let reads=0;
  const helper=createReviewUndo({view:async()=>{throw Error('unused')},undoState:async()=>{reads++;throw Error('unused')},undoStep:async()=>{throw Error('unused')}});

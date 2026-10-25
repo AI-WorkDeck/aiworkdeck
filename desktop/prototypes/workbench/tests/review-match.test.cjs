@@ -37,6 +37,15 @@ test('verification reads one revision via check_revision, never the full uno sna
   assert.equal(h.calls.some(call => Array.isArray(call) && call[0] === 'uno' && call[1] === 'snapshot'), false);
 });
 
+test('stacked CAPI author and current UNO author are independently required',async()=>{
+ const card={...baseCard,author:'Current',capiAuthor:'Prior'};
+ assert.equal(matchesCapiRevision(card,{...baseCard,author:'Prior'}),true);
+ assert.equal(matchesCapiRevision(card,{...baseCard,author:'Current'}),false);
+ assert.equal(matchesUnoRevision(card,{...card}),true);
+ assert.equal(matchesUnoRevision(card,{...card,author:'Prior'}),false);
+ assert.equal(matchesUnoRevision(card,{...card,capiAuthor:'Forged'}),false);
+});
+
 test('scroll target comes from the current layout after preceding paragraphs change', async () => {
   const rects = [[150, 24000, 300, 200]];
   const h = harness({ freshItems: [{ ...baseCard, rects }] });
@@ -67,6 +76,22 @@ test('a CAPI field change (deleted and replaced at the same index) is rejected',
     const h = harness({ freshItems: [{ ...baseCard, [key]: '不同' }] });
     await assert.rejects(verifyReviewTarget({ revisionId: '2', refreshEpoch: 7 }, h.deps), /已变化/);
     assert.equal(h.calls.some(call => Array.isArray(call) && call[0] === 'uno'), false, key);
+  }
+});
+
+test('a controlled view transition may change a text revision summary only with exact full UNO proof', async () => {
+  const fresh = { ...baseCard, description: 'Insert “新增...字”' };
+  const h = harness({ freshItems: [fresh] });
+  h.deps.displayChanged = true;
+  assert.equal((await verifyReviewTarget({ revisionId: '2', refreshEpoch: 7 }, h.deps)).identifier, 'rev-b');
+  assert.equal(h.calls.at(-1)[1], 'check_revision');
+  const changed = harness({ freshItems: [fresh], unoEntry: { ...baseCard, text: '不同的完整文字' } });
+  changed.deps.displayChanged = true;
+  await assert.rejects(verifyReviewTarget({ revisionId: '2', refreshEpoch: 7 }, changed.deps), /已变化/);
+  for (const card of [{ ...baseCard, textAvailable: false }, { ...baseCard, type: 'Format' }]) {
+    const incomplete = harness({ identityItems: [card], freshItems: [{ ...card, description: 'different' }] });
+    incomplete.deps.displayChanged = true;
+    await assert.rejects(verifyReviewTarget({ revisionId: '2', refreshEpoch: 7 }, incomplete.deps), /已变化/);
   }
 });
 

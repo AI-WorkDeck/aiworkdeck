@@ -464,6 +464,7 @@ function createMainWindow() {
       additionalArguments: [
         '--checkba-api-base=http://127.0.0.1:' + backendPort,
         '--checkba-system-memory=' + require('node:os').totalmem(),
+        '--checkba-native-docx-max-bytes=' + (process.platform === 'darwin' && process.env?.AWD_EDITOR_ENGINE === 'lok' ? 64 * 1024 * 1024 : 0),
         // ARM 版 Windows（Mac 虚拟机）转译运行时启动看门狗已放宽 8 倍（dev-board#340），
         // 渲染层的等待死线要跟着放大，否则前端仍按 90 秒判超时（dev-board#341）
         ...(require('./services/win-arch').isWinArmEmulated() ? ['--checkba-win-emulated=1'] : [])
@@ -1720,7 +1721,20 @@ ipcMain.handle('checkba:update-restart', async () => {
 // starts the shared same-origin server (so LOWA/page are isolated) on first ask,
 // then returns the URL + the webview preload path + the partition. Dormant until
 // the renderer (LibreOfficeEditor.vue) requests it.
-ipcMain.handle('checkba:zetaoffice-editor', async () => {
+let nativeEditorManager = null
+ipcMain.handle('checkba:zetaoffice-editor', async (event, options) => {
+  // Only a named DOCX within the native byte limit opts into this slice. Generic spares and the
+  // comparison/merge callers require the complete WASM command service; their
+  // later document type is not known when this handler is called.
+  if (process.platform === 'darwin' && process.env.AWD_EDITOR_ENGINE === 'lok'
+      && typeof options?.readOnly === 'boolean' && /\.docx$/i.test(options.name || '')
+      && Number.isSafeInteger(options.size) && options.size >= 0 && options.size <= 64 * 1024 * 1024) {
+    nativeEditorManager ||= require('./native/editor-ipc').createNativeEditorManager({
+      root: path.join(app.getPath('temp'), 'aiworkdeck-native-editors'),
+      configFile: process.env.AWD_NATIVE_EDITOR_CONFIG,
+    })
+    return nativeEditorManager.open(event.sender, options)
+  }
   const { installZetaOfficeIsolation, ZETAOFFICE_PARTITION } = require('./zetaoffice-session')
   const { startEditorServer, editorUrl } = require('./zetaoffice-server')
   installZetaOfficeIsolation(ZETAOFFICE_PARTITION)
@@ -1732,6 +1746,14 @@ ipcMain.handle('checkba:zetaoffice-editor', async () => {
     preload: require('url').pathToFileURL(path.join(__dirname, '../preload/zetaoffice-webview-preload.js')).href,
     partition: ZETAOFFICE_PARTITION,
   }
+})
+ipcMain.handle('checkba:native-editor-request', (event, sessionId, action, params) => {
+  if (!nativeEditorManager) throw Error('Native editor is not enabled')
+  return nativeEditorManager.request(event.sender, sessionId, action, params)
+})
+ipcMain.handle('checkba:native-editor-close', (event, sessionId) => {
+  if (!nativeEditorManager) throw Error('Native editor is not enabled')
+  return nativeEditorManager.close(event.sender, sessionId)
 })
 
 // 编辑器本机字体（desktop/main/system-fonts.js）：设置面板列出/保存启用集；
@@ -2005,6 +2027,10 @@ app.on('before-quit', async (e) => {
       //    就是「闪退」。先 hide 才是 Mac 应用按 ⌘Q 的正常观感：窗口立刻消失，
       //    收尾在后台进行。
       hideAllWindowsForQuit()
+      if (nativeEditorManager) {
+        try { await nativeEditorManager.closeAll() }
+        catch (error) { logDesktopEvent('native-editor-stop-error', { message: String(error.message || error) }) }
+      }
       // 先终止进行中的模型下载子进程，否则退出时它们会变孤儿继续占用资源
       if (modelManager) modelManager.killAllActive()
       // ③ 停服务带总墙钟上限：到点就走，不再无限等

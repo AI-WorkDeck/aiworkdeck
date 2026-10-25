@@ -39,6 +39,17 @@ test('a partial final batch retains its exact alignment',async()=>{
  assert.equal(last.start,25);assert.equal(last.nextOffset,27);assert.equal(last.items.length,2);assert.equal(last.items[1].identifier,'uno-27');
 });
 
+test('stacked revisions retain the current author while separately validating CAPI successor author',async()=>{
+ const h=harness(2);
+ h.alterBatch(batch=>{batch.entries.forEach(item=>{item.capiAuthor=item.author;item.author='Current reviewer'});return batch});
+ await h.run(0,1);await h.run(1,1);
+ assert.equal(h.original.items[0].author,'Current reviewer');
+ assert.equal(h.original.items[0].capiAuthor,'Reviewer 0');
+ const wrong=harness(1);
+ wrong.alterBatch(batch=>{batch.entries[0].capiAuthor='Forged prior author';return batch});
+ await assert.rejects(wrong.run(),/STALE_REVIEW_BATCH/);
+});
+
 test('oversized, missing, negative and fractional batches fail before native reads',async()=>{
  for(const [start,limit]of [[0,26],[-1,25],[0,0],[0,1.5],[0,undefined]]){
   const h=harness();await assert.rejects(hydrateReviewBatch({documentEpoch:3,refreshEpoch:7,start,limit},h.deps),/range/);assert.deepEqual(h.calls,[]);

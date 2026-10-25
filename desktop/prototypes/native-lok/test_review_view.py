@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import unittest
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import review_uno
@@ -479,6 +480,7 @@ class FakeRedline:
         if name == 'RedlineDateTime':
             class D:
                 Year, Month, Day, Hours, Minutes, Seconds = 2026, 10, 25, 9, 30, 0
+                NanoSeconds = 0
             return D()
         if name == 'RedlineSuccessorData':
             return None
@@ -517,6 +519,38 @@ class FakeRedlines:
 
 
 class PreservedMethodTests(unittest.TestCase):
+    def test_stacked_revision_keeps_current_and_capi_successor_authors_separate(self):
+        for successor, expected in ((None, 'me'),
+                ((SimpleNamespace(Name='RedlineAuthor', Value='Prior reviewer'),), 'Prior reviewer')):
+            revision = FakeRedline('r1', 'x')
+            original = revision.getPropertyValue
+            revision.getPropertyValue = lambda name: successor if name == 'RedlineSuccessorData' else original(name)
+            model = supported_model()
+            model.getRedlines = lambda: FakeRedlines([revision])
+            detail = review_uno.detail_of(revision)
+            batch = review_uno.dispatch('snapshot_batch', {'start': 0, 'limit': 1, 'expectedCount': 1}, model, FakeUno)
+            self.assertEqual(detail['author'], 'me')
+            self.assertEqual(detail['capiAuthor'], expected)
+            self.assertEqual(batch['entries'][0]['capiAuthor'], expected)
+
+    def test_revision_timestamps_match_capi_iso8601_in_detail_and_batch(self):
+        for hours, minutes, seconds, nanos, expected in (
+                (0, 0, 0, 0, '2026-10-01'),
+                (9, 3, 7, 0, '2026-10-01T09:03:07'),
+                (0, 0, 0, 1234, '2026-10-01T00:00:00,000001234')):
+            date = SimpleNamespace(Year=2026, Month=10, Day=1, Hours=hours,
+                                   Minutes=minutes, Seconds=seconds, NanoSeconds=nanos)
+            revision = FakeRedline('r1', 'x')
+            original = revision.getPropertyValue
+            revision.getPropertyValue = lambda name: date if name == 'RedlineDateTime' else original(name)
+            model = supported_model()
+            model.getRedlines = lambda: FakeRedlines([revision])
+            with self.subTest(expected=expected):
+                detail = review_uno.dispatch('check_revision', {'identifier': 'r1'}, model, FakeUno)
+                batch = review_uno.dispatch('snapshot_batch', {'start': 0, 'limit': 1, 'expectedCount': 1}, model, FakeUno)
+                self.assertEqual(detail['dateTime'], expected)
+                self.assertEqual(batch['entries'][0]['dateTime'], expected)
+
     def test_check_revision_returns_single_detail(self):
         model = supported_model()
         model.redlines = None
@@ -553,6 +587,25 @@ class BatchSnapshotTests(unittest.TestCase):
         self.assertEqual(batch['start'], 575)
         self.assertEqual([entry['index'] for entry in batch['entries']], list(range(575, 600)))
         self.assertEqual(batch['entries'][-1]['identifier'], 'r599')
+
+    def test_view_proof_reads_only_requested_indices_and_checks_live_identity(self):
+        model, redlines = self.fixture()
+        result = review_uno.dispatch('check_revision_batch', {'expectedCount': 600,
+            'targets': [{'index': 2, 'identifier': 'r2'}, {'index': 599, 'identifier': 'r599'}]}, model, FakeUno)
+        self.assertEqual(redlines.reads, [2, 599])
+        self.assertEqual([item['index'] for item in result['entries']], [2, 599])
+        with self.assertRaisesRegex(RuntimeError, 'identity changed'):
+            review_uno.dispatch('check_revision_batch', {'expectedCount': 600,
+                'targets': [{'index': 2, 'identifier': 'r599'}]}, model, FakeUno)
+
+    def test_invalid_view_proof_never_fetches_a_revision(self):
+        for targets in ([], [{'index': i, 'identifier': str(i)} for i in range(26)],
+                        [{'index': True, 'identifier': 'r1'}],
+                        [{'index': 0, 'identifier': 'r0'}, {'index': 0, 'identifier': 'r0'}]):
+            model, redlines = self.fixture()
+            with self.assertRaises(ValueError):
+                review_uno.dispatch('check_revision_batch', {'expectedCount': 600, 'targets': targets}, model, FakeUno)
+            self.assertEqual(redlines.reads, [])
 
     def test_invalid_bounds_and_wrong_count_never_fetch_a_revision(self):
         for params in ({'start': 0, 'limit': 26, 'expectedCount': 600},

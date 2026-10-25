@@ -176,6 +176,7 @@ function quitHarness({ stopAll, prepare = async () => {}, fullUpdate = null, res
   vm.runInContext(`
     let quitInProgress = false
     let backendSupervisor = null
+    let nativeEditorManager = null
     let services = globalThis.__noServices ? null : { stopAll: globalThis.__stopAll }
     let modelManager = { killAllActive: () => globalThis.__events.push('killAllActive') }
     ${section("app.on('activate'", '// 后端有 45s')}

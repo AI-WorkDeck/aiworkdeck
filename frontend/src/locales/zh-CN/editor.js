@@ -65,6 +65,9 @@ export default {
     saveFailed: '保存失败',
     movedSaveFailed: '文件已被移动或改名，改动尚未保存',
     versionSaveBusy: '正在整理版本，改动尚未保存，请稍后重试',
+    localVersionSaveBusy: '正在整理版本，保存结果待确认，请稍后重试',
+    contentSaveReloadRequired: '旧保存已停止，请先另存当前改动，再重新加载文件',
+    contentSaveConflict: '文件已在别处更新，请先另存当前改动，再重新打开',
     desktopOnly: '仅桌面版可用',
   },
   boot: {
