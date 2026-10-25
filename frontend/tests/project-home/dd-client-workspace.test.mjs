@@ -11,7 +11,7 @@ const source = readFileSync(new URL('../../src/components/dd/DdClientChecklist.v
 function fixture(api = {}, locale = 'zh-CN') {
   const body = source.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace('export default', 'return')
   const options = new Function('ddClientRead', 'ddClientWrite', 'ddClientUpload', 'ddClientDownload', body)(api.read || (async () => []), api.write || (async () => {}), api.upload || (async () => {}), async () => {})
-  const vm = { ...options.data(), $t: translate(locale), requestId: 1, projectId: 2, connectionId: 'client-one' }
+  const vm = { ...options.data(), $emit: () => {}, $t: translate(locale), requestId: 1, projectId: 2, connectionId: 'client-one' }
   for (const [key, fn] of Object.entries(options.methods)) vm[key] = fn.bind(vm)
   for (const [key, fn] of Object.entries(options.computed)) Object.defineProperty(vm, key, { get: fn.bind(vm) })
   return vm
@@ -210,4 +210,35 @@ test('English upload error and language header preserve the same retry semantics
   await assert.rejects(api.ddClientUpload({ connectionId: 'bound', requestId: 5 }, 7, [], 'retry-en', false), /upload timed out.*files are retained/i)
   assert.equal(sent.headers['X-App-Language'], 'en-US'); assert.equal(sent.headers['X-Session-Id'], 'local')
   assert.equal(sent.body.get('idempotencyKey'), 'retry-en'); assert.equal(sends, 1)
+})
+
+
+test('returning to the materials list keeps the active form and reopening does not toggle it closed', async () => {
+  const vm = fixture(); const item = { id: 7 }; vm.items = [item]
+  await vm.selectItem(item); vm.addFiles([{ name: 'selected.pdf' }]); vm.reason = 'draft'; vm.formMode = 'explanation'
+  const files = vm.pendingFiles; const key = vm.uploadKey
+  vm.showDetails = false; await vm.selectItem(item)
+  assert.equal(vm.showDetails, true); assert.equal(vm.selectedId, 7); assert.equal(vm.pendingFiles, files)
+  assert.equal(vm.uploadKey, key); assert.equal(vm.reason, 'draft'); assert.equal(vm.formMode, 'explanation')
+})
+
+test('one pending upload locks other materials and ignores callbacks after its request changes', async () => {
+  let finish, progress, calls = 0; const captured = []
+  const vm = fixture({ upload: (scope, itemId, files, key, consent, notify) => { calls++; captured.push([scope, itemId]); progress = notify; return new Promise(resolve => { finish = resolve }) } })
+  const item = { id: 7 }; vm.request = { status: 'PUBLISHED' }; vm.items = [item]; await vm.selectItem(item); vm.addFiles([{ name: 'original.pdf' }])
+  const pending = vm.upload(item); await vm.upload(item); await vm.selectItem({ id: 8 })
+  assert.equal(calls, 1); assert.equal(vm.selectedId, 7); progress(45); assert.equal(vm.uploadProgress, 45)
+  vm.requestId = 3; vm.reset(); vm.pendingFiles = [{ name: 'new-request.pdf' }]; vm.reason = 'new draft'
+  progress(100); finish(); await pending
+  assert.deepEqual(captured, [[{ connectionId: 'client-one', requestId: 1, projectId: 2 }, 7]])
+  assert.equal(vm.uploadProgress, null); assert.equal(vm.pendingFiles[0].name, 'new-request.pdf'); assert.equal(vm.reason, 'new draft'); assert.equal(vm.notice, '')
+})
+
+test('workspace prevents connection, request, refresh and notification navigation during submission', async () => {
+  const calls = []; const vm = navigationFixture(async (...args) => { calls.push(args); return [] })
+  vm.selectedId = 'client-one'; vm.requestId = 4; vm.requests = [{ id: 4 }, { id: 5 }]; vm.submissionBusy = true
+  vm.selectConnection('client-two'); vm.selectRequest(5); await vm.loadRequests(); await vm.openNotification({ connectionId: 'client-two', requestId: 5 })
+  assert.equal(vm.selectedId, 'client-one'); assert.equal(vm.requestId, 4); assert.equal(calls.length, 0)
+  vm.navigationTarget = { connectionId: 'client-two', projectId: 3, requestId: 5 }
+  await vm.applyNavigationTarget(); assert.equal(vm.selectedId, 'client-one'); assert.equal(vm.pendingNavigation, true)
 })
