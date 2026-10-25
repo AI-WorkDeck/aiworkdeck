@@ -166,7 +166,10 @@ p {
 
 .brand-title {
   display: block;
-  font-size: 15px;
+  font-family: var(--awd-font-serif, "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", serif);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .self-badge {
@@ -183,25 +186,31 @@ p {
 }
 
 .tabbar {
-  display: flex;
-  gap: 4px;
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  margin-bottom: 10px;
+  background: var(--awd-surface-2, var(--fallback-surface-2));
+  border: 1px solid var(--awd-border-subtle, var(--fallback-border));
+  border-radius: var(--awd-radius-md, 6px);
   overflow-x: auto;
 }
 
 .tab-btn {
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: var(--awd-radius-sm, 6px) var(--awd-radius-sm, 6px) 0 0;
+  border: 1px solid transparent;
+  border-radius: var(--awd-radius-sm, 4px);
   background: transparent;
-  padding: 8px 14px;
+  padding: 5px 12px;
+  min-height: var(--awd-control-xs, 26px);
   font-weight: 500;
   color: var(--awd-text-2, var(--fallback-muted));
 }
 
 .tab-btn[aria-selected="true"] {
-  color: var(--awd-accent, var(--fallback-accent));
-  border-bottom-color: var(--awd-accent, var(--fallback-accent));
-  background: var(--awd-accent-wash, var(--fallback-wash));
+  color: var(--awd-accent-text, var(--fallback-accent));
+  border-color: var(--awd-border-subtle, var(--fallback-border));
+  background: var(--awd-surface, var(--fallback-surface));
+  box-shadow: var(--awd-shadow-btn, 0 1px 2px rgba(42, 38, 30, 0.06));
   font-weight: 600;
 }
 
@@ -254,8 +263,9 @@ p {
 .card {
   background: var(--awd-surface, var(--fallback-surface));
   border: 1px solid var(--awd-border, var(--fallback-border));
-  border-radius: var(--awd-radius-md, 8px);
+  border-radius: var(--awd-radius-dialog, 8px);
   padding: 14px 16px;
+  box-shadow: var(--awd-shadow-card, 0 1px 3px rgba(42, 38, 30, 0.05));
 }
 
 .card-header {

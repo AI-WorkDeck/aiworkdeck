@@ -173,6 +173,8 @@ export default {
     "loadingChecklist": "Loading checklist…",
     "awaitingPublication": "Checklists will appear here after your lawyer confirms and publishes them.",
     "removeConnection": "Remove local connection",
+    "materialList": "Materials",
+    "backToMaterials": "Back to materials",
     "chooseChecklist": "Choose a checklist to start preparing documents.",
     "checklistTitle": "Due diligence checklist",
     "progressSummary": "{completed} / {total} items passed · {pending} to prepare",

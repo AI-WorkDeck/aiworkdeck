@@ -26,6 +26,18 @@ declare namespace awd {
     /** Opens only this plugin. The target never executes a business decision. */
     target?: { kind: 'plugin'; pluginId: string; view?: string; recordId?: string };
   }
+  interface ProgressState {
+    title?: string;
+    detail?: string;
+    percent?: number;
+    safetyNote?: string;
+    cancelText?: string;
+    onCancel?: () => void;
+  }
+  interface ProgressController {
+    update(next: ProgressState | null | false): void;
+    clear(): void;
+  }
   interface SDK {
     readonly version: string;
     context: Context | null;
@@ -37,7 +49,11 @@ declare namespace awd {
       prepareDrag(path: string, rect?: Rect, options?: CallOptions): Promise<Drag>;
       endDrag(options?: CallOptions): Promise<unknown>;
     };
-    ui: { toast(message: string, options?: CallOptions): Promise<unknown>; openFile(path: string, options?: CallOptions): Promise<unknown> };
+    ui: {
+      toast(message: string, options?: CallOptions): Promise<unknown>;
+      openFile(path: string, options?: CallOptions): Promise<unknown>;
+      progress(target: string | Element | null, state?: ProgressState | null | false): ProgressController;
+    };
     tools: { invoke(name: string, args?: Params, options?: CallOptions): Promise<string> };
     chat: { send(prompt: string, options?: CallOptions): Promise<unknown>; addFile(path: string, options?: CallOptions): Promise<unknown> };
     im: { request<T = unknown>(action: string, params?: Params, options?: CallOptions): Promise<T> };
