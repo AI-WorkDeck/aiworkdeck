@@ -272,17 +272,21 @@
        <view class="header-actions">
           <view class="memory-header-btn" @tap="showMemoryBrowser = true">{{ $t('chat.memoryButton') }}</view>
           <view class="icon-btn" @tap="$emit('toggle-history')" title="History">
-             <image class="btn-icon default" src="/static/history.png" />
-             <image class="btn-icon hover" src="/static/history_hover.png" />
+             <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+               <circle cx="12" cy="12" r="9" />
+               <path d="M12 7v5l3 2" />
+             </svg>
              <view v-if="historyBadge" class="conv-dot header-dot" :class="historyBadge"></view>
           </view>
           <view class="icon-btn" @tap="startNewChat" title="New Chat">
-             <image class="btn-icon default" src="/static/plus.png" />
-             <image class="btn-icon hover" src="/static/plus_hover.png" />
+             <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+               <path d="M12 5v14M5 12h14" />
+             </svg>
           </view>
           <view class="icon-btn" @tap="$emit('close')" title="Close">
-             <image class="btn-icon default" src="/static/close.png" />
-             <image class="btn-icon hover" src="/static/close_hover.png" />
+             <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+               <path d="M18 6L6 18M6 6l12 12" />
+             </svg>
           </view>
        </view>
     </view>
@@ -4563,7 +4567,7 @@ export default {
   height: 100%;
   width: 100%;
   max-width: 100%;
-  background: var(--awd-bg);
+  background: var(--awd-surface);
   position: relative;
   overflow: hidden; /* Prevent children from overflowing */
   box-sizing: border-box;
@@ -4571,12 +4575,12 @@ export default {
 
 .chat-header {
   height: 36px;
-  border-bottom: none;
+  border-bottom: 1px solid var(--awd-border-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 16px;
-  background: var(--awd-bg);
+  padding: 0 12px;
+  background: var(--awd-surface-2);
   flex-shrink: 0;
 }
 
@@ -4666,7 +4670,8 @@ export default {
   width: 14px;
   height: 14px;
 }
-/* 加号用内联 SVG（描边风格与发送键一致），hover 走 currentColor 变绿，不再双位图切换 */
+/* 顶栏与输入栏内联 SVG 按钮：描边风格与发送键一致，hover 走 currentColor 变绿 */
+.icon-btn .btn-svg,
 .icon-btn .plus-svg {
   width: 15px;
   height: 15px;
@@ -4674,10 +4679,12 @@ export default {
   color: var(--awd-text-2);
   transition: color 0.15s ease;
 }
+.icon-btn.mini .btn-svg,
 .icon-btn.mini .plus-svg {
   width: 14px;
   height: 14px;
 }
+.icon-btn:hover .btn-svg,
 .icon-btn:hover .plus-svg {
   color: var(--awd-accent-text);
 }
@@ -4876,6 +4883,7 @@ export default {
 }
 
 .welcome-text {
+  font-family: var(--awd-font-serif);
   font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-text);
@@ -4897,7 +4905,7 @@ export default {
   padding: 16px;
   width: 100%;
   box-sizing: border-box;
-  box-shadow: var(--awd-shadow-sm);
+  box-shadow: var(--awd-shadow-card);
   position: relative;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }

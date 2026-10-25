@@ -23,14 +23,14 @@
           <button v-if="notificationPermission === 'default'" type="button" class="text-button" @click="enableNotifications">{{ $t('ddWorkflow.client.enableNotifications') }}</button>
           <small v-else-if="notificationPermission !== 'granted'" class="notif-hint">{{ $t('ddWorkflow.client.notificationsDisabled') }}</small>
         </div>
-        <button v-if="connections.length" type="button" class="secondary" :class="{ 'is-active': adding }" @click="adding = !adding">
+        <button v-if="connections.length" type="button" class="secondary" :disabled="submissionBusy" :class="{ 'is-active': adding }" @click="adding = !adding">
           {{ $t(adding ? 'ddWorkflow.cancel' : 'ddWorkflow.client.joinProject') }}
         </button>
       </div>
     </header>
 
     <div v-if="notifications.length" class="notification-list">
-      <button v-for="n in notifications" :key="`${n.connectionId}:${n.id}`" type="button" class="notification-chip" @click="openNotification(n)">
+      <button v-for="n in notifications" :key="`${n.connectionId}:${n.id}`" type="button" class="notification-chip" :disabled="submissionBusy" @click="openNotification(n)">
         <span class="chip-dot" aria-hidden="true"></span>
         <span>{{ n.title }}</span>
       </button>
@@ -111,7 +111,7 @@
         <div class="sidebar-group">
           <label for="dd-project" class="sidebar-label">{{ $t('ddWorkflow.client.invitedProjects') }}</label>
           <div class="select-wrap">
-            <select id="dd-project" :value="selectedId" @change="selectConnection($event.target.value)">
+            <select id="dd-project" :disabled="submissionBusy" :value="selectedId" @change="selectConnection($event.target.value)">
               <option v-for="c in connections" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
             <span class="select-chevron" aria-hidden="true">▾</span>
@@ -121,18 +121,23 @@
         <div class="sidebar-group sidebar-checklists">
           <div class="list-heading">
             <span class="sidebar-label">{{ $t('ddWorkflow.client.publishedChecklists') }}</span>
-            <button type="button" class="text-button" @click="loadRequests">{{ $t('ddWorkflow.refresh') }}</button>
+            <button type="button" class="text-button" :disabled="submissionBusy || requestsLoading" @click="loadRequests">{{ $t('ddWorkflow.refresh') }}</button>
           </div>
           <p v-if="requestsLoading" class="empty">{{ $t('ddWorkflow.client.loadingChecklist') }}</p>
           <p v-else-if="!requests.length" class="empty">{{ $t('ddWorkflow.client.awaitingPublication') }}</p>
-          <div v-else class="request-stack">
+          <div v-else class="request-picker">
+            <select :value="requestId" :disabled="submissionBusy" :aria-label="$t('ddWorkflow.client.publishedChecklists')" @change="selectRequest($event.target.value)">
+              <option v-for="request in requests" :key="request.id" :value="request.id">{{ request.name }}</option>
+            </select>
+          </div>
+          <div v-if="requests.length" class="request-stack">
             <button
               v-for="request in requests"
               :key="request.id"
               type="button"
               class="request-row"
               :class="{ selected: String(requestId) === String(request.id) }"
-              @click="requestId = request.id"
+              :disabled="submissionBusy" @click="selectRequest(request.id)"
             >
               <span class="request-name">{{ request.name }}</span>
               <small v-if="request.status === 'ARCHIVED'" class="request-badge">{{ $t('ddWorkflow.requestStatus.ARCHIVED') }}</small>
@@ -141,7 +146,7 @@
         </div>
 
         <div class="sidebar-footer">
-          <button type="button" class="text-button remove" @click="leave">{{ $t('ddWorkflow.client.removeConnection') }}</button>
+          <button type="button" class="text-button remove" :disabled="submissionBusy" @click="leave">{{ $t('ddWorkflow.client.removeConnection') }}</button>
         </div>
       </aside>
 
@@ -152,6 +157,7 @@
         :project-id="selected.projectId"
         :connection-id="selected.id"
         :focus-item-id="focusItemId"
+        @busy-change="setSubmissionBusy"
       />
       <div v-else class="empty detail-empty">{{ $t('ddWorkflow.client.chooseChecklist') }}</div>
     </div>
@@ -166,17 +172,20 @@ export default {
   name: 'DdClientWorkspace', components: { DdClientChecklist },
   props: { navigationTarget: { type: Object, default: null } },
   watch: { navigationTarget() { this.applyNavigationTarget() } },
-  data: () => ({ code: '', connections: [], selectedId: '', requestId: null, focusItemId: null, requests: [], adding: false, joining: false, loading: false, requestsLoading: false, error: '', cloudConnections: [], cloudConnectionId: '', generation: 0, identity: '', identityTimer: null, notificationTimer: null, notifications: [], notificationPermission: ddNotificationPermission() }),
+  data: () => ({ submissionBusy: false, pendingNavigation: false, code: '', connections: [], selectedId: '', requestId: null, focusItemId: null, requests: [], adding: false, joining: false, loading: false, requestsLoading: false, error: '', cloudConnections: [], cloudConnectionId: '', generation: 0, identity: '', identityTimer: null, notificationTimer: null, notifications: [], notificationPermission: ddNotificationPermission() }),
   computed: { selected() { return this.connections.find(c => c.id === this.selectedId) } },
   mounted() {
     this.identity = ddClientIdentity(); this.load(); this.refreshNotifications(); this.notificationTimer = setInterval(() => this.refreshNotifications(), 15000)
     if (typeof window !== 'undefined' && window.__AWD_PORTAL_CODE__) { this.code = window.__AWD_PORTAL_CODE__; window.__AWD_PORTAL_CODE__ = ''; this.adding = true }
     if (!isClientPortalBuild()) listCloudConnections().then(r => { this.cloudConnections = r?.data?.connections || r?.connections || [] }).catch(() => {})
-    this.identityTimer = setInterval(() => { if (this.identity !== ddClientIdentity()) { this.identity = ddClientIdentity(); this.generation++; this.connections = []; this.notifications = []; this.requests = []; this.selectedId = ''; this.requestId = null; this.load() } }, 1000)
+    this.identityTimer = setInterval(() => { if (this.identity !== ddClientIdentity()) { this.identity = ddClientIdentity(); this.generation++; this.submissionBusy = false; this.pendingNavigation = false; this.connections = []; this.notifications = []; this.requests = []; this.selectedId = ''; this.requestId = null; this.load() } }, 1000)
   },
   beforeUnmount() { this.generation++; clearInterval(this.identityTimer); clearInterval(this.notificationTimer) },
   methods: {
+    setSubmissionBusy(value) { this.submissionBusy = value; if (!value && this.pendingNavigation) { this.pendingNavigation = false; this.applyNavigationTarget() } },
+    selectRequest(id) { if (!this.submissionBusy) { this.requestId = this.requests.find(r => String(r.id) === String(id))?.id || null; this.focusItemId = null } },
     async applyNavigationTarget() {
+      if (this.submissionBusy) { this.pendingNavigation = true; return }
       const target = this.navigationTarget
       if (!target || !this.connections.length) return
       const connection = this.connections.find(c => c.id === target.connectionId)
@@ -192,6 +201,7 @@ export default {
     async refreshNotifications() { try { const result = await pollDdClientNotifications({ onOpen: n => this.openNotification(n) }); this.notifications = result.notifications; this.notificationPermission = ddNotificationPermission() } catch {} },
     async enableNotifications() { this.notificationPermission = await enableDdNotifications(); await this.refreshNotifications() },
     async openNotification(n) {
+      if (this.submissionBusy) return
       this.selectConnection(n.connectionId)
       await this.loadRequests()
       if (this.requests.some(r => r.id === n.requestId)) this.requestId = n.requestId
@@ -204,21 +214,22 @@ export default {
       finally { if (generation === this.generation) this.loading = false }
     },
     async join() {
-      if (this.joining || !this.code.trim()) return
+      if (this.submissionBusy || this.joining || !this.code.trim()) return
       this.joining = true; this.error = ''
       try { const row = await connectDdClient(this.code.trim(), this.cloudConnectionId || null); this.code = ''; this.selectedId = row.id; this.adding = false; await this.load() }
       catch (e) { this.error = e.message } finally { this.joining = false }
     },
-    selectConnection(id) { this.selectedId = id; this.requestId = null; this.requests = []; this.loadRequests() },
+    selectConnection(id) { if (this.submissionBusy) return; this.focusItemId = null; this.selectedId = id; this.requestId = null; this.requests = []; this.loadRequests() },
     async loadRequests() {
+      if (this.submissionBusy) return
       const selected = this.selected; if (!selected) return
       const id = selected.id; this.requestsLoading = true; this.error = ''
-      try { const rows = await ddClientRead({ connectionId: id, projectId: selected.projectId }, '/projects'); if (id !== this.selectedId) return; this.requests = rows; if (!rows.some(r => r.id === this.requestId)) this.requestId = rows[0]?.id || null }
+      try { const rows = await ddClientRead({ connectionId: id, projectId: selected.projectId }, '/projects'); if (id !== this.selectedId || this.submissionBusy) return; this.requests = rows; if (!rows.some(r => r.id === this.requestId)) this.requestId = rows[0]?.id || null }
       catch (e) { if (id === this.selectedId) this.error = e.message }
       finally { if (id === this.selectedId) this.requestsLoading = false }
     },
     async leave() {
-      const id = this.selectedId; if (!id) return
+      const id = this.selectedId; if (this.submissionBusy || !id) return
       try { await removeDdClientConnection(id); this.selectedId = ''; this.requestId = null; await this.load() } catch (e) { this.error = e.message }
     },
   },
@@ -226,6 +237,7 @@ export default {
 </script>
 <style scoped lang="scss">
 .dd-workspace {
+  container: dd-workspace / inline-size;
   height: 100%;
   min-height: 0;
   display: flex;
@@ -693,6 +705,8 @@ p {
   gap: var(--awd-space-2);
 }
 
+.request-picker { display: none; }
+
 .request-stack {
   display: flex;
   flex-direction: column;
@@ -780,20 +794,22 @@ p {
   flex-wrap: wrap;
 }
 
+@container dd-workspace (max-width: 1100px) {
+  .workspace-body { display: flex; flex-direction: column; min-height: auto; }
+  .project-list { border-right: 0; border-bottom: 1px solid var(--awd-border); padding: var(--awd-space-4); overflow: visible; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--awd-space-3); }
+  .sidebar-group { min-width: 0; }
+  .sidebar-footer { grid-column: 1 / -1; padding-top: 0; border-top: 0; }
+  .request-stack { display: none; }
+  .request-picker { display: block; }
+}
+
+@container dd-workspace (max-width: 480px) {
+  .project-list { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (max-width: 760px) {
   .workspace-header {
     padding: var(--awd-space-4);
-  }
-  .workspace-body {
-    display: flex;
-    flex-direction: column;
-    min-height: auto;
-  }
-  .project-list {
-    border-right: 0;
-    border-bottom: 1px solid var(--awd-border);
-    padding: var(--awd-space-4);
-    overflow: visible;
   }
   .join-stage,
   .join-stage.is-empty-stage {

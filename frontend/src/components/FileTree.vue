@@ -80,19 +80,15 @@
             @tap="selectTempParent(null)"
           >
             <view class="tree-expand-icon-wrapper" @tap.stop="toggleFolderSelectorExpand('root')">
-              <image
-                class="tree-expand-icon-img"
-                :src="folderSelectorExpanded['root'] !== false ? '/static/down.png' : '/static/right.png'"
-                mode="aspectFit"
-              />
+              <svg class="tree-expand-svg" :class="{ 'is-open': folderSelectorExpanded['root'] !== false }" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 4l4 4-4 4" />
+              </svg>
             </view>
-            <image
-              :src="folderSelectorExpanded['root'] !== false ? '/static/folder-opened.png' : '/static/folder-closed.png'"
-              class="folder-icon-img"
-              :class="{ 'is-opened': folderSelectorExpanded['root'] !== false }"
-              style="margin-right: 8px;"
-              mode="aspectFit"
-            />
+            <view class="folder-icon-svg-wrap" :class="{ 'is-opened': folderSelectorExpanded['root'] !== false }" style="margin-right: 8px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+            </view>
             <text class="folder-name">{{ $t('fileTree.rootDirectory') }}</text>
           </view>
 
@@ -105,18 +101,15 @@
           >
             <view class="indent" :style="{ width: (folder.level * 20) + 'px' }"></view>
             <view class="tree-expand-icon-wrapper" @tap.stop="toggleFolderSelectorExpand(folder.id)">
-              <image
-                class="tree-expand-icon-img"
-                :src="folderSelectorExpanded[String(folder.id)] === true ? '/static/down.png' : '/static/right.png'"
-                mode="aspectFit"
-              />
+              <svg class="tree-expand-svg" :class="{ 'is-open': folderSelectorExpanded[String(folder.id)] === true }" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 4l4 4-4 4" />
+              </svg>
             </view>
-            <image
-              :src="folderSelectorExpanded[String(folder.id)] === true ? '/static/folder-opened.png' : '/static/folder-closed.png'"
-              class="folder-icon-img"
-              :class="{ 'is-opened': folderSelectorExpanded[String(folder.id)] === true }"
-              mode="aspectFit"
-            />
+            <view class="folder-icon-svg-wrap" :class="{ 'is-opened': folderSelectorExpanded[String(folder.id)] === true }">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+            </view>
             <view v-if="renamingId === folder.id" class="rename-input-wrapper dialog-rename" @tap.stop>
               <input
                 class="rename-input"
@@ -4727,11 +4720,13 @@ export default {
 /* Selection stays distinct from both alternating rows and hover. */
 .tree-list .tree-item.tree-item-selected {
   background-color: var(--awd-mint) !important; /* Forest Green Lighter Tint - darkened for visibility */
+  box-shadow: var(--awd-shadow-card);
 }
 
 /* Cmd/Ctrl 多选样式 */
 .tree-list .tree-item.tree-item-multi-selected {
   background-color: var(--awd-mint) !important;
+  box-shadow: var(--awd-shadow-card);
 }
 
 /* mint 亮绿底两个主题下都是亮色，行内文字必须钉配对的深墨色，
@@ -5224,8 +5219,9 @@ export default {
      滚动而不是让盒子无限长高。 */
   max-height: 85vh;
   background-color: var(--awd-surface);
+  border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-dialog);
-  box-shadow: var(--awd-shadow-md);
+  box-shadow: var(--awd-shadow-lg);
   overflow: hidden;
   animation: awd-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
@@ -5254,6 +5250,7 @@ export default {
 }
 
 .awd-dialog-title {
+  font-family: var(--awd-font-serif);
   font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-accent-text); /* Forest Green */
@@ -5414,20 +5411,36 @@ export default {
   justify-content: center;
   cursor: pointer;
 }
-.awd-dialog .tree-expand-icon-img {
-  width: 10px;
-  height: 10px;
+.awd-dialog .tree-expand-icon-img,
+.awd-dialog .tree-expand-svg {
+  width: 11px;
+  height: 11px;
+  color: var(--awd-text-3);
+  transition: transform 0.15s ease;
+}
+.awd-dialog .tree-expand-svg.is-open {
+  transform: rotate(90deg);
 }
 .awd-dialog .tree-expand-placeholder {
   width: 24px;
 }
-.folder-icon-img {
+.folder-icon-img,
+.folder-icon-svg-wrap {
   width: 18px;
   height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--awd-accent-text);
   transition: transform 0.2s;
 }
-.folder-icon-img.is-opened {
-  transform: scale(1.2);
+.folder-icon-svg-wrap svg {
+  width: 16px;
+  height: 16px;
+}
+.folder-icon-img.is-opened,
+.folder-icon-svg-wrap.is-opened {
+  transform: scale(1.08);
 }
 .folder-name {
   margin-left: 8px;
