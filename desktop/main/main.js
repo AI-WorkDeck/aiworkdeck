@@ -121,12 +121,13 @@ function configureBackendSupervision(startupFailed = false) {
   backendStartupFailed = startupFailed
   if (backendSupervisor || !services) return
   if (startupFailed && (!services.isOwned('backend') || !services.ports.backend)) return
-  backendSupervisor = new BackendSupervisor(services, (health) => {
+  backendSupervisor = new BackendSupervisor(services, (health, verifiedLaunch) => {
+    if (health.ok && verifiedLaunch) recordBackendBoot(true, verifiedLaunch)
     logDesktopEvent('backend-health', health)
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send('checkba:backend-health-changed', health)
     }
-  })
+  }, { onStartupFailure: (launch, reason) => recordBackendBoot(false, launch, reason) })
   backendSupervisor.bindPowerMonitor(powerMonitor)
   if (startupFailed) backendSupervisor.publish('failed', 'startup-failed')
   backendSupervisor.start()
@@ -137,6 +138,26 @@ function getBackendHealth() {
     state: backendStartupFailed ? 'failed' : 'starting', ok: false, owned: false, attempts: 0,
     reason: backendStartupFailed ? 'startup-failed' : '', updatedAt: Date.now()
   }
+}
+
+// Bind the verdict to the overlay actually used by this owned launch. A background
+// update may already have activated a different overlay while Spring was starting.
+function recordBackendBoot(ok, launch, reason = '') {
+  if (!launch?.bootOverlay || launch.bootRecorded) return { reverted: false }
+  launch.bootRecorded = true
+  try {
+    const overlay = require('./services/overlay')
+    const { context, current } = launch.bootOverlay
+    const active = overlay.readCurrent(context)
+    if (active?.version !== current?.version || JSON.stringify(active?.components) !== JSON.stringify(current?.components)) {
+      return { reverted: false }
+    }
+    if (ok) { overlay.markBootOk(context); return { reverted: false } }
+    if (!active) return { reverted: false }
+    const result = overlay.noteBackendBootFailure(context)
+    updateService?.logEvent(result.reverted ? 'reverted' : 'boot-failure', { message: reason })
+    return result
+  } catch (e) { console.error('[overlay]', e); return { reverted: false } }
 }
 
 // 增量更新（docs/INCREMENTAL_UPDATE_DESIGN.md）：overlay 上下文——三个 seam
@@ -479,6 +500,9 @@ function createMainWindow() {
   // 官网头像的 CORP 放行（dev-board#603）。必须赶在第一次 load 之前挂上，
   // 否则首屏那次头像请求会漏在拦截器外面。只挂一次（函数内自带去重标记）。
   attachAvatarCorpRelaxation(mainWindow.webContents.session)
+  require('./services/backend-request-gate').installBackendRequestGate(mainWindow.webContents.session, {
+    getState: () => ({ port: services?.ports.backend, launch: services?.getLaunch('backend'), closing: services?.closing })
+  })
 
   // UI：直接复用现有 frontend（开发态用 dev server）
   if (IS_DEV) {
@@ -1621,7 +1645,8 @@ ipcMain.handle('checkba:service-ensure', async (_evt, payload) => {
   if (!services) return { ok: false, message: 'services not ready' }
   try {
     const name = payload && payload.name
-    const res = await services.start(name)
+    const res = { ...await services.start(name) }
+    delete res.launch // Child-process/overlay evidence stays in the main process, never Electron IPC.
     if (!res.ok) return { ...res, ok: false }
     const { PACK_ID_BY_SERVICE, waitForServiceHealth } = require('./services/pysvc-runtime')
     if (PACK_ID_BY_SERVICE[name] && !(await waitForServiceHealth(name, services.ports[name]))) {
@@ -1817,17 +1842,15 @@ app.whenReady().then(() => {
       // 增量更新自愈（设计 §6）：overlay 生效时后端起不来 → 记账，连续 2 次
       // 自动回滚到上一版本/内置并当场重试一次；启动健康则清零计数并清理旧版本
       try {
-        const overlay = require('./services/overlay')
-        const ctx = overlayCtx()
         const b0 = results.backend
-        if (b0 && b0.ok) {
-          overlay.markBootOk(ctx)
-        } else if (overlay.readCurrent(ctx)) {
-          const { reverted } = overlay.noteBackendBootFailure(ctx)
-          if (updateService) updateService.logEvent(reverted ? 'reverted' : 'boot-failure', { message: b0 && b0.error })
+        if (b0 && b0.ok && b0.fullReady !== false) {
+          recordBackendBoot(true, b0.launch)
+        } else if (!b0?.ok) {
+          const { reverted } = recordBackendBoot(false, services?.getLaunch?.('backend'), b0 && b0.error)
           if (reverted) {
             console.error('[overlay] 后端连续启动失败，已回滚补丁并重试')
             results.backend = await services.restart('backend').catch((e) => ({ ok: false, error: String(e && e.message ? e.message : e) }))
+            if (results.backend.ok && results.backend.fullReady !== false) recordBackendBoot(true, results.backend.launch)
           }
         }
       } catch (e) { console.error('[overlay]', e) }
@@ -2015,6 +2038,8 @@ app.on('before-quit', async (e) => {
 
 ipcMain.handle('checkba:backend-restart', async () => {
   if (!backendSupervisor) return { ok: false, error: backendStartupFailed ? 'backend startup failed; reopen the application' : 'backend is still starting' }
-  return backendSupervisor.recover()
+  const result = { ...await backendSupervisor.recover() }
+  delete result.launch
+  return result
 })
 ipcMain.handle('checkba:backend-health', getBackendHealth)

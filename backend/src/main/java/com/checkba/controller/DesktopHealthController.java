@@ -28,6 +28,16 @@ public class DesktopHealthController {
         this.availability = availability;
     }
 
+    /** Full backend path for the startup probe. The early core implements its own narrower readiness. */
+    @GetMapping("/api/desktop/startup-health")
+    public ResponseEntity<Map<String, String>> startupHealth() {
+        ResponseEntity<Map<String, String>> health = health();
+        if (!health.getStatusCode().is2xxSuccessful()) return health;
+        var body = new java.util.HashMap<>(health.getBody());
+        body.put("phase", "full");
+        return ResponseEntity.ok(body);
+    }
+
     @GetMapping("/api/desktop/health")
     public ResponseEntity<Map<String, String>> health() {
         // A listening server/database can precede repository validation, runners and ready listeners.
