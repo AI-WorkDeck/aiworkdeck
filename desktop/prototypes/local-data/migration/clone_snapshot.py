@@ -30,6 +30,7 @@ import stat
 import subprocess
 import sys
 import time
+from urllib.parse import quote
 
 SNAPSHOT_FORMAT = "awd-h2-snapshot-v1"
 MAX_FILE_SIZE = 32 * 1024 * 1024
@@ -43,12 +44,12 @@ PROJECT_COLUMNS = {"id", "uid", "name", "project_type", "listed_company_name", "
 FILE_COLUMNS = {"id", "uid", "project_id", "parent_id", "is_folder", "name", "file_type", "file_size",
                 "file_path", "external_path", "wps_file_id", "sort_order", "user_id", "client_visible",
                 "created_at", "updated_at", "is_deleted", "meta_json", "deleted_at"}
-REQUIRED_PROJECT_COLUMNS = {"id", "uid", "name", "created_at", "updated_at", "local_root", "user_id"}
+REQUIRED_PROJECT_COLUMNS = {"id", "uid", "name", "created_at", "updated_at", "local_root", "user_id", "project_type"}
 REQUIRED_FILE_COLUMNS = {"id", "uid", "project_id", "parent_id", "is_folder", "name", "file_path",
-                         "file_size", "updated_at", "is_deleted", "external_path"}
+                         "file_size", "updated_at", "is_deleted", "external_path", "user_id", "client_visible"}
 SAFE_INT = 9007199254740991  # Swift integer() helper bound for JSON protocol IDs
 UNAVAILABLE = ["git-versions", "ai", "cloud-acl", "watcher", "external-files", "h2-cutover",
-               "project-acl-roles"]
+               "identity-selection", "client-uploads", "acl-management"]
 INT_RE = re.compile(r"^[0-9]+$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -319,7 +320,7 @@ def build_model(snapshot):
                 "created_at": require_text(values["created_at"], "project.created_at"),
                 "updated_at": require_text(values["updated_at"], "project.updated_at"),
                 "local_root": values.get("local_root") or "",
-                "user_id": values.get("user_id"),
+                "user_id": values.get("user_id"), "project_type": values.get("project_type"),
             }
             project_uids[uid] = pid
     for table, values in snapshot["rows"]:
@@ -344,6 +345,7 @@ def build_model(snapshot):
             "name": values.get("name"), "file_path": values.get("file_path") or "",
             "file_size": values.get("file_size"), "updated_at": values.get("updated_at"),
             "deleted": deleted, "external_path": values.get("external_path") or "",
+            "user_id": values.get("user_id"), "client_visible": values.get("client_visible"),
         }
         files[fid] = row
         file_uids[uid] = fid
@@ -396,6 +398,92 @@ def build_model(snapshot):
         if not row["is_folder"]:
             row["size"] = parse_size(row["file_size"], f"project_file {fid} file_size")
     return projects, files, live
+
+
+def build_acl(snapshot, projects, live):
+    """Bind only the source's definite persisted local identity; never guess an owner."""
+    required = {"app_users": {"id", "username", "display_name", "role"},
+                "project_member": {"project_id", "user_id", "role"},
+                "system_setting": {"config_key", "value"}}
+    for table, columns in required.items():
+        if not columns.issubset(snapshot["tables"].get(table, [])):
+            fail("IDENTITY_REQUIRED" if table == "system_setting" else "INVALID_ACL",
+                 f"Snapshot must contain {table} columns {sorted(columns)}; create a fresh export")
+
+    def identifier(value, field):
+        try:
+            return parse_pos_int(value, field)
+        except CloneError:
+            fail("INVALID_ACL", f"{field} must be a positive safe integer")
+
+    users, names, members, selected = {}, set(), {}, []
+    for table, row in snapshot["rows"]:
+        if table == "app_users":
+            uid = identifier(row["id"], "app_users.id")
+            name, role, display = row["username"], row["role"], row["display_name"]
+            if uid in users or not isinstance(name, str) or not name.strip() or "\0" in name or name in names:
+                fail("INVALID_ACL", "User IDs and nonempty usernames must be unique")
+            if display is not None and (not isinstance(display, str) or "\0" in display):
+                fail("INVALID_ACL", f"User {uid} display_name must be text without U+0000, or null")
+            if not isinstance(role, str) or role.upper() not in ("USER", "ADMIN", "CLIENT"):
+                fail("INVALID_ACL", f"Unsupported app_users role for user {uid}")
+            users[uid] = {"id": uid, "username": name, "display_name": display, "role": role}
+            names.add(name)
+        elif table == "system_setting" and row["config_key"] == "local.identity.selectedUserId":
+            selected.append(row["value"])
+    if len(selected) != 1:
+        fail("IDENTITY_REQUIRED", "Exactly one persisted local.identity.selectedUserId is required; select the source identity before exporting")
+    try:
+        # Match LocalIdentityService.loadSelected(): Java String.trim followed
+        # by Long.parseLong. The active pointer remains a positive safe ID.
+        selected_text = selected[0]
+        if isinstance(selected_text, str):
+            selected_text = selected_text.strip("".join(chr(n) for n in range(33)))
+            if selected_text.startswith("+"):
+                selected_text = selected_text[1:]
+        subject = parse_pos_int(selected_text, "selectedUserId")
+    except CloneError:
+        fail("IDENTITY_REQUIRED", "Persisted local identity is not a safe user ID")
+    if subject not in users:
+        fail("IDENTITY_REQUIRED", "Persisted local identity does not reference an exported user")
+    for pid, row in projects.items():
+        row["user_id"] = identifier(row["user_id"], "project.user_id")
+        if row["user_id"] not in users:
+            fail("INVALID_ACL", f"Project {pid} owner does not exist")
+        if not isinstance(row["project_type"], str) or not row["project_type"].strip() or "\0" in row["project_type"]:
+            fail("INVALID_ACL", f"Project {pid} must retain a nonempty project_type")
+    for fid, row in live.items():
+        if row["user_id"] is not None:
+            row["user_id"] = identifier(row["user_id"], "project_file.user_id")
+            if row["user_id"] not in users:
+                fail("INVALID_ACL", f"File {fid} creator does not exist")
+        try:
+            row["client_visible"] = parse_flag(row["client_visible"], "project_file.client_visible")
+        except CloneError:
+            fail("INVALID_ACL", f"File {fid} client_visible must be boolean or null")
+    for table, row in snapshot["rows"]:
+        if table != "project_member":
+            continue
+        pid = identifier(row["project_id"], "project_member.project_id")
+        uid = identifier(row["user_id"], "project_member.user_id")
+        role = row["role"]
+        if pid not in projects or uid not in users or (pid, uid) in members:
+            fail("INVALID_ACL", "Membership must reference existing project/user and be unique")
+        if role not in ("ADMIN", "PARTICIPANT", "READ_ONLY", "CLIENT", "CLIENT_NAMED", "CLIENT_GENERIC"):
+            fail("INVALID_ACL", f"Unsupported membership role for project {pid}, user {uid}")
+        members[(pid, uid)] = role
+    return {"users": users, "members": members, "subject": subject}
+
+
+def project_access(project, acl):
+    subject = acl["subject"]
+    owner = project["user_id"] == subject
+    member = acl["members"].get((project["id"], subject))
+    readable = owner or member is not None
+    client = acl["users"][subject]["role"].upper() == "CLIENT" or (
+        not owner and member in ("CLIENT", "CLIENT_NAMED", "CLIENT_GENERIC"))
+    writable = readable and not client and (owner or member in ("ADMIN", "PARTICIPANT"))
+    return readable, client, writable, "OWNER" if owner else member
 
 
 def identity_floors(snapshot, projects, files):
@@ -586,13 +674,17 @@ class SwiftClient:
         line, self.buffer = self.buffer.split(b"\n", 1)
         return json.loads(line)
 
-    def call(self, method, **params):
+    def call(self, method, expected_error=False, **params):
         self.sequence += 1
         self.process.stdin.write(json.dumps({"id": self.sequence, "method": method, "params": params}) + "\n")
         self.process.stdin.flush()
         response = self.receive()
         if response.get("id") != self.sequence:
             fail("VERIFY_MISMATCH", f"Swift protocol id mismatch: {response}")
+        if expected_error:
+            if response.get("error", {}).get("code") not in ("ACCESS_DENIED", "NOT_FOUND"):
+                fail("VERIFY_MISMATCH", f"Swift {method} did not enforce the expected access denial")
+            return response["error"]
         if "error" in response:
             fail("VERIFY_MISMATCH", f"Swift {method} failed: {response['error']}")
         return response["result"]
@@ -675,18 +767,28 @@ def build_clone(binary, staging, projects, files, live, roots, snapshot, source_
             database.execute("PRAGMA foreign_keys=ON")
             database.execute("PRAGMA busy_timeout=5000")
             database.execute("BEGIN IMMEDIATE")
+            acl = snapshot["acl"]
+            database.execute("DELETE FROM profile_identity")
+            database.execute("DELETE FROM users")
+            database.executemany("INSERT INTO users(id,username,display_name,role) VALUES(?,?,?,?)",
+                                 [(u["id"], u["username"], u["display_name"], u["role"]) for u in acl["users"].values()])
+            database.execute("INSERT INTO profile_identity(id,selected_user_id) VALUES(1,?)", (acl["subject"],))
             for pid in sorted(projects):
                 project = projects[pid]
                 database.execute(
-                    "INSERT INTO projects(id,uid,name,created_at,updated_at) VALUES(?,?,?,?,?)",
-                    (pid, project["uid"], project["name"], project["created_at"], project["updated_at"]))
+                    "INSERT INTO projects(id,uid,name,created_at,updated_at,user_id,project_type) VALUES(?,?,?,?,?,?,?)",
+                    (pid, project["uid"], project["name"], project["created_at"], project["updated_at"],
+                     project["user_id"], project["project_type"]))
+            database.executemany("INSERT INTO project_members(project_id,user_id,role) VALUES(?,?,?)",
+                                 [(pid, uid, role) for (pid, uid), role in acl["members"].items()])
             for row in sorted(live.values(), key=lambda row: row["id"]):
                 database.execute(
-                    "INSERT INTO files(id,uid,project_id,parent_id,name,kind,size,generation,live,updated_at) "
-                    "VALUES(?,?,?,?,?,?,?,?,1,?)",
+                    "INSERT INTO files(id,uid,project_id,parent_id,name,kind,size,generation,live,updated_at,user_id,client_visible) "
+                    "VALUES(?,?,?,?,?,?,?,?,1,?,?,?)",
                     (row["id"], row["uid"], row["project_id"], row["parent_id"], row["name"],
                      1 if row["is_folder"] else 0, 0 if row["is_folder"] else row["size"],
-                     "" if row["is_folder"] else row["generation"], row["updated_at"]))
+                     "" if row["is_folder"] else row["generation"], row["updated_at"], row["user_id"],
+                     int(row["client_visible"])))
             database.execute(
                 "CREATE TABLE migration_archive(seq INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, "
                 "table_name TEXT, imported INTEGER NOT NULL DEFAULT 0, note TEXT, payload TEXT NOT NULL)")
@@ -698,7 +800,11 @@ def build_clone(binary, staging, projects, files, live, roots, snapshot, source_
                 if kind == "row" and table == CORE_PROJECT:
                     record = json.loads(raw)
                     if int(record["values"]["id"]) in project_ids:
-                        imported, note = 1, "imported as a live prototype project; local_root/user_id stay archive-only"
+                        imported, note = 1, "imported as a live prototype project with source owner/type; local_root stays archive-only"
+                elif kind == "row" and table in ("app_users", "project_member"):
+                    imported, note = 1, "minimal identity/ACL columns active; remaining columns archived only"
+                elif kind == "row" and table == "system_setting" and json.loads(raw)["values"]["config_key"] == "local.identity.selectedUserId":
+                    imported, note = 1, "persisted local identity bound to this isolated profile"
                 elif kind == "row" and table == CORE_FILE:
                     record = json.loads(raw)
                     fid = int(record["values"]["id"])
@@ -731,49 +837,123 @@ def build_clone(binary, staging, projects, files, live, roots, snapshot, source_
         os.close(lock_fd)
 
 
-def verify_clone(binary, staging, projects, live, source_hashes):
+def verify_database(staging, projects, live, acl, floors):
+    """Check every imported active row without elevating the protocol subject."""
+    database = sqlite3.connect("file:" + quote(os.path.join(staging, "local.sqlite")) + "?mode=ro", uri=True)
+    try:
+        checks = [
+            ("SELECT id,username,display_name,role FROM users ORDER BY id",
+             [(u["id"], u["username"], u["display_name"], u["role"]) for _, u in sorted(acl["users"].items())]),
+            ("SELECT id,selected_user_id FROM profile_identity", [(1, acl["subject"])]),
+            ("SELECT project_id,user_id,role FROM project_members ORDER BY project_id,user_id",
+             [(pid, uid, role) for (pid, uid), role in sorted(acl["members"].items())]),
+            ("SELECT id,uid,name,created_at,updated_at,user_id,project_type FROM projects ORDER BY id",
+             [(r["id"], r["uid"], r["name"], r["created_at"], r["updated_at"], r["user_id"], r["project_type"])
+              for _, r in sorted(projects.items())]),
+            ("SELECT id,uid,project_id,parent_id,name,kind,size,generation,live,updated_at,user_id,client_visible FROM files ORDER BY id",
+             [(r["id"], r["uid"], r["project_id"], r["parent_id"], r["name"], int(r["is_folder"]),
+               0 if r["is_folder"] else r["size"], "" if r["is_folder"] else r["generation"], 1,
+               r["updated_at"], r["user_id"], int(r["client_visible"])) for _, r in sorted(live.items())]),
+        ]
+        for sql, expected in checks:
+            if database.execute(sql).fetchall() != expected:
+                fail("VERIFY_MISMATCH", f"Full imported data mismatch: {sql}")
+        for table, floor in floors.items():
+            if database.execute("SELECT seq FROM sqlite_sequence WHERE name=?", (table,)).fetchall() != [(floor,)]:
+                fail("VERIFY_MISMATCH", f"Imported {table} identity high water changed during verification")
+        if database.execute("SELECT COUNT(*) FROM pending").fetchone()[0]:
+            fail("VERIFY_MISMATCH", "Import verification left an unfinished write journal")
+        if database.execute("PRAGMA foreign_key_check").fetchall():
+            fail("VERIFY_MISMATCH", "Imported active rows contain dangling references")
+    finally:
+        database.close()
+
+
+def verify_clone(binary, staging, projects, live, source_hashes, acl, floors):
+    verify_database(staging, projects, live, acl, floors)
     client = SwiftClient(binary, staging)
     try:
         health = client.call("health")
+        identity = client.call("identity.status")
+        if identity != {"localMode": True, "userId": acl["subject"], "needsSelection": False}:
+            fail("VERIFY_MISMATCH", "Swift identity.status does not match the persisted source selection")
         listed = client.call("projects.list")
         by_id = {entry["id"]: entry for entry in listed}
-        if set(by_id) != set(projects):
-            fail("VERIFY_MISMATCH", "Swift projects.list does not match the imported project ids")
-        for pid, project in projects.items():
-            entry = by_id[pid]
-            for key, expected in (("uid", project["uid"]), ("name", project["name"]),
-                                  ("createdAt", project["created_at"]), ("updatedAt", project["updated_at"])):
-                if entry[key] != expected:
-                    fail("VERIFY_MISMATCH", f"Project {pid} {key} mismatch after re-read: {entry[key]!r} != {expected!r}")
+        expected_ids = {pid for pid, row in projects.items()
+                        if project_access(row, acl)[0] and row["project_type"] != "LOOSE_FILES"}
+        if len(listed) != len(by_id) or set(by_id) != expected_ids:
+            fail("VERIFY_MISMATCH", "Swift projects.list does not match the selected identity's visible projects")
+        protocol_files, denials = 0, 0
         per_project = {}
-        for row in live.values():
-            per_project.setdefault(row["project_id"], {})[row["id"]] = row
-        verified_bytes = 0
-        for pid, rows in per_project.items():
-            listing = {entry["id"]: entry for entry in client.call("files.list", projectId=pid)}
-            if set(listing) != set(rows):
-                fail("VERIFY_MISMATCH", f"Swift files.list for project {pid} does not match the imported ids")
+        for fid, row in live.items():
+            per_project.setdefault(row["project_id"], {})[fid] = row
+        for pid, project in projects.items():
+            readable, is_client, writable, role = project_access(project, acl)
+            if not readable:
+                client.call("projects.get", expected_error=True, projectId=pid)
+                denials += 1
+            else:
+                entry = client.call("projects.get", projectId=pid)
+                if pid in by_id and by_id[pid] != entry:
+                    fail("VERIFY_MISMATCH", f"Project {pid} list/get metadata differs")
+                for key, expected in (("uid", project["uid"]), ("name", project["name"]),
+                                      ("createdAt", project["created_at"]), ("updatedAt", project["updated_at"]),
+                                      ("projectType", project["project_type"]), ("myRole", role),
+                                      ("canWrite", writable), ("canBrowseFiles", not is_client)):
+                    if entry.get(key) != expected:
+                        fail("VERIFY_MISMATCH", f"Project {pid} {key} mismatch after authorized re-read")
+            rows = per_project.get(pid, {})
+            if readable and not is_client:
+                listing = client.call("files.list", projectId=pid)
+                listed_files = {entry["id"]: entry for entry in listing}
+                if len(listing) != len(listed_files) or set(listed_files) != set(rows):
+                    fail("VERIFY_MISMATCH", f"Swift files.list for project {pid} does not match imported ids")
+                for fid, row in rows.items():
+                    checks = (("uid", row["uid"]), ("name", row["name"]), ("isFolder", row["is_folder"]),
+                              ("filePath", f"projects/{pid}/{row['relative']}"), ("canWrite", writable),
+                              ("parentId", None if row["parent_id"] == 0 else row["parent_id"]))
+                    if any(listed_files[fid].get(key) != expected for key, expected in checks):
+                        fail("VERIFY_MISMATCH", f"File {fid} metadata mismatch after authorized re-read")
+            else:
+                client.call("files.list", expected_error=True, projectId=pid)
+                denials += 1
             for fid, row in rows.items():
-                entry = listing[fid]
-                expected_path = f"projects/{pid}/{row['relative']}"
-                checks = (("uid", row["uid"]), ("name", row["name"]), ("isFolder", row["is_folder"]),
-                          ("filePath", expected_path),
-                          ("parentId", None if row["parent_id"] == 0 else row["parent_id"]))
-                for key, expected in checks:
-                    if entry[key] != expected:
-                        fail("VERIFY_MISMATCH", f"File {fid} {key} mismatch after re-read")
-                if not row["is_folder"]:
-                    read = client.call("files.read", projectId=pid, fileId=fid)
-                    payload = base64.b64decode(read["contentBase64"])
-                    if sha256(payload) != source_hashes[fid] or read["generation"] != source_hashes[fid]:
-                        fail("VERIFY_MISMATCH", f"File {fid} bytes differ from the verified source hash")
-                    if read["uid"] != row["uid"] or read["fileSize"] != len(payload):
-                        fail("VERIFY_MISMATCH", f"File {fid} metadata mismatch after re-read")
-                    verified_bytes += len(payload)
+                if row["is_folder"]:
+                    continue
+                allowed = readable and (not is_client or row["user_id"] == acl["subject"] or row["client_visible"])
+                if not allowed:
+                    client.call("files.read", expected_error=True, projectId=pid, fileId=fid)
+                    denials += 1
+                    continue
+                read = client.call("files.read", projectId=pid, fileId=fid)
+                payload = base64.b64decode(read["contentBase64"], validate=True)
+                if sha256(payload) != source_hashes[fid] or read["generation"] != source_hashes[fid]:
+                    fail("VERIFY_MISMATCH", f"File {fid} bytes differ from verified source hash")
+                if read["uid"] != row["uid"] or read["fileSize"] != len(payload) or read.get("canWrite") != writable:
+                    fail("VERIFY_MISMATCH", f"File {fid} metadata/permission mismatch after re-read")
+                if is_client and any(key in read for key in ("physicalPath", "filePath", "parentId")):
+                    fail("VERIFY_MISMATCH", "Client read exposes private directory metadata")
+                protocol_files += 1
+            if not writable:
+                # Probe every existing mutation boundary; a buggy acceptance is
+                # confined to staging and prevents publishing the clone.
+                probe = "acl-probe-" + secrets.token_hex(8)
+                client.call("files.mkdir", expected_error=True, projectId=pid, name=probe)
+                client.call("files.create", expected_error=True, projectId=pid, name=probe + ".txt", contentBase64="")
+                denials += 2
+                for fid, row in rows.items():
+                    if not row["is_folder"]:
+                        client.call("files.save", expected_error=True, projectId=pid, fileId=fid,
+                                    expectedGeneration=source_hashes[fid], contentBase64="")
+                        denials += 1
+        verify_database(staging, projects, live, acl, floors)
         return {"healthCapabilities": health.get("capabilities", []),
                 "healthUnavailable": health.get("unavailable", []),
                 "projectsVerified": len(projects), "entriesVerified": len(live),
-                "filesVerified": len(source_hashes), "bytesVerified": verified_bytes}
+                "filesVerified": len(source_hashes),
+                "bytesVerified": sum(row["size"] for row in live.values() if not row["is_folder"]),
+                "protocolFilesRead": protocol_files, "protocolAccessDenials": denials,
+                "selectedUserId": acl["subject"]}
     finally:
         client.close()
 
@@ -847,6 +1027,7 @@ def run(arguments):
     snapshot = parse_snapshot(arguments.snapshot)
     projects, files, live = build_model(snapshot)
     snapshot["identityFloors"] = identity_floors(snapshot, projects, files)
+    snapshot["acl"] = build_acl(snapshot, projects, live)
     roots = resolve_roots(projects, live, roots_map)
     reject_source_overlap((arguments.output, staging, os.path.join(parent, "home")), roots_map.values())
     os.mkdir(staging, 0o700)
@@ -854,13 +1035,16 @@ def run(arguments):
         source_hashes = {}
         imported_files = build_clone(arguments.binary, staging, projects, files, live, roots,
                                      snapshot, source_hashes)
-        verification = verify_clone(arguments.binary, staging, projects, live, source_hashes)
+        verification = verify_clone(arguments.binary, staging, projects, live, source_hashes, snapshot["acl"], snapshot["identityFloors"])
         recheck_against_sources(live, roots, source_hashes)
         recheck_copied_files(staging, live, source_hashes)
         report = {
             "tool": "clone_snapshot.py", "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "sourceSha256": snapshot["header"]["sourceSha256"], "h2Version": snapshot["header"]["h2Version"],
-            "scope": "isolated offline clone of a synthetic snapshot; not a production cutover",
+            "scope": "isolated offline clone with fixed selected local identity and active file ACL; not a production cutover",
+            "selectedUserId": snapshot["acl"]["subject"],
+            "usersImported": len(snapshot["acl"]["users"]),
+            "membershipsImported": len(snapshot["acl"]["members"]),
             "identityFloors": snapshot["identityFloors"],
             "projectsImported": len(projects),
             "filesImported": imported_files,
@@ -868,18 +1052,18 @@ def run(arguments):
             "rowsArchived": sum(1 for kind, _, _ in snapshot["raw"] if kind == "row"),
             "deletedRowsArchivedOnly": sum(1 for row in files.values() if row["deleted"]),
             "archiveOnlyFields": [
-                "project.local_root", "project.user_id", "project.project_type",
+                "project.local_root",
                 "project.listed_company_name", "project.target_company_name",
                 "project.listed_company_info_json", "project.target_company_info_json",
                 "project.version_opt_out",
                 "project_file.file_type", "project_file.wps_file_id", "project_file.sort_order",
-                "project_file.user_id", "project_file.client_visible", "project_file.created_at",
+                "project_file.created_at",
                 "project_file.meta_json", "project_file.deleted_at", "project_file.external_path",
             ],
             "unusedAuthorizedRoots": sorted(str(pid) for pid in roots_map if pid not in roots),
             "unavailableCapabilities": UNAVAILABLE,
             "archiveNotice": "migration_archive preserves raw legacy rows for audit only; it is not a "
-                             "writable business table and not feature parity with H2, Git, AI, ACL or watchers",
+                             "writable business table and not feature parity with H2, Git, AI, identity selection, ACL management or watchers",
             "verification": verification,
         }
         report_path = os.path.join(staging, "migration-report.json")

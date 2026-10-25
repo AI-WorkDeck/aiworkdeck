@@ -62,6 +62,16 @@ display changes, full revision text and controller capabilities. CAPI checks
 cover native-ID accept/reject, stale snapshots, duplicate input, export readback
 and rejection of inputs from a closed document epoch.
 
+Use `readonly_probe.py` with the same explicit arguments and a new output directory
+to verify a read-only model. It requires UNO to compare actual text, tracking and
+modified state before and after rejected input/commands, navigation and mouse
+selection; it also reopens a writable model and verifies a real edit/export.
+`open` accepts an optional boolean `readOnly` (older isolated probes omit it).
+Read-only opens require the runtime's `setViewReadOnly` API and block writing
+actions in the worker. Its reply records policy and API invocation, not a native
+getter readback; use the behavioral probe as evidence. One unchanged mouse drag
+does not establish that every possible native drag/drop gesture was covered.
+
 ## Source-built runtime packaging
 
 After applying the pinned upstream and local patches in `UPSTREAM.md`, copy the
@@ -104,7 +114,7 @@ product relay contract.
 
 | Action | Inputs and meaning |
 | --- | --- |
-| `open` | Absolute `path` inside artifact root; one model per worker. Returns model size in twips. |
+| `open` | Absolute `path` inside artifact root, optional boolean `readOnly`; one model per worker. Returns model size in twips and read-only policy. |
 | `paint` | Pixel `width,height` and `xTwips,yTwips,widthTwips,heightTwips`; returns tightly packed four-byte pixels with `tileMode` and `changedBytes`. Verified mode 1 is BGRA. `pixelsChanged` means a sentinel was overwritten, not that the user saw text. |
 | `values` | `command`, for example `.uno:AcceptTrackedChanges`; fails if the native API returns null. |
 | `command` | `command` and JSON string `arguments`; `acceptedForDispatch` is not completion. Inspect the notified command callback and real state. |
@@ -143,15 +153,16 @@ writing `ShowChanges=false` alone silently failed. Final text then retained all
 300 inserted clauses and excluded all 300 deleted clauses. This is a small set
 of engine primitives, not the complete AI command, anchor or file-ID bridge.
 
-The 2026-10-25 follow-up reads `AwdReviewGeometry` and `AwdReviewSidebarWidth`
-on the **controller** (the correct owner), and both are absent from this runtime.
-The product's review geometry patches and complete command semantics still need
-porting. The visible host now exercises caret-positioned input and real project
-Git history; see [the experiment report](../EXPERIMENT.md) for exact tests and
-remaining limits. Still unverified: OS IME candidate placement, complete input/
-clipboard and layout parity, multi-document state, AI checkpoints, all existing
-engine assertions and the minimum supported OS. A faster component does not
-waive these requirements or authorize switching the default engine.
+The original Ely runtime lacks controller `AwdReviewGeometry` and
+`AwdReviewSidebarWidth`. The later source-built runtime ports those properties
+and fixes the reproduced temporary UNO redline release race; the exact source,
+patches and negative control are documented in `UPSTREAM.md` and
+[the experiment report](../EXPERIMENT.md). That report also separates the user's
+real OS IME confirmation from automated composition tests, and Java-backed Git
+history from the standalone data service. Complete review bubbles/comments,
+input/clipboard and layout parity, multi-document state, AI checkpoints, all
+existing engine assertions and minimum supported OS remain unverified. A faster
+component does not waive these requirements or authorize a default-engine switch.
 
 Two API details matter: CAPI JSON integer arguments use `type:"uint32"`, whereas
 pyuno uses typed UNO values. Supplying the UNO type name in CAPI JSON can silently

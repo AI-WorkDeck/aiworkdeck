@@ -86,6 +86,19 @@ test('unconfirmed default tracking never mounts an editable document',async()=>{
  }finally{h.close()}
 });
 
+test('read-only models retain viewing and review navigation while edit controls stay disabled',async()=>{
+ const h=harness({openState:{readOnly:true}});
+ try{
+  await h.open();h.complete(0);await until(()=>h.batches.length===2);h.complete(1);await until(()=>h.marks.includes('review-ready'));
+  for(const id of ['save','undo','redo','tracking'])assert.equal(h.doc.querySelector('#'+id).disabled,true);
+  assert.equal(h.doc.querySelector('#view-mode').disabled,false);
+  for(const card of h.doc.querySelectorAll('.item')){
+   const buttons=card.querySelectorAll('button');assert.equal(buttons[0].disabled,false);
+   assert.equal(buttons[1].disabled,true);assert.equal(buttons[2].disabled,true);
+  }
+ }finally{h.close()}
+});
+
 test('tracking toggle drains input and shows only confirmed state; composition blocks mutation',async()=>{
  for(const composing of [false,true]){
   const h=harness({composing});

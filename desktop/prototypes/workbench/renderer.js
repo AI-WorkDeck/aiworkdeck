@@ -23,16 +23,17 @@ async function paint(){
   canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(tile.pixels),tile.width,tile.height),0,0);
   input?.viewportChanged?.();
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-  if(!firstPaint){firstPaint=true;api.painted('body-visible');status.textContent='正文已绘制'}
+  if(!firstPaint){firstPaint=true;api.painted('body-visible');status.textContent=model.readOnly?'只读文档':'正文已绘制'}
  }catch(error){message(error)}finally{painting=false;if(paintAgain){paintAgain=false;schedulePaint()}}
 }
 function schedulePaint(){clearTimeout(paintTimer);paintTimer=setTimeout(paint,35)}
 async function flush(){
  if(!model)return;
+ if(model.readOnly){await input.flush();status.textContent='只读文档';return}
  await input.flush();const saved=await api.save();status.textContent=saved.dirty?'待保存':'已保存';if(saved.dirty)throw Error('保存期间有新输入，请完成后再试');
 }
 api.onFlush(async()=>{if(input)await input.suspend();try{await flush()}catch(error){input?.resume();throw error}});
-function controls(enabled){enabled=enabled&&model?.trackingReady===true;for(const id of ['save','undo','redo','view-mode','tracking'])document.getElementById(id).disabled=!enabled;document.querySelector('#show-history').disabled=!enabled||!model?.historyAvailable}
+function controls(enabled){enabled=enabled&&model?.trackingReady===true;for(const id of ['save','undo','redo','tracking'])document.getElementById(id).disabled=!enabled||model?.readOnly===true;document.querySelector('#view-mode').disabled=!enabled;document.querySelector('#show-history').disabled=!enabled||!model?.historyAvailable}
 function showTracking(){const button=document.querySelector('#tracking');button.setAttribute('aria-pressed',String(model.recordChanges));button.textContent='跟踪修订：'+(model.recordChanges?'开':'关')}
 async function activate(ids){
  if(opening)return;opening=true;controls(false);
@@ -60,6 +61,7 @@ async function projects(){
  document.querySelector('#notice').textContent=result.source==='cache'?'正在核对上次的项目列表…':'';
  for(const project of result.projects){
   const title=document.createElement('strong');title.textContent=project.name;list.append(title);
+  if(project.canBrowseFiles===false){const note=document.createElement('small');note.textContent='当前身份不能浏览资源管理器';list.append(note);continue}
   function appendFiles(parent,files){
    for(const file of files){
     if(file.isFolder||file.isDirectory||file.directory||file.fileType==='folder'){
@@ -109,7 +111,7 @@ async function refreshReview(){
   for(const [label,action]of [['定位','goto'],['接受','accept'],['拒绝','reject']]){
    const button=element('button',label);button.disabled=true;button.onclick=async()=>{
     try{
-     if(!alive()||snapshot!==result||!item.textAvailable)return;
+     if(!alive()||snapshot!==result||!item.textAvailable||(model.readOnly&&action!=='goto'))return;
      await input.flush();
      if(!alive()||snapshot!==result)return;
      const params={refreshEpoch:result.refreshEpoch,revisionId:item.revisionId};
@@ -142,7 +144,7 @@ async function refreshReview(){
    }
    for(let i=0;i<batch.items.length;i++){
     const row=rows[start+i];Object.assign(row.item,batch.items[i]);row.body.textContent=row.item.text;
-    row.note.remove();for(const button of row.buttons)button.disabled=false;
+    row.note.remove();for(const [index,button] of row.buttons.entries())button.disabled=model.readOnly===true&&index!==0;
    }
    if(start===0)api.painted('review-first-details');
    start=batch.nextOffset;result.hydratedCount=start;count.textContent=result.items.length+' 处修订 · 完整内容 '+start+'/'+result.items.length;
@@ -173,7 +175,7 @@ document.querySelector('#save').onclick=()=>flush().catch(message);
 for(const [id,command]of [['undo','.uno:Undo'],['redo','.uno:Redo']])document.getElementById(id).onclick=async()=>{try{await input.flush();await request('command',{command,arguments:'{}'});status.textContent='待保存';await paint();await refreshReview()}catch(error){message(error)}};
 document.querySelector('#view-mode').onchange=async event=>{try{await input.flush();const next=await request('review_view',{mode:event.target.value});if(next.widthTwips)model.widthTwips=next.widthTwips;if(next.heightTwips)model.heightTwips=next.heightTwips;await paint();await refreshReview()}catch(error){message(error)}};
 document.querySelector('#tracking').onclick=async()=>{
- const owner=model,editor=input;if(!owner?.trackingReady)return;
+ const owner=model,editor=input;if(!owner?.trackingReady||owner.readOnly)return;
  const enabled=!owner.recordChanges;let dispatched=false;controls(false);
  try{
   // suspend preserves the composition guard and drains confirmed input first.

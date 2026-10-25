@@ -116,6 +116,25 @@ static NSString *safeUrl(NSString *path, NSString *root) {
     if (![resolved hasPrefix:[root stringByAppendingString:@"/"]]) return nil;
     return [NSURL fileURLWithPath:resolved].absoluteString;
 }
+static bool jsonBoolean(id value) {
+    return value && [value isKindOfClass:NSNumber.class]
+        && CFGetTypeID((__bridge CFTypeRef)value) == CFBooleanGetTypeID();
+}
+static bool integerField(id value) {
+    return value && [value isKindOfClass:NSNumber.class] && !jsonBoolean(value)
+        && [value doubleValue] == [value intValue];
+}
+static bool readOnlyKey(NSDictionary *q) {
+    if (!integerField(q[@"eventType"]) || !integerField(q[@"charCode"])
+        || !integerField(q[@"keyCode"]) || [q[@"charCode"] intValue] != 0) return false;
+    int type=[q[@"eventType"] intValue], key=[q[@"keyCode"] intValue];
+    if (key < 0 || key > 0xFFFF) return false;
+    if (type == LOK_KEYEVENT_KEYUP) return true;
+    if (type != LOK_KEYEVENT_KEYINPUT) return false;
+    int base=key & 0xFFF, modifiers=key & 0xF000;
+    return (base >= 1024 && base <= 1031 && (modifiers == 0 || modifiers == 0x1000))
+        || (base == 512 && (modifiers == 0x2000 || modifiers == 0x8000));
+}
 
 int main(int argc, char **argv) {
     @autoreleasepool {
@@ -138,6 +157,7 @@ int main(int argc, char **argv) {
             @"startURPAvailable": @(LIBREOFFICEKIT_HAS(kit, startURP) && kit->pClass->startURP != nullptr)};
         free(version);
         static LibreOfficeKitDocument *doc = nullptr; // Accessed only by the main dispatch queue.
+        static bool documentReadOnly = false;
         dispatch_async(dispatch_get_main_queue(), ^{ frame(ready); });
         std::thread([&] {
         while (true) {
@@ -160,12 +180,18 @@ int main(int argc, char **argv) {
                 auto t = std::chrono::steady_clock::now();
                 if ([action isEqual:@"open"]) {
                     NSString *url = safeUrl(q[@"path"], root);
-                    if (!url || doc) { r[@"success"]=@NO; r[@"error"]=@"invalid local path or document already open"; }
+                    if (q[@"readOnly"] && !jsonBoolean(q[@"readOnly"])) { r[@"success"]=@NO; r[@"error"]=@"INVALID_READ_ONLY"; }
+                    else if (!url || doc) { r[@"success"]=@NO; r[@"error"]=@"invalid local path or document already open"; }
                     else {
+                        bool readOnly=[q[@"readOnly"] boolValue]; // Omitted only by older isolated probes.
                         doc = kit->pClass->documentLoadWithOptions(kit, url.UTF8String, "Language=zh-CN");
                         if (doc && (!LIBREOFFICEKIT_DOCUMENT_HAS(doc, postWindowExtTextInputEvent) || !doc->pClass->postWindowExtTextInputEvent)) {
                             doc->pClass->destroy(doc); doc=nullptr;
                             r[@"success"]=@NO; r[@"error"]=@"runtime lacks required document API";
+                        }
+                        if (doc && readOnly && (!LIBREOFFICEKIT_DOCUMENT_HAS(doc, setViewReadOnly) || !doc->pClass->setViewReadOnly)) {
+                            doc->pClass->destroy(doc); doc=nullptr;
+                            r[@"success"]=@NO; r[@"error"]=@"runtime lacks required read-only view API";
                         }
                         if (doc) {
                             ++documentEpoch; ++refreshEpoch; lastInputSeq=0; reviewSnapshot=nil;
@@ -173,6 +199,15 @@ int main(int argc, char **argv) {
                             identity = new DocumentIdentity{documentEpoch,doc->pClass->getView(doc)};
                             doc->pClass->registerCallback(doc, callback, identity);
                             doc->pClass->initializeForRendering(doc, "{\".uno:Author\":{\"type\":\"string\",\"value\":\"Native Prototype\"}}");
+                            if (LIBREOFFICEKIT_DOCUMENT_HAS(doc, setViewReadOnly) && doc->pClass->setViewReadOnly)
+                                doc->pClass->setViewReadOnly(doc,identity->view,readOnly);
+                            if (readOnly) {
+                                if (LIBREOFFICEKIT_DOCUMENT_HAS(doc, setAllowChangeComments) && doc->pClass->setAllowChangeComments)
+                                    doc->pClass->setAllowChangeComments(doc,identity->view,false);
+                                if (LIBREOFFICEKIT_DOCUMENT_HAS(doc, setAllowManageRedlines) && doc->pClass->setAllowManageRedlines)
+                                    doc->pClass->setAllowManageRedlines(doc,identity->view,false);
+                            }
+                            documentReadOnly=readOnly;
                             long w=0, height=0; doc->pClass->getDocumentSize(doc,&w,&height);
                             r[@"widthTwips"]=@(w); r[@"heightTwips"]=@(height);
                             r[@"kind"]=@(doc->pClass->getDocumentType(doc));
@@ -197,7 +232,15 @@ int main(int argc, char **argv) {
                 }
                 else if ([action isEqual:@"close"]) {
                     doc->pClass->destroy(doc); doc=nullptr; identity=nullptr; ++documentEpoch; ++refreshEpoch;
-                    lastInputSeq=0; reviewSnapshot=nil;
+                    lastInputSeq=0; reviewSnapshot=nil; documentReadOnly=false;
+                }
+                else if (documentReadOnly && ([action isEqual:@"input_text"] || [action isEqual:@"paste"]
+                    || [action isEqual:@"command"] || [action isEqual:@"review_resolve"] || [action isEqual:@"save"]
+                    || (([action isEqual:@"input_key"] || [action isEqual:@"key"]) && !readOnlyKey(q)))) {
+                    // Defense in depth: the view blocks native mouse editing;
+                    // this gate also rejects direct input/command bypasses.
+                    r[@"success"]=@NO; r[@"error"]=@"READ_ONLY_DOCUMENT";
+                    if ([action hasPrefix:@"input_"]) r[@"lastInputSeq"]=@(lastInputSeq);
                 }
                 else if ([action isEqual:@"review_snapshot"]) {
                     NSArray *items=trackedChanges(doc);
@@ -340,6 +383,7 @@ int main(int argc, char **argv) {
                 } else { r[@"success"]=@NO; r[@"error"]=@"UNSUPPORTED_PROTOTYPE_ACTION"; }
                 r[@"elapsedMs"]=@(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-t).count());
                 r[@"documentEpoch"]=@(documentEpoch); r[@"viewId"]=@(identity ? identity->view : -1);
+                r[@"readOnly"]=@(documentReadOnly);
                 frame(r,replyBytes);
                 });
             }

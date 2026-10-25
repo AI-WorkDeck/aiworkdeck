@@ -229,6 +229,11 @@ def apply_tracking(model, enabled, initialize):
 
 def dispatch(method, params, model, uno_mod):
     ctrl = model.getCurrentController()
+    if method == 'tracking_state':
+        enabled, modified = model.getPropertyValue('RecordChanges'), model.isModified()
+        if not isinstance(enabled, bool) or not isinstance(modified, bool):
+            raise RuntimeError('Tracking state is not readable as booleans')
+        return {'enabled': enabled, 'modified': modified}
     if method == 'tracking':
         enabled, initialize = params.get('enabled'), params.get('initialize', False)
         if not isinstance(enabled, bool) or not isinstance(initialize, bool):
