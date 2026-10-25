@@ -151,12 +151,77 @@
     }
   });
 
-  // ---- 主题（v2.6）----------------------------------------------------------
+  // ---- 主题与 Plugin UI v3.0 样式注入（v2.6 / v3.0）--------------------------
   // 自动应用 + 回调通知。tokens 缺席（老宿主）时只挂 data-theme/class，
   // 插件的 var(--awd-*) 走自己 CSS 里的 fallback 值。
+  // 同时在具备 document.head 的真实 DOM 环境里自动注入 <style id="awd-plugin-ui-v3">，
+  // 提供 .awd-plugin-stage / .awd-plugin-header / .awd-plugin-grid / .awd-card / .awd-btn / .awd-safe-progress 等标准组件类。
+  var PLUGIN_UI_V3_CSS = [
+    ':root{color-scheme:light}:root[data-theme="dark"]{color-scheme:dark}',
+    '.awd-plugin-stage{container-type:inline-size;box-sizing:border-box;width:100%;max-width:1120px;margin:0 auto;padding:var(--awd-space-5,20px) var(--awd-space-6,24px);font-family:var(--awd-font-sans,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif);font-size:var(--awd-font-size-body,13px);line-height:var(--awd-line-height-ui,1.5);color:var(--awd-text,#2B2A26)}',
+    '.awd-plugin-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:var(--awd-space-3,12px);padding-bottom:var(--awd-space-4,16px);margin-bottom:var(--awd-space-4,16px);border-bottom:1px solid var(--awd-border-subtle,#EAE7DD)}',
+    '.awd-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--awd-accent-text,#2E5A50);margin-bottom:4px}',
+    '.awd-title{margin:0;font-family:var(--awd-font-serif,"Source Han Serif SC","Noto Serif CJK SC","Songti SC",serif);font-size:20px;font-weight:700;line-height:1.3;letter-spacing:-.01em;color:var(--awd-text,#2B2A26)}',
+    '.awd-subtitle{margin:4px 0 0;font-size:12.5px;line-height:1.55;color:var(--awd-text-2,#6B675C)}',
+    '.awd-header-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--awd-space-2,8px)}',
+    '.awd-subnav{display:inline-flex;align-items:center;gap:2px;padding:3px;background:var(--awd-surface-2,#E9E6DC);border:1px solid var(--awd-border-subtle,#EAE7DD);border-radius:var(--awd-radius-md,6px);margin-bottom:var(--awd-space-4,16px)}',
+    '.awd-subnav-item{appearance:none;border:1px solid transparent;background:transparent;color:var(--awd-text-2,#6B675C);font:inherit;font-size:12px;font-weight:500;height:var(--awd-control-xs,24px);padding:0 12px;border-radius:var(--awd-radius-sm,4px);cursor:pointer;transition:all var(--awd-motion-fast,140ms) ease}',
+    '.awd-subnav-item.is-active,.awd-subnav-item[aria-selected="true"]{background:var(--awd-surface,#FCFBF7);color:var(--awd-accent-text,#2E5A50);font-weight:600;border-color:var(--awd-border-subtle,#EAE7DD);box-shadow:var(--awd-shadow-btn,0 1px 2px rgba(42,38,30,.06))}',
+    '.awd-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--awd-space-3,12px);margin-bottom:var(--awd-space-4,16px)}',
+    '.awd-kpi-card{background:var(--awd-surface,#FCFBF7);border:1px solid var(--awd-border,#DDD8CA);border-radius:var(--awd-radius-dialog,8px);padding:var(--awd-space-3,12px) var(--awd-space-4,16px);box-shadow:var(--awd-shadow-card,0 1px 3px rgba(42,38,30,.05))}',
+    '.awd-kpi-label{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--awd-text-2,#6B675C);margin-bottom:4px}',
+    '.awd-kpi-value{font-family:var(--awd-font-serif,"Source Han Serif SC","Noto Serif CJK SC","Songti SC",serif);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--awd-text,#2B2A26);line-height:1.25}',
+    '.awd-plugin-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--awd-space-4,16px);align-items:start}',
+    '@container (min-width:640px){.awd-plugin-grid{grid-template-columns:minmax(260px,320px) minmax(0,1fr)}}',
+    '.awd-card{background:var(--awd-surface,#FCFBF7);border:1px solid var(--awd-border,#DDD8CA);border-radius:var(--awd-radius-dialog,8px);padding:var(--awd-space-4,16px);box-shadow:var(--awd-shadow-card,0 1px 3px rgba(42,38,30,.05));box-sizing:border-box}',
+    '.awd-card+.awd-card{margin-top:var(--awd-space-3,12px)}',
+    '.awd-card-header{display:flex;align-items:center;justify-content:space-between;gap:var(--awd-space-2,8px);margin-bottom:var(--awd-space-3,12px);padding-bottom:var(--awd-space-2,8px);border-bottom:1px solid var(--awd-border-subtle,#EAE7DD)}',
+    '.awd-card-title{margin:0;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--awd-text-2,#6B675C)}',
+    '.awd-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:var(--awd-control-md,32px);padding:0 12px;border-radius:var(--awd-radius-md,6px);border:1px solid var(--awd-border,#DDD8CA);background:var(--awd-surface,#FCFBF7);color:var(--awd-text,#2B2A26);font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;box-shadow:var(--awd-shadow-btn,0 1px 2px rgba(42,38,30,.06));transition:all var(--awd-motion-fast,140ms) ease;box-sizing:border-box}',
+    '.awd-btn:hover:not(:disabled){background:var(--awd-surface-2,#E9E6DC);border-color:var(--awd-accent,#2E5A50);color:var(--awd-accent-text,#2E5A50)}',
+    '.awd-btn:disabled{opacity:.55;cursor:not-allowed}',
+    '.awd-btn-sm{min-height:var(--awd-control-sm,28px);padding:0 10px;font-size:12px}',
+    '.awd-btn-xs{min-height:var(--awd-control-xs,24px);padding:0 8px;font-size:11px}',
+    '.awd-btn-primary{background:var(--awd-accent,#2E5A50);border-color:var(--awd-accent,#2E5A50);color:var(--awd-text-on-accent,#FFF)}',
+    '.awd-btn-primary:hover:not(:disabled){background:var(--awd-accent-hover,#254B42);border-color:var(--awd-accent-hover,#254B42);color:var(--awd-text-on-accent,#FFF)}',
+    '.awd-btn-danger{background:var(--awd-danger-soft,#F9EBEA);border-color:var(--awd-danger,#B5483C);color:var(--awd-danger-text,#B5483C)}',
+    '.awd-input,.awd-select,.awd-textarea{box-sizing:border-box;width:100%;min-height:var(--awd-control-md,32px);padding:5px 10px;border-radius:var(--awd-radius-md,6px);border:1px solid var(--awd-border,#DDD8CA);background:var(--awd-surface,#FCFBF7);color:var(--awd-text,#2B2A26);font:inherit;font-size:13px}',
+    '.awd-input:focus,.awd-select:focus,.awd-textarea:focus{outline:none;border-color:var(--awd-accent,#2E5A50);box-shadow:0 0 0 2px var(--awd-accent-soft,rgba(46,90,80,.12))}',
+    '.awd-badge{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;background:var(--awd-surface-2,#E9E6DC);color:var(--awd-text-2,#6B675C);border:1px solid var(--awd-border-subtle,#EAE7DD)}',
+    '.awd-badge-accent{background:var(--awd-accent-soft,#E6EFEA);color:var(--awd-accent-text,#2E5A50)}',
+    '.awd-badge-gold{background:var(--awd-gold-soft,#F4EFE4);color:var(--awd-gold-text,#7D6438)}',
+    '.awd-badge-info{background:var(--awd-info-soft,#E9EFF4);color:var(--awd-info-text,#3C5A73)}',
+    '.awd-badge-warning{background:var(--awd-warning-soft,#F8F0DF);color:var(--awd-warning-text,#8A5D14)}',
+    '.awd-badge-danger{background:var(--awd-danger-soft,#F9EBEA);color:var(--awd-danger-text,#B5483C)}',
+    '.awd-safe-progress{background:var(--awd-surface,#FCFBF7);border:1px solid var(--awd-border,#DDD8CA);border-left:3px solid var(--awd-accent,#2E5A50);border-radius:var(--awd-radius-dialog,8px);padding:12px 14px;margin-bottom:var(--awd-space-3,12px);box-shadow:var(--awd-shadow-card,0 1px 3px rgba(42,38,30,.05))}',
+    '.awd-safe-progress-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}',
+    '.awd-safe-progress-title{font-size:12.5px;font-weight:600;color:var(--awd-text,#2B2A26)}',
+    '.awd-safe-progress-pct{font-family:var(--awd-font-mono,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--awd-accent-text,#2E5A50)}',
+    '.awd-safe-progress-track{height:5px;border-radius:999px;background:var(--awd-surface-2,#E9E6DC);overflow:hidden;margin-bottom:8px}',
+    '.awd-safe-progress-fill{height:100%;border-radius:999px;background:var(--awd-accent,#2E5A50);transition:width 220ms ease}',
+    '.awd-safe-progress-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--awd-text-2,#6B675C)}'
+  ].join('\n');
+
+  function ensurePluginUiStyle() {
+    try {
+      if (typeof document === 'undefined' || !document.head || !document.createElement) return;
+      if (document.getElementById && document.getElementById('awd-plugin-ui-v3')) return;
+      var styleEl = document.createElement('style');
+      styleEl.id = 'awd-plugin-ui-v3';
+      styleEl.textContent = PLUGIN_UI_V3_CSS;
+      if (document.head.firstChild && document.head.insertBefore) {
+        document.head.insertBefore(styleEl, document.head.firstChild);
+      } else if (document.head.appendChild) {
+        document.head.appendChild(styleEl);
+      }
+    } catch (e) { /* 无 DOM 环境静默 */ }
+  }
+  ensurePluginUiStyle();
+
   var themeState = { mode: 'light', tokens: {} };
   var themeListeners = [];
   function applyTheme(mode, tokens) {
+    ensurePluginUiStyle();
     themeState.mode = mode === 'dark' ? 'dark' : 'light';
     if (tokens && typeof tokens === 'object') themeState.tokens = tokens;
     try {
@@ -256,7 +321,78 @@
     ui: {
       toast: function (message, options) { return call('ui.toast', { message: message }, options); },
       /** 把项目文件打开到工作台中栏（需 file_read） */
-      openFile: function (path, options) { return call('ui.openFile', { path: path }, options); }
+      openFile: function (path, options) { return call('ui.openFile', { path: path }, options); },
+      /**
+       * 渲染或更新 AWD Plugin UI v3.0 长耗时任务安全进度卡片（.awd-safe-progress）。
+       * target 可为选择器字符串或 DOM 元素；state 为 false/null 时清空。
+       */
+      progress: function (target, state) {
+        var el = null;
+        try {
+          el = typeof target === 'string' && typeof document !== 'undefined' && document.querySelector
+            ? document.querySelector(target)
+            : target;
+        } catch (e) { el = null; }
+        function render(next) {
+          if (!el || typeof document === 'undefined' || !document.createElement) return;
+          while (el.firstChild) el.removeChild(el.firstChild);
+          if (!next) {
+            el.hidden = true;
+            return;
+          }
+          el.hidden = false;
+          var box = document.createElement('div');
+          box.className = 'awd-safe-progress';
+          box.setAttribute('role', 'status');
+          box.setAttribute('aria-live', 'polite');
+
+          var head = document.createElement('div');
+          head.className = 'awd-safe-progress-head';
+          var titleEl = document.createElement('span');
+          titleEl.className = 'awd-safe-progress-title';
+          titleEl.textContent = next.title || '正在处理任务…';
+          head.appendChild(titleEl);
+
+          var pctNum = typeof next.percent === 'number' && isFinite(next.percent)
+            ? Math.max(0, Math.min(100, Math.round(next.percent)))
+            : null;
+          var pctEl = document.createElement('span');
+          pctEl.className = 'awd-safe-progress-pct';
+          pctEl.textContent = next.detail || (pctNum != null ? pctNum + '%' : '进行中');
+          head.appendChild(pctEl);
+          box.appendChild(head);
+
+          var track = document.createElement('div');
+          track.className = 'awd-safe-progress-track';
+          var fill = document.createElement('div');
+          fill.className = 'awd-safe-progress-fill';
+          fill.style.width = (pctNum != null ? pctNum : 38) + '%';
+          track.appendChild(fill);
+          box.appendChild(track);
+
+          var foot = document.createElement('div');
+          foot.className = 'awd-safe-progress-foot';
+          var noteEl = document.createElement('span');
+          noteEl.textContent = next.safetyNote || '本地与已保存进度不受影响，可随时安全中止';
+          foot.appendChild(noteEl);
+
+          if (typeof next.onCancel === 'function') {
+            var cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'awd-btn awd-btn-xs';
+            cancelBtn.textContent = next.cancelText || '取消';
+            cancelBtn.onclick = function () { next.onCancel(); };
+            foot.appendChild(cancelBtn);
+          }
+          box.appendChild(foot);
+          el.appendChild(box);
+        }
+        render(state);
+        return {
+          update: render,
+          clear: function () { render(null); }
+        };
+      }
     },
     tools: {
       /** 直调本插件的 JAR 工具 -> 工具原始字符串输出（自行 JSON.parse） */

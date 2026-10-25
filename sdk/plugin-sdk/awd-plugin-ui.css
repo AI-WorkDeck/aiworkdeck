@@ -1,0 +1,384 @@
+/* SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/**
+ * AWD Plugin UI v3.0 —— 宋韵精工（Neo-Oriental Editorial）插件标准样式表
+ *
+ * 说明：
+ * 1. `awd-plugin-sdk.js` 会在有 DOM 的浏览器环境中自动将本样式表的核心规则注入到
+ *    `<style id="awd-plugin-ui-v3">`，插件无需额外打包即可直接使用 `.awd-*` 语义类。
+ * 2. 所有颜色、圆角、字号均消费宿主通过 `PluginPane` 注入的 `--awd-*` CSS 变量，
+ *    并提供宣纸浅色默认值以兼容独立预览或老版本宿主。
+ */
+
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+.awd-plugin-stage {
+  container-type: inline-size;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--awd-space-5, 20px) var(--awd-space-6, 24px);
+  font-family: var(--awd-font-sans, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif);
+  font-size: var(--awd-font-size-body, 13px);
+  line-height: var(--awd-line-height-ui, 1.5);
+  color: var(--awd-text, #2B2A26);
+}
+
+/* 1. 宋韵刊头（Editorial Header） */
+.awd-plugin-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--awd-space-3, 12px);
+  padding-bottom: var(--awd-space-4, 16px);
+  margin-bottom: var(--awd-space-4, 16px);
+  border-bottom: 1px solid var(--awd-border-subtle, #EAE7DD);
+}
+
+.awd-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--awd-accent-text, #2E5A50);
+  margin-bottom: 4px;
+}
+
+.awd-title {
+  margin: 0;
+  font-family: var(--awd-font-serif, "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", serif);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--awd-text, #2B2A26);
+}
+
+.awd-subtitle {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--awd-text-2, #6B675C);
+}
+
+.awd-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--awd-space-2, 8px);
+}
+
+/* 2. 二级分段导航（Segmented Subnav） */
+.awd-subnav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--awd-surface-2, #E9E6DC);
+  border: 1px solid var(--awd-border-subtle, #EAE7DD);
+  border-radius: var(--awd-radius-md, 6px);
+  margin-bottom: var(--awd-space-4, 16px);
+}
+
+.awd-subnav-item {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--awd-text-2, #6B675C);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  height: var(--awd-control-xs, 24px);
+  padding: 0 12px;
+  border-radius: var(--awd-radius-sm, 4px);
+  cursor: pointer;
+  transition: all var(--awd-motion-fast, 140ms) ease;
+}
+
+.awd-subnav-item:hover {
+  color: var(--awd-text, #2B2A26);
+}
+
+.awd-subnav-item.is-active,
+.awd-subnav-item[aria-selected='true'] {
+  background: var(--awd-surface, #FCFBF7);
+  color: var(--awd-accent-text, #2E5A50);
+  font-weight: 600;
+  border-color: var(--awd-border-subtle, #EAE7DD);
+  box-shadow: var(--awd-shadow-btn, 0 1px 2px rgba(42, 38, 30, 0.06));
+}
+
+/* 3. KPI 指标横条（KPI Summary Strip） */
+.awd-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--awd-space-3, 12px);
+  margin-bottom: var(--awd-space-4, 16px);
+}
+
+.awd-kpi-card {
+  background: var(--awd-surface, #FCFBF7);
+  border: 1px solid var(--awd-border, #DDD8CA);
+  border-radius: var(--awd-radius-dialog, 8px);
+  padding: var(--awd-space-3, 12px) var(--awd-space-4, 16px);
+  box-shadow: var(--awd-shadow-card, 0 1px 3px rgba(42, 38, 30, 0.05));
+}
+
+.awd-kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--awd-text-2, #6B675C);
+  margin-bottom: 4px;
+}
+
+.awd-kpi-value {
+  font-family: var(--awd-font-serif, "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", serif);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--awd-text, #2B2A26);
+  line-height: 1.25;
+}
+
+/* 4. 容器查询自适应主从网格（Container-Query Adaptive Grid） */
+.awd-plugin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--awd-space-4, 16px);
+  align-items: start;
+}
+
+@container (min-width: 640px) {
+  .awd-plugin-grid {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  }
+}
+
+/* 5. 纸张卡片（Tactile Paper Card） */
+.awd-card {
+  background: var(--awd-surface, #FCFBF7);
+  border: 1px solid var(--awd-border, #DDD8CA);
+  border-radius: var(--awd-radius-dialog, 8px);
+  padding: var(--awd-space-4, 16px);
+  box-shadow: var(--awd-shadow-card, 0 1px 3px rgba(42, 38, 30, 0.05));
+  box-sizing: border-box;
+}
+
+.awd-card + .awd-card {
+  margin-top: var(--awd-space-3, 12px);
+}
+
+.awd-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--awd-space-2, 8px);
+  margin-bottom: var(--awd-space-3, 12px);
+  padding-bottom: var(--awd-space-2, 8px);
+  border-bottom: 1px solid var(--awd-border-subtle, #EAE7DD);
+}
+
+.awd-card-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--awd-text-2, #6B675C);
+}
+
+/* 6. 统一控件尺寸契约（Unified Controls） */
+.awd-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--awd-control-md, 32px);
+  padding: 0 12px;
+  border-radius: var(--awd-radius-md, 6px);
+  border: 1px solid var(--awd-border, #DDD8CA);
+  background: var(--awd-surface, #FCFBF7);
+  color: var(--awd-text, #2B2A26);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--awd-shadow-btn, 0 1px 2px rgba(42, 38, 30, 0.06));
+  transition: all var(--awd-motion-fast, 140ms) ease;
+  box-sizing: border-box;
+}
+
+.awd-btn:hover:not(:disabled) {
+  background: var(--awd-surface-2, #E9E6DC);
+  border-color: var(--awd-accent, #2E5A50);
+  color: var(--awd-accent-text, #2E5A50);
+}
+
+.awd-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.awd-btn-sm {
+  min-height: var(--awd-control-sm, 28px);
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.awd-btn-xs {
+  min-height: var(--awd-control-xs, 24px);
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.awd-btn-primary {
+  background: var(--awd-accent, #2E5A50);
+  border-color: var(--awd-accent, #2E5A50);
+  color: var(--awd-text-on-accent, #FFFFFF);
+}
+
+.awd-btn-primary:hover:not(:disabled) {
+  background: var(--awd-accent-hover, #254B42);
+  border-color: var(--awd-accent-hover, #254B42);
+  color: var(--awd-text-on-accent, #FFFFFF);
+}
+
+.awd-btn-danger {
+  background: var(--awd-danger-soft, #F9EBEA);
+  border-color: var(--awd-danger, #B5483C);
+  color: var(--awd-danger-text, #B5483C);
+}
+
+.awd-input,
+.awd-select,
+.awd-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--awd-control-md, 32px);
+  padding: 5px 10px;
+  border-radius: var(--awd-radius-md, 6px);
+  border: 1px solid var(--awd-border, #DDD8CA);
+  background: var(--awd-surface, #FCFBF7);
+  color: var(--awd-text, #2B2A26);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color var(--awd-motion-fast, 140ms) ease, box-shadow var(--awd-motion-fast, 140ms) ease;
+}
+
+.awd-input:focus,
+.awd-select:focus,
+.awd-textarea:focus {
+  outline: none;
+  border-color: var(--awd-accent, #2E5A50);
+  box-shadow: 0 0 0 2px var(--awd-accent-soft, rgba(46, 90, 80, 0.12));
+}
+
+/* 7. 语义徽标（Semantic Badges） */
+.awd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--awd-surface-2, #E9E6DC);
+  color: var(--awd-text-2, #6B675C);
+  border: 1px solid var(--awd-border-subtle, #EAE7DD);
+}
+
+.awd-badge-accent {
+  background: var(--awd-accent-soft, #E6EFEA);
+  color: var(--awd-accent-text, #2E5A50);
+}
+
+.awd-badge-gold {
+  background: var(--awd-gold-soft, #F4EFE4);
+  color: var(--awd-gold-text, #7D6438);
+}
+
+.awd-badge-info {
+  background: var(--awd-info-soft, #E9EFF4);
+  color: var(--awd-info-text, #3C5A73);
+}
+
+.awd-badge-warning {
+  background: var(--awd-warning-soft, #F8F0DF);
+  color: var(--awd-warning-text, #8A5D14);
+}
+
+.awd-badge-danger {
+  background: var(--awd-danger-soft, #F9EBEA);
+  color: var(--awd-danger-text, #B5483C);
+}
+
+/* 8. 长耗时任务进度与安全感知条（Safe Progress Bar） */
+.awd-safe-progress {
+  background: var(--awd-surface, #FCFBF7);
+  border: 1px solid var(--awd-border, #DDD8CA);
+  border-left: 3px solid var(--awd-accent, #2E5A50);
+  border-radius: var(--awd-radius-dialog, 8px);
+  padding: 12px 14px;
+  margin-bottom: var(--awd-space-3, 12px);
+  box-shadow: var(--awd-shadow-card, 0 1px 3px rgba(42, 38, 30, 0.05));
+}
+
+.awd-safe-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.awd-safe-progress-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--awd-text, #2B2A26);
+}
+
+.awd-safe-progress-pct {
+  font-family: var(--awd-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--awd-accent-text, #2E5A50);
+}
+
+.awd-safe-progress-track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--awd-surface-2, #E9E6DC);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.awd-safe-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--awd-accent, #2E5A50);
+  transition: width 220ms ease;
+}
+
+.awd-safe-progress-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--awd-text-2, #6B675C);
+}

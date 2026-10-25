@@ -3,6 +3,6 @@
 <script>export default {}</script>
 <style>
 html, body, #app, uni-app, uni-page, uni-page-wrapper, uni-page-body { height: 100%; margin: 0; min-width: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--awd-text); background: var(--awd-surface); }
+body { font-family: var(--awd-font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif); color: var(--awd-text); background: var(--awd-surface); }
 * { box-sizing: border-box; }
 </style>

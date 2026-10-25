@@ -24,7 +24,7 @@ export const THEME_MODES = ['light', 'dark', 'system']
 // webview 注入 --vscode-* 变量的机制）。App.vue 新增令牌时这里要同步补名——
 // 漏了不报错，只是插件侧 var() 落空走 fallback。
 export const THEME_TOKEN_NAMES = [
-  'bg', 'surface', 'surface-2', 'surface-3',
+  'bg', 'surface', 'surface-2', 'surface-3', 'surface-elevated',
   'text', 'text-2', 'text-3', 'text-on-accent', 'text-on-mint',
   'border-subtle', 'border', 'border-strong',
   'accent', 'accent-hover', 'accent-text', 'accent-soft', 'accent-wash',
@@ -36,12 +36,16 @@ export const THEME_TOKEN_NAMES = [
   'warning', 'warning-text', 'warning-soft',
   'info', 'info-text', 'info-soft',
   'file-word', 'file-ppt', 'file-excel', 'file-pdf', 'file-md', 'file-image',
-  'shadow-sm', 'shadow-md', 'shadow-lg', 'overlay',
+  'shadow-sm', 'shadow-md', 'shadow-lg', 'shadow-island', 'shadow-card', 'shadow-btn',
+  'specular', 'overlay',
   'halo-1', 'halo-2', 'halo-page', 'glass', 'glass-border', 'canvas',
   // iframe 与宿主共用字体、密度和交互尺寸，新增公共令牌须同时进入此表。
   'font-serif', 'font-sans', 'font-mono',
   'space-1', 'space-2', 'space-3', 'space-4', 'space-5', 'space-6', 'space-7', 'space-8',
-  'control-height', 'control-height-touch', 'radius-sm', 'radius-md', 'radius-dialog',
+  'control-xs', 'control-sm', 'control-md',
+  'control-height', 'control-height-touch',
+  'radius-sm', 'radius-md', 'radius-dialog', 'radius-lg',
+  'island-radius', 'island-gap',
   'font-size-body', 'font-size-reading', 'font-size-title', 'line-height-ui',
   'focus-width', 'focus-offset', 'motion-fast', 'motion-base',
   'switch-width', 'switch-track-height', 'switch-knob-size',
