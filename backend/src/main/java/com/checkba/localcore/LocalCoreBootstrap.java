@@ -71,6 +71,7 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
     private ConfigurableApplicationContext context;
     private ConfigurableEnvironment environment;
     private String build;
+    private LocalCorePersistenceContract persistenceContract;
     private Path databaseFile;
     private boolean candidate;
     private boolean readyEventSeen;
@@ -156,6 +157,10 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
             }
             candidate = enabled;
             if (!candidate && !recovery) { proposed.close(); return; }
+            // Capture the effective configuration before installing the no-DDL safety overrides.
+            // A package identity is not a migration identity: compatible rebuilds reuse the proof.
+            var bundled = LocalCorePersistenceContract.bundled();
+            persistenceContract = bundled != null && bundled.supports(env) ? bundled : null;
             if (!Files.isRegularFile(databaseFile)) {
                 if (recovery) throw new IllegalStateException("Pending local content database is unavailable");
                 proposed.close(); return;
@@ -164,8 +169,8 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
             // AUTO_SERVER prevents attaching to another JVM and lets H2's file lock exclude even
             // unmodified legacy processes. The original environment remains unchanged on fallback.
             proposed.setJdbcUrl(exclusiveExistingFileUrl(proposed.getJdbcUrl()));
-            var proof = new LocalCoreSchemaProof(proposed, enabled ? build : "recovery");
-            early = enabled && proof.isCurrent();
+            var proof = new LocalCoreSchemaProof(proposed, enabled ? build : "recovery", persistenceContract);
+            early = enabled && persistenceContract != null && proof.isCurrent();
             if (recovery && !proof.isRecordedSchema())
                 throw new IllegalStateException("Pending local content requires its recorded database schema");
             store = new LocalCoreStore(proposed, storageRoot(env));
@@ -177,7 +182,7 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
             return;
         }
         pool = proposed;
-        // A new build uses legacy DDL, but retains this exclusive pool. It must not later expose the
+        // An unqualified schema uses legacy DDL, but retains this exclusive pool. It must not later expose the
         // new write protocol through an AUTO_SERVER connection that another JVM can attach to.
         if (!early && !recovery) return;
         callbacks.onPersistencePrepared(env, pool, store, databaseFile);
@@ -258,7 +263,7 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
                 if (sameFile) {
                     String proofBuild = build != null && !build.isBlank() && build.length() <= 256
                             && !build.contains("\n") && !build.contains("\r") ? build : "recovery";
-                    var proof = new LocalCoreSchemaProof(source, proofBuild);
+                    var proof = new LocalCoreSchemaProof(source, proofBuild, persistenceContract);
                     if (ownership == null) proof.recordAfterLegacyInitialization();
                     recordedSchema = proof.isCurrent();
                 }

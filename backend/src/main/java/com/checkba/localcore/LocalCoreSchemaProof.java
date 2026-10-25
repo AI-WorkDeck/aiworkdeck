@@ -21,7 +21,7 @@ import java.util.Set;
 
 /**
  * Remembers a completed legacy initialization in the same H2 database, without changing its schema.
- * A new backend build or a change to the covered schema requires legacy initialization again. This is an
+ * A changed persistence contract or covered schema requires legacy initialization again. This is an
  * eligibility check, not a migration or a readiness signal. The caller must check that the existing
  * database file exists before opening it, and must never run Hibernate DDL alongside a writable core.
  */
@@ -31,14 +31,21 @@ public final class LocalCoreSchemaProof {
     private static final Set<String> REQUIRED = Set.of("app_users", "project", "project_file", "system_setting");
     private final DataSource dataSource;
     private final String build;
+    private final LocalCorePersistenceContract persistenceContract;
 
     public LocalCoreSchemaProof(DataSource dataSource, String backendBuild) {
+        this(dataSource, backendBuild, null);
+    }
+
+    public LocalCoreSchemaProof(DataSource dataSource, String backendBuild,
+                                LocalCorePersistenceContract persistenceContract) {
         this.dataSource = Objects.requireNonNull(dataSource);
         if (backendBuild == null || backendBuild.isBlank() || backendBuild.length() > 256
                 || backendBuild.indexOf('\n') >= 0 || backendBuild.indexOf('\r') >= 0) {
             throw new IllegalArgumentException("An explicit backend build identity is required");
         }
         this.build = backendBuild;
+        this.persistenceContract = persistenceContract;
     }
 
     public boolean isCurrent() throws SQLException {
@@ -50,7 +57,7 @@ public final class LocalCoreSchemaProof {
         return matchesRecordedSchema(false);
     }
 
-    private boolean matchesRecordedSchema(boolean sameBuild) throws SQLException {
+    private boolean matchesRecordedSchema(boolean current) throws SQLException {
         try (Connection c = dataSource.getConnection()) {
             Shape shape = inspect(c);
             if (!shape.compatible()) return false;
@@ -59,8 +66,18 @@ public final class LocalCoreSchemaProof {
                 try (ResultSet r = s.executeQuery()) {
                     if (!r.next()) return false;
                     String recorded = r.getString(1);
-                    boolean matches = sameBuild ? proof(shape).equals(recorded)
-                            : recorded != null && recorded.matches(CONTRACT + "\\n[^\\r\\n]{1,256}\\n" + shape.digest());
+                    String[] parts = recorded == null ? new String[0] : recorded.split("\n", -1);
+                    boolean legacy = parts.length == 3 && CONTRACT.equals(parts[0]);
+                    boolean qualified = parts.length == 5 && "2".equals(parts[0])
+                            && parts[2].matches("[a-f0-9]{64}") && parts[3].matches("[0-9]{1,16}");
+                    boolean matches = (legacy || qualified) && !parts[1].isBlank()
+                            && parts[1].length() <= 256 && !parts[1].contains("\r")
+                            && shape.digest().equals(parts[parts.length - 1]);
+                    if (matches && current) {
+                        matches = persistenceContract == null ? build.equals(parts[1])
+                                : qualified && persistenceContract.id().equals(parts[2])
+                                    && persistenceContract.bootstrapEpoch().equals(parts[3]);
+                    }
                     return matches && !r.next();
                 }
             }
@@ -84,10 +101,14 @@ public final class LocalCoreSchemaProof {
         }
     }
 
-    private String proof(Shape shape) { return CONTRACT + "\n" + build + "\n" + shape.digest(); }
-    private record Shape(boolean compatible, String digest) {}
+    private String proof(Shape shape) {
+        return persistenceContract == null ? CONTRACT + "\n" + build + "\n" + shape.digest()
+                : "2\n" + build + "\n" + persistenceContract.id() + "\n"
+                    + persistenceContract.bootstrapEpoch() + "\n" + shape.digest();
+    }
+    record Shape(boolean compatible, String digest) {}
 
-    private static Shape inspect(Connection c) throws SQLException {
+    static Shape inspect(Connection c) throws SQLException {
         DatabaseMetaData metadata = c.getMetaData();
         if (!"H2".equals(metadata.getDatabaseProductName())) return new Shape(false, "");
         // These objects do not occur in the existing desktop schema. Leave installations with
