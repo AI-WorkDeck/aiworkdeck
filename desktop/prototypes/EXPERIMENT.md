@@ -61,6 +61,6 @@ Word 终点通过连续真实窗口截图判断纸张和文字，保留上一张
 
 本机工件目录 `2026-10-24-native-integration`：`FINAL_MEASUREMENTS.json`、`final-normal-sequence.json`、`final-measurement-source-hashes.json`、`final-saved-verification.json`、`engine/complete-native-1/`、`engine/uno-edge-range-results.json`、`input-root-complete.txt`、`data-root-complete.txt`、`data/java-1/`、`runs/ui-java-final-*/`、`runs/os-ime-1/manual-observation.json`。旧工件目录 `2026-10-24-native-local-prototype` 保留前轮测量、Swift 数据服务和运行时来源/签名检查。
 
-本轮子代理分域调查与部分实现后因额度中断，最终整合、修复、审阅与复跑由主任务完成；没有第二位审阅者对最终版本的批准，不声称独立性能复现。GitHub HTTP 401 阻断本轮推送、PR/台账和共享经验同步；本地保存接续与共享贡献草稿，不把草稿称为已发布。
+本轮子代理分域调查与部分实现后因额度中断，最终整合、修复、审阅与复跑由主任务完成；没有第二位审阅者对最终版本的批准，不声称独立性能复现。代码提交 `091d5d048` 已通过仓库现有 SSH 通道推送到实验分支。GitHub API 返回 HTTP 401，应用内检查连接也不可用，PR 说明、台账和共享经验同步仍受阻；远端 CI 状态尚未核验。本地保存接续与共享贡献草稿，不把草稿称为已发布。
 
-沿用 Draft PR #1211、dev-board#1472/#1474，继续保持进行中。会话 `01a16b76-9431-7e21-8e60-a46dc3530aed`，分支 `codex/native-local-prototype`。无产品合并、发版、部署或客户端升级。
+沿用 Draft PR #1211、dev-board#1472/#1474；卡片应保持进行中，远端状态尚未同步。会话 `01a16b76-9431-7e21-8e60-a46dc3530aed`，分支 `codex/native-local-prototype`。无产品合并、发版、部署或客户端升级。
