@@ -55,6 +55,13 @@ result, exit and cleanup. A successful process exit alone is not an acceptance
 verdict: inspect all saved-content and UNO assertions. Preserve failed runs.
 No real system IME is exercised by this driver.
 
+For the document input/review lifecycle regression, use the same explicit paths
+with `review_probe.py` and a fresh `--out` directory. Its optional UNO arguments
+exercise repeated native cursor-range verification (including deletions), typed
+display changes, full revision text and controller capabilities. CAPI checks
+cover native-ID accept/reject, stale snapshots, duplicate input, export readback
+and rejection of inputs from a closed document epoch.
+
 ## Protocol and lifecycle
 
 Worker argv are `LO-Frameworks isolated-profile-file-URL artifact-root`.
@@ -80,6 +87,11 @@ product relay contract.
 | `key` | LOK `eventType,charCode,keyCode`; no OS key or IME adapter. |
 | `paste` | UTF-8 text in binary frame; returns the native paste result. |
 | `selected_text` | Reads the current text selection. |
+| `review_snapshot` | Requires `documentEpoch`; returns native revision IDs, descriptions, geometry and a fresh `refreshEpoch`. Full text comes from the URL-bound UNO helper. |
+| `review_goto` / `review_resolve` | Require current document/review epochs and `revisionId`. Goto dispatch alone is not success: the host checks the actual UNO view-cursor range. Resolve additionally takes `decision:accept/reject` and checks the target layer and unrelated entries afterward. Unknown results lock the host channel. |
+| `input_text` / `input_key` / `input_mouse` | Require the next `inputSeq` and current document epoch. Text uses native extended input and ends composition; the host only sends confirmed browser text. |
+| `input_barrier` | Acknowledges the last applied input sequence before save or model replacement. |
+| `set_viewport` / `close` | Current epoch only; synchronize CSS/twips or destroy the current model. Old callbacks retain their old identity. |
 | `save` | Absolute DOCX `path` inside artifact root; returns native export success. |
 | `start_urp` | Optional test-only single-client loopback port; opens the public function-based URP bridge after accept. No authentication: never expose this beyond an isolated local experiment. |
 | `shutdown` | Closes owned sockets, destroys the document and exits the isolated unipoll process. It does not test in-process kit teardown or restart recovery. |
@@ -107,11 +119,20 @@ writing `ShowChanges=false` alone silently failed. Final text then retained all
 300 inserted clauses and excluded all 300 deleted clauses. This is a small set
 of engine primitives, not the complete AI command, anchor or file-ID bridge.
 
-`AwdReviewGeometry` and `AwdReviewSidebarWidth` were absent from this runtime.
+The 2026-10-25 follow-up reads `AwdReviewGeometry` and `AwdReviewSidebarWidth`
+on the **controller** (the correct owner), and both are absent from this runtime.
 The product's review geometry patches and complete command semantics still need
-porting. Also unverified: actual macOS IME candidates/composition, keyboard and
-mouse mapping, rich clipboard, fonts/layout equivalence, all document structures,
-multi-document state, save failures/races, checkpoint/Git integration, retry and
-crash recovery, all 607 existing engine assertions, minimum supported OS, and
-complete product startup performance. A faster component does not waive these
-requirements or authorize switching the default engine.
+porting. The visible host now exercises caret-positioned input and real project
+Git history; see [the experiment report](../EXPERIMENT.md) for exact tests and
+remaining limits. Still unverified: OS IME candidate placement, complete input/
+clipboard and layout parity, multi-document state, AI checkpoints, all existing
+engine assertions and the minimum supported OS. A faster component does not
+waive these requirements or authorize switching the default engine.
+
+Two API details matter: CAPI JSON integer arguments use `type:"uint32"`, whereas
+pyuno uses typed UNO values. Supplying the UNO type name in CAPI JSON can silently
+drop a revision ID and let an operation use the current cursor instead. For
+display, write typed `short` values 2 (all) or 0 (final), then verify `ShowChanges`;
+Writer can normalize 0 to 1, so enum readback equality is not a valid assertion.
+Deleted text can also be absent from `getTextSelection` even when its range is
+selected; never use nonempty copied text as the sole location check.
