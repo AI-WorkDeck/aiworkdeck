@@ -5,6 +5,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {EventEmitter}=require('node:events');
+const {pathToFileURL}=require('node:url');
 const {createRequire}=require('node:module');
 const turn=()=>new Promise(resolve=>setImmediate(resolve));
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}}
@@ -65,7 +66,7 @@ test('open waits for verified default tracking before queued input can run',asyn
  gate.resolve({enabled:true,changed:true,modified:false});
  const model=await opened;await input;
  assert.equal(model.trackingReady,true);assert.equal(model.recordChanges,true);
- assert.deepEqual(h.calls.find(c=>c.method==='tracking').params,{documentUrl:'file:///isolated/run/document-1.docx',enabled:true,initialize:true});
+ assert.deepEqual(h.calls.find(c=>c.method==='tracking').params,{documentUrl:pathToFileURL('/isolated/run/document-1.docx').href,enabled:true,initialize:true});
 });
 
 test('read-only files open a temporary model, permit reading and never enter a write path',async()=>{
@@ -95,7 +96,7 @@ test('missing data permission and an unconfirmed native read-only model fail bef
  assert.equal(wrong.calls.some(c=>c.method==='tracking'),false);
  const hiddenPath=await harness({file:{canWrite:false,physicalPath:undefined}});
  await hiddenPath.open();
- assert.equal(hiddenPath.calls.find(c=>c.method==='open').params.path,'/isolated/run/readonly-document.docx');
+ assert.equal(hiddenPath.calls.find(c=>c.method==='open').params.path,path.join('/isolated/run','readonly-document.docx'));
  await hiddenPath.invoke('close');
 });
 
@@ -115,7 +116,7 @@ test('initial configuration does not dirty the host; a user toggle requires savi
  assert.equal(result.enabled,false);assert.equal(result.documentEpoch,2);
  await assert.rejects(h.invoke('close'),/未保存/);
  const tracking=h.calls.filter(c=>c.method==='tracking');
- assert.equal(tracking.at(-1).params.documentUrl,'file:///isolated/run/document-2.docx');
+ assert.equal(tracking.at(-1).params.documentUrl,pathToFileURL('/isolated/run/document-2.docx').href);
  assert.equal(tracking.at(-1).params.initialize,undefined);
  await h.invoke('save');await h.invoke('close');
 });
@@ -127,7 +128,7 @@ test('invalid booleans and old epochs cannot change tracking or reset modified',
  assert.equal(h.calls.filter(c=>c.method==='tracking').length,1);
  await h.action('review_tracking',{enabled:false,initialize:true,documentUrl:'file:///other.docx'});
  const params=h.calls.filter(c=>c.method==='tracking').at(-1).params;
- assert.equal(params.documentUrl,'file:///isolated/run/document-1.docx');assert.equal(params.initialize,undefined);
+ assert.equal(params.documentUrl,pathToFileURL('/isolated/run/document-1.docx').href);assert.equal(params.initialize,undefined);
 });
 
 test('display changes do not alter tracking, and a failed toggle locks further edits',async()=>{
