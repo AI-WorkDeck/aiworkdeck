@@ -305,6 +305,12 @@ html[data-theme='light'] {
     --awd-file-pdf: #D93025;
     --awd-file-md: #6B7280;
     --awd-file-image: #7C3AED;
+    /* 宋韵精工（Neo-Oriental Editorial）建筑层次与高光令牌 */
+    --awd-surface-elevated: #FFFFFF;
+    --awd-specular: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    --awd-shadow-island: 0 2px 10px rgba(42, 38, 30, 0.05), 0 0 0 1px rgba(46, 42, 34, 0.09);
+    --awd-shadow-card: 0 1px 3px rgba(42, 38, 30, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    --awd-shadow-btn: 0 1px 2px rgba(42, 38, 30, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.85);
     color-scheme: light;
 }
 
@@ -389,6 +395,12 @@ html[data-theme='dark'] {
     --awd-file-pdf: #FF8A80;
     --awd-file-md: #A6ADB4;
     --awd-file-image: #A78BFA;
+    /* 宋韵精工·徽墨夜览（Neo-Oriental Editorial Dark）建筑层次与高光令牌 */
+    --awd-surface-elevated: #2A2620;
+    --awd-specular: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --awd-shadow-island: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.07);
+    --awd-shadow-card: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --awd-shadow-btn: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     color-scheme: dark;
 }
 
@@ -435,11 +447,17 @@ html {
     --awd-space-6: 24px;
     --awd-space-7: 28px;
     --awd-space-8: 32px;
+    --awd-control-xs: 24px;
+    --awd-control-sm: 28px;
+    --awd-control-md: 32px;
     --awd-control-height: 32px;
     --awd-control-height-touch: 48px;
     --awd-radius-sm: 4px;
     --awd-radius-md: 6px;
     --awd-radius-dialog: 8px;
+    --awd-radius-lg: 10px;
+    --awd-island-radius: 10px;
+    --awd-island-gap: 6px;
     --awd-font-size-body: 13px;
     --awd-font-size-reading: 15px;
     --awd-font-size-title: 16px;
