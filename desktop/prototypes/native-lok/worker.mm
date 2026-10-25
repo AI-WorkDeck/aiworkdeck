@@ -25,6 +25,11 @@ static constexpr uint64_t maxFrame = 64 * 1024 * 1024;
 static std::atomic<int> urpFd{-1};
 static int urpListener = -1;
 static void *urpBridge = nullptr;
+struct DocumentIdentity { uint64_t epoch; int view; };
+static uint64_t documentEpoch = 0, lastInputSeq = 0;
+static std::atomic<uint64_t> refreshEpoch{0};
+static DocumentIdentity *identity = nullptr;
+static NSArray *reviewSnapshot;
 static bool transfer(int fd, void *bytes, size_t size, bool writing) {
     auto *p = static_cast<unsigned char *>(bytes);
     while (size) {
@@ -42,11 +47,61 @@ static void frame(NSDictionary *header, NSData *binary = nil) {
     transfer(outputFd, const_cast<void *>(json.bytes), json.length, true);
     if (binary.length) transfer(outputFd, const_cast<void *>(binary.bytes), binary.length, true);
 }
-static void callback(int type, const char *payload, void *) {
+static void callback(int type, const char *payload, void *context) {
     @autoreleasepool {
+        auto *owner = static_cast<DocumentIdentity *>(context);
+        NSString *value = payload ? [NSString stringWithUTF8String:payload] : @"";
+        if (owner && (type == LOK_CALLBACK_REDLINE_TABLE_SIZE_CHANGED || type == LOK_CALLBACK_REDLINE_TABLE_ENTRY_MODIFIED)) ++refreshEpoch;
         frame(@{@"type": @"callback", @"callbackType": @(type),
-            @"payload": payload ? [NSString stringWithUTF8String:payload] : @""});
+            @"payload": value, @"documentEpoch": @(owner ? owner->epoch : 0), @"viewId": @(owner ? owner->view : -1)});
     }
+}
+static NSArray *trackedChanges(LibreOfficeKitDocument *doc) {
+    char *raw = doc->pClass->getCommandValues(doc, ".uno:AcceptTrackedChanges");
+    if (!raw) return nil;
+    NSData *data = [[NSString stringWithUTF8String:raw] dataUsingEncoding:NSUTF8StringEncoding];
+    free(raw);
+    id result = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    return [result isKindOfClass:NSDictionary.class] && [result[@"redlines"] isKindOfClass:NSArray.class] ? result[@"redlines"] : nil;
+}
+static NSDictionary *revisionWithId(NSArray *items, NSString *revisionId) {
+    NSDictionary *found = nil;
+    for (NSDictionary *item in items) if ([[item[@"index"] description] isEqual:revisionId]) {
+        if (found) return nil;
+        found = item;
+    }
+    return found;
+}
+static BOOL sameRevision(NSDictionary *a, NSDictionary *b) {
+    if (!a || !b) return NO;
+    for (NSString *key in @[@"index",@"type",@"author",@"dateTime",@"comment",@"description"]) {
+        if (![a[key] isEqual:b[key]]) return NO;
+    }
+    return YES;
+}
+static NSArray *reviewItems(NSArray *items) {
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSDictionary *item in items) {
+        NSMutableArray *rects = [NSMutableArray array];
+        for (NSString *rect in [item[@"textRange"] componentsSeparatedByString:@";"]) {
+            NSArray *v = [rect componentsSeparatedByString:@","];
+            if (v.count == 4) [rects addObject:@{@"x": @([v[0] doubleValue]), @"y": @([v[1] doubleValue]), @"width": @([v[2] doubleValue]), @"height": @([v[3] doubleValue])}];
+        }
+        [out addObject:@{@"revisionId": [item[@"index"] description], @"author": item[@"author"] ?: @"", @"type": item[@"type"] ?: @"",
+            @"dateTime": item[@"dateTime"] ?: @"", @"description": item[@"description"] ?: @"", @"rects": rects,
+            @"text": NSNull.null, @"textAvailable": @NO}];
+    }
+    return out;
+}
+static NSString *selectedText(LibreOfficeKitDocument *doc) {
+    char *mime=nullptr; char *text=doc->pClass->getTextSelection(doc,"text/plain;charset=utf-8",&mime);
+    NSString *result=text ? [NSString stringWithUTF8String:text] : @"";
+    free(text); free(mime); return result;
+}
+static void postCommand(LibreOfficeKitDocument *doc, NSString *command, NSDictionary *args) {
+    NSData *data = [NSJSONSerialization dataWithJSONObject:args options:0 error:nil];
+    NSString *json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    doc->pClass->postUnoCommand(doc, command.UTF8String, json.UTF8String, true);
 }
 static NSString *errorOf(LibreOfficeKit *kit) {
     char *s = kit->pClass->getError(kit);
@@ -106,12 +161,15 @@ int main(int argc, char **argv) {
                     if (!url || doc) { r[@"success"]=@NO; r[@"error"]=@"invalid local path or document already open"; }
                     else {
                         doc = kit->pClass->documentLoadWithOptions(kit, url.UTF8String, "Language=zh-CN");
-                        if (doc && !LIBREOFFICEKIT_DOCUMENT_HAS(doc, getCommandValues)) {
+                        if (doc && (!LIBREOFFICEKIT_DOCUMENT_HAS(doc, postWindowExtTextInputEvent) || !doc->pClass->postWindowExtTextInputEvent)) {
                             doc->pClass->destroy(doc); doc=nullptr;
                             r[@"success"]=@NO; r[@"error"]=@"runtime lacks required document API";
                         }
                         if (doc) {
-                            doc->pClass->registerCallback(doc, callback, nullptr);
+                            ++documentEpoch; ++refreshEpoch; lastInputSeq=0; reviewSnapshot=nil;
+                            // Retain each small callback context until process exit: an old queued callback must never acquire the new document's identity.
+                            identity = new DocumentIdentity{documentEpoch,doc->pClass->getView(doc)};
+                            doc->pClass->registerCallback(doc, callback, identity);
                             doc->pClass->initializeForRendering(doc, "{\".uno:Author\":{\"type\":\"string\",\"value\":\"Native Prototype\"}}");
                             long w=0, height=0; doc->pClass->getDocumentSize(doc,&w,&height);
                             r[@"widthTwips"]=@(w); r[@"heightTwips"]=@(height);
@@ -127,6 +185,87 @@ int main(int argc, char **argv) {
                     exit(0); // Isolated unipoll process: no external document or shared profile exists.
                 }
                 else if (!doc) { r[@"success"]=@NO; r[@"error"]=@"DOCUMENT_NOT_READY"; }
+                else if (([action hasPrefix:@"review_"] || [action hasPrefix:@"input_"] || [action isEqual:@"set_viewport"] || [action isEqual:@"close"] || q[@"documentEpoch"])
+                    && (!q[@"documentEpoch"] || [q[@"documentEpoch"] unsignedLongLongValue] != documentEpoch)) {
+                    r[@"success"]=@NO; r[@"error"]=@"STALE_DOCUMENT";
+                }
+                else if ([action isEqual:@"close"]) {
+                    doc->pClass->destroy(doc); doc=nullptr; identity=nullptr; ++documentEpoch; ++refreshEpoch;
+                    lastInputSeq=0; reviewSnapshot=nil;
+                }
+                else if ([action isEqual:@"review_snapshot"]) {
+                    NSArray *items=trackedChanges(doc);
+                    if (!items) { r[@"success"]=@NO; r[@"error"]=@"REVIEW_UNAVAILABLE"; }
+                    else {
+                        reviewSnapshot=items; r[@"refreshEpoch"]=@(++refreshEpoch); r[@"items"]=reviewItems(items);
+                        long w=0,h=0; doc->pClass->getDocumentSize(doc,&w,&h); r[@"widthTwips"]=@(w); r[@"heightTwips"]=@(h);
+                    }
+                }
+                else if ([action isEqual:@"review_goto"] || [action isEqual:@"review_resolve"]) {
+                    NSString *revisionId=[q[@"revisionId"] description];
+                    NSArray *current=trackedChanges(doc);
+                    NSDictionary *expected=revisionWithId(reviewSnapshot,revisionId), *actual=revisionWithId(current,revisionId);
+                    if (!q[@"refreshEpoch"] || [q[@"refreshEpoch"] unsignedLongLongValue]!=refreshEpoch || !expected || !actual || ![expected isEqual:actual]) {
+                        r[@"success"]=@NO; r[@"error"]=@"STALE_REVIEW";
+                    } else if ([action isEqual:@"review_goto"]) {
+                        postCommand(doc,@".uno:NextTrackedChange",@{@"NextTrackedChange":@{@"type":@"uint32",@"value":@([revisionId longLongValue])}});
+                        r[@"text"]=selectedText(doc); r[@"revisionId"]=revisionId; r[@"acceptedForDispatch"]=@YES;
+                        // Copying a selected deletion returns empty text. The host verifies the
+                        // actual view-cursor range through the URL-bound UNO helper instead.
+                    } else if (![q[@"decision"] isEqual:@"accept"] && ![q[@"decision"] isEqual:@"reject"]) {
+                        r[@"success"]=@NO; r[@"error"]=@"INVALID_REVIEW_DECISION";
+                    } else {
+                        postCommand(doc,@".uno:NextTrackedChange",@{@"NextTrackedChange":@{@"type":@"uint32",@"value":@([revisionId longLongValue])}});
+                        NSString *name=[q[@"decision"] isEqual:@"accept"] ? @"AcceptTrackedChange" : @"RejectTrackedChange";
+                        postCommand(doc,[@".uno:" stringByAppendingString:name],@{name:@{@"type":@"uint32",@"value":@([revisionId longLongValue])}});
+                        NSArray *after=trackedChanges(doc);
+                        NSDictionary *remaining=revisionWithId(after,revisionId);
+                        BOOL verified=after && (!remaining || !sameRevision(actual,remaining));
+                        // A correct single-target dispatch must not silently resolve an unrelated entry.
+                        // Connected multi-entry families need the full product grouping contract; fail closed here.
+                        for (NSDictionary *other in current) {
+                            if ([[other[@"index"] description] isEqual:revisionId]) continue;
+                            if (!sameRevision(other,revisionWithId(after,[other[@"index"] description]))) verified=NO;
+                        }
+                        r[@"success"]=@(verified); r[@"applied"]=@(verified); r[@"outcomeUnknown"]=@(!verified);
+                        r[@"revisionId"]=revisionId; r[@"remainingCount"]=@(after.count); ++refreshEpoch; reviewSnapshot=nil;
+                        if (!verified) r[@"error"]=@"REVIEW_OUTCOME_NOT_VERIFIED";
+                    }
+                }
+                else if ([action isEqual:@"review_view"]) {
+                    // The host implements all/final through typed UNO; the patched margin mode is unavailable.
+                    r[@"success"]=@NO; r[@"error"]=@"TYPED_UNO_VIEW_REQUIRED";
+                }
+                else if ([action isEqual:@"set_viewport"]) {
+                    int w=[q[@"width"] ?: q[@"cssWidth"] intValue], h=[q[@"height"] ?: q[@"cssHeight"] intValue];
+                    int tw=[q[@"widthTwips"] intValue], th=[q[@"heightTwips"] intValue];
+                    if (w<=0 || h<=0 || tw<=0 || th<=0) { r[@"success"]=@NO; r[@"error"]=@"INVALID_VIEWPORT"; }
+                    else { doc->pClass->setClientZoom(doc,w,h,tw,th); doc->pClass->setClientVisibleArea(doc,[q[@"xTwips"] intValue],[q[@"yTwips"] intValue],tw,th); r[@"applied"]=@YES; }
+                }
+                else if ([action hasPrefix:@"input_"]) {
+                    uint64_t seq=[q[@"inputSeq"] unsignedLongLongValue];
+                    BOOL barrier=[action isEqual:@"input_barrier"];
+                    if (!q[@"inputSeq"] || seq != lastInputSeq+(barrier ? 0 : 1)) { r[@"success"]=@NO; r[@"error"]=@"INPUT_SEQUENCE_MISMATCH"; }
+                    else {
+                        if ([action isEqual:@"input_text"] && [q[@"text"] isKindOfClass:NSString.class]) {
+                            if ([q[@"text"] rangeOfString:[NSString stringWithFormat:@"%C",(unichar)0]].location != NSNotFound) {
+                                r[@"success"]=@NO; r[@"error"]=@"INVALID_INPUT_NUL";
+                            } else {
+                            doc->pClass->postWindowExtTextInputEvent(doc,0,LOK_EXT_TEXTINPUT,[q[@"text"] UTF8String]);
+                            doc->pClass->postWindowExtTextInputEvent(doc,0,LOK_EXT_TEXTINPUT_END,"");
+                            }
+                        } else if ([action isEqual:@"input_key"] && [q[@"eventType"] intValue]>=0 && [q[@"eventType"] intValue]<=1) {
+                            int key=[q[@"keyCode"] intValue], base=key & 0xFFF;
+                            BOOL nativeFileShortcut=(key & (0x2000|0x8000)) && (base==526 || base==527 || base==528 || base==530 || base==534);
+                            if (nativeFileShortcut) { r[@"success"]=@NO; r[@"error"]=@"HOST_FILE_OPERATION_REQUIRED"; }
+                            else doc->pClass->postKeyEvent(doc,[q[@"eventType"] intValue],[q[@"charCode"] intValue],key);
+                        } else if ([action isEqual:@"input_mouse"] && [q[@"eventType"] intValue]>=0 && [q[@"eventType"] intValue]<=2) {
+                            doc->pClass->postMouseEvent(doc,[q[@"eventType"] intValue],[q[@"xTwips"] intValue],[q[@"yTwips"] intValue],[q[@"clickCount"] intValue],[q[@"buttons"] intValue],[q[@"modifier"] intValue]);
+                        } else if (!barrier) { r[@"success"]=@NO; r[@"error"]=@"INVALID_INPUT"; }
+                        if ([r[@"success"] boolValue]) { lastInputSeq=seq; r[@"applied"]=@YES; if (!barrier) ++refreshEpoch; }
+                    }
+                    r[@"lastInputSeq"]=@(lastInputSeq);
+                }
                 else if ([action isEqual:@"start_urp"]) {
                     if (urpListener >= 0 || urpBridge || !LIBREOFFICEKIT_HAS(kit, startURP) || !kit->pClass->startURP) {
                         r[@"success"]=@NO; r[@"error"]=@"URP_UNAVAILABLE_OR_ALREADY_STARTED";
@@ -186,15 +325,15 @@ int main(int argc, char **argv) {
                     doc->pClass->postKeyEvent(doc,[q[@"eventType"] intValue],[q[@"charCode"] intValue],[q[@"keyCode"] intValue]);
                 } else if ([action isEqual:@"paste"]) {
                     r[@"success"]=@(doc->pClass->paste(doc,"text/plain;charset=utf-8",static_cast<const char *>(binary.bytes),binary.length));
-                } else if ([action isEqual:@"selected_text"]) {
-                    char *mime=nullptr; char *v=doc->pClass->getTextSelection(doc,"text/plain;charset=utf-8",&mime);
-                    r[@"text"]=v ? [NSString stringWithUTF8String:v] : @""; free(v); free(mime);
+                } else if ([action isEqual:@"selected_text"] || [action isEqual:@"selection_text"]) {
+                    r[@"text"]=selectedText(doc);
                 } else if ([action isEqual:@"save"]) {
                     NSString *url=safeUrl(q[@"path"],root);
                     r[@"success"]=@(url && doc->pClass->saveAs(doc,url.UTF8String,"docx",nullptr));
                     r[@"engineError"]=errorOf(kit);
                 } else { r[@"success"]=@NO; r[@"error"]=@"UNSUPPORTED_PROTOTYPE_ACTION"; }
                 r[@"elapsedMs"]=@(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-t).count());
+                r[@"documentEpoch"]=@(documentEpoch); r[@"viewId"]=@(identity ? identity->view : -1);
                 frame(r,replyBytes);
                 });
             }
