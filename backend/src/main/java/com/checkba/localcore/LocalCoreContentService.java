@@ -647,11 +647,15 @@ public final class LocalCoreContentService {
                 Image copied = copy(java.nio.channels.Channels.newInputStream(source), output, manifest.request().contentLength());
                 if (!copied.sha().equals(manifest.afterSha256())) throw failure("JOURNAL_IMAGE_INVALID");
                 requireRegularIdentity(parent, temporary, temporaryKey);
-                // macOS cp -p retains ACL/xattrs but can substitute the old mtime for birthtime.
-                Files.getFileAttributeView(parent.resolve(temporary), BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS)
-                        .setTimes(null, null, permissions.creationTime());
-                if (!Files.readAttributes(parent.resolve(temporary), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS)
-                        .creationTime().equals(permissions.creationTime())) throw failure("FILE_ATTRIBUTES_NOT_PRESERVED");
+                // Linux birthtime belongs to the new inode and cannot be restored with setTimes.
+                // The database creation timestamp is unchanged on every platform. On macOS,
+                // cp -p can substitute mtime for birthtime, so restore and verify it explicitly.
+                if (!System.getProperty("os.name").startsWith("Linux")) {
+                    Files.getFileAttributeView(parent.resolve(temporary), BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS)
+                            .setTimes(null, null, permissions.creationTime());
+                    if (!Files.readAttributes(parent.resolve(temporary), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS)
+                            .creationTime().equals(permissions.creationTime())) throw failure("FILE_ATTRIBUTES_NOT_PRESERVED");
+                }
                 force(output);
             }
             // No non-atomic fallback: unsupported atomic replacement leaves the journal retryable.
@@ -672,7 +676,8 @@ public final class LocalCoreContentService {
 
     private Object prepareReplacement(Directory parent, Path original, Path temporary, PosixFileAttributes sourceAttributes) throws IOException {
         parent.check(); requireRegularIdentity(parent, original, sourceAttributes.fileKey());
-        if (System.getProperty("os.name").startsWith("Mac")) {
+        boolean mac = System.getProperty("os.name").startsWith("Mac");
+        if (mac || System.getProperty("os.name").startsWith("Linux")) {
             // -P applies to the source only. Reserve and verify the destination inode ourselves;
             // this detects ordinary replacements, not an adversarial race inside cp itself.
             try (var reserved = parent.newByteChannel(temporary, CREATE,
@@ -681,13 +686,22 @@ public final class LocalCoreContentService {
             faults.at(FaultPoint.BEFORE_ATTRIBUTE_COPY);
             requireRegularIdentity(parent, original, sourceAttributes.fileKey());
             requireRegularIdentity(parent, temporary, temporaryKey);
-            ProcessBuilder command = new ProcessBuilder("/bin/cp", "-pP", parent.resolve(original).toString(), parent.resolve(temporary).toString())
+            // Linux's Java provider has no AclFileAttributeView even on files with POSIX ACLs.
+            // GNU cp preserves those with mode. Spell out xattr instead of --preserve=all,
+            // whose documented behavior ignores xattr preservation failures.
+            ProcessBuilder command = new ProcessBuilder(mac
+                    ? List.of("/bin/cp", "-pP", parent.resolve(original).toString(), parent.resolve(temporary).toString())
+                    : List.of("/bin/cp", "--preserve=mode,ownership,timestamps,xattr", "--no-dereference", "--",
+                            parent.resolve(original).toString(), parent.resolve(temporary).toString()))
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD);
             command.environment().remove("COPYFILE_DISABLE");
             awaitAttributeCopy(command.start(), Duration.ofSeconds(10));
             faults.at(FaultPoint.AFTER_ATTRIBUTE_COPY);
             requireRegularIdentity(parent, original, sourceAttributes.fileKey());
             requireRegularIdentity(parent, temporary, temporaryKey);
+            var copied = Files.readAttributes(parent.resolve(temporary), PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            if (!copied.permissions().equals(sourceAttributes.permissions()) || !copied.owner().equals(sourceAttributes.owner())
+                    || !copied.group().equals(sourceAttributes.group())) throw failure("FILE_ATTRIBUTES_NOT_PRESERVED");
             return temporaryKey;
         }
         // Do not treat a missing ACL view as an empty ACL on an unverified provider.

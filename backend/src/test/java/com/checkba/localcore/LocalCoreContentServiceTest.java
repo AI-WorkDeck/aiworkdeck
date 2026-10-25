@@ -256,6 +256,31 @@ class LocalCoreContentServiceTest {
         assertEquals(before, macMetadata(document));
     }
 
+    @Test void linuxSavePreservesPosixAclAndBinaryXattrsWithoutJavaAclView() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Linux"));
+        // Linux POSIX ACL xattrs are not exposed through Java's AclFileAttributeView.
+        // Build a real named-user ACL on this owned fixture without requiring setfacl.
+        nativeCommand("python3", "-c", """
+                import os, struct, sys
+                entries = [(1, 6, 0xffffffff), (2, 4, 65534), (4, 4, 0xffffffff),
+                           (16, 4, 0xffffffff), (32, 0, 0xffffffff)]
+                acl = struct.pack('<I', 2) + b''.join(struct.pack('<HHI', *e) for e in entries)
+                os.setxattr(sys.argv[1], 'system.posix_acl_access', acl)
+                os.setxattr(sys.argv[1], 'user.awd.fixture', bytes([0, 255, 1, 128, 42]))
+                """, document.toString());
+        assertNull(Files.getFileAttributeView(document, java.nio.file.attribute.AclFileAttributeView.class));
+        String readAttributes = "import os,sys; print([(k,os.getxattr(sys.argv[1],k).hex()) for k in sorted(os.listxattr(sys.argv[1]))])";
+        String before = nativeCommand("python3", "-c", readAttributes, document.toString());
+        var posix = Files.readAttributes(document, PosixFileAttributes.class);
+        save(content, request(ORIGINAL, SAVED), SAVED);
+        assertEquals(SAVED, Files.readString(document));
+        assertEquals(before, nativeCommand("python3", "-c", readAttributes, document.toString()));
+        var after = Files.readAttributes(document, PosixFileAttributes.class);
+        assertEquals(posix.permissions(), after.permissions());
+        assertEquals(posix.owner(), after.owner());
+        assertEquals(posix.group(), after.group());
+    }
+
     @Test void immutableMacOriginalFailsWithoutRemovingItsFlagsOrChangingItsBytes() throws Exception {
         attachMacMetadata();
         nativeCommand("/usr/bin/chflags", "uchg", document.toString());
