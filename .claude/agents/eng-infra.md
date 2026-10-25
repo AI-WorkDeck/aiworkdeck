@@ -597,7 +597,7 @@ Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Ac
 
 ### 本地轻量启动候选（dev-board#1472/#1474，默认未启用）
 
-`desktop.local-core.enabled=true` 仅用于 desktop/local-mode/loopback 的隔离候选。`LocalCoreBootstrap` 在 Spring 建容器前核验现有 H2 的同构建 schema proof；未知构建或不支持的 schema 走原初始化，完成所有同步 Ready 回调后才记 proof。使用原数据库、原 ID/UID、原文件路径，不能再旁建可写 SQLite 权威。早期池禁用 AUTO_SERVER 并要求 IFEXISTS，阻止另一个旧 JVM 同时连接；Hikari 实例交给 JPA 共用，Hibernate/schema SQL 初始化在已验证路径禁用。真正 native EMF 未完成时仍保留 CORE 读取；`StartupDataInitializer` 的首个动作排空 CORE leases，再交权给业务初始化。失败不得自动回 CORE 形成双写。
+`desktop.local-core.enabled=true` 仅用于 desktop/local-mode/loopback 的隔离候选。`LocalCoreBootstrap` 在 Spring 建容器前核验现有 H2 的持久化契约与实际 schema proof。构建时用完整实体映射两次生成独立 H2，确认结构一致后打包契约（DDL、H2/Hibernate 版本、JPA/SQL 初始化配置、bootstrap epoch）；启动直接顺序读取自身应用归档的 class 字节指纹，校验构建资源未过期，不再运行 Spring 实体元数据扫描，也不创建 EMF。普通类新增持久化注解同样会使旧指纹失效；构建阶段拒绝自身归档之外的映射类，未来增加外部映射模块须显式扩展契约。字节指纹不进入兼容 ID，兼容重打包仍复用资格。v2 proof 允许应用重打包但契约相同的升级直接进入 CORE；旧 v1、缺失/过期契约、配置差异或 schema 变化仍走完整初始化，完成所有同步 Ready 回调后再记 v2。bootstrap 数据准备语义变化时必须提升 `BOOTSTRAP_EPOCH`。build ID 继续用于进程/健康身份，不能代替数据兼容凭据。全新数据库仍先走完整初始化，不能宣称首次安装已获同等提速。使用原数据库、原 ID/UID、原文件路径，不能再旁建可写 SQLite 权威。早期池禁用 AUTO_SERVER 并要求 IFEXISTS，阻止另一个旧 JVM 同时连接；Hikari 实例交给 JPA 共用，Hibernate/schema SQL 初始化在已验证路径禁用。真正 native EMF 未完成时仍保留 CORE 读取；`StartupDataInitializer` 的首个动作排空 CORE leases，再交权给业务初始化。失败不得自动回 CORE 形成双写。
 
 独立 `LocalCoreGateway` 保持公开端口，Spring 私有 connector 使用随机端口，配置中的 server.port 和回调 URL 仍用公开端口。复用本机准入、CORS、源代码声明过滤器；文件通过现有 ResourceHttpRequestHandler 支持 HEAD/Range/416。关闭独立 Tomcat 必须 stop 后 destroy，否则容器 await 线程会使 JVM 退出不完。未知路由转交完整后端前先释放 CORE lease，不能持 lease 等待交权。
 

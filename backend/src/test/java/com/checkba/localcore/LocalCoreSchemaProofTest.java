@@ -51,6 +51,28 @@ class LocalCoreSchemaProofTest {
         assertTrue(proof.isCurrent());
     }
 
+    @Test void qualifiedContractSurvivesBuildChangeButNotContractEpochOrInstalledSchemaChanges() throws Exception {
+        schema();
+        var contract = new LocalCorePersistenceContract("a".repeat(64), "1", java.util.Map.of());
+        var next = new LocalCoreSchemaProof(source, "new-build", contract);
+        proof.recordAfterLegacyInitialization();
+        assertFalse(next.isCurrent(), "A legacy build proof must qualify through full initialization once");
+        assertTrue(next.isRecordedSchema(), "Old proof still permits journal recovery before DDL");
+        new LocalCoreSchemaProof(source, "old-build", contract).recordAfterLegacyInitialization();
+        assertTrue(next.isCurrent(), "Compatible builds must not repeat initialization on the critical path");
+        var changed = new LocalCoreSchemaProof(source, "new-build", new LocalCorePersistenceContract(
+                "b".repeat(64), "1", java.util.Map.of()));
+        assertFalse(changed.isCurrent());
+        assertTrue(changed.isRecordedSchema());
+        sql("UPDATE system_setting SET \"value\"=REPLACE(\"value\", CHAR(10)||'1'||CHAR(10), CHAR(10)||'2'||CHAR(10))");
+        assertFalse(next.isCurrent());
+        assertTrue(next.isRecordedSchema());
+        new LocalCoreSchemaProof(source, "old-build", contract).recordAfterLegacyInitialization();
+        sql("ALTER TABLE project ADD COLUMN changed INTEGER");
+        assertFalse(next.isCurrent());
+        assertFalse(next.isRecordedSchema());
+    }
+
     @Test void ordinaryDataAndIdentitySequenceChangesDoNotInvalidateSchemaProof() throws Exception {
         schema(); proof.recordAfterLegacyInitialization();
         sql("INSERT INTO app_users VALUES(7, 'Synthetic user')");
