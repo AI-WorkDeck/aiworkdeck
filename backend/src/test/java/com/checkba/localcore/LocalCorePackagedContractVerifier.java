@@ -15,6 +15,10 @@ import java.util.zip.ZipFile;
 public final class LocalCorePackagedContractVerifier {
     public static final class Probe {
         public static void main(String[] args) {
+            var resolver = new org.springframework.core.io.support.PathMatchingResourcePatternResolver();
+            if (new org.springframework.orm.jpa.persistenceunit.PersistenceManagedTypesScanner(resolver)
+                    .scan("com.checkba").getManagedClassNames().isEmpty())
+                throw new IllegalStateException("Packaged application mappings are not discoverable");
             var contract = LocalCorePersistenceContract.bundled();
             if (contract == null) throw new IllegalStateException("Packaged persistence contract unavailable");
             System.out.println("PACKAGED_PERSISTENCE_CONTRACT_OK=" + contract.id());
@@ -45,10 +49,13 @@ public final class LocalCorePackagedContractVerifier {
                  var output = new JarOutputStream(Files.newOutputStream(app))) {
                 for (var entries = archive.entries(); entries.hasMoreElements();) {
                     var entry = entries.nextElement();
-                    if (entry.isDirectory()) continue;
                     if (entry.getName().startsWith("BOOT-INF/classes/")) {
-                        output.putNextEntry(new JarEntry(entry.getName().substring("BOOT-INF/classes/".length())));
-                        try (var input = archive.getInputStream(entry)) { input.transferTo(output); }
+                        String name = entry.getName().substring("BOOT-INF/classes/".length());
+                        if (name.isEmpty()) continue;
+                        output.putNextEntry(new JarEntry(name));
+                        if (!entry.isDirectory()) {
+                            try (var input = archive.getInputStream(entry)) { input.transferTo(output); }
+                        }
                         output.closeEntry();
                     } else if (entry.getName().startsWith("BOOT-INF/lib/") && entry.getName().endsWith(".jar")) {
                         Path target = libraries.resolve(entry.getName().substring("BOOT-INF/lib/".length())).normalize();
