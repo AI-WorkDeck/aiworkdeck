@@ -580,5 +580,141 @@ class BatchSnapshotTests(unittest.TestCase):
         self.assertNotIn('index', result['entries'][0])
 
 
+class TrackingModel(FakeModel):
+    def __init__(self, enabled=False, **kwargs):
+        super().__init__(props={'RecordChanges': enabled, 'ShowChanges': True}, **kwargs)
+        self.modified = False
+        self.clear_error = None
+
+    def isModified(self):
+        return self.modified
+
+    def setModified(self, value):
+        self.modified_calls.append(('set', value))
+        if self.clear_error:
+            raise self.clear_error
+        self.modified = value
+
+    def setPropertyValue(self, name, value):
+        super().setPropertyValue(name, value)
+        self.modified = True
+
+
+class TrackingTests(unittest.TestCase):
+    def tracking(self, model, **params):
+        return review_uno.dispatch('tracking', params, model, FakeUno)
+
+    def test_new_model_enables_tracking_and_clears_only_initial_dirty(self):
+        model = TrackingModel()
+        before_undo = review_uno.undo_state(model)
+        result = self.tracking(model, enabled=True, initialize=True)
+        self.assertEqual(result, {'enabled': True, 'changed': True, 'modified': False})
+        self.assertEqual(model.modified_calls, [('set', False)])
+        self.assertEqual(all_write_names(model), ['RecordChanges'])
+        self.assertEqual(review_uno.undo_state(model), before_undo)
+
+    def test_user_toggle_marks_dirty_and_never_clears_existing_edits(self):
+        model = TrackingModel(True)
+        model.modified = True
+        result = self.tracking(model, enabled=False)
+        self.assertEqual(result, {'enabled': False, 'changed': True, 'modified': True})
+        self.assertNotIn(('set', False), model.modified_calls)
+        self.assertNotIn('ShowChanges', all_write_names(model))
+
+    def test_user_noop_preserves_dirty_and_clean_state(self):
+        for dirty in (False, True):
+            model = TrackingModel(True)
+            model.modified = dirty
+            self.assertEqual(self.tracking(model, enabled=True),
+                             {'enabled': True, 'changed': False, 'modified': dirty})
+            self.assertEqual(all_write_names(model), [])
+            self.assertEqual(model.modified_calls, [])
+
+    def test_boolean_parameters_are_strict_before_any_write(self):
+        for key in ('enabled', 'initialize'):
+            for bad in (None, 0, 1, '', 'false', [], {}):
+                model = TrackingModel()
+                with self.subTest(key=key, value=bad), self.assertRaises(ValueError):
+                    self.tracking(model, **{'enabled': True, key: bad})
+                self.assertEqual(all_write_names(model), [])
+        with self.assertRaises(ValueError):
+            self.tracking(TrackingModel())
+        with self.assertRaises(ValueError):
+            self.tracking(TrackingModel(), enabled=False, initialize=True)
+
+    def test_missing_or_non_boolean_readback_never_becomes_enabled(self):
+        for value in (None, 1, 'true'):
+            model = TrackingModel(value)
+            with self.assertRaisesRegex(RuntimeError, 'RecordChanges'):
+                self.tracking(model, enabled=True, initialize=True)
+            self.assertEqual(model.modified_calls, [])
+
+    def test_silent_write_failure_does_not_clear_dirty(self):
+        model = TrackingModel(drop_writes=('RecordChanges',))
+        with self.assertRaisesRegex(RuntimeError, 'not applied'):
+            self.tracking(model, enabled=True, initialize=True)
+        self.assertEqual(model.modified_calls, [])
+
+    def test_initial_dirty_clear_failure_propagates(self):
+        model = TrackingModel()
+        model.clear_error = RuntimeError('dirty reset failed')
+        with self.assertRaisesRegex(RuntimeError, 'dirty reset failed'):
+            self.tracking(model, enabled=True, initialize=True)
+
+    def test_silent_dirty_reset_failure_blocks_initialization(self):
+        model = TrackingModel()
+        model.setModified = lambda value: None
+        with self.assertRaisesRegex(RuntimeError, 'modified state'):
+            self.tracking(model, enabled=True, initialize=True)
+
+    def test_protected_tracking_write_propagates_without_clearing_dirty(self):
+        model = TrackingModel()
+        model.props.raise_writes['RecordChanges'] = RuntimeError('protected tracking')
+        with self.assertRaisesRegex(RuntimeError, 'protected tracking'):
+            self.tracking(model, enabled=True, initialize=True)
+        self.assertEqual(model.modified_calls, [])
+
+    def test_tracking_resolves_exactly_one_writer_by_url(self):
+        class Desktop:
+            def __init__(self, models):
+                self.models = list(models)
+
+            def getComponents(self):
+                return self
+
+            def createEnumeration(self):
+                return self
+
+            def hasMoreElements(self):
+                return bool(self.models)
+
+            def nextElement(self):
+                return self.models.pop(0)
+
+        def document(url):
+            model = TrackingModel()
+            model.supportsService = lambda name: name == 'com.sun.star.text.TextDocument'
+            model.getURL = lambda: url
+            return model
+
+        old, current = document('file:///old.docx'), document('file:///current.docx')
+        bound = review_uno.model_for(Desktop([old, current]), 'file:///current.docx')
+        self.tracking(bound, enabled=True, initialize=True)
+        self.assertFalse(old.getPropertyValue('RecordChanges'))
+        self.assertTrue(current.getPropertyValue('RecordChanges'))
+        for models in ([old], [current, document('file:///current.docx')]):
+            with self.assertRaisesRegex(RuntimeError, 'exactly one URL-bound'):
+                review_uno.model_for(Desktop(models), 'file:///current.docx')
+
+    def test_view_switches_preserve_enabled_and_disabled_tracking(self):
+        for enabled in (False, True):
+            model = supported_model()
+            model.props.props['RecordChanges'] = enabled
+            for mode in ('all', 'final', 'balloons'):
+                review_uno.dispatch('view', {'mode': mode, 'refresh': True}, model, FakeUno)
+                self.assertEqual(model.getPropertyValue('RecordChanges'), enabled)
+            self.assertNotIn('RecordChanges', all_write_names(model))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -97,6 +97,20 @@ async function reviewCall(method,params={}){
  await startUno();if(!unoClient)throw Error('需要原生审阅连接');
  return unoClient.call(method,{documentUrl:pathToFileURL(selected.physicalPath).href,...params});
 }
+async function setTracking(enabled,initialize=false){
+ if(typeof enabled!=='boolean')throw Error('enabled must be a boolean');
+ const identity=selected,documentUrl=pathToFileURL(identity.physicalPath).href;
+ identity.trackingReady=false;
+ await startUno();if(!unoClient)throw Error('需要原生修订连接');
+ if(selected!==identity)throw Error('STALE_DOCUMENT');
+ const result=await unoClient.call('tracking',{documentUrl,enabled,...(initialize?{initialize:true}:{})});
+ if(selected!==identity)throw Error('STALE_DOCUMENT');
+ if(result.enabled!==enabled||typeof result.changed!=='boolean'||typeof result.modified!=='boolean'
+   ||(initialize&&result.modified)||(!initialize&&result.changed&&!result.modified))throw Error('修订跟踪状态未确认');
+ identity.recordChanges=result.enabled;identity.trackingReady=true;
+ if(!initialize&&result.changed){dirty=true;mutationVersion++}
+ return {...result,documentEpoch:identity.documentEpoch};
+}
 const reviewUndo=createReviewUndo({view:params=>reviewCall('view',params),
  undoState:()=>reviewCall('undo_state'),undoStep:(kind,expected)=>reviewCall('undo_step',{kind,expected})});
 async function reviewSnapshot(){
@@ -141,8 +155,15 @@ async function openDocument(ids){
  await startEngine();
  initialCallbacks.clear();reviewIdentity=null;
  const model=await engine.call('open',{path:file.physicalPath});
- selected={...ids,...file,...model};reviewUndo.reset();dirty=false;documentLocked=false;mark('model-loaded');
- return {documentEpoch:selected.documentEpoch,viewId:model.viewId,widthTwips:model.widthTwips,heightTwips:model.heightTwips,historyAvailable:!!authority,initialCallbacks:[...initialCallbacks.values()].filter(event=>event.documentEpoch===model.documentEpoch)};
+ selected={...ids,...file,...model,trackingReady:false};reviewUndo.reset();dirty=false;documentLocked=false;mark('model-loaded');
+ try{await setTracking(true,true);mark('tracking-ready')}
+ catch(error){
+  // No input has been accepted yet. Never expose a model whose default could
+  // not be confirmed; retain the failure if the native close also fails.
+  try{await closeDocument()}catch(closeError){throw new AggregateError([error,closeError],'修订初始化失败，文档未进入可编辑状态')}
+  throw error;
+ }
+ return {documentEpoch:selected.documentEpoch,viewId:model.viewId,widthTwips:model.widthTwips,heightTwips:model.heightTwips,trackingReady:true,recordChanges:selected.recordChanges,historyAvailable:!!authority,initialCallbacks:[...initialCallbacks.values()].filter(event=>event.documentEpoch===model.documentEpoch)};
 }
 async function closeDocument(){
  if(!selected)return;
@@ -153,6 +174,7 @@ async function closeDocument(){
 async function saveDocument(){
  if(savePromise)return savePromise;
  if(!selected)throw Error('尚未打开文档');
+ if(!selected.trackingReady)throw Error('修订跟踪状态未确认，已暂停编辑');
  reviewUndo.assertSafe();
  const identity=selected,saveVersion=mutationVersion;
  savePromise=(async()=>{
@@ -226,17 +248,19 @@ app.whenReady().then(async()=>{
  });
  handle('write-clipboard',text=>{if(typeof text!=='string'||Buffer.byteLength(text)>8*1024*1024)throw Error('Invalid clipboard text');clipboard.writeText(text);return {written:true}});
  handle('open',ids=>nativeTask(()=>openDocument(ids)));handle('close',()=>nativeTask(closeDocument));handle('paint',viewport=>nativeTask(()=>paint(viewport)));handle('save',()=>nativeTask(saveDocument));
- const allowed=new Set(['set_viewport','input_text','input_key','input_mouse','input_barrier','review_snapshot','review_batch','review_goto','review_resolve','review_view','selected_text','selection_text','command']);
+ const allowed=new Set(['set_viewport','input_text','input_key','input_mouse','input_barrier','review_snapshot','review_batch','review_goto','review_resolve','review_view','review_tracking','selected_text','selection_text','command']);
  handle('action',(action,params={})=>nativeTask(async()=>{
   if(!selected||!allowed.has(action))throw Error('Unsupported editor action');
+  if(!selected.trackingReady)throw Error('修订跟踪状态未确认，已暂停编辑');
   reviewUndo.assertSafe();
-  if(documentLocked&&['input_text','input_key','input_mouse','review_resolve','review_goto','command','review_view'].includes(action))throw Error('文档正在保存或恢复，请稍候');
+  if(documentLocked&&['input_text','input_key','input_mouse','review_resolve','review_goto','command','review_view','review_tracking'].includes(action))throw Error('文档正在保存或恢复，请稍候');
   if(params.documentEpoch!==selected.documentEpoch)throw Error('STALE_DOCUMENT');
   if(action==='command'&&!['.uno:Undo','.uno:Redo'].includes(params.command))throw Error('Unsupported toolbar command');
   if(['input_text','input_key','command'].includes(action)){dirty=true;mutationVersion++}
   if(action==='command')return reviewUndo.step(params.command==='.uno:Undo'?'undo':'redo');
   if(action==='review_snapshot')return reviewSnapshot();
   if(action==='review_batch')return reviewBatch(params);
+  if(action==='review_tracking')return setTracking(params.enabled);
   if(action==='review_view'){
    await startUno();if(!unoClient)throw Error('需要原生审阅连接');
    const result=await unoClient.call('view',{documentUrl:pathToFileURL(selected.physicalPath).href,mode:params.mode,refresh:true});
