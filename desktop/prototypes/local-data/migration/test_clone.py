@@ -76,11 +76,21 @@ def file_row(fid, uid, pid, parent, folder, name, file_path, size, updated="2026
 
 def write_snapshot(path, projects, files, extra_tables=None, fmt=SNAPSHOT_FORMAT,
                    include_footer=True, counts=None, trailing=None, extra_records=None,
-                   project_columns=None, file_columns=None):
+                   project_columns=None, file_columns=None, users=None, members=None, selected_user="1"):
     """Mirror the real exporter: header, all DDL, then per table its declaration
     immediately followed by its rows, then the complete footer."""
-    extra_tables = extra_tables or {}
-    extra_records = extra_records or {}
+    extra_tables = dict(extra_tables or {})
+    extra_records = dict(extra_records or {})
+    extra_tables.update({"app_users": ["id", "username", "display_name", "role"],
+                         "project_member": ["project_id", "user_id", "role"],
+                         "system_setting": ["config_key", "value"]})
+    extra_records.update({
+        "app_users": users if users is not None else [
+            {"id": "1", "username": "local", "display_name": "本机用户", "role": "USER"}],
+        "project_member": members or [],
+        "system_setting": [] if selected_user is None else [
+            {"config_key": "local.identity.selectedUserId", "value": selected_user}],
+    })
     lines = [{"kind": "header", "format": fmt, "sourceSha256": SOURCE_SHA, "h2Version": "2.3.232"}]
     lines.append({"kind": "source-ddl", "sql": 'CREATE CACHED TABLE "PUBLIC"."PROJECT"(ID BIGINT PRIMARY KEY)'})
     lines.append({"kind": "source-ddl", "sql": 'CREATE CACHED TABLE "PUBLIC"."PROJECT_FILE"(ID BIGINT PRIMARY KEY)'})
@@ -306,7 +316,7 @@ class CloneTests(unittest.TestCase):
 
         database = sqlite3.connect(self.output / "local.sqlite")
         total = database.execute("SELECT COUNT(*) FROM migration_archive").fetchone()[0]
-        self.assertEqual(total, 1 + 2 + 3 + len(projects) + len(files) + 1 + 1,
+        self.assertEqual(total, len(self.snapshot.read_text().splitlines()),
                          "every raw snapshot record (header, ddl, tables, rows, footer) must be archived verbatim")
         archived_deleted = database.execute(
             "SELECT imported, note, payload FROM migration_archive WHERE kind='row' AND table_name='project_file' "
@@ -328,7 +338,7 @@ class CloneTests(unittest.TestCase):
             "AND payload LIKE '%uid-file-103%'").fetchone()[0]
         self.assertIn('\\"docketNo\\":\\"(2026)京01民初1号\\"', archived_meta)
         self.assertIn('"wps_file_id": "project_7_doc_103_v1"', archived_meta)
-        self.assertIn("project.project_type", report["archiveOnlyFields"])
+        self.assertNotIn("project.project_type", report["archiveOnlyFields"])
         self.assertIn("project_file.meta_json", report["archiveOnlyFields"])
         self.assertEqual(database.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         database.close()
@@ -358,6 +368,214 @@ class CloneTests(unittest.TestCase):
         self.assertEqual(source.read_bytes(), original)
         client.close()
 
+    # ---------------------------------------------------------- active identity / ACL
+
+    def acl_fixture(self, global_role="USER", member_role="PARTICIPANT", owner=False):
+        root, _ = self.make_source("acl-source", {
+            ".": {"own.txt": b"own", "shared.txt": b"shared", "private.txt": b"private", "null.txt": b"null"},
+            "private-dir": {"nested.txt": b"nested"}})
+        other, _ = self.make_source("other", {})
+        loose, _ = self.make_source("loose", {})
+        projects = [project_row(1, "p1", "ACL项目", local_root=str(root), user_id="7" if owner else "1"),
+                    project_row(2, "p2", "他人项目", local_root=str(other), user_id="8"),
+                    project_row(3, "p3", "散文件", local_root=str(loose), user_id="7", project_type="LOOSE_FILES")]
+        files = [file_row(11, "f11", 1, 0, False, "own.txt", "projects/1/own.txt", 3, user_id="7"),
+                 file_row(12, "f12", 1, 0, False, "shared.txt", "projects/1/shared.txt", 6, client_visible="TRUE"),
+                 file_row(13, "f13", 1, 0, False, "private.txt", "projects/1/private.txt", 7),
+                 file_row(14, "f14", 1, 0, False, "null.txt", "projects/1/null.txt", 4,
+                          user_id=None, client_visible=None),
+                 file_row(15, "f15", 1, 0, True, "private-dir", "projects/1/private-dir", 0,
+                          client_visible="TRUE"),
+                 file_row(16, "f16", 1, 15, False, "nested.txt", "projects/1/private-dir/nested.txt", 6)]
+        users = [{"id": str(i), "username": "local" if i == 7 else f"user{i}",
+                  "display_name": None if i == 8 else f"用户{i}", "role": global_role if i == 7 else "USER"}
+                 for i in (1, 7, 8)]
+        members = [] if member_role is None else [{"project_id": "1", "user_id": "7", "role": member_role}]
+        write_snapshot(self.snapshot, projects, files, users=users, members=members, selected_user="7")
+        self.write_roots({1: root, 2: other, 3: loose})
+        return root
+
+    def acl_clone(self, **kwargs):
+        source = self.acl_fixture(**kwargs)
+        code, result = self.run_tool()
+        self.assertEqual(code, 0, result)
+        return source, self.client(self.output)
+
+    def assertWriteDeniedUnchanged(self, client):
+        before = (self.output / "storage/projects/1/own.txt").read_bytes()
+        with sqlite3.connect(self.output / "local.sqlite") as db:
+            old = list(db.iterdump())
+        for method, params in (
+                ("files.save", {"fileId": 11, "expectedGeneration": hashlib.sha256(before).hexdigest(),
+                                "contentBase64": encoded(b"denied")} ),
+                ("files.create", {"name": "denied.txt", "contentBase64": encoded(b"denied")}),
+                ("files.mkdir", {"name": "denied-dir"})):
+            response = client.call(method, projectId=1, **params)
+            self.assertEqual(response.get("error", {}).get("code"), "ACCESS_DENIED", response)
+        self.assertEqual((self.output / "storage/projects/1/own.txt").read_bytes(), before)
+        self.assertFalse((self.output / "storage/projects/1/denied.txt").exists())
+        self.assertFalse((self.output / "storage/projects/1/denied-dir").exists())
+        with sqlite3.connect(self.output / "local.sqlite") as db:
+            self.assertEqual(list(db.iterdump()), old, "denied writes must not change rows or identity high water")
+
+    def test_acl_imports_fixed_identity_types_and_all_active_references(self):
+        _, client = self.acl_clone()
+        self.assertEqual(client.result("identity.status"), {"localMode": True, "userId": 7, "needsSelection": False})
+        listed = client.result("projects.list")
+        self.assertEqual([p["id"] for p in listed], [1])
+        self.assertEqual(listed[0]["projectType"], "MAJOR_ASSET_RESTRUCTURING")
+        self.assertEqual(listed[0]["myRole"], "PARTICIPANT")
+        self.assertTrue(listed[0]["canWrite"])
+        self.assertTrue(listed[0]["canBrowseFiles"])
+        self.assertIn("error", client.call("projects.get", projectId=2))
+        self.assertIn("error", client.call("files.read", projectId=2, fileId=11))
+        client.close()
+        with sqlite3.connect(self.output / "local.sqlite") as db:
+            self.assertEqual(db.execute("SELECT id,username,display_name,role FROM users ORDER BY id").fetchall(),
+                             [(1, "user1", "用户1", "USER"), (7, "local", "用户7", "USER"), (8, "user8", None, "USER")])
+            self.assertEqual(db.execute("SELECT * FROM profile_identity").fetchall(), [(1, 7)])
+            self.assertEqual(db.execute("SELECT * FROM project_members").fetchall(), [(1, 7, "PARTICIPANT")])
+            self.assertEqual(db.execute("SELECT user_id,client_visible FROM files WHERE id=14").fetchone(), (None, 0))
+        restarted = self.client(self.output)
+        self.assertEqual(restarted.result("identity.status")["userId"], 7)
+
+    def test_acl_read_only_reads_private_but_cannot_write(self):
+        _, client = self.acl_clone(member_role="READ_ONLY")
+        self.assertFalse(client.result("projects.get", projectId=1)["canWrite"])
+        self.assertEqual(len(client.result("files.list", projectId=1)), 6)
+        self.assertEqual(base64.b64decode(client.result("files.read", projectId=1, fileId=13)["contentBase64"]), b"private")
+        self.assertWriteDeniedUnchanged(client)
+
+    def test_acl_internal_writers_and_owner_priority(self):
+        for role, owner in (("ADMIN", False), ("PARTICIPANT", False), ("CLIENT_NAMED", True)):
+            with self.subTest(role=role, owner=owner):
+                self.output = self.directory / f"profile-{role}-{owner}"
+                source, client = self.acl_clone(member_role=role, owner=owner)
+                info = client.result("projects.get", projectId=1)
+                self.assertEqual(info["myRole"], "OWNER" if owner else role)
+                self.assertTrue(info["canWrite"])
+                old = client.result("files.read", projectId=1, fileId=13)
+                client.result("files.save", projectId=1, fileId=13, expectedGeneration=old["generation"],
+                              contentBase64=encoded(b"changed"))
+                folder = client.result("files.mkdir", projectId=1, name="new-dir")
+                created = client.result("files.create", projectId=1, parentId=folder["id"], name="new.txt",
+                                        contentBase64=encoded(b"new"))
+                self.assertTrue(created["canWrite"])
+                self.assertEqual((source / "private.txt").read_bytes(), b"private")
+                client.close()
+                with sqlite3.connect(self.output / "local.sqlite") as db:
+                    self.assertEqual(db.execute("SELECT user_id,client_visible FROM files WHERE id=?", (created["id"],)).fetchone(), (7, 0))
+
+    def test_acl_clients_only_read_own_or_explicit_shared_files(self):
+        for role, account, owner in (("CLIENT", "USER", False), ("CLIENT_NAMED", "USER", False),
+                                     ("CLIENT_GENERIC", "USER", False), ("ADMIN", "CLIENT", True),
+                                     ("ADMIN", "cLiEnT", True)):
+            with self.subTest(role=role, account=account, owner=owner):
+                self.output = self.directory / f"profile-{role}-{account}-{owner}-{self.source_counter}"
+                _, client = self.acl_clone(global_role=account, member_role=role, owner=owner)
+                project = client.result("projects.get", projectId=1)
+                self.assertFalse(project["canWrite"])
+                self.assertFalse(project["canBrowseFiles"])
+                self.assertEqual(client.call("files.list", projectId=1).get("error", {}).get("code"), "ACCESS_DENIED")
+                for fid in (11, 12):
+                    read = client.result("files.read", projectId=1, fileId=fid)
+                    self.assertFalse(read["canWrite"])
+                    self.assertTrue(all(key not in read for key in ("physicalPath", "filePath", "parentId")))
+                for fid in (13, 14, 16):
+                    self.assertIn("error", client.call("files.read", projectId=1, fileId=fid))
+                self.assertWriteDeniedUnchanged(client)
+                client.close()
+
+    def test_acl_global_admin_without_project_membership_cannot_read(self):
+        _, client = self.acl_clone(global_role="ADMIN", member_role=None)
+        self.assertEqual(client.result("projects.list"), [])
+        self.assertIn("error", client.call("projects.get", projectId=1))
+        for fid in (11, 12):
+            self.assertIn("error", client.call("files.read", projectId=1, fileId=fid), "own/shared file cannot override project membership")
+        self.assertWriteDeniedUnchanged(client)
+
+    def test_acl_missing_or_invalid_selected_identity_rejected_before_copy(self):
+        for selected in (None, "999", "invalid", "9007199254740992"):
+            with self.subTest(selected=selected):
+                self.output = self.directory / f"profile-{selected}"
+                self.rejection_fixture(selected_user=selected)
+                self.assertRejected("IDENTITY_REQUIRED")
+                self.assertFalse(Path(str(self.output) + ".staging").exists())
+
+    def test_acl_invalid_roles_and_dangling_references_rejected_before_copy(self):
+        variants = [
+            ("app_users", "role", "SUPERUSER"), ("project_member", "role", "OWNER"),
+            ("project", "user_id", "999"), ("project_file", "user_id", "999"),
+            ("project_member", "user_id", "999"), ("project_member", "project_id", "999")]
+        for table, key, value in variants:
+            with self.subTest(table=table, key=key):
+                self.output = self.directory / f"profile-{table}-{key}"
+                self.acl_fixture()
+                records = [json.loads(line) for line in self.snapshot.read_text().splitlines()]
+                row = next(r for r in records if r["kind"] == "row" and r["table"] == table)
+                row["values"][key] = value
+                self.snapshot.write_text("".join(json.dumps(r) + "\n" for r in records))
+                self.assertRejected("INVALID_ACL")
+                self.assertFalse(Path(str(self.output) + ".staging").exists())
+
+    def test_acl_duplicate_identity_users_and_memberships_rejected(self):
+        for table, code in (("system_setting", "IDENTITY_REQUIRED"), ("app_users", "INVALID_ACL"),
+                            ("project_member", "INVALID_ACL")):
+            with self.subTest(table=table):
+                self.acl_fixture()
+                records = [json.loads(line) for line in self.snapshot.read_text().splitlines()]
+                index = next(i for i, row in enumerate(records) if row["kind"] == "row" and row["table"] == table)
+                records.insert(index, records[index])
+                records[-1]["counts"][table] += 1
+                self.snapshot.write_text("".join(json.dumps(r) + "\n" for r in records))
+                self.assertRejected(code)
+                self.assertFalse(Path(str(self.output) + ".staging").exists())
+
+    def test_acl_missing_source_tables_rejected(self):
+        for table in ("app_users", "project_member", "system_setting"):
+            with self.subTest(table=table):
+                self.acl_fixture()
+                records = [json.loads(line) for line in self.snapshot.read_text().splitlines()]
+                records = [r for r in records if not (r["kind"] == "table" and r["name"] == table)
+                           and not (r["kind"] == "row" and r["table"] == table)]
+                del records[-1]["counts"][table]
+                self.snapshot.write_text("".join(json.dumps(r) + "\n" for r in records))
+                self.assertRejected("IDENTITY_REQUIRED" if table == "system_setting" else "INVALID_ACL")
+
+    def test_acl_active_text_cannot_be_truncated_or_coerced(self):
+        for table, key in (("app_users", "username"), ("app_users", "display_name"), ("project", "project_type")):
+            for value, code in (("before\0after", "INVALID_ACL"), (123, "SNAPSHOT_FORMAT"), ({}, "SNAPSHOT_FORMAT")):
+                with self.subTest(table=table, key=key, value=value):
+                    self.acl_fixture()
+                    records = [json.loads(line) for line in self.snapshot.read_text().splitlines()]
+                    row = next(r for r in records if r["kind"] == "row" and r["table"] == table)
+                    row["values"][key] = value
+                    self.snapshot.write_text("".join(json.dumps(r) + "\n" for r in records))
+                    self.assertRejected(code)
+                    self.assertFalse(Path(str(self.output) + ".staging").exists())
+
+    def test_acl_selected_identity_uses_source_trim_and_numeric_semantics(self):
+        self.acl_fixture()
+        records = [json.loads(line) for line in self.snapshot.read_text().splitlines()]
+        row = next(r for r in records if r["kind"] == "row" and r["table"] == "system_setting")
+        row["values"]["value"] = " \t+007\r\n"
+        project = next(r for r in records if r["kind"] == "row" and r["table"] == "project")
+        project["values"]["project_type"] = "FUTURE_PROJECT_TYPE"
+        self.snapshot.write_text("".join(json.dumps(r) + "\n" for r in records))
+        code, result = self.run_tool()
+        self.assertEqual(code, 0, result)
+        client = self.client(self.output)
+        self.assertEqual(client.result("identity.status")["userId"], 7)
+        self.assertEqual(client.result("projects.get", projectId=1)["projectType"], "FUTURE_PROJECT_TYPE")
+
+    def test_acl_request_user_id_cannot_elevate_bound_subject(self):
+        _, client = self.acl_clone(member_role="READ_ONLY")
+        response = client.call("files.save", projectId=1, fileId=11, userId=1,
+                               expectedGeneration=hashlib.sha256(b"own").hexdigest(), contentBase64=encoded(b"bad"))
+        self.assertIn("error", response)
+        self.assertEqual(client.result("identity.status")["userId"], 7)
+        self.assertEqual((self.output / "storage/projects/1/own.txt").read_bytes(), b"own")
+
     # ---------------------------------------------------------- rejections
 
     def rejection_fixture(self, mutate_files=None, mutate_projects=None, **snapshot_kwargs):
@@ -381,7 +599,8 @@ class CloneTests(unittest.TestCase):
         self.assertRejected("SNAPSHOT_INCOMPLETE")
 
     def test_counts_mismatch_rejected(self):
-        self.rejection_fixture(counts={"project": 1, "project_file": 99})
+        self.rejection_fixture(counts={"project": 1, "project_file": 99,
+                                      "app_users": 1, "project_member": 0, "system_setting": 1})
         self.assertRejected("COUNTS_MISMATCH")
 
     def test_unknown_kind_and_old_format_rejected(self):
@@ -566,16 +785,19 @@ class CloneTests(unittest.TestCase):
         # zero-row declared table omitted from the footer -> rejected
         write_snapshot(self.snapshot, projects, files,
                        extra_tables={"app_setting": SETTING_COLUMNS},
-                       counts={"project": 1, "project_file": 2})
+                       counts={"project": 1, "project_file": 2,
+                               "app_users": 1, "project_member": 0, "system_setting": 1})
         self.assertRejected("COUNTS_MISMATCH")
         # undeclared zero-count entry in the footer -> rejected (used to pass)
         write_snapshot(self.snapshot, projects, files,
-                       counts={"project": 1, "project_file": 2, "ghost_table": 0})
+                       counts={"project": 1, "project_file": 2, "ghost_table": 0,
+                               "app_users": 1, "project_member": 0, "system_setting": 1})
         self.assertRejected("COUNTS_MISMATCH")
         # exact coverage of a zero-row declared table -> accepted
         write_snapshot(self.snapshot, projects, files,
                        extra_tables={"app_setting": SETTING_COLUMNS},
-                       counts={"project": 1, "project_file": 2, "app_setting": 0})
+                       counts={"project": 1, "project_file": 2, "app_setting": 0,
+                               "app_users": 1, "project_member": 0, "system_setting": 1})
         returncode, result = self.run_tool()
         self.assertEqual(returncode, 0, result)
 

@@ -148,14 +148,14 @@
     }
     function commit(text) {
       if (!composing) input.value = '';
-      if (!text || !model || !caretRect || disposed || failure || suspended) return;
+      if (!text || !model || model.readOnly || !caretRect || disposed || failure || suspended) return;
       send(enqueue('input_text', { text }, true, true));
     }
     function listen(target, type, callback, options) {
       target.addEventListener(type, callback, options); listeners.push(() => target.removeEventListener(type, callback, options));
     }
     listen(input, 'compositionstart', () => {
-      if (failure || disposed || !caretRect || suspended) return;
+      if (failure || disposed || !caretRect || suspended || model?.readOnly) return;
       composing = true; compositionCommitted = false; committedText = ''; echo(null); notify();
     });
     listen(input, 'compositionupdate', event => { if (composing && !compositionCommitted) showPreview(event.data || ''); });
@@ -167,7 +167,7 @@
       compositionCommitted = false; committedText = ''; input.value = ''; echo(text); layout(); notify();
     });
     listen(input, 'input', event => {
-      if (!caretRect || failure || disposed || suspended) { input.value = ''; return; }
+      if (!caretRect || failure || disposed || suspended || model?.readOnly) { input.value = ''; return; }
       const text = event.data != null ? event.data : input.value, inserts = !event.inputType || /^insert/.test(event.inputType);
       if (composing) {
         if (compositionCommitted || !inserts || !text || (event.isComposing !== false && event.inputType !== 'insertFromComposition')) {
@@ -189,6 +189,12 @@
     });
     listen(input, 'keydown', event => {
       if(suspended){event.preventDefault();return;}
+      if(model?.readOnly){
+        const mods=modifiers(event),code=KEYS[event.key];
+        const navigation=code>=1024&&code<=1031&&(mods&~0x1000)===0;
+        const selectOrCopy=/^[ac]$/i.test(event.key)&&(mods===0x2000||mods===0x8000);
+        if(!navigation&&!selectOrCopy){event.preventDefault();return;}
+      }
       if (composing || event.isComposing || event.keyCode === 229) return;
       echo(null);
       if ((event.metaKey || event.ctrlKey) && !event.altKey && /^[zy]$/i.test(event.key)) {
@@ -232,7 +238,7 @@
       event.preventDefault();
       const keyCode = code | modifiers(event), id = event.code || event.key;
       pressedKeys.set(id, keyCode);
-      send(enqueue('input_key', { eventType: 0, charCode: 0, keyCode }, true, !/^Arrow|^(Home|End|PageUp|PageDown|Escape)$/.test(event.key)));
+      send(enqueue('input_key', { eventType: 0, charCode: 0, keyCode }, true, !model?.readOnly && !/^Arrow|^(Home|End|PageUp|PageDown|Escape)$/.test(event.key)));
     });
     listen(input, 'keyup', event => {
       const id = event.code || event.key, keyCode = pressedKeys.get(id);
@@ -248,6 +254,7 @@
     listen(canvas, 'mousedown', event => {
       event.preventDefault();
       if (composing || failure || disposed || !model || suspended) return;
+      if(model.readOnly&&event.button!==0)return;
       const buttons = event.button === 0 ? 1 : event.button === 2 ? 2 : 4;
       requestedFocus = true; dragging = { ...mouseParams(event, 0, buttons), buttons };
       send(viewportChanged()); send(enqueue('input_mouse', dragging, true)); layout();
@@ -291,7 +298,8 @@
       if (disposed) throw problem('DOCUMENT_CLOSED', 'Document input is closed');
       if (composing) throw problem('COMPOSITION_ACTIVE', 'Finish or cancel composition before changing document');
       if (!Number.isInteger(next?.documentEpoch) || !Number.isInteger(next?.viewId)) throw new TypeError('Document epoch and viewId are required');
-      model = { documentEpoch: next.documentEpoch, viewId: next.viewId };
+      model = { documentEpoch: next.documentEpoch, viewId: next.viewId, readOnly: next.readOnly===true };
+      input.readOnly=model.readOnly;
       caretRect = null; selectionRects = []; cursorVisible = true; requestedFocus = false; dragging = null; pressedKeys.clear();
       queue = Promise.resolve(); inputSeq = lastAppliedSeq = pending = 0; failure = null; suspended = false; lastViewport = '';
       compositionCommitted = false; committedText = ''; echo(null); input.value = ''; showPreview(''); layout(); notify();

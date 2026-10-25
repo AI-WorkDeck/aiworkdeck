@@ -150,20 +150,37 @@ async function openDocument(ids){
   file=await authority.readFile(ids.projectId,ids.fileId);
   const physicalPath=path.join(config.run,'opened-document.docx');
   fs.writeFileSync(physicalPath,Buffer.from(file.bytes));file={...file,physicalPath};
- }else file=await data.call('files.read',ids);
+ }else{
+  file=await data.call('files.read',ids);
+  if(typeof file.canWrite!=='boolean')throw Error('文件权限未确认');
+  if(!file.canWrite){
+   if(typeof file.contentBase64!=='string')throw Error('只读文件内容未确认');
+   const physicalPath=path.join(config.run,'readonly-document.docx');
+   fs.writeFileSync(physicalPath,Buffer.from(file.contentBase64,'base64'));file={...file,physicalPath};
+  }
+ }
  mark('document-read');
  await startEngine();
  initialCallbacks.clear();reviewIdentity=null;
- const model=await engine.call('open',{path:file.physicalPath});
+ const readOnly=file.canWrite===false;
+ const model=await engine.call('open',{path:file.physicalPath,readOnly});
  selected={...ids,...file,...model,trackingReady:false};reviewUndo.reset();dirty=false;documentLocked=false;mark('model-loaded');
- try{await setTracking(true,true);mark('tracking-ready')}
+ try{
+  if(readOnly){
+   if(model.readOnly!==true)throw Error('原生只读状态未确认');
+   const state=await reviewCall('tracking_state');
+   if(typeof state.enabled!=='boolean'||typeof state.modified!=='boolean')throw Error('只读修订状态未确认');
+   selected.recordChanges=state.enabled;selected.trackingReady=true;
+  }else await setTracking(true,true);
+  mark('tracking-ready');
+ }
  catch(error){
   // No input has been accepted yet. Never expose a model whose default could
   // not be confirmed; retain the failure if the native close also fails.
   try{await closeDocument()}catch(closeError){throw new AggregateError([error,closeError],'修订初始化失败，文档未进入可编辑状态')}
   throw error;
  }
- return {documentEpoch:selected.documentEpoch,viewId:model.viewId,widthTwips:model.widthTwips,heightTwips:model.heightTwips,trackingReady:true,recordChanges:selected.recordChanges,historyAvailable:!!authority,initialCallbacks:[...initialCallbacks.values()].filter(event=>event.documentEpoch===model.documentEpoch)};
+ return {documentEpoch:selected.documentEpoch,viewId:model.viewId,widthTwips:model.widthTwips,heightTwips:model.heightTwips,readOnly,trackingReady:true,recordChanges:selected.recordChanges,historyAvailable:!!authority,initialCallbacks:[...initialCallbacks.values()].filter(event=>event.documentEpoch===model.documentEpoch)};
 }
 async function closeDocument(){
  if(!selected)return;
@@ -174,6 +191,7 @@ async function closeDocument(){
 async function saveDocument(){
  if(savePromise)return savePromise;
  if(!selected)throw Error('尚未打开文档');
+ if(selected.readOnly)throw Error('只读文档不能保存');
  if(!selected.trackingReady)throw Error('修订跟踪状态未确认，已暂停编辑');
  reviewUndo.assertSafe();
  const identity=selected,saveVersion=mutationVersion;
@@ -236,6 +254,7 @@ app.whenReady().then(async()=>{
   if(authority){const cached=await authority.cachedSnapshot();if(cached&&!authorityIsReady)return cached;await authorityReady;return authority.snapshot()}
   const projects=await data.call('projects.list');
   return {source:'authority',projects:await Promise.all(projects.map(async project=>{
+   if(project.canBrowseFiles===false)return {...project,files:[]};
    const files=await data.call('files.list',{projectId:project.id});
    const nodes=new Map(files.map(file=>[file.id,{...file,children:[]}])),roots=[];
    for(const file of files){
@@ -255,8 +274,16 @@ app.whenReady().then(async()=>{
   reviewUndo.assertSafe();
   if(documentLocked&&['input_text','input_key','input_mouse','review_resolve','review_goto','command','review_view','review_tracking'].includes(action))throw Error('文档正在保存或恢复，请稍候');
   if(params.documentEpoch!==selected.documentEpoch)throw Error('STALE_DOCUMENT');
+  if(selected.readOnly){
+   const key=Number(params.keyCode),base=key&0xFFF,mods=key&~0xFFF;
+   const navigation=Number.isInteger(key)&&Number(params.charCode||0)===0
+    &&((base>=1024&&base<=1031&&(mods&~0x1000)===0)
+     ||(base===512&&(mods===0x2000||mods===0x8000)));
+   if(['input_text','command','review_resolve','review_tracking'].includes(action)
+     ||(action==='input_key'&&!navigation))throw Error('只读文档不能修改');
+  }
   if(action==='command'&&!['.uno:Undo','.uno:Redo'].includes(params.command))throw Error('Unsupported toolbar command');
-  if(['input_text','input_key','command'].includes(action)){dirty=true;mutationVersion++}
+  if(!selected.readOnly&&['input_text','input_key','command'].includes(action)){dirty=true;mutationVersion++}
   if(action==='command')return reviewUndo.step(params.command==='.uno:Undo'?'undo':'redo');
   if(action==='review_snapshot')return reviewSnapshot();
   if(action==='review_batch')return reviewBatch(params);

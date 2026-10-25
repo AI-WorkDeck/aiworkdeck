@@ -23,6 +23,7 @@ CREATE TABLE files(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQU
 CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE pending(file_id INTEGER PRIMARY KEY REFERENCES files(id), stage TEXT NOT NULL, expected TEXT, generation TEXT NOT NULL, size INTEGER NOT NULL, updated_at TEXT NOT NULL);
 """
+TREE_SCHEMA = LEGACY_SCHEMA.replace("name TEXT NOT NULL, size INTEGER", "parent_id INTEGER NOT NULL DEFAULT 0, name TEXT NOT NULL, kind INTEGER NOT NULL DEFAULT 0, size INTEGER").replace("UNIQUE(project_id,name)", "UNIQUE(project_id,parent_id,name)")
 
 
 def encoded(data):
@@ -122,6 +123,294 @@ class LocalDataTests(unittest.TestCase):
 
     def assertError(self, response, code):
         self.assertEqual(response.get("error", {}).get("code"), code, response)
+
+    def seed_acl(self, selected=1):
+        """Offline fixture; add columns for the frozen v2 binary's negative control too."""
+        self.client.close()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT NOT NULL UNIQUE,display_name TEXT,role TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS profile_identity(id INTEGER PRIMARY KEY CHECK(id=1),selected_user_id INTEGER NOT NULL REFERENCES users(id))")
+            db.execute("CREATE TABLE IF NOT EXISTS project_members(project_id INTEGER REFERENCES projects(id),user_id INTEGER REFERENCES users(id),role TEXT NOT NULL,PRIMARY KEY(project_id,user_id))")
+            for table, column, declaration in (
+                ("projects", "user_id", "INTEGER REFERENCES users(id)"),
+                ("projects", "project_type", "TEXT NOT NULL DEFAULT 'BLANK'"),
+                ("files", "user_id", "INTEGER REFERENCES users(id)"),
+                ("files", "client_visible", "INTEGER NOT NULL DEFAULT 0 CHECK(client_visible IN (0,1))"),
+            ):
+                if column not in {row[1] for row in db.execute(f"PRAGMA table_info({table})")}:
+                    db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+            db.executemany("INSERT OR IGNORE INTO users VALUES(?,?,?,?)", [
+                (1, "local", "本机用户", "USER"), (2, "other", "其他所有者", "USER"),
+                (3, "reader", "只读成员", "USER"), (4, "customer", "全局客户", "CLIENT"),
+                (5, "administrator", "项目管理员", "USER"), (6, "participant", "参与人", "USER"),
+                (7, "named", "具名客户", "USER"), (8, "generic", "通用客户", "USER"),
+                (9, "outsider", "无权限用户", "USER")])
+            db.execute("UPDATE projects SET user_id=1 WHERE user_id IS NULL")
+            db.execute("UPDATE files SET user_id=1 WHERE user_id IS NULL")
+            db.execute("INSERT OR REPLACE INTO profile_identity VALUES(1,?)", (selected,))
+            db.executemany("INSERT OR REPLACE INTO project_members VALUES(?,?,?)", [
+                (self.project["id"], user, role) for user, role in
+                ((3, "READ_ONLY"), (4, "ADMIN"), (5, "ADMIN"), (6, "PARTICIPANT"), (7, "CLIENT_NAMED"), (8, "CLIENT_GENERIC"))])
+
+    def select_offline(self, user):
+        self.client.close()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("UPDATE profile_identity SET selected_user_id=? WHERE id=1", (user,))
+        self.client = self.start()
+
+    def assert_explorer_write_denied(self):
+        for method, params in (
+            ("files.save", dict(fileId=self.file["id"], expectedGeneration=self.file["generation"], contentBase64=encoded(b"forbidden"))),
+            ("files.create", dict(name="forbidden.txt", contentBase64=encoded(b"forbidden"))),
+            ("files.mkdir", dict(name="forbidden-directory")),
+        ):
+            self.assertError(self.client.call(method, projectId=self.project["id"], userId=1, **params), "ACCESS_DENIED")
+        self.assertEqual(self.path.read_bytes(), self.original)
+        self.assertFalse((self.path.parent / "forbidden.txt").exists())
+        self.assertFalse((self.path.parent / "forbidden-directory").exists())
+
+    def test_acl_fresh_profile_has_colocated_identity_and_owners(self):
+        self.assertEqual(self.client.result("identity.status"), {"localMode": True, "userId": 1, "needsSelection": False})
+        self.assertEqual(self.client.result("health")["identityStatus"]["userId"], 1)
+        self.assertTrue(self.project["canWrite"])
+        self.assertTrue(self.project["canBrowseFiles"])
+        self.assertTrue(self.file["canWrite"])
+        self.client.close()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
+            self.assertEqual(db.execute("SELECT * FROM users").fetchall(), [(1, "local", "本机用户", "USER")])
+            self.assertEqual(db.execute("SELECT user_id,project_type FROM projects").fetchall(), [(1, "BLANK")])
+            self.assertEqual(db.execute("SELECT user_id,client_visible FROM files").fetchall(), [(1, 0)])
+
+    def test_acl_projects_filter_membership_type_and_ignore_forged_subject(self):
+        foreign = self.client.result("projects.create", name="另一人的秘密项目")
+        loose = self.client.result("projects.create", name="不进入列表的独立文件")
+        self.seed_acl(3)
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("UPDATE projects SET user_id=2 WHERE id=?", (foreign["id"],))
+            db.execute("UPDATE projects SET project_type='LOOSE_FILES' WHERE id=?", (loose["id"],))
+            db.execute("UPDATE projects SET project_type='LITIGATION' WHERE id=?", (self.project["id"],))
+        self.client = self.start()
+        cards = self.client.result("projects.list", userId=1)
+        self.assertEqual([row["id"] for row in cards], [self.project["id"]])
+        self.assertEqual((cards[0]["myRole"], cards[0]["projectType"], cards[0]["canWrite"]), ("READ_ONLY", "LITIGATION", False))
+        self.assertError(self.client.call("projects.get", projectId=foreign["id"], userId=2), "ACCESS_DENIED")
+        self.assertError(self.client.call("files.read", projectId=foreign["id"], fileId=self.file["id"], userId=2), "ACCESS_DENIED")
+        self.select_offline(1)
+        self.assertEqual([row["id"] for row in self.client.result("projects.list")], [self.project["id"]])
+        self.assertEqual(self.client.result("projects.get", projectId=loose["id"])["projectType"], "LOOSE_FILES")
+
+    def test_acl_read_only_member_can_read_but_cannot_write(self):
+        self.seed_acl(3)
+        self.client = self.start()
+        self.assert_explorer_write_denied()
+        self.assertFalse(self.read()["canWrite"])
+        self.assertTrue(self.client.result("projects.get", projectId=self.project["id"])["canBrowseFiles"])
+        self.assertEqual(base64.b64decode(self.read()["contentBase64"]), self.original)
+        self.assertFalse(self.client.result("files.list", projectId=self.project["id"])[0]["canWrite"])
+
+    def test_acl_revocation_after_read_blocks_save_without_mutating_bytes(self):
+        self.seed_acl(5)
+        self.client = self.start()
+        current = self.read()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("DELETE FROM project_members WHERE project_id=? AND user_id=5", (self.project["id"],))
+        self.assertError(self.save(b"revoked write", generation=current["generation"]), "ACCESS_DENIED")
+        self.assertError(self.client.call("files.read", projectId=self.project["id"], fileId=self.file["id"]), "ACCESS_DENIED")
+        self.assertEqual(self.client.result("projects.list"), [])
+        self.assertEqual(self.path.read_bytes(), self.original)
+
+    def test_acl_owner_admin_participant_write_and_new_rows_belong_to_subject(self):
+        self.seed_acl()
+        for user, role in ((1, "OWNER"), (5, "ADMIN"), (6, "PARTICIPANT")):
+            self.select_offline(user)
+            card = self.client.result("projects.get", projectId=self.project["id"])
+            self.assertEqual((card["myRole"], card["canWrite"]), (role, True))
+            before = self.read()
+            self.client.result("files.save", projectId=self.project["id"], fileId=self.file["id"],
+                               expectedGeneration=before["generation"], contentBase64=encoded(self.original))
+            folder = self.mkdir(f"member-{user}")
+            created = self.client.result("files.create", projectId=self.project["id"], parentId=folder["id"],
+                                         name="owned.txt", userId=2, contentBase64=encoded(b"owned"))
+            project = self.client.result("projects.create", name=f"new-{user}", userId=2)
+            self.assertTrue(created["canWrite"])
+            self.client.close()
+            with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+                self.assertEqual(db.execute("SELECT user_id FROM files WHERE id IN (?,?) ORDER BY id", (folder["id"], created["id"])).fetchall(), [(user,), (user,)])
+                self.assertEqual(db.execute("SELECT user_id FROM projects WHERE id=?", (project["id"],)).fetchone(), (user,))
+
+    def test_acl_owner_beats_customer_membership_but_global_client_does_not(self):
+        self.seed_acl()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("INSERT INTO project_members VALUES(?,1,'CLIENT_NAMED')", (self.project["id"],))
+        self.client = self.start()
+        self.assertTrue(self.client.result("projects.get", projectId=self.project["id"])["canWrite"])
+        self.assertEqual(len(self.client.result("files.list", projectId=self.project["id"])), 1)
+        self.client.close()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("UPDATE users SET role='cLiEnT' WHERE id=1")
+        self.client = self.start()
+        self.assertFalse(self.client.result("projects.get", projectId=self.project["id"])["canWrite"])
+        self.assertFalse(self.client.result("projects.get", projectId=self.project["id"])["canBrowseFiles"])
+        self.assertFalse(self.read()["canWrite"])
+        self.assertError(self.client.call("files.list", projectId=self.project["id"]), "ACCESS_DENIED")
+        self.assertError(self.client.call("projects.create", name="forbidden"), "ACCESS_DENIED")
+        self.assert_explorer_write_denied()
+
+    def test_acl_customers_can_only_read_owned_or_shared_files_without_paths(self):
+        folder = self.mkdir("hidden-parent-sensitive")
+        visible = self.client.result("files.create", projectId=self.project["id"], parentId=folder["id"], name="shared.txt", contentBase64=encoded(b"shared"))
+        own = self.client.result("files.create", projectId=self.project["id"], parentId=folder["id"], name="mine.txt", contentBase64=encoded(b"mine"))
+        self.seed_acl()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("UPDATE files SET client_visible=1 WHERE id=?", (visible["id"],))
+        for user in (4, 7, 8):
+            self.client.close()
+            with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+                db.execute("UPDATE files SET user_id=? WHERE id=?", (user, own["id"]))
+            self.select_offline(user)
+            self.assertFalse(self.client.result("projects.get", projectId=self.project["id"])["canBrowseFiles"])
+            self.assertError(self.client.call("files.list", projectId=self.project["id"]), "ACCESS_DENIED")
+            for target, content in ((visible, b"shared"), (own, b"mine")):
+                row = self.client.result("files.read", projectId=self.project["id"], fileId=target["id"])
+                self.assertEqual(base64.b64decode(row["contentBase64"]), content)
+                self.assertFalse(row["canWrite"])
+                for private_key in ("filePath", "physicalPath", "parentId"):
+                    self.assertNotIn(private_key, row)
+                self.assertNotIn("hidden-parent-sensitive", json.dumps(row))
+            denied = self.client.call("files.read", projectId=self.project["id"], fileId=self.file["id"], userId=1)
+            self.assertError(denied, "NOT_FOUND")
+            self.assertNotIn(self.file["name"], json.dumps(denied))
+            self.assert_explorer_write_denied()
+        self.select_offline(9)
+        self.assertEqual(self.client.result("projects.list"), [])
+        self.assertError(self.client.call("files.read", projectId=self.project["id"], fileId=visible["id"]), "ACCESS_DENIED")
+
+    def test_acl_missing_or_dangling_selected_identity_blocks_all_business(self):
+        self.seed_acl()
+        for operation in ("DELETE FROM profile_identity", "INSERT OR REPLACE INTO profile_identity VALUES(1,999)"):
+            self.client.close()
+            with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+                db.execute(operation)
+            self.client = self.start()
+            self.assertEqual(self.client.result("identity.status", userId=1), {"localMode": True, "userId": None, "needsSelection": True})
+            self.assertTrue(self.client.result("health")["identityStatus"]["needsSelection"])
+            for method, params in (("projects.list", {}), ("projects.create", {"name": "no identity"}),
+                                   ("files.read", {"projectId": self.project["id"], "fileId": self.file["id"]}),
+                                   ("settings.set", {"key": "local.ui.theme", "value": "x"})):
+                self.assertError(self.client.call(method, userId=1, **params), "IDENTITY_REQUIRED")
+        self.assertEqual(self.path.read_bytes(), self.original)
+
+    def test_acl_missing_project_owner_fails_closed_even_for_member(self):
+        self.seed_acl(5)
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("UPDATE projects SET user_id=NULL WHERE id=?", (self.project["id"],))
+        self.client = self.start()
+        self.assertEqual(self.client.result("projects.list"), [])
+        self.assertError(self.client.call("projects.get", projectId=self.project["id"]), "ACCESS_DENIED")
+        self.assertError(self.client.call("files.read", projectId=self.project["id"], fileId=self.file["id"]), "ACCESS_DENIED")
+        self.assert_explorer_write_denied()
+
+    def test_acl_unknown_or_null_global_role_requires_identity_without_writes(self):
+        self.seed_acl()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            # Model a corrupt/future schema that no longer enforces the role's NOT NULL.
+            db.execute("CREATE TABLE users_nullable(id INTEGER PRIMARY KEY,username TEXT NOT NULL UNIQUE,display_name TEXT,role TEXT)")
+            db.execute("INSERT INTO users_nullable SELECT * FROM users")
+            db.execute("DROP TABLE users")
+            db.execute("ALTER TABLE users_nullable RENAME TO users")
+        for role in ("FUTURE_ROLE", "", None):
+            self.client.close()
+            with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+                db.execute("UPDATE users SET role=? WHERE id=1", (role,))
+            self.client = self.start()
+            self.assertTrue(self.client.result("identity.status")["needsSelection"])
+            for method, params in (("projects.list", {}), ("projects.create", {"name": "invalid role"}),
+                                   ("files.save", {"projectId": self.project["id"], "fileId": self.file["id"],
+                                                   "expectedGeneration": self.file["generation"], "contentBase64": encoded(b"bad")})):
+                self.assertError(self.client.call(method, **params), "IDENTITY_REQUIRED")
+            self.assertEqual(self.path.read_bytes(), self.original)
+
+    def test_acl_unknown_or_forged_owner_membership_cannot_grant_access(self):
+        self.seed_acl(5)
+        for role in ("OWNER", "FUTURE_ROLE", "", "admin"):
+            self.client.close()
+            with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+                db.execute("UPDATE project_members SET role=? WHERE project_id=? AND user_id=5", (role, self.project["id"]))
+            self.client = self.start()
+            self.assertError(self.client.call("projects.list"), "ACCESS_DENIED")
+            self.assertError(self.client.call("projects.get", projectId=self.project["id"]), "ACCESS_DENIED")
+            self.assertError(self.client.call("files.read", projectId=self.project["id"], fileId=self.file["id"]), "ACCESS_DENIED")
+            self.assert_explorer_write_denied()
+
+    def test_acl_recovery_finishes_previous_commit_without_current_identity(self):
+        self.client.close()
+        crashing = self.start("afterJournal")
+        crashing.send("files.save", projectId=self.project["id"], fileId=self.file["id"], expectedGeneration=self.file["generation"], contentBase64=encoded(b"journaled by previous identity"))
+        self.assertEqual(crashing.process.wait(timeout=10), 77)
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            db.execute("DELETE FROM profile_identity")
+        self.client = self.start()
+        self.assertTrue(self.client.result("health")["ready"])
+        self.assertError(self.client.call("files.read", projectId=self.project["id"], fileId=self.file["id"]), "IDENTITY_REQUIRED")
+        self.assertEqual(self.path.read_bytes(), b"journaled by previous identity")
+        self.client.close()
+        with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM pending").fetchone()[0], 0)
+
+    def v2_profile(self, name):
+        profile = self.directory / name
+        folder = profile / "storage" / "projects" / "7"
+        folder.mkdir(parents=True)
+        (profile / ".awd-local-data-prototype").write_text("isolated-native-data-prototype-v1\n")
+        (folder / "old.txt").write_bytes(b"v2 original")
+        with sqlite3.connect(profile / "local.sqlite") as db:
+            db.executescript(TREE_SCHEMA)
+            db.execute("INSERT INTO projects VALUES(7,'p7','v2','t','t')")
+            db.execute("INSERT INTO files VALUES(42,'f42',7,0,'old.txt',0,11,?,1,'t')", (hashlib.sha256(b"v2 original").hexdigest(),))
+            db.execute("PRAGMA user_version=2")
+        return profile
+
+    def test_acl_v2_synthetic_upgrade_preserves_data_and_sets_single_owner(self):
+        profile = self.v2_profile("v2-synthetic")
+        migrated = Client(BINARY, profile)
+        self.clients.append(migrated)
+        self.assertEqual(migrated.result("identity.status")["userId"], 1)
+        self.assertTrue(migrated.result("projects.get", projectId=7)["canWrite"])
+        self.assertEqual(base64.b64decode(migrated.result("files.read", projectId=7, fileId=42)["contentBase64"]), b"v2 original")
+        migrated.close()
+        with sqlite3.connect(profile / "local.sqlite") as db:
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
+            self.assertEqual(db.execute("SELECT user_id FROM projects").fetchall(), [(1,)])
+            self.assertEqual(db.execute("SELECT user_id,client_visible FROM files").fetchall(), [(1, 0)])
+            self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
+
+    def test_acl_v2_archive_requires_reimport_without_changing_database(self):
+        profile = self.v2_profile("v2-imported")
+        with sqlite3.connect(profile / "local.sqlite") as db:
+            db.execute("CREATE TABLE migration_archive(name TEXT,original TEXT)")
+        before = (profile / "local.sqlite").read_bytes()
+        rejected = Client(BINARY, profile)
+        self.clients.append(rejected)
+        self.assertError(rejected.receive(), "NEEDS_REIMPORT")
+        rejected.close()
+        self.assertEqual((profile / "local.sqlite").read_bytes(), before)
+        self.assertEqual((profile / "storage/projects/7/old.txt").read_bytes(), b"v2 original")
+
+    def test_acl_v2_migration_failure_rolls_back_identity_and_columns(self):
+        profile = self.v2_profile("v2-invalid-references")
+        with sqlite3.connect(profile / "local.sqlite") as db:
+            db.execute("UPDATE files SET project_id=999")
+        rejected = Client(BINARY, profile)
+        self.clients.append(rejected)
+        self.assertError(rejected.receive(), "MIGRATION_CONFLICT")
+        rejected.close()
+        with sqlite3.connect(profile / "local.sqlite") as db:
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertNotIn("user_id", {row[1] for row in db.execute("PRAGMA table_info(projects)")})
+            self.assertEqual(db.execute("SELECT name FROM sqlite_master WHERE name IN ('users','profile_identity','project_members')").fetchall(), [])
+            self.assertEqual(db.execute("SELECT project_id FROM files").fetchall(), [(999,)])
+        self.assertEqual((profile / "storage/projects/7/old.txt").read_bytes(), b"v2 original")
 
     def test_real_docx_read_save_reopen_stable_ids(self):
         self.assertEqual(base64.b64decode(self.read()["contentBase64"]), self.original)
@@ -570,9 +859,11 @@ class LocalDataTests(unittest.TestCase):
         self.client.close()
         with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
             db.execute("PRAGMA user_version=99")
+        before = (self.directory / "profile" / "local.sqlite").read_bytes()
         rejected = self.start()
         self.assertError(rejected.receive(), "UNSUPPORTED_SCHEMA")
         rejected.close()
+        self.assertEqual((self.directory / "profile" / "local.sqlite").read_bytes(), before)
         with sqlite3.connect(self.directory / "profile" / "local.sqlite") as db:
             self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 99)
         self.assertEqual(self.path.read_bytes(), self.original)
@@ -607,7 +898,7 @@ class LocalDataTests(unittest.TestCase):
         with sqlite3.connect(profile / "local.sqlite") as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM pending").fetchone()[0], 0)
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
-            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
 
     def test_legacy_flat_profile_upgrades_preserving_identity_and_bytes(self):
         profile = self.directory / "legacy-profile"
@@ -645,7 +936,7 @@ class LocalDataTests(unittest.TestCase):
         self.assertEqual((profile / "storage" / "projects" / "7" / "新目录" / "旧文档.docx").read_bytes(), b"nested copy")
         legacy.close()
         db = sqlite3.connect(profile / "local.sqlite")
-        self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         row = db.execute("SELECT uid,parent_id,kind,size,generation FROM files WHERE id=42").fetchone()
         self.assertEqual(row, ("legacy-file-uid", 0, 0, len(content), hashlib.sha256(content).hexdigest()))
@@ -709,11 +1000,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--filter", default="", help="Run test methods containing this substring")
     args = parser.parse_args()
     BINARY = args.binary.resolve()
     OUTPUT = args.output.resolve()
     OUTPUT.mkdir(parents=True, exist_ok=False)
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(LocalDataTests)
+    if args.filter:
+        suite = unittest.TestSuite(test for test in suite if args.filter in test.id())
     with (OUTPUT / "tests.log").open("w") as log:
         result = unittest.TextTestRunner(stream=log, verbosity=2).run(suite)
     print((OUTPUT / "tests.log").read_text(), end="")

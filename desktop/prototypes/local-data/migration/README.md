@@ -55,7 +55,7 @@ TEST_OUTPUT=/absolute/new-test-output \
 python3 desktop/prototypes/local-data/migration/test_snapshot.py
 ```
 
-Six real-JDBC cases cover value/schema preservation, source-file identity,
+Seven real-JDBC cases cover value/schema preservation, source-file identity,
 refusal of a live writer, no implicit database creation, no destination overwrite,
 path/URL-option refusal, and identity high water after physically deleting the
 highest project and file IDs. The identity case additionally requires
@@ -63,8 +63,10 @@ highest project and file IDs. The identity case additionally requires
 create/read protocol; without that variable it is explicitly skipped.
 An additional isolated backend-created database
 exported all 97 tables and 26 synthetic rows with its source hash unchanged.
-These checks do not establish migration of original file bytes, local-root or
-external-file permissions, Git/watcher/AI ownership, or SQLite business behavior.
+The ACL fixture also exercises a real snapshot and clone with a selected read-only
+member and a global customer, checking allowed reads and denied writes through Swift.
+These are JDBC fixtures plus the actual importer/service, not a Java permission-service
+oracle. They do not establish local-root/external-file grants or Git/watcher/AI ownership.
 
 ## Isolated clone into the lightweight data service
 
@@ -89,9 +91,24 @@ Output, staging and the helper HOME must not intersect any explicitly mapped
 source tree in either ancestor direction. This is checked before creating helper
 paths, including existing symlink and case aliases. Every declared directory
 must exist, and every live file is copied and checked through the actual Swift protocol. All legacy rows and schema records are also
-archived for audit; archived ACL, Git, AI, watcher and project-specific fields are
-not implemented as active business behavior. This clone does not complete the
+archived for audit. Schema v3 additionally imports minimal `app_users`, `project_member`,
+project type/owner, file creator/visibility and the exact persisted local identity.
+The fixed subject's access rules are enforced by Swift; other account fields and Git,
+AI, watcher and project-specific fields remain archives. This clone does not complete the
 production migration and must not replace the original data authority.
+
+The snapshot must contain exactly one `system_setting.config_key` equal to
+`local.identity.selectedUserId`, with a valid pointer to an exported user. An absent
+or ambiguous selection fails without guessing the owner. Unknown roles, dangling
+owners/members, duplicate memberships and unrepresentable text/IDs are rejected.
+Only minimal identity columns become active; password and authentication secrets are
+not copied into active user tables. This does not add interactive identity selection
+or authentication to the sample.
+
+Verification checks all active SQLite rows and copied bytes offline, then calls the
+real Swift protocol as the fixed imported subject: visible projects, permitted file
+reads and denied private/cross-project/customer Explorer access. It never temporarily
+grants OWNER to validate hidden data. The original snapshot remains archived exactly.
 
 Fresh exports include `identityColumns` from H2's structured metadata. For the
 project and file tables the clone preserves the greater of the original next

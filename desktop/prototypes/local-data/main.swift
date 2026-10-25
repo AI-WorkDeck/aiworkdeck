@@ -6,7 +6,7 @@ import CryptoKit
 import SQLite3
 import Darwin
 
-// A deliberately isolated, single-owner prototype. Never opens or migrates H2.
+// A deliberately isolated, single-writer prototype. Never opens or migrates H2.
 struct Failure: Error {
     let code: String
     let message: String
@@ -66,34 +66,52 @@ final class Database {
         }
         sqlite3_busy_timeout(handle, 1000)
         let version = try query("PRAGMA user_version").first?["user_version"] as? Int64 ?? 0
-        try require(version <= 2, "UNSUPPORTED_SCHEMA", "Profile was created by a newer data service")
+        try require(version <= 3, "UNSUPPORTED_SCHEMA", "Profile was created by a newer data service")
+        if version < 3 {
+            try require(try query("SELECT name FROM sqlite_master WHERE name='migration_archive'").isEmpty,
+                        "NEEDS_REIMPORT", "Imported profiles must be reimported with their original identity and permissions")
+        }
         try execute("PRAGMA journal_mode=WAL")
         try execute("PRAGMA synchronous=FULL")
         try execute("PRAGMA foreign_keys=ON")
-        let fileColumns = try query("PRAGMA table_info(files)").compactMap { $0["name"] as? String }
-        if !fileColumns.isEmpty && !fileColumns.contains("parent_id") { try migrateFlatFiles() }
-        try execute("CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQUE, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
-        try execute("CREATE TABLE IF NOT EXISTS files(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQUE, project_id INTEGER NOT NULL REFERENCES projects(id), parent_id INTEGER NOT NULL DEFAULT 0, name TEXT NOT NULL, kind INTEGER NOT NULL DEFAULT 0, size INTEGER NOT NULL, generation TEXT NOT NULL, live INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, UNIQUE(project_id,parent_id,name))")
-        try execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
-        try execute("CREATE TABLE IF NOT EXISTS pending(file_id INTEGER PRIMARY KEY REFERENCES files(id), stage TEXT NOT NULL, expected TEXT, generation TEXT NOT NULL, size INTEGER NOT NULL, updated_at TEXT NOT NULL)")
-        try execute("PRAGMA user_version=2")
+        if version < 3 { try migrateSyntheticProfile() }
     }
-    // Upgrades the flat v1 files table (UNIQUE(project_id,name)) to the v2 tree table in one
-    // transaction. Old numeric IDs, UIDs and on-disk root bytes are carried over unchanged;
-    // a failed migration rolls back and leaves the v1 table intact.
-    func migrateFlatFiles() throws {
+    // Old standalone samples have one synthetic owner. Imported archives must never acquire
+    // that identity. Tree and ACL upgrades share one transaction, including FK validation.
+    func migrateSyntheticProfile() throws {
         try execute("PRAGMA foreign_keys=OFF")
         defer { try? execute("PRAGMA foreign_keys=ON") }
         try transaction {
-            try execute("CREATE TABLE files_tree(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQUE, project_id INTEGER NOT NULL REFERENCES projects(id), parent_id INTEGER NOT NULL DEFAULT 0, name TEXT NOT NULL, kind INTEGER NOT NULL DEFAULT 0, size INTEGER NOT NULL, generation TEXT NOT NULL, live INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, UNIQUE(project_id,parent_id,name))")
-            try execute("INSERT INTO files_tree(id,uid,project_id,parent_id,name,kind,size,generation,live,updated_at) SELECT id,uid,project_id,0,name,0,size,generation,live,updated_at FROM files")
-            let oldSequence = (try query("SELECT seq FROM sqlite_sequence WHERE name='files'").first?["seq"] as? Int64) ?? 0
-            try execute("DROP TABLE files")
-            try execute("ALTER TABLE files_tree RENAME TO files")
-            try execute("UPDATE sqlite_sequence SET seq=MAX(seq,?) WHERE name='files'", [oldSequence])
+            let fileColumns = try query("PRAGMA table_info(files)").compactMap { $0["name"] as? String }
+            if !fileColumns.isEmpty && !fileColumns.contains("parent_id") { try migrateFlatFiles() }
+            try execute("CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQUE, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
+            try execute("CREATE TABLE IF NOT EXISTS files(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQUE, project_id INTEGER NOT NULL REFERENCES projects(id), parent_id INTEGER NOT NULL DEFAULT 0, name TEXT NOT NULL, kind INTEGER NOT NULL DEFAULT 0, size INTEGER NOT NULL, generation TEXT NOT NULL, live INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, UNIQUE(project_id,parent_id,name))")
+            try execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            try execute("CREATE TABLE IF NOT EXISTS pending(file_id INTEGER PRIMARY KEY REFERENCES files(id), stage TEXT NOT NULL, expected TEXT, generation TEXT NOT NULL, size INTEGER NOT NULL, updated_at TEXT NOT NULL)")
+            try execute("CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT NOT NULL UNIQUE,display_name TEXT,role TEXT NOT NULL)")
+            try execute("CREATE TABLE profile_identity(id INTEGER PRIMARY KEY CHECK(id=1),selected_user_id INTEGER NOT NULL REFERENCES users(id))")
+            try execute("CREATE TABLE project_members(project_id INTEGER NOT NULL REFERENCES projects(id),user_id INTEGER NOT NULL REFERENCES users(id),role TEXT NOT NULL,PRIMARY KEY(project_id,user_id))")
+            try execute("INSERT INTO users VALUES(1,'local','本机用户','USER')")
+            try execute("INSERT INTO profile_identity VALUES(1,1)")
+            try execute("ALTER TABLE projects ADD COLUMN user_id INTEGER REFERENCES users(id)")
+            try execute("ALTER TABLE projects ADD COLUMN project_type TEXT NOT NULL DEFAULT 'BLANK'")
+            try execute("ALTER TABLE files ADD COLUMN user_id INTEGER REFERENCES users(id)")
+            try execute("ALTER TABLE files ADD COLUMN client_visible INTEGER NOT NULL DEFAULT 0 CHECK(client_visible IN (0,1))")
+            try execute("UPDATE projects SET user_id=1")
+            try execute("UPDATE files SET user_id=1")
             try require(try query("PRAGMA foreign_key_check").isEmpty, "MIGRATION_CONFLICT", "Existing profile references are inconsistent")
-            try execute("PRAGMA user_version=2")
+            try execute("PRAGMA user_version=3")
         }
+    }
+    // Called within the schema transaction with foreign keys temporarily disabled.
+    // Preserve the identity high-water mark even when the greatest file was deleted.
+    func migrateFlatFiles() throws {
+        try execute("CREATE TABLE files_tree(id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL UNIQUE, project_id INTEGER NOT NULL REFERENCES projects(id), parent_id INTEGER NOT NULL DEFAULT 0, name TEXT NOT NULL, kind INTEGER NOT NULL DEFAULT 0, size INTEGER NOT NULL, generation TEXT NOT NULL, live INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, UNIQUE(project_id,parent_id,name))")
+        try execute("INSERT INTO files_tree(id,uid,project_id,parent_id,name,kind,size,generation,live,updated_at) SELECT id,uid,project_id,0,name,0,size,generation,live,updated_at FROM files")
+        let oldSequence = (try query("SELECT seq FROM sqlite_sequence WHERE name='files'").first?["seq"] as? Int64) ?? 0
+        try execute("DROP TABLE files")
+        try execute("ALTER TABLE files_tree RENAME TO files")
+        try execute("UPDATE sqlite_sequence SET seq=MAX(seq,?) WHERE name='files'", [oldSequence])
     }
     deinit { sqlite3_close(handle) }
     func query(_ sql: String, _ values: [Any?] = []) throws -> [[String: Any]] {
@@ -181,6 +199,54 @@ final class Store {
         try recover()
     }
     deinit { flock(lockFD, LOCK_UN); close(lockFD) }
+    func selectedUser() throws -> [String: Any]? {
+        guard let user = try db.query("SELECT u.* FROM profile_identity i JOIN users u ON u.id=i.selected_user_id WHERE i.id=1").first,
+              let id = user["id"] as? Int64, id > 0, id <= 9_007_199_254_740_991,
+              let role = user["role"] as? String, ["USER", "ADMIN", "CLIENT"].contains(role.uppercased()) else { return nil }
+        return user
+    }
+    func identityStatus() throws -> [String: Any] {
+        let user = try selectedUser()
+        return ["localMode": true, "userId": user?["id"] ?? NSNull(), "needsSelection": user == nil]
+    }
+    struct ProjectAccess {
+        let userID: Int64
+        let role: String
+        let client: Bool
+        let canWrite: Bool
+    }
+    func isGlobalClient(_ user: [String: Any]) -> Bool {
+        (user["role"] as? String)?.uppercased() == "CLIENT"
+    }
+    // Match ProjectMemberService: owner wins over a member role, but a global CLIENT
+    // remains a client even when the project owner. Never cache ACLs across requests.
+    func projectAccess(_ row: [String: Any], _ user: [String: Any]) throws -> ProjectAccess {
+        guard let owner = row["user_id"] as? Int64,
+              try !db.query("SELECT id FROM users WHERE id=?", [owner]).isEmpty else {
+            throw Failure("ACCESS_DENIED", "Project is not accessible")
+        }
+        let userID = user["id"] as! Int64
+        let role: String
+        if owner == userID { role = "OWNER" }
+        else {
+            guard let member = try db.query("SELECT role FROM project_members WHERE project_id=? AND user_id=?", [row["id"], userID]).first,
+                  let memberRole = member["role"] as? String,
+                  ["ADMIN", "PARTICIPANT", "READ_ONLY", "CLIENT", "CLIENT_NAMED", "CLIENT_GENERIC"].contains(memberRole) else {
+                throw Failure("ACCESS_DENIED", "Project is not accessible")
+            }
+            role = memberRole
+        }
+        let client = isGlobalClient(user) || ["CLIENT", "CLIENT_NAMED", "CLIENT_GENERIC"].contains(role)
+        return ProjectAccess(userID: userID, role: role, client: client,
+                             canWrite: !client && ["OWNER", "ADMIN", "PARTICIPANT"].contains(role))
+    }
+    func requireWrite(_ access: ProjectAccess) throws {
+        try require(access.canWrite, "ACCESS_DENIED", "Project does not allow document changes")
+    }
+    func requireRead(_ row: [String: Any], _ access: ProjectAccess) throws {
+        try require(!access.client || row["user_id"] as? Int64 == access.userID || row["client_visible"] as? Int64 == 1,
+                    "NOT_FOUND", "File is not available")
+    }
     func project(_ id: Int64) throws -> [String: Any] {
         guard let row = try db.query("SELECT * FROM projects WHERE id=?", [id]).first else { throw Failure("NOT_FOUND", "Project does not exist") }
         return row
@@ -255,20 +321,25 @@ final class Store {
         try require(info.st_size <= 32 * 1024 * 1024, "UNSUPPORTED", "Prototype reads are limited to 32 MiB")
         return try handle.readToEnd() ?? Data()
     }
-    func fileDTO(_ row: [String: Any]) throws -> [String: Any] {
+    func fileDTO(_ row: [String: Any], _ access: ProjectAccess) throws -> [String: Any] {
         let projectID = row["project_id"] as! Int64
         let name = row["name"] as! String
         let parentID = row["parent_id"] as? Int64 ?? 0
         let folder = isDirectory(row)
-        let parent: Any = parentID == 0 ? NSNull() : parentID
-        let components = try chain(row) + [name]
-        return ["id": row["id"]!, "uid": row["uid"]!, "projectId": projectID, "parentId": parent, "name": name,
-                "filePath": "projects/\(projectID)/" + components.joined(separator: "/"),
+        var result: [String: Any] = ["id": row["id"]!, "uid": row["uid"]!, "projectId": projectID, "name": name,
                 "fileType": folder ? "" : (name as NSString).pathExtension,
-                "isFolder": folder, "fileSize": row["size"]!, "generation": row["generation"]!, "updatedAt": row["updated_at"]!, "tags": []]
+                "isFolder": folder, "fileSize": row["size"]!, "generation": row["generation"]!, "updatedAt": row["updated_at"]!, "tags": [],
+                "canWrite": access.canWrite]
+        // Direct customer reads can refer to a visible file below a hidden folder.
+        // Do not expose that folder's ID/name through a path or reconstruct an Explorer tree.
+        if !access.client {
+            result["parentId"] = parentID == 0 ? NSNull() : parentID
+            result["filePath"] = "projects/\(projectID)/" + (try chain(row) + [name]).joined(separator: "/")
+        }
+        return result
     }
-    func projectDTO(_ row: [String: Any]) -> [String: Any] {
-        ["id": row["id"]!, "uid": row["uid"]!, "name": row["name"]!, "projectType": "BLANK", "myRole": "OWNER",
+    func projectDTO(_ row: [String: Any], _ access: ProjectAccess) -> [String: Any] {
+        ["id": row["id"]!, "uid": row["uid"]!, "name": row["name"]!, "projectType": row["project_type"]!, "myRole": access.role, "canWrite": access.canWrite, "canBrowseFiles": !access.client,
          "createdAt": row["created_at"]!, "updatedAt": row["updated_at"]!, "lastActivityAt": row["updated_at"]!]
     }
     func decoded(_ p: [String: Any]) throws -> Data {
@@ -323,11 +394,11 @@ final class Store {
             try publish(row, pending)
         }
     }
-    func save(_ row: [String: Any], _ data: Data, expected: String?) throws -> [String: Any] {
+    func save(_ row: [String: Any], _ data: Data, expected: String?, access: ProjectAccess) throws -> [String: Any] {
         let target = try filePath(row)
         if let expected = expected {
             try require(digest(try readBytes(target)) == expected, "CONFLICT", "File changed since it was read")
-            try require(access(target, W_OK) == 0, "IO_ERROR", "File is not writable")
+            try require(Darwin.access(target, W_OK) == 0, "IO_ERROR", "File is not writable")
         } else { try require(!FileManager.default.fileExists(atPath: target), "CONFLICT", "File name already exists") }
         let stageName = ".native-" + UUID().uuidString + ".pending"
         let stage = (target as NSString).deletingLastPathComponent + "/" + stageName
@@ -356,20 +427,28 @@ final class Store {
             throw error
         }
         let result = try file(row["project_id"] as! Int64, row["id"] as! Int64)
-        return try fileDTO(result)
+        return try fileDTO(result, access)
     }
     func call(_ method: String, _ p: [String: Any]) throws -> Any {
         if method == "health" {
             return ["ready": !blocked, "protocolVersion": 1, "backend": "swift-sqlite-isolated-prototype", "profile": root,
-                    "capabilities": ["projects", "flat-files", "file-tree", "atomic-save", "ui-settings"],
+                    "capabilities": ["projects", "flat-files", "file-tree", "atomic-save", "ui-settings", "local-identity-acl"],
                     "unavailable": ["h2-migration", "ai", "git-versions", "cloud-acl", "watcher", "external-files"],
+                    "identityStatus": try identityStatus(),
                     "elapsedMs": Double(DispatchTime.now().uptimeNanoseconds - launchTime) / 1_000_000]
         }
+        if method == "identity.status" { return try identityStatus() }
         try require(!blocked, "RECOVERY_REQUIRED", "A previous save has an unresolved outcome; restart required")
+        guard let user = try selectedUser() else { throw Failure("IDENTITY_REQUIRED", "Select a valid identity in this profile before continuing") }
         switch method {
-        case "projects.list": return try db.query("SELECT * FROM projects ORDER BY id").map(projectDTO)
-        case "projects.get": return try projectDTO(project(integer(p, "projectId")))
+        case "projects.list":
+            return try db.query("SELECT p.* FROM projects p JOIN users u ON u.id=p.user_id WHERE p.project_type<>'LOOSE_FILES' AND (p.user_id=? OR EXISTS(SELECT 1 FROM project_members m WHERE m.project_id=p.id AND m.user_id=?)) ORDER BY p.id", [user["id"], user["id"]])
+                .map { row in projectDTO(row, try projectAccess(row, user)) }
+        case "projects.get":
+            let row = try project(integer(p, "projectId"))
+            return try projectDTO(row, projectAccess(row, user))
         case "projects.create":
+            try require(!isGlobalClient(user), "ACCESS_DENIED", "Customer accounts cannot create projects")
             try checkStorage()
             let name = try string(p, "name")
             try require(name.utf8.count <= 240, "INVALID_ARGUMENT", "Project name is too long")
@@ -379,7 +458,7 @@ final class Store {
             do {
                 try db.transaction {
                     let timestamp = now()
-                    try db.execute("INSERT INTO projects(uid,name,created_at,updated_at) VALUES(?,?,?,?)", [UUID().uuidString, name, timestamp, timestamp])
+                    try db.execute("INSERT INTO projects(uid,name,created_at,updated_at,user_id) VALUES(?,?,?,?,?)", [UUID().uuidString, name, timestamp, timestamp, user["id"]])
                     id = try db.generatedID()
                     path = storage + "/\(id)"
                     try require(!FileManager.default.fileExists(atPath: path!), "CONFLICT", "Project storage already exists")
@@ -388,24 +467,32 @@ final class Store {
                     try syncDirectory(storage)
                 }
             } catch { if createdDirectory, let path = path { try? FileManager.default.removeItem(atPath: path) }; throw error }
-            return try projectDTO(project(id))
+            let row = try project(id)
+            return try projectDTO(row, projectAccess(row, user))
         case "files.list":
             let id = try integer(p, "projectId")
+            let access = try projectAccess(project(id), user)
+            try require(!access.client, "ACCESS_DENIED", "Customer accounts cannot browse the project file tree")
             _ = try projectPath(id)
-            return try db.query("SELECT * FROM files WHERE project_id=? AND live=1 ORDER BY id", [id]).map(fileDTO)
+            return try db.query("SELECT * FROM files WHERE project_id=? AND live=1 ORDER BY id", [id]).map { try fileDTO($0, access) }
         case "files.read":
-            let row = try file(integer(p, "projectId"), integer(p, "fileId"))
+            let projectID = try integer(p, "projectId")
+            let access = try projectAccess(project(projectID), user)
+            let row = try file(projectID, integer(p, "fileId"))
+            try requireRead(row, access)
             try require(!isDirectory(row), "IS_DIRECTORY", "Directories cannot be read as files")
             let path = try filePath(row)
             let bytes = try readBytes(path)
-            var result = try fileDTO(row)
+            var result = try fileDTO(row, access)
             result["generation"] = digest(bytes)
             result["fileSize"] = bytes.count
             result["contentBase64"] = bytes.base64EncodedString()
-            result["physicalPath"] = path
+            if !access.client { result["physicalPath"] = path }
             return result
         case "files.mkdir":
             let projectID = try integer(p, "projectId")
+            let access = try projectAccess(project(projectID), user)
+            try requireWrite(access)
             let parentID = try optionalInteger(p, "parentId")
             let parentPath = try directoryPath(projectID, parentID)
             let name = try string(p, "name")
@@ -417,7 +504,7 @@ final class Store {
             var id: Int64 = 0
             do {
                 try db.transaction {
-                    try db.execute("INSERT INTO files(uid,project_id,parent_id,name,kind,size,generation,live,updated_at) VALUES(?,?,?,?,1,0,'',1,?)", [UUID().uuidString, projectID, parentID, name, now()])
+                    try db.execute("INSERT INTO files(uid,project_id,parent_id,name,kind,size,generation,live,updated_at,user_id) VALUES(?,?,?,?,1,0,'',1,?,?)", [UUID().uuidString, projectID, parentID, name, now(), access.userID])
                     id = try db.generatedID()
                     try checkedPOSIX(mkdir(target, 0o700), "Create directory")
                     createdDirectory = true
@@ -427,9 +514,11 @@ final class Store {
                 if createdDirectory { _ = rmdir(target) } // Preserve any uncoordinated external additions.
                 throw error
             }
-            return try fileDTO(file(projectID, id))
+            return try fileDTO(file(projectID, id), access)
         case "files.create":
             let projectID = try integer(p, "projectId")
+            let access = try projectAccess(project(projectID), user)
+            try requireWrite(access)
             _ = try projectPath(projectID)
             let parentID = try optionalInteger(p, "parentId")
             if parentID != 0 { _ = try directory(projectID, parentID) }
@@ -439,15 +528,18 @@ final class Store {
             try require(try db.query("SELECT id FROM files WHERE project_id=? AND parent_id=? AND name=?", [projectID, parentID, name]).isEmpty, "CONFLICT", "File name already exists in this directory")
             var id: Int64 = 0
             try db.transaction {
-                try db.execute("INSERT INTO files(uid,project_id,parent_id,name,kind,size,generation,updated_at) VALUES(?,?,?,?,0,0,?,?)", [UUID().uuidString, projectID, parentID, name, "", now()])
+                try db.execute("INSERT INTO files(uid,project_id,parent_id,name,kind,size,generation,updated_at,user_id) VALUES(?,?,?,?,0,0,?,?,?)", [UUID().uuidString, projectID, parentID, name, "", now(), access.userID])
                 id = try db.generatedID()
             }
-            do { return try save(file(projectID, id, includePending: true), data, expected: nil) }
+            do { return try save(file(projectID, id, includePending: true), data, expected: nil, access: access) }
             catch { if !blocked { try? db.execute("DELETE FROM files WHERE id=? AND live=0", [id]) }; throw error }
         case "files.save":
-            let row = try file(integer(p, "projectId"), integer(p, "fileId"))
+            let projectID = try integer(p, "projectId")
+            let access = try projectAccess(project(projectID), user)
+            try requireWrite(access)
+            let row = try file(projectID, integer(p, "fileId"))
             try require(!isDirectory(row), "IS_DIRECTORY", "Directories cannot be saved as files")
-            return try save(row, decoded(p), expected: string(p, "expectedGeneration"))
+            return try save(row, decoded(p), expected: string(p, "expectedGeneration"), access: access)
         case "settings.get", "settings.set":
             let key = try string(p, "key")
             try require(key.hasPrefix("local.ui.") && key.utf8.count <= 128, "UNSUPPORTED", "Only local.ui.* settings are owned by this prototype")

@@ -17,7 +17,7 @@ function harness(request, options={}) {
       if (request) return request(action, params);
       return { applied: true, lastInputSeq: params.inputSeq, documentEpoch: params.documentEpoch, viewId: 2 };
     } });
-  component.setDocument({ documentEpoch: 1, viewId: 2 });
+  component.setDocument({ documentEpoch: 1, viewId: 2, readOnly: options.readOnly===true });
   const callback = (callbackType, payload, extra = {}) => component.handleCallback({ type: 'callback', callbackType, payload, documentEpoch: 1, viewId: 2, ...extra });
   callback(1, '120, 240, 0, 40'); component.focus();
   const input = canvas.parentElement.querySelector('input');
@@ -35,6 +35,26 @@ function harness(request, options={}) {
 }
 const texts = h => h.calls.filter(c => c.action === 'input_text').map(c => c.text);
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+test('read-only input keeps selection and copy but never submits edits, shortcuts or composition',async()=>{
+ let saved=0,copied='',changed=0;
+ const h=harness(async(action,p)=>action==='selection_text'?{text:'可复制选区'}:{applied:true,lastInputSeq:p.inputSeq,documentEpoch:p.documentEpoch,viewId:2},
+  {readOnly:true,onSave:()=>saved++,onChanged:()=>changed++,writeClipboard:async text=>{copied=text}});
+ try{
+  assert.equal(h.input.readOnly,true);
+  h.text('不可写');h.composition('compositionstart');h.composition('compositionend','不可写中文');
+  for(const key of ['x','v','z','y','b','s'])h.key(key,{metaKey:true});
+  h.key('Backspace');h.key('Delete');h.key('Enter');
+  h.key('ArrowRight',{shiftKey:true});h.key('a',{metaKey:true});
+  h.mouse(h.canvas,'mousedown');h.mouse(h.window,'mouseup');
+  h.key('c',{metaKey:true});await tick();await tick();await h.component.flush();
+  assert.equal(h.component.getState().composing,false);assert.deepEqual(texts(h),[]);
+  assert.equal(saved,0);assert.equal(changed,0);assert.equal(copied,'可复制选区');
+  assert.equal(h.calls.filter(c=>c.action==='command').length,0);
+  assert.deepEqual(h.calls.filter(c=>c.action==='input_key').map(c=>c.keyCode),[1027|0x1000,512|0x2000]);
+  assert.equal(h.errors.length,0);
+ }finally{h.close()}
+});
 
 test('preedit updates do not change model; confirmation + echoed input is exactly once', async () => {
   const h = harness();

@@ -8,7 +8,7 @@ const {EventEmitter}=require('node:events');
 const {createRequire}=require('node:module');
 const turn=()=>new Promise(resolve=>setImmediate(resolve));
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}}
-async function harness(){
+async function harness(options={}){
  const main=path.join(__dirname,'../main.cjs'),localRequire=createRequire(main),handlers=new Map(),calls=[],events=[];
  const config={run:'/isolated/run',profile:'/isolated/data',worker:'worker',dataBinary:'data',runtime:'/candidate/Frameworks',unoHost:'uno',unoRuntime:'/uno-runtime'};
  let epoch=0,tracking=true,view,trackingHandler;
@@ -27,13 +27,14 @@ async function harness(){
    const method=q.action||q.method,params=command==='worker'?q:q.params;calls.push({command,method,params});
    Promise.resolve().then(async()=>{
     let result={};
-    if(command==='data'&&method==='files.read')result={physicalPath:'/isolated/run/document-'+params.fileId+'.docx',generation:1};
-    if(command==='worker'&&method==='open')result={documentEpoch:++epoch,viewId:0,widthTwips:12000,heightTwips:15000};
+    if(command==='data'&&method==='files.read')result={physicalPath:'/isolated/run/document-'+params.fileId+'.docx',generation:1,contentBase64:Buffer.from('readonly-docx').toString('base64'),canWrite:true,...options.file};
+    if(command==='worker'&&method==='open')result={documentEpoch:++epoch,viewId:0,widthTwips:12000,heightTwips:15000,readOnly:params.readOnly===true,...options.model};
     if(method==='start_urp')result={port:12345};
     if(method==='tracking'){
      if(trackingHandler)result=await trackingHandler(params);
      else{const changed=tracking!==params.enabled;tracking=params.enabled;result={enabled:tracking,changed,modified:!params.initialize&&changed}}
     }
+    if(method==='tracking_state')result={enabled:tracking,modified:false};
     if(method==='view')result={mode:params.mode||'all'};
     if(method==='review_snapshot')result={documentEpoch:epoch,refreshEpoch:1,widthTwips:12000,heightTwips:15000,items:[]};
     if(method==='files.save')result={generation:2};
@@ -65,6 +66,37 @@ test('open waits for verified default tracking before queued input can run',asyn
  const model=await opened;await input;
  assert.equal(model.trackingReady,true);assert.equal(model.recordChanges,true);
  assert.deepEqual(h.calls.find(c=>c.method==='tracking').params,{documentUrl:'file:///isolated/run/document-1.docx',enabled:true,initialize:true});
+});
+
+test('read-only files open a temporary model, permit reading and never enter a write path',async()=>{
+ const h=await harness({file:{canWrite:false}}),model=await h.open();
+ assert.equal(model.readOnly,true);
+ assert.equal(h.calls.find(c=>c.method==='open').params.readOnly,true);
+ assert.equal(h.calls.some(c=>c.method==='tracking'),false);
+ assert.equal(h.calls.filter(c=>c.method==='tracking_state').length,1);
+ for(const [action,params] of [['input_text',{text:'blocked'}],['input_key',{eventType:0,keyCode:1286}],['input_key',{eventType:0,keyCode:513|0x2000}],['command',{command:'.uno:Undo'}],['review_resolve',{decision:'accept'}],['review_tracking',{enabled:false}]]){
+  await assert.rejects(h.action(action,params),/只读/);
+ }
+ await assert.rejects(h.invoke('save'),/只读/);
+ await h.action('review_snapshot');
+ await h.action('input_key',{eventType:0,keyCode:1027,charCode:0,inputSeq:1});
+ await h.action('review_view',{mode:'final'});
+ await h.invoke('close');
+ assert.equal(h.calls.some(c=>c.method==='files.save'||c.method==='save'||c.method==='input_text'||c.method==='command'),false);
+});
+
+test('missing data permission and an unconfirmed native read-only model fail before editable publication',async()=>{
+ const missing=await harness({file:{canWrite:undefined}});
+ await assert.rejects(missing.open(),/权限/);
+ assert.equal(missing.calls.some(c=>c.method==='open'),false);
+ const wrong=await harness({file:{canWrite:false},model:{readOnly:false}});
+ await assert.rejects(wrong.open(),/只读/);
+ assert.equal(wrong.calls.filter(c=>c.method==='close').length,1);
+ assert.equal(wrong.calls.some(c=>c.method==='tracking'),false);
+ const hiddenPath=await harness({file:{canWrite:false,physicalPath:undefined}});
+ await hiddenPath.open();
+ assert.equal(hiddenPath.calls.find(c=>c.method==='open').params.path,'/isolated/run/readonly-document.docx');
+ await hiddenPath.invoke('close');
 });
 
 test('failed or mismatched initialization closes the undisclosed model and blocks input/save',async()=>{

@@ -604,6 +604,19 @@ class TrackingTests(unittest.TestCase):
     def tracking(self, model, **params):
         return review_uno.dispatch('tracking', params, model, FakeUno)
 
+    def test_read_only_tracking_state_does_not_change_recording_dirty_or_undo(self):
+        for enabled in (False, True):
+            model = TrackingModel(enabled)
+            model.modified = True
+            before = review_uno.undo_state(model)
+            self.assertEqual(review_uno.dispatch('tracking_state', {}, model, FakeUno),
+                             {'enabled': enabled, 'modified': True})
+            self.assertEqual(all_write_names(model), [])
+            self.assertEqual(model.modified_calls, [])
+            self.assertEqual(review_uno.undo_state(model), before)
+        with self.assertRaises(RuntimeError):
+            review_uno.dispatch('tracking_state', {}, TrackingModel('false'), FakeUno)
+
     def test_new_model_enables_tracking_and_clears_only_initial_dirty(self):
         model = TrackingModel()
         before_undo = review_uno.undo_state(model)
