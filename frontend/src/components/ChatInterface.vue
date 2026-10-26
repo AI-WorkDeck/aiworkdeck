@@ -963,172 +963,6 @@
        </template>
     </view>
 
-    <!-- 常驻工作流右键菜单（切换版本 / 编辑提示词 / 新建版本） -->
-    <view v-if="bwContextMenu.visible && bwContextTarget" class="bw-context-mask" @tap="closeBuiltinWorkflowContextMenu" @contextmenu.prevent="closeBuiltinWorkflowContextMenu">
-       <view class="bw-context-menu" :style="{ left: bwContextMenu.x + 'px', top: bwContextMenu.y + 'px' }" @tap.stop>
-          <view class="bw-context-header">
-             <text class="bw-context-title">{{ bwContextTarget.title }}</text>
-             <text class="bw-context-sub">{{ $t('chat.bwMenuTitle') }}</text>
-          </view>
-          <view class="bw-context-item" @tap="applyBuiltinWorkflow(bwContextTarget); closeBuiltinWorkflowContextMenu()">
-             <text class="bw-context-item-label">{{ $t('chat.bwMenuApplyNow') }}</text>
-          </view>
-          <view class="bw-context-divider"></view>
-          <view class="bw-context-sec-label">{{ projectId ? $t('chat.bwScopeProject') : $t('chat.bwScopeGlobal') }}</view>
-          <view v-for="ver in bwContextTarget.versions" :key="ver.versionId"
-                class="bw-context-item bw-context-ver"
-                :class="{ active: ver.versionId === bwContextTarget.activeVersionId }"
-                @tap="selectBuiltinWorkflowVersionQuick(bwContextTarget, ver.versionId)">
-             <view class="bw-context-ver-left">
-                <text class="bw-context-check">{{ ver.versionId === bwContextTarget.activeVersionId ? '✓' : '' }}</text>
-                <text class="bw-context-item-label">{{ ver.versionName }}</text>
-                <text class="bw-context-badge" :class="{ custom: !ver.systemDefault }">
-                   {{ ver.systemDefault ? $t('chat.bwSystemDefaultBadge') : $t('chat.bwCustomVersionBadge') }}
-                </text>
-             </view>
-             <text class="bw-context-edit-link" @tap.stop="openBuiltinWorkflowEditor(bwContextTarget, ver.versionId)">
-                {{ ver.systemDefault ? '查看/派生' : '编辑' }}
-             </text>
-          </view>
-          <view class="bw-context-divider"></view>
-          <view class="bw-context-item" @tap="openBuiltinWorkflowEditor(bwContextTarget, bwContextTarget.activeVersionId)">
-             <text class="bw-context-item-label">{{ $t('chat.bwMenuEditVersions') }}</text>
-          </view>
-          <view class="bw-context-item primary" @tap="openBuiltinWorkflowEditor(bwContextTarget, '__new__')">
-             <text class="bw-context-item-label">{{ $t('chat.bwMenuCreateVersion') }}</text>
-          </view>
-       </view>
-    </view>
-
-    <!-- 常驻工作流版本管理与编辑弹窗（支持四大工作流顶栏快速切换） -->
-    <view v-if="bwEditorModal.visible && bwEditorTarget" class="bw-modal-mask" @tap="closeBuiltinWorkflowEditor">
-       <view class="bw-modal-card" @tap.stop>
-          <view class="bw-modal-header">
-             <view class="bw-modal-header-text">
-                <text class="bw-modal-title">{{ $t('chat.bwEditorTitle', { name: bwEditorTarget.title }) }}</text>
-                <text class="bw-modal-subtitle">{{ $t('chat.bwEditorSubtitle') }}</text>
-             </view>
-             <text class="bw-modal-close" @tap="closeBuiltinWorkflowEditor">×</text>
-          </view>
-          <!-- 四大常驻工作流切换 Tab -->
-          <view class="bw-workflow-tabs">
-             <view v-for="wf in builtinQuickWorkflows" :key="wf.id"
-                   class="bw-workflow-tab"
-                   :class="{ active: wf.id === bwEditorModal.skillId }"
-                   @tap="switchBuiltinWorkflowInEditor(wf)">
-                <text class="bw-workflow-tab-name">{{ wf.title }}</text>
-                <text class="bw-workflow-tab-ver" :class="{ custom: !wf.activeIsSystemDefault }">{{ wf.activeVersionName }}</text>
-             </view>
-          </view>
-          <view class="bw-modal-body">
-             <!-- 左侧版本列表 -->
-             <view class="bw-modal-sidebar">
-                <view class="bw-sidebar-head">
-                   <text class="bw-sidebar-title">{{ $t('chat.bwVersionListTitle') }}</text>
-                   <text class="bw-new-ver-btn" @tap="startNewBwVersion">{{ $t('chat.bwNewVersionBtn') }}</text>
-                </view>
-                <view class="bw-version-list">
-                   <view v-for="ver in bwEditorTarget.versions" :key="ver.versionId"
-                         class="bw-version-row"
-                         :class="{ selected: !bwEditorModal.isCreatingNew && bwEditorModal.selectedVersionId === ver.versionId, active: ver.versionId === bwEditorTarget.activeVersionId }"
-                         @tap="selectBwEditorVersion(ver)">
-                      <view class="bw-version-row-top">
-                         <text class="bw-version-row-name">{{ ver.versionName }}</text>
-                         <text v-if="ver.versionId === bwEditorTarget.activeVersionId" class="bw-version-active-pill">{{ $t('chat.bwActiveNowBadge') }}</text>
-                      </view>
-                      <view class="bw-version-row-meta">
-                         <text class="bw-version-type-tag" :class="{ custom: !ver.systemDefault }">
-                            {{ ver.systemDefault ? $t('chat.bwSystemDefaultBadge') : $t('chat.bwCustomVersionBadge') }}
-                         </text>
-                      </view>
-                   </view>
-                   <view v-if="bwEditorModal.isCreatingNew" class="bw-version-row selected creating">
-                      <view class="bw-version-row-top">
-                         <text class="bw-version-row-name">{{ bwEditorModal.formName || $t('chat.bwNewVersionDefaultName') }}</text>
-                         <text class="bw-version-type-tag custom">未保存</text>
-                      </view>
-                   </view>
-                </view>
-             </view>
-             <!-- 右侧版本详情与编辑器 -->
-             <view class="bw-modal-editor">
-                <view v-if="bwEditorIsSystemDefault" class="bw-readonly-banner">
-                   <text class="bw-readonly-text">{{ $t('chat.bwReadonlySystemNotice') }}</text>
-                   <text class="bw-fork-btn" @tap="forkSystemDefaultToCustom">{{ $t('chat.bwForkFromDefaultBtn') }}</text>
-                </view>
-                <view class="bw-form-group">
-                   <text class="bw-form-label">{{ $t('chat.bwFieldVersionName') }}</text>
-                   <input class="bw-form-input"
-                          v-model="bwEditorModal.formName"
-                          :disabled="bwEditorIsSystemDefault"
-                          :placeholder="$t('chat.bwFieldVersionNamePlaceholder')" />
-                </view>
-                <view class="bw-form-group">
-                   <text class="bw-form-label">{{ $t('chat.bwFieldQuickPrompt') }}</text>
-                   <text class="bw-form-help">{{ $t('chat.bwFieldQuickPromptHint') }}</text>
-                   <textarea class="bw-form-textarea short"
-                             v-model="bwEditorModal.formQuickPrompt"
-                             :disabled="bwEditorIsSystemDefault"
-                             :placeholder="$t('chat.bwFieldQuickPromptPlaceholder')"></textarea>
-                </view>
-                <view class="bw-form-group">
-                   <text class="bw-form-label">{{ $t('chat.bwFieldOutputSpec') }}</text>
-                   <textarea class="bw-form-textarea short"
-                             v-model="bwEditorModal.formOutput"
-                             :disabled="bwEditorIsSystemDefault"
-                             :placeholder="$t('chat.bwFieldOutputSpecPlaceholder')"></textarea>
-                </view>
-                <view class="bw-form-group grow">
-                   <text class="bw-form-label">{{ $t('chat.bwFieldInstructions') }}</text>
-                   <text class="bw-form-help">{{ $t('chat.bwFieldInstructionsHint') }}</text>
-                   <textarea class="bw-form-textarea tall"
-                             v-model="bwEditorModal.formInstructions"
-                             :disabled="bwEditorIsSystemDefault"></textarea>
-                </view>
-                <!-- 切换范围 -->
-                <view class="bw-scope-bar">
-                   <text class="bw-scope-label">{{ $t('chat.bwScopeLabel') }}：</text>
-                   <view v-if="projectId"
-                         class="bw-scope-option"
-                         :class="{ active: bwEditorModal.scope === 'project' }"
-                         @tap="bwEditorModal.scope = 'project'">
-                      <text>{{ $t('chat.bwScopeProject') }}</text>
-                   </view>
-                   <view class="bw-scope-option"
-                         :class="{ active: bwEditorModal.scope === 'global' || !projectId }"
-                         @tap="bwEditorModal.scope = 'global'">
-                      <text>{{ $t('chat.bwScopeGlobal') }}</text>
-                   </view>
-                </view>
-                <view class="bw-modal-footer">
-                   <view class="bw-footer-left">
-                      <text v-if="!bwEditorIsSystemDefault && !bwEditorModal.isCreatingNew"
-                            class="bw-btn danger"
-                            @tap="deleteCurrentBwVersion">{{ $t('chat.bwDeleteVersionBtn') }}</text>
-                   </view>
-                   <view class="bw-footer-right">
-                      <text class="bw-btn ghost" @tap="closeBuiltinWorkflowEditor">{{ $t('chat.bwCloseBtn') }}</text>
-                      <text v-if="bwEditorIsSystemDefault"
-                            class="bw-btn secondary"
-                            @tap="forkSystemDefaultToCustom">{{ $t('chat.bwForkFromDefaultBtn') }}</text>
-                      <text v-if="bwEditorIsSystemDefault"
-                            class="bw-btn primary"
-                            @tap="activateSelectedBwVersionOnly">{{ $t('chat.bwActivateOnlyBtn') }}</text>
-                      <text v-if="!bwEditorIsSystemDefault && !bwEditorModal.isCreatingNew"
-                            class="bw-btn secondary"
-                            :class="{ disabled: bwEditorModal.saving }"
-                            @tap="saveCurrentBwVersion(false)">{{ $t('chat.bwSaveVersionBtn') }}</text>
-                      <text v-if="!bwEditorIsSystemDefault"
-                            class="bw-btn primary"
-                            :class="{ disabled: bwEditorModal.saving }"
-                            @tap="saveCurrentBwVersion(true)">{{ $t('chat.bwSaveAndActivateBtn') }}</text>
-                   </view>
-                </view>
-             </view>
-          </view>
-       </view>
-    </view>
-
     <!-- Background Task Progress Indicator -->
     <BackgroundTaskIndicator
       :backgroundTasks="backgroundTasks"
@@ -6827,7 +6661,7 @@ export default {
   font-weight: 600;
 }
 .skill-builtin-pill-more {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   padding: 0 2px;
 }
@@ -6963,7 +6797,7 @@ export default {
   flex-shrink: 0;
 }
 .builtin-workflow-ver-tag {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   line-height: 1.3;
   padding: 1px 6px;
   border-radius: var(--awd-radius-sm);
@@ -6982,7 +6816,7 @@ export default {
   font-weight: 500;
 }
 .builtin-workflow-more-btn {
-  font-size: 13px;
+  font-size: var(--awd-panel-fs);
   line-height: 1;
   color: var(--awd-text-2);
   padding: 1px 4px;
@@ -7008,7 +6842,7 @@ export default {
   padding: 0 2px;
 }
 .builtin-workflows-foot-hint {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 
@@ -7028,7 +6862,7 @@ export default {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--awd-shadow-lg);
   padding: 6px;
   z-index: 2401;
   display: flex;
@@ -7049,7 +6883,7 @@ export default {
   color: var(--awd-text);
 }
 .bw-menu-sub {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
 }
 .bw-menu-versions {
@@ -7075,7 +6909,7 @@ export default {
 }
 .bw-menu-check {
   width: 14px;
-  font-size: 12px;
+  font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-accent-text);
   flex-shrink: 0;
@@ -7096,7 +6930,7 @@ export default {
   text-overflow: ellipsis;
 }
 .bw-menu-version-tag {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   background: var(--awd-bg);
   border: 1px solid var(--awd-border-subtle);
@@ -7105,7 +6939,7 @@ export default {
   flex-shrink: 0;
 }
 .bw-menu-version-edit {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   padding: 2px 6px;
   border-radius: var(--awd-radius-sm);
@@ -7194,7 +7028,7 @@ export default {
   text-overflow: ellipsis;
 }
 .bw-workflow-tab-ver {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);
   background: var(--awd-bg);
   padding: 1px 5px;
@@ -7229,7 +7063,7 @@ export default {
   padding: 2px 4px;
 }
 .bw-sidebar-title {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   font-weight: 600;
   color: var(--awd-text-3);
   text-transform: uppercase;
@@ -7272,7 +7106,7 @@ export default {
   text-overflow: ellipsis;
 }
 .bw-sidebar-active-dot {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
 }
 .bw-sidebar-item-meta {
@@ -7281,7 +7115,7 @@ export default {
   gap: 4px;
 }
 .bw-meta-pill {
-  font-size: 10px;
+  font-size: var(--awd-panel-fs-meta);
   padding: 1px 5px;
   border-radius: var(--awd-radius-sm);
   color: var(--awd-text-3);
@@ -7357,7 +7191,7 @@ export default {
   color: var(--awd-text-2);
 }
 .bw-reset-link {
-  font-size: 11px;
+  font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   cursor: pointer;
 }
@@ -7407,14 +7241,14 @@ export default {
 .bw-checkbox {
   width: 15px;
   height: 15px;
-  border-radius: 3px;
+  border-radius: var(--awd-radius-sm);
   border: 1px solid var(--awd-border);
   background: var(--awd-bg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  color: #fff;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-on-accent);
 }
 .bw-checkbox.checked {
   background: var(--awd-accent);
@@ -7438,9 +7272,9 @@ export default {
   column-gap: 8px;
 }
 .bw-btn-danger {
-  color: var(--awd-danger, #dc2626);
+  color: var(--awd-danger);
   background: transparent;
-  border: 1px solid var(--awd-danger, #dc2626);
+  border: 1px solid var(--awd-danger);
 }
 
 /* Model dropdown mask overlay */
