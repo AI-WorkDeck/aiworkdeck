@@ -59,7 +59,7 @@ Packaging: `desktop/scripts/prepare-python-service.js` installs each service's `
 | License | MPL-2.0 |
 | Where | Shipped as compiled artifacts (`soffice.js`, `soffice.wasm`, `soffice.data`). Build recipe and our patches are in `desktop/lowa-build/` (`RECIPE.md`, `patches/`). |
 | Source availability | The corresponding source is the upstream branch above plus the patches in `desktop/lowa-build/`. Together they reproduce the shipped artifacts. |
-| Related | zeta.js marshalling layer by [allotropia](https://github.com/allotropia/zetajs), MIT, vendored under `frontend/src/zetaoffice/public/` (see `UPSTREAM.md` there). CJK fonts under the SIL Open Font License 1.1, downloaded at build time. |
+| Related | zeta.js marshalling layer by [allotropia](https://github.com/allotropia/zetajs), MIT, vendored under `frontend/src/zetaoffice/public/` (see `UPSTREAM.md` there). CJK and multilingual fonts (Noto Sans/Serif SC, Noto Sans/Serif KR, LXGW WenKai, Zhuque Fangsong, Noto Sans/Serif Thai, Noto Sans Khmer/Lao/Myanmar/Arabic/Devanagari) under the SIL Open Font License 1.1, downloaded at build time by `desktop/scripts/fetch-lowa-assets.js`. |
 
 ## Diagram layout (native pack, downloaded on first use)
 
