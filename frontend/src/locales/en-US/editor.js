@@ -3,6 +3,15 @@
 // Document editor domain: user-visible copy for LibreOfficeEditor / ReviewPanel /
 // DocDiffViewer / CompareDocDialog / VariablePanel / DrawioEditor.
 export default {
+  navigation: {
+    "slides": "Slides",
+    "sheets": "Sheets",
+    "slideLabel": "Slide {n}, {name}",
+    "loading": "Loading…",
+    "loadFailed": "Could not load navigation",
+    "switchFailed": "Could not switch. Please retry.",
+    "previewFailed": "Preview unavailable"
+},
   visualReview: {
     "title": "Layout check",
     "pagesTitle": "Layout check: choose pages",

@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
 const body = source.match(/<script>([\s\S]*?)<\/script>/)[1]
+  .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
   .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
 function makeVm(extra = {}, events = []) {
   // stampApplication / documentStampApplication 是 B4 的打标链路，这里喂成「开关关着」，
