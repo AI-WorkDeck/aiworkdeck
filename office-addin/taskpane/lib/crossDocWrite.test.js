@@ -31,7 +31,7 @@ test('word refuses without tracking support', async () => {
     exec: async () => { ran = true; return { ok: true } }, capture: async () => null, trackingOk: () => false
   })
   assert.equal(result.ok, false)
-  assert.match(result.error, /无法标记修订/)
+  assert.match(result.error, /无法标记修订|cannot track changes/i)
   assert.equal(ran, false)
   assert.equal(entry, null)
 })
@@ -75,7 +75,7 @@ test('Word 里标不出修订的命令（删表格行列、接受/拒绝修订�
       capture: async () => null, trackingOk: () => true
     })
     assert.equal(result.ok, false, command)
-    assert.match(result.error, /修订/)
+    assert.match(result.error, /修订|tracked change/i)
     assert.equal(ran, false, command)
     assert.equal(entry, null)
   }
@@ -98,7 +98,7 @@ test('批注类命令（新增/回复/标记已处理）跨文档一律拒绝，
         capture: async () => null, trackingOk: () => true
       })
       assert.equal(result.ok, false, `${command}/${family}`)
-      assert.match(result.error, /修订/)
+      assert.match(result.error, /修订|tracked change/i)
       assert.equal(ran, false, `${command}/${family} 不许执行`)
       assert.equal(entry, null, `${command}/${family} 不许留条目`)
     }

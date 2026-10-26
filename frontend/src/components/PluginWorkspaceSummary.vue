@@ -12,24 +12,24 @@
           <input
             v-model="searchKeyword"
             class="pws-search-input"
-            placeholder="搜索会话或联系人…"
+            :placeholder="tr('panels.pwsSearchPlaceholder', '搜索会话或联系人…')"
           />
           <text v-if="searchKeyword" class="pws-search-clear" @tap="searchKeyword = ''">×</text>
         </view>
         <view class="pws-im-quick-row">
           <view class="pws-quick-btn primary" @tap="emitCommand('open-new-chat')">
-            <text>+ 新建会话</text>
+            <text>{{ tr('panels.pwsNewChat', '+ 新建会话') }}</text>
           </view>
           <view class="pws-quick-btn" @tap="emitCommand('open-join-chat')">
-            <text>邀请码加入</text>
+            <text>{{ tr('panels.pwsJoinChat', '邀请码加入') }}</text>
           </view>
         </view>
 
         <!-- 内联添加朋友表单 -->
         <view v-if="showAddFriend" class="pws-friend-form">
-          <text class="pws-form-title">添加外部联系人</text>
-          <input v-model="friendDraft.name" class="pws-form-input" placeholder="姓名（如：王律师 / 李法务）" maxlength="40" />
-          <input v-model="friendDraft.org" class="pws-form-input" placeholder="所属律所或单位（选填）" maxlength="60" />
+          <text class="pws-form-title">{{ tr('panels.pwsAddExternalContact', '添加外部联系人') }}</text>
+          <input v-model="friendDraft.name" class="pws-form-input" :placeholder="tr('panels.pwsContactNamePlaceholder', '姓名（如：王律师 / 李法务）')" maxlength="40" />
+          <input v-model="friendDraft.org" class="pws-form-input" :placeholder="tr('panels.pwsContactOrgPlaceholder', '所属律所或单位（选填）')" maxlength="60" />
           <view class="pws-form-tags">
             <view
               v-for="tag in FRIEND_ROLE_TAGS"
@@ -42,8 +42,8 @@
             </view>
           </view>
           <view class="pws-form-actions">
-            <view class="pws-quick-btn" @tap="showAddFriend = false"><text>取消</text></view>
-            <view class="pws-quick-btn primary" @tap="submitAddFriend"><text>保存到通讯录</text></view>
+            <view class="pws-quick-btn" @tap="showAddFriend = false"><text>{{ tr('panels.pwsCancel', '取消') }}</text></view>
+            <view class="pws-quick-btn primary" @tap="submitAddFriend"><text>{{ tr('panels.pwsSaveToDirectory', '保存到通讯录') }}</text></view>
           </view>
         </view>
       </view>
@@ -52,7 +52,7 @@
         <view v-if="filteredAgents.length || projectAgentReason" class="pws-section pws-agent-section">
           <button v-for="agent in filteredAgents" :key="agent.scope + ':' + agent.scopeKey" class="pws-agent-entry" @tap="openAgent(agent)">
             <text class="pws-agent-badge">AI</text>
-            <text class="pws-agent-name">{{ agent.name || (agentScopeLabel(agent.scope) + '助手') }}</text>
+            <text class="pws-agent-name">{{ agent.name || (agentScopeLabel(agent.scope) + tr('panels.pwsAgentDefaultSuffix', '助手')) }}</text>
             <text class="pws-contact-badge">{{ agentScopeLabel(agent.scope) }}</text>
           </button>
           <text v-if="projectAgentReason" class="pws-dir-empty-text">{{ projectAgentReason }}</text>
@@ -60,10 +60,10 @@
         <!-- 会话是默认入口；通讯录按需展开。 -->
         <view class="pws-section pws-conv-section">
           <view class="pws-sec-bar">
-            <text class="pws-sec-label">对话列表</text>
+            <text class="pws-sec-label">{{ tr('panels.pwsConvListTitle', '对话列表') }}</text>
             <view class="pws-sec-right">
               <text class="pws-sec-count">{{ filteredConversations.length }}</text>
-              <view class="pws-icon-action" title="刷新会话" @tap="loadImData">
+              <view class="pws-icon-action" :title="tr('panels.pwsRefreshConvs', '刷新会话')" @tap="loadImData">
                 <svg :class="{ spinning: loadingIm }" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path v-for="(d, gi) in ICONS.refresh" :key="gi" :d="d" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
@@ -84,8 +84,8 @@
           </view>
 
           <view v-if="filteredConversations.length === 0" class="pws-conv-empty">
-            <text class="pws-conv-empty-title">{{ searchKeyword ? '没有匹配的对话' : '暂无活跃对话' }}</text>
-            <text class="pws-conv-empty-desc">新建会话或用邀请码加入。需要联系同事与客户时，展开下方通讯录。</text>
+            <text class="pws-conv-empty-title">{{ searchKeyword ? tr('panels.pwsNoMatchingConvs', '没有匹配的对话') : tr('panels.pwsNoActiveConvs', '暂无活跃对话') }}</text>
+            <text class="pws-conv-empty-desc">{{ tr('panels.pwsConvEmptyDesc', '新建会话或用邀请码加入。需要联系同事与客户时，展开下方通讯录。') }}</text>
 
           </view>
 
@@ -98,7 +98,7 @@
               @tap="selectConversation(c)"
             >
               <view class="pws-conv-avatar" :class="c.type === 'DIRECT' ? 'direct' : 'group'">
-                <text>{{ c.agent ? 'AI' : (c.type === 'DIRECT' ? '私' : '群') }}</text>
+                <text>{{ c.agent ? 'AI' : (c.type === 'DIRECT' ? tr('panels.pwsDirectAvatar', '私') : tr('panels.pwsGroupAvatar', '群')) }}</text>
               </view>
               <view class="pws-conv-main">
                 <view class="pws-conv-top">
@@ -111,7 +111,7 @@
           </view>
         </view>
         <button class="pws-directory-toggle" :aria-expanded="String(directoryOpen || !!kw)" @tap="directoryOpen = !directoryOpen">
-          <text>通讯录</text><text class="pws-sec-sub">律所 · 团队 · 项目</text>
+          <text>{{ tr('panels.pwsDirectoryTitle', '通讯录') }}</text><text class="pws-sec-sub">{{ tr('panels.pwsDirectorySub', '律所 · 团队 · 项目') }}</text>
         </button>
         <view v-if="directoryOpen || kw">
         <!-- ===== 组织身份卡（飞书式租户切换入口）=====
@@ -119,9 +119,9 @@
              这里只展示当前身份与能否切换的原因，并跳转过去；完成后 awd:org-changed 触发本栏重拉。 -->
         <view class="pws-org-card">
           <view class="pws-org-main" @tap="orgMenuOpen = !orgMenuOpen">
-            <view class="pws-org-avatar"><text>{{ directory.organization ? avatarChar(directory.organization.name) : '无' }}</text></view>
+            <view class="pws-org-avatar"><text>{{ directory.organization ? avatarChar(directory.organization.name) : tr('panels.pwsOrgAvatarNone', '无') }}</text></view>
             <view class="pws-org-text">
-              <text class="pws-org-name">{{ directory.organization ? (directory.organization.name || '未命名团队') : '尚未加入团队' }}</text>
+              <text class="pws-org-name">{{ directory.organization ? (directory.organization.name || tr('panels.pwsOrgUnnamed', '未命名团队')) : tr('panels.pwsOrgNotJoined', '尚未加入团队') }}</text>
               <text class="pws-org-sub">{{ orgSubtitle }}</text>
             </view>
             <text class="pws-chevron" :class="{ open: orgMenuOpen }">›</text>
@@ -135,11 +135,11 @@
               :class="{ mine: t.isMine }"
             >
               <text class="pws-org-team-name">{{ t.name }}</text>
-              <text class="pws-org-team-tag">{{ t.isMine ? '本团队' : (t.isHead ? '总部团队' : '成员团队') }}</text>
+              <text class="pws-org-team-tag">{{ t.isMine ? tr('panels.pwsTeamMine', '本团队') : (t.isHead ? tr('panels.pwsTeamHead', '总部团队') : tr('panels.pwsTeamMember', '成员团队')) }}</text>
             </view>
             <view class="pws-org-actions">
               <view class="pws-quick-btn primary" @tap="openOrgSettings">
-                <text>{{ directory.organization ? '切换团队或律所' : '创建或加入团队' }}</text>
+                <text>{{ directory.organization ? tr('panels.pwsSwitchTeamOrFirm', '切换团队或律所') : tr('panels.pwsCreateOrJoinTeam', '创建或加入团队') }}</text>
               </view>
             </view>
           </view>
@@ -151,16 +151,16 @@
           <view class="pws-dir-group">
             <button class="pws-dir-head pws-project-toggle" :aria-expanded="String(dirExpanded.project || !!kw)" @tap="toggleDirGroup('project')">
               <text class="pws-chevron" :class="{ open: dirExpanded.project || kw }">›</text>
-              <view class="pws-dir-title-wrap"><text class="pws-dir-title">当前项目</text><text class="pws-dir-subtitle">项目成员</text></view>
+              <view class="pws-dir-title-wrap"><text class="pws-dir-title">{{ tr('panels.pwsCurrentProject', '当前项目') }}</text><text class="pws-dir-subtitle">{{ tr('panels.pwsProjectMember', '项目成员') }}</text></view>
               <text class="pws-dir-count">{{ filteredProjectMembers.length }}</text>
             </button>
             <view v-if="dirExpanded.project || kw" class="pws-dir-body">
               <button v-for="m in filteredProjectMembers" :key="'project-' + m.id" class="pws-contact-row pws-project-contact" @tap="startContactChat(m, 'project')">
                 <view class="pws-contact-avatar org"><text>{{ avatarChar(m.name) }}</text></view>
-                <view class="pws-contact-main"><text class="pws-contact-name">{{ m.name }}</text><text class="pws-contact-meta">{{ m.roleLabel || '项目成员' }}</text></view>
-                <text class="pws-contact-badge">发消息</text>
+                <view class="pws-contact-main"><text class="pws-contact-name">{{ m.name }}</text><text class="pws-contact-meta">{{ m.roleLabel || tr('panels.pwsProjectMember', '项目成员') }}</text></view>
+                <text class="pws-contact-badge">{{ tr('panels.pwsSendMessage', '发消息') }}</text>
               </button>
-              <text v-if="!filteredProjectMembers.length" class="pws-dir-empty-text">{{ kw ? '没有匹配的项目成员' : '项目中暂无其他成员。' }}</text>
+              <text v-if="!filteredProjectMembers.length" class="pws-dir-empty-text">{{ kw ? tr('panels.pwsNoMatchingProjectMembers', '没有匹配的项目成员') : tr('panels.pwsNoOtherProjectMembers', '项目中暂无其他成员。') }}</text>
             </view>
           </view>
 
@@ -174,8 +174,8 @@
                 </svg>
               </view>
               <view class="pws-dir-title-wrap">
-                <text class="pws-dir-title">我的团队</text>
-                <text class="pws-dir-subtitle">{{ directory.organization ? directory.organization.name : '尚未加入团队' }}</text>
+                <text class="pws-dir-title">{{ tr('panels.pwsMyTeam', '我的团队') }}</text>
+                <text class="pws-dir-subtitle">{{ directory.organization ? directory.organization.name : tr('panels.pwsOrgNotJoined', '尚未加入团队') }}</text>
               </view>
               <text class="pws-dir-count">{{ filteredOrgMembers.length }}</text>
             </view>
@@ -192,21 +192,21 @@
                 <view class="pws-contact-main">
                   <view class="pws-contact-line">
                     <text class="pws-contact-name">{{ m.name }}</text>
-                    <text class="pws-contact-badge">{{ m.roleLabel || '成员' }}</text>
+                    <text class="pws-contact-badge">{{ m.roleLabel || tr('panels.pwsRoleMember', '成员') }}</text>
                   </view>
                   <text class="pws-contact-meta">{{ directory.organization ? directory.organization.name : '' }}</text>
                 </view>
                 <view class="pws-contact-action" @tap.stop="startContactChat(m, 'org')">
-                  <text>发消息</text>
+                  <text>{{ tr('panels.pwsSendMessage', '发消息') }}</text>
                 </view>
               </view>
               <view v-if="!directory.organization" class="pws-dir-empty">
-                <text class="pws-dir-empty-text">尚未加入团队，加入后可在这里看到同事。</text>
-                <view class="pws-dir-foot-btn" @tap="openOrgSettings"><text>去创建或加入团队</text></view>
+                <text class="pws-dir-empty-text">{{ tr('panels.pwsTeamEmptyDesc', '尚未加入团队，加入后可在这里看到同事。') }}</text>
+                <view class="pws-dir-foot-btn" @tap="openOrgSettings"><text>{{ tr('panels.pwsGoCreateOrJoinTeam', '去创建或加入团队') }}</text></view>
               </view>
-              <text v-else-if="!filteredOrgMembers.length" class="pws-dir-empty-text">{{ kw ? '没有匹配的同事' : '团队里暂时只有你' }}</text>
-              <view v-else class="pws-dir-foot-btn" @tap="startGroupChat(directory.organization.name + ' · 团队群')">
-                <text>+ 发起团队群聊</text>
+              <text v-else-if="!filteredOrgMembers.length" class="pws-dir-empty-text">{{ kw ? tr('panels.pwsNoMatchingColleagues', '没有匹配的同事') : tr('panels.pwsOnlyYouInTeam', '团队里暂时只有你') }}</text>
+              <view v-else class="pws-dir-foot-btn" @tap="startGroupChat(directory.organization.name + tr('panels.pwsTeamGroupSuffix', ' · 团队群'))">
+                <text>{{ tr('panels.pwsStartTeamGroupChat', '+ 发起团队群聊') }}</text>
               </view>
             </view>
           </view>
@@ -221,8 +221,8 @@
                 </svg>
               </view>
               <view class="pws-dir-title-wrap">
-                <text class="pws-dir-title">我的律所</text>
-                <text class="pws-dir-subtitle">{{ directory.firm ? directory.firm.name : (directory.organization ? '本团队未并入律所' : '加入团队后可并入律所') }}</text>
+                <text class="pws-dir-title">{{ tr('panels.pwsMyFirm', '我的律所') }}</text>
+                <text class="pws-dir-subtitle">{{ directory.firm ? directory.firm.name : (directory.organization ? tr('panels.pwsFirmNotMerged', '本团队未并入律所') : tr('panels.pwsFirmJoinTeamFirst', '加入团队后可并入律所')) }}</text>
               </view>
               <text class="pws-dir-count">{{ filteredFirmTeams.length }}</text>
             </view>
@@ -231,7 +231,7 @@
                 v-for="t in filteredFirmTeams"
                 :key="'firm-' + t.id + '-' + t.name"
                 class="pws-contact-row"
-                @tap="startGroupChat(t.name + ' · 律所协作群')"
+                @tap="startGroupChat(t.name + tr('panels.pwsFirmGroupSuffix', ' · 律所协作群'))"
               >
                 <view class="pws-contact-avatar firm">
                   <text>{{ avatarChar(t.name) }}</text>
@@ -239,17 +239,17 @@
                 <view class="pws-contact-main">
                   <view class="pws-contact-line">
                     <text class="pws-contact-name">{{ t.name }}</text>
-                    <text class="pws-contact-badge">{{ t.isMine ? '本团队' : (t.isHead ? '总部团队' : '成员团队') }}</text>
+                    <text class="pws-contact-badge">{{ t.isMine ? tr('panels.pwsTeamMine', '本团队') : (t.isHead ? tr('panels.pwsTeamHead', '总部团队') : tr('panels.pwsTeamMember', '成员团队')) }}</text>
                   </view>
-                  <text class="pws-contact-meta">{{ t.memberCount != null ? ('成员 ' + t.memberCount + ' 人') : '' }}</text>
+                  <text class="pws-contact-meta">{{ t.memberCount != null ? tr('panels.pwsFirmMemberCount', '成员 ' + t.memberCount + ' 人', { count: t.memberCount }) : '' }}</text>
                 </view>
-                <view class="pws-contact-action" @tap.stop="startGroupChat(t.name + ' · 律所协作群')">
-                  <text>发起群聊</text>
+                <view class="pws-contact-action" @tap.stop="startGroupChat(t.name + tr('panels.pwsFirmGroupSuffix', ' · 律所协作群'))">
+                  <text>{{ tr('panels.pwsStartGroupChat', '发起群聊') }}</text>
                 </view>
               </view>
               <view v-if="!directory.firm" class="pws-dir-empty">
                 <text class="pws-dir-empty-text">{{ firmEmptyText }}</text>
-                <view v-if="directory.organization" class="pws-dir-foot-btn" @tap="openOrgSettings"><text>去团队设置</text></view>
+                <view v-if="directory.organization" class="pws-dir-foot-btn" @tap="openOrgSettings"><text>{{ tr('panels.pwsGoTeamSettings', '去团队设置') }}</text></view>
               </view>
             </view>
           </view>
@@ -264,8 +264,8 @@
                 </svg>
               </view>
               <view class="pws-dir-title-wrap">
-                <text class="pws-dir-title">其他联系人</text>
-                <text class="pws-dir-subtitle">个人通讯录 · 项目客户</text>
+                <text class="pws-dir-title">{{ tr('panels.pwsOtherContacts', '其他联系人') }}</text>
+                <text class="pws-dir-subtitle">{{ tr('panels.pwsOtherContactsSub', '个人通讯录 · 项目客户') }}</text>
               </view>
               <text class="pws-dir-count">{{ filteredFriends.length }}</text>
             </view>
@@ -282,17 +282,17 @@
                 <view class="pws-contact-main">
                   <view class="pws-contact-line">
                     <text class="pws-contact-name">{{ fr.name }}</text>
-                    <text class="pws-contact-badge">{{ fr.roleLabel || '外部联系人' }}</text>
+                    <text class="pws-contact-badge">{{ fr.roleLabel || tr('panels.pwsExternalContact', '外部联系人') }}</text>
                   </view>
-                  <text class="pws-contact-meta">{{ fr.org || fr.note || (fr.source === 'project' ? '当前项目客户' : '') }}</text>
+                  <text class="pws-contact-meta">{{ fr.org || fr.note || (fr.source === 'project' ? tr('panels.pwsCurrentProjectClient', '当前项目客户') : '') }}</text>
                 </view>
                 <view class="pws-contact-action" @tap.stop="startContactChat(fr, 'friend')">
-                  <text>发消息</text>
+                  <text>{{ tr('panels.pwsSendMessage', '发消息') }}</text>
                 </view>
               </view>
-              <text v-if="!filteredFriends.length" class="pws-dir-empty-text">{{ kw ? '没有匹配的联系人' : '还没有其他联系人。手动添加的联系人只保存在本机当前账户下，切换团队或律所不影响。' }}</text>
+              <text v-if="!filteredFriends.length" class="pws-dir-empty-text">{{ kw ? tr('panels.pwsNoMatchingContacts', '没有匹配的联系人') : tr('panels.pwsNoOtherContactsDesc', '还没有其他联系人。手动添加的联系人只保存在本机当前账户下，切换团队或律所不影响。') }}</text>
               <view class="pws-dir-foot-btn" @tap="toggleAddFriendForm">
-                <text>+ 添加外部联系人</text>
+                <text>{{ tr('panels.pwsAddExternalContactBtn', '+ 添加外部联系人') }}</text>
               </view>
             </view>
           </view>
@@ -308,14 +308,14 @@
         <image src="/static/icons/plugin-baoqingtian.png" class="pws-brand-avatar" mode="aspectFill" />
         <view class="pws-brand-info">
           <text class="pws-brand-name">{{ plugin.label }}</text>
-          <text class="pws-brand-desc">浏览案源广场，管理在包晴天发布的笔记与草稿</text>
+          <text class="pws-brand-desc">{{ tr('panels.pwsBqtBrandDesc', '浏览案源广场，管理在包晴天发布的笔记与草稿') }}</text>
         </view>
       </view>
 
       <scroll-view scroll-y class="pws-scroll">
         <view class="pws-section">
           <view class="pws-sec-bar">
-            <text class="pws-sec-label">工作视图</text>
+            <text class="pws-sec-label">{{ tr('panels.pwsBqtWorkViews', '工作视图') }}</text>
           </view>
           <view class="pws-nav-list">
             <view
@@ -325,8 +325,8 @@
             >
               <view class="pws-nav-dot"></view>
               <view class="pws-nav-main">
-                <text class="pws-nav-title">案源广场</text>
-                <text class="pws-nav-sub">了解法律需求，找到合适的合作机会</text>
+                <text class="pws-nav-title">{{ tr('panels.pwsBqtCaseSquare', '案源广场') }}</text>
+                <text class="pws-nav-sub">{{ tr('panels.pwsBqtCaseSquareDesc', '了解法律需求，找到合适的合作机会') }}</text>
               </view>
             </view>
             <view
@@ -336,8 +336,8 @@
             >
               <view class="pws-nav-dot"></view>
               <view class="pws-nav-main">
-                <text class="pws-nav-title">我的笔记</text>
-                <text class="pws-nav-sub">管理已发布的图文笔记和草稿</text>
+                <text class="pws-nav-title">{{ tr('panels.pwsBqtMyNotes', '我的笔记') }}</text>
+                <text class="pws-nav-sub">{{ tr('panels.pwsBqtMyNotesDesc', '管理已发布的图文笔记和草稿') }}</text>
               </view>
             </view>
           </view>
@@ -345,7 +345,7 @@
 
         <view class="pws-section">
           <view class="pws-sec-bar">
-            <text class="pws-sec-label">笔记状态筛选</text>
+            <text class="pws-sec-label">{{ tr('panels.pwsBqtNoteFilterTitle', '笔记状态筛选') }}</text>
           </view>
           <view class="pws-conv-filters">
             <view
@@ -362,17 +362,17 @@
 
         <view class="pws-section">
           <view class="pws-sec-bar">
-            <text class="pws-sec-label">快捷操作</text>
+            <text class="pws-sec-label">{{ tr('panels.pwsBqtQuickActions', '快捷操作') }}</text>
           </view>
           <view class="pws-action-stack">
             <view class="pws-action-row primary" @tap="emitBqtCommand('new-note')">
-              <text>+ 新建笔记</text>
+              <text>{{ tr('panels.pwsBqtNewNote', '+ 新建笔记') }}</text>
             </view>
             <view class="pws-action-row" @tap="emitBqtCommand('refresh')">
-              <text>刷新当前列表</text>
+              <text>{{ tr('panels.pwsBqtRefreshList', '刷新当前列表') }}</text>
             </view>
             <view class="pws-action-row" @tap="$emit('open')">
-              <text>在中栏打开包晴天工作区</text>
+              <text>{{ tr('panels.pwsBqtOpenWorkspace', '在中栏打开包晴天工作区') }}</text>
             </view>
           </view>
         </view>
@@ -397,34 +397,34 @@
         <view v-if="isLawFirmPlugin" class="lawfirm-summary-card">
           <view class="lawfirm-stat-grid">
             <view class="lawfirm-stat-item">
-              <text class="lawfirm-stat-label">在办案件</text>
+              <text class="lawfirm-stat-label">{{ tr('panels.pwsLfActiveMatters', '在办案件') }}</text>
               <text class="lawfirm-stat-val">{{ lawfirmStats.activeMatters }}</text>
             </view>
             <view class="lawfirm-stat-item">
-              <text class="lawfirm-stat-label">待审利冲</text>
+              <text class="lawfirm-stat-label">{{ tr('panels.pwsLfPendingClearances', '待审利冲') }}</text>
               <text class="lawfirm-stat-val warn">{{ lawfirmStats.pendingClearances }}</text>
             </view>
             <view class="lawfirm-stat-item">
-              <text class="lawfirm-stat-label">签约总额</text>
+              <text class="lawfirm-stat-label">{{ tr('panels.pwsLfContractedTotal', '签约总额') }}</text>
               <text class="lawfirm-stat-val">{{ lawfirmStats.contractedText }}</text>
             </view>
             <view class="lawfirm-stat-item">
-              <text class="lawfirm-stat-label">实收到账</text>
+              <text class="lawfirm-stat-label">{{ tr('panels.pwsLfCollectedTotal', '实收到账') }}</text>
               <text class="lawfirm-stat-val accent">{{ lawfirmStats.collectedText }}</text>
             </view>
           </view>
           <view class="lawfirm-quick-jumps">
-            <button class="lawfirm-jump-btn" @tap="openLawFirmTab('intake')">立案与利冲</button>
-            <button class="lawfirm-jump-btn" @tap="openLawFirmTab('finance')">开票与财务</button>
-            <button class="lawfirm-jump-btn" @tap="openLawFirmTab('dashboard')">全所三维看板</button>
-            <button class="lawfirm-jump-btn" @tap="openLawFirmTab('oa')">OA与IM联动</button>
+            <button class="lawfirm-jump-btn" @tap="openLawFirmTab('intake')">{{ tr('panels.pwsLfJumpIntake', '立案与利冲') }}</button>
+            <button class="lawfirm-jump-btn" @tap="openLawFirmTab('finance')">{{ tr('panels.pwsLfJumpFinance', '开票与财务') }}</button>
+            <button class="lawfirm-jump-btn" @tap="openLawFirmTab('dashboard')">{{ tr('panels.pwsLfJumpDashboard', '全所三维看板') }}</button>
+            <button class="lawfirm-jump-btn" @tap="openLawFirmTab('oa')">{{ tr('panels.pwsLfJumpOa', 'OA与IM联动') }}</button>
           </view>
         </view>
 
         <view v-if="plugin.pluginId === 'due-diligence'" class="pws-section">
           <view class="pws-sec-bar">
-            <text class="pws-sec-label">尽调作业阶段</text>
-            <text class="pws-sec-sub">6 步标准流程</text>
+            <text class="pws-sec-label">{{ tr('panels.pwsDdStagesTitle', '尽调作业阶段') }}</text>
+            <text class="pws-sec-sub">{{ tr('panels.pwsDdStagesSub', '6 步标准流程') }}</text>
           </view>
           <view class="pws-nav-list">
             <view
@@ -445,23 +445,23 @@
 
         <view class="pws-section">
           <view class="pws-sec-bar">
-            <text class="pws-sec-label">工作区与 AI 协同</text>
+            <text class="pws-sec-label">{{ tr('panels.pwsWorkspaceAndAi', '工作区与 AI 协同') }}</text>
           </view>
           <view class="pws-action-stack">
             <view class="pws-action-row primary" @tap="$emit('open')">
               <text>{{ $t('panels.pgOpenWorkspace') }}</text>
             </view>
             <template v-if="plugin.pluginId === 'due-diligence'">
-              <view class="pws-action-row" @tap="emitAiPrompt('请根据当前项目的尽调清单与已上传材料，核查尚缺哪些关键尽调底稿并列出补充清单。')">
-                <text>AI 核查尽调材料缺口</text>
+              <view class="pws-action-row" @tap="emitAiPrompt(tr('panels.pwsDdAiCheckGapsPrompt', '请根据当前项目的尽调清单与已上传材料，核查尚缺哪些关键尽调底稿并列出补充清单。'))">
+                <text>{{ tr('panels.pwsDdAiCheckGapsBtn', 'AI 核查尽调材料缺口') }}</text>
               </view>
-              <view class="pws-action-row" @tap="emitAiPrompt('请汇总当前项目已识别的法律尽调核心风险点，按重大风险、一般风险及整改建议生成结构化摘要。')">
-                <text>AI 汇总尽调核心风险矩阵</text>
+              <view class="pws-action-row" @tap="emitAiPrompt(tr('panels.pwsDdAiRiskMatrixPrompt', '请汇总当前项目已识别的法律尽调核心风险点，按重大风险、一般风险及整改建议生成结构化摘要。'))">
+                <text>{{ tr('panels.pwsDdAiRiskMatrixBtn', 'AI 汇总尽调核心风险矩阵') }}</text>
               </view>
             </template>
             <template v-else-if="plugin.pluginId === 'tencent-meeting'">
-              <view class="pws-action-row" @tap="emitAiPrompt('请梳理当前项目中的腾讯会议转写记录，提炼各方核心诉求、争议焦点与会后待办事项。')">
-                <text>AI 提炼会议纪要与待办</text>
+              <view class="pws-action-row" @tap="emitAiPrompt(tr('panels.pwsTmAiSummaryPrompt', '请梳理当前项目中的腾讯会议转写记录，提炼各方核心诉求、争议焦点与会后待办事项。'))">
+                <text>{{ tr('panels.pwsTmAiSummaryBtn', 'AI 提炼会议纪要与待办') }}</text>
               </view>
             </template>
           </view>
@@ -570,24 +570,46 @@ export default {
       return {
         activeMatters,
         pendingClearances,
-        contractedText: `${contractedWan} 万`,
-        collectedText: `${collectedWan} 万`,
+        contractedText: this.tr('panels.pwsLfWanSuffix', `${contractedWan} 万`, { amount: contractedWan }),
+        collectedText: this.tr('panels.pwsLfWanSuffix', `${collectedWan} 万`, { amount: collectedWan }),
       }
     },
     ICONS() {
       return ICONS
     },
     FRIEND_ROLE_TAGS() {
-      return FRIEND_ROLE_TAGS
+      return [
+        this.tr('panels.pwsFriendTagPartnerLawyer', FRIEND_ROLE_TAGS[0]),
+        this.tr('panels.pwsFriendTagClientContact', FRIEND_ROLE_TAGS[1]),
+        this.tr('panels.pwsFriendTagIndustryExpert', FRIEND_ROLE_TAGS[2]),
+        this.tr('panels.pwsFriendTagCounterpartyLegal', FRIEND_ROLE_TAGS[3]),
+      ]
     },
     CONV_FILTERS() {
-      return CONV_FILTERS
+      return [
+        { key: 'all', label: this.tr('panels.pwsFilterAll', CONV_FILTERS[0].label) },
+        { key: 'unread', label: this.tr('panels.pwsFilterUnread', CONV_FILTERS[1].label) },
+        { key: 'GROUP', label: this.tr('panels.pwsFilterGroup', CONV_FILTERS[2].label) },
+        { key: 'DIRECT', label: this.tr('panels.pwsFilterDirect', CONV_FILTERS[3].label) },
+      ]
     },
     BQT_STATUS_FILTERS() {
-      return BQT_STATUS_FILTERS
+      return [
+        { key: '', label: this.tr('panels.pwsFilterAll', BQT_STATUS_FILTERS[0].label) },
+        { key: 'draft', label: this.tr('panels.pwsBqtStatusDraft', BQT_STATUS_FILTERS[1].label) },
+        { key: 'published', label: this.tr('panels.pwsBqtStatusPublished', BQT_STATUS_FILTERS[2].label) },
+        { key: 'private', label: this.tr('panels.pwsBqtStatusPrivate', BQT_STATUS_FILTERS[3].label) },
+      ]
     },
     DD_STAGES() {
-      return DD_STAGES
+      return [
+        { key: 'checklist', title: this.tr('panels.pwsDdStageChecklistTitle', DD_STAGES[0].title), desc: this.tr('panels.pwsDdStageChecklistDesc', DD_STAGES[0].desc) },
+        { key: 'collection', title: this.tr('panels.pwsDdStageCollectionTitle', DD_STAGES[1].title), desc: this.tr('panels.pwsDdStageCollectionDesc', DD_STAGES[1].desc) },
+        { key: 'entity', title: this.tr('panels.pwsDdStageEntityTitle', DD_STAGES[2].title), desc: this.tr('panels.pwsDdStageEntityDesc', DD_STAGES[2].desc) },
+        { key: 'contracts', title: this.tr('panels.pwsDdStageContractsTitle', DD_STAGES[3].title), desc: this.tr('panels.pwsDdStageContractsDesc', DD_STAGES[3].desc) },
+        { key: 'litigation', title: this.tr('panels.pwsDdStageLitigationTitle', DD_STAGES[4].title), desc: this.tr('panels.pwsDdStageLitigationDesc', DD_STAGES[4].desc) },
+        { key: 'report', title: this.tr('panels.pwsDdStageReportTitle', DD_STAGES[5].title), desc: this.tr('panels.pwsDdStageReportDesc', DD_STAGES[5].desc) },
+      ]
     },
     pluginGlyph() {
       return getPluginGlyphPaths(this.plugin && this.plugin.pluginId)
@@ -598,10 +620,10 @@ export default {
     orgSubtitle() {
       const org = this.directory.organization
       const firm = this.directory.firm
-      if (!org) return '加入团队后可看到同事与律所'
+      if (!org) return this.tr('panels.pwsOrgSubNotJoined', '加入团队后可看到同事与律所')
       const parts = []
       if (org.myRoleLabel) parts.push(org.myRoleLabel)
-      parts.push(firm ? ('律所：' + (firm.name || '未命名') + (firm.isHead ? '（总部团队）' : '')) : '未并入律所')
+      parts.push(firm ? (this.tr('panels.pwsOrgSubFirmPrefix', '律所：') + (firm.name || this.tr('panels.pwsOrgSubUnnamed', '未命名')) + (firm.isHead ? this.tr('panels.pwsOrgSubHeadSuffix', '（总部团队）') : '')) : this.tr('panels.pwsOrgSubNotInFirm', '未并入律所'))
       return parts.join(' · ')
     },
     // 与 TeamPanel 的 canLeave / canLeaveFirm 同口径，只解释「能不能切、为什么」
@@ -609,16 +631,16 @@ export default {
       const org = this.directory.organization
       const firm = this.directory.firm
       const cap = this.directory.capabilities || {}
-      if (!org) return '一个账户同一时间只属于一个团队。可在「设置 › 团队」创建团队或用邀请码加入。'
-      if (cap.isTeamOwner && firm && firm.isHead) return '你是总部团队负责人：负责人不能退出团队，总部团队也不能退出律所。'
-      if (cap.isTeamOwner && firm) return '你是团队负责人：不能切换团队，但可以把本团队切换到其他律所。'
-      if (cap.isTeamOwner) return '你是团队负责人：不能切换团队，可以创建律所或用律所邀请码并入。'
-      return '切换团队会先退出当前团队再加入新团队；律所由团队负责人切换。已有项目会话按会话成员身份保留。'
+      if (!org) return this.tr('panels.pwsOrgHintNoOrg', '一个账户同一时间只属于一个团队。可在「设置 › 团队」创建团队或用邀请码加入。')
+      if (cap.isTeamOwner && firm && firm.isHead) return this.tr('panels.pwsOrgHintHeadOwner', '你是总部团队负责人：负责人不能退出团队，总部团队也不能退出律所。')
+      if (cap.isTeamOwner && firm) return this.tr('panels.pwsOrgHintTeamOwnerInFirm', '你是团队负责人：不能切换团队，但可以把本团队切换到其他律所。')
+      if (cap.isTeamOwner) return this.tr('panels.pwsOrgHintTeamOwnerNoFirm', '你是团队负责人：不能切换团队，可以创建律所或用律所邀请码并入。')
+      return this.tr('panels.pwsOrgHintMember', '切换团队会先退出当前团队再加入新团队；律所由团队负责人切换。已有项目会话按会话成员身份保留。')
     },
     firmEmptyText() {
       const cap = this.directory.capabilities || {}
-      if (!this.directory.organization) return '加入团队后，团队可以并入律所。'
-      return cap.isTeamOwner ? '本团队尚未并入律所。你可以创建律所或用律所邀请码并入。' : '本团队尚未并入律所，由团队负责人操作。'
+      if (!this.directory.organization) return this.tr('panels.pwsFirmEmptyNoOrg', '加入团队后，团队可以并入律所。')
+      return cap.isTeamOwner ? this.tr('panels.pwsFirmEmptyOwner', '本团队尚未并入律所。你可以创建律所或用律所邀请码并入。') : this.tr('panels.pwsFirmEmptyMember', '本团队尚未并入律所，由团队负责人操作。')
     },
     filteredProjectMembers() {
       const meId = this.directory.me && this.directory.me.id
@@ -725,6 +747,11 @@ export default {
     }
   },
   methods: {
+    tr(key, fallback, params) {
+      if (typeof this.$t !== 'function') return fallback
+      const res = this.$t(key, params)
+      return (!res || res === key) ? fallback : res
+    },
     notifyImSidebar(visible, projectId = this.projectId) {
       uni.$emit('awd:plugin-sidebar-command', { pluginId: 'project-im', command: 'host-sidebar', projectId, visible })
     },
@@ -749,11 +776,16 @@ export default {
     },
     avatarChar(name) {
       const s = String(name || '').trim()
-      return s ? s.slice(0, 1) : '联'
+      return s ? s.slice(0, 1) : this.tr('panels.pwsAvatarDefault', '联')
     },
     roleName(role) {
-      const map = { OWNER: '负责人', ADMIN: '管理员', MEMBER: '成员', CLIENT: '客户' }
-      return map[role] || '成员'
+      const map = {
+        OWNER: this.tr('panels.pwsRoleOwner', '负责人'),
+        ADMIN: this.tr('panels.pwsRoleAdmin', '管理员'),
+        MEMBER: this.tr('panels.pwsRoleMember', '成员'),
+        CLIENT: this.tr('panels.pwsRoleClient', '客户'),
+      }
+      return map[role] || this.tr('panels.pwsRoleMember', '成员')
     },
     toggleDirGroup(key) {
       this.dirExpanded[key] = !this.dirExpanded[key]
@@ -769,7 +801,7 @@ export default {
     submitAddFriend() {
       const name = String(this.friendDraft.name || '').trim()
       if (!name) {
-        uni.showToast({ title: '请输入联系人姓名', icon: 'none' })
+        uni.showToast({ title: this.tr('panels.pwsEnterContactNameToast', '请输入联系人姓名'), icon: 'none' })
         return
       }
       try {
@@ -780,7 +812,7 @@ export default {
         })
         this.directory.friends = [Object.assign({ source: 'personal' }, res.added), ...this.directory.friends.filter(f => f.name !== name)]
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || '添加失败', icon: 'none' })
+        uni.showToast({ title: (e && e.message) || this.tr('panels.pwsAddFailedToast', '添加失败'), icon: 'none' })
         return
       }
       this.friendDraft.name = ''
@@ -788,7 +820,7 @@ export default {
       this.showAddFriend = false
       this.dirExpanded.friends = true
       this.emitCommand('refresh-directory', { reason: 'manual' })
-      uni.showToast({ title: '已添加到「其他联系人」', icon: 'none' })
+      uni.showToast({ title: this.tr('panels.pwsAddedToOtherContactsToast', '已添加到「其他联系人」'), icon: 'none' })
     },
     async loadDirectoryOnly() {
       const sequence = ++this.directoryLoadSequence, projectId = this.projectId
@@ -832,13 +864,23 @@ export default {
         command,
       }, extra))
     },
-    agentScopeLabel(scope) { return { project: '项目', team: '团队', firm: '律所' }[scope] || '' },
+    agentScopeLabel(scope) {
+      return {
+        project: this.tr('panels.pwsScopeProject', '项目'),
+        team: this.tr('panels.pwsScopeTeam', '团队'),
+        firm: this.tr('panels.pwsScopeFirm', '律所'),
+      }[scope] || ''
+    },
     openAgent(agent) {
       this.emitCommand('open-agent', { scope: agent.scope, scopeKey: agent.scopeKey, title: agent.title || agent.name, private: false })
     },
     conversationLabel(c) {
-      if (c.agent) return c.agent.private || c.type === 'AGENT_DIRECT' ? '云端助手私聊 · 仅你可见' : '云端助手群聊 · 群成员可见'
-      return (c.type === 'DIRECT' ? '私聊' : '群聊') + ' · ' + this.roleName(c.role)
+      if (c.agent) {
+        return c.agent.private || c.type === 'AGENT_DIRECT'
+          ? this.tr('panels.pwsAgentDirectLabel', '云端助手私聊 · 仅你可见')
+          : this.tr('panels.pwsAgentGroupLabel', '云端助手群聊 · 群成员可见')
+      }
+      return (c.type === 'DIRECT' ? this.tr('panels.pwsFilterDirect', '私聊') : this.tr('panels.pwsFilterGroup', '群聊')) + ' · ' + this.roleName(c.role)
     },
     selectConversation(c) {
       if (!c) return

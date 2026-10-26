@@ -1,0 +1,5 @@
+{
+  "plugin.name": "依据",
+  "plugin.description": "文档依据检索、一致性核验和合同审查。",
+  "view.main.name": "依据"
+}

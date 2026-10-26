@@ -536,7 +536,25 @@ export const ZH = {
   transferPushOfflineNotice: '对方设备当前离线，上线后会自动收取该文件',
   transferPushSubmitted: '已提交投送：费用已扣除，若长期未送达将自动退回',
   transferLoadingFiles: '正在加载文件…',
-  transferSelectAFile: '请先选择一个文件'
+  transferSelectAFile: '请先选择一个文件',
+
+  // ---- lib/hostBridge.js / lib/crossDocWrite.js / lib/textMatch.js / lib/officeExecutor.js ----
+  hostEnvUnavailable: '宿主环境不可用：请在 Office 或 WPS 任务窗格中使用本插件',
+  crossDocExecNoResult: '插件执行失败（未返回结果）',
+  crossDocWpsNoTracking: '本机 WPS 文字无法标记修订，已拒绝跨文档修改',
+  crossDocWordNoTracking: '本机 Word 版本无法标记修订，已拒绝跨文档修改',
+  crossDocCommandUntrackable: '该操作（{command}）在 Word/WPS 文字里无法标记为修订，跨文档执行会留下没有痕迹的修改，已拒绝。请让用户在目标文档自己的 AI WorkDeck 窗格里完成这一步。',
+  anchorFailureHead: '{kind}：在文档中未找到该文本。已按全角/半角、直弯引号、不间断空格与零宽字符做过归一化后仍无命中。',
+  anchorFailureNoCandidate: '文档中没有与之相近的片段，请先用读取类工具确认文档当前内容，不要凭上一轮的印象拼锚点。',
+  anchorFailureCandidate: '文档里最接近的一段原文是：「{frag}」（相似度约 {pct}%）。请改用这段原文里逐字照抄的一小段（建议 10-30 字、且在全文唯一）作为锚点重试；若差异来自你自己改写过的措辞，请先重新读取该处的当前内容。',
+  officeCrossDocNoTracking: '本机 Word 版本无法标记修订，已拒绝跨文档修改',
+  officeEnvUnavailable: 'Office 环境不可用：请在 Office 任务窗格中使用本插件',
+  officeUnsupportedHost: 'unsupported host: 该命令只在 {required} 中可用（当前宿主：{current}）',
+  officeUnknownHost: '未知',
+  officeWorksheetNotFound: '未找到名为「{sheetName}」的工作表。本工作簿现有工作表：{names}。请用其中之一重试（名称区分空格与全角半角），或留空 sheetName 表示活动工作表。',
+  officeTargetCellMissing: '目标单元格已不存在',
+  officeTargetTextFrameMissing: '目标文本框已不存在',
+  officeUnrecognizedSnapshot: '无法识别的修订快照，撤销未执行'
 }
 
 export const EN = {
@@ -1015,7 +1033,25 @@ export const EN = {
   transferPushOfflineNotice: 'The target device is offline; it will pick up the file automatically once online',
   transferPushSubmitted: 'Push submitted: charged now, auto-refunded if never delivered',
   transferLoadingFiles: 'Loading files…',
-  transferSelectAFile: 'Select a file first'
+  transferSelectAFile: 'Select a file first',
+
+  // ---- lib/hostBridge.js / lib/crossDocWrite.js / lib/textMatch.js / lib/officeExecutor.js ----
+  hostEnvUnavailable: 'Host environment unavailable: please use this add-in inside an Office or WPS task pane',
+  crossDocExecNoResult: 'Add-in execution failed (no result returned)',
+  crossDocWpsNoTracking: 'This WPS Writer version cannot track changes; cross-document modification rejected',
+  crossDocWordNoTracking: 'This Word version cannot track changes; cross-document modification rejected',
+  crossDocCommandUntrackable: 'This operation ({command}) cannot be recorded as a tracked change in Word/WPS Writer; cross-document execution would leave untracked edits and has been rejected. Please ask the user to complete this step in the target document\'s own AI WorkDeck pane.',
+  anchorFailureHead: '{kind}: text not found in document. No match found even after normalizing character width, quotes, non-breaking spaces, and zero-width characters.',
+  anchorFailureNoCandidate: ' No similar fragment was found in the document; please use a read tool to confirm the current document content instead of relying on previous turns.',
+  anchorFailureCandidate: ' The closest text in the document is: "{frag}" (~{pct}% similarity). Retry using a short, unique verbatim substring (10-30 characters recommended) from this text as the anchor; if the difference comes from your own prior edits, re-read the current content first.',
+  officeCrossDocNoTracking: 'This Word version cannot track changes; cross-document modification rejected',
+  officeEnvUnavailable: 'Office environment unavailable: please use this add-in inside an Office task pane',
+  officeUnsupportedHost: 'unsupported host: this command is only available in {required} (current host: {current})',
+  officeUnknownHost: 'Unknown',
+  officeWorksheetNotFound: 'Worksheet "{sheetName}" not found. Existing worksheets in this workbook: {names}. Please retry with one of them (names are sensitive to spaces and character width), or leave sheetName empty for the active worksheet.',
+  officeTargetCellMissing: 'Target cell no longer exists',
+  officeTargetTextFrameMissing: 'Target text frame no longer exists',
+  officeUnrecognizedSnapshot: 'Unrecognized revision snapshot; undo was not executed'
 }
 
 export const currentLang = detectLang()

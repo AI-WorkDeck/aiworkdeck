@@ -69,7 +69,7 @@ test('Word：强制修订 + 宿主标不了修订 → 拒绝执行，一个字�
   try {
     const r = await executeOfficeCommand('insert_break', { __forceTracking: true })
     assert.equal(r.ok, false)
-    assert.match(r.error, /无法标记修订/)
+    assert.match(r.error, /无法标记修订|cannot track changes/i)
     assert.equal(w.state.breaks.length, 0)
   } finally { w.restore() }
 })
@@ -99,7 +99,7 @@ test('Word：runCrossDocWrite 用默认依赖跑通（门槛探测走宿主桥�
       command: 'insert_break', args: {}, origin: { docName: 'A.docx' }, host: 'word', family: 'office'
     })
     assert.equal(result.ok, false)
-    assert.match(result.error, /无法标记修订/)
+    assert.match(result.error, /无法标记修订|cannot track changes/i)
     assert.equal(entry, null)
     assert.equal(w.state.breaks.length, 0)
   } finally { w.restore() }

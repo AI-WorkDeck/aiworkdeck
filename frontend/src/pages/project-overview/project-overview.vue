@@ -4420,7 +4420,9 @@ export default {
     // （30 命中 / 500 元素），不会刷屏。total=0 表示命令不预知总数。
     onEditorCommandProgress(p) {
       if (!p || typeof p.done !== 'number') return
-      const title = p.total > 0 ? ('处理中 ' + p.done + '/' + p.total) : ('已处理 ' + p.done + ' 处')
+      const title = p.total > 0
+        ? this.$t('workbench.editorProgressWithTotal', { done: p.done, total: p.total })
+        : this.$t('workbench.editorProgressCount', { done: p.done })
       try { uni.showToast({ title, icon: 'none', duration: 1500 }) } catch (e) { /* ignore */ }
     },
     // Options API 模板拿不到裸导入函数，包一层 method 才能在模板里当 getInitial(...) 调用
@@ -6756,7 +6758,7 @@ export default {
         .trim()
       if (!cleaned) return ''
       if (!maxLen || cleaned.length <= maxLen) return cleaned
-      return `${cleaned.slice(0, maxLen)}\n...[上下文已截断 ${cleaned.length - maxLen} 字]`
+      return `${cleaned.slice(0, maxLen)}\n${this.$t('workbench.contextTruncatedSuffix', { count: cleaned.length - maxLen })}`
     },
     buildAiContextPreview(context) {
       if (!context) return null
@@ -7309,11 +7311,11 @@ export default {
         const pluginDrop = consumePluginImDrag(dt, this.projectId)
         if (pluginDrop.handled) {
              if (!pluginDrop.file) {
-                  uni.showToast({ title: '拖拽已过期，请从文件卡片重新拖入', icon: 'none' })
+                  uni.showToast({ title: this.$t('workbench.pluginDragExpiredToast'), icon: 'none' })
                   return
              }
              this.onPluginAddFileToAi({ projectId: this.projectId, file: pluginDrop.file, isCurrent: pluginDrop.isCurrent })
-                  .catch(err => uni.showToast({ title: err.message || '无法加入 AI 对话，请重试', icon: 'none' }))
+                  .catch(err => uni.showToast({ title: err.message || this.$t('workbench.pluginAddToAiFailedToast'), icon: 'none' }))
              return
         }
 
@@ -7616,19 +7618,28 @@ export default {
             ['favorites', 'config.tools.favorites'],
             ['clipboard', 'config.tools.clipboard'],
             ['insight', 'insight.title'],
+            ['tencent-meeting', 'workbench.pluginLabels.tencentMeeting'],
+            ['baoqingtian', 'workbench.pluginLabels.baoqingtian'],
+            ['dpia-workbench', 'workbench.pluginLabels.dpiaWorkbench'],
+            ['lawfirm-management', 'workbench.pluginLabels.lawfirmManagement'],
+            ['project-im', 'workbench.pluginLabels.projectIm'],
           ])
           // list 同时包含停用、封禁和版本不兼容项；rail 只显示当前可用的插件。
           // 请求世代防止安装时的旧响应在禁用/卸载后迟到，把入口重新加回来。
           this.dynamicPlugins = list.filter(p => p && p.enabled === true && !p.revokedReason && !p.incompatibleReason).map(p => {
             const frontendEntry = resolvePluginEntryUrl(p.id, p.frontendEntry)
             const views = pluginViews(p, resolvePluginEntryUrl)
+            const labelKey = migratedLabelKeys.get(p.id)
+            const translatedLabel = labelKey && typeof this.$t === 'function' ? this.$t(labelKey) : ''
             return {
               key: `plugin-${p.id}`,
               // 左栏面板 key 是 plugin-<id>，桥要的是原始 id（握手上下文 + KV 分区键），
               // 两者别混用
               pluginId: p.id,
               version: p.version,
-              label: migratedLabelKeys.has(p.id) ? this.$t(migratedLabelKeys.get(p.id)) : p.name,
+              label: (translatedLabel && translatedLabel !== labelKey)
+                ? translatedLabel
+                : (p.name || (typeof this.$t === 'function' ? this.$t('workbench.pluginFallbackName') : '插件')),
               // registry 的 icon 字段是 emoji（全站禁 emoji，一律不当图片渲染），
               // 且 /static/plugin_default.png 并不存在（会 404 成 HTML=破图）。所以
               // 纯工具/skill 插件不给位图，改由 rail 用统一的 SVG 兜底（见模板 svgFallback）。

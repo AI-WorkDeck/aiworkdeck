@@ -6,7 +6,9 @@
 # 与本 skill 同进退：广场启用即出现（leftSidebarPlugins.js）。
 id: plugin-dev
 name: 插件开发
+name_en: Plugin Development
 description: 在 AI WorkDeck 里直接开发 Web 插件：AI 按需求生成/修改插件源码（项目「插件开发」目录，文件树可见可编辑），一键安装到本机沙箱运行测试，全程不离开产品。只支持纯 Web 插件（沙箱 iframe + 受控桥），带 JAR 的插件仍须走广场审核签名流程。
+description_en: "Develop Web plugins directly inside AI WorkDeck: AI generates and edits plugin source files in the project's Plugin Development folder with one-click installation into the local sandbox for live testing."
 
 author: AI WorkDeck
 author_url: https://www.aiworkdeck.com

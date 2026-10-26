@@ -169,6 +169,46 @@ public enum SensitiveType {
         return java.util.Arrays.stream(values()).filter(SensitiveType::isAutoDetect).toList();
     }
 
+    public String getLocalizedLabel() {
+        if (!com.checkba.service.LangText.isEnglish()) return label;
+        return switch (this) {
+            case PHONE -> "Mobile Phone";
+            case ID_CARD -> "ID Card Number";
+            case UNIFIED_SOCIAL_CREDIT -> "Unified Social Credit Code";
+            case LAWYER_LICENSE -> "Lawyer License Number";
+            case EMAIL -> "Email Address";
+            case BANK_CARD -> "Bank Card Number";
+            case COMPANY -> "Company Name";
+            case CHINESE_NAME -> "Chinese Personal Name";
+            case FIXED_PHONE -> "Landline Phone";
+            case ADDRESS -> "Address";
+            case PASSWORD -> "Password";
+            case CAR_LICENSE -> "License Plate Number";
+            case IPV4 -> "IPv4 Address";
+            case IPV6 -> "IPv6 Address";
+        };
+    }
+
+    public String getLocalizedDescription() {
+        if (!com.checkba.service.LangText.isEnglish()) return description;
+        return switch (this) {
+            case PHONE -> "Keep first 3 and last 4 digits";
+            case ID_CARD -> "Keep first 6 and last 4 digits";
+            case UNIFIED_SOCIAL_CREDIT -> "Validated by GB 32100-2015 check digit; invalid candidates are flagged below preview without modification";
+            case LAWYER_LICENSE -> "1-digit category + 5/6-digit region + 4-digit year + 1-digit type + 6-digit serial";
+            case EMAIL -> "Keep first letter and domain";
+            case BANK_CARD -> "Keep first 6 and last 4 digits";
+            case COMPANY -> "Matched by corporate suffixes; short names can be added manually";
+            case CHINESE_NAME -> "Matched by surname lexicon and person context; reviewable in preview";
+            case FIXED_PHONE -> "Keep area code and last 4 digits";
+            case ADDRESS -> "Retains administrative hierarchy only; reversible in token mode";
+            case PASSWORD -> "Mask completely";
+            case CAR_LICENSE -> "Keep first 2 and last 2 characters";
+            case IPV4 -> "Keep first two octets";
+            case IPV6 -> "Keep first two groups";
+        };
+    }
+
     /**
      * Mask the original string based on the type's strategy
      */

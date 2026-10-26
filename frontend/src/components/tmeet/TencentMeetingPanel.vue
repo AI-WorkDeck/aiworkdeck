@@ -469,7 +469,7 @@ export default {
 
     async onExportDoc(item) {
       if (!this.projectId) {
-        uni.showToast({ title: '请先打开一个项目后再导出', icon: 'none' })
+        uni.showToast({ title: this.$t('tmeet.openProjectBeforeExport'), icon: 'none' })
         return
       }
       this.exportingId = item.id

@@ -497,7 +497,7 @@ export default {
       try {
         out = await this.handleCall(String(msg.method || ''), msg.params || {})
       } catch (e) {
-        out = { ok: false, error: { code: 'internal_error', message: (e && e.message) || '调用失败' } }
+        out = { ok: false, error: { code: 'internal_error', message: (e && e.message) || (typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US' ? 'Invocation failed' : '调用失败') } }
       }
       if (!await this.verifyAuthorization(generation)) return
       this.reply(msg.seq, out, generation)
@@ -519,13 +519,16 @@ export default {
     },
 
     denied(permission) {
+      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
       return {
         ok: false,
-        error: { code: 'permission_denied', message: 'manifest.permissions 未声明 ' + permission }
+        error: { code: 'permission_denied', message: (en ? 'Permission not declared in manifest.permissions: ' : 'manifest.permissions 未声明 ') + permission }
       }
     },
 
     async handleCall(method, params) {
+      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const L = (zh, enText) => (en ? enText : zh)
       const generation = this.sessionGeneration
       if (/^(settings|connections|mcp|billing)\./.test(method)) {
         const platform = await this.platformServices().request(method, params)
@@ -537,7 +540,7 @@ export default {
       if (method.indexOf('x-') === 0 && !this.devInstalled) {
         return {
           ok: false,
-          error: { code: 'experimental_not_allowed', message: '实验方法仅对本机开发安装的插件开放：' + method }
+          error: { code: 'experimental_not_allowed', message: L('实验方法仅对本机开发安装的插件开放：', 'Experimental methods are only available to locally dev-installed plugins: ') + method }
         }
       }
       switch (method) {
@@ -556,7 +559,7 @@ export default {
           const conversationId = typeof params.conversationId === 'string' ? params.conversationId.trim() : ''
           const attachmentId = typeof params.attachmentId === 'string' ? params.attachmentId.trim() : ''
           if (!conversationId || !attachmentId || conversationId.length > 128 || attachmentId.length > 128) {
-            return { ok: false, error: { code: 'invalid_params', message: '缺少有效的会话或附件标识' } }
+            return { ok: false, error: { code: 'invalid_params', message: L('缺少有效的会话或附件标识', 'Missing valid conversation or attachment ID') } }
           }
           const generation = this.sessionGeneration
           const projectId = this.projectId
@@ -564,16 +567,16 @@ export default {
           try {
             const res = await requestPluginIm(this.pluginId, projectId, 'download', { conversationId, attachmentId })
             if (!current()) return this.staleContext()
-            if (!res || res.code !== 0) return { ok: false, error: { code: 'invoke_failed', message: res?.message || '文件下载失败' } }
+            if (!res || res.code !== 0) return { ok: false, error: { code: 'invoke_failed', message: res?.message || L('文件下载失败', 'File download failed') } }
             const data = res.data
             const maxBytes = 8 * 1024 * 1024
             if (!data || String(data.id) !== attachmentId || typeof data.base64 !== 'string'
                 || data.base64.length > Math.ceil(maxBytes / 3) * 4
                 || data.base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data.base64)) {
-              throw new Error('附件数据无效或超过 8 MB，未开始下载。')
+              throw new Error(L('附件数据无效或超过 8 MB，未开始下载。', 'Attachment data is invalid or exceeds 8 MB; download was not started.'))
             }
             const raw = window.atob(data.base64)
-            if (raw.length > maxBytes) throw new Error('附件超过 8 MB，未开始下载。')
+            if (raw.length > maxBytes) throw new Error(L('附件超过 8 MB，未开始下载。', 'Attachment exceeds 8 MB; download was not started.'))
             const bytes = new Uint8Array(raw.length)
             for (let index = 0; index < raw.length; index++) bytes[index] = raw.charCodeAt(index)
             let name = String(data.name || 'attachment.bin').replace(/[\\/:*?"<>|\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '_').replace(/^[. ]+|[. ]+$/g, '').trim().slice(0, 200)
@@ -594,7 +597,7 @@ export default {
             }
             return { ok: true, result: { started: true, name } }
           } catch (e) {
-            return { ok: false, error: { code: 'invoke_failed', message: e?.message || '文件下载失败，请重试' } }
+            return { ok: false, error: { code: 'invoke_failed', message: e?.message || L('文件下载失败，请重试', 'File download failed. Please try again.') } }
           }
         }
 
@@ -605,11 +608,11 @@ export default {
           try {
             const res = await requestPluginNotifications(this.pluginId, method.split('.')[1], params)
             if (generation !== this.sessionGeneration) return this.staleContext()
-            if (!res || res.code !== 0) return { ok: false, error: { code: 'invoke_failed', message: res?.message || '消息通知请求失败' } }
+            if (!res || res.code !== 0) return { ok: false, error: { code: 'invoke_failed', message: res?.message || L('消息通知请求失败', 'Notification request failed') } }
             uni.$emit('awd:message-center-changed')
             return { ok: true, result: res.data }
           } catch (e) {
-            return { ok: false, error: { code: 'invoke_failed', message: e?.message || '消息中心暂不可用' } }
+            return { ok: false, error: { code: 'invoke_failed', message: e?.message || L('消息中心暂不可用', 'Message Center is temporarily unavailable') } }
           }
         }
 
@@ -618,17 +621,17 @@ export default {
           const action = typeof params.action === 'string' ? params.action.trim() : ''
           if (!action || !this.projectId || (params.params != null
               && (typeof params.params !== 'object' || Array.isArray(params.params)))) {
-            return { ok: false, error: { code: 'invalid_params', message: '缺少项目、action 或有效 params' } }
+            return { ok: false, error: { code: 'invalid_params', message: L('缺少项目、action 或有效 params', 'Missing project, action, or valid params') } }
           }
           const generation = this.sessionGeneration
           try {
             const res = await requestPluginIm(this.pluginId, this.projectId, action, params.params || {})
             if (generation !== this.sessionGeneration) return this.staleContext()
-            if (!res || res.code !== 0) return { ok: false, error: { code: 'invoke_failed', message: res?.message || '沟通服务请求失败' } }
+            if (!res || res.code !== 0) return { ok: false, error: { code: 'invoke_failed', message: res?.message || L('沟通服务请求失败', 'Communication service request failed') } }
             if (['import', 'export', 'sendFile', 'binding'].includes(action)) this.$emit('files-changed')
             return { ok: true, result: res.data }
           } catch (e) {
-            return { ok: false, error: { code: 'invoke_failed', message: e?.message || '沟通服务暂不可用，请重试' } }
+            return { ok: false, error: { code: 'invoke_failed', message: e?.message || L('沟通服务暂不可用，请重试', 'Communication service is temporarily unavailable. Please try again.') } }
           }
         }
 
@@ -637,18 +640,18 @@ export default {
           const action = typeof params.action === 'string' ? params.action.trim() : ''
           if (!action || (params.params != null
               && (typeof params.params !== 'object' || Array.isArray(params.params)))) {
-            return { ok: false, error: { code: 'invalid_params', message: '缺少 action 或有效 params' } }
+            return { ok: false, error: { code: 'invalid_params', message: L('缺少 action 或有效 params', 'Missing action or valid params') } }
           }
           const generation = this.sessionGeneration
           try {
             const res = await requestPluginLawFirm(this.pluginId, this.projectId, action, params.params || {})
             if (generation !== this.sessionGeneration) return this.staleContext()
             if (!res || res.code !== 0) {
-              return { ok: false, error: { code: 'invoke_failed', message: res?.message || '律所管理服务请求失败' } }
+              return { ok: false, error: { code: 'invoke_failed', message: res?.message || L('律所管理服务请求失败', 'Law firm management service request failed') } }
             }
             return { ok: true, result: res.data }
           } catch (e) {
-            return { ok: false, error: { code: 'invoke_failed', message: e?.message || '律所管理服务请求失败' } }
+            return { ok: false, error: { code: 'invoke_failed', message: e?.message || L('律所管理服务请求失败', 'Law firm management service request failed') } }
           }
         }
 
@@ -656,22 +659,22 @@ export default {
         case 'files.prepareDrag': {
           if (!this.hasPermission('file_read')) return this.denied('file_read')
           const path = typeof params.path === 'string' ? params.path : ''
-          if (!path) return { ok: false, error: { code: 'invalid_params', message: '缺少项目文件路径 path' } }
+          if (!path) return { ok: false, error: { code: 'invalid_params', message: L('缺少项目文件路径 path', 'Missing project file path') } }
           const generation = this.sessionGeneration
           const projectId = this.projectId
           const isCurrent = () => generation === this.sessionGeneration && String(projectId) === String(this.projectId)
           try {
             const hit = (await this.listProjectFiles()).find(f => f.path === path)
             if (!isCurrent()) return this.staleContext()
-            if (!hit) return { ok: false, error: { code: 'not_found', message: '文件不存在：' + path } }
+            if (!hit) return { ok: false, error: { code: 'not_found', message: L('文件不存在：', 'File not found: ') + path } }
             if (method === 'files.prepareDrag') {
               return { ok: true, result: preparePluginImDrag(this, hit, projectId, window, { frame: this.$refs.pluginFrame, rect: params.rect }) }
             }
-            if (!this.addFileToAi) return { ok: false, error: { code: 'unavailable', message: '当前工作台无法打开 AI 对话' } }
+            if (!this.addFileToAi) return { ok: false, error: { code: 'unavailable', message: L('当前工作台无法打开 AI 对话', 'AI chat is unavailable in the current workspace') } }
             await this.addFileToAi({ projectId, file: { id: hit.id, name: hit.name, fileType: hit.fileType, isDir: false }, isCurrent })
             return isCurrent() ? { ok: true, result: {} } : this.staleContext()
           } catch (e) {
-            return { ok: false, error: { code: 'invoke_failed', message: e?.message || '文件操作失败，请重试' } }
+            return { ok: false, error: { code: 'invoke_failed', message: e?.message || L('文件操作失败，请重试', 'File operation failed. Please try again.') } }
           }
         }
 
@@ -712,7 +715,7 @@ export default {
           next[String(params.key == null ? '' : params.key)] = params.value
           const serialized = JSON.stringify(next)
           if (serialized.length > STORAGE_LIMIT) {
-            return { ok: false, error: { code: 'quota_exceeded', message: '插件存储超过 64 KB 上限' } }
+            return { ok: false, error: { code: 'quota_exceeded', message: L('插件存储超过 64 KB 上限', 'Plugin storage exceeds the 64 KB limit') } }
           }
           this.writeStore(serialized)
           return { ok: true, result: {} }
@@ -724,24 +727,24 @@ export default {
           // 直调本插件自己的 JAR 工具：权限/配额/projectId 都在后端端点与 ToolRegistry 里闸，
           // 桥这里只负责转发；插件不可能借这条路调到别的插件或宿主内置工具（端点按 manifest 校验）
           const name = String(params.name == null ? '' : params.name).trim()
-          if (!name) return { ok: false, error: { code: 'invalid_params', message: '缺少工具名 name' } }
+          if (!name) return { ok: false, error: { code: 'invalid_params', message: L('缺少工具名 name', 'Missing tool name') } }
           let res
           try {
             res = await invokePluginTool(this.pluginId, name, this.projectId, params.args || {})
           } catch (e) {
-            return { ok: false, error: { code: 'invoke_failed', message: (e && e.message) || '工具调用失败' } }
+            return { ok: false, error: { code: 'invoke_failed', message: (e && e.message) || L('工具调用失败', 'Tool invocation failed') } }
           }
           const body = res && res.output !== undefined ? res : (res && res.data) || {}
           if (body.code !== 0) {
-            return { ok: false, error: { code: 'invoke_failed', message: String(body.output || body.message || '工具调用失败') } }
+            return { ok: false, error: { code: 'invoke_failed', message: String(body.output || body.message || L('工具调用失败', 'Tool invocation failed')) } }
           }
           return { ok: true, result: { output: body.output == null ? '' : String(body.output) } }
         }
 
         case 'chat.send': {
           const prompt = String(params.prompt == null ? '' : params.prompt).trim()
-          if (!prompt) return { ok: false, error: { code: 'invalid_params', message: 'prompt 不能为空' } }
-          if (prompt.length > 4000) return { ok: false, error: { code: 'quota_exceeded', message: 'prompt 超过 4000 字上限' } }
+          if (!prompt) return { ok: false, error: { code: 'invalid_params', message: L('prompt 不能为空', 'prompt cannot be empty') } }
+          if (prompt.length > 4000) return { ok: false, error: { code: 'quota_exceeded', message: L('prompt 超过 4000 字上限', 'prompt exceeds the 4000-character limit') } }
           this.$emit('kickoff', { prompt })
           return { ok: true, result: {} }
         }
@@ -749,16 +752,16 @@ export default {
         case 'chat.open': {
           if (!this.hasPermission('ai')) return this.denied('ai')
           const conversationId = String(params.conversationId || '')
-          if (!conversationId || conversationId.length > 200) return { ok: false, error: { code: 'invalid_params', message: '无效的会话标识' } }
+          if (!conversationId || conversationId.length > 200) return { ok: false, error: { code: 'invalid_params', message: L('无效的会话标识', 'Invalid conversation ID') } }
           const generation = this.sessionGeneration
           const projectId = this.projectId
           const response = await getAiConversations(projectId)
           if (generation !== this.sessionGeneration || String(projectId) !== String(this.projectId)) return this.staleContext()
           const rows = Array.isArray(response) ? response : response?.data
           const conversation = Array.isArray(rows) && rows.find(row => row.conversationId === conversationId)
-          if (!conversation) return { ok: false, error: { code: 'not_found', message: '当前项目中尚无该会话记录，请在任务开始后重试' } }
+          if (!conversation) return { ok: false, error: { code: 'not_found', message: L('当前项目中尚无该会话记录，请在任务开始后重试', 'Conversation record not found in the current project. Please try again after the task starts.') } }
           if (!this.businessActions.openConversation || !await this.businessActions.openConversation(conversation)) {
-            return { ok: false, error: { code: 'open_failed', message: '执行会话未能打开，请重试' } }
+            return { ok: false, error: { code: 'open_failed', message: L('执行会话未能打开，请重试', 'Failed to open the execution conversation. Please try again.') } }
           }
           return { ok: true, result: {} }
         }
@@ -766,9 +769,9 @@ export default {
         case 'ui.openUrl': {
           if (!this.hasPermission('network')) return this.denied('network')
           let url
-          try { url = new URL(String(params.url || '')) } catch { return { ok: false, error: { code: 'invalid_params', message: '无效的网址' } } }
-          if (url.protocol !== 'https:' || url.username || url.password) return { ok: false, error: { code: 'invalid_params', message: '仅支持不含登录信息的 HTTPS 网址' } }
-          if (!this.businessActions.openBrowser) return { ok: false, error: { code: 'unavailable', message: '浏览器入口暂不可用' } }
+          try { url = new URL(String(params.url || '')) } catch { return { ok: false, error: { code: 'invalid_params', message: L('无效的网址', 'Invalid URL') } } }
+          if (url.protocol !== 'https:' || url.username || url.password) return { ok: false, error: { code: 'invalid_params', message: L('仅支持不含登录信息的 HTTPS 网址', 'Only HTTPS URLs without credentials are supported') } }
+          if (!this.businessActions.openBrowser) return { ok: false, error: { code: 'unavailable', message: L('浏览器入口暂不可用', 'Browser entry is temporarily unavailable') } }
           await this.businessActions.openBrowser(url.href)
           return { ok: true, result: {} }
         }
@@ -779,7 +782,7 @@ export default {
           const generation = this.sessionGeneration
           const hit = (await this.listProjectFiles()).find(f => f.path === path)
           if (generation !== this.sessionGeneration) return this.staleContext()
-          if (!hit) return { ok: false, error: { code: 'not_found', message: '文件不存在：' + path } }
+          if (!hit) return { ok: false, error: { code: 'not_found', message: L('文件不存在：', 'File not found: ') + path } }
           // 与 evidence.locate 打开底稿同一条路：工作台监听后走 openFileLinkTarget
           uni.$emit('awd:open-evidence-target', { fileId: hit.id, locator: null, linkKey: null })
           return { ok: true, result: {} }
@@ -790,12 +793,12 @@ export default {
         case 'doc.exec': {
           if (!this.hasPermission('editor')) return this.denied('editor')
           const action = String(params.action == null ? '' : params.action).trim()
-          if (!action) return { ok: false, error: { code: 'invalid_params', message: '缺少 action' } }
+          if (!action) return { ok: false, error: { code: 'invalid_params', message: L('缺少 action', 'Missing action') } }
           if (!PLUGIN_DOC_ACTIONS.has(action)) {
-            return { ok: false, error: { code: 'action_not_allowed', message: '该原语不对插件开放：' + action } }
+            return { ok: false, error: { code: 'action_not_allowed', message: L('该原语不对插件开放：', 'This action is not allowed for plugins: ') + action } }
           }
           const ed = this.activeEditor()
-          if (!ed) return this.noActiveDocument('没有打开的文档，doc.exec 只作用于当前聚焦的编辑器')
+          if (!ed) return this.noActiveDocument(L('没有打开的文档，doc.exec 只作用于当前聚焦的编辑器', 'No active document. doc.exec only operates on the currently focused editor.'))
           // __agent: 修订署名 "AI WorkDeck"、Writer 修订模式行为与 AI 管线一致——
           // 插件写入可被用户逐条接受/拒绝（executor 之后还有 EDITOR_ACTIONS 第二道既有闸）
           const r = await ed.executor(action, Object.assign({}, params.params || {}, { __agent: true }))
@@ -851,18 +854,18 @@ export default {
         case 'settings.get': {
           // v2.9：只读本插件声明过的设置项（secret 的键不进桥，服务端返回 null → not_found）
           const key = String(params.key == null ? '' : params.key).trim()
-          if (!key) return { ok: false, error: { code: 'invalid_params', message: '缺少 key' } }
+          if (!key) return { ok: false, error: { code: 'invalid_params', message: L('缺少 key', 'Missing key') } }
           let res
           try {
             res = await getPluginSettings(this.pluginId)
           } catch (e) {
-            return { ok: false, error: { code: 'internal_error', message: (e && e.message) || '设置读取失败' } }
+            return { ok: false, error: { code: 'internal_error', message: (e && e.message) || L('设置读取失败', 'Failed to read plugin settings') } }
           }
           const body = res && res.settings !== undefined ? res : (res && res.data) || {}
           const rows = Array.isArray(body.settings) ? body.settings : []
           const hit = rows.find(r => r.key === key)
-          if (!hit) return { ok: false, error: { code: 'not_found', message: '未声明的设置项：' + key } }
-          if (hit.secret) return { ok: false, error: { code: 'permission_denied', message: 'secret 设置项不提供给插件页面' } }
+          if (!hit) return { ok: false, error: { code: 'not_found', message: L('未声明的设置项：', 'Undeclared setting key: ') + key } }
+          if (hit.secret) return { ok: false, error: { code: 'permission_denied', message: L('secret 设置项不提供给插件页面', 'Secret settings are not exposed to plugin pages') } }
           return { ok: true, result: { key, value: hit.value == null ? '' : String(hit.value) } }
         }
 
@@ -870,9 +873,9 @@ export default {
           if (!this.hasPermission('ai')) return this.denied('ai')
           const prompt = String(params.prompt == null ? '' : params.prompt)
           const system = params.system == null ? '' : String(params.system)
-          if (!prompt.trim()) return { ok: false, error: { code: 'invalid_params', message: 'prompt 不能为空' } }
+          if (!prompt.trim()) return { ok: false, error: { code: 'invalid_params', message: L('prompt 不能为空', 'prompt cannot be empty') } }
           if (prompt.length + system.length > AI_REQUEST_MAX_CHARS) {
-            return { ok: false, error: { code: 'quota_exceeded', message: 'prompt+system 超过 ' + AI_REQUEST_MAX_CHARS + ' 字符上限' } }
+            return { ok: false, error: { code: 'quota_exceeded', message: L('prompt+system 超过 ' + AI_REQUEST_MAX_CHARS + ' 字符上限', 'prompt+system exceeds the ' + AI_REQUEST_MAX_CHARS + '-character limit') } }
           }
           let res
           try {
@@ -880,11 +883,11 @@ export default {
               prompt, system, purpose: String(params.purpose == null ? '' : params.purpose).slice(0, 64)
             })
           } catch (e) {
-            return { ok: false, error: { code: 'ai_failed', message: (e && e.message) || 'AI 请求失败' } }
+            return { ok: false, error: { code: 'ai_failed', message: (e && e.message) || L('AI 请求失败', 'AI request failed') } }
           }
           const body = res && res.code !== undefined ? res : (res && res.data) || {}
           if (body.code !== 0) {
-            return { ok: false, error: { code: body.errorCode || 'ai_failed', message: String(body.message || 'AI 请求失败') } }
+            return { ok: false, error: { code: body.errorCode || 'ai_failed', message: String(body.message || L('AI 请求失败', 'AI request failed')) } }
           }
           return { ok: true, result: { text: body.text == null ? '' : String(body.text), modelId: body.modelId || '' } }
         }
@@ -902,7 +905,7 @@ export default {
           return await this.evidenceLocate(params)
 
         default:
-          return { ok: false, error: { code: 'unknown_method', message: '未知方法：' + method } }
+          return { ok: false, error: { code: 'unknown_method', message: L('未知方法：', 'Unknown method: ') + method } }
       }
     },
 
@@ -946,7 +949,8 @@ export default {
     // ==== 证据链接（evidence.*）====
 
     noActiveDocument(message) {
-      return { ok: false, error: { code: 'no_active_document', message: message || '没有打开的 Word 文档' } }
+      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      return { ok: false, error: { code: 'no_active_document', message: message || (en ? 'No Word document is open' : '没有打开的 Word 文档') } }
     },
 
     activeEditor() {
@@ -966,17 +970,19 @@ export default {
     },
 
     async evidenceList(params) {
+      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const L = (zh, enText) => (en ? enText : zh)
       const { idByPath, pathById } = await this.pathTables()
       let query
       if (params.path) {
         const fileId = idByPath.get(String(params.path))
-        if (!fileId) return { ok: false, error: { code: 'not_found', message: '文件不存在：' + params.path } }
+        if (!fileId) return { ok: false, error: { code: 'not_found', message: L('文件不存在：', 'File not found: ') + params.path } }
         query = { fileId }
       } else {
         let docFileId
         if (params.docPath) {
           docFileId = idByPath.get(String(params.docPath))
-          if (!docFileId) return { ok: false, error: { code: 'not_found', message: '文件不存在：' + params.docPath } }
+          if (!docFileId) return { ok: false, error: { code: 'not_found', message: L('文件不存在：', 'File not found: ') + params.docPath } }
         } else {
           const ed = this.activeEditor()
           if (!ed) return this.noActiveDocument()
@@ -990,14 +996,16 @@ export default {
     },
 
     async evidenceLink(params) {
+      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const L = (zh, enText) => (en ? enText : zh)
       const ed = this.activeEditor()
       if (!ed) return this.noActiveDocument()
       const { idByPath } = await this.pathTables()
       if (params.docPath) {
         // 书签只能打在当前聚焦的编辑器里，docPath 指向别的文档无法代劳
         const want = idByPath.get(String(params.docPath))
-        if (!want) return { ok: false, error: { code: 'not_found', message: '文件不存在：' + params.docPath } }
-        if (want !== ed.fileId) return this.noActiveDocument('docPath 不是当前聚焦的文档，请先切到该文档')
+        if (!want) return { ok: false, error: { code: 'not_found', message: L('文件不存在：', 'File not found: ') + params.docPath } }
+        if (want !== ed.fileId) return this.noActiveDocument(L('docPath 不是当前聚焦的文档，请先切到该文档', 'docPath is not the currently focused document. Please switch to that document first.'))
       }
       const ti = toTargetInputs(params.targets, idByPath)
       if (ti.error) return { ok: false, error: ti.error }
@@ -1009,7 +1017,7 @@ export default {
         if (!sel || !sel.success) {
           // 查找留下的 __ai_anchor_* 书签不能残留在 docx 里
           try { await ed.executor('clear_anchors', {}) } catch (e) { /* ignore */ }
-          return { ok: false, error: { code: 'anchor_ambiguous', message: (sel && sel.message) || '引文无法选中' } }
+          return { ok: false, error: { code: 'anchor_ambiguous', message: (sel && sel.message) || L('引文无法选中', 'Failed to select the quote') } }
         }
       }
 
@@ -1032,7 +1040,7 @@ export default {
         }
       }
       if (!res.ok) {
-        return { ok: false, error: { code: 'no_selection', message: res.message || '无法在选区上建立锚点' } }
+        return { ok: false, error: { code: 'no_selection', message: res.message || L('无法在选区上建立锚点', 'Failed to create an anchor on the selection') } }
       }
       const view = res.view && res.view.linkKey ? res.view : (res.view && res.view.data) || {}
       // 编辑器的 _evidenceCache 与证据面板都只在这个事件上刷新，不发就要重开文档才看得到
@@ -1047,6 +1055,8 @@ export default {
     },
 
     async evidenceLocate(params) {
+      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const L = (zh, enText) => (en ? enText : zh)
       const linkKey = String(params.linkKey || '')
       let link = null
       try {
@@ -1055,13 +1065,13 @@ export default {
       } catch (e) {
         link = null
       }
-      if (!link) return { ok: false, error: { code: 'not_found', message: '链接不存在：' + linkKey } }
+      if (!link) return { ok: false, error: { code: 'not_found', message: L('链接不存在：', 'Link not found: ') + linkKey } }
       const targets = Array.isArray(link.targets) ? link.targets : []
       const tgt = params.targetId != null && params.targetId !== ''
         ? targets.find(t => Number(t.id) === Number(params.targetId))
         : null
       if (params.targetId != null && params.targetId !== '' && !tgt) {
-        return { ok: false, error: { code: 'not_found', message: '底稿位置不存在：' + params.targetId } }
+        return { ok: false, error: { code: 'not_found', message: L('底稿位置不存在：', 'Target location not found: ') + params.targetId } }
       }
       if (tgt) {
         // 打开底稿并定位：由工作台（project-overview）监听后调 openFileLinkTarget
@@ -1070,11 +1080,11 @@ export default {
       }
       const ed = this.activeEditor()
       if (!ed || ed.fileId !== Number(link.docFileId)) {
-        return this.noActiveDocument('该链接所在文档不是当前聚焦的文档')
+        return this.noActiveDocument(L('该链接所在文档不是当前聚焦的文档', 'The document containing this link is not currently focused'))
       }
       const r = await ed.executor('goto_bookmark', { name: link.linkKey })
       if (!r || !r.success) {
-        return { ok: false, error: { code: 'not_found', message: (r && r.message) || '文档里找不到该锚点' } }
+        return { ok: false, error: { code: 'not_found', message: (r && r.message) || L('文档里找不到该锚点', 'Anchor not found in the document') } }
       }
       return { ok: true, result: {} }
     },
@@ -1082,7 +1092,8 @@ export default {
     // ==== 项目文件 ====
 
     staleContext() {
-      return { ok: false, error: { code: 'stale_context', message: '项目或账户已切换，请重试' } }
+      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      return { ok: false, error: { code: 'stale_context', message: en ? 'Project or account has switched. Please try again.' : '项目或账户已切换，请重试' } }
     },
 
     // 后端返回的是一份扁平全树（每条带 parentId），这里就地拼出项目内相对路径——
@@ -1110,19 +1121,21 @@ export default {
     },
 
     async readProjectFile(path) {
+      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const L = (zh, enText) => (en ? enText : zh)
       if (!path) {
-        return { ok: false, error: { code: 'not_found', message: '文件不存在：' + path } }
+        return { ok: false, error: { code: 'not_found', message: L('文件不存在：', 'File not found: ') + path } }
       }
       const hit = (await this.listProjectFiles()).find(f => f.path === path)
       if (!hit) {
-        return { ok: false, error: { code: 'not_found', message: '文件不存在：' + path } }
+        return { ok: false, error: { code: 'not_found', message: L('文件不存在：', 'File not found: ') + path } }
       }
       if (!READABLE_EXTS.has(extOf(hit.name))) {
         return {
           ok: false,
           error: {
             code: 'permission_denied',
-            message: '不是可读取的文本格式，files.read 只支持文本与可抽取文本的文档：' + hit.name
+            message: L('不是可读取的文本格式，files.read 只支持文本与可抽取文本的文档：', 'Unsupported text format. files.read only supports plain text and text-extractable documents: ') + hit.name
           }
         }
       }
@@ -1162,9 +1175,11 @@ export default {
     // ==== 项目沟通 · 通讯录（组织 / 律所 / 朋友）与宿主左栏同步 ====
 
     async handleImDirectory(params = {}) {
+      const en = typeof getAppLanguage === 'function' && getAppLanguage() === 'en-US'
+      const L = (zh, enText) => (en ? enText : zh)
       // 通讯录数据统一由 utils/imDirectory.js 提供（只用真实数据）。测试夹具会剥掉 import，故先判函数存在。
       if (typeof loadImDirectory !== 'function') {
-        return { ok: false, error: { code: 'unknown_method', message: '通讯录不可用' } }
+        return { ok: false, error: { code: 'unknown_method', message: L('通讯录不可用', 'Directory is unavailable') } }
       }
       const action = String(params.action || 'get')
       const deps = {
@@ -1188,12 +1203,12 @@ export default {
           }
           uni.$emit('awd:im-directory-changed', {})
         } else if (action !== 'get') {
-          return { ok: false, error: { code: 'invalid_params', message: '未知的通讯录操作：' + action } }
+          return { ok: false, error: { code: 'invalid_params', message: L('未知的通讯录操作：', 'Unknown directory action: ') + action } }
         }
         const result = await loadImDirectory({ projectId: this.projectId, deps })
         return { ok: true, result }
       } catch (e) {
-        return { ok: false, error: { code: (e && e.code) || 'internal_error', message: (e && e.message) || '通讯录读取失败' } }
+        return { ok: false, error: { code: (e && e.code) || 'internal_error', message: (e && e.message) || L('通讯录读取失败', 'Failed to load directory') } }
       }
     }
   }

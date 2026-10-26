@@ -127,12 +127,22 @@ const LAW_CONTENT = ['content', 'text', 'articleContent', 'body', 'fullText', '�
 const ARTICLE_INLINE_BODY = /^(第[零〇一二三四五六七八九十百千万两\d]+条(?:之[零〇一二三四五六七八九十百千万两\d]+)?)(?:[\s\u3000：:、.．-]+([\s\S]+))?$/u
 
 function synthesizeLawMetaContent(record) {
+  let en = false
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') en = true
+    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') en = true
+  } catch (_) { /* ignore */ }
+  const docNo = pick(record, ['DocumentNO', 'doc_no', 'documentNo'])
+  const dept = pick(record, ['IssueDepartment', 'issueDepartment', '发布部门'])
+  const eff = pick(record, ['EffectivenessDic', 'effectiveness', '效力级别'])
+  const issueDate = pick(record, ['IssueDate', 'issueDate', '发布日期'])
+  const implDate = pick(record, ['ImplementDate', 'implementDate', '实施日期'])
   const lines = [
-    pick(record, ['DocumentNO', 'doc_no', 'documentNo']) ? `发文字号：${pick(record, ['DocumentNO', 'doc_no', 'documentNo'])}` : '',
-    pick(record, ['IssueDepartment', 'issueDepartment', '发布部门']) ? `发布部门：${pick(record, ['IssueDepartment', 'issueDepartment', '发布部门'])}` : '',
-    pick(record, ['EffectivenessDic', 'effectiveness', '效力级别']) ? `效力级别：${pick(record, ['EffectivenessDic', 'effectiveness', '效力级别'])}` : '',
-    pick(record, ['IssueDate', 'issueDate', '发布日期']) ? `发布日期：${pick(record, ['IssueDate', 'issueDate', '发布日期'])}` : '',
-    pick(record, ['ImplementDate', 'implementDate', '实施日期']) ? `实施日期：${pick(record, ['ImplementDate', 'implementDate', '实施日期'])}` : '',
+    docNo ? (en ? `Document No.: ${docNo}` : `发文字号：${docNo}`) : '',
+    dept ? (en ? `Issuing Authority: ${dept}` : `发布部门：${dept}`) : '',
+    eff ? (en ? `Level of Authority: ${eff}` : `效力级别：${eff}`) : '',
+    issueDate ? (en ? `Issue Date: ${issueDate}` : `发布日期：${issueDate}`) : '',
+    implDate ? (en ? `Effective Date: ${implDate}` : `实施日期：${implDate}`) : '',
   ].filter(Boolean)
   return lines.join('\n')
 }

@@ -38,11 +38,20 @@ function defaultRandom(n) {
  * @param {{selection?: boolean, quote?: string}} anchor
  * @returns {Promise<{mode:'selection', text:string} | {mode:'quote', anchorId:string, text:string} | {error:{code:string,message:string}}>}
  */
+function isEnLang() {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') return true
+    if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') return true
+  } catch (_) { /* ignore */ }
+  return false
+}
+
 export async function resolveAnchor(exec, anchor) {
+  const en = isEnLang()
   if (anchor && anchor.selection === true) {
     const cur = await exec('get_selection_hyperlink', {})
     const text = cur && cur.success ? String(cur.text || '').trim() : ''
-    if (!text) return { error: { code: 'no_selection', message: '编辑器当前没有选区' } }
+    if (!text) return { error: { code: 'no_selection', message: en ? 'No text is currently selected in the editor' : '编辑器当前没有选区' } }
     return { mode: 'selection', text }
   }
   if (anchor && typeof anchor.quote === 'string' && anchor.quote.trim()) {
@@ -52,12 +61,19 @@ export async function resolveAnchor(exec, anchor) {
     const matches = r && r.success && Array.isArray(r.matches) ? r.matches : []
     const n = matches.length
     if (n !== 1) {
-      return { error: { code: 'anchor_ambiguous', message: n === 0 ? '引文未命中：' + quote : '引文命中 ' + n + ' 处，请加长引文' } }
+      return {
+        error: {
+          code: 'anchor_ambiguous',
+          message: n === 0
+            ? (en ? 'Quote not found: ' + quote : '引文未命中：' + quote)
+            : (en ? 'Quote matched ' + n + ' locations; please provide a longer quote' : '引文命中 ' + n + ' 处，请加长引文')
+        }
+      }
     }
-    if (!matches[0].anchorId) return { error: { code: 'anchor_ambiguous', message: '引文命中但无法定位' } }
+    if (!matches[0].anchorId) return { error: { code: 'anchor_ambiguous', message: en ? 'Quote matched but cannot be located' : '引文命中但无法定位' } }
     return { mode: 'quote', anchorId: String(matches[0].anchorId), text: String(matches[0].text || quote) }
   }
-  return { error: { code: 'anchor_ambiguous', message: 'anchor 需为 { selection: true } 或 { quote }' } }
+  return { error: { code: 'anchor_ambiguous', message: en ? 'anchor must be { selection: true } or { quote }' : 'anchor 需为 { selection: true } 或 { quote }' } }
 }
 
 /**
@@ -90,13 +106,14 @@ export function toPluginLink(link, pathById) {
  * @param {Map<string, number>} idByPath
  */
 export function toTargetInputs(targets, idByPath) {
+  const en = isEnLang()
   const list = Array.isArray(targets) ? targets : []
-  if (!list.length) return { error: { code: 'not_found', message: 'targets 为空，至少关联一个底稿' } }
+  if (!list.length) return { error: { code: 'not_found', message: en ? 'targets is empty; link at least one source file' : 'targets 为空，至少关联一个底稿' } }
   const out = []
   for (const t of list) {
     const path = t && t.path != null ? String(t.path) : ''
     const fileId = idByPath.get(path)
-    if (!fileId) return { error: { code: 'not_found', message: '文件不存在：' + path } }
+    if (!fileId) return { error: { code: 'not_found', message: (en ? 'File not found: ' : '文件不存在：') + path } }
     out.push({
       fileId,
       locatorJson: t.locator == null ? null : JSON.stringify(t.locator),

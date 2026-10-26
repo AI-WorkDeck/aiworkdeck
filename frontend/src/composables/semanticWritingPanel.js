@@ -1,8 +1,27 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import editorZh from '../locales/zh-CN/editor.js'
+import editorEn from '../locales/en-US/editor.js'
+
 /** Guest UI only. All data and mutations travel through the existing writing session. */
 export function attachSemanticWritingPanel({ canvas, input, transport, focus }) {
   const doc = canvas.ownerDocument, win = doc.defaultView
+  function sw(key, params) {
+    let en = false
+    try {
+      if (doc?.documentElement?.lang === 'en-US') en = true
+      else if (win?.localStorage?.getItem('checkba_app_language') === 'en-US') en = true
+      else if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') en = true
+    } catch (_) { /* ignore */ }
+    const dict = (en ? editorEn : editorZh)?.semanticWriting || editorZh.semanticWriting
+    let text = dict[key] || editorZh.semanticWriting[key] || key
+    if (params && typeof text === 'string') {
+      for (const [k, v] of Object.entries(params)) {
+        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v ?? ''))
+      }
+    }
+    return text
+  }
   let session = '', writable = false, available = false, sheetOpen = false, composing = false, disposed = false, sequence = 0, requestId = 0, timer = null, active = false, accepting = false, saving = false
   const pending = new Map(), selected = new Set()
   const root = doc.createElement('div'); root.className = 'awd-semantic'; root.hidden = true
@@ -21,27 +40,27 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
   doc.head.append(style); doc.body.append(root)
   function element(tag, text, parent, cls) { const el = doc.createElement(tag); if (text != null) el.textContent = text; if (cls) el.className = cls; parent?.append(el); return el }
   function button(text, parent, handler, cls) { const el = element('button', text, parent, cls); el.type = 'button'; el.addEventListener('click', () => Promise.resolve(handler()).catch(e => status(e.message))); return el }
-  const sheet = element('section', null, root, 'awd-semantic-sheet'); sheet.hidden = true; sheet.setAttribute('aria-label', '有据续写'); sheet.setAttribute('role', 'dialog')
-  const head = element('div', null, sheet, 'awd-semantic-head'); element('strong', '有据续写', head); button('关闭', head, () => closePanel(true))
+  const sheet = element('section', null, root, 'awd-semantic-sheet'); sheet.hidden = true; sheet.setAttribute('aria-label', sw('panelTitle')); sheet.setAttribute('role', 'dialog')
+  const head = element('div', null, sheet, 'awd-semantic-head'); element('strong', sw('panelTitle'), head); button(sw('closeBtn'), head, () => closePanel(true))
   const controls = element('div', null, sheet, 'awd-semantic-section')
-  element('label', '文书类型', controls, 'awd-semantic-label')
-  const profile = element('select', null, controls); profile.setAttribute('aria-label', '文书类型')
-  for (const [value, label] of [['auto', '自动识别'], ['litigation', '起诉状 / 代理词'], ['contract', '合同'], ['diligence', '尽调报告 / 法律意见书']]) { const option = element('option', label, profile); option.value = value }
-  const settings = element('details', null, controls); element('summary', '项目立场与核查截止日', settings)
-  element('label', '项目立场', settings, 'awd-semantic-label'); const stance = element('textarea', null, settings); stance.dataset.semanticStance = ''; stance.setAttribute('aria-label', '项目立场'); stance.maxLength = 120
-  element('label', '核查截止日（未确定可留空）', settings, 'awd-semantic-label'); const cutoff = element('input', null, settings); cutoff.type = 'date'; cutoff.setAttribute('aria-label', '核查截止日')
-  const saveButton = button('保存项目设置', settings, async () => {
-    saving = true; invalidate(true); updateActions(); status('正在保存项目设置…')
-    try { await rpc('semantic-save-settings', { stance: stance.value, cutoffDate: cutoff.value }); status('项目设置已保存。') }
+  element('label', sw('docTypeLabel'), controls, 'awd-semantic-label')
+  const profile = element('select', null, controls); profile.setAttribute('aria-label', sw('docTypeLabel'))
+  for (const [value, label] of [['auto', sw('docTypeAuto')], ['litigation', sw('docTypeLitigation')], ['contract', sw('docTypeContract')], ['diligence', sw('docTypeDiligence')]]) { const option = element('option', label, profile); option.value = value }
+  const settings = element('details', null, controls); element('summary', sw('stanceAndCutoffSummary'), settings)
+  element('label', sw('stanceLabel'), settings, 'awd-semantic-label'); const stance = element('textarea', null, settings); stance.dataset.semanticStance = ''; stance.setAttribute('aria-label', sw('stanceLabel')); stance.maxLength = 120
+  element('label', sw('cutoffLabel'), settings, 'awd-semantic-label'); const cutoff = element('input', null, settings); cutoff.type = 'date'; cutoff.setAttribute('aria-label', sw('stanceLabel') === 'Project Stance' ? 'Verification Cutoff Date' : '核查截止日')
+  const saveButton = button(sw('saveSettingsBtn'), settings, async () => {
+    saving = true; invalidate(true); updateActions(); status(sw('savingSettingsStatus'))
+    try { await rpc('semantic-save-settings', { stance: stance.value, cutoffDate: cutoff.value }); status(sw('settingsSavedStatus')) }
     finally { saving = false; updateActions() }
   })
-  element('div', '参考项目材料 · 最多 4 份', controls, 'awd-semantic-label'); const files = element('div', null, controls, 'awd-semantic-files')
-  element('div', '当前文书会一同参考。材料中的说法不会自动视为已核实事实。', controls, 'awd-semantic-hint')
+  element('div', sw('referenceMaterialsLabel'), controls, 'awd-semantic-label'); const files = element('div', null, controls, 'awd-semantic-files')
+  element('div', sw('referenceMaterialsHint'), controls, 'awd-semantic-hint')
   const actions = element('div', null, sheet, 'awd-semantic-section'), actionGrid = element('div', null, actions, 'awd-semantic-actions')
-  for (const [mode, label] of [['local', '读取事实'], ['sentence', '续写一句'], ['paragraph', '续写一段'], ['rewrite', '改写选区']]) button(label, actionGrid, () => run(mode), mode === 'sentence' ? 'awd-semantic-primary' : '')
-  element('div', '读取事实仅整理当前资料；其余操作明确请求 AI 生成。采用前请核对依据。', actions, 'awd-semantic-hint')
-  const statusEl = element('div', '选择参考材料后，生成当前位置的建议。', sheet, 'awd-semantic-status'); statusEl.setAttribute('role', 'status')
-  const cancelButton = button('取消生成', sheet, () => { invalidate(true); status('已取消生成。') }); cancelButton.hidden = true
+  for (const [mode, label] of [['local', sw('modeLocal')], ['sentence', sw('modeSentence')], ['paragraph', sw('modeParagraph')], ['rewrite', sw('modeRewrite')]]) button(label, actionGrid, () => run(mode), mode === 'sentence' ? 'awd-semantic-primary' : '')
+  element('div', sw('actionsHint'), actions, 'awd-semantic-hint')
+  const statusEl = element('div', sw('initialStatus'), sheet, 'awd-semantic-status'); statusEl.setAttribute('role', 'status')
+  const cancelButton = button(sw('cancelGenerateBtn'), sheet, () => { invalidate(true); status(sw('cancelledStatus')) }); cancelButton.hidden = true
   const output = element('div', null, sheet)
   function status(text) { statusEl.textContent = text || '' }
   // 面板的唯一入口在宿主的自建工具栏（dev-board#748）：客体只按指令开合，并把
@@ -52,10 +71,10 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
   function closePanel(refocus) { if (!sheetOpen) return; sheetOpen = false; applyOpen(); invalidate(true); report(); if (refocus) focus?.() }
   function openPanel() { if (!available || sheetOpen) return; sheetOpen = true; applyOpen(); report(); loadSettings().catch(e => status(e.message)) }
   function rpc(action, data = {}) {
-    if (disposed || !session) return Promise.reject(new Error('文档已切换，请重新打开面板。'))
+    if (disposed || !session) return Promise.reject(new Error(sw('docSwitchedReopenError')))
     const id = `semantic-${++requestId}`, expected = session
     return new Promise((resolve, reject) => {
-      const timeout = win.setTimeout(() => { pending.delete(id); reject(new Error('请求超时，请重试。')) }, 120000)
+      const timeout = win.setTimeout(() => { pending.delete(id); reject(new Error(sw('requestTimeoutError'))) }, 120000)
       pending.set(id, { resolve, reject, timeout, session: expected })
       transport.send({ __lo: 'lo-relay', type: 'writing-request', session: expected, id, action, data })
     })
@@ -63,11 +82,11 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
   function stopTimer() { if (timer != null) win.clearTimeout(timer); timer = null }
   function invalidate(remote = false) {
     const hadActive = active, hadContent = output.childNodes.length > 0; sequence++; active = false; stopTimer(); output.replaceChildren(); cancelButton.hidden = true
-    if (hadActive || hadContent) status('正文、光标或参考条件已变化，请重新生成。')
+    if (hadActive || hadContent) status(sw('contextChangedStatus'))
     if (remote && hadActive && session) rpc('semantic-cancel').catch(() => {})
   }
   async function loadSettings() {
-    const expected = session; status('正在读取项目设置…')
+    const expected = session; status(sw('loadingSettingsStatus'))
     const result = await rpc('semantic-settings'); if (disposed || expected !== session) return
     stance.value = result.stance || ''; cutoff.value = result.cutoffDate || ''; files.replaceChildren()
     const available = new Set((result.files || []).map(file => file.id))
@@ -77,20 +96,20 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
       element('span', file.name, row)
       box.addEventListener('change', () => { if (box.checked) selected.add(file.id); else selected.delete(file.id); updateChecks(); invalidate(true); syncContext() })
     }
-    updateChecks(); syncContext(); if (!active) status('选择参考材料后，生成当前位置的建议。')
+    updateChecks(); syncContext(); if (!active) status(sw('initialStatus'))
   }
   function syncContext() { rpc('semantic-context', { documentType: profile.value, sourceFileIds: [...selected] }).catch(e => status(e.message)) }
   function updateChecks() { for (const box of files.querySelectorAll('input')) box.disabled = !box.checked && selected.size >= 4 }
   function sourceDetails(parent, view, advice) {
     const chosen = (view.facts || []).filter(f => advice.factIds?.includes(f.id))
     const references = (view.sources || []).filter(s => advice.sourceIds?.includes(s.id) || chosen.some(f => f.sourceId === s.id))
-    const details = element('details', null, parent); element('summary', `依据与原文 · ${references.length} 个来源`, details)
+    const details = element('details', null, parent); element('summary', sw('sourcesSummary', { count: references.length }), details)
     for (const source of references) {
       const name = element('div', [source.name, source.locator].filter(Boolean).join(' · '), details, 'awd-semantic-hint')
-      if (source.version) name.title = `来源版本：${source.version}`
+      if (source.version) name.title = sw('sourceVersionTitle', { version: source.version })
       const quotes = chosen.filter(f => f.sourceId === source.id).map(f => f.quote).filter(Boolean)
       if (quotes.length) for (const quote of new Set(quotes)) element('blockquote', quote, details)
-      else element('blockquote', source.text || '该来源未提供可显示的原文。', details)
+      else element('blockquote', source.text || sw('sourceNoText'), details)
     }
   }
   function render(result, seq) {
@@ -98,43 +117,54 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
     const view = result.view || {}, notices = [...(result.notices || []), ...(view.warnings || [])]
     output.replaceChildren(); cancelButton.hidden = view.status !== 'RUNNING'
     if (view.status === 'RUNNING') {
-      status('正在结合文书与材料生成建议，可随时取消。')
+      status(sw('runningStatus'))
       timer = win.setTimeout(async () => { try { render(await rpc('semantic-poll'), seq) } catch (e) { if (seq === sequence) status(e.message) } }, 800)
       return
     }
     stopTimer()
-    const labels = { READY: `已按${view.profileLabel || '当前文书'}整理建议。`, EMPTY: '没有足够依据形成建议。请补充材料或缩小写作范围。', FAILED: view.error || '本次未能生成，请稍后重试。', CANCELLED: '已取消生成。' }
-    status([labels[view.status] || '未取得建议。', ...notices].join('\n'))
+    const labels = {
+      READY: sw('readyStatus', { profile: view.profileLabel || sw('currentDocFallback') }),
+      EMPTY: sw('emptyStatus'),
+      FAILED: view.error || sw('failedFallback'),
+      CANCELLED: sw('cancelledStatus'),
+    }
+    status([labels[view.status] || sw('noSuggestionFallback'), ...notices].join('\n'))
     if (!['READY', 'EMPTY'].includes(view.status)) { active = false; return }
     if (!(view.advice || []).length && (view.facts || []).length) {
-      if (view.status === 'EMPTY') status(['已整理资料摘录，当前位置暂无可直接采用的建议。', ...notices].join('\n'))
-      const card = element('div', null, output, 'awd-semantic-card'); element('strong', '资料摘录 · 不代表已核实', card)
-      const states = { PENDING: '条件待确认', CONFLICT: '资料有分歧', MISSING: '材料未取得', CLAIM: '当事人主张', COUNTERPARTY_PROPOSAL: '对方稿' }
+      if (view.status === 'EMPTY') status([sw('factsOnlyStatus'), ...notices].join('\n'))
+      const card = element('div', null, output, 'awd-semantic-card'); element('strong', sw('factsCardTitle'), card)
+      const states = {
+        PENDING: sw('factStatePending'),
+        CONFLICT: sw('factStateConflict'),
+        MISSING: sw('factStateMissing'),
+        CLAIM: sw('factStateClaim'),
+        COUNTERPARTY_PROPOSAL: sw('factStateCounterparty'),
+      }
       for (const fact of view.facts) {
         const row = element('div', `${fact.label}：${fact.value}`, card)
-        element('span', ` · ${[states[fact.status] || '材料记载', fact.role].filter(Boolean).join(' · ')}`, row, 'awd-semantic-hint')
+        element('span', ` · ${[states[fact.status] || sw('factStateRecorded'), fact.role].filter(Boolean).join(' · ')}`, row, 'awd-semantic-hint')
         sourceDetails(card, view, { factIds: [fact.id], sourceIds: [fact.sourceId] })
       }
     }
     if (view.status !== 'READY') { active = false; return }
     for (const [index, advice] of (view.advice || []).entries()) {
-      const card = element('div', null, output, 'awd-semantic-card'); element('strong', '建议文字', card)
+      const card = element('div', null, output, 'awd-semantic-card'); element('strong', sw('adviceCardTitle'), card)
       element('div', advice.text, card, 'awd-semantic-preview'); if (advice.explanation) element('div', advice.explanation, card, 'awd-semantic-hint')
       sourceDetails(card, view, advice)
-      button('采用这条', card, async () => {
-        if (composing) { status('请先完成当前输入，再采用建议。'); return }
+      button(sw('acceptBtn'), card, async () => {
+        if (composing) { status(sw('finishComposingBeforeAcceptError')); return }
         if (seq !== sequence) return
         accepting = true
-        try { const applied = await rpc('semantic-accept', { index, composing }); if (seq !== sequence) return; if (!applied.applied) throw new Error('未能采用，请重新生成。'); invalidate(); status(applied.message || '已采用，可用 Ctrl+Z / ⌘Z 撤销。'); focus?.() }
+        try { const applied = await rpc('semantic-accept', { index, composing }); if (seq !== sequence) return; if (!applied.applied) throw new Error(sw('acceptFailedError')); invalidate(); status(applied.message || sw('acceptedUndoHint')); focus?.() }
         finally { accepting = false }
       }, 'awd-semantic-primary')
     }
   }
   function updateActions() { saveButton.disabled = saving; for (const button of actionGrid.querySelectorAll('button')) button.disabled = saving }
   async function run(mode) {
-    if (saving) { status('项目设置正在保存，请稍后生成。'); return }
-    if (composing) { status('请先完成当前输入，再生成建议。'); return }
-    invalidate(true); active = true; const seq = sequence; cancelButton.hidden = false; status('正在读取当前位置与参考材料…')
+    if (saving) { status(sw('savingWaitGenerateError')); return }
+    if (composing) { status(sw('finishComposingBeforeGenerateError')); return }
+    invalidate(true); active = true; const seq = sequence; cancelButton.hidden = false; status(sw('readingContextStatus'))
     try { render(await rpc('semantic-generate', { mode, documentType: profile.value, sourceFileIds: [...selected], composing }), seq) }
     catch (e) { if (seq === sequence) { active = false; cancelButton.hidden = true; status(e.message) } }
   }
@@ -142,7 +172,7 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
     if (disposed) return
     if (msg?.type === 'writing-config') {
       const config = msg.config || {}
-      if ('session' in config && config.session !== session) { invalidate(); selected.clear(); files.replaceChildren(); stance.value = ''; cutoff.value = ''; profile.value = 'auto'; sheetOpen = false; session = config.session || ''; for (const item of pending.values()) { win.clearTimeout(item.timeout); item.reject(new Error('文档已切换。')) } pending.clear() }
+      if ('session' in config && config.session !== session) { invalidate(); selected.clear(); files.replaceChildren(); stance.value = ''; cutoff.value = ''; profile.value = 'auto'; sheetOpen = false; session = config.session || ''; for (const item of pending.values()) { win.clearTimeout(item.timeout); item.reject(new Error(sw('docSwitchedError'))) } pending.clear() }
       if ('writable' in config) writable = !!config.writable
       const wasOpen = sheetOpen
       available = !!session && !!writable
@@ -167,6 +197,6 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
     isComposing() { return composing },
     cursorMoved() { if (!accepting && active) invalidate(true) },
     committed() { if (!accepting && active) invalidate(true) },
-    destroy() { if (disposed) return; invalidate(true); disposed = true; unsubscribe?.(); for (const item of pending.values()) { win.clearTimeout(item.timeout); item.reject(new Error('文档已关闭。')) } pending.clear(); doc.removeEventListener('compositionstart', beginComposition, true); doc.removeEventListener('compositionend', endComposition, true); root.remove(); style.remove() },
+    destroy() { if (disposed) return; invalidate(true); disposed = true; unsubscribe?.(); for (const item of pending.values()) { win.clearTimeout(item.timeout); item.reject(new Error(sw('docClosedError'))) } pending.clear(); doc.removeEventListener('compositionstart', beginComposition, true); doc.removeEventListener('compositionend', endComposition, true); root.remove(); style.remove() },
   }
 }

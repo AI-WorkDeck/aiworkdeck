@@ -34,18 +34,25 @@ export function bytesToBase64(bytes) {
  * data 里只放后端要的东西：base64、字节数、源文件 id；绝不回传原始 bytes。
  */
 export function agentPdfExportResult(res, sourceFileId) {
+  let isEn = false
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
+    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+  } catch (_) { /* ignore */ }
   if (!res || res.success === false) {
-    const error = (res && (res.error || res.message)) || 'PDF 导出失败'
+    const error = (res && (res.error || res.message)) || (isEn ? 'PDF export failed' : 'PDF 导出失败')
     return { success: false, data: null, error }
   }
   const bytes = normalizePdfBytes(res.bytes)
-  if (!bytes || !bytes.length) return { success: false, data: null, error: 'PDF 导出结果为空' }
+  if (!bytes || !bytes.length) return { success: false, data: null, error: isEn ? 'PDF export result is empty' : 'PDF 导出结果为空' }
   if (bytes.length > MAX_EXPORT_PDF_BYTES) {
     const mb = Math.round(MAX_EXPORT_PDF_BYTES / 1024 / 1024)
     return {
       success: false,
       data: null,
-      error: '导出的 PDF 超过 ' + mb + 'MB，无法经 AI 存进项目；请用菜单「文件 → 导出为 PDF」另存'
+      error: isEn
+        ? 'Exported PDF exceeds ' + mb + 'MB and cannot be saved into the project via AI; please use "File -> Export as PDF" instead'
+        : '导出的 PDF 超过 ' + mb + 'MB，无法经 AI 存进项目；请用菜单「文件 → 导出为 PDF」另存'
     }
   }
   return {

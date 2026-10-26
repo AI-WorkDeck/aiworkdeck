@@ -34,6 +34,14 @@ function scalarText(v) {
   return String(v)
 }
 
+function isEnLang() {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') return true
+    if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') return true
+  } catch (_) { /* ignore */ }
+  return false
+}
+
 function renderInto(lines, value, indent, depth) {
   if (lines.length >= MAX_LINES) return
   const pad = '  '.repeat(indent)
@@ -49,7 +57,7 @@ function renderInto(lines, value, indent, depth) {
       }
     }
     const hidden = value.length - shown.length
-    if (hidden > 0 && lines.length < MAX_LINES) lines.push(pad + `…（另 ${hidden} 条略）`)
+    if (hidden > 0 && lines.length < MAX_LINES) lines.push(pad + (isEnLang() ? `…(${hidden} more omitted)` : `…（另 ${hidden} 条略）`))
     return
   }
   for (const [k, v] of Object.entries(value)) {
@@ -85,7 +93,7 @@ export function humanizeToolOutput(raw) {
   if (parsed === null || typeof parsed !== 'object') return null
   const lines = []
   renderInto(lines, parsed, 0, 0)
-  if (lines.length >= MAX_LINES) lines.push('…（其余略）')
+  if (lines.length >= MAX_LINES) lines.push(isEnLang() ? '…(rest omitted)' : '…（其余略）')
   return lines.length ? lines.join('\n') : null
 }
 

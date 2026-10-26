@@ -184,9 +184,12 @@ test('地址默认勾选并通过预览和生成共用请求传给后端', async
 
 
 test('两种替换方式均说明地址只保留层级，编号须完整保留用于复敏', async () => {
-  for (const lang of ['zh-CN', 'en-US']) {
+  for (const [lang, expected] of [
+    ['zh-CN', /XX省XX市XX区XXXX/],
+    ['en-US', /XX Province, XX City, XX District, XXXX/],
+  ]) {
     const panels = await loadPanels(lang)
-    assert.match(panels.deTokenNotice, /XX省XX市XX区XXXX/)
-    assert.match(panels.deMaskNotice, /XX省XX市XX区XXXX/)
+    assert.match(panels.deTokenNotice, expected)
+    assert.match(panels.deMaskNotice, expected)
   }
 })

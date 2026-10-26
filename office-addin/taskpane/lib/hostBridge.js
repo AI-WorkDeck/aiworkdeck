@@ -50,6 +50,7 @@ import {
   locateWpsTarget
 } from './wpsExecutor.js'
 import { docKeyOf } from './revisionLog.js'
+import { t } from './i18n.js'
 
 export { hashContent } from './wordDoc.js'
 
@@ -106,7 +107,7 @@ export async function executeCommand(command, args) {
   const family = hostFamily()
   if (family === 'office') return executeOfficeCommand(command, args)
   if (family === 'wps') return executeWpsCommand(command, args)
-  return { ok: false, error: '宿主环境不可用：请在 Office 或 WPS 任务窗格中使用本插件' }
+  return { ok: false, error: t('hostEnvUnavailable') }
 }
 
 /** 命令中文名表两个家族共用（officeExecutor 里的纯数据表，不碰宿主 API） */
@@ -167,7 +168,7 @@ export async function writeCrossDocState(state) {
   const family = hostFamily()
   if (family === 'office') return writeOfficeState(state)
   if (family === 'wps') return writeWpsState(state)
-  throw new Error('宿主环境不可用：请在 Office 或 WPS 任务窗格中使用本插件')
+  throw new Error(t('hostEnvUnavailable'))
 }
 
 /**

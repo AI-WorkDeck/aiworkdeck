@@ -47,7 +47,7 @@ public final class DocxComparisonFinalizer {
     private static void requireProjection(Document source, Document result, boolean finalSide) {
         if (!DocxComparisonFields.projection(source.getDocumentElement(), true)
                 .equals(DocxComparisonFields.projection(result.getDocumentElement(), finalSide))) {
-            throw new IllegalArgumentException("比对稿与原文内容未能完整对应，请重试；未创建文件");
+            throw new IllegalArgumentException(LangText.of("比对稿与原文内容未能完整对应，请重试；未创建文件", "Comparison output does not fully match the source document; please retry (no file was created)"));
         }
     }
 
@@ -152,7 +152,7 @@ public final class DocxComparisonFinalizer {
             Range old = oldRanges.get(name), newer = newRanges.get(name);
             if (old == null && newer == null) continue; // Preserve an already broken source reference as-is.
             if (cutsFieldCache(rawOldRanges.get(name), oldCaches) || cutsFieldCache(rawNewRanges.get(name), newCaches))
-                throw new IllegalArgumentException("引用目标位于另一字段的缓存内部，无法安全恢复该书签，未创建比对稿");
+                throw new IllegalArgumentException(LangText.of("引用目标位于另一字段的缓存内部，无法安全恢复该书签，未创建比对稿", "Reference target lies inside another field's cached value and cannot be safely restored; comparison document was not created"));
             if ((old == null || old.equals(actualOld.get(name))) && (newer == null || newer.equals(actualNew.get(name)))) continue;
             Scan startSide = old == null ? newSide : oldSide, endSide = startSide;
             int startAt = old == null ? newer.start : old.start, endAt = old == null ? newer.end : old.end;
@@ -182,7 +182,7 @@ public final class DocxComparisonFinalizer {
         actualOld = bookmarkRanges(scan(result, false)); actualNew = bookmarkRanges(scan(result, true));
         for (String name : targets) if (oldRanges.containsKey(name) && !oldRanges.get(name).equals(actualOld.get(name))
                 || newRanges.containsKey(name) && !newRanges.get(name).equals(actualNew.get(name)))
-            throw new IllegalArgumentException("同名引用书签无法同时还原两份文档中的位置，未创建比对稿");
+            throw new IllegalArgumentException(LangText.of("同名引用书签无法同时还原两份文档中的位置，未创建比对稿", "Reference bookmark with the same name cannot be restored for both documents simultaneously; comparison document was not created"));
     }
     private static List<Range> fieldCacheRanges(Document source, Scan raw) {
         List<Range> ranges = new ArrayList<>();
@@ -204,7 +204,7 @@ public final class DocxComparisonFinalizer {
             Integer start = scan.bookmarkStarts.get(entry.getKey()), end = scan.bookmarkEnds.get(entry.getKey());
             if (start != null && end != null && end >= start) {
                 if (ranges.putIfAbsent(entry.getValue(), new Range(start, end)) != null)
-                    throw new IllegalArgumentException("文档含重复名称的引用书签，未创建比对稿");
+                    throw new IllegalArgumentException(LangText.of("文档含重复名称的引用书签，未创建比对稿", "Document contains duplicate reference bookmark names; comparison document was not created"));
             }
         }
         return ranges;
@@ -254,7 +254,7 @@ public final class DocxComparisonFinalizer {
                 }
             }
             Scan projection = revisedSide ? newProjection : oldProjection;
-            if (range.end > projection.text.length()) throw new IllegalArgumentException("批注位置超出比对正文");
+            if (range.end > projection.text.length()) throw new IllegalArgumentException(LangText.of("批注位置超出比对正文", "Comment range exceeds comparison document text"));
             Token first = boundary(projection, range.start, true), last = boundary(projection, range.end, false);
             boolean replacedRow = first != null && insideTrackedRow(first.element) || last != null && insideTrackedRow(last.element);
             String tableQuote = replacedRow ? projection.text.substring(range.start, range.end).replace("\ufffc", "［引用域］") : "";
@@ -324,7 +324,7 @@ public final class DocxComparisonFinalizer {
         // Native exports do not retain Word's comment threads. Do not leave stale metadata referring
         // to the old comment IDs after replacing the definitions.
         for (String part : List.of("word/commentsExtended.xml", "word/commentsIds.xml", "word/commentsExtensible.xml")) {
-            if (result.entries.containsKey(part)) throw new IllegalArgumentException("比对结果包含尚不能安全重建的批注线程信息");
+            if (result.entries.containsKey(part)) throw new IllegalArgumentException(LangText.of("比对结果包含尚不能安全重建的批注线程信息", "Comparison result contains comment thread metadata that cannot yet be safely reconstructed"));
         }
     }
 
@@ -370,9 +370,9 @@ public final class DocxComparisonFinalizer {
                 anchorId = parents.get(anchorId);
             Integer start = scan.starts.get(anchorId), end = scan.ends.get(anchorId);
             if (start == null || end == null || end < start)
-                throw new IllegalArgumentException("文档含无法定位的批注，未创建比对稿");
+                throw new IllegalArgumentException(LangText.of("文档含无法定位的批注，未创建比对稿", "Document contains unlocatable comments; comparison document was not created"));
             // Copying a relationship without its resource would silently corrupt rich comments.
-            if (hasRelationship(def)) throw new IllegalArgumentException("批注含链接或附件，当前无法完整合并该批注");
+            if (hasRelationship(def)) throw new IllegalArgumentException(LangText.of("批注含链接或附件，当前无法完整合并该批注", "Comment contains links or attachments that cannot currently be merged"));
             out.add(new Comment(def, new Range(start, end), revised));
         }
     }
@@ -462,7 +462,7 @@ public final class DocxComparisonFinalizer {
         for (Element text : texts) {
             if (!markers.containsKey(text)) continue;
             if (!(text.getParentNode() instanceof Element run) || !is(run, "r"))
-                throw new IllegalArgumentException("不支持的批注文字结构");
+                throw new IllegalArgumentException(LangText.of("不支持的批注文字结构", "Unsupported comment text structure"));
             if (!runs.add(run)) continue;
             Node parent = run.getParentNode();
             Element part = emptyRun(run);
@@ -485,7 +485,7 @@ public final class DocxComparisonFinalizer {
         }
         if (!empty.isEmpty()) {
             List<Element> paragraphs = elements(doc, "p");
-            if (paragraphs.isEmpty()) throw new IllegalArgumentException("批注没有可用的段落锚点");
+            if (paragraphs.isEmpty()) throw new IllegalArgumentException(LangText.of("批注没有可用的段落锚点", "No paragraph anchor available for comments"));
             for (Element marker : empty) paragraphs.get(0).appendChild(marker);
         }
     }
@@ -608,11 +608,11 @@ public final class DocxComparisonFinalizer {
                 for (ZipEntry entry; (entry = zip.getNextEntry()) != null;) {
                     byte[] data = zip.readNBytes(32 * 1024 * 1024 + 1); total += data.length;
                     if (data.length > 32 * 1024 * 1024 || total > 128 * 1024 * 1024 || entries.size() >= 4096)
-                        throw new IllegalArgumentException("文档解压后过大，请拆分比对");
-                    if (entries.putIfAbsent(entry.getName(), data) != null) throw new IllegalArgumentException("DOCX 含重复条目");
+                        throw new IllegalArgumentException(LangText.of("文档解压后过大，请拆分比对", "Uncompressed document is too large; please split before comparing"));
+                    if (entries.putIfAbsent(entry.getName(), data) != null) throw new IllegalArgumentException(LangText.of("DOCX 含重复条目", "DOCX contains duplicate zip entries"));
                 }
             }
-            if (!entries.containsKey(DOCUMENT) || !entries.containsKey("[Content_Types].xml")) throw new IllegalArgumentException("不是有效的 DOCX 文件");
+            if (!entries.containsKey(DOCUMENT) || !entries.containsKey("[Content_Types].xml")) throw new IllegalArgumentException(LangText.of("不是有效的 DOCX 文件", "Not a valid DOCX file"));
         }
         Document xml(String name) throws Exception { return parse(entries.get(name)); }
         void putXml(String name, Document d) throws Exception {

@@ -178,11 +178,9 @@
       <!-- 界面语言。2026-08-18 从设置页「系统配置」搬来：语言是每个人自己的
            偏好（storage 权威源、人人可改、不要 admin 权限）。
            独立保存链（setAppLanguage 直写），与本栏其它字段无关。 -->
-      <SettingsSection :title="appLanguage === 'en-US' ? 'Language' : '语言 / Language'">
+      <SettingsSection :title="$t('account.languageGroupTitle')">
         <text class="bind-tip">
-          {{ appLanguage === 'en-US'
-            ? 'Applies to the interface, document editor, and AI replies. Newly opened editors use the new language; restart the app for full effect.'
-            : '作用于界面、文档编辑器与 AI 回复。新打开的编辑器使用新语言，重启应用后完全生效。' }}
+          {{ $t('account.languageGroupHint') }}
         </text>
         <view class="lang-row">
           <view
@@ -599,7 +597,7 @@ export default {
       if (value === this.appLanguage) return
       this.appLanguage = setAppLanguage(value)
       uni.showToast({
-        title: this.appLanguage === 'en-US' ? 'Switching to English…' : '正在切换为简体中文…',
+        title: this.appLanguage === 'en-US' ? this.$t('account.languageSwitchingToEn') : this.$t('account.languageSwitchingToZh'),
         icon: 'none',
       })
       // 整页 reload：i18n 单例的 locale、config 模块顶层取值的静态 label、

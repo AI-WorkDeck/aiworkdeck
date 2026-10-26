@@ -1,7 +1,9 @@
 # 股东大会核查 Skill（打包格式见 docs/SKILL_SPEC.md）
 id: shareholder-meeting-verification
 name: 股东大会核查
+name_en: Shareholder Meeting Verification
 description: 上市公司/挂牌公司股东会法律见证：对照股东大会通知、董事会决议公告与投票结果做逐字段交叉核对与表决复算，撰写（或按本所初稿填充）法律意见书，并生成可溯源的交叉核对底稿表。
+description_en: "Legal attestation for listed-company shareholder meetings: field-by-field cross-verification and vote tally recalculation across meeting notices, board resolution announcements, and voting results, drafting or populating the legal opinion and generating a traceable working-paper checklist."
 
 # 法律事项类别（匿名统计用，枚举见 MatterCategory）
 category: 资本市场证券
