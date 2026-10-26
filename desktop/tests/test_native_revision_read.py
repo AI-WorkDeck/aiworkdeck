@@ -52,14 +52,52 @@ const {NativeEditorSession}=require(source+'/editor-session'),{createProcessChan
 })();
 '''
 
+ADOPTION_SCENARIO = r"""
+const fs=require('node:fs/promises'),assert=require('node:assert/strict');
+const {NativeEditorSession}=require(process.env.AWD_NATIVE_EDIT_SOURCE+'/editor-session');
+(async()=>{
+ const root=process.env.AWD_NATIVE_EDIT_RUN,config=JSON.parse(await fs.readFile(process.env.AWD_NATIVE_EDIT_CONFIG)),results=[];
+ const s=new NativeEditorSession({config,run:root+'/engine',readOnly:false});
+ const settle=async()=>{for(let i=0;i<200;i++){await new Promise(r=>setTimeout(r,5));await s.queue;if(!s.viewReadGuard?.scheduled&&!s.viewReadGuard?.pending.size)return}throw Error('proof did not settle')};
+ try{
+  await s.execute('load_document',{bytes:new Uint8Array(await fs.readFile(process.env.AWD_NATIVE_EDIT_FIXTURE)),name:'adoption.docx',authorName:'隔离审校采用验证'});
+  await s.execute('set_revision_view',{mode:'balloons'});await settle();
+  const context=await s.execute('get_review_context');
+  assert.equal(context.success,true);assert.ok(context.text.length>0);
+  await s.execute('set_revision_view',{mode:'final'});
+  const pending=s.viewReadGuard?.pending.size||0;
+  results.push({phase:'captured',revision:context.revision,hostRevision:s.revision,pending});
+  assert.ok(pending>25,'must exercise an unfinished visual Modify wave');
+  const before=s.revision,params={revision:context.revision,paragraphIndex:context.paragraphIndex,start:0,end:1,expectedParagraph:context.text,quote:context.text.slice(0,1),replacement:'审'};
+  const adopted=await s.execute('apply_review_edit',params);
+  results.push({phase:'adopted',before,after:s.revision,result:adopted});
+  assert.equal(adopted.success,true);assert.equal(s.revision,before+1,'only the actual adoption invalidates');
+  const text=await s.execute('get_document_text',{__agent:true});await settle();
+  assert.equal(text.paragraphs.find(p=>p.index===context.paragraphIndex)?.text,'审'+context.text.slice(1),'real engine returns the exact adopted paragraph');
+  const stale=await s.execute('apply_review_edit',params);
+  results.push({phase:'old-range',result:stale});assert.equal(stale.reason,'stale');
+  await s.execute('undo');
+  const restored=await s.execute('get_document_text',{__agent:true});await settle();
+  assert.equal(restored.paragraphs.find(p=>p.index===context.paragraphIndex)?.text,context.text,'one undo restores the original paragraph');
+  results.push({phase:'verified',textReadback:true,oldRangeRejected:true,oneUndo:true});
+ }catch(e){results.push({error:e.stack});process.exitCode=1}finally{await s.close();await fs.writeFile(root+'/results.json',JSON.stringify(results,null,2));console.log(root);}
+})();
+"""
+
 @unittest.skipUnless(os.environ.get('AWD_NATIVE_EDIT_CONFIG') and os.environ.get('AWD_NATIVE_EDIT_FIXTURE'),
                      'isolated runtime and synthetic 600-revision fixture explicitly required')
 class NativeRevisionRead(unittest.TestCase):
     def test_read_views_exports_and_actual_mutations(self):
+        self.run_scenario(SCENARIO)
+
+    def test_adoption_waits_for_unfinished_visual_proof(self):
+        self.run_scenario(ADOPTION_SCENARIO)
+
+    def run_scenario(self, scenario):
         artifacts = Path(os.environ['AWD_NATIVE_EDIT_ARTIFACTS'])
         artifacts.mkdir(parents=True, exist_ok=True)
         run = Path(tempfile.mkdtemp(prefix='verified-', dir=artifacts))
-        script = run / 'scenario.cjs'; script.write_text(SCENARIO)
+        script = run / 'scenario.cjs'; script.write_text(scenario)
         env = {**os.environ, 'AWD_NATIVE_EDIT_SOURCE': str(SOURCE), 'AWD_NATIVE_EDIT_RUN': str(run)}
         with (run / 'scenario.log').open('w') as log:
             child = subprocess.Popen(['node', str(script)], env=env, stdout=log,
