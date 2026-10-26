@@ -4,6 +4,10 @@
 // meeting verification, redaction, due diligence, browser pane, project favorites,
 // plugin container, text-to-speech, clipboard, variable library.
 export default {
+  workspaceNavigation: 'Workspace',
+  workspaceAiActions: 'AI assistance',
+  workspaceAbout: 'About this plugin',
+  workspaceState: { active: 'In view', open: 'In a tab', closed: 'Open' },
   // LitigationVisualPanel.vue
   litRefresh: 'Refresh',
   litNoGraphvizNotice: "This machine doesn't have graphviz, so flowcharts can't be drawn for now; the other six kinds — timelines, relationship maps, ownership structure trees, and more — still work.",

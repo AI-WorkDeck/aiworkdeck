@@ -84,12 +84,14 @@ test('real sandbox SDK bridge supports explicit import/export/member/leave confi
   });
   const dragButton = await frame.waitForSelector('.drag-file'); const bounds = await dragButton.boundingBox();
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
-  await page.waitForSelector('[data-awd-plugin-drag-handle]');
+  const nativeDragHandle = await page.waitForSelector('[data-awd-plugin-drag-handle]');
   await page.mouse.down(); await page.mouse.move(bounds.x + bounds.width / 2 + 12, bounds.y + bounds.height / 2, { steps: 5 });
   await page.mouse.move(810, 230, { steps: 30 }); await page.mouse.up();
   await page.waitForFunction(() => window.nativeDrop?.file?.id === 6);
   assert.equal(await page.evaluate(() => nativeDrop.file.name), '合成合同.docx');
-  assert.equal(await page.$$eval('[data-awd-plugin-drag-handle]', (els) => els.length), 0);
+  // Chromium may restore hover to the source after a CDP drag and prepare a new
+  // handle. Verify the handle consumed by this drop, not an unrelated later hover.
+  assert.equal(await nativeDragHandle.evaluate((el) => el.isConnected), false);
   await frame.click('#members-button'); await confirmedAction('移除', 'removeMember');
   await frame.waitForFunction(() => document.querySelectorAll('.member-row').length === 1);
   await confirmedAction('退出会话', 'leave'); await frame.waitForFunction(() => document.getElementById('active-chat').hidden);

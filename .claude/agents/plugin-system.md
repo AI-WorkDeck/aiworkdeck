@@ -67,7 +67,7 @@ description: 插件系统领域（具体插件实现）。任务涉及尽调/脱
 
 **「语音」合并插件（dev-board#66，2026-08-20）**：概念模型「左栏一个图标 = 一个插件，skill 只在 AI 对话生效」——text-to-speech 与 meeting-recorder 两个成员 skill 在广场三处 UI 里合并成**一个**「语音」条目（分组定义 `VOICE_PLUGIN_GROUP` + 合成视图 `buildVoiceGroupSkill()`，都在 `leftSidebarPlugins.js`），启停一体：前端开关一次翻全部成员，后端 `SkillRegistry.convergeVoiceMergedSkills()` 每次扫描后把分裂态收敛为「任一启用 → 全部启用」（防「tab 可见但生成纪要 kick-off 命不中 skill」的静默断裂）；meeting-recorder 的 `enabled_by_default` 因此也改为 true。两个 skill 文件本身、AI 对话行为、触发词都没动。
 
-**动态 JAR / Web 插件（dev-board#1143/#1144，2026-10-08）**：点击 rail 使用 `pluginWorkspaceTabs.js` 的 `openPluginTab(pluginId)` 打开或聚焦工作区单例标签（`tabType:'plugin'`）。左栏 `PluginWorkspaceSummary.vue` 只显示简介与「打开工作区」入口。腾讯会议与尽调报告的 Web 主界面由工作区承载；后续动态插件默认复用该能力，不要再把复杂操作全部塞在左栏。
+**动态 JAR / Web 插件（dev-board#1143/#1144，2026-10-08；#1493，2026-10-26）**：点击 rail 使用 `pluginWorkspaceTabs.js` 的 `openPluginTab(pluginId)` 打开或聚焦工作区单例标签（`tabType:'plugin'`）。左栏 `PluginWorkspaceSummary.vue` 显示轻量工作区导航和真实标签状态，简介默认折叠在「关于此插件」。腾讯会议与尽调报告的 Web 主界面由工作区承载；后续动态插件默认复用该能力，不要再把复杂操作全部塞在左栏。
 
 - 有 `frontendEntry` → 工作区 `PluginPane`；无入口 → `PluginGuidePane`（manifest.guide 的 intro/steps/quickActions 与工具清单）。两者都连接 `onPluginQuickAction`，prompt 仍需包含 skill 触发词。
 - 左右工作区分别按标签 `v-for/v-show` 保留实例，普通标签切换不丢输入；关闭、禁用、卸载、封禁或不兼容卸载实例。跨窗格移动可能重建，不承诺未持久化表单保活。插件禁止 Alt 双开。

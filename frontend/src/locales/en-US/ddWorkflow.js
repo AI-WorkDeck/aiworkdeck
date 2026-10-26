@@ -12,7 +12,7 @@ export default {
   "pendingNotifications": "Notifications to review",
   "unreadNotifications": "{count} unread collaboration notifications",
   "clientWorkspace": "Client collaboration",
-  "clientWorkspaceHint": "Enter your lawyer’s invitation code in the workspace to view checklists, submit documents and follow reviews.",
+  "clientWorkspaceHint": "Connect to invited projects in this workspace to view checklists, submit documents and follow reviews.",
   "openClientWorkspace": "Open client collaboration",
   "lists": "Due diligence checklists",
   "refresh": "Refresh",
@@ -148,7 +148,7 @@ export default {
   },
   "client": {
     "messageUnavailable": "This invited project or checklist is no longer available. Refresh and try again.",
-    "workspaceTitle": "Invited due diligence",
+    "workspaceTitle": "Client collaboration",
     "workspaceHint": "Prepare documents from your lawyer’s checklist, submit each item and follow the feedback.",
     "joinProject": "Join project",
     "unreadMessages": "{count} unread messages",
