@@ -375,32 +375,32 @@ const renderItems = computed(() => {
 .harness-adaptation-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 6px 0 2px;
+  gap: var(--awd-space-1);
+  margin: var(--awd-space-1) 0 2px;
 }
 .harness-adaptation-item {
-  border-left: 2px solid var(--color-primary, #4f6bed);
-  background: var(--color-bg-subtle, rgba(79, 107, 237, 0.06));
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-size: 12px;
+  border-left: 2px solid var(--awd-accent);
+  background: var(--awd-accent-soft);
+  border-radius: var(--awd-radius-sm);
+  padding: var(--awd-space-1) var(--awd-space-2);
+  font-size: var(--awd-panel-fs);
   line-height: 1.5;
 }
 .harness-adaptation-item.tier-domain {
-  border-left-color: var(--color-warning, #d97706);
-  background: rgba(217, 119, 6, 0.06);
+  border-left-color: var(--awd-gold);
+  background: var(--awd-gold-soft);
 }
 .ha-badge {
   display: inline-block;
-  font-size: 11px;
-  opacity: 0.75;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
   margin-bottom: 2px;
 }
 .ha-title {
   font-weight: 600;
 }
 .ha-diagnosis {
-  opacity: 0.8;
+  color: var(--awd-text-2);
 }
 .process-divider { width: 100%; border-bottom: 1px solid var(--awd-border-subtle); margin-top: var(--awd-space-1); }
 .process-card {
