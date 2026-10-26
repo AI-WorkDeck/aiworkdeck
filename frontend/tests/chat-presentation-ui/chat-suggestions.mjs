@@ -65,6 +65,10 @@ try {
   assert.equal(await page.evaluate(() => window.suggestionRequests.length), 0, 'history must not generate suggestions')
   await submit('请审查这份合成合同。'); await finish(); await shown()
   assert.equal(await page.evaluate(() => window.suggestionRequests.length), 1)
+  assert.equal(await page.$eval('.composer-advanced-settings', el => el.open), false)
+  assert.equal(await page.$eval('.suggestion-text', el => el.checkVisibility()), true, 'live suggestions stay visible outside closed settings')
+  assert.equal(await page.$$eval('.suggestion-text', els => els.length), 1, 'one live suggestion, never duplicated inside settings')
+  await (await page.$('.input-area-wrapper')).screenshot({ path: '/tmp/awd-advanced-live-suggestion.png' })
   // Editing area only. Shift+Tab and IME keep ordinary keyboard behavior.
   await page.focus('.chat-input-rich')
   let count = await page.evaluate(() => window.chatPosts.length)
@@ -103,6 +107,7 @@ try {
   await page.evaluate(async () => { await window.chat.loadMessages('another', []); window.releaseSuggestion(); window.releaseSuggestion = null })
   assert.equal(await page.$('.suggestion-text'), null)
   // Toggle off suppresses new model requests; a new identity gets its own default.
+  await page.click('.composer-advanced-summary')
   await page.click('.suggestion-toggle'); count = await page.evaluate(() => window.suggestionRequests.length)
   await submit('关闭状态的一轮'); await finish()
   assert.equal(await page.evaluate(() => window.suggestionRequests.length), count)
