@@ -37,7 +37,16 @@ r6 has 72 expected palette/compact-font failures, 26 passes and 2 explicit resiz
 skips; r7 has 98 passes and the same 2 skips. DPR1/2, light/dark, 50/100/150% zoom,
 whole-row/column clicks, wheel scroll and strict XLSX export/reopen preserve values,
 formulas, fonts, formats and dimensions. Actual label ink changes from 12 CSSpx
-to about 9 / 8.5 CSSpx. Resize is separately investigated, not counted as passed.
+to about 9 / 8.5 CSSpx. With `CALC_HEADER_RESIZE=1`, the audit agent additionally
+passed 53 assertions each at DPR1/2 with native chrome visible: real column/row
+dragging, two actual clicks for autofit, scrolling and strict export/reopen. r6
+passes the same native resizing operations (36 expected style failures remain).
+
+This is **not** a pass for the hidden-chrome resize path: when headers touch the
+canvas top, both engines can place the size tooltip beside the pointer, where
+Qt's padded window hit-testing intercepts later mouse events. The existing
+limitation is tracked separately in dev-board#1515. Tests preserve the tooltip
+and distinguish the two layouts; they do not bypass or claim to fix this path.
 
 `mouse-clock.mjs`: r6 fails same-point clicks 1.3 seconds apart; r7 passes it.
 Both pass genuine fast double-click and content preservation. r7 additionally

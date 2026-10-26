@@ -111,6 +111,8 @@ evidence of native runtime correctness.
 构建后使用 `LOWA_ENGINE_DIR` 指向候选产物，运行
 `npm run test:lowa-calc-chrome` 与 `npm run test:lowa-mouse-clock`；
 `LOWA_MOUSE_CLOCK_DRAG=1` 另跑生产补偿及测试专用取消补偿的拖移/撤销。
+`CALC_HEADER_RESIZE=1` 另验原生菜单/工具栏可见时的真实行列拖动、双击与重开；
+隐藏chrome时顶部提示窗截获输入是旧新共有的已知问题（dev-board#1515），不得把前者通过当作后者已修复。
 两项样式/慢击断言须先在旧 r6 失败再在新引擎通过。具体产物与实际验收
 结果写入 `RECIPE.md`；没有真实结果的候选不能替换默认引擎地址。
 
