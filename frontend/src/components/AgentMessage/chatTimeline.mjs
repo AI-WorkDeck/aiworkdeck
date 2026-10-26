@@ -46,6 +46,7 @@ export function captureChatTimeline(bubble) {
           last = { type: 'process', source: proc, data: { ...proc, items: [] } }
           entries.push(last)
         }
+        if (proc.harnessAdaptations) last.data.harnessAdaptations = proc.harnessAdaptations
         last.data.items.push(item)
       }
     }

@@ -75,9 +75,20 @@ test('插入失败时不抢焦点', async () => {
   assert.deepEqual(focused, [])
 })
 
+test('引擎明确拒绝插入时不提示成功或抢焦点', async () => {
+  for (const result of [null, { success: false, code: 'UNSUPPORTED_NATIVE_ACTION' }, { success: false, code: 'READ_ONLY' }]) {
+    const { vm, focused, toasts } = makePage()
+    vm.libreOfficeExecutor.executeCommand = async () => result
+    await vm.insertPlainTextToWps({ type: 'TEXT', content: 'x' })
+    assert.deepEqual(focused, [])
+    assert.deepEqual(toasts, ['workbench.insertFailed'])
+  }
+})
+
 test('LibreOfficeEditor.focusEditor 聚焦编辑器容器（webview / iframe）', () => {
   const SRC = read('components/LibreOfficeEditor.vue')
   const BODY = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
   // eslint-disable-next-line no-new-func
   const options = new Function('ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'setTimeout', BODY)(null, null, null, () => 0)

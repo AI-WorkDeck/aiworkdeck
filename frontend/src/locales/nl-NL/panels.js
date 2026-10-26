@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "workspaceNavigation": "Workspace",
+  "workspaceAiActions": "AI assistance",
+  "workspaceAbout": "About this plugin",
+  "workspaceState": {
+    "active": "In view",
+    "open": "In a tab",
+    "closed": "Open"
+  },
   "litRefresh": "Vernieuwen",
   "litNoGraphvizNotice": "This machine doesn't have graphviz, so flowcharts can't be drawn for now; the other six kinds — timelines, relationship maps, ownership structure trees, and more — still work.",
   "litNewDiagramSectionTitle": "Generate a New Diagram",

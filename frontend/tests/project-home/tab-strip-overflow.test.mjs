@@ -67,8 +67,10 @@ test('滚轮横滚改成原生 addEventListener 挂在真实元素上，且会�
     'rebindTabsWheel 要按 .tabs-scroll 在本实例的 DOM 子树里找元素')
   assert.match(DRAG, /unbindTabsWheel\s*\(\)\s*\{/, 'tabDragSplit.js 缺少 unbindTabsWheel')
   assert.ok(!/onTabsWheel/.test(DRAG + VUE), '模板事件版的 onTabsWheel 还没删干净')
-  assert.match(VUE, /mounted\(\)[\s\S]{0,1200}?rebindTabsWheel\(\)/, 'mounted 里没有挂')
-  assert.match(VUE, /beforeUnmount\(\)[\s\S]{0,400}?unbindTabsWheel\(\)/, 'beforeUnmount 里没有摘')
+  const mounted = VUE.match(/\n  mounted\(\) \{([\s\S]*?)\n  \},/)
+  const unmount = VUE.match(/\n  beforeUnmount\(\) \{([\s\S]*?)\n  \},/)
+  assert.match(mounted?.[1] || '', /rebindTabsWheel\(\)/, 'mounted 里没有挂')
+  assert.match(unmount?.[1] || '', /unbindTabsWheel\(\)/, 'beforeUnmount 里没有摘')
   // 分屏开关会把右侧那条标签栏整个建/拆，回来要重挂（bind 是幂等的）
   const splitWatch = VUE.match(/    splitMode\(\) \{([\s\S]*?)\n    activeToolKey/)
   assert.ok(splitWatch, '缺少 splitMode watcher')

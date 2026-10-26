@@ -103,4 +103,16 @@ class LangTextTest {
         LangText.reset();
         assertFalse(LangText.isEnglish());
     }
+
+    @Test
+    void scopedLanguageWorksBeforeSpringAndNeverTouchesStartingRepository() {
+        LangText.reset();
+        assertEquals("English", AppLanguageScope.call("en-US", () -> LangText.of("中文", "English")));
+        AppLanguageService starting = mock(AppLanguageService.class);
+        LangText.register(starting);
+        assertEquals("English", AppLanguageScope.call("en-US", () -> LangText.of("中文", "English")));
+        assertEquals("中文", AppLanguageScope.call("zh-CN", () -> LangText.of("中文", "English")));
+        org.mockito.Mockito.verifyNoInteractions(starting);
+        assertNull(AppLanguageScope.current());
+    }
 }

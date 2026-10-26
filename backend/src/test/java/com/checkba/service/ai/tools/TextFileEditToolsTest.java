@@ -40,17 +40,23 @@ class TextFileEditToolsTest {
     private WorkSessionService workSessions;
     private EditorBridgeService bridge;
     private TextFileEditTools tools;
+    private com.checkba.service.ProjectFileContentService content;
 
     @BeforeEach
     void setUp() {
         ProjectContextHolder.setProjectId("7");
+        ProjectContextHolder.setUserId(3L);
         repo = Mockito.mock(ProjectFileRepository.class);
         storage = Mockito.mock(StorageService.class);
         StorageServiceFactory factory = Mockito.mock(StorageServiceFactory.class);
         when(factory.getStorageService()).thenReturn(storage);
         workSessions = Mockito.mock(WorkSessionService.class);
         bridge = Mockito.mock(EditorBridgeService.class);
-        tools = new TextFileEditTools(repo, factory, workSessions, bridge, null);
+        var members = mock(com.checkba.service.ProjectMemberService.class);
+        lenient().when(members.hasWritePermission(7L, 3L)).thenReturn(true);
+        content = com.checkba.service.ContentServiceTestSupport.create(repo, factory, members,
+                mock(com.checkba.service.ProjectFileAccessService.class), mock(com.checkba.storage.ProjectStorageResolver.class), workSessions);
+        tools = new TextFileEditTools(repo, content, workSessions, bridge, null);
     }
 
     @AfterEach
@@ -93,7 +99,7 @@ class TextFileEditToolsTest {
         when(users.getUserById(3L)).thenReturn(u);
         StorageServiceFactory factory = Mockito.mock(StorageServiceFactory.class);
         when(factory.getStorageService()).thenReturn(storage);
-        TextFileEditTools signed = new TextFileEditTools(repo, factory, workSessions, bridge, users);
+        TextFileEditTools signed = new TextFileEditTools(repo, content, workSessions, bridge, users);
         ProjectContextHolder.setUserId(3L);
         ProjectFile pf = textFile(12L, "备忘二.txt", "txt");
         when(repo.findById(12L)).thenReturn(Optional.of(pf));
@@ -173,8 +179,9 @@ class TextFileEditToolsTest {
 
         assertFalse(out.startsWith("Error"), out);
         assertEquals("# 新内容\n正文", savedContent(pf));
-        assertEquals("# 新内容\n正文".getBytes(StandardCharsets.UTF_8).length, pf.getFileSize());
-        verify(repo).save(pf);
+        verify(repo).updateContentMetadataIfCurrent(eq(pf.getId()), eq(7L), eq(pf.getFilePath()),
+                eq((long) "# 新内容\n正文".getBytes(StandardCharsets.UTF_8).length), any());
+        verify(repo, never()).save(any());
         verify(workSessions).onChangeSignal(eq(7L), any(), anyString());
         verify(bridge).sendTextReloadFileAction(pf);
     }

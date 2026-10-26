@@ -20,6 +20,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 import * as barriers from '../../src/utils/checkpointSaveBarrier.js'
+import * as viewPrefs from '../../src/utils/editorViewPrefs.js'
 let projectSequence = 0
 let checkpointStateReader = async () => ({ mayWrite: false })
 function optionsOf(rel) {
@@ -41,7 +42,7 @@ function optionsOf(rel) {
   const body = script
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
     .replace(/export\s+default\s*\{/, 'return {')
-  return new Function(...names, body)(...names.map(name => barriers[name] || (name === 'getCheckpointRestoreWriteState' ? ((...args) => checkpointStateReader(...args)) : null) || (name === 'createAuthorNameResolver' ? (() => ({ current: () => '' })) : (() => {}))))
+  return new Function(...names, body)(...names.map(name => barriers[name] || viewPrefs[name] || (name === 'getCheckpointRestoreWriteState' ? ((...args) => checkpointStateReader(...args)) : null) || (name === 'createAuthorNameResolver' ? (() => ({ current: () => '' })) : (() => {}))))
 }
 
 const toolbar = optionsOf('../../src/components/EditorToolbar.vue')

@@ -25,6 +25,7 @@ const SRC = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', i
 // export default 换成 return，外部符号由 new Function 的形参喂桩。
 function loadMethods() {
   const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '')
     .replace(/export default \{/, 'return {')
   const factory = new Function(...Object.keys(barriers),
@@ -81,7 +82,7 @@ test('迟到的失败不许把重试装载好的文档判成 loadFailed（关掉
   await tick()
   assert.deepEqual(vm.dispatched, [], '原始链路还卡在下载上')
 
-  vm.fetchArrayBuffer = async () => new ArrayBuffer(4096)   // 重试这次秒下完
+  vm.fetchDocumentBytes = async () => new ArrayBuffer(4096)   // 重试这次秒下完
   vm.retryLoad()
   await tick(); await tick()
   assert.equal(vm.statusKey, 'ready')
@@ -100,7 +101,7 @@ test('重试期间只推一次 load_document，ready 也只发一次', async () 
   const stale = vm.finishDocLoad()
   await tick()
 
-  vm.fetchArrayBuffer = async () => new ArrayBuffer(4096)
+  vm.fetchDocumentBytes = async () => new ArrayBuffer(4096)
   vm.retryLoad()
   await tick(); await tick()
 
@@ -113,7 +114,7 @@ test('重试期间只推一次 load_document，ready 也只发一次', async () 
 
 test('没有并发时正常装载不受影响', async () => {
   const vm = makeVm()
-  vm.fetchArrayBuffer = async () => new ArrayBuffer(4096)
+  vm.fetchDocumentBytes = async () => new ArrayBuffer(4096)
   await vm.finishDocLoad()
   assert.deepEqual(vm.dispatched, ['load_document'])
   assert.equal(vm.statusKey, 'ready')
@@ -123,7 +124,7 @@ test('没有并发时正常装载不受影响', async () => {
 
 test('装载真失败时仍然置位保存闸（重入闸不许吞掉真失败）', async () => {
   const vm = makeVm()
-  vm.fetchArrayBuffer = async () => { throw new Error('boom') }
+  vm.fetchDocumentBytes = async () => { throw new Error('boom') }
   await vm.finishDocLoad()
   assert.equal(vm.docLoadFailed, true)
   assert.equal(vm.statusKey, 'loadFailed')

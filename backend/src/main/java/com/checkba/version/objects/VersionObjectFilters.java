@@ -113,6 +113,26 @@ public final class VersionObjectFilters {
         finally { STAGING.set(previous); }
     }
 
+    /** Insert verified historical bytes using the new-snapshot rules, never the working file or old index. */
+    public static ObjectId insertSnapshot(Repository repo, String relativePath, InputStream source) throws IOException {
+        TemporaryBuffer.LocalFile encoded = new TemporaryBuffer.LocalFile(null);
+        boolean previous = STAGING.get();
+        STAGING.set(true);
+        try (source) {
+            // null deliberately bypasses legacy-index preservation. The caller is creating a new
+            // baseline, while the current index may already contain the edited working bytes.
+            if (relativePath.startsWith(".awd/")) {
+                source.transferTo(encoded);
+                encoded.close();
+            } else clean(repo, source, encoded, isMedia(relativePath), null).run();
+            try (InputStream input = encoded.openInputStream(); var inserter = repo.newObjectInserter()) {
+                ObjectId blob = inserter.insert(Constants.OBJ_BLOB, encoded.length(), input);
+                inserter.flush();
+                return blob;
+            }
+        } finally { STAGING.set(previous); encoded.destroy(); }
+    }
+
     public static <T> T materializing(Repository repo, Map<String, Set<LocalVersionObjectStore.ObjectRef>> paths,
                                      Action<T> action) throws Exception {
         Map<String, Set<LocalVersionObjectStore.ObjectRef>> previous = MATERIALIZING.get();

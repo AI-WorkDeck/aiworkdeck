@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "workspaceNavigation": "Workspace",
+  "workspaceAiActions": "AI assistance",
+  "workspaceAbout": "About this plugin",
+  "workspaceState": {
+    "active": "In view",
+    "open": "In a tab",
+    "closed": "Open"
+  },
   "litRefresh": "Làm mới",
   "litNoGraphvizNotice": "Máy này không có graphviz nên tạm thời không thể vẽ lưu đồ; sáu loại còn lại — dòng thời gian, sơ đồ quan hệ, sơ đồ cơ cấu sở hữu, v.v. — vẫn hoạt động bình thường.",
   "litNewDiagramSectionTitle": "Tạo sơ đồ mới",

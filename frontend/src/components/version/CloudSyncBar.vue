@@ -2,7 +2,11 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <view class="cloud-bar">
-    <template v-if="!linked">
+    <template v-if="!cloud">
+      <text class="cloud-text">{{ $t('version.cloudStatusUnknown') }}</text>
+      <text class="cloud-open-link" @tap="open('casefile')">{{ $t('version.manageCloudSync') }}</text>
+    </template>
+    <template v-else-if="!linked">
       <text class="cloud-text cloud-unlinked">{{ unlinkedText }}</text>
       <!-- hasConnection 为假 = 本站没有官方案件库、本机也没有连接（国际站）。此时没有
            任何可点的下一步：手填服务器地址的入口已经撤掉，自建部署改由部署配置
@@ -14,7 +18,7 @@
     <template v-else>
       <text class="cloud-dot" :class="stateClass"></text>
       <text class="cloud-text">{{ stateText }}</text>
-      <text class="cloud-open-link" @tap="open('casefile')">{{ $t('version.openCollab') }}</text>
+      <text class="cloud-open-link" @tap="open('casefile')">{{ $t('version.manageCloudSync') }}</text>
     </template>
   </view>
 </template>
@@ -62,7 +66,8 @@ export default {
       if (this.cloud.remoteAhead) {
         return remoteAheadText((k, p) => this.$t(k, p), this.cloud, { fallbackKey: 'version.colleagueSubmittedNew' })
       }
-      if (this.cloud.pendingUpload || this.working) return this.$t('version.hasUnsubmittedChanges')
+      if (this.cloud.pendingUpload) return this.$t('version.pendingCloudUpload')
+      if (this.working) return this.$t('version.cloudSubmitFirst')
       return this.$t('version.inSyncWithTeam')
     },
     stateClass() {

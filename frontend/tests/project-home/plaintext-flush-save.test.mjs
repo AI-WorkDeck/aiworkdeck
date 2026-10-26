@@ -10,21 +10,24 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { beginDocumentSave, beginCheckpointSaveBarrier, checkpointSaveBarrier, endCheckpointSaveBarrier, pendingDocumentSaveFileIds } from '../../src/utils/checkpointSaveBarrier.js'
 
 const SFC = readFileSync(
   new URL('../../src/components/PlainTextEditor.vue', import.meta.url), 'utf8')
 
-function loadOptions(setTimeoutStub, clearTimeoutStub) {
+function loadOptions(setTimeoutStub, clearTimeoutStub, emit) {
   const script = SFC.match(/<script>([\s\S]*?)<\/script>/)[1]
   const body = script
     .replace(/^import .*$/gm, '')
     .replace('export default', 'return')
   // eslint-disable-next-line no-new-func
-  return new Function('setTimeout', 'clearTimeout', body)(setTimeoutStub, clearTimeoutStub)
+  return new Function('setTimeout', 'clearTimeout', 'uni', 'beginDocumentSave', 'checkpointSaveBarrier', body)(setTimeoutStub, clearTimeoutStub, { $emit: emit }, beginDocumentSave, checkpointSaveBarrier)
 }
 
+let editorId = 100
 function makeEditor() {
   const uploads = []          // { content, resolve, reject, done }
+  const events = []
   const deferred = []
   // 防抖/重试（>=1s）在测试里挂起不放行；flushSave 的百毫秒轮询立刻推进，
   // 免得真的等满十秒。
@@ -33,15 +36,16 @@ function makeEditor() {
     Promise.resolve().then(fn)
     return 2
   }
-  const opts = loadOptions(setTimeoutStub, () => {})
+  const opts = loadOptions(setTimeoutStub, () => {}, (...args) => events.push(args))
   const inst = Object.assign({}, opts.data(), {
     phase: 'ready',
+    file: { id: ++editorId }, projectId: 'plain-save-test',
     _loadOk: true,
     _seq: 0,
     _saveTimer: null,
     _retryTimer: null,
     _inflight: null,
-    _view: { state: { doc: { toString: () => inst._text } } },
+    _view: { state: { doc: { toString: () => inst._text } }, destroy() {} },
     _text: 'v1'
   })
   for (const [k, fn] of Object.entries(opts.methods)) inst[k] = fn.bind(inst)
@@ -52,8 +56,24 @@ function makeEditor() {
     deferred.push(d)
   })
   const edit = (text) => { inst._text = text; inst.onUserEdit() }
-  return { inst, uploads, edit }
+  return { inst, uploads, edit, events, unmount: () => opts.beforeUnmount.call(inst) }
 }
+
+test('保存回执更新版本角标，上传失败不发成功事件', async () => {
+  const { inst, uploads, edit, events } = makeEditor()
+  inst.file = { id: 12 }; inst.projectId = 8
+  edit('updated')
+  const saved = inst.save()
+  assert.deepEqual(events, [])
+  uploads[0].resolve()
+  await saved
+  assert.deepEqual(events, [['awd:file-saved', { projectId: 8, fileId: 12 }]])
+  edit('unsaved')
+  const failed = inst.save()
+  uploads[1].reject(new Error('offline'))
+  assert.equal(await failed, false)
+  assert.equal(events.length, 1)
+})
 
 const tick = async (n = 8) => { for (let i = 0; i < n; i++) await Promise.resolve() }
 
@@ -147,4 +167,58 @@ test('保存期间新增文本不能被当成全部落盘', async () => {
   uploads[0].resolve()
   assert.equal(await flush, false)
   assert.equal(inst.dirty, true)
+})
+
+test('关闭标签后的在途上传仍被项目保存屏障等待', async () => {
+  const { inst, uploads, edit, unmount } = makeEditor()
+  edit('last edit')
+  const saving = inst.save()
+  unmount()
+  assert.ok(pendingDocumentSaveFileIds(inst.projectId).includes(String(inst.file.id)))
+  const barrier = beginCheckpointSaveBarrier(inst.projectId, inst.file.id, 'version-action')
+  let drained = false
+  const waiting = barrier.drained.then(ok => { drained = ok })
+  await tick()
+  assert.equal(drained, false)
+  uploads[0].resolve()
+  await saving; await waiting
+  assert.equal(drained, true)
+  endCheckpointSaveBarrier(inst.projectId, inst.file.id, 'version-action')
+})
+
+test('卸载兜底上传也登记租约；结果未知不允许覆盖', async () => {
+  const { inst, uploads, edit, unmount } = makeEditor()
+  edit('last edit'); unmount()
+  assert.equal(uploads.length, 1)
+  assert.ok(pendingDocumentSaveFileIds(inst.projectId).includes(String(inst.file.id)))
+  const barrier = beginCheckpointSaveBarrier(inst.projectId, inst.file.id, 'version-action')
+  uploads[0].reject(new Error('unknown upload result'))
+  assert.equal(await barrier.drained, false)
+  endCheckpointSaveBarrier(inst.projectId, inst.file.id, 'version-action')
+  assert.ok(pendingDocumentSaveFileIds(inst.projectId).includes(String(inst.file.id)))
+})
+
+test('版本屏障期间不能自动保存或卸载兜底写入', async () => {
+  const { inst, uploads, edit, unmount } = makeEditor()
+  const barrier = beginCheckpointSaveBarrier(inst.projectId, inst.file.id, 'version-action')
+  edit('stale text')
+  assert.equal(await inst.save(), false)
+  unmount()
+  assert.equal(uploads.length, 0)
+  endCheckpointSaveBarrier(inst.projectId, inst.file.id, barrier.restoreId)
+})
+
+test('重载在途切到另一文件，旧下载不能覆盖新实例内容', async () => {
+  const { inst } = makeEditor()
+  const fileId = inst.file.id
+  let finish, writes = 0
+  inst.download = () => new Promise(resolve => { finish = resolve })
+  inst._view.dispatch = () => { writes++ }
+  const barrier = beginCheckpointSaveBarrier(inst.projectId, fileId, 'version-action')
+  const reload = inst.reloadFromBackend('version-action')
+  inst.file = { id: 'replacement' }
+  finish('old file bytes')
+  assert.equal(await reload, false)
+  assert.equal(writes, 0)
+  endCheckpointSaveBarrier(inst.projectId, fileId, barrier.restoreId)
 })

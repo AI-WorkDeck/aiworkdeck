@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "workspaceNavigation": "Workspace",
+  "workspaceAiActions": "AI assistance",
+  "workspaceAbout": "About this plugin",
+  "workspaceState": {
+    "active": "In view",
+    "open": "In a tab",
+    "closed": "Open"
+  },
   "litRefresh": "새로고침",
   "litNoGraphvizNotice": "이 컴퓨터에는 graphviz가 없어 흐름도는 일시적으로 그릴 수 없으며, 나머지 여섯 종류 — 타임라인, 관계도, 지분 구조 트리 등 — 는 정상적으로 사용할 수 있습니다.",
   "litNewDiagramSectionTitle": "새 다이어그램 생성",

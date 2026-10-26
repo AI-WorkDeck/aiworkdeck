@@ -12,7 +12,7 @@ export default {
   "pendingNotifications": "待处理通知",
   "unreadNotifications": "{count} 条未读协作通知",
   "clientWorkspace": "客户协作",
-  "clientWorkspaceHint": "在标签页中输入律师提供的邀请码，查收清单、提交材料并跟进核验结果。",
+  "clientWorkspaceHint": "在此工作区连接律师邀请的项目，查看清单、提交材料和跟进反馈。",
   "openClientWorkspace": "打开客户协作",
   "lists": "尽调清单",
   "refresh": "刷新",
@@ -148,7 +148,7 @@ export default {
   },
   "client": {
     "messageUnavailable": "该消息对应的受邀项目或清单已不可访问，请刷新后重试。",
-    "workspaceTitle": "受邀尽调",
+    "workspaceTitle": "客户协作",
     "workspaceHint": "按律师清单准备材料，逐项提交并查看反馈。",
     "joinProject": "加入项目",
     "unreadMessages": "{count} 条未读消息",

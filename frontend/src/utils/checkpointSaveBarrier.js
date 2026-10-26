@@ -6,11 +6,11 @@ const files = new Map()
 const keyOf = (projectId, fileId) => String(projectId) + ':' + String(fileId)
 function stateOf(projectId, fileId) {
   const key = keyOf(projectId, fileId)
-  if (!files.has(key)) files.set(key, { saves: new Set(), barrier: null, generation: 0, uncertain: false })
+  if (!files.has(key)) files.set(key, { saves: new Set(), barrier: null, generation: 0, uncertain: new Set() })
   return files.get(key)
 }
 function prune(key, state) {
-  if (!state.barrier && !state.saves.size && !state.generation && !state.uncertain && files.get(key) === state) files.delete(key)
+  if (!state.barrier && !state.saves.size && !state.generation && !state.uncertain.size && files.get(key) === state) files.delete(key)
 }
 export function documentCheckpointGeneration(projectId, fileId) {
   return files.get(keyOf(projectId, fileId))?.generation || 0
@@ -18,27 +18,39 @@ export function documentCheckpointGeneration(projectId, fileId) {
 export function checkpointSaveBarrier(projectId, fileId) {
   return files.get(keyOf(projectId, fileId))?.barrier || null
 }
+export function pendingDocumentSaveFileIds(projectId) {
+  const prefix = String(projectId) + ':'
+  return [...files].filter(([key, state]) => key.startsWith(prefix) && (state.saves.size || state.uncertain.size || state.barrier))
+    .map(([key]) => key.slice(prefix.length))
+}
 export function beginDocumentSave(projectId, fileId) {
   const state = stateOf(projectId, fileId)
   if (state.barrier) return null
-  let resolve, finished = false
+  let resolve, finished = false, operation = Symbol('legacy-save')
   const done = new Promise(r => { resolve = r })
   state.saves.add(done)
-  return { finish(safeToOverwrite) {
+  return { setOperationId(id) { if (!finished && typeof id === 'string' && id) operation = id }, finish(safeToOverwrite) {
     if (finished) return
     finished = true
-    if (!safeToOverwrite) state.uncertain = true
+    if (!safeToOverwrite) state.uncertain.add(operation)
     resolve(!!safeToOverwrite)
     state.saves.delete(done)
     prune(keyOf(projectId, fileId), state)
   } }
+}
+// A verified receipt resolves only that upload; unrelated unknown saves still block a restore.
+export function resolveDocumentSaveOperation(projectId, fileId, operationId) {
+  const key = keyOf(projectId, fileId), state = files.get(key)
+  if (!state || typeof operationId !== 'string') return
+  state.uncertain.delete(operationId)
+  prune(key, state)
 }
 export function beginCheckpointSaveBarrier(projectId, fileId, restoreId) {
   const state = stateOf(projectId, fileId)
   if (state.barrier) return null
   state.generation++
   const barrier = { projectId, fileId, restoreId, invalidated: false,
-    drained: Promise.all([...state.saves]).then(results => !state.uncertain && results.every(Boolean)) }
+    drained: Promise.all([...state.saves]).then(results => !state.uncertain.size && results.every(Boolean)) }
   state.barrier = barrier
   return barrier
 }
@@ -63,8 +75,9 @@ export function findCheckpointSaveBarrier(fileId, restoreId, conversationId) {
 export async function reconcileCheckpointSaveBarrier(projectId, fileId, getWriteState, loadingInstance) {
   const barrier = checkpointSaveBarrier(projectId, fileId)
   if (!barrier) return true
-  if (!barrier.conversationId) return false
-  const state = await getWriteState(barrier.conversationId, fileId, barrier.restoreId)
+  if (!barrier.conversationId && !barrier.readWriteState) return false
+  const state = barrier.readWriteState ? await barrier.readWriteState()
+    : await getWriteState(barrier.conversationId, fileId, barrier.restoreId)
   if (checkpointSaveBarrier(projectId, fileId) !== barrier) return !checkpointSaveBarrier(projectId, fileId)
   if (state?.mayWrite !== false) return false
   barrier.invalidated = true

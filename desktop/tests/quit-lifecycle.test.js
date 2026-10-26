@@ -176,6 +176,7 @@ function quitHarness({ stopAll, prepare = async () => {}, fullUpdate = null, res
   vm.runInContext(`
     let quitInProgress = false
     let backendSupervisor = null
+    let nativeEditorManager = null
     let services = globalThis.__noServices ? null : { stopAll: globalThis.__stopAll }
     let modelManager = { killAllActive: () => globalThis.__events.push('killAllActive') }
     ${section("app.on('activate'", '// 后端有 45s')}
@@ -270,15 +271,16 @@ test('主动重启完整更新：原生更新器接管重开，只在停服后�
 })
 
 function preparationHarness() {
-  const handlers = {}, listeners = {}, sent = [], timers = []
-  const sender = { send: (type, data) => sent.push({ type, data }) }
+  const handlers = {}, listeners = {}, sent = [], timers = [], cleared = new Set()
+  const sender = new EventEmitter()
+  sender.send = (type, data) => sent.push({ type, data })
   const context = vm.createContext({
     require, mainWindow: { isDestroyed: () => false, webContents: sender },
     ipcMain: { on: (name, fn) => { listeners[name] = fn }, handle: (name, fn) => { handlers[name] = fn } },
-    setTimeout: (fn) => { timers.push(fn); return timers.length }, clearTimeout: () => {}
+    setTimeout: (fn) => { timers.push(fn); return timers.length }, clearTimeout: id => cleared.add(id)
   })
   vm.runInContext(`${section('// Acknowledgement comes only', "app.on('window-all-closed'")}\nglobalThis.prepare = prepareRendererForQuit`, context)
-  return { handlers, listeners, sent, timers, sender, prepare: context.prepare }
+  return { handlers, listeners, sent, timers, cleared, sender, prepare: context.prepare }
 }
 
 test('退出IPC真实接线：只接受主renderer同requestId的ACK，过期/伪造ACK无效', async () => {
@@ -358,4 +360,47 @@ test('原生业务菜单的真实getWindow在退出准备中不可取得旧rende
   assert.equal(getter(), null)
   context.quitInProgress = false
   assert.equal(getter(), win)
+})
+
+test('quit confirmation pauses the native deadline; saving restarts it and stale stages are ignored', async () => {
+  const h = preparationHarness()
+  h.listeners['checkba:quit-handler-ready']({ sender: h.sender })
+  const pending = h.prepare()
+  const requestId = h.sent[0].data.requestId
+  const stage = (sender, id, value) => h.handlers['checkba:quit-stage']({ sender }, { requestId: id, stage: value })
+  assert.equal(stage({}, requestId, 'confirming'), false)
+  assert.equal(stage(h.sender, 'stale', 'confirming'), false)
+  assert.equal(h.cleared.has(1), false)
+  assert.equal(stage(h.sender, requestId, 'confirming'), true)
+  assert.equal(h.cleared.has(1), true)
+  assert.equal(h.timers.length, 1, 'no native timer while waiting for the user')
+  assert.equal(stage(h.sender, requestId, 'saving'), true)
+  assert.equal(h.timers.length, 2)
+  h.handlers['checkba:cancel-quit']({ sender: h.sender })
+  assert.equal(stage(h.sender, requestId, 'saving'), false, 'cancelled attempts cannot arm a fresh timer')
+  await assert.rejects(pending, /取消退出/)
+  assert.equal(h.cleared.has(2), true)
+})
+
+test('Mac close and a concurrent quit share one native preparation and one renderer confirmation', async () => {
+  const h = preparationHarness()
+  h.listeners['checkba:quit-handler-ready']({ sender: h.sender })
+  const closing = h.prepare(), quitting = h.prepare()
+  assert.equal(h.sent.length, 1)
+  const requestId = h.sent[0].data.requestId
+  h.handlers['checkba:quit-prepared']({ sender: h.sender }, { requestId, ok: true })
+  await Promise.all([closing, quitting])
+})
+
+test('renderer loss during an untimed confirmation cancels preparation and removes liveness listeners', async () => {
+  const h = preparationHarness()
+  h.listeners['checkba:quit-handler-ready']({ sender: h.sender })
+  const pending = h.prepare()
+  const requestId = h.sent[0].data.requestId
+  h.handlers['checkba:quit-stage']({ sender: h.sender }, { requestId, stage: 'confirming' })
+  h.sender.emit('render-process-gone')
+  await assert.rejects(pending, /取消退出/)
+  assert.equal(h.sender.listenerCount('destroyed'), 0)
+  assert.equal(h.sender.listenerCount('render-process-gone'), 0)
+  assert.equal(h.handlers['checkba:quit-stage']({ sender: h.sender }, { requestId, stage: 'saving' }), false)
 })

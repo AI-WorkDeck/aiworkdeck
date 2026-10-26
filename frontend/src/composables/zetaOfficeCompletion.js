@@ -17,9 +17,11 @@ const MIN_TYPED = 20
 const DISMISS_PAUSE = 120000
 
 /** Guest-side UI. No network access: all requests travel through the document host. */
-export function attachWritingAssistance({ canvas, input, execute, transport, focus, language = 'zh-CN' }) {
+export function attachWritingAssistance({ canvas, input, execute, transport, focus, language = 'zh-CN', overlayContainer, bounds }) {
   const doc = canvas.ownerDocument
   const view = doc.defaultView
+  const viewport = () => bounds?.() || { left: 0, top: 0, right: view.innerWidth, bottom: view.innerHeight, width: view.innerWidth, height: view.innerHeight }
+  const queryRoot = overlayContainer || doc
   const t = LABELS[language.startsWith('en') ? 'en' : 'zh']
   let config = { enabled: false, learning: false, hints: true, writable: false, session: '', items: [] }
   let items = [], current = null, choices = [], active = 0, generation = 0, timer = 0, learningTimer = 0
@@ -36,7 +38,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   const style = doc.createElement('style')
   style.textContent = WRITING_ASSISTANCE_CSS
   doc.head.appendChild(style)
-  doc.body.appendChild(root)
+  ;(overlayContainer || doc.body).appendChild(root)
   const button = (text, fn, parent = panel) => {
     const b = doc.createElement('button'); b.type = 'button'; b.textContent = text
     b.addEventListener('mousedown', (e) => e.preventDefault())
@@ -72,20 +74,21 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   function setPanelOpen(next) { if (panelOpen === next) return; panelOpen = next; report() }
   function note(text, parent = panel) { const n = doc.createElement('div'); n.textContent = text; n.className = 'awd-wa-copy'; parent.appendChild(n); return n }
   function position(point) {
-    const r = input.getBoundingClientRect(), margin = 12, gap = 4
-    const anchored = !point && r.height < 100 && r.width < view.innerWidth * 0.8
-    const x = point ? point.x : anchored ? r.left : view.innerWidth - 400
-    panel.style.maxHeight = Math.max(0, view.innerHeight - margin * 2) + 'px'
-    let y = point ? point.y : anchored ? r.bottom + gap : view.innerHeight - 300
+    const r = input.getBoundingClientRect(), b = viewport(), margin = 12, gap = 4
+    const anchored = !point && r.height < 100 && r.width < b.width * 0.8
+    const x = point ? point.x : anchored ? r.left : b.right - 400
+    panel.style.maxWidth = Math.max(0, b.width - margin * 2) + 'px'
+    panel.style.maxHeight = Math.max(0, b.height - margin * 2) + 'px'
+    let y = point ? point.y : anchored ? r.bottom + gap : b.bottom - 300
     if (anchored) {
-      const below = Math.max(0, view.innerHeight - margin - r.bottom - gap)
-      const above = Math.max(0, r.top - margin - gap)
+      const below = Math.max(0, b.bottom - margin - r.bottom - gap)
+      const above = Math.max(0, r.top - b.top - margin - gap)
       const upwards = panel.offsetHeight > below && above > below
-      panel.style.maxHeight = Math.min(view.innerHeight * 0.55, upwards ? above : below) + 'px'
+      panel.style.maxHeight = Math.min(b.height * 0.55, upwards ? above : below) + 'px'
       y = upwards ? r.top - panel.offsetHeight - gap : r.bottom + gap
     }
-    panel.style.left = Math.max(8, Math.min(x, view.innerWidth - panel.offsetWidth - margin)) + 'px'
-    panel.style.top = Math.max(8, Math.min(y, view.innerHeight - panel.offsetHeight - margin)) + 'px'
+    panel.style.left = Math.max(b.left + 8, Math.min(x, b.right - panel.offsetWidth - margin)) + 'px'
+    panel.style.top = Math.max(b.top + 8, Math.min(y, b.bottom - panel.offsetHeight - margin)) + 'px'
   }
   function show(kind, title = t.title, point) {
     if (disposed) return
@@ -323,7 +326,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
     const entries = extractCompletionEntries(text)
     learn(entries, 'project'); learn(entries, 'user')
   }
-  const semanticPanelOpen = () => doc.querySelector('.awd-semantic-sheet')?.hidden === false
+  const semanticPanelOpen = () => queryRoot.querySelector('.awd-semantic-sheet')?.hidden === false
   async function automaticSuggestion() {
     if (disposed || composing || !config.enabled || !config.writable || accepting || mode || semanticPanelOpen() || doc.hidden || doc.activeElement !== input) return
     if (Date.now() < quietUntil || Date.now() - lastAutomaticAt < AUTO_INTERVAL || typedSinceAttempt < MIN_TYPED) return
@@ -542,7 +545,7 @@ export function attachWritingAssistance({ canvas, input, execute, transport, foc
   doc.addEventListener('mousedown', pointer, true)
   root.addEventListener('keydown', panelKeydown)
   report()
-  return { committed, keydown, invalidate, cursorMoved,
+  return { committed, keydown, invalidate, cursorMoved, reposition: resized,
     destroy() {
       if (disposed) return
       invalidate(); disposed = true; clearTimeout(timer); clearTimeout(learningTimer); unsub()

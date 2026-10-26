@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "workspaceNavigation": "Workspace",
+  "workspaceAiActions": "AI assistance",
+  "workspaceAbout": "About this plugin",
+  "workspaceState": {
+    "active": "In view",
+    "open": "In a tab",
+    "closed": "Open"
+  },
   "litRefresh": "Actualiser",
   "litNoGraphvizNotice": "Cette machine ne dispose pas de graphviz, les organigrammes ne peuvent donc pas être dessinés pour le moment ; les six autres types — frises chronologiques, cartes de relations, arbres de structure de propriété, etc. — restent disponibles.",
   "litNewDiagramSectionTitle": "Générer un nouveau diagramme",

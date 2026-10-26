@@ -93,6 +93,22 @@ test('assistant group, retry and private chat work through native browser input 
   await page.evaluate(() => setSidebarVisible(false));
   await frame.waitForFunction(() => !document.getElementById('workspace').classList.contains('host-sidebar'));
   assert.notEqual(await frame.$eval('#sidebar', el => getComputedStyle(el).display), 'none');
+  for (const width of [260, 960]) for (const theme of ['light', 'dark']) {
+    await page.setViewport({ width, height: 760 });
+    await page.evaluate(theme => document.querySelector('iframe').contentWindow.postMessage({ awd: 1, type: 'theme', theme, tokens: {} }, '*'), theme);
+    await frame.waitForFunction(theme => document.documentElement.dataset.theme === theme, {}, theme);
+    const layout = await frame.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth > innerWidth,
+      sendVisible: document.getElementById('send').getBoundingClientRect().bottom <= innerHeight,
+      toolsVisible: !document.querySelector('.composer-tools').hidden,
+      toolsWithinComposer: ['local-file', 'project-file'].every(id => {
+        const tool = document.getElementById(id).getBoundingClientRect(), composer = document.getElementById('composer').getBoundingClientRect();
+        return tool.left >= composer.left && tool.right <= composer.right;
+      })
+    }));
+    assert.deepEqual(layout, { overflow: false, sendVisible: true, toolsVisible: true, toolsWithinComposer: true }, `group ${width} ${theme}`);
+    if (process.env.IM_SCREENSHOT_DIR) await page.screenshot({ path: process.env.IM_SCREENSHOT_DIR + `/group-${width}-${theme}.png` });
+  }
   await frame.click('#agent-private');
   await frame.waitForFunction(() => document.getElementById('chat-subtitle').textContent.includes('仅你可见'));
   assert.match(await frame.$eval('#agent-info-summary', el => el.textContent), /使用平台 AI 额度.*当前项目资料在云端回复/);

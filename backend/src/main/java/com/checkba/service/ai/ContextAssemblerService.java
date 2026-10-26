@@ -581,7 +581,13 @@ public class ContextAssemblerService {
         if (agentMode != AgentMode.ASK) {
             for (com.checkba.service.ai.skill.SkillRouter.ActiveSkill active
                     : skillRouter.activeSkills(runId)) {
-                systemText.append(skillRouter.promptInjectionFor(active.definition()));
+                String injection = skillRouter.promptInjectionFor(active.definition(), userId, projectId);
+                if (injection == null) {
+                    injection = skillRouter.promptInjectionFor(active.definition());
+                }
+                if (injection != null) {
+                    systemText.append(injection);
+                }
             }
         }
 
@@ -2206,15 +2212,16 @@ public class ContextAssemblerService {
 1. **FORBIDDEN ACTIONS** - 以下操作在 Ask 模式下完全禁止：
    - DO NOT output `<artifact>` tags - 不生成任何计划或任务清单
    - DO NOT output `<process>` tags - 不执行任何操作流程
-   - 除 memory_list、memory_read、memory_search 外，不允许调用任何工具
+   - 除 memory_list、memory_read、memory_search、version_status、version_history、version_changes 外，不允许调用任何工具
    - memory_write、memory_edit、memory_delete、save_memory 等写操作严格禁止
 
 2. **ALLOWED ACTIONS** - 在 Ask 模式下你只能：
    - 直接回答用户问题（使用 `<thinking>` + 纯文本或 `<final>` 标签）
    - 基于已有上下文（文件内容、历史记录）进行分析和解答
    - 可用 memory_list、memory_read、memory_search 只读查询当前用户有权访问的长期记忆
+   - 可用 version_status、version_history、version_changes 只读检查项目版本；禁止提交、取回、恢复或合并
    - 提供建议和意见，但不执行任何操作
-   - 如果用户请求需要工具才能完成，请告知用户切换到 Agent 模式
+   - 如果用户请求需要修改内容或执行其他工具，请告知用户切换到 Agent 模式
 
 3. **OUTPUT FORMAT**:
    <thinking>分析用户意图...</thinking>
@@ -2363,15 +2370,16 @@ public class ContextAssemblerService {
 1. **FORBIDDEN ACTIONS** - the following are completely prohibited in Ask mode:
    - DO NOT output `<artifact>` tags - no plans or task lists
    - DO NOT output `<process>` tags - no operation flows
-   - Do not call any tool except memory_list, memory_read, and memory_search
+   - Do not call any tool except memory_list, memory_read, memory_search, version_status, version_history, and version_changes
    - memory_write, memory_edit, memory_delete, save_memory, and all other writes are prohibited
 
 2. **ALLOWED ACTIONS** - in Ask mode you may ONLY:
    - Answer the user's question directly (using `<thinking>` + plain text or the `<final>` tag)
    - Analyze and explain based on context you already have (file contents, conversation history)
    - Use memory_list, memory_read, and memory_search to read long-term memory the current user may access
+   - Use version_status, version_history, and version_changes to inspect project versions; commits, pulls, restores, and merges are prohibited
    - Offer advice and opinions, without performing any operation
-   - If the user's request requires tools to complete, tell the user to switch to Agent mode
+   - If the user's request needs changes or other tools, tell the user to switch to Agent mode
 
 3. **OUTPUT FORMAT**:
    <thinking>Analyzing the user's intent...</thinking>

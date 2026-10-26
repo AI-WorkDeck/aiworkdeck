@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "workspaceNavigation": "Workspace",
+  "workspaceAiActions": "AI assistance",
+  "workspaceAbout": "About this plugin",
+  "workspaceState": {
+    "active": "In view",
+    "open": "In a tab",
+    "closed": "Open"
+  },
   "litRefresh": "Actualizar",
   "litNoGraphvizNotice": "Este equipo no tiene graphviz, por lo que no se pueden dibujar diagramas de flujo por ahora; los otros seis tipos —líneas de tiempo, mapas de relaciones, árboles de estructura de propiedad y más— siguen funcionando.",
   "litNewDiagramSectionTitle": "Generar un nuevo diagrama",

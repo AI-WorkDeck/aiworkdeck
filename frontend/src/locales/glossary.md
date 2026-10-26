@@ -77,6 +77,9 @@
 | 自动保存 | Autosave | |
 | 只读预览 | Read-only Preview | |
 | 版本记录 | Version History | |
+| 版本控制 | Source Control | 项目全局入口 |
+| 提交本次改动 | Commit Changes | 整理为一条可查阅和恢复的历史记录；不等于云端已同步 |
+| 提交并退出 / 直接退出 / 取消 | Commit and Exit / Exit Without Committing / Cancel | 退出前的项目级提醒；直接退出仍保存文件 |
 | 工作段 | Work Session | |
 | 重要版本 | Milestone | 版本时间线里的星标版本；「标为重要版本」 → Mark as Milestone |
 | 主线 | Mainline | 「回到主线工作」 → Return to Mainline |

@@ -1,0 +1,173 @@
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
+# Native LibreOfficeKit component prototype
+
+This macOS prototype loads a separately supplied native LibreOfficeKit runtime,
+opens a synthetic DOCX, returns actual document tiles, edits and exports it, and
+optionally exercises deep UNO calls. It does not change AI WorkDeck's default
+engine, entry point, existing helper, frontend, Windows support, or release path.
+It is a component capability test, not a complete editor or a performance result.
+
+Read [UPSTREAM.md](UPSTREAM.md) before supplying a runtime. A stock macOS package
+can expose `paintTile` while doing no painting; the locally verified runtime has
+the Ely macOS patches. Keep all output and profiles in a dedicated scratch folder,
+and use synthetic documents only. The worker refuses document paths outside its
+supplied artifact root, but it is not a production isolation boundary.
+
+## Build and run
+
+Run from the repository root. Set `PROBE_OUT` to an existing scratch directory,
+`LO_FRAMEWORKS` to an extracted supported app's `Contents/Frameworks`, and
+`FIXTURE` to the agreed synthetic DOCX. The functional run directory must not
+already exist. Do not run component probes during someone else's performance
+measurement window.
+
+```sh
+xcrun clang++ -std=c++17 -fobjc-arc -framework Foundation \
+  desktop/prototypes/native-lok/worker.mm -o "$PROBE_OUT/lok-probe"
+xcrun clang desktop/prototypes/native-lok/python_host.c \
+  -o "$PROBE_OUT/python-host"
+python3 desktop/prototypes/native-lok/probe.py \
+  --worker "$PROBE_OUT/lok-probe" --runtime "$LO_FRAMEWORKS" \
+  --fixture "$FIXTURE" --out "$PROBE_OUT/function-run" \
+  --uno-host "$PROBE_OUT/python-host" --uno-runtime "$LO_PYTHON_CONTENTS"
+```
+
+`LO_PYTHON_CONTENTS` is an explicit isolated compatible LibreOffice copy's `Contents`
+directory with Python 3.12 and pyuno. The verified Ely runtime omits Python.
+Omit the two UNO arguments to exercise only the C API. `python_host.c` loads the
+Python framework library and calls its public `Py_BytesMain` entry point. The
+installed Python launcher exited with signal 9 on the test machine; this small
+host invokes its public runtime entry without changing native binaries,
+signatures, or OS security settings.
+An early run regenerated twelve sealed Python bytecode files in an installed
+framework. The task restored exactly those twelve from the same official version,
+checking each against the nested signature seal, and retained unrelated older
+signature differences. The final driver requires explicit runtime paths, disables
+bytecode writes, and points its cache prefix into the artifact directory. Use an
+isolated extracted copy or a read-only mounted official runtime for the client.
+It does not call `officehelper.bootstrap`.
+
+The driver creates its own HOME, TMPDIR and profile, launches one worker, and
+terminates only that owned process on failure. `result.json` records each actual
+result, exit and cleanup. A successful process exit alone is not an acceptance
+verdict: inspect all saved-content and UNO assertions. Preserve failed runs.
+No real system IME is exercised by this driver.
+
+For the document input/review lifecycle regression, use the same explicit paths
+with `review_probe.py` and a fresh `--out` directory. Its optional UNO arguments
+exercise repeated native cursor-range verification (including deletions), typed
+display changes, full revision text and controller capabilities. CAPI checks
+cover native-ID accept/reject, stale snapshots, duplicate input, export readback
+and rejection of inputs from a closed document epoch.
+
+Use `readonly_probe.py` with the same explicit arguments and a new output directory
+to verify a read-only model. It requires UNO to compare actual text, tracking and
+modified state before and after rejected input/commands, navigation and mouse
+selection; it also reopens a writable model and verifies a real edit/export.
+`open` accepts an optional boolean `readOnly` (older isolated probes omit it).
+Read-only opens require the runtime's `setViewReadOnly` API and block writing
+actions in the worker. Its reply records policy and API invocation, not a native
+getter readback; use the behavioral probe as evidence. One unchanged mouse drag
+does not establish that every possible native drag/drop gesture was covered.
+
+## Source-built runtime packaging
+
+After applying the pinned upstream and local patches in `UPSTREAM.md`, copy the
+built app into a **new isolated** `PACK_ROOT/instdir/LibreOffice.app`. Keep the
+original build frozen. Run the existing packaging helper on that copy, from this
+repository root (`PACK_ROOT` is an absolute path to that new copy's parent):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 - "$PACK_ROOT" <<'PYTHON'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location(
+    "awd_packaging", "desktop/lowa-build/patches/apply-source-patches.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module.slim_dictionaries(sys.argv[1])
+PYTHON
+```
+
+This reuses the product's en/zh dictionary selection and removes inert Python
+Lightproof registration from a `--disable-python` build. It is not safe to apply
+to an installed/signed app or a runtime with a different supported-language
+contract. Verify that only `Contents/Resources/extensions` changed; record the
+retained resource and library hashes before functional/performance tests.
+
+## Protocol and lifecycle
+
+Worker argv are `LO-Frameworks isolated-profile-file-URL artifact-root`.
+Set `SAL_LOK_OPTIONS=unipoll`; call initialization and the native event loop on
+the main thread. This worker reads stdin on a background thread and dispatches
+all document operations onto the main queue. `runLoop` receives a non-null opaque
+context. The ready event is emitted only when that queue can drain.
+
+Each frame is exactly `[uint32 headerLength LE][uint32 binaryLength LE]`, then
+UTF-8 JSON and optional raw binary. The total input payload is capped at 64 MiB.
+Native stdout diagnostics are redirected to stderr. Requests carry `reqId` and
+`action`; replies carry `type:result`, the same `reqId`, and `success`.
+Callbacks and phase events can arrive between replies. This framing matches the
+existing sidecar, but the action schema deliberately does not implement its full
+product relay contract.
+
+| Action | Inputs and meaning |
+| --- | --- |
+| `open` | Absolute `path` inside artifact root, optional boolean `readOnly`; one model per worker. Returns model size in twips and read-only policy. |
+| `paint` | Pixel `width,height` and `xTwips,yTwips,widthTwips,heightTwips`; returns tightly packed four-byte pixels with `tileMode` and `changedBytes`. Verified mode 1 is BGRA. `pixelsChanged` means a sentinel was overwritten, not that the user saw text. |
+| `values` | `command`, for example `.uno:AcceptTrackedChanges`; fails if the native API returns null. |
+| `command` | `command` and JSON string `arguments`; `acceptedForDispatch` is not completion. Inspect the notified command callback and real state. |
+| `key` | LOK `eventType,charCode,keyCode`; no OS key or IME adapter. |
+| `paste` | UTF-8 text in binary frame; returns the native paste result. |
+| `selected_text` | Reads the current text selection. |
+| `review_snapshot` | Requires `documentEpoch`; returns native revision IDs, descriptions, geometry and a fresh `refreshEpoch`. Full text comes from the URL-bound UNO helper. |
+| `review_goto` / `review_resolve` | Require current document/review epochs and `revisionId`. Goto dispatch alone is not success: the host checks the actual UNO view-cursor range. Resolve additionally takes `decision:accept/reject` and checks the target layer and unrelated entries afterward. Unknown results lock the host channel. |
+| `input_text` / `input_key` / `input_mouse` | Require the next `inputSeq` and current document epoch. Text uses native extended input and ends composition; the host only sends confirmed browser text. |
+| `input_barrier` | Acknowledges the last applied input sequence before save or model replacement. |
+| `set_viewport` / `close` | Current epoch only; synchronize CSS/twips or destroy the current model. Old callbacks retain their old identity. |
+| `save` | Absolute DOCX `path` inside artifact root; returns native export success. |
+| `start_urp` | Optional test-only single-client loopback port; opens the public function-based URP bridge after accept. No authentication: never expose this beyond an isolated local experiment. |
+| `shutdown` | Closes owned sockets, destroys the document and exits the isolated unipoll process. It does not test in-process kit teardown or restart recovery. |
+
+A parent must independently paint the received tile into a visible view and
+verify paper plus ink. Record process-ready, model-loaded, tile-completed, visible
+body and interactive input as separate stages. Never substitute conversion or
+load time for visible editor startup. Extract the runtime to SSD before comparing
+against another SSD runtime; a mounted DMG is a different I/O condition.
+
+## Locally verified scope and remaining gaps
+
+The 2026-10-24 arm64/macOS 27 test used one exact 60-paragraph, 600-revision DOCX.
+The successful engine produced real Chinese text and insertion/deletion marks,
+returned 600 redlines, accepted native key input and Chinese text paste, and
+exported a valid DOCX. XML validation concatenated text runs and compared every
+original revision's type, author, date and text; original/final projections and
+the 600 original clause order were retained. LibreOffice splits revision XML
+nodes, so unchanged node counts or raw XML equality are incorrect criteria.
+
+The optional UNO test bound the model by URL, read paragraphs and revision data,
+verified a range's text before replacing it, exercised undo/redo, and restored
+the user's revision display state. Use a typed `RedlineDisplayType` property:
+writing `ShowChanges=false` alone silently failed. Final text then retained all
+300 inserted clauses and excluded all 300 deleted clauses. This is a small set
+of engine primitives, not the complete AI command, anchor or file-ID bridge.
+
+The original Ely runtime lacks controller `AwdReviewGeometry` and
+`AwdReviewSidebarWidth`. The later source-built runtime ports those properties
+and fixes the reproduced temporary UNO redline release race; the exact source,
+patches and negative control are documented in `UPSTREAM.md` and
+[the experiment report](../EXPERIMENT.md). That report also separates the user's
+real OS IME confirmation from automated composition tests, and Java-backed Git
+history from the standalone data service. Complete review bubbles/comments,
+input/clipboard and layout parity, multi-document state, AI checkpoints, all
+existing engine assertions and minimum supported OS remain unverified. A faster
+component does not waive these requirements or authorize a default-engine switch.
+
+Two API details matter: CAPI JSON integer arguments use `type:"uint32"`, whereas
+pyuno uses typed UNO values. Supplying the UNO type name in CAPI JSON can silently
+drop a revision ID and let an operation use the current cursor instead. For
+display, write typed `short` values 2 (all) or 0 (final), then verify `ShowChanges`;
+Writer can normalize 0 to 1, so enum readback equality is not a valid assertion.
+Deleted text can also be absent from `getTextSelection` even when its range is
+selected; never use nonempty copied text as the sole location check.

@@ -1,14 +1,14 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-# Chat / Scratch Mode (`💬 对话 | 🛠 工作台`) Design Spec (`dev-board#1479`)
+# Chat / Scratch Mode (`对话 | 工作台`) Design Spec (`dev-board#1479`)
 
 ## 1. Background & Goals
 
 AI WorkDeck traditionally opens into a 4-column IDE workbench (`left-rail` + `sidebar-left` + `content-area` + `side-panel-ai`) tailored for multi-file, long-running, collaborative projects. However, for lightweight Q&A, quick drafting, or ad-hoc cross-project synthesis, users often want an Antigravity/Claude-style **Chat-first Mode** without the overhead of creating a formal project first.
 
 ### Core Goals
-1. **Dual-Mode Single Shell (`💬 对话 | 🛠 工作台`)**:
+1. **Dual-Mode Single Shell (`对话 | 工作台`)**:
    - Persistent mode switcher in the top header (`viewMode: 'chat' | 'ide'`).
    - Switching between `chat` and `ide` happens **in-place inside `project-overview.vue`** without `uni.reLaunch`, preserving active SSE chat streams (`ChatInterface.vue`) and keeping `LibreOfficeEditor` (`<webview>`) instances alive in the DOM.
 2. **Configurable Startup Mode + Welcome Quick Chat Entry**:
@@ -70,10 +70,10 @@ AI WorkDeck traditionally opens into a 4-column IDE workbench (`left-rail` + `si
   - Emits: `['toggle-collapse', 'new-chat', 'select-conversation', 'delete-conversation', 'create-doc', 'open-file', 'attach-cross-project-file', 'preview-cross-project-file', 'promote-scratch', 'switch-project']`
   - Sections: Conversations, Current Workspace Files (`+ 新建 Word`, `+ 新建 Markdown`), Cross-Project Explorer (`跨项目调取` with search & lazy tree expand).
 - **`frontend/src/components/welcome/WelcomePane.vue`**:
-  - Adds Hero Quick Chat input box (`quickPrompt`) + quick entry buttons (`💬 进入随手对话`, `📝 新建空白文稿`).
+  - Adds Hero Quick Chat input box (`quickPrompt`) + quick entry buttons (`进入随手对话`, `新建空白文稿`).
   - Emits: `['create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc']`.
 - **`frontend/src/pages/project-overview/project-overview.vue` & `project-overview.scss` & `frontend/src/App.vue`**:
-  - Header mode segmented control `[ 💬 对话 | 🛠 工作台 ]` in `.header-center`.
+  - Header mode segmented control `[ 对话 | 工作台 ]` in `.header-center`.
   - Scratch Workspace indicator badge + `[转为正式项目]` button in `.header-left`.
   - `.page-project-overview.chat-mode` CSS flex layout:
     - Hides `.left-rail` and `.sidebar-left`; displays `<ChatModeSidebar>` on the left.

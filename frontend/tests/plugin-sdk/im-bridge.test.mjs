@@ -146,7 +146,7 @@ test('actual workbench drop recovers native transfer and rejects expired plugin 
     'return function(e) {' + method.replace(/},\s*$/, '}'))
   const added = [], warnings = []
   const handler = drop(consumePluginImDrag, nativeDataTransfer, { showToast: p => warnings.push(p.title) })
-  const vm = { projectId: 5, $t: (key) => workbench[key.split('.').pop()] || key, onPluginAddFileToAi: async value => { added.push(value.file) } }
+  const vm = { projectId: 5, $t: key => key, onPluginAddFileToAi: async value => { added.push(value.file) } }
   const owner = {}, receipt = preparePluginImDrag(owner, { id: 42, name: '证据.pdf', fileType: 'pdf' }, 5)
   const original = globalThis.window
   try {
@@ -155,7 +155,7 @@ test('actual workbench drop recovers native transfer and rejects expired plugin 
     assert.deepEqual(added.map(file => file.id), [42])
     handler.call(vm, { preventDefault() {} })
     assert.equal(added.length, 1)
-    assert.match(warnings[0], /已过期/)
+    assert.equal(warnings[0], 'workbench.pluginDragExpiredToast')
   } finally { globalThis.window = original; endPluginImDrag() }
 })
 

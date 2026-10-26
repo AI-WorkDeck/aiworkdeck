@@ -1084,9 +1084,10 @@ export const fileOpenTabsMethods = {
     // 顶掉，律师只看得见最后一条、还以为只更新了一份。多文件时改为静音逐份重载、
     // 最后聚合成一句。单文件语义一个字不改（仍是原来的逐文件 toast）。
     async onVersionReloadFiles(affectedFileIds) {
+      if (this._projectVersionReload) return this._projectVersionReload()
       // 文件树切栏后仍保留挂载，版本操作须主动刷新清单；不等待请求，避免延迟编辑器换入新内容。
       this.$refs?.fileTree?.loadFiles()
-      if (!Array.isArray(affectedFileIds) || !affectedFileIds.length) return
+      if (!Array.isArray(affectedFileIds) || !affectedFileIds.length) return true
       const idSet = new Set(affectedFileIds)
       const openIds = new Set()
       for (const f of this.leftFiles) {
@@ -1097,6 +1098,7 @@ export const fileOpenTabsMethods = {
       }
       const many = openIds.size > 1
       let ok = 0
+      let textOk = true
       for (const fileId of openIds) {
         // forceActive：这条链上的每一种动作（退回/开稿/切线/采纳/放弃/丢弃）都是律师
         // 亲手点出来的，正在显示的那个实例也必须就地换文档——不然下一次 autosave 会把
@@ -1116,7 +1118,8 @@ export const fileOpenTabsMethods = {
       // 标签没有实例（v-if 单实例），下次激活挂载即拉新内容。失败时组件自己转入
       // 错误相位并封死保存，这里不再叠加提示。
       for (const fileId of idSet) {
-        await this.reloadPlainTextInstances(fileId)
+        if (await this.reloadPlainTextInstances(fileId) === false) textOk = false
       }
+      return ok === openIds.size && textOk
     },
 }

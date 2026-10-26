@@ -34,6 +34,7 @@ public class RecordingToolRegistry extends ToolRegistry {
 
     private final List<Dispatch> dispatches = new ArrayList<>();
     private Map<String, String> stubs = Map.of();
+    private List<EnvPerturbation> perturbations = List.of();
     private final com.checkba.service.ai.ClientCapabilityService capabilities;
 
     public RecordingToolRegistry(List<AgentToolComponent> components, PluginService pluginService) {
@@ -73,6 +74,11 @@ public class RecordingToolRegistry extends ToolRegistry {
         this.stubs = stubs == null ? Map.of() : stubs;
     }
 
+    /** 设置 EnvHarness 环境扰动器列表（dev-board#1481） */
+    public void setPerturbations(List<EnvPerturbation> perturbations) {
+        this.perturbations = perturbations == null ? List.of() : List.copyOf(perturbations);
+    }
+
     public List<Dispatch> dispatches() {
         return List.copyOf(dispatches);
     }
@@ -92,6 +98,12 @@ public class RecordingToolRegistry extends ToolRegistry {
             // 与生产行为一致：未注册 / 本会话不可见的工具返回 found=false，
             // 并带上那句指路（审计 A11）
             return new ToolResult(ToolRegistry.unknownToolMessage(resolved), null, false);
+        }
+        for (EnvPerturbation p : perturbations) {
+            String intercepted = p.interceptTool(resolved, argsJson, ctx, List.copyOf(dispatches), stubs);
+            if (intercepted != null) {
+                return new ToolResult(intercepted, tool.get(), true);
+            }
         }
         if (liveTools.contains(resolved) && !stubs.containsKey(resolved)) {
             return super.execute(resolved, argsJson, ctx);

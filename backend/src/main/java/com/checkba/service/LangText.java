@@ -35,6 +35,10 @@ public final class LangText {
     }
 
     public static boolean isEnglish() {
+        // Early desktop requests already resolved the language from the lightweight store.
+        // Honor their scope before asking a Spring service whose repository may still be starting.
+        String scoped = AppLanguageScope.current();
+        if (scoped != null) return AppLanguageService.EN_US.equals(scoped);
         AppLanguageService svc = languageService;
         if (svc == null) return false;
         try {

@@ -81,6 +81,7 @@ function previewVm({ endpointUp = false, module } = {}) {
   const vm = { _endpointUp: endpointUp, ready: false, previewReady: false, previewFailed: false,
     projectId: 1, file: { id: 7, fileType: 'docx' }, $nextTick: async () => {}, $refs: { docxPreviewHost: { innerHTML: '' } }, appendLog() {},
     tryDocxPreview: options.methods.tryDocxPreview,
+    fetchDocumentBytes: options.methods.fetchDocumentBytes,
   }
   return { vm, events, options }
 }

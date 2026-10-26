@@ -130,10 +130,10 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- LangChain4j + Ollama -->
+        <!-- Tools/model orchestration is explicit; no @AiService proxies or classpath scanner. -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-spring-boot-starter</artifactId>
+            <artifactId>langchain4j</artifactId>
             <version>0.36.0</version>
         </dependency>
         <dependency>
@@ -424,6 +424,40 @@
             </resource>
         </resources>
         <plugins>
+
+            <!-- Never package a stale generated contract, including after a skipped/failed generator. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <executions><execution>
+                    <id>discard-stale-persistence-contract</id><phase>initialize</phase><goals><goal>clean</goal></goals>
+                    <configuration>
+                        <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                        <filesets><fileset><directory>${project.build.outputDirectory}/local-core</directory>
+                            <includes><include>persistence-contract.json</include></includes>
+                        </fileset></filesets>
+                    </configuration>
+                </execution></executions>
+            </plugin>
+            <!-- Runs for test and package (also -DskipTests); no application services are started. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId><artifactId>exec-maven-plugin</artifactId><version>3.5.0</version>
+                <executions><execution>
+                    <id>generate-verified-persistence-contract</id><phase>process-test-classes</phase><goals><goal>java</goal></goals>
+                    <configuration>
+                        <mainClass>com.checkba.localcore.LocalCorePersistenceContractGenerator</mainClass>
+                        <classpathScope>test</classpathScope>
+                        <arguments><argument>${project.build.outputDirectory}/local-core/persistence-contract.json</argument></arguments>
+                    </configuration>
+                </execution><execution>
+                    <id>verify-packaged-persistence-contract</id><phase>verify</phase><goals><goal>java</goal></goals>
+                    <configuration>
+                        <mainClass>com.checkba.localcore.LocalCorePackagedContractVerifier</mainClass>
+                        <classpathScope>test</classpathScope>
+                        <arguments><argument>${project.build.directory}/${project.build.finalName}.jar</argument></arguments>
+                    </configuration>
+                </execution></executions>
+            </plugin>
 
             <plugin>
                 <groupId>org.springframework.boot</groupId>

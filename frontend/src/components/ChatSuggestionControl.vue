@@ -20,16 +20,24 @@ export default {
 }
 </script>
 <style scoped>
-.chat-suggestion-control { padding: 4px 2px; color: var(--awd-text-2); font-size: 11px; }
-.chat-suggestion { display: flex; align-items: center; gap: 8px; padding: 7px 9px; margin-bottom: 5px; background: var(--awd-surface-2); border: 1px solid var(--awd-border); border-radius: 8px; }
+.chat-suggestion-control { padding: 0; color: var(--awd-text-2); font-size: var(--awd-panel-fs); }
+.chat-suggestion { display: flex; align-items: center; gap: 8px; padding: 7px 9px; margin: 10px 0 0; background: var(--awd-surface-2); border: 1px solid var(--awd-border); border-radius: 8px; }
 .chat-suggestion-control button { font: inherit; color: inherit; background: transparent; border: 0; padding: 3px 0; margin: 0; cursor: pointer; line-height: 1.5; }
 .chat-suggestion-control button::after { border: 0; }
 .chat-suggestion-control button:focus-visible, summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
 .suggestion-text { flex: 1; min-width: 0; text-align: left; overflow-wrap: anywhere; color: var(--awd-text) !important; font-size: 12px !important; }
 .suggestion-shortcut { flex-shrink: 0; font-size: 10px; }
 .suggestion-dismiss { flex-shrink: 0; width: 22px; }
-.suggestion-settings { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.suggestion-settings { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 36px; padding: 5px 6px; box-sizing: border-box; }
+.suggestion-toggle { display: inline-flex; align-items: center; gap: 8px; text-align: left; border-radius: var(--awd-radius-sm); }
+.suggestion-toggle::before { content: ''; width: 6px; height: 6px; margin-right: 2px; border-radius: 50%; background: var(--awd-text-3); flex-shrink: 0; }
+.suggestion-toggle[aria-pressed="true"]::before { background: var(--awd-accent); }
+.suggestion-settings details { font-size: var(--awd-panel-fs-meta); }
+.suggestion-settings details[open] { flex-basis: 100%; }
+.suggestion-settings details[open] summary { text-align: right; }
 .suggestion-toggle[aria-pressed="true"] { color: var(--awd-accent-text); }
-summary { cursor: pointer; list-style: none; }
-details p { max-width: 40em; margin: 5px 0; line-height: 1.6; }
+summary { padding: 3px 0 3px 6px; cursor: pointer; list-style: none; color: var(--awd-text-2); }
+summary::-webkit-details-marker { display: none; }
+summary:hover { color: var(--awd-accent-text); }
+details p { max-width: 40em; margin: 5px 0 5px 16px; line-height: 1.6; }
 </style>

@@ -36,13 +36,17 @@ function harness({ rollback = false, allocationFails = false } = {}) {
   let backendCalls = 0, version = 'candidate'
   manager._start = (name) => {
     calls.push(name)
-    if (name === 'backend') return (++backendCalls === 1 ? backend : retry).promise
+    if (name === 'backend') {
+      const launch = { bootOverlay: { context: {}, current: overlay.readCurrent() } }
+      manager.launches.set('backend', launch)
+      return (++backendCalls === 1 ? backend : retry).promise.then(result => ({ ...result, launch }))
+    }
     return optional.promise
   }
   const overlay = {
     cleanupStaleMajors() {},
     markBootOk: () => calls.push('boot-ok'),
-    readCurrent: () => rollback ? { version: 'candidate' } : null,
+    readCurrent: () => rollback && version === 'candidate' ? { version: 'candidate', components: {} } : null,
     noteBackendBootFailure: () => { version = 'previous'; return { reverted: rollback } },
   }
   const stubs = {
@@ -73,6 +77,9 @@ function harness({ rollback = false, allocationFails = false } = {}) {
     views: {}, quitInProgress: false, services: null, mainWindow: null,
     mainWindowStartupReady: false, fullUpdate: null, updateService: null,
   })
+  const recordStart = source.indexOf('function recordBackendBoot(')
+  const recordEnd = source.indexOf('// 增量更新（docs/INCREMENTAL_UPDATE_DESIGN.md）', recordStart)
+  vm.runInContext(source.slice(recordStart, recordEnd), context)
   vm.runInContext(startup, context)
   return { context, manager, backend, retry, optional, calls, windows, failures, health }
 }
@@ -98,6 +105,19 @@ test('window waits for backend readiness but not optional model services', async
   assert.equal(h.windows.length, 1, 'an optional failure must not rebuild or reload the workbench')
   assert.ok(h.failures.some(line => line.includes('optional component unavailable')))
   assert.equal(h.calls.filter(name => name === 'backend').length, 1, 'background startup must not restart the backend')
+})
+
+test('core readiness opens the workbench without clearing overlay failures; only full health records success', async () => {
+  const h = harness()
+  await settle()
+  h.backend.resolve({ ok: true, fullReady: false })
+  await settle()
+  assert.equal(h.windows.length, 1)
+  assert.deepEqual(h.calls, ['backend'])
+  h.context.recordBackendBoot(true, h.manager.getLaunch('backend'))
+  assert.deepEqual(h.calls, ['backend', 'boot-ok'])
+  h.context.recordBackendBoot(true, h.manager.getLaunch('backend'))
+  assert.deepEqual(h.calls, ['backend', 'boot-ok'], 'one launch only records one verdict')
 })
 
 test('overlay rollback and healthy retry finish before loading the window', async () => {

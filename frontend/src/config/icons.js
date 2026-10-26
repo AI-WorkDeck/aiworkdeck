@@ -38,6 +38,11 @@ export const ICONS = {
   gridView: ['M4 4h7v7H4z', 'M13 4h7v7h-7z', 'M4 13h7v7H4z', 'M13 13h7v7h-7z'],
   listView: ['M4 6h1', 'M4 12h1', 'M4 18h1', 'M9 6h11', 'M9 12h11', 'M9 18h11'],
   plus: ['M12 5v14', 'M5 12h14'],
+  // 对话 / 工作台双模式（dev-board#1479）：单层对话气泡、折叠箭头、关闭
+  chat: ['M20 5H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h4v3.5l4-3.5h8a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z'],
+  chevronRight: ['M9 6l6 6-6 6'],
+  chevronDown: ['M6 9l6 6 6-6'],
+  close: ['M6 6l12 12', 'M18 6 6 18'],
   // 带书签的文稿：Skill（提示词能力）
   skill: ['M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z', 'M14 3v5h5', 'M9 13h6', 'M9 17h4'],
   bolt: ['M13 2 4 14h7l-1 8 9-12h-7l1-8Z'],

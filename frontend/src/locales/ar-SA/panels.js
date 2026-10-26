@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "workspaceNavigation": "Workspace",
+  "workspaceAiActions": "AI assistance",
+  "workspaceAbout": "About this plugin",
+  "workspaceState": {
+    "active": "In view",
+    "open": "In a tab",
+    "closed": "Open"
+  },
   "litRefresh": "تحديث",
   "litNoGraphvizNotice": "لا يحتوي هذا الجهاز على graphviz، لذا لا يمكن رسم المخططات الانسيابية حاليًا؛ أما الأنواع الستة الأخرى — مثل الخطوط الزمنية وخرائط العلاقات وأشجار هيكل الملكية وغيرها — فتعمل بشكل طبيعي.",
   "litNewDiagramSectionTitle": "إنشاء مخطط جديد",

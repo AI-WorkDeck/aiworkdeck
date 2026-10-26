@@ -29,7 +29,7 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 0.3. **完整版本退出安装（dev-board#1356）**：`update-service.js` 继续先验证 Ed25519 清单；`channels[major].installers` 的 `darwin-arm64` / `win32` 含 `{version,size,sha256,urls}`，只接受更新版本并流式校验完整字节。沿用现有 DMG/NSIS 和 `/update/desktop/installers/` 镜像；`installers/latest.json` 没有签名，仍仅供官网，不作为客户端安装信任依据。`finalize-update-manifest.js` 在 release job 收齐两个平台后验证原清单签名、绑定实际产物哈希并重新签名，任一平台缺失不发布。旧壳不具备完整安装能力，首次仍需安装包含本改动的完整版本；不得声称补丁能升级旧壳。
    - Mac：`full-update.js` 挂载已校验 DMG、核对 plist 版本、用系统 ditto 转本地 ZIP，由 Electron 内置 Squirrel.Mac 经随机路径的回环 HTTP 校验签名并准备安装；只在 `update-downloaded` 后 ready。正常退出不调用 `quitAndInstall`（ShipIt 随下次启动应用更新），主动重启才调用；签名身份变更可能拒绝自动升级，不能删除签名校验。签名拒绝、替换/回退由原生更新器负责，单测替身不证明正式签名安装成功。
    - Windows：`install-update.ps1` 复制到数据目录后运行（PowerShell 不认识 app.asar 路径），握手完成才退出；helper 等父进程退出，再次校验 SHA256 与 Authenticode，运行原 NSIS `/S --updated`。只在成功且用户主动重启/安装期间手动重开时启动。helper 存活期间启动锁阻止第二后端；超过20分钟提示检查安装器，不强杀。失败保留已验证下载件和 `.error`，下次状态读出；沿用 NSIS 的失败行为，不保证产品级回退，不能声称 Windows 安装失败自动恢复旧版。
-   - 退出：`host.lifecycle.onPrepareQuit/onQuitCancelled/cancelQuit` 与主renderer的 `checkba:prepare-quit` / `quit-prepared` ACK 共用普通退出/更新重启。renderer暂停任务、保存dirty编辑器后ACK；主进程只接受当前主窗口同requestId，60s超时/取消不隐藏或停服务。完成ACK后才停后端再安装。Windows点X同样走此路径；Mac红叉只隐藏保留编辑器，Dock激活恢复，避免退出时renderer已销毁无法保存。
+   - 退出：`host.lifecycle.onPrepareQuit/onQuitCancelled/cancelQuit` 与主renderer的 `checkba:prepare-quit` / `quit-prepared` ACK 共用普通退出/更新重启。renderer暂停任务、保存dirty编辑器、等待项目级提交选择、再次确认保存后ACK；主进程只接受当前主窗口同requestId，60s保存超时/取消不隐藏或停服务。dev-board#1489 新增确认阶段通知，等待选择与提交期间暂停退出计时，取消恢复任务。完成ACK后才停后端再安装。Windows点X同样走此路径；Mac红叉先确认再隐藏并恢复暂停的任务，Dock激活恢复，Cmd+Q与关窗复用在途确认。
    - 验证：`update-service.test.js` 的本地签名HTTP、`full-update.test.js` 的真实回环feed/平台替身、`quit-lifecycle.test.js` 的实际主进程片段和ACK，以及 Windows CI 才运行的 helper 合成测试。正式签名Mac/Windows升级、Squirrel回退、Windows NSIS安装/安装期间快开须另外隔离实测，不可用源码测试替代；未获本次发版授权不打tag或部署。
    - 完整 Windows 验收入口：手动 `full-upgrade-smoke.yml` 指定成功的签名 Desktop Build run；`test-full-upgrade.ps1` 仅允许一次性 Actions runner，实际安装、启动、退出、升级并核对签名、后端 JAR、项目/文件 ID、正文及偏好持久化。`LegacyHelper` 只证明新 helper 兼容旧安装目录；`AppUpdater` 必须提供含新更新器的较低版本签名基线，分别验 Restart/Quit/Reopen。本地临时签名清单仅用于测试，不能替代生产清单验签；脚本存在不等于实测已通过，结果以对应 run 的 evidence.json 与截图为准。
    - 完整 Mac 验收：`full-upgrade-mac-smoke.yml` 在全新 ARM64 GitHub-hosted GUI 用户下，用精确提交的两版真实签名包执行 Squirrel 下载准备、普通退出安装和手动重开，核对签名、候选 app.asar/JAR、项目与文件 ID、正文及偏好。仅改 HOME 或 Electron app 路径不足以隔离同用户的 ShipIt launchd job 与 Foundation 缓存，因此不得把本机 QA 路径隔离当成原生升级隔离；测试 feed 的临时签名不代表生产清单信任，真实 LOWA/AI 接续另外验收。
@@ -526,10 +526,10 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
   （2026-08 改 Ollama 设置键时踩过：测试报 expected qwen3:14b but was qwen3-vl:8b，`javap` 确认
   测试类里内联的还是老键名）。CI 是 clean build 所以只坑本地。
 - **删「零引用」的 Spring bean 前先想有没有 `@ConditionalOnMissingBean` 角色**：
-  `service/ai/DynamicContentRetriever` 全仓 grep 不到调用方，但它靠存在本身压住了 langchain4j
-  `RagAutoConfig`——删掉后自动配置自己造 `contentRetriever`，而本项目有两个
-  `EmbeddingStore<TextSegment>`，全部 `@SpringBootTest` 一起 NoUniqueBeanDefinition 起不来
-  （2026-08 清理孤儿类时踩过，16 个 context 加载失败）。`DesktopContextSmokeTest` 是这条的护栏。
+  2026-08 清理 `service/ai/DynamicContentRetriever` 时，langchain4j `RagAutoConfig` 因缺少该 bean
+  自造 `contentRetriever`，但项目有两个 `EmbeddingStore<TextSegment>`，导致16个 context
+  因 NoUniqueBeanDefinition 起不来。当前启动候选已移除通用 starter，保留显式检索器；
+  重新引入自动装配时仍须核对这项依赖。`DesktopContextSmokeTest` 保留为容器装配护栏。
 - **`@Table` 的 `indexes` / `uniqueConstraints` 里必须写 snake_case 物理列名**：这两处不参与
   PhysicalNamingStrategy 的驼峰转换（本仓没配自定义策略，用 Spring Boot 默认的
   CamelCaseToUnderscoresNamingStrategy，字段 `projectId` 落成列 `project_id`）。
@@ -563,6 +563,8 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
 
 `DesktopHealthController` 只有在 `ApplicationAvailability` 为 `ACCEPTING_TRAFFIC` 且有界数据库探测成功时返回 UP；必要 runner、同步 ready listener 尚未结束或应用正在关闭时返回 503。不要在最高优先级 Ready listener 中提前置位。`DesktopStartupReadinessTest` 使用真实 HTTP 监听与门闩验证未完成/失败启动；其专用配置用 `@TestConfiguration`，避免污染全应用扫描。既有补丁健康判定、回退与退出流程仍消费同一接口。
 
+`LocalRootWatchService` 的存量项目目录注册不再占住同步 Ready 回调，而由已有 `watchExecutor` 承担唯一可取消任务；已打开项目的实时对账继续使用独立 executor。项目显式打开、删除提交、停止与关闭的竞争契约见 `version-control.md` 与 `LocalRootWatchStartupTest`。不要把这项注册延后说成数据库/JPA 迁移完成，正式健康门未放宽。
+
 ## 验证（改本领域自身时）
 
 - 写作辅助（dev-board#538）：CI 跑 `frontend npm run test:completion`（本地提取/排序、资料转换、宿主范围与客体交互）；`test:lowa-completion` 与 `test:writing-ui` 需真实 LOWA 载荷，覆盖位置令牌、中文输入、明确查询预览、资料插入与撤销。第三方响应使用测试资料，不在回归中自动消费查询额度。
@@ -592,6 +594,36 @@ Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Ac
 
 
 ## 本地后端运行期自检（dev-board#1216）
+
+### 本地轻量启动候选（dev-board#1472/#1474，默认未启用）
+
+`desktop.local-core.enabled=true` 仅用于 desktop/local-mode/loopback 的隔离候选。`LocalCoreBootstrap` 在 Spring 建容器前核验现有 H2 的持久化契约与实际 schema proof。构建时用完整实体映射两次生成独立 H2，确认结构一致后打包契约（DDL、H2/Hibernate 版本、JPA/SQL 初始化配置、bootstrap epoch）；启动直接顺序读取自身应用归档的 class 字节指纹，校验构建资源未过期，不再运行 Spring 实体元数据扫描，也不创建 EMF。普通类新增持久化注解同样会使旧指纹失效；构建阶段拒绝自身归档之外的映射类，未来增加外部映射模块须显式扩展契约。字节指纹不进入兼容 ID，兼容重打包仍复用资格。v2 proof 允许应用重打包但契约相同的升级直接进入 CORE；旧 v1、缺失/过期契约、配置差异或 schema 变化仍走完整初始化，完成所有同步 Ready 回调后再记 v2。bootstrap 数据准备语义变化时必须提升 `BOOTSTRAP_EPOCH`。build ID 继续用于进程/健康身份，不能代替数据兼容凭据。全新数据库仍先走完整初始化，不能宣称首次安装已获同等提速。使用原数据库、原 ID/UID、原文件路径，不能再旁建可写 SQLite 权威。早期池禁用 AUTO_SERVER 并要求 IFEXISTS，阻止另一个旧 JVM 同时连接；Hikari 实例交给 JPA 共用，Hibernate/schema SQL 初始化在已验证路径禁用。真正 native EMF 未完成时仍保留 CORE 读取；`StartupDataInitializer` 的首个动作排空 CORE leases，再交权给业务初始化。失败不得自动回 CORE 形成双写。
+
+独立 `LocalCoreGateway` 保持公开端口，Spring 私有 connector 使用随机端口，配置中的 server.port 和回调 URL 仍用公开端口。复用本机准入、CORS、源代码声明过滤器；文件通过现有 ResourceHttpRequestHandler 支持 HEAD/Range/416。关闭独立 Tomcat 必须 stop 后 destroy，否则容器 await 线程会使 JVM 退出不完。未知路由转交完整后端前先释放 CORE lease，不能持 lease 等待交权。
+
+轻量项目列表与 `ProjectService.listProjects` 同时隐藏 `LOOSE_FILES` 和 `SCRATCH`，包括本人和成员的随手工作区；直接访问仍按原 ACL，转正后同一 ID/UID 立即可见。新增聊天模式默认仍从 welcome/ide 进入；明确选择 chat 恢复时，创建随手工作区的 POST 继续等待完整服务，不把写接口混入早期读取白名单。
+
+资格化候选在 CORE leases 完全排空、真实 JPA/版本交接成功且状态已为 JPA 后，通过独立 `onJpaAvailable → jpaDocumentsReady` 发布本地文档能力；DRAINING 仍拒绝新准入。Gateway 只将精确文档方法/路由交给该能力，复用原 H2 的只读/内容协议实现；内容发布此时已绑定真实 `WorkSessionService` 项目锁和 JGit receipt 交接，不需要等私有 Servlet、插件初始化或后续 runners。未知业务接口仍等完整后台，full-health仍503，effects仍到完整Ready后才安装。失败/关闭撤销本地JPA准入，不能退回CORE。
+
+该并行窗口的 `MediaFileTypeReconciler`、`OrphanParentReconciler` 在候选开启时使用同一项目锁：外层只发现项目/文件ID，锁内重新查询实体后才修改，不能把锁外旧实体merge回去覆盖刚保存的file_size/updated_at。资格与schema契约不变；feature-off保留原迁移路径。`LocalCoreJpaContinuityTest` 使用真实Spring Data JPA、H2、项目锁、JGit和HTTP，在没有私有Servlet/完整Ready的场景验证保存与before-image baseline；受控暂停迁移的旧实体发现查询，再并发保存，核验两种迁移不覆盖新元数据。此测试不等于全产品正常负载性能或旧数据库升级验收。
+
+兼容候选另有较窄的「文档路由就绪」门槛：所有 runners 已结束后的 Ready 事件先显式完成 `OrphanParentReconciler`（同次启动只执行一次，失败不提前放行），再允许既有核心 GET/HEAD、内容协议 GET/HEAD/PUT 与 receipt GET/DELETE 经原 MVC 访问。尚未完成的普通 Ready 回调仍挡住其他业务路由；两条精确健康 GET/HEAD 经原 MVC 就绪检查返回503，不能据端口可用提前报UP。该阶段保留原本机准入、控制器鉴权、内容事务和版本锁，保存后的 AI/标签副作用仍等完整 Ready。启动失败/关闭会同时撤销文档准入；无 gateway 的 legacy/首次安装/feature-off 不触发额外修复或提前路由。这条门槛仅负责切换到私有 MVC；更早的 JPA 本地文档能力见上段。`LocalCoreDocumentReadyTest` 用随机本机端口、受控阻塞的 Ready listener、真实 MVC 与 H2 内容发布验证；版本服务使用替身，不能据此称完整 JPA/JGit 或正常负载提速已验。
+
+`/api/desktop/startup-health` 的 UP/phase=core 只表示早期业务读取可用，原 `/api/desktop/health` 此时仍是503。phase=full 与完整健康必须等 ACCEPTING_TRAFFIC，不能只看 ApplicationReadyEvent 或 FactoryBean 代理。桌面首屏只等 startup-health；完整后端在原启动 deadline 内以最多500ms周期检测，确认完整健康后恢复10s。新路由只有明确404才兼容旧健康链，dev 的 wizard 同样不能覆盖已存在的503。健康结果、overlay 成功/失败均绑定实际 launch/process，迟到旧结果不能给新启动记成功；内部 launch 含 child，不得放入 renderer IPC。
+
+完整 UI 曾暴露 HTTP/1.1 六连接饥饿：六个非早期接口在网关等完整后端，使文件树在浏览器排队约4秒，真正读取仅约13ms。`backend-request-gate.js` 在主窗 session 的 onBeforeRequest 中排队这些请求，保留早期 GET/HEAD 与 OPTIONS 通道；能力清单只来自 build 校验成功的 core 健康响应。未知旧后端保持原传输；换 launch、端口、退出或到截止时取消待发请求，不重放到新进程。不要同时给同一 session 安装第二个 onBeforeRequest listener。实际隔离 UI 文件树4019→150ms只属诊断，不替代正常负载正式对照。
+
+排队请求必须按 Chromium request id 在 `onErrorOccurred` / `onCompleted` 中移除，不能再调用已取消请求的回调。Electron 30.5.1 的真实 XHR 超时探针可使旧实现触发 native dangling-pointer 崩溃，JS try/catch 无法捕获；见上游 [electron#42505](https://github.com/electron/electron/issues/42505)。队列同时拥有这三个 webRequest 监听器，清理时一并注销，不能被其他监听器覆盖。`npm --prefix desktop run test:backend-request-gate-e2e` 用隔离 profile、随机本机端口和真实 Electron 验证超时不重放、后续请求成功及进程退出；不使用关闭崩溃检查的启动参数。
+
+后台工具和 RAG 使用项目显式装配；通用 `langchain4j-spring-boot-starter` 已替换为同版本核心库，避免无 `@AiService` 接口时仍进行额外类扫描，Ollama starter 保留。`WebTools` 在 local-mode 不启动浏览器预热线程，实际 browse 请求仍沿原路径创建 Playwright；不能把这项改动称为已验证首次网页读取无额外成本。必要数据恢复、完整仓库校验及 Ready 回调顺序保持原样。
+
+候选的 `LocalCoreContentHttp` 在 CORE/JPA 两阶段提供同一带版本的 GET/HEAD/PUT 与 receipt GET/DELETE 协议。下载快照绑定实际字节的 SHA、文件 UID 与本机身份；上传完整收完后才取得项目版本锁、publication 锁和短数据库事务。持久操作 UUID/回执/取消栅栏阻止重复与迟到写入，任何不确定结果不得降级为旧无条件 POST。客户端先探测数字 `coreContentProtocol=1`，元数据跟随准确的 ArrayBuffer，在模型装入成功后绑定；重载先解决或取消旧保存。早期能力一旦已发布，交接后不能因 schema proof 失效静默撤回。
+
+保存前的 `GET /api/document/generator/settings` 同样属于早期只读能力：直接读取原 H2 的开关，产品名仍取 `ProductIdentity`，保留原控制器的缺省值和匿名读取规则；PUT 仍等完整后端。只拆内容上传还不够：这项可选元数据若排在完整初始化后，`stampGeneratorMetadata` 会把已导出的文档卡在上传之前。`LocalCoreHttpReadsTest` 与原控制器逐项对拍开关语义，`backend-request-gate.test.js` 验证只放行读请求。
+
+保存 journal 位于原 H2 文件旁；即使关闭开关或构建标识变化，存在 journal 时也必须在 legacy DDL 之前恢复并验证记录过的 schema。`LocalCoreVersionHandoff` 保留既有 HEAD，未建库时以首个 before image 建初始版本，原件始终保留最新内容；版本确认后才 ack。feature-off/recovery-only 同样必须完成实际 EMF 和交接才可 full-ready。通知在项目锁释放后执行，失败的本进程回执重试可以重试通知，非持久通知 outbox。DDL 中途崩溃造成 proof 不匹配会保守拒绝启动，不能称已自动恢复所有升级窗口。
+
+隔离的完整 Spring/JPA/H2/HTTP/JGit 联调已覆盖阻塞实际 EMF 时读写/取消、交权后相同路由、CORS、版本基线以及关闭开关/变更构建标识的骤停恢复；变更构建仅为同 JAR 改标识，并非另一二进制/DDL 兼容验证。当前仍默认关闭轻量候选，默认文档引擎仍为 LOWA；完整原生体验和正常负载对照未通过前不得据样板性能切换默认。
 
 `desktop/main/services/backend-supervisor.js` 在服务启动完成后每 10s 检查后端，连续三次失败后按 5/15/45s 退避尝试恢复，最多三次；连续健康 5min 才重置预算。只恢复 `ServiceManager` 创建的 child，复用外部后端同样检查 `/api/desktop/health`，503/超时不能退回 wizard 假报健康；仅明确404且wizard识别成功时标记 `degraded/external-health-unverified`（旧版健康未知），不接管。原来按端口杀陈旧后端的路径已移除。后端初启 HTTP 就绪宽限 120s（Windows ARM 转译延长），运行期使用 `/api/desktop/health`（DB 检查+本次 child 的 build），不以 TCP 通等价健康。dev prod profile 兼容 `/api/admin/wizard`。健康检查固定本次 spawn 指纹，后台下载激活 overlay 不会触发运行中的旧版本被误判并自动换件。
 
