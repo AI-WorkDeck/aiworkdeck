@@ -41,6 +41,11 @@ to about 9 / 8.5 CSSpx. With `CALC_HEADER_RESIZE=1`, the audit agent additionall
 passed 53 assertions each at DPR1/2 with native chrome visible: real column/row
 dragging, two actual clicks for autofit, scrolling and strict export/reopen. r6
 passes the same native resizing operations (36 expected style failures remain).
+The main task then repeated the entire native-chrome matrix: 106/106 passed in
+fresh browsers per DPI. One earlier same-browser second-engine startup exceeded
+the 5-minute test deadline; the individual DPR2 rerun passed, and each DPI now
+gets a fresh browser/worker lifetime. This isolates test cases, not a claimed
+product startup fix; the interrupted run remains in local evidence.
 
 This is **not** a pass for the hidden-chrome resize path: when headers touch the
 canvas top, both engines can place the size tooltip beside the pointer, where
