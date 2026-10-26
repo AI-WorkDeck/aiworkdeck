@@ -45,6 +45,8 @@ public final class LocalCoreGateway implements AutoCloseable {
     private final Duration waitForBackend;
     private final CompletableFuture<Integer> backend = new CompletableFuture<>();
     private final CompletableFuture<Integer> documentBackend = new CompletableFuture<>();
+    private final CompletableFuture<Void> documentAvailable = new CompletableFuture<>();
+    private volatile CoreHandler jpaDocuments;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
             .followRedirects(HttpClient.Redirect.NEVER).version(HttpClient.Version.HTTP_1_1).build();
     private final WebServer server;
@@ -90,12 +92,22 @@ public final class LocalCoreGateway implements AutoCloseable {
         validateDestination(port);
         if (!backend.complete(port)) throw new IllegalStateException("Backend destination already published");
         documentBackend.complete(port);
+        documentAvailable.complete(null);
     }
 
     /** Only document routes, after runners and synchronous file reconciliation; not full readiness. */
     public synchronized void documentBackendReady(int port) {
         validateDestination(port);
         if (!documentBackend.complete(port)) throw new IllegalStateException("Document destination already published");
+        documentAvailable.complete(null);
+    }
+
+    /** A distinct, bounded capability after the CORE lease drain and successful JPA handoff. */
+    public synchronized void jpaDocumentsReady(CoreHandler handler) {
+        if (closed || failed || ownership.state() != LocalCoreOwnership.State.JPA || jpaDocuments != null || backend.isDone())
+            throw new IllegalStateException("JPA document capability is not available");
+        jpaDocuments = java.util.Objects.requireNonNull(handler);
+        documentAvailable.complete(null);
     }
 
     private void validateDestination(int port) {
@@ -109,6 +121,7 @@ public final class LocalCoreGateway implements AutoCloseable {
         failed = true;
         var failure = new IllegalStateException("Backend startup failed");
         backend.completeExceptionally(failure); documentBackend.completeExceptionally(failure);
+        documentAvailable.completeExceptionally(failure);
     }
 
     private static boolean documentRoute(String method, String path) {
@@ -138,7 +151,15 @@ public final class LocalCoreGateway implements AutoCloseable {
             }
             if (ownership.state() == LocalCoreOwnership.State.FAILED) { unavailable(response); return; }
             // Never retain a core lease while waiting for the backend that needs to drain those leases.
-            var destination = documentRoute(request.getMethod(), request.getRequestURI()) ? documentBackend : backend;
+            boolean document = documentRoute(request.getMethod(), request.getRequestURI());
+            if (document) {
+                documentAvailable.get(waitForBackend.toMillis(), TimeUnit.MILLISECONDS);
+                if (closed || failed) { unavailable(response); return; }
+                var local = jpaDocuments;
+                if (!backend.isDone() && ownership.state() == LocalCoreOwnership.State.JPA && local != null
+                        && local.handle(request, response)) return;
+            }
+            var destination = document ? documentBackend : backend;
             int target = destination.get(waitForBackend.toMillis(), TimeUnit.MILLISECONDS);
             if (closed || failed) { unavailable(response); return; }
             proxy(request, response, target);

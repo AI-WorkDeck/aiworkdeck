@@ -61,6 +61,8 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
         AutoCloseable onCorePrepared(ConfigurableEnvironment environment, DataSource dataSource,
                                      LocalCoreStore store, LocalCoreOwnership ownership) throws Exception;
         default void onJpaHandoff(ConfigurableApplicationContext context) throws Exception {}
+        /** Ownership is now JPA; no CORE operation can overlap this publication. */
+        default void onJpaAvailable(ConfigurableApplicationContext context) throws Exception {}
         /** All synchronous Ready listeners have returned; this is separate from JPA ownership. */
         default void onReady(ConfigurableApplicationContext context) throws Exception {}
         default void onReady(ConfigurableApplicationContext context, boolean recordedSchema) throws Exception { onReady(context); }
@@ -242,6 +244,7 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
             if (ownership == null) callbacks.onJpaHandoff(ctx);
             else ownership.drainAndHandoff(drainTimeout, () -> callbacks.onJpaHandoff(ctx));
             handedOff = true;
+            callbacks.onJpaAvailable(ctx);
         } catch (Exception failure) {
             throw new IllegalStateException("Local core ownership handoff failed", failure);
         }

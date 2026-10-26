@@ -47,6 +47,7 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
     private final Map<String, Object> shared = new LinkedHashMap<>();
     private ObjectMapper json;
     private LocalCoreGateway gateway;
+    private LocalCoreGateway.CoreHandler localDocumentRoutes;
     private ConfigurableApplicationContext applicationContext;
     private LocalCoreContentService content;
     private LocalCoreContentHttp contentHttp;
@@ -217,7 +218,7 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
         String build = environment.getRequiredProperty("AWD_BACKEND_BUILD");
         int publicPort = environment.getProperty("server.port", Integer.class, 8080);
         protocolPublished = contentHttp != null; // The bootstrap verified this exact recorded schema.
-        gateway = new LocalCoreGateway(publicPort, ownership, (request, response) -> {
+        localDocumentRoutes = (request, response) -> {
             if (handleContent(request, response)) return true;
             if (("GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod()))
                     && request.getRequestURI().equals("/api/desktop/health")) {
@@ -264,7 +265,9 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
                     } catch (Exception e) { throw new RequestFailure(e); }
                 });
             } catch (RequestFailure e) { throw e.original; }
-        }, environment.getProperty("security.cors.allowed-origins", ""),
+        };
+        gateway = new LocalCoreGateway(publicPort, ownership, localDocumentRoutes,
+                environment.getProperty("security.cors.allowed-origins", ""),
                 environment.getProperty("security.cors.allow-all", Boolean.class, false), Duration.ofSeconds(10));
         // Keep server.port for callback URLs and internal clients; only the connector binds privately.
         org.springframework.boot.web.server.WebServerFactoryCustomizer<org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory>
@@ -294,6 +297,15 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
         versions.handoff(content);
         for (var image : pending) savedBeforeReady.put(image.request().operationId(), image.request());
         sessions = context.getBean(com.checkba.version.WorkSessionService.class);
+    }
+
+    @Override public void onJpaAvailable(ConfigurableApplicationContext context) {
+        if (gateway == null) return;
+        if (sessions == null || versions == null) throw new IllegalStateException("JPA document locks are not installed");
+        // Gateway admits only its explicit document methods/routes, and only in JPA. The content
+        // adapter now publishes under the real project lock and hands receipts to JGit. Effects
+        // remain deferred until full readiness; no private Servlet or optional startup work is needed.
+        gateway.jpaDocumentsReady((request, response) -> localDocumentRoutes.handle(request, response));
     }
 
     @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
