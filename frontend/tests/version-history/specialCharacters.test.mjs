@@ -8,6 +8,8 @@ const source = readFileSync(new URL('../../src/components/EditorToolbar.vue', im
 const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
 const imports = [...script.matchAll(/^import\s+([\s\S]*?)\s+from\s+'[^']+'\s*;?\s*$/gm)].flatMap(m => m[1].replace(/[{},]/g, ' ').split(/\s+/).filter(Boolean))
 const body = script.replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '').replace('export default {', 'const toolbar = {') + '\n return { toolbar, hosts: VIEW_PREFS_HOSTS }'
+const prefsBody = readFileSync(new URL('../../src/utils/editorViewPrefs.js', import.meta.url), 'utf8')
+  .replace(/export /g, '') + '\nreturn { MARK_OPTIONS, readViewPrefs, writeViewPrefs, getWriterViewOptions }'
 const keys = ['paragraphMarks', 'lineBreaks', 'spaces', 'tabs']
 function harness(stored = '', { failStorage = false, failEngine = false } = {}) {
   const emitted = [], calls = [], notices = []
@@ -17,7 +19,8 @@ function harness(stored = '', { failStorage = false, failEngine = false } = {}) 
     setStorageSync: (key, value) => { if (failStorage) throw Error('quota'); saved = value },
     showToast: m => notices.push(m),
   }
-  const { toolbar, hosts } = new Function('uni', ...imports, body)(uni, ...imports.map(() => () => {}))
+  const prefs = new Function('uni', prefsBody)(uni)
+  const { toolbar, hosts } = new Function('uni', ...imports, body)(uni, ...imports.map(name => prefs[name] || (() => {})))
   const make = () => {
     const host = { ...toolbar.data(), ...toolbar.methods, $emit: name => emitted.push(name), $t: s => s,
       async call(action, params) {

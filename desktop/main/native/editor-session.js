@@ -244,6 +244,8 @@ class NativeEditorSession {
     const bytes = Buffer.from(params.bytes)
     if (bytes.length > 64 * 1024 * 1024) throw Error('Native DOCX exceeds the current 64 MiB limit')
     if (typeof params.authorName !== 'string') throw TypeError('authorName must be a string')
+    if (params.viewOptions !== undefined && (!params.viewOptions || typeof params.viewOptions !== 'object' || Array.isArray(params.viewOptions))) throw TypeError('viewOptions must be an object')
+    const permission = this.permissionSeq
     await this.start()
     if (this.model) {
       await this.engine.call('close', { documentEpoch: this.model.documentEpoch })
@@ -256,13 +258,20 @@ class NativeEditorSession {
     const opened = await this.engine.call(bytes.length ? 'open' : 'open_blank', { path: local, readOnly: this.readOnly })
     if (opened.readOnly !== this.readOnly || !Number.isInteger(opened.documentEpoch) || !Number.isInteger(opened.viewId)) throw Error('Native open identity not confirmed')
     this.model = { ...opened, name: params.name, authorName: params.authorName, documentUrl: pathToFileURL(local).href, trackingReady: false }
+    const owner = this.model
     try {
       await this.unoCall('author', { name: params.authorName })
       const tracking = await this.unoCall(this.readOnly ? 'tracking_state' : 'tracking', this.readOnly ? {} : { enabled: true, initialize: true })
       if (typeof tracking.enabled !== 'boolean' || (!this.readOnly && (tracking.enabled !== true || tracking.modified !== false))) throw Error('Native tracking initialization not confirmed')
       this.model.trackingInitialized = !this.readOnly
+      if (params.viewOptions !== undefined) await this.unoCall('set_view_options', params.viewOptions)
       this.model.view = await this.unoCall('view_settings')
       this.model.layout = await this.unoCall('view_metrics')
+      // Drain initialization callbacks while this model is still unpublished.
+      if (params.viewOptions !== undefined) await this.engine.call('selected_text', { documentEpoch: owner.documentEpoch })
+      this.assertLive()
+      if (this.model !== owner) throw Error('STALE_DOCUMENT')
+      if (this.permissionSeq !== permission) throw Error('STALE_PERMISSION_UPDATE')
       this.model.trackingReady = true
       const { documentEpoch, viewId, widthTwips, heightTwips } = this.model
       return { success: true, kind: 'writer', docKind: 'writer', nativeModel: { documentEpoch, viewId, widthTwips, heightTwips, readOnly: this.readOnly, permissionSeq: this.permissionSeq, view: this.model.view, layout: this.model.layout },
@@ -568,14 +577,42 @@ class NativeEditorSession {
       })
     }
     if (action === 'set_view_options') {
-      const owner = this.model, permission = this.permissionSeq, read = this.reviewRead
-      const pending = read?.owner === owner && read.revision === this.revision ? read.promise : null
-      const ready = this.review?.revision === this.revision && this.review.items.every(item => item.textAvailable === true)
-      // Initial toolbar preferences can arrive between an existing reader's
-      // bounded hydration batches. Share that read before publishing view-only
-      // callbacks; do not start a new full scan just to initialize the toolbar.
-      if (pending || ready) return (pending || Promise.resolve()).then(() =>
-        this.executeQueued(action, params, owner, permission))
+      const owner = this.model, permission = this.permissionSeq, revision = this.revision
+      const context = { owner, permission, revision }
+      const check = () => {
+        this.assertDocument(params.documentEpoch)
+        if (this.model !== owner) throw Error('STALE_DOCUMENT')
+        if (this.permissionSeq !== permission) throw Error('STALE_PERMISSION_UPDATE')
+        if (this.revision !== revision) throw Error('STALE_REVIEW_BATCH: document changed while checking view preferences')
+      }
+      // The common bootstrap request already matches the preferences applied at
+      // load. Prove that from real UNO values before waiting for a full reader.
+      return this.task(async () => {
+        check()
+        const { documentEpoch: _, ...query } = params
+        const result = await this.unoCall('match_view_options', query)
+        check()
+        if (typeof result.matches !== 'boolean') throw Error('Native view preference match not confirmed')
+        return result
+      }).then(async result => {
+        check()
+        if (result.matches) {
+          this.model.view = result.view
+          return { success: true, unchanged: true, nativeView: result.view }
+        }
+        // Actual changes still share any existing full read and its proof. Do
+        // not start a full scan solely for a toolbar with no reader or identity.
+        const { pending, ready } = await this.task(() => {
+          check()
+          // A reader queued during matching publishes its job before this
+          // check. Return its promise; never await hydration inside the queue.
+          const read = this.reviewRead
+          return { pending: read?.owner === owner && read.revision === revision ? read.promise : null,
+            ready: this.review?.revision === revision && this.review.items.every(item => item.textAvailable === true) }
+        })
+        if (pending) await pending
+        return this.executeQueued(action, params, pending || ready ? owner : undefined, context)
+      }).catch(error => { if (error.message.includes('VIEW_OUTCOME_UNKNOWN')) this.fail(error); throw error })
     }
     const finalRead = viewReadActions.has(action) || completionReads.has(action) || ['get_review_context', 'goto_review_range'].includes(action)
       || (action === 'get_document_text' && params.__agent === true)
@@ -595,14 +632,18 @@ class NativeEditorSession {
     }
     return this.executeQueued(action, params)
   }
-  executeQueued(action, params, finalReadOwner, finalReadPermission) {
+  executeQueued(action, params, finalReadOwner, viewOptionsContext) {
     return this.task(async () => {
       if (action === 'load_document') return this.load(params)
       this.assertDocument(params.documentEpoch)
+      if (viewOptionsContext) {
+        if (this.model !== viewOptionsContext.owner) throw Error('STALE_DOCUMENT')
+        if (this.permissionSeq !== viewOptionsContext.permission) throw Error('STALE_PERMISSION_UPDATE')
+        if (this.revision !== viewOptionsContext.revision) throw Error('STALE_REVIEW_BATCH: document changed while preparing view preferences')
+      }
       if (finalReadOwner) {
         this.assertDocument(finalReadOwner.documentEpoch)
         if (this.model !== finalReadOwner) throw Error('STALE_DOCUMENT')
-        if (finalReadPermission !== undefined && finalReadPermission !== this.permissionSeq) throw Error('STALE_PERMISSION_UPDATE')
         if (params.nativeExpectedRevision !== undefined && params.nativeExpectedRevision !== this.revision)
           return { success: false, available: false, reason: 'stale', error: 'stale', message: 'stale' }
         if (this.review?.revision !== this.revision || !this.review.items.every(item => item.textAvailable === true))
