@@ -2348,7 +2348,7 @@ try {
       await mouseClickSel('[title="资源管理器"]')
       await mouseClickSel('.version-entry')
       await page.waitForSelector('.cloud-dot', { timeout: 15000 })
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('案件参与人')
       await page.waitForSelector('.collab-add-row .uni-input-input', { timeout: 10000 })
@@ -2457,7 +2457,7 @@ try {
       // 同上一步的教训：等 .cloud-dot 出现（已放进案件库才有的选择器）比等 700ms 定式稳，
       // 面板这时候要重新拉 /status+/drafts+/cloud/status 三串请求才会渲染出这行状态。
       await page.waitForSelector('.cloud-dot', { timeout: 15000 })
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('取回最新稿')
       await sleep(2000)
@@ -2550,7 +2550,7 @@ try {
     })
 
     await step('A：点「交稿」按引导取回新稿后冲突弹窗标签正确', async () => {
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('交稿')
       // 已知案件库领先时，交稿先进入 #645 三步引导，按当前可操作步骤取回新稿。
@@ -3782,7 +3782,7 @@ try {
     }
     const pullViaUi = async () => {
       // 进这一步时仓库必须是干净的。上一轮没收尾的话裁决弹窗还挂着，而它是全屏遮罩
-      // （.awd-mask）：下面点「打开协作」会点在遮罩上，症状是 .collab-dialog 十秒超时，
+      // （.awd-mask）：下面点「管理云端同步」会点在遮罩上，症状是 .collab-dialog 十秒超时，
       // 完全看不出真因。把前提写成一条明确的失败信息，别让它伪装成 UI 回归。
       const stale = await conflictA()
       if (stale) {
@@ -3790,7 +3790,7 @@ try {
           + String(JSON.stringify(stale)).slice(0, 200))
       }
       await remountVersionPanel()
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('取回最新稿')
       await sleep(2500)
