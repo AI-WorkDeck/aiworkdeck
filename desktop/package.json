@@ -12,7 +12,9 @@
     "dev": "cross-env AIWORKDECK_DESKTOP_DEV=1 electron .",
     "start": "electron .",
     "build": "electron-builder",
-    "test": "node --test tests/startup-readiness.test.js tests/patch-nsis-known-folder.test.js tests/open-paths.test.js tests/file-associations.test.js tests/dropped-files.test.js tests/file-drag.test.js tests/permissions-service.test.js tests/patch-gate.test.js tests/service-manager.test.js tests/quit-lifecycle.test.js tests/backend-reuse-gate.test.js tests/backend-supervisor.test.js tests/port-chain-contract.test.js tests/model-manager.test.js tests/service-pack-gate.test.js tests/pysvc-extract-removed.test.js tests/pysvc-runtime.pack-resolve.test.js tests/overlay.test.js tests/update-service.test.js tests/full-update.test.js tests/drawio-server.test.js tests/browser-views.test.js tests/native-theme-light.test.js tests/titlebar-overlay-theme.test.js tests/main-window-bounds.test.js tests/main-window-lifecycle.test.js tests/chrome-state.test.js tests/build-pack.test.js tests/fetch-lowa-assets.test.js tests/prepare-python-service.test.js tests/trim-driver-bundle.test.js tests/verify-backend-natives.test.js tests/after-pack.test.js tests/workflow-release-gating.test.js tests/dependency-clean-windows.test.js tests/share-file.test.js tests/trash-items.test.js tests/product-identity-ua.test.js tests/prefs.test.js tests/kokoro-offline-english.test.js tests/reload-shortcut.test.js tests/recovery-download.test.js tests/captcha-webview-preload.test.js tests/clipboard-watch.test.js tests/edit-undo-redo-forward.test.js tests/pdf-viewer-lang.test.js tests/pdf-export-download-dir.test.js tests/mac-lproj-locale.test.js tests/system-fonts.test.js && node --test tests/about-window.test.js"
+    "test": "node --test tests/startup-readiness.test.js tests/backend-request-gate.test.js tests/patch-nsis-known-folder.test.js tests/open-paths.test.js tests/file-associations.test.js tests/dropped-files.test.js tests/file-drag.test.js tests/permissions-service.test.js tests/patch-gate.test.js tests/service-manager.test.js tests/quit-lifecycle.test.js tests/backend-reuse-gate.test.js tests/backend-supervisor.test.js tests/port-chain-contract.test.js tests/model-manager.test.js tests/service-pack-gate.test.js tests/pysvc-extract-removed.test.js tests/pysvc-runtime.pack-resolve.test.js tests/overlay.test.js tests/update-service.test.js tests/full-update.test.js tests/drawio-server.test.js tests/browser-views.test.js tests/native-theme-light.test.js tests/titlebar-overlay-theme.test.js tests/main-window-bounds.test.js tests/main-window-lifecycle.test.js tests/chrome-state.test.js tests/build-pack.test.js tests/fetch-lowa-assets.test.js tests/prepare-python-service.test.js tests/trim-driver-bundle.test.js tests/verify-backend-natives.test.js tests/after-pack.test.js tests/workflow-release-gating.test.js tests/dependency-clean-windows.test.js tests/share-file.test.js tests/trash-items.test.js tests/product-identity-ua.test.js tests/prefs.test.js tests/kokoro-offline-english.test.js tests/reload-shortcut.test.js tests/recovery-download.test.js tests/captcha-webview-preload.test.js tests/clipboard-watch.test.js tests/edit-undo-redo-forward.test.js tests/pdf-viewer-lang.test.js tests/pdf-export-download-dir.test.js tests/mac-lproj-locale.test.js tests/system-fonts.test.js && node --test tests/about-window.test.js && npm run test:native",
+    "test:backend-request-gate-e2e": "electron tests/backend-request-gate.electron.cjs",
+    "test:native": "node --test tests/native-editor-routing.test.js tests/native-editor-session.test.js tests/native-process-channel.test.js tests/native-office-surface.test.js tests/native-document-rulers.test.js tests/native-permission-input.test.js tests/native-permission-surface.test.js prototypes/workbench/tests/review-export.test.cjs prototypes/workbench/tests/review-hydration.test.cjs prototypes/workbench/tests/review-match.test.cjs prototypes/workbench/tests/review-renderer.test.cjs prototypes/workbench/tests/review-tracking.test.cjs prototypes/workbench/tests/review-undo.test.cjs prototypes/workbench/tests/document-input.test.js"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
@@ -86,7 +88,27 @@
           "calendar/web/**",
           "favorites/web/**",
           "clipboard/web/**",
-          "insight/web/**"
+          "insight/web/**",
+          "search/l10n/**",
+          "voice/l10n/**",
+          "desensitize/l10n/**",
+          "litigation-visual/l10n/**",
+          "calendar/l10n/**",
+          "favorites/l10n/**",
+          "clipboard/l10n/**",
+          "insight/l10n/**",
+          "theme-inkwash-zen/manifest.json",
+          "theme-inkwash-zen/web/**",
+          "theme-inkwash-zen/themes/**",
+          "theme-inkwash-zen/l10n/**",
+          "theme-anime-twilight/manifest.json",
+          "theme-anime-twilight/web/**",
+          "theme-anime-twilight/themes/**",
+          "theme-anime-twilight/l10n/**",
+          "theme-aurora-glass/manifest.json",
+          "theme-aurora-glass/web/**",
+          "theme-aurora-glass/themes/**",
+          "theme-aurora-glass/l10n/**"
         ]
       }
     ],

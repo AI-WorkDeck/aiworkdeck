@@ -45,11 +45,17 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
     .awd-rb-actions { display:flex;gap:6px;flex-wrap:wrap; }.awd-rb-actions button:disabled { opacity:.45;cursor:wait; }
     .awd-rb-lines { position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none; }
     .awd-rb-lines path { fill:none;stroke:var(--awd-bamboo);stroke-width:1;stroke-dasharray:4 4;opacity:.65; }
-    .awd-rb-notice { position:absolute;bottom:8px;right:8px;max-width:260px;padding:5px 10px;background:var(--awd-warning-soft);color:var(--awd-warning-text);z-index:3; }
+    .awd-rb-notice { position:absolute;bottom:8px;right:8px;max-width:260px;padding:5px 10px;background:var(--awd-warning-soft);color:var(--awd-warning-text);z-index:3;pointer-events:auto; }
+    .awd-rb-notice button { margin-left:8px;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-decoration:underline;cursor:pointer; }
   `
   const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.classList.add('awd-rb-lines')
   const list = doc.createElement('aside'); list.className = 'awd-rb-list'; list.setAttribute('aria-label', labels.title)
   const notice = doc.createElement('div'); notice.className = 'awd-rb-notice'; notice.hidden = true
+  notice.setAttribute('role', 'status')
+  const noticeText = doc.createElement('span'); noticeText.className = 'awd-rb-notice-text'
+  const retry = doc.createElement('button'); retry.textContent = en ? 'Refresh review' : '刷新审阅'
+  retry.onclick = () => { actionFailure = ''; showNotice(''); refreshNow() }
+  notice.append(noticeText, retry)
   root.append(svg, list, notice); doc.head.append(style); doc.body.append(root)
   let suspended = 0, generation = 0
   let disposed = false, timer = null, inFlight = false, again = false, snapshot = null
@@ -58,12 +64,12 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
   // item on the office thread). Edits refresh positions from cached metadata;
   // metadata is re-read once the document has been quiet for FRESH_DELAY.
   const EDIT_DELAY = 250, FRESH_DELAY = 900
-  let wantFresh = true, freshTimer = null, lastAction = '', pendingPolls = 0
+  let wantFresh = true, freshTimer = null, refreshAfterSuspend = false, pendingPolls = 0
   let enabled = false, cards = [], focusKey = '', busy = false, editingKey = '', pointerDown = false
   // Last read's gutter conclusion; the width only moves once two reads agree.
   let lastWantGutter = false
   const pageLayers = new Map()
-  function showNotice(text) { notice.textContent = text; notice.hidden = !text }
+  function showNotice(text) { noticeText.textContent = text; notice.hidden = !text }
   function showActionFailure(result) {
     const failed = result?.results?.find(x => !x.success)
     const reason = [failed?.error, failed?.message, result?.error, result?.message]
@@ -337,7 +343,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       reconcile(data, items)
       root.hidden = !enabled
       if (enabled) place(data)
-    } catch { if (!disposed) showNotice(labels.failed) }
+    } catch { if (!disposed && !suspended && capturedGeneration === generation) showNotice(labels.failed) }
     finally { inFlight = false; if (again && !suspended && !pointerDown && (!busy || editingKey)) { again = false; schedule(0) } }
   }
   function schedule(delay = 80) { if (disposed) return; clearTimeout(timer); timer = setTimeout(refresh, delay) }
@@ -372,8 +378,12 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
   schedule(0)
   return {
     suspend(action) {
-      suspended++; generation++; clearTimeout(timer); lastAction = action
-      if (action === 'load_document') {
+      suspended++; generation++; clearTimeout(timer)
+      // Comparisons build a different review snapshot just like document import.
+      // Do not leave cards or partial-list notices from the previous snapshot
+      // over the host's loading screen while the engine is still generating it.
+      if (['load_document', 'compare_document', 'build_comparison_document', 'build_merge_draft'].includes(action)) {
+        refreshAfterSuspend = true
         actionFailure = ''; busy = false; editingKey = ''; pointerDown = false; snapshot = null; cards = []; focusKey = ''; enabled = false; lastWantGutter = false
         list.replaceChildren(); pageLayers.clear(); svg.replaceChildren(); root.hidden = true
       }
@@ -382,7 +392,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       suspended = Math.max(0, suspended - 1)
       if (suspended) return
       // Content edits also arrive as documentChanged; a command alone only moves things.
-      if (lastAction === 'load_document') refreshNow(); else schedule(EDIT_DELAY)
+      if (refreshAfterSuspend) { refreshAfterSuspend = false; refreshNow() } else schedule(EDIT_DELAY)
     },
     documentChanged: edited,
     cursorMoved() { if (enabled) schedule(200) },

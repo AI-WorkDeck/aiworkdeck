@@ -125,6 +125,15 @@
               @answer="$emit('answer-question', $event)"
             />
 
+            <!-- 5d. Harness² 对齐（dev-board#1481）：独立只读核验报告与本轮沉淀的自进化规则，
+                 用户可在卡片上切换作用域、升格为技能或一键撤销——系统适配用户、由用户掌舵。 -->
+            <VerificationReportCard v-if="bubble.verificationReport" :report="bubble.verificationReport" />
+            <HarnessEvolutionCard
+              v-if="bubble.harnessEvolution"
+              :evolution="bubble.harnessEvolution"
+              @updated="bubble.harnessEvolution = $event"
+            />
+
             <div v-if="fileChanges.length" class="turn-files">
               <button v-for="file in fileChanges" :key="String(file.fileId || file.fileName)"
                 type="button" class="turn-file" @click="$emit('open-file', file)">
@@ -166,6 +175,8 @@ import TodoProgressCard from './TodoProgressCard.vue'
 import ProcessCard from './ProcessCard.vue'
 import ArtifactCard from '../ArtifactCard.vue'
 import QuestionCard from './QuestionCard.vue'
+import VerificationReportCard from './VerificationReportCard.vue'
+import HarnessEvolutionCard from './HarnessEvolutionCard.vue'
 import MarkdownPreview from '../MarkdownPreview.vue'
 import { t } from '@/i18n'
 import { visibleChatTimeline, isTimelineEntryActive } from './chatTimeline.mjs'

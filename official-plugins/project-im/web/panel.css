@@ -86,11 +86,17 @@ p{margin:8px 0}
 .drag-file[draggable="true"]{cursor:grab}
 .send-failure{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--awd-danger-text,var(--fallback-danger));font-size:12px}
 .send-failure button{margin-top:6px}
-#composer{border-top:1px solid var(--awd-border,var(--fallback-border));background:var(--awd-surface,var(--fallback-surface));padding:10px 14px;min-width:0}
+.compose-area{min-width:0;margin:0 14px 14px;border:1px solid var(--awd-border,var(--fallback-border));border-radius:var(--awd-radius-md,6px);background:var(--awd-surface,var(--fallback-surface))}
+.compose-area:focus-within{border-color:var(--awd-accent,var(--fallback-accent))}
+#composer{padding:10px 12px;min-width:0}
 .composer-tools,.send-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
-.composer-tools{margin-bottom:8px}
+.composer-tools{margin-bottom:4px}
+.composer-tools button,#agent-reply,#clear-file{display:inline-flex;align-items:center;gap:6px;padding:4px;border-color:transparent;background:transparent;color:var(--awd-text-2,var(--fallback-muted))}
+.composer-tools svg{flex-shrink:0}
+.composer-tools .hint{margin-left:auto;font-size:11px}
 .send-row{justify-content:space-between;margin-top:8px}
-#draft{resize:vertical;max-height:200px;min-height:65px}
+#draft{display:block;resize:vertical;max-height:200px;min-height:65px;padding:6px 0;border:0;border-radius:0;background:transparent}
+#draft:focus-visible{outline:0}
 #attachment{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:6px 0;overflow-wrap:anywhere}
 dialog{width:min(450px,calc(100% - 24px));max-height:85vh;overflow:auto;border:1px solid var(--awd-border,var(--fallback-border));border-radius:var(--awd-radius-dialog,var(--awd-radius-lg,8px));background:var(--awd-surface,var(--fallback-surface));color:inherit;padding:18px}
 dialog::backdrop{background:var(--awd-overlay,rgba(35,32,26,.45))}
@@ -122,9 +128,10 @@ dialog label input,dialog label select{margin-top:5px}
   #back{display:block}
   #sidebar{border:0}
   .chat-header,#composer,#project-bar{padding:8px 10px}
+  .compose-area{margin:0 10px 10px}
   .bubble{max-width:95%}
   #message-scroll{padding:10px}
-  .composer-tools .hint{width:100%}
+  .composer-tools .hint{width:100%;margin-left:4px}
 }
 @media(prefers-reduced-motion:no-preference){button{transition:background .12s ease}}
 #workspace.host-sidebar{grid-template-columns:minmax(0,1fr)}
@@ -135,11 +142,11 @@ dialog label input,dialog label select{margin-top:5px}
 .agent-entry{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:transparent;padding:8px 0}
 .agent-entry .avatar{color:var(--awd-accent,var(--fallback-accent));font-size:11px}
 .agent-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
-#agent-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px;font-size:12px;color:var(--awd-text-2,var(--fallback-muted));background:var(--awd-accent-wash,var(--fallback-wash));overflow-wrap:anywhere;max-height:160px;overflow-y:auto}
+#agent-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 12px 0;padding:6px 8px;border-radius:var(--awd-radius-sm,4px);font-size:12px;color:var(--awd-text-2,var(--fallback-muted));background:var(--awd-accent-wash,var(--fallback-wash));overflow-wrap:anywhere;max-height:160px;overflow-y:auto}
 
 .agent-failure{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%}
 
-#agent-info{padding:6px 14px;font-size:11px;color:var(--awd-text-2,var(--fallback-muted));background:var(--awd-surface,var(--fallback-surface));border-top:1px solid var(--awd-border,var(--fallback-border));overflow-wrap:anywhere}
+#agent-info{padding:10px 12px 0;font-size:11px;color:var(--awd-text-2,var(--fallback-muted));overflow-wrap:anywhere}
 #agent-info p{margin:0;line-height:1.5}
 #agent-info summary{cursor:pointer;width:fit-content;margin-top:2px}
 #agent-info details p{margin-top:4px}

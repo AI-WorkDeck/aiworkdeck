@@ -26,6 +26,7 @@
  *   （继续重连就是互顶循环的另一半），交给调用方提示用户。
  */
 import { decodeAttr } from './askUser.js'
+import { t } from './i18n.js'
 
 const RECONNECT_BASE_MS = 1000
 const RECONNECT_MAX_MS = 30000
@@ -101,7 +102,7 @@ export function createSseConnection({ baseUrl, token, conversationId, clientId, 
   }
 
   function httpError(status) {
-    const err = new Error(`SSE 建连失败（HTTP ${status}）：令牌无效或后端拒绝了请求`)
+    const err = new Error(t('sseConnectFailedHttp', { status }))
     // 挂上状态码：403（会话不归当前用户/签发登记已丢）是调用方能自愈的，其余不能
     err.status = status
     return err
@@ -276,7 +277,7 @@ export function createSseConnection({ baseUrl, token, conversationId, clientId, 
       xhr.onerror = xhr.ontimeout = () => {
         if (!settled) {
           settled = true
-          reject(new Error('SSE 建连失败：网络不可达'))
+          reject(new Error(t('sseConnectFailedUnreachable')))
           return
         }
         // 已在读流中失败：走统一收尾（重连或关闭）

@@ -25,6 +25,7 @@ const SRC = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', i
 
 function loadOptions() {
   const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '')
     .replace(/export default \{/, 'return {')
   const factory = new Function(...Object.keys(barriers),
@@ -59,7 +60,7 @@ function makeVm(exec, fileSize = 4096) {
     emitted: [], calls: [], remounts: 0,
     $emit(ev, arg) { this.emitted.push([ev, arg]) },
     appendLog() {}, startBootTrickle() {}, logLoadFailure() {}, initEvidence() {},
-    fetchArrayBuffer: async () => new ArrayBuffer(fileSize),
+    fetchDocumentBytes: async () => new ArrayBuffer(fileSize),
     executor: { executeCommand: (action, params, opts) => { vm.calls.push({ action, params, opts }); return exec(action, params, opts) } },
   }
   for (const name of ['finishDocLoad', 'loadDocument', 'retryLoad', 'bootMilestone', 'initWritingAssistance', 'loadWaitBudgetMs']) if (METHODS[name]) vm[name] = METHODS[name].bind(vm)

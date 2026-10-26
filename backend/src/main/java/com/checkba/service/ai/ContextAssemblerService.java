@@ -122,6 +122,35 @@ public class ContextAssemblerService {
     @Autowired(required = false)
     private StyleProfileResolver styleProfileResolver;
 
+    /**
+     * 跨项目只读附件（dev-board#1479）。字段注入 + required=false，口径同
+     * {@link #styleProfileResolver}——不能往构造器里加 final 牵动既有测试；
+     * null 时视觉附件维持原来的项目内围栏。
+     */
+    @Autowired(required = false)
+    private com.checkba.service.ProjectMemberService projectMemberService;
+
+    public void setProjectMemberService(com.checkba.service.ProjectMemberService projectMemberService) {
+        this.projectMemberService = projectMemberService;
+    }
+
+    /**
+     * 附件来自其他项目时给 <file>/<image> 补 project / readonly 属性，
+     * 让模型知道这是一份跨项目只读引用（dev-board#1479）。
+     */
+    private String extraFileAttrs(com.checkba.controller.ai.AiAgentController.ContextItem item) {
+        if (item == null) return "";
+        StringBuilder sb = new StringBuilder();
+        if (item.getProjectName() != null && !item.getProjectName().isBlank()) {
+            sb.append(" project=\"").append(attrSafe(item.getProjectName())).append("\"");
+        }
+        if (item.getProjectName() != null && !item.getProjectName().isBlank()
+                || Boolean.TRUE.equals(item.getReadOnly())) {
+            sb.append(" readonly=\"true\"");
+        }
+        return sb.toString();
+    }
+
     /** 供测试直接装配。 */
     void setStyleProfileResolver(StyleProfileResolver resolver) {
         this.styleProfileResolver = resolver;
@@ -409,8 +438,9 @@ public class ContextAssemblerService {
             ProjectContextHolder.setUserId(userId);
         }
 
-        // 应用语言：本次组装全程按它二选一（协议面 zh/en 完全一致，只有措辞与 Language 行不同）
+        // 既有中英文路径保持原文；新增语种复用同一基底，仅替换最终 Language 规则。
         final boolean english = appLanguageService.isEnglish();
+        final String rawLang = appLanguageService.language();
 
         // 本轮的 projectId 数值形态。**必须在扇出之前解析**：下面几个后台任务都按它查库。
         // 纯本地解析、无副作用，提前到这里不改变任何行为。
@@ -466,8 +496,8 @@ public class ContextAssemblerService {
         String currentPhase = determinePhase(planId, taskListId);
 
         // [Injection] Enforcement (HIGHEST PRIORITY)
-        // zh/en 差异只有 Language 一节（SIMPLIFIED CHINESE ONLY -> ENGLISH ONLY）与
-        // artifact 命名示例；停机条件/输出顺序/工具规则两版逐条一致。
+        // 中英文基底保持原文，其他语种在最终组装后只替换 Language 规则。
+        // 停机条件/输出顺序/工具规则不因应用语言变化。
         //
         // **这一段三档能力共用，所以不许点名任何挑客户端的工具**（dev-board#809 / K29）：
         // doc_* / sheet_* / slide_* / office_* 在别的能力档下压根不可见，提到名字就是在
@@ -551,7 +581,13 @@ public class ContextAssemblerService {
         if (agentMode != AgentMode.ASK) {
             for (com.checkba.service.ai.skill.SkillRouter.ActiveSkill active
                     : skillRouter.activeSkills(runId)) {
-                systemText.append(skillRouter.promptInjectionFor(active.definition()));
+                String injection = skillRouter.promptInjectionFor(active.definition(), userId, projectId);
+                if (injection == null) {
+                    injection = skillRouter.promptInjectionFor(active.definition());
+                }
+                if (injection != null) {
+                    systemText.append(injection);
+                }
             }
         }
 
@@ -723,7 +759,8 @@ public class ContextAssemblerService {
                         // 模型能直接转述给用户的说明。原来它照样被当成附件正文写进 CDATA，
                         // 于是模型会「引用」一句 Java 异常文案当合同原文。
                         systemText.append("<file id=\"").append(item.getId())
-                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\">")
+                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
+                                  .append(extraFileAttrs(item)).append(">")
                                   .append(english ? "This attachment could not be read: "
                                                   : "该附件内容暂不可读：")
                                   .append(attrSafe(isToolFailureText(content)
@@ -742,7 +779,8 @@ public class ContextAssemblerService {
                     int effectiveCap = Math.min(maxCharsPerFile, Math.max(0, attachmentCharBudget));
                     if (effectiveCap <= 0) {
                         systemText.append("<file id=\"").append(item.getId())
-                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\">")
+                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
+                                  .append(extraFileAttrs(item)).append(">")
                                   .append(english
                                           ? "Body omitted: this turn's combined attachment budget is used up. "
                                             + "Call extract_file_text with this id if you need its content."
@@ -762,7 +800,8 @@ public class ContextAssemblerService {
                     }
                     attachmentCharBudget -= content.length();
                     systemText.append("<file id=\"").append(item.getId())
-                              .append("\" name=\"").append(attrSafe(item.getName())).append("\"><![CDATA[\n");
+                              .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
+                              .append(extraFileAttrs(item)).append("><![CDATA[\n");
                     systemText.append(fenceSafe(content));
                     systemText.append("\n]]></file>\n");
                     ledger.attachment(item.getId(), item.getName(), item.getFileType(), "file", false);
@@ -1083,6 +1122,24 @@ public class ContextAssemblerService {
         // 任何在这行之后再往 systemText 追加的内容都会掉进被缓存的前缀里。
         systemText.append(SYSTEM_VOLATILE_SEPARATOR).append(volatileText);
 
+        if ("zh-TW".equals(rawLang)) {
+            int at = systemText.indexOf("SIMPLIFIED CHINESE ONLY");
+            if (at >= 0) {
+                systemText.replace(at, at + "SIMPLIFIED CHINESE ONLY".length(),
+                        "TRADITIONAL CHINESE (繁體中文, zh-TW) ONLY");
+            }
+        } else if (rawLang != null && !"zh-CN".equals(rawLang) && !"en-US".equals(rawLang)) {
+            com.checkba.util.AppLocale locale = com.checkba.util.AppLocale.fromCode(rawLang);
+            String englishRule = "- ENGLISH ONLY for all user-facing output.";
+            String localizedRule = "- Reply in " + locale.englishName() + " (" + locale.nativeName()
+                    + ", " + locale.code() + ") by default for all user-facing output."
+                    + " If the user explicitly writes in another language, follow the user's message language.";
+            int at = systemText.indexOf(englishRule);
+            if (at >= 0) {
+                systemText.replace(at, at + englishRule.length(), localizedRule);
+            }
+        }
+
         messages.add(dev.langchain4j.data.message.SystemMessage.from(systemText.toString()));
 
         timings.mark("systemPrompt", systemText.length());
@@ -1344,7 +1401,8 @@ public class ContextAssemblerService {
                 log.warn("[Vision] File not found: id={}", item.getId());
                 return null;
             }
-            String denied = com.checkba.service.ai.tools.ToolFileGuard.rejectIfOutsideProject(file);
+            String denied = com.checkba.service.ai.tools.ToolFileGuard
+                    .rejectIfCannotRead(file, projectMemberService);
             if (denied != null) {
                 log.warn("[Vision] Refusing image attachment id={}: {}", item.getId(), denied);
                 return null;
@@ -2154,15 +2212,16 @@ public class ContextAssemblerService {
 1. **FORBIDDEN ACTIONS** - 以下操作在 Ask 模式下完全禁止：
    - DO NOT output `<artifact>` tags - 不生成任何计划或任务清单
    - DO NOT output `<process>` tags - 不执行任何操作流程
-   - 除 memory_list、memory_read、memory_search 外，不允许调用任何工具
+   - 除 memory_list、memory_read、memory_search、version_status、version_history、version_changes 外，不允许调用任何工具
    - memory_write、memory_edit、memory_delete、save_memory 等写操作严格禁止
 
 2. **ALLOWED ACTIONS** - 在 Ask 模式下你只能：
    - 直接回答用户问题（使用 `<thinking>` + 纯文本或 `<final>` 标签）
    - 基于已有上下文（文件内容、历史记录）进行分析和解答
    - 可用 memory_list、memory_read、memory_search 只读查询当前用户有权访问的长期记忆
+   - 可用 version_status、version_history、version_changes 只读检查项目版本；禁止提交、取回、恢复或合并
    - 提供建议和意见，但不执行任何操作
-   - 如果用户请求需要工具才能完成，请告知用户切换到 Agent 模式
+   - 如果用户请求需要修改内容或执行其他工具，请告知用户切换到 Agent 模式
 
 3. **OUTPUT FORMAT**:
    <thinking>分析用户意图...</thinking>
@@ -2311,15 +2370,16 @@ public class ContextAssemblerService {
 1. **FORBIDDEN ACTIONS** - the following are completely prohibited in Ask mode:
    - DO NOT output `<artifact>` tags - no plans or task lists
    - DO NOT output `<process>` tags - no operation flows
-   - Do not call any tool except memory_list, memory_read, and memory_search
+   - Do not call any tool except memory_list, memory_read, memory_search, version_status, version_history, and version_changes
    - memory_write, memory_edit, memory_delete, save_memory, and all other writes are prohibited
 
 2. **ALLOWED ACTIONS** - in Ask mode you may ONLY:
    - Answer the user's question directly (using `<thinking>` + plain text or the `<final>` tag)
    - Analyze and explain based on context you already have (file contents, conversation history)
    - Use memory_list, memory_read, and memory_search to read long-term memory the current user may access
+   - Use version_status, version_history, and version_changes to inspect project versions; commits, pulls, restores, and merges are prohibited
    - Offer advice and opinions, without performing any operation
-   - If the user's request requires tools to complete, tell the user to switch to Agent mode
+   - If the user's request needs changes or other tools, tell the user to switch to Agent mode
 
 3. **OUTPUT FORMAT**:
    <thinking>Analyzing the user's intent...</thinking>

@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Zwischenablage",
+  "plugin.description": "Zwischenablage-Verlauf durchsuchen, kopieren und Inhalte einfügen.",
+  "view.main.name": "Zwischenablage"
+}

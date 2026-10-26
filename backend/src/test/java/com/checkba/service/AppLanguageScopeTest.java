@@ -35,17 +35,21 @@ class AppLanguageScopeTest {
     }
 
     @Test
-    @DisplayName("归一化：认 zh-CN/en-US，也认 zh/en/en-GB/zh_CN；认不出的一律不覆盖")
+    @DisplayName("归一化：20 语种及常见变体归一到标准码；认不出的一律不覆盖")
     void normalizeAcceptsCommonLocaleShapes() {
         assertEquals("zh-CN", AppLanguageScope.normalize("zh-CN"));
         assertEquals("zh-CN", AppLanguageScope.normalize("zh"));
         assertEquals("zh-CN", AppLanguageScope.normalize("zh_CN"));
-        assertEquals("zh-CN", AppLanguageScope.normalize("zh-Hant-TW"));
+        assertEquals("zh-TW", AppLanguageScope.normalize("zh-Hant-TW"));
         assertEquals("en-US", AppLanguageScope.normalize("en-US"));
         assertEquals("en-US", AppLanguageScope.normalize(" EN "));
         assertEquals("en-US", AppLanguageScope.normalize("en-GB"));
+        assertEquals("ja-JP", AppLanguageScope.normalize("ja"));
+        assertEquals("fr-FR", AppLanguageScope.normalize("fr-CA"));
+        assertEquals("ar-SA", AppLanguageScope.normalize("ar"));
         // 认不出来 = 不覆盖（回落全局设置），不是报错：语言不是准入条件
-        assertNull(AppLanguageScope.normalize("ja-JP"));
+        assertNull(AppLanguageScope.normalize("tlh-KL"));
+        assertNull(AppLanguageScope.normalize("eo"));
         assertNull(AppLanguageScope.normalize(""));
         assertNull(AppLanguageScope.normalize("   "));
         assertNull(AppLanguageScope.normalize(null));
@@ -72,7 +76,8 @@ class AppLanguageScopeTest {
         globalIs(AppLanguageService.EN_US);
         assertTrue(service.isEnglish(), "全局设成英文时，不声明语言的调用方仍然拿英文");
         AppLanguageScope.run(null, () -> assertTrue(service.isEnglish()));
-        AppLanguageScope.run("ja-JP", () -> assertTrue(service.isEnglish(), "认不出的值不许把英文改掉"));
+        AppLanguageScope.run("tlh-KL", () -> assertTrue(service.isEnglish(), "认不出的值不许把英文改掉"));
+        AppLanguageScope.run("ja-JP", () -> assertEquals("ja-JP", service.language()));
     }
 
     @Test

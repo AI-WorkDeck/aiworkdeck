@@ -12,6 +12,7 @@ function vmFor(totalBytes, timers = { setTimeout, clearTimeout }) {
   const methods = new Function('isDesktopHost', 'host', 'setTimeout', 'clearTimeout', body)(() => true, totalBytes === undefined ? {} : { systemMemory: { totalBytes } }, timers.setTimeout, timers.clearTimeout)
   const vm = {
     libreLruKeys: [], libreSpares: [], _libreRefs: {}, _libreExecMap: {},
+    pdfKeepAliveKeys: [],
     leftFiles: [], rightFiles: [], splitMode: false, activeFileIdLeft: null, activeFileIdRight: null,
     useLibreEditor: () => true,
   }

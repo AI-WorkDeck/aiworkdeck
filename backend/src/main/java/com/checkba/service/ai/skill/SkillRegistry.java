@@ -182,22 +182,25 @@ public class SkillRegistry {
     }
 
     /**
-     * 语言过滤（EN 版 PR5）：skill.yml 的 languages 列表声明可用的应用语言，
-     * **缺省（空）= 只在 zh-CN 可用**——存量 skill 没有该字段，英文版下自动隐藏，方向安全
-     * （如 listing-pathway 的触发词含 IPO/SPAC/VIE，会命中英文输入，必须真隐藏）。
-     * 收口选在 isAvailable：match（自动匹配）、activateForTurn（钉选）、activeSkill（注入前复查）
-     * 三条路径都过它，不会出现"列表过滤了、注入没过滤"的缝。
-     * zh-CN 下空列表恒可用，行为与引入前逐字节一致。
+     * 未声明 languages 的存量 skill 仅中文可用；zh-TW 可复用 zh-CN 声明，
+     * 其他非中文语种可复用 en-US 声明。所有匹配、钉选和注入路径共用 isAvailable 过滤。
      */
     private boolean supportsCurrentLanguage(SkillDefinition skill) {
         String lang = appLanguageService != null
                 ? appLanguageService.language()
                 : com.checkba.service.AppLanguageService.ZH_CN;
+        com.checkba.util.AppLocale current = com.checkba.util.AppLocale.fromCode(lang);
         List<String> langs = skill.getLanguages();
         if (langs == null || langs.isEmpty()) {
-            return com.checkba.service.AppLanguageService.ZH_CN.equals(lang);
+            return current.isChinese();
         }
-        return langs.contains(lang);
+        if (langs.contains(lang)) {
+            return true;
+        }
+        if (current == com.checkba.util.AppLocale.ZH_TW && langs.contains("zh-CN")) {
+            return true;
+        }
+        return !current.isChinese() && langs.contains("en-US");
     }
 
     /** skill 是否为"仅手动"（不参与触发词自动匹配）；工程内置工作流（builtin_workflow）恒为自动匹配 */
@@ -471,6 +474,8 @@ public class SkillRegistry {
         skill.setTriggers(asStringList(raw.get("triggers")));
         skill.setAllowedTools(asStringList(raw.get("allowed_tools")));
         applyToolPolicy(skill, raw.get("tool_policy"));
+        SkillDefinition.VerificationPolicy.parse(asString(raw.get("verification_policy")))
+                .ifPresent(skill::setVerificationPolicy);
         skill.setOutput(asString(raw.get("output")));
         skill.setRequires(asStringList(raw.get("requires")));
         skill.setCategory(asString(raw.get("category")));

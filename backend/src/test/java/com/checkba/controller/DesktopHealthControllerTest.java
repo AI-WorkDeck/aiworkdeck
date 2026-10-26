@@ -33,6 +33,36 @@ class DesktopHealthControllerTest {
     }
 
     @Test
+    void acceptingTrafficStillWaitsForTheLocalHandoffAndReadyCallback() {
+        DataSource ds = mock(DataSource.class);
+        var bootstrap = mock(com.checkba.localcore.LocalCoreBootstrap.class);
+        var controller = new DesktopHealthController(ds, ready());
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "localCore", bootstrap);
+        assertEquals(503, controller.health().getStatusCode().value());
+        assertEquals(503, controller.startupHealth().getStatusCode().value());
+        verifyNoInteractions(ds);
+    }
+
+    @Test
+    void startupHealthAdvertisesOnlyThePublishedProtocolAfterFullReadiness() throws Exception {
+        try (var pool = new com.zaxxer.hikari.HikariDataSource()) {
+            pool.setJdbcUrl("jdbc:h2:mem:desktop-health-protocol");
+            var controller = new DesktopHealthController(pool, ready());
+            var bootstrap = mock(com.checkba.localcore.LocalCoreBootstrap.class);
+            var application = mock(com.checkba.localcore.LocalCoreApplication.class);
+            org.springframework.test.util.ReflectionTestUtils.setField(controller, "localCore", bootstrap);
+            org.springframework.test.util.ReflectionTestUtils.setField(controller, "localApplication", application);
+            when(bootstrap.isFullReady()).thenReturn(true);
+            assertEquals(0, controller.startupHealth().getBody().get("coreContentProtocol"));
+            when(application.contentProtocolVersion()).thenReturn(1);
+            var response = controller.startupHealth();
+            assertEquals(200, response.getStatusCode().value());
+            assertEquals("full", response.getBody().get("phase"));
+            assertEquals(1, response.getBody().get("coreContentProtocol"));
+        }
+    }
+
+    @Test
     void realExhaustedPoolReturnsUnavailableWithinAcquisitionTimeout() throws Exception {
         try (var pool = new com.zaxxer.hikari.HikariDataSource()) {
             pool.setJdbcUrl("jdbc:h2:mem:desktop-health-pool");

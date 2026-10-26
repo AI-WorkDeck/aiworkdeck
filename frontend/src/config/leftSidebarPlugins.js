@@ -19,7 +19,7 @@ import { t } from '@/i18n'
  */
 export const DD_FILES_PLUGIN = {
   key: 'dd-files',
-  label: t('config.sidebar.ddFiles'),
+  get label() { return t('config.sidebar.ddFiles') },
   svgPaths: [
     { d: 'M3 5l1.5 1.5L7 4' },
     { d: 'M3 12l1.5 1.5L7 10.5' },
@@ -40,7 +40,7 @@ export const DD_FILES_PLUGIN = {
  */
 export const VERSION_PLUGIN = {
   key: 'version',
-  label: t('config.sidebar.version'),
+  get label() { return t('config.sidebar.version') },
   svgPaths: [
     { d: "M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" },
     { d: "M12 7V12L15.5 14" }
@@ -56,7 +56,7 @@ export const LEFT_SIDEBAR_PLUGINS = [
     // 项目概览：2026-08-19 起在**左栏**展示（此前是中栏标签，维护者认为交互混乱）。
     // 走的是和其它面板完全一样的 toggleLeftPane 语义，因此它就是数组里的普通一项。
     key: 'home',
-    label: t('config.sidebar.projectHome'),
+    get label() { return t('config.sidebar.projectHome') },
     svgPaths: [
       { d: 'M3 22h18' },
       { d: 'M6 18v-7' },
@@ -72,25 +72,20 @@ export const LEFT_SIDEBAR_PLUGINS = [
     // 打开一个项目」就是这里。有无项目两态都在 rail 上；无项目态下 rail 只剩它与几个全局项
     // （见 pages/project-overview/noProjectShell.js 的 NO_PROJECT_PANE_KEYS）。
     key: 'projects',
-    label: t('config.sidebar.projects'),
+    get label() { return t('config.sidebar.projects') },
     svgPaths: [
       { d: 'M20 17a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2Z' },
       { d: 'M2 8v11a2 2 0 0 0 2 2h14' }
     ]
   },
   {
-    key: 'messages',
-    label: t('messageCenter.title'),
-    svgPaths: [{ d: 'M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z' }]
-  },
-  {
     key: 'dd-client',
-    label: t('ddWorkflow.clientWorkspace'),
+    get label() { return t('ddWorkflow.clientWorkspace') },
     svgPaths: [{ d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }, { d: 'M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0' }, { d: 'M16 11l2 2 4-4' }]
   },
   {
     key: 'files',
-    label: t('config.sidebar.files'),
+    get label() { return t('config.sidebar.files') },
     svgPaths: [
       { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7l-5-5Z' },
       { d: 'M15 2v5h5' },
@@ -103,7 +98,7 @@ export const LEFT_SIDEBAR_PLUGINS = [
     // 插件中心：原来单挂在 rail 底部（goToPluginMarket）。它和其它面板一样只是
     // toggleLeftPane('market')，没有任何特殊性，收进数组后 rail 顺序才有单一出处。
     key: 'market',
-    label: t('config.sidebar.market'),
+    get label() { return t('config.sidebar.market') },
     svgPaths: [
       { d: 'M4 4h7v7H4z' },
       { d: 'M4 13h7v7H4z' },
@@ -117,7 +112,7 @@ export const LEFT_SIDEBAR_PLUGINS = [
     // 本机/卸载/交给 AI 开发/打开运行五个动作。requiresSkill 门控形制照抄
     // litigation-visual 的先例——默认不装，装了 skill 才在 rail 上出现。
     key: 'dev',
-    label: t('config.sidebar.dev'),
+    get label() { return t('config.sidebar.dev') },
     requiresSkill: 'plugin-dev',
     // 尖括号（代码/开发意象）
     svgPaths: [
@@ -172,6 +167,7 @@ export function getPluginsForUser(role, { cloudTrack = false } = {}) {
  * 判不出这份案卷有没有放进案件库，宁可落在资源管理器也不落在一个可能不存在的面板上。
  */
 const LEFT_PANE_KEY_ALIASES = {
+  messages: 'files', // 消息入口已迁至右上角头像，不再占左栏（dev-board#1490）。
   search: 'plugin-search', voice: 'plugin-voice', calendar: 'plugin-calendar', favorites: 'plugin-favorites', clipboard: 'plugin-clipboard', insight: 'plugin-insight', tmeet: 'plugin-tencent-meeting',
   desensitize: 'plugin-desensitize',
   'litigation-visual': 'plugin-litigation-visual',

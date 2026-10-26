@@ -464,6 +464,8 @@ export default {
   ocrChoiceConfirmed: '已确认，当前回复结束后继续原任务…',
   ocrChoiceRetryCancel: '重试取消',
   ocrChoiceCancel: '取消',
+  ocrChoiceCancelFailedError: '取消尚未确认，请重试。已发出的识别请求无法撤回；确认取消后会停止后续页面。',
+  ocrChoiceSaveFailedError: '选择未保存，请重试',
   ocrSettingsTitle: '扫描件识别',
   ocrSettingsDesc: '本地识别不可用时，按你的选择继续任务。此设置仅对当前账号生效。',
   ocrSettingsOptAsk: '每次询问',

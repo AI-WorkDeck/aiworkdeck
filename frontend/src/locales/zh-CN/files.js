@@ -102,6 +102,8 @@ export default {
     close: '关闭',
   },
   loadFailed: '加载失败',
+  fileUrlEmptyError: '文件地址为空',
+  renderContainerNotReadyError: '渲染容器未就绪',
   resourceLoadFailedStatus: '资源加载失败: {status}',
   networkErrorResource: '网络错误，资源加载失败',
   archiveReadFailed: '压缩包读取失败',

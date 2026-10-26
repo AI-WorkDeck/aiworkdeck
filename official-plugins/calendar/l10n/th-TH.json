@@ -1,0 +1,6 @@
+{
+  "plugin.name": "Calendar",
+  "plugin.description": "Cross-project calendar, tasks, reminders, and file links.",
+  "view.sidebar.name": "Calendar",
+  "view.main.name": "Calendar"
+}

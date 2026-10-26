@@ -1,106 +1,204 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// 应用语言（zh-CN / en-US）。权威源是这里的 uni storage 值；后端 system_setting
-// 与桌面主进程（菜单/原生对话框）只是镜像，由 App.vue 监听 EVENT 统一写透。
-//
-// 首启猜测规则（只猜一次，之后以用户显式设置为准）：
-// 1. 存量安装保护：storage 里已有使用痕迹（最近项目/会话）→ zh-CN。
-//    既有用户全部来自中文版，绝不能因为系统 locale 是 en-* 就把他们翻成英文
-//    （Electron 下系统 locale 报 en-* 的教训见 utils/toolDisplayNames.js）。
-// 2. 全新安装：navigator.language 以 zh 开头 → zh-CN，其余 → en-US。
-//    与桌面主进程 desktop/main/app-language.js 的 app.getLocale() 规则一致。
-//
-// 本模块刻意零依赖（host.js / api.js 都不引），否则 host.js 取语言会形成
-// host → appLanguage → api → host 的循环引用。
 
-export const APP_LANGUAGE_KEY = 'awd_app_language'
-// 「用户亲手选过语言」的标记。APP_LANGUAGE_KEY 在首启猜测时就会落盘，
-// 不能拿它的存在与否判断「选过没有」——解锁页选国际站时要据此决定
-// 是否顺手切到英文（设计 2026-09-23 §2.4：用户手动选过就尊重用户）。
-export const APP_LANGUAGE_MANUAL_KEY = 'awd_app_language_manual'
-export const APP_LANGUAGE_EVENT = 'awd-language-changed'
-export const SUPPORTED_LANGUAGES = ['zh-CN', 'en-US']
-
-let cached = ''
-
-function readStorage(key) {
-  try {
-    const v = uni.getStorageSync(key)
-    return typeof v === 'string' ? v.trim() : ''
-  } catch (e) {
-    return ''
-  }
-}
-
-function hasExistingFootprint() {
-  // 与 utils/recentProjects.js（checkba_last_project_id）、utils/auth.js（checkba_session_id）
-  // 的存储键对齐；任一存在即视为存量用户。
-  return !!(readStorage('checkba_last_project_id') || readStorage('checkba_session_id'))
-}
-
-function guessLanguage() {
-  if (hasExistingFootprint()) return 'zh-CN'
-  let loc = ''
-  try { loc = String((typeof navigator !== 'undefined' && navigator.language) || '') } catch (e) { /* ignore */ }
-  return loc.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US'
-}
-
-export function getAppLanguage() {
-  if (cached) return cached
-  const stored = readStorage(APP_LANGUAGE_KEY)
-  if (SUPPORTED_LANGUAGES.includes(stored)) {
-    cached = stored
-    syncDocumentLang(cached)
-    return cached
-  }
-  cached = guessLanguage()
-  try { uni.setStorageSync(APP_LANGUAGE_KEY, cached) } catch (e) { /* ignore */ }
-  syncDocumentLang(cached)
-  return cached
-}
+import {
+  SYSTEM_LANGUAGE_MODE,
+  LOCALE_REGISTRY,
+  SUPPORTED_LOCALE_CODES,
+  LOCALE_MAP,
+  COUNTRY_TO_LOCALE,
+  normalizeLocaleCode,
+  normalizeLanguageSetting,
+  matchSystemLocale,
+  matchCountryToLocale,
+  getLocaleEntry,
+  getLocaleFallbackChain,
+} from '../locales/registry.js'
 
 /**
- * 把 <html lang> 跟到应用语言上（dev-board#849）。index.html 写死的只是首帧的值；
- * 浏览器按 lang 挑 CJK 字形与断行规则，标成 en 时中文会落到日文/西文字形回退上。
- * 启动时（首次解析语言）与 setAppLanguage 各调一次。
+ * 应用语言（20 语种 + 跟随系统 system，dev-board#1477）：
+ * - 存储键：`app_language`（uni.getStorageSync / localStorage），值为 20 个规范 BCP-47 代码之一或 `'system'`
+ * - 默认值：首次未设置时按系统/浏览器语言自动匹配（exact -> prefix -> 'en-US'）
+ * - 广播事件：切换时通过 `uni.$emit('app-language-changed', resolvedLang)` 通知根组件与 i18n
  */
-function syncDocumentLang(lang) {
+
+export const APP_LANGUAGE_KEY = 'app_language'
+// 用户是否主动点过语言切换器（登录页 / 设置面板 / 菜单）。一旦置 '1'，站点切换不再自动改语言。
+export const APP_LANGUAGE_MANUAL_KEY = 'app_language_manual'
+export const APP_LANGUAGE_EVENT = 'app-language-changed'
+
+export {
+  SYSTEM_LANGUAGE_MODE,
+  LOCALE_REGISTRY,
+  SUPPORTED_LOCALE_CODES,
+  LOCALE_MAP,
+  COUNTRY_TO_LOCALE,
+  normalizeLocaleCode,
+  normalizeLanguageSetting,
+  matchSystemLocale,
+  matchCountryToLocale,
+  getLocaleEntry,
+  getLocaleFallbackChain,
+}
+
+export const SUPPORTED_LOCALES = SUPPORTED_LOCALE_CODES
+export const SUPPORTED_LANGUAGES = Object.freeze([
+  ...SUPPORTED_LOCALE_CODES,
+  SYSTEM_LANGUAGE_MODE,
+])
+
+function detectSystemLocale() {
   try {
-    if (typeof document !== 'undefined' && document.documentElement) document.documentElement.lang = lang
+    if (typeof navigator !== 'undefined') {
+      const candidates = Array.isArray(navigator.languages) && navigator.languages.length
+        ? navigator.languages
+        : [navigator.language || navigator.userLanguage || '']
+      for (const c of candidates) {
+        const matched = normalizeLocaleCode(String(c || ''))
+        if (matched) return matched
+      }
+    }
+    if (typeof uni !== 'undefined' && typeof uni.getSystemInfoSync === 'function') {
+      const sys = uni.getSystemInfoSync()
+      const raw = String((sys && (sys.appLanguage || sys.language)) || '')
+      const matched = normalizeLocaleCode(raw)
+      if (matched) return matched
+    }
+  } catch (e) {
+    // ignore
+  }
+  return 'en-US'
+}
+
+function readStorage(key = APP_LANGUAGE_KEY) {
+  try {
+    if (typeof uni !== 'undefined' && typeof uni.getStorageSync === 'function') {
+      const v = uni.getStorageSync(key)
+      if (v) return String(v)
+    }
+  } catch (e) { /* ignore */ }
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const v = localStorage.getItem(key)
+      if (v) return String(v)
+    }
+  } catch (e) { /* ignore */ }
+  return ''
+}
+
+function writeStorage(key, val) {
+  if (val === undefined) {
+    val = key
+    key = APP_LANGUAGE_KEY
+  }
+  try {
+    if (typeof uni !== 'undefined' && typeof uni.setStorageSync === 'function') {
+      uni.setStorageSync(key, val)
+    }
+  } catch (e) { /* ignore */ }
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, val)
+    }
   } catch (e) { /* ignore */ }
 }
 
-export function isEnglish() {
-  return getAppLanguage() === 'en-US'
-}
-
-/** 用户是否亲手选过界面语言（设置页、应用菜单、解锁页底部切换都算）。 */
 export function isLanguageManuallyChosen() {
-  return !!readStorage(APP_LANGUAGE_MANUAL_KEY)
+  return readStorage(APP_LANGUAGE_MANUAL_KEY) === '1'
 }
 
 /**
- * 设置语言并广播。镜像写透（后端 system_setting、桌面主进程）由 App.vue
- * 的 APP_LANGUAGE_EVENT 监听器完成，调用方不需要关心。
- * 默认视为用户亲手选择；程序替用户切换（如选国际站顺带切英文）传 { auto: true }，
- * 不留「手动选过」的标记。
+ * 返回用户保存的语言偏好：`'system'`（跟随系统）或 20 个规范语言代码之一。
  */
-export function setAppLanguage(lang, opts = {}) {
-  if (!SUPPORTED_LANGUAGES.includes(lang)) return getAppLanguage()
-  const changed = lang !== getAppLanguage()
-  cached = lang
-  syncDocumentLang(lang)
-  try { uni.setStorageSync(APP_LANGUAGE_KEY, lang) } catch (e) { console.warn('[appLanguage] persist failed:', e) }
-  if (!(opts && opts.auto)) {
-    try { uni.setStorageSync(APP_LANGUAGE_MANUAL_KEY, '1') } catch (e) { /* ignore */ }
+export function getAppLanguagePreference() {
+  const stored = readStorage(APP_LANGUAGE_KEY)
+  const normalized = normalizeLanguageSetting(stored)
+  if (normalized) {
+    if (stored !== normalized) writeStorage(APP_LANGUAGE_KEY, normalized)
+    return normalized
   }
-  if (changed) {
-    try { uni.$emit(APP_LANGUAGE_EVENT, lang) } catch (e) { /* ignore */ }
-  }
-  return cached
+  return isLanguageManuallyChosen() ? getAppLanguage() : SYSTEM_LANGUAGE_MODE
 }
 
-/** 双语文案就地取值：tr({ zh: '…', en: '…' })。i18n 框架接线前的轻量通道。 */
-export function tr(pair) {
-  return isEnglish() ? pair.en : pair.zh
+/**
+ * 返回当前生效的规范语言代码（恒为 20 个 BCP-47 代码之一，不会返回 `'system'`）。
+ */
+export function getAppLanguage() {
+  const stored = readStorage(APP_LANGUAGE_KEY)
+  const normalized = normalizeLanguageSetting(stored)
+  if (normalized === SYSTEM_LANGUAGE_MODE) {
+    return detectSystemLocale()
+  }
+  if (normalized) {
+    if (stored !== normalized) writeStorage(APP_LANGUAGE_KEY, normalized)
+    return normalized
+  }
+  const detected = detectSystemLocale()
+  writeStorage(APP_LANGUAGE_KEY, detected)
+  return detected
+}
+
+export function getLocaleMeta(lang = getAppLanguage()) {
+  return getLocaleEntry(lang)
+}
+
+export function syncDocumentLang(lang = getAppLanguage()) {
+  try {
+    if (typeof document !== 'undefined' && document.documentElement) {
+      const entry = getLocaleEntry(lang)
+      document.documentElement.lang = entry.bcp47 || lang
+      document.documentElement.dir = entry.dir || 'ltr'
+    }
+  } catch (e) { /* SSR / non-DOM */ }
+}
+
+/**
+ * @param {string} lang  20 个规范语言代码之一、旧版简写（'zh'/'en'）或 `'system'`
+ * @param {{ auto?: boolean }} [opts]  auto=true 表示站点联动或远端拉取自动改语言，不记为「用户手动选过」
+ */
+export function setAppLanguage(lang, opts = {}) {
+  const normalized = normalizeLanguageSetting(lang)
+  if (!normalized) return getAppLanguage()
+  writeStorage(APP_LANGUAGE_KEY, normalized)
+  if (!opts.auto) writeStorage(APP_LANGUAGE_MANUAL_KEY, '1')
+  const resolved = normalized === SYSTEM_LANGUAGE_MODE ? detectSystemLocale() : normalized
+  syncDocumentLang(resolved)
+  try {
+    if (typeof uni !== 'undefined' && typeof uni.$emit === 'function') {
+      uni.$emit(APP_LANGUAGE_EVENT, resolved)
+    }
+  } catch (e) { /* ignore */ }
+  return resolved
+}
+
+export function isChineseUi(lang = getAppLanguage()) {
+  const code = normalizeLocaleCode(lang) || getAppLanguage()
+  return code === 'zh-CN' || code === 'zh-TW'
+}
+
+/**
+ * 二元 `{ zh, en }` 调用点的非中文判定：
+ * 所有非中文语种在只有 `{ zh, en }` 的地方一律走英文兜底（!isChineseUi()）。
+ */
+export function isEnglish() {
+  return !isChineseUi()
+}
+
+/**
+ * 轻量内联多语种字典取值：
+ * 支持 `{ zh: '...', en: '...' }` 或包含任意规范语言键 `{ 'zh-CN', 'zh-TW', 'en-US', 'ja-JP', ... }`。
+ * 回退链：当前语言 -> (zh-TW 回退 zh-CN/zh；其他语言回退 en-US/en -> zh-CN/zh)。
+ */
+export function tr(map) {
+  if (!map) return ''
+  if (typeof map === 'string') return map
+  const lang = getAppLanguage()
+  if (map[lang] != null && map[lang] !== '') return map[lang]
+  const entry = getLocaleEntry(lang)
+  if (entry && map[entry.slug] != null && map[entry.slug] !== '') return map[entry.slug]
+  if (entry && map[entry.prefix] != null && map[entry.prefix] !== '') return map[entry.prefix]
+  if (lang === 'zh-TW' || lang === 'zh-CN') {
+    return map['zh-CN'] ?? map.zh ?? map['en-US'] ?? map.en ?? ''
+  }
+  return map['en-US'] ?? map.en ?? map['zh-CN'] ?? map.zh ?? ''
 }

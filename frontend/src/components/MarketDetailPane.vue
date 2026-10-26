@@ -276,9 +276,11 @@
           <text class="mdp-sec-note">{{ $t('market.themeNote') }}</text>
           <iframe
             v-if="themePreviewUrl"
+            ref="themePreview"
             :src="themePreviewUrl"
+            @load="pushThemePreview"
             class="mdp-theme-preview-frame"
-            sandbox="allow-scripts allow-same-origin"
+            sandbox="allow-scripts"
           ></iframe>
         </view>
 
@@ -319,7 +321,7 @@
 // 由左栏 MarketSidebarPanel 点行打开。自行拉取市场与已安装两份数据合成视图，
 // 装/卸/启停后通过 uni.$emit('awd:market-changed') 通知左栏刷新。
 import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile, getContributedThemes, selectContributedTheme, resolvePluginEntryUrl } from '@/services/api.js'
-import { setActiveSkin } from '@/utils/appTheme.js'
+import { setActiveSkin, getResolvedTheme, collectThemeTokens, APP_THEME_EVENT } from '@/utils/appTheme.js'
 import { ICONS } from '@/config/icons.js'
 import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { isPanelSkill, buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
@@ -623,6 +625,7 @@ export default {
     'spec.projectId'() { this.loadContribution() },
   },
   mounted() {
+    uni.$on(APP_THEME_EVENT, this.pushThemePreview)
     uni.$on('awd:account-changed', this.loadContribution)
     this.reload()
     uni.$on('awd:market-changed-from-sidebar', this.reload)
@@ -631,12 +634,18 @@ export default {
   beforeUnmount() {
     this.reloadGeneration++
     this.contributionGeneration++
+    uni.$off(APP_THEME_EVENT, this.pushThemePreview)
     uni.$off('awd:account-changed', this.loadContribution)
     uni.$off('awd:market-changed-from-sidebar', this.reload)
     uni.$off('awd:market-update-checked', this.onUpdatesChecked)
     this.stopPackPoll()
   },
   methods: {
+    pushThemePreview() {
+      this.$refs.themePreview?.contentWindow?.postMessage({
+        awd: 1, type: 'theme', theme: getResolvedTheme(), tokens: collectThemeTokens(),
+      }, '*')
+    },
     onUpdatesChecked() {
       if (this.loading || this.busy) return
       return this.reload(false)

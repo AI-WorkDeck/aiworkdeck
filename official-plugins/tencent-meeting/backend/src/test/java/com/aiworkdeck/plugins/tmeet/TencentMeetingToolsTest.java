@@ -67,6 +67,17 @@ class TencentMeetingToolsTest {
         JsonNode status = call("status", "{}").path("data");
         assertTrue(status.path("cliAvailable").asBoolean()); assertFalse(status.path("loggedIn").asBoolean());
     }
+    @Test void statusWaitsForLoginBeforeStartingAnyOtherCliCommand() throws Exception {
+        cli.pending = true;
+        JsonNode waiting = call("status", "{}").path("data");
+        assertTrue(waiting.path("loginPending").asBoolean());
+        assertFalse(waiting.path("loggedIn").asBoolean());
+        assertTrue(cli.calls.isEmpty(), "A second CLI process can break the login token lock");
+        cli.pending = false;
+        cli.answer = args -> new TmeetCli.Result(0, args.contains("--version") ? "1.0" : "Logged in\nUserName: 测试用户");
+        assertTrue(call("status", "{}").path("data").path("loggedIn").asBoolean());
+        assertEquals(List.of(List.of("--version"), List.of("auth", "status")), cli.calls);
+    }
     @Test void loginValidatesOfficialUrlAndLogoutRequiresConfirmation() throws Exception {
         assertTrue(call("login", "{}").path("success").asBoolean());
         cli.url = "https://meeting.tencent.com.attacker.example/auth";
@@ -75,6 +86,14 @@ class TencentMeetingToolsTest {
         assertTrue(call("logout", "{\"confirmed\":true}").path("success").asBoolean()); assertTrue(cli.cancelled);
         assertFalse(TmeetCli.validAuthorizeUrl("javascript:alert(1)"));
         assertFalse(TmeetCli.validAuthorizeUrl("https://evil@meeting.tencent.com/a"));
+    }
+    @Test void reloadedLoginReportsWaitingWithoutAnAuthorizationUrl() throws Exception {
+        cli.url = null;
+        JsonNode result = call("login", "{}");
+        assertTrue(result.path("success").asBoolean());
+        assertTrue(result.path("data").path("loginPending").asBoolean());
+        assertFalse(result.path("data").has("authorizeUrl"));
+        assertTrue(cli.calls.isEmpty());
     }
     @Test void configPersistsPerUserAndProjectWithoutTrustingCallerIds() throws Exception {
         assertEquals(30, call("config", "{}").path("data").path("lookbackDays").asInt());
@@ -201,10 +220,11 @@ class TencentMeetingToolsTest {
         }
     }
     static class FakeCli implements TmeetCli.Runner {
-        List<List<String>> calls = new ArrayList<>(); boolean cancelled; String url = "https://meeting.tencent.com/authorize?code=fixture";
+        List<List<String>> calls = new ArrayList<>(); boolean cancelled, pending; String url = "https://meeting.tencent.com/authorize?code=fixture";
         Function<List<String>, TmeetCli.Result> answer = args -> new TmeetCli.Result(0, "ok");
         public TmeetCli.Result run(List<String> args, Duration timeout) { calls.add(List.copyOf(args)); return answer.apply(args); }
         public String login(long userId) { return url; }
+        public boolean loginPending() { return pending; }
         public void cancelLogin(long userId) { cancelled = true; }
     }
     static class FakeHost implements PluginHost {

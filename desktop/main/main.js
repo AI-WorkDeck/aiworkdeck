@@ -35,7 +35,14 @@ if (!singleInstanceLock) {
 
 // NSIS may still be replacing files after a very fast manual reopen.
 if (app.isPackaged && process.platform === 'win32' && require('./services/full-update').deferWindowsLaunch(path.join(app.getPath('home'), '.aiworkdeck'), undefined, () => {
-  require('electron').dialog.showErrorBox('AI WorkDeck 更新仍在进行', '安装过程超过预期，请检查正在运行的安装程序后再打开应用。 / Installation is taking longer than expected. Check the running installer before reopening the app.')
+  const { t: langT } = require('./app-language')
+  require('electron').dialog.showErrorBox(
+    langT({ zh: 'AI WorkDeck 更新仍在进行', en: 'AI WorkDeck Update Still in Progress' }),
+    langT({
+      zh: '安装过程超过预期，请检查正在运行的安装程序后再打开应用。',
+      en: 'Installation is taking longer than expected. Check the running installer before reopening the app.'
+    })
+  )
 }, require('./open-paths').pathsFromArgv(process.argv))) {
   app.exit(0)
   return
@@ -121,12 +128,13 @@ function configureBackendSupervision(startupFailed = false) {
   backendStartupFailed = startupFailed
   if (backendSupervisor || !services) return
   if (startupFailed && (!services.isOwned('backend') || !services.ports.backend)) return
-  backendSupervisor = new BackendSupervisor(services, (health) => {
+  backendSupervisor = new BackendSupervisor(services, (health, verifiedLaunch) => {
+    if (health.ok && verifiedLaunch) recordBackendBoot(true, verifiedLaunch)
     logDesktopEvent('backend-health', health)
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send('checkba:backend-health-changed', health)
     }
-  })
+  }, { onStartupFailure: (launch, reason) => recordBackendBoot(false, launch, reason) })
   backendSupervisor.bindPowerMonitor(powerMonitor)
   if (startupFailed) backendSupervisor.publish('failed', 'startup-failed')
   backendSupervisor.start()
@@ -137,6 +145,26 @@ function getBackendHealth() {
     state: backendStartupFailed ? 'failed' : 'starting', ok: false, owned: false, attempts: 0,
     reason: backendStartupFailed ? 'startup-failed' : '', updatedAt: Date.now()
   }
+}
+
+// Bind the verdict to the overlay actually used by this owned launch. A background
+// update may already have activated a different overlay while Spring was starting.
+function recordBackendBoot(ok, launch, reason = '') {
+  if (!launch?.bootOverlay || launch.bootRecorded) return { reverted: false }
+  launch.bootRecorded = true
+  try {
+    const overlay = require('./services/overlay')
+    const { context, current } = launch.bootOverlay
+    const active = overlay.readCurrent(context)
+    if (active?.version !== current?.version || JSON.stringify(active?.components) !== JSON.stringify(current?.components)) {
+      return { reverted: false }
+    }
+    if (ok) { overlay.markBootOk(context); return { reverted: false } }
+    if (!active) return { reverted: false }
+    const result = overlay.noteBackendBootFailure(context)
+    updateService?.logEvent(result.reverted ? 'reverted' : 'boot-failure', { message: reason })
+    return result
+  } catch (e) { console.error('[overlay]', e); return { reverted: false } }
 }
 
 // 增量更新（docs/INCREMENTAL_UPDATE_DESIGN.md）：overlay 上下文——三个 seam
@@ -443,6 +471,7 @@ function createMainWindow() {
       additionalArguments: [
         '--checkba-api-base=http://127.0.0.1:' + backendPort,
         '--checkba-system-memory=' + require('node:os').totalmem(),
+        '--checkba-native-docx-max-bytes=' + (process.platform === 'darwin' && process.env?.AWD_EDITOR_ENGINE === 'lok' ? 64 * 1024 * 1024 : 0),
         // ARM 版 Windows（Mac 虚拟机）转译运行时启动看门狗已放宽 8 倍（dev-board#340），
         // 渲染层的等待死线要跟着放大，否则前端仍按 90 秒判超时（dev-board#341）
         ...(require('./services/win-arch').isWinArmEmulated() ? ['--checkba-win-emulated=1'] : [])
@@ -479,6 +508,9 @@ function createMainWindow() {
   // 官网头像的 CORP 放行（dev-board#603）。必须赶在第一次 load 之前挂上，
   // 否则首屏那次头像请求会漏在拦截器外面。只挂一次（函数内自带去重标记）。
   attachAvatarCorpRelaxation(mainWindow.webContents.session)
+  require('./services/backend-request-gate').installBackendRequestGate(mainWindow.webContents.session, {
+    getState: () => ({ port: services?.ports.backend, launch: services?.getLaunch('backend'), closing: services?.closing })
+  })
 
   // UI：直接复用现有 frontend（开发态用 dev server）
   if (IS_DEV) {
@@ -565,12 +597,23 @@ function createMainWindow() {
   }
 
   const createdWindow = mainWindow
+  let closePreparationPending = false
   createdWindow.on('close', (event) => {
     if (quitInProgress && !services) return
     event.preventDefault()
-    if (quitInProgress) return
-    if (process.platform === 'darwin') createdWindow.hide()
-    else app.quit()
+    if (quitInProgress || closePreparationPending) return
+    if (process.platform !== 'darwin') { app.quit(); return }
+    closePreparationPending = true
+    prepareRendererForQuit().then(() => {
+      // Cmd+Q during the confirmation adopts this same preparation for real exit.
+      if (quitInProgress || createdWindow.isDestroyed()) return
+      createdWindow.hide()
+      createdWindow.webContents.send('checkba:quit-cancelled', { windowHidden: true })
+    }).catch((error) => {
+      if (!quitInProgress && !createdWindow.isDestroyed()) {
+        createdWindow.webContents.send('checkba:quit-cancelled', { error: String(error.message || error) })
+      }
+    }).finally(() => { closePreparationPending = false })
   })
   createdWindow.on('closed', () => {
     // 旧窗迟到的 closed 不能断开新窗的剪贴板、菜单和原生弹窗。
@@ -1621,7 +1664,8 @@ ipcMain.handle('checkba:service-ensure', async (_evt, payload) => {
   if (!services) return { ok: false, message: 'services not ready' }
   try {
     const name = payload && payload.name
-    const res = await services.start(name)
+    const res = { ...await services.start(name) }
+    delete res.launch // Child-process/overlay evidence stays in the main process, never Electron IPC.
     if (!res.ok) return { ...res, ok: false }
     const { PACK_ID_BY_SERVICE, waitForServiceHealth } = require('./services/pysvc-runtime')
     if (PACK_ID_BY_SERVICE[name] && !(await waitForServiceHealth(name, services.ports[name]))) {
@@ -1695,7 +1739,20 @@ ipcMain.handle('checkba:update-restart', async () => {
 // starts the shared same-origin server (so LOWA/page are isolated) on first ask,
 // then returns the URL + the webview preload path + the partition. Dormant until
 // the renderer (LibreOfficeEditor.vue) requests it.
-ipcMain.handle('checkba:zetaoffice-editor', async () => {
+let nativeEditorManager = null
+ipcMain.handle('checkba:zetaoffice-editor', async (event, options) => {
+  // Only a named DOCX within the native byte limit opts into this slice. Generic spares and the
+  // comparison/merge callers require the complete WASM command service; their
+  // later document type is not known when this handler is called.
+  if (process.platform === 'darwin' && process.env.AWD_EDITOR_ENGINE === 'lok'
+      && typeof options?.readOnly === 'boolean' && /\.docx$/i.test(options.name || '')
+      && Number.isSafeInteger(options.size) && options.size >= 0 && options.size <= 64 * 1024 * 1024) {
+    nativeEditorManager ||= require('./native/editor-ipc').createNativeEditorManager({
+      root: path.join(app.getPath('temp'), 'aiworkdeck-native-editors'),
+      configFile: process.env.AWD_NATIVE_EDITOR_CONFIG,
+    })
+    return nativeEditorManager.open(event.sender, options)
+  }
   const { installZetaOfficeIsolation, ZETAOFFICE_PARTITION } = require('./zetaoffice-session')
   const { startEditorServer, editorUrl } = require('./zetaoffice-server')
   installZetaOfficeIsolation(ZETAOFFICE_PARTITION)
@@ -1703,10 +1760,18 @@ ipcMain.handle('checkba:zetaoffice-editor', async () => {
   return {
     // LO 画布 UI 语言跟随应用语言；只影响新建的编辑器实例（保活池里已 boot 的
     // 实例保持原语言，重启应用后全量生效）。
-    url: editorUrl(origin, { uilang: require('./app-language').getAppLanguage() }),
+    url: editorUrl(origin, { uilang: (typeof require('./app-language').getLowaUiLang === 'function' ? require('./app-language').getLowaUiLang() : require('./app-language').getAppLanguage()) }),
     preload: require('url').pathToFileURL(path.join(__dirname, '../preload/zetaoffice-webview-preload.js')).href,
     partition: ZETAOFFICE_PARTITION,
   }
+})
+ipcMain.handle('checkba:native-editor-request', (event, sessionId, action, params) => {
+  if (!nativeEditorManager) throw Error('Native editor is not enabled')
+  return nativeEditorManager.request(event.sender, sessionId, action, params)
+})
+ipcMain.handle('checkba:native-editor-close', (event, sessionId) => {
+  if (!nativeEditorManager) throw Error('Native editor is not enabled')
+  return nativeEditorManager.close(event.sender, sessionId)
 })
 
 // 编辑器本机字体（desktop/main/system-fonts.js）：设置面板列出/保存启用集；
@@ -1817,17 +1882,15 @@ app.whenReady().then(() => {
       // 增量更新自愈（设计 §6）：overlay 生效时后端起不来 → 记账，连续 2 次
       // 自动回滚到上一版本/内置并当场重试一次；启动健康则清零计数并清理旧版本
       try {
-        const overlay = require('./services/overlay')
-        const ctx = overlayCtx()
         const b0 = results.backend
-        if (b0 && b0.ok) {
-          overlay.markBootOk(ctx)
-        } else if (overlay.readCurrent(ctx)) {
-          const { reverted } = overlay.noteBackendBootFailure(ctx)
-          if (updateService) updateService.logEvent(reverted ? 'reverted' : 'boot-failure', { message: b0 && b0.error })
+        if (b0 && b0.ok && b0.fullReady !== false) {
+          recordBackendBoot(true, b0.launch)
+        } else if (!b0?.ok) {
+          const { reverted } = recordBackendBoot(false, services?.getLaunch?.('backend'), b0 && b0.error)
           if (reverted) {
             console.error('[overlay] 后端连续启动失败，已回滚补丁并重试')
             results.backend = await services.restart('backend').catch((e) => ({ ok: false, error: String(e && e.message ? e.message : e) }))
+            if (results.backend.ok && results.backend.fullReady !== false) recordBackendBoot(true, results.backend.launch)
           }
         }
       } catch (e) { console.error('[overlay]', e) }
@@ -1922,17 +1985,48 @@ ipcMain.handle('checkba:quit-prepared', (event, data = {}) => {
 ipcMain.handle('checkba:cancel-quit', (event) => {
   if (event.sender === mainWindow?.webContents) quitPreparation?.reject(new Error('已取消退出'))
 })
+ipcMain.handle('checkba:quit-stage', (event, data = {}) => {
+  if (!quitPreparation || quitPreparation.settled || event.sender !== mainWindow?.webContents
+      || data.requestId !== quitPreparation.id) return false
+  if (!['pausing', 'saving', 'confirming'].includes(data.stage)) return false
+  quitPreparation.setStage(data.stage)
+  return true
+})
 async function prepareRendererForQuit() {
+  if (quitPreparation) return quitPreparation.promise
   if (!mainWindow || mainWindow.isDestroyed()) return
   if (quitHandlerSender !== mainWindow.webContents) throw new Error('工作台尚未准备好退出，请稍后重试')
+  const preparation = { id: require('crypto').randomUUID(), settled: false }
+  let timer
+  preparation.promise = new Promise((resolve, reject) => {
+    const finish = (error) => {
+      if (preparation.settled) return
+      preparation.settled = true
+      clearTimeout(timer)
+      error ? reject(error) : resolve()
+    }
+    preparation.resolve = () => finish()
+    preparation.reject = finish
+    preparation.setStage = (stage) => {
+      clearTimeout(timer)
+      if (stage !== 'confirming') timer = setTimeout(() => finish(new Error('任务或文档仍在保存，已取消退出')), 60000)
+    }
+  })
+  quitPreparation = preparation
+  preparation.setStage('pausing')
+  const sender = mainWindow.webContents
+  const rendererLost = () => preparation.reject(new Error('工作台已停止响应，已取消退出'))
+  sender.once('destroyed', rendererLost)
+  sender.once('render-process-gone', rendererLost)
   try {
-    await new Promise((resolve, reject) => {
-      const id = require('crypto').randomUUID()
-      const timer = setTimeout(() => reject(new Error('任务或文档仍在保存，已取消退出')), 60000)
-      quitPreparation = { id, resolve: () => { clearTimeout(timer); resolve() }, reject: (e) => { clearTimeout(timer); reject(e) } }
-      mainWindow.webContents.send('checkba:prepare-quit', { requestId: id })
-    })
-  } finally { quitPreparation = null }
+    try { sender.send('checkba:prepare-quit', { requestId: preparation.id }) }
+    catch (error) { preparation.reject(error) }
+    await preparation.promise
+  } finally {
+    sender.removeListener('destroyed', rendererLost)
+    sender.removeListener('render-process-gone', rendererLost)
+    if (quitPreparation === preparation) quitPreparation = null
+  }
 }
 
 app.on('window-all-closed', () => {
@@ -1968,7 +2062,7 @@ app.on('before-quit', async (e) => {
       try { await prepareRendererForQuit() } catch (err) {
         updateRestartRequested = false
         quitInProgress = false
-        mainWindow?.webContents.send('checkba:quit-cancelled', { error: String(err.message || err) })
+        try { mainWindow?.webContents.send('checkba:quit-cancelled', { error: String(err.message || err) }) } catch (_) { /* Renderer already gone. */ }
         logDesktopEvent('quit-cancelled', { message: String(err.message || err) })
         openPaths.resume()
         return
@@ -1982,6 +2076,10 @@ app.on('before-quit', async (e) => {
       //    就是「闪退」。先 hide 才是 Mac 应用按 ⌘Q 的正常观感：窗口立刻消失，
       //    收尾在后台进行。
       hideAllWindowsForQuit()
+      if (nativeEditorManager) {
+        try { await nativeEditorManager.closeAll() }
+        catch (error) { logDesktopEvent('native-editor-stop-error', { message: String(error.message || error) }) }
+      }
       // 先终止进行中的模型下载子进程，否则退出时它们会变孤儿继续占用资源
       if (modelManager) modelManager.killAllActive()
       // ③ 停服务带总墙钟上限：到点就走，不再无限等
@@ -2015,6 +2113,8 @@ app.on('before-quit', async (e) => {
 
 ipcMain.handle('checkba:backend-restart', async () => {
   if (!backendSupervisor) return { ok: false, error: backendStartupFailed ? 'backend startup failed; reopen the application' : 'backend is still starting' }
-  return backendSupervisor.recover()
+  const result = { ...await backendSupervisor.recover() }
+  delete result.launch
+  return result
 })
 ipcMain.handle('checkba:backend-health', getBackendHealth)

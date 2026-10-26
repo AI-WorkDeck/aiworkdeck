@@ -29,3 +29,14 @@ test('a live Agent stream prevents mixing an older answer into its table', async
   host.$refs = { chatInterface: { menuState: () => ({aiRunning: true}) } }
   await insert.call(host, {content:'old answer'})
 })
+
+test('selection replacement reports a native refusal instead of claiming success', async () => {
+  const method = source.slice(source.indexOf('    async applyAiMessageToSelection(message) {'), source.indexOf('    onPluginAddFileToAi(request) {'))
+  const replace = new Function('uni', 'markdownToPlainText', `return ({${method}}).applyAiMessageToSelection`)({ showToast: value => notices.push(value) }, value => value)
+  for (const result of [null, { success: false, message: 'Document is readonly' }]) {
+    notices.length = 0
+    await replace.call(vm(async action => action === 'get_selection' ? { success: true, text: '选中原文' } : result), { content: '替换文字' })
+    assert.ok(notices.some(value => value.icon === 'none'))
+    assert.ok(!notices.some(value => value.icon === 'success'))
+  }
+})

@@ -3,6 +3,7 @@
 
 package com.checkba.service.lawfirm;
 
+import com.checkba.service.LangText;
 import com.checkba.service.ai.PluginService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,7 +49,7 @@ public class LawFirmBundledPluginInstaller {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         Resource manifest = resolver.getResource("classpath:" + BUNDLE_ROOT + "manifest.json");
         if (!manifest.exists()) {
-            throw new IllegalStateException("当前版本未内置律所管理插件，请从插件中心安装");
+            throw new IllegalStateException(LangText.of("当前版本未内置律所管理插件，请从插件中心安装", "Law Firm Management plugin is not bundled in this version; please install it from the Plugin Center"));
         }
         String bundledManifest;
         try (InputStream in = manifest.getInputStream()) {
@@ -92,7 +93,7 @@ public class LawFirmBundledPluginInstaller {
                 }
                 if (!Files.isRegularFile(staging.resolve("manifest.json"))
                         || !Files.isRegularFile(staging.resolve("web/index.html"))) {
-                    throw new IllegalStateException("内置律所管理插件不完整，已中止安装");
+                    throw new IllegalStateException(LangText.of("内置律所管理插件不完整，已中止安装", "Bundled Law Firm Management plugin is incomplete; installation aborted"));
                 }
                 if (Files.exists(target)) {
                     cn.hutool.core.io.FileUtil.del(target.toFile());
@@ -112,7 +113,7 @@ public class LawFirmBundledPluginInstaller {
         }
 
         if (pluginService.getPlugin(PLUGIN_ID) == null) {
-            throw new IllegalStateException("律所管理插件登记失败，请查看日志");
+            throw new IllegalStateException(LangText.of("律所管理插件登记失败，请查看日志", "Failed to register Law Firm Management plugin; please check the logs"));
         }
         String incompatible = pluginService.incompatibleReason(PLUGIN_ID);
         if (incompatible != null) throw new IllegalStateException(incompatible);

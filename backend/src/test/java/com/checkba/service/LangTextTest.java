@@ -55,6 +55,46 @@ class LangTextTest {
     }
 
     @Test
+    void traditionalChinese_convertsSimplifiedPairAndMapFallback() {
+        AppLanguageService zhTw = mock(AppLanguageService.class);
+        when(zhTw.language()).thenReturn("zh-TW");
+        LangText.register(zhTw);
+
+        assertEquals("請設定網路資料夾", LangText.of("请设置网络文件夹", "Settings"));
+        assertEquals("設定詞條", LangText.of(java.util.Map.of(
+                "zh-CN", "设置词条", "en-US", "Entry")));
+        assertEquals("原生繁體", LangText.of(java.util.Map.of(
+                "zh-TW", "原生繁體", "zh-CN", "简体")));
+    }
+
+    @Test
+    void localizedMap_usesCurrentLocaleThenEnglishThenChinese() {
+        AppLanguageService fr = mock(AppLanguageService.class);
+        when(fr.language()).thenReturn("fr-FR");
+        when(fr.isEnglish()).thenReturn(true);
+        LangText.register(fr);
+
+        assertEquals("Bonjour", LangText.of(java.util.Map.of(
+                "fr-FR", "Bonjour", "en-US", "Hello", "zh-CN", "你好")));
+        assertEquals("Hello", LangText.of(java.util.Map.of(
+                "en-US", "Hello", "zh-CN", "你好")));
+        assertEquals("你好", LangText.of(java.util.Map.of("zh-CN", "你好")));
+        assertNull(LangText.of(java.util.Map.of("ja-JP", "こんにちは")));
+        assertNull(LangText.of((java.util.Map<String, String>) null));
+    }
+
+    @Test
+    void nullLanguageWithLegacyEnglishMock_keepsEnglishCompatibility() {
+        AppLanguageService en = mock(AppLanguageService.class);
+        when(en.isEnglish()).thenReturn(true);
+        LangText.register(en);
+
+        assertEquals("en-US", LangText.localeCode());
+        assertEquals(com.checkba.util.AppLocale.EN_US, LangText.locale());
+        assertEquals("Hello", LangText.of(java.util.Map.of("en-US", "Hello", "zh-CN", "你好")));
+    }
+
+    @Test
     void resetRestoresChineseDefault() {
         AppLanguageService en = mock(AppLanguageService.class);
         when(en.isEnglish()).thenReturn(true);
@@ -62,5 +102,17 @@ class LangTextTest {
         assertTrue(LangText.isEnglish());
         LangText.reset();
         assertFalse(LangText.isEnglish());
+    }
+
+    @Test
+    void scopedLanguageWorksBeforeSpringAndNeverTouchesStartingRepository() {
+        LangText.reset();
+        assertEquals("English", AppLanguageScope.call("en-US", () -> LangText.of("中文", "English")));
+        AppLanguageService starting = mock(AppLanguageService.class);
+        LangText.register(starting);
+        assertEquals("English", AppLanguageScope.call("en-US", () -> LangText.of("中文", "English")));
+        assertEquals("中文", AppLanguageScope.call("zh-CN", () -> LangText.of("中文", "English")));
+        org.mockito.Mockito.verifyNoInteractions(starting);
+        assertNull(AppLanguageScope.current());
     }
 }

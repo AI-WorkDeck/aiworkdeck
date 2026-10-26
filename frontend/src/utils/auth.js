@@ -3,6 +3,8 @@
 // 用户认证工具函数
 // 说明：管理用户登录状态和 sessionId
 
+import { getAppLanguage } from './appLanguage.js'
+
 const SESSION_KEY = 'checkba_session_id'
 const USER_KEY = 'checkba_user'
 
@@ -80,6 +82,7 @@ export function getAuthHeaders() {
   const sessionId = getSessionId()
   const headers = {
     'Content-Type': 'application/json',
+    'X-App-Language': getAppLanguage(),
   }
   if (sessionId) {
     headers['X-Session-Id'] = sessionId

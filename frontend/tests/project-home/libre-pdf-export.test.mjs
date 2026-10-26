@@ -12,6 +12,7 @@ import { watchDownloadDone, displayName } from '../../src/utils/downloadDone.js'
 
 const SRC = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
 const BODY = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
   .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
 
 function setup({ result, throws, fs, localPath } = {}) {

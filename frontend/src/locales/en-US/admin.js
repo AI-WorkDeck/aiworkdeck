@@ -465,6 +465,8 @@ export default {
   ocrChoiceConfirmed: 'Confirmed; the original task will continue after the current reply finishes…',
   ocrChoiceRetryCancel: 'Retry cancel',
   ocrChoiceCancel: 'Cancel',
+  ocrChoiceCancelFailedError: 'Cancellation not yet confirmed; please try again. Dispatched recognition requests cannot be recalled; once confirmed, remaining pages will stop.',
+  ocrChoiceSaveFailedError: 'Choice was not saved; please try again',
   ocrSettingsTitle: 'Scanned Document Recognition',
   ocrSettingsDesc: 'When local recognition is unavailable, tasks continue according to your choice. This setting applies only to the current account.',
   ocrSettingsOptAsk: 'Ask every time',

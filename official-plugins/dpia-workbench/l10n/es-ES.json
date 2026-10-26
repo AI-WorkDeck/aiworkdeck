@@ -1,0 +1,15 @@
+{
+  "plugin.name": "Taller de DPIA",
+  "plugin.description": "Evaluación de impacto en protección de datos: trazado de fuentes, confirmación de hechos, preguntas y respuestas, riesgos y remediación, reevaluación continua e informes versionados. Adaptado del DSH DPIA Workbench de Zhu Lingfeng; requiere Node.js, Python y LibreOffice.",
+  "plugin.author": "AI WorkDeck (Origen: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Ejecutable de Node.js",
+  "setting.nodePath.description": "Déjelo en blanco para usar el node del PATH del sistema; requiere Node.js 20 o superior.",
+  "setting.pythonPath.label": "Ejecutable de Python",
+  "setting.pythonPath.description": "Requiere las dependencias de documento de runtime/requirements.txt; puede especificar una ruta de Python de un entorno virtual.",
+  "setting.pdfFontPath.label": "Archivo de fuente CJK para PDF",
+  "setting.pdfFontPath.description": "Para rellenar texto CJK en plantillas PDF nativas se necesita una fuente TrueType incrustable (TTF/TTC); déjelo en blanco para usar la búsqueda de fuentes del sistema.",
+  "setting.sofficePath.label": "Ejecutable de LibreOffice",
+  "setting.sofficePath.description": "Solo es necesario para la exportación de informes a PDF y la vista previa de páginas; déjelo en blanco para probar las ubicaciones predeterminadas del sistema.",
+  "tool.dpia_workbench_action.description": "Casos DPIA, materiales, confirmación de hechos, preguntas y respuestas, estado de ejecución y operaciones de informes. Solo para la interfaz del taller; la IA no debe invocar entradas de confirmación/aprobación manual.",
+  "tool.dpia_workbench_task.description": "Ejecute las tareas DPIA actualmente congeladas: context/read/write/script/commit/report; estrictamente limitado al proyecto del usuario actual y al directorio de salida del caso."
+}

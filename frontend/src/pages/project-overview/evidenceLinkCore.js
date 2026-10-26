@@ -11,17 +11,17 @@ function isNotFound(e) {
   return /not[ _-]?found|不存在/i.test(String(e.message || ''))
 }
 
-// 拖放建链：targets 固定为一条 {fileId, supports, written_review}，createdByKind=human。
+// 拖放建链：targets 为一条 {fileId, supports, method}（method 来自常用标签首项），createdByKind=human。
 // 返回值在 createEvidenceLinkForSelection 之上多一个 targetId（该 fileId 下刚追加的那条）。
-export async function createEvidenceLinkForDrop({ exec, api, projectId, docFileId, file, internalBase }) {
-  const target = { fileId: Number(file.id), relation: 'supports', method: 'written_review' }
+export async function createEvidenceLinkForDrop({ exec, api, projectId, docFileId, file, internalBase, method = 'written_review' }) {
+  const target = { fileId: Number(file.id), relation: 'supports', method }
   const res = await createEvidenceLinkForSelection({ exec, api, projectId, docFileId, internalBase, targets: [target], createdByKind: 'human' })
   if (!res.ok) return res
   const targets = (res.view && Array.isArray(res.view.targets)) ? res.view.targets : []
   // 同一文件可能已挂过：取该 fileId 下 id 最大的那条（刚追加的）
   const mine = targets.filter((x) => Number(x.fileId) === Number(file.id))
   const tgt = mine.length ? mine.reduce((a, b) => (Number(b.id) > Number(a.id) ? b : a)) : null
-  return { ...res, targetId: tgt ? tgt.id : null }
+  return { ...res, targetId: tgt ? tgt.id : null, method: tgt && 'method' in tgt ? tgt.method : method }
 }
 
 // 在当前选区上建链的唯一流程（拖放与 Web 插件 SDK evidence.link 共用，别再维护第二份）。
@@ -35,7 +35,8 @@ export async function createEvidenceLinkForDrop({ exec, api, projectId, docFileI
 export async function createEvidenceLinkForSelection({ exec, api, projectId, docFileId, internalBase, targets, createdByKind = 'human' }) {
   let cur = null
   try { cur = await exec('get_selection_hyperlink', {}) } catch (e) { cur = null }
-  const selText = cur && cur.success ? String(cur.text || '').trim() : ''
+  const expectedText = cur && cur.success ? String(cur.text || '') : ''
+  const selText = expectedText.trim()
   if (!selText) return { ok: false, reason: 'no_selection' }
 
   let linkKey = ''
@@ -45,10 +46,12 @@ export async function createEvidenceLinkForSelection({ exec, api, projectId, doc
   let created = false
   if (!linkKey) {
     linkKey = 'EVID_' + ulid()
-    const bm = await exec('bookmark_selection', { name: linkKey })
+    // 核验最初选区的完整原文；显示摘要的 trim 不能改变写入前提。
+    // 两次 RPC 仍非原子：后一步拒绝时，前一步书签可能已经存在。
+    const bm = await exec('bookmark_selection', { name: linkKey, expectedText })
     if (!bm || !bm.success) return { ok: false, reason: 'bookmark_failed', message: (bm && (bm.error || bm.message)) || '' }
     const url = buildFileLinkUrl(internalBase, linkKey, projectId)
-    const r = await exec('set_selection_hyperlink', { url })
+    const r = await exec('set_selection_hyperlink', { url, expectedText })
     if (!r || !r.success) return { ok: false, reason: 'hyperlink_failed', message: (r && (r.error || r.message)) || '' }
     created = true
   }

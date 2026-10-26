@@ -47,6 +47,10 @@ public class MediaFileTypeReconciler implements CommandLineRunner {
 
     private final boolean localMode;
     private final ProjectFileRepository projectFileRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.version.WorkSessionService contentLocks;
+    @Value("${desktop.local-core.enabled:false}")
+    private boolean localCoreEnabled;
 
     public MediaFileTypeReconciler(@Value("${security.local-mode:false}") boolean localMode,
                                    ProjectFileRepository projectFileRepository) {
@@ -72,15 +76,18 @@ public class MediaFileTypeReconciler implements CommandLineRunner {
         }
         int fixed = 0;
         for (ProjectFile f : rows) {
-            String ext = MobileRelayClientService.fileTypeOf(f.getName(), null);
-            if (ext == null || ext.equals(f.getFileType())) continue;
             try {
-                String before = f.getFileType();
-                f.setFileType(ext);
-                projectFileRepository.save(f);
-                fixed++;
-                log.info("影像 fileType 对账：文件 {}（{}）{} → {}，此前在文件树里点开会被判「不支持的类型」",
-                        f.getId(), f.getName(), before, ext);
+                if (localCoreEnabled) {
+                    if (contentLocks == null) throw new IllegalStateException("Content lock service is unavailable");
+                    int[] changed = {0};
+                    contentLocks.runLocked(f.getProjectId(), () -> {
+                        var current = projectFileRepository.findById(f.getId()).orElse(null);
+                        if (current != null && java.util.Objects.equals(current.getProjectId(), f.getProjectId())
+                                && !Boolean.TRUE.equals(current.getIsFolder()) && !Boolean.TRUE.equals(current.getIsDeleted())
+                                && BAD_FILE_TYPES.contains(current.getFileType())) changed[0] = repair(current);
+                    });
+                    fixed += changed[0];
+                } else fixed += repair(f);
             } catch (RuntimeException e) {
                 log.warn("影像 fileType 对账：文件 {} 改写失败 {}", f.getId(), e.toString());
             }
@@ -89,5 +96,13 @@ public class MediaFileTypeReconciler implements CommandLineRunner {
             log.info("影像 fileType 对账完成：修正 {} 行", fixed);
         }
         return fixed;
+    }
+
+    private int repair(ProjectFile file) {
+        String ext = MobileRelayClientService.fileTypeOf(file.getName(), null);
+        if (ext == null || ext.equals(file.getFileType())) return 0;
+        String before = file.getFileType(); file.setFileType(ext); projectFileRepository.save(file);
+        log.info("影像 fileType 对账：文件 {}（{}）{} → {}", file.getId(), file.getName(), before, ext);
+        return 1;
     }
 }

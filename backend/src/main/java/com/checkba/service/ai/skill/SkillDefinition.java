@@ -163,6 +163,36 @@ public class SkillDefinition {
     /** 英文 prompt 模板（目录下存在 prompt.en.md 时加载）；英文模式下注入用它，缺省回退 promptTemplate */
     private String promptTemplateEn;
 
+    /**
+     * 收尾独立核验策略（VeriHarness 对齐，dev-board#1481；skill.yml: {@code verification_policy}）。
+     *
+     * <p>缺省为 {@link VerificationPolicy#NONE}；声明为 {@link VerificationPolicy#SLOT_EVIDENCE_CHALLENGER}
+     * 的 skill（如 {@code legal-opinion-review} 及用户从自进化卡片晋升的高敏核查技能）在实质审查/修订轮次
+     * 正常收尾前，由编排器自动派发一次独立只读 Challenger 子任务执行逐槽证据核验，并将结构化核验报告
+     * 通过 SSE {@code verification_report} 呈现给用户。
+     */
+    private VerificationPolicy verificationPolicy = VerificationPolicy.NONE;
+
+    /** {@link #verificationPolicy} 的取值。 */
+    public enum VerificationPolicy {
+        /** 不额外派发收尾只读核验子任务（缺省）。 */
+        NONE,
+        /** 独立只读 Challenger 逐槽证据核验（主体角色、法律关系、标的、条件、事实时点）。 */
+        SLOT_EVIDENCE_CHALLENGER;
+
+        public static java.util.Optional<VerificationPolicy> parse(String raw) {
+            if (raw == null || raw.isBlank()) {
+                return java.util.Optional.empty();
+            }
+            String normalized = raw.trim().toUpperCase(java.util.Locale.ROOT).replace('-', '_');
+            try {
+                return java.util.Optional.of(VerificationPolicy.valueOf(normalized));
+            } catch (IllegalArgumentException e) {
+                return java.util.Optional.empty();
+            }
+        }
+    }
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
     public String getName() { return name; }
@@ -217,4 +247,8 @@ public class SkillDefinition {
     public void setOutputEn(String outputEn) { this.outputEn = outputEn; }
     public String getPromptTemplateEn() { return promptTemplateEn; }
     public void setPromptTemplateEn(String promptTemplateEn) { this.promptTemplateEn = promptTemplateEn; }
+    public VerificationPolicy getVerificationPolicy() { return verificationPolicy; }
+    public void setVerificationPolicy(VerificationPolicy verificationPolicy) {
+        this.verificationPolicy = verificationPolicy == null ? VerificationPolicy.NONE : verificationPolicy;
+    }
 }

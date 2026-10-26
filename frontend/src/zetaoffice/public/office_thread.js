@@ -2532,7 +2532,12 @@ function resolvePage(p) {
 }
 // XDrawPage 没有稳定的等值比较；退回按 Number 属性比对（GenericDrawPage.Number 只读）。
 function unoSameDrawPage(a, b) {
-  try { return a.getPropertyValue('Number') === b.getPropertyValue('Number'); } catch (e) { return a === b; }
+  try {
+    // 选区也可能是形状；读取不存在的属性即使捕获异常也会破坏 WASM 状态。
+    if (!a.getPropertySetInfo().hasPropertyByName('Number') ||
+        !b.getPropertySetInfo().hasPropertyByName('Number')) return a === b;
+    return a.getPropertyValue('Number') === b.getPropertyValue('Number');
+  } catch (e) { return a === b; }
 }
 // 用 .uno:MovePage* 把"当前页"从 fromIndex 挪到 toIndex（同一份 count 快照下，均
 // 0-based）。调用前必须已 ctrl.setCurrentPage() 到源页。XDrawPages 无直接 move
@@ -2618,20 +2623,23 @@ function ensureShapeNames(page) {
   // 实锤：矩形形状的名字后来指向了标题形状）。先收集页面上已占用的名字集合，
   // 分配新名字时跳过已占用的，保证同一页内任何时刻名字唯一。
   const used = new Set();
+  const shapes = new Array(n), unnamed = [];
   for (let i = 0; i < n; i++) {
     let shape; try { shape = page.getByIndex(i); } catch (e) { continue; }
+    shapes[i] = shape;
     let name = ''; try { name = shape.getName ? shape.getName() : ''; } catch (e) {}
     if (name) used.add(name);
+    else unnamed.push(shape);
   }
   let counter = 0;
-  for (let i = 0; i < n; i++) {
-    let shape; try { shape = page.getByIndex(i); } catch (e) { continue; }
-    let name = ''; try { name = shape.getName ? shape.getName() : ''; } catch (e) {}
-    if (name) continue;
+  for (const shape of unnamed) {
     let candidate;
     do { candidate = '__awd_shape_' + (counter++); } while (used.has(candidate));
     try { shape.setName(candidate); used.add(candidate); } catch (e) {}
   }
+  // Reuse only within this synchronous read; the next call reacquires the page
+  // so edits, reordered shapes and recreated placeholders cannot leave stale refs.
+  return shapes;
 }
 // 形状文字：大多数形状（文本框/标题/占位符）实现 drawing.Text；线条/连接符/表格
 // 外壳等不实现，统一 try/catch 归零而非抛错，读取面据此判断"这个形状没有文字"。
@@ -2643,10 +2651,11 @@ function shapeText(shape) {
 // 形状，经 page.getByIndex() 重新取到的引用上 supportsService('com.sun.star.
 // drawing.TableShape') 报 false，但它的 Model 属性货真价实是一张能读写行列的
 // XTable（slide_add_table 内部用同一属性建表已验证）。service 名判定在这个引擎
-// 构建上对新建表格不可靠，改成直接尝试取 Model 并鸭子类型检查 getRows/
-// getColumns 方法是否存在——不依赖 service 字符串，也不关心它为什么不可靠。
+// 构建上对新建表格不可靠，先确认 Model 属性存在，再鸭子类型检查 getRows/
+// getColumns。普通形状读取不存在的 Model 会破坏 WASM 状态，catch 不能补救。
 function isTableShape(shape) {
   try {
+    if (!shape.getPropertySetInfo().hasPropertyByName('Model')) return false;
     const m = shape.getPropertyValue('Model');
     return !!(m && typeof m.getRows === 'function' && typeof m.getColumns === 'function');
   } catch (e) { return false; }
@@ -2803,8 +2812,12 @@ function activeCalcSelection() {
     sheets = xModel.getSheets();
     sheetCount = sheets.getCount();
     const cap = Math.min(sheetCount, 50);
-    for (let i = 0; i < cap; i++) {
-      try { sheetNames.push(String(sheets.getByIndex(i).getName() || '')); } catch (e) {}
+    try {
+      sheetNames.push(...Array.from(sheets.getElementNames()).slice(0, cap).map(name => String(name || '')));
+    } catch (e) {
+      for (let i = 0; i < cap; i++) {
+        try { sheetNames.push(String(sheets.getByIndex(i).getName() || '')); } catch (e) {}
+      }
     }
   } catch (e) {}
   try { sheet = ctrl.getActiveSheet(); } catch (e) {}
@@ -2915,12 +2928,24 @@ function activeCalcRangeName() {
   try { return activeCalcSelection().range || 'A1'; } catch (e) { return 'A1'; }
 }
 
+// Clipboard must use the complete real range, never the toolbar's A1 fallback.
+function calcClipboardSelection() {
+  let range = ctrl.getSelection();
+  if (range && typeof range.getByIndex === 'function' && typeof range.getRangeAddress !== 'function') {
+    if (range.getCount() !== 1) throw new Error('请先选择一个连续区域，再复制或粘贴');
+    range = range.getByIndex(0);
+  }
+  if (!range || typeof range.getRangeAddress !== 'function') throw new Error('请先选择单元格区域，再复制或粘贴');
+  const address = range.getRangeAddress();
+  return { range: range, address: address, sheet: xModel.getSheets().getByIndex(address.Sheet) };
+}
+
 // Impress 当前幻灯片、选中形状与形状列表解析（供 get_ui_state / format_selection / set_paragraph_format / ui_command 共用）
 function slidePages() {
   try { return xModel.getDrawPages(); } catch (e) { return null; }
 }
 function activeImpressContext(wantShapeName) {
-  let page = null;
+  let page = null, pageShapes = null;
   try { if (ctrl && ctrl.getCurrentPage) page = ctrl.getCurrentPage(); } catch (e) {}
   let pages = null, slideCount = 0;
   try { pages = xModel.getDrawPages(); slideCount = pages.getCount(); } catch (e) {}
@@ -2936,7 +2961,7 @@ function activeImpressContext(wantShapeName) {
       if (idx >= 0) n = idx + 1;
     }
     if (n >= 1) slideNumber = n;
-    try { ensureShapeNames(page); } catch (e) {}
+    try { pageShapes = ensureShapeNames(page); } catch (e) {}
   }
   const currentSlideIndex = Math.max(0, slideNumber - 1);
   let slideWidthMm = 280, slideHeightMm = 157.5, widthPt = 793.7, heightPt = 446.5;
@@ -2982,9 +3007,10 @@ function activeImpressContext(wantShapeName) {
   try { if (selectedRawShape && selectedRawShape.getName) rawSelectedName = String(selectedRawShape.getName() || ''); } catch (e) {}
   if (page) {
     let cnt = 0;
-    try { cnt = page.getCount(); } catch (e) {}
+    try { cnt = pageShapes ? pageShapes.length : page.getCount(); } catch (e) {}
     for (let i = 0; i < cnt; i++) {
-      let s; try { s = page.getByIndex(i); } catch (e) { continue; }
+      let s; try { s = pageShapes ? pageShapes[i] : page.getByIndex(i); } catch (e) { continue; }
+      if (!s) continue;
       let nm = ''; try { nm = s.getName ? String(s.getName() || '') : ''; } catch (e) {}
       const kind = shapeKind(s);
       const txt = shapeText(s);
@@ -3015,7 +3041,7 @@ function activeImpressContext(wantShapeName) {
       }
     }
     if (!fallbackShape && cnt > 0) {
-      try { fallbackShape = page.getByIndex(0); fallbackIndex = 0; } catch (e) {}
+      try { fallbackShape = pageShapes ? pageShapes[0] : page.getByIndex(0); if (fallbackShape) fallbackIndex = 0; } catch (e) {}
     }
   }
   let targetShape = selectedRawShape || fallbackShape;
@@ -4856,30 +4882,35 @@ const EXEC = {
   replace_selection(p) {
     const rawText = String((p && p.text) || '');
     if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
-      const selInfo = activeCalcSelection();
+      const selection = calcClipboardSelection();
       const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
       if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
       const rows = (lines.length ? lines : ['']).map(function (ln) { return ln.split('\t'); });
       const r = EXEC.sheet_write_cells({
-        sheet: selInfo.sheetName || undefined,
-        startCell: selInfo.address || 'A1',
+        sheet: selection.sheet.getName(),
+        startCell: colLetterOf(selection.address.StartColumn) + (selection.address.StartRow + 1),
         rows: rows,
       });
       return Object.assign({}, r, { text: rawText });
     }
     if (typeof isImpressDoc === 'function' && isImpressDoc()) {
-      const ctx = activeImpressContext(p && p.shapeName);
-      if (ctx && ctx.selectedShape && ctx.selectedShapeName) {
-        const r = EXEC.slide_set_shape_text({
-          slideNumber: ctx.slideNumber,
-          shapeName: ctx.selectedShapeName,
-          text: rawText,
-        });
-        return Object.assign({}, r, { text: rawText });
+      // Retain the model-edit contract used by plugins/AI. Only the real
+      // clipboard bridge targets the live outliner/caret instead of a shape.
+      if (!p.clipboard) {
+        const ctx = activeImpressContext(p.shapeName);
+        if (ctx && ctx.selectedShape && ctx.selectedShapeName) return Object.assign({}, EXEC.slide_set_shape_text({
+          slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, text: rawText,
+        }), { text: rawText });
+        return slideFail('请先选择要替换的文本框');
       }
-      if (!rawText) return { success: true, text: '' };
-      const keys = [];
-      for (let i = 0; i < rawText.length; i++) keys.push({ ch: rawText[i] });
+      // A live Impress outliner owns its text while editing. Mutating the shape
+      // model reports success but is overwritten by that outliner. Use the same
+      // native input route as typing, preserving the caret, selection and format.
+      const selection = ctrl.getSelection();
+      if (!selection) return slideFail('请先双击文本框，把光标放在要粘贴的位置');
+      const keys = Array.from(rawText.replace(/\r\n?/g, '\n')).map(function (ch) {
+        return ch === '\n' ? { key: 'RETURN', ch: '\r' } : ch === '\t' ? { key: 'TAB', ch: '\t' } : { ch: ch };
+      });
       return Object.assign(postNativeKeys(keys), { text: rawText });
     }
     const vc = ctrl.getViewCursor();
@@ -4983,36 +5014,31 @@ const EXEC = {
     return r;
   },
   // [verified] current selection text (anchor, not integer offset).
-  get_selection() {
-    if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
-      const selInfo = activeCalcSelection();
-      let text = '';
-      try {
-        if (selInfo.sheet && (selInfo.rowCount > 1 || selInfo.colCount > 1)) {
-          const maxR = Math.min(selInfo.endRow, selInfo.row + 99);
-          const maxC = Math.min(selInfo.endCol, selInfo.col + 49);
-          const lines = [];
-          for (let r = selInfo.row; r <= maxR; r++) {
-            const cols = [];
-            for (let c = selInfo.col; c <= maxC; c++) {
-              try {
-                const v = readCellOut(selInfo.sheet.getCellByPosition(c, r));
-                cols.push(v == null ? '' : String(v));
-              } catch (e) { cols.push(''); }
-            }
-            lines.push(cols.join('\t'));
-          }
-          text = lines.join('\n');
-        } else if (selInfo.cell) {
-          const v = readCellOut(selInfo.cell);
-          text = v != null && v !== '' ? String(v) : String(selInfo.cell.getString() || '');
-        }
-      } catch (e) {}
-      return { success: true, text: text, hasSelection: text.length > 0 };
+  get_selection(p = {}) {
+    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const selection = calcClipboardSelection();
+      const a = selection.address;
+      const cells = (a.EndRow - a.StartRow + 1) * (a.EndColumn - a.StartColumn + 1);
+      if (cells > 50000) return slideFail('所选区域超过 50,000 个单元格，请缩小范围后复制；未复制或删除任何内容');
+      // One UNO range read instead of thousands of per-cell bridge calls.
+      const rows = Array.from(selection.range.getDataArray());
+      const text = rows.map(function (row) {
+        return Array.from(row).map(function (value) { return value == null ? '' : String(value); }).join('\t');
+      }).join('\n');
+      return { success: true, text: text, hasSelection: true };
     }
     if (typeof isImpressDoc === 'function' && isImpressDoc()) {
-      const ctx = activeImpressContext();
-      const text = ctx && ctx.selectedShape ? shapeText(ctx.selectedShape) : '';
+      if (!p.clipboard) {
+        const ctx = activeImpressContext();
+        const text = ctx && ctx.selectedShape ? shapeText(ctx.selectedShape) : '';
+        return { success: true, text: text, hasSelection: text.length > 0 };
+      }
+      const selection = ctrl.getSelection();
+      // Only a selected text range is clipboard text. A shape collection also
+      // appears for a collapsed caret; copying its whole text would cut data
+      // outside the user's selection. Object clipboard is not this text bridge.
+      const text = selection && typeof selection.getString === 'function'
+        && typeof selection.getShapeType !== 'function' ? String(selection.getString() || '') : '';
       return { success: true, text: text, hasSelection: text.length > 0 };
     }
     const sel = ctrl.getSelection();
@@ -5332,7 +5358,13 @@ const EXEC = {
   // re-selected the SAME char and deletion jammed after one press (headless-
   // verified). The engine dispatch owns revision semantics: mark + step past for
   // original text, hard-delete for own unaccepted inserts, selection-aware.
-  delete_backward() {
+  delete_backward(p = {}) {
+    if (p.clipboard && isCalcDoc()) {
+      const selected = calcClipboardSelection();
+      // Clear only values, dates, strings and formulas; keep cell formatting.
+      selected.range.clearContents(1 | 2 | 4 | 16);
+      return { success: true };
+    }
     if (nativeKeyDoc()) return postNativeKeys([{ key: 'BACKSPACE', ch: '\b' }]);
     dispatchUno('.uno:SwBackspace');
     return { success: true };
@@ -5712,7 +5744,7 @@ const EXEC = {
     if (isImpressDoc()) {
       const ctx = activeImpressContext();
       const shape = ctx.selectedShape;
-      const sf = shape ? shapeCharFormat(shape) : {};
+      const sf = (shape ? shapeCharFormat(shape) : null) || {};
       out.character = {
         bold: !!sf.bold,
         italic: !!sf.italic,
@@ -5929,7 +5961,7 @@ const EXEC = {
     };
     // 不带任何字段 = 只读查询：回报当前各处可见性。宿主用它复核「藏了之后
     // 真的没再冒出来」（上下文工具栏是选中表格/图片时由引擎自己拉起来的）。
-    const anyField = ['all', 'menubar', 'statusbar', 'toolbars', 'rulers'].some((k) => req[k] != null);
+    const anyField = ['all', 'menubar', 'statusbar', 'toolbars', 'rulers', 'sheetTabs'].some((k) => req[k] != null);
     if (!anyField) {
       const cur = { toolbars: {} };
       try { cur.all = !!lm.isVisible(); } catch (e) {}
@@ -5943,6 +5975,7 @@ const EXEC = {
         const vs = ctrl.getViewSettings();
         cur.rulers = { ShowHoriRuler: !!vs.getPropertyValue('ShowHoriRuler'), ShowVertRuler: !!vs.getPropertyValue('ShowVertRuler') };
       } catch (e) {}
+      if (isCalcDoc()) { try { cur.sheetTabs = !!ctrl.getPropertyValue('HasSheetTabs'); } catch (e) {} }
       return { success: true, visible: cur };
     }
     if (req.all != null) {
@@ -5979,6 +6012,12 @@ const EXEC = {
       } else if (req.menubar === false && req.statusbar === false && req.toolbars === false) {
         try { lm.setVisible(false); } catch (e) {}
       }
+    }
+    if (req.sheetTabs != null && isCalcDoc()) {
+      try {
+        ctrl.setPropertyValue('HasSheetTabs', !!req.sheetTabs);
+        out.applied.sheetTabs = !!ctrl.getPropertyValue('HasSheetTabs');
+      } catch (e) { out.sheetTabsErr = errStr(e); }
     }
     if (req.rulers != null) {
       let vs = null;
@@ -6460,6 +6499,10 @@ const EXEC = {
     // 导出是同步的、跑在这条 office 线程上，期间不可能有用户编辑挤进来，
     // 复原不会吃掉真实修改；宿主侧的 dirty 是另一套独立记账，也不受影响。
     const wasModified = (() => { try { return !!xModel.isModified(); } catch (e) { return false; } })();
+    // The office queue has now applied earlier IME/AI writes. Export is
+    // synchronous: later input can only modify the model after this snapshot.
+    if (Number.isSafeInteger(p && p.saveSnapshotId) && p.saveSnapshotId > 0)
+      post('save-snapshot', { saveSnapshotId: p.saveSnapshotId });
     exportInFlight = true;
     try {
       withInlineMarkupForExport(function () { if (ext === 'docx') repairMoveRangeBookmarks(); xModel.storeToURL('private:stream', props); });
@@ -7335,7 +7378,7 @@ const EXEC = {
     if ((!p || p.paragraphIndex == null) && typeof isImpressDoc === 'function' && isImpressDoc()) {
       const ctx = activeImpressContext();
       const shape = ctx.selectedShape;
-      const sf = shape ? shapeCharFormat(shape) : {};
+      const sf = (shape ? shapeCharFormat(shape) : null) || {};
       const detail = shape ? impressShapeDetail(shape) : null;
       if (detail) detail.shapeIndex = ctx.selectedShapeIndex;
       const w = ctx.slideWidthMm || 280;
@@ -9249,6 +9292,93 @@ const EXEC = {
       revisionCount: (acc && acc.resolved) || 0, remainingInParagraph: left.length,
       text: para2 ? String(para2.getString() || '') : '',
     };
+  },
+  // Lightweight navigation: read native identities without changing the active page/sheet.
+  office_get_navigation() {
+    try {
+      const kind = docKindOf();
+      const items = [];
+      let activeId = null;
+      if (kind === 'calc') {
+        const sheets = xModel.getSheets();
+        activeId = String(ctrl.getActiveSheet().getName());
+        for (let i = 0; i < sheets.getCount(); i++) {
+          const sheet = sheets.getByIndex(i);
+          if (!sheet.getPropertyValue('IsVisible')) continue;
+          const name = String(sheet.getName());
+          items.push({ id: name, name: name });
+        }
+      } else if (kind === 'impress') {
+        const pages = xModel.getDrawPages();
+        const current = ctrl.getCurrentPage();
+        for (let i = 0; i < pages.getCount(); i++) {
+          const page = pages.getByIndex(i);
+          if (unoSameDrawPage(current, page)) activeId = i + 1;
+          items.push({ id: i + 1, name: String(page.getName()),
+            width: Number(page.getPropertyValue('Width')), height: Number(page.getPropertyValue('Height')) });
+        }
+      }
+      return { success: true, kind: kind, items: items, activeId: activeId, documentSeq: docSeq, revision: currentReviewRevision() };
+    } catch (e) { return { success: false, message: errStr(e) }; }
+  },
+  office_activate_item(p) {
+    if (!p || p.documentSeq !== docSeq) return { success: false, message: '文档已切换，请重试' };
+    try {
+      if (isCalcDoc()) {
+        const sheets = xModel.getSheets();
+        if (typeof p.id !== 'string' || !sheets.hasByName(p.id)) return { success: false, message: '工作表不存在' };
+        const sheet = sheets.getByName(p.id);
+        if (!sheet.getPropertyValue('IsVisible')) return { success: false, message: '工作表不可见' };
+        ctrl.setActiveSheet(sheet);
+      } else if (isImpressDoc()) {
+        const pages = xModel.getDrawPages();
+        if (!Number.isInteger(p.id) || p.id < 1 || p.id > pages.getCount()) return slideFail('页码越界');
+        ctrl.setCurrentPage(pages.getByIndex(p.id - 1));
+      } else return { success: false, message: '当前文档不支持此导航' };
+      return EXEC.office_get_navigation();
+    } catch (e) { return { success: false, message: errStr(e) }; }
+  },
+  // Export one draw page directly; resolvePage would move the user's current page.
+  slide_get_thumbnail(p) {
+    if (!p || p.documentSeq !== docSeq) return slideFail('文档已切换，请重试');
+    if (!isImpressDoc()) return slideFail(NOT_PRESENTATION_MSG);
+    const pages = xModel.getDrawPages();
+    const number = Number(p && p.slideNumber);
+    if (!Number.isInteger(number) || number < 1 || number > pages.getCount()) return slideFail('页码越界');
+    const page = pages.getByIndex(number - 1);
+    const width = Math.max(80, Math.min(480, Math.round(Number(p && p.width) || 240)));
+    const pageWidth = Number(page.getPropertyValue('Width'));
+    const pageHeight = Number(page.getPropertyValue('Height'));
+    const height = Math.max(1, Math.round(width * pageHeight / pageWidth));
+    const chunks = [];
+    let total = 0;
+    const sink = zetajs.unoObject([css.io.XOutputStream], {
+      writeBytes(seq) {
+        const bytes = new Uint8Array(seq.buffer ? seq.buffer.slice(seq.byteOffset, seq.byteOffset + seq.byteLength) : seq);
+        chunks.push(bytes); total += bytes.length;
+      },
+      flush() {}, closeOutput() {},
+    });
+    const wasModified = xModel.isModified();
+    exportInFlight = true;
+    try {
+      const exporter = context.getServiceManager().createInstanceWithContext('com.sun.star.drawing.GraphicExportFilter', context);
+      exporter.setSourceDocument(page);
+      const filterData = new zetajs.Any(zetajs.type.sequence(zetajs.type.struct(css.beans.PropertyValue)), [
+        mkProp('PixelWidth', width), mkProp('PixelHeight', height),
+      ]);
+      if (!exporter.filter([mkProp('MediaType', 'image/png'), mkProp('OutputStream', sink), mkProp('FilterData', filterData)]))
+        return slideFail('缩略图导出失败');
+      if (!total) return slideFail('缩略图为空');
+      const bytes = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+      return { success: true, slideNumber: number, width: width, height: height, bytes: bytes, documentSeq: docSeq, revision: currentReviewRevision() };
+    } catch (e) { return slideFail(errStr(e)); }
+    finally {
+      try { if (xModel.isModified() !== wasModified) xModel.setModified(wasModified); } catch (e) {}
+      exportInFlight = false;
+    }
   },
   // [逐段溯源] 表格里的「当前这一格」。段落级用 get_review_context 的
   // paragraphIndex，xlsx 这一条与 pptx 的 slide_get_current 是它的对应物。

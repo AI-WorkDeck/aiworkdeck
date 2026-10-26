@@ -37,5 +37,5 @@ final class DdMessageCenterSupport {
             if (!id.equals(String.valueOf(row.get("id"))) || !read(row)) throw unconfirmed();
         } catch (java.io.IOException e) { throw unconfirmed(); }
     }
-    private static IllegalArgumentException unconfirmed() { return new IllegalArgumentException("通知已读状态未确认，请稍后重试"); }
+    private static IllegalArgumentException unconfirmed() { return new IllegalArgumentException(com.checkba.service.LangText.of("通知已读状态未确认，请稍后重试", "Notification read status was not confirmed; please try again later")); }
 }

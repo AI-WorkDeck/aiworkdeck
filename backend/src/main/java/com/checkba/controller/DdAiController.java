@@ -52,15 +52,16 @@ public class DdAiController {
         Long user = writer(session, projectId);
         String text = content;
         if (file != null && !file.isEmpty()) {
-            if (file.getSize() > 20 * 1024 * 1024) throw new IllegalArgumentException("请导入20MB以内的清单文件");
+            if (file.getSize() > 20 * 1024 * 1024) throw new IllegalArgumentException(LangText.of("请导入20MB以内的清单文件", "Please import a checklist file within 20 MB"));
             String filename = Objects.toString(file.getOriginalFilename(), "").toLowerCase(Locale.ROOT);
-            if (!filename.matches(".*\\.(pdf|docx|doc|xlsx|xls|txt|md|csv)$")) throw new IllegalArgumentException("支持Word、PDF、Excel或文字清单");
+            if (!filename.matches(".*\\.(pdf|docx|doc|xlsx|xls|txt|md|csv)$")) throw new IllegalArgumentException(LangText.of("支持Word、PDF、Excel或文字清单", "Supports Word, PDF, Excel, or text checklists"));
             try (InputStream stream = file.getInputStream()) { text = filename.endsWith(".pdf") ? documents.parsePdf(stream) : documents.parse(stream); }
         }
-        if (text == null || text.isBlank()) throw new IllegalArgumentException("未能读取清单文字，请导入含文字的文件或直接粘贴内容");
-        if (text.length() > 200_000) throw new IllegalArgumentException("清单内容过长，请分轮导入；系统没有截断原文");
-        if (name.isBlank() || name.length() > 200) throw new IllegalArgumentException("清单名称需在1至200字之间");
-        return ai.view(ai.enqueue(projectId, user, "IMPORT", null, null, Map.of("content", text, "name", name.strip()), idempotencyKey));
+        if (text == null || text.isBlank()) throw new IllegalArgumentException(LangText.of("未能读取清单文字，请导入含文字的文件或直接粘贴内容", "Failed to read checklist text; please import a file containing text or paste the content directly"));
+        if (text.length() > 200_000) throw new IllegalArgumentException(LangText.of("清单内容过长，请分轮导入；系统没有截断原文", "Checklist content is too long; please import in batches (original text was not truncated)"));
+        if (name.isBlank() || name.length() > 200) throw new IllegalArgumentException(LangText.of("清单名称需在1至200字之间", "Checklist name must be between 1 and 200 characters"));
+        String resolvedName = "导入的尽调清单".equals(name) ? LangText.of("导入的尽调清单", "Imported Due Diligence Checklist") : name.strip();
+        return ai.view(ai.enqueue(projectId, user, "IMPORT", null, null, Map.of("content", text, "name", resolvedName), idempotencyKey));
     }
 
     @PostMapping("/items/{itemId}/example")
@@ -109,10 +110,10 @@ public class DdAiController {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> invalid(IllegalArgumentException e) {
-        return ResponseEntity.badRequest().body(Map.of("code", 400, "message", Objects.toString(e.getMessage(), "请求参数有误")));
+        return ResponseEntity.badRequest().body(Map.of("code", 400, "message", Objects.toString(e.getMessage(), LangText.of("请求参数有误", "Invalid request parameters"))));
     }
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> accessError(ResponseStatusException e) {
-        return ResponseEntity.status(e.getStatusCode()).body(Map.of("code", e.getStatusCode().value(), "message", Objects.toString(e.getReason(), "无权进行此操作或资源不存在")));
+        return ResponseEntity.status(e.getStatusCode()).body(Map.of("code", e.getStatusCode().value(), "message", Objects.toString(e.getReason(), LangText.of("无权进行此操作或资源不存在", "Permission denied or resource not found"))));
     }
 }

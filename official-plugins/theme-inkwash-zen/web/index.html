@@ -108,25 +108,6 @@
       <div class="swatch"><div class="swatch-dot" style="background:#141312"></div><strong>浓墨夜读</strong><div class="swatch-hex">#141312</div></div>
     </div>
   </div>
-  <script>
-    (function () {
-      function syncHostTheme() {
-        try {
-          var hostDoc = window.parent && window.parent.document && window.parent.document.documentElement;
-          if (!hostDoc) return;
-          var t = hostDoc.getAttribute('data-theme') || 'light';
-          document.documentElement.setAttribute('data-theme', t);
-        } catch (e) {}
-      }
-      syncHostTheme();
-      try {
-        var hostEl = window.parent && window.parent.document && window.parent.document.documentElement;
-        if (hostEl && typeof MutationObserver !== 'undefined') {
-          new MutationObserver(syncHostTheme).observe(hostEl, { attributes: true, attributeFilter: ['data-theme'] });
-        }
-      } catch (e) {}
-    })();
-  </script>
   <script src="/api/plugins/sdk/awd-plugin-sdk.js"></script>
 </body>
 </html>

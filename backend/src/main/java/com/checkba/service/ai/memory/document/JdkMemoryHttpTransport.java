@@ -3,6 +3,7 @@
 
 package com.checkba.service.ai.memory.document;
 
+import com.checkba.service.LangText;
 import org.springframework.stereotype.Component;
 import java.net.URI;
 import java.net.http.*;
@@ -31,9 +32,9 @@ public class JdkMemoryHttpTransport implements MemoryHttpTransport {
             return new Reply(response.statusCode(), response.body());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new MemoryDocumentException(503, "共享记忆请求被中断");
+            throw new MemoryDocumentException(503, LangText.of("共享记忆请求被中断", "Shared memory request was interrupted"));
         } catch (Exception e) {
-            throw new MemoryDocumentException(503, "共享记忆服务暂时不可用");
+            throw new MemoryDocumentException(503, LangText.of("共享记忆服务暂时不可用", "Shared memory service is temporarily unavailable"));
         }
     }
 }

@@ -46,10 +46,7 @@ public class FileController {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FileController.class);
 
     @Autowired
-    private com.checkba.service.mobile.CloudStorageQuotaService cloudStorageQuota;
-
-    @org.springframework.beans.factory.annotation.Value("${storage.subscription-quota.enabled:false}")
-    private boolean subscriptionQuotaEnabled;
+    private com.checkba.service.ProjectFileContentService contentService;
 
     @Autowired
     private StorageServiceFactory storageServiceFactory;
@@ -277,7 +274,8 @@ public class FileController {
     public ResponseEntity<Resource> downloadFile(
             @PathVariable("fileId") String fileId,
             @RequestParam(value = "token", required = false) String token,
-            @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader) {
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader,
+            @RequestParam(value = "inline", defaultValue = "false") boolean inline) {
         log.info("[FileDownload] ===== 开始处理下载请求 =====");
         log.info("[FileDownload] 收到下载请求: fileId={}", fileId);
         
@@ -357,7 +355,7 @@ public class FileController {
             }
 
             String filename = URLEncoder.encode(downloadFilename, StandardCharsets.UTF_8).replace("+", "%20");
-            String contentDisposition = "attachment; filename=\"" + filename + "\"";
+            String contentDisposition = (inline && MediaType.APPLICATION_PDF.equals(mediaType) ? "inline" : "attachment") + "; filename=\"" + filename + "\"";
 
             // Range（dev-board#1025）：返回 200 + Resource 时，Spring MVC（AbstractMessageConverterMethodProcessor）
             // 会按请求的 Range 头自行切成 ResourceRegion 回 206 / 越界回 416 + "bytes */total"，
@@ -368,6 +366,7 @@ public class FileController {
                 return ResponseEntity.ok()
                         .contentType(mediaType)
                         .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                    .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
                         .body(new InputStreamResource(resource.getInputStream()));
             }
 
@@ -375,6 +374,7 @@ public class FileController {
                     .contentType(mediaType)
                     .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                     .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                    .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
                     .body(resource);
         } catch (StorageException e) {
             log.error("[FileDownload] 存储异常: fileId={}, message={}", fileId, e.getMessage());
@@ -420,38 +420,6 @@ public class FileController {
     }
 
     /**
-     * 递归构建文件的逻辑路径（相对于项目根目录）
-     */
-    private String buildLogicalPath(ProjectFile file) {
-        if (file.getParentId() == null) {
-            return "";
-        }
-        
-        StringBuilder pathBuilder = new StringBuilder();
-        ProjectFile current = file;
-        
-        // 向上查找父文件夹，直到根目录
-        // 为防止死循环，设置最大深度
-        int depth = 0;
-        while (current.getParentId() != null && depth < 20) {
-            Optional<ProjectFile> parentOpt = projectFileRepository.findById(current.getParentId());
-            if (parentOpt.isPresent()) {
-                current = parentOpt.get();
-                // 在路径前插入父文件夹名
-                if (pathBuilder.length() > 0) {
-                    pathBuilder.insert(0, "/");
-                }
-                pathBuilder.insert(0, current.getName());
-            } else {
-                break;
-            }
-            depth++;
-        }
-        
-        return pathBuilder.toString();
-    }
-
-    /**
      * 下载 / 上传的目标文件定位：只认数据库数字 id（dev-board#1035）。
      *
      * <p>曾经查不到还会按 wpsFileId 回退，但 wpsFileId 不唯一（清单同步建的行为 null，
@@ -466,40 +434,7 @@ public class FileController {
         }
     }
 
-    /**
-     * 解析上传目标的存储路径：优先用 DB 记录的 filePath；没有则按项目逻辑路径
-     * 生成并回写 DB。首块(save)、追加块(append)、断点查询(getSize) 三处必须用
-     * 同一路径，否则分片会写散。
-     */
-    private String resolveUploadStoragePath(String fileId, Optional<ProjectFile> projectFileOpt) {
-        String storagePath = fileId;
-        if (projectFileOpt.isPresent()) {
-            ProjectFile pf = projectFileOpt.get();
-            if (StringUtils.hasText(pf.getFilePath())) {
-                storagePath = pf.getFilePath();
-            } else {
-                String safeName = StringUtils.hasText(pf.getName()) ? pf.getName() : fileId;
-                if (pf.getFileType() != null && !safeName.endsWith("." + pf.getFileType())) {
-                    safeName += "." + pf.getFileType();
-                }
-                String logicalPath = buildLogicalPath(pf);
-                String basePath = String.format("projects/%d", pf.getProjectId());
-                storagePath = StringUtils.hasText(logicalPath) ?
-                    String.format("%s/%s/%s", basePath, logicalPath, safeName) :
-                    String.format("%s/%s", basePath, safeName);
-
-                pf.setFilePath(storagePath);
-                projectFileRepository.save(pf);
-            }
-        }
-        return storagePath;
-    }
-
-    /**
-     * 上传接口
-     * 不在控制器方法层挂 @Transactional：流式读取客户端上传流并写盘（save/append）耗时与网络/文件大小成正比，
-     * 全程持事务会把数据库连接占满；配额校验与元数据落库由各自 Service/Repository 的短事务独立完成。
-     */
+    /** Upload reception stays outside transactions and the version lock; publication uses the content service. */
     @PostMapping("/{fileId}/upload")
     public ResponseEntity<Map<String, Object>> uploadFile(
             @PathVariable("fileId") String fileId,
@@ -588,123 +523,51 @@ public class FileController {
                 inputStream = request.getInputStream();
             }
 
-            // 1. 确定存储路径
-            // ... (Existing path logic, keep simplified for brevity in this replace block if possible, but I need to be careful not to delete logic)
-            // Wait, replace_file_content replaces a block. I should probably use multi_replace to be precise or rewrite the whole method carefully.
-            // I will rewrite the logic to use `append` if offset > 0.
+            String sid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
+            Long actor = AuthController.getUserIdFromSession(sid);
+            long incoming = multipartFile != null ? multipartFile.getSize() : request.getContentLengthLong();
+            var published = contentService.upload(projectFileOpt.get().getId(), projectFileOpt.get().getProjectId(),
+                    actor, inputStream, incoming, offset, "1".equals(request.getParameter("mustExist")),
+                    request.getHeader("X-File-Total-Size"));
 
-            // 1. 确定存储路径（首块与追加块必须解析到同一路径：此前追加块直接用
-            // 裸 wpsFileId 作路径，>5MB 文件的第 2+ 块被追加到存储根的孤儿文件里，
-            // 正式路径上只剩首块 5MB —— 下载得到截断的 zip，文档加载失败）
-            if (subscriptionQuotaEnabled) {
-                long incoming = multipartFile != null ? multipartFile.getSize() : request.getContentLengthLong();
-                if (incoming < 0) throw new IllegalArgumentException("Cloud uploads require Content-Length");
-                ProjectFile target = projectFileOpt.get();
-                cloudStorageQuota.requireFileCapacity(target, incoming, offset != null && offset > 0);
-            }
-            // Quota admission refreshes the managed row after locking its owner, so resolve the path now.
-            String storagePath = resolveUploadStoragePath(fileId, projectFileOpt);
-            String savedPath;
-            if (offset != null && offset > 0) {
-                 // 追加模式
-                 savedPath = getStorageService().append(storagePath, inputStream);
-            } else {
-                 // 覆盖/新传模式
-                 savedPath = getStorageService().save(storagePath, inputStream);
-            }
-
-            if (subscriptionQuotaEnabled) {
-                ProjectFile target = projectFileOpt.get();
-                target.setFileSize(getStorageService().getSize(savedPath));
-                projectFileRepository.saveAndFlush(target);
-            }
-
-            // 检查是否完成上传并触发RAG (Async)
-            // uploadComplete 同时复用为版本变更信号的完成判定：分片上传时，"上传成功"
-            // 指整个文件传完，而不是某一片落盘，避免几百个分片各发一次信号。
-            // 无 X-File-Total-Size 头的普通（非分片）上传路径不受影响，视为一次性完成。
-            boolean uploadComplete = true;
-            String totalSizeStr = request.getHeader("X-File-Total-Size");
-            if (StringUtils.hasText(totalSizeStr)) {
-                uploadComplete = false;
+            // The executor may use CallerRunsPolicy. All indexing, notifications and version signals
+            // are intentionally submitted only after publication has released the canonical lock.
+            if (published.postProcess()) {
                 try {
-                    long totalSize = Long.parseLong(totalSizeStr);
-                    long currentSize = getStorageService().getSize(savedPath); // Need to ensure savedPath works for getSize, usually it takes key?
-                    // LocalFileStorageService.getSize implementation takes key (filePath).
-                    // Wait, getStorageService().save returns the key (path). so savedPath is the key.
-
-                    uploadComplete = currentSize >= totalSize;
-                    if (uploadComplete) {
-                         if (projectFileOpt.isPresent()) {
-                             Long pid = projectFileOpt.get().getProjectId();
-                             // Async execution on bounded executor to prevent blocking 408 Timeout or exhausting ForkJoinPool.commonPool
-                             java.util.concurrent.CompletableFuture.runAsync(() -> {
-                                 try {
-                                     log.info("触发异步RAG索引: projectId={}, file={}", pid, savedPath);
-                                     projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(pid), savedPath);
-                                     
-                                     // 触发自动打标签
-                                     try {
-                                         autoTaggingService.autoTagFile(pid, projectFileOpt.get().getId(), savedPath, projectFileOpt.get().getUserId());
-                                     } catch (Exception e) {
-                                         log.error("AutoTag failed", e);
-                                     }
-                                 } catch (Exception e) {
-                                     log.error("Async RAG indexing failed for file: " + savedPath, e);
-                                 }
-                             }, asyncExecutor());
-                         }
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to check completion for RAG trigger", e);
-                }
-            } else {
-                // Compatibility: If no header, trigger for first chunk (Legacy behavior, but Async now)
-                if ((offset == null || offset == 0) && projectFileOpt.isPresent()) {
-                     Long pid = projectFileOpt.get().getProjectId();
-                     java.util.concurrent.CompletableFuture.runAsync(() -> {
-                         try {
-                              projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(pid), savedPath);
-                              
-                              // 触发自动打标签 (Legacy)
-                              try {
-                                  autoTaggingService.autoTagFile(pid, projectFileOpt.get().getId(), savedPath, projectFileOpt.get().getUserId());
-                              } catch (Exception e) {
-                                  log.error("AutoTag (Legacy) failed", e);
-                              }
-                         } catch (Exception e) {
-                              log.error("Async RAG (Legacy) failed", e);
-                         }
-                     }, asyncExecutor());
+                    java.util.concurrent.CompletableFuture.runAsync(() -> {
+                        try {
+                            projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(published.file().getProjectId()), published.path());
+                            try {
+                                autoTaggingService.autoTagFile(published.file().getProjectId(), published.file().getId(),
+                                        published.path(), published.file().getUserId());
+                            } catch (Exception e) { log.error("AutoTag failed", e); }
+                        } catch (Exception e) { log.error("Async RAG indexing failed for file: " + published.path(), e); }
+                    }, asyncExecutor());
+                } catch (RuntimeException e) {
+                    log.warn("文件内容已保存，未能提交索引/标签任务: fileId={}", published.file().getId(), e);
                 }
             }
-
-            if (uploadComplete && projectFileOpt.isPresent()) {
-                String sid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
-                signalChange(projectFileOpt.get().getProjectId(), AuthController.getUserIdFromSession(sid), AuthController.getUsernameFromSession(sid));
-                // 覆盖保存也是修改：此前这条路径只写字节、不动文件行，于是编辑器自动保存
-                // 一整天，ProjectFile.updatedAt 仍停在建文件那一刻——项目列表的「最近修改」
-                // 因此永远等于创建日期。挂在 uploadComplete 上而不是每一片，分片上传只写一次。
-                try {
-                    ProjectFile touched = projectFileOpt.get();
-                    touched.setUpdatedAt(java.time.LocalDateTime.now());
-                    try {
-                        long size = getStorageService().getSize(savedPath);
-                        if (size > 0) touched.setFileSize(size);
-                    } catch (Exception ignored) {
-                        // 取不到大小不影响「改过了」这件事，时间照写
-                    }
-                    projectFileRepository.save(touched);
-                } catch (Exception e) {
-                    // 字节已经落盘，元数据没记上不该让整个上传报失败
-                    log.warn("上传完成后回写文件修改时间失败: fileId={}", fileId, e);
-                }
+            if (published.complete()) {
+                signalChange(published.file().getProjectId(), actor, AuthController.getUsernameFromSession(sid));
             }
 
             Map<String, Object> result = new HashMap<>();
             result.put("code", 0);
             return ResponseEntity.ok(result);
 
+        } catch (com.checkba.service.ProjectFileContentService.ContentWriteException e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("code", -1); error.put("message", e.getMessage());
+            if (e.reason() != null) error.put("reason", e.reason());
+            if (e.status() == 423 && "VERSION_BUSY".equals(e.reason())) error.put("writeState", "not_started");
+            return ResponseEntity.status(e.status()).body(error);
+        } catch (com.checkba.version.VersionException e) {
+            // Pre-publication lock rejection was translated by the content service. A version
+            // exception from inside publication may follow a disk write and has an unknown outcome.
+            log.warn("Content publication failed in version coordination", e);
+            return ResponseEntity.status(500)
+                    .body(Map.of("code", -1, "message", e.isUserFacing() ? e.getMessage()
+                            : com.checkba.service.LangText.of("保存失败，请重试", "Save failed; please retry")));
         } catch (Exception e) {
             log.error("上传失败", e);
             // e.getMessage() 可能为 null（如 JVM fast-throw 优化后的 NPE），

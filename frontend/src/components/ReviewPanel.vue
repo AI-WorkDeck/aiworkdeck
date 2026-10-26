@@ -336,6 +336,7 @@ export default {
       // 第一次读成功之前两份清单都算「还没读」，空态与计数不渲染（BUG-39）。
       // 读失败不置位——同 reload() 的「读失败不许清零」。
       revLoaded: false, cmtLoaded: false,
+      revisionsTruncated: null, commentsTruncated: null,
       // 批注回复（BUG-37）：同一时刻只展开一张卡片的回复框，按批注 id 认。
       replyingId: null, replyText: '',
       authorFilter: 'all',
@@ -384,7 +385,8 @@ export default {
       ]
     },
     listLimitReached() {
-      return this.tab === 'rev' ? this.revisions.length >= 500 : this.tab === 'cmt' && this.comments.length >= 500
+      return this.tab === 'rev' ? (this.revisionsTruncated ?? this.revisions.length >= 500)
+        : this.tab === 'cmt' && (this.commentsTruncated ?? this.comments.length >= 500)
     },
     activeCardId() {
       const loc = this.documentLocation || {}
@@ -614,7 +616,11 @@ export default {
     //    越忙越读不回来。在飞时只记一笔 _again，收尾时补跑一次——最后一次触发
     //    一定被读到（照 useEvidenceAnchors 的 state.recheck 写法）。
     async reload() {
-      if (!this.executor) { this.revisions = []; this.comments = []; return }
+      if (!this.executor) {
+        this.revisions = []; this.comments = []
+        this.revisionsTruncated = false; this.commentsTruncated = false
+        return
+      }
       if (this._loading) { this._again = true; return }
       this._loading = true
       try {
@@ -623,12 +629,14 @@ export default {
           const [rv, cm] = await Promise.all([this.run('list_revisions', { limit: 500 }), this.run('list_comments', { limit: 500 })])
           if (rv) {
             this.revisions = rv.revisions || []
+            this.revisionsTruncated = typeof rv.truncated === 'boolean' ? rv.truncated : null
             this.reviewRevision = rv.revision ?? null
             this.reviewDocumentSeq = rv.documentSeq ?? null
             this.revLoaded = true
           }
           if (cm) {
             this.comments = (cm.comments || []).map(c => ({ ...c, revision: cm.revision, documentSeq: cm.documentSeq }))
+            this.commentsTruncated = typeof cm.truncated === 'boolean' ? cm.truncated : null
             this.cmtLoaded = true
           }
         } while (this._again)
@@ -773,7 +781,10 @@ export default {
     // 走引擎已有的 reply_comment（父批注同一锚点上追加一条「回复 X：」批注）。
     // asUser：按当前登录用户署名，不署 AI WorkDeck。
     async submitReply(c) {
-      const text = String(this.replyText || '').trim()
+      // uni textarea throttles v-model by 100ms. A fast send must include the
+      // current visible draft, even before that trailing model update arrives.
+      const input = this.$el?.querySelector?.('.rp-reply textarea')
+      const text = String(input?.value ?? this.replyText ?? '').trim()
       if (!text) return
       const res = await this.run('reply_comment', { id: c.id, index: c.index, text, asUser: true })
       if (!res) return // 失败已写进红条；回复框留着，草稿不丢

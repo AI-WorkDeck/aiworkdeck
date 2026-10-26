@@ -5,9 +5,9 @@
 import { t } from '@/i18n'
 
 export const CLIPBOARD_TYPE_META = {
-  TEXT: { label: t('config.clipboardTypes.text'), tone: 'neutral' },
-  IMAGE: { label: t('config.clipboardTypes.image'), tone: 'info' },
-  FILE: { label: t('config.clipboardTypes.file'), tone: 'info' },
+  TEXT: { get label() { return t('config.clipboardTypes.text') }, tone: 'neutral' },
+  IMAGE: { get label() { return t('config.clipboardTypes.image') }, tone: 'info' },
+  FILE: { get label() { return t('config.clipboardTypes.file') }, tone: 'info' },
 }
 
 export function getClipboardTypeMeta(type) {

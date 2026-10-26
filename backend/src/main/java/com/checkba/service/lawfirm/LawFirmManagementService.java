@@ -27,6 +27,7 @@ import com.checkba.repository.lawfirm.LawFirmCollectionRepository;
 import com.checkba.repository.lawfirm.LawFirmConflictClearanceRepository;
 import com.checkba.repository.lawfirm.LawFirmInvoiceRepository;
 import com.checkba.repository.lawfirm.LawFirmMatterIntakeRepository;
+import com.checkba.service.LangText;
 import com.checkba.service.ai.PluginService;
 import com.checkba.service.im.ImService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -120,7 +121,7 @@ public class LawFirmManagementService {
                     "filename", "lawfirm-finance-ledger-" + LocalDate.now() + ".csv"
             );
             case "seedDemo", "seedDemoData" -> seedDemoData(effectiveUserId, params);
-            default -> throw new IllegalArgumentException("不支持的律所管理操作：" + act);
+            default -> throw new IllegalArgumentException(LangText.of("不支持的律所管理操作：", "Unsupported law firm management action: ") + act);
         };
     }
 
@@ -288,7 +289,7 @@ public class LawFirmManagementService {
         Map<Long, String> userNames = loadUserDisplayNames();
         LawFirmMatterIntake intake = buildDraftIntakeFromParams(userId, projectId, params, userNames);
         if (intake.getClientName() == null || intake.getClientName().isBlank()) {
-            throw new IllegalArgumentException("请填写委托人名称");
+            throw new IllegalArgumentException(LangText.of("请填写委托人名称", "Please enter the client name"));
         }
         if (intake.getTitle() == null || intake.getTitle().isBlank()) {
             intake.setTitle(intake.getClientName() + "专项法律服务项目");
@@ -379,22 +380,22 @@ public class LawFirmManagementService {
             clearanceId = longVal(params.get("id"));
         }
         if (clearanceId == null) {
-            throw new IllegalArgumentException("缺少利冲征询单编号 clearanceId");
+            throw new IllegalArgumentException(LangText.of("缺少利冲征询单编号 clearanceId", "Missing conflict clearance ID (clearanceId)"));
         }
         final Long clearanceIdRef = clearanceId;
         LawFirmConflictClearance clearance = clearanceRepository.findById(clearanceIdRef)
-                .orElseThrow(() -> new IllegalArgumentException("利冲征询单不存在：" + clearanceIdRef));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("利冲征询单不存在：", "Conflict clearance not found: ") + clearanceIdRef));
         // 放行权属于被征询的承办律师本人：别人不能替他点「同意」。
         if (!canActFor(userId, clearance.getTargetUserId())) {
-            throw new IllegalStateException("只有被征询的承办律师本人可以处理这条利冲征询");
+            throw new IllegalStateException(LangText.of("只有被征询的承办律师本人可以处理这条利冲征询", "Only the consulted lawyer can respond to this conflict clearance"));
         }
         if (!"PENDING".equalsIgnoreCase(clearance.getDecision())) {
-            throw new IllegalStateException("这条利冲征询已处理，不能重复放行");
+            throw new IllegalStateException(LangText.of("这条利冲征询已处理，不能重复放行", "This conflict clearance has already been processed"));
         }
 
         String decision = string(params, "decision", "APPROVED").toUpperCase(Locale.ROOT);
         if (!Set.of("APPROVED", "APPROVED_WITH_WALL", "REJECTED").contains(decision)) {
-            throw new IllegalArgumentException("放行决定无效，须为 APPROVED / APPROVED_WITH_WALL / REJECTED");
+            throw new IllegalArgumentException(LangText.of("放行决定无效，须为 APPROVED / APPROVED_WITH_WALL / REJECTED", "Invalid clearance decision; must be APPROVED / APPROVED_WITH_WALL / REJECTED"));
         }
         String comment = string(params, "comment", "");
         Boolean wallRequested = boolVal(params.get("ethicalWallApplied"));
@@ -409,7 +410,7 @@ public class LawFirmManagementService {
 
         final Long parentIntakeId = clearance.getIntakeId();
         LawFirmMatterIntake intake = intakeRepository.findById(parentIntakeId)
-                .orElseThrow(() -> new IllegalArgumentException("关联收案申请不存在：" + parentIntakeId));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("关联收案申请不存在：", "Associated matter intake not found: ") + parentIntakeId));
 
         if ("APPROVED_WITH_WALL".equals(decision) || Boolean.TRUE.equals(wallRequested)) {
             intake.setEthicalWallApplied(true);
@@ -469,24 +470,24 @@ public class LawFirmManagementService {
             intakeId = longVal(params.get("id"));
         }
         if (intakeId == null) {
-            throw new IllegalArgumentException("缺少收案申请编号 intakeId");
+            throw new IllegalArgumentException(LangText.of("缺少收案申请编号 intakeId", "Missing matter intake ID (intakeId)"));
         }
         final Long intakeIdRef = intakeId;
         LawFirmMatterIntake intake = intakeRepository.findById(intakeIdRef)
-                .orElseThrow(() -> new IllegalArgumentException("收案申请不存在：" + intakeIdRef));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("收案申请不存在：", "Matter intake not found: ") + intakeIdRef));
 
         String decision = string(params, "decision", "APPROVE_AND_FILE").toUpperCase(Locale.ROOT);
         boolean rejecting = Set.of("REJECT", "REJECTED", "REJECTED_CONFLICT").contains(decision);
         if (!rejecting && !"APPROVE_AND_FILE".equals(decision)) {
-            throw new IllegalArgumentException("终审决定无效，须为 APPROVE_AND_FILE / REJECT");
+            throw new IllegalArgumentException(LangText.of("终审决定无效，须为 APPROVE_AND_FILE / REJECT", "Invalid final review decision; must be APPROVE_AND_FILE / REJECT"));
         }
         if (Set.of("APPROVED_FILED", "REJECTED_CONFLICT", "CLOSED").contains(intake.getStatus())) {
-            throw new IllegalStateException("该收案申请已终结（" + intake.getStatus() + "），不能重复终审");
+            throw new IllegalStateException(LangText.of("该收案申请已终结（" + intake.getStatus() + "），不能重复终审", "This matter intake has already been finalized (" + intake.getStatus() + ")"));
         }
         // 利冲委员人人可当，但团队服务器上不能终审自己提交或自己主办的申请（自我审查无意义）。
         if (!localMode && (Objects.equals(intake.getApplicantUserId(), userId)
                 || Objects.equals(intake.getLeadLawyerUserId(), userId))) {
-            throw new IllegalStateException("申请人或主办律师不能终审自己的收案申请，请由其他利冲委员审查");
+            throw new IllegalStateException(LangText.of("申请人或主办律师不能终审自己的收案申请，请由其他利冲委员审查", "The applicant or lead lawyer cannot finalize their own intake; please have another conflict committee member review it"));
         }
         String comment = string(params, "comment", "");
         Boolean ethicalWall = boolVal(params.get("ethicalWallApplied"));
@@ -536,8 +537,9 @@ public class LawFirmManagementService {
         // 1. 红色直接利益冲突/常顾对抗冲突：原则上禁止直接立案，除非上传双方客户书面豁免函并启用隔离墙
         if ("RED".equalsIgnoreCase(intake.getConflictRiskLevel())
                 && !Boolean.TRUE.equals(intake.getClientWaiverUploaded())) {
-            throw new IllegalStateException(
-                    "直接利益冲突（红色预警）原则上禁止立案；若属法定豁免情形，必须上传双方当事人书面豁免函并启用信息隔离墙");
+            throw new IllegalStateException(LangText.of(
+                    "直接利益冲突（红色预警）原则上禁止立案；若属法定豁免情形，必须上传双方当事人书面豁免函并启用信息隔离墙",
+                    "Direct conflict of interest (RED alert) cannot be filed in principle; if a statutory exemption applies, written waivers from both parties must be uploaded and an ethical wall enabled"));
         }
 
         // 2. 校验所有关联案件承办律师均已放行
@@ -548,7 +550,7 @@ public class LawFirmManagementService {
                 .anyMatch(c -> !"APPROVED".equalsIgnoreCase(c.getDecision())
                         && !"APPROVED_WITH_WALL".equalsIgnoreCase(c.getDecision()));
         if (unCleared) {
-            throw new IllegalStateException("尚有关联案件承办律师未放行，无法完成立案终审");
+            throw new IllegalStateException(LangText.of("尚有关联案件承办律师未放行，无法完成立案终审", "Cannot complete final filing review while related case lawyers have not granted clearance"));
         }
 
         if (intake.getClearedAt() == null) {
@@ -614,7 +616,7 @@ public class LawFirmManagementService {
 
         Long amountCents = centsFromParams(params, "amountCents", "amountYuan");
         if (amountCents == null || amountCents <= 0) {
-            throw new IllegalArgumentException("开票含税金额必须大于 0");
+            throw new IllegalArgumentException(LangText.of("开票含税金额必须大于 0", "Invoice tax-inclusive amount must be greater than 0"));
         }
         int taxRateBps = intVal(params.get("taxRateBps"), 600);
         long netAmountCents = Math.round(amountCents * 10000.0 / (10000.0 + taxRateBps));
@@ -652,10 +654,10 @@ public class LawFirmManagementService {
                 intake != null ? intake.getClientCreditCode() : null);
         String invoiceType = string(params, "invoiceType", "DIGITAL_SPECIAL");
         if (!Set.of("DIGITAL_SPECIAL", "DIGITAL_NORMAL", "VAT_SPECIAL", "VAT_NORMAL").contains(invoiceType)) {
-            throw new IllegalArgumentException("发票类型无效");
+            throw new IllegalArgumentException(LangText.of("发票类型无效", "Invalid invoice type"));
         }
         if (invoiceType.endsWith("_SPECIAL") && (buyerTaxId == null || buyerTaxId.isBlank())) {
-            throw new IllegalArgumentException("专用发票必须填写购买方纳税人识别号");
+            throw new IllegalArgumentException(LangText.of("专用发票必须填写购买方纳税人识别号", "Special VAT invoice requires the buyer's taxpayer identification number"));
         }
         String issuedNumber = string(params, "invoiceNumber", "");
         boolean issueNow = !issuedNumber.isBlank()
@@ -709,19 +711,19 @@ public class LawFirmManagementService {
             invoiceId = longVal(params.get("id"));
         }
         if (invoiceId == null) {
-            throw new IllegalArgumentException("缺少发票申请单编号 invoiceId");
+            throw new IllegalArgumentException(LangText.of("缺少发票申请单编号 invoiceId", "Missing invoice application ID (invoiceId)"));
         }
         final Long invoiceIdRef = invoiceId;
         LawFirmInvoice invoice = invoiceRepository.findById(invoiceIdRef)
-                .orElseThrow(() -> new IllegalArgumentException("发票申请单不存在：" + invoiceIdRef));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("发票申请单不存在：", "Invoice application not found: ") + invoiceIdRef));
         if (!"PENDING_APPROVAL".equals(invoice.getStatus())) {
-            throw new IllegalStateException("只有待开票的申请可以登记开票，当前状态：" + invoice.getStatus());
+            throw new IllegalStateException(LangText.of("只有待开票的申请可以登记开票，当前状态：", "Only pending invoice applications can be issued; current status: ") + invoice.getStatus());
         }
 
         // 发票号码来自税务平台/开票系统；若手动登记时显式要求严格校验则校验非空。
         String invoiceNumber = firstNonBlank(string(params, "invoiceNumber", null), invoice.getInvoiceNumber());
         if (invoiceNumber == null || invoiceNumber.isBlank()) {
-            throw new IllegalArgumentException("请填写开票系统返回的发票号码（数电票为 20 位号码）");
+            throw new IllegalArgumentException(LangText.of("请填写开票系统返回的发票号码（数电票为 20 位号码）", "Please enter the invoice number returned by the billing system (20 digits for digital invoices)"));
         }
         Instant issuedAt = parseInstantOrDefault(params.get("issuedAt"), Instant.now());
         invoice.setIssuedAt(issuedAt);
@@ -747,10 +749,10 @@ public class LawFirmManagementService {
         if (invoiceId == null) {
             invoiceId = longVal(params.get("id"));
         }
-        if (invoiceId == null) throw new IllegalArgumentException("缺少发票申请单编号 invoiceId");
+        if (invoiceId == null) throw new IllegalArgumentException(LangText.of("缺少发票申请单编号 invoiceId", "Missing invoice application ID (invoiceId)"));
         final Long voidId = invoiceId;
         LawFirmInvoice invoice = invoiceRepository.findById(voidId)
-                .orElseThrow(() -> new IllegalArgumentException("发票申请单不存在：" + voidId));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("发票申请单不存在：", "Invoice application not found: ") + voidId));
         String mode = string(params, "mode", "VOIDED");
         invoice.setStatus("RED_INVOICED".equalsIgnoreCase(mode) ? "RED_INVOICED" : "VOIDED");
         invoice.setUpdatedAt(Instant.now());
@@ -762,7 +764,7 @@ public class LawFirmManagementService {
     public Map<String, Object> recordCollection(Long userId, Map<String, Object> params) {
         Long amountCents = centsFromParams(params, "amountCents", "amountYuan");
         if (amountCents == null || amountCents <= 0) {
-            throw new IllegalArgumentException("到账实收金额必须大于 0");
+            throw new IllegalArgumentException(LangText.of("到账实收金额必须大于 0", "Collected payment amount must be greater than 0"));
         }
 
         Long invoiceId = longVal(params.get("invoiceId"));
@@ -843,12 +845,12 @@ public class LawFirmManagementService {
 
         if (invoice != null) {
             if (Set.of("VOIDED", "RED_INVOICED").contains(invoice.getStatus())) {
-                throw new IllegalStateException("该发票已作废或红冲，不能再核销回款");
+                throw new IllegalStateException(LangText.of("该发票已作废或红冲，不能再核销回款", "This invoice has been voided or red-invoiced and cannot be reconciled"));
             }
             long prev = invoice.getCollectedAmountCents() != null ? invoice.getCollectedAmountCents() : 0L;
             long remaining = Math.max(0L, (invoice.getAmountCents() == null ? 0L : invoice.getAmountCents()) - prev);
             if (amountCents > remaining) {
-                throw new IllegalArgumentException("核销金额超过该发票待收余额（剩余 " + formatYuan(remaining) + " 元）");
+                throw new IllegalArgumentException(LangText.of("核销金额超过该发票待收余额（剩余 " + formatYuan(remaining) + " 元）", "Reconciliation amount exceeds the remaining invoice balance (" + formatYuan(remaining) + " CNY remaining)"));
             }
         }
 
@@ -927,9 +929,9 @@ public class LawFirmManagementService {
     public Map<String, Object> confirmErpSync(Long userId, Map<String, Object> params) {
         Object raw = params.get("records");
         if (!(raw instanceof List<?> records) || records.isEmpty()) {
-            throw new IllegalArgumentException("缺少 ERP 回执记录 records");
+            throw new IllegalArgumentException(LangText.of("缺少 ERP 回执记录 records", "Missing ERP receipt records (records)"));
         }
-        if (records.size() > 1000) throw new IllegalArgumentException("单次回执最多 1000 条");
+        if (records.size() > 1000) throw new IllegalArgumentException(LangText.of("单次回执最多 1000 条", "Up to 1000 receipt records per request"));
         int invoicesConfirmed = 0, collectionsConfirmed = 0;
         List<String> notFound = new ArrayList<>();
         for (Object item : records) {
@@ -1160,7 +1162,7 @@ public class LawFirmManagementService {
             }
         }
         for (Project p : allProjects) {
-            if (p.getUserId() != null && !p.isLooseFileWorkspace()) {
+            if (p.getUserId() != null && !p.isLooseFileWorkspace() && !p.isScratchWorkspace()) {
                 unitNameMap.putIfAbsent(p.getUserId(), userNames.getOrDefault(p.getUserId(), "项目律师#" + p.getUserId()));
             }
         }

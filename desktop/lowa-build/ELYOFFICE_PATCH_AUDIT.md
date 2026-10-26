@@ -23,7 +23,8 @@ AI WorkDeck operates a dual-track LibreOffice evolution strategy:
 
 - **Tier A — Immediate Port to `desktop/lowa-build` (14 patches)**:
   - `0002`, `0005`, `0006`, `0008`, `0009`, `0010`, `0011`, `0013`, `0043`, `0045`, `0048`, `0049`, `0050`, `0051`
-  - Curated verbatim under `desktop/lowa-build/upstream/elyoffice/` and integrated into `desktop/lowa-build/patches/apply-source-patches.py`.
+  - Curated verbatim under `desktop/lowa-build/upstream/elyoffice/`. This is a classification, not proof that every patch is in the shipped engine.
+  - As checked on 2026-10-26, `apply-source-patches.py` implements the adaptations for `0002`, `0005`, `0006`, `0008`, `0009`, `0010`, `0011`, `0013`, `0048`; `0043`, `0045`, `0049`, `0050`, `0051` remain archived candidates, without an application function/call in that script. The r6 recipe records its actual build evidence. See [the follow-up rebuild review](REBUILD-2026-10-26.md) before adding more patches.
 - **Tier B — Native LOK Sidecar Specific / Track 2 (37 patches)**:
   - **Tier B1 (Native OS Tile Painting & Event Loop — 6 patches)**: `0001`, `0007`, `0015`, `0033`, `0039`, `0044`
   - **Tier B2 (LOK Tile/Panel/Calc/Impress State & JSON Bridges — 31 patches)**: `0003`, `0004`, `0012`, `0014`, `0016`–`0032`, `0034`–`0038`, `0040`–`0042`, `0046`–`0047`

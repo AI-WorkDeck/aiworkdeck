@@ -1,0 +1,15 @@
+{
+  "plugin.name": "منصة عمل تقييم أثر حماية البيانات",
+  "plugin.description": "تقييم أثر حماية البيانات: تتبع المصدر، وتأكيد الوقائع، والمتابعة عبر الأسئلة والأجوبة، والمخاطر والمعالجة، وإعادة التقييم المستمر، والتقارير ذات الإصدارات. مُكيَّف من منصة عمل DPIA لـ Zhu Lingfeng الخاصة بـ DSH؛ يتطلب Node.js وPython وLibreOffice.",
+  "plugin.author": "AI WorkDeck (المصدر الأصلي: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "ملف Node.js التنفيذي",
+  "setting.nodePath.description": "اتركه فارغًا لاستخدام node من مسار النظام PATH؛ يتطلب Node.js إصدار 20 أو أحدث.",
+  "setting.pythonPath.label": "ملف Python التنفيذي",
+  "setting.pythonPath.description": "يتطلب اعتماديات المستند من runtime/requirements.txt؛ يمكن تحديد مسار Python من بيئة افتراضية.",
+  "setting.pdfFontPath.label": "ملف خط PDF للغات الصينية واليابانية والكورية (CJK)",
+  "setting.pdfFontPath.description": "تتطلب تعبئة النصوص باللغات CJK في قوالب PDF أصلية خطًا من نوع TrueType قابلًا للتضمين (TTF/TTC)؛ اتركه فارغًا لاستخدام البحث عن خطوط النظام.",
+  "setting.sofficePath.label": "ملف LibreOffice التنفيذي",
+  "setting.sofficePath.description": "مطلوب فقط لتصدير التقارير بصيغة PDF ومعاينة الصفحات؛ اتركه فارغًا لتجربة المواقع الافتراضية للنظام.",
+  "tool.dpia_workbench_action.description": "قضية DPIA والمواد وتأكيد الوقائع والأسئلة والأجوبة وحالة التنفيذ وعمليات التقارير. لواجهة منصة العمل فقط؛ يجب على الذكاء الاصطناعي عدم استدعاء مداخل التأكيد/الموافقة اليدوية.",
+  "tool.dpia_workbench_task.description": "تنفيذ مهام DPIA المجمَّدة حاليًا: السياق/القراءة/الكتابة/البرمجة النصية/الاعتماد/التقرير؛ محدَّد بدقة بمخرجات المشروع والقضية للمستخدم الحالي."
+}

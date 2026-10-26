@@ -1,0 +1,6 @@
+{
+  "plugin.name": "Takvim",
+  "plugin.description": "Projeler arası takvim, görevler, hatırlatıcılar ve dosya bağlantıları.",
+  "view.sidebar.name": "Takvim",
+  "view.main.name": "Takvim"
+}
