@@ -38,7 +38,7 @@ public final class LangText {
         // Early desktop requests already resolved the language from the lightweight store.
         // Honor their scope before asking a Spring service whose repository may still be starting.
         String scoped = AppLanguageScope.current();
-        if (scoped != null) return AppLanguageService.EN_US.equals(scoped);
+        if (scoped != null) return !AppLocale.fromCode(scoped).isChinese();
         AppLanguageService svc = languageService;
         if (svc == null) return false;
         try {
@@ -50,6 +50,8 @@ public final class LangText {
     }
 
     public static String localeCode() {
+        String scoped = AppLanguageScope.current();
+        if (scoped != null) return AppLocale.fromCode(scoped).code();
         AppLanguageService svc = languageService;
         if (svc == null) return AppLanguageService.ZH_CN;
         try {
