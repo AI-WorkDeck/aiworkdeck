@@ -330,6 +330,7 @@ test('invalid or stale permission update cannot alter model and failed acknowled
 
 test('document commands use session authority and writable bookmarks join the undo lineage',async()=>{
   const {session}=opened();session.revision=42
+  session.review={revision:42,items:[],hydratedCount:0}
   const calls=[];let edits=0
   session.uno={call:async(action,params)=>{calls.push({action,params});return {success:true,revision:params.nativeRevision}}}
   session.undo.edit=async run=>{edits++;return run()}
@@ -353,6 +354,7 @@ test('readonly document searches and navigation cannot request writable bookmark
 })
 test('failed final-view restoration blocks future document writes and does not retry',async()=>{
   const {session}=opened();let reads=0
+  session.review={revision:0,items:[],hydratedCount:0}
   session.unoCall=async()=>{reads++;throw Error('FINAL_TEXT_RESTORE_FAILED: enableSetModified')}
   await assert.rejects(session.execute('get_document_text',{__agent:true}),/FINAL_TEXT_RESTORE_FAILED/)
   await assert.rejects(session.execute('native_input',{action:'input_text',params:{documentEpoch:7,text:'no'}}),/FINAL_TEXT_RESTORE_FAILED/)
@@ -493,6 +495,64 @@ test('text state-only change and evidence no-op use separate trusted undo proofs
   await session.execute('adopt_legacy_links')
   await session.execute('set_selection_hyperlink',{url:'https://example.test'})
   assert.deepEqual(noop,[true,true,false]);assert.equal(events.filter(e=>e.type==='modified').length,2)
+})
+
+test('review suggestion refusal is nonfatal only with a verified unchanged receipt',async()=>{
+  const {session}=opened();session.revision=4
+  const result={success:false,reason:'stale',changed:false,textChanged:false,trackingChanged:false}
+  session.unoCall=async()=>result
+  let noops=0
+  session.undo.edit=async(run,options)=>{const value=await run();assert.equal(options.isNoop(value),true);noops++;return value}
+  assert.deepEqual(await session.execute('apply_review_edit',{revision:3}),{...result,revision:4})
+  assert.equal(session.failure,undefined);assert.equal(noops,1);assert.equal(session.revision,4)
+  result.changed=true
+  await assert.rejects(session.execute('apply_review_edit',{revision:4}),/EDIT_OUTCOME_UNKNOWN/)
+  assert.ok(session.failure)
+})
+
+test('review suggestion advances revision after a verified edit and enforces readonly and epoch',async()=>{
+  const {session}=opened();session.revision=4
+  session.unoCall=async()=>({success:true,changed:true,textChanged:true,trackingChanged:false,revision:4})
+  const result=await session.execute('apply_review_edit',{revision:4})
+  assert.equal(result.revision,5);assert.equal(session.revision,5)
+  await assert.rejects(session.execute('apply_review_edit',{documentSeq:6}),/STALE_DOCUMENT/)
+  const {session:readonly}=opened(true)
+  await assert.rejects(readonly.execute('apply_review_edit'),{code:'READ_ONLY'})
+})
+
+test('non-agent review context uses the existing verified final-view callback guard',async()=>{
+  const {session}=opened(true)
+  const item={revisionId:'1',identifier:'uno-1',author:'A',type:'Delete',dateTime:'date',description:'deleted',text:'old',textAvailable:true}
+  session.review={revision:0,items:[item],hydratedCount:1}
+  session.engine.call=async()=>({documentEpoch:7,items:[item]})
+  session.unoCall=async(method)=>{
+    if(method==='check_revision_batch')return {entries:[{...item,index:0}],total:1}
+    session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:31,payload:JSON.stringify({redline:{action:'Modify',index:'1'}})})
+    return {success:true,revision:0}
+  }
+  for(const action of ['get_review_context','goto_review_range'])assert.equal((await session.execute(action)).revision,0)
+  assert.equal(session.revision,0)
+})
+
+test('final-text snapshots hydrate without the sidebar and reuse current complete proof',async()=>{
+  const {session}=opened(true);let hydrated=0,reads=0
+  session.listRevisions=async()=>{hydrated++;session.review={revision:session.revision,items:[],hydratedCount:0}}
+  session.unoCall=async()=>{reads++;return {success:true,revision:session.revision}}
+  for(const [action,params] of [['get_document_text',{__agent:true}],['get_review_context',{}],['goto_review_range',{revision:0}]])
+    assert.equal((await session.execute(action,params)).revision,0)
+  assert.equal(hydrated,1);assert.equal(reads,3)
+  session.changed()
+  assert.equal((await session.execute('get_review_context')).revision,1)
+  assert.equal(hydrated,2)
+})
+
+test('input queued while the final-text proof prepares invalidates it before UNO reads',async()=>{
+  const {session}=opened(true);const entered=latch(),release=latch();let reads=0
+  session.listRevisions=async()=>{session.review={revision:0,items:[],hydratedCount:0};entered.resolve();await release.promise}
+  session.unoCall=async()=>{reads++;return {success:true}}
+  const read=session.execute('get_review_context'),failed=assert.rejects(read,/STALE_REVIEW_BATCH/)
+  await entered.promise;session.changed();release.resolve();await failed
+  assert.equal(reads,0)
 })
 
 test('evidence navigation shares host model authority and restoration failure locks writes',async()=>{

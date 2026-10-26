@@ -22,9 +22,9 @@ import native_document_edit_uno as edit
 
 
 class EditContracts(unittest.TestCase):
-    def test_only_existing_five_actions(self):
+    def test_only_supported_text_edit_actions(self):
         self.assertEqual(edit.ACTIONS, {'replace_at_position', 'replace_selection', 'insert_at_cursor',
-                                        'modify_paragraph', 'collapse_selection'})
+                                        'modify_paragraph', 'collapse_selection', 'apply_review_edit'})
 
     def test_readonly_rejects_before_model_identity_or_author_access(self):
         commands = edit.NativeDocumentEdits(document.NativeDocumentCommands())
@@ -171,14 +171,14 @@ def bridge_driver(port):
                               record=model.getPropertyValue('RecordChanges'), show=model.getPropertyValue('ShowChanges'),
                               modifiedEnabled=model.isSetModifiedEnabled(), author=[access.getByName('givenname'), access.getByName('sn')],
                               undo=review.undo_state(model), revisions=review.dispatch('snapshot', {}, model, uno, remote)['entries'])
-            elif action == 'test_fail_after_edit':
+            elif action in ('test_fail_after_edit', 'test_fail_review_edit'):
                 original_apply = edit.apply_replacement
                 def fail_after(*args):
                     original_apply(*args)
                     raise RuntimeError('controlled failure after actual text publication')
                 edit.apply_replacement = fail_after
                 try:
-                    result = commands.execute('replace_selection', params, model, uno, remote,
+                    result = commands.execute('apply_review_edit' if action == 'test_fail_review_edit' else 'replace_selection', params, model, uno, remote,
                                               document_epoch=params['nativeDocumentEpoch'], revision=params['nativeRevision'],
                                               read_only=params['nativeReadOnly'])
                 finally:
