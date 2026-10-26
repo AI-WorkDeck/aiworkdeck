@@ -25,9 +25,9 @@ public class DdMessageCenterSource implements MessageCenterSource {
     }
     List<Entry> allEntries(Long userId) {
         return workflow.accountInbox(userId).stream().map(n ->
-                new Entry(n.getId().toString(), id(), "客户尽调", n.getKind(), n.getTitle(), "",
+                new Entry(n.getId().toString(), id(), com.checkba.service.LangText.of("客户尽调", "Due Diligence"), n.getKind(), n.getTitle(), "",
                         n.getProjectId(), "project:" + n.getProjectId(), projects.findById(n.getProjectId())
-                            .map(p -> Objects.toString(p.getName(), "项目")).orElse("项目"),
+                            .map(p -> Objects.toString(p.getName(), com.checkba.service.LangText.of("项目", "Project"))).orElse(com.checkba.service.LangText.of("项目", "Project")),
                         n.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant(), n.getReadAt() == null ? null
                             : n.getReadAt().atZone(ZoneId.systemDefault()).toInstant(), n.getActionState(), target(n))).toList();
     }
@@ -35,7 +35,7 @@ public class DdMessageCenterSource implements MessageCenterSource {
     public Map<String,Object> target(Long userId, String itemId) { return target(require(userId, itemId)); }
     private DdNotification require(Long userId, String id) {
         return workflow.accountInbox(userId).stream().filter(n -> n.getId().toString().equals(id)).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("通知不存在或已失去项目权限"));
+                .orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("通知不存在或已失去项目权限", "Notification not found or project access lost")));
     }
     private Map<String,Object> target(DdNotification n) {
         Map<String,Object> target = new LinkedHashMap<>(); target.put("kind", "dd");

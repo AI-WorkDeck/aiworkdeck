@@ -35,7 +35,7 @@ public class DdAiGateway {
                 JsonNode result = json.readTree(text);
                 if (result == null || !result.isObject()) throw new IOException();
                 return result;
-            } catch (IOException e) { throw new DdProcessingException("AI 未返回完整的结构化结果，请重试或交由律师处理"); }
+            } catch (IOException e) { throw new DdProcessingException(com.checkba.service.LangText.of("AI 未返回完整的结构化结果，请重试或交由律师处理", "AI did not return a complete structured result; please try again or submit for lawyer review")); }
         });
     }
 
@@ -43,7 +43,7 @@ public class DdAiGateway {
         return PlatformAiUserScope.call(userId, () -> {
             models.ensurePaidAccess(userId);
             var credentials = models.decisionCredentials(null, models.resolveProvider());
-            if (credentials == null) throw new DdProcessingException("参考图需要图像生成服务，请在设置中选择 AI WorkDeck 云端或 OpenRouter");
+            if (credentials == null) throw new DdProcessingException(com.checkba.service.LangText.of("参考图需要图像生成服务，请在设置中选择 AI WorkDeck 云端或 OpenRouter", "Reference image generation requires an image service; please select AI WorkDeck Cloud or OpenRouter in Settings"));
             String model = EXAMPLE_MODEL;
             String prompt = "仅为一种材料制作一张可供客户照着准备文件的中文示例，材料名称：‘" + title
                     + "’。这一项的提交要求：‘" + Objects.toString(requirements, "") + "’。"
@@ -62,24 +62,25 @@ public class DdAiGateway {
                         .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build();
                 try (okhttp3.Response response = client.newCall(request).execute()) {
                     if (!response.isSuccessful() || response.body() == null)
-                        throw new DdProcessingException("参考图生成服务暂不可用（" + response.code() + "），原清单已保留，可稍后重试");
+                        throw new DdProcessingException(com.checkba.service.LangText.of("参考图生成服务暂不可用（" + response.code() + "），原清单已保留，可稍后重试",
+                                "Reference image service is temporarily unavailable (" + response.code() + "); original checklist is preserved, please try again later"));
                     byte[] raw = response.body().byteStream().readNBytes(24 * 1024 * 1024 + 1);
-                    if (raw.length > 24 * 1024 * 1024) throw new DdProcessingException("参考图超过大小限制，请重试");
+                    if (raw.length > 24 * 1024 * 1024) throw new DdProcessingException(com.checkba.service.LangText.of("参考图超过大小限制，请重试", "Reference image exceeds size limit; please try again"));
                     JsonNode result = json.readTree(raw);
                     JsonNode receipt = result.path("usage");
                     usage.recordDecisionUsage(projectId, userId, "dd-example", model,
                             receipt.path("prompt_tokens").asInt(), receipt.path("completion_tokens").asInt(),
                             receipt.hasNonNull("cost") ? receipt.path("cost").decimalValue() : null, credentials.platform());
                     String encoded = result.path("data").path(0).path("b64_json").asText();
-                    if (encoded.isBlank()) throw new DdProcessingException("生成服务没有返回参考图，请稍后重试");
+                    if (encoded.isBlank()) throw new DdProcessingException(com.checkba.service.LangText.of("生成服务没有返回参考图，请稍后重试", "Image generation service did not return a reference image; please try again later"));
                     byte[] image = Base64.getDecoder().decode(encoded);
-                    if (image.length > 15 * 1024 * 1024) throw new DdProcessingException("参考图超过大小限制");
+                    if (image.length > 15 * 1024 * 1024) throw new DdProcessingException(com.checkba.service.LangText.of("参考图超过大小限制", "Reference image exceeds size limit"));
                     return image;
                 }
             } catch (DdProcessingException e) {
                 throw e;
             } catch (IOException | IllegalArgumentException e) {
-                throw new DdProcessingException("参考图生成未完成，原清单已保留，请稍后重试");
+                throw new DdProcessingException(com.checkba.service.LangText.of("参考图生成未完成，原清单已保留，请稍后重试", "Reference image generation did not complete; original checklist is preserved, please try again later"));
             }
         });
     }

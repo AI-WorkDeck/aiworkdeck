@@ -44,15 +44,15 @@ public class ImService {
     public Object execute(Long userId, String action, Map<String, Object> params) {
         if (userId == null || !users.existsById(userId)) throw bad("请先登录");
         Map<String,Object> p = params == null ? Map.of() : params;
-        if (!ACTIONS.contains(action)) throw bad("不支持的沟通操作");
+        if (!ACTIONS.contains(action)) throw bad(com.checkba.service.LangText.of("不支持的沟通操作", "Unsupported IM action"));
         if ("self".equals(action)) return Map.of("id", userId, "displayName", displayName(userId));
         if ("agentScopes".equals(action)) return agentService().scopes(userId);
         if ("ensureAgent".equals(action)) {
-            if (p.containsKey("private") && !(p.get("private") instanceof Boolean)) throw bad("private必须为布尔值");
+            if (p.containsKey("private") && !(p.get("private") instanceof Boolean)) throw bad(com.checkba.service.LangText.of("private必须为布尔值", "private must be a boolean"));
             String key = string(p, "scopeKey");
             if ("project".equals(string(p, "scope")) && !Boolean.TRUE.equals(p.get("private")) && key.matches("project:[1-9][0-9]{0,18}")) {
                 try { return projectGroup(userId, Map.of("projectId", Long.parseLong(key.substring(8)))); }
-                catch (NumberFormatException invalid) { throw bad("项目标识无效"); }
+                catch (NumberFormatException invalid) { throw bad(com.checkba.service.LangText.of("项目标识无效", "Invalid project identifier")); }
             }
             ImConversation c = agentService().ensure(userId, p);
             return view(c, requireMember(c.getId(), userId));
@@ -87,13 +87,13 @@ public class ImService {
             case "upload" -> upload(conversation, member, p);
             case "download" -> download(conversation, member, p);
             case "fileAccess" -> fileAccess(conversation, member, p);
-            default -> throw bad("不支持的沟通操作");
+            default -> throw bad(com.checkba.service.LangText.of("不支持的沟通操作", "Unsupported IM action"));
         };
     }
 
     private Object create(Long userId, Map<String,Object> p) {
         String type = required(p, "type", 16);
-        if (!Set.of("GROUP", "DIRECT").contains(type)) throw bad("请选择私聊或群聊");
+        if (!Set.of("GROUP", "DIRECT").contains(type)) throw bad(com.checkba.service.LangText.of("请选择私聊或群聊", "Please select a direct or group conversation"));
         ImConversation c = new ImConversation();
         c.setId(UUID.randomUUID().toString()); c.setTitle(required(p, "title", 128));
         c.setType(type); c.setOwnerId(userId); c.setCreatedAt(Instant.now());
@@ -105,21 +105,21 @@ public class ImService {
     private Object projectGroup(Long userId, Map<String,Object> p) {
         long projectId = number(p, "projectId", -1);
         if (projectPermissions == null || projectId <= 0 || !projectPermissions.hasReadPermission(projectId, userId))
-            throw bad("项目不存在或无权访问");
-        Project project = projects.lockForImWrite(projectId).orElseThrow(() -> bad("项目不存在或无权访问"));
+            throw bad(com.checkba.service.LangText.of("项目不存在或无权访问", "Project does not exist or access denied"));
+        Project project = projects.lockForImWrite(projectId).orElseThrow(() -> bad(com.checkba.service.LangText.of("项目不存在或无权访问", "Project does not exist or access denied")));
         if (!projectPermissions.hasReadPermission(projectId, userId) || project.getUserId() == null)
-            throw bad("项目不存在或无权访问");
+            throw bad(com.checkba.service.LangText.of("项目不存在或无权访问", "Project does not exist or access denied"));
         ImConversation c = conversations.findByProjectId(projectId).orElse(null);
         if (c == null) {
             c = new ImConversation(); c.setId(UUID.randomUUID().toString()); c.setType("GROUP");
-            String title = Objects.toString(project.getName(), "项目") + " · 项目群";
+            String title = Objects.toString(project.getName(), com.checkba.service.LangText.of("项目", "Project")) + com.checkba.service.LangText.of(" · 项目群", " · Project Group");
             c.setTitle(title.substring(0, Math.min(128, title.length()))); c.setOwnerId(project.getUserId());
             c.setProjectId(projectId); c.setCreatedAt(Instant.now()); c.setLastMessageAt(c.getCreatedAt());
             conversations.save(c); addMember(c.getId(), project.getUserId(), "OWNER");
         }
         c = lock(c.getId());
         if (c.getAgentScope() == null) {
-            c.setAgentScope("project"); c.setAgentScopeKey("project:" + projectId); c.setAgentName("项目助手"); c.setAgentPrivate(false);
+            c.setAgentScope("project"); c.setAgentScopeKey("project:" + projectId); c.setAgentName(com.checkba.service.LangText.of("项目助手", "Project Assistant")); c.setAgentPrivate(false);
             c.setAgentBindingKey(sha(("project\nproject:" + projectId + "\nshared").getBytes(StandardCharsets.UTF_8)));
             conversations.saveAndFlush(c);
         }
@@ -131,11 +131,11 @@ public class ImService {
 
     private Object invite(ImConversation c, ImMember me, Map<String,Object> p) {
         requireOwner(me);
-        if (c.getProjectId() != null) throw bad("请通过项目成员邀请加入项目群，群聊邀请码不授予项目权限");
+        if (c.getProjectId() != null) throw bad(com.checkba.service.LangText.of("请通过项目成员邀请加入项目群，群聊邀请码不授予项目权限", "Please invite members through project membership; group invite codes do not grant project permissions"));
         ImAgentService.requireInvitable(c);
-        if ("DIRECT".equals(c.getType()) && members.countByConversationId(c.getId()) >= 2) throw bad("私聊已有两位参与人");
+        if ("DIRECT".equals(c.getType()) && members.countByConversationId(c.getId()) >= 2) throw bad(com.checkba.service.LangText.of("私聊已有两位参与人", "Direct conversation already has two participants"));
         String role = required(p, "role", 16);
-        if (!Set.of("MEMBER", "CLIENT").contains(role)) throw bad("邀请角色无效");
+        if (!Set.of("MEMBER", "CLIENT").contains(role)) throw bad(com.checkba.service.LangText.of("邀请角色无效", "Invalid invitation role"));
         // A fresh invitation replaces outstanding codes, limiting stale invitations and storage growth.
         invitations.deleteByConversationIdAndIssuedBy(c.getId(), me.getUserId());
         byte[] entropy = new byte[24]; new SecureRandom().nextBytes(entropy);
@@ -148,16 +148,16 @@ public class ImService {
 
     private Object join(Long userId, Map<String,Object> p) {
         String hash = sha(required(p, "code", 64).getBytes(StandardCharsets.UTF_8));
-        String conversationId = invitations.conversationIdForHash(hash).orElseThrow(() -> bad("邀请码无效或已过期"));
+        String conversationId = invitations.conversationIdForHash(hash).orElseThrow(() -> bad(com.checkba.service.LangText.of("邀请码无效或已过期", "Invitation code is invalid or expired")));
         ImConversation c = lock(conversationId);
         ImAgentService.requireInvitable(c);
         // Reload under the conversation lock: two redeemers cannot both consume a code.
-        ImInvitation invite = invitations.findById(hash).orElseThrow(() -> bad("邀请码无效或已过期"));
-        if (invite.getUsedAt() != null || !invite.getExpiresAt().isAfter(Instant.now())) throw bad("邀请码无效或已过期");
+        ImInvitation invite = invitations.findById(hash).orElseThrow(() -> bad(com.checkba.service.LangText.of("邀请码无效或已过期", "Invitation code is invalid or expired")));
+        if (invite.getUsedAt() != null || !invite.getExpiresAt().isAfter(Instant.now())) throw bad(com.checkba.service.LangText.of("邀请码无效或已过期", "Invitation code is invalid or expired"));
         ImMember issuer = requireMember(c.getId(), invite.getIssuedBy()); requireOwner(issuer);
-        if (members.findByConversationIdAndUserId(c.getId(), userId).isPresent()) throw bad("你已在此会话中");
+        if (members.findByConversationIdAndUserId(c.getId(), userId).isPresent()) throw bad(com.checkba.service.LangText.of("你已在此会话中", "You are already in this conversation"));
         long size = members.countByConversationId(c.getId());
-        if (size >= ("DIRECT".equals(c.getType()) ? 2 : 100)) throw bad("会话人数已满");
+        if (size >= ("DIRECT".equals(c.getType()) ? 2 : 100)) throw bad(com.checkba.service.LangText.of("会话人数已满", "Conversation has reached its member limit"));
         invite.setUsedAt(Instant.now()); invitations.save(invite);
         return view(c, addMember(c.getId(), userId, invite.getRole()));
     }
@@ -165,7 +165,7 @@ public class ImService {
     private Object remove(ImConversation c, ImMember me, long targetId) {
         requireOwner(me);
         ImMember target = requireMember(c.getId(), targetId);
-        if ("OWNER".equals(target.getRole())) throw bad("不能移除会话负责人");
+        if ("OWNER".equals(target.getRole())) throw bad(com.checkba.service.LangText.of("不能移除会话负责人", "Cannot remove the conversation owner"));
         members.delete(target);
         return Map.of("removed", true);
     }
@@ -173,8 +173,8 @@ public class ImService {
     private Object leave(ImConversation c, ImMember me) {
         if (c.getAgentScope() != null && (Boolean.TRUE.equals(c.getAgentPrivate())
                 || ("project".equals(c.getAgentScope()) && "OWNER".equals(me.getRole()))))
-            throw bad("此助手会话需要保留，可关闭面板后随时重新打开");
-        if ("OWNER".equals(me.getRole()) && members.countByConversationId(c.getId()) > 1) throw bad("请先移除其他成员，再退出会话");
+            throw bad(com.checkba.service.LangText.of("此助手会话需要保留，可关闭面板后随时重新打开", "This assistant conversation must be kept; you can close the panel and reopen it anytime"));
+        if ("OWNER".equals(me.getRole()) && members.countByConversationId(c.getId()) > 1) throw bad(com.checkba.service.LangText.of("请先移除其他成员，再退出会话", "Please remove other members before leaving the conversation"));
         invitations.deleteByConversationIdAndIssuedBy(c.getId(), me.getUserId());
         members.delete(me);
         return Map.of("left", true);
@@ -183,7 +183,7 @@ public class ImService {
     private Object listMessages(ImConversation c, ImMember me, Map<String,Object> p) {
         int limit = (int)Math.max(1, Math.min(100, number(p, "limit", 50)));
         long after = number(p, "afterId", 0), before = number(p, "beforeId", Long.MAX_VALUE);
-        if (after < 0 || before < 1 || (p.containsKey("afterId") && p.containsKey("beforeId"))) throw bad("消息分页参数无效");
+        if (after < 0 || before < 1 || (p.containsKey("afterId") && p.containsKey("beforeId"))) throw bad(com.checkba.service.LangText.of("消息分页参数无效", "Invalid message pagination parameters"));
         var page = p.containsKey("afterId")
                 ? messages.findByConversationIdAndIdGreaterThanOrderByIdAsc(c.getId(), after, PageRequest.of(0, limit))
                 : messages.findByConversationIdAndIdLessThanOrderByIdDesc(c.getId(), before, PageRequest.of(0, limit));
@@ -198,19 +198,19 @@ public class ImService {
     private Object send(ImConversation c, ImMember me, Map<String,Object> p) {
         String clientId = required(p, "clientMessageId", 100);
         String text = string(p, "text");
-        if (text.length() > 8000) throw bad("消息最多8000字");
+        if (text.length() > 8000) throw bad(com.checkba.service.LangText.of("消息最多8000字", "Message cannot exceed 8,000 characters"));
         String attachmentId = string(p, "attachmentId");
-        if (text.isBlank() && attachmentId.isBlank()) throw bad("请输入消息或选择文件");
+        if (text.isBlank() && attachmentId.isBlank()) throw bad(com.checkba.service.LangText.of("请输入消息或选择文件", "Please enter a message or select a file"));
         var existing = messages.findByConversationIdAndSenderIdAndClientMessageId(c.getId(), me.getUserId(), clientId);
         if (existing.isPresent()) {
             ImMessage old = existing.get();
             if (!old.getText().equals(text) || !Objects.equals(old.getAttachmentId(), attachmentId.isBlank() ? null : attachmentId))
-                throw bad("消息重试标识已用于其他内容");
+                throw bad(com.checkba.service.LangText.of("消息重试标识已用于其他内容", "Message retry key has already been used for different content"));
             return messageView(old, me);
         }
         if (!attachmentId.isBlank()) {
             ImAttachment file = requireAttachment(c.getId(), attachmentId);
-            if (!file.getUploadedBy().equals(me.getUserId())) throw bad("只能发送自己上传的文件");
+            if (!file.getUploadedBy().equals(me.getUserId())) throw bad(com.checkba.service.LangText.of("只能发送自己上传的文件", "You can only send files that you uploaded"));
         }
         ImMessage message = new ImMessage(); message.setUid(UUID.randomUUID().toString());
         message.setConversationId(c.getId()); message.setSenderId(me.getUserId()); message.setClientMessageId(clientId);
@@ -224,8 +224,8 @@ public class ImService {
     private Object markRead(ImConversation c, ImMember me, Map<String,Object> p) {
         long id = number(p, "lastReadId", 0);
         if (id != 0) {
-            ImMessage message = messages.findById(id).orElseThrow(() -> bad("消息不存在"));
-            if (!c.getId().equals(message.getConversationId())) throw bad("无权访问该消息");
+            ImMessage message = messages.findById(id).orElseThrow(() -> bad(com.checkba.service.LangText.of("消息不存在", "Message not found")));
+            if (!c.getId().equals(message.getConversationId())) throw bad(com.checkba.service.LangText.of("无权访问该消息", "You do not have access to this message"));
         }
         me.setLastReadId(Math.max(me.getLastReadId(), id)); members.save(me);
         return Map.of("lastReadId", me.getLastReadId());
@@ -233,15 +233,15 @@ public class ImService {
 
     private Object upload(ImConversation c, ImMember me, Map<String,Object> p) {
         String encoded = string(p, "base64");
-        if (encoded.length() > ((MAX_FILE_BYTES + 2L) / 3) * 4) throw bad("文件不能超过8MiB");
+        if (encoded.length() > ((MAX_FILE_BYTES + 2L) / 3) * 4) throw bad(com.checkba.service.LangText.of("文件不能超过8MiB", "File cannot exceed 8 MiB"));
         byte[] bytes;
         try { bytes = Base64.getDecoder().decode(encoded); }
-        catch (IllegalArgumentException e) { throw bad("文件编码无效"); }
-        if (bytes.length == 0 || bytes.length > MAX_FILE_BYTES) throw bad("文件不能为空且不能超过8MiB");
+        catch (IllegalArgumentException e) { throw bad(com.checkba.service.LangText.of("文件编码无效", "Invalid file encoding")); }
+        if (bytes.length == 0 || bytes.length > MAX_FILE_BYTES) throw bad(com.checkba.service.LangText.of("文件不能为空且不能超过8MiB", "File cannot be empty and cannot exceed 8 MiB"));
         String name = safeName(required(p, "name", 500)), digest = sha(bytes);
         String projectUid = null, fileUid = null;
         if (p.get("source") != null) {
-            if (!(p.get("source") instanceof Map<?,?> source)) throw bad("文件来源格式无效");
+            if (!(p.get("source") instanceof Map<?,?> source)) throw bad(com.checkba.service.LangText.of("文件来源格式无效", "Invalid file source format"));
             projectUid = sourceUid(source.get("projectUid")); fileUid = sourceUid(source.get("fileUid"));
         }
         String clientId = p.containsKey("clientMessageId") ? required(p, "clientMessageId", 100) : null;
@@ -251,11 +251,11 @@ public class ImService {
                 ImAttachment old = existing.get();
                 if (!old.getSha256().equals(digest) || !old.getName().equals(name)
                         || !Objects.equals(old.getSourceProjectUid(), projectUid) || !Objects.equals(old.getSourceFileUid(), fileUid))
-                    throw bad("文件重试标识已用于其他内容");
+                    throw bad(com.checkba.service.LangText.of("文件重试标识已用于其他内容", "File retry key has already been used for different content"));
                 return attachmentView(old, me);
             }
         }
-        if (attachments.totalSize(c.getId()) + bytes.length > MAX_CONVERSATION_BYTES) throw bad("本会话文件空间已满（100MiB）");
+        if (attachments.totalSize(c.getId()) + bytes.length > MAX_CONVERSATION_BYTES) throw bad(com.checkba.service.LangText.of("本会话文件空间已满（100MiB）", "Conversation file storage is full (100 MiB)"));
         ImAttachment file = new ImAttachment(); file.setId(UUID.randomUUID().toString());
         file.setConversationId(c.getId()); file.setUploadedBy(me.getUserId()); file.setClientMessageId(clientId);
         file.setName(name); file.setSize(bytes.length);
@@ -268,7 +268,7 @@ public class ImService {
         String attachmentId = required(p, "attachmentId", 36);
         var metadata = attachments.metadata(attachmentId, c.getId());
         if (metadata.isEmpty() || !canRead(me, (Long)metadata.get(0)[4], Boolean.TRUE.equals(metadata.get(0)[5])))
-            throw bad(FILE_UNAVAILABLE);
+            throw bad(fileUnavailable());
         ImAttachment file = requireAttachment(c.getId(), attachmentId);
         Map<String,Object> result = new LinkedHashMap<>(attachmentView(file, me));
         result.put("base64", Base64.getEncoder().encodeToString(file.getContent()));
@@ -276,20 +276,20 @@ public class ImService {
     }
 
     private Object fileAccess(ImConversation c, ImMember me, Map<String,Object> p) {
-        if (!(p.get("clientVisible") instanceof Boolean visible)) throw bad("clientVisible必须为布尔值");
+        if (!(p.get("clientVisible") instanceof Boolean visible)) throw bad(com.checkba.service.LangText.of("clientVisible必须为布尔值", "clientVisible must be a boolean"));
         ImAttachment file = requireAttachment(c.getId(), required(p, "attachmentId", 36));
-        if (!canManage(me, file.getUploadedBy())) throw bad(FILE_UNAVAILABLE);
+        if (!canManage(me, file.getUploadedBy())) throw bad(fileUnavailable());
         file.setClientVisible(visible); attachments.save(file);
         return attachmentView(file, me);
     }
 
     private ImAgentService agentService() {
-        if (agents == null) throw bad("当前服务尚未开通沟通助手");
+        if (agents == null) throw bad(com.checkba.service.LangText.of("当前服务尚未开通沟通助手", "IM assistant is not enabled on this server"));
         return agents;
     }
     private void authorizeAgent(ImConversation conversation, Long userId) {
         if (conversation.getProjectId() != null && !projectPermissions.hasReadPermission(conversation.getProjectId(), userId))
-            throw bad("项目不存在或已退出项目");
+            throw bad(com.checkba.service.LangText.of("项目不存在或已退出项目", "Project does not exist or you have left the project"));
         if (conversation.getAgentScope() != null) agentService().authorize(conversation, userId);
     }
     private Map<String,Object> memberViews(ImConversation conversation) {
@@ -302,12 +302,12 @@ public class ImService {
         return Map.of("members", rows, "humanCount", humanCount);
     }
 
-    private ImConversation lock(String id) { return conversations.lockById(id).orElseThrow(() -> bad("会话不存在或无权访问")); }
-    private ImMember requireMember(String id, Long userId) { return members.findByConversationIdAndUserId(id, userId).orElseThrow(() -> bad("会话不存在或无权访问")); }
-    private void requireOwner(ImMember member) { if (!"OWNER".equals(member.getRole())) throw bad("只有会话负责人可以执行此操作"); }
+    private ImConversation lock(String id) { return conversations.lockById(id).orElseThrow(() -> bad(com.checkba.service.LangText.of("会话不存在或无权访问", "Conversation does not exist or access denied"))); }
+    private ImMember requireMember(String id, Long userId) { return members.findByConversationIdAndUserId(id, userId).orElseThrow(() -> bad(com.checkba.service.LangText.of("会话不存在或无权访问", "Conversation does not exist or access denied"))); }
+    private void requireOwner(ImMember member) { if (!"OWNER".equals(member.getRole())) throw bad(com.checkba.service.LangText.of("只有会话负责人可以执行此操作", "Only the conversation owner can perform this action")); }
     private ImAttachment requireAttachment(String conversationId, String id) {
-        ImAttachment file = attachments.findById(id).orElseThrow(() -> bad("文件不存在或无权访问"));
-        if (!conversationId.equals(file.getConversationId())) throw bad("文件不存在或无权访问");
+        ImAttachment file = attachments.findById(id).orElseThrow(() -> bad(com.checkba.service.LangText.of("文件不存在或无权访问", "File does not exist or access denied")));
+        if (!conversationId.equals(file.getConversationId())) throw bad(com.checkba.service.LangText.of("文件不存在或无权访问", "File does not exist or access denied"));
         return file;
     }
     private ImMember addMember(String id, Long userId, String role) {
@@ -326,7 +326,7 @@ public class ImService {
         if (projectId != null) {
             result.put("projectId", projectId);
             result.put("projectKey", "project:" + projectId);
-            projects.findById(projectId).ifPresent(project -> result.put("projectName", Objects.toString(project.getName(), "项目")));
+            projects.findById(projectId).ifPresent(project -> result.put("projectName", Objects.toString(project.getName(), com.checkba.service.LangText.of("项目", "Project"))));
         }
         return result;
     }
@@ -354,12 +354,15 @@ public class ImService {
     }
     private Map<String,Object> attachmentView(String id, String name, long size, String sha256, Long uploadedBy,
                                                boolean clientVisible, String projectUid, String fileUid, ImMember me) {
-        if (!canRead(me, uploadedBy, clientVisible)) return Map.of("id", id, "available", false, "message", FILE_UNAVAILABLE);
+        if (!canRead(me, uploadedBy, clientVisible)) return Map.of("id", id, "available", false, "message", fileUnavailable());
         Map<String,Object> result = new LinkedHashMap<>(); result.put("id", id); result.put("name", name);
         result.put("size", size); result.put("sha256", sha256); result.put("available", true);
         result.put("clientVisible", clientVisible); result.put("canManageAccess", canManage(me, uploadedBy));
         if (projectUid != null && fileUid != null) result.put("source", Map.of("projectUid", projectUid, "fileUid", fileUid));
         return result;
+    }
+    private static String fileUnavailable() {
+        return com.checkba.service.LangText.of(FILE_UNAVAILABLE, "Sorry, this file is still being prepared. Please contact your lawyer.");
     }
     private boolean client(ImMember me) {
         return "CLIENT".equals(me.getRole()) || users.findById(me.getUserId()).map(User::getRole).filter("CLIENT"::equals).isPresent()
@@ -374,14 +377,14 @@ public class ImService {
     }
     private static String sourceUid(Object value) {
         if (!(value instanceof String raw) || !raw.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))
-            throw bad("文件来源编号无效");
+            throw bad(com.checkba.service.LangText.of("文件来源编号无效", "Invalid file source ID"));
         return UUID.fromString(raw).toString();
     }
-    private String displayName(Long userId) { return users.findById(userId).map(User::getDisplayName).filter(s -> !s.isBlank()).orElse("用户"); }
+    private String displayName(Long userId) { return users.findById(userId).map(User::getDisplayName).filter(s -> !s.isBlank()).orElse(com.checkba.service.LangText.of("用户", "User")); }
     static String safeName(String name) {
         String clean = name.replace('\\', '/'); clean = clean.substring(clean.lastIndexOf('/') + 1);
         clean = clean.replaceAll("[\\p{Cntrl}<>:\"|?*]", "_").replaceAll("^[. ]+|[. ]+$", "");
-        if (clean.isBlank()) throw bad("文件名无效");
+        if (clean.isBlank()) throw bad(com.checkba.service.LangText.of("文件名无效", "Invalid file name"));
         return clean.substring(0, Math.min(180, clean.length()));
     }
     public static String sha(byte[] content) {
@@ -390,12 +393,12 @@ public class ImService {
     }
     public static String string(Map<String,Object> p, String key) { Object value = p.get(key); return value instanceof String s ? s : ""; }
     private static String required(Map<String,Object> p, String key, int max) {
-        String value = string(p, key).trim(); if (value.isEmpty() || value.length() > max) throw bad("参数无效：" + key); return value;
+        String value = string(p, key).trim(); if (value.isEmpty() || value.length() > max) throw bad(com.checkba.service.LangText.of("参数无效：" + key, "Invalid parameter: " + key)); return value;
     }
     private static long number(Map<String,Object> p, String key, long fallback) {
         Object value = p.get(key); if (value == null) return fallback;
         if (value instanceof Number n && Double.isFinite(n.doubleValue()) && n.doubleValue() == n.longValue()) return n.longValue();
-        throw bad("参数无效：" + key);
+        throw bad(com.checkba.service.LangText.of("参数无效：" + key, "Invalid parameter: " + key));
     }
     private static IllegalArgumentException bad(String message) { return new IllegalArgumentException(message); }
 }

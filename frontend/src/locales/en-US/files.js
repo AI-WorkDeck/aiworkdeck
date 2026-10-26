@@ -102,6 +102,8 @@ export default {
     close: 'Close',
   },
   loadFailed: 'Failed to load',
+  fileUrlEmptyError: 'File URL is empty',
+  renderContainerNotReadyError: 'Render container is not ready',
   resourceLoadFailedStatus: 'Failed to load resource: {status}',
   networkErrorResource: 'Network error. Failed to load resource.',
   archiveReadFailed: 'Failed to read archive',

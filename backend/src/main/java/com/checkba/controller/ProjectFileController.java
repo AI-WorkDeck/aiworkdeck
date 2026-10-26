@@ -192,7 +192,7 @@ public class ProjectFileController {
         if (userId == null) throw new UnauthorizedException("请先登录");
         checkFileInProject(fileId, projectId);
         if (!(request.get("clientVisible") instanceof Boolean visible)) {
-            return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "clientVisible 必须为布尔值"));
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "message", com.checkba.service.LangText.of("clientVisible 必须为布尔值", "clientVisible must be a boolean")));
         }
         ProjectFile file = fileAccess.setClientVisible(projectFileService.getFile(fileId), userId, visible);
         return ResponseEntity.ok(Map.of("code", 0, "data", Map.of("fileId", fileId,

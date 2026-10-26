@@ -27,7 +27,7 @@ public class DdMaterialController {
     public Map<String, Object> start(@PathVariable Long projectId, @RequestHeader(value = "X-Session-Id", required = false) String session,
             @RequestBody MaterialRequest input, jakarta.servlet.http.HttpServletRequest request) {
         Long user = writer(session, projectId), requestId = input.requestId();
-        if (requestId == null || requestId <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请选择清单");
+        if (requestId == null || requestId <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, LangText.of("请选择清单", "Please select a checklist"));
         String kind = request.getRequestURI().endsWith("/report") ? "REPORT" : "MATERIALS";
         return jobs.view(jobs.enqueue(projectId, user, kind, null, null, Map.of("requestId", requestId), input.idempotencyKey()));
     }
@@ -41,10 +41,10 @@ public class DdMaterialController {
     }
     @ExceptionHandler(ResponseStatusException.class)
     public org.springframework.http.ResponseEntity<Map<String, Object>> accessError(ResponseStatusException e) {
-        return org.springframework.http.ResponseEntity.status(e.getStatusCode()).body(Map.of("code", e.getStatusCode().value(), "message", java.util.Objects.toString(e.getReason(), "无权进行此操作或资源不存在")));
+        return org.springframework.http.ResponseEntity.status(e.getStatusCode()).body(Map.of("code", e.getStatusCode().value(), "message", java.util.Objects.toString(e.getReason(), LangText.of("无权进行此操作或资源不存在", "Permission denied or resource not found"))));
     }
     @ExceptionHandler(IllegalArgumentException.class)
     public org.springframework.http.ResponseEntity<Map<String, Object>> invalid(IllegalArgumentException e) {
-        return org.springframework.http.ResponseEntity.badRequest().body(Map.of("code", 400, "message", java.util.Objects.toString(e.getMessage(), "请求参数有误")));
+        return org.springframework.http.ResponseEntity.badRequest().body(Map.of("code", 400, "message", java.util.Objects.toString(e.getMessage(), LangText.of("请求参数有误", "Invalid request parameters"))));
     }
 }

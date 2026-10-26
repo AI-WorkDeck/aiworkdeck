@@ -28,8 +28,8 @@ public class MessageCenterController {
         Long projectId=null;
         if (body.get("projectId")!=null) {
             String raw=String.valueOf(body.get("projectId"));
-            if (!raw.matches("[1-9][0-9]{0,18}")) throw new IllegalArgumentException("项目编号无效");
-            try { projectId=Long.parseLong(raw); } catch (NumberFormatException e) { throw new IllegalArgumentException("项目编号无效"); }
+            if (!raw.matches("[1-9][0-9]{0,18}")) throw new IllegalArgumentException(com.checkba.service.LangText.of("项目编号无效", "Invalid project ID"));
+            try { projectId=Long.parseLong(raw); } catch (NumberFormatException e) { throw new IllegalArgumentException(com.checkba.service.LangText.of("项目编号无效", "Invalid project ID")); }
         }
         return Map.of("code",0,"data",gateway.execute(userId,action,ImController.params(body),projectId));
     }

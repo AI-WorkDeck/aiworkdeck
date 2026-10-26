@@ -40,7 +40,7 @@ public class ImScopedAgentHost implements ImProjectActionHandler {
             try {
                 Long boundProject=boundProject(userId,projectId,accountScope);
                 Map<String,Object> entry=new LinkedHashMap<>();
-                entry.put("scope","project"); entry.put("name","项目助手"); entry.put("title",project.getName());
+                entry.put("scope","project"); entry.put("name",com.checkba.service.LangText.of("项目助手", "Project Assistant")); entry.put("title",project.getName());
                 entry.put("private",false); entry.put("localProjectId",projectId);
                 if (boundProject!=null) {
                     Map<String,Object> group=projectGroup(userId,projectId,boundProject,accountScope);
@@ -51,14 +51,14 @@ public class ImScopedAgentHost implements ImProjectActionHandler {
                 } else entry.put("scopeKey",projectFiles.ensureIdentity(userId,projectId,accountScope));
                 agents.add(entry);
             } catch (IllegalArgumentException unavailable) {
-                result.put("projectReason", "当前项目助手尚未就绪，请由项目内部成员打开项目沟通完成关联");
+                result.put("projectReason", com.checkba.service.LangText.of("当前项目助手尚未就绪，请由项目内部成员打开项目沟通完成关联", "Project Assistant is not ready yet; please ask an internal project member to open Project IM to complete binding"));
             }
             if (remote.get("agents") instanceof List<?> rows) agents.addAll(rows);
             result.put("agents", agents);
             return result;
         }
         if ("ensureAgent".equals(action)) {
-            if (p.containsKey("private") && !(p.get("private") instanceof Boolean)) throw new IllegalArgumentException("private必须为布尔值");
+            if (p.containsKey("private") && !(p.get("private") instanceof Boolean)) throw new IllegalArgumentException(com.checkba.service.LangText.of("private必须为布尔值", "private must be a boolean"));
             String scope = ImService.string(p, "scope");
             Map<String, Object> request = new LinkedHashMap<>();
             request.put("scope", scope);
@@ -70,11 +70,11 @@ public class ImScopedAgentHost implements ImProjectActionHandler {
                 String boundKey=boundProject==null ? null : "project:"+boundProject;
                 if (boundProject!=null && !privateChat) {
                     if (!boundKey.equals(supplied) && !projectFiles.readIdentity(userId,projectId,accountScope).equals(supplied))
-                        throw new IllegalArgumentException("项目已切换，请重新打开项目助手");
+                        throw new IllegalArgumentException(com.checkba.service.LangText.of("项目已切换，请重新打开项目助手", "Project has changed; please reopen the Project Assistant"));
                     return projectGroup(userId,projectId,boundProject,accountScope);
                 }
                 String uid=projectFiles.ensureIdentity(userId,projectId,accountScope);
-                if (!uid.equals(supplied) && !Objects.equals(boundKey,supplied)) throw new IllegalArgumentException("项目已切换，请重新打开项目助手");
+                if (!uid.equals(supplied) && !Objects.equals(boundKey,supplied)) throw new IllegalArgumentException(com.checkba.service.LangText.of("项目已切换，请重新打开项目助手", "Project has changed; please reopen the Project Assistant"));
                 request.put("scopeKey",uid);
                 request.put("title",project.getName().substring(0,Math.min(128,project.getName().length())));
                 if (boundProject!=null) request.put("projectId",boundProject);
@@ -86,7 +86,7 @@ public class ImScopedAgentHost implements ImProjectActionHandler {
             if ("project".equals(scope)) result.put("localProjectId", projectId);
             return result;
         }
-        if (!"agentReply".equals(action)) throw new IllegalArgumentException("不支持的助手操作");
+        if (!"agentReply".equals(action)) throw new IllegalArgumentException(com.checkba.service.LangText.of("不支持的助手操作", "Unsupported assistant action"));
         String conversationId = ImService.string(p, "conversationId");
         Map<String, Object> conversation = map(gateway.executeWithinScope(userId, accountScope,
                 "agentInfo", Map.of("conversationId", conversationId)));
@@ -97,11 +97,11 @@ public class ImScopedAgentHost implements ImProjectActionHandler {
         // A plugin-supplied projectContext is intentionally discarded for every scope.
         if (Boolean.TRUE.equals(agent.get("private")) && "project".equals(agent.get("scope"))) {
             String uid = projectFiles.readIdentity(userId, projectId, accountScope);
-            if (!uid.equals(agent.get("scopeKey"))) throw new IllegalArgumentException("请切换到这位助手所属的项目后再私聊");
+            if (!uid.equals(agent.get("scopeKey"))) throw new IllegalArgumentException(com.checkba.service.LangText.of("请切换到这位助手所属的项目后再私聊", "Please switch to the project this assistant belongs to before chatting privately"));
             if (conversation.get("projectId")!=null) {
                 Long boundProject=boundProject(userId,projectId,accountScope);
                 if (boundProject==null || !String.valueOf(boundProject).equals(String.valueOf(conversation.get("projectId"))))
-                    throw new IllegalArgumentException("请切换到这位助手所属的项目后再私聊");
+                    throw new IllegalArgumentException(com.checkba.service.LangText.of("请切换到这位助手所属的项目后再私聊", "Please switch to the project this assistant belongs to before chatting privately"));
             }
             request.put("projectContext", context.build(userId, project));
             requireProject(userId, projectId);
@@ -117,31 +117,31 @@ public class ImScopedAgentHost implements ImProjectActionHandler {
         gateway.assertAccountScope(accountScope);
         var connection=officialCloud.connectOfficial(userId);
         if (!Objects.equals(userId,connection.getUserId()) || !Objects.equals(accountScope,connection.getAccountFingerprint()))
-            throw new IllegalArgumentException("账户已变化，请重新打开项目助手");
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("账户已变化，请重新打开项目助手", "Account has changed; please reopen the Project Assistant"));
         if (!Objects.equals(connection.getId(),remote.getConnectionId())) return null;
         requireProject(userId,projectId); gateway.assertAccountScope(accountScope);
         String id=remote.getRemoteProjectId();
-        if (id==null || !id.matches("[1-9][0-9]{0,18}")) throw new IllegalArgumentException("案件库项目标识无效");
+        if (id==null || !id.matches("[1-9][0-9]{0,18}")) throw new IllegalArgumentException(com.checkba.service.LangText.of("案件库项目标识无效", "Invalid case library project ID"));
         try { return Long.valueOf(id); }
-        catch (NumberFormatException invalid) { throw new IllegalArgumentException("案件库项目标识无效"); }
+        catch (NumberFormatException invalid) { throw new IllegalArgumentException(com.checkba.service.LangText.of("案件库项目标识无效", "Invalid case library project ID")); }
     }
 
     private Map<String,Object> projectGroup(Long userId,Long localProjectId,Long remoteProjectId,String accountScope) {
         Map<String,Object> group=new LinkedHashMap<>(map(gateway.executeWithinScope(userId,accountScope,"projectGroup",Map.of("projectId",remoteProjectId))));
-        if (!String.valueOf(remoteProjectId).equals(String.valueOf(group.get("projectId")))) throw new IllegalArgumentException("项目群关联无效");
+        if (!String.valueOf(remoteProjectId).equals(String.valueOf(group.get("projectId")))) throw new IllegalArgumentException(com.checkba.service.LangText.of("项目群关联无效", "Invalid project group binding"));
         requireProject(userId,localProjectId); gateway.assertAccountScope(accountScope);
         group.put("localProjectId",localProjectId); return group;
     }
 
     private Project requireProject(Long userId, Long projectId) {
         if (userId == null || projectId == null || !members.hasReadPermission(projectId, userId))
-            throw new IllegalArgumentException("没有当前项目的访问权限");
-        return projects.findById(projectId).orElseThrow(() -> new IllegalArgumentException("项目不存在"));
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("没有当前项目的访问权限", "You do not have access to the current project"));
+        return projects.findById(projectId).orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("项目不存在", "Project not found")));
     }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> map(Object value) {
-        if (!(value instanceof Map<?, ?>)) throw new IllegalArgumentException("助手服务响应无效，请重试");
+        if (!(value instanceof Map<?, ?>)) throw new IllegalArgumentException(com.checkba.service.LangText.of("助手服务响应无效，请重试", "Invalid assistant service response; please try again"));
         return (Map<String, Object>) value;
     }
 }

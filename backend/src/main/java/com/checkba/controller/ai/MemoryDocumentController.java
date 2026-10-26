@@ -74,7 +74,7 @@ public class MemoryDocumentController {
 
     private static Long user(String sessionId) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
-        if (userId == null) throw new MemoryDocumentException(401, "请先登录");
+        if (userId == null) throw new MemoryDocumentException(401, com.checkba.service.LangText.of("请先登录", "Please sign in first"));
         return userId;
     }
 

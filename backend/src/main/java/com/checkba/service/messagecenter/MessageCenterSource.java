@@ -18,7 +18,7 @@ public interface MessageCenterSource {
         return new ConversationSnapshot(conversations(userId), List.of());
     }
     default Object im(Long userId, String action, Map<String,Object> params) {
-        throw new IllegalArgumentException("此来源不提供项目沟通");
+        throw new IllegalArgumentException(com.checkba.service.LangText.of("此来源不提供项目沟通", "This source does not provide Project IM"));
     }
     record Entry(String id, String sourceId, String sourceName, String kind, String title, String body,
                  Long projectId, String projectKey, String projectName, Instant createdAt, Instant readAt,

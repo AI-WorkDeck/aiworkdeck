@@ -90,7 +90,7 @@ public class PluginContributionService {
         try {
             storageServiceFactory.getStorageService().save(file.getFilePath(), new ByteArrayInputStream(bytes));
         } catch (Exception e) {
-            throw new IllegalStateException("模板内容写入失败: " + e.getMessage(), e);
+            throw new IllegalStateException(com.checkba.service.LangText.of("模板内容写入失败: ", "Failed to write template content: ") + e.getMessage(), e);
         }
         log.info("plugin {} template {} -> project {} file {}", pluginId, templateId, projectId, file.getId());
         return file;
@@ -100,11 +100,11 @@ public class PluginContributionService {
         PluginService.PluginMetadata meta = pluginService.getPlugin(pluginId);
         if (meta == null || !pluginService.isEnabled(pluginId) || meta.getContributes() == null
                 || meta.getContributes().getTemplates() == null) {
-            throw new IllegalArgumentException("插件不存在或未启用: " + pluginId);
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("插件不存在或未启用: ", "Plugin does not exist or is not enabled: ") + pluginId);
         }
         return meta.getContributes().getTemplates().stream()
                 .filter(t -> t.getId().equals(templateId)).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("模板不存在: " + templateId));
+                .orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("模板不存在: ", "Template does not exist: ") + templateId));
     }
 
     // ==================== 样式画像 ====================
@@ -137,7 +137,7 @@ public class PluginContributionService {
         }
         String[] parts = ref.split(":", 2);
         if (parts.length != 2 || findStyleProfileDecl(parts[0], parts[1]) == null) {
-            throw new IllegalArgumentException("画像不存在或所属插件未启用: " + ref);
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("画像不存在或所属插件未启用: ", "Style profile does not exist or its plugin is not enabled: ") + ref);
         }
         // 选定前解析一遍：坏 JSON 的画像不允许被选中（否则每次导出都 WARN 一遍）
         StyleProfiles.parse(new String(readContributedFile(parts[0], findStyleProfileDecl(parts[0], parts[1]).getFile()),
@@ -225,13 +225,13 @@ public class PluginContributionService {
     public void saveSettings(String pluginId, Map<String, Object> values, Long userId, Long projectId) {
         PluginService.PluginMetadata meta = pluginService.getPlugin(pluginId);
         if (meta == null || meta.getSettings() == null) {
-            throw new IllegalArgumentException("插件没有可配置项: " + pluginId);
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("插件没有可配置项: ", "Plugin has no configurable settings: ") + pluginId);
         }
         Map<String, String> writes = new LinkedHashMap<>();
         for (Map.Entry<String, Object> e : values.entrySet()) {
             PluginService.PluginSettingDecl d = meta.getSettings().stream()
                     .filter(x -> x.getKey().equals(e.getKey())).findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("未声明的设置项: " + e.getKey()));
+                    .orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("未声明的设置项: ", "Undeclared setting key: ") + e.getKey()));
             String v = e.getValue() == null ? "" : String.valueOf(e.getValue());
             validateValue(d, v);
             writes.put(settingKey(pluginId, d, userId, projectId), v);
@@ -292,7 +292,7 @@ public class PluginContributionService {
         switch (d.getType()) {
             case "boolean" -> {
                 if (!"true".equals(v) && !"false".equals(v) && !v.isEmpty()) {
-                    throw new IllegalArgumentException(d.getKey() + " 需要 true/false");
+                    throw new IllegalArgumentException(d.getKey() + com.checkba.service.LangText.of(" 需要 true/false", " requires true/false"));
                 }
             }
             case "number" -> {
@@ -300,18 +300,18 @@ public class PluginContributionService {
                     try {
                         if (!Double.isFinite(Double.parseDouble(v))) throw new NumberFormatException();
                     } catch (NumberFormatException e) {
-                        throw new IllegalArgumentException(d.getKey() + " 需要数字");
+                        throw new IllegalArgumentException(d.getKey() + com.checkba.service.LangText.of(" 需要数字", " requires a number"));
                     }
                 }
             }
             case "select" -> {
                 if (!v.isEmpty() && (d.getOptions() == null || !d.getOptions().contains(v))) {
-                    throw new IllegalArgumentException(d.getKey() + " 必须是候选值之一");
+                    throw new IllegalArgumentException(d.getKey() + com.checkba.service.LangText.of(" 必须是候选值之一", " must be one of the allowed options"));
                 }
             }
             default -> {
                 if (v.length() > 4000) {
-                    throw new IllegalArgumentException(d.getKey() + " 超过 4000 字符上限");
+                    throw new IllegalArgumentException(d.getKey() + com.checkba.service.LangText.of(" 超过 4000 字符上限", " exceeds the 4,000-character limit"));
                 }
             }
         }
@@ -330,20 +330,20 @@ public class PluginContributionService {
     byte[] readContributedFile(String pluginId, String relFile) {
         File pluginDir = pluginService.getPluginDir(pluginId);
         if (pluginDir == null) {
-            throw new IllegalArgumentException("插件目录不存在: " + pluginId);
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("插件目录不存在: ", "Plugin directory does not exist: ") + pluginId);
         }
         try {
             File target = new File(pluginDir, relFile);
             String canonical = target.getCanonicalPath();
             if (!canonical.startsWith(pluginDir.getCanonicalPath() + File.separator)) {
-                throw new IllegalArgumentException("声明文件路径逃逸插件目录: " + relFile);
+                throw new IllegalArgumentException(com.checkba.service.LangText.of("声明文件路径逃逸插件目录: ", "Contributed file path escapes plugin directory: ") + relFile);
             }
             if (!target.isFile() || target.length() > MAX_TEMPLATE_BYTES) {
-                throw new IllegalArgumentException("声明文件不存在或超限: " + relFile);
+                throw new IllegalArgumentException(com.checkba.service.LangText.of("声明文件不存在或超限: ", "Contributed file does not exist or exceeds size limit: ") + relFile);
             }
             return Files.readAllBytes(target.toPath());
         } catch (java.io.IOException e) {
-            throw new IllegalStateException("声明文件读取失败: " + e.getMessage(), e);
+            throw new IllegalStateException(com.checkba.service.LangText.of("声明文件读取失败: ", "Failed to read contributed file: ") + e.getMessage(), e);
         }
     }
 

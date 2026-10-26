@@ -16,7 +16,10 @@ export function createOcrRoutingHandler(deps) {
     } catch (_) {
       if (mark === generation && !state) {
         pending = snapshot.pending
-        state = { ...snapshot.state, phase: 'cancelFailed', error: '取消尚未确认，请重试。已发出的识别请求无法撤回；确认取消后会停止后续页面。' }
+        const cancelFailedMsg = typeof deps.t === 'function'
+          ? deps.t('admin.ocrChoiceCancelFailedError')
+          : '取消尚未确认，请重试。已发出的识别请求无法撤回；确认取消后会停止后续页面。'
+        state = { ...snapshot.state, phase: 'cancelFailed', error: cancelFailedMsg }
         publish()
       }
       return false
@@ -64,7 +67,10 @@ export function createOcrRoutingHandler(deps) {
       await continueReady()
       return true
     } catch (error) {
-      if (mark === generation && valid()) { state.phase = 'choose'; state.error = error.message || '选择未保存，请重试'; publish() }
+      if (mark === generation && valid()) {
+        const saveFailedMsg = typeof deps.t === 'function' ? deps.t('admin.ocrChoiceSaveFailedError') : '选择未保存，请重试'
+        state.phase = 'choose'; state.error = error.message || saveFailedMsg; publish()
+      }
       return false
     }
   }

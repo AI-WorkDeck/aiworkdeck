@@ -75,7 +75,7 @@ public class AiModelCatalogController {
         // 鉴权口径与同目录其他 AI 控制器一致（会话解析照抄 AiChatController）
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) {
-            return ResponseEntity.status(401).body("请先登录");
+            return ResponseEntity.status(401).body(com.checkba.service.LangText.of("请先登录", "Please sign in first"));
         }
 
         AllowedModels.Region region = networkRegionService.effectiveRegion();
