@@ -60,6 +60,10 @@ export default {
     noPendingChanges: 'No pending changes',
     saveFailed: 'Failed to save',
     movedSaveFailed: 'File was moved or renamed; changes not saved yet',
+    versionSaveBusy: 'Version history is busy; changes are not saved yet. Please retry shortly.',
+    localVersionSaveBusy: 'Version history is busy; the save result is unconfirmed. Please retry shortly.',
+    contentSaveReloadRequired: 'The earlier save was stopped. Save a copy of your edits, then reload the file.',
+    contentSaveConflict: 'The file changed elsewhere. Save a copy of your edits, then reopen the file.',
     desktopOnly: 'Desktop app only',
   },
   boot: {

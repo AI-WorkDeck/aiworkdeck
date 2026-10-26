@@ -63,20 +63,45 @@ public class OrphanParentReconciler {
     private static final long ORPHAN_PARENT_ID = 0L;
 
     private final ProjectFileRepository projectFileRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.version.WorkSessionService contentLocks;
+    @org.springframework.beans.factory.annotation.Value("${desktop.local-core.enabled:false}")
+    private boolean localCoreEnabled;
+    private boolean startupAttempted;
+    private boolean startupSucceeded;
 
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
+        prepareForDocumentRequests();
+    }
+
+    /** The local document gate may require this repair earlier in the same Ready event. */
+    public synchronized boolean prepareForDocumentRequests() {
+        if (startupAttempted) return startupSucceeded;
+        startupAttempted = true;
         try {
             reconcile();
+            startupSucceeded = true;
         } catch (RuntimeException e) {
             // 对账是顺手活，读不到文件表不该拦住启动
             log.warn("孤儿父节点对账跳过：{}", e.toString());
         }
+        return startupSucceeded;
     }
 
     /** @return 被改写（含软删除）的行数，供测试与日志用 */
     public int reconcile() {
-        int changed = healOrphanRows() + dedupeByFilePath();
+        int changed;
+        if (localCoreEnabled) {
+            if (contentLocks == null) throw new IllegalStateException("Content lock service is unavailable");
+            var projects = new java.util.TreeSet<Long>();
+            for (var file : projectFileRepository.findByParentId(ORPHAN_PARENT_ID)) projects.add(file.getProjectId());
+            for (var group : projectFileRepository.findDuplicateLiveFilePaths()) projects.add((Long) group[0]);
+            int[] total = {0};
+            for (long projectId : projects) contentLocks.runLocked(projectId,
+                    () -> total[0] += healOrphanRows(projectId) + dedupeByFilePath(projectId));
+            changed = total[0];
+        } else changed = healOrphanRows(null) + dedupeByFilePath(null);
         if (changed > 0) {
             log.info("孤儿父节点对账完成：共处理 {} 行", changed);
         }
@@ -85,10 +110,12 @@ public class OrphanParentReconciler {
 
     // ---- (a)(b) parent_id = 0 的孤儿行 ----
 
-    private int healOrphanRows() {
-        List<ProjectFile> orphans = projectFileRepository.findByParentId(ORPHAN_PARENT_ID);
+    private int healOrphanRows(Long onlyProject) {
+        List<ProjectFile> orphans = onlyProject == null ? projectFileRepository.findByParentId(ORPHAN_PARENT_ID)
+                : projectFileRepository.findByProjectIdAndParentId(onlyProject, ORPHAN_PARENT_ID);
         int changed = 0;
         for (ProjectFile orphan : orphans) {
+            if (onlyProject != null && !onlyProject.equals(orphan.getProjectId())) continue;
             ProjectFile twin = liveRootTwinOf(orphan);
             if (Boolean.TRUE.equals(orphan.getIsDeleted())) {
                 if (twin == null) {
@@ -167,10 +194,11 @@ public class OrphanParentReconciler {
 
     // ---- (c) 同一项目内重复的 file_path ----
 
-    private int dedupeByFilePath() {
+    private int dedupeByFilePath(Long onlyProject) {
         int changed = 0;
         for (Object[] row : projectFileRepository.findDuplicateLiveFilePaths()) {
             Long projectId = (Long) row[0];
+            if (onlyProject != null && !onlyProject.equals(projectId)) continue;
             String filePath = (String) row[1];
             List<ProjectFile> rows = new ArrayList<>(
                     projectFileRepository.findByProjectIdAndFilePathAndIsDeletedFalse(projectId, filePath));

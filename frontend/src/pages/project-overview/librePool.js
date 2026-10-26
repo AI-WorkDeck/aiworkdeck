@@ -29,6 +29,12 @@ function useConservativeLibrePool() {
     return !Number.isFinite(total) || total <= LOW_MEMORY_BYTES
 }
 
+function wantsNativeDocx(file) {
+    const limit = host.zetaoffice?.nativeDocxMaxBytes
+    return Number.isSafeInteger(limit) && limit > 0 && /\.docx$/i.test(file?.name || file?.fileName || '') &&
+        Number.isSafeInteger(file?.fileSize) && file.fileSize >= 0 && file.fileSize <= limit
+}
+
 function libreInstanceWeight(fileSizeBytes) {
     const n = Number(fileSizeBytes)
     if (!(n > 0)) return 1
@@ -167,6 +173,7 @@ export const librePoolMethods = {
     scheduleLibreSpare() {
         // 延迟建胎：避开项目打开期（文件树/面板初始化）的资源竞争。
         clearTimeout(this._libreSpareTimer)
+        if (this.hasActiveNativeDocument()) return
         if (useConservativeLibrePool() && this.hasLibreDocumentInstance()) return
         this._libreSpareTimer = setTimeout(() => this.initLibreSpare(), 4000)
     },
@@ -176,6 +183,7 @@ export const librePoolMethods = {
         // 备胎是常驻的空白 LOWA 实例（数百 MB 内存），只在桌面壳里预热：
         // Web 态没有保活语境（页面刷新即丢），不值这个内存。
         if (!isDesktopHost() || (useConservativeLibrePool() && this.hasLibreDocumentInstance())) return
+        if (this.hasActiveNativeDocument()) return
         if (this.libreSpares.some(sp => !sp.file && !sp.hidden)) return // 已有空闲备胎
         // 直接冷开也让前台文档先完成，避免 4 秒计时器同时启动第二套引擎。
         if (this.hasLoadingLibreDocumentInstance()) {
@@ -208,8 +216,14 @@ export const librePoolMethods = {
         return loading('left', this.leftFiles, this.activeFileIdLeft) ||
             (this.splitMode && loading('right', this.rightFiles, this.activeFileIdRight))
     },
+    hasActiveNativeDocument() {
+        return wantsNativeDocx(this.leftFiles.find(file => file.id === this.activeFileIdLeft)) ||
+            (this.splitMode && wantsNativeDocx(this.rightFiles.find(file => file.id === this.activeFileIdRight)))
+    },
     maybeAdoptLibreSpare(file) {
         if (!file || !this.useLibreEditor(file)) return
+        // A spare is already bound to WASM. Retargeting it cannot select the native engine.
+        if (wantsNativeDocx(file)) return
         const id = String(file.id)
         if (this.libreSpares.some(sp => sp.file && String(sp.file.id) === id)) return // 已是过继实例
         if (this.libreLruKeys.includes('left:' + file.id)) return // 常规池里已有活实例

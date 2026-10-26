@@ -201,7 +201,7 @@ test('换文档（版本退回 / 检查点恢复 / AI 直改文件）之后，�
   const vm = Object.assign(makeEditorVm(), {
     _docLoadSeq: 0,
     docKind: 'writer',
-    fetchArrayBuffer: async () => new ArrayBuffer(4096),
+    fetchDocumentBytes: async () => new ArrayBuffer(4096),
     bootMilestone() {},
     executor: { executeCommand: async () => ({ success: true, kind: 'writer' }) },
   })

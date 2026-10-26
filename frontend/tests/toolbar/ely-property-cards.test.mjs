@@ -5,6 +5,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { CN_FONT_SIZES, PT_FONT_SIZES } from '../../src/utils/paragraphFormat.js'
+import * as viewPrefs from '../../src/utils/editorViewPrefs.js'
 import zh from '../../src/locales/zh-CN/editor.js'
 import en from '../../src/locales/en-US/editor.js'
 
@@ -17,8 +18,9 @@ function loadToolbarComponent() {
   return new Function(
     'bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host',
     'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel',
+    ...Object.keys(viewPrefs),
     script.replace(/^import .*$/gm, '').replace('export default', 'return'),
-  )(() => () => {}, () => () => {}, () => false, {}, CN_FONT_SIZES, PT_FONT_SIZES, {}, {})
+  )(() => () => {}, () => () => {}, () => false, {}, CN_FONT_SIZES, PT_FONT_SIZES, {}, {}, ...Object.values(viewPrefs))
 }
 
 function makeToolbarVm(customHandler) {

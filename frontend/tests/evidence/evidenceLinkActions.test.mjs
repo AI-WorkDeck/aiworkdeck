@@ -3,6 +3,8 @@
 // 拖到编辑器建链的纯函数（evidenceLinkCore.js，exec/api 全部注入）：mock exec 按 action 返回，断言各条路径。
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import vm from 'node:vm'
 import { createEvidenceLinkForDrop, createEvidenceLinkForSelection, pickEvidenceTarget } from '../../src/pages/project-overview/evidenceLinkCore.js'
 
 const BASE = 'https://checkba-internal.local/open'
@@ -63,6 +65,78 @@ test('新建：bookmark_selection + set_selection_hyperlink + createEvidenceLink
   assert.equal(body.sectionTitle, '二、主体资格')
   assert.equal(body.createdByKind, 'human')
   assert.deepEqual(body.targets, [{ fileId: 77, relation: 'supports', method: 'written_review' }])
+})
+
+test('两次选区写入都核验首次读取的完整原文，空格与换行不被 trim', async () => {
+  const text = ' \t合同原文😀\n 第二行\u3000 '
+  const h = harness({ selection: { success: true, url: '', hasSelection: true, text } })
+  assert.equal((await run(h)).ok, true)
+  assert.equal(h.calls[1][1].expectedText, text)
+  assert.equal(h.calls[2][1].expectedText, text)
+  assert.equal(h.apiCalls[0][2].anchorText, text.trim(), '保留既有展示摘要口径，不能拿它代替原文校验')
+})
+
+for (const changedBefore of ['bookmark_selection', 'set_selection_hyperlink']) {
+  test(`选区在 ${changedBefore} 前变化时拒绝该步，不写入后端关联`, async () => {
+    const original = ' 原文\n第二行 '
+    let current = original, bookmarkCreated = false
+    const h = harness()
+    h.exec = async (action, params) => {
+      h.calls.push([action, params])
+      if (action === 'get_selection_hyperlink') {
+        if (changedBefore === 'bookmark_selection') current = '另一处文字'
+        return { success: true, text: original, url: '', hasSelection: true }
+      }
+      if (action === 'bookmark_selection' || action === 'set_selection_hyperlink') {
+        // 与原生契约相同：显式 expectedText 才能核验，旧调用漏传会继续写。
+        if (Object.hasOwn(params, 'expectedText') && params.expectedText !== current) {
+          return { success: false, error: 'EVIDENCE_SELECTION_CHANGED' }
+        }
+        if (action === 'bookmark_selection') {
+          bookmarkCreated = true
+          if (changedBefore === 'set_selection_hyperlink') current = '另一处文字'
+        }
+        return { success: true }
+      }
+      return { success: true }
+    }
+    const result = await run(h)
+    assert.equal(result.ok, false)
+    assert.equal(result.reason, changedBefore === 'bookmark_selection' ? 'bookmark_failed' : 'hyperlink_failed')
+    assert.equal(result.message, 'EVIDENCE_SELECTION_CHANGED')
+    assert.equal(h.actions().at(-1), changedBefore)
+    assert.equal(h.apiCalls.length, 0)
+    assert.equal(bookmarkCreated, changedBefore === 'set_selection_hyperlink', '后一步失败不伪称前一步原子回滚')
+  })
+}
+
+test('现有 WASM 两条真实方法兼容额外 expectedText 参数，保留实际选区文字', () => {
+  const source = readFileSync(new URL('../../src/zetaoffice/public/office_thread.js', import.meta.url), 'utf8')
+  const methods = ['bookmark_selection', 'set_selection_hyperlink'].map(name => {
+    const start = source.indexOf(`  ${name}(p) {`)
+    assert.ok(start >= 0)
+    const end = source.indexOf('\n  },', start)
+    assert.ok(end > start)
+    return source.slice(start, end + 5)
+  })
+  const text = ' 原文\n第二行 ', mutations = []
+  const range = { getString: () => text, getText: () => ({
+    insertTextContent: (target, bookmark, absorb) => mutations.push(['bookmark', target, bookmark.name, absorb]),
+    createTextCursorByRange: () => ({ setPropertyValue: (key, value) => mutations.push([key, value]) }),
+  }) }
+  const actions = vm.runInNewContext(`({${methods.join('\n')}})`, {
+    isWriterDoc: () => true, selectionRange: () => range,
+    bmFail: message => ({ success: false, message }), errStr: String,
+    xModel: { getBookmarks: () => ({ hasByName: () => false }), createInstance: () => ({ setName(name) { this.name = name } }) },
+    ctrl: { getSelection: () => ({ getCount: () => 1, getByIndex: () => range }) },
+  })
+  const bookmark = actions.bookmark_selection({ name: 'EVID_TEST', expectedText: text })
+  const link = actions.set_selection_hyperlink({ url: BASE, expectedText: text })
+  assert.equal(bookmark.success, true)
+  assert.equal(link.success, true)
+  assert.equal(bookmark.text, text)
+  assert.equal(link.text, text)
+  assert.deepEqual(mutations, [['bookmark', range, 'EVID_TEST', true], ['HyperLinkURL', BASE]])
 })
 
 test('选区已带 filelink?k= → 复用 linkKey，只 addEvidenceTargets，取该文件下最新 target', async () => {

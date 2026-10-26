@@ -51,7 +51,8 @@ function findFreePort() {
  *   verifyReuse?: (ctx, port) => Promise<boolean>  // 端口已被监听时验明是否自家服务；缺省视为是（旧语义）
  *   reallocatePort?: (ctx) => Promise<number>      // verifyReuse 失败（端口被陌生进程占）时重新分配
  *   fixedPort?: boolean               // 分配后不得漂移（后端地址已注入渲染层）
- *   health?: (ctx, port, build) => Promise<boolean> // 启动/运行共用 HTTP 健康定义
+ *   health?: (ctx, port, build) => Promise<boolean> // 完整后端健康，供持续监督
+ *   startupHealth?: (ctx, port, build, launch) => Promise<boolean> // 可选的首屏就绪；不代替完整健康
  *   requestStop?: (ctx, port, controlToken) => Promise<boolean> // 本次 child 的优雅退出
  *   stopTimeoutMs?: number            // SIGKILL 前宽限；后端需要覆盖 Spring graceful 时间
  *   startTimeoutMs: (ctx) => number
@@ -69,6 +70,7 @@ class ServiceManager {
     this.procs = new Map()
     this.operations = new Map()
     this.healthChecks = new Map()
+    this.launches = new Map()
     this.stopRequests = new Map()
     this.managed = new Set() // 曾由本管理器启动；退出后仍可恢复
     this.closing = false
@@ -111,7 +113,16 @@ class ServiceManager {
 
   isOwned(name) { return this.managed.has(name) }
   isBusy(name) { return this.operations.has(name) }
-  checkHealth(name) { return this.healthChecks.get(name)?.() || Promise.resolve(false) }
+  getLaunch(name) { return this.launches.get(name) }
+  async checkHealth(name, launch = this.launches.get(name)) {
+    const current = () => launch && this.launches.get(name) === launch &&
+      this.procs.get(name) === launch.process && launch.process.exitCode == null && launch.process.signalCode == null
+    if (!current()) return false
+    const healthy = await (this.healthChecks.get(name)?.() || Promise.resolve(false))
+    if (!current()) return false
+    if (healthy) launch.fullReady = true
+    return healthy
+  }
 
   async _start(name) {
     if (this.closing) throw new Error('services are stopping')
@@ -134,16 +145,20 @@ class ServiceManager {
       state = await probe()
     }
     if (state === 'reuse') {
-      if (!this.procs.has(name)) this.managed.delete(name)
-      return { ok: true, reused: true }
+      if (!this.procs.has(name)) { this.managed.delete(name); this.launches.delete(name) }
+      const launch = this.launches.get(name)
+      return { ok: true, reused: true, launch,
+        fullReady: launch ? await this.checkHealth(name, launch) : d.health ? await d.health(this.ctx, port) : true }
     }
     if (state === 'foreign') throw new Error(`${name} port ${port} 被未知进程占用`)
 
     if (d.prepare) await d.prepare(this.ctx)
     const postPrepare = await probe()
     if (postPrepare === 'reuse') {
-      if (!this.procs.has(name)) this.managed.delete(name)
-      return { ok: true, reused: true }
+      if (!this.procs.has(name)) { this.managed.delete(name); this.launches.delete(name) }
+      const launch = this.launches.get(name)
+      return { ok: true, reused: true, launch,
+        fullReady: launch ? await this.checkHealth(name, launch) : d.health ? await d.health(this.ctx, port) : true }
     }
     if (postPrepare === 'foreign') throw new Error(`${name} port ${port} 被未知进程占用`)
     if (this.procs.get(name)) await this._stop(name)
@@ -166,6 +181,9 @@ class ServiceManager {
       const spec = candidates[i]
       const stdio = logStream ? ['ignore', 'pipe', 'pipe'] : 'inherit'
       const proc = spawn(spec.cmd, spec.args, { cwd: spec.cwd, env: spec.env, stdio })
+      const launch = { process: proc, deadline: Date.now() + timeoutMs,
+        fullReady: false, splitReadiness: !!d.startupHealth, bootOverlay: spec.bootOverlay }
+      this.launches.set(name, launch)
       this.procs.set(name, proc)
       this.managed.add(name)
       if (d.requestStop) this.stopRequests.set(name, () => d.requestStop(this.ctx, port, spec.env?.AWD_BACKEND_CONTROL_TOKEN))
@@ -178,10 +196,17 @@ class ServiceManager {
       // 捕获本次启动的指纹，后台下载激活 overlay 不应把仍运行的旧版本判死。
       const health = d.health ? () => d.health(this.ctx, port, spec.env?.AWD_BACKEND_BUILD) : null
       if (health) this.healthChecks.set(name, health)
+      const startupHealth = d.startupHealth ? () => d.startupHealth(this.ctx, port, spec.env?.AWD_BACKEND_BUILD, launch) : health
       // 等 HTTP 就绪或进程退出；其它服务保留 TCP readiness。
       // eslint-disable-next-line no-await-in-loop
-      const result = await this.waitStartOrExit(proc, port, timeoutMs, health)
-      if (result === 'started') return { ok: true, reused: false, cmd: spec.cmd }
+      const result = await this.waitStartOrExit(proc, port, timeoutMs, startupHealth)
+      if (result === 'started') {
+        // A split startup probe only opens the window gate. Full readiness is confirmed
+        // asynchronously by the supervisor, never awaited again on the startup path.
+        const fullReady = !d.startupHealth
+        launch.fullReady = fullReady
+        return { ok: true, reused: false, cmd: spec.cmd, fullReady, launch }
+      }
       if (result === 'timeout' || this.closing) {
         // 进程还活着但端口没起：杀掉再试下一个候选
         // eslint-disable-next-line no-await-in-loop

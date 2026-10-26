@@ -14,7 +14,9 @@ public class CheckbaApplication {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CheckbaApplication.class);
 
     public static void main(String[] args) {
-        SpringApplication.run(CheckbaApplication.class, args);
+        SpringApplication application = new SpringApplication(CheckbaApplication.class);
+        com.checkba.localcore.LocalCoreApplication.configure(application);
+        application.run(args);
         log.info("Checkba AI Agent Backend is running!");
     }
 

@@ -238,6 +238,13 @@ function relayCommentRequest(documentSeq) {
 }
 function relayModified(d) {
   if (!d || !d.cmd) return
+  if (d.cmd === 'save-snapshot') {
+    // The first edit after this export must reach the host even if the previous
+    // edit was within the ordinary 500 ms throttle window.
+    lastModifiedRelay = 0
+    try { hostTransport.send({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: d.saveSnapshotId }) } catch (e) { /* ignore */ }
+    return
+  }
   if (d.cmd === 'comment-request') { relayCommentRequest(d.documentSeq); return }
   // 原生「导出为 PDF」入口被 worker 拦下（dev-board#886）：宿主取字节并下载
   if (d.cmd === 'export-pdf-request') {

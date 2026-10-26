@@ -4,6 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { CN_FONT_SIZES, PT_FONT_SIZES } from '../../src/utils/paragraphFormat.js'
+import * as viewPrefs from '../../src/utils/editorViewPrefs.js'
 import { JSDOM } from 'jsdom'
 import { attachImeOverlay } from '../../src/composables/zetaOfficeImeOverlay.js'
 
@@ -15,6 +16,7 @@ function component(path, dependencies = {}) {
   return new Function(...Object.keys(dependencies), body)(...Object.values(dependencies))
 }
 const toolbarComponent = component('../../src/components/EditorToolbar.vue', {
+  ...viewPrefs,
   bindHorizontalWheel: () => () => {}, watchScrollEdges: () => () => {},
   isEnglish: () => false, host: {}, CN_FONT_SIZES, PT_FONT_SIZES,
   ParagraphFormatPanel: {}, SystemFontsPanel: {},

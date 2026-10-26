@@ -35,7 +35,8 @@ export async function createEvidenceLinkForDrop({ exec, api, projectId, docFileI
 export async function createEvidenceLinkForSelection({ exec, api, projectId, docFileId, internalBase, targets, createdByKind = 'human' }) {
   let cur = null
   try { cur = await exec('get_selection_hyperlink', {}) } catch (e) { cur = null }
-  const selText = cur && cur.success ? String(cur.text || '').trim() : ''
+  const expectedText = cur && cur.success ? String(cur.text || '') : ''
+  const selText = expectedText.trim()
   if (!selText) return { ok: false, reason: 'no_selection' }
 
   let linkKey = ''
@@ -45,10 +46,12 @@ export async function createEvidenceLinkForSelection({ exec, api, projectId, doc
   let created = false
   if (!linkKey) {
     linkKey = 'EVID_' + ulid()
-    const bm = await exec('bookmark_selection', { name: linkKey })
+    // 核验最初选区的完整原文；显示摘要的 trim 不能改变写入前提。
+    // 两次 RPC 仍非原子：后一步拒绝时，前一步书签可能已经存在。
+    const bm = await exec('bookmark_selection', { name: linkKey, expectedText })
     if (!bm || !bm.success) return { ok: false, reason: 'bookmark_failed', message: (bm && (bm.error || bm.message)) || '' }
     const url = buildFileLinkUrl(internalBase, linkKey, projectId)
-    const r = await exec('set_selection_hyperlink', { url })
+    const r = await exec('set_selection_hyperlink', { url, expectedText })
     if (!r || !r.success) return { ok: false, reason: 'hyperlink_failed', message: (r && (r.error || r.message)) || '' }
     created = true
   }

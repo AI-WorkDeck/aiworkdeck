@@ -6460,6 +6460,10 @@ const EXEC = {
     // 导出是同步的、跑在这条 office 线程上，期间不可能有用户编辑挤进来，
     // 复原不会吃掉真实修改；宿主侧的 dirty 是另一套独立记账，也不受影响。
     const wasModified = (() => { try { return !!xModel.isModified(); } catch (e) { return false; } })();
+    // The office queue has now applied earlier IME/AI writes. Export is
+    // synchronous: later input can only modify the model after this snapshot.
+    if (Number.isSafeInteger(p && p.saveSnapshotId) && p.saveSnapshotId > 0)
+      post('save-snapshot', { saveSnapshotId: p.saveSnapshotId });
     exportInFlight = true;
     try {
       withInlineMarkupForExport(function () { if (ext === 'docx') repairMoveRangeBookmarks(); xModel.storeToURL('private:stream', props); });

@@ -15,6 +15,7 @@ import assert from 'node:assert/strict'
 import vm from 'node:vm'
 import { readFileSync } from 'node:fs'
 import { CN_FONT_SIZES, PT_FONT_SIZES } from '../../src/utils/paragraphFormat.js'
+import * as viewPrefs from '../../src/utils/editorViewPrefs.js'
 import { EDITOR_ACTIONS, createLibreOfficeExecutor } from '../../src/composables/libreofficeExecutorClient.js'
 
 const WORKER_SRC = readFileSync(new URL('../../src/zetaoffice/public/office_thread.js', import.meta.url), 'utf8')
@@ -55,8 +56,9 @@ function loadToolbar() {
   const script = src.match(/<script>([\s\S]*?)<\/script>/)[1]
   return new Function('bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host',
     'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel',
+    ...Object.keys(viewPrefs),
     script.replace(/^import .*$/gm, '').replace('export default', 'return'))(
-    () => () => {}, () => () => {}, () => false, {}, CN_FONT_SIZES, PT_FONT_SIZES, {}, {})
+    () => () => {}, () => () => {}, () => false, {}, CN_FONT_SIZES, PT_FONT_SIZES, {}, {}, ...Object.values(viewPrefs))
 }
 
 // engineView: worker 侧 get_ui_state 回的 view 段（= 引擎的真实读回）

@@ -17,12 +17,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
 import java.io.BufferedReader;
@@ -35,8 +38,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 /**
  * 真 Tomcat + Hikari + 本机权限查库 + 真实目录监听；没有替换鉴权、对账或通知服务。
@@ -74,7 +83,10 @@ class LocalProjectFileChangeHttpTest {
 
     @Autowired private LocalIdentityService identity;
     @Autowired private LocalProjectService projects;
-    @Autowired private LocalRootWatchService watcher;
+    @SpyBean private LocalRootWatchService watcher;
+    @Autowired private ProjectService projectService;
+    @Autowired private com.checkba.repository.ProjectRepository projectRepository;
+    @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private LocalProjectFileChangeService changes;
     @Autowired private DataSource dataSource;
     @Autowired private ObjectMapper json;
@@ -87,6 +99,125 @@ class LocalProjectFileChangeHttpTest {
         AuthController.registerUserSessionService(null);
         AuthController.registerDeviceTokenService(null);
         ReflectionTestUtils.setField(AuthController.class, "staticUserService", null);
+    }
+
+    @Test
+    void deletionStopsWatchingOnlyAfterCommitAndRollbackKeepsTheWatcher() throws Exception {
+        Path root = Files.createDirectory(SANDBOX.resolve("delete-transaction"));
+        Path file = Files.writeString(root.resolve("keep.txt"), "synthetic local file");
+        Long projectId = projects.openLocalFolder(root.toString(), false, "synthetic", null,
+                identity.localUserId()).project().getId();
+        doAnswer(call -> { call.<Runnable>getArgument(1).run(); return null; })
+                .when(workSessions).runProjectDeletion(eq(projectId), any());
+        var transaction = new TransactionTemplate(transactionManager);
+        try {
+            transaction.executeWithoutResult(status -> {
+                projectService.deleteProject(projectId);
+                assertTrue(watcher.isWatching(projectId), "Uncommitted deletion must not stop the watcher");
+                status.setRollbackOnly();
+            });
+            assertTrue(projectRepository.existsById(projectId));
+            assertTrue(watcher.isWatching(projectId));
+            transaction.executeWithoutResult(status -> {
+                projectService.deleteProject(projectId);
+                assertTrue(watcher.isWatching(projectId));
+            });
+            assertFalse(projectRepository.existsById(projectId));
+            assertFalse(watcher.isWatching(projectId));
+            watcher.onLocalProjectOpened(new LocalProjectService.LocalProjectOpened(projectId, root.toString()));
+            assertFalse(watcher.isWatching(projectId), "A late open must not revive the deleted project");
+            assertEquals("synthetic local file", Files.readString(file));
+        } finally {
+            watcher.stopWatch(projectId);
+        }
+    }
+
+    @Test
+    void committedDeletionDuringDirectoryRegistrationClosesTheLateWatcher() throws Exception {
+        Path root = Files.createDirectory(SANDBOX.resolve("delete-during-registration"));
+        Long projectId = projects.openLocalFolder(root.toString(), false, "synthetic", null,
+                identity.localUserId()).project().getId();
+        watcher.stopWatch(projectId);
+        var registration = mock(io.methvin.watcher.DirectoryWatcher.class);
+        var started = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        when(registration.watchAsync(any())).thenAnswer(call -> {
+            started.countDown();
+            assertTrue(release.await(10, TimeUnit.SECONDS));
+            return new CompletableFuture<Void>();
+        });
+        doReturn(registration).when(watcher).createWatcher(eq(root), any());
+        doAnswer(call -> { call.<Runnable>getArgument(1).run(); return null; })
+                .when(workSessions).runProjectDeletion(eq(projectId), any());
+        var caller = Executors.newSingleThreadExecutor();
+        try {
+            var pendingOpen = caller.submit(() -> watcher.ensureWatch(projectId, root.toString()));
+            assertTrue(started.await(5, TimeUnit.SECONDS));
+            projectService.deleteProject(projectId);
+            verify(registration, never()).close();
+            release.countDown();
+            assertFalse(pendingOpen.get(5, TimeUnit.SECONDS));
+            verify(registration).close();
+            assertFalse(watcher.isWatching(projectId));
+            assertFalse(watcher.ensureWatch(projectId, root.toString()));
+            assertFalse(projectRepository.existsById(projectId));
+        } finally {
+            release.countDown();
+            watcher.stopWatch(projectId);
+            caller.shutdownNow();
+        }
+    }
+
+    @Test
+    void startupReconcilesChangesMadeBeforeALaterProjectWasRegistered() throws Exception {
+        Path firstRoot = Files.createDirectory(SANDBOX.resolve("startup-gap-a"));
+        Path laterRoot = Files.createDirectory(SANDBOX.resolve("startup-gap-b"));
+        Path original = Files.writeString(laterRoot.resolve("before.txt"), "synthetic startup gap");
+        var first = projects.openLocalFolder(firstRoot.toString(), false, "synthetic", null,
+                identity.localUserId()).project();
+        var later = projects.openLocalFolder(laterRoot.toString(), false, "synthetic", null,
+                identity.localUserId()).project();
+        watcher.stopWatch(first.getId());
+        watcher.stopWatch(later.getId());
+        long fileId = rowByName(readTree(later.getId()), "before.txt").path("id").asLong();
+        var snapshotRepository = mock(com.checkba.repository.ProjectRepository.class);
+        when(snapshotRepository.findByLocalRootIsNotNull()).thenReturn(List.of(first, later));
+        when(snapshotRepository.findById(anyLong())).thenAnswer(call -> projectRepository.findById(call.getArgument(0)));
+        var startup = spy(new LocalRootWatchService(snapshotRepository, projects, changes));
+        var blocked = mock(io.methvin.watcher.DirectoryWatcher.class);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        when(blocked.watchAsync(any())).thenAnswer(call -> {
+            entered.countDown();
+            assertTrue(release.await(10, TimeUnit.SECONDS));
+            return new CompletableFuture<Void>();
+        });
+        doReturn(blocked).when(startup).createWatcher(eq(firstRoot), any());
+        try (Stream stream = openStream(later.getId())) {
+            stream.await("ready");
+            startup.onStartup();
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            assertFalse(startup.isWatching(later.getId()));
+            Files.move(original, laterRoot.resolve("after.txt"));
+            assertEquals(fileId, rowByName(readTree(later.getId()), "before.txt").path("id").asLong());
+            release.countDown();
+            ((java.util.concurrent.Future<?>) ReflectionTestUtils.getField(startup, "startupTask"))
+                    .get(5, TimeUnit.SECONDS);
+            assertTrue(startup.isWatching(later.getId()));
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(4);
+            JsonNode rows = readTree(later.getId());
+            while (!rows.toString().contains("after.txt") && System.nanoTime() < deadline) {
+                Thread.sleep(50);
+                rows = readTree(later.getId());
+            }
+            assertEquals(fileId, rowByName(rows, "after.txt").path("id").asLong(),
+                    "The missed move must be reconciled without changing the file identity");
+            assertEquals(later.getId().longValue(), stream.await("files_changed").path("projectId").asLong());
+        } finally {
+            release.countDown();
+            startup.shutdown();
+            changes.shutdown();
+        }
     }
 
     @Test
