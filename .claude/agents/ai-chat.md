@@ -7,6 +7,18 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 职责边界：AI 对话功能本身（编排循环、工具注册分发、记忆、SSE、前端聊天 UI、评测）。AI→编辑器指令链路属 ai-doc-bridge 领域；skill 机制属 plugin-system 领域（但 SkillRouter 在编排循环里有两处旁路接入点）。
 
+## AI 项目版本操作（2026-10-26，dev-board#1498）
+
+`VersionTools` 提供 `version_status/history/changes/commit/pull/restore`，独立 `version` 类目，均要求工作台 LOWA 宿主，不要求打开某份文档；Office/none 不可调用，ASK 仅放行状态、历史和变更清单。身份取 `ProjectContextHolder`，不可由模型指定另一项目或用户；客户不可读取版本历史，写动作仍经过既有成员权限与版本接口。`version_changes` 返回路径及增删改类型，不是正文差异；磁盘清单不代表编辑器未保存缓冲。历史可选 `includeAuto`，让 AI 找回恢复前自动保留的工作。
+
+写工具经 `VersionToolActionService` 创建绑定项目、用户、会话、SSE 代次和本轮令牌的一次性操作；`project_version_action` 同步桥由工作台保存所有受支持编辑器、领取执行、重载后回执。`/api/ai/agent/version-action/state` 和 `/execute` 仅接受服务端操作 ID，参数已在服务端固定。重复领取返回在途状态或已完成结果；停止、换轮、超时和旧连接不能开始未执行动作，已开始动作须对账，不能因缺回执重复提交。
+
+AI 自动合并续步也用同一操作的 `/merge`、`/merge-file` 与独立 `stepId` 回执，不能直接调用普通 UI 的写接口后用原提交的终态解锁编辑器。续步在原仓库锁内再次核对本轮有效、权限、同一冲突及 AUTO 分类；最终只允许所有路径已 MERGED 的收尾。`state?stepId=...` 查询指定续步，丢包只查询，不重发。前端入队时捕获固定守卫；停止的冲突身份暂停到显式重试，后台轮询不得把它重新排为自动合并。
+
+恢复必须使用历史列表里核实的完整版本编号，范围是整个项目；沿既有 `revertTo` 先保留当前工作、再追加恢复记录。提交、云端同步与编辑器刷新分别报告；自动合并复用现有 AUTO 流程，有内容取舍的冲突交版本面板，不自动选择一方。项目版本工具不标记单文档 `MODIFIED`，避免误触发活动文档检查点。
+
+按用户要求参考成熟 Git/gh 工作流：可解析状态与分支信息（[git status](https://git-scm.com/docs/git-status)）、取回后集成（[git pull](https://git-scm.com/docs/git-pull)）、明确恢复来源和范围（[git restore](https://git-scm.com/docs/git-restore)）。[gh repo sync](https://cli.github.com/manual/gh_repo_sync) 的普通同步和强制重置是不同动作，本工具不把失败自动升级为强制覆盖。底层仍使用项目既有 JGit/对象过滤/文件树清单，借鉴操作语义，不另造提交或合并算法。
+
 ## Harness² 自愈、证据挑战与用户自进化（2026-10-26，dev-board#1481）
 
 对齐 Google `Harness²`（Invariant vs. Domain 双层架构 + Propose–Probe–Compose 自愈 + 对比式自进化）、`VeriHarness`（声明式证据挑战网关）与 `EnvHarness`（Setup/Rule/Link 环境扰动评测）：

@@ -52,6 +52,8 @@ public class AgentOrchestrator {
 
     /** ASK remains read-only but can inspect the user's durable memory. */
     static final Set<String> ASK_MEMORY_TOOLS = Set.of("memory_list", "memory_read", "memory_search");
+    static final Set<String> ASK_READ_TOOLS = Set.of("memory_list", "memory_read", "memory_search",
+            "version_status", "version_history", "version_changes");
     /**
      * Agent/Plan 回合里 skill 收窄时仍补回的 Markdown 记忆工具（dev-board#798 的原始语义：
      * skill 白名单不许把记忆能力藏掉）。没被 skill 收窄的回合只补只读的三个（{@link #ASK_MEMORY_TOOLS}，
@@ -2505,8 +2507,8 @@ public class AgentOrchestrator {
 
                     String result;
                     boolean success;
-                    if (agentMode == AgentMode.ASK && !ASK_MEMORY_TOOLS.contains(req.name())) {
-                        result = "Error: ASK mode permits only memory_list, memory_read, and memory_search.";
+                    if (agentMode == AgentMode.ASK && !ASK_READ_TOOLS.contains(req.name())) {
+                        result = "Error: ASK mode permits only read-only memory and version inspection tools.";
                         success = false;
                     } else {
                         ToolRegistry.ToolResult toolResult = dispatchTool(req.name(), req.arguments(),
@@ -2676,8 +2678,8 @@ public class AgentOrchestrator {
                     if (call.parseError() != null) {
                         result = call.parseError();
                         xmlToolSuccess = false;
-                    } else if (agentMode == AgentMode.ASK && !ASK_MEMORY_TOOLS.contains(call.toolName())) {
-                        result = "Error: ASK mode permits only memory_list, memory_read, and memory_search.";
+                    } else if (agentMode == AgentMode.ASK && !ASK_READ_TOOLS.contains(call.toolName())) {
+                        result = "Error: ASK mode permits only read-only memory and version inspection tools.";
                         xmlToolSuccess = false;
                     } else {
                         toolResult = dispatchTool(call.toolName(), call.argsJson(),
@@ -3225,7 +3227,7 @@ public class AgentOrchestrator {
         List<ToolSpecification> registered =
                 toolRegistry.getAllSpecifications(conversationId, guard == null ? null : guard.activeDocKind);
         // 再去掉本轮运行期确定用不了的（dev-board#750）。这一层刻意放在编排器而不是注册表里：
-        // 可见性的最后一道裁剪本来就在这里（skill 白名单、ASK 只留只读记忆工具），而且
+        // 可见性的最后一道裁剪本来就在这里（skill 白名单、ASK 只留只读记忆和版本检查工具），而且
         // guard.unusableTools 是**轮次级**状态，只有这里拿得到。
         if (guard != null && !guard.unusableTools.isEmpty()) {
             registered = registered.stream()
@@ -3241,8 +3243,8 @@ public class AgentOrchestrator {
             guard.roundTrimmed = 0;
         }
         if (agentMode == AgentMode.ASK) {
-            visible = registered.stream().filter(s -> ASK_MEMORY_TOOLS.contains(s.name())).toList();
-            log.info("Ask mode: generating with {} read-only memory tools", visible.size());
+            visible = registered.stream().filter(s -> ASK_READ_TOOLS.contains(s.name())).toList();
+            log.info("Ask mode: generating with {} read-only tools", visible.size());
         } else {
             List<ToolSpecification> afterSkill = skillRouter.visibleTools(guard.runId, registered);
             // skill 的 allowed_tools 本身已经是一次披露；两层叠起来会把 skill 精心挑出来的
@@ -3436,7 +3438,7 @@ public class AgentOrchestrator {
      * 没开文档的会话（纯对话、Office 任务窗格）里同样只下发核心集——「帮我建个事项」若不预放回
      * task 类目，就要先花一轮 list_tools，下一轮工具集一变提示缓存还得整段重付（09-29 实测 T-B 20/20 如此）。
      *
-     * <p>ASK 模式只下发只读记忆工具，裁不裁、放不放回都一样，不做。
+     * <p>ASK 模式只下发只读记忆和版本检查工具，裁不裁、放不放回都一样，不做。
      */
     private void prepareToolCategoryPutBack(RunGuard guard, String userMessage, AgentMode agentMode) {
         ToolDisclosurePolicy policy = this.toolDisclosurePolicy;

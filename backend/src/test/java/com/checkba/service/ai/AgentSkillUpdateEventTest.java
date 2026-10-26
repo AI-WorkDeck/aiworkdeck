@@ -282,6 +282,73 @@ class AgentSkillUpdateEventTest {
     }
 
     @Test
+    @DisplayName("ASK 原生与XML均可执行只读版本检查")
+    void askAllowsReadOnlyVersionInspection() {
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "xmlToolCallParser", new XmlToolCallParser(toolRegistry));
+        List<String> reads = List.of("version_status", "version_history", "version_changes");
+        when(toolRegistry.getAllSpecifications(any(), any())).thenReturn(java.util.stream.Stream.concat(
+                reads.stream(), java.util.stream.Stream.of("version_commit", "version_pull", "version_restore"))
+                .map(AgentSkillUpdateEventTest::spec).toList());
+        for (boolean xml : List.of(false, true)) {
+            for (String tool : reads) {
+                when(toolRegistry.hasTool(tool)).thenReturn(true);
+                when(toolRegistry.execute(eq(tool), any(), any())).thenReturn(new ToolRegistry.ToolResult("{\"changes\":[]}", null, true));
+                java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+                StreamingChatLanguageModel model = new StreamingChatLanguageModel() {
+                    @Override public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) { generate(messages, List.of(), handler); }
+                    @Override public void generate(List<ChatMessage> messages, List<ToolSpecification> tools, StreamingResponseHandler<AiMessage> handler) {
+                        assertEquals(reads, tools.stream().map(ToolSpecification::name).toList());
+                        AiMessage reply = calls.getAndIncrement() == 0
+                                ? (xml ? AiMessage.from("<tool_code>" + tool + "()</tool_code>")
+                                : AiMessage.from(ToolExecutionRequest.builder().id("read1").name(tool).arguments("{}").build()))
+                                : AiMessage.from("<final>inspection complete</final>");
+                        if (reply.text() != null) handler.onNext(reply.text());
+                        handler.onComplete(Response.from(reply));
+                    }
+                };
+                when(chatModelFactory.getStreamingChatModel(MODEL)).thenReturn(model);
+                run("ask-read-" + tool + xml, AgentMode.ASK, null);
+                assertEquals(2, calls.get());
+            }
+        }
+        for (String tool : reads) verify(toolRegistry, times(2)).execute(eq(tool), any(), any());
+        for (String tool : List.of("version_commit", "version_pull", "version_restore")) verify(toolRegistry, never()).execute(eq(tool), any(), any());
+    }
+
+    @Test
+    @DisplayName("ASK 同时拒绝原生与 XML 版本写工具")
+    void askRejectsNativeAndXmlVersionWrites() {
+        org.springframework.test.util.ReflectionTestUtils.setField(orchestrator, "xmlToolCallParser",
+                new XmlToolCallParser(toolRegistry));
+        for (boolean xml : List.of(false, true)) {
+            for (String tool : List.of("version_commit", "version_pull", "version_restore")) {
+                when(toolRegistry.getAllSpecifications(any(), any())).thenReturn(List.of(spec(tool)));
+                when(toolRegistry.hasTool(tool)).thenReturn(true);
+                java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+                StreamingChatLanguageModel model = new StreamingChatLanguageModel() {
+                    @Override public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                        generate(messages, List.of(), handler);
+                    }
+                    @Override public void generate(List<ChatMessage> messages, List<ToolSpecification> tools,
+                                                   StreamingResponseHandler<AiMessage> handler) {
+                        assertFalse(tools.stream().anyMatch(s -> s.name().equals(tool)));
+                        AiMessage reply = calls.getAndIncrement() == 0
+                                ? (xml ? AiMessage.from("<tool_code>" + tool + "()</tool_code>")
+                                : AiMessage.from(ToolExecutionRequest.builder().id("v1").name(tool).arguments("{}").build()))
+                                : AiMessage.from("<final>write refused</final>");
+                        if (reply.text() != null) handler.onNext(reply.text());
+                        handler.onComplete(Response.from(reply));
+                    }
+                };
+                when(chatModelFactory.getStreamingChatModel(MODEL)).thenReturn(model);
+                run("conv-ask-" + tool + xml, AgentMode.ASK, null);
+                verify(toolRegistry, never()).execute(eq(tool), any(), any());
+                assertEquals(2, calls.get(), "The attempted write must be rejected and followed by a reply");
+            }
+        }
+    }
+
+    @Test
     @DisplayName("技能裁剪不能隐藏 Agent/Plan 的六个 memory 工具")
     void skillNarrowingRetainsAllOrdinaryMemoryTools() {
         ToolSpecification action = spec("skill_action");

@@ -36,6 +36,7 @@ import com.checkba.service.ai.tools.TemplateTools;
 import com.checkba.service.ai.tools.TextFileEditTools;
 import com.checkba.service.ai.tools.TodoTools;
 import com.checkba.service.ai.tools.ToolDiscoveryTools;
+import com.checkba.service.ai.tools.VersionTools;
 import com.checkba.service.ai.tools.WebTools;
 import com.checkba.service.ai.tools.WebVerifyTools;
 
@@ -103,6 +104,7 @@ final class RealToolBeans {
                 // dev-board#729 ① 要断言「docx 活跃时 slide_* 被裁掉」，先把它们补进来，
                 // 否则那条用例即使裁剪整个失效也照样绿。
                 CheckpointTools.class,
+                VersionTools.class,
                 // search_project_content：跨项目文件的全文检索（dev-board#1065 T-03）
                 ContentSearchTools.class,
                 ContributedTemplateTools.class,

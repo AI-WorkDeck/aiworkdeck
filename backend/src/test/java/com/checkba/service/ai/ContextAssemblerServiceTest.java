@@ -166,6 +166,9 @@ class ContextAssemblerServiceTest {
             assertTrue(systemText.contains("memory_list"));
             assertTrue(systemText.contains("memory_read"));
             assertTrue(systemText.contains("memory_search"));
+            assertTrue(systemText.contains("version_status"));
+            assertTrue(systemText.contains("version_history"));
+            assertTrue(systemText.contains("version_changes"));
             assertTrue(systemText.contains("memory_write"));
             assertTrue(systemText.contains(english ? "prohibited" : "禁止"));
         }

@@ -222,7 +222,7 @@ class VersionControllerAuthTest {
             case DRAFT_ABANDON -> controller.abandonDraft(PROJECT_ID, 3L, sessionId);
             case DISABLE -> controller.disable(PROJECT_ID, sessionId);
             case MERGE_ANALYSIS -> controller.mergeAnalysis(PROJECT_ID, "a.docx", sessionId);
-            case MERGE_RESOLVE_FILE -> controller.mergeResolveFile(PROJECT_ID, "a.docx", "manual", "[]", null,
+            case MERGE_RESOLVE_FILE -> controller.mergeResolveFile(PROJECT_ID, "a.docx", "manual", "[]", null, null, null,
                     new org.springframework.mock.web.MockMultipartFile("file", "a.docx", null, new byte[]{1}),
                     sessionId);
             case MERGE_RESOLVE_STRUCTURED -> controller.mergeResolveStructured(PROJECT_ID,

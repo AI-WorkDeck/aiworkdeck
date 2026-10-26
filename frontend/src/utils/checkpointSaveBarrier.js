@@ -18,6 +18,11 @@ export function documentCheckpointGeneration(projectId, fileId) {
 export function checkpointSaveBarrier(projectId, fileId) {
   return files.get(keyOf(projectId, fileId))?.barrier || null
 }
+export function pendingDocumentSaveFileIds(projectId) {
+  const prefix = String(projectId) + ':'
+  return [...files].filter(([key, state]) => key.startsWith(prefix) && (state.saves.size || state.uncertain.size || state.barrier))
+    .map(([key]) => key.slice(prefix.length))
+}
 export function beginDocumentSave(projectId, fileId) {
   const state = stateOf(projectId, fileId)
   if (state.barrier) return null
@@ -70,8 +75,9 @@ export function findCheckpointSaveBarrier(fileId, restoreId, conversationId) {
 export async function reconcileCheckpointSaveBarrier(projectId, fileId, getWriteState, loadingInstance) {
   const barrier = checkpointSaveBarrier(projectId, fileId)
   if (!barrier) return true
-  if (!barrier.conversationId) return false
-  const state = await getWriteState(barrier.conversationId, fileId, barrier.restoreId)
+  if (!barrier.conversationId && !barrier.readWriteState) return false
+  const state = barrier.readWriteState ? await barrier.readWriteState()
+    : await getWriteState(barrier.conversationId, fileId, barrier.restoreId)
   if (checkpointSaveBarrier(projectId, fileId) !== barrier) return !checkpointSaveBarrier(projectId, fileId)
   if (state?.mayWrite !== false) return false
   barrier.invalidated = true

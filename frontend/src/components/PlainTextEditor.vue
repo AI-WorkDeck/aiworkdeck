@@ -89,6 +89,7 @@ import { getAuthHeaders } from '@/utils/auth.js'
 import { toRaw } from 'vue'
 import * as fileReview from '@/services/fileReview.js'
 import { lineDiff } from '@/utils/lineDiff.js'
+import { beginDocumentSave, checkpointSaveBarrier, reconcileCheckpointSaveBarrier } from '@/utils/checkpointSaveBarrier.js'
 import { reanchorComment, buildPlanReviewPrompt } from '@/utils/planReview.js'
 import { createReviewExtensions } from '@/utils/planReviewExtensions.js'
 import PlanReviewBar from './PlanReviewBar.vue'
@@ -231,7 +232,9 @@ export default {
     // 放弃修改在途时不兜底上传：服务端正在把文件写回基线，此时上传会把放弃静默撤销
     if (this.dirty && !this.saving && this._loadOk && this._view && !this._discarding) {
       const content = this._view.state.doc.toString()
-      this.uploadContent(content).catch((e) => {
+      const saveLease = beginDocumentSave(this.projectId, this.fileRef())
+      if (saveLease) this.uploadContent(content).then(() => saveLease.finish(true), (e) => {
+        saveLease.finish(false)
         console.warn('[PlainTextEditor] unmount flush-save failed:', e)
       })
     }
@@ -267,6 +270,7 @@ export default {
       clearTimeout(this._retryTimer)
       if (this._view) { this._view.destroy(); this._view = null }
       try {
+        if (!await reconcileCheckpointSaveBarrier(this.projectId, this.fileRef(), null, this)) throw new Error(this.$t('version.aiActionUnknown'))
         const text = await this.download()
         this._loadOk = true
         // 审阅记录要在建 view 之前拿到：扩展装配依赖基线
@@ -367,18 +371,23 @@ export default {
 
     async save() {
       if (!this._loadOk || this.phase !== 'ready' || !this._view) return false
+      if (checkpointSaveBarrier(this.projectId, this.fileRef()) || this._checkpointRestoreId) return false
       // 放弃修改在途：服务端正在把文件写回基线，此时再上传会把修订内容写回去
       if (this._discarding) return false
       if (this.saving) { this.scheduleSave(); return false }
       const seq = this._seq
       const savedFileId = this.fileRef()
       const savedProjectId = this.projectId
+      const saveLease = beginDocumentSave(savedProjectId, savedFileId)
+      if (!saveLease) return false
+      let published = false
       const content = this._view.state.doc.toString()
       this.saving = true
       try {
         // 句柄留给 flushSave：关闭前必须等这一次真正结束，不能只看 saving 标志
         this._inflight = this.uploadContent(content)
         await this._inflight
+        published = true
         uni.$emit('awd:file-saved', { projectId: savedProjectId, fileId: savedFileId })
         this.saveFailed = false
         // 保存期间又有输入的话保持脏、让防抖继续跑；没有才清脏
@@ -392,6 +401,7 @@ export default {
         this._retryTimer = setTimeout(() => { this._retryTimer = null; if (this.dirty) this.save() }, RETRY_DELAY)
         return false
       } finally {
+        saveLease.finish(published)
         this._inflight = null
         this.saving = false
       }
@@ -433,12 +443,31 @@ export default {
     },
 
     /**
-     * 后端就地改了文件之后的重载（版本退回 / 检查点恢复 / AI text_* 直改）。
+     * 后端就地改了文件之后的保护与重载（版本退回 / 检查点恢复 / AI text_* 直改）。
      * 丢弃本地未保存态——这条链上的动作以后端为准，保留本地脏内容等于让下一次
      * 自动保存把操作结果冲掉（LOWA reloadFromBackend 的同款数据事故，PR#218）。
      * 失败则转入 error 相位封死保存（画布内容已不可信），用户可点重试。
      */
-    async reloadFromBackend() {
+    async prepareCheckpointRestore(operationId) {
+      if (!this._loadOk || this.phase !== 'ready' || this.dirty || this.saving || this._inflight) return false
+      this._checkpointRestoreId = operationId
+      clearTimeout(this._saveTimer)
+      clearTimeout(this._retryTimer)
+      return true
+    },
+    failCheckpointRestore(operationId) {
+      if (this._checkpointRestoreId && this._checkpointRestoreId !== operationId) return
+      this._checkpointRestoreId = null
+      this._loadOk = false
+      this.phase = 'error'
+      this.errorText = this.$t('version.aiReloadFailed')
+      clearTimeout(this._saveTimer)
+      clearTimeout(this._retryTimer)
+    },
+    async reloadFromBackend(operationId) {
+      const projectId = this.projectId, fileId = this.fileRef()
+      const barrier = checkpointSaveBarrier(projectId, fileId)
+      if (barrier && barrier.restoreId !== operationId) return false
       clearTimeout(this._saveTimer)
       this._saveTimer = null
       clearTimeout(this._retryTimer)
@@ -450,6 +479,8 @@ export default {
       }
       try {
         const text = await this.download()
+        if (this.projectId !== projectId || this.fileRef() !== fileId ||
+            (barrier && checkpointSaveBarrier(projectId, fileId) !== barrier)) return false
         if (this._view) {
           this._applyingRemote = true
           try {
@@ -464,6 +495,8 @@ export default {
         }
         this._seq++
         this.dirty = false
+        this._loadOk = true
+        this._checkpointRestoreId = null
         if (this.previewMode) this.renderPreview()
         return true
       } catch (e) {

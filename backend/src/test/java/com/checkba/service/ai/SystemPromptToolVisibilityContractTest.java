@@ -128,6 +128,13 @@ class SystemPromptToolVisibilityContractTest {
             Map.entry("pptx_get_project_pages", ToolMeta.Host.LOWA),
             Map.entry("pptx_check_service", ToolMeta.Host.LOWA),
             Map.entry("pptx_export_editable", ToolMeta.Host.LOWA),
+            // 项目版本：桌面保存/重载项目编辑器；不要求有活动文档，入口由 version 类目披露
+            Map.entry("version_status", ToolMeta.Host.LOWA),
+            Map.entry("version_history", ToolMeta.Host.LOWA),
+            Map.entry("version_changes", ToolMeta.Host.LOWA),
+            Map.entry("version_commit", ToolMeta.Host.LOWA),
+            Map.entry("version_pull", ToolMeta.Host.LOWA),
+            Map.entry("version_restore", ToolMeta.Host.LOWA),
             // 导出 PDF（T-25）：doc_ 前缀本来就锁在 LOWA，声明是冗余的显式化
             Map.entry("doc_export_pdf", ToolMeta.Host.LOWA)));
 
