@@ -602,13 +602,15 @@
           <details class="builtin-workflows-fold" :class="{ customized: builtinCustomActiveCount > 0 }">
              <summary class="builtin-workflows-summary">
                 <span class="builtin-workflows-entry">
-                   <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                   <span class="builtin-workflows-heading">
+                      <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                      <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
+                         {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
+                      </span>
+                   </span>
                    <span class="builtin-workflows-scope">{{ $t('chat.builtinWorkflowsScope') }}</span>
                 </span>
                 <span class="builtin-workflows-summary-right">
-                   <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
-                      {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
-                   </span>
                    <button type="button" class="builtin-workflows-adv-btn"
                            @click.stop.prevent="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">
                       {{ $t('chat.builtinWorkflowsAdvancedBtn') }}
@@ -930,13 +932,15 @@
           <details class="builtin-workflows-fold builtin-workflows-fold-bottom" :class="{ customized: builtinCustomActiveCount > 0 }">
              <summary class="builtin-workflows-summary">
                 <span class="builtin-workflows-entry">
-                   <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                   <span class="builtin-workflows-heading">
+                      <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                      <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
+                         {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
+                      </span>
+                   </span>
                    <span class="builtin-workflows-scope">{{ $t('chat.builtinWorkflowsScope') }}</span>
                 </span>
                 <span class="builtin-workflows-summary-right">
-                   <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
-                      {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
-                   </span>
                    <button type="button" class="builtin-workflows-adv-btn"
                            @click.stop.prevent="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">
                       {{ $t('chat.builtinWorkflowsAdvancedBtn') }}
@@ -6718,11 +6722,8 @@ export default {
 
 /* 输入区的辅助设置共用行距、分隔线和信息层级。 */
 .composer-preferences {
-  margin-top: 12px;
-  border: 1px solid var(--awd-border-subtle);
-  border-radius: var(--awd-radius-dialog);
-  background: var(--awd-surface-2);
-  padding: 0 12px;
+  margin-top: 10px;
+  padding: 0 2px;
   min-width: 0;
 }
 .composer-preferences > :deep(:not(:first-child)) {
@@ -6734,7 +6735,8 @@ export default {
   grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 10px 0;
+  padding: 10px 6px;
+  border-radius: var(--awd-radius-md);
   list-style: none;
   font-size: var(--awd-panel-fs);
   line-height: 1.5;
@@ -6750,32 +6752,34 @@ export default {
   transform: rotate(-45deg);
 }
 .builtin-workflows-fold[open] > .builtin-workflows-summary::before { transform: rotate(45deg); }
-.builtin-workflows-summary:hover { color: var(--awd-accent-text); }
+.builtin-workflows-summary:hover { color: var(--awd-accent-text); background: var(--awd-accent-wash); }
 .builtin-workflows-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
 .builtin-workflows-entry { min-width: 0; overflow-wrap: anywhere; }
-.builtin-workflows-title { display: block; color: var(--awd-text); font-weight: 500; }
-.builtin-workflows-scope { display: block; margin-top: 2px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
-.builtin-workflows-summary-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 100px; }
-.builtin-workflows-summary-state { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
+.builtin-workflows-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.builtin-workflows-title { color: var(--awd-text); font-weight: 500; }
+.builtin-workflows-scope { display: block; margin-top: 2px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
+.builtin-workflows-summary-right { display: flex; align-items: center; max-width: 100px; }
+.builtin-workflows-summary-state { font-size: var(--awd-panel-fs-meta); font-weight: 400; line-height: 1.4; color: var(--awd-accent-text); background: var(--awd-accent-wash); border-radius: var(--awd-radius-sm); padding: 1px 5px; }
 .builtin-workflows-summary-state.custom { color: var(--awd-accent-text); font-weight: 600; }
 .builtin-workflows-adv-btn {
   font: inherit;
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   background: transparent;
-  border: 1px solid var(--awd-border);
+  border: 0;
   border-radius: var(--awd-radius-sm);
-  padding: 2px 7px;
+  padding: 4px 0 4px 6px;
   margin: 0;
   line-height: 1.4;
   cursor: pointer;
 }
 .builtin-workflows-adv-btn::after { border: 0; }
-.builtin-workflows-adv-btn:hover { border-color: var(--awd-accent); background: var(--awd-accent-wash); }
-.builtin-workflows-body { padding: 0 0 10px; display: flex; flex-direction: column; row-gap: 6px; }
+.builtin-workflows-adv-btn:hover { text-decoration: underline; }
+.builtin-workflows-adv-btn:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
+.builtin-workflows-body { padding: 4px 6px 12px 22px; display: flex; flex-direction: column; row-gap: 6px; }
 .builtin-workflows-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
   gap: 6px;
 }
 .builtin-workflow-card {
