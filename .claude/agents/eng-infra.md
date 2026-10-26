@@ -601,6 +601,8 @@ Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Ac
 
 独立 `LocalCoreGateway` 保持公开端口，Spring 私有 connector 使用随机端口，配置中的 server.port 和回调 URL 仍用公开端口。复用本机准入、CORS、源代码声明过滤器；文件通过现有 ResourceHttpRequestHandler 支持 HEAD/Range/416。关闭独立 Tomcat 必须 stop 后 destroy，否则容器 await 线程会使 JVM 退出不完。未知路由转交完整后端前先释放 CORE lease，不能持 lease 等待交权。
 
+轻量项目列表与 `ProjectService.listProjects` 同时隐藏 `LOOSE_FILES` 和 `SCRATCH`，包括本人和成员的随手工作区；直接访问仍按原 ACL，转正后同一 ID/UID 立即可见。新增聊天模式默认仍从 welcome/ide 进入；明确选择 chat 恢复时，创建随手工作区的 POST 继续等待完整服务，不把写接口混入早期读取白名单。
+
 资格化候选在 CORE leases 完全排空、真实 JPA/版本交接成功且状态已为 JPA 后，通过独立 `onJpaAvailable → jpaDocumentsReady` 发布本地文档能力；DRAINING 仍拒绝新准入。Gateway 只将精确文档方法/路由交给该能力，复用原 H2 的只读/内容协议实现；内容发布此时已绑定真实 `WorkSessionService` 项目锁和 JGit receipt 交接，不需要等私有 Servlet、插件初始化或后续 runners。未知业务接口仍等完整后台，full-health仍503，effects仍到完整Ready后才安装。失败/关闭撤销本地JPA准入，不能退回CORE。
 
 该并行窗口的 `MediaFileTypeReconciler`、`OrphanParentReconciler` 在候选开启时使用同一项目锁：外层只发现项目/文件ID，锁内重新查询实体后才修改，不能把锁外旧实体merge回去覆盖刚保存的file_size/updated_at。资格与schema契约不变；feature-off保留原迁移路径。`LocalCoreJpaContinuityTest` 使用真实Spring Data JPA、H2、项目锁、JGit和HTTP，在没有私有Servlet/完整Ready的场景验证保存与before-image baseline；受控暂停迁移的旧实体发现查询，再并发保存，核验两种迁移不覆盖新元数据。此测试不等于全产品正常负载性能或旧数据库升级验收。

@@ -127,7 +127,7 @@ public final class LocalCoreStore {
             List<Map<String, Object>> result = new ArrayList<>();
             for (Map<String, Object> project : query(c, "SELECT " + PROJECT_COLUMNS + " FROM project p WHERE "
                     + "(p.user_id=? OR EXISTS (SELECT 1 FROM project_member m WHERE m.project_id=p.id AND m.user_id=?)) "
-                    + "AND p.project_type <> 'LOOSE_FILES' "
+                    + "AND p.project_type NOT IN ('LOOSE_FILES', 'SCRATCH') "
                     + "AND NOT EXISTS (SELECT 1 FROM addin_project_link link WHERE link.user_id=? AND link.cloud_project_id=p.id) "
                     + "ORDER BY p.created_at DESC, p.id", actor.id(), actor.id(), actor.id())) {
                 Access access = access(c, project, actor);

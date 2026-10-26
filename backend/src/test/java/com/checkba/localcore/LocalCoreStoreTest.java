@@ -125,6 +125,29 @@ class LocalCoreStoreTest {
         assertCode("PROJECT_FORBIDDEN", () -> store.projectDetail(202));
     }
 
+    @Test void scratchCardsStayHiddenForOwnersAndMembersUntilPromoted() throws Exception {
+        project(303, 11, null, "SCRATCH"); project(404, 66, null, "SCRATCH");
+        project(505, 66, null, "CASE");
+        execute("UPDATE project SET version_opt_out=TRUE WHERE id IN (303,404)");
+        execute("INSERT INTO project_member VALUES(5,303,22,'PARTICIPANT',?), (6,404,11,'PARTICIPANT',?), (7,505,11,'READ_ONLY',?)", CREATED, CREATED, CREATED);
+        assertEquals(List.of(101L, 505L), store.projectCards().stream().map(p -> p.get("id")).toList());
+        // Hiding the card does not revoke the scratch owner's or member's direct access.
+        assertEquals("project-303", store.projectDetail(303).get("uid"));
+        assertEquals("SCRATCH", store.projectDetail(404).get("projectType"));
+        store.selectIdentity(22);
+        assertEquals(List.of(101L), store.projectCards().stream().map(p -> p.get("id")).toList());
+        assertEquals("project-303", store.projectDetail(303).get("uid"));
+        assertCode("PROJECT_FORBIDDEN", () -> store.projectDetail(404));
+        // Promotion updates the same row; no cached list or new identity may hide it afterward.
+        execute("UPDATE project SET project_type='BLANK', version_opt_out=FALSE WHERE id=303");
+        assertEquals(List.of(101L, 303L), store.projectCards().stream().map(p -> p.get("id")).toList());
+        assertEquals("PARTICIPANT", store.projectCards().get(1).get("myRole"));
+        assertEquals("project-303", store.projectDetail(303).get("uid"));
+        store.selectIdentity(11);
+        assertEquals(List.of(101L, 303L, 505L), store.projectCards().stream().map(p -> p.get("id")).toList());
+        assertEquals("OWNER", store.projectCards().get(1).get("myRole"));
+    }
+
     @Test void membersKeepVirtualOwnerAndStoredAccountBinding() throws Exception {
         execute("INSERT INTO account_binding VALUES(22,'remote-22')");
         var members = store.projectMembers(101);
