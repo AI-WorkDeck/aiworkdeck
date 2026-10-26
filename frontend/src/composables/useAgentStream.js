@@ -1321,6 +1321,14 @@ export function useAgentStream() {
                             if (!p.harnessAdaptations.some(a => a.id && a.id === payload.id)) {
                                 p.harnessAdaptations.push(payload)
                             }
+                            if (Array.isArray(target.timeline)) {
+                                for (let ti = target.timeline.length - 1; ti >= 0; ti--) {
+                                    const tEntry = target.timeline[ti]
+                                    if (tEntry?.type === 'process' && (tEntry.source === p || tEntry.data?.id === p.id)) {
+                                        tEntry.data.harnessAdaptations = p.harnessAdaptations
+                                    }
+                                }
+                            }
                             break
                         }
                     }
@@ -2375,6 +2383,7 @@ export function useAgentStream() {
                     title: processTitle,
                     isExpanded: true,
                     items: [], // CHANGED: from steps -> items
+                    harnessAdaptations: [],
                     content: '',
                     stepIndex: stepIdx,
                     stepTitle: stepIdx >= 0 ? (planTodos.value[stepIdx].content || '') : ''

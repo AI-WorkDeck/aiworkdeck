@@ -3783,7 +3783,8 @@ public class AgentOrchestrator {
                     initialInstruction,
                     guard.pendingRollbackSignal,
                     steered,
-                    guard.harnessAdaptations);
+                    guard.harnessAdaptations,
+                    guard.assistantMessageId);
             if (evolved.isPresent()) {
                 sendRunEvent(guard, "harness_evolution", SKILL_UPDATE_MAPPER.writeValueAsString(evolved.get()));
             }

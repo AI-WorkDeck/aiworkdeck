@@ -456,4 +456,6 @@ export default {
   evolutionContrastToggle: 'View Before / After Contrast',
   evolutionContrastBefore: 'Before',
   evolutionContrastAfter: 'After',
+  evolutionActionFailed: 'The action did not go through; please try again',
+  evolutionPromoteAdminOnly: 'Promoted skills apply to everyone on this instance; administrator permission required',
 }
