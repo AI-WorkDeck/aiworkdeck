@@ -284,6 +284,10 @@ export default {
     }
   },
   computed: {
+    previewLoadIdentity() {
+      // 对象替换与原地内容版本更新共用一个 watch，切文件时只加载一次。
+      return { file: this.file, version: this.file && this.file.wpsFileId }
+    },
     revealInFolderKey() {
       return revealInFolderKey()
     },
@@ -407,11 +411,11 @@ export default {
     }
   },
   watch: {
-    file: {
+    previewLoadIdentity: {
       immediate: true,
-      handler(newFile) {
-        console.log('FilePreview file 变化:', newFile)
-        this.reloadPreview(newFile)
+      handler(identity, previous) {
+        if (previous && identity.file === previous.file && !identity.version) return
+        this.reloadPreview(identity.file)
       }
     },
     // 宿主 openFile(file, {locator}) 落到 tab.pendingLocator → 这里的 prop。收到即拷贝成
@@ -422,15 +426,6 @@ export default {
       handler(loc) {
         if (!loc) return
         this.applyLocator(loc)
-      }
-    },
-    // AI 修改文件后（pdf_highlight/pdf_redact 等）后端会更新 wpsFileId 并发 reload_file，
-    // reload 处理是对既有 file 对象 Object.assign 原地更新——对象引用不变，上面的
-    // file watch 不会触发。监听 wpsFileId 让预览重新拉取最新字节（编辑器同款语义）。
-    'file.wpsFileId'(newVal, oldVal) {
-      if (newVal && newVal !== oldVal) {
-        console.log('FilePreview wpsFileId 变化，重新加载预览:', newVal)
-        this.reloadPreview(this.file)
       }
     }
   },
@@ -457,7 +452,7 @@ export default {
     this.syncImageViewportListeners()
   },
   methods: {
-    // file watch 与 wpsFileId watch 共用的加载分发（原 file watch handler 逻辑原样抽出）
+    // 文件身份或内容版本变更时重新加载；定位符变化不重新下载。
     reloadPreview(newFile) {
       this._mediaReqId = (this._mediaReqId || 0) + 1
       this._mediaXhr?.abort()
