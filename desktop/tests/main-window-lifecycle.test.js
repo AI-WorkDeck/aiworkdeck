@@ -17,7 +17,7 @@ function section(from, to) {
 
 // Execute the shipping functions, with only Electron/OS effects replaced. No source-pattern
 // assertion can catch a stale closed callback nulling the replacement window.
-function harness(platform = 'darwin', engine = '') {
+function harness(platform = 'darwin', engine = '', prepare = async () => {}) {
   const windows = []
   const intervals = []
   class Window extends EventEmitter {
@@ -53,7 +53,7 @@ function harness(platform = 'darwin', engine = '') {
   app.isPackaged = false
   const clipboard = { text: 'already copied before launch', availableFormats: () => ['text/plain'], readText() { return this.text } }
   const context = vm.createContext({
-    app, BrowserWindow: Window, clipboard, path, console,
+    app, BrowserWindow: Window, clipboard, path, console, prepareRendererForQuit: prepare,
     // createMainWindow 用 nativeTheme 决定窗口的 backgroundColor（首屏白闪兜底，dev-board#731）。
     // 默认给浅色：桌面壳启动时 applyNativeTheme('light') 就是出厂值，与真实运行一致。
     nativeTheme: { shouldUseDarkColors: false },
@@ -164,7 +164,7 @@ test('closing the current window still permits Dock activation to reopen it', ()
   assert.equal(h.intervals.length, 1)
 })
 
-function preloadBridge(argv) {
+function preloadBridge(argv, ipcRenderer = {}) {
   let bridge
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../preload/preload.js'), 'utf8'), {
     process: { argv, platform: 'win32' },
@@ -172,7 +172,7 @@ function preloadBridge(argv) {
       assert.equal(name, 'electron')
       return {
         contextBridge: { exposeInMainWorld: (_name, value) => { bridge = value } },
-        ipcRenderer: {},
+        ipcRenderer,
       }
     },
   })
@@ -205,16 +205,66 @@ test('missing or malformed physical memory remains unknown, never zero', () => {
   }
 })
 
-test('Mac 红叉隐藏并保留编辑器，Dock 激活恢复同一窗口供退出时保存', () => {
+test('Mac 红叉确认后隐藏并保留编辑器，Dock 激活恢复同一窗口供退出时保存', async () => {
   const h = harness()
   h.context.finishStartup()
   const current = h.current ? h.current() : h.context.current()
   let prevented = false
   current.emit('close', { preventDefault: () => { prevented = true } })
   assert.equal(prevented, true)
+  await new Promise(resolve => setImmediate(resolve))
   assert.equal(current.hidden, true)
   assert.equal(current.destroyed, false)
   h.app.emit('activate')
   assert.equal(current.hidden, false)
   assert.equal(h.windows.length, 1)
+})
+
+test('Mac close waits for confirmation, coalesces repeat closes, and cancellation keeps the window visible', async () => {
+  let reject, calls = 0
+  const h = harness('darwin', '', () => { calls++; return new Promise((_, no) => { reject = no }) })
+  h.context.finishStartup()
+  const current = h.context.current()
+  current.emit('close', { preventDefault() {} })
+  current.emit('close', { preventDefault() {} })
+  assert.equal(calls, 1)
+  assert.notEqual(current.hidden, true)
+  reject(new Error('cancelled'))
+  await new Promise(resolve => setImmediate(resolve))
+  assert.notEqual(current.hidden, true)
+  assert.equal(current.sent.at(-1)[0], 'checkba:quit-cancelled')
+})
+
+test('Cmd+Q takes over an in-flight Mac close without resuming AI before the real exit', async () => {
+  let accept
+  const h = harness('darwin', '', () => new Promise(resolve => { accept = resolve }))
+  h.context.finishStartup()
+  const current = h.context.current()
+  current.emit('close', { preventDefault() {} })
+  vm.runInContext('quitInProgress = true', h.context)
+  accept()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.ok(!current.sent.some(([name]) => name === 'checkba:quit-cancelled'))
+  assert.notEqual(current.hidden, true, 'real exit owns the window hide')
+})
+
+test('shipping preload forwards the native request identity through confirmation stage and final ACK', async () => {
+  const listeners = {}, sent = [], invoked = []
+  const bridge = preloadBridge([], {
+    on: (name, fn) => { listeners[name] = fn },
+    send: (...args) => sent.push(args),
+    invoke: async (name, data) => { invoked.push([name, data]); return true },
+  })
+  bridge.lifecycle.onPrepareQuit(async ({ reportStage }) => {
+    await reportStage('confirming')
+    await reportStage('saving')
+    return { ok: true }
+  })
+  assert.equal(sent[0][0], 'checkba:quit-handler-ready')
+  await listeners['checkba:prepare-quit']({}, { requestId: 'quit-test-1489' })
+  assert.deepEqual(JSON.parse(JSON.stringify(invoked)), [
+    ['checkba:quit-stage', { requestId: 'quit-test-1489', stage: 'confirming' }],
+    ['checkba:quit-stage', { requestId: 'quit-test-1489', stage: 'saving' }],
+    ['checkba:quit-prepared', { requestId: 'quit-test-1489', ok: true }],
+  ])
 })

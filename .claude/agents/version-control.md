@@ -44,6 +44,16 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 - NOT_IN_ORG 指引先说明同团队/同律所条件，无团队可受邀，已有团队请负责人核对律所归属；不得一概要求加入第二个团队。现有切换团队/律所入口仍受 OWNER/总部等原有约束，本修复不改变资格或自动迁移组织。
 - 回归入口：`CloudCloneReadOnlyTest`、`ProjectMemberLookupTest`，前端 `test:version-history`、`test:version-merge`、`test:member-invite`；自动化桩验证不替代实际安装版双机验收。
 
+## 全局版本入口与退出提醒（2026-10-26，dev-board#1486–#1489）
+
+- 文件编辑器只展示文件落盘状态，不再显示 `fileVersionBar` 或“已保存，尚未存为版本”；逐段溯源仍在审阅面板。后端 provenance 的 fileVersion/dirty 兼容字段保留，不得把它们当作未保存或未同步。
+- 全局版本入口的数字只读 `/version/status.changedCount`（相对 HEAD 的文件数，排除 `.awd/`）；自动存档后归零，有工作段则用点提示“改动已自动记录，可整理本次提交”。云端待上传/待取回用箭头，绝不把版本数相加到文件数。状态失败显示未知，不能显示已同步。
+- 本次用户要求明确“提交”下一步，因此全局按钮采用“提交本次改动”，并解释为整理历史记录；这一处及退出提醒允许 commit 文案，取代原先一律禁止“提交”的规则。文件保存、提交历史、云端同步保持区分；已关联案件库的主线提交仍沿原有自动上传机制。
+- 工作台复用状态查询处理角标：Office/文本保存确认广播 `awd:file-saved`，文件树变化防抖刷新；可见的活跃工作台每15秒只读本地快照，联网协作轮询保持原频率。代次/项目/销毁围栏阻止旧响应覆盖；面板读取同一份工作/云端快照。
+- 提交前等待所有打开编辑器真正保存，不套用关闭标签的10秒等待预算；失败不提交。无工作段但有脏文件时，面板仍提供提交；`endSession` 在原仓库锁内核对真实 `pendingChanges`，非空才补开工作段并沿原流程提交。干净无段保留原错误，不造空工作段；稿分支和冲突分流不变。
+- 关闭窗口、退出应用、离开项目和退出登录前先保存，再读取最新项目状态；有改动时提供“提交并退出”“直接退出”“取消”。提交阶段展示真实保存/提交/确认步骤，成功后继续原退出流程；直接退出不丢弃文件；取消、提交失败或冲突保留现场。`versionExitGuard` 去重并在各异步边界核对项目/生命周期；重启恢复的内部 reLaunch 不再提示一遍。
+- 回归：`tests/version-history/{versionEntryState,versionExitGuard,fileVersionBar}.test.mjs`、`tests/project-home/{flush-dirty-editors,desktop-quit,plaintext-flush-save}.test.mjs` 与真实 Uni 合成 API 脚本 `tests/version-history/version-entry-ui.mjs`。后者不证明真实云端传输。
+
 ## 关键文件地图
 
 **后端 `backend/src/main/java/com/checkba/version/`（12 个类）**
@@ -146,7 +156,7 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 - `VersionNodeDetail.vue` —— 点某个节点弹出的详情弹窗：拉该 sha 的变更列表、「退回到这一版」二次确认、「标为重要版本」、第 3 期新增「从这一版另起一稿」（`openDraftNaming`，独立嵌套 `.awd-dialog`，同款 `.uni-input-input` 陷阱；`createDraft(projectId, version.sha, name)`，任意节点都能开，包括采纳产生的双亲合并节点）、对 `MODIFY` 类型且非根提交的改动行渲染「和上一版对比」按钮，`@tap` 上抛 `{path, sha}` 交给宿主页面决定走桌面修订稿分支还是文本降级分支。
 - `MergeReviewTab.vue` —— 三方合并新增（dev-board#630），**可编辑**的合并比对稿宿主：主线侧改动是一批带作者的修订，另一侧不重叠的改动被逐段重放成另一位作者的修订，同一段两边都改了的那几处刻意没重放、交给右栏 `ReviewPanel`（`mode="merge"`）三选一。与 `VersionCompareTab` 一样**没有 upload 路径**（导出字节只走 `POST /version/merge/resolve-file`，绝不写回 `ProjectFile`）、不进保活池、不派发 `.uno:EditDoc`（spike A5 实测 r5 上不生效，只读靠的是「没有保存路径」）。标签管道见 `sidebar-shell.md` 的 `merge-review` 一条。
 - `VersionCompareTab.vue` —— 第 2 期新增，「和上一版对比」的桌面 docx 展示宿主，**只读、绝无保存路径**：不订阅 `lo-relay` 的 `modified` 信号、不进保活池（`_libreRefs`/LRU 一概不注册）、`beforeUnmount` 只 `dispose executor` + 移除 `<webview>`。流程：并行下载新旧字节 + 启动引擎 → `load_document` 新版 → `compare_document` 一次性生成修订并自动切只读。
-- **三方合并的前端纯函数与编排**：`composables/useDocumentMerge.js`（自动合并编排，纯工厂）、`services/mergeDraft.js`（`fetchMergeInputs` + `buildMergeDraft`，自动合并与比对稿标签页共用）、`utils/mergeRows.js`（裁决总览行态与文案）、`utils/mergeReviewDecisions.js`（`collectDecisions`）、`utils/historyMerges.js`（把两条新尾注翻成人话）、`utils/provenanceAlign.js`（溯源 LCS 对齐 + 自带同步 sha256 + `fileVersionBar` 文件级小条三态）、`utils/mergeSideNames.js`（两侧的称呼与喂给引擎的署名 = 修订分桶键，见下方「两侧的称呼与分桶键」）。后五个是纯函数，`node --test` 直接跑（`mergeSideNames` 只 import `historyMerges`，其余零依赖）。
+- **三方合并的前端纯函数与编排**：`composables/useDocumentMerge.js`（自动合并编排，纯工厂）、`services/mergeDraft.js`（`fetchMergeInputs` + `buildMergeDraft`，自动合并与比对稿标签页共用）、`utils/mergeRows.js`（裁决总览行态与文案）、`utils/mergeReviewDecisions.js`（`collectDecisions`）、`utils/historyMerges.js`（把两条新尾注翻成人话）、`utils/provenanceAlign.js`（溯源 LCS 对齐 + 自带同步 sha256）、`utils/mergeSideNames.js`（两侧的称呼与喂给引擎的署名 = 修订分桶键，见下方「两侧的称呼与分桶键」）。后五个是纯函数，`node --test` 直接跑（`mergeSideNames` 只 import `historyMerges`，其余零依赖）。
 
 **前端集成点**
 
@@ -755,18 +765,7 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
   折叠落在这份文件自己的历史里是对的而不是巧合：一段工作收尾时的 NO_FF 合并节点带着这段工作对该文件的净变化
   （见地雷 #14），所以 auto 的归宿必然也触及这个路径。还没收尾那段工作里的 auto 比任何命名版本都新、
   找不到归宿，照旧不算有名字。窗口上限沿用 `MAX_HISTORY`（500）。
-- **「已保存，尚未存为版本」（`provenanceFileUncommitted`，2026-09-25 前文案是「本机未保存的改动」，dev-board#933 改掉：保存成功后仍说「未保存」会让律师以为文件没存）= `ProjectRepoService.isPathDirty`**：**单路径 `git status`，只读、一次 `add` 都不做**
-  （`add` 在合并窗口里等于「这个冲突我解决了」，见地雷 #20；这条小条随每次落版刷新，绝不能带副作用），
-  也顺带省掉 `pendingChanges` 的全仓 `add "."`。读不出来一律报「不脏」——宁可少说一句，
-  也不要在正文上方挂一句站不住的「本机未保存的改动」。结束工作 / 采纳 / 重载落版后随 `version-landed`
-  重拉 provenance 而消失（PR#860 已接好的链）。
-- **三态判定在纯函数 `utils/provenanceAlign.js` 的 `fileVersionBar`**（顺序有意义）：`versioned` 假 → 整条不出现
-  （这时说「初始版本」或「本机未保存的改动」都是胡说）；`dirty` → 「本机未保存的改动」，**排在版本名前面**
-  （律师此刻要知道的是「还没进版本记录」）；否则报 `fileVersion`，为 null 时落到「初始版本」
-  （`version.provenanceFileInitial`）。`sha` 非空才可点（点击行为没动，仍是 `open-history`）。
-  组件那边只剩 `provenanceBar`/`provenanceBarVisible`/`provText`/`provSha` 四个薄 computed。
-  护栏 `frontend/tests/version-history/fileVersionBar.test.mjs`（11 条）与
-  `ProvenanceServiceTest.fileVersion*`/`.dirtyFollowsTheWorkingTreeOfThisFileOnly`。
+- **文件版本小条已于 dev-board#1487 移除**：后端单路径 dirty 与 fileVersion 接口仍兼容保留；当前文件保存只读编辑器真实持久化状态，项目提交/同步入口见本文顶部。
 
 **已知限制（都是取舍，不是待修的 bug）**：
 - **另一侧「只改了格式没改文字」的段自动合不过来**——文字重放带不动格式。这一档不静默丢掉：引擎把它列进 `formatOnly`，

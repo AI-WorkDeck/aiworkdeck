@@ -103,7 +103,7 @@ test('保存失败态仍要尝试；返回 false 或仍然 dirty 都属于未保
 })
 
 for (const name of ['leaveWorkbench', 'handleLogout']) {
-  for (const outcome of ['failed', 'throws', 'saved']) {
+  for (const outcome of ['failed', 'throws', 'saved', 'cancelled']) {
     test(`${name} ${outcome}：只有全部保存成功才能导航或清会话`, async () => {
       const from = PAGE.indexOf(`    async ${name}(`)
       const end = PAGE.indexOf(name === 'leaveWorkbench' ? '    goAllProjects()' : '    onFileTreeQuickAction(', from)
@@ -113,8 +113,9 @@ for (const name of ['leaveWorkbench', 'handleLogout']) {
         async () => { if (outcome === 'throws') throw new Error('offline'); return { failed: outcome === 'failed' ? 1 : 0 } },
         { showToast: () => calls.push('toast'), reLaunch: ({ success }) => { calls.push('navigate'); success?.() } },
         () => calls.push('clear'))
-      await methods[name].call({ $t: k => k }, '/target')
+      await methods[name].call({ $t: k => k, confirmVersionBeforeLeaving: async () => outcome !== 'cancelled' }, '/target')
       if (outcome === 'saved') assert.deepEqual(calls, name === 'handleLogout' ? ['clear', 'navigate'] : ['navigate'])
+      else if (outcome === 'cancelled') assert.deepEqual(calls, [], '取消后不导航也不清除会话')
       else assert.deepEqual(calls, ['toast'], '失败必须留在工作台并保留会话')
     })
   }
