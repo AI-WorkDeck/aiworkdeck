@@ -4909,3 +4909,131 @@ $color-accent: var(--awd-mint); // Mint Green
   button::after { border: 0; display: none; }
   button:hover { background: var(--awd-accent-hover); border-color: var(--awd-accent-hover); }
 }
+
+
+/* Chat / Scratch 双模式：只改外壳布局，ChatInterface 与 LOWA 实例保持挂载。 */
+.header-center {
+  pointer-events: auto;
+}
+
+.mode-switch-capsule {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--awd-border-subtle);
+  border-radius: 999px;
+  background: var(--awd-surface-2);
+}
+
+.mode-switch-item {
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: var(--awd-text-2);
+  cursor: pointer;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.mode-switch-item.active {
+  background: var(--awd-surface);
+  color: var(--awd-text);
+  box-shadow: var(--awd-shadow-sm);
+}
+
+.mode-switch-label {
+  font-size: var(--awd-panel-fs-meta);
+  font-weight: 500;
+}
+
+.scratch-workspace-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.scratch-badge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--awd-accent-soft);
+  color: var(--awd-accent-text);
+  font-size: var(--awd-panel-fs-meta);
+  white-space: nowrap;
+}
+
+.scratch-promote-btn {
+  color: var(--awd-accent-text);
+  font-size: var(--awd-panel-fs-meta);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chat-canvas-close-btn {
+  flex-shrink: 0;
+  align-self: center;
+  margin: 0 6px;
+  padding: 3px 7px;
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs-meta);
+  cursor: pointer;
+}
+
+.chat-canvas-close-btn:hover {
+  background: var(--awd-accent-soft);
+  color: var(--awd-accent-text);
+}
+
+.page-project-overview.chat-mode .left-rail,
+.page-project-overview.chat-mode .sidebar-left,
+.page-project-overview.chat-mode .sidebar-collapse-anchor {
+  display: none;
+}
+
+.page-project-overview.chat-mode .workbench {
+  padding-left: 0;
+}
+
+.page-project-overview.chat-mode .workbench-main > .side-panel-ai {
+  order: 1;
+  flex: 1 1 auto;
+  width: 100% !important;
+  max-width: 100%;
+  border-left: none;
+}
+
+.page-project-overview.chat-mode .workbench-main > .content-area {
+  order: 2;
+  width: 0;
+  min-width: 0;
+  flex: 0 0 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.page-project-overview.chat-mode:not(.chat-canvas-open) .side-panel-ai .right-dock-body > .chat-interface {
+  width: 100%;
+  max-width: 840px;
+  margin: 0 auto;
+}
+
+.page-project-overview.chat-mode.chat-canvas-open .workbench-main > .side-panel-ai {
+  flex: 0 1 42%;
+  width: 42% !important;
+  min-width: 340px;
+  max-width: 50%;
+  border-right: 1px solid var(--awd-border-subtle);
+}
+
+.page-project-overview.chat-mode.chat-canvas-open .workbench-main > .content-area {
+  flex: 1;
+  width: auto;
+  min-width: 360px;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.page-project-overview.chat-mode .side-resize-handle {
+  display: none;
+}
