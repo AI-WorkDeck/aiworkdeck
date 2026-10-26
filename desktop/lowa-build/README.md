@@ -119,6 +119,9 @@ evidence of native runtime correctness.
 仅在样式诊断时用 `CALC_HEADER_RESIZE=0` 明确跳过，结果中会记录 SKIP。
 首个 r7 候选仍复现顶部提示框截获输入，补充候选必须在相同裸画布路径通过；
 不得仅隐藏提示框或改变布局避开失败。
+`node frontend/tests/lowa-e2e/native-font-popup.mjs` 另用真实鼠标选择原生字体下拉项、检查单元格格式与撤销，
+防止误伤同属 `ToolTip` 类型的交互窗口。该测试用 UITest 读取原生控件几何，不调用其动作 API；
+UITest 可能关闭控件双缓冲，因此这项只作输入回归，不用来证明标题像素或渲染性能。
 两项样式/慢击断言须先在旧 r6 失败再在新引擎通过。具体产物与实际验收
 结果写入 `RECIPE.md`；没有真实结果的候选不能替换默认引擎地址。
 
