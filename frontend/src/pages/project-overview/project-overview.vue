@@ -9,10 +9,6 @@
              消失，只能自绘（spec §6.4）。读的是与 mac 完全同一份命令表数据。
              mac 上组件内部 visible=false，不渲染。 -->
         <AppMenuBar :refresh-key="menuBarRefreshKey" />
-        <view v-if="isScratchWorkspace" class="scratch-workspace-actions">
-          <text class="scratch-badge">{{ $t('workbench.chatMode.scratchBadge') }}</text>
-          <view class="scratch-promote-btn" @click="handlePromoteScratchWorkspace">{{ $t('workbench.chatMode.promoteAction') }}</view>
-        </view>
 
         <!-- 无项目态（dev-board#1047）：顶栏只有应用名，没有项目切换器 / 协作 chip / 负责人一行 -->
         <view v-if="!hasNamedProject" class="project-info no-project-info">
@@ -76,7 +72,8 @@
                 <text>{{ $t('workbench.allProjects') }}</text>
               </view>
             </view>
-            <view class="project-status-badge">
+            <view v-if="isScratchWorkspace" class="scratch-promote-btn" @click="handlePromoteScratchWorkspace">{{ $t('workbench.chatMode.promoteAction') }}</view>
+            <view v-else class="project-status-badge">
               <text class="status-text">{{ $t('workbench.statusInProgress') }}</text>
             </view>
             <!-- 协作状态 chip：只在这份案卷真的放进过团队案件库时才渲染。
@@ -96,7 +93,7 @@
               <text class="collab-chip-text">{{ collabStateText }}</text>
             </view>
           </view>
-          <view class="project-meta">
+          <view v-if="!isScratchWorkspace" class="project-meta">
             <text v-if="!soloLocalProject" class="meta-item">{{ $t('workbench.managerLabel', { name: project.manager || userDisplayName || $t('workbench.me') }) }}</text>
 
             <block v-if="project.listedCompanyName && project.listedCompanyName !== '-'">
@@ -114,12 +111,12 @@
 
       <!-- Center Logo -->
       <view class="header-center">
-        <view class="mode-switch-capsule" role="tablist">
-          <view class="mode-switch-item" :class="{ active: viewMode === 'chat' }" role="tab" @click="switchViewMode('chat')">
-            <text class="mode-switch-label">💬 {{ $t('workbench.chatMode.modeChat') }}</text>
+        <view class="mode-switch-capsule" role="tablist" :aria-label="$t('workbench.chatMode.modeSwitchLabel')">
+          <view class="mode-switch-item" :class="{ active: viewMode === 'chat' }" role="tab" :aria-selected="viewMode === 'chat' ? 'true' : 'false'" @click="switchViewMode('chat')">
+            <text class="mode-switch-label">{{ $t('workbench.chatMode.modeChat') }}</text>
           </view>
-          <view class="mode-switch-item" :class="{ active: viewMode === 'ide' }" role="tab" @click="switchViewMode('ide')">
-            <text class="mode-switch-label">🛠 {{ $t('workbench.chatMode.modeIde') }}</text>
+          <view class="mode-switch-item" :class="{ active: viewMode === 'ide' }" role="tab" :aria-selected="viewMode === 'ide' ? 'true' : 'false'" @click="switchViewMode('ide')">
+            <text class="mode-switch-label">{{ $t('workbench.chatMode.modeIde') }}</text>
           </view>
         </view>
       </view>
@@ -992,8 +989,14 @@
               <view
                 v-if="isChatMode && chatCanvasVisible"
                 class="chat-canvas-close-btn"
+                :title="$t('workbench.chatMode.closeCanvas')"
                 @click="chatCanvasOpen = false; $nextTick(() => triggerWorkbenchResize())"
-              >{{ $t('workbench.chatMode.closeCanvas') }} ×</view>
+              >
+                <svg class="chat-canvas-close-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path v-for="(d, gi) in GLYPHS.panelRight" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <text>{{ $t('workbench.chatMode.closeCanvas') }}</text>
+              </view>
 
             </view>
 
@@ -6551,6 +6554,8 @@ export default {
     toggleAiPanel() {
       // 无项目态右栏 AI 不渲染（会话按项目隔离，spec 2026-09-29 §4），菜单 / 快捷键进来也不开
       if (!this.hasProject) return
+      // 对话模式下主屏就是对话，关闭按钮不收起 AI 面板
+      if (this.isChatMode) return
       this.showAiPanel = !this.showAiPanel
       if (this.showAiPanel) this.aiPanelMounted = true
       this.$nextTick(() => {
