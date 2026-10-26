@@ -1503,11 +1503,17 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 8个业务包为search/voice/desensitize/litigation-visual/calendar/favorites/clipboard/insight；tmeet由已有tencent-meeting包承接。布局从manifest contributes.views解析，动态PluginPane承载sidebar/workspace，global无项目可开，project受项目/CLIENT门控。源在frontend/plugin-app，构建npm run build:plugins；npm run build:h5先构建8包。业务服务桥分pluginBusinessServices/pluginCollectionServices/pluginVoiceServices/pluginInsightServices，账号与本机设备仍在宿主。日历深链转插件workspace视图，保留task/file/focus过滤。核心保留home/projects/files/dev/market/version/staging/members及受限CLIENT dd-files，详见PLUGIN_SPEC §17盘点。验证除了单元测试还需真实Uni+opaque sandbox：ES模块静态资产需要仅plugin-web路由ACAO:*；不增加allow-same-origin或unsafe-eval。
 
 
+## 插件与客户协作导航的层级（dev-board#1493/#1494）
+
+通用 `PluginWorkspaceSummary` 以一行工作区导航显示 `workspaceTabState`（当前显示/已打开/打开），简介默认折叠，业务阶段与 AI 动作保留为轻量行。客户协作使用相同导航方式，左栏和中栏名称一致；不再重复大介绍卡与“打开工作区”按钮。状态读取真实左右窗格，定位隐藏右分屏中的已有插件时恢复 splitMode；不创建重复实例，不令普通切标签自动切左栏。回归 `plugin-workspace-tabs` / `dd-client-i18n`。
+
+消息会话与项目沟通插件把上下文、过程状态、附件、输入和发送包在同一输入表面，内部不重复加框；保留云端处理范围与原有发送、附件和重试逻辑。项目沟通实测须使用真实 SDK/opaque iframe，见 `official-plugins/project-im/tests/agent-browser-sandbox.mjs`。全局消息页及入口重整由 #1490 / PR #1223 承接，勿回退它的布局。
+
 ## 文件标签浏览（dev-board#1446）
 
-主资源管理器给 FileTree 传 `enable-tag-view`，顶部「文件夹 / 标签」切换；选择器等复用方默认关闭。
+主资源管理器给 FileTree 传 `enable-tag-view`，显示下方标签分组；选择器等复用方默认关闭。
 标签视图跨折叠目录列出已标记文件，显示原父目录，多选标签 AND，不改文件实际位置和文件夹展开状态。
-共用 `TagFilter.vue` 的限高分组、名称过滤和常驻已选项，搜索契约见 utility-tools.md。
+资源管理器共用 `TagFilter.vue` 的 `sidebar` 形态（dev-board#1491）：取消顶部“文件夹／标签”切换，在文件列表下方显示可折叠的“标签”分组，圆点+名称；超过 8 项才出现名称过滤。点击标签进入跨目录筛选，清空/返回文件夹恢复目录，`showAllTaggedFiles` 单独处理“空 ids + 标签视图”的全部已标记文件。折叠保留所选条件，回收站和其他嵌入文件树不显示此入口；搜索沿用默认形态，契约见 utility-tools.md。
 过滤改变时清空选择；后台刷新移除命中项时清除隐藏选择，并关闭含失效目标的右键菜单。
 `fileOpenTabs.syncFileTreeSelectionWithActiveTab` 不能重新选中筛选外文件；批量操作取当前可见选择。
 标签列表按一个根窗口分页，键盘跨第 100 项必须同步扩展根窗口，不再按文件原父目录计数。
