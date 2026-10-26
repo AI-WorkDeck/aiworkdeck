@@ -131,11 +131,14 @@ function inkHeight(values) {
 
 preflight()
 const server=await startServer({patchServed})
-const browser=await launchBrowser(await loadPuppeteer(), { headed: true })
-browser.on('targetcreated',async target=>{const page=await target.page();page?.on('pageerror',e=>console.error('PAGE ERROR:',e.message))})
-const deadline=setTimeout(()=>{console.error('FAIL total runtime exceeded 5 minutes');browser.close()},300000)
+let browser
+const puppeteer=await loadPuppeteer()
+const deadline=setTimeout(()=>{console.error('FAIL total runtime exceeded 5 minutes');browser?.close()},300000)
 try {
   for(const dpr of (process.env.LOWA_E2E_DPR ? [Number(process.env.LOWA_E2E_DPR)] : [1,2])) {
+    // Isolate each DPI's native windows and WASM worker lifetime.
+    browser=await launchBrowser(puppeteer, { headed: true })
+    browser.on('targetcreated',async target=>{const page=await target.page();page?.on('pageerror',e=>console.error('PAGE ERROR:',e.message))})
     const page=await openEditor(browser,{clipboard:false,viewport:{width:1000,height:720,deviceScaleFactor:dpr}})
     await page.evaluate(()=>{for(const type of ['keydown','keyup','beforeinput','input']) window.addEventListener(type,e=>{e.preventDefault();e.stopImmediatePropagation()},true)})
     await page.evaluate(()=>{
@@ -290,17 +293,18 @@ try {
     await exec('set_chrome',{all:false,rulers:false})
     await capture(`dpr${dpr}-reopened`)
     await page.close()
+    await browser.close();browser=null
   }
 } catch(error) {
   check('test execution',false,error.stack)
-  for(const page of await browser.pages().catch(()=>[])) if(page.url().includes('editor.html')) {
+  for(const page of await (browser?.pages().catch(()=>[]) || [])) if(page.url().includes('editor.html')) {
     await page.screenshot({path:path.join(out,'failure.png')}).catch(()=>{})
     fs.writeFileSync(path.join(out,'pointer-log.json'),JSON.stringify(await page.evaluate(()=>({events:window.__headerPointerLog,canvases:[...document.querySelectorAll('canvas')].map(e=>({id:e.id,className:e.className,html:e.parentElement.outerHTML.slice(0,1000)}))})).catch(()=>null),null,2))
     console.error(await page.evaluate(()=>document.querySelector('#vlog')?.textContent).catch(()=>''))
   }
 }
 finally {
-  clearTimeout(deadline);await browser.close();await new Promise(r=>server.close(r))
+  clearTimeout(deadline);await browser?.close();await new Promise(r=>server.close(r))
   fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(results,null,2))
 }
 console.log('Artifacts: '+out)
