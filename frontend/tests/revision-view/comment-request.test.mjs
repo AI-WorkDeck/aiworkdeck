@@ -12,6 +12,7 @@ const read = path => readFileSync(new URL(path, import.meta.url), 'utf8')
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
 function component(path, dependencies = {}) {
   const body = read(path).match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import OfficeNavigation from .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
   return new Function(...Object.keys(dependencies), body)(...Object.values(dependencies))
 }

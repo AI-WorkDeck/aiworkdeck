@@ -20,6 +20,7 @@ const style = EDITOR.match(/<style scoped>([\s\S]*?)<\/style>/)[1]
 
 function editorComponent() {
   const body = EDITOR.match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import OfficeNavigation from .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
   return new Function('ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', body)(null, null, null)
 }

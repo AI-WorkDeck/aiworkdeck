@@ -482,3 +482,13 @@ test('office_thread.js：CHROME_URLS 覆盖 Calc/Impress 原生工具栏且 get_
 test('zh-CN 与 en-US 的 editor.toolbar 新增 Calc / Impress 国际化键集合严格对齐', () => {
   assert.deepEqual(Object.keys(zh.toolbar).sort(), Object.keys(en.toolbar).sort())
 })
+
+test('Calc keeps a single bottom sheet strip when native chrome is hidden or restored', async () => {
+  const vm = makeToolbarVm('calc')
+  await vm.applyChrome(true)
+  await vm.applyChrome(false)
+  const requests = vm.calls.filter(call => call.action === 'set_chrome')
+  assert.equal(requests.length, 2)
+  assert.ok(requests.every(call => call.params.sheetTabs === false), 'native sheet tabs must stay hidden beside the host-owned tab strip')
+  assert.ok(!TEMPLATE.includes('class="etb-calc-sheet-tabs"'), 'sheet tabs no longer belong in the formula bar')
+})
