@@ -7,47 +7,125 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>深海极光 · 冰刃琉璃</title>
   <style>
-    :root { color-scheme: light dark; }
+    :root {
+      color-scheme: light dark;
+      --skin-bg: #EFF5FA;
+      --skin-surface: #F9FCFF;
+      --skin-text: #0F1E2E;
+      --skin-text-2: #465A70;
+      --skin-border: #C9DCEB;
+      --skin-accent-soft: #E0F1FC;
+      --skin-accent-text: #026199;
+    }
+    html[data-theme='dark'] {
+      --skin-bg: #0B131E;
+      --skin-surface: #121E2F;
+      --skin-text: #EAF2FA;
+      --skin-text-2: #9AB0C7;
+      --skin-border: #263B54;
+      --skin-accent-soft: rgba(56, 189, 248, 0.16);
+      --skin-accent-text: #7DD3FC;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: var(--awd-font-sans, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif);
-      background: var(--awd-bg, #EFF5FA);
-      color: var(--awd-text, #0F1E2E);
-      padding: 24px;
-      line-height: 1.6;
+      background: transparent;
+      color: var(--skin-text);
+      padding: 2px;
+      line-height: 1.5;
+      overflow: hidden;
     }
     .card {
-      background: var(--awd-surface, #F9FCFF);
-      border: 1px solid var(--awd-border, #C9DCEB);
+      background: var(--skin-surface);
+      border: 1px solid var(--skin-border);
       border-radius: 10px;
-      padding: 20px;
-      box-shadow: var(--awd-shadow-sm, 0 1px 2px rgba(0,0,0,0.06));
+      padding: 16px 18px;
     }
-    .title { font-size: 20px; font-weight: 600; margin: 10px 0 6px; }
-    .subtitle { color: var(--awd-text-2, #465A70); font-size: 13px; margin-bottom: 16px; }
-    .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
-    .swatch { border: 1px solid var(--awd-border, #C9DCEB); border-radius: 8px; padding: 12px; font-size: 12px; }
-    .swatch-dot { width: 28px; height: 28px; border-radius: 50%; margin-bottom: 8px; border: 1px solid rgba(128,128,128,0.25); }
+    .head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .subtitle {
+      color: var(--skin-text-2);
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .swatch {
+      background: var(--skin-bg);
+      border: 1px solid var(--skin-border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11px;
+    }
+    .swatch-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      margin-bottom: 6px;
+      border: 1px solid rgba(128,128,128,0.28);
+    }
+    .swatch-hex {
+      color: var(--skin-text-2);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+    }
     .badge {
-      display: inline-block; padding: 3px 10px; border-radius: 999px;
-      background: var(--awd-accent-soft, #E0F1FC); color: var(--awd-accent-text, #026199);
-      font-size: 12px; font-weight: 500;
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--skin-accent-soft);
+      color: var(--skin-accent-text);
+      font-size: 11px;
+      font-weight: 500;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <span class="badge">UI 皮肤插件 · Skin 04</span>
-    <h1 class="title">深海极光 · 冰刃琉璃</h1>
+    <div class="head-row">
+      <h1 class="title">深海极光 · 冰刃琉璃</h1>
+      <span class="badge">UI 皮肤画廊 · Skin 04</span>
+    </div>
     <p class="subtitle">静谧深海蓝底与冰青磨砂琉璃交织，紫水晶星核凝聚专注，适合长时间高密度卷宗审阅。</p>
     <div class="swatches">
-      <div class="swatch"><div class="swatch-dot" style="background:#EFF5FA"></div><strong>冰川晨光</strong><div>#EFF5FA</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#026AA7"></div><strong>冰青琉璃</strong><div>#026AA7</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#8B5CF6"></div><strong>紫晶星核</strong><div>#8B5CF6</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#38BDF8"></div><strong>极光流青</strong><div>#38BDF8</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#0B131E"></div><strong>静谧深海</strong><div>#0B131E</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#EFF5FA"></div><strong>冰川晨光</strong><div class="swatch-hex">#EFF5FA</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#026AA7"></div><strong>冰青琉璃</strong><div class="swatch-hex">#026AA7</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#8B5CF6"></div><strong>紫晶星核</strong><div class="swatch-hex">#8B5CF6</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#38BDF8"></div><strong>极光流青</strong><div class="swatch-hex">#38BDF8</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#0B131E"></div><strong>静谧深海</strong><div class="swatch-hex">#0B131E</div></div>
     </div>
   </div>
+  <script>
+    (function () {
+      function syncHostTheme() {
+        try {
+          var hostDoc = window.parent && window.parent.document && window.parent.document.documentElement;
+          if (!hostDoc) return;
+          var t = hostDoc.getAttribute('data-theme') || 'light';
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      }
+      syncHostTheme();
+      try {
+        var hostEl = window.parent && window.parent.document && window.parent.document.documentElement;
+        if (hostEl && typeof MutationObserver !== 'undefined') {
+          new MutationObserver(syncHostTheme).observe(hostEl, { attributes: true, attributeFilter: ['data-theme'] });
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script src="/api/plugins/sdk/awd-plugin-sdk.js"></script>
 </body>
 </html>

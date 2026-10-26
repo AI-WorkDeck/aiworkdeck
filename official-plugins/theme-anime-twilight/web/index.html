@@ -7,47 +7,125 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>日漫晨昏 · 逢魔之时</title>
   <style>
-    :root { color-scheme: light dark; }
+    :root {
+      color-scheme: light dark;
+      --skin-bg: #F5F4FA;
+      --skin-surface: #FDFCFE;
+      --skin-text: #1E243B;
+      --skin-text-2: #545B78;
+      --skin-border: #D4CFE6;
+      --skin-accent-soft: #EAE7FA;
+      --skin-accent-text: #4C4194;
+    }
+    html[data-theme='dark'] {
+      --skin-bg: #14192B;
+      --skin-surface: #1C2238;
+      --skin-text: #EEF0FA;
+      --skin-text-2: #ADB4D1;
+      --skin-border: #343F61;
+      --skin-accent-soft: rgba(157, 141, 242, 0.16);
+      --skin-accent-text: #B5AAFA;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: var(--awd-font-sans, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif);
-      background: var(--awd-bg, #F5F4FA);
-      color: var(--awd-text, #1E243B);
-      padding: 24px;
-      line-height: 1.6;
+      background: transparent;
+      color: var(--skin-text);
+      padding: 2px;
+      line-height: 1.5;
+      overflow: hidden;
     }
     .card {
-      background: var(--awd-surface, #FDFCFE);
-      border: 1px solid var(--awd-border, #D4CFE6);
+      background: var(--skin-surface);
+      border: 1px solid var(--skin-border);
       border-radius: 10px;
-      padding: 20px;
-      box-shadow: var(--awd-shadow-sm, 0 1px 2px rgba(0,0,0,0.06));
+      padding: 16px 18px;
     }
-    .title { font-size: 20px; font-weight: 600; margin: 10px 0 6px; }
-    .subtitle { color: var(--awd-text-2, #545B78); font-size: 13px; margin-bottom: 16px; }
-    .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
-    .swatch { border: 1px solid var(--awd-border, #D4CFE6); border-radius: 8px; padding: 12px; font-size: 12px; }
-    .swatch-dot { width: 28px; height: 28px; border-radius: 50%; margin-bottom: 8px; border: 1px solid rgba(128,128,128,0.25); }
+    .head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .subtitle {
+      color: var(--skin-text-2);
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .swatch {
+      background: var(--skin-bg);
+      border: 1px solid var(--skin-border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11px;
+    }
+    .swatch-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      margin-bottom: 6px;
+      border: 1px solid rgba(128,128,128,0.28);
+    }
+    .swatch-hex {
+      color: var(--skin-text-2);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+    }
     .badge {
-      display: inline-block; padding: 3px 10px; border-radius: 999px;
-      background: var(--awd-accent-soft, #EAE7FA); color: var(--awd-accent-text, #4C4194);
-      font-size: 12px; font-weight: 500;
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--skin-accent-soft);
+      color: var(--skin-accent-text);
+      font-size: 11px;
+      font-weight: 500;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <span class="badge">UI 皮肤插件 · Skin 03</span>
-    <h1 class="title">日漫晨昏 · 逢魔之时</h1>
+    <div class="head-row">
+      <h1 class="title">日漫晨昏 · 逢魔之时</h1>
+      <span class="badge">UI 皮肤画廊 · Skin 03</span>
+    </div>
     <p class="subtitle">新海诚式群青星空与暮色珊瑚霞光交汇，薰衣草紫星芒点亮赛璐珞通透玻璃界面。</p>
     <div class="swatches">
-      <div class="swatch"><div class="swatch-dot" style="background:#F5F4FA"></div><strong>朝霞晴空</strong><div>#F5F4FA</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#53489E"></div><strong>星芒紫蓝</strong><div>#53489E</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#E07A5F"></div><strong>暮色珊瑚</strong><div>#E07A5F</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#9D8DF2"></div><strong>薰衣草星</strong><div>#9D8DF2</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#14192B"></div><strong>逢魔群青</strong><div>#14192B</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#F5F4FA"></div><strong>朝霞晴空</strong><div class="swatch-hex">#F5F4FA</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#53489E"></div><strong>星芒紫蓝</strong><div class="swatch-hex">#53489E</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#E07A5F"></div><strong>暮色珊瑚</strong><div class="swatch-hex">#E07A5F</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#9D8DF2"></div><strong>薰衣草星</strong><div class="swatch-hex">#9D8DF2</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#14192B"></div><strong>逢魔群青</strong><div class="swatch-hex">#14192B</div></div>
     </div>
   </div>
+  <script>
+    (function () {
+      function syncHostTheme() {
+        try {
+          var hostDoc = window.parent && window.parent.document && window.parent.document.documentElement;
+          if (!hostDoc) return;
+          var t = hostDoc.getAttribute('data-theme') || 'light';
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      }
+      syncHostTheme();
+      try {
+        var hostEl = window.parent && window.parent.document && window.parent.document.documentElement;
+        if (hostEl && typeof MutationObserver !== 'undefined') {
+          new MutationObserver(syncHostTheme).observe(hostEl, { attributes: true, attributeFilter: ['data-theme'] });
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script src="/api/plugins/sdk/awd-plugin-sdk.js"></script>
 </body>
 </html>

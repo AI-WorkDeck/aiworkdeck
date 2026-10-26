@@ -798,4 +798,28 @@ html.is-desktop .page-variable-library .header-card {
 html.is-desktop .page-plugin-market .hero {
     padding-top: 38px;
 }
+
+/* ============ 声明式皮肤插件特征质感（dev-board#1480） ============
+   当用户启用了带 surfaceTexture / aiPulseStyle 的皮肤插件时，appTheme.js 在
+   documentElement 上挂载 data-skin-texture 与 data-skin-pulse。通过极轻量的
+   全局特征样式增强三套皮肤的视觉辨识度，同时严格复用 var(--awd-*) 语义令牌。 */
+html[data-skin-texture='xuan-paper'] .page-project-overview,
+html[data-skin-texture='xuan-paper'] .pane-empty {
+    background-image:
+        radial-gradient(ellipse 85% 65% at 50% 35%, var(--awd-halo-1) 0%, transparent 72%),
+        repeating-linear-gradient(0deg, transparent 0px, transparent 3px, var(--awd-accent-wash) 3px, var(--awd-accent-wash) 4px);
+}
+html[data-skin-texture='xuan-paper'] .project-title-text,
+html[data-skin-texture='xuan-paper'] .sidebar-title-text {
+    font-family: var(--awd-font-serif);
+    letter-spacing: 0.03em;
+}
+html[data-skin-texture='cel-glass'] .pane-empty,
+html[data-skin-texture='cel-glass'] .project-header {
+    background-image: linear-gradient(125deg, var(--awd-halo-1) 0%, transparent 48%, var(--awd-halo-2) 100%);
+}
+html[data-skin-texture='frosted-glass'] .pane-empty,
+html[data-skin-texture='frosted-glass'] .project-header {
+    background-image: radial-gradient(circle at 80% 15%, var(--awd-halo-1) 0%, var(--awd-halo-2) 45%, transparent 78%);
+}
 </style>
