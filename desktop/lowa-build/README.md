@@ -96,6 +96,24 @@ evidence of native runtime correctness.
 
 ## 消费产物 / Consume
 
+### Calc 标题与 Qt 输入时钟候选（#1509 / #1511）
+
+本轮范围与近期未并入项见 [重烧复核](REBUILD-2026-10-26.md)。
+`mega-build.sh` 现钉死 core、Qt5、emscripten fork 和 emsdk 源码提交；
+新增的 `patches/apply-qt-patches.py` 须与其他构建脚本一起上传到 `/root/`。
+它在 Qt 子模块初始化后、configure 前修正鼠标及滚轮的计时来源。
+已有 Qt 安装目录会拒绝继续，避免静默链接旧库；使用干净构建目录。
+
+表头补丁只修改 Calc 的 `ScHeaderControl`：包内 Liberation Sans 9pt、
+与产品令牌一致的局部深浅配色。没有改动正文/单元格格式或全局 Qt 调色板。
+正式 wrapper 的旧引擎点击补偿仍保留。
+
+构建后使用 `LOWA_ENGINE_DIR` 指向候选产物，运行
+`npm run test:lowa-calc-chrome` 与 `npm run test:lowa-mouse-clock`；
+`LOWA_MOUSE_CLOCK_DRAG=1` 另跑生产补偿及测试专用取消补偿的拖移/撤销。
+两项样式/慢击断言须先在旧 r6 失败再在新引擎通过。具体产物与实际验收
+结果写入 `RECIPE.md`；没有真实结果的候选不能替换默认引擎地址。
+
 ```bash
 # PR #68 的 LOWA_BASE_URL 机制（file:// 或 https://）：
 cd frontend && npm run build:zetaoffice   # 注意会清空 dist/zetaoffice/lowa
