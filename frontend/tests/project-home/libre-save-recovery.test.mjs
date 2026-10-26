@@ -220,10 +220,12 @@ function makeCloseVm(confirm) {
     discardPendingSave: () => { discarded++ },
   }
   const vm = { leftFiles: [{ id: 7 }], rightFiles: [], activeFileIdLeft: 7,
+    pdfKeepAliveKeys: [],
     _libreRefs: { 'left:7': inst }, useLibreEditor: () => true,
     isBrowserTab: () => false, $t: k => k, lastActiveIdsByMode: { left: {} },
     saveActiveIdsByMode() {},
   }
+  vm.evictPdfKeepAlive = methods.evictPdfKeepAlive.bind(vm)
   return { vm, close: methods.closeFile.bind(vm), modals, toasts,
     counts: () => ({ flushed, discarded }) }
 }
@@ -256,6 +258,7 @@ test('关闭等待期间继续输入：保留标签后新改动必须重新进�
   assert.equal(await pending, false, '关标签者必须知道仍有后来输入没保存')
   assert.ok(vm._saveTimer, '解除 flush 闸后必须给后来输入补排保存，不能一直 dirty + ready')
   clearTimeout(vm._saveTimer)
+  vm._lastInteractionAt = Date.now() - 1501 // Exercise the scheduled idle retry after the later edit.
   await vm.autoSave()
   assert.equal(uploads, 2)
   assert.equal(vm.dirty, false)

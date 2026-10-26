@@ -58,7 +58,7 @@ async function fixture(initial = { id: 1, fileType: 'pdf', wpsFileId: 'a' }, ini
   const file = ref(initial), pendingLocator = ref(initialLocator)
   let vm
   const app = renderer.createApp({ render: () => h(options, {
-    file: file.value, locator: pendingLocator.value, ref: value => { if (value) vm = value },
+    file: file.value, sourceUrl: file.value ? `/synthetic/${file.value.id}/download` : '', locator: pendingLocator.value, ref: value => { if (value) vm = value },
     onLocatorConsumed: id => emitted.push(id),
   }) })
   app.config.globalProperties.$t = key => key

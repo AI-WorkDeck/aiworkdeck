@@ -201,7 +201,7 @@ test('焦点接管：焦点在 iframe 里（LOWA 编辑器等）→ 不抢', () 
 })
 
 test('文件切换同走这条规则：reloadPreview 的媒体分支调用 focusMediaPlayer', () => {
-  const m = FP_SRC.match(/\n    reloadPreview\(newFile\) \{\n([\s\S]*?)\n    \},/)
+  const m = FP_SRC.match(/\n    reloadPreview\(newFile(?:, [^)]*)?\) \{\n([\s\S]*?)\n    \},/)
   assert.ok(m)
   assert.match(m[1], /isVideo \|\| this\.isAudio\) \{[\s\S]*?focusMediaPlayer\(\)/)
 })

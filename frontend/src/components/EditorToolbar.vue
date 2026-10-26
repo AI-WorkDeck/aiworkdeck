@@ -1482,7 +1482,7 @@ export default {
       }
       // 激活态变了要通知宿主：菜单栏的「修订模式」勾选读的就是这里的
       // state.view.recordChanges，不广播的话菜单会停在上一次的状态。
-      this.$emit('ui-state')
+      this.$emit('ui-state', r)
     },
     // 命令跑完必须刷新两件事：工具栏自己的激活态，以及宿主的自动保存（改了文档）
     async after(res, changed) {

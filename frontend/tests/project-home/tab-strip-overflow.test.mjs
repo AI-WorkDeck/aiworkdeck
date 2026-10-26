@@ -76,7 +76,7 @@ test('滚轮横滚改成原生 addEventListener 挂在真实元素上，且会�
   assert.ok(splitWatch, '缺少 splitMode watcher')
   let tick, bindings = 0
   new Function(splitWatch[1].replace(/\},\s*$/, '')).call({
-    splitMode: false, pushMenuState() {}, scheduleLibreSpare() {},
+    splitMode: false, pdfKeepAliveKeys: [], pushMenuState() {}, scheduleLibreSpare() {},
     $nextTick(fn) { tick = fn }, rebindTabsWheel() { bindings++ },
   })
   assert.equal(bindings, 0, '必须等标签栏 DOM 更新后再挂滚轮')
