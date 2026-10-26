@@ -1074,6 +1074,7 @@
                     :target-id="evidenceMethodBar.targetId"
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
+                    :saving="evidenceMethodBar.saving"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
@@ -1375,6 +1376,7 @@
                     :target-id="evidenceMethodBar.targetId"
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
+                    :saving="evidenceMethodBar.saving"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
