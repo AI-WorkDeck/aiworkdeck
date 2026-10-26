@@ -122,6 +122,35 @@ public class ContextAssemblerService {
     @Autowired(required = false)
     private StyleProfileResolver styleProfileResolver;
 
+    /**
+     * 跨项目只读附件（dev-board#1479）。字段注入 + required=false，口径同
+     * {@link #styleProfileResolver}——不能往构造器里加 final 牵动既有测试；
+     * null 时视觉附件维持原来的项目内围栏。
+     */
+    @Autowired(required = false)
+    private com.checkba.service.ProjectMemberService projectMemberService;
+
+    public void setProjectMemberService(com.checkba.service.ProjectMemberService projectMemberService) {
+        this.projectMemberService = projectMemberService;
+    }
+
+    /**
+     * 附件来自其他项目时给 <file>/<image> 补 project / readonly 属性，
+     * 让模型知道这是一份跨项目只读引用（dev-board#1479）。
+     */
+    private String extraFileAttrs(com.checkba.controller.ai.AiAgentController.ContextItem item) {
+        if (item == null) return "";
+        StringBuilder sb = new StringBuilder();
+        if (item.getProjectName() != null && !item.getProjectName().isBlank()) {
+            sb.append(" project=\"").append(attrSafe(item.getProjectName())).append("\"");
+        }
+        if (item.getProjectName() != null && !item.getProjectName().isBlank()
+                || Boolean.TRUE.equals(item.getReadOnly())) {
+            sb.append(" readonly=\"true\"");
+        }
+        return sb.toString();
+    }
+
     /** 供测试直接装配。 */
     void setStyleProfileResolver(StyleProfileResolver resolver) {
         this.styleProfileResolver = resolver;
@@ -723,7 +752,8 @@ public class ContextAssemblerService {
                         // 模型能直接转述给用户的说明。原来它照样被当成附件正文写进 CDATA，
                         // 于是模型会「引用」一句 Java 异常文案当合同原文。
                         systemText.append("<file id=\"").append(item.getId())
-                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\">")
+                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
+                                  .append(extraFileAttrs(item)).append(">")
                                   .append(english ? "This attachment could not be read: "
                                                   : "该附件内容暂不可读：")
                                   .append(attrSafe(isToolFailureText(content)
@@ -742,7 +772,8 @@ public class ContextAssemblerService {
                     int effectiveCap = Math.min(maxCharsPerFile, Math.max(0, attachmentCharBudget));
                     if (effectiveCap <= 0) {
                         systemText.append("<file id=\"").append(item.getId())
-                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\">")
+                                  .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
+                                  .append(extraFileAttrs(item)).append(">")
                                   .append(english
                                           ? "Body omitted: this turn's combined attachment budget is used up. "
                                             + "Call extract_file_text with this id if you need its content."
@@ -762,7 +793,8 @@ public class ContextAssemblerService {
                     }
                     attachmentCharBudget -= content.length();
                     systemText.append("<file id=\"").append(item.getId())
-                              .append("\" name=\"").append(attrSafe(item.getName())).append("\"><![CDATA[\n");
+                              .append("\" name=\"").append(attrSafe(item.getName())).append("\"")
+                              .append(extraFileAttrs(item)).append("><![CDATA[\n");
                     systemText.append(fenceSafe(content));
                     systemText.append("\n]]></file>\n");
                     ledger.attachment(item.getId(), item.getName(), item.getFileType(), "file", false);
@@ -1344,7 +1376,8 @@ public class ContextAssemblerService {
                 log.warn("[Vision] File not found: id={}", item.getId());
                 return null;
             }
-            String denied = com.checkba.service.ai.tools.ToolFileGuard.rejectIfOutsideProject(file);
+            String denied = com.checkba.service.ai.tools.ToolFileGuard
+                    .rejectIfCannotRead(file, projectMemberService);
             if (denied != null) {
                 log.warn("[Vision] Refusing image attachment id={}: {}", item.getId(), denied);
                 return null;

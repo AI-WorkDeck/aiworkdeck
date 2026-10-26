@@ -26,9 +26,13 @@ import java.util.Objects;
 public class Project {
 
     public static final String LOOSE_FILES = "LOOSE_FILES";
+    public static final String SCRATCH = "SCRATCH";
 
     @com.fasterxml.jackson.annotation.JsonIgnore
     public boolean isLooseFileWorkspace() { return LOOSE_FILES.equals(projectType); }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isScratchWorkspace() { return SCRATCH.equals(projectType); }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
