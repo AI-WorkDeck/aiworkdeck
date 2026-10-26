@@ -18,7 +18,7 @@ function extract(name, opts = {}) {
   const body = m[0].replace(/,$/, '')
   // 对象方法简写 → 函数表达式；外部依赖经参数注入
   return new Function(
-    'createEvidenceLinkForDrop', 'uni',
+    'createEvidenceLinkForDrop', 'uni', 'loadEvidenceTags = () => ["written_review"]',
     'return ' + (opts.async ? 'async function ' : 'function ') + body.replace(/^async /, '')
   )
 }
