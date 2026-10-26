@@ -91,6 +91,18 @@ public final class EvalHarness {
 
     /** 同步跑一个用例（handleUserMessage 直接调用，不经 Spring 代理，@Async 不生效） */
     public static RunResult run(EvalCase c) {
+        return run(c, new EnvPerturbation[0]);
+    }
+
+    /**
+     * 带 EnvHarness 环境扰动器跑一个用例（dev-board#1481）：
+     * 传入非空扰动器时，自动接入 {@code HarnessDiagnosticService}、{@code VerificationHarness}
+     * 与 {@code HarnessEvolutionService}，检验编排器在 Setup / Rule / Link 扰动下的运行时自愈与进化能力。
+     */
+    public static RunResult run(EvalCase c, EnvPerturbation... perturbations) {
+        List<EnvPerturbation> perturbationList = perturbations == null
+                ? List.of()
+                : List.of(perturbations);
         PluginService pluginService = new PluginService();
         ScriptedStreamingModel scripted = new ScriptedStreamingModel(c.turns);
 
@@ -136,8 +148,12 @@ public final class EvalHarness {
         RecordingToolRegistry registry = new RecordingToolRegistry(toolBeans, pluginService);
         registry.init();
         registry.setStubs(c.toolStubs);
+        registry.setPerturbations(perturbationList);
         registry.setLiveTools(java.util.Set.of(com.checkba.service.ai.tools.SkillTools.TOOL_NAME,
                 com.checkba.service.ai.ToolDisclosurePolicy.CATALOG_TOOL));
+        for (EnvPerturbation p : perturbationList) {
+            p.beforeRun(c, registry);
+        }
         XmlToolCallParser parser = new XmlToolCallParser(registry);
 
         ChatModelFactory chatModelFactory = mock(ChatModelFactory.class);
@@ -249,6 +265,17 @@ public final class EvalHarness {
         // ContextAssemblerService 在本 harness 里是 mock，system prompt 段不走这条路；
         // 那一段的护栏在 ContextAssemblerServiceTest。
         orchestrator.setToolDisclosurePolicy(disclosurePolicy);
+        if (!perturbationList.isEmpty()) {
+            com.checkba.service.ai.harness.HarnessDiagnosticService diagnosticService =
+                    new com.checkba.service.ai.harness.HarnessDiagnosticService(disclosurePolicy, skillRegistry, skillRouter);
+            com.checkba.service.ai.harness.VerificationHarness verificationHarness =
+                    new com.checkba.service.ai.harness.VerificationHarness(skillRouter);
+            com.checkba.service.ai.harness.HarnessEvolutionService evolutionService =
+                    new com.checkba.service.ai.harness.HarnessEvolutionService(null, skillRegistry, skillProperties);
+            orchestrator.setHarnessDiagnosticService(diagnosticService);
+            orchestrator.setVerificationHarness(verificationHarness);
+            orchestrator.setHarnessEvolutionService(evolutionService);
+        }
 
         AiAgentController.AgentChatRequest request = new AiAgentController.AgentChatRequest();
         request.setProjectId(1L);

@@ -59,6 +59,12 @@ public class ProjectAiMessageService {
     private com.checkba.service.ai.InlineContentCache inlineContentCache;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.repository.ConversationSummaryRepository conversationSummaries;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.harness.HarnessEvolutionService harnessEvolutionService;
+
+    public void setHarnessEvolutionService(com.checkba.service.ai.harness.HarnessEvolutionService harnessEvolutionService) {
+        this.harnessEvolutionService = harnessEvolutionService;
+    }
 
     void setAttachmentRepositoryForTest(com.checkba.repository.ProjectAiMessageAttachmentRepository repo) {
         this.attachmentRepository = repo;
@@ -888,10 +894,47 @@ public class ProjectAiMessageService {
     @org.springframework.transaction.annotation.Transactional
     public String rollbackWithArchive(String conversationId, Long messageId, String clientRequestId, Long userId) {
         Long targetId = resolveRollbackTarget(conversationId, messageId, clientRequestId);
+        recordRollbackEvolutionSignalQuietly(conversationId, targetId, userId);
         String archived = forkConversation(conversationId, userId,
                 LangText.of(" · 回退前存档", " · before rollback"), conversationId, targetId);
         truncateHistory(conversationId, targetId);
         return archived;
+    }
+
+    private void recordRollbackEvolutionSignalQuietly(String conversationId, Long targetId, Long userId) {
+        if (harnessEvolutionService == null || conversationId == null || targetId == null) {
+            return;
+        }
+        try {
+            ProjectAiMessage target = repository.findById(targetId).orElse(null);
+            if (target == null) {
+                return;
+            }
+            String rolledBackUser = "USER".equalsIgnoreCase(target.getRole())
+                    ? (target.getDisplayContent() != null && !target.getDisplayContent().isBlank()
+                            ? target.getDisplayContent()
+                            : target.getContent())
+                    : "";
+            String rolledBackAssistant = "ASSISTANT".equalsIgnoreCase(target.getRole())
+                    ? target.getContent()
+                    : "";
+            List<ProjectAiMessage> all = repository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+            boolean afterTarget = false;
+            for (ProjectAiMessage m : all) {
+                if (targetId.equals(m.getId())) {
+                    afterTarget = true;
+                    continue;
+                }
+                if (afterTarget && "ASSISTANT".equalsIgnoreCase(m.getRole()) && rolledBackAssistant.isEmpty()) {
+                    rolledBackAssistant = m.getContent() != null ? m.getContent() : "";
+                    break;
+                }
+            }
+            harnessEvolutionService.recordRollbackSignal(
+                    conversationId, userId, target.getProjectId(), rolledBackUser, rolledBackAssistant);
+        } catch (Exception e) {
+            log.debug("Skipped recording rollback evolution signal for {}: {}", conversationId, e.getMessage());
+        }
     }
 
     /**
