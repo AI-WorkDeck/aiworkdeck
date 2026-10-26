@@ -20,6 +20,7 @@ languages:
   - en-US
 
 name_en: Contract Review
+description_en: Review a contract or agreement clause by clause from the specified party's perspective—establishing party stance and governing law, auditing structure (numbering, cross-references, blanks, arithmetic, prior revisions), running multi-pass legal and commercial checks, applying tracked changes and comments in batch, and delivering a categorized findings schedule.
 
 # 触发条件：用户输入包含任一关键词即命中（不区分大小写）。
 # 刻意不用单字「审查」「审阅」——它们会命中「尽调审查」「审阅笔录」这类别的任务，

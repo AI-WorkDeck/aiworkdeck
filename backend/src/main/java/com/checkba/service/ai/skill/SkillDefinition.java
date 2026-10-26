@@ -151,6 +151,9 @@ public class SkillDefinition {
     /** 英文展示名（skill.yml: name_en，可选）；英文模式下注入块用它，缺省回退 name */
     private String nameEn;
 
+    /** 英文简介（skill.yml: description_en，可选）；英文界面下优先展示，缺省回退 description */
+    private String descriptionEn;
+
     /** 英文触发词（skill.yml: triggers_en，可选）；仅英文模式参与匹配（连同 triggers 一起） */
     private List<String> triggersEn = new ArrayList<>();
 
@@ -206,6 +209,8 @@ public class SkillDefinition {
     public void setLanguages(List<String> languages) { this.languages = languages; }
     public String getNameEn() { return nameEn; }
     public void setNameEn(String nameEn) { this.nameEn = nameEn; }
+    public String getDescriptionEn() { return descriptionEn; }
+    public void setDescriptionEn(String descriptionEn) { this.descriptionEn = descriptionEn; }
     public List<String> getTriggersEn() { return triggersEn; }
     public void setTriggersEn(List<String> triggersEn) { this.triggersEn = triggersEn; }
     public String getOutputEn() { return outputEn; }

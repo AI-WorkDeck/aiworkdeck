@@ -304,7 +304,18 @@ export function createLibreOfficeExecutor(opts = {}) {
       (action === 'build_comparison_document' || action === 'export_document')
     return new Promise((resolve, reject) => {
       const timer = waitForCompletion ? null : setTimeout(() => {
-        if (pending.has(reqId)) { pending.delete(reqId); reject(Object.assign(new Error('等待编辑器结果超时，操作可能仍在执行。请先检查文档和修订记录，确认结果前不要重复执行写入操作。 / Editor result timed out; the operation may still be running. Check the document and tracked changes before repeating any write.'), { code: 'EDITOR_RESULT_TIMEOUT' })) }
+        if (pending.has(reqId)) {
+          pending.delete(reqId)
+          let isEn = false
+          try {
+            if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
+            else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+          } catch (_) { /* ignore */ }
+          const timeoutMsg = isEn
+            ? 'Editor result timed out; the operation may still be running. Check the document and tracked changes before repeating any write.'
+            : '等待编辑器结果超时，操作可能仍在执行。请先检查文档和修订记录，确认结果前不要重复执行写入操作。'
+          reject(Object.assign(new Error(timeoutMsg), { code: 'EDITOR_RESULT_TIMEOUT' }))
+        }
       }, budget)
       pending.set(reqId, { resolve, reject, timer, onProgress: callOpts && callOpts.onProgress })
       if (callOpts && callOpts.onIssued) { try { callOpts.onIssued(reqId) } catch (e) { /* ignore */ } }

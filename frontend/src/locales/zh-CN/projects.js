@@ -103,6 +103,17 @@ export default {
   placeholderOpenedAt: '例如：2026-08-01',
   placeholderNextStep: '例如：8 月 15 日前出尽调报告初稿',
   placeholderCounterparty: '例如：上海某某贸易有限公司',
+  matterTypeCorporateGovernance: '公司治理',
+  matterTypeCapitalMarkets: '资本市场证券',
+  matterTypeMna: '并购交易',
+  matterTypeDisputeResolution: '争议解决',
+  matterTypeContractReview: '合同审查起草',
+  matterTypeCompliance: '合规监管',
+  matterTypeIp: '知识产权',
+  matterTypeLabor: '劳动人事',
+  matterTypeBankruptcy: '破产重整',
+  matterTypeOtherLegal: '其他法律事务',
+  matterTypeNonLegal: '非法律事务',
 
   // OverviewStatsBar.vue
   statsLoadingHint: '正在读取项目情况…',

@@ -1,0 +1,5 @@
+{
+  "plugin.name": "脱敏",
+  "plugin.description": "核查敏感信息并生成脱敏副本，可用恢复包复敏。",
+  "view.main.name": "脱敏"
+}

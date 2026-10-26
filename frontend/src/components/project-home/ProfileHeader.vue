@@ -15,12 +15,12 @@
 
         <AwdSelect
           v-if="editingKey === f.fieldKey && f.fieldKey === 'matterType'"
-          :range="matterTypes"
+          :range="matterTypeLabels"
           :value="matterTypeIndex"
           @change="onPickMatterType"
           @cancel="cancelEdit"
         >
-          <view class="profile-field-picker">{{ draft || $t('projects.selectMatterType') }}</view>
+          <view class="profile-field-picker">{{ draft ? matterTypeLabel(draft) : $t('projects.selectMatterType') }}</view>
         </AwdSelect>
 
         <input
@@ -39,7 +39,7 @@
           class="profile-field-value"
           :class="{ 'profile-field-empty': !f.fieldValue, 'profile-field-weak': isWeak(f) }"
           @tap="startEdit(f.fieldKey)"
-        >{{ f.fieldValue || $t('projects.notFilled') }}</text>
+        >{{ (f.fieldKey === 'matterType' && f.fieldValue ? matterTypeLabel(f.fieldValue) : f.fieldValue) || $t('projects.notFilled') }}</text>
 
         <text v-if="hintOf(f)" class="profile-field-hint">{{ hintOf(f) }}</text>
       </view>
@@ -58,6 +58,7 @@
 // 空态引导因此写成手填口径而不是「让 AI 读一遍项目里的文件」——
 // Plan 2 上线 AI 抽取后，把空态引导改回 AI 文案，并把按钮随抽取链路一起放出来。
 import { MATTER_TYPES } from '@/config/matterTypes.js'
+import { matterTypeLabel as formatMatterTypeLabel } from '@/config/matterTypes.js'
 import { isProfileEmpty, profileFieldHint } from '@/utils/projectHomeFormat.js'
 import { t } from '@/i18n'
 import AwdSelect from '@/components/AwdSelect.vue'
@@ -93,6 +94,9 @@ export default {
     matterTypeIndex() {
       return this.matterTypes.indexOf(this.draft)
     },
+    matterTypeLabels() {
+      return this.matterTypes.map((opt) => this.matterTypeLabel(opt))
+    },
   },
   watch: {
     // 换了项目就把半截的编辑态丢掉，避免把 A 项目的输入提交到 B 项目
@@ -101,6 +105,9 @@ export default {
     },
   },
   methods: {
+    matterTypeLabel(val) {
+      return formatMatterTypeLabel(val, (key) => (this.$t ? this.$t(key) : t(key)))
+    },
     isWeak(f) {
       return f.source === 'default' || f.source === 'ai'
     },

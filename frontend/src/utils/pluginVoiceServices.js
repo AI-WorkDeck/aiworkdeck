@@ -21,10 +21,17 @@ export function createPluginVoiceServices({ projectId, permissions, isCurrent, a
   let sourceFileId = null
   const installResults = new Map()
   let lastStop = null
+  const isEn = () => {
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') return true
+      if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') return true
+    } catch (_) { /* ignore */ }
+    return false
+  }
   const allowed = permission => { if (!permissions().includes(permission)) error('permission_denied', permission + ' is required') }
   const check = signal => { if (signal.aborted || !isCurrent()) error('cancelled', 'Request cancelled') }
   const confirm = async (content, signal) => {
-    const result = await showDialog({ title: '语音', content })
+    const result = await showDialog({ title: isEn() ? 'Voice' : '语音', content })
     check(signal)
     if (!result.confirm) error('cancelled', 'Cancelled')
   }
@@ -104,14 +111,17 @@ export function createPluginVoiceServices({ projectId, permissions, isCurrent, a
       }
       if (operation === 'setTier') {
         if (!['local', 'platform'].includes(params.provider)) error('invalid_params', 'Unsupported speech provider')
-        if (params.provider === 'platform') { allowed('network'); await confirm('使用宿主的云端转写服务？音频会上传至已配置的服务。', signal) }
+        if (params.provider === 'platform') {
+          allowed('network')
+          await confirm(isEn() ? 'Use the host cloud transcription service? Audio will be uploaded to the configured service.' : '使用宿主的云端转写服务？音频会上传至已配置的服务。', signal)
+        }
         return api.setPlatformServiceProvider('asr', params.provider)
       }
       if (operation === 'notice') return api.getMeetingAsrNotice()
       if (operation === 'acknowledgeNotice') {
         allowed('network')
         const notice = await api.getMeetingAsrNotice(); check(signal)
-        await confirm(String(notice?.body || notice?.content || '确认已阅读录音转写告知，并允许使用云端转写服务？'), signal)
+        await confirm(String(notice?.body || notice?.content || (isEn() ? 'Confirm that you have read the recording transcription notice and allow using the cloud transcription service?' : '确认已阅读录音转写告知，并允许使用云端转写服务？')), signal)
         return api.acknowledgeMeetingAsrNotice(true)
       }
       allowed('file_read')
@@ -131,7 +141,7 @@ export function createPluginVoiceServices({ projectId, permissions, isCurrent, a
       if (operation === 'list') return api.getMeetingRecordings(projectId())
       if (operation === 'start') {
         allowed('file_write'); await cloudGate(signal)
-        await confirm('开始录音并保存到当前项目？录音会在切换面板后继续，直到你停止。', signal)
+        await confirm(isEn() ? 'Start recording and save to the current project? Recording will continue when switching panels until you stop it.' : '开始录音并保存到当前项目？录音会在切换面板后继续，直到你停止。', signal)
         const devices = await recorder.listAudioInputDevices(); check(signal)
         const deviceId = devices.some(d => d.deviceId === params.deviceId) ? params.deviceId : undefined
         await recorder.startRecording(projectId(), deviceId, { signal, isCurrent })
@@ -171,7 +181,7 @@ export function createPluginVoiceServices({ projectId, permissions, isCurrent, a
         return api.updateMeetingRecording(row.id, payload)
       }
       if (operation === 'export') return api.exportMeetingTranscript(row.id)
-      if (operation === 'delete') { await confirm('删除这份会议录音？', signal); return api.deleteMeetingRecording(row.id) }
+      if (operation === 'delete') { await confirm(isEn() ? 'Delete this meeting recording?' : '删除这份会议录音？', signal); return api.deleteMeetingRecording(row.id) }
       error('unknown_operation', 'Unknown voice operation')
     },
   }
