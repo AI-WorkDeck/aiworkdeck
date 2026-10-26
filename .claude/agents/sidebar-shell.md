@@ -525,6 +525,13 @@ launch（**启动页**）/ unlock / identity / login / newproject / **project-li
 
 ## 窗口外壳与菜单栏（2026-08-16）
 
+**工作台主布局不得滚动（dev-board#1503）**：`.main-layout` 使用 `overflow:clip` +
+`min-height:0`，只裁切内容、允许 flex 收缩；不要改回 `overflow:hidden`，后者仍可被
+后代 `scrollIntoView` / 聚焦带着滚动。rail 内容超高时，定位文件会让整排左栏标题与
+文档标签上移到顶栏下方，之后滚回文件列表顶部也无法恢复。浏览器回归
+`npm run test:workbench-scroll` 使用真实 SCSS 与合成内容，覆盖三种窗口尺寸的文件定位、
+聚焦及滚轮往返，检查标题几何和底栏位置；可用 `CHROME_PATH` 指定 Chromium。
+
 **没有系统标题栏了。** `main.js` 的 `titleBarStyle:'hidden'`：mac 用
 `trafficLightPosition:{x:18,y:13}` 把三颗交通灯精确摆进 42px 的 `.project-header`
 垂直中心（**不用 `hiddenInset`**——那个按系统默认标题栏高度摆，压不准我们的 42px）；
