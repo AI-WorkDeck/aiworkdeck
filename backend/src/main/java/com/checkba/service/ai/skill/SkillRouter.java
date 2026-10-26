@@ -73,6 +73,26 @@ public class SkillRouter {
     @org.springframework.lang.Nullable
     private final com.checkba.service.AppLanguageService appLanguageService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.lang.Nullable
+    private BuiltinWorkflowVersionService builtinWorkflowVersionService;
+
+    public void setBuiltinWorkflowVersionService(
+            @org.springframework.lang.Nullable BuiltinWorkflowVersionService builtinWorkflowVersionService) {
+        this.builtinWorkflowVersionService = builtinWorkflowVersionService;
+    }
+
+    @org.springframework.lang.Nullable
+    public BuiltinWorkflowVersionService.WorkflowVersion resolveActiveWorkflowVersion(
+            SkillDefinition skill,
+            @org.springframework.lang.Nullable Long userId,
+            @org.springframework.lang.Nullable String projectId) {
+        if (skill == null || !skill.isBuiltinWorkflow() || builtinWorkflowVersionService == null) {
+            return null;
+        }
+        return builtinWorkflowVersionService.resolveActiveVersion(userId, projectId, skill.getId());
+    }
+
     /** 来源：触发词自动命中 */
     public static final String SOURCE_AUTO = "auto";
     /** 来源：用户在对话面板里主动选择（含旧字段 pinnedSkillId） */
@@ -623,7 +643,28 @@ public class SkillRouter {
      * 只是不带「本轮命中了技能」那行系统注入前缀（中途调用不是命中）。
      */
     public String skillInstructionsFor(SkillDefinition skill) {
+        return skillInstructionsFor(skill, null, null);
+    }
+
+    /**
+     * 按当前用户与项目偏好解析内置工作流版本后的指引正文（供 {@code use_skill} 调用）。
+     */
+    public String skillInstructionsFor(
+            SkillDefinition skill,
+            @org.springframework.lang.Nullable Long userId,
+            @org.springframework.lang.Nullable String projectId) {
         boolean english = isEnglish();
+        BuiltinWorkflowVersionService.WorkflowVersion activeVer =
+                resolveActiveWorkflowVersion(skill, userId, projectId);
+        if (activeVer != null && !activeVer.isSystemDefault()) {
+            String template = activeVer.getPromptTemplate();
+            String output = activeVer.getOutput();
+            StringBuilder sb = new StringBuilder(template == null ? "" : template);
+            if (output != null && !output.isBlank()) {
+                sb.append(english ? "\n\n## Output Conventions\n" : "\n\n## 输出约定\n").append(output);
+            }
+            return sb.toString();
+        }
         String template = english && skill.getPromptTemplateEn() != null && !skill.getPromptTemplateEn().isBlank()
                 ? skill.getPromptTemplateEn()
                 : skill.getPromptTemplate();
@@ -639,6 +680,22 @@ public class SkillRouter {
 
     /** 组装注入块：skill 的 prompt 模板 + 输出约定（由 ContextAssemblerService 追加到系统消息） */
     public String promptInjectionFor(SkillDefinition skill) {
+        return promptInjectionFor(skill, null, null);
+    }
+
+    /**
+     * 组装注入块（感知当前用户与项目选用的内置常驻工作流版本）。
+     * 若当前项目或用户全局选用了自定义工作流版本，则注入该版本的自定义 Prompt 与输出约定。
+     */
+    public String promptInjectionFor(
+            SkillDefinition skill,
+            @org.springframework.lang.Nullable Long userId,
+            @org.springframework.lang.Nullable String projectId) {
+        BuiltinWorkflowVersionService.WorkflowVersion activeVer =
+                resolveActiveWorkflowVersion(skill, userId, projectId);
+        if (activeVer != null && !activeVer.isSystemDefault()) {
+            return promptInjectionForCustomVersion(skill, activeVer);
+        }
         if (isEnglish()) {
             return promptInjectionForEn(skill);
         }
@@ -650,6 +707,34 @@ public class SkillRouter {
         sb.append(skill.getPromptTemplate());
         if (skill.getOutput() != null && !skill.getOutput().isBlank()) {
             sb.append("\n\n## 输出约定\n").append(skill.getOutput());
+        }
+        return sb.toString();
+    }
+
+    private String promptInjectionForCustomVersion(
+            SkillDefinition skill,
+            BuiltinWorkflowVersionService.WorkflowVersion ver) {
+        boolean english = isEnglish();
+        String baseName = displayName(skill);
+        String verName = ver.getName() != null && !ver.getName().isBlank() ? ver.getName() : "";
+        String fullTitle = verName.isEmpty() ? baseName : (baseName + (english ? " (" + verName + ")" : "（" + verName + "）"));
+        String template = ver.getPromptTemplate() != null ? ver.getPromptTemplate() : "";
+        String output = ver.getOutput();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n\n# Active Skill: ").append(fullTitle);
+        if (english) {
+            sb.append("\n[SYSTEM INJECTION] The user's request this turn matched the skill \"")
+                    .append(fullTitle)
+                    .append("\". Handle this turn according to the user-customized workflow guidance below:\n\n");
+        } else {
+            sb.append("\n[SYSTEM INJECTION] 用户本轮请求命中了技能「")
+                    .append(fullTitle)
+                    .append("」，请按以下用户定制的工作流指引处理本轮请求：\n\n");
+        }
+        sb.append(template);
+        if (output != null && !output.isBlank()) {
+            sb.append(english ? "\n\n## Output Conventions\n" : "\n\n## 输出约定\n").append(output);
         }
         return sb.toString();
     }
