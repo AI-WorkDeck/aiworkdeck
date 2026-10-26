@@ -13,6 +13,7 @@
 #     0013, 0048) + optional bundled dictionary/Lightproof
 #     pruning (--slim-dictionaries).
 #  9. Calc row/column header UI font and local palette (#1509).
+# 10. Preserve real tooltip input transparency on WASM (#1515).
 import argparse
 import glob
 import os
@@ -1371,6 +1372,27 @@ def patch_calc_header_chrome(core):
     )
 
 
+# ---- WASM tooltip input transparency (#1515) --------------------------------
+def patch_wasm_tooltip_input(core):
+    # HelpTextWindow is already mouse-transparent in VCL. Preserve that intent
+    # at the platform-window boundary; isPopup() also uses ToolTip, but must
+    # remain interactive. The companion Qt compositor patch honors this flag.
+    patch(
+        f'{core}/vcl/qt5/QtFrame.cxx',
+        '''        else if (nStyle & SalFrameStyleFlags::TOOLTIP)
+            aWinFlags = Qt::ToolTip;
+''',
+        '''        else if (nStyle & SalFrameStyleFlags::TOOLTIP)
+        {
+            aWinFlags = Qt::ToolTip;
+            if (QGuiApplication::platformName() == "wasm")
+                aWinFlags |= Qt::WindowTransparentForInput;
+        }
+''',
+        'WASM tooltip input transparency',
+    )
+
+
 # ---- Bundled dictionary & Lightproof pruning helper (PERF-01) ----------------
 def _should_keep_dict_dir(name, keep_langs):
     if not name.startswith('dict-'):
@@ -1467,6 +1489,7 @@ def main(argv=None):
     patch_swriter_pagesize_and_dialogless_uno(CORE)
     patch_word_count_and_outline_values(CORE)
     patch_calc_header_chrome(CORE)
+    patch_wasm_tooltip_input(CORE)
 
     if args.slim_dictionaries or os.path.isdir(f'{CORE}/instdir/share/extensions'):
         slim_dictionaries(CORE, keep_langs=keep_langs)

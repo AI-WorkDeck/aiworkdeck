@@ -28,6 +28,14 @@ The adaptation uses the existing Qt elapsed-time mouse/wheel overloads; it
 does not copy another editor's implementation. Build source revisions are
 pinned in `desktop/lowa-build/mega-build.sh`.
 
+The tooltip input adaptation (#1515) in the same patchers targets
+`vcl/qt5/QtFrame.cxx` (LibreOffice revision above, original MPL-2.0 header retained)
+and `src/plugins/platforms/wasm/qwasmcompositor.cpp` (qtbase revision above,
+original Qt Company 2018 GPL-3.0-or-later header retained). On WASM, real VCL
+tooltip frames receive `WindowTransparentForInput`, and compositor hit testing
+honors that flag. Interactive combo popups also use the `ToolTip` window type;
+their branch remains unchanged. Painting, stacking and mouse clocks are unchanged.
+
 ### Local Modifications (`desktop/lowa-build/`)
 
 - **`patches/apply-source-patches.py` & `patches/source-patches.diff`**:

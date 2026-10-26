@@ -15,6 +15,10 @@ Calc 行列标题由原生 `ScHeaderControl` 绘制，字体在构造时缓存�
 
 Qt WASM 的鼠标/滚轮分支把 `emscripten_date_now()` 纪元毫秒 double 传给32位ulong，存在越界转换；候选改用Qt自带的无timestamp重载和应用QElapsedTimer。**原生源码并非字面传零**。`apply-qt-patches.py` 钉死qtbase SHA并在configure前执行。旧r6的真实同点慢击会误选整词；生产`zetaOfficeSelectionDrag`远点点击补偿仍保留。新旧对照入口：`test:lowa-mouse-clock`（`LOWA_MOUSE_CLOCK_DRAG=1`另验取消补偿的测试构建）及`test:lowa-calc-chrome`。补丁单测不能代替实际编译、像素与交互结果。
 
+## WASM 提示框输入穿透（dev-board#1515，补充候选）
+
+Calc 隐藏原生 chrome 后，表头贴画布顶部，尺寸提示框可落在鼠标旁；旧 compositor 的 5px 命中外圈会截走后续移动/释放。VCL `HelpTextWindow` 本身已鼠标穿透，但 QtFrame 与 WASM 命中层丢失此语义。源码补丁仅在 WASM 的 `SalFrameStyleFlags::TOOLTIP` 分支附加 `WindowTransparentForInput`，Qt `windowAt` 跳过带此标记的窗口。不能按 `Qt::ToolTip` 类型一概排除，LO 的交互式组合框 popup 也用该类型。补充候选正在编译，实际结果以 `desktop/lowa-build/RECIPE.md` 为准；禁止仅隐藏提示框或用原生工具栏有上方空白的路径冒充裸画布通过。
+
 ## 拖选期间滚轮翻页（dev-board#1393）
 
 `get_cursor_rect()` 默认只读光标，不再读取 `selectionRects`。端点测量会通过 `gotoRange` 临时移动视光标，后台审校在 wheel 后调用它会拉回视口并打断正在进行的鼠标选区。只有 `zetaOfficeSelectionDrag.refreshSelection` 在鼠标松开后显式请求 `{selectionRects:true}`；普通 IME/审校读取不得隐式开启。非空选区的普通光标回包不清除已缓存的端点，折叠光标仍清除；键盘选区通过 `sel_changed` 刷新。
