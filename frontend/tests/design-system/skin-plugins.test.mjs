@@ -157,7 +157,7 @@ test('skin previews retain opaque origins and receive only the existing theme ch
   for (const { id } of OFFICIAL_SKIN_PLUGINS) {
     const html = read(`official-plugins/${id}/web/index.html`)
     assert.doesNotMatch(html, /parent\.document/)
-    assert.match(html, /src="\/api\/plugins\/sdk\/awd-plugin-sdk\.js"/)
+    assert.match(html, /src="awd-plugin-sdk\.js"/)
   }
 })
 

@@ -119,7 +119,7 @@ test('service timeout sends cancellation for its request and settled calls detac
 })
 
 test('all distributed SDK copies are identical and safe to embed in website template', async () => {
-  for (const copy of ['../../../backend/src/main/resources/plugin-dev/awd-plugin-sdk.js', '../../../examples/hello-web-plugin/web/awd-plugin-sdk.js', '../../../examples/plugin-service-demo/web/awd-plugin-sdk.js', '../../../official-plugins/baoqingtian/web/awd-plugin-sdk.js', '../../../official-plugins/tencent-meeting/web/awd-plugin-sdk.js']) {
+  for (const copy of ['../../../backend/src/main/resources/plugin-dev/awd-plugin-sdk.js', '../../../examples/hello-web-plugin/web/awd-plugin-sdk.js', '../../../examples/plugin-service-demo/web/awd-plugin-sdk.js', '../../../official-plugins/baoqingtian/web/awd-plugin-sdk.js', '../../../official-plugins/tencent-meeting/web/awd-plugin-sdk.js', '../../../official-plugins/theme-inkwash-zen/web/awd-plugin-sdk.js', '../../../official-plugins/theme-anime-twilight/web/awd-plugin-sdk.js', '../../../official-plugins/theme-aurora-glass/web/awd-plugin-sdk.js']) {
     assert.equal(await readFile(new URL(copy, import.meta.url), 'utf8'), source)
   }
   assert.equal(source.includes('`'), false); assert.equal(source.includes('${'), false)

@@ -2,5 +2,11 @@
   "plugin.name": "Aurora Glass · Abyssal Pro Skin",
   "plugin.desc": "Abyssal navy depths, frosted ice-cyan glass, and amethyst crystal core for deep focus.",
   "theme.name": "Aurora Glass",
-  "theme.desc": "Abyssal Navy × Frosted Ice Cyan × Amethyst Crystal Core"
+  "theme.desc": "Abyssal Navy × Frosted Ice Cyan × Amethyst Crystal Core",
+  "gallery.badge": "Συλλογή θεμάτων",
+  "gallery.swatch1": "Παγετώδης αυγή",
+  "gallery.swatch2": "Παγωμένο γυαλί",
+  "gallery.swatch3": "Αμέθυστος",
+  "gallery.swatch4": "Κυανό σέλας",
+  "gallery.swatch5": "Βαθύς ωκεανός"
 }

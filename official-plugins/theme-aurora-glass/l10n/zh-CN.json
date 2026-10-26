@@ -2,5 +2,11 @@
   "plugin.name": "深海极光 · 冰刃琉璃",
   "plugin.desc": "静谧深海蓝底、冰青磨砂琉璃与紫水晶星核，专为长时深度审阅打造的冷冽高透双境。",
   "theme.name": "深海极光 · 冰刃琉璃",
-  "theme.desc": "深海极光 · 冰刃破圈（静谧深海蓝 × 冰青磨砂琉璃 × 紫水晶星核）"
+  "theme.desc": "深海极光 · 冰刃破圈（静谧深海蓝 × 冰青磨砂琉璃 × 紫水晶星核）",
+  "gallery.badge": "皮肤画廊",
+  "gallery.swatch1": "冰川晨光",
+  "gallery.swatch2": "冰青琉璃",
+  "gallery.swatch3": "紫晶星核",
+  "gallery.swatch4": "极光流青",
+  "gallery.swatch5": "静谧深海"
 }

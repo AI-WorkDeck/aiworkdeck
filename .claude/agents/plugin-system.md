@@ -464,3 +464,7 @@ Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings
 `awd:litviz-restyled` 成功信号按项目转 `files.changed`；顶部 `awd:meeting-recording-stopped` 转权限为speech的空 `speech.stopped`，iframe再唤醒原面板列表监听。绘图换风格等待保存也要纳入try/catch，取消时向原项目发结束信号释放保存屏障。脱敏原API为300000ms，适配器和SDK上限一致，SDK默认仍60000ms。录音停止可等待用户确认付费转写，超出单次RPC时继续查询真实状态；宿主按项目和meetingId保存原停止结果（包括失败时null），不能再次stop或把旧结果当新结果。
 
 日程读取完整目录元数据，不能用SDK对外扁平文件投影；更新时可保留已验证原事项中的软删关联，新关联仍查可见文件。插件TaskDialog在窄iframe中滚动/换行，遮罩低于Uni确认框；动态引用图标必须构建期导入，不能请求后端根/static。随附UI修复必须同步构建并提高插件版本，`PluginBundledInstaller` 仅升级更高版本且带 `.awd-bundled` 的安装，不覆盖独立市场安装或用户卸载记录。
+
+### 主题画廊分发与语言（dev-board#1527）
+
+三主题 1.0.2 的 `web/index.html` 使用包内相对 SDK、gallery runtime 与生成的 20 语词典；`official-plugins/build-theme-plugins.sh` 从 canonical SDK 和各包 l10n 重建、打 ZIP，禁止引用不存在的 `/api/plugins/sdk/awd-plugin-sdk.js`。真实静态路由是 `/api/plugin-web/{id}/**`。宿主 0.72.1 的 MarketDetailPane/PluginPane 通过既有 theme 消息携带当前应用 language，监听 APP_LANGUAGE_EVENT 并卸载清理；PluginPane 初次 init.context.language 保持原契约。0.72.0 预览缺语言时明确以 en-US 回退，不能用 navigator 冒充应用偏好。iframe 保持 opaque origin，语言/主题消息只接受 parent。Node 渲染回归见 theme-gallery.test.mjs；浏览器脚本必须连接真实隔离后端，不能伪造 SDK 路由。浏览器受宿主禁用时只报告 HTTP/Node 验证，不称 UI 实测。

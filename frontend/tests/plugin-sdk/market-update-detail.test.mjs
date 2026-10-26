@@ -4,6 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { mergePluginCatalog, isPluginUpdateAvailable } from '../../src/utils/marketUpdates.js'
+import { APP_LANGUAGE_EVENT } from '../../src/utils/appLanguage.js'
 import { APP_THEME_EVENT } from '../../src/utils/appTheme.js'
 
 const detail = readFileSync(new URL('../../src/components/MarketDetailPane.vue', import.meta.url), 'utf8')
@@ -137,16 +138,18 @@ test('open detail refreshes after manual update checks and removes its listener 
   const lifecycle = name => {
     const start = detail.indexOf(`  ${name}() {`)
     const end = detail.indexOf('\n  },', start)
-    return new Function('uni', 'APP_THEME_EVENT', `return ({${detail.slice(start, end + 5)}}).${name}`).call(null, uni, APP_THEME_EVENT)
+    return new Function('uni', 'APP_THEME_EVENT', 'APP_LANGUAGE_EVENT', `return ({${detail.slice(start, end + 5)}}).${name}`).call(null, uni, APP_THEME_EVENT, APP_LANGUAGE_EVENT)
   }
   lifecycle('mounted').call(vm)
   handlers.get(APP_THEME_EVENT)()
-  assert.equal(previewUpdates, 1)
+  handlers.get(APP_LANGUAGE_EVENT)()
+  assert.equal(previewUpdates, 2)
   handlers.get('awd:market-update-checked')()
   assert.deepEqual(reloads, [[], [false]], 'background checks only refresh metadata')
   lifecycle('beforeUnmount').call(vm)
   assert.equal(handlers.has('awd:market-update-checked'), false)
   assert.equal(handlers.has(APP_THEME_EVENT), false)
+  assert.equal(handlers.has(APP_LANGUAGE_EVENT), false)
 })
 
 test('background version checks preserve an unsaved plugin settings draft', async () => {

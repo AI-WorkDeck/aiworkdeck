@@ -1,7 +1,7 @@
 {
   "id": "theme-aurora-glass",
   "name": "%plugin.name%",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "%plugin.desc%",
   "author": "AI WorkDeck",
   "frontendEntry": "web/index.html",
