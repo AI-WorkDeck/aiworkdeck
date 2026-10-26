@@ -111,6 +111,7 @@ export const EDITOR_ACTIONS = [
   // 「当前这一格 / 当前这一页」的取数原语（顶上那条版本身份小条 #672 起是文件级的，
   // 不再用它们；两条原语本身是引擎公开 API，lowa-e2e 组 34 有用例）。
   'build_merge_draft', 'merge_take_other', 'sheet_get_active_cell', 'slide_get_current',
+  'office_get_navigation', 'office_activate_item', 'slide_get_thumbnail',
   // [格式增强] 富格式原语：编号/表格/格式读取/全文标准格式化；insert_under_heading
   // 是后端一直在派发但从未接通的原语（本次补齐 worker 实现）。
   'set_numbering', 'format_table', 'insert_table', 'get_formatting', 'apply_house_style',

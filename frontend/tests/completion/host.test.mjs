@@ -81,7 +81,8 @@ test('document candidates retain saved details for acceptance, completed-name hi
 })
 
 const editorScript = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
-  .match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
+  .match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import OfficeNavigation from .*$/m, 'const OfficeNavigation = {}')
+    .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
 const editorMethods = new Function('ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', editorScript)(null, null, null).methods
 
 test('engine remount disposes vocabulary before detaching its old transport', async () => {

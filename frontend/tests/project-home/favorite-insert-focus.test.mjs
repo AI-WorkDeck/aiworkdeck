@@ -88,6 +88,7 @@ test('引擎明确拒绝插入时不提示成功或抢焦点', async () => {
 test('LibreOfficeEditor.focusEditor 聚焦编辑器容器（webview / iframe）', () => {
   const SRC = read('components/LibreOfficeEditor.vue')
   const BODY = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
   // eslint-disable-next-line no-new-func
   const options = new Function('ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'setTimeout', BODY)(null, null, null, () => 0)

@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import * as barriers from '../../src/utils/checkpointSaveBarrier.js'
 import * as protocol from '../../src/utils/localContentProtocol.js'
 const body = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1]
+  .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
   .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
 const deferred = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve } }
 const tick = () => new Promise(r => setTimeout(r, 0))

@@ -3,6 +3,15 @@
 // 文档编辑器域：LibreOfficeEditor / ReviewPanel / DocDiffViewer /
 // CompareDocDialog / VariablePanel / DrawioEditor 的用户可见文案。
 export default {
+  navigation: {
+    "slides": "幻灯片",
+    "sheets": "工作表",
+    "slideLabel": "第 {n} 页，{name}",
+    "loading": "正在加载…",
+    "loadFailed": "导航加载失败",
+    "switchFailed": "切换失败，请重试",
+    "previewFailed": "预览暂不可用"
+},
   visualReview: {
     "title": "版面检查",
     "pagesTitle": "版面检查：选择页码",

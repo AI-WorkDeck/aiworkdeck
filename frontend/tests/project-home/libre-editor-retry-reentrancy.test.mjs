@@ -25,6 +25,7 @@ const SRC = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', i
 // export default 换成 return，外部符号由 new Function 的形参喂桩。
 function loadMethods() {
   const body = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '')
     .replace(/export default \{/, 'return {')
   const factory = new Function(...Object.keys(barriers),

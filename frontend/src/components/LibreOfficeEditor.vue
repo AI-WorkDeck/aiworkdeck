@@ -101,6 +101,12 @@
     <view class="libre-body" :class="{ 'review-overview-open': reviewOverviewShown, 'review-en': reviewPanelEn }">
       <!-- 浮层必须钉在**画布**上而不是整个编辑器上：审阅面板是并排挤宽的，钉在
            外层右上角会正好压住面板的「修订/批注」标题行（真机截图实证）。 -->
+      <OfficeNavigation
+        v-if="ready && file && !loadingOverlayVisible && docKind === 'impress'"
+        :key="'slides-' + file.id" :executor="executor" kind="impress"
+        :refresh-key="uiRefreshKey" :content-key="navigationContentKey" :active="active"
+        @navigate="onOfficeNavigate"
+      />
       <view class="libre-canvas-wrap">
         <view :id="hostId" class="libre-host"></view>
         <!-- 改字 stale 提示条：绝对定位叠在画布顶部，非阻塞；不依赖审阅面板开着 -->
@@ -159,6 +165,12 @@
         @inline-review="onInlineReviewAction"
       />
     </view>
+    <OfficeNavigation
+      v-if="ready && file && !loadingOverlayVisible && docKind === 'calc'"
+      :key="'sheets-' + file.id" :executor="executor" kind="calc"
+      :refresh-key="uiRefreshKey" :content-key="navigationContentKey" :active="active" :writable="canWrite"
+      @navigate="onOfficeNavigate" @add-sheet="$refs.toolbar && $refs.toolbar.addCalcSheet()"
+    />
   </view>
 </template>
 
@@ -179,6 +191,7 @@ import { webviewTransport, iframeTransport } from '@/composables/useZetaOfficeWe
 import { createRelayExecutor, PROBE_ACTION, PROBE_BUDGET_MS } from '@/composables/zetaOfficeRelay.js'
 import { classifyLoadFailure, shouldSelfHealLoadFailure, loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED } from '@/utils/editorLoadFailure.js'
 import ReviewPanel from '@/components/ReviewPanel.vue'
+import OfficeNavigation from '@/components/OfficeNavigation.vue'
 import EditorToolbar from '@/components/EditorToolbar.vue'
 import EvidenceStaleBar from '@/components/EvidenceStaleBar.vue'
 import { getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
@@ -231,7 +244,7 @@ function currentAuthorName() { return authorNames().current() }
 
 export default {
   name: 'LibreOfficeEditor',
-  components: { ReviewPanel, EditorToolbar, EvidenceStaleBar },
+  components: { OfficeNavigation, ReviewPanel, EditorToolbar, EvidenceStaleBar },
   // command-progress：批量命令（find_replace >50 命中 / apply_house_style）的
   // 「第 x/y 处」进度，{reqId, done, total}；reqId 可用 executeCommand('cancel', {reqId}) 喊停。
   // open-insight：行内写作提示 → 宿主打开「依据」窗格；不自动调用 AI 或外部库。
@@ -296,6 +309,7 @@ export default {
       // 没有轮询：编辑器页把 worker 的选区监听与 IME 覆盖层的光标移动合流成
       // 一个 selection 事件送过来，覆盖了用户能让光标动起来的所有途径。
       uiRefreshKey: 0,
+      navigationContentKey: 0,
       // 状态用 key 存（editor.status.* 命名空间），显示时经 $t 取文案；
       // isError/displayStatus 与「安静保存」的自比较全部按 key 判断，
       // zh 渲染结果与判定行为都与迁移前逐字节一致。
@@ -2203,6 +2217,8 @@ export default {
       if (!this.file) return
       const fid = payload && payload.fileId
       if (fid != null && String(fid) !== String(this.file.id)) return
+      this.navigationContentKey++
+      this.uiRefreshKey++
       // 这里只接 AI 写入完成通知，不接人工补全的 modified，避免关闭它自己的资料提示。
       if (this._transportSend) this._transportSend({ __lo: 'lo-relay', type: 'writing-invalidate' })
       if (this.reviewOpen) {
@@ -2211,12 +2227,17 @@ export default {
         this.reviewRefreshKey++
       }
     },
+    onOfficeNavigate() {
+      this.uiRefreshKey++
+      this.$emit('menu-state')
+    },
     onDocModified() {
       // docLoadFailed：画布上是空白 boot 文档，标脏会引发空文档覆盖真文件
       if (!this.ready || !this.file || this.docLoadFailed || this._checkpointInvalidated) return
       // 重载窗口期（版本退回 / 检查点恢复正在换文档）里的 modified 一律丢弃：
       // 它描述的是即将被替换掉的旧文档，标脏只会让 autosave 把旧内容传回去。
       if (this._reloading || this._saveDiscarded) return
+      this.navigationContentKey++
       this.dirty = true
       this._writingHost?.modified()
       this._inlineReviewHost?.modified()
