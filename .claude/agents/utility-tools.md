@@ -640,7 +640,7 @@ FileTree 的节点/根/空白落点先认包内载荷，先同步快照与 claim
 
 ## PDF 加载与保活（dev-board#1504/#1514）
 
-`PdfPreviewPane.vue` 为工作台 PDF 提供每窗格最多2个已访问查看器，隐藏用 visibility，保留页码/缩放，不对所有 FilePreview 无界保活。关闭、项目/账户/实际权限变化清理池，后台版本变化逐出。成员轮询按稳定的身份/角色签名判断，不因相同内容的新数组销毁查看器；权限重建后仍把当前 PDF 记入池。`FilePreview.reloadFromBackend()` 强制刷新，即使 wpsFileId 未改变；取消旧请求并以请求世代隔离迟到结果。
+`PdfPreviewPane.vue` 为工作台 PDF 提供每窗格最多2个已访问查看器，隐藏用 visibility，保留页码/缩放，不对所有 FilePreview 无界保活。关闭、项目/账户/实际权限变化清理池，后台版本变化逐出。成员轮询按当前用户的身份、全局角色和项目有效角色判断；所有者不依赖成员清单，其他成员变化或同内容新数组不销毁查看器。权限重建后仍把当前 PDF 记入池。`FilePreview.reloadFromBackend()` 强制刷新，即使 wpsFileId 未改变；取消旧请求并以请求世代隔离迟到结果。
 
 H5 的项目 PDF 先用鉴权 HEAD 校验，再让内置查看器直连 `/api/files/{id}/download?inline=true`，复用媒体 URL 的 session 鉴权，不打印带 token 的 URL。Spring 与轻量 LocalCore 同时支持 PDF-only inline，原下载仍 attachment，Range 和每次权限校验不变。旧服务未支持 inline、查看器加载失败时回退鉴权 Blob；sourceUrl 与非 H5 保留 Blob 路径。iframe load 仅为导航接收确认，首屏性能必须另看正文像素。
 

@@ -3513,9 +3513,10 @@ export default {
         (f.id === this.activeFileIdRight || this.libreLruKeys.includes('right:' + f.id)))
     },
     pdfPermissionIdentity() {
-      return JSON.stringify([this.project?.userId, this.currentUser?.role,
-        (this.localProjectMembers || []).map(member => [member.userId, member.role])
-          .sort((a, b) => String(a[0]).localeCompare(String(b[0])))])
+      const uid = this.currentUser?.id
+      const owner = uid != null && this.project?.userId != null && String(uid) === String(this.project.userId)
+      const member = (this.localProjectMembers || []).find(item => uid != null && String(item.userId) === String(uid))
+      return JSON.stringify([uid, this.currentUser?.role, owner ? 'OWNER' : member?.role || null])
     },
     leftPdfFiles() {
       return this.leftFiles.filter(file => this.isPdfPreviewFile(file) &&
