@@ -1,6 +1,77 @@
 # zh-CN LOWA engine rebuild recipe (with tooltip-CJK fix) — issue #66
 
 
+## r7b candidate (2026-10-26) — real tooltip input transparency (#1515)
+
+This follow-up retains the r7 header palette/font and input-clock fixes below,
+and fixes the bare-canvas resize failure found during that validation. In WASM,
+LibreOffice's real `SalFrameStyleFlags::TOOLTIP` frames now carry
+`Qt::WindowTransparentForInput`; Qt's compositor skips those windows during hit
+testing. Interactive ComboBox popups also use `Qt::ToolTip`, so filtering by the
+window type would be incorrect. Painting, popup input and production wrapper
+compensation remain intact. This is an **unpublished local candidate**; default
+engine URLs and the installed client remain r6.
+
+### Build and raw SHA-256
+
+Exact core/Qt/toolchain pins are unchanged from r7. Build ran
+12:33:12–13:07:25 UTC (34m13s); all four downloaded hashes match the build output.
+Metadata is byte-identical to r7/r6, preserving all 1821 resources. The temporary
+VM was confirmed absent at 13:09:35 UTC; its key pair, security group, vSwitch,
+VPC and private transfer object were also deleted. Approximately 39 minutes at
+the quoted rate is CNY12.33; both builds total about CNY26.26 compute, **an estimate
+rather than the settled bill**, excluding traffic and billing adjustments.
+
+| File | Bytes | SHA-256 |
+|---|---:|---|
+| soffice.js | 858359 | `5a8b4cc2218c40dfe1d41b9f26df85496b9e1ad7e862b32d8daa9c9212f8dd06` |
+| soffice.wasm | 161689746 | `da328b5190fe02c7ce28023df663521a682da7004224214ebc0ce65243b29260` |
+| soffice.data | 56494002 | `1671cf6dbb1bd0fb78add49a28f793dc39a1493ed4e070a4be511a9eeb13f2e0` |
+| soffice.data.js.metadata | 207339 | `871e91a4ef63866b518b559f4e3fdbedb59dcca418c56b5d60fb74d0d2b62945` |
+
+### Actual validation and limits
+
+- Main task reran the final bare-canvas test against old r7: 47 style/selection
+  assertions pass, then the column drag fails to converge. With r7b, isolated
+  DPR1 and DPR2 each pass 57 assertions: **114 passed, zero skips**. Actual mouse
+  gestures grow/shrink columns and rows, Undo restores dimensions, genuine
+  double-click autofits, wheel scrolls, and strict XLSX export/reopen preserves
+  content, formulas, formats and dimensions. Main task inspected both DPRs'
+  mid-drag screenshots: the tooltip remains visible, and mouse release completes
+  the resize. No hidden tooltip or native-toolbar spacing workaround is used.
+- `native-font-popup.mjs` passes at both DPRs: real mouse opens the native font
+  popup, selects Caladea, closes it, preserves cell value, and Undo restores
+  Arial. UITest is used only to read native geometry, never `executeAction`.
+  Its `getState()` may alter widget buffering; this is input coverage, **not**
+  pixel/performance evidence. Header pixel tests use a separate geometry probe.
+- Main task passes input-clock checks (slow clicks, true double-click, unchanged
+  text) and selected-text drag/Undo with both production compensation and the
+  test-only build without it. Multi-page drag/wheel also passes with background
+  review enabled, reversal, release and ordinary scrolling. Source patch tests
+  pass 20/20.
+- The audit subagent reran the full engine suite: **607 passed, zero failed**,
+  covering Word, Excel and PPT editing/export/reopen; all 15 font families and
+  embedded PDF subsets pass. Main task read the original logs. PDF native
+  browser/Electron routing/export/recovery contracts pass 13/13 separately;
+  PDF preview does not use Qt WASM.
+- The first r7b Calc run hit the five-minute test deadline before functional
+  assertions. Its exact initialization stage and cause were not captured;
+  simultaneous full-suite execution is only correlation. Separate fresh-browser
+  DPR runs passed without product/startup changes. The interrupted evidence is
+  retained, and the test now logs browser/request and initialization stages;
+  its failure handler also tolerates an already-closed target. This does **not**
+  establish a product startup fix or claim every first attempt passed. The final
+  diagnostic version was also rerun by the main task at DPR1: 57/57 passed,
+  with complete initialization and request logs.
+- A second Codex agent reviewed the LO/Qt fix; the Qt patch author also performed
+  self-review, not an independent approval. No Windows runtime, high-contrast,
+  installed PDF interaction, full desktop autosave or client-upgrade acceptance
+  is claimed. No release or deployment occurred.
+
+Local evidence and raw candidate:
+`/Users/zewei/.codex/artifacts/2026-10-26-calc-tooltip-1515/`.
+The r7 observations below are historical; r7b supersedes its tooltip limitation.
+
 ## r7 candidate (2026-10-26) — Calc header chrome and Qt input clock (#1509 / #1511)
 
 Built successfully from the exact source revisions pinned in `mega-build.sh` and
@@ -50,8 +121,9 @@ product startup fix; the interrupted run remains in local evidence.
 This is **not** a pass for the hidden-chrome resize path: when headers touch the
 canvas top, both engines can place the size tooltip beside the pointer, where
 Qt's padded window hit-testing intercepts later mouse events. The existing
-limitation is tracked separately in dev-board#1515. Tests preserve the tooltip
-and distinguish the two layouts; they do not bypass or claim to fix this path.
+limitation was recorded in dev-board#1515 and is fixed by the r7b follow-up above.
+The r7 tests preserved the tooltip and distinguished the two layouts; those
+results alone did not establish a fix for this path.
 
 `mouse-clock.mjs`: r6 fails same-point clicks 1.3 seconds apart; r7 passes it.
 Both pass genuine fast double-click and content preservation. r7 additionally

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Apply the WASM input-clock fix before configuring/building the pinned Qt base.
+"""Apply WASM input fixes before configuring/building the pinned Qt base.
 
 Usage: python3 apply-qt-patches.py /root/lowa-build/qt5/qtbase
 
@@ -11,6 +11,11 @@ emscripten_date_now() (epoch milliseconds, double), implicitly converted to the
 32-bit ulong timestamp. That conversion is out of range on WASM32. Use Qt's
 existing no-timestamp overloads: both use eventTime.elapsed(), a QElapsedTimer
 started by QGuiApplication. No new clock, event dispatch or scrolling policy.
+
+The compositor must also honor WindowTransparentForInput (#1515). LibreOffice
+marks real tooltip frames with this flag; interactive combo popups also use
+Qt::ToolTip, so checking the window type would incorrectly disable them.
+Only hit testing changes: stacking, painting and focus stay unchanged.
 
 Low-level acceptance (not implied by patch application): compare stock r6 and
 rebuilt engine using the same fixture and wrapper. Record two presses at the
@@ -30,6 +35,13 @@ import sys
 
 EXPECTED_QTBASE = 'a320678c85ec8029d5394bcd673d4c208af1de3a'
 SOURCE = Path('src/plugins/platforms/wasm/qwasmeventtranslator.cpp')
+COMPOSITOR_SOURCE = Path('src/plugins/platforms/wasm/qwasmcompositor.cpp')
+COMPOSITOR_OLD = '''        if (compositedWindow.visible && geometry.contains(globalPoint))
+            return m_windowStack.at(index)->window();'''
+COMPOSITOR_NEW = '''        if (compositedWindow.visible
+            && !compositedWindow.window->window()->flags().testFlag(Qt::WindowTransparentForInput)
+            && geometry.contains(globalPoint))
+            return m_windowStack.at(index)->window();'''
 REPLACEMENTS = (
     (
         'void QWasmEventTranslator::processMouse(int eventType, const EmscriptenMouseEvent *mouseEvent)\n'
@@ -68,19 +80,35 @@ def patch_source(source):
     return source
 
 
+def patch_compositor(source):
+    if source.count(COMPOSITOR_OLD) == 0 and source.count(COMPOSITOR_NEW) == 1:
+        return source
+    if source.count(COMPOSITOR_OLD) != 1 or source.count(COMPOSITOR_NEW) != 0:
+        raise ValueError('Qt input-transparent patch: expected one unique original hit-test anchor')
+    return source.replace(COMPOSITOR_OLD, COMPOSITOR_NEW, 1)
+
+
 def apply(qtbase):
     qtbase = Path(qtbase)
     head = subprocess.check_output(['git', '-C', str(qtbase), 'rev-parse', 'HEAD'], text=True).strip()
     if head != EXPECTED_QTBASE:
         raise ValueError('unsupported qtbase commit: ' + head)
-    path = qtbase / SOURCE
-    before = path.read_text(encoding='utf-8')
-    after = patch_source(before)
-    if after == before:
-        print('QT_INPUT_CLOCK_ALREADY_APPLIED')
-        return
-    path.write_text(after, encoding='utf-8')
-    print('QT_INPUT_CLOCK_PATCHED')
+    # Read and validate both files before any write. A missing/drifted compositor
+    # must not leave a newly patched clock file behind (and vice versa).
+    changes = []
+    for relative, transform, label in (
+        (SOURCE, patch_source, 'QT_INPUT_CLOCK'),
+        (COMPOSITOR_SOURCE, patch_compositor, 'QT_INPUT_TRANSPARENT'),
+    ):
+        path = qtbase / relative
+        before = path.read_text(encoding='utf-8')
+        changes.append((path, before, transform(before), label))
+    for path, before, after, label in changes:
+        if after == before:
+            print(label + '_ALREADY_APPLIED')
+        else:
+            path.write_text(after, encoding='utf-8')
+            print(label + '_PATCHED')
 
 
 def main():
@@ -90,7 +118,7 @@ def main():
     try:
         apply(args.qtbase)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
-        print('FAIL Qt input-clock patch: ' + str(error), file=sys.stderr)
+        print('FAIL Qt input patches: ' + str(error), file=sys.stderr)
         return 1
     return 0
 

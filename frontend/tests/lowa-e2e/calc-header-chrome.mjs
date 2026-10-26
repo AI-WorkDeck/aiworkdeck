@@ -6,9 +6,9 @@
 // CALC_HEADER_OUT selects screenshots + JSON (default: a new temp directory).
 // Runs DPR 1 and 2; old r6 must fail the palette/font assertions. This is an
 // engine test, not a claim about the packaged Electron or automatic-save path.
-// CALC_HEADER_RESIZE=1 opts into resize/double-click with native chrome visible.
-// Bare-canvas tooltip interception is an existing r6/r7 limitation; skips are
-// explicitly recorded and never counted as PASS.
+// Bare-canvas resize/double-click is mandatory by default (#1515). Set
+// CALC_HEADER_NATIVE_CHROME=1 only for the native-toolbar comparison.
+// CALC_HEADER_RESIZE=0 explicitly selects style-only diagnosis, with a SKIP.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -136,27 +136,51 @@ const puppeteer=await loadPuppeteer()
 const deadline=setTimeout(()=>{console.error('FAIL total runtime exceeded 5 minutes');browser?.close()},300000)
 try {
   for(const dpr of (process.env.LOWA_E2E_DPR ? [Number(process.env.LOWA_E2E_DPR)] : [1,2])) {
+    const started=Date.now()
+    const log=message=>fs.appendFileSync(path.join(out,`dpr${dpr}-browser.log`),`${Date.now()-started}ms ${message}\n`)
+    const stage=async(name,run)=>{
+      const began=Date.now();log('BEGIN '+name)
+      const result=await run()
+      log(`END ${name} (${Date.now()-began}ms)`);return result
+    }
     // Isolate each DPI's native windows and WASM worker lifetime.
     browser=await launchBrowser(puppeteer, { headed: true })
-    browser.on('targetcreated',async target=>{const page=await target.page();page?.on('pageerror',e=>console.error('PAGE ERROR:',e.message))})
-    const page=await openEditor(browser,{clipboard:false,viewport:{width:1000,height:720,deviceScaleFactor:dpr}})
-    await page.evaluate(()=>{for(const type of ['keydown','keyup','beforeinput','input']) window.addEventListener(type,e=>{e.preventDefault();e.stopImmediatePropagation()},true)})
-    await page.evaluate(()=>{
+    browser.on('targetcreated',async target=>{
+      const page=await target.page().catch(()=>null)
+      if(!page)return
+      const requests=new WeakMap();let requestId=0
+      page.on('request',r=>{
+        const entry={id:++requestId,started:Date.now()};requests.set(r,entry)
+        log(`REQUEST BEGIN #${entry.id} ${r.method()} ${r.url()}`)
+      })
+      page.on('response',r=>log(`RESPONSE #${requests.get(r.request())?.id} ${r.status()} ${r.url()}`))
+      page.on('requestfinished',r=>{
+        const entry=requests.get(r)
+        log(`REQUEST END #${entry?.id} ${r.url()} (${entry ? Date.now()-entry.started : 'unknown'}ms)`)
+      })
+      page.on('console',m=>log(`${m.type()}: ${m.text()}`))
+      page.on('pageerror',e=>log('PAGE ERROR: '+e.message))
+      page.on('requestfailed',r=>log(`REQUEST FAILED #${requests.get(r)?.id}: ${r.url()} ${r.failure()?.errorText}`))
+    })
+    const page=await stage('openEditor',()=>openEditor(browser,{clipboard:false,viewport:{width:1000,height:720,deviceScaleFactor:dpr}}))
+    log('openEditor ready: __loExecutor available')
+    await stage('keyboard event setup',()=>page.evaluate(()=>{for(const type of ['keydown','keyup','beforeinput','input']) window.addEventListener(type,e=>{e.preventDefault();e.stopImmediatePropagation()},true)}))
+    await stage('pointer event setup',()=>page.evaluate(()=>{
       window.__headerPointerLog=[]
       for(const type of ['pointerdown','pointermove','pointerup','mousedown','mousemove','mouseup']) document.addEventListener(type,e=>{
         const rect=e.target.getBoundingClientRect()
         window.__headerPointerLog.push({type,x:e.clientX,y:e.clientY,buttons:e.buttons,time:e.timeStamp,target:e.target.tagName+'#'+e.target.id+'.'+e.target.className,rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}})
         if(window.__headerPointerLog.length>100)window.__headerPointerLog.shift()
       },true)
-    })
-    const exec=async(action,params={})=>{
+    }))
+    const exec=(action,params={})=>stage('exec '+action,async()=>{
       const r=await page.evaluate((a,p)=>window.__loExecutor.executeCommand(a,p),action,params)
       assert.equal(r?.success,true,action+': '+JSON.stringify(r));return r
-    }
+    })
     const state=()=>exec('debug_calc_header_state')
     // editor.html declares these two fixed overlays; neither is production UI.
-    await page.addStyleTag({content:'#verify,#vlog{display:none!important}'})
-    await page.evaluate(()=>window.dispatchEvent(new Event('resize')))
+    await stage('hide verification overlays',()=>page.addStyleTag({content:'#verify,#vlog{display:none!important}'}))
+    await stage('resize after overlay removal',()=>page.evaluate(()=>window.dispatchEvent(new Event('resize'))))
     await exec('load_document',{name:'synthetic-header.xlsx',bytes:await fixture()})
     await exec('set_chrome',{all:false,rulers:false})
     // XLSX maps Liberation Sans to Arial on export; use a round-trip stable
@@ -232,47 +256,67 @@ try {
     s=await waitState(v=>v.selection.StartRow===0&&v.selection.EndRow===0&&v.selection.EndColumn>=11)
     check(`DPR${dpr} click selects whole row`,s.selection.StartColumn===0,s.selection)
     await exec('sheet_select_range',{range:'A1'});s=await state();g=geometry(s)
-    if(process.env.CALC_HEADER_RESIZE==='1') {
-      // Native chrome gives Calc's above-header size tooltip room. With a bare
-      // canvas at y=0, both r6 and r7 place the tooltip beside the pointer and
-      // Qt WASM's 5px windowAt padding intercepts subsequent move/up events.
-      // Keep that known limitation separate; do not hide or disable the tip.
-      await exec('set_chrome',{all:true})
-      await page.setViewport({width:1000,height:719,deviceScaleFactor:dpr})
-      await page.setViewport({width:1000,height:720,deviceScaleFactor:dpr})
-      shot=await capture(`dpr${dpr}-native-chrome-before-resize`)
-      s=await state();g=geometry(s)
-      // The UNO container excludes the native menubar. Like drag-wheel.mjs,
-      // align its bottom with the canvas using one width-derived scale.
-      const nativeTop=Math.max(0,shot.height*s.frame.Width/shot.width-s.frame.Height)
-      g=Object.fromEntries(Object.entries(g).map(([key,rect])=>[key,{...rect,y:rect.y+nativeTop}]))
-      fs.writeFileSync(path.join(out,`dpr${dpr}-native-chrome-state.json`),JSON.stringify({state:s,geometry:g},null,2))
-      colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
-      rowEdge=boundaries(shot,g.vertical,shot.width/s.frame.Width,false)[1]
-      const drag=async(x,y,dx,dy)=>{
+    if(process.env.CALC_HEADER_RESIZE!=='0') {
+      // The product-style bare canvas must keep receiving moves/releases
+      // while its visible size tooltip overlaps the pointer. Native chrome is
+      // an explicit comparison only, never a way to turn that regression green.
+      if(process.env.CALC_HEADER_NATIVE_CHROME==='1') {
+        await exec('set_chrome',{all:true})
+        await page.setViewport({width:1000,height:719,deviceScaleFactor:dpr})
+        await page.setViewport({width:1000,height:720,deviceScaleFactor:dpr})
+        shot=await capture(`dpr${dpr}-native-chrome-before-resize`)
+        s=await state();g=geometry(s)
+        // The UNO container excludes the native menubar. Like drag-wheel.mjs,
+        // align its bottom with the canvas using one width-derived scale.
+        const nativeTop=Math.max(0,shot.height*s.frame.Width/shot.width-s.frame.Height)
+        g=Object.fromEntries(Object.entries(g).map(([key,rect])=>[key,{...rect,y:rect.y+nativeTop}]))
+        fs.writeFileSync(path.join(out,`dpr${dpr}-native-chrome-state.json`),JSON.stringify({state:s,geometry:g},null,2))
+        colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
+        rowEdge=boundaries(shot,g.vertical,shot.width/s.frame.Width,false)[1]
+      }
+      const drag=async(x,y,dx,dy,evidence)=>{
         const a=await cssPoint(x,y),b=await cssPoint(x+dx,y+dy)
         await page.mouse.move(a.x,a.y);await pause();await page.mouse.down();await pause()
-        for(let i=1;i<=8;i++){await page.mouse.move(a.x+(b.x-a.x)*i/8,a.y+(b.y-a.y)*i/8);await pause()}
+        for(let i=1;i<=8;i++){
+          await page.mouse.move(a.x+(b.x-a.x)*i/8,a.y+(b.y-a.y)*i/8);await pause()
+          if(i===1&&evidence)await capture(`dpr${dpr}-${evidence}-tooltip-during-drag`)
+        }
         await page.mouse.up();await pause()
       }
       const oldWidth=s.columns[0],oldHeight=s.rows[0]
-      await drag(colEdge,g.horizontal.y+g.horizontal.height/2,40*s.dpi/96,0)
+      await drag(colEdge,g.horizontal.y+g.horizontal.height/2,40*s.dpi/96,0,'column-grow')
       s=await waitState(v=>v.columns[0]>oldWidth+200)
-      check(`DPR${dpr} drag column width (native chrome)`,s.columns[0]>oldWidth,{before:oldWidth,after:s.columns[0]})
+      check(`DPR${dpr} drag column width`,s.columns[0]>oldWidth,{before:oldWidth,after:s.columns[0]})
+      const grownWidth=s.columns[0]
       shot=await capture(`dpr${dpr}-column-dragged`);colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
+      await drag(colEdge,g.horizontal.y+g.horizontal.height/2,-24*s.dpi/96,0,'column-shrink')
+      s=await waitState(v=>v.columns[0]<grownWidth-300)
+      check(`DPR${dpr} reverse drag shrinks column`,true,{before:grownWidth,after:s.columns[0]})
+      await exec('undo',{steps:1})
+      s=await waitState(v=>Math.abs(v.columns[0]-grownWidth)<=5)
+      check(`DPR${dpr} undo restores dragged column width`,true,s.columns)
+      shot=await capture(`dpr${dpr}-column-undo`);colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
       await click(colEdge,g.horizontal.y+g.horizontal.height/2,2)
       s=await waitState(v=>v.columns[0]<oldWidth)
-      check(`DPR${dpr} double click auto width (native chrome)`,s.columns[0]<oldWidth,s.columns)
-      await drag(g.vertical.x+g.vertical.width/2,rowEdge,0,16*s.dpi/96)
+      check(`DPR${dpr} double click auto width`,s.columns[0]<oldWidth,s.columns)
+      await drag(g.vertical.x+g.vertical.width/2,rowEdge,0,16*s.dpi/96,'row-grow')
       s=await waitState(v=>v.rows[0]>oldHeight+150)
-      check(`DPR${dpr} drag row height (native chrome)`,s.rows[0]>oldHeight,{before:oldHeight,after:s.rows[0]})
+      check(`DPR${dpr} drag row height`,s.rows[0]>oldHeight,{before:oldHeight,after:s.rows[0]})
+      const grownHeight=s.rows[0]
       shot=await capture(`dpr${dpr}-row-dragged`);rowEdge=boundaries(shot,g.vertical,shot.width/s.frame.Width,false)[1]
+      await drag(g.vertical.x+g.vertical.width/2,rowEdge,0,-8*s.dpi/96,'row-shrink')
+      s=await waitState(v=>v.rows[0]<grownHeight-100)
+      check(`DPR${dpr} reverse drag shrinks row`,true,{before:grownHeight,after:s.rows[0]})
+      await exec('undo',{steps:1})
+      s=await waitState(v=>Math.abs(v.rows[0]-grownHeight)<=5)
+      check(`DPR${dpr} undo restores dragged row height`,true,s.rows)
+      shot=await capture(`dpr${dpr}-row-undo`);rowEdge=boundaries(shot,g.vertical,shot.width/s.frame.Width,false)[1]
       await click(g.vertical.x+g.vertical.width/2,rowEdge,2)
       s=await waitState(v=>v.rows[0]<oldHeight+150)
-      check(`DPR${dpr} double click auto height (native chrome)`,s.rows[0]<oldHeight+150,s.rows)
+      check(`DPR${dpr} double click auto height`,s.rows[0]<oldHeight+150,s.rows)
     } else {
-      results.push({name:`DPR${dpr} resize and double-click`,status:'skipped',reason:'Enable CALC_HEADER_RESIZE=1 for native chrome; bare-canvas tooltip interception remains a known r6/r7 limitation.'})
-      console.log(`SKIP DPR${dpr} resize and double-click (CALC_HEADER_RESIZE=1 to enable)`)
+      results.push({name:`DPR${dpr} resize and double-click`,status:'skipped',reason:'Explicit CALC_HEADER_RESIZE=0: style-only diagnosis.'})
+      console.log(`SKIP DPR${dpr} resize and double-click (explicit CALC_HEADER_RESIZE=0)`)
     }
     const p=await cssPoint(g.grid.x+g.grid.width/2,g.grid.y+g.grid.height/2)
     await page.mouse.move(p.x,p.y);await page.mouse.wheel({deltaY:500})
@@ -297,7 +341,9 @@ try {
   }
 } catch(error) {
   check('test execution',false,error.stack)
-  for(const page of await (browser?.pages().catch(()=>[]) || [])) if(page.url().includes('editor.html')) {
+  for(const page of await (browser?.pages().catch(()=>[]) || [])) {
+    let url;try{url=page.url()}catch{continue}
+    if(!url.includes('editor.html'))continue
     await page.screenshot({path:path.join(out,'failure.png')}).catch(()=>{})
     fs.writeFileSync(path.join(out,'pointer-log.json'),JSON.stringify(await page.evaluate(()=>({events:window.__headerPointerLog,canvases:[...document.querySelectorAll('canvas')].map(e=>({id:e.id,className:e.className,html:e.parentElement.outerHTML.slice(0,1000)}))})).catch(()=>null),null,2))
     console.error(await page.evaluate(()=>document.querySelector('#vlog')?.textContent).catch(()=>''))
