@@ -14,13 +14,14 @@
   失败重试交给父级换 key 整体重建，本组件内部不做 retry）。
 
   布局照 LibreOfficeEditor 的 overlay 模式：<webview> 宿主容器**始终**渲染，状态
-  卡片盖在它上面。绝不能把宿主放在 v-show="ready" 里——那样整个 boot 期间宿主是
+  卡片盖在它上面；就绪前用 opacity 隐去客体内的审阅浮层，保留真实尺寸。
+  绝不能把宿主放在 v-show="ready" 里——那样整个 boot 期间宿主是
   display:none，Electron 的 <webview> 在隐藏子树里常常压根不 attach，dom-ready
   永远不来，律师只会等到 150 秒超时。
 -->
 <template>
   <view class="vcmp-root">
-    <view :id="hostId" class="vcmp-host"></view>
+    <view :id="hostId" class="vcmp-host" :style="{ opacity: ready ? 1 : 0 }"></view>
     <view v-show="!ready" class="vcmp-status">
       <text>{{ statusText }}</text>
     </view>

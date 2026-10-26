@@ -18,33 +18,36 @@
         <component :is="'button'" type="button" class="session-btn session-btn-danger" :disabled="busy" @click="confirmAbandon">{{ $t('version.abandonDraft') }}</component>
       </view>
     </template>
-    <template v-else-if="working">
+    <template v-else-if="working || changedCount > 0">
       <view class="session-status">
         <view class="session-dot" />
-        <text class="session-text">{{ changedCount ? $t('version.workingWithCount', { count: changedCount }) : $t('version.working') }}</text>
+        <text class="session-text">{{ changedCount ? $t('version.pendingFileCount', { count: changedCount }) : $t('version.changesAutoRecorded') }}</text>
       </view>
       <view class="session-actions">
         <component :is="'button'" type="button" class="session-btn session-btn-main" :disabled="busy" @click="openNaming">{{ $t('version.endSession') }}</component>
-        <component :is="'button'" type="button" class="session-btn session-btn-danger" :disabled="busy" @click="confirmDiscard">{{ $t('version.discard') }}</component>
+        <component :is="'button'" type="button" v-if="working" class="session-btn session-btn-danger" :disabled="busy" @click="confirmDiscard">{{ $t('version.discard') }}</component>
       </view>
     </template>
     <template v-else>
       <text class="session-text session-idle">{{ $t('version.noActiveSession') }}</text>
     </template>
+    <text class="session-help">{{ $t('version.commitHistoryHelp') }}</text>
 
-    <view v-if="naming" class="awd-mask" @tap.self="naming = false">
+    <view v-if="naming" class="awd-mask" @tap.self="!busy && (naming = false)">
       <view class="awd-dialog">
         <view class="awd-header"><text class="awd-title">{{ $t('version.nameSessionTitle') }}</text></view>
         <view class="awd-body">
+          <text class="session-help">{{ $t(cloudLinked && !onDraft ? 'version.commitCloudHelp' : 'version.commitLocalHelp') }}</text>
           <input
             v-model="title"
             class="awd-input"
+            :disabled="busy"
             :placeholder="$t('version.sessionNamePlaceholder')"
           />
         </view>
         <view class="awd-footer">
-          <view class="awd-btn awd-btn-secondary" @tap="naming = false">{{ $t('common.cancel') }}</view>
-          <view class="awd-btn awd-btn-primary" @tap="end">{{ $t('version.finish') }}</view>
+          <view class="awd-btn awd-btn-secondary" :aria-disabled="busy" @tap="!busy && (naming = false)">{{ $t('common.cancel') }}</view>
+          <view class="awd-btn awd-btn-primary" :aria-disabled="busy" @tap="end">{{ $t(busy ? 'version.committingChanges' : 'version.finish') }}</view>
         </view>
       </view>
     </view>
@@ -63,6 +66,8 @@ export default {
     working: { type: Boolean, default: false },
     changedCount: { type: Number, default: 0 },
     onDraft: { type: Object, default: null },
+    beforeCommit: { type: Function, default: null },
+    cloudLinked: { type: Boolean, default: false },
   },
   emits: ['ended', 'discarded', 'mainline-resumed', 'draft-adopted', 'draft-abandoned'],
   data() {
@@ -130,6 +135,7 @@ export default {
       if (this.busy) return
       this.busy = true
       try {
+        if (this.beforeCommit && await this.beforeCommit() === false) return
         const res = await endWorkSession(this.projectId, this.title)
         // notice = 结束成功但没生成版本（整段工作一个改动都没有）。后端刻意用返回值
         // 而不是异常表达：它已经把工作段收尾了，走 catch 分支会让弹窗卡开、状态条
@@ -182,6 +188,7 @@ export default {
 .draft-dot { background: var(--awd-info); }
 .session-text { min-width: 0; font-size: var(--awd-panel-fs); line-height: 1.5; color: var(--awd-panel-text); overflow-wrap: anywhere; }
 .session-idle { color: var(--awd-panel-text-2); }
+.session-help { display: block; font-size: var(--awd-panel-fs-meta); line-height: 1.6; color: var(--awd-text-2); margin-bottom: var(--awd-space-1); }
 .session-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--awd-space-1) var(--awd-panel-gap); }
 .session-btn {
   margin: 0; padding: var(--awd-space-1) var(--awd-panel-gap); max-width: 100%;

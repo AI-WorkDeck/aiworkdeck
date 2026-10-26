@@ -107,12 +107,15 @@ test('保存成功后仍等待导航回执，导航失败向打开请求报告',
   const leave = new Function('flushDirtyEditors', 'uni', `return async function(url, options = {}) {${body('leaveWorkbench')}}`)(
     async () => ({ failed: 0 }), { reLaunch: opts => { navigate = opts } })
   let complete = false
-  const pending = leave.call({}, '/target').then(value => { complete = true; return value })
+  const host = { confirmVersionBeforeLeaving: async () => true }
+  const pending = leave.call(host, '/target').then(value => { complete = true; return value })
+  await Promise.resolve()
   await Promise.resolve()
   assert.equal(complete, false)
   navigate.success()
   assert.equal(await pending, true)
-  const failure = leave.call({}, '/target')
+  const failure = leave.call(host, '/target')
+  await Promise.resolve()
   await Promise.resolve()
   navigate.fail(new Error('navigation failed'))
   await assert.rejects(failure, /navigation failed/)

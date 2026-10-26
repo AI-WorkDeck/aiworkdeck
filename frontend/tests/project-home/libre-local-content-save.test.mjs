@@ -15,8 +15,8 @@ async function download(bytes) {
  return response(200, bytes.buffer, { 'X-AWD-Content-Protocol':'1', 'X-AWD-File-Uid':'uid-7', 'X-AWD-Actor-Id':'1',
   'X-AWD-SHA256': await protocol.contentSha256(bytes), 'Content-Length': String(bytes.length) })
 }
-function vmFor(send, projectId) {
- const deps = { ...barriers, ...protocol,
+function vmFor(send, projectId, events = []) {
+ const deps = { ...barriers, ...protocol, uni: { $emit: (...args) => events.push(args) },
   localContentCapability: (url,args) => protocol.localContentCapability(url,{...args,send}),
   cancelLocalContent: (p,args) => protocol.cancelLocalContent(p,{...args,send}),
   downloadLocalContent: args => protocol.downloadLocalContent({...args, send}),
@@ -208,3 +208,26 @@ for (const disposed of [false, true]) {
     assert.equal(vm.dirty, true)
   })
 }
+
+test('本地内容保存确认后同样通知项目入口刷新，失败不发成功事件', async () => {
+  const events = [], gate = deferred()
+  const vm = vmFor(async req => {
+    await gate.promise
+    return json(200, { code: 0, data: { operationId: req.headers['X-AWD-Operation-Id'],
+      uid: 'uid-7', actorId: 1, sha256: await protocol.contentSha256(req.bytes), size: req.bytes.length } })
+  }, 1487, events)
+  vm._localContentMetadata = currentMetadata(1487)
+  const saved = vm.saveDocument()
+  await tick()
+  assert.deepEqual(events, [])
+  gate.resolve()
+  assert.equal(await saved, true)
+  assert.equal(vm.legacyUploads, 0)
+  assert.deepEqual(events, [['awd:file-saved', { projectId: 1487, fileId: 7 }]])
+
+  const failedEvents = []
+  const failed = vmFor(async () => json(409, { code: -1, reason: 'CONTENT_CONFLICT', writeState: 'unknown' }), 1488, failedEvents)
+  failed._localContentMetadata = currentMetadata(1488)
+  assert.equal(await failed.saveDocument(), false)
+  assert.deepEqual(failedEvents, [])
+})

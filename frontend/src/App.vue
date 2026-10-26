@@ -15,7 +15,7 @@ import { getAppLanguage, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
 import { initAppTheme } from '@/utils/appTheme.js'
 import { installModalFocusGuard } from '@/utils/modalFocusGuard.js'
 import { saveAppLanguageRemote, prepareAgentRestart, abortAgentRestart } from '@/services/api.js'
-import { createDesktopQuitGuard, flushQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
+import { createDesktopQuitGuard, flushQuitWorkbenches, confirmQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 
 export default {
@@ -79,33 +79,49 @@ export default {
     let systemOpenPending = Promise.resolve()
     let quitPreparationPending = Promise.resolve()
     if (host.lifecycle?.onPrepareQuit) {
+      let reportQuitStage = () => {}
+      let awaitingChoice = false
       const quitGuard = createDesktopQuitGuard({
         prepare: prepareAgentRestart,
         abort: abortAgentRestart,
         flush: flushQuitWorkbenches,
-        progress: stage => uni.showLoading({ title: this.$t('admin.quit' + (stage === 'pausing' ? 'Pausing' : 'Saving')), mask: true }),
+        confirm: confirmQuitWorkbenches,
+        progress: stage => {
+          awaitingChoice = stage === 'confirming'
+          if (awaitingChoice) uni.hideLoading()
+          else uni.showLoading({ title: this.$t('admin.quit' + (stage === 'pausing' ? 'Pausing' : 'Saving')), mask: true })
+          setGlobalOverlay(!awaitingChoice, 'desktop-quit')
+          return reportQuitStage(stage)
+        },
         errorText: key => this.$t('admin.quitErrors.' + key),
       })
       let preparing = false
       const releaseQuitOverlay = () => {
         preparing = false
+        awaitingChoice = false
         uni.hideLoading()
         setGlobalOverlay(false, 'desktop-quit')
       }
-      const cancel = async () => {
+      const cancel = async ({ windowHidden = false } = {}) => {
         if (!preparing) return
-        try { await quitGuard.cancel() } catch (_) { /* Keep the window open. */ }
+        let recoveryPending = false
+        try { recoveryPending = (await quitGuard.cancel())?.paused > 0 } catch (_) { recoveryPending = true }
         releaseQuitOverlay()
+        // A completed window hide has no failing prepare call left to report recovery.
+        if (windowHidden && recoveryPending) {
+          uni.showModal({ title: this.$t('admin.quitStopped'), content: this.$t('admin.quitErrors.recoveryPending'), showCancel: false })
+        }
       }
       // Escape cancels a slow shutdown; ordinary input cannot dirty a saved editor.
       window.addEventListener('keydown', event => {
-        if (!preparing) return
+        if (!preparing || awaitingChoice) return
         event.preventDefault()
         event.stopImmediatePropagation()
         if (event.key === 'Escape') host.lifecycle.cancelQuit?.()
       }, true)
       host.lifecycle.onQuitCancelled?.(cancel)
-      host.lifecycle.onPrepareQuit(() => {
+      host.lifecycle.onPrepareQuit(({ reportStage } = {}) => {
+        reportQuitStage = reportStage || (() => {})
         uni.$emit('awd:cancel-restart-recovery')
         preparing = true
         setGlobalOverlay(true, 'desktop-quit')
@@ -117,7 +133,7 @@ export default {
           // Keep input blocked after ACK until the main process hides the window.
           if (!result.ok) {
             releaseQuitOverlay()
-            uni.showModal({ title: this.$t('admin.quitStopped'), content: result.error, showCancel: false })
+            if (!result.cancelled) uni.showModal({ title: this.$t('admin.quitStopped'), content: result.error, showCancel: false })
           }
           return result
         })()

@@ -14,17 +14,18 @@ import { readFileSync } from 'node:fs'
 const SFC = readFileSync(
   new URL('../../src/components/PlainTextEditor.vue', import.meta.url), 'utf8')
 
-function loadOptions(setTimeoutStub, clearTimeoutStub) {
+function loadOptions(setTimeoutStub, clearTimeoutStub, emit) {
   const script = SFC.match(/<script>([\s\S]*?)<\/script>/)[1]
   const body = script
     .replace(/^import .*$/gm, '')
     .replace('export default', 'return')
   // eslint-disable-next-line no-new-func
-  return new Function('setTimeout', 'clearTimeout', body)(setTimeoutStub, clearTimeoutStub)
+  return new Function('setTimeout', 'clearTimeout', 'uni', body)(setTimeoutStub, clearTimeoutStub, { $emit: emit })
 }
 
 function makeEditor() {
   const uploads = []          // { content, resolve, reject, done }
+  const events = []
   const deferred = []
   // 防抖/重试（>=1s）在测试里挂起不放行；flushSave 的百毫秒轮询立刻推进，
   // 免得真的等满十秒。
@@ -33,7 +34,7 @@ function makeEditor() {
     Promise.resolve().then(fn)
     return 2
   }
-  const opts = loadOptions(setTimeoutStub, () => {})
+  const opts = loadOptions(setTimeoutStub, () => {}, (...args) => events.push(args))
   const inst = Object.assign({}, opts.data(), {
     phase: 'ready',
     _loadOk: true,
@@ -52,8 +53,24 @@ function makeEditor() {
     deferred.push(d)
   })
   const edit = (text) => { inst._text = text; inst.onUserEdit() }
-  return { inst, uploads, edit }
+  return { inst, uploads, edit, events }
 }
+
+test('保存回执更新版本角标，上传失败不发成功事件', async () => {
+  const { inst, uploads, edit, events } = makeEditor()
+  inst.file = { id: 12 }; inst.projectId = 8
+  edit('updated')
+  const saved = inst.save()
+  assert.deepEqual(events, [])
+  uploads[0].resolve()
+  await saved
+  assert.deepEqual(events, [['awd:file-saved', { projectId: 8, fileId: 12 }]])
+  edit('unsaved')
+  const failed = inst.save()
+  uploads[1].reject(new Error('offline'))
+  assert.equal(await failed, false)
+  assert.equal(events.length, 1)
+})
 
 const tick = async (n = 8) => { for (let i = 0; i < n; i++) await Promise.resolve() }
 
