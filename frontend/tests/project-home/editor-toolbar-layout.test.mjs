@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // 编辑器工具栏的两条布局契约（dev-board#502 / #503）。都是「不跑引擎也能红」的
 // 结构断言——真机那一层的证据在下面各自的说明里。
 //
