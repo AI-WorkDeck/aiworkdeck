@@ -2928,6 +2928,18 @@ function activeCalcRangeName() {
   try { return activeCalcSelection().range || 'A1'; } catch (e) { return 'A1'; }
 }
 
+// Clipboard must use the complete real range, never the toolbar's A1 fallback.
+function calcClipboardSelection() {
+  let range = ctrl.getSelection();
+  if (range && typeof range.getByIndex === 'function' && typeof range.getRangeAddress !== 'function') {
+    if (range.getCount() !== 1) throw new Error('请先选择一个连续区域，再复制或粘贴');
+    range = range.getByIndex(0);
+  }
+  if (!range || typeof range.getRangeAddress !== 'function') throw new Error('请先选择单元格区域，再复制或粘贴');
+  const address = range.getRangeAddress();
+  return { range: range, address: address, sheet: xModel.getSheets().getByIndex(address.Sheet) };
+}
+
 // Impress 当前幻灯片、选中形状与形状列表解析（供 get_ui_state / format_selection / set_paragraph_format / ui_command 共用）
 function slidePages() {
   try { return xModel.getDrawPages(); } catch (e) { return null; }
@@ -4870,30 +4882,35 @@ const EXEC = {
   replace_selection(p) {
     const rawText = String((p && p.text) || '');
     if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
-      const selInfo = activeCalcSelection();
+      const selection = calcClipboardSelection();
       const lines = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
       if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
       const rows = (lines.length ? lines : ['']).map(function (ln) { return ln.split('\t'); });
       const r = EXEC.sheet_write_cells({
-        sheet: selInfo.sheetName || undefined,
-        startCell: selInfo.address || 'A1',
+        sheet: selection.sheet.getName(),
+        startCell: colLetterOf(selection.address.StartColumn) + (selection.address.StartRow + 1),
         rows: rows,
       });
       return Object.assign({}, r, { text: rawText });
     }
     if (typeof isImpressDoc === 'function' && isImpressDoc()) {
-      const ctx = activeImpressContext(p && p.shapeName);
-      if (ctx && ctx.selectedShape && ctx.selectedShapeName) {
-        const r = EXEC.slide_set_shape_text({
-          slideNumber: ctx.slideNumber,
-          shapeName: ctx.selectedShapeName,
-          text: rawText,
-        });
-        return Object.assign({}, r, { text: rawText });
+      // Retain the model-edit contract used by plugins/AI. Only the real
+      // clipboard bridge targets the live outliner/caret instead of a shape.
+      if (!p.clipboard) {
+        const ctx = activeImpressContext(p.shapeName);
+        if (ctx && ctx.selectedShape && ctx.selectedShapeName) return Object.assign({}, EXEC.slide_set_shape_text({
+          slideNumber: ctx.slideNumber, shapeName: ctx.selectedShapeName, text: rawText,
+        }), { text: rawText });
+        return slideFail('请先选择要替换的文本框');
       }
-      if (!rawText) return { success: true, text: '' };
-      const keys = [];
-      for (let i = 0; i < rawText.length; i++) keys.push({ ch: rawText[i] });
+      // A live Impress outliner owns its text while editing. Mutating the shape
+      // model reports success but is overwritten by that outliner. Use the same
+      // native input route as typing, preserving the caret, selection and format.
+      const selection = ctrl.getSelection();
+      if (!selection) return slideFail('请先双击文本框，把光标放在要粘贴的位置');
+      const keys = Array.from(rawText.replace(/\r\n?/g, '\n')).map(function (ch) {
+        return ch === '\n' ? { key: 'RETURN', ch: '\r' } : ch === '\t' ? { key: 'TAB', ch: '\t' } : { ch: ch };
+      });
       return Object.assign(postNativeKeys(keys), { text: rawText });
     }
     const vc = ctrl.getViewCursor();
@@ -4997,36 +5014,31 @@ const EXEC = {
     return r;
   },
   // [verified] current selection text (anchor, not integer offset).
-  get_selection() {
-    if (typeof isCalcDoc === 'function' && isCalcDoc() && typeof activeCalcSelection === 'function') {
-      const selInfo = activeCalcSelection();
-      let text = '';
-      try {
-        if (selInfo.sheet && (selInfo.rowCount > 1 || selInfo.colCount > 1)) {
-          const maxR = Math.min(selInfo.endRow, selInfo.row + 99);
-          const maxC = Math.min(selInfo.endCol, selInfo.col + 49);
-          const lines = [];
-          for (let r = selInfo.row; r <= maxR; r++) {
-            const cols = [];
-            for (let c = selInfo.col; c <= maxC; c++) {
-              try {
-                const v = readCellOut(selInfo.sheet.getCellByPosition(c, r));
-                cols.push(v == null ? '' : String(v));
-              } catch (e) { cols.push(''); }
-            }
-            lines.push(cols.join('\t'));
-          }
-          text = lines.join('\n');
-        } else if (selInfo.cell) {
-          const v = readCellOut(selInfo.cell);
-          text = v != null && v !== '' ? String(v) : String(selInfo.cell.getString() || '');
-        }
-      } catch (e) {}
-      return { success: true, text: text, hasSelection: text.length > 0 };
+  get_selection(p = {}) {
+    if (typeof isCalcDoc === 'function' && isCalcDoc()) {
+      const selection = calcClipboardSelection();
+      const a = selection.address;
+      const cells = (a.EndRow - a.StartRow + 1) * (a.EndColumn - a.StartColumn + 1);
+      if (cells > 50000) return slideFail('所选区域超过 50,000 个单元格，请缩小范围后复制；未复制或删除任何内容');
+      // One UNO range read instead of thousands of per-cell bridge calls.
+      const rows = Array.from(selection.range.getDataArray());
+      const text = rows.map(function (row) {
+        return Array.from(row).map(function (value) { return value == null ? '' : String(value); }).join('\t');
+      }).join('\n');
+      return { success: true, text: text, hasSelection: true };
     }
     if (typeof isImpressDoc === 'function' && isImpressDoc()) {
-      const ctx = activeImpressContext();
-      const text = ctx && ctx.selectedShape ? shapeText(ctx.selectedShape) : '';
+      if (!p.clipboard) {
+        const ctx = activeImpressContext();
+        const text = ctx && ctx.selectedShape ? shapeText(ctx.selectedShape) : '';
+        return { success: true, text: text, hasSelection: text.length > 0 };
+      }
+      const selection = ctrl.getSelection();
+      // Only a selected text range is clipboard text. A shape collection also
+      // appears for a collapsed caret; copying its whole text would cut data
+      // outside the user's selection. Object clipboard is not this text bridge.
+      const text = selection && typeof selection.getString === 'function'
+        && typeof selection.getShapeType !== 'function' ? String(selection.getString() || '') : '';
       return { success: true, text: text, hasSelection: text.length > 0 };
     }
     const sel = ctrl.getSelection();
@@ -5346,7 +5358,13 @@ const EXEC = {
   // re-selected the SAME char and deletion jammed after one press (headless-
   // verified). The engine dispatch owns revision semantics: mark + step past for
   // original text, hard-delete for own unaccepted inserts, selection-aware.
-  delete_backward() {
+  delete_backward(p = {}) {
+    if (p.clipboard && isCalcDoc()) {
+      const selected = calcClipboardSelection();
+      // Clear only values, dates, strings and formulas; keep cell formatting.
+      selected.range.clearContents(1 | 2 | 4 | 16);
+      return { success: true };
+    }
     if (nativeKeyDoc()) return postNativeKeys([{ key: 'BACKSPACE', ch: '\b' }]);
     dispatchUno('.uno:SwBackspace');
     return { success: true };

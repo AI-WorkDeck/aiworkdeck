@@ -84,7 +84,7 @@
       @toggle-semantic-writing="toggleSemanticWriting"
       @toggle-writing-assistance="toggleWritingAssistance"
       @changed="onDocModified"
-      @ui-state="$emit('menu-state')"
+      @ui-state="onToolbarState"
       @focus-editor="focusEditor"
       @ai-format="onToolbarAiFormat"
     />
@@ -96,6 +96,10 @@
         <text v-if="statusKey === 'movedSaveFailed' && !saving" class="libre-save-retry" @tap="saveCopyAs">{{ $t('editor.saveCopyAs') }}</text>
       </view>
     </view>
+    <view v-if="inputError" class="libre-input-error" role="alert">
+      <text>{{ inputError }}</text>
+      <button type="button" :aria-label="$t('common.close')" @click="inputError = ''">×</button>
+    </view>
     <!-- review-overview-open：审阅概览现在浮在画布右侧（不挤宽画布），画布上的
          宿主浮层据此让出面板宽度，见样式 .libre-review-overview 之后那一段。 -->
     <view class="libre-body" :class="{ 'review-overview-open': reviewOverviewShown, 'review-en': reviewPanelEn }">
@@ -105,6 +109,7 @@
         v-if="ready && file && !loadingOverlayVisible && docKind === 'impress'"
         :key="'slides-' + file.id" :executor="executor" kind="impress"
         :refresh-key="uiRefreshKey" :content-key="navigationContentKey" :active="active"
+        :current-item="navigationCurrentItem" :structure-key="navigationStructureKey" :can-background-work="canRunNavigationWork"
         @navigate="onOfficeNavigate"
       />
       <view class="libre-canvas-wrap">
@@ -168,7 +173,8 @@
     <OfficeNavigation
       v-if="ready && file && !loadingOverlayVisible && docKind === 'calc'"
       :key="'sheets-' + file.id" :executor="executor" kind="calc"
-      :refresh-key="uiRefreshKey" :content-key="navigationContentKey" :active="active" :writable="canWrite"
+      :refresh-key="uiRefreshKey" :content-key="navigationContentKey" :active="active"
+        :current-item="navigationCurrentItem" :structure-key="navigationStructureKey" :can-background-work="canRunNavigationWork" :writable="canWrite"
       @navigate="onOfficeNavigate" @add-sheet="$refs.toolbar && $refs.toolbar.addCalcSheet()"
     />
   </view>
@@ -309,6 +315,9 @@ export default {
       // 没有轮询：编辑器页把 worker 的选区监听与 IME 覆盖层的光标移动合流成
       // 一个 selection 事件送过来，覆盖了用户能让光标动起来的所有途径。
       uiRefreshKey: 0,
+      navigationCurrentItem: null,
+      navigationStructureKey: 0,
+      inputError: '',
       navigationContentKey: 0,
       // 状态用 key 存（editor.status.* 命名空间），显示时经 $t 取文案；
       // isError/displayStatus 与「安静保存」的自比较全部按 key 判断，
@@ -1340,6 +1349,10 @@ export default {
           this._reviewRefreshTimer = setTimeout(() => {
             if (this._nativeSurface === owner && this.reviewOpen) this.reviewRefreshKey++
           }, 1000)
+        } else if (msg.type === 'interaction') {
+          this._lastInteractionAt = Date.now()
+        } else if (msg.type === 'input-error') {
+          this.inputError = String(msg.message || '')
         } else if (msg.type === 'modified') {
           this.onDocModified()
         } else if (msg.type === 'save-snapshot') {
@@ -1398,7 +1411,7 @@ export default {
         this._lastCmdAt = 0
         const innerExec = this.executor.executeCommand.bind(this.executor)
         this.executor.executeCommand = async (action, params, callOpts) => {
-          if (action === 'export_document' || (callOpts && callOpts.background)) return innerExec(action, params, callOpts) // 保存自身与后台只读溯源不算「活跃编辑」
+          if (action === 'export_document' || ['get_ui_state', 'office_get_navigation', 'slide_get_thumbnail', 'list_fonts', 'list_styles'].includes(action) || (callOpts && callOpts.background)) return innerExec(action, params, callOpts) // 保存自身与后台只读溯源不算「活跃编辑」
           this._cmdBusy++
           this._lastCmdAt = Date.now()
           try { return await innerExec(action, params, callOpts) }
@@ -2217,6 +2230,7 @@ export default {
       if (!this.file) return
       const fid = payload && payload.fileId
       if (fid != null && String(fid) !== String(this.file.id)) return
+      this.navigationStructureKey++
       this.navigationContentKey++
       this.uiRefreshKey++
       // 这里只接 AI 写入完成通知，不接人工补全的 modified，避免关闭它自己的资料提示。
@@ -2226,6 +2240,15 @@ export default {
         clearTimeout(this._reviewRefreshTimer)
         this.reviewRefreshKey++
       }
+    },
+    onToolbarState(state) {
+      if (state?.success && state.calc) this.navigationCurrentItem = { activeId: state.calc.sheetName, itemCount: state.calc.sheetCount }
+      else if (state?.success && state.impress) this.navigationCurrentItem = { activeId: state.impress.slideNumber, itemCount: state.impress.slideCount }
+      this.$emit('menu-state')
+    },
+    canRunNavigationWork() {
+      return this.active && this.ready && !this.dirty && !this.saving && !this._reloading
+        && !this._cmdBusy && Date.now() - (this._lastInteractionAt || 0) >= 700
     },
     onOfficeNavigate() {
       this.uiRefreshKey++
@@ -2237,6 +2260,7 @@ export default {
       // 重载窗口期（版本退回 / 检查点恢复正在换文档）里的 modified 一律丢弃：
       // 它描述的是即将被替换掉的旧文档，标脏只会让 autosave 把旧内容传回去。
       if (this._reloading || this._saveDiscarded) return
+      this._lastInteractionAt = Date.now()
       this.navigationContentKey++
       this.dirty = true
       this._writingHost?.modified()
@@ -2270,7 +2294,7 @@ export default {
       // 改为：命令在飞或刚结束（<1.5s）时让路、等空闲窗口再导出；只有脏数据
       // 超过 60s 才强制保存（崩溃丢失上限从 15s 放宽到 60s，换取修订期不冻结）。
       const dirtyAge = this._dirtySince ? Date.now() - this._dirtySince : 0
-      const sinceCmd = Date.now() - (this._lastCmdAt || 0)
+      const sinceCmd = Date.now() - Math.max(this._lastCmdAt || 0, this._lastInteractionAt || 0)
       if ((this._cmdBusy > 0 || sinceCmd < 1500) && dirtyAge < 60000) {
         clearTimeout(this._saveTimer)
         this._saveTimer = setTimeout(() => this.autoSave(), 2000)
@@ -2689,6 +2713,8 @@ export default {
 </script>
 
 <style scoped>
+.libre-input-error { display: flex; align-items: center; gap: 12px; padding: 6px 12px; color: var(--awd-danger); background: var(--awd-surface); font-size: 13px; }
+.libre-input-error button { margin: 0 0 0 auto; padding: 0 8px; font-size: 18px; line-height: 24px; background: transparent; color: inherit; }
 .libre-editor-wrapper { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--awd-surface); }
 /* Floating status pill, pinned over the CANVAS's top-right corner (not the
    wrapper's — the review panel sits to the right and would be covered). No

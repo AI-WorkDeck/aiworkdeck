@@ -99,7 +99,7 @@ test('页面生命周期接线：恢复结束和 mounted 均尝试注册，离�
   assert.match(page, /this\._openWorkbenchMounted = true\s*this\.maybeRegisterOpenWorkbench\(\)/)
   assert.match(page, /onShow\(\) \{\s*this\.maybeRegisterOpenWorkbench\(\)/)
   assert.doesNotMatch(page.match(/onHide\(\) \{([\s\S]*?)\n  \},/)?.[1] || '', /unregisterOpenWorkbench/)
-  assert.match(page, /beforeUnmount\(\) \{\s*this\._openWorkbenchMounted = false\s*unregisterOpenWorkbench\(this\)/)
+  assert.match(page, /beforeUnmount\(\) \{[\s\S]{0,200}this\._openWorkbenchMounted = false\s*\n\s*unregisterOpenWorkbench\(this\)/)
 })
 
 test('保存成功后仍等待导航回执，导航失败向打开请求报告', async () => {

@@ -274,7 +274,8 @@ public class FileController {
     public ResponseEntity<Resource> downloadFile(
             @PathVariable("fileId") String fileId,
             @RequestParam(value = "token", required = false) String token,
-            @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader) {
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader,
+            @RequestParam(value = "inline", defaultValue = "false") boolean inline) {
         log.info("[FileDownload] ===== 开始处理下载请求 =====");
         log.info("[FileDownload] 收到下载请求: fileId={}", fileId);
         
@@ -354,7 +355,7 @@ public class FileController {
             }
 
             String filename = URLEncoder.encode(downloadFilename, StandardCharsets.UTF_8).replace("+", "%20");
-            String contentDisposition = "attachment; filename=\"" + filename + "\"";
+            String contentDisposition = (inline && MediaType.APPLICATION_PDF.equals(mediaType) ? "inline" : "attachment") + "; filename=\"" + filename + "\"";
 
             // Range（dev-board#1025）：返回 200 + Resource 时，Spring MVC（AbstractMessageConverterMethodProcessor）
             // 会按请求的 Range 头自行切成 ResourceRegion 回 206 / 越界回 416 + "bytes */total"，
@@ -365,6 +366,7 @@ public class FileController {
                 return ResponseEntity.ok()
                         .contentType(mediaType)
                         .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                    .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
                         .body(new InputStreamResource(resource.getInputStream()));
             }
 
@@ -372,6 +374,7 @@ public class FileController {
                     .contentType(mediaType)
                     .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                     .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                    .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
                     .body(resource);
         } catch (StorageException e) {
             log.error("[FileDownload] 存储异常: fileId={}, message={}", fileId, e.getMessage());

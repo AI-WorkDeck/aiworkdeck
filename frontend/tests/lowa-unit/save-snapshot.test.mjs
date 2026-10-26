@@ -29,7 +29,7 @@ for (const saveSnapshotId of [1, undefined, 0, '1']) {
 
 test('snapshot relay resets modify throttling so rapid edits after export are never dropped', () => {
   const source = readFileSync(new URL('../../src/zetaoffice/editor-main.js', import.meta.url), 'utf8')
-  const fn = source.slice(source.indexOf('function relayModified(d) {'), source.indexOf('// (自建工具栏) 光标/选区动了'))
+  const fn = source.slice(source.indexOf('function relayModified(d) {'), source.indexOf('// Only real input resets the save idle window'))
   const messages = []
   const relay = new Function('hostTransport', 'Date', `let lastModifiedRelay = 0;
     const reviewBalloons = null, reviewHover = null, inlineReview = null;
