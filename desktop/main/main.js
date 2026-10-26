@@ -1760,7 +1760,7 @@ ipcMain.handle('checkba:zetaoffice-editor', async (event, options) => {
   return {
     // LO 画布 UI 语言跟随应用语言；只影响新建的编辑器实例（保活池里已 boot 的
     // 实例保持原语言，重启应用后全量生效）。
-    url: editorUrl(origin, { uilang: require('./app-language').getLowaUiLang() }),
+    url: editorUrl(origin, { uilang: (typeof require('./app-language').getLowaUiLang === 'function' ? require('./app-language').getLowaUiLang() : require('./app-language').getAppLanguage()) }),
     preload: require('url').pathToFileURL(path.join(__dirname, '../preload/zetaoffice-webview-preload.js')).href,
     partition: ZETAOFFICE_PARTITION,
   }
