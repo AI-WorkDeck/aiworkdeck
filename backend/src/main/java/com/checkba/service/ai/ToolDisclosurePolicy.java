@@ -218,6 +218,7 @@ public class ToolDisclosurePolicy {
         CATEGORIES.put("pdf", List.of("pdf_"));
         CATEGORIES.put("litigation", List.of("litigation_"));
         CATEGORIES.put("reference", List.of("ref_"));
+        CATEGORIES.put("version", List.of("version_"));
         // update_project_info 写的是项目记忆（project_memory），不是外部企业数据（T-19）
         CATEGORIES.put("memory", List.of("memory_", "name:update_project_info"));
         CATEGORIES.put("enterprise-data", List.of("qichacha_", "name:tushare_query"));
@@ -280,6 +281,7 @@ public class ToolDisclosurePolicy {
 
     static {
         CATEGORY_KEYWORDS.put("pdf", List.of("pdf"));
+        CATEGORY_KEYWORDS.put("version", List.of("版本", "提交改动", "提交修改", "取回", "自动合并", "git", "commit", "pull", "restore"));
         CATEGORY_KEYWORDS.put("litigation", List.of("时间轴", "关系图", "流程图", "可视化",
                 "timeline", "diagram", "relationship graph"));
         CATEGORY_KEYWORDS.put("slides", List.of("ppt", "pptx", "幻灯片", "演示文稿", "slides", "presentation"));

@@ -3,12 +3,18 @@
 // project-overview.vue 的 AI 指令路由：SSE client_action 分发、
 // doc 流式写入缓冲、编辑器打开/重载/命令执行与结果回传。
 // 经展开进组件 methods（纯搬移，Phase 1 外置），`this` 即 project-overview 页面实例。
-import { beginCheckpointSaveBarrier, endCheckpointSaveBarrier, checkpointSaveBarrier, findCheckpointSaveBarrier, reconcileCheckpointSaveBarrier } from '@/utils/checkpointSaveBarrier.js'
+import { beginCheckpointSaveBarrier, endCheckpointSaveBarrier, checkpointSaveBarrier, findCheckpointSaveBarrier, reconcileCheckpointSaveBarrier, pendingDocumentSaveFileIds } from '@/utils/checkpointSaveBarrier.js'
 import { sendEditorResult, getFileDetail, getCheckpointRestoreWriteState } from '@/services/api.js'
 import { createSerialQueue } from '@/utils/asyncSerialize.js'
 import { DOC_MUTATED_EVENT, DOC_MUTATED_DEBOUNCE_MS, isDocMutatingAction } from '@/utils/docEvents.js'
 import { actionBudgetMs } from '@/composables/zetaOfficeRelay.js'
 import { agentPdfExportResult } from './agentPdfExport.js'
+import { createProjectVersionActionRunner, createProjectVersionMergeApi, versionActionMayWrite } from '@/utils/projectVersionAction.js'
+import { protectProjectVersionEditors } from '@/utils/projectVersionEditors.js'
+import { flushDirtyEditors } from './flushDirtyEditors.js'
+import { setGlobalOverlay } from '@/utils/overlayState.js'
+import { getSessionId, getCurrentUser } from '@/utils/auth.js'
+import { getApiBaseUrl, getCloudAccountGeneration, getProjectVersionActionState, executeProjectVersionAction, continueProjectVersionMerge, continueProjectVersionMergeFile, getVersionStatus } from '@/services/api.js'
 
 // AI 命令等编辑器启动的上限（dev-board#1018）。**必须低于后端 editor_command 的等待上限**
 // （EditorBridgeService 读写类 120s）：后端先到点的话，模型收到的是普通超时错误而不是
@@ -36,7 +42,106 @@ export function shouldFlushDocStream(targetFileId, currentFileId) {
 }
 
 export const agentClientActionMethods = {
+    async handleProjectVersionAction(action) {
+        if (!this._projectVersionRunner) {
+            const holder = Symbol('project-version-action')
+            const identity = () => JSON.stringify([getApiBaseUrl(), getSessionId(), getCurrentUser()?.id, getCloudAccountGeneration()])
+            const instances = () => [...new Set([...Object.values(this._libreRefs || {}), ...Object.values(this._plainTextRefs || {})].filter(inst => inst?.file))]
+            const blockKey = event => { event.preventDefault(); event.stopImmediatePropagation() }
+            this._projectVersionRunner = createProjectVersionActionRunner({
+                capture: command => {
+                    const owner = identity(), projectId = this.projectId
+                    return () => owner === identity() && !this._versionStatusDisposed && this.hasNamedProject && !this.isClientView &&
+                        this.isActiveOverviewInstance() && String(command.params?.projectId) === String(projectId) && this.projectId === projectId &&
+                        this.$refs.chatInterface?.currentConversationId === command.conversationId
+                },
+                unsupportedEditor: () => [...this.leftFiles, ...this.rightFiles].some(file => file && this.isDrawioFile(file)),
+                busy: () => !!this.documentMergeState?.running,
+                streaming: () => !!(this._docStreamActive || this._docStreamBusy || (this._docStreamBuffer && !this._projectVersionStreamInterrupted)),
+                state: async command => (await getProjectVersionActionState(command.params.operationId, command.conversationId))?.data,
+                execute: async command => (await executeProjectVersionAction(command.params.operationId, command.conversationId))?.data,
+                wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
+                block: (active, operationId) => {
+                    if (active) {
+                        this._projectVersionBusy = operationId
+                        setGlobalOverlay(true, holder)
+                        if (typeof window !== 'undefined') {
+                            document.activeElement?.blur?.()
+                            window.focus()
+                            window.addEventListener('keydown', blockKey, true)
+                        }
+                    } else if (this._projectVersionBusy === operationId) {
+                        this._projectVersionBusy = null
+                        this._projectVersionReload = null
+                        this._projectVersionContinue = null
+                        this._projectVersionMergeApi = null
+                        if (typeof window !== 'undefined') window.removeEventListener('keydown', blockKey, true)
+                        setGlobalOverlay(false, holder)
+                        uni.hideLoading()
+                    }
+                },
+                progress: stage => uni.showLoading({ title: this.$t('version.' + ({ saving: 'aiSaving', executing: 'aiExecuting', merging: 'aiMerging', reloading: 'aiReloading' }[stage])), mask: true }),
+                save: async () => !(await flushDirtyEditors(this._libreRefs, this._plainTextRefs, { timeoutMs: 0 })).failed,
+                protect: async (command, current) => {
+                    const captured = instances(), owner = identity()
+                    let pendingStepId = null
+                    if (captured.some(inst => inst.dirty || inst.saving)) throw new Error('saveBeforeCommitFailed')
+                    const files = [...this.leftFiles, ...this.rightFiles].filter(file => !file.tabType && !file.isFolder && (this.useLibreEditor(file) || this.isPlainTextFile(file)))
+                    const protection = await protectProjectVersionEditors({
+                        projectId: this.projectId, operationId: command.params.operationId,
+                        fileIds: [...files.map(file => file.id), ...captured.map(inst => inst.file.id), ...pendingDocumentSaveFileIds(this.projectId)], instances: captured,
+                        current, registered: inst => instances().includes(inst),
+                        readWriteState: async () => {
+                            if (this._projectVersionBusy === command.params.operationId) return { mayWrite: true }
+                            if (owner !== identity()) return { mayWrite: true }
+                            const state = (await getProjectVersionActionState(command.params.operationId, command.conversationId, pendingStepId))?.data
+                            if (pendingStepId) return { mayWrite: state?.lastStep?.stepId !== pendingStepId ||
+                                !['succeeded', 'failed'].includes(state.lastStep.status) }
+                            return { mayWrite: versionActionMayWrite(state) }
+                        },
+                    })
+                    this._projectVersionReload = protection.reload
+                    this._projectVersionContinue = async () => current() && (await getProjectVersionActionState(command.params.operationId, command.conversationId))?.data?.canContinue === true
+                    const operationId = command.params.operationId, conversationId = command.conversationId
+                    this._projectVersionMergeApi = createProjectVersionMergeApi({ operationId, current,
+                        onStep: stepId => { pendingStepId = stepId },
+                        state: async stepId => (await getProjectVersionActionState(operationId, conversationId, stepId))?.data,
+                        post: async body => (await continueProjectVersionMerge({ ...body, operationId, conversationId }))?.data,
+                        postFile: async body => (await continueProjectVersionMergeFile({ ...body, operationId, conversationId }))?.data,
+                        wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
+                    })
+                    return protection
+                },
+                readStatus: async () => (await getVersionStatus(this.projectId))?.data || {},
+                merge: async status => {
+                    const conflict = status.sessionEndConflict || status.cloudConflict || status.adoptConflict
+                    const ctx = status.sessionEndConflict ? 'session-end' : status.cloudConflict ? 'cloud' : 'adopt'
+                    if (conflict) return await this._documentMerge?.onConflictStatus(conflict, ctx, {
+                        canContinue: this._projectVersionContinue, api: this._projectVersionMergeApi,
+                    })
+                },
+                holdConflict: status => this._documentMerge?.suspend(status.sessionEndConflict || status.cloudConflict,
+                    status.sessionEndConflict ? 'session-end' : 'cloud'),
+                refresh: async () => {
+                    await this.$refs.fileTree?.loadFiles()
+                    uni.$emit('awd:files-changed', { projectId: this.projectId })
+                    await this.onVersionPanelStatusChanged()
+                    this.collabRefreshToken += 1
+                },
+                openOverview: () => this.openProjectVersionPanel(),
+            })
+        }
+        const result = await this._projectVersionRunner.run(action)
+        const error = result.success ? null : (result.message || this.$t('version.' + result.code))
+        await sendEditorResult(action.conversationId, action.requestId, true, { ...result, message: error, operationId: action.params?.operationId }, null)
+    },
     handleClientAction(action) {
+        // Project operations do not require an active document or an executor.
+        if (action.tool === 'editor_command' && action.action === 'project_version_action') return this.handleProjectVersionAction(action)
+        if (this._projectVersionBusy && action.tool === 'editor_command') {
+            return sendEditorResult(action.conversationId, action.requestId, false, null, this.$t('version.aiActionBusy'))
+        }
+        if (this._projectVersionBusy && ['doc_open_file', 'doc_reload_file', 'text_reload_file'].includes(action.action)) return
         console.log('[ProjectOverview] Client Action:', action)
 
         // 事件名单轨（dev-board#816）：后端曾对每条指令按"新名在前、旧名在后"各发一份，
@@ -124,6 +229,8 @@ export const agentClientActionMethods = {
     // 与原 WPS 实现同构：本地缓冲 + 定时批量 flush，减少 worker 往返。
     handleDocStreamData(content) {
         if (!content) return
+        this._docStreamActive = true
+        if (this._projectVersionBusy) this._projectVersionStreamInterrupted = true
         this._docStreamBuffer = (this._docStreamBuffer || '') + content
         if (!this._docStreamTimer) {
             this._docStreamTimer = setTimeout(() => {
@@ -141,6 +248,7 @@ export const agentClientActionMethods = {
      * 写的内容插进了一份无关文档。
      */
     docStreamBlockReason() {
+        if (this._projectVersionBusy || this._projectVersionStreamInterrupted) return this.$t('version.aiActionBusy')
         if (!this.libreOfficeActive || !this.libreOfficeExecutor) return this._docStreamText('docStreamReasonEditorNotReady', '文档编辑器尚未就绪')
         // 装载失败的编辑器端着空白占位文档、保存闸永久落下：写进去等于静默丢失（dev-board#1018）
         if (typeof this.libreLoadFailureOf === 'function' && this.libreLoadFailureOf(this.libreOfficeExecutor)) {
@@ -214,6 +322,11 @@ export const agentClientActionMethods = {
     //（dev-board#465：写入失败必须有人看得见，不能停在「正在向文档流式写入内容…」）。
     async handleDocStreamEnd(payload) {
         if (this._docStreamTimer) { clearTimeout(this._docStreamTimer); this._docStreamTimer = null }
+        if (this._projectVersionBusy || this._projectVersionStreamInterrupted) {
+            this._projectVersionStreamInterrupted = true
+            this._docStreamActive = false
+            return this.$t('version.aiActionBusy')
+        }
         for (let i = 0; i < 100 && this._docStreamBusy; i++) {
             await new Promise(resolve => setTimeout(resolve, 50))
         }
@@ -248,6 +361,7 @@ export const agentClientActionMethods = {
         this._docStreamBlockedReason = null
         this._docStreamWroteAny = false
         this._docStreamRetries = 0
+        this._docStreamActive = false
         return reason
     },
 
@@ -364,6 +478,7 @@ export const agentClientActionMethods = {
             // 这条流式会话正式绑定到这份文件——flushDocStreamBuffer 落字前必须核对
             // executor 此刻服务的还是不是它，见文件头 shouldFlushDocStream。
             this._docStreamTargetFileId = file.id
+            this._projectVersionStreamInterrupted = false
             // worker 端 markdown 状态机也要硬清（上一条流若异常中断会留下半张表/半行）
             try { await this.libreOfficeExecutor.executeCommand('stream_flush', { discard: true }) } catch (e) {}
             // 项目模板画像（后端只在非 house-default 时附带）：流式落字前先换画像，stream_insert
@@ -713,6 +828,10 @@ export const agentClientActionMethods = {
         }
     },
     async handleEditorCommand(action) {
+        if (this._projectVersionBusy) {
+            await sendEditorResult(action.conversationId, action.requestId, false, null, this.$t('version.aiActionBusy'))
+            return
+        }
         if (action.action === 'doc_checkpoint_restore') return this.handleCheckpointRestore(action)
         const currentFileId = typeof this.resolveLibreExecutorFileId === 'function'
             ? this.resolveLibreExecutorFileId(this.libreOfficeExecutor) : null
