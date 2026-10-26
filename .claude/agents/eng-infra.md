@@ -21,6 +21,8 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 
 ## 发版链路
 
+- 0.72.0 发布准备（dev-board#1516）：LOWA `24.2.8-zhcn-r7` 使用 #1515 的最终 r7b 候选，发布前已在北京、新加坡逐文件解码哈希和 metadata 大小校验。官方插件改资源后必须递增 manifest 版本，避免同版本保留策略让旧用户漏更；JAR 插件同时同步 pom 与 backendJars。独立插件 ZIP 与桌面 extraResources 都须包含 `l10n/`，构建后检查真实包内语言文件。
+
 - **Mac 原生升级的 JRE 权限（dev-board#1368，验收总卡 #1367）**：jlink 产出的 `jre/legal/` 中部分许可证为 `0444`。真实签名升级 run `39217849923` 已证明 ShipIt 在复制候选包后、验签/接管文件前清除 quarantine 时对 `java.xml/bcel.md` 报 `EACCES`，重试三次后放弃。`desktop/scripts/after-pack.js` 现在只给该目录内普通文件补 owner-write，保留内容、其他权限和符号链接，发生在外层 app 签名前；不可在验收时 chmod 已签名候选包来掩盖问题。`after-pack.test.js` 包含 macOS 真实 xattr 红绿复现；修复后仍须重打签名候选并跑 `full-upgrade-mac-smoke.yml`，原成功交接 ShipIt 的 0.65 baseline 可保留。该 smoke 在 ShipIt 明确终止重试时立即失败并保存原因，避免再空等十分钟。
 
 0. **版本规则 0.X.Y**（docs/INCREMENTAL_UPDATE_DESIGN.md）：X=大版本全量安装包；Y=小版本应用内补丁（overlay 机制，组件=backend-app/frontend-h5/zetaoffice-wrapper）。小版本 tag 触发 CI `patch-gate` job（desktop/scripts/patch-gate.sh）：改壳（desktop/）、pom、LOWA 引擎、requirements.lock、`backend/skills/` 都会被拒；内置 skill 需全量版本，requirements.lock 改动走独立 pack 发版。补丁产物+签名 manifest 由 build-patch-assets.js 在 windows job 生成（私钥=secret UPDATE_SIGNING_KEY，备份 ~/.ssh/aiworkdeck_update_signing.pem；公钥内置 update-service.js，换钥须发大版本）；镜像同步 deploy/update-mirror-sync.sh 在官网 ECS 跑。

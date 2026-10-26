@@ -11,6 +11,7 @@ import sys,json,zipfile
 root,repo=map(Path,sys.argv[1:]);manifest=json.loads((root/'manifest.json').read_text())
 files=[(root/'manifest.json','manifest.json'),(root/'README.md','README.md')]
 files.extend((f,str(f.relative_to(root))) for f in sorted((root/'web').glob('*')) if f.is_file() and f.name!='awd-plugin-sdk.js')
+files.extend((f,str(f.relative_to(root))) for f in sorted((root/'l10n').rglob('*')) if f.is_file())
 files.append((repo/'sdk/plugin-sdk/awd-plugin-sdk.js','web/awd-plugin-sdk.js'))
 out=root/'dist';out.mkdir(exist_ok=True)
 with zipfile.ZipFile(out/f"{manifest['id']}-{manifest['version']}.zip",'w',zipfile.ZIP_DEFLATED) as z:

@@ -1,7 +1,7 @@
 {
   "id": "litigation-visual",
   "name": "诉讼可视化",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "选择案卷材料，生成并管理可编辑的诉讼图表。",
   "author": "AI WorkDeck",
   "permissions": ["file_read", "file_write"],
