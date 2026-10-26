@@ -610,6 +610,9 @@ export const agentClientActionMethods = {
                 wpsFileId: file.wpsFileId
             })
 
+            const forcePdfReload = this.isPdfPreviewFile?.(file) && [...this.leftFiles, ...this.rightFiles]
+                .some(open => open.id === file.id && open.wpsFileId === file.wpsFileId)
+
             // 同时更新 leftFiles 和 rightFiles 中的文件信息
             // 这样可以确保所有打开的相同文件都能获得新的 wpsFileId
             let updated = false
@@ -658,6 +661,12 @@ export const agentClientActionMethods = {
             if (!updated) {
                 console.log('[ProjectOverview] File not open, opening:', file.name)
                 this.openFile(file)
+            }
+
+            if (updated && this.isPdfPreviewFile?.(file)) {
+                // Join a changed-version watcher; unchanged metadata still needs an explicit reload.
+                await this.$nextTick()
+                reloadOk = await this.reloadPdfInstances(file.id, forcePdfReload) && reloadOk
             }
 
             if (reloadOk) {

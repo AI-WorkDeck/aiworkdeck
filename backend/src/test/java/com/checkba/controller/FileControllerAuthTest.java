@@ -61,7 +61,7 @@ class FileControllerAuthTest {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(7L);
             when(fileAccess.canRead(pf, 7L)).thenReturn(false);
 
-            ResponseEntity<Resource> resp = controller.downloadFile("5", "sess", null);
+            ResponseEntity<Resource> resp = controller.downloadFile("5", "sess", null, false);
             assertEquals(403, resp.getStatusCode().value());
         }
     }
@@ -70,14 +70,14 @@ class FileControllerAuthTest {
     void downloadRejectsUnknownFileWith404() {
         when(projectFileRepository.findById(9L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Resource> resp = controller.downloadFile("9", "sess", null);
+        ResponseEntity<Resource> resp = controller.downloadFile("9", "sess", null, false);
         assertEquals(404, resp.getStatusCode().value());
     }
 
     /** dev-board#1035：非数字 fileId 不再按 wpsFileId 回退查找，下载与上传一律 404。 */
     @Test
     void nonNumericFileIdIsNotFoundWithoutWpsFileIdFallback() throws Exception {
-        ResponseEntity<Resource> down = controller.downloadFile("project_4_doc_1_abc", "sess", null);
+        ResponseEntity<Resource> down = controller.downloadFile("project_4_doc_1_abc", "sess", null, false);
         assertEquals(404, down.getStatusCode().value());
 
         ResponseEntity<java.util.Map<String, Object>> up = controller.uploadFile(

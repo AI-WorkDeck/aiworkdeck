@@ -223,6 +223,19 @@ class LocalCoreHttpReadsTest {
         assertEquals(403, get("/api/files/1001/download", null).status());
     }
 
+    @Test void inlinePdfUsesTheSameLightweightReadAndFreshPermissionChecks() throws Exception {
+        execute("UPDATE project_file SET name='scan.pdf', file_type='pdf' WHERE id=1001");
+        var response = get("/api/files/1001/download", "inline=true");
+        assertEquals(200, response.status());
+        assertEquals("application/pdf", response.headers().get("Content-Type"));
+        assertTrue(response.headers().get("Content-Disposition").startsWith("inline;"));
+        assertEquals("contents-1001", Files.readString(response.bodyFile()));
+        assertTrue(get("/api/files/1001/download", null).headers().get("Content-Disposition").startsWith("attachment;"));
+        store.selectIdentity(33);
+        execute("DELETE FROM project_member WHERE user_id=33");
+        assertEquals(403, get("/api/files/1001/download", "inline=true").status());
+    }
+
     @Test void customerDownloadsOnlyOwnOrExplicitlyVisibleFiles() throws Exception {
         store.selectIdentity(44);
         assertEquals(403, get("/api/files/1001/download", null).status());

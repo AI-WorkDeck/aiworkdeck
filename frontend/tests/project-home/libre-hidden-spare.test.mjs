@@ -37,5 +37,5 @@ test('两个桶都是从 libreSpares 按 hidden 位切出来的 computed', () =>
 test('自动合并进行中的顶栏文案带已等秒数，时钟只在 running 期间走', () => {
   assert.match(VUE, /version\.mergeAutoRunningElapsed/, '顶栏要有带秒数的文案键')
   assert.match(VUE, /'documentMergeState\.running'\(running\)/, '要 watch running 来起停时钟')
-  assert.match(VUE, /beforeUnmount\(\)\s*\{[\s\S]{0,200}clearInterval\(this\._mergeElapsedTimer\)/, '卸载时要清掉时钟')
+  assert.match(VUE, /beforeUnmount\(\)\s*\{[\s\S]{0,400}clearInterval\(this\._mergeElapsedTimer\)/, '卸载时要清掉时钟')
 })

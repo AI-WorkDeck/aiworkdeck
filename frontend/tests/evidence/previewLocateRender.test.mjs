@@ -49,6 +49,7 @@ async function render(state) {
     data: () => ({
       file: { id: 7, name: 'e.pdf', fileType: 'pdf' },
       blobUrl: 'blob:fake',
+      pdfResourceUrl: 'blob:fake',
       ...state,
     }),
     methods: {

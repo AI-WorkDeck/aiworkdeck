@@ -637,3 +637,11 @@ FileTree 的节点/根/空白落点先认包内载荷，先同步快照与 claim
 安装指引核验来源（2026-10-21）：腾讯官方 https://github.com/TencentCloud/tencentmeeting-cli#安装 的 `npm install -g @tencentcloud/tmeet`，前置 Node.js LTS；LibreOffice https://www.libreoffice.org/download/ 保留官方选择系统/架构的下载页；Docker https://docs.docker.com/desktop/setup/install/mac-install/ 与 https://docs.docker.com/desktop/setup/install/windows-install/ 的 main/{arm64,amd64} 官方安装包链接（Windows ARM 按官方标明抢先体验）。打开页面/复制命令不表示安装完成，回到页面重新检测。所有按钮只响应用户点击，不后台下载或安装。
 
 回归：`TmeetCliLocatorTest`、`TmeetCliServiceTest`、`ExternalDependenciesControllerTest`、`PythonToolsDockerProbeTest`、`LibreOfficePdfConverterTest`；`tests/external-dependencies/preparation.test.mjs` 与 `preparation-ui.mjs`。UI/API 与剪贴板均用替身；不代表 Windows 真安装、Docker 服务启动或腾讯账户授权已实测。
+
+## PDF 加载与保活（dev-board#1504/#1514）
+
+`PdfPreviewPane.vue` 为工作台 PDF 提供每窗格最多2个已访问查看器，隐藏用 visibility，保留页码/缩放，不对所有 FilePreview 无界保活。关闭、项目/账户/实际权限变化清理池，后台版本变化逐出。成员轮询按稳定的身份/角色签名判断，不因相同内容的新数组销毁查看器；权限重建后仍把当前 PDF 记入池。`FilePreview.reloadFromBackend()` 强制刷新，即使 wpsFileId 未改变；取消旧请求并以请求世代隔离迟到结果。
+
+H5 的项目 PDF 先用鉴权 HEAD 校验，再让内置查看器直连 `/api/files/{id}/download?inline=true`，复用媒体 URL 的 session 鉴权，不打印带 token 的 URL。Spring 与轻量 LocalCore 同时支持 PDF-only inline，原下载仍 attachment，Range 和每次权限校验不变。旧服务未支持 inline、查看器加载失败时回退鉴权 Blob；sourceUrl 与非 H5 保留 Blob 路径。iframe load 仅为导航接收确认，首屏性能必须另看正文像素。
+
+版本恢复按 affectedFileIds 处理 PDF，包括受保护的项目版本流程；AI 后端更新有新版本号时等待 watcher 的既有加载，无新版本号则显式重载，两者都须等待查看器接收结果，失败不得报更新成功；文件树同步同时更新 PDF 版本及大小。覆盖测试：`tests/project-home/pdf-version-restore.test.mjs`；后端 `FileControllerRangeTest`、`LocalCoreHttpReadsTest`。PDF 按真实阅读/AI修改/版本能力验收，不把 Word 的输入和保存结论外推。
