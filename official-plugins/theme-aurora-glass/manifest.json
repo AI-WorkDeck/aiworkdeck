@@ -23,5 +23,6 @@
         "scope": "global"
       }
     ]
-  }
+  },
+  "minHostVersion": "0.72.0"
 }
