@@ -1161,3 +1161,78 @@ test('view preference mismatch shares a new final reader started while actual-st
   assert.equal(session.revision,0);assert.equal(h.calls.filter(c=>c.action==='snapshot_batch').length,3)
   await new Promise(r=>setTimeout(r,15));await session.queue;assert.equal(session.revision,0)
 })
+
+test('already-inline export saves real bytes without waiting for the review reader', async () => {
+  const { session, calls } = opened(), waiting = latch()
+  session.run = await fs.mkdtemp(path.join(os.tmpdir(), 'awd-inline-export-'))
+  session.reviewRead = { owner: session.model, revision: session.revision, promise: waiting.promise }
+  const views = []
+  session.unoCall = async (action, params) => { views.push([action, params]); assert.equal(action, 'view'); assert.equal(params, undefined); return { mode: 'all' } }
+  session.engine.call = async (action, params) => {
+    calls.push({ action, params })
+    if (action === 'save') await fs.writeFile(params.path, 'saved-current-docx')
+    else assert.equal(action, 'selected_text')
+    return { success: true }
+  }
+  try {
+    const result = await Promise.race([session.execute('export_document'), new Promise((_, reject) => setTimeout(() => reject(Error('waited for review hydration')), 200))])
+    assert.equal(Buffer.from(result.bytes).toString(), 'saved-current-docx')
+    assert.deepEqual(calls.map(c => c.action), ['save', 'selected_text'])
+    assert.equal(views.length, 2); assert.equal(session.review, null)
+  } finally { waiting.resolve(); await fs.rm(session.run, { recursive: true, force: true }) }
+})
+
+test('inline export refuses permission owner content view and close changes before publishing bytes', async () => {
+  for (const boundary of ['permission', 'permission-roundtrip', 'retarget', 'edit', 'callback', 'view', 'close', 'failed-save']) {
+    const { session } = opened()
+    session.run = await fs.mkdtemp(path.join(os.tmpdir(), 'awd-inline-fence-'))
+    let views = 0
+    session.unoCall = async action => { assert.equal(action, 'view'); return { mode: ++views > 1 && boundary === 'view' ? 'final' : 'all' } }
+    session.engine.call = async (action, params) => {
+      if (action === 'save') {
+        await fs.writeFile(params.path, 'must-not-publish')
+        if (boundary === 'permission') { session.readOnly = true; session.permissionSeq++ }
+        if (boundary === 'permission-roundtrip') session.permissionSeq += 2
+        if (boundary === 'callback') session.event({ type: 'callback', documentEpoch: 7, viewId: 3, callbackType: 31, payload: 'unknown' })
+        if (boundary === 'retarget') session.model = { ...session.model, documentEpoch: 8 }
+        if (boundary === 'edit') session.changed()
+        if (boundary === 'close') session.closed = true
+        if (boundary === 'failed-save') return { success: false }
+      }
+      return { success: true }
+    }
+    try { await assert.rejects(session.execute('export_document'), /STALE_|Read-only|closed|export failed/, boundary) }
+    finally { await fs.rm(session.run, { recursive: true, force: true }) }
+  }
+})
+
+test('non-inline export retains full preparation and restores the actual revision view', async () => {
+  for (const initial of ['final', 'balloons', 'margin']) {
+    const { session } = opened(), calls = []
+    session.review = { revision: 0, items: [], hydratedCount: 0 }
+    session.run = await fs.mkdtemp(path.join(os.tmpdir(), 'awd-transition-export-'))
+    let mode = initial
+    session.unoCall = async (action, params) => {
+      assert.equal(action, 'view'); calls.push(params?.mode || 'read')
+      if (params?.mode) mode = params.mode
+      return { mode }
+    }
+    session.engine.call = async (action, params) => {
+      if (action === 'save') { assert.equal(mode, 'all'); await fs.writeFile(params.path, 'all-layers') }
+      return { success: true }
+    }
+    try {
+      const result = await session.execute('export_document')
+      assert.equal(Buffer.from(result.bytes).toString(), 'all-layers'); assert.equal(mode, initial)
+      assert.deepEqual(calls, ['read', 'read', 'all', initial]); assert.ok(session.viewReadGuard)
+    } finally { await fs.rm(session.run, { recursive: true, force: true }) }
+  }
+})
+
+
+test('inline export rejects a stale caller revision before saving', async () => {
+  const { session, calls } = opened()
+  session.unoCall = async () => { throw Error('must not query view') }
+  await assert.rejects(session.execute('export_document', { nativeExpectedRevision: -1 }), /STALE_DOCUMENT_EXPORT/)
+  assert.deepEqual(calls, [])
+})
