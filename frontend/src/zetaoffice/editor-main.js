@@ -371,6 +371,16 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
     { url: './cjk-serif.otf', family: 'Noto Serif SC', category: 'serif' },
     { url: './cjk-kai.ttf', family: '霞鹜文楷', category: 'kai' },
     { url: './cjk-fangsong.ttf', family: '朱雀仿宋（预览测试版）', category: 'fangsong' },
+    // 多语种字体（dev-board#1478）：韩文无衬线/衬线、泰语无衬线/衬线及东南亚/CTL 主流文字
+    { url: './cjk-kr.otf', family: 'Noto Sans KR', category: 'kr' },
+    { url: './cjk-kr-serif.otf', family: 'Noto Serif KR', category: 'kr-serif' },
+    { url: './cjk-thai.ttf', family: 'Noto Sans Thai', category: 'thai' },
+    { url: './cjk-thai-serif.ttf', family: 'Noto Serif Thai', category: 'thai-serif' },
+    { url: './cjk-khmer.ttf', family: 'Noto Sans Khmer', category: 'khmer' },
+    { url: './cjk-lao.ttf', family: 'Noto Sans Lao', category: 'lao' },
+    { url: './cjk-myanmar.ttf', family: 'Noto Sans Myanmar', category: 'myanmar' },
+    { url: './cjk-arabic.ttf', family: 'Noto Sans Arabic', category: 'arabic' },
+    { url: './cjk-devanagari.ttf', family: 'Noto Sans Devanagari', category: 'devanagari' },
     // 本机字体排在随包字体之后（无 category，不参与别名目标；其族名会让 boot
     // 跳过同名别名规则，真字体不被 assign 劫持到随包字体上）。
     ...systemFonts,
