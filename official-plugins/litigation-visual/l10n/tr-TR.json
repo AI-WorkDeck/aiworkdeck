@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Dava Görselleştirme",
+  "plugin.description": "Düzenlenebilir dava grafikleri oluşturmak ve yönetmek için dava materyallerini seçin.",
+  "view.main.name": "Dava Görselleştirme"
+}

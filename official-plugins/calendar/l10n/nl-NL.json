@@ -1,0 +1,6 @@
+{
+  "plugin.name": "Agenda",
+  "plugin.description": "Agenda, taken, herinneringen en bestandskoppelingen over projecten heen.",
+  "view.sidebar.name": "Agenda",
+  "view.main.name": "Agenda"
+}

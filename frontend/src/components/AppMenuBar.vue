@@ -61,7 +61,7 @@
 
 import { buildMenuPayload } from '@/config/commands/index.js'
 import { getMenuState, runCommandById } from '@/utils/appMenuBridge.js'
-import { getAppLanguage } from '@/utils/appLanguage.js'
+import { getAppLanguage, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
 
 export default {
   name: 'AppMenuBar',
@@ -91,9 +91,14 @@ export default {
       else if (e.key === 'ArrowLeft') { e.preventDefault(); this.step(-1) }
     }
     document.addEventListener('keydown', this._keydown, true)
+    this._onLang = () => { this.rebuild() }
+    try { uni.$on(APP_LANGUAGE_EVENT, this._onLang) } catch (e) { /* ignore */ }
   },
   beforeUnmount() {
     if (this._keydown) document.removeEventListener('keydown', this._keydown, true)
+    if (this._onLang) {
+      try { uni.$off(APP_LANGUAGE_EVENT, this._onLang) } catch (e) { /* ignore */ }
+    }
   },
   methods: {
     syncVisible() {

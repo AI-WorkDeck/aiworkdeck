@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Favoriten",
+  "plugin.description": "Projektfavoriten durchsuchen, kopieren, einfügen oder Quellen öffnen.",
+  "view.main.name": "Favoriten"
+}

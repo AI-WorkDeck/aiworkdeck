@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Project Search",
+  "plugin.description": "Search project files by full text or tags and jump directly to documents.",
+  "view.main.name": "Project Search"
+}

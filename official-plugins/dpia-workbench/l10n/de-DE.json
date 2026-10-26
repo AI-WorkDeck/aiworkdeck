@@ -1,0 +1,15 @@
+{
+  "plugin.name": "DPIA-Werkbank",
+  "plugin.description": "Datenschutz-Folgenabschätzung: Quellenrückverfolgung, Faktenbestätigung, Q&A-Nachverfolgung, Risiken & Behebung, kontinuierliche Neubewertung und versionierte Berichte. Angepasst von Zhu Lingfengs DSH-DPIA-Werkbank; benötigt Node.js, Python und LibreOffice.",
+  "plugin.author": "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Node.js-Programm",
+  "setting.nodePath.description": "Leer lassen, um den Node aus dem System-PATH zu verwenden; erfordert Node.js 20 oder neuer.",
+  "setting.pythonPath.label": "Python-Executable",
+  "setting.pythonPath.description": "Erfordert Dokumentabhängigkeiten aus runtime/requirements.txt; es kann ein Python-Pfad aus einer virtuellen Umgebung angegeben werden.",
+  "setting.pdfFontPath.label": "PDF-CJK-Schriftartdatei",
+  "setting.pdfFontPath.description": "Das Einfügen von CJK-Text in native PDF-Vorlagen erfordert eine einbettbare TrueType-Schriftart (TTF/TTC); leer lassen, um die Systemschriftartsuche zu verwenden.",
+  "setting.sofficePath.label": "LibreOffice-Executable",
+  "setting.sofficePath.description": "Nur für den PDF-Export von Berichten und die Seitenvorschau erforderlich; leer lassen, um Standard-Systempfade zu versuchen.",
+  "tool.dpia_workbench_action.description": "DPIA-Fall, Materialien, Faktenbestätigung, Q&A, Ausführungsstatus und Berichtsvorgänge. Nur für die Workbench-Benutzeroberfläche; die KI darf keine manuellen Bestätigungs-/Genehmigungseinträge aufrufen.",
+  "tool.dpia_workbench_task.description": "Derzeit eingefrorene DPIA-Aufgaben ausführen: context/read/write/script/commit/report; strikt auf das aktuelle Benutzerprojekt und das Fall-Ausgabeverzeichnis beschränkt."
+}

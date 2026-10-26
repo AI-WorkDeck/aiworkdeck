@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Nachweise & Insights",
+  "plugin.description": "Abruf von Dokumentnachweisen, Konsistenzprüfung und Vertragsprüfung.",
+  "view.main.name": "Nachweise & Insights"
+}

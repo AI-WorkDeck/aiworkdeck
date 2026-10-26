@@ -1,0 +1,5 @@
+{
+  "plugin.name": "รายการโปรด",
+  "plugin.description": "Search project favorites, copy, insert, or open sources.",
+  "view.main.name": "รายการโปรด"
+}

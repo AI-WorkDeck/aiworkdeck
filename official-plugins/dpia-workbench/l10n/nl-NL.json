@@ -1,0 +1,15 @@
+{
+  "plugin.name": "DPIA-werkbank",
+  "plugin.description": "Data Protection Impact Assessment: bronherleiding, feitencontrole, vraag-en-antwoord-opvolging, risico's & maatregelen, doorlopende herevaluatie en rapporten met versiebeheer. Aangepast van Zhu Lingfengs DSH DPIA Workbench; vereist Node.js, Python en LibreOffice.",
+  "plugin.author": "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Node.js Uitvoerbaar Bestand",
+  "setting.nodePath.description": "Laat leeg om node uit het systeem-PATH te gebruiken; vereist Node.js 20 of nieuwer.",
+  "setting.pythonPath.label": "Python Uitvoerbaar Bestand",
+  "setting.pythonPath.description": "Vereist documentafhankelijkheden uit runtime/requirements.txt; kan een Python-pad uit een virtuele omgeving opgeven.",
+  "setting.pdfFontPath.label": "PDF CJK Lettertypebestand",
+  "setting.pdfFontPath.description": "Het invullen van CJK-tekst in native PDF-sjablonen vereist een inbeddbaar TrueType-lettertype (TTF/TTC); laat leeg om systeemlettertype-opzoeking te gebruiken.",
+  "setting.sofficePath.label": "LibreOffice Uitvoerbaar Bestand",
+  "setting.sofficePath.description": "Alleen nodig voor PDF-export van rapporten en paginavoorbeeld; laat leeg om standaard systeemlocaties te proberen.",
+  "tool.dpia_workbench_action.description": "DPIA-zaak, materialen, feitenbevestiging, Q&A, uitvoeringsstatus en rapportbewerkingen. Alleen voor de workbench-UI; AI mag handmatige bevestigings-/goedkeuringsingangen niet aanroepen.",
+  "tool.dpia_workbench_task.description": "Voer momenteel bevroren DPIA-taken uit: context/read/write/script/commit/report; strikt beperkt tot de huidige uitvoermap van gebruikersproject en zaak."
+}

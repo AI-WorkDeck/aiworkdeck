@@ -65,4 +65,9 @@ export default {
   sourceChannelWpsExcel: 'WPS Spreadsheets',
   sourceChannelWpsPowerpoint: 'WPS Presentation',
   sourceChannelPlugin: 'Add-in',
+  // ---- components/LanguagePicker.vue ----
+  languagePickerLabel: 'Select language',
+  languageFollowSystem: 'Follow system',
+  languageSearchPlaceholder: 'Search languages…',
+  languageNoMatch: 'No matching languages',
 }

@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Klembord",
+  "plugin.description": "Zoek in klembordgeschiedenis, kopieer en voeg inhoud in.",
+  "view.main.name": "Klembord"
+}

@@ -202,9 +202,11 @@
       <!-- 底部一行：左边语言切换（语言名用各自的语言写，不翻译），右边 Key 入口 / 返回 / 暂不登录 -->
       <div class="unlock-card-foot">
         <div class="unlock-lang">
-          <span class="unlock-lang-item" :class="{ 'is-active': !isEn }" role="button" @click="pickLanguage('zh-CN')">中文</span>
-          <span class="unlock-lang-sep">·</span>
-          <span class="unlock-lang-item" :class="{ 'is-active': isEn }" role="button" @click="pickLanguage('en-US')">English</span>
+          <LanguagePicker
+            compact
+            placement="top"
+            @change="({ resolved }) => pickLanguage(resolved)"
+          />
         </div>
         <div class="unlock-foot-right">
           <span v-if="mode === 'code'" class="unlock-foot-link" role="button" @click="switchMode('login')">{{ $t('onboarding.unlock.back') }}</span>
@@ -217,16 +219,17 @@
 </template>
 
 <script>
-import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, getAccountCaptchaChallenge, accountPasswordOperation } from '@/services/api.js'
+import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, getAccountCaptchaChallenge, accountPasswordOperation, getAppLanguageRemote, saveAppLanguageRemote } from '@/services/api.js'
 import { setupCaptcha, teardownCaptcha } from '@/utils/captcha.js'
 import { captchaFailureNotice, toCaptchaFailure } from '@/utils/captchaFailure.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { loadSiteLinks, siteBaseUrl, resetSiteLinks } from '@/utils/siteLinks.js'
-import { getAppLanguage, setAppLanguage, isLanguageManuallyChosen } from '@/utils/appLanguage.js'
+import { getAppLanguage, setAppLanguage, isLanguageManuallyChosen, normalizeLocaleCode } from '@/utils/appLanguage.js'
 import { siteLanguageToApply } from '@/utils/siteLanguage.js'
 import { applyI18nLocale } from '@/i18n/index.js'
 import { recordAccountConsents } from '@/utils/accountConsent.js'
 import { showDialog } from '@/utils/dialog.js'
+import LanguagePicker from '@/components/LanguagePicker.vue'
 
 // 与站点无关（GitHub README），不走 siteBaseUrl()
 const TRIAL_CODE_URL = 'https://github.com/AI-WorkDeck/aiworkdeck#readme'
@@ -239,6 +242,7 @@ const SITE_PRESELECT_KEY = 'awd_site_preselected'
 
 export default {
   name: 'AccountLoginDialog',
+  components: { LanguagePicker },
   props: {
     // 'dialog'：就地登录弹层；'page'：解锁页薄壳里的卡片
     variant: { type: String, default: 'dialog' },
@@ -751,6 +755,20 @@ export default {
      */
     async finishLogin(res, toast) {
       if (toast) uni.showToast({ title: toast.title, icon: 'success', duration: 1600 })
+      try {
+        if (isLanguageManuallyChosen()) {
+          saveAppLanguageRemote(getAppLanguage()).catch(() => {})
+        } else {
+          getAppLanguageRemote()
+            .then((r) => {
+              const remoteLang = normalizeLocaleCode(r && (r.language || r.appLanguage || (r.data && r.data.language)))
+              if (remoteLang && remoteLang !== getAppLanguage()) {
+                this.applyLanguage(remoteLang, { auto: true })
+              }
+            })
+            .catch(() => {})
+        }
+      } catch (e) { /* ignore */ }
       // 换了一个账户（后端 previousAccountDiffers，一次性）：维护者拍板「本机项目属于这台电脑」
       if (res && res.previousAccountDiffers) {
         await showDialog({

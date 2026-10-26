@@ -1,0 +1,15 @@
+{
+  "plugin.name": "Εργαστήριο DPIA",
+  "plugin.description": "Εκτίμηση Αντίκτυπου Προστασίας Δεδομένων: ανίχνευση πηγής, επιβεβαίωση στοιχείων, ερωταπαντήσεις, κίνδυνοι & διορθωτικές ενέργειες, συνεχής επανεκτίμηση και εκθέσεις με εκδόσεις. Προσαρμοσμένο από το DSH DPIA Workbench του Zhu Lingfeng· απαιτεί Node.js, Python και LibreOffice.",
+  "plugin.author": "AI WorkDeck (Πηγαίος κώδικας: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Εκτελέσιμο Node.js",
+  "setting.nodePath.description": "Αφήστε κενό για χρήση του node από το PATH του συστήματος· απαιτεί Node.js 20 ή νεότερο.",
+  "setting.pythonPath.label": "Εκτελέσιμο Python",
+  "setting.pythonPath.description": "Απαιτεί εξαρτήσεις εγγράφων από το runtime/requirements.txt· μπορεί να οριστεί διαδρομή Python από εικονικό περιβάλλον.",
+  "setting.pdfFontPath.label": "Αρχείο γραμματοσειράς PDF CJK",
+  "setting.pdfFontPath.description": "Η συμπλήρωση κειμένου CJK σε εγγενή πρότυπα PDF απαιτεί ενσωματώσιμη γραμματοσειρά TrueType (TTF/TTC)· αφήστε κενό για αυτόματη αναζήτηση γραμματοσειράς συστήματος.",
+  "setting.sofficePath.label": "Εκτελέσιμο LibreOffice",
+  "setting.sofficePath.description": "Απαραίτητο μόνο για εξαγωγή PDF αναφορών και προεπισκόπηση σελίδων· αφήστε κενό για δοκιμή προεπιλεγμένων θέσεων συστήματος.",
+  "tool.dpia_workbench_action.description": "Υπόθεση DPIA, υλικά, επιβεβαίωση στοιχείων, ερωταπαντήσεις, κατάσταση εκτέλεσης και λειτουργίες αναφοράς. Μόνο για το περιβάλλον εργασίας· το AI δεν πρέπει να καλεί χειροκίνητες εγγραφές επιβεβαίωσης/έγκρισης.",
+  "tool.dpia_workbench_task.description": "Εκτέλεση των επί του παρόντος παγωμένων εργασιών DPIA: context/read/write/script/commit/report· αυστηρά περιορισμένες στον τρέχοντα κατάλογο εξόδου έργου και υπόθεσης του χρήστη."
+}

@@ -183,16 +183,7 @@
           {{ $t('account.languageGroupHint') }}
         </text>
         <view class="lang-row">
-          <view
-            v-for="opt in appLanguageOptions"
-            :key="opt.value"
-            class="lang-item"
-            :class="{ checked: appLanguage === opt.value }"
-            @tap="onAppLanguagePick(opt.value)"
-          >
-            <view class="lang-dot"></view>
-            <text class="lang-label">{{ opt.label }}</text>
-          </view>
+          <LanguagePicker @change="onAppLanguageChange" />
         </view>
       </SettingsSection>
 
@@ -220,18 +211,20 @@ import { submittedInputValue } from '@/utils/identityProfile.js'
 import { getDocumentGeneratorSettings, updateDocumentGeneratorSettings } from '@/services/api.js'
 import { resetDocumentStampCache } from '@/utils/documentGeneratorSetting.js'
 import AwdSwitch from '@/components/AwdSwitch.vue'
+import LanguagePicker from '@/components/LanguagePicker.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import { isDesktopHost } from '@/services/host.js'
 import { getCurrentUser, setSessionUser } from '@/utils/auth.js'
 import { signOut } from '@/utils/signOut.js'
-import { getAppLanguage, setAppLanguage } from '@/utils/appLanguage.js'
+import { getAppLanguage, setAppLanguage, getLocaleEntry, LOCALE_REGISTRY } from '@/utils/appLanguage.js'
+import { applyI18nLocale } from '@/i18n/index.js'
 import { getInitial } from '@/utils/textInitial.js'
 import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
 
 export default {
   name: 'PersonalSettingsPanel',
-  components: { AwdSwitch, SettingsSection, SettingsRow },
+  components: { AwdSwitch, LanguagePicker, SettingsSection, SettingsRow },
   computed: {
     isDesktop() {
       return isDesktopHost()
@@ -273,10 +266,10 @@ export default {
       // 界面语言：读写走 utils/appLanguage.js（storage 权威源 + App.vue 镜像同步）。
       // 选项标签用各自母语，刻意不随语言翻译。
       appLanguage: getAppLanguage(),
-      appLanguageOptions: [
-        { value: 'zh-CN', label: '简体中文' },
-        { value: 'en-US', label: 'English' },
-      ],
+      appLanguageOptions: LOCALE_REGISTRY.map((entry) => ({
+        value: entry.code,
+        label: entry.nativeName,
+      })),
 
       // 文档属性里的产品标识（B4）：默认按「开」渲染，拉到后端值再纠正——
       // 缺省就是开，先画成关会在加载瞬间闪一下。
@@ -593,19 +586,19 @@ export default {
     handleLogout() {
       signOut()
     },
-    onAppLanguagePick(value) {
-      if (value === this.appLanguage) return
-      this.appLanguage = setAppLanguage(value)
+    onAppLanguageChange({ resolved } = {}) {
+      this.appLanguage = resolved || getAppLanguage()
+      const entry = getLocaleEntry(this.appLanguage)
       uni.showToast({
-        title: this.appLanguage === 'en-US' ? this.$t('account.languageSwitchingToEn') : this.$t('account.languageSwitchingToZh'),
+        title: this.$t('account.languageSwitchedToast', { lang: entry.nativeName }),
         icon: 'none',
       })
-      // 整页 reload：i18n 单例的 locale、config 模块顶层取值的静态 label、
-      // LOWA 编辑器 uilang 全部随之重建。延迟给 App.vue 的镜像同步
-      //（主进程 IPC + 后端 POST）留出发出的窗口。
-      setTimeout(() => {
-        try { window.location.reload() } catch (e) { /* 非浏览器环境忽略 */ }
-      }, 600)
+    },
+    onAppLanguagePick(value) {
+      if (value === this.appLanguage) return
+      const resolved = setAppLanguage(value)
+      applyI18nLocale(resolved)
+      this.onAppLanguageChange({ resolved })
     },
     async toggleTotpPanel() {
       if (this.totpBusy) return // startSetup 在飞期间禁用，防止二次点击触发并发请求
