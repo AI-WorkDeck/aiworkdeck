@@ -83,6 +83,7 @@ export function useDocumentMerge(deps) {
   let operationGuard
   let operationApi
   let writeUncertain = false
+  let openedOverviewKey = null
 
   const isDesktop = () => (typeof deps.isDesktop === 'function' ? !!deps.isDesktop() : !!deps.isDesktop)
   const t = deps.t || ((k) => k)
@@ -190,6 +191,14 @@ export function useDocumentMerge(deps) {
     }
   }
 
+  // 状态轮询不能把用户从对比/资源面板拉回；人工「去处理」仍直接打开总览。
+  function openOverviewOnce(conflict, ctx) {
+    const key = conflictKey(conflict, ctx)
+    if (openedOverviewKey === key) return
+    openedOverviewKey = key
+    if (typeof deps.openOverview === 'function') deps.openOverview()
+  }
+
   async function finalize(conflict, ctx) {
     if (writeUncertain) return { merged: false, uncertain: true }
     const paths = (conflict.conflictingPaths || []).length
@@ -202,7 +211,7 @@ export function useDocumentMerge(deps) {
     })
     if (!allMerged) {
       state.overviewRequired = true
-      if (typeof deps.openOverview === 'function') deps.openOverview()
+      openOverviewOnce(conflict, ctx)
       return { merged: false }
     }
     const key = conflictKey(conflict, ctx) + '|__finalize__'
@@ -235,7 +244,7 @@ export function useDocumentMerge(deps) {
       if (!landed) finalized.delete(key)
       state.overviewRequired = true
       if (typeof deps.toast === 'function') deps.toast((e && e.message) || t('version.mergeAutoFinalizeFailed'))
-      if (typeof deps.openOverview === 'function') deps.openOverview()
+      openOverviewOnce(conflict, ctx)
       return { merged: false, ...(writeUncertain ? { uncertain: true } : {}) }
     }
   }
@@ -261,6 +270,7 @@ export function useDocumentMerge(deps) {
     operationApi = api
     writeUncertain = false
     if (!conflict) {
+      openedOverviewKey = null
       state.rows = []
       state.conflictKey = null
       state.overviewRequired = false
@@ -311,7 +321,7 @@ export function useDocumentMerge(deps) {
     }
     if (suspended.has(nextKey)) {
       state.overviewRequired = true
-      if (typeof deps.openOverview === 'function') deps.openOverview()
+      openOverviewOnce(conflict, ctx)
       return { merged: false }
     }
 
