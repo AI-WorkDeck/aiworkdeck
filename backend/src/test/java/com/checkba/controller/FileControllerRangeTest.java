@@ -108,6 +108,25 @@ class FileControllerRangeTest {
     }
 
     @Test
+    void pdf_inline_preview_preserves_range_and_authorization() throws Exception {
+        givenFile("scan.pdf", "pdf");
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(7L);
+            when(fileAccess.canRead(any(ProjectFile.class), eq(7L))).thenReturn(true);
+            var response = mvc.perform(get("/api/files/5/download").param("token", "sess")
+                    .param("inline", "true").header("Range", "bytes=0-99")).andReturn().getResponse();
+            assertEquals(206, response.getStatus());
+            assertEquals("application/pdf", response.getContentType());
+            assertTrue(response.getHeader("Content-Disposition").startsWith("inline;"));
+            assertEquals("bytes 0-99/1000", response.getHeader("Content-Range"));
+            assertArrayEquals(Arrays.copyOfRange(content, 0, 100), response.getContentAsByteArray());
+            when(fileAccess.canRead(any(ProjectFile.class), eq(7L))).thenReturn(false);
+            assertEquals(403, mvc.perform(get("/api/files/5/download").param("token", "sess")
+                    .param("inline", "true").header("Range", "bytes=0-99")).andReturn().getResponse().getStatus());
+        }
+    }
+
+    @Test
     void range_0_99_returns_206_with_slice() throws Exception {
         givenFile("clip.mp4", "mp4");
         MvcResult r = download("bytes=0-99", true);

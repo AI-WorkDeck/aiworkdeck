@@ -33,16 +33,18 @@ function mediaHarness() {
   }
   // Execute the production methods, including the actual lifecycle hook. An aborted
   // XHR may already have queued a callback, so the tests explicitly fire it anyway.
-  const body = between(PREVIEW, '    async loadMediaResource()', '    fetchAuthedBlob()')
-    + between(PREVIEW, '    reloadPreview(newFile)', '    resetImageViewState()')
+  const body = between(PREVIEW, '    async loadMediaResource(', '    fetchAuthedBlob()')
+    + between(PREVIEW, '    reloadPreview(newFile', '    resetImageViewState()')
     + between(PREVIEW, '  beforeUnmount()', '  mounted()')
-  const methods = new Function('XMLHttpRequest', 'getAuthHeaders', 'URL', 'console', 'uni', 'window', `return ({${body}})`)(
+  const methods = new Function('XMLHttpRequest', 'getAuthHeaders', 'URL', 'console', 'uni', 'window', 'IS_H5', `return ({${body}})`)(
     XMLHttpRequest, () => ({}), URL,
     { log: (...args) => calls.logs.push(args), error: (...args) => calls.logs.push(args) },
     { showToast: value => calls.toasts.push(value) }, { removeEventListener() {} },
+    false,
   )
   const vm = {
-    file: { name: '照片.jpg', fileType: 'jpg' }, fileUrl: 'blob:archive-entry', blobUrl: '', loading: false,
+    file: { name: '照片.jpg', fileType: 'jpg' }, fileUrl: 'blob:archive-entry', blobUrl: '', pdfStreamUrl: '',
+    sourceUrl: 'blob:archive-entry', loading: false,
     getMimeType: () => 'image/jpeg', $t: key => key,
     clearEvidenceRectTimers() {}, unbindImageViewportListeners() {}, resetImageViewState() {},
     loadTextContent() { calls.textLoads++ },
@@ -60,7 +62,7 @@ function completeImage(xhr) {
 for (const leave of ['unmount', 'switch-to-text']) {
   test(`archive image ${leave}: late load, error and progress cannot retain bytes or disturb the next preview`, async () => {
     const { vm, calls } = mediaHarness()
-    await vm.loadMediaResource()
+    const pending = vm.loadMediaResource()
     const xhr = calls.requests[0]
     if (leave === 'unmount') vm.beforeUnmount()
     else {
@@ -78,13 +80,15 @@ for (const leave of ['unmount', 'switch-to-text']) {
     assert.deepEqual(calls.toasts, [], 'an old image must not show a network error over the new preview')
     assert.equal(calls.logs.length, logCount, 'old progress must also be ignored')
     assert.equal(vm.loading, true)
+    await pending
   })
 }
 
 test('a successfully displayed archive image releases its Blob URL when its child preview unmounts', async () => {
   const { vm, calls } = mediaHarness()
-  await vm.loadMediaResource()
+  const pending = vm.loadMediaResource()
   completeImage(calls.requests[0])
+  await pending
   assert.equal(calls.created.length, 1)
   assert.equal(vm.blobUrl, calls.created[0].value)
   assert.equal(vm.loading, false)

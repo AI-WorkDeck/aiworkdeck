@@ -33,7 +33,7 @@ function topLevel(name) {
 }
 // EXEC 里的方法：两格缩进的 `name(p) {` 到同缩进的 `},`。
 function method(name) {
-  const m = SRC.match(new RegExp('\\n  ' + name + '\\((p)?\\) \\{\\n[\\s\\S]*?\\n  \\},\\n'))
+  const m = SRC.match(new RegExp('\\n  ' + name + '\\([^\\n)]*\\) \\{\\n[\\s\\S]*?\\n  \\},\\n'))
   assert.ok(m, 'office_thread.js 里找不到原语 ' + name)
   return m[0].trim()
 }

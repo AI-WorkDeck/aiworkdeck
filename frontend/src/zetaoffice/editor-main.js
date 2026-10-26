@@ -262,6 +262,16 @@ function relayModified(d) {
   try { hostTransport.send({ __lo: 'lo-relay', type: 'modified' }) } catch (e) { /* ignore */ }
 }
 
+// Only real input resets the save idle window; toolbar reads and thumbnails do not.
+let lastInteractionRelay = 0
+for (const event of ['keydown', 'pointerdown', 'wheel']) {
+  document.addEventListener(event, e => {
+    if (!e.isTrusted || Date.now() - lastInteractionRelay < 100) return
+    lastInteractionRelay = Date.now()
+    try { hostTransport.send({ __lo: 'lo-relay', type: 'interaction' }) } catch (_) {}
+  }, { capture: true, passive: true })
+}
+
 // (自建工具栏) 光标/选区动了 → 宿主重读 get_ui_state 刷新激活态。两个来源：
 // worker 的 XSelectionChangeListener（盖选区类变化）与 IME 覆盖层的
 // onCursorMoved（盖纯光标移动与画布点击，前者盖不住）。合流后节流 1/150ms，
@@ -485,6 +495,7 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
       onCommitted: (text) => { writingAssistance?.committed(text); semanticWriting?.committed(text); inlineReview?.committed(text) },
       onAssistanceKey: (event) => writingAssistance?.keydown(event) || false,
       onCommentRequested: () => relayCommentRequest(),
+      onError: message => hostTransport.send({ __lo: 'lo-relay', type: 'input-error', message }),
       onLog: (m) => { console.log('[zeta-editor]', m); if (VERIFY) vlog(m) },
     })
     writingAssistance = attachWritingAssistance({

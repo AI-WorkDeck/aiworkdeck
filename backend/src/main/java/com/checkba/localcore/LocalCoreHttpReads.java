@@ -105,7 +105,7 @@ public final class LocalCoreHttpReads {
                 cards.forEach(card -> card.computeIfPresent("managerName", (key, name) -> displayNameForUi.apply((String) name)));
                 return Optional.of(json(200, cards));
             }
-            if (download.matches()) return Optional.of(download(id(download.group(1), 404)));
+            if (download.matches()) return Optional.of(download(id(download.group(1), 404), booleanQuery(query.get("inline"))));
             long projectId = id(project.group(1), 400);
             String child = project.group(2);
             if (child == null) return Optional.of(json(200, store.projectDetail(projectId)));
@@ -210,7 +210,7 @@ public final class LocalCoreHttpReads {
         return members;
     }
 
-    private Response download(long fileId) throws SQLException {
+    private Response download(long fileId, boolean inline) throws SQLException {
         LocalCoreStore.FileTarget target;
         try (Connection c = database.getConnection()) {
             // The URL carries a file id, never a client-supplied project or disk path.
@@ -232,7 +232,7 @@ public final class LocalCoreHttpReads {
         else if (target.fileType() != null && !target.fileType().isBlank()
                 && !name.toLowerCase(Locale.ROOT).endsWith("." + target.fileType().toLowerCase(Locale.ROOT))) name += "." + target.fileType();
         String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8).replace("+", "%20");
-        return new Response(200, Map.of("Content-Type", mediaType(name), "Content-Disposition", "attachment; filename=\"" + encoded + "\"",
+        return new Response(200, Map.of("Content-Type", mediaType(name), "Content-Disposition", (inline && "application/pdf".equals(mediaType(name)) ? "inline" : "attachment") + "; filename=\"" + encoded + "\"",
                 "Cache-Control", "no-store"), null, target.path());
     }
 

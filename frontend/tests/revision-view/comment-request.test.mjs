@@ -47,7 +47,7 @@ function hostFixture(t, execute) {
 
 test('worker request relays its document fence without a modified event', () => {
   const source = read('../../src/zetaoffice/editor-main.js')
-  const body = source.slice(source.indexOf('let inlineReview = null'), source.indexOf('// (自建工具栏)'))
+  const body = source.slice(source.indexOf('let inlineReview = null'), source.indexOf('// Only real input resets the save idle window'))
   const messages = []
   const relay = new Function('hostTransport', 'reviewBalloons', 'relaySelection', body + '\nreturn { relayModified, relayCommentRequest }')(
     { send: msg => messages.push(msg) }, null, () => {})

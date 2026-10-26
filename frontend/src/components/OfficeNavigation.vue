@@ -36,6 +36,7 @@ export default {
   name: 'OfficeNavigation',
   props: {
     executor: Object, kind: String, refreshKey: Number, contentKey: Number,
+    currentItem: Object, structureKey: Number, canBackgroundWork: Function,
     active: { type: Boolean, default: true }, writable: Boolean,
   },
   emits: ['navigate', 'add-sheet'],
@@ -54,8 +55,23 @@ export default {
       this.loading = true
       this.scheduleRefresh()
     },
-    refreshKey() { this.scheduleRefresh() },
-    contentKey() { this.invalidateThumbnails(); this.scheduleRefresh() },
+    refreshKey() { if (!this.currentItem) this.scheduleRefresh() },
+    currentItem(value, previous) {
+      if (!value || !previous || value.itemCount !== previous.itemCount) { this.scheduleRefresh(); return }
+      if (value.activeId != null && value.activeId !== previous.activeId) {
+        this.activeId = value.activeId
+        this.$nextTick(() => { this.scrollSelected(); this.loadVisibleThumbnails() })
+      }
+    },
+    structureKey() { this.invalidateThumbnails(); this.scheduleRefresh() },
+    contentKey() {
+      this._contentRevision = (this._contentRevision || 0) + 1
+      const ids = [...new Set([this.activeId, this.currentItem?.activeId])]
+        .filter(id => id != null)
+      if (ids.length && ids.every(id => this.items.some(item => item.id === id))) ids.forEach(id => this.invalidateItem(id))
+      else this.invalidateThumbnails()
+      this.scheduleRefresh()
+    },
     active(value) { if (value) this.scheduleRefresh() },
   },
   mounted() {
@@ -70,6 +86,7 @@ export default {
     this._disposed = true
     this._readSeq++
     clearTimeout(this._refreshTimer)
+    clearTimeout(this._thumbRetryTimer)
     this.clearThumbnails()
     window.removeEventListener('resize', this.loadVisibleThumbnails)
   },
@@ -83,34 +100,63 @@ export default {
       this._generation++
       this.thumbnailErrors = {}
     },
+    invalidateItem(id) {
+      this._itemRevision ||= {}
+      this._itemRevision[id] = (this._itemRevision[id] || 0) + 1
+      delete this._rendered[id]
+      if (this.thumbnailErrors[id]) this.thumbnailErrors[id] = false
+    },
+    async refresh() {
+      // Merge concurrent refreshes: one read in flight, at most one trailing re-read.
+      if (this._refreshRunning) { this._refreshTrailing = true; return }
+      this._refreshRunning = true
+      try {
+        do {
+          this._refreshTrailing = false
+          await this.readNavigation()
+        } while (this._refreshTrailing && !this._disposed)
+      } finally { this._refreshRunning = false }
+    },
+    async readNavigation() {
+      if (!this.executor || !this.active || this._disposed) return
+      const readSeq = ++this._readSeq
+      const contentRevision = this._contentRevision || 0
+      try {
+        const result = await this.executor.executeCommand('office_get_navigation', {})
+        if (readSeq !== this._readSeq || this._disposed) return
+        if (!result?.success || result.kind !== this.kind) throw new Error(this.$t('editor.navigation.loadFailed'))
+        await this.applyManifest(result, contentRevision)
+      } catch (e) {
+        if (readSeq === this._readSeq && !this._disposed) this.error = this.$t('editor.navigation.loadFailed')
+      } finally {
+        if (readSeq === this._readSeq) this.loading = false
+      }
+    },
+    async applyManifest(result, contentRevision = 0) {
+      const structureChanged = this.documentSeq !== result.documentSeq
+        || JSON.stringify(this.items) !== JSON.stringify(result.items)
+      if (structureChanged) this.clearThumbnails()
+      const selectedChanged = this.activeId !== result.activeId
+      this.items = result.items
+      this.activeId = result.activeId
+      this.documentSeq = result.documentSeq
+      // A toolbar snapshot may still name the previous slide when typing starts.
+      // Only a manifest read after that edit can settle its thumbnail invalidation.
+      if (contentRevision > (this._appliedContentRevision || 0)) {
+        this.invalidateItem(result.activeId)
+        this._appliedContentRevision = contentRevision
+      }
+      this.error = ''
+      await this.$nextTick()
+      if (selectedChanged) this.scrollSelected()
+      this.loadVisibleThumbnails()
+    },
     clearThumbnails() {
       this.invalidateThumbnails()
       this._rendered = {}
       Object.values(this.thumbnails).forEach(url => URL.revokeObjectURL(url))
       this.thumbnails = {}
       this.thumbnailErrors = {}
-    },
-    async refresh() {
-      if (!this.executor || !this.active || this._disposed) return
-      const readSeq = ++this._readSeq
-      try {
-        const result = await this.executor.executeCommand('office_get_navigation', {})
-        if (readSeq !== this._readSeq || this._disposed) return
-        if (!result?.success || result.kind !== this.kind) throw new Error(this.$t('editor.navigation.loadFailed'))
-        if (this.documentSeq !== result.documentSeq || JSON.stringify(this.items) !== JSON.stringify(result.items)) this.clearThumbnails()
-        const selectedChanged = this.activeId !== result.activeId
-        this.items = result.items
-        this.activeId = result.activeId
-        this.documentSeq = result.documentSeq
-        this.error = ''
-        await this.$nextTick()
-        if (selectedChanged) this.scrollSelected()
-        this.loadVisibleThumbnails()
-      } catch (e) {
-        if (readSeq === this._readSeq && !this._disposed) this.error = this.$t('editor.navigation.loadFailed')
-      } finally {
-        if (readSeq === this._readSeq) this.loading = false
-      }
     },
     scrollSelected() {
       const list = this.element(this.$refs.list)
@@ -127,16 +173,21 @@ export default {
     },
     async activate(item) {
       if (this._switching || this._disposed) return false
-      if (this.thumbnailErrors[item.id]) delete this.thumbnailErrors[item.id]
+      if (this.thumbnailErrors[item.id]) this.invalidateItem(item.id)
+      this._readSeq++ // A manifest read started before activation must not undo it.
       this._switching = true
       const activationSeq = this._activationSeq = (this._activationSeq || 0) + 1
       const executor = this.executor
       const documentSeq = this.documentSeq
+      const contentRevision = this._contentRevision || 0
       try {
         const result = await this.executor.executeCommand('office_activate_item', { id: item.id, documentSeq: this.documentSeq })
         if (this._disposed || executor !== this.executor || documentSeq !== this.documentSeq) return false
         if (!result?.success) throw new Error('navigation failed')
-        await this.refresh()
+        // The activation call already returns the navigation manifest; consume it
+        // instead of issuing a second read.
+        if (result.kind === this.kind && Array.isArray(result.items)) await this.applyManifest(result, contentRevision)
+        else await this.refresh()
         if (this._disposed || executor !== this.executor || documentSeq !== this.documentSeq) return false
         this.$emit('navigate')
         return true
@@ -166,27 +217,46 @@ export default {
       if (!await this.activate(this.items[target]) || executor !== this.executor || this._disposed) return
       this.element(this.$refs.list)?.querySelectorAll('.office-nav-item')[target]?.focus()
     },
+    scheduleThumbnailRetry() {
+      if (this._disposed || this._thumbRetryTimer != null) return
+      this._thumbRetryTimer = setTimeout(() => {
+        this._thumbRetryTimer = null
+        this.loadVisibleThumbnails()
+      }, 250)
+    },
     async loadVisibleThumbnails() {
       if (this.kind !== 'impress' || !this.active || this._disposed) return
       if (this._drawing) { this._drawAgain = true; return }
       const list = this.element(this.$refs.list)
       if (!list?.clientHeight) return
+      clearTimeout(this._thumbRetryTimer)
+      this._thumbRetryTimer = null
       this._drawing = true
       this._drawAgain = false
       const rows = list.querySelectorAll('.office-nav-item')
       const generation = this._generation
+      const targets = []
+      for (let index = 0; index < this.items.length; index++) {
+        const row = rows[index]
+        if (!row) break
+        if (row.offsetTop >= list.scrollTop + list.clientHeight) break
+        if (row.offsetTop + row.offsetHeight > list.scrollTop) targets.push(index)
+      }
+      // Render visible rows plus at most one adjacent item, one image at a time.
+      // Navigation changes and edits cancel the old batch between native calls.
+      if (targets.length) targets.push(targets[targets.length - 1] + 1)
       try {
-        // Render only visible rows and one viewport ahead, one image at a time.
-        // Navigation changes and edits cancel the old batch between native calls.
-        for (let index = 0; index < this.items.length; index++) {
+        for (const index of targets) {
           if (this._disposed || !this.active || generation !== this._generation) break
           const row = rows[index]
           const item = this.items[index]
-          if (!row || row.offsetTop + row.offsetHeight < list.scrollTop - list.clientHeight || row.offsetTop > list.scrollTop + list.clientHeight * 2) continue
-          if (this._rendered[item.id] === generation || this.thumbnailErrors[item.id]) continue
+          if (!item || !row || this._rendered[item.id] === generation || this.thumbnailErrors[item.id]) continue
+          if (this.canBackgroundWork && !this.canBackgroundWork()) { this.scheduleThumbnailRetry(); break }
+          const itemRevision = this._itemRevision?.[item.id] || 0
           try {
-            const result = await this.executor.executeCommand('slide_get_thumbnail', { slideNumber: item.id, width: 320, documentSeq: this.documentSeq })
+            const result = await this.executor.executeCommand('slide_get_thumbnail', { slideNumber: item.id, width: 320, documentSeq: this.documentSeq }, { background: true })
             if (this._disposed || generation !== this._generation) break
+            if (itemRevision !== (this._itemRevision?.[item.id] || 0)) { this._drawAgain = true; continue }
             if (!result?.success || result.documentSeq !== this.documentSeq || !result.bytes?.length) throw new Error('thumbnail unavailable')
             if (this.thumbnails[item.id]) URL.revokeObjectURL(this.thumbnails[item.id])
             this._rendered[item.id] = generation
@@ -194,10 +264,12 @@ export default {
           } catch (e) {
             if (generation === this._generation && !this._disposed) this.thumbnailErrors[item.id] = true
           }
+          // Yield to the event loop so input and saving preempt the batch.
+          await new Promise(resolve => setTimeout(resolve, 0))
         }
       } finally {
         this._drawing = false
-        if ((generation !== this._generation || this._drawAgain) && !this._disposed) this.loadVisibleThumbnails()
+        if (!this._disposed && (generation !== this._generation || this._drawAgain)) this.loadVisibleThumbnails()
       }
     },
   },
@@ -215,8 +287,10 @@ export default {
 .office-nav-item::after, .office-nav-add::after, .office-nav-retry::after { border: 0; }
 .impress .office-nav-item { display: flex; align-items: flex-start; gap: 7px; width: 100%; padding: 4px 0; margin-bottom: 8px; }
 .office-nav-number { flex: 0 0 18px; text-align: right; padding-top: 4px; font-size: var(--awd-panel-fs-meta); }
-.office-nav-preview { position: relative; flex: 1; min-width: 0; overflow: hidden; background: var(--awd-bg); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); }
-.office-nav-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.office-nav-preview { position: relative; flex: 1; min-width: 0; overflow: hidden; background: var(--awd-bg); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); aspect-ratio: 4 / 3; }
+/* Absolute so the img's natural size can never stretch the row or the scroll container;
+   the fixed aspect-ratio box is the sole source of height. */
+.office-nav-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .office-nav-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--awd-text-3); font-size: var(--awd-panel-fs-meta); }
 .office-nav-item:hover .office-nav-preview { border-color: var(--awd-text-3); }
 .selected .office-nav-preview { border-color: var(--awd-mint); box-shadow: 0 0 0 1px var(--awd-mint); }

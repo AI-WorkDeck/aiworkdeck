@@ -68,17 +68,17 @@ test('arrow and end keys activate actual tabs and focus them', async () => {
   assert.equal(prevented, 1)
 })
 
-test('thumbnail requests are limited to visible rows and do not run in background tabs', async () => {
+test('thumbnail requests are limited to visible rows plus one adjacent item and do not run in background tabs', async () => {
   const h = harness('impress', () => ({ success: true, documentSeq: 1, bytes: [137,80,78,71] }))
   h.vm.documentSeq = 1
   h.vm.items = Array.from({ length: 60 }, (_, i) => ({ id: i + 1 }))
   h.vm.$refs.list = { clientHeight: 100, scrollTop: 0, querySelectorAll: () => h.vm.items.map((_, i) => ({ offsetTop: i * 100, offsetHeight: 100 })) }
   await h.vm.loadVisibleThumbnails()
-  assert.deepEqual(h.calls.map(c => c.params.slideNumber), [1,2,3])
+  assert.deepEqual(h.calls.map(c => c.params.slideNumber), [1,2])
   h.vm.active = false
   h.vm.$refs.list.scrollTop = 500
   await h.vm.loadVisibleThumbnails()
-  assert.equal(h.calls.length, 3)
+  assert.equal(h.calls.length, 2)
 })
 
 test('edits keep the previous image visible until a fresh preview replaces it, then release its URL', async () => {

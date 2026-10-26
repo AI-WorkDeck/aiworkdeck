@@ -603,3 +603,11 @@ IME 光标定位优先用 `XController.getViewData()` 的实时分号数据与 V
 - 回归入口：`tests/zeta-relay/{comparison-wait,engine-fatal}.test.mjs`、project-home `{compare-dialog-progress,comparison-engine-exit,docx-compare-flow,libre-hidden-release-reactive}.test.mjs`，以及真实隔离Electron长等待/取消/故障注入验收。onAbort人工注入只能证明回调链，不等同于自然OOM复现。
 
 - #1123 隔离 Electron 实测：同历史 SHA 的 2000 页密集修改样本本轮原生比较 84.2 秒、build 88.1 秒、导出 15.2 秒；两侧 OOXML 文字投影与来源一致，末页中文/修订可见，键盘输入落盘并正常关闭重开。算法未改，不能把耗时差异归因为取消截止。真实时钟无回应注入（未调用 native）超过 180 秒保持等待、约 304 秒提示，继续不重发、取消释放且同页重试成功；onAbort 回调及隐藏 guest 崩溃人工注入分别约 685ms/1060ms 结束等待，随后同页重试成功。证据入口为本机 `~/.codex/handoffs/2026-10-01-docx-compare-progress/host/ACCEPTANCE.md`，不代表任意复杂 2000 页文档或自然 OOM 已验证。
+
+## 跨格式输入与保存调度（dev-board#1499/#1500/#1512/#1513）
+
+- `zetaOfficeImeOverlay` 的真实剪贴板调用携带 `clipboard:true`。Impress 活动文本由 Outliner 持有，直接写形状模型会被编辑缓冲覆盖；剪贴板粘贴走原生键盘通道，保留当前光标、选区和文字格式。**折叠光标也可能返回形状集合**，不能据 `getString` 缺失就退回形状 setter。插件/AI 无该标记时保留原形状模型命令契约。成功投递不是内容成功，真实验收须看正常自动保存文件与重开内容。
+- Calc 复制直接读取真实连续区域 `getDataArray()`；超过 50,000 格或非连续多选明确拒绝，禁止静默截为100行/50列。粘贴沿用500行/100列写入边界；失败经 guest `input-error` 在宿主持续显示，可关闭。复制失败或截断不得继续剪切；Calc 剪切清除所选格的值、日期、字符串和公式，保留格式，不能用 Backspace 代替整块清除。
+- 宿主只读状态/导航/字体/缩略图不更新编辑空闲计时；真实 guest 键盘、指针与滚轮事件以及 modified 更新交互时间。保存屏障、修改后再次标脏、失败暂停、版本恢复保护仍保留。
+- `OfficeNavigation` 合并在途读取，切页直接使用返回清单；工具栏状态提供当前页/表及数量。普通修改只失效当前页，未知/结构变化保守失效全部。缩略图仅可见项加一个邻项、逐项让出事件循环；输入、未保存、保存中不启动新图，每次开工前复核。单页在途时再次修改须丢弃旧图并重画，不能将旧结果重新标为最新。
+- 回归：`tests/lowa-unit/clipboard-selection.test.mjs`、`tests/revision-view/clipboard-errors.test.mjs`、`tests/toolbar/office-navigation-scheduling.test.mjs`、`open-critical-path.test.mjs`。组件/模拟事件测试不等于 macOS 实际中文候选窗测试。

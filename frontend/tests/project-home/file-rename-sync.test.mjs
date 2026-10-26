@@ -66,6 +66,14 @@ function workspace() {
     _selectionSyncs: 0,
     syncFileTreeSelectionWithActiveTab() { this._selectionSyncs++ },
     updateWindowTitle() { this._titleUpdates++ },
+    // fileOpenTabs.js 里 PDF keepalive 的最小等价桩（本用例的标签都是 docx，不会触发驱逐）
+    pdfKeepAliveKeys: [],
+    isPdfPreviewFile(file) {
+      return !!(file && !file.tabType && !file.isFolder && String(file.fileType || '').toLowerCase() === 'pdf')
+    },
+    evictPdfKeepAlive(pane, fileId) {
+      this.pdfKeepAliveKeys = (this.pdfKeepAliveKeys || []).filter(item => item !== pane + ':' + fileId)
+    },
   }
   for (const [name, method] of Object.entries(syncMethods)) vm[name] = method.bind(vm)
   return vm

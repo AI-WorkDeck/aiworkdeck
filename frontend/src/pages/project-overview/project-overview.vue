@@ -1194,7 +1194,18 @@
                     <text>{{ $t('panels.pgWorkspacePending') }}</text>
                     <button @tap="loadDynamicPlugins">{{ $t('panels.pgWorkspaceRetry') }}</button>
                   </view>
-                  <view v-if="activeFileLeft && activeFileLeft.tabType !== 'plugin' && !useLibreEditor(activeFileLeft) && !isBrowserTab(activeFileLeft)" class="pane-content">
+                  <PdfPreviewPane
+                    v-for="file in leftPdfFiles"
+                    :key="'pdf-left-' + pdfPreviewEpoch + '-' + file.id"
+                    :ref="el => setPdfPreviewRef('left', file.id, el)"
+                    :file="file"
+                    :project-id="file.projectId || projectId"
+                    :locator="file.pendingLocator || null"
+                    :active="!!(activeFileLeft && activeFileLeft.id === file.id)"
+                    @extracted="onArchiveExtracted"
+                    @locator-consumed="onLocatorConsumed"
+                  />
+                  <view v-if="activeFileLeft && activeFileLeft.tabType !== 'plugin' && !useLibreEditor(activeFileLeft) && !isBrowserTab(activeFileLeft) && !isPdfPreviewFile(activeFileLeft)" class="pane-content">
                     <MarkdownPreview
                       v-if="isMarkdownTab(activeFileLeft)"
                       :content="activeFileLeft.content"
@@ -1454,7 +1465,18 @@
                     <text>{{ $t('panels.pgWorkspacePending') }}</text>
                     <button @tap="loadDynamicPlugins">{{ $t('panels.pgWorkspaceRetry') }}</button>
                   </view>
-                  <view v-if="activeFileRight && activeFileRight.tabType !== 'plugin' && !useLibreEditor(activeFileRight) && !isBrowserTab(activeFileRight)" class="pane-content">
+                  <PdfPreviewPane
+                    v-for="file in rightPdfFiles"
+                    :key="'pdf-right-' + pdfPreviewEpoch + '-' + file.id"
+                    :ref="el => setPdfPreviewRef('right', file.id, el)"
+                    :file="file"
+                    :project-id="file.projectId || projectId"
+                    :locator="file.pendingLocator || null"
+                    :active="!!(activeFileRight && activeFileRight.id === file.id)"
+                    @extracted="onArchiveExtracted"
+                    @locator-consumed="onLocatorConsumed"
+                  />
+                  <view v-if="activeFileRight && activeFileRight.tabType !== 'plugin' && !useLibreEditor(activeFileRight) && !isBrowserTab(activeFileRight) && !isPdfPreviewFile(activeFileRight)" class="pane-content">
                     <MarkdownPreview
                       v-if="isMarkdownTab(activeFileRight)"
                       :content="activeFileRight.content"
@@ -2330,6 +2352,7 @@ import CommandPalette from '@/components/CommandPalette.vue'
 import AppMenuBar from '@/components/AppMenuBar.vue'
 import DesktopUpdateIndicator from '@/components/DesktopUpdateIndicator.vue'
 import FilePreview from '@/components/FilePreview.vue'
+import PdfPreviewPane from '@/components/PdfPreviewPane.vue'
 import QuickLookDialog from '@/components/QuickLookDialog.vue'
 import VariablePanel from '@/components/VariablePanel.vue'
 import EvidenceMethodBar from '@/components/EvidenceMethodBar.vue'
@@ -2574,6 +2597,7 @@ export default {
     DesktopUpdateIndicator,
     FileTree,
     FilePreview,
+    PdfPreviewPane,
     QuickLookDialog,
     VariablePanel,
     EvidenceMethodBar,
@@ -2933,6 +2957,8 @@ export default {
       // 网页标签保活 LRU：'pane:tabId'，最近激活在前（同 libreLruKeys 的形制）。
       // 只在 Web/H5 用得上——见 leftWebTabs 与 WEB_KEEPALIVE_MAX。
       webKeepAliveKeys: [],
+      pdfKeepAliveKeys: [],
+      pdfPreviewEpoch: 0,
       // 后端 doc_stream_data 流式写入的本地缓冲（#79：LibreOffice 消费端）
       _docStreamBuffer: '',
       _docStreamTimer: null,
@@ -3486,6 +3512,19 @@ export default {
       return this.rightFiles.filter(f => this.useLibreEditor(f) &&
         (f.id === this.activeFileIdRight || this.libreLruKeys.includes('right:' + f.id)))
     },
+    pdfPermissionIdentity() {
+      return JSON.stringify([this.project?.userId, this.currentUser?.role,
+        (this.localProjectMembers || []).map(member => [member.userId, member.role])
+          .sort((a, b) => String(a[0]).localeCompare(String(b[0])))])
+    },
+    leftPdfFiles() {
+      return this.leftFiles.filter(file => this.isPdfPreviewFile(file) &&
+        (file.id === this.activeFileIdLeft || this.pdfKeepAliveKeys.includes('left:' + file.id)))
+    },
+    rightPdfFiles() {
+      return this.rightFiles.filter(file => this.isPdfPreviewFile(file) &&
+        (file.id === this.activeFileIdRight || this.pdfKeepAliveKeys.includes('right:' + file.id)))
+    },
     // 网页标签保活池只在没有 BrowserView 能力的宿主（Web/H5）里开。
     // 桌面端**绝不能**开：那边 BrowserPane 挂载即 browser-create，一次挂 5 个
     // 就是 5 个 BrowserView 同时挂到窗口上（后台那几个会浮到最上层盖住界面，
@@ -3667,6 +3706,8 @@ export default {
     }
   },
   beforeUnmount() {
+    this.resetPdfPreviewPool()
+    this._pdfPreviewRefs = {}
     this._openWorkbenchMounted = false
     unregisterOpenWorkbench(this)
     this.cancelFileTreePdfExport()
@@ -4481,7 +4522,10 @@ export default {
     this.maybeRegisterOpenWorkbench()
   },
   watch: {
-    projectId() { this.cancelFileTreePdfExport() },
+    projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool() },
+    'currentUser.id'() { this.resetPdfPreviewPool() },
+    // 成员轮询会替换数组；只在实际权限信息变化时销毁 PDF 查看器。
+    pdfPermissionIdentity() { this.resetPdfPreviewPool() },
     tabSnapshotSignature() {
       this.scheduleTabSnapshotSave()
     },
@@ -4520,7 +4564,10 @@ export default {
       this.$nextTick(() => this.rebindTabsWheel())
       // 重开分屏会重建右侧引擎，活动文件 ID 没变也必须重新核算驻留预算。
       if (this.splitMode) this.onActiveOfficeFileChanged('right', this.activeFileRight)
-      else this.scheduleLibreSpare()
+      else {
+        this.pdfKeepAliveKeys = this.pdfKeepAliveKeys.filter(key => !key.startsWith('right:'))
+        this.scheduleLibreSpare()
+      }
     },
     activeToolKey() { this.pushMenuState() },
     leftPaneKey() { this.pushMenuState() },
@@ -4544,13 +4591,13 @@ export default {
     // 内嵌 LibreOffice 多实例保活：激活的 Office 标签记入 LRU（超上限触发
     // 淘汰），并把 AI 指令路由指针同步到当前活动实例（活跃实例指针，同
     // PR#151 WPS 编辑器模式）。
-    activeFileLeft(f) { this.onActiveOfficeFileChanged('left', f); this.touchWebKeepAlive('left', f); this.prefetchInsightIndex(f) },
-    activeFileRight(f) { this.onActiveOfficeFileChanged('right', f); this.touchWebKeepAlive('right', f); this.prefetchInsightIndex(f) },
+    activeFileLeft(f) { this.onActiveOfficeFileChanged('left', f); this.touchWebKeepAlive('left', f); this.touchPdfKeepAlive('left', f); this.prefetchInsightIndex(f) },
+    activeFileRight(f) { this.onActiveOfficeFileChanged('right', f); this.touchWebKeepAlive('right', f); this.touchPdfKeepAlive('right', f); this.prefetchInsightIndex(f) },
     focusedPane() { this.syncLibreExecutor(); this.notifyRestartRecovery(); this.syncFileTreeSelectionWithActiveTab() },
     currentActiveTab() { this.notifyRestartRecovery(); this.refreshActiveSelection() },
     // 关闭 tab 后清掉文件已不在左列表的过继备胎条目（closeFile 已 flush）
-    'leftFiles.length'() { this.pruneClosedLibreSpares() },
-    'rightFiles.length'() { this.pruneClosedLibreSpares() },
+    'leftFiles.length'() { this.pruneClosedLibreSpares(); this.prunePdfKeepAlive() },
+    'rightFiles.length'() { this.pruneClosedLibreSpares(); this.prunePdfKeepAlive() },
   },
   methods: {
     // 批量命令（find_replace 逐命中路径 / apply_house_style）的「第 x/y 处」进度
@@ -6838,18 +6885,24 @@ export default {
       const byId = new Map()
       list.forEach(f => { if (f && f.id != null) byId.set(String(f.id), f) })
       let changed = false
-      const sync = (files) => {
+      const sync = (files, pane) => {
         (files || []).forEach(f => {
           if (!f) return
           const src = byId.get(String(f.id))
-          if (src && src.name && f.name !== src.name) {
+          if (!src) return
+          if (src.name && f.name !== src.name) {
             f.name = src.name
             changed = true
           }
+          if (this.isPdfPreviewFile(f) && Object.prototype.hasOwnProperty.call(src, 'fileSize')) f.fileSize = src.fileSize
+          if (this.isPdfPreviewFile(f) && Object.prototype.hasOwnProperty.call(src, 'wpsFileId') && src.wpsFileId !== f.wpsFileId) {
+            this.evictPdfKeepAlive(pane, f.id, { includeActive: false })
+            f.wpsFileId = src.wpsFileId
+          }
         })
       }
-      sync(this.leftFiles)
-      sync(this.rightFiles)
+      sync(this.leftFiles, 'left')
+      sync(this.rightFiles, 'right')
       if (changed) this.updateWindowTitle()
       this.syncFileTreeSelectionWithActiveTab()
     },
