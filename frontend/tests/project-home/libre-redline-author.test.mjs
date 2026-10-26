@@ -22,6 +22,7 @@ import { createAuthorNameResolver } from '../../src/utils/editorAuthor.js'
 
 const SRC = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
 const BODY = SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+  .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
   .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
 
 // 组件里 `import { getCurrentUser } from '@/utils/auth.js'`（本地缓存，同步）与
