@@ -28,16 +28,16 @@ export default {
 .suggestion-text { flex: 1; min-width: 0; text-align: left; overflow-wrap: anywhere; color: var(--awd-text) !important; font-size: 12px !important; }
 .suggestion-shortcut { flex-shrink: 0; font-size: 10px; }
 .suggestion-dismiss { flex-shrink: 0; width: 22px; }
-.suggestion-settings { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 40px; padding: 6px 0; box-sizing: border-box; }
-.suggestion-toggle { display: inline-flex; align-items: center; gap: 8px; text-align: left; }
+.suggestion-settings { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 36px; padding: 5px 6px; box-sizing: border-box; }
+.suggestion-toggle { display: inline-flex; align-items: center; gap: 8px; text-align: left; border-radius: var(--awd-radius-sm); }
 .suggestion-toggle::before { content: ''; width: 6px; height: 6px; margin-right: 2px; border-radius: 50%; background: var(--awd-text-3); flex-shrink: 0; }
 .suggestion-toggle[aria-pressed="true"]::before { background: var(--awd-accent); }
 .suggestion-settings details { font-size: var(--awd-panel-fs-meta); }
 .suggestion-settings details[open] { flex-basis: 100%; }
 .suggestion-settings details[open] summary { text-align: right; }
 .suggestion-toggle[aria-pressed="true"] { color: var(--awd-accent-text); }
-summary { cursor: pointer; list-style: none; color: var(--awd-text-3); }
+summary { padding: 3px 0 3px 6px; cursor: pointer; list-style: none; color: var(--awd-text-2); }
 summary::-webkit-details-marker { display: none; }
 summary:hover { color: var(--awd-accent-text); }
-details p { max-width: 40em; margin: 5px 0; line-height: 1.6; }
+details p { max-width: 40em; margin: 5px 0 5px 16px; line-height: 1.6; }
 </style>
