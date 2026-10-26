@@ -55,6 +55,8 @@ public class SkillController {
         /** 英文展示名（skill.yml: name_en），英文界面下前端优先用它；缺省回退 name */
         private String nameEn;
         private String description;
+        /** 英文简介（skill.yml: description_en），英文界面下前端优先用它；缺省回退 description */
+        private String descriptionEn;
         private List<String> triggers;
         private List<String> allowedTools;
         private String sourcePluginId;
@@ -150,7 +152,7 @@ public class SkillController {
     public ResponseEntity<Map<String, Object>> listMarket(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         if (AuthController.getUserIdFromSession(sessionId) == null) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("未登录"));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("未登录", "Not signed in")));
         }
         try {
             Map<String, Object> result = ok();
@@ -219,6 +221,7 @@ public class SkillController {
         view.setName(skill.getName());
         view.setNameEn(skill.getNameEn());
         view.setDescription(skill.getDescription());
+        view.setDescriptionEn(skill.getDescriptionEn());
         view.setTriggers(skill.getTriggers());
         view.setAllowedTools(skill.getAllowedTools());
         view.setSourcePluginId(skill.getSourcePluginId());
@@ -232,6 +235,14 @@ public class SkillController {
         if ("desensitize".equals(skill.getId()) && skill.getSourcePluginId() == null) {
             view.setVersion(com.checkba.service.SensitiveService.VERSION);
             view.setDescription(com.checkba.service.SensitiveService.DESCRIPTION);
+        }
+        if (LangText.isEnglish()) {
+            if (skill.getNameEn() != null && !skill.getNameEn().isBlank()) {
+                view.setName(skill.getNameEn());
+            }
+            if (skill.getDescriptionEn() != null && !skill.getDescriptionEn().isBlank()) {
+                view.setDescription(skill.getDescriptionEn());
+            }
         }
         view.setLicense(skill.getLicense());
         view.setCredits(skill.getCredits());

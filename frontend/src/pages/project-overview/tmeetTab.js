@@ -33,7 +33,7 @@ export const tmeetTabMethods = {
     // 未开时，加入当前聚焦的窗格（未分屏时入左窗格）
     const targetPane = this.splitMode ? this.focusedPane : 'left'
     const list = targetPane === 'left' ? this.leftFiles : this.rightFiles
-    const tabName = meeting.subject || '腾讯会议逐字稿'
+    const tabName = meeting.subject || (this.$t ? this.$t('tmeet.defaultTranscriptTabName') : '腾讯会议逐字稿')
     const tab = {
       id,
       tabType: TMEET_TRANSCRIPT_TAB_TYPE,

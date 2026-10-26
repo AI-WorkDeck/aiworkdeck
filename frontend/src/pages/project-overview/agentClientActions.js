@@ -232,7 +232,7 @@ export const agentClientActionMethods = {
                 // 收尾会把未换行的尾行/尾表真正写进文档，同样是 AI 的笔迹
                 const result = await this.libreOfficeExecutor.executeCommand('stream_flush', { __agent: true })
                 if (!result || result.success === false) {
-                    this._docStreamFailReason = result?.error || result?.message || this._docStreamText('docStreamReasonInsertFailed', 'stream_flush 失败')
+                    this._docStreamFailReason = result?.error || result?.message || this._docStreamText('docStreamReasonFlushFailed', 'stream_flush 失败')
                 }
             } catch (e) {
                 this._docStreamFailReason = (e && e.message) || String(e)
@@ -274,9 +274,10 @@ export const agentClientActionMethods = {
      * 或干脆没写——AgentStreamHandler 的 HIDDEN_CONTENT_TAGS 会整段吞掉）。
      */
     // 失败原因要进对话气泡，得走 locale（EN 版不能露中文）；测试壳没有 $t 时退回中文
-    _docStreamText(key, fallback) {
-        const t = typeof this.$t === 'function' ? this.$t('agentStream.' + key) : null
-        return t && t !== 'agentStream.' + key ? t : fallback
+    _docStreamText(key, fallback, params) {
+        const fullKey = 'agentStream.' + key
+        const t = typeof this.$t === 'function' ? this.$t(fullKey, params) : null
+        return t && t !== fullKey ? t : fallback
     },
 
     docStreamFailureReason(payload) {
@@ -310,7 +311,7 @@ export const agentClientActionMethods = {
         try {
             if (!params || !params.fileId) {
                 console.error('[ProjectOverview] No fileId in doc_open_file_sync')
-                await sendEditorResult(conversationId, requestId, false, null, '缺少文件ID')
+                await sendEditorResult(conversationId, requestId, false, null, this._docStreamText('missingFileIdError', '缺少文件ID'))
                 return
             }
 
@@ -323,7 +324,7 @@ export const agentClientActionMethods = {
             const file = await getFileDetail(this.projectId, params.fileId)
             if (!file) {
                 console.error('[ProjectOverview] File not found:', params.fileId)
-                await sendEditorResult(conversationId, requestId, false, null, '文件不存在')
+                await sendEditorResult(conversationId, requestId, false, null, this._docStreamText('fileNotFoundError', '文件不存在'))
                 return
             }
 
@@ -345,7 +346,7 @@ export const agentClientActionMethods = {
 
             if (!editorReady) {
                 console.error('[ProjectOverview] LibreOffice editor not ready after timeout')
-                await sendEditorResult(conversationId, requestId, false, null, '编辑器未就绪')
+                await sendEditorResult(conversationId, requestId, false, null, this._docStreamText('editorNotReadyError', '编辑器未就绪'))
                 return
             }
             // 就绪了但文档没打开（空白占位 + 保存闸落下）：不许接着往里流式落字（dev-board#1018）
@@ -617,7 +618,7 @@ export const agentClientActionMethods = {
     async replyIfEditorLoadFailed(conversationId, requestId) {
         const failed = typeof this.libreLoadFailureOf === 'function' ? this.libreLoadFailureOf(this.libreOfficeExecutor) : null
         if (!failed) return false
-        const msg = '文档未能打开（' + failed.code + '），这一步没有执行；请告知用户并停止对该文档的编辑'
+        const msg = this._docStreamText('editorLoadFailedError', '文档未能打开（' + failed.code + '），这一步没有执行；请告知用户并停止对该文档的编辑', { code: failed.code })
         console.error('[ProjectOverview] editor command refused: document failed to load', failed)
         await sendEditorResult(conversationId, requestId, false,
             { error: msg, code: 'EDITOR_LOAD_FAILED', retryable: false }, msg)
@@ -635,7 +636,7 @@ export const agentClientActionMethods = {
         let prepareAckAttempted = false
         let entryOwnedByAction = phase !== 'prepare'
         try {
-            if (!fileId || !restoreId) throw new Error('检查点恢复缺少文件或操作标识')
+            if (!fileId || !restoreId) throw new Error(this._docStreamText('checkpointMissingIdError', '检查点恢复缺少文件或操作标识'))
             if (phase === 'prepare') {
                 if (entry) {
                     // 旧 prepare 的终态 SSE（reload/abort）丢失后，旧 entry 会一直占住
@@ -646,20 +647,20 @@ export const agentClientActionMethods = {
                     if (entry.restoreId === restoreId || !ownsEntry() || !entry.barrier.conversationId ||
                         !await reconcileCheckpointSaveBarrier(entry.projectId, fileId, getCheckpointRestoreWriteState) ||
                         pending.get(String(fileId))) {
-                        throw new Error('该文档已有检查点恢复进行中')
+                        throw new Error(this._docStreamText('checkpointInProgressError', '该文档已有检查点恢复进行中'))
                     }
                     entry = null
                 }
                 if (checkpointSaveBarrier(this.projectId, fileId) &&
                     !await reconcileCheckpointSaveBarrier(this.projectId, fileId, getCheckpointRestoreWriteState)) {
-                    throw new Error('检查点仍在恢复，请稍后重新加载文档')
+                    throw new Error(this._docStreamText('checkpointStillRestoringError', '检查点仍在恢复，请稍后重新加载文档'))
                 }
                 const instances = [...new Set(Object.values(this._libreRefs || {}).filter(inst =>
                     inst && inst.file && String(inst.file.id) === String(fileId)))]
                 const active = [this.activeFileIdLeft, this.activeFileIdRight].some(id => String(id) === String(fileId))
-                if (active && !instances.length) throw new Error('目标编辑器尚未就绪，未恢复快照')
+                if (active && !instances.length) throw new Error(this._docStreamText('checkpointEditorNotReadyError', '目标编辑器尚未就绪，未恢复快照'))
                 const barrier = beginCheckpointSaveBarrier(this.projectId, fileId, restoreId)
-                if (!barrier) throw new Error('该文档已有检查点恢复进行中')
+                if (!barrier) throw new Error(this._docStreamText('checkpointInProgressError', '该文档已有检查点恢复进行中'))
                 barrier.instances = instances
                 barrier.conversationId = conversationId
                 entry = { restoreId, instances, barrier, projectId: this.projectId, pending }
@@ -668,33 +669,33 @@ export const agentClientActionMethods = {
                 entryOwnedByAction = true
                 for (const inst of instances) {
                     if (typeof inst.prepareCheckpointRestore !== 'function' || !await inst.prepareCheckpointRestore(restoreId)) {
-                        throw new Error('无法暂停目标文档的保存，未恢复快照，请重新打开文档后重试')
+                        throw new Error(this._docStreamText('checkpointPauseSaveFailedError', '无法暂停目标文档的保存，未恢复快照，请重新打开文档后重试'))
                     }
-                    if (!ownsEntry()) throw new Error('检查点恢复已被取消或取代')
+                    if (!ownsEntry()) throw new Error(this._docStreamText('checkpointCancelledError', '检查点恢复已被取消或取代'))
                 }
-                if (!await entry.barrier.drained) throw new Error('此前保存结果不确定，未恢复快照，请核对文件后重试')
-                if (!ownsEntry() || entry.barrier.invalidated) throw new Error('恢复期间目标编辑器已变化，请重新打开文档核对')
+                if (!await entry.barrier.drained) throw new Error(this._docStreamText('checkpointDrainedUncertainError', '此前保存结果不确定，未恢复快照，请核对文件后重试'))
+                if (!ownsEntry() || entry.barrier.invalidated) throw new Error(this._docStreamText('checkpointEditorChangedError', '恢复期间目标编辑器已变化，请重新打开文档核对'))
             } else {
-                if (!entry || entry.restoreId !== restoreId) throw new Error('检查点恢复状态已变化，请重新发起恢复')
+                if (!entry || entry.restoreId !== restoreId) throw new Error(this._docStreamText('checkpointStateChangedError', '检查点恢复状态已变化，请重新发起恢复'))
                 if (phase === 'reload') {
                     const current = Object.values(this._libreRefs || {}).filter(inst =>
                         inst && inst.file && String(inst.file.id) === String(fileId))
                     if (entry.barrier.invalidated || current.some(inst => !entry.instances.includes(inst))) {
-                        throw new Error('恢复期间目标编辑器已变化，请重新打开文档核对')
+                        throw new Error(this._docStreamText('checkpointEditorChangedError', '恢复期间目标编辑器已变化，请重新打开文档核对'))
                     }
                     for (const inst of entry.instances) {
                         if (!current.includes(inst) || !inst.ready || !inst.executor ||
                             !await inst.reloadFromBackend(restoreId) || !ownsEntry() || entry.barrier.invalidated || !inst.executor ||
                             !Object.values(this._libreRefs || {}).includes(inst)) {
-                            throw new Error('快照已写回，但编辑器重载失败，请停止编辑并重新打开文档')
+                            throw new Error(this._docStreamText('checkpointReloadFailedError', '快照已写回，但编辑器重载失败，请停止编辑并重新打开文档'))
                         }
                     }
                 } else if (phase === 'abort') {
                     for (const inst of entry.instances) {
                         if (inst.file && String(inst.file.id) === String(fileId)) inst.failCheckpointRestore(restoreId)
                     }
-                } else throw new Error('未知检查点恢复阶段')
-                if (!ownsEntry()) throw new Error('检查点恢复已被取消或取代')
+                } else throw new Error(this._docStreamText('checkpointUnknownPhaseError', '未知检查点恢复阶段'))
+                if (!ownsEntry()) throw new Error(this._docStreamText('checkpointCancelledError', '检查点恢复已被取消或取代'))
                 endCheckpointSaveBarrier(entry.projectId, fileId, restoreId)
             }
             prepareAckAttempted = phase === 'prepare'
@@ -716,7 +717,7 @@ export const agentClientActionMethods = {
         const currentFileId = typeof this.resolveLibreExecutorFileId === 'function'
             ? this.resolveLibreExecutorFileId(this.libreOfficeExecutor) : null
         if (this._checkpointRestores?.has(String(currentFileId))) {
-            await sendEditorResult(action.conversationId, action.requestId, false, null, '检查点正在恢复，这一步未执行，请等待恢复完成')
+            await sendEditorResult(action.conversationId, action.requestId, false, null, this._docStreamText('checkpointRestoringStepSkippedError', '检查点正在恢复，这一步未执行，请等待恢复完成'))
             return
         }
         console.log('[ProjectOverview] ========== Editor Command Start ==========')
@@ -733,18 +734,18 @@ export const agentClientActionMethods = {
             const booting = typeof this.libreBootingInstances === 'function' ? this.libreBootingInstances() : []
             if (!booting.length) {
                 console.error('[ProjectOverview] No embedded editor available')
-                await sendEditorResult(conversationId, requestId, false, null, '编辑器未就绪，请先打开一个文档')
+                await sendEditorResult(conversationId, requestId, false, null, this._docStreamText('editorNotReadyOpenDocError', '编辑器未就绪，请先打开一个文档'))
                 return
             }
             const outcome = await this.waitLibreExecutorReady(booting, commandAction)
             if (outcome !== 'ready') {
                 if (outcome === 'timeout') {
-                    const msg = '编辑器仍在启动，请稍后重试同一步'
+                    const msg = this._docStreamText('editorStillBootingError', '编辑器仍在启动，请稍后重试同一步')
                     await sendEditorResult(conversationId, requestId, false,
                         { error: msg, code: 'EDITOR_BOOTING', retryable: true }, msg)
                 } else {
                     // 等待期间实例落了失败态 / 被关掉：不再是「启动中」，照旧回未就绪
-                    await sendEditorResult(conversationId, requestId, false, null, '编辑器未就绪，请先打开一个文档')
+                    await sendEditorResult(conversationId, requestId, false, null, this._docStreamText('editorNotReadyOpenDocError', '编辑器未就绪，请先打开一个文档'))
                 }
                 return
             }

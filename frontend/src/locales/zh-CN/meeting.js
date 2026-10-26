@@ -59,10 +59,19 @@ export default {
   pause: '暂停',
   resume: '继续',
   stopRecording: '结束录音',
+  stopShort: '停止',
   saving: '保存中...',
+  savingShort: '保存中',
   backgroundHint: '切到其他页面录音不会中断，可从顶部胶囊随时停止',
   otherProjectRecording: '另一个项目正在录音中，从顶部胶囊停止后即可在这里开始',
   cannotStartRecording: '无法开始录音',
+  noticeTitle: '录音转写告知',
+  noticeCheckLabel: '我已知悉上述处理方式',
+  noticeConfirm: '确认，继续用云端转写',
+  noticeSwitchLocal: '改用本机转写',
+  noticeSaveFailed: '保存失败，稍后重试',
+  noticeBlockBeforeRecording: '开始录音前，看一下上方的转写告知',
+  noticeBlockBeforeUpload: '上传前，看一下上方的转写告知',
 
   // ---- 录音引擎 utils/meetingRecorder.js ----
   alreadyRecording: '已有一场录音在进行中',
@@ -154,4 +163,7 @@ export default {
   deleteDialogBody: '将删除该会议的转写记录与录音文件，不可恢复。确认删除？',
   confirmDelete: '确认删除',
   deleteFailed: '删除失败：{message}',
+  uploadNetworkError: '网络错误',
+  uploadTimeout: '上传超时',
+  uploadPlatformUnsupported: '当前平台不支持录音上传',
 }

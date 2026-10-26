@@ -17,6 +17,15 @@ const FRIENDS_KEY_PREFIX = 'awd_im_friends_v2:'
 const MAX_FRIENDS = 300
 
 const ROLE_LABELS = { OWNER: '负责人', ADMIN: '管理员', MEMBER: '成员' }
+const ROLE_LABELS_EN = { OWNER: 'Owner', ADMIN: 'Admin', MEMBER: 'Member' }
+
+function isEnLang() {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') return true
+    if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') return true
+  } catch (_) { /* ignore */ }
+  return false
+}
 
 function str(value, max = 120) {
   return String(value == null ? '' : value).trim().slice(0, max)
@@ -56,7 +65,7 @@ export function writeImFriends(accountKey, list) {
 
 export function addImFriend(accountKey, input = {}) {
   const name = str(input.name, 64)
-  if (!name) throw Object.assign(new Error('请输入联系人姓名'), { code: 'invalid_params' })
+  if (!name) throw Object.assign(new Error(isEnLang() ? 'Please enter a contact name' : '请输入联系人姓名'), { code: 'invalid_params' })
   const entry = {
     id: 'fr-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     name,
@@ -111,17 +120,19 @@ export async function loadImDirectory({ projectId, deps = {} } = {}) {
   const myAccountId = str(teamData && teamData.myAccountId, 80)
   const accountKey = myAccountId || str(me && (me.id != null ? me.id : me.username), 80) || 'local'
 
+  const en = isEnLang()
+  const roleMap = en ? ROLE_LABELS_EN : ROLE_LABELS
   const organization = team ? {
     id: team.id == null ? '' : String(team.id),
     name: str(team.name, 80),
     myRole,
-    myRoleLabel: ROLE_LABELS[myRole] || '',
+    myRoleLabel: roleMap[myRole] || '',
     members: (Array.isArray(teamData.members) ? teamData.members : [])
       .map((m) => ({
         id: str(m.accountId || m.userId || m.id, 80),
         name: str(m.displayName || m.username || m.accountId, 64),
         role: str(m.role, 16).toUpperCase(),
-        roleLabel: ROLE_LABELS[str(m.role, 16).toUpperCase()] || '成员',
+        roleLabel: roleMap[str(m.role, 16).toUpperCase()] || (en ? 'Member' : '成员'),
         isMe: !!myAccountId && str(m.accountId, 80) === myAccountId,
       }))
       .filter((m) => m.name),
@@ -153,13 +164,13 @@ export async function loadImDirectory({ projectId, deps = {} } = {}) {
     if (!name) continue
     const entry = { id: str(m.userId || m.id || name, 80), name, role }
     if (role === 'CLIENT') clients.push(entry)
-    else projectColleagues.push(Object.assign(entry, { roleLabel: role === 'OWNER' ? '项目负责人' : '项目成员' }))
+    else projectColleagues.push(Object.assign(entry, { roleLabel: role === 'OWNER' ? (en ? 'Project Lead' : '项目负责人') : (en ? 'Project Member' : '项目成员') }))
   }
 
   const friends = readImFriends(accountKey).map((f) => Object.assign({ source: 'personal' }, f))
   for (const c of clients) {
     if (friends.some((f) => f.name === c.name)) continue
-    friends.push({ id: 'client-' + c.id, name: c.name, org: '当前项目客户', roleLabel: '客户', source: 'project' })
+    friends.push({ id: 'client-' + c.id, name: c.name, org: en ? 'Current Project Client' : '当前项目客户', roleLabel: en ? 'Client' : '客户', source: 'project' })
   }
 
   const isTeamOwner = myRole === 'OWNER'

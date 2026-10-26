@@ -285,13 +285,13 @@ export default {
     _toCardItem(raw) {
       const scope = raw.scope || 'D'
       const badgeMap = {
-        D: { text: '文\n本', tone: 'neutral', label: '文本' },
-        P: { text: '项\n目', tone: 'info', label: '项目' },
-        U: { text: '用\n户', tone: 'info', label: '用户' }
+        D: { text: this.$t('panels.vpScopeBadgeDoc'), tone: 'neutral', label: this.$t('panels.vpScopeLabelDoc') },
+        P: { text: this.$t('panels.vpScopeBadgeProj'), tone: 'info', label: this.$t('panels.vpScopeLabelProj') },
+        U: { text: this.$t('panels.vpScopeBadgeUser'), tone: 'info', label: this.$t('panels.vpScopeLabelUser') }
       }
       const badge = badgeMap[scope] || badgeMap.D
       const occurrences = raw.occurrences || 0
-      const meta = occurrences ? `${badge.label} · ${occurrences}处` : badge.label
+      const meta = occurrences ? this.$t('panels.vpScopeMetaWithOccurrences', { label: badge.label, count: occurrences }) : badge.label
       return {
         key: raw.key,
         scope,

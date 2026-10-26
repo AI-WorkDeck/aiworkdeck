@@ -9,7 +9,7 @@
     >
       <template #actions>
         <view class="intake-top-actions">
-          <button class="intake-btn primary" :disabled="busy" @tap="onOpenCloudWorkflow">律所云端利冲协作</button>
+          <button class="intake-btn primary" :disabled="busy" @tap="onOpenCloudWorkflow">{{ $t('account.caseCloudWorkflowBtn') }}</button>
           <button class="intake-btn primary" @tap="openNewIntakeForm">
             {{ $t('account.caseIntakeNewBtn') }}
           </button>
@@ -21,7 +21,7 @@
           </button>
         </view>
       </template>
-      <text class="field-label">下方为本机收案与财务台账；本机征询记录不表示已送达同事。指定委员、本人确认和终审请进入律所云端利冲协作。</text>
+      <text class="field-label">{{ $t('account.caseLocalLedgerDisclaimer') }}</text>
 
       <!-- 顶部子视图切换胶囊 -->
       <view class="intake-subnav">
@@ -179,7 +179,7 @@
                 :key="'phit-' + idx"
                 class="alert-hit-row"
               >
-                <text class="hit-rule">{{ hit.statutoryCitation || hit.ruleCitation || '《全国律协执业行为规范》第51/52条' }}</text>
+                <text class="hit-rule">{{ hit.statutoryCitation || hit.ruleCitation || $t('account.caseDefaultRuleCitation') }}</text>
                 <text class="hit-desc">{{ hit.description || hit.ruleTitle || hit.matchedMatterTitle || hit.conflictingMatterTitle }}</text>
               </view>
               <text v-if="previewResult.feeComplianceWarning" class="fee-warning-line">
@@ -238,7 +238,7 @@
                 :key="'hit-' + hIdx"
                 class="alert-hit-row"
               >
-                <text class="hit-rule">{{ hit.statutoryCitation || hit.ruleCitation || '《全国律协执业行为规范》第51/52条' }}</text>
+                <text class="hit-rule">{{ hit.statutoryCitation || hit.ruleCitation || $t('account.caseDefaultRuleCitation') }}</text>
                 <text class="hit-desc">{{ hit.description || hit.ruleTitle || hit.matchedMatterTitle || hit.conflictingMatterTitle }}</text>
               </view>
               <text v-if="item.feeComplianceWarning" class="fee-warning-line">
@@ -267,7 +267,7 @@
 
       <!-- 子视图 2：利冲审查与协同放行 -->
       <view v-else-if="activeSubView === 'clearance'" class="subview-body">
-        <text class="block-desc">本页操作只登记本机历史核查结果，不代表其他律师或云端指定委员已确认。本人确认请进入上方「律所云端利冲协作」。</text>
+        <text class="block-desc">{{ $t('account.caseClearanceLocalDisclaimer') }}</text>
         <!-- 待我放行的冲突案件征询 -->
         <view class="clearance-block">
           <text class="block-title">{{ $t('account.caseMyClearanceTitle') }}</text>
@@ -278,12 +278,12 @@
           <view v-for="clr in lawyerClearances" :key="clr.id" class="clearance-card">
             <view class="clearance-head">
               <text class="clearance-title">
-                {{ clr.intakeTitle || clr.title || ('收案 #' + clr.intakeId) }}
+                {{ clr.intakeTitle || clr.title || $t('account.caseIntakeItemFallback', { id: clr.intakeId }) }}
               </text>
               <text class="status-badge">{{ clr.decision || clr.status || 'PENDING' }}</text>
             </view>
             <text class="clearance-meta">
-              {{ clr.ruleCitation || '《全国律协执业行为规范》第51/52条' }} ·
+              {{ clr.ruleCitation || $t('account.caseDefaultRuleCitation') }} ·
               {{ clr.conflictDescription || clr.conflictingMatterTitle || clr.reason || '' }}
             </text>
             <view class="clearance-action-bar">
@@ -460,7 +460,7 @@
             <text>{{ $t('account.noRecords') }}</text>
           </view>
           <view v-for="inv in invoices" :key="'inv-' + inv.id" class="ledger-row">
-            <text class="ledger-badge">发票</text>
+            <text class="ledger-badge">{{ $t('account.caseLedgerBadgeInvoice') }}</text>
             <text class="ledger-main">{{ inv.invoiceNo || inv.invoiceNumber || ('INV-' + inv.id) }} · {{ inv.payerTitle || inv.buyerName || inv.matterTitle }}</text>
             <text class="ledger-amount">{{ formatAmountCents(inv.amountCents, inv.amountWan) }}</text>
             <text class="status-badge">{{ inv.status || 'ISSUED' }}</text>
@@ -474,8 +474,8 @@
             </button>
           </view>
           <view v-for="col in collections" :key="'col-' + col.id" class="ledger-row">
-            <text class="ledger-badge collected">到账</text>
-            <text class="ledger-main">{{ col.payerName || col.matterTitle }} · {{ col.referenceNo || col.paymentMethod || '银行转账' }}</text>
+            <text class="ledger-badge collected">{{ $t('account.caseLedgerBadgeCollected') }}</text>
+            <text class="ledger-main">{{ col.payerName || col.matterTitle }} · {{ col.referenceNo || col.paymentMethod || $t('account.caseDefaultPaymentMethod') }}</text>
             <text class="ledger-amount">{{ formatAmountCents(col.amountCents, col.amountWan) }}</text>
             <text class="status-badge">{{ col.erpSyncStatus || 'MANUAL_RECORDED' }}</text>
           </view>
@@ -493,13 +493,14 @@ import {
   ensureLawFirmPlugin,
   getLawFirmFinanceCsvUrl,
 } from '@/services/api.js'
+import { t } from '@/i18n/index.js'
 
-const DEFAULT_STEP_LABELS = [
-  '① 提交收案申请',
-  '② 自动利冲检索',
-  '③ 关联律师站内信放行',
-  '④ 利冲委员终审',
-  '⑤ 正式立案并建项',
+const DEFAULT_STEP_KEY_LIST = [
+  'account.caseStep1Submit',
+  'account.caseStep2AutoScan',
+  'account.caseStep3LawyerClearance',
+  'account.caseStep4CommitteeReview',
+  'account.caseStep5Filed',
 ]
 
 export default {
@@ -518,8 +519,8 @@ export default {
       previewResult: null,
       intakeForm: {
         title: '',
-        practiceArea: '商事争议解决',
-        departmentName: '争议解决部',
+        practiceArea: t('account.caseDefaultPracticeArea'),
+        departmentName: t('account.caseDefaultDepartment'),
         leadLawyerName: '',
         clientName: '',
         counterpartyName: '',
@@ -593,7 +594,7 @@ export default {
         uni.$emit('awd:market-changed')
         uni.$emit('awd:open-lawfirm-plugin', { tab: 'conflicts' })
       } catch (e) {
-        uni.showToast({ title: e?.message || '打开律所协作失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.caseOpenCloudWorkflowFailedToast'), icon: 'none' })
       } finally { this.busy = false }
     },
     unwrapData(res) {
@@ -631,7 +632,7 @@ export default {
         REJECTED_CONFLICT: this.$t('account.statusRejectedConflict'),
         REJECTED: this.$t('account.statusRejectedConflict'),
       }
-      return map[status] || status || '已提交'
+      return map[status] || status || this.$t('account.caseStatusSubmittedFallback')
     },
     resolveProgressSteps(item) {
       if (Array.isArray(item.progressSteps) && item.progressSteps.length) {
@@ -640,7 +641,7 @@ export default {
       const status = item.status || ''
       const isFiled = status === 'APPROVED_FILED' || status === 'FILED'
       const isRejected = status === 'REJECTED_CONFLICT' || status === 'REJECTED'
-      return DEFAULT_STEP_LABELS.map((label, idx) => {
+      return DEFAULT_STEP_KEY_LIST.map((key, idx) => {
         let state = 'pending'
         if (isFiled) {
           state = 'done'
@@ -653,21 +654,21 @@ export default {
         } else if (idx === 0) {
           state = 'done'
         }
-        return { key: 's' + (idx + 1), label, state }
+        return { key: 's' + (idx + 1), label: this.$t(key), state }
       })
     },
     formatAmountCents(cents, wanFallback) {
       if (typeof cents === 'number' && Number.isFinite(cents)) {
-        return '¥' + (cents / 1000000).toFixed(2) + '万'
+        return this.$t('account.caseAmountWanCurrency', { amount: (cents / 1000000).toFixed(2) })
       }
       if (wanFallback !== undefined && wanFallback !== null && wanFallback !== '') {
-        return '¥' + Number(wanFallback).toFixed(2) + '万'
+        return this.$t('account.caseAmountWanCurrency', { amount: Number(wanFallback).toFixed(2) })
       }
-      return '¥0.00万'
+      return this.$t('account.caseAmountWanCurrency', { amount: '0.00' })
     },
     formatCentsYuan(cents) {
       const n = Number(cents || 0)
-      return '¥' + (n / 1000000).toFixed(2) + '万'
+      return this.$t('account.caseAmountWanCurrency', { amount: (n / 1000000).toFixed(2) })
     },
     formatPercent(val) {
       const n = Number(val || 0)
@@ -692,7 +693,7 @@ export default {
         const res = await requestLawFirmAction('conflictPreview', this.buildIntakePayload(), this.projectId)
         this.previewResult = this.unwrapData(res)
       } catch (e) {
-        uni.showToast({ title: e?.message || '预检失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.casePreviewFailedToast'), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -718,7 +719,7 @@ export default {
         this.intakeForm.relatedPartyName = ''
         uni.showToast({ title: this.$t('account.caseSubmitSuccessToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || '提交失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.caseSubmitFailedToast'), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -738,7 +739,7 @@ export default {
         else await this.loadOverview()
         uni.showToast({ title: this.$t('account.caseClearanceSavedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || '操作失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.caseActionFailedToast'), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -769,7 +770,7 @@ export default {
         else await this.loadOverview()
         uni.showToast({ title: this.$t('account.caseCommitteeSavedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || '终审操作失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.caseCommitteeFailedToast'), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -799,7 +800,7 @@ export default {
         this.invoiceForm.amountWan = ''
         uni.showToast({ title: this.$t('account.caseInvoiceSubmittedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || '提交发票失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.caseSubmitInvoiceFailedToast'), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -817,7 +818,7 @@ export default {
         else await this.loadOverview()
         uni.showToast({ title: this.$t('account.caseInvoiceIssuedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || '开具发票失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.caseIssueInvoiceFailedToast'), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -842,7 +843,7 @@ export default {
         this.collectionForm.referenceNo = ''
         uni.showToast({ title: this.$t('account.caseCollectionSavedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || '登记收款失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.caseRecordCollectionFailedToast'), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -856,7 +857,7 @@ export default {
         else await this.loadOverview()
         uni.showToast({ title: this.$t('account.caseErpSyncedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || '财务同步失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.caseSyncErpFailedToast'), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -899,7 +900,7 @@ export default {
         else await this.loadOverview()
         uni.showToast({ title: this.$t('account.caseDemoSeededToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || '加载演示数据失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.caseSeedDemoFailedToast'), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -912,7 +913,7 @@ export default {
         uni.$emit('awd:open-lawfirm-plugin')
         uni.showToast({ title: this.$t('account.casePluginOpenedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || '打开插件失败', icon: 'none' })
+        uni.showToast({ title: e?.message || this.$t('account.caseOpenPluginFailedToast'), icon: 'none' })
       } finally {
         this.busy = false
       }

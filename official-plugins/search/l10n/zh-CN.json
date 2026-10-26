@@ -1,0 +1,5 @@
+{
+  "plugin.name": "项目搜索",
+  "plugin.description": "按正文、标签搜索项目文件，并定位到文档。",
+  "view.main.name": "项目搜索"
+}

@@ -9,7 +9,9 @@
 # 中文姓名默认采用百家姓、复姓和人物上下文识别；补充敏感词是可选入口（dev-board#599）。
 id: desensitize
 name: 脱敏
+name_en: Redaction
 description: 本地规则脱敏：公司、中文姓名、注册地址及正文地址、统一社会信用代码、律师执业证号等自动识别，地址仅保留行政层级，支持补充词语、预览与编号替换；校验失败的证件号单独提示不处理；编辑副本后凭加密映射和密码复敏。引擎随桌面端更新，不调用大模型。
+description_en: "Local rule-based redaction: automatically identifies company names, Chinese personal names, registered and body addresses, unified social credit codes, and lawyer license numbers; retains only administrative levels for addresses; supports custom terms, preview, and numbered replacement; restores redacted copies with an encrypted mapping table and password without calling an LLM."
 
 author: AI Workdeck
 author_url: https://www.aiworkdeck.com
