@@ -601,7 +601,11 @@ Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Ac
 
 独立 `LocalCoreGateway` 保持公开端口，Spring 私有 connector 使用随机端口，配置中的 server.port 和回调 URL 仍用公开端口。复用本机准入、CORS、源代码声明过滤器；文件通过现有 ResourceHttpRequestHandler 支持 HEAD/Range/416。关闭独立 Tomcat 必须 stop 后 destroy，否则容器 await 线程会使 JVM 退出不完。未知路由转交完整后端前先释放 CORE lease，不能持 lease 等待交权。
 
-兼容候选另有较窄的「文档路由就绪」门槛：所有 runners 已结束后的 Ready 事件先显式完成 `OrphanParentReconciler`（同次启动只执行一次，失败不提前放行），再允许既有核心 GET/HEAD、内容协议 GET/HEAD/PUT 与 receipt GET/DELETE 经原 MVC 访问。尚未完成的普通 Ready 回调仍挡住其他业务路由；两条精确健康 GET/HEAD 经原 MVC 就绪检查返回503，不能据端口可用提前报UP。该阶段保留原本机准入、控制器鉴权、内容事务和版本锁，保存后的 AI/标签副作用仍等完整 Ready。启动失败/关闭会同时撤销文档准入；无 gateway 的 legacy/首次安装/feature-off 不触发额外修复或提前路由。仅解决 Ready 后半段：handoff→私有 connector 启动与 runners 的等待仍存在。`LocalCoreDocumentReadyTest` 用随机本机端口、受控阻塞的 Ready listener、真实 MVC 与 H2 内容发布验证；版本服务使用替身，不能据此称完整 JPA/JGit 或正常负载提速已验。
+资格化候选在 CORE leases 完全排空、真实 JPA/版本交接成功且状态已为 JPA 后，通过独立 `onJpaAvailable → jpaDocumentsReady` 发布本地文档能力；DRAINING 仍拒绝新准入。Gateway 只将精确文档方法/路由交给该能力，复用原 H2 的只读/内容协议实现；内容发布此时已绑定真实 `WorkSessionService` 项目锁和 JGit receipt 交接，不需要等私有 Servlet、插件初始化或后续 runners。未知业务接口仍等完整后台，full-health仍503，effects仍到完整Ready后才安装。失败/关闭撤销本地JPA准入，不能退回CORE。
+
+该并行窗口的 `MediaFileTypeReconciler`、`OrphanParentReconciler` 在候选开启时使用同一项目锁：外层只发现项目/文件ID，锁内重新查询实体后才修改，不能把锁外旧实体merge回去覆盖刚保存的file_size/updated_at。资格与schema契约不变；feature-off保留原迁移路径。`LocalCoreJpaContinuityTest` 使用真实Spring Data JPA、H2、项目锁、JGit和HTTP，在没有私有Servlet/完整Ready的场景验证保存与before-image baseline；受控暂停迁移的旧实体发现查询，再并发保存，核验两种迁移不覆盖新元数据。此测试不等于全产品正常负载性能或旧数据库升级验收。
+
+兼容候选另有较窄的「文档路由就绪」门槛：所有 runners 已结束后的 Ready 事件先显式完成 `OrphanParentReconciler`（同次启动只执行一次，失败不提前放行），再允许既有核心 GET/HEAD、内容协议 GET/HEAD/PUT 与 receipt GET/DELETE 经原 MVC 访问。尚未完成的普通 Ready 回调仍挡住其他业务路由；两条精确健康 GET/HEAD 经原 MVC 就绪检查返回503，不能据端口可用提前报UP。该阶段保留原本机准入、控制器鉴权、内容事务和版本锁，保存后的 AI/标签副作用仍等完整 Ready。启动失败/关闭会同时撤销文档准入；无 gateway 的 legacy/首次安装/feature-off 不触发额外修复或提前路由。这条门槛仅负责切换到私有 MVC；更早的 JPA 本地文档能力见上段。`LocalCoreDocumentReadyTest` 用随机本机端口、受控阻塞的 Ready listener、真实 MVC 与 H2 内容发布验证；版本服务使用替身，不能据此称完整 JPA/JGit 或正常负载提速已验。
 
 `/api/desktop/startup-health` 的 UP/phase=core 只表示早期业务读取可用，原 `/api/desktop/health` 此时仍是503。phase=full 与完整健康必须等 ACCEPTING_TRAFFIC，不能只看 ApplicationReadyEvent 或 FactoryBean 代理。桌面首屏只等 startup-health；完整后端在原启动 deadline 内以最多500ms周期检测，确认完整健康后恢复10s。新路由只有明确404才兼容旧健康链，dev 的 wizard 同样不能覆盖已存在的503。健康结果、overlay 成功/失败均绑定实际 launch/process，迟到旧结果不能给新启动记成功；内部 launch 含 child，不得放入 renderer IPC。
 

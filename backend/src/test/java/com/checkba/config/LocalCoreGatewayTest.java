@@ -16,12 +16,43 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class LocalCoreGatewayTest {
     private final HttpClient client = HttpClient.newHttpClient();
+
+    @Test void jpaLocalCapabilityWaitsForDrainAndWakesOnlyDocumentRequests() throws Exception {
+        var owner = new LocalCoreOwnership(); var lease = owner.acquireCoreLease();
+        var calls = new AtomicInteger();
+        try (var gateway = new LocalCoreGateway(0, owner, (q, r) -> false, "", false, Duration.ofMillis(400))) {
+            LocalCoreGateway.CoreHandler documents = (q, r) -> { calls.incrementAndGet(); r.getWriter().write("JPA document"); return true; };
+            assertThrows(IllegalStateException.class, () -> gateway.jpaDocumentsReady(documents));
+            var drained = CompletableFuture.runAsync(() -> {
+                try { owner.drainAndHandoff(Duration.ofSeconds(2), () -> {}); }
+                catch (Exception failure) { throw new RuntimeException(failure); }
+            });
+            long limit = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+            while (owner.state() == LocalCoreOwnership.State.CORE && System.nanoTime() < limit) Thread.onSpinWait();
+            assertEquals(LocalCoreOwnership.State.DRAINING, owner.state());
+            assertThrows(IllegalStateException.class, () -> gateway.jpaDocumentsReady(documents));
+            var waiting = client.sendAsync(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + gateway.port()
+                    + "/api/document/generator/settings")).build(), HttpResponse.BodyHandlers.ofString());
+            assertThrows(TimeoutException.class, () -> waiting.get(30, TimeUnit.MILLISECONDS));
+            lease.close(); drained.get(2, TimeUnit.SECONDS);
+            gateway.jpaDocumentsReady(documents);
+            assertEquals("JPA document", waiting.get(1, TimeUnit.SECONDS).body());
+            assertEquals(503, send(gateway, "PUT", "/api/document/generator/settings").statusCode());
+            assertEquals(503, send(gateway, "GET", "/api/unknown").statusCode());
+            assertEquals(1, calls.get());
+            gateway.backendFailed();
+            assertEquals(503, send(gateway, "GET", "/api/document/generator/settings").statusCode());
+            assertThrows(IllegalStateException.class, () -> gateway.jpaDocumentsReady(documents));
+            assertEquals(1, calls.get());
+        } finally { lease.close(); }
+    }
 
     @Test void documentReadyOnlyReleasesExactMethodsAndPathsUntilFullReadiness() throws Exception {
         var owner = new LocalCoreOwnership(); owner.drainAndHandoff(Duration.ZERO, () -> {});
