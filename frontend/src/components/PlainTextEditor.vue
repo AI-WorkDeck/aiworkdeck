@@ -371,12 +371,15 @@ export default {
       if (this._discarding) return false
       if (this.saving) { this.scheduleSave(); return false }
       const seq = this._seq
+      const savedFileId = this.fileRef()
+      const savedProjectId = this.projectId
       const content = this._view.state.doc.toString()
       this.saving = true
       try {
         // 句柄留给 flushSave：关闭前必须等这一次真正结束，不能只看 saving 标志
         this._inflight = this.uploadContent(content)
         await this._inflight
+        uni.$emit('awd:file-saved', { projectId: savedProjectId, fileId: savedFileId })
         this.saveFailed = false
         // 保存期间又有输入的话保持脏、让防抖继续跑；没有才清脏
         if (this._seq === seq) this.dirty = false
