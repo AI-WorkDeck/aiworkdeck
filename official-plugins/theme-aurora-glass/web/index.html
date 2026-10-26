@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>深海极光 · 冰刃琉璃</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--awd-font-sans, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif);
+      background: var(--awd-bg, #EFF5FA);
+      color: var(--awd-text, #0F1E2E);
+      padding: 24px;
+      line-height: 1.6;
+    }
+    .card {
+      background: var(--awd-surface, #F9FCFF);
+      border: 1px solid var(--awd-border, #C9DCEB);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: var(--awd-shadow-sm, 0 1px 2px rgba(0,0,0,0.06));
+    }
+    .title { font-size: 20px; font-weight: 600; margin: 10px 0 6px; }
+    .subtitle { color: var(--awd-text-2, #465A70); font-size: 13px; margin-bottom: 16px; }
+    .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+    .swatch { border: 1px solid var(--awd-border, #C9DCEB); border-radius: 8px; padding: 12px; font-size: 12px; }
+    .swatch-dot { width: 28px; height: 28px; border-radius: 50%; margin-bottom: 8px; border: 1px solid rgba(128,128,128,0.25); }
+    .badge {
+      display: inline-block; padding: 3px 10px; border-radius: 999px;
+      background: var(--awd-accent-soft, #E0F1FC); color: var(--awd-accent-text, #026199);
+      font-size: 12px; font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">UI 皮肤插件 · Skin 04</span>
+    <h1 class="title">深海极光 · 冰刃琉璃</h1>
+    <p class="subtitle">静谧深海蓝底与冰青磨砂琉璃交织，紫水晶星核凝聚专注，适合长时间高密度卷宗审阅。</p>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch-dot" style="background:#EFF5FA"></div><strong>冰川晨光</strong><div>#EFF5FA</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#026AA7"></div><strong>冰青琉璃</strong><div>#026AA7</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#8B5CF6"></div><strong>紫晶星核</strong><div>#8B5CF6</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#38BDF8"></div><strong>极光流青</strong><div>#38BDF8</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#0B131E"></div><strong>静谧深海</strong><div>#0B131E</div></div>
+    </div>
+  </div>
+  <script src="/api/plugins/sdk/awd-plugin-sdk.js"></script>
+</body>
+</html>

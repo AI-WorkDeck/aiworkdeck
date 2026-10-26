@@ -120,6 +120,8 @@ export default {
   appearanceLight: 'Light',
   appearanceDark: 'Dark',
   appearanceSystem: 'Follow system',
+  skinSectionTitle: 'Theme Skin',
+  skinDefaultName: 'Oriental Serenity (Default)',
   walletChipTitle: 'Credits balance and membership tier; click to open account settings',
   walletMenuLabel: 'Account and usage',
   trialInfo: 'About the Trial',

@@ -302,6 +302,8 @@ public class PluginService {
         private List<TemplateDecl> templates;
         /** 样式画像（规范 v2.9 P4）：styleProfile v1 JSON，可被选为全局默认画像 */
         private List<StyleProfileDecl> styleProfiles;
+        /** 外观皮肤主题（规范 v2.11）：双模式（light/dark）--awd-* 语义令牌与字体/动效预设 */
+        private List<ThemeDecl> themes;
         /** 能力实现（规范 v2.10 §15）：把插件目录里的一份实现挂进宿主的某个能力槽 */
         private List<CapabilityDecl> capabilities;
         private List<McpServerDecl> mcpServers;
@@ -368,6 +370,15 @@ public class PluginService {
     public static class StyleProfileDecl {
         private String id;
         private String name;
+        private String file;
+    }
+
+    /** 一条外观皮肤主题声明（file 指向插件目录内的皮肤令牌 JSON） */
+    @lombok.Data
+    public static class ThemeDecl {
+        private String id;
+        private String name;
+        private String description;
         private String file;
     }
 
@@ -1306,6 +1317,19 @@ public class PluginService {
                     valid.add(sp);
                 }
                 meta.getContributes().setStyleProfiles(valid);
+            }
+            if (meta.getContributes().getThemes() != null) {
+                List<ThemeDecl> valid = new ArrayList<>();
+                for (ThemeDecl th : meta.getContributes().getThemes()) {
+                    if (th == null || th.getId() == null || !PACK_ID.matcher(th.getId()).matches()
+                            || !isSafeRelFile(th.getFile())) {
+                        log.warn("Plugin {} theme with invalid id/file ({}), dropped",
+                                meta.getId(), th == null ? null : th.getId());
+                        continue;
+                    }
+                    valid.add(th);
+                }
+                meta.getContributes().setThemes(valid);
             }
             // contributes.capabilities（规范 v2.10 §15）：capability 槽 id 点分、id 过 kebab、
             // kind 三选一、entry 是不逃逸的相对路径、protocol 必填。非法条目丢弃并告警——

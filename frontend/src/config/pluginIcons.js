@@ -37,6 +37,21 @@ export const PLUGIN_GLYPH_MAP = Object.freeze({
     'M17 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
   ],
   'plugin-dev': ['M9 8l-5 4 5 4', 'M15 8l5 4-5 4', 'M13 5l-2 14'],
+  'theme-inkwash-zen': [
+    'M12 3a9 9 0 1 0 8.5 6.1',
+    'M18 3c-2.5 1.5-4.5 4.2-5 7.5 2.8-.4 5.3-2.2 6.8-4.7',
+    'M12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z',
+  ],
+  'theme-anime-twilight': [
+    'M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4L12 3Z',
+    'M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1Z',
+    'M4 19c4-3 9-4.5 16-5',
+  ],
+  'theme-aurora-glass': [
+    'M12 2L4.5 9.5 12 22l7.5-12.5L12 2Z',
+    'M4.5 9.5h15',
+    'M12 2v20',
+  ],
 })
 
 export function normalizePluginKey(rawId) {
