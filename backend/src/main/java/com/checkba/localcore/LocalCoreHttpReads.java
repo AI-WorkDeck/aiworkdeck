@@ -5,7 +5,9 @@ package com.checkba.localcore;
 import com.checkba.service.DeviceTokenService;
 import com.checkba.service.LicenseService;
 import com.checkba.service.account.AccountService;
+import com.checkba.service.document.DocumentGeneratorSettings;
 import com.checkba.service.site.SiteProfileService;
+import com.checkba.util.ProductIdentity;
 
 import javax.sql.DataSource;
 import java.net.URLDecoder;
@@ -36,7 +38,8 @@ public final class LocalCoreHttpReads {
     /** Advertised to the desktop scheduler; this does not grant access to any of these routes. */
     public static final List<String> READ_PATHS = List.of("/api/license/status", "/api/local-identity/status",
             "/api/local-identity/candidates", "/api/auth/me", "/api/projects/my", "/api/projects/:id",
-            "/api/projects/:id/members", "/api/projects/:id/files", "/api/files/:id/download");
+            "/api/projects/:id/members", "/api/projects/:id/files", "/api/files/:id/download",
+            "/api/document/generator/settings");
     private static final Pattern PROJECT = Pattern.compile("/api/projects/([^/]+)(?:/(members|files))?");
     private static final Pattern DOWNLOAD = Pattern.compile("/api/files/([^/]+)/download");
     private final LocalCoreStore store;
@@ -79,7 +82,8 @@ public final class LocalCoreHttpReads {
         String path = request.path();
         var project = PROJECT.matcher(path);
         var download = DOWNLOAD.matcher(path);
-        boolean anonymous = List.of("/api/license/status", "/api/local-identity/status", "/api/local-identity/candidates").contains(path);
+        boolean anonymous = List.of("/api/license/status", "/api/local-identity/status", "/api/local-identity/candidates",
+                "/api/document/generator/settings").contains(path);
         if (!anonymous && !path.equals("/api/auth/me") && !path.equals("/api/projects/my")
                 && !project.matches() && !download.matches()) return Optional.empty();
         try {
@@ -94,6 +98,7 @@ public final class LocalCoreHttpReads {
             if (path.equals("/api/license/status")) return Optional.of(json(200, licenseStatus()));
             if (path.equals("/api/local-identity/status")) return Optional.of(json(200, identityStatus()));
             if (path.equals("/api/local-identity/candidates")) return Optional.of(json(200, identityCandidates()));
+            if (path.equals("/api/document/generator/settings")) return Optional.of(json(200, generatorSettings()));
             if (path.equals("/api/auth/me")) return Optional.of(json(200, Map.of("code", 0, "data", currentUser())));
             if (path.equals("/api/projects/my")) {
                 List<Map<String, Object>> cards = store.projectCards();
@@ -120,6 +125,18 @@ public final class LocalCoreHttpReads {
         } catch (LocalCoreStore.LocalCoreException e) {
             return Optional.of(error(e.status(), e.code()));
         }
+    }
+
+    private Map<String, Object> generatorSettings() throws SQLException {
+        // Saving already uses the core content protocol. Its optional metadata setting must not
+        // pull that save back behind JPA; retain DocumentGeneratorSettings' null/default semantics.
+        String value = null;
+        try (var c = database.getConnection(); var s = c.prepareStatement("SELECT \"value\" FROM system_setting WHERE config_key=?")) {
+            s.setString(1, DocumentGeneratorSettings.KEY_ENABLED);
+            try (var r = s.executeQuery()) { if (r.next()) value = r.getString(1); }
+        }
+        return Map.of("code", 0, "enabled", Boolean.parseBoolean(value == null ? "true" : value),
+                "application", ProductIdentity.applicationName());
     }
 
     private Map<String, Object> licenseStatus() {

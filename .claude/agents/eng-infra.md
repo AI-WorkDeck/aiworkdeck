@@ -526,10 +526,10 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
   （2026-08 改 Ollama 设置键时踩过：测试报 expected qwen3:14b but was qwen3-vl:8b，`javap` 确认
   测试类里内联的还是老键名）。CI 是 clean build 所以只坑本地。
 - **删「零引用」的 Spring bean 前先想有没有 `@ConditionalOnMissingBean` 角色**：
-  `service/ai/DynamicContentRetriever` 全仓 grep 不到调用方，但它靠存在本身压住了 langchain4j
-  `RagAutoConfig`——删掉后自动配置自己造 `contentRetriever`，而本项目有两个
-  `EmbeddingStore<TextSegment>`，全部 `@SpringBootTest` 一起 NoUniqueBeanDefinition 起不来
-  （2026-08 清理孤儿类时踩过，16 个 context 加载失败）。`DesktopContextSmokeTest` 是这条的护栏。
+  2026-08 清理 `service/ai/DynamicContentRetriever` 时，langchain4j `RagAutoConfig` 因缺少该 bean
+  自造 `contentRetriever`，但项目有两个 `EmbeddingStore<TextSegment>`，导致16个 context
+  因 NoUniqueBeanDefinition 起不来。当前启动候选已移除通用 starter，保留显式检索器；
+  重新引入自动装配时仍须核对这项依赖。`DesktopContextSmokeTest` 保留为容器装配护栏。
 - **`@Table` 的 `indexes` / `uniqueConstraints` 里必须写 snake_case 物理列名**：这两处不参与
   PhysicalNamingStrategy 的驼峰转换（本仓没配自定义策略，用 Spring Boot 默认的
   CamelCaseToUnderscoresNamingStrategy，字段 `projectId` 落成列 `project_id`）。
@@ -605,7 +605,13 @@ Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Ac
 
 完整 UI 曾暴露 HTTP/1.1 六连接饥饿：六个非早期接口在网关等完整后端，使文件树在浏览器排队约4秒，真正读取仅约13ms。`backend-request-gate.js` 在主窗 session 的 onBeforeRequest 中排队这些请求，保留早期 GET/HEAD 与 OPTIONS 通道；能力清单只来自 build 校验成功的 core 健康响应。未知旧后端保持原传输；换 launch、端口、退出或到截止时取消待发请求，不重放到新进程。不要同时给同一 session 安装第二个 onBeforeRequest listener。实际隔离 UI 文件树4019→150ms只属诊断，不替代正常负载正式对照。
 
+排队请求必须按 Chromium request id 在 `onErrorOccurred` / `onCompleted` 中移除，不能再调用已取消请求的回调。Electron 30.5.1 的真实 XHR 超时探针可使旧实现触发 native dangling-pointer 崩溃，JS try/catch 无法捕获；见上游 [electron#42505](https://github.com/electron/electron/issues/42505)。队列同时拥有这三个 webRequest 监听器，清理时一并注销，不能被其他监听器覆盖。`npm --prefix desktop run test:backend-request-gate-e2e` 用隔离 profile、随机本机端口和真实 Electron 验证超时不重放、后续请求成功及进程退出；不使用关闭崩溃检查的启动参数。
+
+后台工具和 RAG 使用项目显式装配；通用 `langchain4j-spring-boot-starter` 已替换为同版本核心库，避免无 `@AiService` 接口时仍进行额外类扫描，Ollama starter 保留。`WebTools` 在 local-mode 不启动浏览器预热线程，实际 browse 请求仍沿原路径创建 Playwright；不能把这项改动称为已验证首次网页读取无额外成本。必要数据恢复、完整仓库校验及 Ready 回调顺序保持原样。
+
 候选的 `LocalCoreContentHttp` 在 CORE/JPA 两阶段提供同一带版本的 GET/HEAD/PUT 与 receipt GET/DELETE 协议。下载快照绑定实际字节的 SHA、文件 UID 与本机身份；上传完整收完后才取得项目版本锁、publication 锁和短数据库事务。持久操作 UUID/回执/取消栅栏阻止重复与迟到写入，任何不确定结果不得降级为旧无条件 POST。客户端先探测数字 `coreContentProtocol=1`，元数据跟随准确的 ArrayBuffer，在模型装入成功后绑定；重载先解决或取消旧保存。早期能力一旦已发布，交接后不能因 schema proof 失效静默撤回。
+
+保存前的 `GET /api/document/generator/settings` 同样属于早期只读能力：直接读取原 H2 的开关，产品名仍取 `ProductIdentity`，保留原控制器的缺省值和匿名读取规则；PUT 仍等完整后端。只拆内容上传还不够：这项可选元数据若排在完整初始化后，`stampGeneratorMetadata` 会把已导出的文档卡在上传之前。`LocalCoreHttpReadsTest` 与原控制器逐项对拍开关语义，`backend-request-gate.test.js` 验证只放行读请求。
 
 保存 journal 位于原 H2 文件旁；即使关闭开关或构建标识变化，存在 journal 时也必须在 legacy DDL 之前恢复并验证记录过的 schema。`LocalCoreVersionHandoff` 保留既有 HEAD，未建库时以首个 before image 建初始版本，原件始终保留最新内容；版本确认后才 ack。feature-off/recovery-only 同样必须完成实际 EMF 和交接才可 full-ready。通知在项目锁释放后执行，失败的本进程回执重试可以重试通知，非持久通知 outbox。DDL 中途崩溃造成 proof 不匹配会保守拒绝启动，不能称已自动恢复所有升级窗口。
 

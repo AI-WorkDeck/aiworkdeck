@@ -70,6 +70,29 @@ class LocalCoreHttpReadsTest {
 
     @AfterEach void close() throws SQLException { if (database != null) execute("SHUTDOWN"); }
 
+    @Test void generatorSettingsAreReadableBeforeJpaAndMatchTheExistingController() throws Exception {
+        String path = "/api/document/generator/settings";
+        assertTrue(LocalCoreHttpReads.READ_PATHS.contains(path));
+        // The ordinary controller exposes only a product name and one setting, even before identity selection.
+        execute("DELETE FROM system_setting");
+        var repository = org.mockito.Mockito.mock(com.checkba.repository.SystemSettingRepository.class);
+        var controller = new com.checkba.controller.DocumentGeneratorController(
+                new com.checkba.service.document.DocumentGeneratorSettings(new com.checkba.service.SystemSettingService(repository)));
+        org.mockito.Mockito.when(repository.findByKey("document.generator.enabled")).thenReturn(java.util.Optional.empty());
+        assertEquals(controller.getSettings(), json(get(path, null)));
+        for (String value : new String[]{"false", "TRUE", "", "invalid", null}) {
+            execute("DELETE FROM system_setting");
+            try (var c = database.getConnection(); var s = c.prepareStatement("INSERT INTO system_setting(config_key, \"value\") VALUES (?, ?)")) {
+                s.setString(1, "document.generator.enabled"); s.setString(2, value); s.executeUpdate();
+            }
+            var setting = new com.checkba.model.entity.SystemSetting(); setting.setValue(value);
+            org.mockito.Mockito.when(repository.findByKey("document.generator.enabled")).thenReturn(java.util.Optional.of(setting));
+            assertEquals(controller.getSettings(), json(get(path, null)), "stored value: " + value);
+        }
+        assertEquals(json(get(path, null)), json(reads.handle(new LocalCoreHttpReads.Request("HEAD", path, null, Map.of())).orElseThrow()));
+        assertTrue(reads.handle(new LocalCoreHttpReads.Request("PUT", path, null, Map.of())).isEmpty());
+    }
+
     @Test void licenseUsesLiveLocalServicesWithoutCreatingAnUnlockOrRewritingTickets() throws Exception {
         Map<?, ?> initial = json(get("/api/license/status", null));
         assertEquals(false, initial.get("unlocked")); assertEquals("none", initial.get("edition"));
