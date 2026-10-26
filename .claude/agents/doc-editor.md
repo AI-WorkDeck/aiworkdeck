@@ -7,6 +7,14 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 职责边界：编辑器内核与宿主集成。AI 发编辑指令的链路属 ai-doc-bridge 领域。引擎 = LibreOffice 24.2.8 自建 zh-CN 版（LO core 分支 distro/allotropia/zeta-24-2）。
 
+## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
+
+当前正式基线是 **24.2.8-zhcn-r6**（2026-10-20 PR#1164，四个产物SHA见 `desktop/lowa-build/RECIPE.md`）；下文历史段落的 r5/r6 描述不能当作当前未完成清单。本轮候选范围与近期内核限制复核在 `desktop/lowa-build/REBUILD-2026-10-26.md`，候选已于2026-10-26编译，哈希与真实验收边界见 `RECIPE.md`；默认下载地址仍为r6，未发布或升级客户端。
+
+Calc 行列标题由原生 `ScHeaderControl` 绘制，字体在构造时缓存，CSS 与事后 UNO `ApplicationFont` 设置不能可靠替换。构建补丁将标题字体设为包内 Liberation Sans 9pt，经 VCL 设备DPI换算；在 Paint 中用独立 StyleSettings 副本映射产品深浅令牌，以现有 `AppBackground` 判主题，不修改正文格式或全局Qt调色板。高对比保留原生路径；这不等于滚动条/菜单等全部Qt chrome已深色化。`Color(sal_uInt32)` 在该基准可为 consteval，动态主题须写成 `dark ? Color(常量) : Color(常量)`。
+
+Qt WASM 的鼠标/滚轮分支把 `emscripten_date_now()` 纪元毫秒 double 传给32位ulong，存在越界转换；候选改用Qt自带的无timestamp重载和应用QElapsedTimer。**原生源码并非字面传零**。`apply-qt-patches.py` 钉死qtbase SHA并在configure前执行。旧r6的真实同点慢击会误选整词；生产`zetaOfficeSelectionDrag`远点点击补偿仍保留。新旧对照入口：`test:lowa-mouse-clock`（`LOWA_MOUSE_CLOCK_DRAG=1`另验取消补偿的测试构建）及`test:lowa-calc-chrome`。补丁单测不能代替实际编译、像素与交互结果。
+
 ## 拖选期间滚轮翻页（dev-board#1393）
 
 `get_cursor_rect()` 默认只读光标，不再读取 `selectionRects`。端点测量会通过 `gotoRange` 临时移动视光标，后台审校在 wheel 后调用它会拉回视口并打断正在进行的鼠标选区。只有 `zetaOfficeSelectionDrag.refreshSelection` 在鼠标松开后显式请求 `{selectionRects:true}`；普通 IME/审校读取不得隐式开启。非空选区的普通光标回包不清除已缓存的端点，折叠光标仍清除；键盘选区通过 `sel_changed` 刷新。
