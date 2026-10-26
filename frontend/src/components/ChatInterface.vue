@@ -598,6 +598,10 @@
                  </view>
               </view>
           </view>
+          <ChatSuggestionControl v-if="chatSuggestions.available && visibleSuggestion" :suggestion="visibleSuggestion" :show-settings="false"
+            @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <details class="composer-advanced-settings">
+          <summary class="composer-advanced-summary">{{ $t('chat.composerAdvancedSettings') }}</summary>
           <view class="composer-preferences">
           <details class="builtin-workflows-fold" :class="{ customized: builtinCustomActiveCount > 0 }">
              <summary class="builtin-workflows-summary">
@@ -640,10 +644,10 @@
                 </view>
              </view>
           </details>
-          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" :suggestion="visibleSuggestion"
-            @toggle="chatSuggestions.toggle" @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" @toggle="chatSuggestions.toggle" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
           </view>
+          </details>
           <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask model-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
 
@@ -928,6 +932,10 @@
           </view>
           <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
+          <ChatSuggestionControl v-if="chatSuggestions.available && visibleSuggestion" :suggestion="visibleSuggestion" :show-settings="false"
+            @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <details class="composer-advanced-settings">
+          <summary class="composer-advanced-summary">{{ $t('chat.composerAdvancedSettings') }}</summary>
           <view class="composer-preferences">
           <details class="builtin-workflows-fold builtin-workflows-fold-bottom" :class="{ customized: builtinCustomActiveCount > 0 }">
              <summary class="builtin-workflows-summary">
@@ -970,10 +978,10 @@
                 </view>
              </view>
           </details>
-          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" :suggestion="visibleSuggestion"
-            @toggle="chatSuggestions.toggle" @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" @toggle="chatSuggestions.toggle" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
           </view>
+          </details>
        </template>
     </view>
 
@@ -6720,9 +6728,35 @@ export default {
   color: var(--awd-accent-text);
 }
 
-/* 输入区的辅助设置共用行距、分隔线和信息层级。 */
+/* 辅助设置默认折叠；实际生成的下一句建议独立显示在外侧。 */
+.composer-advanced-settings { margin-top: 8px; min-width: 0; }
+.composer-advanced-summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  padding: 4px 6px;
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.5;
+  list-style: none;
+  cursor: pointer;
+}
+.composer-advanced-summary::-webkit-details-marker { display: none; }
+.composer-advanced-summary::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(-45deg);
+}
+.composer-advanced-settings[open] > .composer-advanced-summary::before { transform: rotate(45deg); }
+.composer-advanced-summary:hover { color: var(--awd-accent-text); background: var(--awd-accent-wash); }
+.composer-advanced-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
 .composer-preferences {
-  margin-top: 10px;
+  margin-top: 4px;
   padding: 0 2px;
   min-width: 0;
 }
