@@ -17,7 +17,7 @@ Qt WASM 的鼠标/滚轮分支把 `emscripten_date_now()` 纪元毫秒 double �
 
 ## WASM 提示框输入穿透（dev-board#1515，补充候选）
 
-Calc 隐藏原生 chrome 后，表头贴画布顶部，尺寸提示框可落在鼠标旁；旧 compositor 的 5px 命中外圈会截走后续移动/释放。VCL `HelpTextWindow` 本身已鼠标穿透，但 QtFrame 与 WASM 命中层丢失此语义。源码补丁仅在 WASM 的 `SalFrameStyleFlags::TOOLTIP` 分支附加 `WindowTransparentForInput`，Qt `windowAt` 跳过带此标记的窗口。不能按 `Qt::ToolTip` 类型一概排除，LO 的交互式组合框 popup 也用该类型。补充候选正在编译，实际结果以 `desktop/lowa-build/RECIPE.md` 为准；禁止仅隐藏提示框或用原生工具栏有上方空白的路径冒充裸画布通过。
+Calc 隐藏原生 chrome 后，表头贴画布顶部，尺寸提示框可落在鼠标旁；旧 compositor 的 5px 命中外圈会截走后续移动/释放。VCL `HelpTextWindow` 本身已鼠标穿透，但 QtFrame 与 WASM 命中层丢失此语义。源码补丁仅在 WASM 的 `SalFrameStyleFlags::TOOLTIP` 分支附加 `WindowTransparentForInput`，Qt `windowAt` 跳过带此标记的窗口。不能按 `Qt::ToolTip` 类型一概排除，LO 的交互式组合框 popup 也用该类型。补充候选 r7b 已编译，旧r7裸画布列拖动失败/新r7b两种DPR114项通过，原生字体下拉框两种DPR可选可撤销；实际结果与未归因的首轮初始化超时见 `desktop/lowa-build/RECIPE.md`；禁止仅隐藏提示框或用原生工具栏有上方空白的路径冒充裸画布通过。
 
 ## 拖选期间滚轮翻页（dev-board#1393）
 

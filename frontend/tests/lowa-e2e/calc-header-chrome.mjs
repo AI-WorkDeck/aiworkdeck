@@ -136,27 +136,51 @@ const puppeteer=await loadPuppeteer()
 const deadline=setTimeout(()=>{console.error('FAIL total runtime exceeded 5 minutes');browser?.close()},300000)
 try {
   for(const dpr of (process.env.LOWA_E2E_DPR ? [Number(process.env.LOWA_E2E_DPR)] : [1,2])) {
+    const started=Date.now()
+    const log=message=>fs.appendFileSync(path.join(out,`dpr${dpr}-browser.log`),`${Date.now()-started}ms ${message}\n`)
+    const stage=async(name,run)=>{
+      const began=Date.now();log('BEGIN '+name)
+      const result=await run()
+      log(`END ${name} (${Date.now()-began}ms)`);return result
+    }
     // Isolate each DPI's native windows and WASM worker lifetime.
     browser=await launchBrowser(puppeteer, { headed: true })
-    browser.on('targetcreated',async target=>{const page=await target.page();page?.on('pageerror',e=>console.error('PAGE ERROR:',e.message))})
-    const page=await openEditor(browser,{clipboard:false,viewport:{width:1000,height:720,deviceScaleFactor:dpr}})
-    await page.evaluate(()=>{for(const type of ['keydown','keyup','beforeinput','input']) window.addEventListener(type,e=>{e.preventDefault();e.stopImmediatePropagation()},true)})
-    await page.evaluate(()=>{
+    browser.on('targetcreated',async target=>{
+      const page=await target.page().catch(()=>null)
+      if(!page)return
+      const requests=new WeakMap();let requestId=0
+      page.on('request',r=>{
+        const entry={id:++requestId,started:Date.now()};requests.set(r,entry)
+        log(`REQUEST BEGIN #${entry.id} ${r.method()} ${r.url()}`)
+      })
+      page.on('response',r=>log(`RESPONSE #${requests.get(r.request())?.id} ${r.status()} ${r.url()}`))
+      page.on('requestfinished',r=>{
+        const entry=requests.get(r)
+        log(`REQUEST END #${entry?.id} ${r.url()} (${entry ? Date.now()-entry.started : 'unknown'}ms)`)
+      })
+      page.on('console',m=>log(`${m.type()}: ${m.text()}`))
+      page.on('pageerror',e=>log('PAGE ERROR: '+e.message))
+      page.on('requestfailed',r=>log(`REQUEST FAILED #${requests.get(r)?.id}: ${r.url()} ${r.failure()?.errorText}`))
+    })
+    const page=await stage('openEditor',()=>openEditor(browser,{clipboard:false,viewport:{width:1000,height:720,deviceScaleFactor:dpr}}))
+    log('openEditor ready: __loExecutor available')
+    await stage('keyboard event setup',()=>page.evaluate(()=>{for(const type of ['keydown','keyup','beforeinput','input']) window.addEventListener(type,e=>{e.preventDefault();e.stopImmediatePropagation()},true)}))
+    await stage('pointer event setup',()=>page.evaluate(()=>{
       window.__headerPointerLog=[]
       for(const type of ['pointerdown','pointermove','pointerup','mousedown','mousemove','mouseup']) document.addEventListener(type,e=>{
         const rect=e.target.getBoundingClientRect()
         window.__headerPointerLog.push({type,x:e.clientX,y:e.clientY,buttons:e.buttons,time:e.timeStamp,target:e.target.tagName+'#'+e.target.id+'.'+e.target.className,rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}})
         if(window.__headerPointerLog.length>100)window.__headerPointerLog.shift()
       },true)
-    })
-    const exec=async(action,params={})=>{
+    }))
+    const exec=(action,params={})=>stage('exec '+action,async()=>{
       const r=await page.evaluate((a,p)=>window.__loExecutor.executeCommand(a,p),action,params)
       assert.equal(r?.success,true,action+': '+JSON.stringify(r));return r
-    }
+    })
     const state=()=>exec('debug_calc_header_state')
     // editor.html declares these two fixed overlays; neither is production UI.
-    await page.addStyleTag({content:'#verify,#vlog{display:none!important}'})
-    await page.evaluate(()=>window.dispatchEvent(new Event('resize')))
+    await stage('hide verification overlays',()=>page.addStyleTag({content:'#verify,#vlog{display:none!important}'}))
+    await stage('resize after overlay removal',()=>page.evaluate(()=>window.dispatchEvent(new Event('resize'))))
     await exec('load_document',{name:'synthetic-header.xlsx',bytes:await fixture()})
     await exec('set_chrome',{all:false,rulers:false})
     // XLSX maps Liberation Sans to Arial on export; use a round-trip stable
@@ -317,7 +341,9 @@ try {
   }
 } catch(error) {
   check('test execution',false,error.stack)
-  for(const page of await (browser?.pages().catch(()=>[]) || [])) if(page.url().includes('editor.html')) {
+  for(const page of await (browser?.pages().catch(()=>[]) || [])) {
+    let url;try{url=page.url()}catch{continue}
+    if(!url.includes('editor.html'))continue
     await page.screenshot({path:path.join(out,'failure.png')}).catch(()=>{})
     fs.writeFileSync(path.join(out,'pointer-log.json'),JSON.stringify(await page.evaluate(()=>({events:window.__headerPointerLog,canvases:[...document.querySelectorAll('canvas')].map(e=>({id:e.id,className:e.className,html:e.parentElement.outerHTML.slice(0,1000)}))})).catch(()=>null),null,2))
     console.error(await page.evaluate(()=>document.querySelector('#vlog')?.textContent).catch(()=>''))
