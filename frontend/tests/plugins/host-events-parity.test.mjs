@@ -9,7 +9,7 @@ function harness() {
   const events = new Map(), posted = []
   const uni = { $on(name, callback) { events.set(name, callback) }, $off(name) { events.delete(name) } }
   const window = { addEventListener() {}, removeEventListener() {} }
-  const options = new Function('uni', 'window', 'host', 'APP_THEME_EVENT', 'ACCOUNT_CHANGED_EVENT', 'subscribeTaskChanges', 'endPluginImDrag', body)(uni, window, {}, 'theme', 'account', () => () => {}, () => {})
+  const options = new Function('uni', 'window', 'host', 'APP_THEME_EVENT', 'APP_LANGUAGE_EVENT', 'getAppLanguage', 'getResolvedTheme', 'collectThemeTokens', 'ACCOUNT_CHANGED_EVENT', 'subscribeTaskChanges', 'endPluginImDrag', body)(uni, window, {}, 'theme', 'language', () => 'ar-SA', () => 'dark', () => ({}), 'account', () => () => {}, () => {})
   const instance = { ...options.data(), projectId: 7, pluginId: 'litigation-visual', permissions: ['file_read'], isWebPlugin: true, $refs: { pluginFrame: { contentWindow: { postMessage: value => posted.push(value) } } } }
   for (const [key, fn] of Object.entries(options.methods)) instance[key] = fn.bind(instance)
   instance.initializeAuthorization = () => {}
@@ -60,4 +60,13 @@ test('host recording stop reaches speech subscribers without meeting data and is
   await new Promise(resolve => setImmediate(resolve))
   assert.deepEqual(h.posted, [{ awd: 1, type: 'event', event: 'speech.stopped', data: {} }])
   h.destroy(); assert.equal(h.events.has('awd:meeting-recording-stopped'), false)
+})
+
+test('open plugin language changes use the theme channel and release the listener on unmount', () => {
+  const h = harness()
+  h.events.get('language')()
+  assert.deepEqual(h.posted, [{ awd: 1, type: 'theme', theme: 'dark', tokens: {}, language: 'ar-SA' }])
+  h.destroy()
+  assert.equal(h.events.has('language'), false)
+  assert.equal(h.events.has('theme'), false)
 })

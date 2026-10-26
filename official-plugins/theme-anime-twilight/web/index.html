@@ -1,11 +1,11 @@
 <!doctype html>
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-<html lang="zh-CN">
+<html lang="en-US">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>日漫晨昏 · 逢魔之时</title>
+  <title data-i18n="plugin.name"></title>
   <style>
     :root {
       color-scheme: light dark;
@@ -95,18 +95,20 @@
 <body>
   <div class="card">
     <div class="head-row">
-      <h1 class="title">日漫晨昏 · 逢魔之时</h1>
-      <span class="badge">UI 皮肤画廊 · Skin 03</span>
+      <h1 class="title" data-i18n="plugin.name"></h1>
+      <span class="badge" data-i18n="gallery.badge"></span>
     </div>
-    <p class="subtitle">新海诚式群青星空与暮色珊瑚霞光交汇，薰衣草紫星芒点亮赛璐珞通透玻璃界面。</p>
+    <p class="subtitle" data-i18n="plugin.desc"></p>
     <div class="swatches">
-      <div class="swatch"><div class="swatch-dot" style="background:#F5F4FA"></div><strong>朝霞晴空</strong><div class="swatch-hex">#F5F4FA</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#53489E"></div><strong>星芒紫蓝</strong><div class="swatch-hex">#53489E</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#E07A5F"></div><strong>暮色珊瑚</strong><div class="swatch-hex">#E07A5F</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#9D8DF2"></div><strong>薰衣草星</strong><div class="swatch-hex">#9D8DF2</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#14192B"></div><strong>逢魔群青</strong><div class="swatch-hex">#14192B</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#F5F4FA"></div><strong data-i18n="gallery.swatch1"></strong><div class="swatch-hex">#F5F4FA</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#53489E"></div><strong data-i18n="gallery.swatch2"></strong><div class="swatch-hex">#53489E</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#E07A5F"></div><strong data-i18n="gallery.swatch3"></strong><div class="swatch-hex">#E07A5F</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#9D8DF2"></div><strong data-i18n="gallery.swatch4"></strong><div class="swatch-hex">#9D8DF2</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#14192B"></div><strong data-i18n="gallery.swatch5"></strong><div class="swatch-hex">#14192B</div></div>
     </div>
   </div>
-  <script src="/api/plugins/sdk/awd-plugin-sdk.js"></script>
+  <script src="awd-plugin-sdk.js"></script>
+  <script src="gallery-l10n.js"></script>
+  <script src="gallery.js"></script>
 </body>
 </html>
