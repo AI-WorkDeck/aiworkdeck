@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+--- a/sw/inc/unoredline.hxx
++++ b/sw/inc/unoredline.hxx
+@@ -77,7 +77,7 @@
+ 
+     virtual     css::uno::Any SAL_CALL queryInterface( const css::uno::Type& aType ) override;
+     virtual void SAL_CALL acquire(  ) noexcept override {OWeakObject::acquire();}
+-    virtual void SAL_CALL release(  ) noexcept override {OWeakObject::release();}
++    virtual void SAL_CALL release(  ) noexcept override;
+ 
+     virtual css::uno::Sequence< css::uno::Type > SAL_CALL getTypes(  ) override;
+     virtual css::uno::Sequence< sal_Int8 > SAL_CALL getImplementationId(  ) override;
+--- a/sw/source/core/unocore/unoredline.cxx
++++ b/sw/source/core/unocore/unoredline.cxx
+@@ -551,6 +551,14 @@
+ 
+ SwXRedline::~SwXRedline()
+ {
++}
++
++void SAL_CALL SwXRedline::release() noexcept
++{
++    // URP releases references on a different thread from getByIndex(). Keep
++    // listener destruction synchronized with the page-style broadcaster.
++    SolarMutexGuard aGuard;
++    OWeakObject::release();
+ }
+ 
+ uno::Reference< beans::XPropertySetInfo > SwXRedline::getPropertySetInfo(  )

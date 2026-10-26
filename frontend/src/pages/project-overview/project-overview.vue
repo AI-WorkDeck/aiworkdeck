@@ -9,10 +9,6 @@
              消失，只能自绘（spec §6.4）。读的是与 mac 完全同一份命令表数据。
              mac 上组件内部 visible=false，不渲染。 -->
         <AppMenuBar :refresh-key="menuBarRefreshKey" />
-        <view v-if="isScratchWorkspace" class="scratch-workspace-actions">
-          <text class="scratch-badge">{{ $t('workbench.chatMode.scratchBadge') }}</text>
-          <view class="scratch-promote-btn" @click="handlePromoteScratchWorkspace">{{ $t('workbench.chatMode.promoteAction') }}</view>
-        </view>
 
         <!-- 无项目态（dev-board#1047）：顶栏只有应用名，没有项目切换器 / 协作 chip / 负责人一行 -->
         <view v-if="!hasNamedProject" class="project-info no-project-info">
@@ -76,7 +72,8 @@
                 <text>{{ $t('workbench.allProjects') }}</text>
               </view>
             </view>
-            <view class="project-status-badge">
+            <view v-if="isScratchWorkspace" class="scratch-promote-btn" @click="handlePromoteScratchWorkspace">{{ $t('workbench.chatMode.promoteAction') }}</view>
+            <view v-else class="project-status-badge">
               <text class="status-text">{{ $t('workbench.statusInProgress') }}</text>
             </view>
             <!-- 协作状态 chip：只在这份案卷真的放进过团队案件库时才渲染。
@@ -96,7 +93,7 @@
               <text class="collab-chip-text">{{ collabStateText }}</text>
             </view>
           </view>
-          <view class="project-meta">
+          <view v-if="!isScratchWorkspace" class="project-meta">
             <text v-if="!soloLocalProject" class="meta-item">{{ $t('workbench.managerLabel', { name: project.manager || userDisplayName || $t('workbench.me') }) }}</text>
 
             <block v-if="project.listedCompanyName && project.listedCompanyName !== '-'">
@@ -114,12 +111,12 @@
 
       <!-- Center Logo -->
       <view class="header-center">
-        <view class="mode-switch-capsule" role="tablist">
-          <view class="mode-switch-item" :class="{ active: viewMode === 'chat' }" role="tab" @click="switchViewMode('chat')">
-            <text class="mode-switch-label">💬 {{ $t('workbench.chatMode.modeChat') }}</text>
+        <view class="mode-switch-capsule" role="tablist" :aria-label="$t('workbench.chatMode.modeSwitchLabel')">
+          <view class="mode-switch-item" :class="{ active: viewMode === 'chat' }" role="tab" :aria-selected="viewMode === 'chat' ? 'true' : 'false'" @click="switchViewMode('chat')">
+            <text class="mode-switch-label">{{ $t('workbench.chatMode.modeChat') }}</text>
           </view>
-          <view class="mode-switch-item" :class="{ active: viewMode === 'ide' }" role="tab" @click="switchViewMode('ide')">
-            <text class="mode-switch-label">🛠 {{ $t('workbench.chatMode.modeIde') }}</text>
+          <view class="mode-switch-item" :class="{ active: viewMode === 'ide' }" role="tab" :aria-selected="viewMode === 'ide' ? 'true' : 'false'" @click="switchViewMode('ide')">
+            <text class="mode-switch-label">{{ $t('workbench.chatMode.modeIde') }}</text>
           </view>
         </view>
       </view>
@@ -278,9 +275,12 @@
           :trial-text="trialMenuText"
           :notice-text="accountNoticeText"
           :client-view="isClientView"
+          :message-unread="messageCenterUnread"
+          :message-partial="messageCenterBadgePartial"
           @login="onAccountLogin"
           @account="onAvatarMenuAccount"
           @grace-info="showTrialInfo = true"
+          @messages="openMessageCenterTab"
           @schedule="onAvatarMenuSchedule"
           @settings="onAvatarMenuSettings"
           @sign-out="onAvatarMenuSignOut"
@@ -313,7 +313,7 @@
           v-for="p in LEFT_SIDEBAR_PLUGINS"
           :key="p.key"
           class="rail-btn"
-          :class="{ active: (p.key === 'messages' && (focusedPane === 'right' ? activeFileRight : activeFileLeft)?.tabType === 'message-center') || ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
+          :class="{ active: ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
           :title="p.label"
           :draggable="!isClientView"
           @tap="onRailBtnTap(p.key)"
@@ -354,7 +354,6 @@
             </svg>
           </view>
           <text v-else class="rail-icon">{{ p.icon }}</text>
-          <text v-if="p.key === 'messages' && (messageCenterUnread > 0 || messageCenterBadgePartial)" class="rail-badge" :title="messageCenterBadgePartial ? $t('messageCenter.sourcesUnavailable') : $t('messageCenter.unreadCount', { count: messageCenterUnread })" :aria-label="messageCenterBadgePartial ? $t('messageCenter.sourcesUnavailable') : $t('messageCenter.unreadCount', { count: messageCenterUnread })">{{ messageCenterUnread > 99 ? '99+' : messageCenterUnread > 0 ? messageCenterUnread : '·' }}</text>
           <text v-if="p.key === 'market' && pluginUpdateState.count > 0" class="rail-badge" :aria-label="$t('market.updateAvailableCount', { count: pluginUpdateState.count })" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count > 99 ? '99+' : pluginUpdateState.count }}</text>
           <text v-if="p.key === 'dd-client' && ddClientUnread > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddClientUnread })">{{ ddClientUnread > 99 ? '99+' : ddClientUnread }}</text>
           <text v-if="p.key === 'dd-files' && ddLawyerNotifications.length > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddLawyerNotifications.length })">{{ ddLawyerNotifications.length > 99 ? '99+' : ddLawyerNotifications.length }}</text>
@@ -396,17 +395,23 @@
 
         <!-- Version History：无项目态不给 -->
         <view
-          v-if="hasNamedProject"
-          class="rail-btn"
+          v-if="hasNamedProject && !isClientView"
+          class="rail-btn version-entry"
           :class="{ active: leftPaneKey === 'version' && !sidebarCollapsed }"
-          :title="VERSION_PLUGIN.label"
-          @tap="toggleLeftPane('version')"
+          :title="versionEntry.title"
+          :aria-label="versionEntry.title"
+          role="button"
+          tabindex="0"
+          @tap="openProjectVersionPanel"
+          @keydown.enter.prevent="openProjectVersionPanel"
+          @keydown.space.prevent="openProjectVersionPanel"
         >
           <view class="rail-icon-wrapper">
             <svg class="rail-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(path, idx) in VERSION_PLUGIN.svgPaths" :key="idx" :d="path.d" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-icon-path" />
             </svg>
           </view>
+          <text v-if="versionEntry.badge" class="rail-badge" :class="{ 'is-overdue': versionEntry.attention }" aria-hidden="true">{{ versionEntry.badge }}</text>
         </view>
 
         <!-- Project Members Stack -->
@@ -714,8 +719,12 @@
             @activate-current-project="showCurrentProjectFiles"
           />
           <view v-else-if="leftPaneKey === 'dd-client'" class="dd-client-entry">
-            <text>{{ $t('ddWorkflow.clientWorkspaceHint') }}</text>
-            <button @tap="openDdClientTab">{{ $t('ddWorkflow.openClientWorkspace') }}</button>
+            <component :is="'button'" type="button" class="dd-client-nav" :class="{ active: workspaceTabState('dd-client') === 'active' }" :aria-current="workspaceTabState('dd-client') === 'active' ? 'page' : undefined" @click.stop="openDdClientTab">
+              <text class="dd-client-nav-label">{{ $t('ddWorkflow.client.invitedProjects') }}</text>
+              <text class="dd-client-nav-state">{{ $t('panels.workspaceState.' + workspaceTabState('dd-client')) }}</text>
+              <text aria-hidden="true">›</text>
+            </component>
+            <text class="dd-client-nav-hint">{{ $t('ddWorkflow.clientWorkspaceHint') }}</text>
           </view>
           <DdFilesPanel
             ref="ddFilesPanel"
@@ -757,6 +766,8 @@
             :collab-refresh-token="collabRefreshToken"
             :cloud-snapshot="collabCloud"
             :document-merge-state="documentMergeState"
+            :work-status="versionStatusLoaded ? versionWorkStatus : null"
+            :before-commit="prepareVersionCommit"
             @compare-file="onVersionCompareFile"
             @clear-file-filter="versionFileFilter = null"
             @reload-files="onVersionReloadFiles"
@@ -825,6 +836,7 @@
             v-else-if="activeDynamicPlugin"
             :plugin="activeDynamicPlugin"
             :project-id="projectId"
+            :workspace-state="workspaceTabState('plugin', activeDynamicPlugin.pluginId)"
             @open="openPluginTab(activeDynamicPlugin.pluginId)"
             @quick-action="onPluginQuickAction"
           />
@@ -992,8 +1004,14 @@
               <view
                 v-if="isChatMode && chatCanvasVisible"
                 class="chat-canvas-close-btn"
+                :title="$t('workbench.chatMode.closeCanvas')"
                 @click="chatCanvasOpen = false; $nextTick(() => triggerWorkbenchResize())"
-              >{{ $t('workbench.chatMode.closeCanvas') }} ×</view>
+              >
+                <svg class="chat-canvas-close-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path v-for="(d, gi) in GLYPHS.panelRight" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <text>{{ $t('workbench.chatMode.closeCanvas') }}</text>
+              </view>
 
             </view>
 
@@ -1056,6 +1074,7 @@
                     :target-id="evidenceMethodBar.targetId"
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
+                    :saving="evidenceMethodBar.saving"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
@@ -1357,6 +1376,7 @@
                     :target-id="evidenceMethodBar.targetId"
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
+                    :saving="evidenceMethodBar.saving"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
@@ -2344,7 +2364,7 @@ import InviteMemberDialog from '@/components/InviteMemberDialog.vue'
 import CollabDialog from '@/components/collab/CollabDialog.vue'
 import SubmitDraftGuide from '@/components/collab/SubmitDraftGuide.vue'
 import { MEMBER_GROUP_LABELS } from '@/config/memberRoles.js'
-import { globalOverlayActive } from '@/utils/overlayState.js'
+import { globalOverlayActive, setGlobalOverlay } from '@/utils/overlayState.js'
 import { AI_PROMPT_EVENT } from '@/utils/paragraphFormat.js'
 import CompareDocDialog from '@/components/CompareDocDialog.vue'
 import DocDiffViewer from '@/components/DocDiffViewer.vue'
@@ -2386,6 +2406,7 @@ import {
   getSkills,
   getFileText,
   getVersionStatus, // 版本面板之外也要知道「有没有采纳等待处理」
+  endWorkSession,
   promptFeatureNotConfigured, // 功能未配置统一引导（#18 T7）
   getProjectLocalPath, // 在访达中显示（IDE 化）
   getFileLocalPath,
@@ -2417,6 +2438,9 @@ import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
 import { getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { mergeMembers } from '@/utils/mergeMembers.js'
 import { remoteAheadText } from '@/utils/collabWording.js'
+import { versionEntryState } from '@/utils/versionEntryState.js'
+import { createVersionExitGuard } from '@/utils/versionExitGuard.js'
+import { showSheet } from '@/utils/dialog.js'
 import { getInitial } from '@/utils/textInitial.js'
 import { recordProjectVisit, getRecentProjectIds, syncRecentToMenuFetching } from '@/utils/recentProjects.js'
 import { markdownToPlainText } from '@/utils/markdownPlain.js'
@@ -2617,7 +2641,10 @@ export default {
       screenshotFolderTree: [],
       screenshotSaveLoading: false,
       screenshotSaveDataUrl: '', // Cached for save dialog
-      projectMembers: [], // Added
+      projectMembers: [], // 展示名单可合并云端；本机写权限只用下面的独立快照。
+      localProjectMembers: [],
+      localProjectMembersLoaded: false,
+      localProjectMembersProjectId: null,
       localMode: null, // 装机形态（local-mode），只用来判「单人本机项目」隐藏负责人一行
       isRenamingProject: false,
       // File Picker
@@ -2850,6 +2877,8 @@ export default {
       switcherProjects: [],
       switcherLoadFailed: false, // 拉取最近项目失败：与"确实没有其他最近项目"的空态区分开，不能吞成同一句文案
       versionWorkStatus: { enabled: false, working: false, changedCount: 0, onDraft: null }, // 底部状态栏工作状态点（顶栏胶囊已去掉）
+      versionStatusLoaded: false,
+      versionStatusError: false,
       // 协作（团队案件库）状态：{linked, serverUrl, pendingUpload, remoteAhead, offline}
       collabCloud: null,
       collabDialogVisible: false,
@@ -2880,6 +2909,7 @@ export default {
 
       // Members
       currentUser: {},
+      permissionUserLoaded: false,
       pageEnterTime: 0,
 
       // Tabs 拖拽状态
@@ -3140,16 +3170,21 @@ export default {
     WPS_INTERNAL_HTTP_LINK_BASE() {
       return WPS_INTERNAL_HTTP_LINK_BASE
     },
-    // 当前用户对项目有没有写权限，与后端 ProjectMemberService.hasWritePermission 同口径
-    // （项目所有者 / ADMIN / PARTICIPANT 可写，READ_ONLY / CLIENT 只读）。成员表没加载到
-    // 或找不到自己时按可写处理——桌面单机没有成员概念，这里只挡「确知是只读」的情况。
+    // 身份、项目和本机成员角色确认后才开放写入。云端名单只用于展示，
+    // 不能用另一用户表的 id 或合并后的角色给本机文档授权。
     canWriteProject() {
       const uid = this.currentUser && this.currentUser.id
-      if (!uid) return true
-      if (this.project && Number(this.project.userId) === Number(uid)) return true
-      const me = (this.projectMembers || []).find(m => Number(m.userId) === Number(uid))
-      if (!me || !me.role) return true
-      return me.role === 'ADMIN' || me.role === 'PARTICIPANT'
+      const role = String(this.currentUser?.role || '').toUpperCase()
+      if (!this.permissionUserLoaded || !this.projectInfoLoaded || uid == null || uid === ''
+          || !Number.isSafeInteger(Number(uid)) || Number(uid) <= 0
+          || this.projectId == null || this.projectId === '' || !this.project || this.project.id == null
+          || !['USER', 'ADMIN'].includes(role)
+          || String(this.project.id) !== String(this.projectId)) return false
+      if (this.project.userId != null && String(this.project.userId) === String(uid)) return true
+      if (!this.localProjectMembersLoaded
+          || String(this.localProjectMembersProjectId) !== String(this.projectId)) return false
+      const me = (this.localProjectMembers || []).find(m => m.userId != null && String(m.userId) === String(uid))
+      return !!me && (me.role === 'ADMIN' || me.role === 'PARTICIPANT')
     },
     // ProjectController.updateProject is owner-only, stricter than document write access.
     canRenameProject() {
@@ -3165,8 +3200,14 @@ export default {
     versionWorkStatusLabel() {
       const s = this.versionWorkStatus
       if (s.onDraft && s.onDraft.name) return this.$t('workbench.workingOnDraft', { name: s.onDraft.name })
-      if (s.working) return s.changedCount ? this.$t('workbench.workingChanged', { count: s.changedCount }) : this.$t('workbench.working')
+      if (s.working) return s.changedCount ? this.$t('version.pendingFileCount', { count: s.changedCount }) : this.$t('version.changesAutoRecorded')
       return ''
+    },
+    versionEntry() {
+      return versionEntryState((key, params) => this.$t(key, params), {
+        status: this.versionWorkStatus, cloud: this.collabCloud,
+        conflict: this.adoptConflictPending, unavailable: this.versionStatusError,
+      })
     },
     isClientView() {
       const user = getCurrentUser()
@@ -3632,6 +3673,7 @@ export default {
     this.unbindTabsWheel()
     this._comparisonDisposed = true
     clearInterval(this._mergeElapsedTimer)
+    this.stopVersionStatusUpdates()
     this.stopMessageCenterBadge()
     this._stopPluginUpdateChecks?.()
     this._ddClientPollStopped = true
@@ -4037,6 +4079,7 @@ export default {
     }
   },
   onUnload() {
+    this.stopVersionStatusUpdates()
     this.cancelFileTreePdfExport()
     this.disposeRestartRecovery()
     unregisterQuitSave(this)
@@ -4061,10 +4104,11 @@ export default {
     this._ddClientPollStopped = false
     this.pollDdClientInbox()
     registerQuitSave(this, async () => {
-      const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs)
+      if (this._projectVersionBusy) return { failed: 1 }
+      const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs, { timeoutMs: 0 })
       this.flushTabSnapshot()
       return result
-    })
+    }, (options) => this.confirmVersionBeforeLeaving(options))
     // 多实例守卫：本页经 navigateTo 反复进入时页面栈里会有多个存活实例，每个都在
     // mounted 绑定了全局（ipcRenderer/window 级）监听；全局事件只让最近展示的实例
     // 处理，否则一次事件触发 N 份副作用（与 PR#148 剪贴板重复入库同源）
@@ -4092,8 +4136,8 @@ export default {
       fetchMergeInputs,
       buildMergeDraft,
       api: { postMergeResolveFile, postMergeResolveStructured, resolveAdopt, resolveCloudMerge, resolveSessionEnd },
-      reloadFiles: (ids) => {
-        this.onVersionReloadFiles(ids || [])
+      reloadFiles: async (ids) => {
+        const reloaded = await this.onVersionReloadFiles(ids || [])
         // 自动合并收尾之后必须把版本面板也刷一次。撞冲突时 onCollabConflict 已经把人送到
         // 了版本面板（裁决弹窗随它那一次 /status 弹出来），而合并是在那之后几秒才完成的——
         // 不刷的话面板一直端着合并前那份 /status，律师面对一个说着「已合并」、点「就按我
@@ -4105,6 +4149,7 @@ export default {
         // 不补这一趟，自动合并收尾后 chip 会继续说「同事交了新稿 · N 版」直到 120 秒轮询
         // （真机走查截图：toast 已出、面板已「和大家的稿一致」、chip 仍是旧话）。
         this.fetchCollabState({ online: false }).catch(() => {})
+        return reloaded
       },
       openOverview: () => this.goHandleAdoptConflict(),
     })
@@ -4133,7 +4178,6 @@ export default {
     // 加了守卫反而让页面栈里的旧实例一直挂着旧头像。
     this._onIdentityUpdated = () => {
       this.loadRealUserInfo()
-      if (this.projectId) this.loadProjectMembers()
     }
     uni.$on('awd:identity-updated', this._onIdentityUpdated)
     // UnlockHint 应用内化（dev-board#187）：解锁引导不再外跳官网，改为打开设置
@@ -4155,8 +4199,21 @@ export default {
     this._onFilesChangedSyncTabs = () => {
       if (!this.isActiveOverviewInstance()) return
       this.syncOpenTabsFromFileTree()
+      this.scheduleVersionStatusRefresh()
     }
     uni.$on('awd:files-changed', this._onFilesChangedSyncTabs)
+    this._onFileSavedVersion = (event) => {
+      if (String(event?.projectId) !== String(this.projectId)) return
+      this.scheduleVersionStatusRefresh()
+    }
+    uni.$on('awd:file-saved', this._onFileSavedVersion)
+    // Auto-recording can finish without a file-tree event. Keep the badge current
+    // even when the version panel is closed; cloud network polling stays separate.
+    this._versionStatusTimer = setInterval(() => {
+      if (!this.isActiveOverviewInstance() || (typeof document !== 'undefined' && document.hidden)) return
+      this.checkAdoptConflict()
+      this.fetchCollabState()
+    }, 15000)
     // 编辑器段落面板「交给 AI 调整格式」：把编辑器拼好的那句话以 AGENT 模式发进 AI 对话，
     // 与插件一键动作（onPluginQuickAction）同一条 resolveChatInterface 路。只让活跃实例接。
     this._onEditorAiPrompt = (payload) => {
@@ -4513,14 +4570,23 @@ export default {
     // loadUserInfo 的写法补一次真实接口，成功后与本地缓存合并（接口字段更全），
     // 失败静默回退本地缓存那份，绝不阻塞首屏、绝不 toast 报错。
     async loadRealUserInfo() {
+      const request = this._permissionUserRequest = (this._permissionUserRequest || 0) + 1
+      this.permissionUserLoaded = false
+      this.localProjectMembersLoaded = false
+      this._permissionMembersRequest = (this._permissionMembersRequest || 0) + 1
       try {
         const res = await getCurrentUserApi()
+        if (this._collabDisposed || request !== this._permissionUserRequest) return
         if (res && res.code === 0 && res.data) {
           this.currentUser = { ...this.currentUser, ...res.data }
+          this.permissionUserLoaded = res.data.id != null && res.data.id !== ''
+            && ['USER', 'ADMIN', 'CLIENT'].includes(String(res.data.role || '').toUpperCase())
           this.userDisplayName = this.currentUser.displayName || this.userDisplayName
+          // 身份刷新已作废旧成员请求；确认新身份后补齐同一项目的本机权限快照。
+          if (this.permissionUserLoaded) await this.loadProjectMembers()
         }
       } catch (e) {
-        // 拿不到就用本地缓存那份，不拦路
+        // 缓存仍可显示头像，但身份未确认时不授予文档写权限。
         console.error('获取用户信息失败:', e)
       }
     },
@@ -4802,6 +4868,8 @@ export default {
         return false
       }
       if (!canNavigate()) return false
+      if (!restartRecovery && !await this.confirmVersionBeforeLeaving()) return false
+      if (!canNavigate()) return false
       await new Promise((resolve, reject) => uni.reLaunch({ url, success: resolve, fail: reject }))
       return true
     },
@@ -4945,7 +5013,87 @@ export default {
     // 「有一次采纳等待处理」固定条的入口：切到版本面板，AdoptConflictDialog 会随
     // 面板的 /status 自动弹出（它本来就是这么起来的，含崩溃后重开的场景）。
     goHandleAdoptConflict() {
-      if (this.leftPaneKey !== 'version') this.toggleLeftPane('version')
+      this.openProjectVersionPanel()
+    },
+    openProjectVersionPanel() {
+      this.versionFileFilter = null
+      if (this.leftPaneKey !== 'version' || this.sidebarCollapsed) this.toggleLeftPane('version')
+      this.checkAdoptConflict()
+    },
+    async prepareVersionCommit() {
+      const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs, { timeoutMs: 0 })
+      if (result.failed) {
+        uni.showToast({ title: this.$t('version.saveBeforeCommitFailed'), icon: 'none', duration: 4000 })
+        return false
+      }
+      return true
+    },
+    confirmVersionBeforeLeaving({ isCurrent = () => true } = {}) {
+      if (!this.hasNamedProject || this.isClientView) return Promise.resolve(true)
+      if (!this._versionExitPromise) {
+        const projectId = this.projectId
+        const overlayHolder = Symbol('version-exit')
+        const blockInput = event => { event.preventDefault(); event.stopImmediatePropagation() }
+        const releaseProgress = () => {
+          if (typeof window !== 'undefined') window.removeEventListener('keydown', blockInput, true)
+          setGlobalOverlay(false, overlayHolder)
+          uni.hideLoading()
+        }
+        const guard = createVersionExitGuard({
+          isCurrent: () => isCurrent() && !this._versionStatusDisposed && projectId === this.projectId,
+          save: () => this.prepareVersionCommit(),
+          progress: (stage) => {
+            if (stage === 'idle') { releaseProgress(); return }
+            if (stage === 'saving') uni.hideToast?.()
+            // A loading mask alone cannot cover native BrowserViews or stop
+            // keyboard edits underneath. Hold both barriers until the receipt.
+            setGlobalOverlay(true, overlayHolder)
+            if (typeof window !== 'undefined') window.addEventListener('keydown', blockInput, true)
+            const key = { saving: 'exitProgressSaving', committing: 'exitProgressCommitting', checking: 'exitProgressChecking' }[stage]
+            uni.showLoading({ title: this.$t('version.' + key), mask: true })
+          },
+          readStatus: async () => {
+            const result = await getVersionStatus(projectId)
+            return result?.data || {}
+          },
+          choose: async () => {
+            const result = await showSheet({
+              title: this.$t('version.exitPrompt', { name: this.project?.name || '' }),
+              itemList: [this.$t('version.exitCommit'), this.$t('version.exitSkip')],
+              cancelText: this.$t('version.exitCancel'),
+            })
+            return result.tapIndex === 0 ? 'commit' : result.tapIndex === 1 ? 'skip' : 'cancel'
+          },
+          commit: async () => {
+            const result = await endWorkSession(projectId, '')
+            await this.onVersionPanelStatusChanged()
+            this.collabRefreshToken += 1
+            return result?.data || {}
+          },
+          onBlocked: (reason) => {
+            if (reason === 'conflict' || reason === 'new-changes') this.openProjectVersionPanel()
+            const key = reason === 'conflict' ? 'exitConflict'
+              : reason === 'new-changes' ? 'exitNewChanges'
+                : reason === 'save-failed' ? 'saveBeforeCommitFailed' : 'exitCheckFailed'
+            uni.showToast({ title: this.$t('version.' + key), icon: 'none', duration: 5000 })
+          },
+        })
+        this._versionExitPromise = guard.confirm().finally(() => { releaseProgress(); this._versionExitPromise = null })
+      }
+      return this._versionExitPromise
+    },
+    scheduleVersionStatusRefresh() {
+      if (this._versionStatusDisposed || !this.isActiveOverviewInstance()) return
+      clearTimeout(this._versionStatusRefreshTimer)
+      this._versionStatusRefreshTimer = setTimeout(() => this.checkAdoptConflict(), 400)
+    },
+    stopVersionStatusUpdates() {
+      this._versionStatusDisposed = true
+      this._versionStatusSeq = (this._versionStatusSeq || 0) + 1
+      clearInterval(this._versionStatusTimer)
+      clearTimeout(this._versionStatusRefreshTimer)
+      if (this._onFileSavedVersion) uni.$off('awd:file-saved', this._onFileSavedVersion)
+      this._onFileSavedVersion = null
     },
     // 裁决清单里「打开合并比对稿」/「查看合并稿」：标签页由 fileOpenTabs 开
     // （openMergeReviewTab 是同一批任务里另一件产出，并行开发期间可能还没到位——
@@ -4967,10 +5115,15 @@ export default {
     // 面板内部的结束工作/丢弃/回主线/采纳/放弃等操作完成后也会经 status-changed
     // 事件再调一次这里，否则底部状态栏会停在操作之前的样子（同步滞后 bug）。
     async checkAdoptConflict() {
-      if (!this.projectInfoLoaded || !this.hasNamedProject) return
+      if (this._versionStatusDisposed || !this.projectInfoLoaded || !this.hasNamedProject || this.isClientView) return
+      const projectId = this.projectId
+      const seq = this._versionStatusSeq = (this._versionStatusSeq || 0) + 1
       try {
-        const res = await getVersionStatus(this.projectId)
+        const res = await getVersionStatus(projectId)
+        if (this._versionStatusDisposed || projectId !== this.projectId || seq !== this._versionStatusSeq) return
         const d = (res && res.data) || {}
+        this.versionStatusLoaded = true
+        this.versionStatusError = false
         this.adoptConflictPending = !!(d.adoptConflict || d.cloudConflict || d.sessionEndConflict)
         // 三语境判定链的优先级由后端保证互斥（sessionEnd > cloud > adopt），这里照同序取。
         const conflict = d.sessionEndConflict || d.cloudConflict || d.adoptConflict || null
@@ -4979,7 +5132,7 @@ export default {
         // 不重叠的那些文件在这里被静默合掉（docx 走隐藏引擎实例，xlsx/pptx 走后端 POI），
         // 全部合成功就自己收尾，不打扰律师；有一份要他动手才把人带到裁决清单。
         // 组合函数内部按 (另一侧 tip, path) 幂等，这条每 120 秒轮询一次也不会重放。
-        if (this._documentMerge) {
+        if (this._documentMerge && !this._projectVersionBusy) {
           this._documentMerge.onConflictStatus(conflict, ctx).catch((e) => {
             console.warn('[DocumentMerge] 自动合并编排失败', e)
           })
@@ -4992,6 +5145,12 @@ export default {
           onDraft: d.onDraft || null,
         }
       } catch (e) {
+        if (this._versionStatusDisposed || projectId !== this.projectId || seq !== this._versionStatusSeq) return
+        if (e.kind === 'VERSION_BUSY') {
+          this.scheduleVersionStatusRefresh()
+          return
+        }
+        this.versionStatusError = true
         console.warn('[Version] 读取采纳状态失败', e)
       }
     },
@@ -5650,6 +5809,7 @@ export default {
         uni.showToast({ title: this.$t('editor.saveBeforeLeaving'), icon: 'none', duration: 4000 })
         return false
       }
+      if (!await this.confirmVersionBeforeLeaving()) return false
       try {
          clearSession()
       } catch (e) {}
@@ -6065,7 +6225,8 @@ export default {
            return
          }
          try {
-           await this.libreOfficeExecutor.executeCommand('insert_at_cursor', { text: t })
+           const result = await this.libreOfficeExecutor.executeCommand('insert_at_cursor', { text: t })
+           if (!result || result.success === false) throw new Error(result?.message || this.$t('workbench.insertFailed'))
            uni.showToast({ title: this.$t('workbench.insertedToDoc'), icon: 'success' })
            // 焦点还给编辑器，Cmd+Z 才能撤掉这次插入（BUG-61）；存盘仍走正常自动保存节奏
            this.focusLibreEditorFor(this.libreOfficeExecutor)
@@ -6224,12 +6385,15 @@ export default {
     // --- 导航与初始化 ---
     async loadProjectInfo() {
       const projectId = this.projectId
+      const request = this._permissionProjectRequest = (this._permissionProjectRequest || 0) + 1
+      this.projectInfoLoaded = false
+      this.localProjectMembersLoaded = false
+      this._permissionMembersRequest = (this._permissionMembersRequest || 0) + 1
       try {
         const data = await getProject(projectId)
-        if (this._collabDisposed || projectId !== this.projectId) return
-        if (data) {
-          this.project = data
-        }
+        if (this._collabDisposed || projectId !== this.projectId || request !== this._permissionProjectRequest) return
+        if (!data || String(data.id) !== String(projectId)) return
+        this.project = data
         this.projectInfoLoaded = true
         if (this.isLooseWorkspace) {
           this.projectSwitcherOpen = false
@@ -6272,30 +6436,37 @@ export default {
      * · 合并后保留本机条目（它带得动本机 userId 与权限语义），role/joinedAt 以案件库为准；
      * · 云端独有条目的 id 加前缀，避免与本机 id 撞 :key；
      * · **云端条目的 userId 一律抹成 null**——它来自案件库服务器的用户表，和本机
-     *   user.id 是两个 id 空间，撞上同一个数字会让 canWriteProject / canRemoveMember
-     *   把别人的角色当成「我的角色」，把有写权限的人判成只读；
+     *   user.id 是两个 id 空间，撞上同一个数字会让 canRemoveMember
+     *   把别人的角色当成「我的角色」；文档写权限另用本机独立快照；
      * · 云端读取失败静默回落到本机名单，不让工作台因此报错。
      */
     async loadProjectMembers() {
         if (!this.projectInfoLoaded || !this.hasNamedProject) return
+        const projectId = this.projectId
+        const request = this._permissionMembersRequest = (this._permissionMembersRequest || 0) + 1
+        const current = () => !this._collabDisposed && projectId === this.projectId
+          && request === this._permissionMembersRequest
+        this.localProjectMembersLoaded = false
         let local = []
         try {
-            const res = await getProjectMembers(this.projectId)
-            local = res.data || []
+            const res = await getProjectMembers(projectId)
+            if (!current()) return
+            if (!Array.isArray(res?.data) || (res.code != null && res.code !== 0)) throw Error('Invalid project members response')
+            local = res.data
         } catch (e) {
             console.error('Failed to load project members', e)
             return
         }
-        // 本机名单先落地再去问案件库：getCloudMembers 是**走网络**的代理调用，
-        // 库连不上时它会一直等到超时，等在这里的话堆栈整段时间都是空的。
+        this.localProjectMembers = local.map(member => ({ ...member }))
+        this.localProjectMembersProjectId = projectId
+        this.localProjectMembersLoaded = true
+        // 本机名单先落地；云端网络结果只更新展示，不改变本机权限快照。
         this.projectMembers = local
         if (!(this.collabCloud && this.collabCloud.linked)) return
         try {
-            const res = await getCloudMembers(this.projectId)
+            const res = await getCloudMembers(projectId)
+            if (!current()) return
             const cloudMembers = (res && res.data && res.data.members) || []
-            // 去重键（accountId → username → 云端 awd_ 前缀）与合并规则在
-            // utils/mergeMembers.js，配单测；同一个官网账户在两张表里叫两个名字
-            // （本机 hanzewei / 案件库 awd_hanzewei）曾让一个人显示成两个人（#625）。
             this.projectMembers = mergeMembers(local, cloudMembers)
         } catch (e) {
             console.warn('[Collab] 读取案件库参与人失败，只显示本机名单', e)
@@ -6550,6 +6721,8 @@ export default {
     toggleAiPanel() {
       // 无项目态右栏 AI 不渲染（会话按项目隔离，spec 2026-09-29 §4），菜单 / 快捷键进来也不开
       if (!this.hasProject) return
+      // 对话模式下主屏就是对话，关闭按钮不收起 AI 面板
+      if (this.isChatMode) return
       this.showAiPanel = !this.showAiPanel
       if (this.showAiPanel) this.aiPanelMounted = true
       this.$nextTick(() => {
@@ -7346,7 +7519,8 @@ export default {
           uni.showToast({ title: this.$t('workbench.selectReplaceContentFirst'), icon: 'none' })
           return
         }
-        await this.libreOfficeExecutor.executeCommand('replace_selection', { text: markdownToPlainText(message.content) })
+        const result = await this.libreOfficeExecutor.executeCommand('replace_selection', { text: markdownToPlainText(message.content) })
+        if (!result || result.success === false) throw new Error(result?.message || this.$t('workbench.replaceFailed'))
         uni.showToast({ title: this.$t('workbench.selectionReplaced'), icon: 'success' })
         return
       } catch (e) {

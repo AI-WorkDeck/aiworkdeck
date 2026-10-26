@@ -474,6 +474,8 @@ public class SkillRegistry {
         skill.setTriggers(asStringList(raw.get("triggers")));
         skill.setAllowedTools(asStringList(raw.get("allowed_tools")));
         applyToolPolicy(skill, raw.get("tool_policy"));
+        SkillDefinition.VerificationPolicy.parse(asString(raw.get("verification_policy")))
+                .ifPresent(skill::setVerificationPolicy);
         skill.setOutput(asString(raw.get("output")));
         skill.setRequires(asStringList(raw.get("requires")));
         skill.setCategory(asString(raw.get("category")));

@@ -17,7 +17,7 @@ export default {
     search: '搜索',
     tts: '语音合成',
     desensitize: '文件脱敏',
-    version: '版本',
+    version: '版本控制',
     calendar: '日历',
   },
   tools: {

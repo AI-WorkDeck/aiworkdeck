@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "workspaceNavigation": "Workspace",
+  "workspaceAiActions": "AI assistance",
+  "workspaceAbout": "About this plugin",
+  "workspaceState": {
+    "active": "In view",
+    "open": "In a tab",
+    "closed": "Open"
+  },
   "litRefresh": "รีเฟรช",
   "litNoGraphvizNotice": "เครื่องนี้ไม่มี graphviz จึงไม่สามารถวาดผังกระบวนการได้ชั่วคราว แต่อีกหกประเภท เช่น เส้นเวลาเหตุการณ์ แผนผังความสัมพันธ์ แผนผังโครงสร้างผู้ถือหุ้น และอื่น ๆ ยังคงใช้งานได้ตามปกติ",
   "litNewDiagramSectionTitle": "สร้างแผนผังใหม่",

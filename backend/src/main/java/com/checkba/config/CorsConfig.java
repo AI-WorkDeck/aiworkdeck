@@ -117,7 +117,7 @@ public class CorsConfig {
             // （页面在 dev/打包端口上，后端在 127.0.0.1:52xx），带自定义头一定触发预检——
             // 漏了这两个名字，**整条 SSE 建连会被浏览器拦在预检上**，表现是对话完全不出字，
             // 而后端日志里干干净净（请求根本没到）。实测就是这么撞上的。
-            response.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Session-Id, X-App-Language, X-Client-Instance, Last-Event-ID, Cache-Control, Pragma, X-File-Offset, X-File-Total-Size");
+            response.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Session-Id, X-App-Language, X-Client-Instance, Last-Event-ID, Cache-Control, Pragma, X-File-Offset, X-File-Total-Size, X-AWD-Content-Protocol, X-AWD-Operation-Id, X-AWD-File-Uid, X-AWD-Actor-Id, X-AWD-Expected-SHA256, X-AWD-Content-Length");
             response.setHeader("Access-Control-Max-Age", "3600");
             response.setHeader("Access-Control-Expose-Headers", "Content-Disposition, X-Suggested-Filename");
 

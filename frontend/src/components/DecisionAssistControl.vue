@@ -34,17 +34,17 @@ export default {
 </script>
 
 <style scoped>
-.decision-assist { margin: var(--awd-space-2) 0 0; border: none; background: transparent; color: var(--awd-text-2); }
-.decision-assist-summary { display: flex; align-items: center; gap: var(--awd-space-2); min-height: 28px; box-sizing: border-box; padding: var(--awd-space-1) 0; list-style: none; font-size: var(--awd-panel-fs); line-height: 1.5; cursor: pointer; }
+.decision-assist { margin: 0; border: none; background: transparent; color: var(--awd-text-2); }
+.decision-assist-summary { display: flex; align-items: center; gap: var(--awd-space-2); min-height: 36px; box-sizing: border-box; padding: 8px 6px; border-radius: var(--awd-radius-md); list-style: none; font-size: var(--awd-panel-fs); line-height: 1.5; cursor: pointer; }
 .decision-assist-summary::-webkit-details-marker { display: none; }
-.decision-assist-summary::before { content: ''; width: 5px; height: 5px; flex-shrink: 0; margin: 0 3px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); }
+.decision-assist-summary::before { content: ''; width: 5px; height: 5px; flex-shrink: 0; margin: 0 3px 0 0; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); }
 .decision-assist[open] > .decision-assist-summary::before { transform: rotate(45deg); }
-.decision-assist-summary:hover { color: var(--awd-accent-text); }
+.decision-assist-summary:hover { color: var(--awd-accent-text); background: var(--awd-accent-wash); }
 .decision-assist-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; border-radius: var(--awd-radius-sm); }
 .decision-assist-entry { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.decision-assist-summary-state { flex-shrink: 0; font-size: var(--awd-panel-fs-meta); }
+.decision-assist-summary-state { flex-shrink: 0; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
 .enabled .decision-assist-summary-state { color: var(--awd-accent-text); font-weight: 600; }
-.decision-assist-body { padding: var(--awd-space-2) 0; }
+.decision-assist-body { padding: 4px 6px 12px 22px; }
 .decision-assist-switch { display: flex; align-items: center; gap: 7px; width: 100%; margin: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--awd-text); font: inherit; font-size: 12px; line-height: 1.5; text-align: left; cursor: pointer; }
 .decision-assist-switch::after { border: 0; }
 .decision-assist-switch:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 3px; }

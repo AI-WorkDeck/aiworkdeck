@@ -301,21 +301,16 @@
       </view>
     </view>
 
-    <view v-if="enableTagView && viewMode !== 'recycle'" class="file-browse-controls" @mousedown.stop>
-      <view class="file-browse-tabs" role="group" :aria-label="$t('files.tagViewFolders')">
-        <component :is="'button'" type="button" class="file-browse-tab" :class="{ active: !tagView }" :aria-pressed="!tagView" @click="setTagView(false)">{{ $t('files.tagViewFolders') }}</component>
-        <component :is="'button'" type="button" class="file-browse-tab" :class="{ active: tagView }" :aria-pressed="tagView" @click="setTagView(true)">{{ $t('files.tagViewTags') }}</component>
-      </view>
-      <TagFilter v-if="isTagView" :tags="projectTags" :model-value="selectedTagIds" :counts="tagFileCounts" :loading="tagsLoading" :error="tagsError" @update:model-value="setTagFilter" @retry="refreshProjectTags" />
-      <view v-if="isTagView" class="tag-view-summary" aria-live="polite">
-        <text v-if="!selectedTagIds.length">{{ $t('files.tagViewAllTagged') }}</text>
-        <text>{{ $t('files.tagViewFileCount', { count: displayFiles.length }) }}</text>
-      </view>
+    <view v-if="isTagView" class="tag-view-summary" aria-live="polite">
+      <component :is="'button'" type="button" class="tag-view-back" @click.stop="setTagView(false)">
+        <text aria-hidden="true">‹</text> {{ $t('files.tagViewFolders') }}
+      </component>
+      <text>{{ $t('files.tagViewFileCount', { count: displayFiles.length }) }}</text>
     </view>
 
     <view
       class="tree-content"
-      :class="{ 'external-drag-over': externalDragActive || stagingDragOver, 'view-mode-recycle': viewMode === 'recycle', 'view-mode-tags': isTagView }"
+      :class="{ 'external-drag-over': externalDragActive || stagingDragOver, 'view-mode-recycle': viewMode === 'recycle', 'view-mode-tags': isTagView, 'has-tag-sidebar': enableTagView && viewMode !== 'recycle' }"
       @contextmenu.prevent="onBlankContextMenu"
       @mousedown="onMarqueeStart" @mousemove="onMarqueeMove" @mouseup="onMarqueeEnd" @tap="closeContextMenu"
       @dragenter="onTreeDragEnter" @dragover="onTreeDragOver" @dragleave="onTreeDragLeave" @drop="onTreeDrop"
@@ -657,6 +652,23 @@
         <!-- #endif -->
       </view> <!-- Close tree-list -->
 
+      <TagFilter
+        :key="projectId"
+        v-if="enableTagView && viewMode !== 'recycle'"
+        class="file-tag-sidebar"
+        @mousedown.stop
+        @contextmenu.stop
+        sidebar
+        :browsing="isTagView"
+        :tags="projectTags"
+        :model-value="selectedTagIds"
+        :counts="tagFileCounts"
+        :loading="tagsLoading"
+        :error="tagsError"
+        @update:model-value="setTagFilter"
+        @browse-all="showAllTaggedFiles"
+        @retry="refreshProjectTags"
+      />
     </view> <!-- Close tree-content -->
 
     <!-- 文档对比按钮（选中 2 个文档时显示） -->
@@ -938,6 +950,7 @@ export default {
       showTagEditDialog: false,
       projectTags: [],
       tagView: false,
+      tagFolderScrollTop: 0,
       selectedTagIds: [],
       tagsLoading: false,
       tagsError: '',
@@ -1196,6 +1209,7 @@ export default {
           this.$refs?.createMenu?.close()
           this.refCounts = {}
           this.tagView = false
+          this.tagFolderScrollTop = 0
           this.selectedTagIds = []
           this.projectTags = []
           this.tagsError = ''
@@ -3788,13 +3802,27 @@ export default {
 
     // Tag Methods
     setTagView(value) {
+      const previous = this.isTagView
+      const container = this.$el?.querySelector?.('.tree-content')
+      const projectId = this.projectId
+      if (value && !previous) this.tagFolderScrollTop = container?.scrollTop || 0
       this.tagView = value
+      if (!value) this.selectedTagIds = []
       this.resetTagSelection()
-      if (value) this.refreshProjectTags()
+      if (value && !previous) this.refreshProjectTags()
+      if (container && (value || previous)) this.$nextTick(() => {
+        if (this.projectId === projectId && this.isTagView === value) {
+          container.scrollTop = value ? 0 : this.tagFolderScrollTop
+        }
+      })
     },
     setTagFilter(ids) {
       this.selectedTagIds = ids
-      this.resetTagSelection()
+      this.setTagView(ids.length > 0)
+    },
+    showAllTaggedFiles() {
+      this.selectedTagIds = []
+      this.setTagView(true)
     },
     resetTagSelection() {
       // A hidden selection must never leak into a later batch delete/move.
@@ -4055,21 +4083,19 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.file-browse-controls { flex-shrink: 0; min-width: 0; }
-.file-browse-tabs { display: flex; gap: var(--awd-space-1); margin: var(--awd-panel-gap) var(--awd-panel-pad-x); }
-.file-browse-tab {
-  flex: 1; min-width: 0; margin: 0; padding: 0 var(--awd-space-2);
-  font-size: var(--awd-font-size-body); line-height: var(--awd-control-height);
-  border: 1px solid var(--awd-border); border-radius: var(--awd-panel-radius);
-  background: transparent; color: var(--awd-text-2); cursor: pointer;
-  &::after { border: 0; }
-  &.active { background: var(--awd-accent-soft); color: var(--awd-accent-text); border-color: var(--awd-accent); }
-  &:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
-}
+.file-tag-sidebar { margin-top: var(--awd-panel-gap-lg); }
+.tree-content.has-tag-sidebar > .tree-list { height: auto; }
 .tag-view-summary {
-  display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--awd-space-1);
-  padding: var(--awd-space-2) var(--awd-panel-pad-x); font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2);
-  border-bottom: 1px solid var(--awd-border);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--awd-space-1);
+  padding: var(--awd-space-1) var(--awd-panel-pad-x); font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2);
+}
+.tag-view-back {
+  display: flex; align-items: center; gap: var(--awd-space-1); margin: 0; padding: 0 var(--awd-space-1);
+  min-height: var(--awd-panel-sec-h); border: 0; border-radius: var(--awd-panel-radius);
+  background: transparent; color: var(--awd-panel-text); font: inherit; cursor: pointer;
+  &::after { border: 0; }
+  &:hover { background: var(--awd-panel-hover); }
+  &:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent-text); outline-offset: var(--awd-focus-offset); }
 }
 .view-mode-tags .tree-item-content { height: auto; min-height: 48px; flex-wrap: wrap; gap: 0 var(--awd-space-1); padding-block: var(--awd-space-1); }
 .tag-file-location { flex-basis: 100%; padding-left: 32px; box-sizing: border-box; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
@@ -4141,6 +4167,7 @@ export default {
 
 .tree-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 
   /* Custom Scrollbar */

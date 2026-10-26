@@ -16,6 +16,7 @@ const PRESENTATION = readFileSync(new URL('../../src/composables/writingAssistan
 
 function makeVm() {
   const body = EDITOR.match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import OfficeNavigation from .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
   const options = new Function('ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar',
     'createAuthorNameResolver', 'getCurrentUser', 'fetchAuthUser', body)(

@@ -79,11 +79,6 @@ export const LEFT_SIDEBAR_PLUGINS = [
     ]
   },
   {
-    key: 'messages',
-    get label() { return t('messageCenter.title') },
-    svgPaths: [{ d: 'M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z' }]
-  },
-  {
     key: 'dd-client',
     get label() { return t('ddWorkflow.clientWorkspace') },
     svgPaths: [{ d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }, { d: 'M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0' }, { d: 'M16 11l2 2 4-4' }]
@@ -172,6 +167,7 @@ export function getPluginsForUser(role, { cloudTrack = false } = {}) {
  * 判不出这份案卷有没有放进案件库，宁可落在资源管理器也不落在一个可能不存在的面板上。
  */
 const LEFT_PANE_KEY_ALIASES = {
+  messages: 'files', // 消息入口已迁至右上角头像，不再占左栏（dev-board#1490）。
   search: 'plugin-search', voice: 'plugin-voice', calendar: 'plugin-calendar', favorites: 'plugin-favorites', clipboard: 'plugin-clipboard', insight: 'plugin-insight', tmeet: 'plugin-tencent-meeting',
   desensitize: 'plugin-desensitize',
   'litigation-visual': 'plugin-litigation-visual',

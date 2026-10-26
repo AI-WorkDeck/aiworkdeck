@@ -22,16 +22,31 @@ import java.util.Map;
 public class DesktopHealthController {
     private final DataSource dataSource;
     private final ApplicationAvailability availability;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.localcore.LocalCoreBootstrap localCore;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.localcore.LocalCoreApplication localApplication;
 
     public DesktopHealthController(DataSource dataSource, ApplicationAvailability availability) {
         this.dataSource = dataSource;
         this.availability = availability;
     }
 
+    /** Full backend path for the startup probe. The early core implements its own narrower readiness. */
+    @GetMapping("/api/desktop/startup-health")
+    public ResponseEntity<Map<String, Object>> startupHealth() {
+        ResponseEntity<Map<String, String>> health = health();
+        if (!health.getStatusCode().is2xxSuccessful()) return ResponseEntity.status(health.getStatusCode()).body(Map.of("status", "DOWN"));
+        var body = new java.util.HashMap<String, Object>(health.getBody());
+        body.put("phase", "full");
+        body.put("coreContentProtocol", localApplication == null ? 0 : localApplication.contentProtocolVersion());
+        return ResponseEntity.ok(body);
+    }
+
     @GetMapping("/api/desktop/health")
     public ResponseEntity<Map<String, String>> health() {
         // A listening server/database can precede repository validation, runners and ready listeners.
-        if (availability.getReadinessState() != ReadinessState.ACCEPTING_TRAFFIC) {
+        if (availability.getReadinessState() != ReadinessState.ACCEPTING_TRAFFIC || (localCore != null && !localCore.isFullReady())) {
             return ResponseEntity.status(503).body(Map.of("status", "DOWN"));
         }
         // Desktop Hikari acquisition is bounded to 2s; no business transactions or project locks.

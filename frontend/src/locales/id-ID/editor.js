@@ -2,6 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "navigation": {
+    "slides": "Slides",
+    "sheets": "Sheets",
+    "slideLabel": "Slide {n}, {name}",
+    "loading": "Loading…",
+    "loadFailed": "Could not load navigation",
+    "switchFailed": "Could not switch. Please retry.",
+    "previewFailed": "Preview unavailable"
+  },
   "visualReview": {
     "title": "Pemeriksaan tata letak",
     "pagesTitle": "Pemeriksaan tata letak: pilih halaman",
@@ -58,6 +67,10 @@ export default {
     "noPendingChanges": "Tidak ada perubahan tertunda",
     "saveFailed": "Gagal menyimpan",
     "movedSaveFailed": "Berkas dipindahkan atau diganti nama; perubahan belum disimpan",
+    "versionSaveBusy": "Version history is busy; changes are not saved yet. Please retry shortly.",
+    "localVersionSaveBusy": "Version history is busy; the save result is unconfirmed. Please retry shortly.",
+    "contentSaveReloadRequired": "The earlier save was stopped. Save a copy of your edits, then reload the file.",
+    "contentSaveConflict": "The file changed elsewhere. Save a copy of your edits, then reopen the file.",
     "desktopOnly": "Hanya aplikasi desktop"
   },
   "boot": {

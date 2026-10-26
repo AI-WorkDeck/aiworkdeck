@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 文件整理与归档内置工作流（懒人模式，dev-board#1438）：
+# 梳理项目文件目录结构、按业务/交易阶段或法律逻辑建立目录并批量重命名/归档。
+# 采用 passthrough 工具策略，不裁剪任何工具。
+id: file-organization
+name: 文件整理
+name_en: File Organization
+builtin_workflow: true
+description: 梳理当前项目中的文件与目录结构，按案件阶段、交易主体或底稿类别归纳分类，支持先给出结构化归档方案或直接通过批量移动与重命名整理项目文件树。
+
+author: AI Workdeck
+author_url: https://www.aiworkdeck.com
+version: 1.0.0
+license: AGPL-3.0-or-later
+
+category: 尽职调查
+
+languages:
+  - zh-CN
+  - en-US
+
+triggers:
+  - 整理当前项目目录中的文件
+  - 整理当前项目中的文件
+  - 整理项目文件
+  - 文件整理
+  - 文件目录整理
+  - 归档项目文件
+  - 整理底稿文件
+  - 批量整理文件
+
+triggers_en:
+  - organize the files in the current project
+  - organize project files
+  - file organization
+  - sort and archive project files
+  - organize working papers
+
+prompt: prompt.md
+
+tool_policy: passthrough
+allowed_tools:
+  - list_files
+  - search_project_files
+  - extract_file_text
+  - create_folder
+  - move_files_batch
+  - move_project_file
+  - rename_project_file
+  - copy_files
+  - move_to_trash
+
+output: |
+  按「当前目录盘点 → 分类与命名规则 → 已执行的整理动作（或待确认的归档方案）→ 需人工核实的零散/存疑文件」结构汇报；
+  需要实际移动多个文件时优先使用 move_files_batch 一次性批量提交，避免逐个移动耗尽步数预算。
+
+output_en: |
+  Report in the structure: "Current Directory Inventory -> Classification & Naming Rules -> Executed Moves/Renames (or Proposed Archiving Plan) -> Ambiguous Files Requiring Human Confirmation".
+  When moving multiple files, always batch operations with move_files_batch in a single step rather than moving files one by one.

@@ -33,6 +33,7 @@ const Vue = await import('vue')
 const { bindHorizontalWheel } = await import('../../src/utils/horizontalWheel.js')
 const { watchScrollEdges, scrollViewMain, scrollEdges } = await import('../../src/utils/scrollEdges.js')
 const { CN_FONT_SIZES, PT_FONT_SIZES } = await import('../../src/utils/paragraphFormat.js')
+const viewPrefs = await import('../../src/utils/editorViewPrefs.js')
 
 // ---- 1) uni-h5 ScrollView 渲染结构金丝雀 ----
 test('金丝雀：uni-h5 的 scroll-view 仍是 uni-scroll-view > div > div(滚动层) > .uni-scroll-view-content', () => {
@@ -132,14 +133,15 @@ function loadToolbarOptions() {
     "import { isEnglish } from '@/utils/appLanguage.js'",
     "import { host } from '@/services/host.js'",
     "import { CN_FONT_SIZES, PT_FONT_SIZES } from '@/utils/paragraphFormat.js'",
+    "import { MARK_OPTIONS, readViewPrefs, writeViewPrefs, getWriterViewOptions } from '@/utils/editorViewPrefs.js'",
     "import ParagraphFormatPanel from './ParagraphFormatPanel.vue'",
     "import SystemFontsPanel from './SystemFontsPanel.vue'",
   ], 'EditorToolbar 的 import 变了，本测试的注入表要跟上')
   const body = script.replace(/^import .*$/gm, '').replace(/export\s+default/, 'return')
   // eslint-disable-next-line no-new-func
   return new Function('bindHorizontalWheel', 'watchScrollEdges', 'isEnglish', 'host',
-    'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel', body)(
-    bindHorizontalWheel, watchScrollEdges, () => false, {}, CN_FONT_SIZES, PT_FONT_SIZES, {}, {})
+    'CN_FONT_SIZES', 'PT_FONT_SIZES', 'ParagraphFormatPanel', 'SystemFontsPanel', ...Object.keys(viewPrefs), body)(
+    bindHorizontalWheel, watchScrollEdges, () => false, {}, CN_FONT_SIZES, PT_FONT_SIZES, {}, {}, ...Object.values(viewPrefs))
 }
 
 async function mountToolbar() {

@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "workspaceNavigation": "工作区",
+  "workspaceAiActions": "AI 协助",
+  "workspaceAbout": "关于此插件",
+  "workspaceState": {
+    "active": "当前显示",
+    "open": "已打开",
+    "closed": "打开"
+  },
   "litRefresh": "重新整理",
   "litNoGraphvizNotice": "这台机器没有 graphviz，流程图暂时画不了；时间轴、关系图、股权结构树等六种照常。",
   "litNewDiagramSectionTitle": "出一张新图",

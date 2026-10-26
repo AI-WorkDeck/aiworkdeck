@@ -89,6 +89,27 @@ public class EditorBridgeService {
      */
     private final ConcurrentHashMap<String, PendingAction> pendingRequests = new ConcurrentHashMap<>();
 
+    // Version writes may start only while their original AI run is still live.
+    private final ConcurrentHashMap<String, Object> versionRunTokens = new ConcurrentHashMap<>();
+
+    public Object versionRunToken(String conversationId) {
+        return conversationId == null ? null : versionRunTokens.get(conversationId);
+    }
+
+    public boolean claimVersionAction(String conversationId, Object token, Runnable claim) {
+        if (token == null) return false;
+        synchronized (token) {
+            if (versionRunTokens.get(conversationId) != token) return false;
+            claim.run();
+            return true;
+        }
+    }
+
+    private void retireVersionRun(String conversationId) {
+        Object token = versionRunTokens.get(conversationId);
+        if (token != null) synchronized (token) { versionRunTokens.remove(conversationId, token); }
+    }
+
     /** 一次在途的编辑器命令：它属于哪个会话，以及谁在等它。 */
     private record PendingAction(String conversationId, CompletableFuture<EditorActionResult> future) {}
     
@@ -238,7 +259,7 @@ public class EditorBridgeService {
 
     static int timeoutSecondsFor(String action) {
         // Host-level save/reload handshake, not a worker/relay action.
-        if ("doc_checkpoint_restore".equals(action)) return 180;
+        if ("doc_checkpoint_restore".equals(action) || "project_version_action".equals(action)) return 180;
         if (action == null) return EDITOR_ACTION_TIMEOUT; // Map.of 对 null 键抛 NPE
         return ACTION_TIMEOUT_SECONDS.getOrDefault(action, EDITOR_ACTION_TIMEOUT);
     }
@@ -252,6 +273,8 @@ public class EditorBridgeService {
     /** 新一轮（新用户消息）开始：清空本轮的整段插入登记、生成物登记与「等组件」标记。 */
     public void clearForNewRun(String conversationId) {
         if (conversationId == null) return;
+        retireVersionRun(conversationId);
+        versionRunTokens.put(conversationId, new Object());
         dispatchedBulkInserts.remove(conversationId);
         generatedThisRun.remove(conversationId);
         componentWaits.remove(conversationId);
@@ -267,6 +290,7 @@ public class EditorBridgeService {
         if (conversationId == null) return;
         cancelPendingActions(conversationId);
         clearForNewRun(conversationId);
+        retireVersionRun(conversationId);
         activeDocKeys.remove(conversationId);
         streamingModes.remove(conversationId);
         streamWroteContent.remove(conversationId);
@@ -831,6 +855,7 @@ public class EditorBridgeService {
      */
     public int cancelPendingActions(String conversationId) {
         if (conversationId == null) return 0;
+        retireVersionRun(conversationId);
         int released = 0;
         for (PendingAction pending : pendingRequests.values()) {
             if (conversationId.equals(pending.conversationId()) && pending.future().cancel(false)) {

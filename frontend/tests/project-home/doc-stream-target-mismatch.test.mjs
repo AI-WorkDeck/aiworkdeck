@@ -105,7 +105,7 @@ test('doc_open_file_sync 建立流式会话时必须把目标 fileId 记下来�
   const src = stripComments(read('pages/project-overview/agentClientActions.js'))
   const start = src.indexOf('async _handleEditorOpenFileSyncImpl(action)')
   assert.ok(start > 0, '找不到 _handleEditorOpenFileSyncImpl')
-  const body = src.slice(start, start + 3000)
+  const body = src.slice(start, src.indexOf('\n    },', start))
   assert.match(body, /this\._docStreamTargetFileId\s*=\s*file\.id/,
     '第 5 步重置缓冲时必须绑定这条流式会话的目标文件')
   // 必须排在重置缓冲之后（同一批状态复位），在返回成功结果之前

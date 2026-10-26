@@ -835,6 +835,33 @@ public class WorkSessionService {
     }
 
     /**
+     * Upload/text publication uses the existing snapshot lock. Callers must finish receiving network
+     * bytes before entering, start their own short DB transactions inside, and notify after returning.
+     * In particular an owner/quota DB lock must never be held while waiting for this lock.
+     */
+    public <T> T withFileContentWriteLock(long projectId, java.util.function.Supplier<T> body) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Content writes cannot enter with an active database transaction");
+        }
+        ReentrantLock lock = repoLock(projectId);
+        try {
+            if (!lock.tryLock(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                throw VersionException.busy(LangText.of("正在整理版本，请稍后重试保存", "Version history is busy; please retry saving shortly"));
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw VersionException.busy(LangText.of("保存等待已中断，请重试", "Save wait was interrupted; please retry"));
+        }
+        try {
+            if (deletedProjects.contains(projectId)) throw VersionException.userFacing(
+                    LangText.of("项目已删除", "Project has been deleted"));
+            return body.get();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
      * pre-receive 停靠：HEAD 在主线、工作区脏、又没有工作段兜着（「脏但无段」）时，
      * 先落一笔无主 auto 存档。master 因此前进，这次 push 的 old-sha 对不上会被
      * git 原生拒绝——客户端走「被拒 → 从云端更新 → 重推」的正常循环，
@@ -1064,8 +1091,13 @@ public class WorkSessionService {
             if (onDraftBranch(projectId)) {
                 return endSessionOnDraft(projectId, userId, userName, title);
             }
-            WorkSession s = activeSession(projectId)
-                    .orElseThrow(() -> VersionException.userFacing(LangText.of("当前没有进行中的工作", "No work session in progress")));
+            WorkSession s = activeSession(projectId).orElseGet(() -> {
+                // 插件或 AI 直接落文件可能没有发改动信号；显式提交时只为真实改动补开工作段。
+                if (repoService.pendingChanges(projectId).isEmpty()) {
+                    throw VersionException.userFacing(LangText.of("当前没有进行中的工作", "No work session in progress"));
+                }
+                return ensureSession(projectId, userId, userName);
+            });
 
             cancelPending(projectId);
             commitNow(projectId, userId, userName, null);

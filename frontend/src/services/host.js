@@ -104,8 +104,8 @@ function desktopZetaoffice(native) {
       api: {
         ...native.zetaoffice,
         isAvailable: async () => true, // 引擎随包分发，必然在
-        getEditor: async () => {
-          const info = await native.zetaoffice.getEditor() // { url, preload, partition, kind? }
+        getEditor: async (options) => {
+          const info = await native.zetaoffice.getEditor(options) // { url, preload, partition, kind? }
           const normalized = info && typeof info === 'object' ? { ...info } : {}
           if (!normalized.kind) delete normalized.kind
           return { kind: info?.kind || 'webview', ...normalized }

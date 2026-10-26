@@ -306,7 +306,12 @@ export function useAgentStream() {
         // 用户点停止后的提示条文案。刻意不并进 content：content 是「模型正文」，
         // 会触发 isReady/hasContent/「用到文档」操作 chip 的判定，系统提示写进去
         // 会让一个空产出的回合长出可插入文档的操作项（dev-board#212）。
-        stopNotice: ''
+        stopNotice: '',
+        // Harness 运行期自愈 / 收尾核验 / 自进化（dev-board#1481）：分别由 harness_adaptation、
+        // verification_report、harness_evolution 三条 SSE 事件填充，供过程卡与根气泡卡片展示。
+        harnessAdaptations: [],
+        verificationReport: null,
+        harnessEvolution: null
     })
 
     const clearDocStreamingPlaceholder = (bubble) => {
@@ -790,6 +795,9 @@ export function useAgentStream() {
             || (bubble.thinking && bubble.thinking.content)
             || (Array.isArray(bubble.processes) && bubble.processes.length)
             || (Array.isArray(bubble.artifacts) && bubble.artifacts.length)
+            || bubble.verificationReport
+            || bubble.harnessEvolution
+            || (Array.isArray(bubble.harnessAdaptations) && bubble.harnessAdaptations.length)
         )
     )
 
@@ -1244,13 +1252,22 @@ export function useAgentStream() {
                     name: s.name || s.id,
                     source: s.source === 'manual' ? 'manual' : 'auto',
                     builtinWorkflow: !!s.builtinWorkflow,
+                    versionId: s.versionId || 'default',
+                    versionName: s.versionName || '',
+                    customVersion: !!s.customVersion,
                     justActivated: freshAuto.some(f => f.id === s.id)
                 }))
                 if (freshAuto.length) {
+                    const first = freshAuto[0]
+                    const display = first.customVersion && first.versionName
+                        ? `${first.name || first.id} · ${first.versionName}`
+                        : (first.name || first.id)
                     skillNotice.value = {
-                        id: freshAuto[0].id,
-                        name: freshAuto[0].name || freshAuto[0].id,
-                        builtinWorkflow: !!freshAuto[0].builtinWorkflow,
+                        id: first.id,
+                        name: display,
+                        builtinWorkflow: !!first.builtinWorkflow,
+                        versionName: first.versionName || '',
+                        customVersion: !!first.customVersion,
                         at: Date.now()
                     }
                     clearSkillFlash()
@@ -1282,6 +1299,55 @@ export function useAgentStream() {
                 }
             } catch (e) {
                 console.error('Failed to parse model_routed', e)
+            }
+            return
+        }
+
+        // Harness² 对齐（dev-board#1481）：运行期自愈、收尾核验报告与自进化提案。
+        // 与 ask_user 同理放在气泡守卫之前，指针为空时挂到最后一个助手气泡上。
+        if (evt === 'harness_adaptation' || evt === 'verification_report' || evt === 'harness_evolution') {
+            try {
+                const payload = JSON.parse(dataStr)
+                if (!payload || typeof payload !== 'object') return
+                let target = currentAssistantBubble.value
+                if (!target) {
+                    const last = bubbles.value[bubbles.value.length - 1]
+                    if (last && last.role === 'ASSISTANT') target = last
+                }
+                if (!target) return
+                if (evt === 'harness_adaptation') {
+                    if (!Array.isArray(target.harnessAdaptations)) target.harnessAdaptations = []
+                    if (!target.harnessAdaptations.some(a => a.id && a.id === payload.id)) {
+                        target.harnessAdaptations.push(payload)
+                    }
+                    // 挂到对应工具的最近一条过程上，过程卡内联展示「诊断 → 处方」
+                    const procs = Array.isArray(target.processes) ? target.processes : []
+                    for (let i = procs.length - 1; i >= 0; i--) {
+                        const p = procs[i]
+                        const code = String(p?.toolCode || p?.code || p?.name || '')
+                        if (!payload.toolName || code.includes(payload.toolName) || i === procs.length - 1) {
+                            if (!Array.isArray(p.harnessAdaptations)) p.harnessAdaptations = []
+                            if (!p.harnessAdaptations.some(a => a.id && a.id === payload.id)) {
+                                p.harnessAdaptations.push(payload)
+                            }
+                            if (Array.isArray(target.timeline)) {
+                                for (let ti = target.timeline.length - 1; ti >= 0; ti--) {
+                                    const tEntry = target.timeline[ti]
+                                    if (tEntry?.type === 'process' && (tEntry.source === p || tEntry.data?.id === p.id)) {
+                                        tEntry.data.harnessAdaptations = p.harnessAdaptations
+                                    }
+                                }
+                            }
+                            break
+                        }
+                    }
+                } else if (evt === 'verification_report') {
+                    target.verificationReport = payload
+                } else {
+                    target.harnessEvolution = payload
+                }
+            } catch (e) {
+                console.error(`Failed to parse ${evt}`, e)
             }
             return
         }
@@ -2326,6 +2392,7 @@ export function useAgentStream() {
                     title: processTitle,
                     isExpanded: true,
                     items: [], // CHANGED: from steps -> items
+                    harnessAdaptations: [],
                     content: '',
                     stepIndex: stepIdx,
                     stepTitle: stepIdx >= 0 ? (planTodos.value[stepIdx].content || '') : ''

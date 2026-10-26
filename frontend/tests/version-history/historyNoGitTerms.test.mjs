@@ -11,16 +11,21 @@ import en from '../../src/locales/en-US/version.js'
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8')
 
-const ZH_BANNED = /主线|分支|提交|哈希|git|commit/i
-const EN_BANNED = /mainline|main line|branch|commit|hash|\bgit\b/i
+// #1488: the project-level action explicitly says commit and explains its result.
+// Keep implementation terms out of the rest of the history UI.
+const COMMIT_COPY = new Set(['exitProgressCommitting', 'exitProgressChecking', 'exitPrompt', 'exitCommit', 'exitSkip', 'exitNewChanges', 'exitCheckFailed', 'pendingFileCount', 'changesAutoRecorded', 'commitHistoryHelp',
+  'commitLocalHelp', 'commitCloudHelp', 'committingChanges', 'saveBeforeCommitFailed',
+  'cloudSubmitFirst', 'endSession', 'noActiveSession', 'nameSessionTitle', 'finish'])
+const ZH_BANNED = /主线|分支|哈希|git|commit/i
+const EN_BANNED = /mainline|main line|branch|hash|\bgit\b/i
 
-test('版本记录的中文文案一个 Git 词都不出现（含「主线」「提交」）', () => {
-  const leaks = Object.entries(zh).filter(([, v]) => typeof v === 'string' && ZH_BANNED.test(v))
+test('中文只在全局操作与解释中说提交，不泄露底层 Git 术语', () => {
+  const leaks = Object.entries(zh).filter(([key, v]) => typeof v === 'string' && (ZH_BANNED.test(v) || (!COMMIT_COPY.has(key) && /提交/.test(v))))
   assert.deepEqual(leaks, [])
 })
 
-test('版本记录的英文文案同样不出现 mainline / branch / commit / hash', () => {
-  const leaks = Object.entries(en).filter(([, v]) => typeof v === 'string' && EN_BANNED.test(v))
+test('英文 commit 只用于全局操作与解释，其余底层术语保持隐藏', () => {
+  const leaks = Object.entries(en).filter(([key, v]) => typeof v === 'string' && (EN_BANNED.test(v) || (!COMMIT_COPY.has(key) && /commit/i.test(v))))
   assert.deepEqual(leaks, [])
 })
 

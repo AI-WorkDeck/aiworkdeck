@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { defineConfig } from "vite";
 import uni from "@dcloudio/vite-plugin-uni";
+import { browserSafeChunks } from "./scripts/browser-safe-chunks.mjs";
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [uni()],
+    plugins: [uni(), browserSafeChunks()],
     resolve: {
         alias: {
             "punycode.js": "punycode",

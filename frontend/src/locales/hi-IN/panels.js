@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "workspaceNavigation": "Workspace",
+  "workspaceAiActions": "AI assistance",
+  "workspaceAbout": "About this plugin",
+  "workspaceState": {
+    "active": "In view",
+    "open": "In a tab",
+    "closed": "Open"
+  },
   "litRefresh": "रिफ्रेश करें",
   "litNoGraphvizNotice": "इस मशीन में graphviz नहीं है, इसलिए फ़्लोचार्ट अभी नहीं बनाए जा सकते; बाकी छह प्रकार — टाइमलाइन, संबंध मैप, स्वामित्व संरचना वृक्ष और अधिक — अभी भी काम करते हैं।",
   "litNewDiagramSectionTitle": "नया आरेख बनाएँ",

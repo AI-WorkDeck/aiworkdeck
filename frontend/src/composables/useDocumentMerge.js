@@ -78,10 +78,30 @@ export function useDocumentMerge(deps) {
   const handled = new Set()
   const inflight = new Set()
   // 已经收过尾的冲突，防止两次 /status 各收一次尾
-  const finalized = new Set()
+  const finalized = new Map()
+  const suspended = new Set()
+  let operationGuard
+  let operationApi
+  let writeUncertain = false
 
   const isDesktop = () => (typeof deps.isDesktop === 'function' ? !!deps.isDesktop() : !!deps.isDesktop)
   const t = deps.t || ((k) => k)
+  const requireCurrentOperation = async () => {
+    if (operationGuard && await operationGuard() !== true) {
+      suspended.add(state.conflictKey)
+      throw new Error(t('version.aiActionExpired'))
+    }
+  }
+  const writeMutation = async run => {
+    try { return await run() }
+    catch (error) {
+      if (operationGuard) {
+        suspended.add(state.conflictKey)
+        if (!error.writeSettled) writeUncertain = true
+      }
+      throw error
+    }
+  }
 
   function rowFor(path) {
     return state.rows.find((r) => r.path === path) || null
@@ -131,9 +151,11 @@ export function useDocumentMerge(deps) {
       if (!exported || exported.success === false || !bytes || !bytes.length) {
         return { failed: true, failReason: 'export' }
       }
-      await deps.api.postMergeResolveFile(deps.projectId, {
+      await requireCurrentOperation()
+      await writeMutation(() => operationApi.postMergeResolveFile(deps.projectId, {
         path: row.path, mode: 'auto', decisions: [], bytes, name, ctx: state.ctx,
-      })
+        mainRef: refs.mainRef, otherRef: refs.otherRef,
+      }))
       // 刻意不把 draft.mainCount/otherCount 带出去：那是「这个作者名下有几条修订」，
       // 不是「这一侧改了几处」——两侧同名时它就是 11/0。行上的「处数」一律用后端
       // 三方比对给的 mainChanges/otherChanges（按单元数，与署名无关）。
@@ -143,8 +165,10 @@ export function useDocumentMerge(deps) {
     return out.result
   }
 
-  async function autoMergeStructured(row) {
-    await deps.api.postMergeResolveStructured(deps.projectId, { path: row.path, decisions: [] })
+  async function autoMergeStructured(row, refs) {
+    await requireCurrentOperation()
+    await writeMutation(() => operationApi.postMergeResolveStructured(deps.projectId, { path: row.path, decisions: [],
+      ctx: state.ctx, mainRef: refs.mainRef, otherRef: refs.otherRef }))
     return { merged: true }
   }
 
@@ -167,6 +191,7 @@ export function useDocumentMerge(deps) {
   }
 
   async function finalize(conflict, ctx) {
+    if (writeUncertain) return { merged: false, uncertain: true }
     const paths = (conflict.conflictingPaths || []).length
       ? conflict.conflictingPaths
       : state.rows.map((r) => r.path)
@@ -178,32 +203,40 @@ export function useDocumentMerge(deps) {
     if (!allMerged) {
       state.overviewRequired = true
       if (typeof deps.openOverview === 'function') deps.openOverview()
-      return
+      return { merged: false }
     }
     const key = conflictKey(conflict, ctx) + '|__finalize__'
-    if (finalized.has(key)) return
-    finalized.add(key)
+    if (finalized.has(key)) return { merged: finalized.get(key) }
+    finalized.set(key, false)
     const resolutions = {}
     for (const p of paths) resolutions[p] = 'MERGED'
+    let landed = false
     try {
+      await requireCurrentOperation()
       let res
-      if (ctx === 'cloud') res = await deps.api.resolveCloudMerge(deps.projectId, resolutions)
-      else if (ctx === 'session-end') res = await deps.api.resolveSessionEnd(deps.projectId, conflict.sessionId, resolutions)
-      else res = await deps.api.resolveAdopt(deps.projectId, conflict.draftId, resolutions)
+      if (ctx === 'cloud') res = await writeMutation(() => operationApi.resolveCloudMerge(deps.projectId, resolutions))
+      else if (ctx === 'session-end') res = await writeMutation(() => operationApi.resolveSessionEnd(deps.projectId, conflict.sessionId, resolutions))
+      else res = await writeMutation(() => operationApi.resolveAdopt(deps.projectId, conflict.draftId, resolutions))
       const data = (res && res.data) || {}
+      landed = true
       state.overviewRequired = false
       if (typeof deps.toast === 'function') {
         deps.toast(t('version.mergeAutoDone', { count: paths.length }))
       }
-      if (typeof deps.reloadFiles === 'function') deps.reloadFiles(data.affectedFileIds || [])
+      if (typeof deps.reloadFiles === 'function' && await deps.reloadFiles(data.affectedFileIds || []) === false) {
+        throw new Error(t('version.aiReloadFailed'))
+      }
+      finalized.set(key, true)
+      return { merged: true }
     } catch (e) {
       // 收尾失败不是数据事故（字节已经落在工作区、待决记录也在），但律师要知道
       // 这次没走完——把人带到总览，那里还能手动「确认选择」。
       console.warn('[DocumentMerge] 自动收尾失败', e)
-      finalized.delete(key)
+      if (!landed) finalized.delete(key)
       state.overviewRequired = true
       if (typeof deps.toast === 'function') deps.toast((e && e.message) || t('version.mergeAutoFinalizeFailed'))
       if (typeof deps.openOverview === 'function') deps.openOverview()
+      return { merged: false, ...(writeUncertain ? { uncertain: true } : {}) }
     }
   }
 
@@ -216,12 +249,17 @@ export function useDocumentMerge(deps) {
   // app-e2e J14 实测复现：xlsx + pptx 两份不重叠改动，后端日志里 PptxMerger 跑了两遍
   // （两次并发各合了一次），随后仓库一直停在 MERGING。
   let queue = Promise.resolve()
-  function onConflictStatus(conflict, ctx) {
-    queue = queue.then(() => runConflictStatus(conflict, ctx), () => runConflictStatus(conflict, ctx))
+  function onConflictStatus(conflict, ctx, options = {}) {
+    const guard = options.canContinue || deps.canContinue
+    const api = options.api || deps.api
+    queue = queue.then(() => runConflictStatus(conflict, ctx, guard, api), () => runConflictStatus(conflict, ctx, guard, api))
     return queue
   }
 
-  async function runConflictStatus(conflict, ctx) {
+  async function runConflictStatus(conflict, ctx, guard, api) {
+    operationGuard = guard
+    operationApi = api
+    writeUncertain = false
     if (!conflict) {
       state.rows = []
       state.conflictKey = null
@@ -267,8 +305,14 @@ export function useDocumentMerge(deps) {
 
     // null 状态之后仍可能到达较早的冲突快照；已成功收尾的不重新弹窗或写入。
     if (finalized.has(nextKey + '|__finalize__')) {
-      state.overviewRequired = false
-      return
+      const merged = finalized.get(nextKey + '|__finalize__')
+      state.overviewRequired = !merged
+      return { merged }
+    }
+    if (suspended.has(nextKey)) {
+      state.overviewRequired = true
+      if (typeof deps.openOverview === 'function') deps.openOverview()
+      return { merged: false }
     }
 
     const refs = { mergeBase: conflict.mergeBase, mainRef: conflict.mainlineTip, otherRef }
@@ -294,7 +338,7 @@ export function useDocumentMerge(deps) {
           inflight.add(key)
           try {
             const kind = String(row.kind || '').toUpperCase()
-            const outcome = kind === 'DOCX' ? await autoMergeDocx(row, refs) : await autoMergeStructured(row)
+            const outcome = kind === 'DOCX' ? await autoMergeDocx(row, refs) : await autoMergeStructured(row, refs)
             applyOutcome(row, outcome)
             handled.add(key)
           } catch (e) {
@@ -304,9 +348,10 @@ export function useDocumentMerge(deps) {
           } finally {
             inflight.delete(key)
           }
+          if (writeUncertain) break
         }
       }
-      await finalize(conflict, ctx)
+      return await finalize(conflict, ctx)
     } finally {
       state.running = false
     }
@@ -316,6 +361,7 @@ export function useDocumentMerge(deps) {
   // 不在这里直接重跑——冲突对象（三个 ref、sides、语境）是 /status 给的，
   // 重跑要用的是最新那一份，不是上一轮缓存下来的。
   function retry(path) {
+    suspended.delete(state.conflictKey)
     const row = rowFor(path)
     if (row) { row.failed = false; row.failReason = null }
     for (const key of Array.from(handled)) {
@@ -323,5 +369,6 @@ export function useDocumentMerge(deps) {
     }
   }
 
-  return { onConflictStatus, retry, state }
+  return { onConflictStatus, retry, state,
+    suspend: (conflict, ctx) => suspended.add(conflictKey(conflict, ctx)) }
 }

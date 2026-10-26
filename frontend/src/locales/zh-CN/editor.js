@@ -3,6 +3,15 @@
 // 文档编辑器域：LibreOfficeEditor / ReviewPanel / DocDiffViewer /
 // CompareDocDialog / VariablePanel / DrawioEditor 的用户可见文案。
 export default {
+  navigation: {
+    "slides": "幻灯片",
+    "sheets": "工作表",
+    "slideLabel": "第 {n} 页，{name}",
+    "loading": "正在加载…",
+    "loadFailed": "导航加载失败",
+    "switchFailed": "切换失败，请重试",
+    "previewFailed": "预览暂不可用"
+},
   visualReview: {
     "title": "版面检查",
     "pagesTitle": "版面检查：选择页码",
@@ -64,6 +73,10 @@ export default {
     noPendingChanges: '无待保存更改',
     saveFailed: '保存失败',
     movedSaveFailed: '文件已被移动或改名，改动尚未保存',
+    versionSaveBusy: '正在整理版本，改动尚未保存，请稍后重试',
+    localVersionSaveBusy: '正在整理版本，保存结果待确认，请稍后重试',
+    contentSaveReloadRequired: '旧保存已停止，请先另存当前改动，再重新加载文件',
+    contentSaveConflict: '文件已在别处更新，请先另存当前改动，再重新打开',
     desktopOnly: '仅桌面版可用',
   },
   boot: {
