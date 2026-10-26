@@ -188,6 +188,24 @@ class DdExportServiceTest {
     }
 
     @Test
+    @DisplayName("查验计划：自定义标签按首遇顺序完整保留，旧标签在前、未注明在后")
+    void groupVerifyPlanRetainsCustomMethods() {
+        FileBrief f = brief(11L, "文件.pdf", "pdf");
+        List<LinkView> links = List.of(link(1L, "EVID_A", "一", "标题", "陈述", "active", List.of(
+                target(101L, 11L, f, null),
+                target(102L, 11L, f, "原件核对"),
+                target(103L, 11L, f, "interview"),
+                target(104L, 11L, f, "待补充"),
+                target(105L, 11L, f, "written_review"),
+                target(106L, 11L, f, "原件核对"),
+                target(107L, 11L, f, ""))));
+
+        List<DdExportService.VerifyPlanRow> rows = DdExportService.groupVerifyPlan(links);
+        assertEquals(List.of("written_review", "interview", "原件核对", "原件核对", "待补充", "", ""),
+                rows.stream().map(DdExportService.VerifyPlanRow::method).toList());
+    }
+
+    @Test
     @DisplayName("查验计划：空数据返回空列表")
     void groupVerifyPlanEmpty() {
         assertTrue(DdExportService.groupVerifyPlan(List.of()).isEmpty());

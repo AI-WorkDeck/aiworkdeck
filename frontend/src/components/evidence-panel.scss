@@ -78,7 +78,7 @@
 .ep-quote { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   margin-top: 3px; padding-left: 6px; border-left: 2px solid var(--awd-border);
   font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); line-height: 1.45; word-break: break-all; }
-.ep-chip { padding: 0 6px; border-radius: var(--awd-radius-sm); font-size: var(--awd-panel-fs-meta); background: var(--awd-accent-soft); color: var(--awd-accent-text); }
+.ep-chip { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; padding: 0 6px; border-radius: var(--awd-radius-sm); font-size: var(--awd-panel-fs-meta); background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .ep-chip.none { background: var(--awd-surface-2); color: var(--awd-text-2); }
 .ep-chip.conf { background: var(--awd-info-soft); color: var(--awd-info-text); }
 .ep-chip.rel.contradicts { background: var(--awd-danger-soft); color: var(--awd-danger-text); }
