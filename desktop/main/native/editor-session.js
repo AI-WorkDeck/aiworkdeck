@@ -232,6 +232,37 @@ class NativeEditorSession {
     return this.uno.call(method, { ...params, documentUrl: this.model.documentUrl, nativeReadOnly: this.readOnly,
       nativeDocumentEpoch: this.model.documentEpoch, nativeRevision: this.revision, nativePermissionSeq: this.permissionSeq })
   }
+  async saveBytes() {
+    const local = path.join(this.run, 'export.docx')
+    this.assertWrite()
+    const result = await this.engine.call('save', { documentEpoch: this.model.documentEpoch, path: local })
+    if (result.success !== true) throw Error('Native export failed')
+    return { success: true, bytes: new Uint8Array(await fs.readFile(local)) }
+  }
+  async exportAlreadyInline(params) {
+    this.assertDocument(params.documentEpoch); this.assertWrite()
+    const owner = this.model, permission = this.permissionSeq
+    this.clearViewRead()
+    const revision = this.revision
+    if (params.nativeExpectedRevision !== undefined && params.nativeExpectedRevision !== revision)
+      throw Error('STALE_DOCUMENT_EXPORT: expected revision changed')
+    const check = () => {
+      this.assertDocument(owner.documentEpoch); this.assertWrite()
+      if (this.model !== owner || this.permissionSeq !== permission || this.revision !== revision)
+        throw Error('STALE_DOCUMENT_EXPORT')
+    }
+    const before = await this.unoCall('view')
+    check()
+    if (before.mode !== 'all') return null
+    // The exporter already sees every revision layer. No view transition means
+    // no display callbacks need a full semantic read to be attributed to it.
+    const result = await this.saveBytes()
+    await this.engine.call('selected_text', { documentEpoch: owner.documentEpoch })
+    const after = await this.unoCall('view')
+    check()
+    if (after.mode !== 'all') throw Error('STALE_DOCUMENT_EXPORT: revision view changed during save')
+    return result
+  }
   async load(params) {
     if (params.bytes === undefined) {
       this.assertDocument()
@@ -614,6 +645,12 @@ class NativeEditorSession {
         return this.executeQueued(action, params, pending || ready ? owner : undefined, context)
       }).catch(error => { if (error.message.includes('VIEW_OUTCOME_UNKNOWN')) this.fail(error); throw error })
     }
+    if (action === 'export_document') {
+      return this.task(() => this.exportAlreadyInline(params)).then(result => result || this.executeWithReview(action, params))
+    }
+    return this.executeWithReview(action, params)
+  }
+  executeWithReview(action, params) {
     const finalRead = viewReadActions.has(action) || completionReads.has(action) || ['get_review_context', 'goto_review_range'].includes(action)
       || (action === 'get_document_text' && params.__agent === true)
     if (finalRead) {
@@ -693,13 +730,7 @@ class NativeEditorSession {
       }
       if (action === 'export_document') {
         this.assertWrite()
-        return exportWithInlineRevisions(params => this.unoCall('view', params), async () => {
-          const local = path.join(this.run, 'export.docx')
-          this.assertWrite()
-          const result = await this.engine.call('save', { documentEpoch: this.model.documentEpoch, path: local })
-          if (result.success !== true) throw Error('Native export failed')
-          return { success: true, bytes: new Uint8Array(await fs.readFile(local)) }
-        })
+        return exportWithInlineRevisions(params => this.unoCall('view', params), () => this.saveBytes())
       }
       if (action === 'get_ui_state') return { success: true, ...await this.unoCall('ui_state') }
       if (action === 'get_ruler_state') return { success: true, ...await this.unoCall(action, params) }
