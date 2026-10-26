@@ -49,6 +49,20 @@ export function normalizeContextLimits(raw) {
   }
 }
 
+export function normalizeContextItem(raw) {
+  const item = raw && typeof raw === 'object' ? raw : {}
+  return {
+    id: item.id,
+    name: item.name || item.fileName || '',
+    fileType: item.fileType || '',
+    wpsFileId: item.wpsFileId || null,
+    isDir: Boolean(item.isDir || item.isFolder || item.fileType === 'folder'),
+    projectId: item.projectId || null,
+    projectName: item.projectName || '',
+    readOnly: Boolean(item.readOnly),
+  }
+}
+
 /** 能直送模型的图片扩展名，与后端 ai.context.vision.extensions 一致（**刻意不含 pdf**）。 */
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']
 
@@ -111,7 +125,8 @@ export function contextQuotaState({ contextFiles, pastedImages, limits }) {
 export function admitFileToContext({ file, contextFiles, pastedImages, limits }) {
   const list = Array.isArray(contextFiles) ? contextFiles : []
   if (!file) return { ok: false, reason: 'duplicate' }
-  if (list.some((f) => String(f.id) === String(file.id))) {
+  if (list.some((f) => String(f.id) === String(file.id)
+    && String(f.projectId || '') === String(file.projectId || ''))) {
     // 已经在里面了：不占新额度，也不该报「到顶」——那会让用户以为自己删错了东西
     return { ok: false, reason: 'duplicate' }
   }

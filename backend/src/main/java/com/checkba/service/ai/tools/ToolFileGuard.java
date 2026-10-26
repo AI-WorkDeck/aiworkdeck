@@ -41,6 +41,34 @@ public final class ToolFileGuard {
     }
 
     /**
+     * 读取类工具的跨项目放行（dev-board#1479）：文件属于当前项目 → 放行；
+     * 属于其他项目时，仅当当前用户对该项目有读权限（projectMemberService.hasReadPermission）
+     * 才放行。写/改/移/删工具仍然只用 {@link #rejectIfOutsideProject}，不许跨项目。
+     *
+     * @return 校验不通过时返回给模型的错误串；通过则返回 null。
+     */
+    public static String rejectIfCannotRead(
+            ProjectFile file,
+            com.checkba.service.ProjectMemberService projectMemberService) {
+        if (file == null) return null;
+        Long currentProjectId = ProjectContextHolder.getProjectIdAsLong();
+        if (currentProjectId == null) {
+            return "Error: no project context for this request; refusing to access file " + file.getId() + ".";
+        }
+        if (currentProjectId.equals(file.getProjectId())) {
+            return null;
+        }
+        Long userId = ProjectContextHolder.getUserId();
+        if (userId != null
+                && projectMemberService != null
+                && file.getProjectId() != null
+                && projectMemberService.hasReadPermission(file.getProjectId(), userId)) {
+            return null;
+        }
+        return "Error: file " + file.getId() + " does not belong to the current project.";
+    }
+
+    /**
      * 单次读取类工具交给模型的正文字符上限。
      *
      * <p>口径与 {@code extract_file_text} 既有的 80k 一致——本方法就是把那处硬编码

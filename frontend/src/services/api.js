@@ -1952,6 +1952,21 @@ export function logout() {
   });
 }
 
+export const ensureScratchProject = () => {
+  return request({
+    url: '/api/projects/scratch',
+    method: 'POST'
+  })
+}
+
+export const promoteScratchProject = (projectId, data = {}) => {
+  return request({
+    url: `/api/projects/${projectId}/promote`,
+    method: 'POST',
+    data
+  })
+}
+
 // 获取当前用户的项目列表
 export function getMyProjects() {
   return request({

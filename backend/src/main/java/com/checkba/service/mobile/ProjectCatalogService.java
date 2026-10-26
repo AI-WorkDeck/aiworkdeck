@@ -49,7 +49,7 @@ public class ProjectCatalogService {
     @Transactional
     public List<Map<String, Object>> catalog(Long userId) {
         List<Project> owned = projects.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .filter(p -> !p.isLooseFileWorkspace()).toList();
+                .filter(p -> !p.isLooseFileWorkspace() && !p.isScratchWorkspace()).toList();
         Map<Long, Project> byId = new HashMap<>();
         for (Project p : owned) {
             ensureProjectUid(p);

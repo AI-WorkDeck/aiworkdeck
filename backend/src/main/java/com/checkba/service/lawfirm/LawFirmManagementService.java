@@ -1160,7 +1160,7 @@ public class LawFirmManagementService {
             }
         }
         for (Project p : allProjects) {
-            if (p.getUserId() != null && !p.isLooseFileWorkspace()) {
+            if (p.getUserId() != null && !p.isLooseFileWorkspace() && !p.isScratchWorkspace()) {
                 unitNameMap.putIfAbsent(p.getUserId(), userNames.getOrDefault(p.getUserId(), "项目律师#" + p.getUserId()));
             }
         }
