@@ -25,7 +25,7 @@ function harness({ platform = 'darwin', engine = 'lok', failNative = false } = {
     './zetaoffice-session': { ZETAOFFICE_PARTITION: 'test-partition', installZetaOfficeIsolation: () => {} },
     './zetaoffice-server': { startEditorServer: async () => { calls.push({ engine: 'wasm' }); return { origin: 'http://owned-test' } },
       editorUrl: origin => origin + '/editor' },
-    './app-language': { getAppLanguage: () => 'zh-CN' },
+    './app-language': { getAppLanguage: () => 'zh-CN', getLowaUiLang: () => 'zh-CN' },
     url: require('node:url'),
   }
   vm.runInNewContext(source.slice(start, end), {
