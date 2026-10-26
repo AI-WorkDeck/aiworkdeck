@@ -25,6 +25,7 @@ const expanded = () => page.$eval('.decision-assist', el => el.open)
 const switchVisible = () => page.$eval(switchSelector, el => el.checkVisibility())
 const expandControl = async () => {
   const before = await state()
+  if (!await page.$eval('.composer-advanced-settings', el => el.open)) await page.click('.composer-advanced-summary')
   if (!await expanded()) await page.click(summarySelector)
   assert.equal(await expanded(), true)
   assert.equal(await switchVisible(), true)
@@ -121,7 +122,7 @@ try {
   await page.evaluate(() => window.chat.loadMessages('synthetic-empty', []))
   assert.equal(await expanded(), false)
   assert.equal(await switchVisible(), false)
-  assert.equal(await page.$eval(summarySelector, el => el.checkVisibility()), true)
+  assert.equal(await page.$eval(summarySelector, el => el.checkVisibility()), false, 'Jev stays inside closed advanced settings')
   assert.ok(await page.$eval('.decision-assist', el => el.getBoundingClientRect().top >= document.querySelector('.chat-input-rich').getBoundingClientRect().bottom))
   await expandControl()
   // Freeze the user's setting before awaiting the active-document flush.
@@ -146,6 +147,8 @@ try {
     await window.chatState.handleSubmit('queue')
     return window.chatPosts.at(-1)
   })).decisionAssistEnabled, false)
+  // Sending the first message remounts the composer with advanced settings closed.
+  await expandControl()
   // A new identity during that same await can never inherit the previous identity's opt-in.
   await page.click(switchSelector)
   await page.evaluate(() => {
