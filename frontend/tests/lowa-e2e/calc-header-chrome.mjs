@@ -6,9 +6,9 @@
 // CALC_HEADER_OUT selects screenshots + JSON (default: a new temp directory).
 // Runs DPR 1 and 2; old r6 must fail the palette/font assertions. This is an
 // engine test, not a claim about the packaged Electron or automatic-save path.
-// CALC_HEADER_RESIZE=1 opts into resize/double-click with native chrome visible.
-// Bare-canvas tooltip interception is an existing r6/r7 limitation; skips are
-// explicitly recorded and never counted as PASS.
+// Bare-canvas resize/double-click is mandatory by default (#1515). Set
+// CALC_HEADER_NATIVE_CHROME=1 only for the native-toolbar comparison.
+// CALC_HEADER_RESIZE=0 explicitly selects style-only diagnosis, with a SKIP.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -232,47 +232,67 @@ try {
     s=await waitState(v=>v.selection.StartRow===0&&v.selection.EndRow===0&&v.selection.EndColumn>=11)
     check(`DPR${dpr} click selects whole row`,s.selection.StartColumn===0,s.selection)
     await exec('sheet_select_range',{range:'A1'});s=await state();g=geometry(s)
-    if(process.env.CALC_HEADER_RESIZE==='1') {
-      // Native chrome gives Calc's above-header size tooltip room. With a bare
-      // canvas at y=0, both r6 and r7 place the tooltip beside the pointer and
-      // Qt WASM's 5px windowAt padding intercepts subsequent move/up events.
-      // Keep that known limitation separate; do not hide or disable the tip.
-      await exec('set_chrome',{all:true})
-      await page.setViewport({width:1000,height:719,deviceScaleFactor:dpr})
-      await page.setViewport({width:1000,height:720,deviceScaleFactor:dpr})
-      shot=await capture(`dpr${dpr}-native-chrome-before-resize`)
-      s=await state();g=geometry(s)
-      // The UNO container excludes the native menubar. Like drag-wheel.mjs,
-      // align its bottom with the canvas using one width-derived scale.
-      const nativeTop=Math.max(0,shot.height*s.frame.Width/shot.width-s.frame.Height)
-      g=Object.fromEntries(Object.entries(g).map(([key,rect])=>[key,{...rect,y:rect.y+nativeTop}]))
-      fs.writeFileSync(path.join(out,`dpr${dpr}-native-chrome-state.json`),JSON.stringify({state:s,geometry:g},null,2))
-      colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
-      rowEdge=boundaries(shot,g.vertical,shot.width/s.frame.Width,false)[1]
-      const drag=async(x,y,dx,dy)=>{
+    if(process.env.CALC_HEADER_RESIZE!=='0') {
+      // The product-style bare canvas must keep receiving moves/releases
+      // while its visible size tooltip overlaps the pointer. Native chrome is
+      // an explicit comparison only, never a way to turn that regression green.
+      if(process.env.CALC_HEADER_NATIVE_CHROME==='1') {
+        await exec('set_chrome',{all:true})
+        await page.setViewport({width:1000,height:719,deviceScaleFactor:dpr})
+        await page.setViewport({width:1000,height:720,deviceScaleFactor:dpr})
+        shot=await capture(`dpr${dpr}-native-chrome-before-resize`)
+        s=await state();g=geometry(s)
+        // The UNO container excludes the native menubar. Like drag-wheel.mjs,
+        // align its bottom with the canvas using one width-derived scale.
+        const nativeTop=Math.max(0,shot.height*s.frame.Width/shot.width-s.frame.Height)
+        g=Object.fromEntries(Object.entries(g).map(([key,rect])=>[key,{...rect,y:rect.y+nativeTop}]))
+        fs.writeFileSync(path.join(out,`dpr${dpr}-native-chrome-state.json`),JSON.stringify({state:s,geometry:g},null,2))
+        colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
+        rowEdge=boundaries(shot,g.vertical,shot.width/s.frame.Width,false)[1]
+      }
+      const drag=async(x,y,dx,dy,evidence)=>{
         const a=await cssPoint(x,y),b=await cssPoint(x+dx,y+dy)
         await page.mouse.move(a.x,a.y);await pause();await page.mouse.down();await pause()
-        for(let i=1;i<=8;i++){await page.mouse.move(a.x+(b.x-a.x)*i/8,a.y+(b.y-a.y)*i/8);await pause()}
+        for(let i=1;i<=8;i++){
+          await page.mouse.move(a.x+(b.x-a.x)*i/8,a.y+(b.y-a.y)*i/8);await pause()
+          if(i===1&&evidence)await capture(`dpr${dpr}-${evidence}-tooltip-during-drag`)
+        }
         await page.mouse.up();await pause()
       }
       const oldWidth=s.columns[0],oldHeight=s.rows[0]
-      await drag(colEdge,g.horizontal.y+g.horizontal.height/2,40*s.dpi/96,0)
+      await drag(colEdge,g.horizontal.y+g.horizontal.height/2,40*s.dpi/96,0,'column-grow')
       s=await waitState(v=>v.columns[0]>oldWidth+200)
-      check(`DPR${dpr} drag column width (native chrome)`,s.columns[0]>oldWidth,{before:oldWidth,after:s.columns[0]})
+      check(`DPR${dpr} drag column width`,s.columns[0]>oldWidth,{before:oldWidth,after:s.columns[0]})
+      const grownWidth=s.columns[0]
       shot=await capture(`dpr${dpr}-column-dragged`);colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
+      await drag(colEdge,g.horizontal.y+g.horizontal.height/2,-24*s.dpi/96,0,'column-shrink')
+      s=await waitState(v=>v.columns[0]<grownWidth-300)
+      check(`DPR${dpr} reverse drag shrinks column`,true,{before:grownWidth,after:s.columns[0]})
+      await exec('undo',{steps:1})
+      s=await waitState(v=>Math.abs(v.columns[0]-grownWidth)<=5)
+      check(`DPR${dpr} undo restores dragged column width`,true,s.columns)
+      shot=await capture(`dpr${dpr}-column-undo`);colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
       await click(colEdge,g.horizontal.y+g.horizontal.height/2,2)
       s=await waitState(v=>v.columns[0]<oldWidth)
-      check(`DPR${dpr} double click auto width (native chrome)`,s.columns[0]<oldWidth,s.columns)
-      await drag(g.vertical.x+g.vertical.width/2,rowEdge,0,16*s.dpi/96)
+      check(`DPR${dpr} double click auto width`,s.columns[0]<oldWidth,s.columns)
+      await drag(g.vertical.x+g.vertical.width/2,rowEdge,0,16*s.dpi/96,'row-grow')
       s=await waitState(v=>v.rows[0]>oldHeight+150)
-      check(`DPR${dpr} drag row height (native chrome)`,s.rows[0]>oldHeight,{before:oldHeight,after:s.rows[0]})
+      check(`DPR${dpr} drag row height`,s.rows[0]>oldHeight,{before:oldHeight,after:s.rows[0]})
+      const grownHeight=s.rows[0]
       shot=await capture(`dpr${dpr}-row-dragged`);rowEdge=boundaries(shot,g.vertical,shot.width/s.frame.Width,false)[1]
+      await drag(g.vertical.x+g.vertical.width/2,rowEdge,0,-8*s.dpi/96,'row-shrink')
+      s=await waitState(v=>v.rows[0]<grownHeight-100)
+      check(`DPR${dpr} reverse drag shrinks row`,true,{before:grownHeight,after:s.rows[0]})
+      await exec('undo',{steps:1})
+      s=await waitState(v=>Math.abs(v.rows[0]-grownHeight)<=5)
+      check(`DPR${dpr} undo restores dragged row height`,true,s.rows)
+      shot=await capture(`dpr${dpr}-row-undo`);rowEdge=boundaries(shot,g.vertical,shot.width/s.frame.Width,false)[1]
       await click(g.vertical.x+g.vertical.width/2,rowEdge,2)
       s=await waitState(v=>v.rows[0]<oldHeight+150)
-      check(`DPR${dpr} double click auto height (native chrome)`,s.rows[0]<oldHeight+150,s.rows)
+      check(`DPR${dpr} double click auto height`,s.rows[0]<oldHeight+150,s.rows)
     } else {
-      results.push({name:`DPR${dpr} resize and double-click`,status:'skipped',reason:'Enable CALC_HEADER_RESIZE=1 for native chrome; bare-canvas tooltip interception remains a known r6/r7 limitation.'})
-      console.log(`SKIP DPR${dpr} resize and double-click (CALC_HEADER_RESIZE=1 to enable)`)
+      results.push({name:`DPR${dpr} resize and double-click`,status:'skipped',reason:'Explicit CALC_HEADER_RESIZE=0: style-only diagnosis.'})
+      console.log(`SKIP DPR${dpr} resize and double-click (explicit CALC_HEADER_RESIZE=0)`)
     }
     const p=await cssPoint(g.grid.x+g.grid.width/2,g.grid.y+g.grid.height/2)
     await page.mouse.move(p.x,p.y);await page.mouse.wheel({deltaY:500})
