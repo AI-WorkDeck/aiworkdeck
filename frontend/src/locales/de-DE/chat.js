@@ -169,6 +169,7 @@ export default {
   "builtinWorkflowsFoldEntry": "Built-in workflows",
   "builtinWorkflowsScope": "Contract · Evidence · Files · Opinion",
   "builtinWorkflowsCustomCount": "{count} customized",
+  "composerAdvancedSettings": "Advanced settings",
   "builtinWorkflowsAdvancedBtn": "Advanced",
   "builtinWorkflowsSub": "Vertragsprüfung, Beweismittelsortierung, Dateiorganisation und Prüfung von Rechtsgutachten sind integriert und werden automatisch auf Grundlage Ihrer Anfrage aktiviert.",
   "builtinWorkflowBadge": "Integriert",

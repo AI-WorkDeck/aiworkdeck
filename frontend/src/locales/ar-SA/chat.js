@@ -169,6 +169,7 @@ export default {
   "builtinWorkflowsFoldEntry": "Built-in workflows",
   "builtinWorkflowsScope": "Contract · Evidence · Files · Opinion",
   "builtinWorkflowsCustomCount": "{count} customized",
+  "composerAdvancedSettings": "Advanced settings",
   "builtinWorkflowsAdvancedBtn": "Advanced",
   "builtinWorkflowsSub": "مراجعة العقود وتنظيم الأدلة وتنظيم الملفات والتحقق من آراء legal مدمجة وتُفعَّل تلقائيًا بناءً على طلبك.",
   "builtinWorkflowBadge": "مدمج",

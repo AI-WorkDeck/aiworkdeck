@@ -169,6 +169,7 @@ export default {
   "builtinWorkflowsFoldEntry": "内置工作流",
   "builtinWorkflowsScope": "合同 · 证据 · 文件 · 意见书",
   "builtinWorkflowsCustomCount": "已定制 {count} 项",
+  "composerAdvancedSettings": "高级设置",
   "builtinWorkflowsAdvancedBtn": "高级设置",
   "builtinWorkflowsSub": "合同审查、证据整理、文件整理、法律意见书核查已内置于工程主链路，直接交代任务即自动启动",
   "builtinWorkflowBadge": "内置常驻",

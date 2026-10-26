@@ -169,6 +169,7 @@ export default {
   "builtinWorkflowsFoldEntry": "Built-in workflows",
   "builtinWorkflowsScope": "Contract · Evidence · Files · Opinion",
   "builtinWorkflowsCustomCount": "{count} customized",
+  "composerAdvancedSettings": "Advanced settings",
   "builtinWorkflowsAdvancedBtn": "Advanced",
   "builtinWorkflowsSub": "契約書レビュー、証拠整理、ファイル整理、法律意見書検証が内蔵されており、リクエストに応じて自動的に有効化されます。",
   "builtinWorkflowBadge": "内蔵",

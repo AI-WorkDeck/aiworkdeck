@@ -169,6 +169,7 @@ export default {
   "builtinWorkflowsFoldEntry": "Built-in workflows",
   "builtinWorkflowsScope": "Contract · Evidence · Files · Opinion",
   "builtinWorkflowsCustomCount": "{count} customized",
+  "composerAdvancedSettings": "Advanced settings",
   "builtinWorkflowsAdvancedBtn": "Advanced",
   "builtinWorkflowsSub": "Semakan kontrak, penyusunan bukti, penyusunan fail, dan pengesahan pendapat undang-undang adalah terbina dalam dan diaktifkan secara automatik daripada permintaan anda.",
   "builtinWorkflowBadge": "Terbina Dalam",

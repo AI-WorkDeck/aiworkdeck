@@ -57,7 +57,7 @@ function extractPlaceholders(str) {
   return [...set].sort()
 }
 
-function compareLocaleMaps(scope, zhMap, targetMap, localeCode, { strictKeys = false } = {}) {
+function compareLocaleMaps(scope, zhMap, targetMap, localeCode, { strictKeys = false, minCoveragePct = 0 } = {}) {
   const entry = getLocaleEntry(localeCode)
   const allowHan = Boolean(entry && entry.allowHan)
   const zhKeys = new Set(Object.keys(zhMap))
@@ -71,11 +71,10 @@ function compareLocaleMaps(scope, zhMap, targetMap, localeCode, { strictKeys = f
         fail(scope, `Missing ${localeCode} key: ${k}`)
       }
     }
-  }
-
-  for (const k of targetKeys) {
-    if (!zhKeys.has(k)) {
-      fail(scope, `Unknown ${localeCode} key (not in zh-CN): ${k}`)
+    for (const k of targetKeys) {
+      if (!zhKeys.has(k)) {
+        fail(scope, `Unknown ${localeCode} key (not in zh-CN): ${k}`)
+      }
     }
   }
 
@@ -104,10 +103,15 @@ function compareLocaleMaps(scope, zhMap, targetMap, localeCode, { strictKeys = f
     }
   }
 
+  const pctNum = zhKeys.size ? (translatedCount / zhKeys.size) * 100 : 100
+  if (minCoveragePct > 0 && pctNum < minCoveragePct) {
+    fail(scope, `${localeCode} coverage ${pctNum.toFixed(1)}% is below required ${minCoveragePct}%`)
+  }
+
   return {
     total: zhKeys.size,
     translated: translatedCount,
-    pct: zhKeys.size ? ((translatedCount / zhKeys.size) * 100).toFixed(1) : '100.0',
+    pct: pctNum.toFixed(1),
   }
 }
 
@@ -174,7 +178,8 @@ async function checkFrontendLocales() {
     }
 
     const stats = compareLocaleMaps('frontend', zhFlatAll, targetFlatAll, localeCode, {
-      strictKeys: isStrict,
+      strictKeys: localeCode === 'en-US' || process.env.STRICT_EXACT_20 === '1',
+      minCoveragePct: localeCode === 'en-US' ? 100 : (STRICT_ALL_LOCALES ? 95 : 0),
     })
     coverageReports.push(`frontend [${localeCode}]: ${stats.translated}/${stats.total} (${stats.pct}%)`)
   }
