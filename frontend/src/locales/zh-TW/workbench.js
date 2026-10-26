@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "skinSectionTitle": "外觀皮膚",
+  "skinDefaultName": "東方清雅（預設）",
   "restartPending": "{count} 个任务可继续",
   "restartContinue": "继续：{name}",
   "restartRestoring": "正在恢复原会话与文档…",

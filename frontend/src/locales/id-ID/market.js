@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "themesTitle": "UI Skins",
+  "themeSelect": "Apply skin",
+  "themeSelected": "Active (tap for default)",
+  "themeNote": "Applying a skin updates semantic color tokens across the workbench, plugins, and editor chrome in both Light and Dark modes.",
   "redactionEngineUpdateNotice": "Aturan lokal secara otomatis mendeteksi perusahaan dan nama Tionghoa, dengan pratinjau, token, dan pemulihan. Mesin diperbarui melalui patch desktop; memasang ulang instruksi Skill tidak memperbaruinya.",
   "redactionEngineUpdateButton": "Periksa pembaruan mesin penyuntingan",
   "heroWatermark": "E",

@@ -1,0 +1,119 @@
+{
+  "id": "anime-twilight",
+  "name": "日漫晨昏 · 逢魔之时",
+  "previewSwatches": ["#F5F4FA", "#53489E", "#D96B43", "#14192B"],
+  "effects": {
+    "aiPulseStyle": "comet-trail",
+    "surfaceTexture": "cel-glass"
+  },
+  "roles": {
+    "light": {
+      "bg": "#F5F4FA",
+      "surface": "#FDFCFE",
+      "surface-2": "#ECE9F5",
+      "surface-3": "#DFDBEE",
+      "surface-elevated": "#FFFFFF",
+      "canvas": "#E6E2F2",
+
+      "text": "#1E243B",
+      "text-2": "#545B78",
+      "text-3": "#747B99",
+      "text-on-accent": "#FFFFFF",
+      "text-on-mint": "#1B2238",
+
+      "border-subtle": "#E7E4F2",
+      "border": "#D4CFE6",
+      "border-strong": "#837DA1",
+
+      "accent": "#53489E",
+      "accent-hover": "#433987",
+      "accent-text": "#4C4194",
+      "accent-soft": "#EAE7FA",
+      "accent-wash": "rgba(83, 72, 158, 0.06)",
+
+      "mint": "#7E74B8",
+      "bamboo": "#7E74B8",
+
+      "gold": "#E07A5F",
+      "gold-line": "#D1694E",
+      "gold-text": "#9E4229",
+      "gold-soft": "#FCEEE9",
+
+      "danger": "#C44545",
+      "danger-text": "#9E3131",
+      "danger-soft": "#FCEEEE",
+      "warning": "#C27D29",
+      "warning-text": "#8F5916",
+      "warning-soft": "#FBF2E4",
+      "info": "#2E628F",
+      "info-text": "#214B70",
+      "info-soft": "#EAF2F9",
+
+      "overlay": "rgba(24, 30, 52, 0.45)",
+      "glass": "rgba(253, 252, 254, 0.80)",
+      "glass-border": "rgba(255, 255, 255, 0.65)",
+
+      "halo-1": "#EAE7FA",
+      "halo-2": "rgba(224, 122, 95, 0.06)",
+      "halo-page": "#EAE7FA",
+
+      "shadow-sm": "0 1px 2px rgba(30, 36, 59, 0.06)",
+      "shadow-md": "0 4px 16px rgba(30, 36, 59, 0.09)",
+      "shadow-lg": "0 12px 32px rgba(30, 36, 59, 0.16)"
+    },
+    "dark": {
+      "bg": "#14192B",
+      "surface": "#1C2238",
+      "surface-2": "#242C47",
+      "surface-3": "#2F3959",
+      "surface-elevated": "#232B45",
+      "canvas": "#0E1220",
+
+      "text": "#EEF0FA",
+      "text-2": "#ADB4D1",
+      "text-3": "#8089AB",
+      "text-on-accent": "#FFFFFF",
+      "text-on-mint": "#14192B",
+
+      "border-subtle": "#252D47",
+      "border": "#343F61",
+      "border-strong": "#69759C",
+
+      "accent": "#7668C9",
+      "accent-hover": "#8A7CD9",
+      "accent-text": "#B5AAFA",
+      "accent-soft": "rgba(157, 141, 242, 0.16)",
+      "accent-wash": "rgba(157, 141, 242, 0.07)",
+
+      "mint": "#9D8DF2",
+      "bamboo": "#9D8DF2",
+
+      "gold": "#F29A6B",
+      "gold-line": "#B56B45",
+      "gold-text": "#F29A6B",
+      "gold-soft": "rgba(242, 154, 107, 0.15)",
+
+      "danger": "#DE6464",
+      "danger-text": "#F29696",
+      "danger-soft": "rgba(196, 69, 69, 0.18)",
+      "warning": "#E0A248",
+      "warning-text": "#F0BE75",
+      "warning-soft": "rgba(194, 125, 41, 0.16)",
+      "info": "#569CD6",
+      "info-text": "#92C5F0",
+      "info-soft": "rgba(46, 98, 143, 0.22)",
+
+      "overlay": "rgba(10, 14, 26, 0.65)",
+      "glass": "rgba(28, 34, 56, 0.78)",
+      "glass-border": "rgba(157, 141, 242, 0.18)",
+
+      "halo-1": "rgba(157, 141, 242, 0.10)",
+      "halo-2": "rgba(242, 154, 107, 0.05)",
+      "halo-page": "#181E33",
+
+      "shadow-sm": "0 1px 2px rgba(6, 9, 18, 0.45)",
+      "shadow-md": "0 4px 16px rgba(6, 9, 18, 0.52)",
+      "shadow-lg": "0 12px 32px rgba(6, 9, 18, 0.65)"
+    }
+  }
+}

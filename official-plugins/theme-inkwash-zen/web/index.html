@@ -1,0 +1,113 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>东方水墨 · 飞白禅圆</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --skin-bg: #F4F1EA;
+      --skin-surface: #FAF8F3;
+      --skin-text: #1A1816;
+      --skin-text-2: #524E48;
+      --skin-border: #D4CFC3;
+      --skin-accent-soft: #EAE6F2;
+      --skin-accent-text: #514170;
+    }
+    html[data-theme='dark'] {
+      --skin-bg: #141312;
+      --skin-surface: #1D1B19;
+      --skin-text: #EDEAE2;
+      --skin-text-2: #B0AAA0;
+      --skin-border: #383530;
+      --skin-accent-soft: rgba(164, 148, 199, 0.16);
+      --skin-accent-text: #C0B2DE;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--awd-font-sans, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif);
+      background: transparent;
+      color: var(--skin-text);
+      padding: 2px;
+      line-height: 1.5;
+      overflow: hidden;
+    }
+    .card {
+      background: var(--skin-surface);
+      border: 1px solid var(--skin-border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .title {
+      font-family: var(--awd-font-serif, "Songti SC", serif);
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .subtitle {
+      color: var(--skin-text-2);
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .swatch {
+      background: var(--skin-bg);
+      border: 1px solid var(--skin-border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11px;
+    }
+    .swatch-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      margin-bottom: 6px;
+      border: 1px solid rgba(128,128,128,0.28);
+    }
+    .swatch-hex {
+      color: var(--skin-text-2);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--skin-accent-soft);
+      color: var(--skin-accent-text);
+      font-size: 11px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="head-row">
+      <h1 class="title">东方水墨 · 一笔禅圆</h1>
+      <span class="badge">UI 皮肤画廊 · Skin 02</span>
+    </div>
+    <p class="subtitle">计白当黑，墨分五色（焦、浓、重、淡、清），怀中一滴紫墨自然润开，配以朱砂印泥语义警示。</p>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch-dot" style="background:#F4F1EA"></div><strong>生宣留白</strong><div class="swatch-hex">#F4F1EA</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#1A1816"></div><strong>焦墨正文</strong><div class="swatch-hex">#1A1816</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#5B4B7A"></div><strong>紫墨点睛</strong><div class="swatch-hex">#5B4B7A</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#B5483C"></div><strong>朱砂印泥</strong><div class="swatch-hex">#B5483C</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#141312"></div><strong>浓墨夜读</strong><div class="swatch-hex">#141312</div></div>
+    </div>
+  </div>
+  <script src="/api/plugins/sdk/awd-plugin-sdk.js"></script>
+</body>
+</html>

@@ -10,13 +10,16 @@
 // 经展开进组件 data/methods（同 railSort.js 的形制），`this` 即 project-overview 页面实例。
 
 import { track } from '@/utils/telemetryClient.js'
-import { getThemeMode, getResolvedTheme, setThemeMode, APP_THEME_EVENT } from '@/utils/appTheme.js'
+import { getThemeMode, getResolvedTheme, setThemeMode, getActiveSkinRef, setActiveSkin, APP_THEME_EVENT } from '@/utils/appTheme.js'
+import { getContributedThemes, selectContributedTheme } from '@/services/api.js'
 import { themeMenuKeyAction } from './themeMenuKeys.js'
 
 export const themeSwitchData = () => ({
   themeMode: getThemeMode(),
   resolvedTheme: getResolvedTheme(),
   themeMenuOpen: false,
+  activeSkinRef: typeof getActiveSkinRef === 'function' ? getActiveSkinRef() : '',
+  contributedSkins: [],
 })
 
 export const themeSwitchMethods = {
@@ -24,13 +27,70 @@ export const themeSwitchMethods = {
     this._onThemeChanged = (resolved) => {
       this.resolvedTheme = resolved || getResolvedTheme()
       this.themeMode = getThemeMode()
+      if (typeof getActiveSkinRef === 'function') {
+        this.activeSkinRef = getActiveSkinRef()
+      }
+    }
+    this._onMarketOrSkinChanged = () => {
+      if (typeof this.loadContributedSkins === 'function') {
+        this.loadContributedSkins()
+      }
     }
     try { uni.$on(APP_THEME_EVENT, this._onThemeChanged) } catch (e) { /* ignore */ }
+    try { uni.$on('awd:market-changed', this._onMarketOrSkinChanged) } catch (e) { /* ignore */ }
+    try { uni.$on('awd:skin-changed', this._onMarketOrSkinChanged) } catch (e) { /* ignore */ }
+    if (typeof this.loadContributedSkins === 'function') {
+      this.loadContributedSkins()
+    }
   },
 
   disposeThemeSwitch() {
     try { if (this._onThemeChanged) uni.$off(APP_THEME_EVENT, this._onThemeChanged) } catch (e) { /* ignore */ }
+    try { if (this._onMarketOrSkinChanged) uni.$off('awd:market-changed', this._onMarketOrSkinChanged) } catch (e) { /* ignore */ }
+    try { if (this._onMarketOrSkinChanged) uni.$off('awd:skin-changed', this._onMarketOrSkinChanged) } catch (e) { /* ignore */ }
     this._onThemeChanged = null
+    this._onMarketOrSkinChanged = null
+  },
+
+  async loadContributedSkins() {
+    if (typeof getContributedThemes !== 'function') return
+    try {
+      const res = await getContributedThemes()
+      const body = res && res.themes !== undefined ? res : (res && res.data) || {}
+      const list = Array.isArray(body.themes) ? body.themes : []
+      this.contributedSkins = list.map((t) => ({
+        ...t,
+        ref: `${t.pluginId}:${t.id}`,
+      }))
+      const selectedRef = typeof body.selected === 'string'
+        ? body.selected
+        : ((this.contributedSkins.find((s) => s.selected) || {}).ref || '')
+      const matched = selectedRef
+        ? (this.contributedSkins.find((s) => s.ref === selectedRef) || null)
+        : null
+      if (typeof setActiveSkin === 'function') {
+        setActiveSkin(matched)
+      }
+      this.activeSkinRef = matched ? matched.ref : ''
+    } catch (e) {
+      // 未登录或离线时保留本地缓存皮肤，不打断界面
+    }
+  },
+
+  async pickSkin(skinRef) {
+    this.themeMenuOpen = false
+    const nextRef = skinRef || ''
+    const matched = nextRef
+      ? ((this.contributedSkins || []).find((s) => s.ref === nextRef) || null)
+      : null
+    if (typeof setActiveSkin === 'function') {
+      setActiveSkin(matched)
+    }
+    this.activeSkinRef = matched ? matched.ref : ''
+    if (typeof selectContributedTheme === 'function') {
+      try { await selectContributedTheme(nextRef) } catch (e) { /* ignore */ }
+    }
+    try { track('ui.themeSkin', { skin: nextRef || 'default' }) } catch (e) { /* ignore */ }
   },
 
   pickTheme(mode) {
@@ -118,6 +178,16 @@ export const themeSwitchComputed = {
       { value: 'light', label: this.$t('workbench.appearanceLight') },
       { value: 'dark', label: this.$t('workbench.appearanceDark') },
       { value: 'system', label: this.$t('workbench.appearanceSystem') },
+    ]
+  },
+  skinOptions() {
+    return [
+      {
+        ref: '',
+        name: this.$t('workbench.skinDefaultName'),
+        previewSwatches: ['#F1EFE7', '#2E5A50', '#89A8A0', '#191713'],
+      },
+      ...(this.contributedSkins || []),
     ]
   },
 }

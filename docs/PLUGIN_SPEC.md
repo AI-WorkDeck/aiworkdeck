@@ -89,7 +89,7 @@ plugins/
 | `backendJars` | string[] | 否 | 相对插件目录的 JAR 文件名列表，启动/重扫时加载其中带 `@Tool` 注解的类。 |
 | `skills` | string[] | 否 | **v2.1 新增**：插件携带的 Skill 子目录名列表（相对插件目录），见 §7。 |
 | `packs` | string[] | 否 | **v2.3 新增**：依赖的原生资源包 id 列表，见 §9 与 [NATIVE_PACK_DISTRIBUTION.md](NATIVE_PACK_DISTRIBUTION.md)。 |
-| `contributes` | object | 否 | **v2.8 新增**：向宿主贡献的声明式内容——`evidenceSources`（证据来源，§13）；**v2.9 起**再加 `templates`（文书模板）与 `styleProfiles`（样式画像），见 §14。按只加不改逐个扩展。 |
+| `contributes` | object | 否 | **v2.8 新增**：向宿主贡献的声明式内容——`evidenceSources`（证据来源，§13）；**v2.9 起**再加 `templates`（文书模板）与 `styleProfiles`（样式画像），见 §14；**v2.12 起**新增 `themes`（外观皮肤主题），见 §14.6。按只加不改逐个扩展。 |
 | `settings` | object[] | 否 | **v2.9 新增**：用户可配置项声明（§14.3，上限 20 条）。广场详情页渲染成表单，值存宿主侧；插件只读（JAR 经 SPI `Settings.get`、Web 经桥 `settings.get`）。 |
 
 未知字段被忽略（向前兼容）；`permissions` 中出现 v1 未定义的值仅记录 WARN，不拒绝加载。
@@ -809,8 +809,33 @@ manifest 与 contributes/settings 里的 `name`/`description`/`label` 值**整�
 
 声明式贡献点可叠加在任何插件形态上；**纯声明插件**（无 backendJars/frontendEntry/skills，
 只有 manifest + 数据文件）风险量级最低，广场受理走最轻审核档。宿主落点：
-`PluginContributionService`（模板/画像/设置）+ `PluginService.localize`（l10n）+
+`PluginContributionService`（模板/画像/设置/皮肤）+ `PluginService.localize`（l10n）+
 `StyleProfileResolver` 插档；示例 [examples/hello-declarative-plugin/](../examples/hello-declarative-plugin/)。
+
+### 14.6 外观皮肤（contributes.themes，v2.12）
+
+```json
+"contributes": {
+  "themes": [
+    {
+      "id": "inkwash-zen",
+      "name": "%theme.name%",
+      "description": "%theme.desc%",
+      "file": "themes/inkwash-zen.json"
+    }
+  ]
+}
+```
+
+- `file` 指向插件目录内的皮肤 JSON（上限 20MB，过相对路径与 canonical path 双闸）。
+- 皮肤 JSON 结构：
+  - `roles.light` / `roles.dark`（或 `light` / `dark`）：键为 `--awd-*` 令牌名（可省略 `--awd-` 前缀，后端自动归一），值经过 `UNSAFE_CSS_VALUE` 安全过滤（拦截 `url()` / `expression()` / `@import` / `;` / `{` / `}` 等 CSS 注入面）。
+  - `fonts`：`serif` / `sans` / `mono` 字体栈覆盖（映射为 `--awd-font-*`）。
+  - `effects`：`aiPulseStyle`、`surfaceTexture` 等特征标记（挂载到 `html[data-skin-pulse]` / `html[data-skin-texture]`）。
+  - `previewSwatches`：4 枚十六进制色样，用于插件广场详情页与顶部外观菜单预览。
+- 选择位存 `system_setting` 的 `ui.theme.selected`（值 `<pluginId>:<themeId>`，空串表示恢复默认「温润纸墨」）；插件禁用或卸载时自动回退默认皮肤。
+- 切换皮肤时，`frontend/src/utils/appTheme.js` 将当前明暗模式对应的令牌写入 `document.documentElement` 并触发 `APP_THEME_EVENT`；所有打开的 Web 插件 iframe 通过既有 v2.6 主题通道（`collectThemeTokens()` -> `PluginPane.pushTheme()`）自动同步最新皮肤计算值。
+- 首批随包内置 3 款「圆融破圈」官方皮肤插件：`theme-inkwash-zen`（东方水墨 · 飞白禅圆）、`theme-anime-twilight`（日漫晨昏 · 逢魔之时）、`theme-aurora-glass`（深海极光 · 冰刃琉璃）。
 
 ## 15. 能力槽与能力包（contributes.capabilities，v2.10）
 

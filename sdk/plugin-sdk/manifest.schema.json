@@ -137,6 +137,12 @@
             "$ref": "#/$defs/fileContribution"
           }
         },
+        "themes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileContribution"
+          }
+        },
         "capabilities": {
           "type": "array",
           "items": {

@@ -148,6 +148,30 @@
               >
                 <text class="theme-menu-text">{{ opt.label }}</text>
               </view>
+              <template v-if="skinOptions && skinOptions.length > 1">
+                <view class="theme-menu-divider"></view>
+                <text class="theme-menu-sec-title">{{ $t('workbench.skinSectionTitle') }}</text>
+                <view
+                  v-for="skin in skinOptions"
+                  :key="skin.ref || 'default'"
+                  class="theme-menu-item theme-skin-item"
+                  :class="{ on: (activeSkinRef || '') === (skin.ref || '') }"
+                  role="menuitemradio"
+                  tabindex="-1"
+                  :aria-checked="(activeSkinRef || '') === (skin.ref || '') ? 'true' : 'false'"
+                  @tap="pickSkin(skin.ref)"
+                >
+                  <text class="theme-menu-text">{{ skin.name }}</text>
+                  <view v-if="skin.previewSwatches && skin.previewSwatches.length" class="theme-skin-swatches">
+                    <view
+                      v-for="(sw, si) in skin.previewSwatches.slice(0, 4)"
+                      :key="si"
+                      class="theme-skin-dot"
+                      :style="{ background: sw }"
+                    ></view>
+                  </view>
+                </view>
+              </template>
             </view>
           </view>
           <view v-if="themeMenuOpen" class="theme-menu-mask" @tap="themeMenuOpen = false"></view>
@@ -3156,12 +3180,12 @@ export default {
       // 动态插件与项目面板一律不上 rail——它们都带着 projectId 干活。
       if (user?.role === 'CLIENT') return getPluginsForUser('CLIENT')
       if (!this.hasProject || this.isLooseWorkspace) {
-        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(isGlobalPlugin)]
+        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => !p.isThemePlugin && isGlobalPlugin(p))]
         return this.applyRailOrder(this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key) || isGlobalPlugin(p)))
       }
       const base = (user && user.role === 'CLIENT')
         ? getPluginsForUser('CLIENT')
-        : [...getPluginsForUser(user && user.role, { cloudTrack: this.ddCloudTrack }), ...this.dynamicPlugins]
+        : [...getPluginsForUser(user && user.role, { cloudTrack: this.ddCloudTrack }), ...this.dynamicPlugins.filter(p => !p.isThemePlugin)]
       // 声明了 requiresSkill 的插件位（诉讼可视化）跟着 skill 启停走：默认不安装，
       // 用户在广场里装了才出现在左栏。
       //
@@ -7967,6 +7991,7 @@ export default {
               // 有真正的前端入口才走 iframe（PluginPane）；纯工具/skill 插件走宿主渲染的
               // 启动面板（PluginGuidePane）——否则点开只有一句「未配置入口地址」。
               hasFrontend: !!frontendEntry,
+              isThemePlugin: Array.isArray(p?.contributes?.themes) && p.contributes.themes.length > 0 && !views.some(view => view.placement === 'sidebar'),
               views,
               sidebarView: views.find(view => view.placement === 'sidebar') || null,
               workspaceView: views.find(view => view.placement === 'workspace') || null,

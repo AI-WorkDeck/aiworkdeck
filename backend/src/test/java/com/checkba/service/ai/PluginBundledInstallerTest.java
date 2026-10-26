@@ -78,7 +78,8 @@ class PluginBundledInstallerTest {
         try (var entries = Files.list(plugins)) { assertEquals(List.of("search"), entries.map(p -> p.getFileName().toString()).toList()); }
     }
     @Test void fixedBusinessBundlesUpgradeExistingOriginalInstallations() throws Exception {
-        for (String id : List.of("voice", "calendar", "desensitize", "litigation-visual", "insight")) {
+        for (String id : List.of("voice", "calendar", "desensitize", "litigation-visual", "insight",
+                "theme-inkwash-zen", "theme-anime-twilight", "theme-aurora-glass")) {
             Path shipped = Path.of("../official-plugins").resolve(id);
             String manifest = Files.readString(shipped.resolve("manifest.json"));
             var original = cn.hutool.json.JSONUtil.parseObj(manifest);
@@ -88,6 +89,15 @@ class PluginBundledInstallerTest {
             Files.createDirectories(source.resolve(id).resolve("web"));
             Files.writeString(source.resolve(id).resolve("manifest.json"), original.toString());
             Files.writeString(source.resolve(id).resolve("web/index.html"), "old plugin");
+            if (Files.isDirectory(shipped.resolve("themes"))) {
+                try (var paths = Files.walk(shipped.resolve("themes"))) {
+                    for (Path file : paths.toList()) {
+                        Path target = source.resolve(id).resolve(shipped.relativize(file));
+                        if (Files.isDirectory(file)) Files.createDirectories(target);
+                        else Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                }
+            }
             installer.installDefaults();
             Files.copy(shipped.resolve("manifest.json"), source.resolve(id).resolve("manifest.json"), StandardCopyOption.REPLACE_EXISTING);
             try (var paths = Files.walk(shipped.resolve("web"))) {
@@ -100,6 +110,9 @@ class PluginBundledInstallerTest {
             installer.installDefaults();
             assertEquals(version, settings.get("plugin.bundled." + id));
             assertEquals(Files.readString(shipped.resolve("web/index.html")), Files.readString(plugins.resolve(id).resolve("web/index.html")));
+            if (Files.isDirectory(shipped.resolve("themes"))) {
+                assertTrue(Files.isDirectory(plugins.resolve(id).resolve("themes")), id + " must copy themes/ directory");
+            }
         }
     }
     @Test void symlinkPayloadIsRejectedWithoutReplacingExistingInstallation() throws Exception {
