@@ -318,3 +318,19 @@ test('identical permission polling preserves PDF viewers, role changes invalidat
   await nextTick(); assert.equal(resets, 2)
   app.unmount()
 })
+
+
+test('owner PDF survives late member initialization and changes to other members', () => {
+  const source = scripts.overview
+  const start = source.indexOf('    pdfPermissionIdentity() {')
+  const end = source.indexOf('    leftPdfFiles() {', start)
+  const identity = new Function('return ({' + source.slice(start, end) + '}).pdfPermissionIdentity')()
+  const host = { currentUser: { id: 1, role: 'USER' }, project: { userId: 1 }, localProjectMembers: [] }
+  const initial = identity.call(host)
+  host.localProjectMembers = [{ userId: 1, role: 'ADMIN' }, { userId: 2, role: 'PARTICIPANT' }]
+  assert.equal(identity.call(host), initial)
+  host.localProjectMembers[1].role = 'CLIENT'
+  assert.equal(identity.call(host), initial)
+  host.project.userId = 2
+  assert.notEqual(identity.call(host), initial)
+})
