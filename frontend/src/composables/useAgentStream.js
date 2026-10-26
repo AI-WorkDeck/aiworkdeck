@@ -941,7 +941,10 @@ export function useAgentStream() {
                     id: String(f.id),
                     name: f.fileName || f.name || 'Unknown',
                     isDir: f.isDir === true,
-                    fileType: f.fileType || ''
+                    fileType: f.fileType || '',
+                    projectId: f.projectId || undefined,
+                    projectName: f.projectName || undefined,
+                    readOnly: f.readOnly || undefined
                 })),
                 fileIds: fileList.map(f => f.id), // Legacy compatibility
                 // NEW: Active context (auto-detected current tab) — 与用户气泡上的快照同源（dev-board#1118）

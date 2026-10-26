@@ -49,6 +49,13 @@ public class FileContextLoader {
      */
     private final com.checkba.service.file.ProjectFileTextExtractor textExtractor;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ProjectMemberService projectMemberService;
+
+    public void setProjectMemberService(com.checkba.service.ProjectMemberService projectMemberService) {
+        this.projectMemberService = projectMemberService;
+    }
+
     public FileContextLoader(ProjectFileService projectFileService,
                              FileContentExtractorService fileContentExtractorService,
                              AiContextProperties contextProperties,
@@ -232,6 +239,17 @@ public class FileContextLoader {
         try {
             Long folderId = Long.parseLong(folderIdStr);
             Long projectId = Long.parseLong(projectIdStr);
+
+            // 跨项目只读文件夹引用：文件夹实际属于其他项目且当前用户有读权限时，
+            // 以文件夹归属的项目为准列出其子项（写类工具仍被 ToolFileGuard 拦在当前项目内）。
+            ProjectFile folder = projectFileService.getFile(folderId);
+            if (folder != null && folder.getProjectId() != null && !folder.getProjectId().equals(projectId)) {
+                Long userId = ProjectContextHolder.getUserId();
+                if (userId != null && projectMemberService != null
+                        && projectMemberService.hasReadPermission(folder.getProjectId(), userId)) {
+                    projectId = folder.getProjectId();
+                }
+            }
 
             List<FolderEntry> allFiles = new ArrayList<>();
             boolean depthLimited = listFilesRecursive(projectId, folderId, allFiles, "", 0);

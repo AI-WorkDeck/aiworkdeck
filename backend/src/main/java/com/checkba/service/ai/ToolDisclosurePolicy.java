@@ -209,7 +209,7 @@ public class ToolDisclosurePolicy {
                 "name:list_files", "name:read_file", "name:write_file", "name:scan_files",
                 "name:move_file", "name:move_project_file", "name:rename_project_file",
                 "name:list_project_folders", "name:delete_file", "text_", "name:doc_export_pdf",
-                "name:copy_files"));
+                "name:copy_files", "name:search_across_projects"));
         // doc_* 里剩下的全是版式与排版：字符格式、段落格式、页面、页眉页脚、目录、脚注、图片、超链接……
         CATEGORIES.put("format", List.of("doc_"));
         CATEGORIES.put("spreadsheet", List.of("sheet_"));

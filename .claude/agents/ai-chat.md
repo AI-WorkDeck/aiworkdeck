@@ -1718,3 +1718,10 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Refe
 - FileChangeTurn 随助手段创建，锁内绑定真实消息 ID、排队保存和去重；子 Agent listener 冻结此对象，超时后工具真实成功返回仍可归原段。待存队列与去重同锁，保存失败保留待存、后续保存/重复回执重试。无法确认的 ID/外项目/已删除/目录不生成文件成果。
 - 子 Agent 接收可信 activeFileId；成功 doc_open_file/doc_start_stream 或打开新编辑文档的 doc_start_stream/sheet_create_file/pdf_to_word 才更新当前文档身份，普通 write_file 不切换。确认产物经 listener 即时上报，同时保留子任务结果快照；部分失败保留此前真实成功文件。
 - 回归：chat-turn-files.test.mjs、question-card-response.test.mjs；ConversationFileChangeServiceTest、AgentOrchestratorFileChangeTargetTest、ContextAssemblerAskUserTest、SubAgentServiceTest。
+
+### 2026-10-26 随手工作区与跨项目只读调取（dev-board#1479）
+
+- **跨项目只读上下文芯片**：`AiAgentController.ContextItem` 新增可选 `projectId`、`projectName`、`readOnly`（前端 `chatMode.buildCrossProjectContextItem`、`chatContextLimits.normalizeContextItem`、`chatAttachments`、`useAgentStream` 全链路保留；`ChatInterface.vue` 渲染 `@项目名 / 文件名` 徽标与 `attachCrossProjectFile` / `sendQuickPrompt` 入口）。`ContextAssemblerService` 对跨项目或只读附件在 `<file>` 标签上附加 `project="..." readonly="true"` 属性。
+- **读写权限分流（`ToolFileGuard.rejectIfCannotRead`）**：写/改/删/移类工具继续严格使用 `ToolFileGuard.rejectIfOutsideProject(file)` 锁定当前 `projectId`；只读链路（`LegalTools.read_document`、`FileTools.extract_file_text`、`ContextAssemblerService.loadVisionAttachment`、`FileContextLoader.buildFolderContextInternal`）改走 `ToolFileGuard.rejectIfCannotRead(file, projectMemberService)`——当文件属于其他项目时校验 `projectMemberService.hasReadPermission(file.getProjectId(), userId)`，有读权限即放行只读抽取。新注入协作者均采用 `@Autowired(required = false)` + setter，保持既有构造器签名不变。
+- **跨项目文件检索工具（`FileTools.search_across_projects`）**：按文件名关键字检索当前用户全部可读正式项目（`projectService.getUserProjects(userId)`，不含 `LOOSE_FILES` 与 `SCRATCH`）中的未删除文件，返回 `[项目: <name> (projectId=<pid>)] <path> (fileId=<fid>, type=<ext>)`，归入 `ToolDisclosurePolicy` 的 `"files"` 类目。
+- **回归**：`ScratchProjectAndCrossProjectReadTest`、`frontend/tests/project-home/chat-mode.test.mjs`。
