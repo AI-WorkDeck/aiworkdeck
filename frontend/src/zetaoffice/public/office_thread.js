@@ -2532,7 +2532,12 @@ function resolvePage(p) {
 }
 // XDrawPage 没有稳定的等值比较；退回按 Number 属性比对（GenericDrawPage.Number 只读）。
 function unoSameDrawPage(a, b) {
-  try { return a.getPropertyValue('Number') === b.getPropertyValue('Number'); } catch (e) { return a === b; }
+  try {
+    // 选区也可能是形状；读取不存在的属性即使捕获异常也会破坏 WASM 状态。
+    if (!a.getPropertySetInfo().hasPropertyByName('Number') ||
+        !b.getPropertySetInfo().hasPropertyByName('Number')) return a === b;
+    return a.getPropertyValue('Number') === b.getPropertyValue('Number');
+  } catch (e) { return a === b; }
 }
 // 用 .uno:MovePage* 把"当前页"从 fromIndex 挪到 toIndex（同一份 count 快照下，均
 // 0-based）。调用前必须已 ctrl.setCurrentPage() 到源页。XDrawPages 无直接 move
@@ -2618,20 +2623,23 @@ function ensureShapeNames(page) {
   // 实锤：矩形形状的名字后来指向了标题形状）。先收集页面上已占用的名字集合，
   // 分配新名字时跳过已占用的，保证同一页内任何时刻名字唯一。
   const used = new Set();
+  const shapes = new Array(n), unnamed = [];
   for (let i = 0; i < n; i++) {
     let shape; try { shape = page.getByIndex(i); } catch (e) { continue; }
+    shapes[i] = shape;
     let name = ''; try { name = shape.getName ? shape.getName() : ''; } catch (e) {}
     if (name) used.add(name);
+    else unnamed.push(shape);
   }
   let counter = 0;
-  for (let i = 0; i < n; i++) {
-    let shape; try { shape = page.getByIndex(i); } catch (e) { continue; }
-    let name = ''; try { name = shape.getName ? shape.getName() : ''; } catch (e) {}
-    if (name) continue;
+  for (const shape of unnamed) {
     let candidate;
     do { candidate = '__awd_shape_' + (counter++); } while (used.has(candidate));
     try { shape.setName(candidate); used.add(candidate); } catch (e) {}
   }
+  // Reuse only within this synchronous read; the next call reacquires the page
+  // so edits, reordered shapes and recreated placeholders cannot leave stale refs.
+  return shapes;
 }
 // 形状文字：大多数形状（文本框/标题/占位符）实现 drawing.Text；线条/连接符/表格
 // 外壳等不实现，统一 try/catch 归零而非抛错，读取面据此判断"这个形状没有文字"。
@@ -2643,10 +2651,11 @@ function shapeText(shape) {
 // 形状，经 page.getByIndex() 重新取到的引用上 supportsService('com.sun.star.
 // drawing.TableShape') 报 false，但它的 Model 属性货真价实是一张能读写行列的
 // XTable（slide_add_table 内部用同一属性建表已验证）。service 名判定在这个引擎
-// 构建上对新建表格不可靠，改成直接尝试取 Model 并鸭子类型检查 getRows/
-// getColumns 方法是否存在——不依赖 service 字符串，也不关心它为什么不可靠。
+// 构建上对新建表格不可靠，先确认 Model 属性存在，再鸭子类型检查 getRows/
+// getColumns。普通形状读取不存在的 Model 会破坏 WASM 状态，catch 不能补救。
 function isTableShape(shape) {
   try {
+    if (!shape.getPropertySetInfo().hasPropertyByName('Model')) return false;
     const m = shape.getPropertyValue('Model');
     return !!(m && typeof m.getRows === 'function' && typeof m.getColumns === 'function');
   } catch (e) { return false; }
@@ -2803,8 +2812,12 @@ function activeCalcSelection() {
     sheets = xModel.getSheets();
     sheetCount = sheets.getCount();
     const cap = Math.min(sheetCount, 50);
-    for (let i = 0; i < cap; i++) {
-      try { sheetNames.push(String(sheets.getByIndex(i).getName() || '')); } catch (e) {}
+    try {
+      sheetNames.push(...Array.from(sheets.getElementNames()).slice(0, cap).map(name => String(name || '')));
+    } catch (e) {
+      for (let i = 0; i < cap; i++) {
+        try { sheetNames.push(String(sheets.getByIndex(i).getName() || '')); } catch (e) {}
+      }
     }
   } catch (e) {}
   try { sheet = ctrl.getActiveSheet(); } catch (e) {}
@@ -2920,7 +2933,7 @@ function slidePages() {
   try { return xModel.getDrawPages(); } catch (e) { return null; }
 }
 function activeImpressContext(wantShapeName) {
-  let page = null;
+  let page = null, pageShapes = null;
   try { if (ctrl && ctrl.getCurrentPage) page = ctrl.getCurrentPage(); } catch (e) {}
   let pages = null, slideCount = 0;
   try { pages = xModel.getDrawPages(); slideCount = pages.getCount(); } catch (e) {}
@@ -2936,7 +2949,7 @@ function activeImpressContext(wantShapeName) {
       if (idx >= 0) n = idx + 1;
     }
     if (n >= 1) slideNumber = n;
-    try { ensureShapeNames(page); } catch (e) {}
+    try { pageShapes = ensureShapeNames(page); } catch (e) {}
   }
   const currentSlideIndex = Math.max(0, slideNumber - 1);
   let slideWidthMm = 280, slideHeightMm = 157.5, widthPt = 793.7, heightPt = 446.5;
@@ -2982,9 +2995,10 @@ function activeImpressContext(wantShapeName) {
   try { if (selectedRawShape && selectedRawShape.getName) rawSelectedName = String(selectedRawShape.getName() || ''); } catch (e) {}
   if (page) {
     let cnt = 0;
-    try { cnt = page.getCount(); } catch (e) {}
+    try { cnt = pageShapes ? pageShapes.length : page.getCount(); } catch (e) {}
     for (let i = 0; i < cnt; i++) {
-      let s; try { s = page.getByIndex(i); } catch (e) { continue; }
+      let s; try { s = pageShapes ? pageShapes[i] : page.getByIndex(i); } catch (e) { continue; }
+      if (!s) continue;
       let nm = ''; try { nm = s.getName ? String(s.getName() || '') : ''; } catch (e) {}
       const kind = shapeKind(s);
       const txt = shapeText(s);
@@ -3015,7 +3029,7 @@ function activeImpressContext(wantShapeName) {
       }
     }
     if (!fallbackShape && cnt > 0) {
-      try { fallbackShape = page.getByIndex(0); fallbackIndex = 0; } catch (e) {}
+      try { fallbackShape = pageShapes ? pageShapes[0] : page.getByIndex(0); if (fallbackShape) fallbackIndex = 0; } catch (e) {}
     }
   }
   let targetShape = selectedRawShape || fallbackShape;
@@ -5712,7 +5726,7 @@ const EXEC = {
     if (isImpressDoc()) {
       const ctx = activeImpressContext();
       const shape = ctx.selectedShape;
-      const sf = shape ? shapeCharFormat(shape) : {};
+      const sf = (shape ? shapeCharFormat(shape) : null) || {};
       out.character = {
         bold: !!sf.bold,
         italic: !!sf.italic,
@@ -7339,7 +7353,7 @@ const EXEC = {
     if ((!p || p.paragraphIndex == null) && typeof isImpressDoc === 'function' && isImpressDoc()) {
       const ctx = activeImpressContext();
       const shape = ctx.selectedShape;
-      const sf = shape ? shapeCharFormat(shape) : {};
+      const sf = (shape ? shapeCharFormat(shape) : null) || {};
       const detail = shape ? impressShapeDetail(shape) : null;
       if (detail) detail.shapeIndex = ctx.selectedShapeIndex;
       const w = ctx.slideWidthMm || 280;

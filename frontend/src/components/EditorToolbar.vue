@@ -1372,6 +1372,8 @@ export default {
   },
 
   beforeUnmount() {
+    this._toolbarDisposed = true
+    this._uiRefreshOwner = null
     if (this._toolbarWheelOff) { this._toolbarWheelOff(); this._toolbarWheelOff = null }
     if (this._toolbarEdgesOff) { this._toolbarEdgesOff(); this._toolbarEdgesOff = null }
     document.removeEventListener('mousedown', this.onDocMouseDown, true)
@@ -1388,24 +1390,60 @@ export default {
       catch (e) { return { success: false, message: (e && e.message) || String(e) } }
     },
     async bootstrap() {
+      if (this._toolbarDisposed) return
+      this._uiRefreshOwner = null
+      const owner = this.uiRefreshOwner()
       this.viewPrefsReady = false
       this.state = EMPTY()
       if (!this.executor) return
       // 首先完成可编辑布局；样式/字体清单只供下拉菜单使用，不能挡住原生外壳隐藏。
       // applyViewPrefs 会回读真实工具栏状态，无需在视图设置前再读一次。
       await this.applyChrome(true)
+      if (!this.uiRefreshCurrent(owner)) return
       const view = await this.applyViewPrefs()
+      if (!this.uiRefreshCurrent(owner)) return
       if (!view || !view.success) await this.refresh()
+      if (!this.uiRefreshCurrent(owner)) return
       this.viewPrefsReady = true
       const [st, fo] = await Promise.all([
         this.isWriter ? this.call('list_styles', {}) : Promise.resolve({ styles: [] }),
         this.call('list_fonts', {}),
       ])
+      if (!this.uiRefreshCurrent(owner)) return
       this.styleList = (st && st.styles) || []
       this.fontList = (fo && fo.families) || []
     },
-    async refresh() {
+    uiRefreshOwner() {
+      const owner = this._uiRefreshOwner
+      if (owner && owner.executor === this.executor && owner.docKind === this.docKind) return owner
+      return (this._uiRefreshOwner = { executor: this.executor, docKind: this.docKind, flight: null, queued: null })
+    },
+    uiRefreshCurrent(owner) {
+      return !this._toolbarDisposed && owner === this._uiRefreshOwner
+        && owner.executor === this.executor && owner.docKind === this.docKind
+    },
+    refresh() {
+      if (this._toolbarDisposed) return Promise.resolve()
+      const owner = this.uiRefreshOwner()
+      if (owner.queued) return owner.queued
+      if (owner.flight) {
+        // A caller after a write must wait for a read started after its request.
+        // Coalesce only the trailing requests, never return the older in-flight state.
+        const next = () => {
+          owner.queued = null
+          if (this.uiRefreshCurrent(owner)) return this.refresh()
+        }
+        return (owner.queued = owner.flight.then(next, next))
+      }
+      const flight = this.readUiState(owner).finally(() => {
+        if (owner.flight === flight) owner.flight = null
+      })
+      owner.flight = flight
+      return flight
+    },
+    async readUiState(owner) {
       const r = await this.call('get_ui_state', {})
+      if (!this.uiRefreshCurrent(owner)) return
       if (r && r.success) {
         this.state = r
         if (r.calc) {
@@ -1862,10 +1900,11 @@ export default {
     // 复核后回报，这里只按结果记状态。
     // 标尺不再跟着 LO chrome 一起藏：它归视图偏好管（默认显示，见 VIEW_PREFS_KEY）。
     async applyChrome(hide) {
+      const owner = this.uiRefreshOwner()
       const res = await this.call('set_chrome', {
         menubar: !hide, statusbar: !hide, toolbars: !hide,
       })
-      if (res && res.success) this.chromeHidden = hide
+      if (this.uiRefreshCurrent(owner) && res && res.success) this.chromeHidden = hide
       return res
     },
     toggleChrome() { this.closeMenus(); return this.applyChrome(!this.chromeHidden) },
@@ -1884,13 +1923,14 @@ export default {
     // 按用户偏好把格式标记 / 标尺设成确定态（set_view_options 直写 ViewSettings）。
     // changed=false：纯视图，不能标脏触发自动保存。
     async applyViewPrefs(prefs = this.viewPrefs) {
+      const owner = this.uiRefreshOwner()
       if (this.docKind === 'calc' || this.docKind === 'impress') {
         await this.refresh()
-        return { success: true }
+        return this.uiRefreshCurrent(owner) ? { success: true } : null
       }
       const r = await this.call('set_view_options', getWriterViewOptions(prefs))
-      if (r && r.success) await this.refresh()
-      return r
+      if (this.uiRefreshCurrent(owner) && r && r.success) await this.refresh()
+      return this.uiRefreshCurrent(owner) ? r : null
     },
     async updateViewPrefs(patch) {
       if (this.viewPrefsBusy) return
