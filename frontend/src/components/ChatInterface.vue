@@ -490,12 +490,12 @@
                  <view v-for="chip in skillChips" :key="chip.id"
                        class="skill-chip"
                        :class="{ auto: chip.source === 'auto', 'is-builtin': chip.builtinWorkflow, flash: chip.justActivated }">
-                    <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.name }) : chip.name }}</text>
+                    <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.customVersion && chip.versionName ? `${chip.name} · ${chip.versionName}` : chip.name }) : chip.name }}</text>
                     <text v-if="chip.source === 'manual'" class="skill-chip-remove"
                           @tap.stop="removeSelectedSkill(chip.id)">×</text>
                  </view>
               </view>
-              <view class="input-footer">
+              <view class="input-footer" :class="{ 'is-streaming': isStreaming }">
                  <view class="action-bar-left">
                     <view class="icon-btn mini file-add-btn" @tap="triggerFileSelect" title="Add File">
                    <svg class="plus-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -541,11 +541,22 @@
                           <view class="skill-builtin-section">
                              <view class="skill-builtin-head">
                                 <text class="skill-builtin-title">{{ $t('chat.builtinWorkflowsHeader') }}</text>
-                                <text class="skill-builtin-badge">{{ $t('chat.builtinWorkflowBadge') }}</text>
+                                <view class="skill-builtin-head-actions">
+                                   <text class="skill-builtin-badge">{{ $t('chat.builtinWorkflowBadge') }}</text>
+                                   <text class="skill-builtin-adv-link" @tap.stop="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
+                                </view>
                              </view>
                              <text class="skill-builtin-sub">{{ $t('chat.builtinWorkflowsSub') }}</text>
                              <view class="skill-builtin-pills">
-                                <text v-for="bw in builtinQuickWorkflows" :key="bw.id" class="skill-builtin-pill" @tap.stop="applyBuiltinWorkflow(bw)">{{ bw.title }}</text>
+                                <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                                      class="skill-builtin-pill"
+                                      :class="{ 'is-custom': !bw.activeIsSystemDefault }"
+                                      :title="$t('chat.builtinWorkflowRightClickHint')"
+                                      @tap.stop="applyBuiltinWorkflow(bw)"
+                                      @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                                   <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
+                                   <text class="skill-builtin-pill-more" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                                </view>
                              </view>
                           </view>
                           <view class="skill-divider"></view>
@@ -587,23 +598,56 @@
                  </view>
               </view>
           </view>
-          <view class="builtin-workflows-bar">
-             <view class="builtin-workflows-header">
-                <text class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsHeader') }}</text>
-                <text class="builtin-workflows-badge">{{ $t('chat.builtinWorkflowBadge') }}</text>
-             </view>
-             <view class="builtin-workflows-grid">
-                <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                      class="builtin-workflow-card"
-                      @tap="applyBuiltinWorkflow(bw)">
-                   <text class="builtin-workflow-name">{{ bw.title }}</text>
-                   <text class="builtin-workflow-desc">{{ bw.desc }}</text>
+          <ChatSuggestionControl v-if="chatSuggestions.available && visibleSuggestion" :suggestion="visibleSuggestion" :show-settings="false"
+            @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <details class="composer-advanced-settings">
+          <summary class="composer-advanced-summary">{{ $t('chat.composerAdvancedSettings') }}</summary>
+          <view class="composer-preferences">
+          <details class="builtin-workflows-fold" :class="{ customized: builtinCustomActiveCount > 0 }">
+             <summary class="builtin-workflows-summary">
+                <span class="builtin-workflows-entry">
+                   <span class="builtin-workflows-heading">
+                      <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                      <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
+                         {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
+                      </span>
+                   </span>
+                   <span class="builtin-workflows-scope">{{ $t('chat.builtinWorkflowsScope') }}</span>
+                </span>
+                <span class="builtin-workflows-summary-right">
+                   <button type="button" class="builtin-workflows-adv-btn"
+                           @click.stop.prevent="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">
+                      {{ $t('chat.builtinWorkflowsAdvancedBtn') }}
+                   </button>
+                </span>
+             </summary>
+             <view class="builtin-workflows-body">
+                <view class="builtin-workflows-grid">
+                   <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                         class="builtin-workflow-card"
+                         :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
+                         :title="$t('chat.builtinWorkflowRightClickHint')"
+                         @tap="applyBuiltinWorkflow(bw)"
+                         @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                      <view class="builtin-workflow-card-top">
+                         <text class="builtin-workflow-name">{{ bw.title }}</text>
+                         <view class="builtin-workflow-card-actions" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                            <text class="builtin-workflow-ver-tag" :class="{ custom: !bw.activeIsSystemDefault }">{{ bw.activeVersionName }}</text>
+                            <text class="builtin-workflow-more-btn">⋯</text>
+                         </view>
+                      </view>
+                      <text class="builtin-workflow-desc">{{ bw.desc }}</text>
+                   </view>
+                </view>
+                <view class="builtin-workflows-foot">
+                   <text class="builtin-workflows-foot-hint">{{ $t('chat.builtinWorkflowRightClickHint') }}</text>
                 </view>
              </view>
-          </view>
-          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" :suggestion="visibleSuggestion"
-            @toggle="chatSuggestions.toggle" @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          </details>
+          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" @toggle="chatSuggestions.toggle" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
+          </view>
+          </details>
           <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask model-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
 
@@ -779,12 +823,12 @@
              <view v-for="chip in skillChips" :key="chip.id"
                    class="skill-chip"
                    :class="{ auto: chip.source === 'auto', 'is-builtin': chip.builtinWorkflow, flash: chip.justActivated }">
-                <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.name }) : chip.name }}</text>
+                <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.customVersion && chip.versionName ? `${chip.name} · ${chip.versionName}` : chip.name }) : chip.name }}</text>
                 <text v-if="chip.source === 'manual'" class="skill-chip-remove"
                       @tap.stop="removeSelectedSkill(chip.id)">×</text>
              </view>
           </view>
-          <view class="input-footer">
+          <view class="input-footer" :class="{ 'is-streaming': isStreaming }">
              <view class="action-bar-left">
                 <view class="icon-btn mini" @tap="triggerFileSelect" title="Add File">
                    <svg class="plus-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -830,11 +874,22 @@
                       <view class="skill-builtin-section">
                          <view class="skill-builtin-head">
                             <text class="skill-builtin-title">{{ $t('chat.builtinWorkflowsHeader') }}</text>
-                            <text class="skill-builtin-badge">{{ $t('chat.builtinWorkflowBadge') }}</text>
+                            <view class="skill-builtin-head-actions">
+                               <text class="skill-builtin-badge">{{ $t('chat.builtinWorkflowBadge') }}</text>
+                               <text class="skill-builtin-adv-link" @tap.stop="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
+                            </view>
                          </view>
                          <text class="skill-builtin-sub">{{ $t('chat.builtinWorkflowsSub') }}</text>
                          <view class="skill-builtin-pills">
-                            <text v-for="bw in builtinQuickWorkflows" :key="bw.id" class="skill-builtin-pill" @tap.stop="applyBuiltinWorkflow(bw)">{{ bw.title }}</text>
+                            <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                                  class="skill-builtin-pill"
+                                  :class="{ 'is-custom': !bw.activeIsSystemDefault }"
+                                  :title="$t('chat.builtinWorkflowRightClickHint')"
+                                  @tap.stop="applyBuiltinWorkflow(bw)"
+                                  @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                               <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
+                               <text class="skill-builtin-pill-more" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                            </view>
                          </view>
                       </view>
                       <view class="skill-divider"></view>
@@ -877,9 +932,56 @@
           </view>
           <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
-          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" :suggestion="visibleSuggestion"
-            @toggle="chatSuggestions.toggle" @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <ChatSuggestionControl v-if="chatSuggestions.available && visibleSuggestion" :suggestion="visibleSuggestion" :show-settings="false"
+            @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <details class="composer-advanced-settings">
+          <summary class="composer-advanced-summary">{{ $t('chat.composerAdvancedSettings') }}</summary>
+          <view class="composer-preferences">
+          <details class="builtin-workflows-fold builtin-workflows-fold-bottom" :class="{ customized: builtinCustomActiveCount > 0 }">
+             <summary class="builtin-workflows-summary">
+                <span class="builtin-workflows-entry">
+                   <span class="builtin-workflows-heading">
+                      <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                      <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
+                         {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
+                      </span>
+                   </span>
+                   <span class="builtin-workflows-scope">{{ $t('chat.builtinWorkflowsScope') }}</span>
+                </span>
+                <span class="builtin-workflows-summary-right">
+                   <button type="button" class="builtin-workflows-adv-btn"
+                           @click.stop.prevent="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">
+                      {{ $t('chat.builtinWorkflowsAdvancedBtn') }}
+                   </button>
+                </span>
+             </summary>
+             <view class="builtin-workflows-body">
+                <view class="builtin-workflows-grid">
+                   <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                         class="builtin-workflow-card"
+                         :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
+                         :title="$t('chat.builtinWorkflowRightClickHint')"
+                         @tap="applyBuiltinWorkflow(bw)"
+                         @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                      <view class="builtin-workflow-card-top">
+                         <text class="builtin-workflow-name">{{ bw.title }}</text>
+                         <view class="builtin-workflow-card-actions" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                            <text class="builtin-workflow-ver-tag" :class="{ custom: !bw.activeIsSystemDefault }">{{ bw.activeVersionName }}</text>
+                            <text class="builtin-workflow-more-btn">⋯</text>
+                         </view>
+                      </view>
+                      <text class="builtin-workflow-desc">{{ bw.desc }}</text>
+                   </view>
+                </view>
+                <view class="builtin-workflows-foot">
+                   <text class="builtin-workflows-foot-hint">{{ $t('chat.builtinWorkflowRightClickHint') }}</text>
+                </view>
+             </view>
+          </details>
+          <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" @toggle="chatSuggestions.toggle" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
+          </view>
+          </details>
        </template>
     </view>
 
@@ -915,6 +1017,185 @@
       </view>
     </view>
 
+    <!-- 内置常驻工作流右键菜单：快速切换当前项目版本 / 打开规则与版本编辑器（dev-board#1438） -->
+    <view v-if="builtinWorkflowMenu.visible && activeMenuWorkflow"
+          class="bw-context-mask"
+          @tap="closeBuiltinWorkflowContextMenu"
+          @contextmenu.prevent="closeBuiltinWorkflowContextMenu">
+      <view class="bw-context-menu"
+            :style="{ left: `${builtinWorkflowMenu.x}px`, top: `${builtinWorkflowMenu.y}px` }"
+            @tap.stop>
+        <view class="bw-menu-head">
+          <text class="bw-menu-title">{{ activeMenuWorkflow.title }}</text>
+          <text class="bw-menu-sub">{{ projectId ? $t('chat.builtinWorkflowMenuSwitchTitle') : $t('chat.builtinWorkflowMenuGlobalTitle') }}</text>
+        </view>
+        <view class="bw-menu-versions">
+          <view v-for="ver in activeMenuWorkflow.versions" :key="ver.id"
+                class="bw-menu-version-item"
+                :class="{ active: activeMenuWorkflow.activeVersionId === ver.id }"
+                @tap.stop="switchBuiltinWorkflowVersion(activeMenuWorkflow, ver.id)">
+            <text class="bw-menu-check">{{ activeMenuWorkflow.activeVersionId === ver.id ? '✓' : '' }}</text>
+            <view class="bw-menu-version-main">
+              <text class="bw-menu-version-name">{{ ver.name }}</text>
+              <text v-if="ver.systemDefault" class="bw-menu-version-tag">{{ $t('chat.builtinWorkflowReadOnlyTag') }}</text>
+            </view>
+            <text class="bw-menu-version-edit"
+                  @tap.stop="openBuiltinWorkflowEditor(activeMenuWorkflow, ver.id)">{{ ver.systemDefault ? '查看' : '编辑' }}</text>
+          </view>
+        </view>
+        <view class="skill-divider"></view>
+        <view class="bw-menu-action" @tap.stop="openBuiltinWorkflowEditor(activeMenuWorkflow, activeMenuWorkflow.activeVersionId)">
+          <text>{{ $t('chat.builtinWorkflowMenuEditCurrent') }}</text>
+        </view>
+        <view class="bw-menu-action accent" @tap.stop="openBuiltinWorkflowEditor(activeMenuWorkflow, '__new__')">
+          <text>{{ $t('chat.builtinWorkflowMenuCreateNew') }}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 内置常驻工作流多版本与规则编辑器弹窗（支持顶部切换四大工作流，dev-board#1438） -->
+    <view v-if="showBuiltinWorkflowModal && activeModalWorkflow"
+          class="awd-dialog-mask bw-modal-mask"
+          @tap="closeBuiltinWorkflowModal">
+      <view class="awd-dialog bw-editor-dialog" @tap.stop>
+        <view class="awd-dialog-header bw-editor-header">
+          <view class="bw-editor-header-text">
+            <text class="awd-dialog-title">{{ $t('chat.builtinWorkflowModalTitle', { name: activeModalWorkflow.title }) }}</text>
+            <text class="bw-editor-subtitle">{{ $t('chat.builtinWorkflowModalSubtitle') }}</text>
+          </view>
+          <text class="awd-dialog-close" @tap="closeBuiltinWorkflowModal">×</text>
+        </view>
+
+        <!-- 顶部四大工作流切换栏：从「高级设置」进入后可一站式配置任意内置工作流 -->
+        <view class="bw-workflow-tabs">
+          <view v-for="wf in builtinQuickWorkflows" :key="wf.id"
+                class="bw-workflow-tab"
+                :class="{ active: bwModalWorkflowId === wf.id }"
+                @tap="switchModalWorkflowTab(wf)">
+            <text class="bw-workflow-tab-title">{{ wf.title }}</text>
+            <text class="bw-workflow-tab-ver" :class="{ custom: !wf.activeIsSystemDefault }">{{ wf.activeVersionName }}</text>
+          </view>
+        </view>
+
+        <view class="bw-editor-body">
+          <!-- 左侧版本列表 -->
+          <view class="bw-editor-sidebar">
+            <view class="bw-sidebar-head">
+              <text class="bw-sidebar-title">{{ $t('chat.builtinWorkflowVersionListTitle') }}</text>
+            </view>
+            <view class="bw-sidebar-list">
+              <view v-for="ver in activeModalWorkflow.versions" :key="ver.id"
+                    class="bw-sidebar-item"
+                    :class="{
+                      selected: bwModalSelectedVersionId === ver.id,
+                      active: activeModalWorkflow.activeVersionId === ver.id
+                    }"
+                    @tap="selectVersionInModal(ver.id)">
+                <view class="bw-sidebar-item-top">
+                  <text class="bw-sidebar-item-name">{{ ver.name }}</text>
+                  <text v-if="activeModalWorkflow.activeVersionId === ver.id" class="bw-sidebar-active-dot">●</text>
+                </view>
+                <view class="bw-sidebar-item-meta">
+                  <text v-if="ver.systemDefault" class="bw-meta-pill">{{ $t('chat.builtinWorkflowReadOnlyTag') }}</text>
+                  <text v-if="activeModalWorkflow.activeVersionId === ver.id" class="bw-meta-pill active">{{ projectId ? $t('chat.builtinWorkflowProjectTag') : $t('chat.builtinWorkflowGlobalTag') }}</text>
+                </view>
+              </view>
+            </view>
+            <view class="bw-sidebar-new-btn"
+                  :class="{ selected: bwModalSelectedVersionId === '__new__' }"
+                  @tap="startNewVersionFromDefault">
+              <text>{{ $t('chat.builtinWorkflowNewVersionBtn') }}</text>
+            </view>
+          </view>
+
+          <!-- 右侧规则编辑面板 -->
+          <view class="bw-editor-main">
+            <view v-if="isModalViewingSystemDefault" class="bw-readonly-banner">
+              <text class="bw-readonly-banner-text">{{ $t('chat.builtinWorkflowReadOnlyBanner') }}</text>
+              <view class="awd-btn awd-btn-primary bw-fork-btn" @tap="startNewVersionFromDefault">
+                {{ $t('chat.builtinWorkflowForkFromDefaultBtn') }}
+              </view>
+            </view>
+
+            <view class="bw-field-group">
+              <text class="bw-field-label">{{ $t('chat.builtinWorkflowFieldVersionName') }}</text>
+              <input v-model="bwEditorForm.name"
+                     class="bw-input"
+                     :disabled="isModalViewingSystemDefault"
+                     :placeholder="$t('chat.builtinWorkflowVersionNamePlaceholder')" />
+            </view>
+
+            <view class="bw-field-group">
+              <text class="bw-field-label">{{ $t('chat.builtinWorkflowFieldQuickPrompt') }}</text>
+              <textarea v-model="bwEditorForm.quickPrompt"
+                        class="bw-textarea bw-textarea-short"
+                        :disabled="isModalViewingSystemDefault"
+                        :maxlength="-1"
+                        :placeholder="$t('chat.builtinWorkflowQuickPromptPlaceholder')" />
+            </view>
+
+            <view class="bw-field-group bw-field-group-grow">
+              <view class="bw-field-label-row">
+                <text class="bw-field-label">{{ $t('chat.builtinWorkflowFieldPromptTemplate') }}</text>
+                <text v-if="!isModalViewingSystemDefault"
+                      class="bw-reset-link"
+                      @tap="resetEditorToSystemDefault">{{ $t('chat.builtinWorkflowResetToDefault') }}</text>
+              </view>
+              <textarea v-model="bwEditorForm.promptTemplate"
+                        class="bw-textarea bw-textarea-code"
+                        :disabled="isModalViewingSystemDefault"
+                        :maxlength="-1"
+                        :placeholder="$t('chat.builtinWorkflowPromptTemplatePlaceholder')" />
+            </view>
+
+            <view class="bw-field-group">
+              <text class="bw-field-label">{{ $t('chat.builtinWorkflowFieldOutput') }}</text>
+              <textarea v-model="bwEditorForm.output"
+                        class="bw-textarea bw-textarea-short"
+                        :disabled="isModalViewingSystemDefault"
+                        :maxlength="-1"
+                        :placeholder="$t('chat.builtinWorkflowOutputPlaceholder')" />
+            </view>
+
+            <view v-if="!isModalViewingSystemDefault" class="bw-scope-options">
+              <view v-if="projectId" class="bw-checkbox-row" @tap="bwEditorForm.applyToProject = !bwEditorForm.applyToProject">
+                <text class="bw-checkbox" :class="{ checked: bwEditorForm.applyToProject }">{{ bwEditorForm.applyToProject ? '✓' : '' }}</text>
+                <text class="bw-checkbox-label">{{ $t('chat.builtinWorkflowApplyToProject') }}</text>
+              </view>
+              <view class="bw-checkbox-row" @tap="bwEditorForm.setAsGlobalDefault = !bwEditorForm.setAsGlobalDefault">
+                <text class="bw-checkbox" :class="{ checked: bwEditorForm.setAsGlobalDefault }">{{ bwEditorForm.setAsGlobalDefault ? '✓' : '' }}</text>
+                <text class="bw-checkbox-label">{{ $t('chat.builtinWorkflowSetAsGlobal') }}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="awd-dialog-footer bw-editor-footer">
+          <view class="bw-footer-left">
+            <view v-if="!isModalViewingSystemDefault && bwEditorForm.id && bwEditorForm.id !== 'default'"
+                  class="awd-btn bw-btn-danger"
+                  @tap="handleDeleteBuiltinWorkflowVersion">
+              {{ $t('chat.builtinWorkflowDeleteVersion') }}
+            </view>
+          </view>
+          <view class="bw-footer-right">
+            <view class="awd-btn awd-btn-secondary" @tap="closeBuiltinWorkflowModal">{{ $t('chat.cancel') }}</view>
+            <view v-if="isModalViewingSystemDefault && activeModalWorkflow.activeVersionId !== 'default'"
+                  class="awd-btn awd-btn-primary"
+                  @tap="switchBuiltinWorkflowVersion(activeModalWorkflow, 'default'); closeBuiltinWorkflowModal()">
+              {{ projectId ? $t('chat.builtinWorkflowApplyToProject') : $t('chat.builtinWorkflowSetAsGlobal') }}
+            </view>
+            <view v-if="!isModalViewingSystemDefault"
+                  class="awd-btn awd-btn-primary"
+                  :class="{ disabled: bwEditorSaving }"
+                  @tap="submitBuiltinWorkflowVersion">
+              {{ $t('chat.builtinWorkflowSaveVersion') }}
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
   </view>
 </template>
 
@@ -931,7 +1212,7 @@ import AgentInbox from './AgentInbox.vue'
 import MemoryBrowser from './MemoryBrowser.vue'
 import { useAgentStream } from '@/composables/useAgentStream.js'
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed } from 'vue'
-import { createFile, importLocalFile, getProjectFiles, getApiBaseUrl, getAiHistory, rollbackConversation, performPptGeneration, getSkills, getCurrentUser as getCurrentUserApi, fetchAiModels, getAiConfig, cancelBackgroundTask, listPluginJobs, cancelPluginJob, getMeetingRecordings, resolveProjectFileByPath } from '@/services/api.js'
+import { createFile, importLocalFile, getProjectFiles, getApiBaseUrl, getAiHistory, rollbackConversation, performPptGeneration, getSkills, getBuiltinWorkflows, saveBuiltinWorkflowVersion, selectBuiltinWorkflowVersion, deleteBuiltinWorkflowVersion, getCurrentUser as getCurrentUserApi, fetchAiModels, getAiConfig, cancelBackgroundTask, listPluginJobs, cancelPluginJob, getMeetingRecordings, resolveProjectFileByPath } from '@/services/api.js'
 import { audioNeedingTranscription, isTranscribableMedia, transcribedAudioFileIds } from '@/utils/audioAttachment.js'
 import { getAuthHeaders, getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { host } from '@/services/host.js'
@@ -947,6 +1228,8 @@ import { ICONS } from '@/config/icons.js'
 import OcrRoutingCard from '@/components/OcrRoutingCard.vue'
 import { createOcrRoutingHandler } from '@/composables/useOcrRouting.js'
 import { chooseOcrRouting, cancelOcrRouting } from '@/services/api.js'
+import { getHarnessEvolutions } from '@/services/api.js'
+import { attachEvolutionsToBubbles } from '@/utils/harnessEvolutionHistory.mjs'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import { componentDownloads } from '@/services/componentDownloads.js'
 import { createComponentRequiredHandler, shouldAutoResend } from '@/composables/useComponentRequired.js'
@@ -960,6 +1243,7 @@ import { warmDragImage } from '@/utils/dragImage.js'
 import {
   DEFAULT_CONTEXT_LIMITS,
   normalizeContextLimits,
+  normalizeContextItem,
   visionNoticeKey,
   admitFileToContext,
   admitPastedImage,
@@ -1187,6 +1471,7 @@ export default {
 
     const ocrRouteState = ref(null)
     const ocrRouteHandler = createOcrRoutingHandler({
+      t,
       conversation: () => currentConversationId.value,
       identity: () => JSON.stringify([getApiBaseUrl(), getSessionId(), getCloudAccountGeneration()]),
       userCount: userMessageCount,
@@ -1814,7 +2099,24 @@ export default {
       }
     }
 
-    const builtinQuickWorkflows = computed(() => [
+    // ---- 内置常驻工作流（懒人模式，dev-board#1438）：多版本与按项目切换偏好 ----
+    const builtinWorkflowStates = ref([])
+    const builtinWorkflowMenu = ref({ visible: false, x: 0, y: 0, workflowId: '' })
+    const showBuiltinWorkflowModal = ref(false)
+    const bwModalWorkflowId = ref('')
+    const bwModalSelectedVersionId = ref('default')
+    const bwEditorSaving = ref(false)
+    const bwEditorForm = ref({
+      id: '',
+      name: '',
+      quickPrompt: '',
+      promptTemplate: '',
+      output: '',
+      applyToProject: true,
+      setAsGlobalDefault: false
+    })
+
+    const defaultWorkflowCards = computed(() => [
       {
         id: 'contract-review',
         title: t('chat.builtinWorkflowContractTitle'),
@@ -1840,6 +2142,272 @@ export default {
         prompt: t('chat.builtinWorkflowOpinionPrompt')
       }
     ])
+
+    const builtinQuickWorkflows = computed(() => {
+      const stateMap = new Map((builtinWorkflowStates.value || []).map(s => [s.skillId, s]))
+      const sysDefaultName = t('chat.builtinWorkflowSystemDefault')
+      return defaultWorkflowCards.value.map(def => {
+        const st = stateMap.get(def.id)
+        const fallbackVersions = [
+          {
+            id: 'default',
+            name: sysDefaultName,
+            systemDefault: true,
+            quickPrompt: def.prompt,
+            promptTemplate: '',
+            output: ''
+          }
+        ]
+        const versions = (st && Array.isArray(st.versions) && st.versions.length)
+          ? st.versions
+          : fallbackVersions
+        const activeVersionId = st?.activeVersionId || 'default'
+        const activeIsSystemDefault = st ? !!st.activeIsSystemDefault : activeVersionId === 'default'
+        const activeVersionName = st?.activeVersionName || sysDefaultName
+        return {
+          ...def,
+          title: st?.shortName || def.title,
+          desc: st?.hint || def.desc,
+          prompt: st?.activeQuickPrompt || def.prompt,
+          activeVersionId,
+          activeVersionName,
+          activeIsSystemDefault,
+          activeScope: st?.activeScope || 'default',
+          versions
+        }
+      })
+    })
+
+    const builtinCustomActiveCount = computed(() =>
+      builtinQuickWorkflows.value.filter(w => !w.activeIsSystemDefault).length
+    )
+
+    const activeMenuWorkflow = computed(() =>
+      builtinQuickWorkflows.value.find(w => w.id === builtinWorkflowMenu.value.workflowId) || null
+    )
+    const activeModalWorkflow = computed(() =>
+      builtinQuickWorkflows.value.find(w => w.id === bwModalWorkflowId.value) || null
+    )
+    const isModalViewingSystemDefault = computed(() => bwModalSelectedVersionId.value === 'default')
+
+    const loadBuiltinWorkflowStates = async () => {
+      try {
+        const res = await getBuiltinWorkflows(props.projectId)
+        const list = Array.isArray(res?.workflows) ? res.workflows : (Array.isArray(res?.data?.workflows) ? res.data.workflows : [])
+        if (list.length) {
+          builtinWorkflowStates.value = list
+        }
+      } catch (e) {
+        console.warn('[ChatInterface] 加载内置工作流版本状态失败:', e)
+      }
+    }
+
+    watch(() => props.projectId, () => {
+      loadBuiltinWorkflowStates()
+    }, { immediate: true })
+
+    const openBuiltinWorkflowContextMenu = (event, bw) => {
+      if (!bw) return
+      let x = 220
+      let y = 260
+      if (event && typeof event.clientX === 'number' && event.clientX > 0) {
+        x = event.clientX
+        y = event.clientY
+      } else if (event?.currentTarget?.getBoundingClientRect) {
+        const rect = event.currentTarget.getBoundingClientRect()
+        x = rect.left + Math.min(rect.width - 20, 80)
+        y = rect.bottom + 4
+      }
+      if (typeof window !== 'undefined') {
+        const maxW = window.innerWidth || 1024
+        const maxH = window.innerHeight || 768
+        x = Math.max(12, Math.min(x, maxW - 260))
+        y = Math.max(12, Math.min(y, maxH - 280))
+      }
+      builtinWorkflowMenu.value = {
+        visible: true,
+        x,
+        y,
+        workflowId: bw.id
+      }
+      loadBuiltinWorkflowStates()
+    }
+
+    const closeBuiltinWorkflowContextMenu = () => {
+      builtinWorkflowMenu.value = { ...builtinWorkflowMenu.value, visible: false }
+    }
+
+    const switchBuiltinWorkflowVersion = async (bw, versionId, scopeOverride) => {
+      if (!bw || !versionId) return
+      closeBuiltinWorkflowContextMenu()
+      try {
+        const scope = scopeOverride || (props.projectId ? 'project' : 'global')
+        const res = await selectBuiltinWorkflowVersion(bw.id, {
+          versionId,
+          scope,
+          projectId: props.projectId || ''
+        })
+        const workflows = res?.workflows || res?.data?.workflows
+        if (Array.isArray(workflows) && workflows.length) {
+          builtinWorkflowStates.value = workflows
+        } else {
+          await loadBuiltinWorkflowStates()
+        }
+        const updatedWf = builtinQuickWorkflows.value.find(w => w.id === bw.id)
+        const verName = updatedWf?.activeVersionName || versionId
+        if (typeof uni !== 'undefined' && uni.showToast) {
+          uni.showToast({
+            title: t('chat.builtinWorkflowSwitchedToast', { workflow: bw.title, version: verName }),
+            icon: 'none',
+            duration: 2200
+          })
+        }
+      } catch (e) {
+        console.error('[ChatInterface] 切换内置工作流版本失败:', e)
+      }
+    }
+
+    const selectVersionInModal = (versionId) => {
+      const wf = activeModalWorkflow.value
+      if (!wf) return
+      const sysDef = (wf.versions || []).find(v => v.systemDefault || v.id === 'default') || {
+        id: 'default',
+        name: t('chat.builtinWorkflowSystemDefault'),
+        systemDefault: true,
+        quickPrompt: wf.prompt || '',
+        promptTemplate: '',
+        output: ''
+      }
+      if (versionId === '__new__') {
+        bwModalSelectedVersionId.value = '__new__'
+        const customCount = (wf.versions || []).filter(v => !v.systemDefault && v.id !== 'default').length
+        const baseName = t('chat.builtinWorkflowNewVersionDefaultName')
+        bwEditorForm.value = {
+          id: '',
+          name: customCount > 0 ? `${baseName} ${customCount + 1}` : baseName,
+          quickPrompt: sysDef.quickPrompt || wf.prompt || '',
+          promptTemplate: sysDef.promptTemplate || '',
+          output: sysDef.output || '',
+          applyToProject: true,
+          setAsGlobalDefault: !props.projectId
+        }
+        return
+      }
+      const target = (wf.versions || []).find(v => v.id === versionId) || sysDef
+      bwModalSelectedVersionId.value = target.id
+      bwEditorForm.value = {
+        id: target.id,
+        name: target.name || '',
+        quickPrompt: target.quickPrompt || wf.prompt || '',
+        promptTemplate: target.promptTemplate || '',
+        output: target.output || '',
+        applyToProject: true,
+        setAsGlobalDefault: wf.activeScope === 'global' && wf.activeVersionId === target.id
+      }
+    }
+
+    const openBuiltinWorkflowEditor = async (bw, targetVersionId) => {
+      if (!bw) return
+      closeBuiltinWorkflowContextMenu()
+      showSkillDropdown.value = false
+      await loadBuiltinWorkflowStates()
+      bwModalWorkflowId.value = bw.id
+      selectVersionInModal(targetVersionId || bw.activeVersionId || 'default')
+      showBuiltinWorkflowModal.value = true
+    }
+
+    const switchModalWorkflowTab = (wf) => {
+      if (!wf) return
+      bwModalWorkflowId.value = wf.id
+      selectVersionInModal(wf.activeVersionId || 'default')
+    }
+
+    const closeBuiltinWorkflowModal = () => {
+      showBuiltinWorkflowModal.value = false
+    }
+
+    const startNewVersionFromDefault = () => {
+      selectVersionInModal('__new__')
+    }
+
+    const resetEditorToSystemDefault = () => {
+      const wf = activeModalWorkflow.value
+      if (!wf) return
+      const sysDef = (wf.versions || []).find(v => v.systemDefault || v.id === 'default')
+      if (!sysDef) return
+      bwEditorForm.value.quickPrompt = sysDef.quickPrompt || wf.prompt || ''
+      bwEditorForm.value.promptTemplate = sysDef.promptTemplate || ''
+      bwEditorForm.value.output = sysDef.output || ''
+    }
+
+    const submitBuiltinWorkflowVersion = async () => {
+      const wf = activeModalWorkflow.value
+      if (!wf || bwEditorSaving.value) return
+      bwEditorSaving.value = true
+      try {
+        const payload = {
+          id: bwModalSelectedVersionId.value === '__new__' ? '' : bwEditorForm.value.id,
+          name: (bwEditorForm.value.name || '').trim() || t('chat.builtinWorkflowNewVersionDefaultName'),
+          quickPrompt: bwEditorForm.value.quickPrompt || '',
+          promptTemplate: bwEditorForm.value.promptTemplate || '',
+          output: bwEditorForm.value.output || '',
+          applyToProject: !!bwEditorForm.value.applyToProject,
+          setAsGlobalDefault: !!bwEditorForm.value.setAsGlobalDefault,
+          projectId: props.projectId || ''
+        }
+        const res = await saveBuiltinWorkflowVersion(wf.id, payload)
+        const workflows = res?.workflows || res?.data?.workflows
+        if (Array.isArray(workflows) && workflows.length) {
+          builtinWorkflowStates.value = workflows
+        } else {
+          await loadBuiltinWorkflowStates()
+        }
+        if (typeof uni !== 'undefined' && uni.showToast) {
+          uni.showToast({
+            title: t('chat.builtinWorkflowSavedToast', { workflow: wf.title, version: payload.name }),
+            icon: 'none',
+            duration: 2200
+          })
+        }
+        showBuiltinWorkflowModal.value = false
+      } catch (e) {
+        console.error('[ChatInterface] 保存内置工作流版本失败:', e)
+        if (typeof uni !== 'undefined' && uni.showToast) {
+          uni.showToast({ title: t('chat.builtinWorkflowSaveFailed'), icon: 'none' })
+        }
+      } finally {
+        bwEditorSaving.value = false
+      }
+    }
+
+    const handleDeleteBuiltinWorkflowVersion = async () => {
+      const wf = activeModalWorkflow.value
+      const verId = bwEditorForm.value.id
+      if (!wf || !verId || verId === 'default' || bwEditorSaving.value) return
+      const verName = bwEditorForm.value.name || verId
+      bwEditorSaving.value = true
+      try {
+        const res = await deleteBuiltinWorkflowVersion(wf.id, verId, props.projectId || '')
+        const workflows = res?.workflows || res?.data?.workflows
+        if (Array.isArray(workflows) && workflows.length) {
+          builtinWorkflowStates.value = workflows
+        } else {
+          await loadBuiltinWorkflowStates()
+        }
+        selectVersionInModal('default')
+        if (typeof uni !== 'undefined' && uni.showToast) {
+          uni.showToast({
+            title: t('chat.builtinWorkflowDeletedToast', { version: verName }),
+            icon: 'none',
+            duration: 2000
+          })
+        }
+      } catch (e) {
+        console.error('[ChatInterface] 删除内置工作流版本失败:', e)
+      } finally {
+        bwEditorSaving.value = false
+      }
+    }
 
     const applyBuiltinWorkflow = (bw) => {
       if (!bw || !bw.prompt) return
@@ -2557,7 +3125,10 @@ export default {
         fileName: f.name,
         fileType: f.fileType,
         wpsFileId: f.wpsFileId,
-        isDir: f.isDir
+        isDir: f.isDir,
+        projectId: f.projectId,
+        projectName: f.projectName,
+        readOnly: f.readOnly
       })).concat(pastedFileList.map(f => ({
         id: f.id,
         fileName: f.name,
@@ -2864,6 +3435,20 @@ export default {
        }
     }
 
+    // Harness 自进化卡片的历史回放（dev-board#1481）：卡片原本只随当轮 SSE 出现，刷新后要按
+    // assistantMessageId 从持久化记录挂回原气泡，否则「撤销这次学习」的入口随刷新消失而规则仍在生效。
+    // 失败静默：这是附加信息，拿不到也不该影响历史本身的展示。
+    const restoreHarnessEvolutions = async (conversationId) => {
+       if (!conversationId) return
+       try {
+          const records = await getHarnessEvolutions({ conversationId })
+          if (currentConversationId.value !== conversationId) return
+          attachEvolutionsToBubbles(bubbles.value, Array.isArray(records) ? records : (records?.data || []))
+       } catch (e) {
+          console.warn('[ChatInterface] restore harness evolutions failed', e)
+       }
+    }
+
     // 历史分页（dev-board#811 K31，审查 C-12）。首屏只取最近一页，向上滚再补更早的。
     // hasMore 为假时这三个状态恒定，翻页那条链整条不参与——旧后端（不认 limit，回裸数组）
     // 与夹具直接传数组的调用一样落在这一档。
@@ -2894,6 +3479,7 @@ export default {
 
        bubbles.value.push(...historyBubbles(loadedMsgs))
        markAnsweredQuestions()
+       restoreHarnessEvolutions(conversationId)
 
        // 后台续跑关键一步：切回会话时重连 SSE。后端 connect 会推 run_state
        // （运行中还会推 state_recovery 全量续流 + plan_update 恢复任务清单），
@@ -2934,6 +3520,7 @@ export default {
           if (older.length) {
              bubbles.value.unshift(...historyBubbles(older))
              markAnsweredQuestions()
+             restoreHarnessEvolutions(conversationId)
           }
           historyHasMore.value = !!(page && page.hasMore)
           historyBefore.value = (page && page.nextBefore) ?? historyBefore.value
@@ -3482,13 +4069,7 @@ export default {
         // duplicate 静默：同一份拖两遍是常见误操作，弹提示只是噪音
         return
       }
-      const fileData = {
-        id: file.id,
-        name: file.name,
-        fileType: file.fileType,
-        wpsFileId: file.wpsFileId,
-        isDir: file.isDir || file.fileType === 'folder'
-      }
+      const fileData = normalizeContextItem(file)
       contextFiles.value.push(fileData)
       // 只有真挂了音视频才去问「它转写过没有」（dev-board#814 K34；视频见 #1024）
       if (isTranscribableMedia(fileData)) refreshTranscribedAudio()
@@ -3509,6 +4090,9 @@ export default {
       const displayName = truncateName(file.name)
       // 文件名由项目成员自由命名（后端只挡路径分隔符），这段字符串会直接进 DOM，必须转义
       const safeDisplayName = escapeHtml(displayName)
+      const projectBadge = file.projectName
+        ? `<span class="ctx-project-badge">${escapeHtml(file.projectName)} /</span>`
+        : ''
       // 淡态 = 上一轮带过的，仍然会继续带上（这才是 E-2 要的跨轮保留）；
       // title 里明说这件事，否则用户会以为淡态是「已失效」
       const carriedClass = carried ? ' is-carried' : ''
@@ -3518,6 +4102,7 @@ export default {
         <span class="context-tag-inline${carriedClass}" contenteditable="false" data-file-id="${file.id}" data-is-dir="${file.isDir ? 'true' : 'false'}" title="${tagTitle}">
           <img src="${icon}" class="tag-icon"/>
           <span class="tag-at">@</span>
+          ${projectBadge}
           <span class="tag-name">${safeDisplayName}</span>
           <span class="tag-close">×</span>
         </span>&nbsp;`.replace(/\s+/g, ' ').trim()
@@ -3594,7 +4179,7 @@ export default {
       if (!Array.isArray(fileList) || !fileList.length) return
       carriedFileIds.value = []
       for (const f of fileList) {
-        addFile({ id: f.id, name: f.fileName, fileType: f.fileType, wpsFileId: f.wpsFileId, isDir: f.isDir })
+        addFile({ id: f.id, name: f.fileName, fileType: f.fileType, wpsFileId: f.wpsFileId, isDir: f.isDir, projectId: f.projectId, projectName: f.projectName, readOnly: f.readOnly })
       }
       if (richInput.value) inputPrompt.value = richInput.value.innerText
     }
@@ -4103,6 +4688,20 @@ export default {
       return { files, failed }
     }
 
+    const attachCrossProjectFile = (contextItem) => {
+      if (!contextItem) return
+      addFile(contextItem)
+      uni.showToast({ title: t('chat.crossProjectAttached', { name: contextItem.name }), icon: 'none' })
+    }
+
+    const sendQuickPrompt = (promptText) => {
+      const prompt = String(promptText || '').trim()
+      if (!prompt) return
+      inputPrompt.value = prompt
+      if (richInput.value) richInput.value.textContent = prompt
+      nextTick(() => handleSubmit())
+    }
+
     // 外部面板（如股东大会核查）注入预设 prompt：强制 AGENT 模式发送
     // （skill 注入依赖 prompt 文本内的触发词；ASK 模式会跳过注入）。
     // 返回本次会话 ID，供调用方把业务对象绑定到该会话。
@@ -4293,6 +4892,7 @@ export default {
     // Expose methods for parent ref access
     expose({
       addFile, loadMessages, loadConversationMetadata, sendExternalPrompt, resumeAfterRestart,
+      attachCrossProjectFile, sendQuickPrompt,
       startNewChat, menuSetMode, menuStop, menuState,
       uploadLocalFilesAndAddContext,
       handleReviewSubmit, handleReviewState,
@@ -4420,7 +5020,28 @@ export default {
        removeSelectedSkill,
        goToSkillManagement,
        builtinQuickWorkflows,
+       builtinCustomActiveCount,
        applyBuiltinWorkflow,
+       builtinWorkflowMenu,
+       activeMenuWorkflow,
+       openBuiltinWorkflowContextMenu,
+       closeBuiltinWorkflowContextMenu,
+       switchBuiltinWorkflowVersion,
+       showBuiltinWorkflowModal,
+       activeModalWorkflow,
+       bwModalWorkflowId,
+       bwModalSelectedVersionId,
+       isModalViewingSystemDefault,
+       bwEditorSaving,
+       bwEditorForm,
+       openBuiltinWorkflowEditor,
+       switchModalWorkflowTab,
+       closeBuiltinWorkflowModal,
+       selectVersionInModal,
+       startNewVersionFromDefault,
+       resetEditorToSystemDefault,
+       submitBuiltinWorkflowVersion,
+       handleDeleteBuiltinWorkflowVersion,
        // Artifact
        handleArtifactOpenTab: (art) => emit('artifact-open-tab', art),
        handleArtifactApprove: async (art) => {
@@ -4570,6 +5191,7 @@ export default {
   background: var(--awd-surface);
   position: relative;
   overflow: hidden; /* Prevent children from overflowing */
+  container: chat-panel / inline-size;
   box-sizing: border-box;
 }
 
@@ -4852,17 +5474,16 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 24px 24px;
+  padding: 0 16px 20px;
   overflow-y: auto;
   min-width: 0;
   box-sizing: border-box;
 }
 
 .empty-top-section {
-  /* 黄金分割位：38.2% from top，进一步上移 */
-  margin-top: calc(30vh - 80px);
+  margin-top: clamp(28px, 16vh, 160px);
   flex-shrink: 0;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   text-align: center;
 }
 
@@ -4877,8 +5498,9 @@ export default {
   width: 100%;
   max-width: 600px;
   flex-shrink: 0;
-  margin-top: auto; /* Push to bottom */
-  padding-top: 24px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--awd-border-subtle);
   box-sizing: border-box;
 }
 
@@ -4892,7 +5514,8 @@ export default {
 }
 
 .welcome-subtitle {
-  font-size: var(--awd-font-size-reading);
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
   font-weight: 400;
   color: var(--awd-text-2);
   display: block;
@@ -4902,7 +5525,7 @@ export default {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-dialog);
-  padding: 16px;
+  padding: 12px;
   width: 100%;
   box-sizing: border-box;
   box-shadow: var(--awd-shadow-card);
@@ -4928,8 +5551,7 @@ export default {
   font-weight: 500;
   color: var(--awd-text-3);
   margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.02em;
 }
 
 .recent-history {
@@ -5010,14 +5632,15 @@ export default {
 }
 
 .history-empty-placeholder {
-  font-size: var(--awd-font-size-body);
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   text-align: center;
-  padding: 24px 0;
+  padding: 12px 0;
 }
 
 .history-disclaimer {
-  font-size: var(--awd-panel-fs);
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.6;
   color: var(--awd-text-3);
   text-align: center;
   padding: 16px 0 0;
@@ -5030,8 +5653,8 @@ export default {
   max-height: 200px;
   overflow-y: auto;
   outline: none;
-  font-size: var(--awd-font-size-reading);
-  line-height: 1.5;
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
   color: var(--awd-text);
 }
 
@@ -5041,29 +5664,43 @@ export default {
 }
 
 .input-footer {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
-  column-gap: 8px;
-  row-gap: 6px;
+  gap: 8px;
   margin-top: 12px;
-  padding-top: 12px;
-  border-top: none;
+  padding-top: 10px;
+  border-top: 1px solid var(--awd-border-subtle);
 }
 
 .action-bar-left {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
-  flex: 1 1 240px;
-  /* 窄面板按控件换行，保留模型名的可读宽度；发送按钮可另起一行。 */
   min-width: 0;
 }
 
+.input-footer .icon-btn.mini,
+.input-footer .skill-selector {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.input-footer .icon-btn.mini { border: 0; }
+.input-footer.is-streaming { grid-template-columns: minmax(0, 1fr); }
+.input-footer.is-streaming .composer-actions { flex-wrap: wrap; justify-content: flex-end; }
+
+@container chat-panel (max-width: 340px) {
+  .action-bar-left { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; }
+  .model-selector { grid-column: 1 / -1; grid-row: 2; }
+  .skill-selector { grid-column: 3; grid-row: 1; }
+  .input-footer { align-items: end; }
+}
+
 .model-selector {
-  font-size: var(--awd-font-size-body);
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
   /* 定位基准挪给 .input-card（见 .model-dropdown 注释）——AI 面板最窄 240px，
@@ -5073,15 +5710,15 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 24px;
+  height: 28px;
   box-sizing: border-box;
   padding: 0 6px;
   border: 1px solid transparent;
   border-radius: var(--awd-radius-md);
   transition: background 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
-  flex: 1 1 100px;
-  min-width: 100px;
+  flex: 1 1 0;
+  min-width: 0;
   max-width: 100%;
 }
 /* uni 的 <text> 不继承父级的 nowrap 效果，窄栏下「Kimi K3」会折成两行（BUG-41） */
@@ -5110,7 +5747,8 @@ export default {
 
 /* ============= Mode Selector (Agent/Ask/Plan) ============= */
 .mode-selector {
-  font-size: var(--awd-font-size-body);
+  font-size: var(--awd-panel-fs);
+  flex-shrink: 0;
   color: var(--awd-text-2);
   cursor: pointer;
   /* 同 .model-selector：定位基准挪给 .input-card。实测在 240px 最窄面板下，
@@ -5121,7 +5759,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 24px;
+  height: 28px;
   box-sizing: border-box;
   padding: 0 8px;
   border-radius: var(--awd-radius-md);
@@ -5475,10 +6113,11 @@ export default {
   align-items: center;
   gap: 4px;
   max-width: 100%;
-  margin: 0 0 4px;
-  padding: 2px 6px 2px 8px;
+  margin: 0 0 8px;
+  padding: 3px 6px 3px 8px;
+  box-sizing: border-box;
   border-radius: var(--awd-radius-sm);
-  border: 1px dashed var(--awd-border);
+  border: 1px solid var(--awd-border-subtle);
   background: var(--awd-surface-2);
   font-size: var(--awd-panel-fs-meta);
   line-height: 1.6;
@@ -5642,6 +6281,15 @@ export default {
  :deep(.tag-at) {
    color: var(--awd-accent-text);
    font-weight: 600;
+ }
+
+ :deep(.ctx-project-badge) {
+   max-width: 88px;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+   color: var(--awd-text-3);
+   font-size: var(--awd-panel-fs-meta);
  }
 
  :deep(.tag-name) {
@@ -5831,7 +6479,7 @@ export default {
    已选数量用角标表达，生效清单在上方 chip 行，不占横向空间 */
 .skill-selector {
   cursor: pointer;
-  position: relative;
+  position: static;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5878,14 +6526,15 @@ export default {
 
 .skill-dropdown {
   position: absolute;
-  /* 选择器位于工具条最右，向右展开会溢出 AI 面板，故右对齐 */
+  /* 与模式、模型菜单一样锚定输入卡，窄栏下仍完整可见。 */
+  left: 0;
   right: 0;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-dialog);
   box-shadow: var(--awd-shadow-md);
   z-index: 1001;
-  min-width: 230px;
+  min-width: 0;
   max-height: 280px;
   overflow-y: auto;
   padding: 4px 0;
@@ -6011,6 +6660,19 @@ export default {
   justify-content: space-between;
   column-gap: 6px;
 }
+.skill-builtin-head-actions {
+  display: flex;
+  align-items: center;
+  column-gap: 6px;
+}
+.skill-builtin-adv-link {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  cursor: pointer;
+}
+.skill-builtin-adv-link:hover {
+  text-decoration: underline;
+}
 .skill-builtin-title {
   font-size: var(--awd-panel-fs);
   font-weight: 600;
@@ -6037,11 +6699,14 @@ export default {
   margin-top: 2px;
 }
 .skill-builtin-pill {
+  display: inline-flex;
+  align-items: center;
+  column-gap: 4px;
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: var(--awd-radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -6050,59 +6715,177 @@ export default {
   border-color: var(--awd-accent);
   background: var(--awd-accent-soft);
 }
-
-.builtin-workflows-bar {
-  width: 100%;
-  max-width: 680px;
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: var(--awd-radius-dialog);
-  background: var(--awd-surface);
-  border: 1px solid var(--awd-border-subtle);
-  box-sizing: border-box;
+.skill-builtin-pill.is-custom {
+  border-color: var(--awd-accent);
+  background: var(--awd-accent-soft);
+  font-weight: 600;
 }
-.builtin-workflows-header {
+.skill-builtin-pill-more {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+  padding: 0 2px;
+}
+.skill-builtin-pill:hover .skill-builtin-pill-more {
+  color: var(--awd-accent-text);
+}
+
+/* 辅助设置默认折叠；实际生成的下一句建议独立显示在外侧。 */
+.composer-advanced-settings { margin-top: 8px; min-width: 0; }
+.composer-advanced-summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.builtin-workflows-title {
-  font-size: var(--awd-panel-fs-meta);
-  font-weight: 600;
+  gap: 7px;
+  width: fit-content;
+  padding: 4px 6px;
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.5;
+  list-style: none;
+  cursor: pointer;
 }
-.builtin-workflows-badge {
+.composer-advanced-summary::-webkit-details-marker { display: none; }
+.composer-advanced-summary::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(-45deg);
+}
+.composer-advanced-settings[open] > .composer-advanced-summary::before { transform: rotate(45deg); }
+.composer-advanced-summary:hover { color: var(--awd-accent-text); background: var(--awd-accent-wash); }
+.composer-advanced-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
+.composer-preferences {
+  margin-top: 4px;
+  padding: 0 2px;
+  min-width: 0;
+}
+.composer-preferences > :deep(:not(:first-child)) {
+  border-top: 1px solid var(--awd-border-subtle);
+}
+.builtin-workflows-fold { width: 100%; color: var(--awd-text-2); box-sizing: border-box; }
+.builtin-workflows-summary {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 6px;
+  border-radius: var(--awd-radius-md);
+  list-style: none;
+  font-size: var(--awd-panel-fs);
+  line-height: 1.5;
+  cursor: pointer;
+}
+.builtin-workflows-summary::-webkit-details-marker { display: none; }
+.builtin-workflows-summary::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(-45deg);
+}
+.builtin-workflows-fold[open] > .builtin-workflows-summary::before { transform: rotate(45deg); }
+.builtin-workflows-summary:hover { color: var(--awd-accent-text); background: var(--awd-accent-wash); }
+.builtin-workflows-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
+.builtin-workflows-entry { min-width: 0; overflow-wrap: anywhere; }
+.builtin-workflows-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.builtin-workflows-title { color: var(--awd-text); font-weight: 500; }
+.builtin-workflows-scope { display: block; margin-top: 2px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
+.builtin-workflows-summary-right { display: flex; align-items: center; max-width: 100px; }
+.builtin-workflows-summary-state { font-size: var(--awd-panel-fs-meta); font-weight: 400; line-height: 1.4; color: var(--awd-accent-text); background: var(--awd-accent-wash); border-radius: var(--awd-radius-sm); padding: 1px 5px; }
+.builtin-workflows-summary-state.custom { color: var(--awd-accent-text); font-weight: 600; }
+.builtin-workflows-adv-btn {
+  font: inherit;
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
-  background: var(--awd-accent-soft);
-  padding: 1px 7px;
+  background: transparent;
+  border: 0;
   border-radius: var(--awd-radius-sm);
+  padding: 4px 0 4px 6px;
+  margin: 0;
+  line-height: 1.4;
+  cursor: pointer;
 }
+.builtin-workflows-adv-btn::after { border: 0; }
+.builtin-workflows-adv-btn:hover { text-decoration: underline; }
+.builtin-workflows-adv-btn:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
+.builtin-workflows-body { padding: 4px 6px 12px 22px; display: flex; flex-direction: column; row-gap: 6px; }
 .builtin-workflows-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
   gap: 6px;
 }
 .builtin-workflow-card {
   display: flex;
   flex-direction: column;
-  row-gap: 2px;
+  row-gap: 3px;
   padding: 7px 10px;
   border-radius: var(--awd-radius-md);
-  background: var(--awd-bg);
+  background: var(--awd-surface);
   border: 1px solid var(--awd-border-subtle);
   cursor: pointer;
   transition: all 0.15s ease;
+}
+.builtin-workflow-card.is-custom-version {
+  border-color: var(--awd-accent);
 }
 .builtin-workflow-card:hover {
   border-color: var(--awd-accent);
   background: var(--awd-accent-wash);
 }
+.builtin-workflow-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 6px;
+}
 .builtin-workflow-name {
   font-size: var(--awd-panel-fs);
   font-weight: 600;
   color: var(--awd-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.builtin-workflow-card-actions {
+  display: flex;
+  align-items: center;
+  column-gap: 4px;
+  flex-shrink: 0;
+}
+.builtin-workflow-ver-tag {
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.3;
+  padding: 1px 6px;
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text-3);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border-subtle);
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.builtin-workflow-ver-tag.custom {
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+  border-color: var(--awd-accent);
+  font-weight: 500;
+}
+.builtin-workflow-more-btn {
+  font-size: var(--awd-panel-fs);
+  line-height: 1;
+  color: var(--awd-text-2);
+  padding: 1px 4px;
+  border-radius: var(--awd-radius-sm);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border-subtle);
+}
+.builtin-workflow-card-actions:hover .builtin-workflow-more-btn {
+  color: var(--awd-accent-text);
+  border-color: var(--awd-accent);
 }
 .builtin-workflow-desc {
   font-size: var(--awd-panel-fs-meta);
@@ -6110,6 +6893,447 @@ export default {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.builtin-workflows-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+.builtin-workflows-foot-hint {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+}
+
+/* 内置常驻工作流右键菜单与版本规则配置弹窗（dev-board#1438） */
+.bw-context-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2400;
+  background: transparent;
+}
+.bw-context-menu {
+  position: fixed;
+  width: 248px;
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  box-shadow: var(--awd-shadow-lg);
+  padding: 6px;
+  z-index: 2401;
+  display: flex;
+  flex-direction: column;
+  row-gap: 2px;
+}
+.bw-menu-head {
+  padding: 5px 8px 6px;
+  border-bottom: 1px solid var(--awd-border-subtle);
+  margin-bottom: 2px;
+  display: flex;
+  flex-direction: column;
+  row-gap: 2px;
+}
+.bw-menu-title {
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  color: var(--awd-text);
+}
+.bw-menu-sub {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+}
+.bw-menu-versions {
+  display: flex;
+  flex-direction: column;
+  row-gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.bw-menu-version-item {
+  display: flex;
+  align-items: center;
+  column-gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--awd-radius-sm);
+  cursor: pointer;
+}
+.bw-menu-version-item:hover {
+  background: var(--awd-accent-wash);
+}
+.bw-menu-version-item.active {
+  background: var(--awd-accent-soft);
+}
+.bw-menu-check {
+  width: 14px;
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  color: var(--awd-accent-text);
+  flex-shrink: 0;
+}
+.bw-menu-version-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  column-gap: 6px;
+}
+.bw-menu-version-name {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bw-menu-version-tag {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border-subtle);
+  padding: 0 4px;
+  border-radius: var(--awd-radius-sm);
+  flex-shrink: 0;
+}
+.bw-menu-version-edit {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  padding: 2px 6px;
+  border-radius: var(--awd-radius-sm);
+  flex-shrink: 0;
+}
+.bw-menu-version-edit:hover {
+  background: var(--awd-surface);
+}
+.bw-menu-action {
+  padding: 6px 10px;
+  border-radius: var(--awd-radius-sm);
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  cursor: pointer;
+}
+.bw-menu-action:hover {
+  background: var(--awd-accent-wash);
+  color: var(--awd-text);
+}
+.bw-menu-action.accent {
+  color: var(--awd-accent-text);
+  font-weight: 500;
+}
+
+.bw-modal-mask {
+  z-index: 2500;
+}
+.bw-editor-dialog {
+  width: 92vw;
+  max-width: 840px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.bw-editor-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--awd-border-subtle);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.bw-editor-header-text {
+  display: flex;
+  flex-direction: column;
+  row-gap: 3px;
+}
+.bw-editor-subtitle {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+}
+.bw-workflow-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--awd-bg);
+  border-bottom: 1px solid var(--awd-border-subtle);
+}
+.bw-workflow-tab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--awd-radius-md);
+  border: 1px solid var(--awd-border-subtle);
+  background: var(--awd-surface);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.bw-workflow-tab:hover {
+  border-color: var(--awd-accent);
+}
+.bw-workflow-tab.active {
+  border-color: var(--awd-accent);
+  background: var(--awd-accent-soft);
+}
+.bw-workflow-tab-title {
+  font-size: var(--awd-panel-fs-meta);
+  font-weight: 600;
+  color: var(--awd-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bw-workflow-tab-ver {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+  background: var(--awd-bg);
+  padding: 1px 5px;
+  border-radius: var(--awd-radius-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 72px;
+}
+.bw-workflow-tab-ver.custom {
+  color: var(--awd-accent-text);
+  font-weight: 600;
+}
+.bw-editor-body {
+  display: flex;
+  flex: 1;
+  min-height: 400px;
+  max-height: calc(88vh - 175px);
+  overflow: hidden;
+}
+.bw-editor-sidebar {
+  width: 210px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--awd-border-subtle);
+  background: var(--awd-bg);
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  row-gap: 8px;
+}
+.bw-sidebar-head {
+  padding: 2px 4px;
+}
+.bw-sidebar-title {
+  font-size: var(--awd-panel-fs-meta);
+  font-weight: 600;
+  color: var(--awd-text-3);
+  text-transform: uppercase;
+}
+.bw-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  row-gap: 4px;
+}
+.bw-sidebar-item {
+  padding: 8px 10px;
+  border-radius: var(--awd-radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  row-gap: 4px;
+}
+.bw-sidebar-item:hover {
+  background: var(--awd-surface);
+}
+.bw-sidebar-item.selected {
+  background: var(--awd-surface);
+  border-color: var(--awd-accent);
+}
+.bw-sidebar-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 4px;
+}
+.bw-sidebar-item-name {
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  color: var(--awd-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bw-sidebar-active-dot {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+}
+.bw-sidebar-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.bw-meta-pill {
+  font-size: var(--awd-panel-fs-meta);
+  padding: 1px 5px;
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text-3);
+  background: var(--awd-surface);
+  border: 1px solid var(--awd-border-subtle);
+}
+.bw-meta-pill.active {
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+  border-color: transparent;
+}
+.bw-sidebar-new-btn {
+  padding: 7px 10px;
+  border-radius: var(--awd-radius-md);
+  border: 1px dashed var(--awd-border);
+  text-align: center;
+  font-size: var(--awd-panel-fs-meta);
+  font-weight: 500;
+  color: var(--awd-accent-text);
+  cursor: pointer;
+}
+.bw-sidebar-new-btn:hover,
+.bw-sidebar-new-btn.selected {
+  border-color: var(--awd-accent);
+  background: var(--awd-accent-soft);
+}
+.bw-editor-main {
+  flex: 1;
+  padding: 14px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  row-gap: 12px;
+}
+.bw-readonly-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--awd-radius-md);
+  background: var(--awd-accent-wash);
+  border: 1px solid var(--awd-border-subtle);
+}
+.bw-readonly-banner-text {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+  line-height: 1.45;
+  flex: 1;
+}
+.bw-fork-btn {
+  flex-shrink: 0;
+  font-size: var(--awd-panel-fs-meta);
+  padding: 5px 10px;
+}
+.bw-field-group {
+  display: flex;
+  flex-direction: column;
+  row-gap: 5px;
+}
+.bw-field-group-grow {
+  flex: 1;
+  min-height: 170px;
+}
+.bw-field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.bw-field-label {
+  font-size: var(--awd-panel-fs-meta);
+  font-weight: 600;
+  color: var(--awd-text-2);
+}
+.bw-reset-link {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-accent-text);
+  cursor: pointer;
+}
+.bw-reset-link:hover {
+  text-decoration: underline;
+}
+.bw-input {
+  height: 32px;
+  padding: 0 10px;
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-text);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+}
+.bw-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.5;
+  color: var(--awd-text);
+  background: var(--awd-bg);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  box-sizing: border-box;
+}
+.bw-textarea-short {
+  height: 54px;
+}
+.bw-textarea-code {
+  flex: 1;
+  min-height: 150px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.bw-scope-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 2px;
+}
+.bw-checkbox-row {
+  display: flex;
+  align-items: center;
+  column-gap: 6px;
+  cursor: pointer;
+}
+.bw-checkbox {
+  width: 15px;
+  height: 15px;
+  border-radius: var(--awd-radius-sm);
+  border: 1px solid var(--awd-border);
+  background: var(--awd-bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-on-accent);
+}
+.bw-checkbox.checked {
+  background: var(--awd-accent);
+  border-color: var(--awd-accent);
+}
+.bw-checkbox-label {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+}
+.bw-editor-footer {
+  padding: 12px 18px;
+  border-top: 1px solid var(--awd-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.bw-footer-left,
+.bw-footer-right {
+  display: flex;
+  align-items: center;
+  column-gap: 8px;
+}
+.bw-btn-danger {
+  color: var(--awd-danger);
+  background: transparent;
+  border: 1px solid var(--awd-danger);
 }
 
 /* Model dropdown mask overlay */

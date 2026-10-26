@@ -7,9 +7,27 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 
 职责边界：给每个项目建一个后台 Git 仓库，把「开启版本记录后律师的每一次动作」记成一条对律师不可见的版本历史，界面上只讲「工作」「版本」「稿」「退回」，不出现任何 Git 术语。第 2 期已落地内容对比（「和上一版对比」，桌面 docx 走修订稿、其余走文本红绿对比）与重要版本标记；第 3 期已落地多稿并行——从任意版本另起一稿并命名、主线与稿之间随时双向切换（两线内容与文件树完全隔离）、采纳一稿（冲突时逐文件三选一，可先对比再选，可中止且两边无损）、放弃一稿。spec 第 0-3 期（v1）全部落地。**版本记录现在默认开启（dev-board#438，2026-09-05）**：新建项目之后与存量项目第一个变更信号时各有一个自动触发点（`VersionLifecycleService`），带大文件夹护栏与持久化 opt-out，配套 `POST /version/disable`「关闭并删除历史」。**v2（云端仓库与多人协作）已落地并入本领域文档**：项目可共享到团队服务器（真实 git smart-HTTP 协议，`GitHttpController`/`GitAccessService`）、同事凭设备令牌接入并双向同步（`CloudSyncService`/`CloudController`）、结束工作/上传/更新三个入口各自可能撞上「同事推进了主线」的冲突，复用第 3 期的三选一裁决 UI（`AdoptConflictDialog` 加了 `mode` 语境）。界面延续零 Git 术语纪律，不说 push/pull/clone。**官方案件库零配置直连（dev-board#439，2026-09-05）**：官网账号登录桌面端后不必再填服务器地址——`cloud.collab.base-url` 留空时按 `ai.account.base-url` 派生官方地址（大陆站 `https://case.aiworkdeck.com`，国际站暂不提供），用本机 awdk_ 走 `/api/auth/awdk-login` 换设备令牌 upsert 成一条普通 `CloudConnection`；「放进案件库」不传 connectionId 即自动连官方；加同事改按手机号/邮箱解析；同一远端案卷本机只能落一份。**加同事再往前一步做成「先查→人卡确认→加入」（dev-board#444，2026-09-05）**：`GET .../members/lookup` 回一张只带展示名/头像/打码联系方式的卡片，确认了才加；查人与加人共用一道按项目管理员的限频。**「律所自建服务器」的界面已全部砍掉（dev-board#440，2026-09-05）**：admin 的「团队案件库」与「记忆同步」两个分区整块撤掉、协作抽屉的连库表单与已连库列表撤掉、多连接选择器全部撤掉——普通用户界面上再也见不到任何服务器地址输入框。**能力一字未砍，降级为部署配置**：`cloud.collab.base-url`（`CLOUD_COLLAB_BASE_URL`）把「官方案件库」指到自建服务器，`POST /api/cloud/connect` 与 `MemorySyncController` 端点原样保留供自建用户与 e2e 直接调，配方写进 `deploy/web/README.md`。**协作 UX 律师化（PR-E，2026-08-06）之后术语再翻一层**：团队服务器→「团队案件库」、共享项目→把案卷「放进团队案件库」、push→「交稿」、pull→「取回最新稿」、members→「案件参与人」（负责人/案件管理员/协作人/只读/客户）；**只改人机界面，协作机制（设备令牌、git 传输、成员权限、冲突三选一）一个字没动**。**记忆/上下文 Git 同步层（Phase A，2026-08-06）已落地**：memory_entry 经独立记忆仓库（`com.checkba.version.memory` 包）跨机器同步——一条记忆一个文件 `{scope}/{uid}.md`、LWW 全自动合并（从不停留在 MERGING、无 UI）、删除用墓碑防复活、remote 可自填任意标准 Git URL；`GitHttpController` 的 `/git/{repo}.git` 路由已按仓库键泛化（纯数字=项目文档仓库，`user-{id}-memory`/`project-{id}-memory`=记忆仓库）。
 
+## 工作段状态与动作布局（dev-board#1492）
+
+`WorkSessionBar.vue` 的状态独占一行，操作在下方轻量换行排列；“提交本次改动”用浅色背景，丢弃/放弃保持危险文字但不使用抢眼外框。按钮用原生 button 支持键盘与 busy 禁用，仍调用原来的命名、结束、丢弃和稿操作流程；保留提交前保存文件、待提交计数及确认语义。窄侧栏和长稿名须保留所有动作，不能裁切。回归 `tests/version-history/draftEndSession.test.mjs` 及该目录既有套件。
+
 ## 版本操作后的文件树刷新（dev-board#1470）
 
+AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/一次性操作协议见 `ai-chat.md` 的“AI 项目版本操作”。前端必须先完成保存屏障，再调用写操作，并核对重载完成；不可用普通单向 `doc_reload_file` 充当完成回执。`version_restore` 恢复整个项目且保留当前工作历史；`version_pull` 沿现有主线、无活动工作及无待决合并的限制，不能静默丢弃或切稿。
+
+`merge/resolve-file` 和 `merge/resolve-structured` 的冲突校验、两侧版本读取、字节落盘与待决记录现在都在原 `WorkSessionService.runLocked` 锁内。新客户端同时传 `ctx/mainRef/otherRef`，锁内核对 `HEAD/MERGE_HEAD`，过期结果拒绝写入；旧客户端可省略两侧编号，保留原接口兼容。上传字节接收在锁前，防止网络上传长期占用仓库锁。
+
 工作台文件树以 `v-show` 保留挂载，切栏不再触发重新读清单。`onVersionReloadFiles` 必须主动调用 `fileTree.loadFiles()`，包括受影响编辑器 ID 为空的切稿/采纳/团队取回；不能等待文件树请求再重载打开中的文档，以免旧内容被自动保存回磁盘。相关可执行回归见 `frontend/tests/project-home/version-reload-files.test.mjs`；全应用 J10/J11 验证切稿隔离与两份都留后的清单。
+
+## 上传与 text_* 的内容发布协调（2026-10-25）
+
+`ProjectFileContentService` 只收拢 `FileController.uploadFile` 和 `TextFileEditTools`，继续以 JPA 为权威。云配额启用时先拒绝长度未知的请求，不读取正文或创建暂存文件；其余上传先接收完整的本次 HTTP 请求到临时文件，再经 `WorkSessionService.withFileContentWriteLock` 复用现有 `repoLock`；AI 查找替换的读、转换、写在同一把锁内。localRoot 仍共用稳定锁，不能另造 per-file 锁。等待最多 2 秒，删除后的项目拒绝发布。锁前拒绝已有事务，锁内开启自己的短事务，云配额顺序为 repo→事务→owner 行锁→发布/严格配额元数据；禁止在已有 owner 锁内反向等 repo。
+
+事务起点清理 OSIV 预检缓存后重新查询文件、项目负责人、成员角色和账户客户角色。云配额等待结束后再清理重查；负责人或配额所检查的路径/大小随后变化则拒绝本次发布，不能把旧额度结果用于新目标。可选修改时间/大小用限定 UPDATE，只改这两列且要求 id/projectId/path/未删除仍吻合；0 行或失败只记录，不把已写字节误报为回滚。云配额严格记账失败仍沿用失败响应。存储层普通覆盖本身不是跨文件系统/数据库原子事务，磁盘中途失败仍可能产生未知结果。RAG（含 CallerRunsPolicy）、版本信号和编辑器通知在锁外。索引/标签任务提交被拒绝也只记录，不把已保存字节报成失败，完成上传仍发一次版本信号。
+
+只有尚未进入发布体的锁忙碌返回 HTTP 423、`code:-1`、`reason:VERSION_BUSY`、`writeState:not_started`。409 继续专属移动/删除保护；不能把下游失败或网络结果未知标成未写。前端保持脏状态，允许手动重试。本片分片逐块仍使用 save/append 和原完成判定，**不保证整个多请求分片过程原子**；中间块不发版本变更信号。
+
+未接入此入口的 `ProjectFileService.overwriteTextContent`、rename/move/delete/permDelete、目录对账和其他内部写路仍有自己的原契约；不能据本片宣称全正文写入闭环、结构竞争已解决或数据库已移出启动。回归：`FileContentCoordinationTest`、`FileContentLockTest`、`ProjectFileContentJpaTest` 加既有上传/文本/嵌套项目版本测试。
 
 ## 嵌套本地文件夹项目
 
@@ -29,6 +47,16 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 - WHOLE/BINARY 也包括 TXT/Markdown 等未支持逐处合并的格式；提示说明整份版本选择，不把文件误报为 PDF/图片。
 - NOT_IN_ORG 指引先说明同团队/同律所条件，无团队可受邀，已有团队请负责人核对律所归属；不得一概要求加入第二个团队。现有切换团队/律所入口仍受 OWNER/总部等原有约束，本修复不改变资格或自动迁移组织。
 - 回归入口：`CloudCloneReadOnlyTest`、`ProjectMemberLookupTest`，前端 `test:version-history`、`test:version-merge`、`test:member-invite`；自动化桩验证不替代实际安装版双机验收。
+
+## 全局版本入口与退出提醒（2026-10-26，dev-board#1486–#1489）
+
+- 文件编辑器只展示文件落盘状态，不再显示 `fileVersionBar` 或“已保存，尚未存为版本”；逐段溯源仍在审阅面板。后端 provenance 的 fileVersion/dirty 兼容字段保留，不得把它们当作未保存或未同步。
+- 全局版本入口的数字只读 `/version/status.changedCount`（相对 HEAD 的文件数，排除 `.awd/`）；自动存档后归零，有工作段则用点提示“改动已自动记录，可整理本次提交”。云端待上传/待取回用箭头，绝不把版本数相加到文件数。状态失败显示未知，不能显示已同步。
+- 本次用户要求明确“提交”下一步，因此全局按钮采用“提交本次改动”，并解释为整理历史记录；这一处及退出提醒允许 commit 文案，取代原先一律禁止“提交”的规则。文件保存、提交历史、云端同步保持区分；已关联案件库的主线提交仍沿原有自动上传机制。
+- 工作台复用状态查询处理角标：Office/文本保存确认广播 `awd:file-saved`，文件树变化防抖刷新；可见的活跃工作台每15秒只读本地快照，联网协作轮询保持原频率。代次/项目/销毁围栏阻止旧响应覆盖；面板读取同一份工作/云端快照。
+- 提交前等待所有打开编辑器真正保存，不套用关闭标签的10秒等待预算；失败不提交。无工作段但有脏文件时，面板仍提供提交；`endSession` 在原仓库锁内核对真实 `pendingChanges`，非空才补开工作段并沿原流程提交。干净无段保留原错误，不造空工作段；稿分支和冲突分流不变。
+- 关闭窗口、退出应用、离开项目和退出登录前先保存，再读取最新项目状态；有改动时提供“提交并退出”“直接退出”“取消”。提交阶段展示真实保存/提交/确认步骤，成功后继续原退出流程；直接退出不丢弃文件；取消、提交失败或冲突保留现场。`versionExitGuard` 去重并在各异步边界核对项目/生命周期；重启恢复的内部 reLaunch 不再提示一遍。
+- 回归：`tests/version-history/{versionEntryState,versionExitGuard,fileVersionBar}.test.mjs`、`tests/project-home/{flush-dirty-editors,desktop-quit,plaintext-flush-save}.test.mjs` 与真实 Uni 合成 API 脚本 `tests/version-history/version-entry-ui.mjs`。后者不证明真实云端传输。
 
 ## 关键文件地图
 
@@ -120,6 +148,7 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
   只在像邮箱 / 归一后是 11 位手机号 / 其余长度 >= 2 时才发请求（敲到一半的手机号不查——查人限频按项目管理员计数，
   与加人共用），递增序号丢弃过期回包。人卡 / 已在案卷 / 「没有这个用户」+「去邀请」（邀请链接
   `${siteBaseUrl()}/{zh|en}/start`，云端轨再给整段加入说明）/ 红字错误行**一律就地显示，不走 toast**。
+  dev-board#1497：只有同事一种邀请方式可用时不显示标签栏（包括轨道加载中、未入案件库状态）；同事与客户均可用时保留两项切换。
   单测 `frontend/tests/member-invite/`（`npm run test:member-invite`，已进 CI）。
 - **admin 的「团队案件库」与「记忆同步」两个分区已撤（dev-board#440，2026-09-05）**，连同
   2026-08-18 那张 `.cloud-help-card` 空态说明卡（`admin.cloudNoServerTitle` 起五条文案）一起。
@@ -132,7 +161,7 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 - `VersionNodeDetail.vue` —— 点某个节点弹出的详情弹窗：拉该 sha 的变更列表、「退回到这一版」二次确认、「标为重要版本」、第 3 期新增「从这一版另起一稿」（`openDraftNaming`，独立嵌套 `.awd-dialog`，同款 `.uni-input-input` 陷阱；`createDraft(projectId, version.sha, name)`，任意节点都能开，包括采纳产生的双亲合并节点）、对 `MODIFY` 类型且非根提交的改动行渲染「和上一版对比」按钮，`@tap` 上抛 `{path, sha}` 交给宿主页面决定走桌面修订稿分支还是文本降级分支。
 - `MergeReviewTab.vue` —— 三方合并新增（dev-board#630），**可编辑**的合并比对稿宿主：主线侧改动是一批带作者的修订，另一侧不重叠的改动被逐段重放成另一位作者的修订，同一段两边都改了的那几处刻意没重放、交给右栏 `ReviewPanel`（`mode="merge"`）三选一。与 `VersionCompareTab` 一样**没有 upload 路径**（导出字节只走 `POST /version/merge/resolve-file`，绝不写回 `ProjectFile`）、不进保活池、不派发 `.uno:EditDoc`（spike A5 实测 r5 上不生效，只读靠的是「没有保存路径」）。标签管道见 `sidebar-shell.md` 的 `merge-review` 一条。
 - `VersionCompareTab.vue` —— 第 2 期新增，「和上一版对比」的桌面 docx 展示宿主，**只读、绝无保存路径**：不订阅 `lo-relay` 的 `modified` 信号、不进保活池（`_libreRefs`/LRU 一概不注册）、`beforeUnmount` 只 `dispose executor` + 移除 `<webview>`。流程：并行下载新旧字节 + 启动引擎 → `load_document` 新版 → `compare_document` 一次性生成修订并自动切只读。
-- **三方合并的前端纯函数与编排**：`composables/useDocumentMerge.js`（自动合并编排，纯工厂）、`services/mergeDraft.js`（`fetchMergeInputs` + `buildMergeDraft`，自动合并与比对稿标签页共用）、`utils/mergeRows.js`（裁决总览行态与文案）、`utils/mergeReviewDecisions.js`（`collectDecisions`）、`utils/historyMerges.js`（把两条新尾注翻成人话）、`utils/provenanceAlign.js`（溯源 LCS 对齐 + 自带同步 sha256 + `fileVersionBar` 文件级小条三态）、`utils/mergeSideNames.js`（两侧的称呼与喂给引擎的署名 = 修订分桶键，见下方「两侧的称呼与分桶键」）。后五个是纯函数，`node --test` 直接跑（`mergeSideNames` 只 import `historyMerges`，其余零依赖）。
+- **三方合并的前端纯函数与编排**：`composables/useDocumentMerge.js`（自动合并编排，纯工厂）、`services/mergeDraft.js`（`fetchMergeInputs` + `buildMergeDraft`，自动合并与比对稿标签页共用）、`utils/mergeRows.js`（裁决总览行态与文案）、`utils/mergeReviewDecisions.js`（`collectDecisions`）、`utils/historyMerges.js`（把两条新尾注翻成人话）、`utils/provenanceAlign.js`（溯源 LCS 对齐 + 自带同步 sha256）、`utils/mergeSideNames.js`（两侧的称呼与喂给引擎的署名 = 修订分桶键，见下方「两侧的称呼与分桶键」）。后五个是纯函数，`node --test` 直接跑（`mergeSideNames` 只 import `historyMerges`，其余零依赖）。
 
 **前端集成点**
 
@@ -142,7 +171,8 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 - `frontend/src/config/leftSidebarPlugins.js`：入口 `version`（图标为时钟 SVG path，非图片资源）。**2026-08-19 挪出了 `LEFT_SIDEBAR_PLUGINS` 数组**——此前排在 rail 顶部那一串（项目概览/文件树/搜索/插件中心/语音/脱敏/门控项）的末尾，现在视觉上挪到 rail 底部、夹在「暂存区」与「成员堆叠」之间，独立导出成 `VERSION_PLUGIN` 并进 `OFF_RAIL_PLUGINS`（照 `DD_FILES_PLUGIN` 的先例）；`getLeftSidebarPlugin('version')` 与 `leftPaneTitle` 兜底仍能查到它（`OFF_RAIL_PLUGINS` 是它们的查找兜底表）。`getPluginsForUser('CLIENT')` 不返回它（CLIENT 只见 `dd-files`，与后端权限口径一致）。`project-overview.vue` 的命令面板「跳转到面板」清单（`menuCommands.js` 的 `pushMenuState`）读的是 `LEFT_SIDEBAR_PLUGINS`，version 挪出数组后需要手动把 `VERSION_PLUGIN` 拼回那份 `views` 清单，否则命令面板会漏掉这一项。`toggleLeftPane('version')` 语义、`VersionPanel.vue` 挂载点本身都没动。
 - 后端触发点：`ProjectFileService.signalChange()`与 `FileController.signalChange()` 两处调用 `workSessionService.onChangeSignal(...)`，都用 try/catch 包死、绝不阻断文件操作/上传。IDE 化本地文件夹项目（`Project.localRoot` 非空）另有 `LocalRootWatchService`（FSEvents 监听 + 防抖 800ms）触发 `LocalProjectService.reconcileProject` 对账——对账只写数据库、绝不写磁盘，新建/更新/软删除走 ProjectFileService 服务方法，signalChange 因此自带，**Finder 里的增删改同样进版本记录**。对账三条硬规则：无变化不动行（防版本噪声与修改时间失真）、回收站行不复活（软删除不动磁盘）、根目录不可达整体跳过（防外置盘拔出误判成全删）。
   - **反过来，应用里对文件夹做的事必须落到磁盘上（dev-board#885）**：对账以磁盘为真相源，「行在库、目录不在盘」就判成律师在 Finder 里删了它。`ProjectFileService` 在本地文件夹项目里：新建/恢复/复制/会话文件夹都 `materializeLocalFolder` 建目录；文件夹改名/移动走 `relocateLocalFolder` 整体搬目录并改写子孙 `filePath`（搬不动就抛错回滚，大小写改名借临时名过渡）。此前这几处只落库——空文件夹在下一次任意磁盘变化（新建文档、保存、写 `.awd/`）触发的对账里必进回收站、恢复后再进；改名被对账撤回并连子孙一起送进回收站；移动在原位置导回幽灵。唯一例外是根下的 `__staging_area__`（`ProjectFileService.isRootStagingFolder`）：不建空目录、对账的删除同步也跳过它。解析器是字段注入（`setStorageResolverForTest`），手工 new 的实例里整段跳过。护栏 `LocalProjectServiceTest` 的五条 #885 用例。
-  - **监听状态必须可观测**（2026-08-17）：`ensureWatch` 返回 boolean、另有 `isWatching(projectId)`，两者都以「事件循环还活着」为准。`DirectoryWatcher.watchAsync` 把注册（`registerPaths`）**同步跑在调用线程上**、只把事件循环丢给执行器，注册异常与事件循环中途死亡**都只体现在它返回的 future 上**；早先把这个 future 丢掉，于是 inotify 名额耗尽、权限被拒、目录刚好被移走这类失败全都静默——日志照打「已监听项目文件夹」，用户在 Finder 里的改动从此不再同步且毫无线索。现在 future 的完成会打 WARN 并把自己从 `watchers` 摘掉（按值移除，不误伤已重建的新监听），因此下次 `ensureWatch` 能重建。**推论：挂载不需要 sleep 等**——`watchAsync` 返回即已在监听，测试里拿返回值断言就行。
+  - **监听状态必须可观测**（2026-08-17）：`ensureWatch` 返回 boolean、另有 `isWatching(projectId)`，两者都以「事件循环还活着」为准。`DirectoryWatcher.watchAsync` 把注册（`registerPaths`）**同步跑在调用线程上**、只把事件循环丢给执行器，注册异常与事件循环中途死亡**都只体现在它返回的 future 上**；早先把这个 future 丢掉，于是 inotify 名额耗尽、权限被拒、目录刚好被移走这类失败全都静默——日志照打「已监听项目文件夹」，用户在 Finder 里的改动从此不再同步且毫无线索。现在 future 的完成会打 WARN 并按实例清除已注册状态（不误伤已重建的新监听），因此下次 `ensureWatch` 能重建。**推论：挂载不需要 sleep 等**——`watchAsync` 返回即已在监听，测试里拿返回值断言就行。
+  - **启动注册不阻塞 Ready**（2026-10-25，dev-board#1472）：存量 localRoot 注册是 `watchExecutor` 上唯一可取消的后台任务；不得占用防抖/对账专用单线程，否则一个大目录扫描会阻塞另一项目的 Finder 通知。明确打开同一项目仍等待那一次注册，其他项目不共用扫描锁。stop/shutdown 使迟到注册失效；`ProjectService.ProjectDeletedEvent` 仅在删除事务提交后发出，已删除 ID 的迟到打开不可复活，回滚保持原监听。注册成功后另做本代补偿对账，捕捉排队期间成为监听初始基线的文件变化。权限查库/SSE 发送不持生命周期锁；macOS 注册与关闭共用底层 monitor，未注册完成时只撤代，交由注册 finally 关闭。`LocalRootWatchStartupTest` 与真实 H2/HTTP/文件变动测试覆盖这些竞争；这不代表 JPA 已移出启动链。
 - **版本操作改磁盘后重载打开中的编辑器，`reload-files` 通用链（响应驱动，不走 SSE）**：第 2 期落地时这条链只服务「退回」一种动作（事件名曾经是 `reverted`/`reverted-files`），第 3 期把开稿/切线/采纳/放弃四种新动作接入同一条链后，**事件名与方法名都已泛化**——现在是 `VersionNodeDetail`/`WorkSessionBar`/`DraftList`/`AdoptConflictDialog` 各自的操作方法拿到后端返回的 `affectedFileIds`，统一 `$emit('reload-files', ids)` 上抛 → `VersionTimeline`/`VersionPanel` 逐层转发（`VersionPanel.onReload()` 同时兼管 `refresh()` 重新拉 `/status`）→ `project-overview.vue` 的 `@reload-files="onVersionReloadFiles"` → `fileOpenTabs.js` 的 `onVersionReloadFiles(affectedFileIds)`：只对左右两窗格里当前打开、id 命中、`useLibreEditor` 为真的标签，复用 `agentClientActions.js` 的 `handleEditorReloadFile({fileId}, {forceActive:true})`（AI 改文档后刷新编辑器走的同一条路，但退回/开稿/切线/采纳/放弃这五种都是律师亲手点出来的，一律 `forceActive` 就地强刷，不同于 AI 改文件的默认「不强刷非活动实例」）。**绝不能用 `closeFile` 实现重载**——它会先 `flushSave`，把操作前编辑器里还端着的旧字节写回覆盖操作结果。第 3 期终审后这条链又补了两处：**「丢弃本次工作」也接进来**（`discardSession` 返回 ids → `WorkSessionBar` 的 `discarded` 事件带 ids → `VersionPanel` 走 `onReload`）；**多文件时 toast 聚合**（`onVersionReloadFiles` 一次改写好几份时逐份静音、末尾只弹一句「已更新 N 份打开中的文件」，靠 `handleEditorReloadFile` 的 `opts.silentSuccessToast` + 返回值；单文件语义一个字没动，失败提示永不静音）。**冲突采纳返回的 `affectedFileIds` 必须并进「合并已改写的非冲突文件」**（`diffNameStatus(合并前主线 tip, 稿 tip)`）——只带停靠差异的话，律师站在主线上采纳时那份是空的，稿的非冲突改动被 autosave 写回旧字节后随 `git add .` 进采纳提交、无声丢失（护栏 `DraftAdoptTest.conflictingAdoptFromMainlineReportsFilesRewrittenByTheMerge`）。
   - `handleEditorReloadFile` 分两半处理：**非活动**保活实例摘出 `libreLruKeys` 卸载（下次激活重挂载）；**当前正显示**的实例摘不掉（活动文件必进池），走 `librePool.js` 的 `reloadActiveLibreInstances(fileId)` → `LibreOfficeEditor.reloadFromBackend()` 就地 `load_document` 换文档。缺了后半段就是律师看着的那份不刷新，autosave 把「旧内容 + 新编辑」写回、操作结果被冲掉（真机复现过，见「已知地雷」第 11 条）。
 ## 核心契约
@@ -740,18 +770,7 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
   折叠落在这份文件自己的历史里是对的而不是巧合：一段工作收尾时的 NO_FF 合并节点带着这段工作对该文件的净变化
   （见地雷 #14），所以 auto 的归宿必然也触及这个路径。还没收尾那段工作里的 auto 比任何命名版本都新、
   找不到归宿，照旧不算有名字。窗口上限沿用 `MAX_HISTORY`（500）。
-- **「已保存，尚未存为版本」（`provenanceFileUncommitted`，2026-09-25 前文案是「本机未保存的改动」，dev-board#933 改掉：保存成功后仍说「未保存」会让律师以为文件没存）= `ProjectRepoService.isPathDirty`**：**单路径 `git status`，只读、一次 `add` 都不做**
-  （`add` 在合并窗口里等于「这个冲突我解决了」，见地雷 #20；这条小条随每次落版刷新，绝不能带副作用），
-  也顺带省掉 `pendingChanges` 的全仓 `add "."`。读不出来一律报「不脏」——宁可少说一句，
-  也不要在正文上方挂一句站不住的「本机未保存的改动」。结束工作 / 采纳 / 重载落版后随 `version-landed`
-  重拉 provenance 而消失（PR#860 已接好的链）。
-- **三态判定在纯函数 `utils/provenanceAlign.js` 的 `fileVersionBar`**（顺序有意义）：`versioned` 假 → 整条不出现
-  （这时说「初始版本」或「本机未保存的改动」都是胡说）；`dirty` → 「本机未保存的改动」，**排在版本名前面**
-  （律师此刻要知道的是「还没进版本记录」）；否则报 `fileVersion`，为 null 时落到「初始版本」
-  （`version.provenanceFileInitial`）。`sha` 非空才可点（点击行为没动，仍是 `open-history`）。
-  组件那边只剩 `provenanceBar`/`provenanceBarVisible`/`provText`/`provSha` 四个薄 computed。
-  护栏 `frontend/tests/version-history/fileVersionBar.test.mjs`（11 条）与
-  `ProvenanceServiceTest.fileVersion*`/`.dirtyFollowsTheWorkingTreeOfThisFileOnly`。
+- **文件版本小条已于 dev-board#1487 移除**：后端单路径 dirty 与 fileVersion 接口仍兼容保留；当前文件保存只读编辑器真实持久化状态，项目提交/同步入口见本文顶部。
 
 **已知限制（都是取舍，不是待修的 bug）**：
 - **另一侧「只改了格式没改文字」的段自动合不过来**——文字重放带不动格式。这一档不静默丢掉：引擎把它列进 `formatOnly`，

@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Veri Maskeleme",
+  "plugin.description": "Hassas bilgileri inceleyin, maskelenmiş kopyalar oluşturun ve kurtarma paketleriyle geri yükleyin.",
+  "view.main.name": "Veri Maskeleme"
+}

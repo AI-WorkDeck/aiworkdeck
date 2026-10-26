@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Voix et parole",
+  "plugin.description": "Lecture à voix haute instantanée, contrôle de la vitesse en temps réel, surlignage des sous-titres et enregistrement des réunions.",
+  "view.main.name": "Voix et parole"
+}

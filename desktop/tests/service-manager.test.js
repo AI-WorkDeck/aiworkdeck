@@ -62,6 +62,83 @@ test('start/stop lifecycle: spawns, waits for port, stops', async (t) => {
   assert.strictEqual(await isPortOpen(mgr.ports.fake), false)
 })
 
+test('startup readiness releases the window gate but checkHealth remains full health with the original deadline', async (t) => {
+  const mgr = makeManager(t)
+  let full = false
+  mgr.register(fakeDescriptor({ startupHealth: async () => isPortOpen(mgr.ports.fake), health: async () => full,
+    startTimeoutMs: () => 5000 }))
+  await mgr.allocatePorts()
+  const before = Date.now()
+  const result = await mgr.start('fake')
+  assert.strictEqual(result.ok, true); assert.strictEqual(result.fullReady, false)
+  const launch = mgr.getLaunch('fake')
+  assert.ok(launch.deadline >= before + 5000 && launch.deadline <= Date.now() + 5000)
+  assert.strictEqual(await mgr.checkHealth('fake'), false)
+  assert.strictEqual(mgr.getLaunch('fake').deadline, launch.deadline)
+  full = true
+  assert.strictEqual(await mgr.checkHealth('fake'), true)
+  assert.strictEqual(launch.fullReady, true)
+})
+
+test('startup readiness never waits for a full-health probe that is still pending', async (t) => {
+  const mgr = makeManager(t)
+  let releaseFull, observedStartup, fullCalls = 0, result
+  const full = new Promise(resolve => { releaseFull = resolve })
+  const observed = new Promise(resolve => { observedStartup = resolve })
+  mgr.register(fakeDescriptor({
+    startupHealth: async () => {
+      const ready = await isPortOpen(mgr.ports.fake)
+      if (ready) observedStartup()
+      return ready
+    },
+    health: () => { fullCalls++; return full },
+  }))
+  await mgr.allocatePorts()
+  const starting = mgr.start('fake').then(value => { result = value; return value })
+  try {
+    await observed
+    await new Promise(setImmediate)
+    assert.equal(result?.ok, true, 'the startup gate must resolve while full health is unresolved')
+    assert.equal(result.fullReady, false)
+    assert.equal(fullCalls, 0, 'full health belongs to the supervisor after startup has returned')
+  } finally { releaseFull(false); await starting }
+})
+
+test('startup metadata is attached to the exact owned launch', async (t) => {
+  const mgr = makeManager(t)
+  let probedLaunch
+  mgr.register(fakeDescriptor({ startupHealth: async (_ctx, port, _build, launch) => {
+    if (!(await isPortOpen(port))) return false
+    probedLaunch = launch
+    if (launch) launch.coreReadPaths = ['/api/projects/:id/files']
+    return true
+  } }))
+  await mgr.allocatePorts()
+  const result = await mgr.start('fake')
+  assert.strictEqual(probedLaunch, mgr.getLaunch('fake'))
+  assert.strictEqual(result.launch, probedLaunch)
+  assert.deepEqual(result.launch.coreReadPaths, ['/api/projects/:id/files'])
+})
+
+test('an old full-health probe cannot return success after another owned launch replaces it', async (t) => {
+  const mgr = makeManager(t)
+  let resolveOld
+  const oldProcess = {}, newProcess = {}
+  const oldLaunch = { process: oldProcess, fullReady: false }
+  const newLaunch = { process: newProcess, fullReady: false }
+  mgr.procs.set('fake', oldProcess); mgr.launches.set('fake', oldLaunch)
+  mgr.healthChecks.set('fake', () => new Promise(resolve => { resolveOld = resolve }))
+  const probing = mgr.checkHealth('fake', oldLaunch)
+  mgr.procs.set('fake', newProcess); mgr.launches.set('fake', newLaunch)
+  mgr.healthChecks.set('fake', async () => false)
+  resolveOld(true)
+  try {
+    assert.equal(await probing, false)
+    assert.equal(newLaunch.fullReady, false)
+    assert.equal(oldLaunch.fullReady, false)
+  } finally { mgr.procs.clear() }
+})
+
 test('reuses already-open port without spawning', async (t) => {
   const http = require('http')
   const server = http.createServer((req, res) => res.end('ok'))

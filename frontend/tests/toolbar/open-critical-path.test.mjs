@@ -81,6 +81,7 @@ function previewVm({ endpointUp = false, module } = {}) {
   const vm = { _endpointUp: endpointUp, ready: false, previewReady: false, previewFailed: false,
     projectId: 1, file: { id: 7, fileType: 'docx' }, $nextTick: async () => {}, $refs: { docxPreviewHost: { innerHTML: '' } }, appendLog() {},
     tryDocxPreview: options.methods.tryDocxPreview,
+    fetchDocumentBytes: options.methods.fetchDocumentBytes,
   }
   return { vm, events, options }
 }
@@ -189,3 +190,33 @@ for (const [name, file, expected] of [
     } finally { descriptor ? Object.defineProperty(globalThis, 'document', descriptor) : delete globalThis.document }
   })
 }
+
+for (const action of ['get_ui_state', 'office_get_navigation', 'slide_get_thumbnail']) {
+  test(`${action} cannot postpone a pending normal autosave`, async () => {
+    const flight = deferred()
+    const options = component('LibreOfficeEditor', { createRelayExecutor: () => ({ executeCommand: () => flight.promise }) })
+    let saves = 0
+    const vm = { ...options.methods, file: { id: 1 }, dirty: true, _dirtySince: Date.now() - 2500,
+      appendLog() {}, saveDocument: async () => { saves++; return true }, scheduleAutoSave() {} }
+    vm.wireExecutor({}, 'test')
+    const pending = vm.executor.executeCommand(action, {})
+    assert.equal(vm._cmdBusy, 0)
+    await vm.autoSave()
+    assert.equal(saves, 1)
+    flight.resolve({ success: true }); await pending
+    assert.equal(vm._lastCmdAt, 0)
+  })
+}
+test('an actual edit in flight or recent user interaction still postpones export', async () => {
+  const flight = deferred()
+  const options = component('LibreOfficeEditor', { createRelayExecutor: () => ({ executeCommand: () => flight.promise }) })
+  let saves = 0
+  const vm = { ...options.methods, file: { id: 1 }, dirty: true, _dirtySince: Date.now() - 2500,
+    appendLog() {}, saveDocument: async () => { saves++; return true } }
+  vm.wireExecutor({}, 'test')
+  const pending = vm.executor.executeCommand('sheet_write_cells', {})
+  await vm.autoSave(); clearTimeout(vm._saveTimer); assert.equal(saves, 0)
+  flight.resolve({ success: true }); await pending
+  vm._lastCmdAt = 0; vm._lastInteractionAt = Date.now()
+  await vm.autoSave(); clearTimeout(vm._saveTimer); assert.equal(saves, 0)
+})

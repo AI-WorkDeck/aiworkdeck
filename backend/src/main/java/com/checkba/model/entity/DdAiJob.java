@@ -23,7 +23,7 @@ public class DdAiJob {
     private Long submissionId;
     @Column(length = 24, nullable = false) private String kind;
     @Column(length = 24, nullable = false) private String status = "QUEUED";
-    @Column(length = 256) private String stage = "等待处理";
+    @Column(length = 256) private String stage = com.checkba.service.LangText.of("等待处理", "Queued");
     @JsonIgnore @Column(columnDefinition = "TEXT") private String inputJson;
     @Column(columnDefinition = "TEXT") private String resultJson;
     @Column(length = 1000) private String error;

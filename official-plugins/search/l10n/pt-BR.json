@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Pesquisa de projetos",
+  "plugin.description": "Pesquise arquivos do projeto por texto completo ou tags e vá diretamente aos documentos.",
+  "view.main.name": "Pesquisa de projetos"
+}

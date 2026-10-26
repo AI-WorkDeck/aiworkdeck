@@ -141,6 +141,53 @@ class WorkSessionServiceTest {
                 sessions.values().iterator().next().getStatus());
     }
 
+    @Test
+    void endSessionCapturesPendingFilesWithoutAChangeSignal() throws Exception {
+        Files.writeString(root.resolve("projects/7/合同.txt"), "插件修改的正文");
+        Files.writeString(root.resolve("projects/7/新报告.txt"), "AI 生成的报告");
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(2, repoSvc.pendingChanges(7L).size(), "前置：文件已落盘但未触发工作段信号");
+        ProjectRepoService observedRepo = spy(repoSvc);
+        svc = new WorkSessionService(observedRepo, manifestSvc, sessionRepo, scheduler, fileRepo, event -> {});
+        doAnswer(call -> {
+            assertTrue(svc.repoLock(7L).isHeldByCurrentThread(), "检查和提交必须在同一仓库锁内");
+            return call.callRealMethod();
+        }).when(observedRepo).pendingChanges(7L);
+
+        var result = svc.endSession(7L, 1L, "韩泽伟", "提交插件与 AI 修改");
+
+        assertNotNull(result.sha());
+        assertNull(result.notice());
+        assertNull(result.conflict());
+        assertEquals("提交插件与 AI 修改", repoSvc.log(7L, "HEAD", 1).get(0).message());
+        assertEquals("插件修改的正文", new String(repoSvc.readBlobAtCommit(7L, result.sha(), "合同.txt")));
+        assertEquals("AI 生成的报告", new String(repoSvc.readBlobAtCommit(7L, result.sha(), "新报告.txt")));
+        assertEquals("插件修改的正文", Files.readString(root.resolve("projects/7/合同.txt")));
+        assertEquals("AI 生成的报告", Files.readString(root.resolve("projects/7/新报告.txt")));
+        assertEquals(List.of(repoSvc.mainBranch()), repoSvc.listBranches(7L));
+        assertTrue(repoSvc.pendingChanges(7L).isEmpty());
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(1, sessions.size());
+        assertEquals(WorkSession.Status.MERGED, sessions.values().iterator().next().getStatus());
+        assertFalse(idleTimerArmed(svc, 7L), "隐式开段后立即收尾，不遗留空闲定时器");
+    }
+
+    @Test
+    void endSessionWithoutChangesDoesNotCreateAWorkSession() throws Exception {
+        String before = repoSvc.resolveRef(7L, "HEAD");
+        assertTrue(repoSvc.pendingChanges(7L).isEmpty());
+
+        VersionException error = assertThrows(VersionException.class,
+                () -> svc.endSession(7L, 1L, "韩泽伟", "不应生成版本"));
+
+        assertTrue(error.isUserFacing());
+        assertEquals("当前没有进行中的工作", error.getMessage());
+        assertEquals(before, repoSvc.resolveRef(7L, "HEAD"));
+        assertTrue(sessions.isEmpty());
+        assertEquals(List.of(repoSvc.mainBranch()), repoSvc.listBranches(7L));
+        assertFalse(idleTimerArmed(svc, 7L));
+    }
+
     private String addLegacyNestedMetadata() throws Exception {
         Path childMetadata = root.resolve("projects/7/child/.awd/tree.json");
         Files.createDirectories(childMetadata.getParent());

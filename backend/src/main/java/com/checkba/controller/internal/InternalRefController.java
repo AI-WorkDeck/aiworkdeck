@@ -144,7 +144,7 @@ public class InternalRefController {
             // 50MB 闸是写给律师看的话术，透传；其余是仓库本身出问题，只说得出一句笼统的
             log.warn("案件库参考读取失败: project={}, userFacing={}", projectId, e.isUserFacing());
             return ResponseEntity.ok(fail(e.isUserFacing() ? e.getMessage()
-                    : "案件库没能读出这份文件，请稍后再试。"));
+                    : com.checkba.service.LangText.of("案件库没能读出这份文件，请稍后再试。", "Case library could not read this file; please try again later.")));
         }
         if (bytes == null) {
             return ResponseEntity.ok(fail(NO_ACCESS));
@@ -155,7 +155,7 @@ public class InternalRefController {
         } catch (IOException e) {
             log.warn("案件库参考抽取失败: project={}, bytes={}", projectId, bytes.length);
             return ResponseEntity.ok(fail(e.getMessage() == null || e.getMessage().isBlank()
-                    ? "这份文件没能抽出文字。" : e.getMessage()));
+                    ? com.checkba.service.LangText.of("这份文件没能抽出文字。", "Could not extract text from this file.") : e.getMessage()));
         }
         log.info("案件库参考读取: project={}, chars={}", projectId, text.length());
         Map<String, Object> out = new LinkedHashMap<>();

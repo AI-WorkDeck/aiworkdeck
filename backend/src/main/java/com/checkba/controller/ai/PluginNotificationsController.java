@@ -30,27 +30,27 @@ public class PluginNotificationsController {
         if (userId==null) throw new IllegalArgumentException("请先登录");
         var plugin=plugins.getPlugin(pluginId);
         if (plugin==null || !plugins.isEnabled(pluginId) || plugins.revokedReason(pluginId)!=null)
-            throw new IllegalArgumentException("插件不存在或未启用");
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("插件不存在或未启用", "Plugin does not exist or is not enabled"));
         if (plugin.getPermissions()==null || !plugin.getPermissions().contains("notifications"))
-            throw new IllegalArgumentException("插件未获得通知权限");
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("插件未获得通知权限", "Plugin does not have notifications permission"));
         byte[] bytes=request.getInputStream().readNBytes(65537);
-        if (bytes.length>65536) throw new IllegalArgumentException("通知请求过大");
+        if (bytes.length>65536) throw new IllegalArgumentException(com.checkba.service.LangText.of("通知请求过大", "Notification request too large"));
         Map<String,Object> body;
         try { body=mapper.readValue(bytes,new TypeReference<>(){}); }
-        catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalArgumentException("通知请求格式无效"); }
-        if (body==null) throw new IllegalArgumentException("通知请求格式无效");
+        catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalArgumentException(com.checkba.service.LangText.of("通知请求格式无效", "Invalid notification request format")); }
+        if (body==null) throw new IllegalArgumentException(com.checkba.service.LangText.of("通知请求格式无效", "Invalid notification request format"));
         Map<String,Object> p=ImController.params(body);
         Object result=switch(String.valueOf(body.getOrDefault("action","publish"))) {
             case "publish" -> gateway.publishPlugin(userId,pluginId,p);
             case "resolve" -> gateway.resolvePlugin(userId,pluginId,text(p,"eventKey"),String.valueOf(p.getOrDefault("state","done")));
-            default -> throw new IllegalArgumentException("不支持的插件通知操作");
+            default -> throw new IllegalArgumentException(com.checkba.service.LangText.of("不支持的插件通知操作", "Unsupported plugin notification action"));
         };
         // Recheck grant after network latency; disabling a plugin cannot deliver stale results to its iframe.
-        if (!plugins.isEnabled(pluginId) || plugins.revokedReason(pluginId)!=null) throw new IllegalArgumentException("插件已停用");
+        if (!plugins.isEnabled(pluginId) || plugins.revokedReason(pluginId)!=null) throw new IllegalArgumentException(com.checkba.service.LangText.of("插件已停用", "Plugin has been disabled"));
         return Map.of("code",0,"data",result);
     }
     private static String text(Map<String,Object> p,String key) {
-        if (!(p.get(key) instanceof String s) || s.isBlank() || s.length()>160) throw new IllegalArgumentException("通知字段无效");
+        if (!(p.get(key) instanceof String s) || s.isBlank() || s.length()>160) throw new IllegalArgumentException(com.checkba.service.LangText.of("通知字段无效", "Invalid notification field"));
         return s;
     }
 }

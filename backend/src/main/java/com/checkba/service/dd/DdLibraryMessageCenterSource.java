@@ -53,8 +53,8 @@ public class DdLibraryMessageCenterSource implements MessageCenterSource {
                 List<Map<String,Object>> notifications = remoteNotifications(userId, scope, remote);
                 List<Entry> projectEntries = new ArrayList<>();
                 for (Map<String,Object> n : notifications) {
-                    projectEntries.add(new Entry(remote.getProjectId() + ":" + n.get("id"), id(), "案件库 · 客户尽调", Objects.toString(n.get("kind"), "NOTICE"),
-                        Objects.toString(n.get("title"), "尽调通知"), "", remote.getProjectId(), "local-project:" + remote.getProjectId(), project.getName(),
+                    projectEntries.add(new Entry(remote.getProjectId() + ":" + n.get("id"), id(), com.checkba.service.LangText.of("案件库 · 客户尽调", "Case Library · Due Diligence"), Objects.toString(n.get("kind"), "NOTICE"),
+                        Objects.toString(n.get("title"), com.checkba.service.LangText.of("尽调通知", "Due Diligence Notice")), "", remote.getProjectId(), "local-project:" + remote.getProjectId(), project.getName(),
                         DdMessageCenterSupport.instant(n, "createdAt"), DdMessageCenterSupport.instant(n, "readAt"),
                         Objects.toString(n.get("actionState"), "none"), target(remote.getProjectId(), n), DdMessageCenterSupport.read(n)));
                 }
@@ -117,6 +117,6 @@ public class DdLibraryMessageCenterSource implements MessageCenterSource {
     private String[] parts(String value) {
         if (value == null || !value.matches("[1-9][0-9]{0,18}:[1-9][0-9]{0,18}")) throw unavailable(); return value.split(":", 2);
     }
-    private void requireCurrent(String scope) { if (!Objects.equals(scope, account.accountFingerprintOrNull())) throw new IllegalArgumentException("账户已变化，请重新打开消息中心"); }
-    private IllegalArgumentException unavailable() { return new IllegalArgumentException("案件库通知暂不可用，或已失去该项目权限"); }
+    private void requireCurrent(String scope) { if (!Objects.equals(scope, account.accountFingerprintOrNull())) throw new IllegalArgumentException(com.checkba.service.LangText.of("账户已变化，请重新打开消息中心", "Account has changed; please reopen the Message Center")); }
+    private IllegalArgumentException unavailable() { return new IllegalArgumentException(com.checkba.service.LangText.of("案件库通知暂不可用，或已失去该项目权限", "Case library notifications are temporarily unavailable or project access has been lost")); }
 }

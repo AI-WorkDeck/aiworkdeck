@@ -17,6 +17,12 @@ const NAMES = {
   update_project_info: { zh: '更新项目信息', en: 'Update project info' },
   get_conversation_summary: { zh: '回顾会话记录', en: 'Recall conversation' },
   list_project_folders: { zh: '列出项目文件夹', en: 'List folders' },
+  version_status: { zh: '查看版本状态', en: 'Check version status' },
+  version_history: { zh: '查看版本历史', en: 'View version history' },
+  version_changes: { zh: '查看版本变更', en: 'View changed files' },
+  version_commit: { zh: '提交项目改动', en: 'Commit project changes' },
+  version_pull: { zh: '取回云端最新版本', en: 'Get latest cloud version' },
+  version_restore: { zh: '恢复历史版本', en: 'Restore a past version' },
   // 日程/日历（dev-board #53）：项目级任务/里程碑，与上面 todo_write 的
   // AI 单次工作步骤条是两个概念，不要合并成一个分组。
   task_create: { zh: '创建日程任务', en: 'Create task' },
@@ -41,7 +47,9 @@ const NAMES = {
   // 文件
   read_document: { zh: '读取文档', en: 'Read document' },
   search_project_files: { zh: '搜索项目文件', en: 'Search files' },
+  search_across_projects: { zh: '跨项目搜索文件', en: 'Search files across projects' },
   search_project_content: { zh: '搜索文件内容', en: 'Search file contents' },
+  search_across_projects: { zh: '跨项目检索', en: 'Search across projects' },
   read_file: { zh: '读取文件', en: 'Read file' },
   extract_file_text: { zh: '提取文档全文', en: 'Extract document text' },
   list_files: { zh: '列出文件', en: 'List files' },

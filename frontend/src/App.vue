@@ -11,11 +11,12 @@ import { mountRecordingIndicator } from '@/utils/recordingIndicator.js'
 import { initWindowChrome, refreshDragStrip } from '@/utils/windowChrome.js'
 import { mountGlobalBack, refreshGlobalBack } from '@/utils/globalBack.js'
 import { initAppMenuBridge } from '@/utils/appMenuBridge.js'
-import { getAppLanguage, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
+import { getAppLanguage, setAppLanguage, isLanguageManuallyChosen, normalizeLocaleCode, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
+import { applyI18nLocale } from '@/i18n/index.js'
 import { initAppTheme } from '@/utils/appTheme.js'
 import { installModalFocusGuard } from '@/utils/modalFocusGuard.js'
-import { saveAppLanguageRemote, prepareAgentRestart, abortAgentRestart } from '@/services/api.js'
-import { createDesktopQuitGuard, flushQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
+import { getAppLanguageRemote, saveAppLanguageRemote, prepareAgentRestart, abortAgentRestart } from '@/services/api.js'
+import { createDesktopQuitGuard, flushQuitWorkbenches, confirmQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 
 export default {
@@ -30,15 +31,35 @@ export default {
     // 桌面主进程（菜单等原生文案）与后端 system_setting（prompt/文案语言）。
     // 之后语言切换（设置页 setAppLanguage）经 APP_LANGUAGE_EVENT 走同一条同步链。
     const syncLanguageMirrors = (lang) => {
-      try { if (host.appLanguage && host.appLanguage.set) host.appLanguage.set(lang) } catch (e) { /* ignore */ }
+      const canonical = normalizeLocaleCode(lang) || getAppLanguage()
+      try { if (host.appLanguage && host.appLanguage.set) host.appLanguage.set(canonical) } catch (e) { /* ignore */ }
       // fire-and-forget：后端没起来也不能拦启动，下次切换/启动会再补。
       // 浏览器态未登录时不发——POST 会回「未登录」，request 包装器据此清会话
       // 并 reLaunch 登录页，启动链会被这条后台同步搅乱；桌面 local-mode 恒可发。
       if (isDesktopHost() || getSessionId()) {
-        try { saveAppLanguageRemote(lang).catch(() => {}) } catch (e) { /* ignore */ }
+        try { saveAppLanguageRemote(canonical).catch(() => {}) } catch (e) { /* ignore */ }
       }
     }
-    syncLanguageMirrors(getAppLanguage())
+    const initialLang = getAppLanguage()
+    applyI18nLocale(initialLang)
+    syncLanguageMirrors(initialLang)
+    if ((isDesktopHost() || getSessionId()) && !isLanguageManuallyChosen()) {
+      try {
+        getAppLanguageRemote()
+          .then((res) => {
+            if (isLanguageManuallyChosen()) return
+            const payload = (res && res.data) || res || {}
+            const remoteLang = normalizeLocaleCode(
+              res && (res.language || res.appLanguage || payload.language || payload.geoLocale || res.geoLocale)
+            )
+            if (remoteLang && remoteLang !== getAppLanguage()) {
+              const resolved = setAppLanguage(remoteLang, { auto: true })
+              applyI18nLocale(resolved)
+            }
+          })
+          .catch(() => {})
+      } catch (e) { /* ignore */ }
+    }
     try { uni.$on(APP_LANGUAGE_EVENT, syncLanguageMirrors) } catch (e) { /* ignore */ }
     // 常驻反馈浮窗：挂在页面树之外，全应用一个实例（见 utils/feedbackWidget.js）
     mountFeedbackWidget()
@@ -79,33 +100,49 @@ export default {
     let systemOpenPending = Promise.resolve()
     let quitPreparationPending = Promise.resolve()
     if (host.lifecycle?.onPrepareQuit) {
+      let reportQuitStage = () => {}
+      let awaitingChoice = false
       const quitGuard = createDesktopQuitGuard({
         prepare: prepareAgentRestart,
         abort: abortAgentRestart,
         flush: flushQuitWorkbenches,
-        progress: stage => uni.showLoading({ title: this.$t('admin.quit' + (stage === 'pausing' ? 'Pausing' : 'Saving')), mask: true }),
+        confirm: confirmQuitWorkbenches,
+        progress: stage => {
+          awaitingChoice = stage === 'confirming'
+          if (awaitingChoice) uni.hideLoading()
+          else uni.showLoading({ title: this.$t('admin.quit' + (stage === 'pausing' ? 'Pausing' : 'Saving')), mask: true })
+          setGlobalOverlay(!awaitingChoice, 'desktop-quit')
+          return reportQuitStage(stage)
+        },
         errorText: key => this.$t('admin.quitErrors.' + key),
       })
       let preparing = false
       const releaseQuitOverlay = () => {
         preparing = false
+        awaitingChoice = false
         uni.hideLoading()
         setGlobalOverlay(false, 'desktop-quit')
       }
-      const cancel = async () => {
+      const cancel = async ({ windowHidden = false } = {}) => {
         if (!preparing) return
-        try { await quitGuard.cancel() } catch (_) { /* Keep the window open. */ }
+        let recoveryPending = false
+        try { recoveryPending = (await quitGuard.cancel())?.paused > 0 } catch (_) { recoveryPending = true }
         releaseQuitOverlay()
+        // A completed window hide has no failing prepare call left to report recovery.
+        if (windowHidden && recoveryPending) {
+          uni.showModal({ title: this.$t('admin.quitStopped'), content: this.$t('admin.quitErrors.recoveryPending'), showCancel: false })
+        }
       }
       // Escape cancels a slow shutdown; ordinary input cannot dirty a saved editor.
       window.addEventListener('keydown', event => {
-        if (!preparing) return
+        if (!preparing || awaitingChoice) return
         event.preventDefault()
         event.stopImmediatePropagation()
         if (event.key === 'Escape') host.lifecycle.cancelQuit?.()
       }, true)
       host.lifecycle.onQuitCancelled?.(cancel)
-      host.lifecycle.onPrepareQuit(() => {
+      host.lifecycle.onPrepareQuit(({ reportStage } = {}) => {
+        reportQuitStage = reportStage || (() => {})
         uni.$emit('awd:cancel-restart-recovery')
         preparing = true
         setGlobalOverlay(true, 'desktop-quit')
@@ -117,7 +154,7 @@ export default {
           // Keep input blocked after ACK until the main process hides the window.
           if (!result.ok) {
             releaseQuitOverlay()
-            uni.showModal({ title: this.$t('admin.quitStopped'), content: result.error, showCancel: false })
+            if (!result.cancelled) uni.showModal({ title: this.$t('admin.quitStopped'), content: result.error, showCancel: false })
           }
           return result
         })()
@@ -197,7 +234,8 @@ export default {
 <style>
 /* AI WorkDeck Global Overrides */
 
-/* ============ 全局字体（dev-board#849） ============
+/* ============ 全局字体（dev-board#849） =====}
+
    此前全仓没有 html/body 字体规则：页面里的组件各自带字体没露馅，挂在 document.body
    上的 uni 弹层（<uni-toast>，以及接管前的 <uni-modal>）却直接掉到浏览器默认衬线字。
    字栈与 uni.scss 的 $awd-font-serif / $awd-font-sans / $awd-font-mono 逐字一致
@@ -215,7 +253,8 @@ uni-toast {
     font-family: var(--awd-font-sans);
 }
 
-/* ============ 颜色语义令牌（浅色/深色两套取值） ============
+/* ============ 颜色语义令牌（浅色/深色两套取值） =====}
+
    改造前全前端有 3950 处硬编码颜色、435 种色值，文字/背景/边框各自混着四套
    并行灰阶（Bootstrap 的 #6C757D/#ADB5BD、Tailwind slate 的 #64748B/#94A3B8、
    Tailwind gray 的 #6B7280/#D1D5DB，外加 #333/#666/#999 遗留）。收敛成下面这
@@ -413,7 +452,8 @@ html[data-theme='dark'] .awd-brand-logo > img {
     filter: invert(1) hue-rotate(180deg) saturate(1.35) brightness(1.1);
 }
 
-/* ============ 无边框窗口：给系统窗口控件让位 ============
+/* ============ 无边框窗口：给系统窗口控件让位 =====}
+
    桌面壳去掉了系统标题栏（main.js titleBarStyle: 'hidden'），窗口控件浮在
    网页内容上。类名由 utils/windowChrome.js 挂在 documentElement 上。
    设计见 docs/superpowers/specs/2026-08-16-desktop-chrome-and-command-menu.md */
@@ -618,6 +658,10 @@ html.is-desktop .project-header .switcher-menu,
 html.is-desktop .project-header .project-status-badge,
 html.is-desktop .project-header .work-status-chip,
 html.is-desktop .project-header .collab-chip,
+html.is-desktop .project-header .mode-switch-capsule,
+html.is-desktop .project-header .mode-switch-item,
+html.is-desktop .project-header .scratch-promote-btn,
+html.is-desktop .project-header .scratch-badge,
 html.is-desktop .project-header .header-center,
 html.is-desktop .project-header .header-tools,
 html.is-desktop .project-header .top-bar-btn,
@@ -658,6 +702,7 @@ html.is-desktop .awd-toast-mask,
 html.is-desktop .awdfb-mask,
 html.is-desktop .backup-overlay,
 html.is-desktop .batch-menu-mask,
+html.is-desktop .bw-context-mask,
 html.is-desktop .cal-filter-mask,
 html.is-desktop .ch-mask,
 html.is-desktop .compare-dialog-mask,
@@ -799,7 +844,8 @@ html.is-desktop .page-plugin-market .hero {
     padding-top: 38px;
 }
 
-/* ============ 声明式皮肤插件特征质感（dev-board#1480） ============
+/* ============ 声明式皮肤插件特征质感（dev-board#1480） =====}
+
    当用户启用了带 surfaceTexture / aiPulseStyle 的皮肤插件时，appTheme.js 在
    documentElement 上挂载 data-skin-texture 与 data-skin-pulse。通过极轻量的
    全局特征样式增强三套皮肤的视觉辨识度，同时严格复用 var(--awd-*) 语义令牌。 */
@@ -821,5 +867,42 @@ html[data-skin-texture='cel-glass'] .project-header {
 html[data-skin-texture='frosted-glass'] .pane-empty,
 html[data-skin-texture='frosted-glass'] .project-header {
     background-image: radial-gradient(circle at 80% 15%, var(--awd-halo-1) 0%, var(--awd-halo-2) 45%, transparent 78%);
+}
+
+/* ---- RTL 基础排版与布局适配（ar-SA，dev-board#1477） ---- */
+html[dir="rtl"] body {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] .awd-global-back {
+    left: auto;
+    right: max(12px, var(--awd-titlebar-safe-inline-start));
+    padding: 0 8px 0 11px;
+}
+
+html[dir="rtl"] .project-header,
+html[dir="rtl"] .home-topbar,
+html[dir="rtl"] .top-nav,
+html[dir="rtl"] .awd-set-row,
+html[dir="rtl"] .settings-row {
+    direction: rtl;
+}
+
+html[dir="rtl"] input[type="tel"],
+html[dir="rtl"] input[type="email"],
+html[dir="rtl"] input[type="url"],
+html[dir="rtl"] code,
+html[dir="rtl"] pre,
+html[dir="rtl"] .mono,
+html[dir="rtl"] .file-path,
+html[dir="rtl"] .shortcut-key,
+html[dir="rtl"] .ltr-inline {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .rtl-flip {
+    transform: scaleX(-1);
 }
 </style>

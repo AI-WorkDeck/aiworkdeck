@@ -434,8 +434,8 @@ public class PluginController {
     public ResponseEntity<Map<String, Object>> selectContributedTheme(
             @org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        if (AuthController.getUserIdFromSession(sessionId) == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(LangText.of("请先登录", "Please sign in first")));
+        if (!isAdmin(sessionId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("仅管理员可操作", "Administrator permission required")));
         }
         try {
             contributionService.selectTheme(body == null ? null : body.get("ref"));

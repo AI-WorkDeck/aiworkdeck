@@ -287,7 +287,7 @@ public class DdController {
     @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> onWorkflowError(org.springframework.web.server.ResponseStatusException e) {
         return ResponseEntity.status(e.getStatusCode()).body(Map.of("code", e.getStatusCode().value(),
-                "message", e.getReason() == null ? "请求失败" : e.getReason()));
+                "message", e.getReason() == null ? LangText.of("请求失败", "Request failed") : e.getReason()));
     }
 
     @PostMapping("/requests/{requestId}/prepare-materials")
@@ -365,7 +365,7 @@ public class DdController {
     public DdNotification markNotificationRead(@PathVariable Long notificationId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
-        if (userId == null) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "未登录");
+        if (userId == null) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, LangText.of("未登录", "Not signed in"));
         return workflow.markRead(notificationId, userId);
     }
 

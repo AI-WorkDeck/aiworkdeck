@@ -223,4 +223,14 @@ class PluginContributionServiceTest {
         assertEquals("", svc.selectedThemeRef());
     }
 
+    @Test void themeValuesRejectEscapedAndImplicitImageUrls() {
+        for (String value : List.of("u\\72l(https://example.invalid/pixel)",
+                "image-set(\"https://example.invalid/pixel\" 1x)",
+                "-webkit-image-set(\"/pixel\" 1x)", "u/*comment*/rl(/pixel)")) {
+            String raw = cn.hutool.json.JSONUtil.toJsonStr(Map.of("roles", Map.of(
+                    "light", Map.of("bg", value), "dark", Map.of("bg", "#121212"))));
+            assertThrows(IllegalArgumentException.class, () -> PluginContributionService.parseThemeJson(raw), value);
+        }
+    }
+
 }

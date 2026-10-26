@@ -1,0 +1,15 @@
+{
+  "plugin.name": "Рабочее место DPIA",
+  "plugin.description": "Оценка воздействия на защиту данных: отслеживание источников, подтверждение фактов, последующие вопросы и ответы, оценка и устранение рисков, непрерывная переоценка и версионированные отчеты. Адаптировано из DSH DPIA Workbench Чжу Линфэна; требует Node.js, Python и LibreOffice.",
+  "plugin.author": "AI WorkDeck (Источник: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Исполняемый файл Node.js",
+  "setting.nodePath.description": "Оставьте пустым, чтобы использовать node из системного PATH; требуется Node.js версии 20 или новее.",
+  "setting.pythonPath.label": "Исполняемый файл Python",
+  "setting.pythonPath.description": "Требуются зависимости документов из runtime/requirements.txt; можно указать путь к Python из виртуального окружения.",
+  "setting.pdfFontPath.label": "Файл шрифта CJK для PDF",
+  "setting.pdfFontPath.description": "Для заполнения текста CJK в нативных PDF-шаблонах требуется встраиваемый шрифт TrueType (TTF/TTC); оставьте пустым, чтобы использовать системный поиск шрифтов.",
+  "setting.sofficePath.label": "Исполняемый файл LibreOffice",
+  "setting.sofficePath.description": "Требуется только для экспорта отчетов в PDF и предпросмотра страниц; оставьте пустым, чтобы попробовать стандартные системные расположения.",
+  "tool.dpia_workbench_action.description": "Дела DPIA, материалы, подтверждение фактов, вопросы и ответы, статус выполнения и операции с отчетами. Только для интерфейса рабочего места; ИИ не должен вызывать ручные подтверждения и одобрения.",
+  "tool.dpia_workbench_task.description": "Выполнение текущих замороженных задач DPIA: context/read/write/script/commit/report; строго ограничено текущим проектом пользователя и каталогом вывода дела."
+}

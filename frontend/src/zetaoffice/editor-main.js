@@ -238,6 +238,13 @@ function relayCommentRequest(documentSeq) {
 }
 function relayModified(d) {
   if (!d || !d.cmd) return
+  if (d.cmd === 'save-snapshot') {
+    // The first edit after this export must reach the host even if the previous
+    // edit was within the ordinary 500 ms throttle window.
+    lastModifiedRelay = 0
+    try { hostTransport.send({ __lo: 'lo-relay', type: 'save-snapshot', saveSnapshotId: d.saveSnapshotId }) } catch (e) { /* ignore */ }
+    return
+  }
   if (d.cmd === 'comment-request') { relayCommentRequest(d.documentSeq); return }
   // 原生「导出为 PDF」入口被 worker 拦下（dev-board#886）：宿主取字节并下载
   if (d.cmd === 'export-pdf-request') {
@@ -253,6 +260,16 @@ function relayModified(d) {
   if (now - lastModifiedRelay < 500) return
   lastModifiedRelay = now
   try { hostTransport.send({ __lo: 'lo-relay', type: 'modified' }) } catch (e) { /* ignore */ }
+}
+
+// Only real input resets the save idle window; toolbar reads and thumbnails do not.
+let lastInteractionRelay = 0
+for (const event of ['keydown', 'pointerdown', 'wheel']) {
+  document.addEventListener(event, e => {
+    if (!e.isTrusted || Date.now() - lastInteractionRelay < 100) return
+    lastInteractionRelay = Date.now()
+    try { hostTransport.send({ __lo: 'lo-relay', type: 'interaction' }) } catch (_) {}
+  }, { capture: true, passive: true })
 }
 
 // (自建工具栏) 光标/选区动了 → 宿主重读 get_ui_state 刷新激活态。两个来源：
@@ -478,6 +495,7 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
       onCommitted: (text) => { writingAssistance?.committed(text); semanticWriting?.committed(text); inlineReview?.committed(text) },
       onAssistanceKey: (event) => writingAssistance?.keydown(event) || false,
       onCommentRequested: () => relayCommentRequest(),
+      onError: message => hostTransport.send({ __lo: 'lo-relay', type: 'input-error', message }),
       onLog: (m) => { console.log('[zeta-editor]', m); if (VERIFY) vlog(m) },
     })
     writingAssistance = attachWritingAssistance({

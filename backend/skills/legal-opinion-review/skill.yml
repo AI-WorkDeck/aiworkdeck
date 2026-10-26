@@ -12,6 +12,7 @@ triggers: [法律意见书, 法律意見書]
 triggers_en: [legal opinion]
 prompt: prompt.md
 tool_policy: restrict
+verification_policy: slot_evidence_challenger
 allowed_tools:
   - doc_get_document_text
   - doc_get_paragraph

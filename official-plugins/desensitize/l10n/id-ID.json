@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Desensitisasi",
+  "plugin.description": "Periksa informasi sensitif, buat salinan yang telah didesensitisasi, dan pulihkan dengan recovery package.",
+  "view.main.name": "Desensitisasi"
+}

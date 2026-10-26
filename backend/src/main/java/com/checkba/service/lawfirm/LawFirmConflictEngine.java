@@ -400,7 +400,7 @@ public class LawFirmConflictEngine {
         // 同时检索工作台已有 Project（尚未通过 LawFirmMatterIntake 登记的存量项目）
         if (existingProjects != null) {
             for (Project proj : existingProjects) {
-                if (proj == null || proj.isLooseFileWorkspace()) continue;
+                if (proj == null || proj.isLooseFileWorkspace() || proj.isScratchWorkspace()) continue;
                 if (proj.getId() != null && coveredProjectIds.contains(proj.getId())) continue;
                 if (candidate.getProjectId() != null && Objects.equals(candidate.getProjectId(), proj.getId())) continue;
 

@@ -31,6 +31,16 @@ AI WorkDeck（checkba_cloud）：面向法律行业的 AI 工作台。Java Sprin
 - 合并的 PR 如果改变了某领域的文件布局、契约或新增了地雷，**同一个 PR 里顺手更新对应领域文档**，防止文档腐烂。
 - 新增领域时在本表加一行。
 
+## 编辑器跨格式联查（用户明确，2026-10-26）
+
+对任意编辑器的性能、功能或交互作改动时，必须同时检查 **Word、PPT、Excel、PDF** 的对应路径，不能只验证本次直接修改的格式。先核对各格式实际使用的引擎、共享宿主与专属实现；在一类编辑器发现的重复读取、阻塞、渲染或保存问题，要检查其余三类是否存在同类问题，适用的优化在同一轮落实。
+
+验收记录逐类说明打开、切换/滚动、输入或批注、保存重开等相关体验，以及共享改动的回归结果。机制不同或确实不适用的项目写明实查依据；尚未验证的项目明确保留，不以 Word 的通过结果代替 PPT、Excel 或 PDF 的结论。不能为了统一实现删除某类编辑器的能力或绕过内容、格式、权限与保存保护。
+
+性能优化必须保留同一文件、相同环境和负载下的多轮前后基线，冷开与预热分开记录。Word、PPT、Excel 使用同一验收链路：打开 → 实际正文画面（用真实空白/正文样本校准）→ 首次成功编辑 → 产品正常自动保存落盘 → 关闭重开核对内容与格式。不能用 ready 回包替代正文、用接口提速替代整体收益，或用手动/强制保存替代自动保存；额外核验不得重置产品的保存等待计时。PDF 按其实际预览、编辑/批注和保存能力映射验证，明确不适用项与未验证项。
+
+来源：本会话用户指示；dev-board#1502。具体文件与验证命令继续维护在原领域文档中。
+
 ## 全局约定
 
 - `docs/` 目录在 .gitignore 里，向其中添加需入库的文件要 `git add -f`。
@@ -56,3 +66,14 @@ AI WorkDeck（checkba_cloud）：面向法律行业的 AI 工作台。Java Sprin
   **不要提议「统一命名 / 清理历史前缀」**：`com.checkba.*` 包根、`--awd-` 令牌、`checkba://` scheme、`X-AWD-*` 提交尾注、插件握手 `awd: 1`、桌面端口链 `[5269, 5369, 5169]`、文档锚点 `__ai_anchor_` 都是写进用户产物或第三方插件的公开契约，有字面量断言测试守着，看不懂的常量先问再动。
   设置页 / Office 与 WPS 任务窗格 / 桌面 About 的许可告示与后端 `X-Source-Code` 响应头是 AGPL 要求的告示，不许删、不许做成强制 logo。
   硬红线：不新增任何未在 `legal/PRIVACY.md` 声明的出站请求，不做隐蔽回传、混淆、魔数水印、故意 bug 陷阱。
+- **多语种令牌化硬规则与合并前必检（dev-board#1477，20 语种体系，术语表与风格指南见 `docs/i18n/`）**：
+  1. **Day-One 全量令牌化，严禁写死文案**：任何新增或修改的用户可见文案（前端 `.vue`/`.js`、桌面端 Electron 主进程与菜单、Office/WPS 加载项、官方插件 `manifest.json` 与 Web 面板、后端 Controller/Service 报错提示、AI 工具 `displayName`、Skill 名称与描述），必须从写下第一行代码起走语言令牌：
+     - 工作台前端：`frontend/src/locales/<locale>/<ns>.js`（通过 `$t('ns.key')` / `t('ns.key')` 调用，`.vue` `<template>` 严禁出现未走 i18n 的裸中文）；
+     - 桌面主进程：`desktop/main/app-language.js` 的 `t(...)`；
+     - Office/WPS 加载项：`office-addin/taskpane/lib/i18n.js`（`office-addin/taskpane/locales/<locale>.js`）；
+     - 官方插件：`official-plugins/<id>/l10n/<locale>.json`；
+     - 后端与 AI 工具：`LangText.of(zh, en)` / `LangText.key(...)`、`ToolRegistry` 名称表与 `skill.yml` 多语言字段。
+  2. **RTL 排版与 Geo-IP 默认语言分流规范**：
+     - `ar-SA`（阿拉伯语）为 RTL（从右往左）语言：新增或修改 UI 布局时，下拉浮层、搜索框图标、引用线、目录缩进等横向定位属性优先使用 CSS 逻辑属性（`inset-inline-start/end`、`padding-inline-start/end`、`border-inline-start`、`text-align: start`），代码块、URL、邮箱、文件路径、快捷键保持 `direction: ltr; unicode-bidi: isolate`。
+     - 首访默认语言支持基于 CDN/反向代理 Geo-IP 国家头（`CF-IPCountry` / `X-Vercel-IP-Country` / `CloudFront-Viewer-Country` / `Ali-Cdn-Real-Country` / `X-Geo-Country`）由 `GeoIpLocaleResolver` 与 `matchCountryToLocale` 自动映射。
+  3. **合并 PR 前必检与自动补齐**：每次提 PR 或合并 PR 前，必须运行 `cd frontend && npm run check:locales` 并核对 `git diff`；若发现任何未令牌化的硬编码文案、占位符 `{var}` 不一致或词条缺失，**必须先补齐令牌与多语种词条、确保门禁全绿后再提交/合并**。

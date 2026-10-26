@@ -749,6 +749,18 @@ public class AiAgentController {
          */
         private String selectionText;
 
+        /** 可选（dev-board#1479）：附件来自其他项目时的跨项目只读引用标注。 */
+        private Long projectId;
+        private String projectName;
+        private Boolean readOnly;
+
+        public Long getProjectId() { return projectId; }
+        public void setProjectId(Long projectId) { this.projectId = projectId; }
+        public String getProjectName() { return projectName; }
+        public void setProjectName(String projectName) { this.projectName = projectName; }
+        public Boolean getReadOnly() { return readOnly; }
+        public void setReadOnly(Boolean readOnly) { this.readOnly = readOnly; }
+
         public boolean isStaleBody() { return staleBody; }
         public void setStaleBody(boolean staleBody) { this.staleBody = staleBody; }
         public String getSelectionText() { return selectionText; }

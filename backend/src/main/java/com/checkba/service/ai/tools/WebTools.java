@@ -41,6 +41,9 @@ public class WebTools implements AgentToolComponent {
     @Value("${bocha.api.key:}")
     private String bochaApiKey;
 
+    @Value("${security.local-mode:false}")
+    private boolean localMode;
+
     // 桌面打包版不注入 BOCHA_API_KEY，环境变量默认为空；管理员可在设置页
     // （external.bocha.apiKey）填 key，DB 值优先于环境变量/配置文件。
     @org.springframework.beans.factory.annotation.Autowired
@@ -300,6 +303,9 @@ public class WebTools implements AgentToolComponent {
 
     @jakarta.annotation.PostConstruct
     public void init() {
+        // Desktop document startup must not unpack/run a browser it does not use.
+        // browseUrl creates its own Playwright/browser on demand; this dry run is not a shared instance.
+        if (localMode) return;
         log.info("WebTools initializing: Checking and downloading Playwright browsers if needed...");
         // Define specific env vars to force download if needed, though default behavior is usually sufficient.
         // We launch a browser dry-run to trigger the download mechanism.

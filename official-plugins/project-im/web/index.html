@@ -51,18 +51,20 @@
         </header>
         <div id="project-bar"><span id="binding" class="hint"></span><button id="bind" type="button">关联当前项目</button><button id="export" type="button">归档聊天</button></div>
         <div id="message-scroll"><button id="older" type="button" hidden>加载更早消息</button><div id="messages" role="log" aria-label="聊天消息" aria-live="polite"></div><p id="empty-messages" class="hint">还没有消息，打个招呼吧。</p></div>
+        <div class="compose-area">
         <div id="agent-info" hidden>
           <p id="agent-info-summary"></p>
           <details><summary>上下文与模型</summary><p id="agent-info-detail"></p></details>
         </div>
         <div id="agent-status" role="status" aria-live="polite" hidden></div>
         <form id="composer">
-          <div class="composer-tools"><button type="button" id="local-file">发送本机文件</button><button type="button" id="project-file">引用项目文件</button><span class="hint">单文件不超过 8 MB</span></div>
+          <div class="composer-tools"><button type="button" id="local-file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>发送本机文件</button><button type="button" id="project-file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>引用项目文件</button><span class="hint">单文件不超过 8 MB</span></div>
           <input type="file" id="file-input" hidden>
           <div id="attachment" hidden><span id="attachment-name"></span><button type="button" id="clear-file">移除</button></div>
           <label class="sr-only" for="draft">输入消息</label><textarea id="draft" rows="3" maxlength="8000" placeholder="输入消息…"></textarea>
           <div class="send-row"><button id="agent-reply" type="button" hidden>请助手回复</button><span class="hint">Enter 发送 · Shift+Enter 换行</span><button class="primary" id="send" type="submit">发送</button></div>
         </form>
+        </div>
       </div>
     </section>
   </main>

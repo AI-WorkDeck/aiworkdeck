@@ -8,11 +8,12 @@
     - 未登录（未连接账户）：「登录」按钮。点击 emit('login')，宿主就地
       `await requireAccount({ reason: 'account' })` 弹登录层（dev-board#1046），不离开工作台。
     - 已登录：头像 .avatar-btn，点击展开头像下拉——账户抬头（余额 + 等级）、宽限 / 试用 / 余额不足提示、
-      「我的日程」「设置」「退出登录」三个动作。动作只 emit，路由与落盘由宿主做
+      「消息中心」「我的日程」「设置」「退出登录」。动作只 emit，路由与落盘由宿主做
       （宿主那三个处理器是 check:nav 盯着的 onAvatarMenuSchedule / onAvatarMenuSettings / onAvatarMenuSignOut）。
 
   设置入口只在这份下拉里（外加应用菜单 ⌘,），rail 上没有齿轮。
-  余额不足 / 有宽限提醒时头像右上角挂一个小点，下拉里给出完整文案。
+  消息未读数在头像角标提示；来源不完整时保留提示，余额提醒另用小点。未连接统一账户时
+  登录按钮旁保留消息入口，受邀客户连接不依赖统一账户登录。
   有无项目两态都渲染、不按 isClientView 收——客户也有自己的账号安全与工作记录。
   顶栏整条是窗口拖拽区：本组件的按钮与下拉都在 App.vue 的 no-drag 名单里（.header-account / .account-entry-btn /
   .avatar-menu），全屏 mask .account-entry-mask 在「全屏浮层」那份名单里。
@@ -22,19 +23,43 @@
   prop 跟上之后以 prop 为准（watch 里清掉本地覆盖）。余额 / 宽限提示仍由宿主订同一事件后重拉。
 -->
 <template>
-  <view class="header-account">
+  <view class="header-account" @keydown.esc.stop="menuOpen = false">
+    <view
+      v-if="!signedIn && !clientView"
+      class="account-entry-btn signed-out-messages"
+      role="button"
+      tabindex="0"
+      :title="messageHint || $t('messageCenter.title')"
+      :aria-label="messageHint || $t('messageCenter.title')"
+      @tap.stop="emitAndClose('messages')"
+      @keydown.enter.stop.prevent="emitAndClose('messages')"
+      @keydown.space.stop.prevent="emitAndClose('messages')"
+    >
+      <svg class="account-message-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M20 11.5a8 8 0 0 1-8 8 8.4 8.4 0 0 1-3.5-.8L4 20l1.3-4.5a8.4 8.4 0 0 1-.8-3.5 8 8 0 1 1 15.5-.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+        <path d="M8.5 11.5h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+      </svg>
+      <text v-if="showMessageBadge" class="account-message-badge" :class="{ 'is-partial': messagePartial }">{{ messageBadgeText }}</text>
+    </view>
     <view
       class="account-entry-btn"
       :class="signedIn ? { 'avatar-btn': true, 'is-open': menuOpen } : { 'header-login-btn': true, 'is-signed-out': true }"
-      :title="signedIn ? $t('workbench.accountMenu') : $t('welcome.signInTitle')"
+      role="button"
+      tabindex="0"
+      :aria-expanded="signedIn ? menuOpen : undefined"
+      :title="signedIn ? (messageHint || $t('workbench.accountMenu')) : $t('welcome.signInTitle')"
+      :aria-label="signedIn ? (messageHint || $t('workbench.accountMenu')) : $t('welcome.signInTitle')"
       @tap.stop="onTap"
+      @keydown.enter.stop.prevent="onTap"
+      @keydown.space.stop.prevent="onTap"
     >
       <template v-if="signedIn">
         <view class="account-avatar">
           <image v-if="avatarUrl" :src="avatarUrl" class="account-avatar-img" />
           <text v-else class="account-avatar-text">{{ initial }}</text>
         </view>
-        <view v-if="attention" class="account-attention-dot"></view>
+        <text v-if="showMessageBadge" class="account-message-badge" :class="{ 'is-partial': messagePartial }">{{ messageBadgeText }}</text>
+        <view v-if="attention" class="account-attention-dot" :class="{ 'with-message-badge': showMessageBadge }"></view>
       </template>
       <template v-else>
         <svg class="account-entry-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -45,9 +70,13 @@
     </view>
 
     <view v-if="menuOpen" class="account-entry-mask" @tap.stop="menuOpen = false"></view>
-    <view v-if="menuOpen" class="avatar-menu account-entry-menu">
+    <view v-if="menuOpen" class="avatar-menu account-entry-menu" role="group" :aria-label="$t('workbench.accountMenu')">
       <view class="avatar-menu-user">
         <text class="avatar-menu-name">{{ displayName || $t('workbench.me') }}</text>
+      </view>
+      <view v-if="!clientView" class="avatar-menu-item avatar-menu-messages" role="button" tabindex="0" @tap.stop="emitAndClose('messages')" @keydown.enter.stop.prevent="emitAndClose('messages')" @keydown.space.stop.prevent="emitAndClose('messages')">
+        <text>{{ $t('messageCenter.title') }}</text>
+        <text v-if="showMessageBadge" class="menu-message-badge" :class="{ 'is-partial': messagePartial }" :title="messageHint" :aria-label="messageHint">{{ messageBadgeText }}</text>
       </view>
       <!-- 账户抬头：余额 + 等级。整块可点，去「账户与用量」 -->
       <view v-if="walletVisible" class="avatar-menu-wallet" @tap.stop="emitAndClose('account')">
@@ -102,8 +131,10 @@ export default {
     noticeText: { type: String, default: '' },
     /** 宿主的客户视角（isClientView）：客户看不到事项，下拉里不出「我的日程」 */
     clientView: { type: Boolean, default: false },
+    messageUnread: { type: Number, default: null },
+    messagePartial: { type: Boolean, default: false },
   },
-  emits: ['login', 'account', 'grace-info', 'schedule', 'settings', 'sign-out'],
+  emits: ['login', 'account', 'grace-info', 'messages', 'schedule', 'settings', 'sign-out'],
   data() {
     return {
       menuOpen: false,
@@ -125,6 +156,19 @@ export default {
     // 头像右上角的小点：余额不足或有宽限 / 试用提醒——原来顶栏那两个 chip 的信号
     attention() {
       return !!(this.walletLow || this.noticeText)
+    },
+    showMessageBadge() {
+      return !this.clientView && (this.messageUnread > 0 || this.messagePartial)
+    },
+    messageBadgeText() {
+      return this.messageUnread > 99 ? '99+' : this.messageUnread > 0 ? String(this.messageUnread) : '·'
+    },
+    messageHint() {
+      if (!this.showMessageBadge) return ''
+      const parts = [this.$t('messageCenter.title')]
+      if (this.messageUnread > 0) parts.push(this.$t('messageCenter.unreadCount', { count: this.messageUnread }))
+      if (this.messagePartial) parts.push(this.$t('messageCenter.sourcesUnavailable'))
+      return parts.join(' · ')
     },
   },
   watch: {
@@ -188,6 +232,60 @@ export default {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.account-entry-btn:focus-visible,
+.avatar-menu-item:focus-visible {
+  outline: 2px solid var(--awd-accent);
+  outline-offset: 3px;
+}
+
+.signed-out-messages {
+  width: 26px;
+  height: 26px;
+  margin-right: 8px;
+  border-radius: var(--awd-radius-sm, 4px);
+  color: var(--awd-text-2);
+
+  &:hover { color: var(--awd-accent-text); background: var(--awd-surface-2); }
+}
+
+.account-message-icon { width: 18px; height: 18px; }
+
+.account-message-badge,
+.menu-message-badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+
+  &.is-partial { outline: 1px solid var(--awd-warning-text); }
+}
+
+.account-message-badge {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  box-shadow: 0 0 0 2px var(--awd-surface);
+  pointer-events: none;
+}
+
+.avatar-menu-messages {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-weight: 600;
 }
 
 /* 已登录：头像。比 .top-bar-btn 大一圈——它是一个人的身份标识，不是又一个开关。 */
@@ -265,6 +363,8 @@ export default {
   border-radius: 50%;
   background: var(--awd-warning-text);
   border: 1.5px solid var(--awd-surface);
+
+  &.with-message-badge { top: auto; bottom: -1px; }
 }
 
 /* 全屏 mask 兜底收起；它是铺满视口的 fixed 浮层，App.vue 的 no-drag 名单里有它 */

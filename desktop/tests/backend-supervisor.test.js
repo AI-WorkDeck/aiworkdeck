@@ -4,22 +4,127 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const http = require('node:http')
 const { BackendSupervisor } = require('../main/services/backend-supervisor')
-const { probeBackendHealth } = require('../main/services/backend-service')
+const { probeBackendHealth, probeBackendStartupHealth } = require('../main/services/backend-service')
 const { ServiceManager, findFreePort } = require('../main/services/service-manager')
 
-function harness(overrides = {}) {
+function harness(overrides = {}, options = {}) {
   let now = 0, healthy = true, restarts = 0
   const events = []
   const services = { ctx: {}, ports: { backend: 1 }, procs: new Map([['backend', {}]]),
     descriptors: new Map([['backend', { health: async () => healthy }]]),
     isOwned: () => true, isBusy: () => false,
-    checkHealth: () => services.descriptors.get('backend').health(),
+    checkHealth: async () => {
+      const result = await services.descriptors.get('backend').health()
+      if (result && services.getLaunch?.('backend')) services.getLaunch('backend').fullReady = true
+      return result
+    },
     restart: async () => { restarts++; healthy = true; services.procs.set('backend', {}); return { ok: true } }, ...overrides }
   const supervisor = new BackendSupervisor(services, (s) => events.push(s),
-    { now: () => now, retryDelays: [5, 15, 45], stableMs: 300, resumeGraceMs: 30 })
+    { now: () => now, retryDelays: [5, 15, 45], stableMs: 300, resumeGraceMs: 30, ...options })
   return { services, supervisor, events, setHealthy: (v) => { healthy = v },
     advance: (v) => { now += v }, restarts: () => restarts }
 }
+
+function pollingHarness(t, deadline = 21000) {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 1000 })
+  const manager = new ServiceManager({ packaged: false })
+  manager.ports.backend = 1; manager.managed.add('backend')
+  let healthy = false, failures = 0
+  const calls = []
+  const replace = () => {
+    const launch = { process: {}, deadline, splitReadiness: true, fullReady: false }
+    manager.procs.set('backend', launch.process); manager.launches.set('backend', launch)
+    return launch
+  }
+  const launch = replace()
+  manager.healthChecks.set('backend', async () => { calls.push(Date.now()); return healthy })
+  const supervisor = new BackendSupervisor(manager, () => {}, {
+    retryDelays: [50000], onStartupFailure: () => { failures++ }
+  })
+  t.after(() => supervisor.stop())
+  const settle = () => new Promise(setImmediate)
+  const advance = async ms => { t.mock.timers.tick(ms); await settle() }
+  return { manager, supervisor, launch, calls, replace, settle, advance,
+    setHealthy: value => { healthy = value }, failures: () => failures }
+}
+
+test('core startup polls full health promptly, then returns to the normal ten-second interval', async t => {
+  const h = pollingHarness(t)
+  h.supervisor.start(); await h.settle()
+  assert.deepEqual(h.calls, [1000])
+  await h.advance(500)
+  assert.deepEqual(h.calls, [1000, 1500])
+  h.setHealthy(true)
+  await h.advance(500)
+  assert.equal(h.launch.fullReady, true)
+  assert.deepEqual(h.calls, [1000, 1500, 2000])
+  await h.advance(9999)
+  assert.equal(h.calls.length, 3, 'steady state must not keep the fast health probe')
+  await h.advance(1)
+  assert.equal(h.calls.at(-1), 12000)
+})
+
+test('fast polling honors the original deadline and reports an expired core launch only once', async t => {
+  const h = pollingHarness(t, 1200)
+  h.supervisor.start(); await h.settle()
+  await h.advance(199)
+  assert.equal(h.calls.length, 1)
+  await h.advance(1)
+  assert.equal(h.failures(), 1)
+  assert.equal(h.launch.deadline, 1200)
+  assert.equal(h.supervisor.getHealth().reason, 'full-startup-failed')
+  await h.advance(9999)
+  assert.equal(h.calls.length, 2, 'an expired startup must stop fast polling')
+  await h.advance(1)
+  assert.equal(h.failures(), 1)
+})
+
+test('a recovered core launch resumes fast polling even while the old steady timer was pending', async t => {
+  const h = pollingHarness(t)
+  h.setHealthy(true)
+  h.supervisor.start(); await h.settle()
+  assert.equal(h.launch.fullReady, true)
+  h.manager.restart = async () => ({ ok: true, fullReady: false, launch: h.replace() })
+  h.setHealthy(false)
+  await h.supervisor.recover()
+  await h.advance(500)
+  assert.equal(h.calls.at(-1), 1500)
+  h.setHealthy(true)
+  await h.advance(500)
+  assert.equal(h.manager.getLaunch('backend').fullReady, true)
+  assert.equal(h.supervisor.getHealth().ok, true)
+})
+
+test('an in-flight startup probe does not overlap or rearm monitoring after stop', async t => {
+  const h = pollingHarness(t)
+  let resolveProbe
+  h.manager.healthChecks.set('backend', () => {
+    h.calls.push(Date.now())
+    return new Promise(resolve => { resolveProbe = resolve })
+  })
+  h.supervisor.start(); await h.settle()
+  await h.advance(1500)
+  assert.equal(h.calls.length, 1)
+  h.supervisor.stop()
+  resolveProbe(false); await h.settle()
+  await h.advance(20000)
+  assert.equal(h.calls.length, 1)
+  assert.equal(h.supervisor.timer, null)
+  assert.equal(h.supervisor.getHealth().state, 'stopped')
+})
+
+test('suspension pauses startup probes and resume restores the short startup interval', async t => {
+  const h = pollingHarness(t)
+  h.supervisor.start(); await h.settle()
+  h.supervisor.suspend()
+  await h.advance(500)
+  assert.equal(h.calls.length, 1)
+  h.supervisor.resume(); await h.settle()
+  assert.equal(h.calls.length, 2)
+  await h.advance(500)
+  assert.equal(h.calls.at(-1), 2000)
+  assert.equal(h.calls.length, 3)
+})
 
 test('HTTP hang requires consecutive failures; restart has delay, preserves port and needs sustained health to reset budget', async () => {
   const h = harness()
@@ -36,6 +141,189 @@ test('HTTP hang requires consecutive failures; restart has delay, preserves port
   assert.equal(h.supervisor.getHealth().attempts, 1)
   h.advance(300); await h.supervisor.check()
   assert.equal(h.supervisor.getHealth().attempts, 0)
+})
+
+test('core readiness has one bounded full-startup deadline and is never published as healthy', async () => {
+  let failures = 0
+  const h = harness({}, { onStartupFailure: async () => { failures++ } })
+  const launch = { process: h.services.procs.get('backend'), deadline: 120, splitReadiness: true, fullReady: false }
+  h.services.getLaunch = () => launch
+  h.setHealthy(false)
+  await h.supervisor.check()
+  assert.equal(h.supervisor.getHealth().state, 'starting')
+  assert.equal(h.supervisor.getHealth().ok, false)
+  h.advance(119); await h.supervisor.check()
+  assert.equal(h.restarts(), 0); assert.equal(failures, 0)
+  h.advance(1); await h.supervisor.check()
+  assert.equal(failures, 1)
+  assert.equal(h.supervisor.getHealth().state, 'degraded')
+  await h.supervisor.check(); assert.equal(failures, 1)
+  h.advance(5); await h.supervisor.check()
+  assert.equal(h.restarts(), 1)
+})
+
+test('full health ends startup grace; subsequent runtime failures do not count as boot failures', async () => {
+  let failures = 0
+  const h = harness({}, { onStartupFailure: async () => { failures++ } })
+  const launch = { process: h.services.procs.get('backend'), deadline: 120, splitReadiness: true, fullReady: false }
+  h.services.getLaunch = () => launch
+  h.setHealthy(false); await h.supervisor.check()
+  h.setHealthy(true); await h.supervisor.check()
+  assert.equal(h.supervisor.getHealth().state, 'healthy'); assert.equal(launch.fullReady, true)
+  h.advance(130); h.setHealthy(false); await h.supervisor.check()
+  assert.equal(h.supervisor.getHealth().state, 'degraded'); assert.equal(failures, 0)
+})
+
+test('a recovery that only reaches core readiness stays starting and does not claim a healthy restart', async () => {
+  const h = harness({ restart: async () => ({ ok: true, fullReady: false }) })
+  assert.equal((await h.supervisor.recover()).ok, true)
+  assert.equal(h.supervisor.getHealth().state, 'starting')
+  assert.equal(h.supervisor.getHealth().ok, false)
+  assert.equal(h.supervisor.healthySince, null)
+})
+
+test('repeated core-only restarts exhaust the recovery budget instead of renewing health forever', async () => {
+  let now = 0, restarts = 0, failures = 0, launch
+  const h = harness({ restart: async () => {
+    restarts++
+    const process = {}
+    h.services.procs.set('backend', process)
+    launch = { process, deadline: now + 120, splitReadiness: true, fullReady: false }
+    return { ok: true, fullReady: false }
+  } }, { now: () => now, onStartupFailure: () => { failures++ } })
+  launch = { process: h.services.procs.get('backend'), deadline: 120, splitReadiness: true, fullReady: false }
+  h.services.getLaunch = () => launch
+  h.setHealthy(false)
+  for (let i = 0; i < 20; i++) { now += 125; await h.supervisor.check() }
+  assert.equal(restarts, 3)
+  assert.equal(failures, 4)
+  assert.equal(h.supervisor.getHealth().state, 'failed')
+  assert.equal(h.supervisor.getHealth().reason, 'retry-limit')
+  assert.equal(h.events.some(event => event.ok), false)
+})
+
+test('startup probe accepts known core/full phases and only falls back for a missing legacy route', async (t) => {
+  let phase = 'core', startupStatus = 200, fullStatus = 503, fullCalls = 0
+  const server = http.createServer((req, res) => {
+    if (req.url === '/api/desktop/startup-health') {
+      res.statusCode = startupStatus
+      res.end(JSON.stringify({ status: 'UP', build: 'candidate', phase }))
+    } else {
+      assert.equal(req.url, '/api/desktop/health'); fullCalls++
+      res.statusCode = fullStatus
+      res.end(JSON.stringify({ status: fullStatus === 200 ? 'UP' : 'DOWN', build: 'candidate' }))
+    }
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => { server.closeAllConnections(); server.close() })
+  const port = server.address().port
+  assert.equal(await probeBackendStartupHealth(port, 100, 'candidate'), true)
+  assert.equal(await probeBackendHealth(port, 100, 'candidate'), false)
+  assert.equal(await probeBackendStartupHealth(port, 100, 'different'), false)
+  phase = 'invented'; assert.equal(await probeBackendStartupHealth(port, 100, 'candidate'), false)
+  phase = 'full'; fullStatus = 200
+  assert.equal(await probeBackendStartupHealth(port, 100, 'candidate'), true)
+  startupStatus = 503; const before = fullCalls
+  assert.equal(await probeBackendStartupHealth(port, 100, 'candidate'), false)
+  assert.equal(fullCalls, before)
+  startupStatus = 404
+  assert.equal(await probeBackendStartupHealth(port, 100, 'candidate'), true)
+  assert.equal(fullCalls, before + 1)
+})
+
+test('core read advertisement belongs only to a build-verified core launch', async (t) => {
+  const { createBackendDescriptor } = require('../main/services/backend-service')
+  const descriptor = createBackendDescriptor()
+  let status = 200, build = 'candidate', phase = 'core', paths = ['/api/projects/:id/files']
+  const server = http.createServer((_req, res) => {
+    res.statusCode = status
+    res.end(JSON.stringify({ status: 'UP', build, phase, coreReadPaths: paths }))
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => { server.closeAllConnections(); server.close() })
+  const port = server.address().port, launch = {}, nextLaunch = {}
+  assert.equal(await descriptor.startupHealth({ packaged: true }, port, 'candidate', launch), true)
+  assert.deepEqual(launch.coreReadPaths, paths)
+  assert.equal(nextLaunch.coreReadPaths, undefined)
+  for (const change of [() => { build = 'wrong' }, () => { build = 'candidate'; phase = 'full' },
+    () => { phase = 'core'; status = 503 }, () => { status = 200; paths = ['/api/*'] }]) {
+    change()
+    const rejected = {}
+    await descriptor.startupHealth({ packaged: true }, port, 'candidate', rejected)
+    assert.equal(rejected.coreReadPaths, undefined)
+  }
+  paths = ['/api/projects/:id/files']
+  await descriptor.startupHealth({ packaged: true }, port, '', nextLaunch)
+  assert.equal(nextLaunch.coreReadPaths, undefined, 'an absent expected fingerprint cannot enable gating')
+})
+
+test('development full health does not wait on wizard while a lightweight core is serving', async (t) => {
+  const { createBackendDescriptor } = require('../main/services/backend-service')
+  let healthStatus = 503, wizardCalls = 0
+  const server = http.createServer((req, res) => {
+    if (req.url === '/api/admin/wizard') {
+      wizardCalls++; res.end(JSON.stringify({ initialized: true })); return
+    }
+    assert.equal(req.url, '/api/desktop/health')
+    res.statusCode = healthStatus; res.end(JSON.stringify({ status: 'DOWN' }))
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => { server.closeAllConnections(); server.close() })
+  const descriptor = createBackendDescriptor(), port = server.address().port
+  assert.equal(await descriptor.health({ packaged: false }, port), false)
+  assert.equal(wizardCalls, 0)
+  healthStatus = 404
+  assert.equal(await descriptor.health({ packaged: false }, port), true)
+  assert.equal(wizardCalls, 1)
+})
+
+test('development startup fallback checks full health before considering a legacy wizard', async (t) => {
+  const { createBackendDescriptor } = require('../main/services/backend-service')
+  let fullStatus = 503, fullBuild = 'candidate', wizardCalls = 0, fullCalls = 0
+  const server = http.createServer((req, res) => {
+    if (req.url === '/api/desktop/startup-health') { res.statusCode = 404; res.end(); return }
+    if (req.url === '/api/admin/wizard') { wizardCalls++; res.end(JSON.stringify({ initialized: true })); return }
+    assert.equal(req.url, '/api/desktop/health'); fullCalls++
+    res.statusCode = fullStatus
+    res.end(JSON.stringify({ status: 'UP', build: fullBuild }))
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => { server.closeAllConnections(); server.close() })
+  const descriptor = createBackendDescriptor(), port = server.address().port
+  assert.equal(await descriptor.startupHealth({ packaged: false }, port, 'candidate'), false)
+  assert.equal(fullCalls, 1); assert.equal(wizardCalls, 0)
+  fullStatus = 200; fullBuild = 'different'
+  assert.equal(await descriptor.startupHealth({ packaged: false }, port, 'candidate'), false)
+  assert.equal(wizardCalls, 0, 'a mismatched full-health build must not downgrade')
+  fullStatus = 404
+  assert.equal(await descriptor.startupHealth({ packaged: false }, port, 'candidate'), true)
+  assert.equal(wizardCalls, 1)
+})
+
+test('service lifecycle replacement outside supervisor recovery invalidates an in-flight health result', async () => {
+  const manager = new ServiceManager({ packaged: false })
+  manager.ports.backend = 1; manager.managed.add('backend')
+  let resolveOld
+  const oldLaunch = { process: {}, fullReady: false, splitReadiness: true, deadline: 120 }
+  const newLaunch = { process: {}, fullReady: false, splitReadiness: true, deadline: 120 }
+  manager.procs.set('backend', oldLaunch.process); manager.launches.set('backend', oldLaunch)
+  manager.healthChecks.set('backend', () => new Promise(resolve => { resolveOld = resolve }))
+  const events = []
+  const supervisor = new BackendSupervisor(manager, (health, verifiedLaunch) => events.push({ health, verifiedLaunch }), { now: () => 0 })
+  const checking = supervisor.check()
+  manager.procs.set('backend', newLaunch.process); manager.launches.set('backend', newLaunch)
+  manager.healthChecks.set('backend', async () => false)
+  resolveOld(true)
+  await checking
+  assert.equal(events.some(event => event.health.ok), false)
+  assert.equal(newLaunch.fullReady, false)
+  assert.equal(supervisor.healthySince, null)
+  await supervisor.check()
+  assert.equal(supervisor.getHealth().state, 'starting')
+  manager.healthChecks.set('backend', async () => true)
+  await supervisor.check()
+  assert.equal(events.at(-1).health.ok, true)
+  assert.equal(events.at(-1).verifiedLaunch, newLaunch)
 })
 
 test('child exit is unhealthy even if the endpoint would respond; recovery budget is bounded', async () => {

@@ -35,7 +35,7 @@
               v-for="tag in FRIEND_ROLE_TAGS"
               :key="tag"
               class="pws-form-tag"
-              :class="{ active: friendDraft.roleLabel === tag }"
+              :class="{ active: (friendDraft.roleLabel || FRIEND_ROLE_TAGS[0]) === tag }"
               @tap="friendDraft.roleLabel = tag"
             >
               <text>{{ tag }}</text>
@@ -380,19 +380,17 @@
     </template>
 
     <!-- ==================== 3. 律所管理 / 尽调报告 / 腾讯会议 / 其余动态插件 ==================== -->
-    <template v-else>
-      <view class="pws-brand-card">
-        <view class="pws-brand-glyph">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <view v-else class="pws-workspace-summary">
+      <view class="pws-workspace-nav">
+        <component :is="'button'" type="button" class="pws-workspace-link" :class="{ active: workspaceState === 'active' }" :aria-current="workspaceState === 'active' ? 'page' : undefined" @click.stop="$emit('open')">
+          <svg class="pws-workspace-glyph" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path v-for="(d, gi) in pluginGlyph" :key="gi" :d="d" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
-        </view>
-        <view class="pws-brand-info">
-          <text class="pws-brand-name">{{ plugin.label }}</text>
-          <text class="pws-brand-desc">{{ plugin.description || $t('panels.pgWorkspaceHint') }}</text>
-        </view>
+          <text class="pws-workspace-label">{{ $t('panels.workspaceNavigation') }}</text>
+          <text class="pws-workspace-state">{{ $t('panels.workspaceState.' + workspaceState) }}</text>
+          <text aria-hidden="true">›</text>
+        </component>
       </view>
-
       <scroll-view scroll-y class="pws-scroll">
         <view v-if="isLawFirmPlugin" class="lawfirm-summary-card">
           <view class="lawfirm-stat-grid">
@@ -443,14 +441,11 @@
           </view>
         </view>
 
-        <view class="pws-section">
+        <view v-if="['due-diligence', 'tencent-meeting'].includes(plugin.pluginId)" class="pws-section">
           <view class="pws-sec-bar">
-            <text class="pws-sec-label">{{ tr('panels.pwsWorkspaceAndAi', '工作区与 AI 协同') }}</text>
+            <text class="pws-sec-label">{{ $t('panels.workspaceAiActions') }}</text>
           </view>
           <view class="pws-action-stack">
-            <view class="pws-action-row primary" @tap="$emit('open')">
-              <text>{{ $t('panels.pgOpenWorkspace') }}</text>
-            </view>
             <template v-if="plugin.pluginId === 'due-diligence'">
               <view class="pws-action-row" @tap="emitAiPrompt(tr('panels.pwsDdAiCheckGapsPrompt', '请根据当前项目的尽调清单与已上传材料，核查尚缺哪些关键尽调底稿并列出补充清单。'))">
                 <text>{{ tr('panels.pwsDdAiCheckGapsBtn', 'AI 核查尽调材料缺口') }}</text>
@@ -466,8 +461,14 @@
             </template>
           </view>
         </view>
+        <view class="pws-about">
+          <component :is="'button'" type="button" class="pws-about-toggle" :aria-expanded="aboutOpen" @click.stop="aboutOpen = !aboutOpen">
+            <text>{{ $t('panels.workspaceAbout') }}</text><text aria-hidden="true">{{ aboutOpen ? '⌄' : '›' }}</text>
+          </component>
+          <text v-if="aboutOpen" class="pws-brand-desc">{{ plugin.description || $t('panels.pgWorkspaceHint') }}</text>
+        </view>
       </scroll-view>
-    </template>
+    </view>
   </view>
 </template>
 
@@ -510,11 +511,13 @@ export default {
   props: {
     plugin: { type: Object, required: true },
     projectId: { type: [String, Number], default: '' },
+    workspaceState: { type: String, default: 'closed' },
   },
   emits: ['open', 'quick-action'],
   data() {
     return {
       lawfirmOverview: null,
+      aboutOpen: false,
       searchKeyword: '',
       directoryOpen: false,
       dirExpanded: {
@@ -527,7 +530,7 @@ export default {
       friendDraft: {
         name: '',
         org: '',
-        roleLabel: '外部合作律师',
+        roleLabel: '',
       },
       // 只放真实数据：organization / firm 为 null 表示没有，界面给空态与入口
       directory: {
@@ -808,7 +811,7 @@ export default {
         const res = addImFriend(this.directory.accountKey, {
           name,
           org: this.friendDraft.org,
-          roleLabel: this.friendDraft.roleLabel,
+          roleLabel: this.friendDraft.roleLabel || this.FRIEND_ROLE_TAGS[0],
         })
         this.directory.friends = [Object.assign({ source: 'personal' }, res.added), ...this.directory.friends.filter(f => f.name !== name)]
       } catch (e) {
@@ -1619,23 +1622,6 @@ export default {
   border: 1.5px solid var(--awd-border);
 }
 
-.pws-brand-glyph {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--awd-radius-md);
-  background: var(--awd-accent-soft);
-  color: var(--awd-accent-text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.pws-brand-glyph svg {
-  width: 18px;
-  height: 18px;
-}
-
 .pws-brand-info {
   flex: 1;
   min-width: 0;
@@ -1763,4 +1749,30 @@ export default {
   color: var(--awd-text-on-accent);
   font-weight: 600;
 }
+
+/* Generic workspace navigation shares the shell's compact sidebar density. */
+.pws-workspace-summary { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.pws-workspace-nav { padding: var(--awd-panel-gap) var(--awd-panel-pad-x); }
+.pws-workspace-link, .pws-about-toggle {
+  box-sizing: border-box; width: 100%; min-width: 0; margin: 0; padding: var(--awd-panel-gap);
+  display: flex; align-items: center; gap: var(--awd-panel-gap); text-align: left;
+  border: 0; border-radius: var(--awd-panel-radius); background: transparent;
+  color: var(--awd-panel-text); font: inherit; font-size: var(--awd-panel-fs); line-height: 1.5; cursor: pointer;
+}
+.pws-workspace-link::after, .pws-about-toggle::after { border: 0; }
+.pws-workspace-link:hover, .pws-about-toggle:hover { background: var(--awd-panel-hover); }
+.pws-workspace-link.active { background: var(--awd-panel-accent-wash); }
+.pws-workspace-link:focus-visible, .pws-about-toggle:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent-text); outline-offset: var(--awd-focus-offset); }
+.pws-workspace-glyph { width: 16px; height: 16px; flex-shrink: 0; color: var(--awd-panel-text-2); }
+.pws-workspace-label { flex: 1; min-width: 0; }
+.pws-workspace-state { flex-shrink: 0; color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-meta); }
+.pws-workspace-summary .pws-section { border: 0; padding-top: var(--awd-panel-gap); }
+.pws-workspace-summary .pws-nav-item { border: 0; background: transparent; }
+.pws-workspace-summary .pws-nav-item.active { background: var(--awd-panel-accent-wash); }
+.pws-workspace-summary .pws-nav-item:hover { background: var(--awd-panel-hover); }
+.pws-workspace-summary .pws-action-row { border: 0; background: transparent; text-align: left; }
+.pws-workspace-summary .pws-action-row:hover { background: var(--awd-panel-hover); }
+.pws-about { padding: var(--awd-panel-gap) var(--awd-panel-pad-x); }
+.pws-about-toggle { justify-content: space-between; color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-meta); }
+.pws-about .pws-brand-desc { display: block; padding: var(--awd-panel-gap); overflow-wrap: anywhere; }
 </style>

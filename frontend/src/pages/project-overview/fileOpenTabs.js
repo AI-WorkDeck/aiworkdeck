@@ -229,6 +229,7 @@ export const fileOpenTabsMethods = {
       // 保留已有 id 的类型，避免数字/字符串来源差异重建编辑器实例。
       const sameFile = tab => tab.id != null && file.id != null
         && String(tab.id) === String(file.id) && (tab.tabType || '') === (file.tabType || '')
+        && (file.tabType !== 'cross-project-preview' || String(tab.projectId) === String(file.projectId))
       const preferredPane = this.splitMode ? this.focusedPane : 'left'
       const otherPane = preferredPane === 'left' ? 'right' : 'left'
       const preferredList = preferredPane === 'left' ? this.leftFiles : this.rightFiles
@@ -497,6 +498,7 @@ export const fileOpenTabsMethods = {
       // activityTracker.logAction('CLOSE_FILE', file.id, file.name, 0, meta)
 
       list.splice(idx, 1)
+      this.evictPdfKeepAlive(pane, fileId)
 
       // 如果关闭的是当前激活的文件，尝试切换到临近的文件
       if (activeId === fileId) {
@@ -576,7 +578,7 @@ export const fileOpenTabsMethods = {
     },
     isEditorOpenableFile(file) {
       // 判断是否为「文档编辑器可打开」的 Office 类文件
-      if (!file || file.tabType === 'web' || file.tabType === 'markdown' || !file.fileType) return false
+      if (!file || file.tabType === 'web' || file.tabType === 'markdown' || file.tabType === 'cross-project-preview' || !file.fileType) return false
 
       const type = file.fileType.toLowerCase()
 
@@ -671,6 +673,58 @@ export const fileOpenTabsMethods = {
             console.warn('[ProjectOverview] plain text reload failed:', e)
             ok = false
           }
+        }
+      }
+      return ok
+    },
+
+    isPdfPreviewFile(file) {
+      return !!(file && !file.tabType && !file.isFolder && String(file.fileType || '').toLowerCase() === 'pdf')
+    },
+    touchPdfKeepAlive(pane, file) {
+      if (!this.isPdfPreviewFile(file)) return
+      const prefix = pane + ':'
+      const key = prefix + file.id
+      const keys = this.pdfKeepAliveKeys || []
+      const own = [key, ...keys.filter(item => item.startsWith(prefix) && item !== key)].slice(0, 2)
+      this.pdfKeepAliveKeys = [...own, ...keys.filter(item => !item.startsWith(prefix))]
+    },
+    evictPdfKeepAlive(pane, fileId, { includeActive = true } = {}) {
+      const activeId = pane === 'left' ? this.activeFileIdLeft : this.activeFileIdRight
+      if (!includeActive && String(activeId) === String(fileId)) return
+      const key = pane + ':' + fileId
+      this.pdfKeepAliveKeys = (this.pdfKeepAliveKeys || []).filter(item => item !== key)
+    },
+    prunePdfKeepAlive() {
+      this.pdfKeepAliveKeys = (this.pdfKeepAliveKeys || []).filter(key => {
+        const pane = key.startsWith('right:') ? 'right' : 'left'
+        const files = pane === 'left' ? this.leftFiles : this.rightFiles
+        const id = key.slice(key.indexOf(':') + 1)
+        return files.some(file => this.isPdfPreviewFile(file) && String(file.id) === id)
+      })
+    },
+    resetPdfPreviewPool() {
+      this.pdfKeepAliveKeys = []
+      this.pdfPreviewEpoch = (this.pdfPreviewEpoch || 0) + 1
+      // 权限初始化也会重建查看器；把当前文件重新记入池，切走时才不会立即销毁。
+      this.touchPdfKeepAlive('left', this.activeFileLeft)
+      this.touchPdfKeepAlive('right', this.activeFileRight)
+    },
+    setPdfPreviewRef(pane, fileId, el) {
+      if (!this._pdfPreviewRefs) this._pdfPreviewRefs = {}
+      const key = pane + ':' + fileId
+      if (el) this._pdfPreviewRefs[key] = el
+      else delete this._pdfPreviewRefs[key]
+    },
+    async reloadPdfInstances(fileId, force = true) {
+      let ok = true
+      for (const [key, inst] of Object.entries(this._pdfPreviewRefs || {})) {
+        if (!inst || String(inst.file?.id) !== String(fileId)) continue
+        try {
+          if (await inst.reloadFromBackend(force) !== true) ok = false
+        } catch (e) {
+          console.warn('[ProjectOverview] PDF reload failed:', key, e)
+          ok = false
         }
       }
       return ok
@@ -1083,9 +1137,15 @@ export const fileOpenTabsMethods = {
     // 顶掉，律师只看得见最后一条、还以为只更新了一份。多文件时改为静音逐份重载、
     // 最后聚合成一句。单文件语义一个字不改（仍是原来的逐文件 toast）。
     async onVersionReloadFiles(affectedFileIds) {
+      if (this._projectVersionReload) {
+        const restored = await this._projectVersionReload()
+        const ids = Array.isArray(affectedFileIds) ? affectedFileIds : [...new Set(Object.values(this._pdfPreviewRefs || {}).map(inst => inst.file?.id).filter(id => id != null))]
+        const pdfResults = await Promise.all(ids.map(id => this.reloadPdfInstances(id)))
+        return restored && pdfResults.every(ok => ok !== false)
+      }
       // 文件树切栏后仍保留挂载，版本操作须主动刷新清单；不等待请求，避免延迟编辑器换入新内容。
       this.$refs?.fileTree?.loadFiles()
-      if (!Array.isArray(affectedFileIds) || !affectedFileIds.length) return
+      if (!Array.isArray(affectedFileIds) || !affectedFileIds.length) return true
       const idSet = new Set(affectedFileIds)
       const openIds = new Set()
       for (const f of this.leftFiles) {
@@ -1096,6 +1156,8 @@ export const fileOpenTabsMethods = {
       }
       const many = openIds.size > 1
       let ok = 0
+      let textOk = true
+      let pdfOk = true
       for (const fileId of openIds) {
         // forceActive：这条链上的每一种动作（退回/开稿/切线/采纳/放弃/丢弃）都是律师
         // 亲手点出来的，正在显示的那个实例也必须就地换文档——不然下一次 autosave 会把
@@ -1115,7 +1177,9 @@ export const fileOpenTabsMethods = {
       // 标签没有实例（v-if 单实例），下次激活挂载即拉新内容。失败时组件自己转入
       // 错误相位并封死保存，这里不再叠加提示。
       for (const fileId of idSet) {
-        await this.reloadPlainTextInstances(fileId)
+        if (await this.reloadPlainTextInstances(fileId) === false) textOk = false
+        if (await this.reloadPdfInstances?.(fileId) === false) pdfOk = false
       }
+      return ok === openIds.size && textOk && pdfOk
     },
 }

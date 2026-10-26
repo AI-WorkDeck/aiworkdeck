@@ -26,6 +26,36 @@
         <text class="welcome-lead">{{ $t('onboarding.unlock.brand.lead') }}</text>
       </view>
 
+      <view class="welcome-quick-chat">
+        <textarea
+          v-model="quickPrompt"
+          class="welcome-quick-chat-input"
+          :placeholder="$t('workbench.welcome.quickChatPlaceholder')"
+          :maxlength="-1"
+          :auto-height="true"
+          @keydown.enter.exact.prevent="submitQuickChat"
+        />
+        <view class="welcome-quick-chat-actions">
+          <view class="welcome-quick-chat-tools">
+            <view class="welcome-quick-tool" data-quick="new-docx" @tap="$emit('quick-create-doc', 'docx')">
+              <svg class="welcome-quick-tool-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path v-for="(d, gi) in ICONS.filePlus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <text>{{ $t('workbench.welcome.quickNewDocx') }}</text>
+            </view>
+            <view class="welcome-quick-tool" data-quick="new-md" @tap="$emit('quick-create-doc', 'md')">
+              <svg class="welcome-quick-tool-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path v-for="(d, gi) in ICONS.docText" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <text>{{ $t('workbench.welcome.quickNewMd') }}</text>
+            </view>
+          </view>
+          <view class="welcome-quick-send" data-quick="send" @tap="submitQuickChat">
+            <text>{{ quickPrompt.trim() ? $t('workbench.welcome.quickChatSend') : $t('workbench.welcome.enterChatMode') }}</text>
+          </view>
+        </view>
+      </view>
+
       <view class="welcome-columns">
         <view class="welcome-col welcome-col-main">
           <view class="welcome-section welcome-start">
@@ -159,9 +189,10 @@ export default {
     /** 「启动时显示欢迎页」当前值（本机记忆由宿主持有） */
     showOnStartup: { type: Boolean, default: true },
   },
-  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'open-projects-pane', 'open-client-workspace', 'update:show-on-startup'],
+  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'open-projects-pane', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc'],
   data() {
     return {
+      quickPrompt: '',
       recentProjects: [],
       recentState: 'loading', // loading | ready | error
       showCloudAccept: false,
@@ -215,6 +246,11 @@ export default {
     setGlobalOverlay(false, this._overlayHolder)
   },
   methods: {
+    submitQuickChat() {
+      const prompt = (this.quickPrompt || '').trim()
+      this.$emit('start-chat', { prompt })
+      this.quickPrompt = ''
+    },
     async loadRecent() {
       this.recentState = 'loading'
       try {
@@ -317,6 +353,114 @@ export default {
   color: var(--awd-text-2);
   line-height: 1.6;
   max-width: 560px;
+}
+
+.welcome-quick-chat {
+  margin: -8px 0 36px;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-dialog);
+  background: var(--awd-surface);
+  box-shadow: var(--awd-shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.welcome-quick-chat:focus-within {
+  border-color: var(--awd-accent);
+  box-shadow: 0 0 0 2px var(--awd-accent-soft);
+}
+
+.welcome-quick-chat-input {
+  width: 100%;
+  min-height: 44px;
+  max-height: 140px;
+  padding: 2px 0;
+  box-sizing: border-box;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: var(--awd-text);
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
+}
+
+.welcome-quick-chat :deep(.uni-textarea-wrapper),
+.welcome-quick-chat :deep(.uni-textarea-textarea),
+.welcome-quick-chat :deep(.uni-textarea-placeholder),
+.welcome-quick-chat :deep(textarea) {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: var(--awd-text);
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
+}
+
+.welcome-quick-chat :deep(.uni-textarea-placeholder) {
+  color: var(--awd-text-3);
+}
+
+.welcome-quick-chat-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--awd-border-subtle);
+}
+
+.welcome-quick-chat-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.welcome-quick-tool {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--awd-radius-sm);
+  color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.welcome-quick-tool:hover {
+  background: var(--awd-surface-2);
+  color: var(--awd-text);
+}
+
+.welcome-quick-tool-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.welcome-quick-send {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: var(--awd-radius-sm);
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
+  font-size: var(--awd-panel-fs);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.welcome-quick-send:hover {
+  background: var(--awd-accent-hover);
 }
 
 .welcome-columns {

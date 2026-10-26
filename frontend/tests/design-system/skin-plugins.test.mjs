@@ -129,3 +129,65 @@ test('setActiveSkin and setThemeMode apply and clear skin CSS variables on docum
     globalThis.uni = oldUni
   }
 })
+
+test('distributed plugin resources include every skin file and all bundled translations', () => {
+  const config = JSON.parse(read('desktop/package.json'))
+  const filters = config.build.extraResources.find(r => r.to === 'official-plugins').filter
+  const bundled = read('backend/src/main/java/com/checkba/service/ai/PluginBundledInstaller.java')
+    .match(/IDS = Set\.of\(([\s\S]*?)\);/)[1].match(/"[a-z0-9-]+"/g).map(s => JSON.parse(s))
+  const included = file => filters.some(f => f.endsWith('/**') ? file.startsWith(f.slice(0, -2)) : file === f)
+  for (const id of bundled) {
+    assert.ok(included(`${id}/manifest.json`), `${id} manifest must ship`)
+    assert.ok(included(`${id}/web/index.html`), `${id} entry must ship`)
+    assert.ok(included(`${id}/l10n/en-US.json`), `${id} translations must ship`)
+  }
+  for (const spec of OFFICIAL_SKIN_PLUGINS) {
+    assert.ok(included(spec.file.replace('official-plugins/', '')), `${spec.id} palette must ship`)
+  }
+})
+
+test('skin previews retain opaque origins and receive only the existing theme channel', () => {
+  const source = read('frontend/src/components/MarketDetailPane.vue')
+  const preview = source.match(/<iframe[\s\S]*?class="mdp-theme-preview-frame"[\s\S]*?>/)[0]
+  assert.match(preview, /sandbox="allow-scripts"/)
+  assert.doesNotMatch(preview, /allow-same-origin/)
+  assert.match(preview, /@load="pushThemePreview"/)
+  assert.match(source, /uni\.\$on\(APP_THEME_EVENT, this\.pushThemePreview\)/)
+  assert.match(source, /uni\.\$off\(APP_THEME_EVENT, this\.pushThemePreview\)/)
+  for (const { id } of OFFICIAL_SKIN_PLUGINS) {
+    const html = read(`official-plugins/${id}/web/index.html`)
+    assert.doesNotMatch(html, /parent\.document/)
+    assert.match(html, /src="\/api\/plugins\/sdk\/awd-plugin-sdk\.js"/)
+  }
+})
+
+test('appearance menu selects every skin, restores the saved choice and clears disabled skins', async () => {
+  const source = read('frontend/src/pages/project-overview/themeSwitch.js')
+    .replace(/^import[\s\S]*?from\s+'[^']+'\s*$/gm, '').replace(/export const /g, 'const ')
+  const skins = OFFICIAL_SKIN_PLUGINS.map(({ id, themeId }) => ({ pluginId: id, id: themeId }))
+  let selected = '', applied = null
+  const calls = []
+  const methods = new Function('getContributedThemes', 'selectContributedTheme', 'setActiveSkin', 'track',
+    source + '\nreturn themeSwitchMethods')(
+    async () => ({ themes: skins, selected }), async ref => { selected = ref; calls.push(ref) },
+    skin => { applied = skin }, () => {})
+  const vm = { contributedSkins: [], activeSkinRef: '', themeMenuOpen: true }
+  for (const [name, method] of Object.entries(methods)) vm[name] = method.bind(vm)
+  await vm.loadContributedSkins()
+  for (const skin of skins) {
+    const ref = `${skin.pluginId}:${skin.id}`
+    await vm.pickSkin(ref)
+    assert.equal(selected, ref)
+    assert.equal(applied.ref, ref)
+    assert.equal(vm.themeMenuOpen, false)
+    applied = null
+    await vm.loadContributedSkins()
+    assert.equal(applied.ref, ref)
+  }
+  skins.splice(0)
+  await vm.loadContributedSkins()
+  assert.equal(applied, null)
+  assert.equal(vm.activeSkinRef, '')
+  await vm.pickSkin('')
+  assert.equal(calls.at(-1), '')
+})

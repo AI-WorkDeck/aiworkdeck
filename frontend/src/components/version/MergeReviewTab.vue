@@ -16,7 +16,7 @@
   - 不进保活池，随标签页关闭即销毁。
 
   布局照 VersionCompareTab / LibreOfficeEditor 的 overlay 形制：<webview> 宿主容器
-  **始终**渲染，状态卡片盖在它上面——放进 v-show 里 Electron 的 <webview> 在隐藏
+  **始终**渲染，就绪前仅设 opacity:0，状态卡片盖在它上面——放进 v-show 里 Electron 的 <webview> 在隐藏
   子树中常常不 attach，dom-ready 永远不来。
 -->
 <template>
@@ -38,7 +38,7 @@
 
     <view class="mrt-body">
       <view class="mrt-canvas">
-        <view :id="hostId" class="mrt-host"></view>
+        <view :id="hostId" class="mrt-host" :style="{ opacity: ready ? 1 : 0 }"></view>
         <view v-show="!ready" class="mrt-status">
           <text>{{ statusText }}</text>
         </view>

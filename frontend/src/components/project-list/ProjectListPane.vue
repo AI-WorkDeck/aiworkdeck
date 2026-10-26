@@ -345,7 +345,7 @@ export default {
       userInfo: {
         id: null,
         username: '',
-        displayName: '用户',
+        displayName: this.$t ? this.$t('workbench.defaultUserName') : '用户',
         avatarUrl: null,
       },
       projects: [],

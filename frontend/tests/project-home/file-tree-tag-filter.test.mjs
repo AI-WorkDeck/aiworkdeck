@@ -172,3 +172,38 @@ test('adding a tag after a global deletion uses the latest file tags rather than
   assert.deepEqual(vm.allFiles[2].tags.map(tag => tag.id), [8])
   assert.deepEqual(oldFile.tags.map(tag => tag.id), [8])
 })
+
+
+test('sidebar tag entry starts filtering directly; clear and back restore folders while all-tagged remains distinct', () => {
+  const { vm } = setup()
+  vm.setTagFilter([7])
+  assert.equal(vm.isTagView, true)
+  assert.deepEqual(ids(vm), [3, 4])
+  vm.setTagFilter([])
+  assert.equal(vm.isTagView, false)
+  assert.deepEqual(ids(vm), [1, 5, 6])
+  vm.showAllTaggedFiles()
+  assert.equal(vm.isTagView, true)
+  assert.deepEqual(ids(vm), [3, 4, 5])
+  vm.setTagFilter([7])
+  vm.setTagView(false)
+  assert.deepEqual(vm.selectedTagIds, [])
+  assert.deepEqual(ids(vm), [1, 5, 6])
+})
+
+test('tag browsing shows results from the top and restores the folder scroll position on return', () => {
+  const { vm } = setup()
+  const container = { scrollTop: 640 }
+  vm.$el = { querySelector: () => container }
+  vm.$nextTick = callback => callback()
+  vm.setTagFilter([7])
+  assert.equal(container.scrollTop, 0)
+  container.scrollTop = 180
+  vm.setTagFilter([7, 8])
+  assert.equal(container.scrollTop, 0, 'changing an active filter shows its first result')
+  vm.setTagFilter([])
+  assert.equal(container.scrollTop, 640, 'clearing restores the directory position before the visit')
+  container.scrollTop = 320
+  vm.setTagFilter([])
+  assert.equal(container.scrollTop, 320, 'background cleanup outside tag browsing must not move the directory')
+})

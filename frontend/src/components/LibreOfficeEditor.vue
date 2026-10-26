@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <view class="libre-editor-wrapper" :class="{ 'evidence-drop-armed': evidenceDropArmed }">
-    <!-- 保存状态沿用版本身份细栏，保持固定位置；加载与其它错误仍走原有浮层。 -->
+    <!-- 文件保存状态保持固定位置；加载与其它错误仍走原有浮层。 -->
     <!-- 加载进度面板：引擎启动 + 文档下载/打开是感知最慢的一段（尤其大文档），
          把过程阶段化展示出来（用户反馈：不能更快，也要看得见进展）。 -->
     <view v-if="loadingOverlayVisible" class="libre-loading">
@@ -84,34 +84,34 @@
       @toggle-semantic-writing="toggleSemanticWriting"
       @toggle-writing-assistance="toggleWritingAssistance"
       @changed="onDocModified"
-      @ui-state="$emit('menu-state')"
+      @ui-state="onToolbarState"
       @focus-editor="focusEditor"
       @ai-format="onToolbarAiFormat"
     />
-    <!-- 版本身份小条（dev-board#632 起有它，#672 复测改成文件级）：说这份**文件**
-         最近一次有名字的版本，磁盘内容领先版本记录时说「已保存，尚未存为版本」。
-         点一下跳到提交历史并高亮那一行。
-         为什么不再逐段跟光标：律师在这里要读的是「我现在看的这份文件存进版本记录了
-         吗、是哪一版」，而光标随便一动那句话就换个名字、落进表格还整条消失。
-         逐段归属一个字没动，仍在审阅面板的「溯源」标签里（设计稿 §5.5）。 -->
-    <view v-if="saveStateText || provenanceBarVisible" class="libre-prov-bar">
-      <text
-        v-if="provenanceBarVisible"
-        class="libre-prov-text"
-        :class="{ clickable: !!provSha }"
-        @tap="openProvenanceHistory"
-      >{{ provText }}</text>
+    <!-- 文件保存状态只反映当前编辑内容是否落盘；版本提交与同步在全局面板管理。 -->
+    <view v-if="saveStateText" class="libre-save-bar">
       <view v-if="saveStateText" class="libre-save-state" :class="{ error: isError && !saving }" role="status">
         <text class="libre-save-label" :title="saveStateText">{{ saveStateText }}</text>
         <text v-if="(statusKey === 'saveFailed' || statusKey === 'movedSaveFailed') && !saving" class="libre-save-retry" @tap="retrySave">{{ $t('editor.retrySave') }}</text>
         <text v-if="statusKey === 'movedSaveFailed' && !saving" class="libre-save-retry" @tap="saveCopyAs">{{ $t('editor.saveCopyAs') }}</text>
       </view>
     </view>
+    <view v-if="inputError" class="libre-input-error" role="alert">
+      <text>{{ inputError }}</text>
+      <button type="button" :aria-label="$t('common.close')" @click="inputError = ''">×</button>
+    </view>
     <!-- review-overview-open：审阅概览现在浮在画布右侧（不挤宽画布），画布上的
          宿主浮层据此让出面板宽度，见样式 .libre-review-overview 之后那一段。 -->
     <view class="libre-body" :class="{ 'review-overview-open': reviewOverviewShown, 'review-en': reviewPanelEn }">
       <!-- 浮层必须钉在**画布**上而不是整个编辑器上：审阅面板是并排挤宽的，钉在
            外层右上角会正好压住面板的「修订/批注」标题行（真机截图实证）。 -->
+      <OfficeNavigation
+        v-if="ready && file && !loadingOverlayVisible && docKind === 'impress'"
+        :key="'slides-' + file.id" :executor="executor" kind="impress"
+        :refresh-key="uiRefreshKey" :content-key="navigationContentKey" :active="active"
+        :current-item="navigationCurrentItem" :structure-key="navigationStructureKey" :can-background-work="canRunNavigationWork"
+        @navigate="onOfficeNavigate"
+      />
       <view class="libre-canvas-wrap">
         <view :id="hostId" class="libre-host"></view>
         <!-- 改字 stale 提示条：绝对定位叠在画布顶部，非阻塞；不依赖审阅面板开着 -->
@@ -170,6 +170,13 @@
         @inline-review="onInlineReviewAction"
       />
     </view>
+    <OfficeNavigation
+      v-if="ready && file && !loadingOverlayVisible && docKind === 'calc'"
+      :key="'sheets-' + file.id" :executor="executor" kind="calc"
+      :refresh-key="uiRefreshKey" :content-key="navigationContentKey" :active="active"
+        :current-item="navigationCurrentItem" :structure-key="navigationStructureKey" :can-background-work="canRunNavigationWork" :writable="canWrite"
+      @navigate="onOfficeNavigate" @add-sheet="$refs.toolbar && $refs.toolbar.addCalcSheet()"
+    />
   </view>
 </template>
 
@@ -190,6 +197,7 @@ import { webviewTransport, iframeTransport } from '@/composables/useZetaOfficeWe
 import { createRelayExecutor, PROBE_ACTION, PROBE_BUDGET_MS } from '@/composables/zetaOfficeRelay.js'
 import { classifyLoadFailure, shouldSelfHealLoadFailure, loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED } from '@/utils/editorLoadFailure.js'
 import ReviewPanel from '@/components/ReviewPanel.vue'
+import OfficeNavigation from '@/components/OfficeNavigation.vue'
 import EditorToolbar from '@/components/EditorToolbar.vue'
 import EvidenceStaleBar from '@/components/EvidenceStaleBar.vue'
 import { getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
@@ -214,7 +222,9 @@ import { createSemanticWritingHost } from '@/composables/semanticWritingHost.js'
 import { getSemanticWritingSettings, saveSemanticWritingSettings, createSemanticWritingSuggestion, getSemanticWritingSuggestion, cancelSemanticWritingSuggestion, acceptSemanticWritingSuggestion } from '@/services/api.js'
 import { getProvenance, reviewDocInsight, listWritingCompletions, learnWritingCompletions, deleteWritingCompletion, clearWritingCompletions, lookupWritingSelection, getDocInsightEntity, getWritingCompletionDetail } from '@/services/api.js'
 import { guestPointToHost } from '@/utils/insightPopup.js'
-import { alignProvenance, fileVersionBar, provenanceSummary } from '@/utils/provenanceAlign.js'
+import { alignProvenance, provenanceSummary } from '@/utils/provenanceAlign.js'
+import { localContentUrl, localContentCapability, observeLocalContentBackend, downloadLocalContent, createLocalContentSave, saveLocalContent, cancelLocalContent } from '@/utils/localContentProtocol.js'
+import { resolveDocumentSaveOperation } from '@/utils/checkpointSaveBarrier.js'
 
 let seq = 0
 
@@ -240,7 +250,7 @@ function currentAuthorName() { return authorNames().current() }
 
 export default {
   name: 'LibreOfficeEditor',
-  components: { ReviewPanel, EditorToolbar, EvidenceStaleBar },
+  components: { OfficeNavigation, ReviewPanel, EditorToolbar, EvidenceStaleBar },
   // command-progress：批量命令（find_replace >50 命中 / apply_house_style）的
   // 「第 x/y 处」进度，{reqId, done, total}；reqId 可用 executeCommand('cancel', {reqId}) 喊停。
   // open-insight：行内写作提示 → 宿主打开「依据」窗格；不自动调用 AI 或外部库。
@@ -305,6 +315,10 @@ export default {
       // 没有轮询：编辑器页把 worker 的选区监听与 IME 覆盖层的光标移动合流成
       // 一个 selection 事件送过来，覆盖了用户能让光标动起来的所有途径。
       uiRefreshKey: 0,
+      navigationCurrentItem: null,
+      navigationStructureKey: 0,
+      inputError: '',
+      navigationContentKey: 0,
       // 状态用 key 存（editor.status.* 命名空间），显示时经 $t 取文案；
       // isError/displayStatus 与「安静保存」的自比较全部按 key 判断，
       // zh 渲染结果与判定行为都与迁移前逐字节一致。
@@ -316,6 +330,8 @@ export default {
       backendHealthState: null,
       backendHealthRecoverySeq: 0,
       backendFailedUpload: null,
+      versionSaveBusy: false,
+      localSaveReason: null,
       // Autosave: set by the worker's modify signal, cleared when a save starts;
       // read by the host (closeFile / evict) to know if a flush is needed.
       dirty: false,
@@ -345,7 +361,7 @@ export default {
       staleItems: [],
       // 逐段溯源（dev-board#632）。provUnits 是后端按历史算好的「每个单元最后是哪一版
       // 改的」，provRows 是它对到画布此刻段序之后的结果（对齐在 utils/provenanceAlign.js）。
-      // 这两样只喂**侧栏「溯源」标签**；顶上那条小条是文件级的，见下面 provFileVersion。
+      // 这两样只喂侧栏「溯源」标签，不参与文件保存状态。
       // 没开版本记录 / 老服务端 / 拉失败时 provLoaded 恒为 false，侧栏标签整个不出现——
       // 溯源是锦上添花，不该在编辑器里弹错。
       provLoaded: false,
@@ -353,15 +369,16 @@ export default {
       provUnits: [],
       provTruncated: false,
       provRows: [],
-      // 顶上那条版本身份小条的三个入参（#672 复测改成文件级，见 utils/provenanceAlign
-      // 的 fileVersionBar）：版本记录开没开、这份文件磁盘上是不是领先版本记录、
-      // 它最近一次有名字的版本是哪一版。都由后端一次算好随 provenance 回来。
-      provVersioned: false,
-      provDirty: false,
-      provFileVersion: null,
     }
   },
   computed: {
+    localContentSaveText() {
+      if (!this.statusKey.endsWith('Failed')) return ''
+      if (this.localSaveReason === 'OPERATION_CANCELLED') return this.$t('editor.status.contentSaveReloadRequired')
+      if (this.localSaveReason === 'CONTENT_CONFLICT') return this.$t('editor.status.contentSaveConflict')
+      if (this.localSaveReason === 'VERSION_BUSY') return this.$t('editor.status.localVersionSaveBusy')
+      return ''
+    },
     isError() {
       return this.statusKey.endsWith('Failed')
     },
@@ -369,6 +386,8 @@ export default {
     // 状态串（就绪/加载文档中/失败）判定——statusKey 化后保留这个只读
     // 别名，zh 语言下取值与迁移前逐字节一致。改名/删除前先改该套件。
     statusText() {
+      if (this.localContentSaveText) return this.localContentSaveText
+      if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       return this.$t('editor.status.' + this.statusKey)
     },
     // Calc/Impress 都没有修订（redline）机制——审阅面板对它们没有数据可展示。
@@ -391,6 +410,8 @@ export default {
     saveStateText() {
       if (!this.ready || !this.file || this.loadingOverlayVisible || this.docLoadFailed) return ''
       if (this.saving) return this.$t('editor.status.saving')
+      if (this.localContentSaveText) return this.localContentSaveText
+      if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       if (this.statusKey === 'saveFailed' && this.backendSaveRetryReady()) return this.$t('workbench.backendHealth.saveRetryReady')
       if (this.statusKey === 'saveFailed' || this.statusKey === 'movedSaveFailed') return this.$t('editor.status.' + this.statusKey)
       if (this.statusKey !== 'ready') return ''
@@ -399,29 +420,12 @@ export default {
     },
     displayStatus() {
       if (this.saveStateText) return ''
+      if (this.localContentSaveText) return this.localContentSaveText
+      if (this.statusKey === 'saveFailed' && this.versionSaveBusy) return this.$t('editor.status.versionSaveBusy')
       return this.statusKey === 'ready' ? '' : this.$t('editor.status.' + this.statusKey)
     },
     bootStageText() {
       return this.$t('editor.boot.' + this.bootStageKey)
-    },
-    // ---- 版本身份小条（文件级）与逐段溯源侧栏 ----
-    // 三态（不出现 / 已保存尚未存为版本 / 作者·日期·版本标题）全在纯函数里，
-    // 免得同一套判定在模板、computed、测试里各写一遍走散。
-    provenanceBar() {
-      return fileVersionBar((k, p) => this.$t(k, p), {
-        versioned: this.provVersioned,
-        dirty: this.provDirty,
-        fileVersion: this.provFileVersion,
-      })
-    },
-    provenanceBarVisible() {
-      return !!(this.ready && this.file && !this.loadingOverlayVisible && this.provenanceBar.visible)
-    },
-    provText() {
-      return this.provenanceBar.text
-    },
-    provSha() {
-      return this.provenanceBar.sha
     },
     // 侧栏「溯源」标签的数据。null = 这份文件没有溯源可看，标签整个不出现。
     provenanceForPanel() {
@@ -497,7 +501,7 @@ export default {
     // 退到后台的实例停掉即时审校；切回来若正文已变就补一轮（dev-board#724）。
     active(v) { this._inlineReviewHost?.setActive(!!v); this._writingHost?.setActive(!!v) },
     docKind() { this.$emit('menu-state'); this.initWritingAssistance() },
-    canWrite() { this.initWritingAssistance() },
+    canWrite() { this.syncNativeWritePermission(); this.initWritingAssistance() },
     // 宿主 openFile(file, {locator}) 把定位符挂在 tab 对象上；已打开的标签再次被
     // 链接点中时是原地换对象，靠这个路径 watch 触发。
     'file.pendingLocator'(loc) { if (loc) this.consumeLocator() },
@@ -545,14 +549,16 @@ export default {
       if (this.file) this.prefetchBytes()
       this.startBootTrickle()
       // { kind:'webview', url, preload, partition } | { kind:'iframe', url }
-      const info = await api.getEditor()
-      this.mountEditor(info)
+      const info = await api.getEditor({ name: this.file?.name || this.file?.fileName, size: this.file?.fileSize, readOnly: !this.canWrite, empty: !this.file?.fileSize })
+      await this.mountEditor(info)
     } catch (e) {
       this.statusKey = 'initFailed'
       this.appendLog('init failed: ' + (e && e.message ? e.message : e))
     }
   },
   beforeUnmount() {
+    this._nativeSurface?.dispose()?.catch(error => this.appendLog('native close failed: ' + error.message))
+    this._nativeSurface = null
     this._backendHealthDisposed = true
     this._backendHealthUnsubscribe?.()
     this._backendHealthUnsubscribe = null
@@ -613,11 +619,14 @@ export default {
       if (snapshot.state === 'healthy' && snapshot.ok === true && ['degraded', 'restarting', 'failed'].includes(this.backendHealthState?.state)) {
         this.backendHealthRecoverySeq = (this.backendHealthRecoverySeq || 0) + 1
       }
+      observeLocalContentBackend(snapshot)
       this.backendHealthState = snapshot
       // 只更新提示。上传结果不明时即使服务恢复，也不能擅自把旧稿再次写回。
     },
     invalidateBackendSaveHint() {
       this.backendFailedUpload = null
+      this.versionSaveBusy = false
+      this.localSaveReason = null
       this._backendSaveContext = (this._backendSaveContext || 0) + 1
     },
     backendSaveRetryReady() {
@@ -860,6 +869,7 @@ export default {
     // 客体窗口拿回焦点且页内无焦点时，IME 覆盖层会接住键盘（zetaOfficeImeOverlay onWindowFocus），
     // Cmd+Z 由覆盖层转成引擎的 undo。
     focusEditor() {
+      if (this._nativeSurface) { this._nativeSurface.focus(); return }
       try { if (this.webviewEl && this.webviewEl.focus) this.webviewEl.focus() } catch (e) { /* ignore */ }
     },
     // 段落面板「交给 AI 调整格式」：拼一句带文件名与需求的话，交给工作台发进 AI 对话
@@ -1123,6 +1133,9 @@ export default {
     // 引擎重启：拆掉 boot 失败的那个 webview/iframe，重新走一遍 mounted 里的
     // 建元素流程。文档字节的预取结果仍然有效（失败的是引擎不是下载），留着。
     async remountEditor() {
+      const native = this._nativeSurface
+      this._nativeSurface = null
+      const nativeClosed = native?.dispose()
       if (this._writingHost) { this._writingHost.destroy(); this._writingHost = null }
       if (this._inlineReviewHost) { this._inlineReviewHost.destroy(); this._inlineReviewHost = null }
       this.inlineReviewState = null
@@ -1153,8 +1166,9 @@ export default {
       this._stageChangedAt = Date.now()
       this.startBootTrickle()
       try {
-        const info = await host.zetaoffice.getEditor()
-        this.mountEditor(info)
+        await nativeClosed
+        const info = await host.zetaoffice.getEditor({ name: this.file?.name || this.file?.fileName, size: this.file?.fileSize, readOnly: !this.canWrite, empty: !this.file?.fileSize })
+        await this.mountEditor(info)
       } catch (e) {
         this.statusKey = 'initFailed'
         this.appendLog('init failed: ' + (e && e.message ? e.message : e))
@@ -1191,13 +1205,48 @@ export default {
       console.log('[libre-editor]', m)
       this.log = (this.log + m + '\n').split('\n').slice(-200).join('\n')
     },
+    async syncNativeWritePermission() {
+      const surface = this._nativeSurface
+      if (!surface) return
+      const request = this._nativePermissionSync = (this._nativePermissionSync || 0) + 1
+      try {
+        // setReadOnly closes its input latch synchronously, even while the
+        // native model is still loading; a grant waits for a fresh view receipt.
+        await surface.setReadOnly(this.canWrite !== true)
+      } catch (error) {
+        if (surface === this._nativeSurface && request === this._nativePermissionSync) {
+          this.appendLog('native permission update failed: ' + (error.message || String(error)))
+        }
+      }
+    },
     // 按宿主给出的容器类型挂编辑器：桌面壳是 Electron <webview>（隔离分区 +
     // preload），Web 服务器版是同源 <iframe>。两者之外的一切——relay 协议、
     // executor 契约、worker、自动保存链路——完全共用。
-    mountEditor(info) {
+    async mountEditor(info) {
       const mountEl = document.getElementById(this.hostId)
       this._initialDocument = this.file?.fileSize > 0
+      if (info.kind === 'native' && (!mountEl || this._backendHealthDisposed)) {
+        await host.zetaoffice.nativeClose(info.sessionId)
+        return
+      }
       if (!mountEl) { this.appendLog('host element missing'); return }
+      if (info.kind === 'native') {
+        let createNativeOfficeSurface
+        try { ({ createNativeOfficeSurface } = await import('@/composables/nativeOfficeSurface.js')) }
+        catch (error) { await host.zetaoffice.nativeClose(info.sessionId); throw error }
+        if (this._backendHealthDisposed) { await host.zetaoffice.nativeClose(info.sessionId); return }
+        const surface = createNativeOfficeSurface({ api: host.zetaoffice, info })
+        this._nativeSurface = surface
+        this.syncNativeWritePermission()
+        surface.element.style.width = '100%'
+        surface.element.style.height = '100%'
+        mountEl.appendChild(surface.element)
+        this.webviewEl = surface.element
+        this.subscribeHostEvents(surface.transport)
+        this.wireExecutor(surface.transport, 'native editor mounted')
+        surface.start()
+        return
+      }
       // 深浅主题初值随 URL 进客体页（editor.html 据此防白闪）；后续切换走
       // pushTheme 的 lo-relay 推送
       try {
@@ -1292,8 +1341,22 @@ export default {
         } else if (msg.type === 'open-url' && msg.url) {
           this.$emit('open-url', { url: String(msg.url), target: msg.target || null,
             fileId: this.file && this.file.id, meta: this.withHostPoint(msg.meta) })
+        } else if (msg.type === 'save-request') {
+          this.saveDocument()
+        } else if (msg.type === 'review-changed' && this._nativeSurface) {
+          const owner = this._nativeSurface
+          clearTimeout(this._reviewRefreshTimer)
+          this._reviewRefreshTimer = setTimeout(() => {
+            if (this._nativeSurface === owner && this.reviewOpen) this.reviewRefreshKey++
+          }, 1000)
+        } else if (msg.type === 'interaction') {
+          this._lastInteractionAt = Date.now()
+        } else if (msg.type === 'input-error') {
+          this.inputError = String(msg.message || '')
         } else if (msg.type === 'modified') {
           this.onDocModified()
+        } else if (msg.type === 'save-snapshot') {
+          this.onSaveSnapshot(msg)
         } else if (msg.type === 'comment-request') {
           this.onCommentRequest(msg)
         } else if (msg.type === 'export-pdf-request') {
@@ -1348,7 +1411,7 @@ export default {
         this._lastCmdAt = 0
         const innerExec = this.executor.executeCommand.bind(this.executor)
         this.executor.executeCommand = async (action, params, callOpts) => {
-          if (action === 'export_document' || (callOpts && callOpts.background)) return innerExec(action, params, callOpts) // 保存自身与后台只读溯源不算「活跃编辑」
+          if (action === 'export_document' || ['get_ui_state', 'office_get_navigation', 'slide_get_thumbnail', 'list_fonts', 'list_styles'].includes(action) || (callOpts && callOpts.background)) return innerExec(action, params, callOpts) // 保存自身与后台只读溯源不算「活跃编辑」
           this._cmdBusy++
           this._lastCmdAt = Date.now()
           try { return await innerExec(action, params, callOpts) }
@@ -1610,7 +1673,7 @@ export default {
       this._previewSkippedForWarmEngine = false
       const t0 = Date.now()
       this._checkpointGeneration = documentCheckpointGeneration(this.projectId, fileId)
-      this._bytesPromise = this.fetchArrayBuffer(getFileBytesUrl(fileId), (loaded, total) => {
+      this._bytesPromise = this.fetchDocumentBytes(getFileBytesUrl(fileId), (loaded, total) => {
         this.dlLoaded = loaded
         this.dlTotal = total
       })
@@ -1745,13 +1808,13 @@ export default {
       let buf = this._bytesPromise ? await this._bytesPromise : null
       if (!buf) {
         try {
-          buf = await this.fetchArrayBuffer(url)
+          buf = await this.fetchDocumentBytes(url)
         } catch (e) {
           // 下载失败自动重试一次（弱网/瞬时超时很常见），仍失败就让异常照常
           // 抛出——finishDocLoad 的 catch 会置 docLoadFailed + statusKey='loadFailed'，
           // 走既有的失败可见路径，不静默卡住。
           this.appendLog('下载失败，重试一次 / download failed, retrying once: ' + (e && e.message ? e.message : e))
-          buf = await this.fetchArrayBuffer(url)
+          buf = await this.fetchDocumentBytes(url)
         }
       }
       assertCurrentGeneration()
@@ -1781,6 +1844,7 @@ export default {
           this.appendLog('修订署名下发失败 / redline author push failed: ' + (e && e.message ? e.message : e))
         }
         assertCurrentGeneration()
+        this._localContentMetadata = this._contentSnapshots?.get(buf) || null
         this._checkpointGeneration = generation
         this._checkpointInvalidated = false
         return false
@@ -1811,6 +1875,7 @@ export default {
       this.appendLog('  ← ' + (Date.now() - t0) + 'ms ' + JSON.stringify(res))
       if (!res || !res.success) throw Object.assign(new Error((res && res.message) || 'load_document returned no success'), { code: res?.code })
       assertCurrentGeneration()
+      this._localContentMetadata = this._contentSnapshots?.get(buf) || null
       this._checkpointGeneration = generation
       this._checkpointInvalidated = false
       if (res.kind) this.docKind = res.kind
@@ -1836,7 +1901,7 @@ export default {
     // Checkpoint restore pauses saves BEFORE the backend overwrites storage. Waiting
     // only after that overwrite cannot stop an already-uploading old document.
     async prepareCheckpointRestore(restoreId) {
-      if (!this.file || !this.executor || !this.ready || this.docLoadFailed || this._reloading || this._loadInFlight) return false
+      if (!this.file || !this.executor || !this.ready || this.docLoadFailed || this._reloading || this._pendingReload || this._loadInFlight) return false
       const fileId = this.file.id, executor = this.executor
       this._checkpointRestoreId = restoreId
       this._docLoadSeq = (this._docLoadSeq || 0) + 1
@@ -1875,7 +1940,6 @@ export default {
       this.dirty = false
     },
     async reloadFromBackend(checkpointRestoreId) {
-      this.invalidateBackendSaveHint()
       const restoreOwner = checkpointRestoreId || null
       const ownsReload = () => (this._checkpointRestoreId || null) === restoreOwner
       if (!ownsReload()) return false
@@ -1893,6 +1957,38 @@ export default {
         this.appendLog('reload skipped: 编辑器未就绪')
         return false
       }
+      if (this._pendingReload) return false
+      const pendingReload = this._pendingReload = {}
+      const fileId = this.file.id, projectId = this.projectId, executor = this.executor
+      const current = () => this._pendingReload === pendingReload && ownsReload() &&
+        this.file?.id === fileId && this.projectId === projectId && this.executor === executor && !this._backendHealthDisposed && !this._saveDiscarded
+      clearTimeout(this._saveTimer)
+      this._saveTimer = null
+      try {
+        // Keep the current model and dirty inputs until the server durably fences any old PUT.
+        // This gate prevents new exports without suppressing modified events while cancellation waits.
+        while (this.saving && current()) await new Promise(resolve => setTimeout(resolve, 100))
+        if (!current()) return false
+        const pending = this._localContentPending
+        if (pending) {
+          await cancelLocalContent(pending, { headers: getAuthHeaders() || {} })
+          resolveDocumentSaveOperation(pending.projectId, pending.fileId, pending.operationId)
+          if (this._localContentPending === pending) this._localContentPending = null
+        }
+        if (!current()) return false
+      } catch (e) {
+        if (current()) {
+          this.dirty = true
+          this._savePaused = true
+          this.localSaveReason = e?.reason || null
+          this.statusKey = 'saveFailed'
+          this.appendLog('reload blocked: previous save is unconfirmed: ' + (e?.message || e))
+        }
+        return false
+      } finally {
+        if (this._pendingReload === pendingReload) this._pendingReload = null
+      }
+      this.invalidateBackendSaveHint()
       // 清脏 + 等在途保存都拦不住「已经启动、正在 export/upload 路上」的那一笔：
       // 它读的是换文档之前的 worker 内容，等它 upload 完成就把退回结果覆盖回旧字节。
       // saving 标志只在 saveDocument 内部为真，await 它结束之后新的 modified 又能
@@ -1929,6 +2025,7 @@ export default {
         // 换完再清一次脏（retarget 里设 RecordChanges 会触发一次 modified）。
         this.docLoadFailed = false
         this._checkpointInvalidated = false
+        this._savePaused = false
         cancelAutoSave()
         // 它还把 LO 原生那套 chrome（菜单栏 / 工具栏 / 状态栏 / 标尺）重新拉了出来，
         // 而自建工具栏的 bootstrap 只在 executor 变化时跑——正常打开那条路藏过一次，
@@ -1964,6 +2061,19 @@ export default {
     },
     // Authed binary fetch — same XHR auth pattern as FilePreview.fetchAuthedBlob,
     // but ArrayBuffer (the bytes we relay into the worker).
+    async fetchDocumentBytes(url, onProgress) {
+      const fileId = this.file?.id, projectId = this.projectId
+      const protocolUrl = this.file?.fileSize > 0 ? localContentUrl(url, projectId, fileId) : null
+      if (protocolUrl && await localContentCapability(protocolUrl, { headers: getAuthHeaders() || {} })) {
+        const result = await downloadLocalContent({ url: protocolUrl, headers: getAuthHeaders() || {}, onProgress })
+        // Prefetch can outlive the engine's load sequence. Keep the stamp with its exact bytes,
+        // then bind both to the model only after that load succeeds.
+        if (!this._contentSnapshots) this._contentSnapshots = new WeakMap()
+        this._contentSnapshots.set(result.bytes, result.metadata)
+        return result.bytes
+      }
+      return this.fetchArrayBuffer(url, onProgress)
+    },
     fetchArrayBuffer(url, onProgress) {
       return new Promise((resolve, reject) => {
         const headers = getAuthHeaders() || {}
@@ -2120,6 +2230,9 @@ export default {
       if (!this.file) return
       const fid = payload && payload.fileId
       if (fid != null && String(fid) !== String(this.file.id)) return
+      this.navigationStructureKey++
+      this.navigationContentKey++
+      this.uiRefreshKey++
       // 这里只接 AI 写入完成通知，不接人工补全的 modified，避免关闭它自己的资料提示。
       if (this._transportSend) this._transportSend({ __lo: 'lo-relay', type: 'writing-invalidate' })
       if (this.reviewOpen) {
@@ -2128,12 +2241,27 @@ export default {
         this.reviewRefreshKey++
       }
     },
+    onToolbarState(state) {
+      if (state?.success && state.calc) this.navigationCurrentItem = { activeId: state.calc.sheetName, itemCount: state.calc.sheetCount }
+      else if (state?.success && state.impress) this.navigationCurrentItem = { activeId: state.impress.slideNumber, itemCount: state.impress.slideCount }
+      this.$emit('menu-state')
+    },
+    canRunNavigationWork() {
+      return this.active && this.ready && !this.dirty && !this.saving && !this._reloading
+        && !this._cmdBusy && Date.now() - (this._lastInteractionAt || 0) >= 700
+    },
+    onOfficeNavigate() {
+      this.uiRefreshKey++
+      this.$emit('menu-state')
+    },
     onDocModified() {
       // docLoadFailed：画布上是空白 boot 文档，标脏会引发空文档覆盖真文件
       if (!this.ready || !this.file || this.docLoadFailed || this._checkpointInvalidated) return
       // 重载窗口期（版本退回 / 检查点恢复正在换文档）里的 modified 一律丢弃：
       // 它描述的是即将被替换掉的旧文档，标脏只会让 autosave 把旧内容传回去。
       if (this._reloading || this._saveDiscarded) return
+      this._lastInteractionAt = Date.now()
+      this.navigationContentKey++
       this.dirty = true
       this._writingHost?.modified()
       this._inlineReviewHost?.modified()
@@ -2152,13 +2280,13 @@ export default {
     },
     scheduleAutoSave() {
       clearTimeout(this._saveTimer)
-      if (this._savePaused || this._saveDiscarded || this._flushPromise) return
+      if (this._savePaused || this._saveDiscarded || this._flushPromise || this._pendingReload) return
       const elapsed = Date.now() - this._dirtySince
       const delay = Math.max(200, Math.min(2500, 15000 - elapsed))
       this._saveTimer = setTimeout(() => this.autoSave(), delay)
     },
     async autoSave() {
-      if (!this.dirty || this._savePaused || this._saveDiscarded || this._flushPromise) return
+      if (!this.dirty || this._savePaused || this._saveDiscarded || this._flushPromise || this._pendingReload) return
       if (this.saving) { this.scheduleAutoSave(); return } // a save is in flight — retry after it
       // 假死根因修复：export_document 是全文档同步序列化，跑在 office 线程上会把
       // Qt 事件循环（滚动/输入/重绘）整段冻住。AI 修订风暴期间 modify 不断，旧的
@@ -2166,7 +2294,7 @@ export default {
       // 改为：命令在飞或刚结束（<1.5s）时让路、等空闲窗口再导出；只有脏数据
       // 超过 60s 才强制保存（崩溃丢失上限从 15s 放宽到 60s，换取修订期不冻结）。
       const dirtyAge = this._dirtySince ? Date.now() - this._dirtySince : 0
-      const sinceCmd = Date.now() - (this._lastCmdAt || 0)
+      const sinceCmd = Date.now() - Math.max(this._lastCmdAt || 0, this._lastInteractionAt || 0)
       if ((this._cmdBusy > 0 || sinceCmd < 1500) && dirtyAge < 60000) {
         clearTimeout(this._saveTimer)
         this._saveTimer = setTimeout(() => this.autoSave(), 2000)
@@ -2174,7 +2302,7 @@ export default {
       }
       this.dirty = false
       this._dirtySince = 0
-      const ok = await this.saveDocument()
+      const ok = await this.saveDocument({ trackSnapshot: true })
       if (!ok && !this._saveDiscarded) {
         // 引擎超时只代表宿主停止等待，后台可能仍在导出。暂停自动重试，
         // 否则每 15 秒再排一笔，文档永远在「保存中 / 保存失败」间循环。
@@ -2198,6 +2326,7 @@ export default {
     },
     // Flush before unmount. 关闭方可给等待预算；超时返回 false，不自动丢文档。
     async flushSave({ timeoutMs } = {}) {
+      if (this._pendingReload) return false
       clearTimeout(this._saveTimer)
       if (!this._flushPromise) {
         this._flushPromise = (async () => {
@@ -2208,7 +2337,7 @@ export default {
           if (this.dirty) {
             this.dirty = false
             this._dirtySince = 0
-            const ok = await this.saveDocument()
+            const ok = await this.saveDocument({ trackSnapshot: true })
             if (!ok && !this._saveDiscarded) { this.dirty = true; this._savePaused = true }
             return ok && !this.dirty
           }
@@ -2230,7 +2359,7 @@ export default {
     },
     // ================= 逐段溯源（dev-board#632） =================
     // 数据流：后端按历史算好「每个单元最后是哪一版改的」→ 这里对到画布此刻的段序
-    // → 光标条与侧栏「溯源」标签。对齐必须做：后端的段序是**落版那一刻**的，律师
+    // → 侧栏「溯源」标签。对齐必须做：后端的段序是**落版那一刻**的，律师
     // 手上还没保存的插入/删除会把它推着漂，按 key 硬对会把名字贴到邻段头上。
 
     /** 只读命令的薄封装：溯源整条是锦上添花，任何失败都只让它静默，不打扰编辑。 */
@@ -2251,11 +2380,6 @@ export default {
         const res = await getProvenance(this.projectId, f.id)
         if (seq !== this._provSeq) return
         const d = (res && res.data) || {}
-        // 顶上那条小条的三个值后端**先**算好了（一次早停 walk + 一次单路径 status），
-        // 所以逐段回溯超预算那条路也带着——不然律师要盯着一条空白小条等几十秒。
-        this.provVersioned = !!d.versioned
-        this.provDirty = !!d.dirty
-        this.provFileVersion = d.fileVersion || null
         // 后端还在算逐段归属（首次对着老文件回溯几百版）：3 秒后再问一次。
         if (d.computing) {
           clearTimeout(this._provRetryTimer)
@@ -2277,9 +2401,6 @@ export default {
         this.provLoaded = false
         this.provUnits = []
         this.provRows = []
-        this.provVersioned = false
-        this.provDirty = false
-        this.provFileVersion = null
       } finally {
         if (seq === this._provSeq) this.provLoading = false
       }
@@ -2313,9 +2434,9 @@ export default {
         index: para.index, text: para.text, unit: map.get(para.index) || null,
       }))
     },
-    /** 点版本身份小条 / 侧栏里的某一版 → 提交历史标签页定位到那一行。 */
+    /** 点侧栏里的某一版 → 提交历史标签页定位到那一行。 */
     openProvenanceHistory(payload) {
-      const sha = (payload && payload.sha) || this.provSha
+      const sha = payload && payload.sha
       if (!sha) return
       this.$emit('open-history', { sha, fileId: this.file && this.file.id })
     },
@@ -2324,9 +2445,22 @@ export default {
     // bytes) and persist via the backend upload endpoint (same fileId contract
     // as the download the document was loaded from). Autosave calls this;
     // returns true on success so autoSave can schedule failure retries.
-    async saveDocument() {
+    onSaveSnapshot(msg) {
+      const pending = this._saveSnapshot
+      if (!pending || pending.acknowledged || msg.saveSnapshotId !== pending.id || !this.saving ||
+          this._saveDiscarded || this._reloading || this._checkpointInvalidated ||
+          this.file?.id !== pending.fileId || this.projectId !== pending.projectId ||
+          (this._backendSaveContext || 0) !== pending.context ||
+          documentCheckpointGeneration(this.projectId, pending.fileId) !== pending.generation) return
+      pending.acknowledged = true
+      // This ordered worker event precedes export, after earlier queued input.
+      // Later modified events still re-dirty the document, including during upload.
+      this.dirty = false
+      this._dirtySince = 0
+    },
+    async saveDocument({ trackSnapshot = false } = {}) {
       const f = this.file
-      if (!f || !this.executor || this.saving || this._saveDiscarded) return false
+      if (!f || !this.executor || this.saving || this._saveDiscarded || this._pendingReload) return false
       const generation = documentCheckpointGeneration(this.projectId, f.id)
       const barrier = checkpointSaveBarrier(this.projectId, f.id)
       if ((barrier && !barrier.instances?.includes(this)) ||
@@ -2349,6 +2483,8 @@ export default {
       const saveProjectId = this.projectId
       let uploadRecoverySeq = null
       this.backendFailedUpload = null
+      this.versionSaveBusy = false
+      this.localSaveReason = null
       this.saving = true
       // 固定细栏通过 saving/dirty 显示保存状态；statusKey 保留慢保存的兼容状态。
       // 上一次的「保存失败」不能当成要恢复的状态，这次成功了就该回到就绪。
@@ -2357,10 +2493,29 @@ export default {
       clearTimeout(this._slowSaveTimer)
       this._slowSaveTimer = setTimeout(() => { if (this.saving) this.statusKey = 'saving' }, 2000)
       try {
+        // Resolve the exact earlier upload before exporting anything newer. Its receipt can only
+        // clear that operation's checkpoint guard, never an unrelated upload with unknown outcome.
+        if (this._localContentPending) {
+          const pending = this._localContentPending
+          if (pending.fileId !== fileId || pending.projectId !== saveProjectId || pending.generation !== generation ||
+              pending.saveContext !== saveContext) throw new Error('保存上下文已变化，请保留当前文档并重新核对')
+          lease.setOperationId(pending.operationId)
+          safeToOverwrite = false; uploadRecoverySeq = this.backendHealthRecoverySeq || 0
+          await this.uploadPendingLocalContent(pending)
+          safeToOverwrite = true; uploadRecoverySeq = null
+          if (this._reloading || this._saveDiscarded || saveContext !== (this._backendSaveContext || 0) ||
+              this.file?.id !== fileId || this.projectId !== saveProjectId) return false
+        }
         const name = f.name || (String(fileId) + '.' + String(f.fileType || 'docx'))
         this.appendLog('▶ export_document「' + name + '」…')
         const tExp = Date.now()
-        const res = await this.executor.executeCommand('export_document', { name })
+        const params = { name }
+        if (trackSnapshot) {
+          params.saveSnapshotId = this._saveSnapshotSeq = (this._saveSnapshotSeq || 0) + 1
+          this._saveSnapshot = { id: params.saveSnapshotId, fileId, projectId: saveProjectId,
+            context: saveContext, generation, acknowledged: false }
+        }
+        const res = await this.executor.executeCommand('export_document', params)
         this.appendLog('  ← export ' + (Date.now() - tExp) + 'ms')
         if (!res || !res.success) throw new Error((res && res.message) || 'export_document returned no success')
         // Structured clone across the relay hops may surface bytes as
@@ -2390,9 +2545,27 @@ export default {
         const mustExist = f.fileSize > 0 || this._savedOnce
         safeToOverwrite = false
         uploadRecoverySeq = this.backendHealthRecoverySeq || 0
-        await this.uploadBytes(getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : ''), u8, name)
+        if (this._localContentMetadata) {
+          const pending = await createLocalContentSave(this._localContentMetadata, u8)
+          Object.assign(pending, { fileId, projectId: saveProjectId, generation, saveContext })
+          if (this._reloading || this._saveDiscarded || checkpointSaveBarrier(this.projectId, fileId) ||
+              documentCheckpointGeneration(this.projectId, fileId) !== generation ||
+              saveContext !== (this._backendSaveContext || 0) || this.file?.id !== fileId ||
+              this.projectId !== saveProjectId) { safeToOverwrite = true; return false }
+          this._localContentPending = pending
+          lease.setOperationId(pending.operationId)
+          await this.uploadPendingLocalContent(pending)
+        } else {
+          await this.uploadBytes(getFileWriteUrl(fileId) + (mustExist ? '?mustExist=1' : ''), u8, name)
+        }
         safeToOverwrite = true
         this._savedOnce = true
+        // 保存确认后通知项目入口刷新；过期文件/重载中的回执不参与当前状态。
+        if (!this._reloading && !this._saveDiscarded && !this._pendingReload && !this._checkpointInvalidated &&
+            saveContext === (this._backendSaveContext || 0) && this.file?.id === fileId &&
+            this.projectId === saveProjectId && documentCheckpointGeneration(saveProjectId, fileId) === generation) {
+          try { uni.$emit('awd:file-saved', { projectId: saveProjectId, fileId }) } catch (e) { /* ignore */ }
+        }
         this.appendLog('  ← saved to backend (fileId=' + fileId + ')')
         this._savePaused = false
         this.statusKey = prevStatusKey
@@ -2400,6 +2573,13 @@ export default {
         this.scheduleProvenanceReload()
         return true
       } catch (e) {
+        // Only the server's explicit pre-publication busy response proves this upload
+        // cannot arrive later. Network failures and other statuses retain the write guard.
+        const notPublished = uploadRecoverySeq !== null && e?.saveNotPublished === true
+        this.localSaveReason = this._localContentPending ? e?.reason || null : null
+        if (notPublished || (e?.operationFinished === true && e.operationId === this._localContentPending?.operationId)) safeToOverwrite = true
+        this.versionSaveBusy = (notPublished || e?.reason === 'VERSION_BUSY') && saveContext === (this._backendSaveContext || 0) &&
+          this.projectId === saveProjectId && this.file?.id === fileId
         if (uploadRecoverySeq !== null && e?.backendUnavailable && !this._backendHealthDisposed && !this._saveDiscarded && !this._reloading &&
             saveContext === (this._backendSaveContext || 0) && this.projectId === saveProjectId && this.file?.id === fileId) {
           this.backendFailedUpload = { fileId, projectId: saveProjectId, recoverySeq: uploadRecoverySeq }
@@ -2412,11 +2592,37 @@ export default {
         this.appendLog('save failed: ' + (e && e.message ? e.message : e))
         return false
       } finally {
+        this._saveSnapshot = null
         lease?.finish(safeToOverwrite)
         this.saving = false
         clearTimeout(this._slowSaveTimer)
         // 只收回自己挂上去的「保存中…」；失败态是 catch 里刚设的，必须留着
         if (this.statusKey === 'saving') this.statusKey = prevStatusKey
+      }
+    },
+    async uploadPendingLocalContent(pending) {
+      let saved
+      try {
+        saved = await saveLocalContent(pending, {
+          headers: getAuthHeaders() || {},
+          onXhr: (xhr, finished) => {
+            if (xhr) this._saveXhr = xhr
+            else if (this._saveXhr === finished) this._saveXhr = null
+          },
+        })
+      } catch (e) {
+        if (e?.operationFinished === true && e.operationId === pending.operationId) {
+          resolveDocumentSaveOperation(pending.projectId, pending.fileId, pending.operationId)
+        }
+        throw e
+      }
+      resolveDocumentSaveOperation(pending.projectId, pending.fileId, pending.operationId)
+      if (this._localContentPending === pending) {
+        if (pending.fileId === this.file?.id && pending.projectId === this.projectId &&
+            pending.saveContext === (this._backendSaveContext || 0)) {
+          this._localContentMetadata = { ...pending.metadata, sha256: saved.sha256, size: saved.size }
+        }
+        this._localContentPending = null
       }
     },
     // 「另存为…」（BUG-14）：目标文件已被外部移走 / 改名且对账认不出新位置时，重试保存
@@ -2485,7 +2691,16 @@ export default {
         xhr.open('POST', url, true)
         xhr.timeout = 60000
         Object.keys(headers).forEach((k) => { if (k.toLowerCase() !== 'content-type') xhr.setRequestHeader(k, headers[k]) })
-        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.response) : reject(Object.assign(new Error('HTTP ' + xhr.status), { status: xhr.status, backendUnavailable: xhr.status >= 500 })))
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) return resolve(xhr.response)
+          let response
+          try { response = JSON.parse(xhr.response) } catch { /* An unreadable error cannot prove no write occurred. */ }
+          const saveNotPublished = xhr.status === 423 && response?.code === -1 &&
+            response.reason === 'VERSION_BUSY' && response.writeState === 'not_started'
+          reject(Object.assign(new Error('HTTP ' + xhr.status), {
+            status: xhr.status, backendUnavailable: xhr.status >= 500, saveNotPublished,
+          }))
+        }
         xhr.onerror = () => reject(Object.assign(new Error('网络错误 / network error'), { backendUnavailable: true }))
         xhr.ontimeout = () => reject(Object.assign(new Error(this.$t('editor.saveTimeout')), { backendUnavailable: true }))
         xhr.onabort = () => reject(new Error(this.$t('editor.saveCancelled')))
@@ -2498,6 +2713,8 @@ export default {
 </script>
 
 <style scoped>
+.libre-input-error { display: flex; align-items: center; gap: 12px; padding: 6px 12px; color: var(--awd-danger); background: var(--awd-surface); font-size: 13px; }
+.libre-input-error button { margin: 0 0 0 auto; padding: 0 8px; font-size: 18px; line-height: 24px; background: transparent; color: inherit; }
 .libre-editor-wrapper { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--awd-surface); }
 /* Floating status pill, pinned over the CANVAS's top-right corner (not the
    wrapper's — the review panel sits to the right and would be covered). No
@@ -2515,18 +2732,12 @@ export default {
 .libre-host { width: 100%; height: 100%; }
 /* Explicit review overview overlays the native gutter without shrinking the canvas. */
 .libre-review-overview { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; max-width: 100%; box-shadow: -8px 0 24px #00000018; }
-/* 版本身份小条：工具栏下面一条细带，右对齐一句「谁 · 哪天 · 哪一版」。
-   浅色外壳，不抢戏；能点的时候才给下划线与手型。 */
-.libre-prov-bar {
+/* 文件保存状态固定在工具栏下面，不随正文滚动。 */
+.libre-save-bar {
   display: flex; align-items: center; justify-content: flex-end; gap: 6px;
   height: 22px; flex-shrink: 0; padding: 0 10px; box-sizing: border-box;
   background: var(--awd-bg); border-bottom: 1px solid var(--awd-border-subtle);
 }
-.libre-prov-text {
-  font-size: 11px; color: var(--awd-text-2); min-width: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.libre-prov-text.clickable { color: var(--awd-accent-text); text-decoration: underline; cursor: pointer; }
 .libre-save-state { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; margin-left: auto; font-size: 11px; color: var(--awd-text-2); }
 .libre-save-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .libre-save-state .libre-save-retry { flex-shrink: 0; }

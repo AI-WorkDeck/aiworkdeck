@@ -24,8 +24,8 @@ public class DdClientMessageCenterSource implements MessageCenterSource {
                 List<Map<String,Object>> notifications = connections.notifications(userId, connectionId);
                 List<Entry> connectionEntries = new ArrayList<>();
                 for (Map<String,Object> n : notifications) {
-                    connectionEntries.add(new Entry(connectionId + ":" + n.get("id"), id(), "受邀项目 · 客户尽调",
-                        Objects.toString(n.get("kind"), "NOTICE"), Objects.toString(n.get("title"), "尽调通知"), "",
+                    connectionEntries.add(new Entry(connectionId + ":" + n.get("id"), id(), com.checkba.service.LangText.of("受邀项目 · 客户尽调", "Invited Project · Due Diligence"),
+                        Objects.toString(n.get("kind"), "NOTICE"), Objects.toString(n.get("title"), com.checkba.service.LangText.of("尽调通知", "Due Diligence Notice")), "",
                         number(connection.get("projectId")), "dd-client:" + connectionId, String.valueOf(connection.get("name")),
                         DdMessageCenterSupport.instant(n, "createdAt"), DdMessageCenterSupport.instant(n, "readAt"),
                         Objects.toString(n.get("actionState"), "none"), target(connection, n), DdMessageCenterSupport.read(n)));
@@ -46,9 +46,9 @@ public class DdClientMessageCenterSource implements MessageCenterSource {
     public Map<String,Object> target(Long userId, String itemId) {
         String[] parts = parts(itemId);
         Map<String,Object> connection = connections.list(userId).stream().filter(c -> parts[0].equals(c.get("id"))).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("受邀项目连接已失效"));
+                .orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("受邀项目连接已失效", "Invited project connection has expired")));
         Map<String,Object> n = connections.notifications(userId, parts[0]).stream().filter(row -> parts[1].equals(String.valueOf(row.get("id")))).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("通知不存在或已失去项目权限"));
+                .orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("通知不存在或已失去项目权限", "Notification not found or project access lost")));
         connections.proxy(userId, parts[0], "GET", "/requests/" + number(n.get("requestId")), null, null);
         return target(connection, n);
     }
@@ -77,7 +77,7 @@ public class DdClientMessageCenterSource implements MessageCenterSource {
         target.put("requestId", n.get("requestId")); if (n.get("itemId") != null) target.put("itemId", n.get("itemId")); return target;
     }
     private String[] parts(String value) {
-        if (value == null || !value.matches("[a-f0-9-]{36}:[1-9][0-9]{0,18}")) throw new IllegalArgumentException("通知编号无效");
+        if (value == null || !value.matches("[a-f0-9-]{36}:[1-9][0-9]{0,18}")) throw new IllegalArgumentException(com.checkba.service.LangText.of("通知编号无效", "Invalid notification ID"));
         return value.split(":", 2);
     }
     static Long number(Object value) { return value instanceof Number n ? n.longValue() : Long.valueOf(String.valueOf(value)); }

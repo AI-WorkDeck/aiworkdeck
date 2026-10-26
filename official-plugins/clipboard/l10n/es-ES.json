@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Portapapeles",
+  "plugin.description": "Busque en el historial del portapapeles, copie e inserte contenido.",
+  "view.main.name": "Portapapeles"
+}

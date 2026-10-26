@@ -10,8 +10,10 @@
 #  4-6. Expose review geometry and reserve one native page gutter (#587).
 #  7. Keep native sidebar hit-testing and page indexing out of that gutter.
 #  8. ElyOffice Tier A portable kernel fixes (0002, 0005, 0006, 0008-0011,
-#     0013, 0043, 0045, 0048-0051) + optional bundled dictionary/Lightproof
+#     0013, 0048) + optional bundled dictionary/Lightproof
 #     pruning (--slim-dictionaries).
+#  9. Calc row/column header UI font and local palette (#1509).
+# 10. Preserve real tooltip input transparency on WASM (#1515).
 import argparse
 import glob
 import os
@@ -1314,6 +1316,83 @@ void GetOutline(tools::JsonWriter& rJsonWriter, SwDocShell* pDocShell)
             )
 
 
+# ---- Calc header chrome (#1509); no cell formatting or input changes --------
+def patch_calc_header_chrome(core):
+    # Original target: LibreOffice core dced3bc711d18407a2cc2400eb46e8261b663d95,
+    # sc/source/ui/view/hdrcont.cxx (MPL-2.0; original license header retained).
+    # Keep this standalone: the build VM receives this script without the repo.
+    target = f'{core}/sc/source/ui/view/hdrcont.cxx'
+    patch(
+        target,
+        '    aNormFont = GetFont();\n',
+        '''    // AI WorkDeck: header labels are UI, not document text. Convert points
+    // through VCL so HiDPI follows the device and sheet zoom cannot scale them.
+    if (!GetSettings().GetStyleSettings().GetHighContrastMode())
+    {
+        vcl::Font aHeaderFont = GetPointFont(*GetOutDev());
+        aHeaderFont.SetFamilyName(u"Liberation Sans"_ustr);
+        aHeaderFont.SetFontSize(Size(0, 9)); // 12 CSS px at 96 DPI, compact UI labels
+        aHeaderFont.SetWeight(WEIGHT_NORMAL);
+        SetPointFont(*GetOutDev(), aHeaderFont);
+    }
+    aNormFont = GetFont();
+''',
+        'Calc header UI font',
+    )
+    patch(
+        target,
+        '    const StyleSettings& rStyleSettings = GetSettings().GetStyleSettings();\n',
+        '''    // AI WorkDeck: a local palette only; never alter cell formats or global
+    // Qt settings. AppBackground is updated by the existing set_app_theme route.
+    StyleSettings aHeaderSettings(GetSettings().GetStyleSettings());
+    if (!aHeaderSettings.GetHighContrastMode())
+    {
+        const bool bHeaderDark = SC_MOD()->GetColorConfig()
+            .GetColorValue(svtools::APPBACKGROUND).nColor.IsDark();
+        // design/tokens/awd-palette.json: roles.dark / roles.light.
+        // Color RGB construction may be consteval; keep literals in each branch.
+        aHeaderSettings.SetFaceColor(bHeaderDark ? Color(0x191713) : Color(0xF1EFE7)); // bg
+        aHeaderSettings.SetButtonTextColor(bHeaderDark ? Color(0xB0AA9C) : Color(0x6B675C)); // text-2
+        aHeaderSettings.SetDarkShadowColor(bHeaderDark ? Color(0x3D372E) : Color(0xDDD8CA)); // border
+        aHeaderSettings.SetAccentColor(bHeaderDark ? Color(0x3E6E62) : Color(0x2E5A50)); // accent
+        aHeaderSettings.SetHighlightColor(bHeaderDark ? Color(0x89A8A0) : Color(0x2E5A50)); // accent-text
+        aHeaderSettings.SetHighlightTextColor(Color(0xFFFFFF)); // text-on-accent
+    }
+    const StyleSettings& rStyleSettings = aHeaderSettings;
+''',
+        'Calc header local palette',
+    )
+    patch(
+        target,
+        '    aSelLineColor.Merge( COL_BLACK, 0xe0 );        // darken just a little bit\n',
+        '''    if (bHighContrast)
+        aSelLineColor.Merge( COL_BLACK, 0xe0 ); // retain the native contrast path
+''',
+        'Calc header accent border',
+    )
+
+
+# ---- WASM tooltip input transparency (#1515) --------------------------------
+def patch_wasm_tooltip_input(core):
+    # HelpTextWindow is already mouse-transparent in VCL. Preserve that intent
+    # at the platform-window boundary; isPopup() also uses ToolTip, but must
+    # remain interactive. The companion Qt compositor patch honors this flag.
+    patch(
+        f'{core}/vcl/qt5/QtFrame.cxx',
+        '''        else if (nStyle & SalFrameStyleFlags::TOOLTIP)
+            aWinFlags = Qt::ToolTip;
+''',
+        '''        else if (nStyle & SalFrameStyleFlags::TOOLTIP)
+        {
+            aWinFlags = Qt::ToolTip;
+            if (QGuiApplication::platformName() == "wasm")
+                aWinFlags |= Qt::WindowTransparentForInput;
+        }
+''',
+        'WASM tooltip input transparency',
+    )
+
+
 # ---- Bundled dictionary & Lightproof pruning helper (PERF-01) ----------------
 def _should_keep_dict_dir(name, keep_langs):
     if not name.startswith('dict-'):
@@ -1409,6 +1488,8 @@ def main(argv=None):
     patch_font_fallback_list_check(CORE)
     patch_swriter_pagesize_and_dialogless_uno(CORE)
     patch_word_count_and_outline_values(CORE)
+    patch_calc_header_chrome(CORE)
+    patch_wasm_tooltip_input(CORE)
 
     if args.slim_dictionaries or os.path.isdir(f'{CORE}/instdir/share/extensions'):
         slim_dictionaries(CORE, keep_langs=keep_langs)

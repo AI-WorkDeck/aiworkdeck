@@ -199,6 +199,7 @@ export default {
   languageGroupHint: '作用于界面、文档编辑器与 AI 回复。新打开的编辑器使用新语言，重启应用后完全生效。',
   languageSwitchingToZh: '正在切换为简体中文…',
   languageSwitchingToEn: 'Switching to English…',
+  languageSwitchedToast: '已切换为 {lang}',
 
   // ---- login.vue：顶部导航 ----
   guideNav: '使用指引',

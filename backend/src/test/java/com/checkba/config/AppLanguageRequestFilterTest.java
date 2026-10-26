@@ -41,6 +41,10 @@ class AppLanguageRequestFilterTest {
         assertEquals("en-US", languageSeenBy("en-US"));
         assertEquals("en-US", languageSeenBy("en"));
         assertEquals("zh-CN", languageSeenBy("zh-CN"));
+        assertEquals("ja-JP", languageSeenBy("ja-JP"));
+        assertEquals("fr-FR", languageSeenBy("fr-FR"));
+        assertEquals("zh-TW", languageSeenBy("zh-Hant-TW"));
+        assertEquals("ar-SA", languageSeenBy("ar-SA"));
     }
 
     @Test
@@ -48,7 +52,8 @@ class AppLanguageRequestFilterTest {
     void missingOrUnknownHeaderLeavesNoOverride() throws Exception {
         assertNull(languageSeenBy(null));
         assertNull(languageSeenBy(""));
-        assertNull(languageSeenBy("ja-JP"));
+        assertNull(languageSeenBy("tlh-KL"));
+        assertNull(languageSeenBy("eo"));
     }
 
     @Test
