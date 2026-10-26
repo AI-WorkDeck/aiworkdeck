@@ -495,7 +495,7 @@
                           @tap.stop="removeSelectedSkill(chip.id)">×</text>
                  </view>
               </view>
-              <view class="input-footer">
+              <view class="input-footer" :class="{ 'is-streaming': isStreaming }">
                  <view class="action-bar-left">
                     <view class="icon-btn mini file-add-btn" @tap="triggerFileSelect" title="Add File">
                    <svg class="plus-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -598,9 +598,13 @@
                  </view>
               </view>
           </view>
+          <view class="composer-preferences">
           <details class="builtin-workflows-fold" :class="{ customized: builtinCustomActiveCount > 0 }">
              <summary class="builtin-workflows-summary">
-                <span class="builtin-workflows-entry">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                <span class="builtin-workflows-entry">
+                   <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                   <span class="builtin-workflows-scope">{{ $t('chat.builtinWorkflowsScope') }}</span>
+                </span>
                 <span class="builtin-workflows-summary-right">
                    <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
                       {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
@@ -637,6 +641,7 @@
           <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" :suggestion="visibleSuggestion"
             @toggle="chatSuggestions.toggle" @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
+          </view>
           <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask model-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
 
@@ -817,7 +822,7 @@
                       @tap.stop="removeSelectedSkill(chip.id)">×</text>
              </view>
           </view>
-          <view class="input-footer">
+          <view class="input-footer" :class="{ 'is-streaming': isStreaming }">
              <view class="action-bar-left">
                 <view class="icon-btn mini" @tap="triggerFileSelect" title="Add File">
                    <svg class="plus-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -921,9 +926,13 @@
           </view>
           <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
+          <view class="composer-preferences">
           <details class="builtin-workflows-fold builtin-workflows-fold-bottom" :class="{ customized: builtinCustomActiveCount > 0 }">
              <summary class="builtin-workflows-summary">
-                <span class="builtin-workflows-entry">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                <span class="builtin-workflows-entry">
+                   <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
+                   <span class="builtin-workflows-scope">{{ $t('chat.builtinWorkflowsScope') }}</span>
+                </span>
                 <span class="builtin-workflows-summary-right">
                    <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
                       {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
@@ -960,6 +969,7 @@
           <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" :suggestion="visibleSuggestion"
             @toggle="chatSuggestions.toggle" @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
+          </view>
        </template>
     </view>
 
@@ -5168,6 +5178,7 @@ export default {
   background: var(--awd-surface);
   position: relative;
   overflow: hidden; /* Prevent children from overflowing */
+  container: chat-panel / inline-size;
   box-sizing: border-box;
 }
 
@@ -5450,17 +5461,16 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 24px 24px;
+  padding: 0 16px 20px;
   overflow-y: auto;
   min-width: 0;
   box-sizing: border-box;
 }
 
 .empty-top-section {
-  /* 黄金分割位：38.2% from top，进一步上移 */
-  margin-top: calc(30vh - 80px);
+  margin-top: clamp(28px, 16vh, 160px);
   flex-shrink: 0;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   text-align: center;
 }
 
@@ -5475,8 +5485,9 @@ export default {
   width: 100%;
   max-width: 600px;
   flex-shrink: 0;
-  margin-top: auto; /* Push to bottom */
-  padding-top: 24px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--awd-border-subtle);
   box-sizing: border-box;
 }
 
@@ -5490,7 +5501,8 @@ export default {
 }
 
 .welcome-subtitle {
-  font-size: var(--awd-font-size-reading);
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
   font-weight: 400;
   color: var(--awd-text-2);
   display: block;
@@ -5500,7 +5512,7 @@ export default {
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-dialog);
-  padding: 16px;
+  padding: 12px;
   width: 100%;
   box-sizing: border-box;
   box-shadow: var(--awd-shadow-card);
@@ -5526,8 +5538,7 @@ export default {
   font-weight: 500;
   color: var(--awd-text-3);
   margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.02em;
 }
 
 .recent-history {
@@ -5608,14 +5619,15 @@ export default {
 }
 
 .history-empty-placeholder {
-  font-size: var(--awd-font-size-body);
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-3);
   text-align: center;
-  padding: 24px 0;
+  padding: 12px 0;
 }
 
 .history-disclaimer {
-  font-size: var(--awd-panel-fs);
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.6;
   color: var(--awd-text-3);
   text-align: center;
   padding: 16px 0 0;
@@ -5628,8 +5640,8 @@ export default {
   max-height: 200px;
   overflow-y: auto;
   outline: none;
-  font-size: var(--awd-font-size-reading);
-  line-height: 1.5;
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
   color: var(--awd-text);
 }
 
@@ -5639,29 +5651,43 @@ export default {
 }
 
 .input-footer {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
-  column-gap: 8px;
-  row-gap: 6px;
+  gap: 8px;
   margin-top: 12px;
-  padding-top: 12px;
-  border-top: none;
+  padding-top: 10px;
+  border-top: 1px solid var(--awd-border-subtle);
 }
 
 .action-bar-left {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
-  flex: 1 1 240px;
-  /* 窄面板按控件换行，保留模型名的可读宽度；发送按钮可另起一行。 */
   min-width: 0;
 }
 
+.input-footer .icon-btn.mini,
+.input-footer .skill-selector {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.input-footer .icon-btn.mini { border: 0; }
+.input-footer.is-streaming { grid-template-columns: minmax(0, 1fr); }
+.input-footer.is-streaming .composer-actions { flex-wrap: wrap; justify-content: flex-end; }
+
+@container chat-panel (max-width: 340px) {
+  .action-bar-left { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; }
+  .model-selector { grid-column: 1 / -1; grid-row: 2; }
+  .skill-selector { grid-column: 3; grid-row: 1; }
+  .input-footer { align-items: end; }
+}
+
 .model-selector {
-  font-size: var(--awd-font-size-body);
+  font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
   cursor: pointer;
   /* 定位基准挪给 .input-card（见 .model-dropdown 注释）——AI 面板最窄 240px，
@@ -5671,15 +5697,15 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 24px;
+  height: 28px;
   box-sizing: border-box;
   padding: 0 6px;
   border: 1px solid transparent;
   border-radius: var(--awd-radius-md);
   transition: background 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
-  flex: 1 1 100px;
-  min-width: 100px;
+  flex: 1 1 0;
+  min-width: 0;
   max-width: 100%;
 }
 /* uni 的 <text> 不继承父级的 nowrap 效果，窄栏下「Kimi K3」会折成两行（BUG-41） */
@@ -5708,7 +5734,8 @@ export default {
 
 /* ============= Mode Selector (Agent/Ask/Plan) ============= */
 .mode-selector {
-  font-size: var(--awd-font-size-body);
+  font-size: var(--awd-panel-fs);
+  flex-shrink: 0;
   color: var(--awd-text-2);
   cursor: pointer;
   /* 同 .model-selector：定位基准挪给 .input-card。实测在 240px 最窄面板下，
@@ -5719,7 +5746,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 24px;
+  height: 28px;
   box-sizing: border-box;
   padding: 0 8px;
   border-radius: var(--awd-radius-md);
@@ -6073,10 +6100,11 @@ export default {
   align-items: center;
   gap: 4px;
   max-width: 100%;
-  margin: 0 0 4px;
-  padding: 2px 6px 2px 8px;
+  margin: 0 0 8px;
+  padding: 3px 6px 3px 8px;
+  box-sizing: border-box;
   border-radius: var(--awd-radius-sm);
-  border: 1px dashed var(--awd-border);
+  border: 1px solid var(--awd-border-subtle);
   background: var(--awd-surface-2);
   font-size: var(--awd-panel-fs-meta);
   line-height: 1.6;
@@ -6438,7 +6466,7 @@ export default {
    已选数量用角标表达，生效清单在上方 chip 行，不占横向空间 */
 .skill-selector {
   cursor: pointer;
-  position: relative;
+  position: static;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6485,14 +6513,15 @@ export default {
 
 .skill-dropdown {
   position: absolute;
-  /* 选择器位于工具条最右，向右展开会溢出 AI 面板，故右对齐 */
+  /* 与模式、模型菜单一样锚定输入卡，窄栏下仍完整可见。 */
+  left: 0;
   right: 0;
   background: var(--awd-surface);
   border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-dialog);
   box-shadow: var(--awd-shadow-md);
   z-index: 1001;
-  min-width: 230px;
+  min-width: 0;
   max-height: 280px;
   overflow-y: auto;
   padding: 4px 0;
@@ -6687,90 +6716,63 @@ export default {
   color: var(--awd-accent-text);
 }
 
-/* 与 Jev (DecisionAssistControl) 对齐的单行折叠条（默认收起，不占垂直空间） */
-.builtin-workflows-fold {
-  width: 100%;
-  max-width: 680px;
-  margin: var(--awd-space-2) 0 0;
-  border: none;
-  background: transparent;
-  color: var(--awd-text-2);
-  box-sizing: border-box;
+/* 输入区的辅助设置共用行距、分隔线和信息层级。 */
+.composer-preferences {
+  margin-top: 12px;
+  border: 1px solid var(--awd-border-subtle);
+  border-radius: var(--awd-radius-dialog);
+  background: var(--awd-surface-2);
+  padding: 0 12px;
+  min-width: 0;
 }
+.composer-preferences > :deep(:not(:first-child)) {
+  border-top: 1px solid var(--awd-border-subtle);
+}
+.builtin-workflows-fold { width: 100%; color: var(--awd-text-2); box-sizing: border-box; }
 .builtin-workflows-summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--awd-space-2);
-  min-height: 28px;
-  box-sizing: border-box;
-  padding: var(--awd-space-1) 0;
+  gap: 8px;
+  padding: 10px 0;
   list-style: none;
   font-size: var(--awd-panel-fs);
   line-height: 1.5;
   cursor: pointer;
 }
-.builtin-workflows-summary::-webkit-details-marker {
-  display: none;
-}
+.builtin-workflows-summary::-webkit-details-marker { display: none; }
 .builtin-workflows-summary::before {
   content: '';
   width: 5px;
   height: 5px;
-  flex-shrink: 0;
-  margin: 0 3px;
   border-right: 1px solid currentColor;
   border-bottom: 1px solid currentColor;
   transform: rotate(-45deg);
 }
-.builtin-workflows-fold[open] > .builtin-workflows-summary::before {
-  transform: rotate(45deg);
-}
-.builtin-workflows-summary:hover {
-  color: var(--awd-accent-text);
-}
-.builtin-workflows-entry {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.builtin-workflows-summary-right {
-  display: inline-flex;
-  align-items: center;
-  column-gap: 8px;
-  flex-shrink: 0;
-}
-.builtin-workflows-summary-state {
-  font-size: var(--awd-panel-fs-meta);
-  color: var(--awd-text-3);
-}
-.builtin-workflows-summary-state.custom {
-  color: var(--awd-accent-text);
-  font-weight: 600;
-}
+.builtin-workflows-fold[open] > .builtin-workflows-summary::before { transform: rotate(45deg); }
+.builtin-workflows-summary:hover { color: var(--awd-accent-text); }
+.builtin-workflows-summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }
+.builtin-workflows-entry { min-width: 0; overflow-wrap: anywhere; }
+.builtin-workflows-title { display: block; color: var(--awd-text); font-weight: 500; }
+.builtin-workflows-scope { display: block; margin-top: 2px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
+.builtin-workflows-summary-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 100px; }
+.builtin-workflows-summary-state { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
+.builtin-workflows-summary-state.custom { color: var(--awd-accent-text); font-weight: 600; }
 .builtin-workflows-adv-btn {
   font: inherit;
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-accent-text);
-  background: var(--awd-accent-soft);
-  border: 1px solid transparent;
+  background: transparent;
+  border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-sm);
-  padding: 1px 7px;
+  padding: 2px 7px;
   margin: 0;
   line-height: 1.4;
   cursor: pointer;
 }
-.builtin-workflows-adv-btn::after {
-  border: 0;
-}
-.builtin-workflows-adv-btn:hover {
-  border-color: var(--awd-accent);
-}
-.builtin-workflows-body {
-  padding: 6px 0 4px;
-  display: flex;
-  flex-direction: column;
-  row-gap: 6px;
-}
+.builtin-workflows-adv-btn::after { border: 0; }
+.builtin-workflows-adv-btn:hover { border-color: var(--awd-accent); background: var(--awd-accent-wash); }
+.builtin-workflows-body { padding: 0 0 10px; display: flex; flex-direction: column; row-gap: 6px; }
 .builtin-workflows-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

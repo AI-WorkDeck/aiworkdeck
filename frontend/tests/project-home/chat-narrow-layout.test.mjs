@@ -16,13 +16,13 @@ const rule = (css, selector) => {
   return css.slice(at, css.indexOf('}', at))
 }
 
-test('模型名单行省略，保留可读宽度并允许工具栏换行', () => {
+test('模型名单行省略，窄栏给模型独立一行并为发送钮保留位置', () => {
   const name = rule(CI, '.model-name')
   assert.match(name, /white-space:\s*nowrap/)
   assert.match(name, /text-overflow:\s*ellipsis/)
   assert.match(name, /overflow:\s*hidden/)
-  assert.match(rule(CI, '.model-selector'), /min-width:\s*100px/, '最窄面板也须保留模型名可读宽度')
-  assert.match(rule(CI, '.action-bar-left'), /flex-wrap:\s*wrap/, '空间不足时按控件换行，不把模型压成一字宽')
+  assert.match(rule(CI, '.input-footer'), /grid-template-columns:\s*minmax\(0, 1fr\) auto/, '发送钮占独立列，不能被工具栏挤下去')
+  assert.match(CI, /@container chat-panel \(max-width: 340px\)[\s\S]*?\.model-selector \{[^}]*grid-column: 1 \/ -1;[^}]*grid-row: 2;/, '窄栏把模型放到完整一行，实际可读宽度由 model-pricing.mjs 检查')
 })
 
 test('空状态发送钮不被 flex-basis 强制换行，宽度足够时可与控件同行', () => {

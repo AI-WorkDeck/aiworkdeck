@@ -100,7 +100,7 @@ try {
   // #1111: actual panel width, with long model name and token usage competing for space.
   for (const lang of ['zh-CN', 'en-US']) {
     for (const empty of [false, true]) {
-      for (const width of [240, 360, 420]) {
+      for (const width of [240, 280, 321, 340, 360, 420]) {
         await open(catalog(CHARGED_CNY), { width, lang, empty })
         await page.evaluate(() => {
           window.chatState.showModelDropdown = false
@@ -134,6 +134,14 @@ try {
         })
         await page.screenshot({ path: `${shots}/k1111-footer-${width}-${lang}-${empty ? 'empty' : 'chat'}.png` })
         assert.deepEqual(issues, [], `${width}px ${lang} ${empty ? 'empty' : 'chat'} footer layout`)
+        await page.$eval('.skill-selector', el => el.dispatchEvent(new CustomEvent('tap', { bubbles: true })))
+        await page.waitForSelector('.skill-dropdown')
+        assert.ok(await page.$eval('.skill-dropdown', el => {
+          const rect = el.getBoundingClientRect()
+          const panel = document.querySelector('.chat-interface').getBoundingClientRect()
+          return rect.left >= panel.left && rect.right <= panel.right && el.scrollWidth <= el.clientWidth + 1
+        }), `${width}px: skill menu remains inside the panel`)
+        await page.$eval('.skill-selector', el => el.dispatchEvent(new CustomEvent('tap', { bubbles: true })))
         // uni dispatches tap in H5; exercise the real handlers in this Vue fixture.
         await page.$eval('.mode-selector', el => el.dispatchEvent(new CustomEvent('tap', { bubbles: true })))
         await page.waitForSelector('.mode-dropdown')
@@ -148,7 +156,7 @@ try {
       }
     }
   }
-  console.log('PASS: footer geometry and mode/model/send at 240/360/420px, zh/en, empty/chat')
+  console.log('PASS: footer geometry and mode/model/send and skill-menu bounds at 240/280/321/340/360/420px, zh/en, empty/chat')
   // ---- 1. 平台通道实付价，人民币，对话中（向上展开）----
   await open(catalog(CHARGED_CNY))
   assert.ok(await page.$('.model-dropdown.up'), '对话中应向上展开')
