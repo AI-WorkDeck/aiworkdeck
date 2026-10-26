@@ -23,7 +23,9 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
     element.appendChild(node)
   }
   const listeners = new Set()
-  let model, input, disposed = false, paintJob, paintAgain = false, paintTimer, layoutTimer, failed = false
+  let model, input, disposed = false, paintJob, paintAgain = false, paintForced = false, paintTimer, layoutTimer, failed = false
+  const exportPaintJobs = new Set()
+  let paintedViewport
   let desiredReadOnly = null, permissionRevision = 0, permissionSeq = 0, permissionApplied = -1, permissionJob
   let insightSub = false, contextGeneration = 0, contextJob, pendingContext, lastContextAt = 0, detachLinks, modelLoads = 0
   let reviewBalloons, assistance, rulers
@@ -176,15 +178,17 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
       } catch (error) { if (model === owner && !disposed) fail(error) }
     }, 150)
   }
-  async function paint(owner = model) {
+  async function paint(owner = model, automatic = false) {
     if (!owner || disposed || failed) return
+    if (automatic && [...exportPaintJobs].some(job => job.owner === owner && job.painted)) return
     if (paintJob) {
       const previous = paintJob
-      if (previous.owner === owner) { paintAgain = true; return previous.promise }
+      if (previous.owner === owner) { paintAgain = true; paintForced ||= !automatic; return previous.promise }
       await previous.promise
       if (owner !== model || disposed) throw Error('STALE_DOCUMENT_PAINT')
-      return paint(owner)
+      return paint(owner, automatic)
     }
+    for (const job of exportPaintJobs) if (job.owner === owner) job.painted = true
     const job = { owner }
     paintJob = job
     job.promise = draw(owner).finally(() => {
@@ -214,18 +218,25 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
       canvas.getContext('2d').putImageData(new ImageData(transparentPageExterior(tile, owner.layout.pages), tile.width, tile.height), 0, 0)
       drawRulers(viewport)
       assistance?.layout()
+      paintedViewport = { owner, signature: JSON.stringify(viewport) }
       await input?.viewportChanged()
     } catch (error) {
       if (owner === model && !disposed) throw error
     }
   }
-  function schedulePaint() {
-    if (disposed || paintTimer) return
-    paintTimer = doc.defaultView.setTimeout(() => { paintTimer = null; paint().catch(fail) }, 16)
+  function schedulePaint(force = false) {
+    if (disposed) return
+    paintForced ||= force
+    if (paintTimer) return
+    paintTimer = doc.defaultView.setTimeout(() => {
+      paintTimer = null
+      const automatic = !paintForced; paintForced = false
+      paint(model, automatic).catch(fail)
+    }, 16)
   }
-  const scroll = () => { rulers?.invalidate(); input?.viewportChanged()?.catch(fail); reviewBalloons?.cursorMoved(); assistance?.cursorMoved(); assistance?.layout(); schedulePaint() }
+  const scroll = () => { rulers?.invalidate(); input?.viewportChanged()?.catch(fail); reviewBalloons?.cursorMoved(); assistance?.cursorMoved(); assistance?.layout(); schedulePaint(true) }
   element.addEventListener('scroll', scroll)
-  const resize = new ResizeObserver(() => { rulers?.invalidate(); assistance?.layout(); schedulePaint() }); resize.observe(element)
+  const resize = new ResizeObserver(() => { rulers?.invalidate(); assistance?.layout(); schedulePaint(true) }); resize.observe(element)
   const off = api.onNativeEvent(info.sessionId, event => {
     if (event.type === 'engine-failed') { fail(Error(event.message || 'Native worker stopped')); return }
     if (!model || event.documentEpoch !== model.documentEpoch) return
@@ -261,7 +272,7 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
       'get_review_context', 'get_completion_context', 'get_context_menu_context', 'capture_writing_context', 'set_host_context_menu', 'get_ruler_state'].includes(action)
     if (!read && assistanceOperation !== assistance?.mutationScope) assistance?.externalChange()
     const reviewOwner = !read && action !== 'set_review_balloons' ? reviewBalloons : null
-    let suspended = false, loading = false
+    let suspended = false, loading = false, exporting
     try {
       if (contextRead) {
         await previousInput?.flush()
@@ -275,6 +286,11 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
         try { suspension = input.suspend() }
         finally { if (assistanceOperation) assistanceOperation.suspending = false }
         await suspension; suspended = true
+      }
+      if (action === 'export_document') {
+        // Present the latest input once; repeated readback callbacks need only
+        // one more frame after save. Explicit scrolling/resizing still paints.
+        exporting = { owner: previous, painted: false }; exportPaintJobs.add(exporting)
       }
       if (action === 'load_document') {
         loading = true; modelLoads++; invalidateContext(); detachLinks?.(); detachLinks = null
@@ -341,7 +357,25 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
           const rectangle = result.rects[0], y = Array.isArray(rectangle) ? rectangle[1] : rectangle.y
           if (Number.isFinite(y)) element.scrollTop = Math.max(0, y * metrics().scale - 80)
         }
-        if (!read) await paint()
+        if (action === 'export_document') {
+          // Bytes are ready and the engine has restored its view. Saving need
+          // not wait behind optional reads for another tile, but input must use
+          // the acknowledged viewport, including a resize during that ACK.
+          let viewport
+          do {
+            if (!currentContext()) throw Error('STALE_DOCUMENT_EXPORT')
+            viewport = JSON.stringify(metrics())
+            if (paintedViewport?.owner !== previous || paintedViewport.signature !== viewport) {
+              try { await paint(previous) }
+              catch (error) {
+                if (previous === model && previousInput === input && !modelLoads && !disposed) fail(error)
+                throw error
+              }
+            }
+            await previousInput?.viewportChanged()
+            if (!currentContext()) throw Error('STALE_DOCUMENT_EXPORT')
+          } while (viewport !== JSON.stringify(metrics()) || paintedViewport?.signature !== viewport)
+        } else if (!read) await paint()
       }
       if (action === 'get_review_layout' && model && result.available) {
         // LOK's internal headless view spans the whole model. Cards use the
@@ -354,8 +388,9 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
       }
       return result
     } finally {
+      if (exporting) { exportPaintJobs.delete(exporting); if (currentContext()) schedulePaint() }
       if (loading) modelLoads--
-      if (suspended && model === previous && !disposed && !failed) input?.resume()
+      if (suspended && model === previous && input === previousInput && !modelLoads && !disposed && !failed) input?.resume()
       reviewOwner?.resume()
     }
   }

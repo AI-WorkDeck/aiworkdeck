@@ -865,3 +865,204 @@ test('ruler drag verifies pending view callbacks without rebasing its captured r
   assert.equal(result.leftIndent,180);assert.equal(result.changed,true)
   assert.deepEqual(batches,[25,25,10]);assert.equal(writeRevision,0);assert.equal(session.revision,1)
 })
+
+function initializingViewRead() {
+  const h=opened(),{session}=h,entered=latch(),release=latch()
+  const items=Array.from({length:60},(_,index)=>({revisionId:String(index),identifier:'init-'+index,author:'A',type:'Delete',dateTime:'date',description:'summary '+index,text:'full '+index,textAvailable:true}))
+  const calls=[];let first=true,changedText=false
+  session.engine.call=async(action,params)=>{
+    calls.push({action,params})
+    if(action==='review_snapshot')return {documentEpoch:7,refreshEpoch:1,items:items.map(item=>({...item}))}
+    return {success:true,...params,lastInputSeq:0}
+  }
+  session.unoCall=async(action,params)=>{
+    calls.push({action,params})
+    if(action==='snapshot_batch'){
+      if(first){first=false;entered.resolve();await release.promise}
+      return {start:params.start,total:items.length,entries:items.slice(params.start,params.start+params.limit).map((item,i)=>({...item,index:params.start+i}))}
+    }
+    if(action==='capture_view_read')return {token:'init-proof'}
+    if(action==='get_document_text')return {success:true,text:'restored document'}
+    if(action==='set_view_options'){
+      for(const item of items)session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:31,payload:JSON.stringify({redline:{action:'Modify',index:item.revisionId}})})
+      return {success:true}
+    }
+    if(action==='view_settings')return {ruler:false}
+    if(action==='check_revision_batch')return {total:items.length,entries:params.targets.map(({index})=>({...items[index],index,...(changedText?{text:'external full text'}:{})}))}
+    throw Error(action)
+  }
+  return {...h,items,calls,entered,release,changeText:()=>{changedText=true}}
+}
+
+test('late view initialization shares in-flight hydration instead of invalidating the first final reads',async()=>{
+  const h=initializingViewRead(),{session}=h
+  const first=session.execute('get_document_text',{__agent:true})
+  await h.entered.promise
+  const second=session.execute('get_document_text',{__agent:true})
+  const view=session.execute('set_view_options',{formattingMarks:true,ruler:true})
+  const completed=Promise.allSettled([first,second,view]);h.release.resolve()
+  const results=await completed
+  assert.deepEqual(results.map(r=>r.status),['fulfilled','fulfilled','fulfilled'])
+  assert.equal(session.revision,0)
+  assert.equal(h.calls.filter(c=>c.action==='snapshot_batch').length,3,'only the already requested hydration')
+  assert.equal(h.calls.filter(c=>c.action==='get_document_text').length,2,'neither final read retries')
+  assert.equal(h.calls.filter(c=>c.action==='set_view_options').length,1)
+  await new Promise(r=>setTimeout(r,15));await session.queue
+  assert.equal(session.revision,0);assert.equal(h.events.filter(e=>e.type==='review-changed').length,0)
+})
+
+test('view initialization without a review reader stays light and fences worker callbacks',async()=>{
+  const {session,calls}=opened();const uno=[]
+  session.unoCall=async action=>{uno.push(action);return action==='view_settings'?{ruler:false}:{success:true}}
+  await session.execute('set_view_options',{formattingMarks:true})
+  assert.deepEqual(uno,['set_view_options','view_settings'])
+  assert.deepEqual(calls.map(c=>c.action),['selected_text'])
+  assert.equal(session.review,null);assert.equal(session.reviewRead,undefined)
+})
+
+test('guarded view initialization still invalidates an actual full-text change',async()=>{
+  const h=initializingViewRead(),{session}=h
+  session.review={revision:0,items:h.items,hydratedCount:h.items.length};h.changeText()
+  await session.execute('set_view_options',{formattingMarks:true})
+  assert.equal(session.revision,1)
+  assert.equal(h.events.filter(e=>e.type==='review-changed').length,1)
+  assert.equal(h.calls.filter(c=>c.action==='snapshot_batch').length,0,'existing identity needs no hydration')
+})
+
+test('view initialization waiting for hydration rejects changed document, permission and close boundaries',async()=>{
+  for(const boundary of ['edit','permission','retarget','close']){
+    const h=initializingViewRead(),{session}=h
+    const read=session.execute('get_document_text',{__agent:true})
+    await h.entered.promise
+    const view=session.execute('set_view_options',{formattingMarks:true})
+    const completed=Promise.allSettled([read,view])
+    if(boundary==='edit')session.changed()
+    if(boundary==='permission'){session.permissionSeq++;session.readOnly=true}
+    if(boundary==='retarget')session.model={...session.model,documentEpoch:8}
+    if(boundary==='close')session.closed=true
+    h.release.resolve();const results=await completed
+    assert.equal(results[1].status,'rejected',boundary)
+    assert.equal(h.calls.filter(c=>c.action==='set_view_options').length,0,boundary)
+    assert.equal(h.calls.filter(c=>c.action==='snapshot_batch').length<=3,true,'no hydration retry')
+  }
+})
+
+test('queued keyboard editing still cancels a view initialization waiting on revision hydration',async()=>{
+  const h=initializingViewRead(),{session}=h
+  session.undo.edit=async run=>run()
+  const read=session.execute('get_document_text',{__agent:true});await h.entered.promise
+  const view=session.execute('set_view_options',{formattingMarks:true})
+  const input=session.execute('native_input',{action:'input_key',params:{documentEpoch:7,eventType:0,keyCode:65,charCode:65}})
+  const completed=Promise.allSettled([read,view,input]);h.release.resolve()
+  const results=await completed
+  assert.deepEqual(results.map(r=>r.status),['rejected','rejected','fulfilled'])
+  assert.equal(h.calls.filter(c=>c.action==='input_key').length,1)
+  assert.equal(h.calls.filter(c=>c.action==='set_view_options').length,0)
+  assert.equal(session.revision,1)
+})
+
+function pendingBalloonResolution() {
+  const h=pendingReviewAdoption(),{session,items}=h
+  session.review.documentEpoch=7;session.review.refreshEpoch=1
+  const resolved=[],checked=[],call=session.uno.call
+  session.uno.call=async(action,params)=>{
+    if(action==='check_revision'){
+      checked.push(params.identifier)
+      return {...items.find(item=>item.identifier===params.identifier)}
+    }
+    return call(action,params)
+  }
+  session.engine.call=async(action,params)=>{
+    if(action==='review_resolve'){resolved.push(params);return {success:true,applied:true,remainingCount:items.length-1}}
+    return {documentEpoch:7,refreshEpoch:2,items}
+  }
+  session.undo.resolve=async run=>run({displayChanged:true})
+  const expected={index:2,identifier:items[2].identifier,type:items[2].type,text:items[2].text,author:items[2].author,timestamp:items[2].dateTime}
+  const params=action=>action==='resolve_revision'
+    ? {documentSeq:7,revision:0,index:2,identifier:expected.identifier,action:'accept',expectedRevision:{...expected}}
+    : {documentSeq:7,revision:0,indices:[2],action:'accept',expectedRevisions:[{...expected}]}
+  return {...h,resolved,checked,params}
+}
+
+test('balloon accept and reject finish bounded pending proof before resolving the captured identity',async()=>{
+  for(const action of ['resolve_revisions','resolve_revision'])for(const decision of ['accept','reject']){
+    const {session,batches,resolved,checked,params,events}=pendingBalloonResolution()
+    const result=await session.execute(action,{...params(action),action:decision})
+    assert.equal(result.success,true,action+' '+decision)
+    assert.deepEqual(batches,[25,25,10]);assert.equal(resolved.length,1)
+    assert.equal(resolved[0].revisionId,'2');assert.equal(resolved[0].decision,decision)
+    assert.deepEqual(checked,['uno-2'],'production target/full-text check still runs')
+    assert.equal(session.revision,1);assert.equal(session.review,null)
+    assert.equal(events.filter(e=>e.type==='modified').length,1)
+  }
+})
+
+test('balloon resolution keeps actual-text, expected-target and repeated-callback refusals',async()=>{
+  for(const reason of ['changed-text','expected-text','repeated-callbacks','new-revision']){
+    const {session,items,batches,resolved,params}=pendingBalloonResolution(),call=session.uno.call,engine=session.engine.call
+    session.uno.call=async(action,p)=>{
+      const result=await call(action,p)
+      if(action==='check_revision_batch'){
+        if(reason==='changed-text')result.entries[0].text='real external edit'
+        if(reason==='repeated-callbacks')for(const {index} of p.targets)
+          session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:31,payload:JSON.stringify({redline:{action:'Modify',index:items[index].revisionId}})})
+      }
+      return result
+    }
+    if(reason==='new-revision')session.engine.call=async(action,p)=>{
+      if(action==='selected_text')session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:30,payload:'{}'})
+      return engine(action,p)
+    }
+    const request=params('resolve_revisions')
+    if(reason==='expected-text')request.expectedRevisions[0].text='outdated rendered text'
+    await assert.rejects(session.execute('resolve_revisions',request),/STALE_REVIEW/,reason)
+    assert.equal(resolved.length,0,reason);assert.ok(batches.length<=3,'one full-list proof bound')
+  }
+})
+
+test('balloon resolution cannot write after permission revocation or close during proof',async()=>{
+  for(const boundary of ['permission','close']){
+    const {session,resolved,params}=pendingBalloonResolution(),entered=latch(),release=latch(),call=session.uno.call
+    session.uno.call=async(action,p)=>{if(action==='check_revision_batch'){entered.resolve();await release.promise}return call(action,p)}
+    const resolving=session.execute('resolve_revisions',params('resolve_revisions'))
+    const rejected=assert.rejects(resolving,/Read-only|STALE_REVIEW|closed/)
+    await entered.promise
+    if(boundary==='permission'){session.permissionSeq++;session.readOnly=true;session.clearViewRead()}
+    else session.closed=true
+    release.resolve();await rejected;assert.equal(resolved.length,0,boundary)
+  }
+})
+
+test('balloon navigation shares the captured proof and preserves readonly and real selection events',async()=>{
+  for(const readOnly of [false,true]){
+    const {session,batches,params,resolved,checked,events}=pendingBalloonResolution(),call=session.uno.call,engine=session.engine.call
+    session.readOnly=readOnly;const visited=[]
+    session.uno.call=async(action,p)=>action==='verify_location'?{success:true}:call(action,p)
+    session.engine.call=async(action,p)=>{
+      if(action==='review_goto'){
+        visited.push(p)
+        session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:2,payload:'actual clicked revision range'})
+        return {success:true,applied:true}
+      }
+      return engine(action,p)
+    }
+    const request=params('resolve_revision')
+    const result=await session.execute('goto_revision',request)
+    assert.equal(result.success,true);assert.equal(visited.length,1)
+    assert.equal(visited[0].revisionId,'2');assert.deepEqual(checked,['uno-2'])
+    assert.deepEqual(batches,[25,25,10]);assert.equal(session.revision,0)
+    assert.equal(request.revision,0);assert.equal(resolved.length,0)
+    assert.equal(events.filter(e=>e.type==='selection').at(-1).origin,undefined)
+    assert.equal(events.filter(e=>e.type==='modified').length,0)
+  }
+})
+
+test('all balloon target actions retain the original stale caller revision',async()=>{
+  for(const action of ['goto_revision','resolve_revision','resolve_revisions']){
+    const {session,params,resolved,checked}=pendingBalloonResolution()
+    const request=params(action==='goto_revision'?'resolve_revision':action);request.revision=-1
+    await assert.rejects(session.execute(action,request),/STALE_REVIEW/)
+    assert.equal(request.revision,-1);assert.equal(session.revision,0)
+    assert.equal(resolved.length,0);assert.equal(checked.length,0)
+  }
+})
