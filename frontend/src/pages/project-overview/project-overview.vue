@@ -275,9 +275,12 @@
           :trial-text="trialMenuText"
           :notice-text="accountNoticeText"
           :client-view="isClientView"
+          :message-unread="messageCenterUnread"
+          :message-partial="messageCenterBadgePartial"
           @login="onAccountLogin"
           @account="onAvatarMenuAccount"
           @grace-info="showTrialInfo = true"
+          @messages="openMessageCenterTab"
           @schedule="onAvatarMenuSchedule"
           @settings="onAvatarMenuSettings"
           @sign-out="onAvatarMenuSignOut"
@@ -310,7 +313,7 @@
           v-for="p in LEFT_SIDEBAR_PLUGINS"
           :key="p.key"
           class="rail-btn"
-          :class="{ active: (p.key === 'messages' && (focusedPane === 'right' ? activeFileRight : activeFileLeft)?.tabType === 'message-center') || ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
+          :class="{ active: ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
           :title="p.label"
           :draggable="!isClientView"
           @tap="onRailBtnTap(p.key)"
@@ -351,7 +354,6 @@
             </svg>
           </view>
           <text v-else class="rail-icon">{{ p.icon }}</text>
-          <text v-if="p.key === 'messages' && (messageCenterUnread > 0 || messageCenterBadgePartial)" class="rail-badge" :title="messageCenterBadgePartial ? $t('messageCenter.sourcesUnavailable') : $t('messageCenter.unreadCount', { count: messageCenterUnread })" :aria-label="messageCenterBadgePartial ? $t('messageCenter.sourcesUnavailable') : $t('messageCenter.unreadCount', { count: messageCenterUnread })">{{ messageCenterUnread > 99 ? '99+' : messageCenterUnread > 0 ? messageCenterUnread : '·' }}</text>
           <text v-if="p.key === 'market' && pluginUpdateState.count > 0" class="rail-badge" :aria-label="$t('market.updateAvailableCount', { count: pluginUpdateState.count })" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count > 99 ? '99+' : pluginUpdateState.count }}</text>
           <text v-if="p.key === 'dd-client' && ddClientUnread > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddClientUnread })">{{ ddClientUnread > 99 ? '99+' : ddClientUnread }}</text>
           <text v-if="p.key === 'dd-files' && ddLawyerNotifications.length > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddLawyerNotifications.length })">{{ ddLawyerNotifications.length > 99 ? '99+' : ddLawyerNotifications.length }}</text>
