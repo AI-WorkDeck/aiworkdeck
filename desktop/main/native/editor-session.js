@@ -600,6 +600,18 @@ class NativeEditorSession {
         || (commentActions.has(action) && action !== 'list_comments')
         || ['format_selection', 'ui_command', 'set_style', 'set_ruler_state', 'set_track_changes', 'undo', 'redo', 'resolve_revision', 'resolve_revisions', 'goto_revision', 'set_selection', 'collapse_selection', 'goto_bookmark'].includes(action)
         || (!this.readOnly && ['find_text_locations', 'clear_anchors'].includes(action))
+      if (action === 'apply_review_edit' || completionWrites.has(action)) {
+        const pendingRead = this.viewReadGuard
+        if (this.currentViewRead(pendingRead)) {
+          // A captured suggestion may arrive between bounded read-proof batches.
+          // Finish one full-list pass inside this task before relinquishing the
+          // proof; remaining/changed callbacks still invalidate in clearViewRead.
+          await this.engine.call('selected_text', { documentEpoch: pendingRead.model.documentEpoch })
+          for (let batches = Math.ceil(pendingRead.identity.items.length / REVIEW_BATCH_SIZE);
+            batches > 0 && this.currentViewRead(pendingRead) && pendingRead.pending.size; batches--)
+            await this.verifyViewRead(pendingRead)
+        }
+      }
       if (actualMutation) this.clearViewRead()
       const mutation = actualMutation ? (this.mutationScope = { invalidated: false, modified: false }) : null
       const guard = finalReadOwner ? this.beginViewRead() : null

@@ -753,3 +753,95 @@ test('explicit mutation invalidation absorbs pending proof exactly once without 
   assert.equal(session.revision,1);assert.equal(session.viewReadGuard,null)
   assert.deepEqual(events.map(e=>e.type),['modified'])
 })
+
+function pendingReviewAdoption() {
+  const h=opened(),{session}=h
+  const items=Array.from({length:60},(_,index)=>({revisionId:String(index),identifier:'uno-'+index,author:'A',type:'Delete',dateTime:'date',description:'summary',text:'full '+index,textAvailable:true}))
+  session.review={revision:0,items,hydratedCount:items.length}
+  const guard=session.beginViewRead()
+  for(let index=0;index<items.length;index++)guard.pending.add(index)
+  const batches=[],writes=[]
+  session.engine.call=async()=>({documentEpoch:7,items})
+  session.undo.edit=async run=>run()
+  session.uno={call:async(method,params)=>{
+    if(method==='check_revision_batch'){
+      batches.push(params.targets.length)
+      return {total:items.length,entries:params.targets.map(({index})=>({...items[index],index}))}
+    }
+    writes.push({method,params})
+    const stale=params.revision!==params.nativeRevision
+    return stale ? {success:false,reason:'stale',changed:false,textChanged:false,trackingChanged:false}
+      : {success:true,changed:true,textChanged:true,trackingChanged:false}
+  }}
+  return {...h,items,guard,batches,writes}
+}
+
+test('adopting a captured suggestion verifies all pending read callbacks before clearing its proof',async()=>{
+  for(const action of ['apply_review_edit','accept_completion']){
+    const {session,batches,writes,events}=pendingReviewAdoption()
+    const result=await session.executeQueued(action,{revision:0})
+    assert.equal(result.success,true,action)
+    assert.deepEqual(batches,[25,25,10]);assert.equal(writes.length,1)
+    assert.equal(writes[0].params.nativeRevision,0);assert.equal(writes[0].params.revision,0)
+    assert.equal(session.revision,1);assert.equal(events.filter(e=>e.type==='review-changed').length,0)
+    assert.equal(events.filter(e=>e.type==='modified').length,1)
+  }
+})
+
+test('adopting a suggestion still rejects a real full-text change hidden by the same summary',async()=>{
+  const {session,writes,events}=pendingReviewAdoption(),call=session.uno.call
+  session.uno.call=async(method,params)=>{
+    const result=await call(method,params)
+    if(method==='check_revision_batch')result.entries[0].text='external real edit'
+    return result
+  }
+  const result=await session.executeQueued('apply_review_edit',{revision:0})
+  assert.equal(result.success,false);assert.equal(result.reason,'stale')
+  assert.equal(session.revision,1);assert.equal(events.filter(e=>e.type==='modified').length,0)
+  assert.equal(writes[0].params.revision,0);assert.equal(writes[0].params.nativeRevision,1)
+})
+
+test('adoption proof has a full-list bound and cannot wait forever on repeating unknown callbacks',async()=>{
+  const {session,batches,items}=pendingReviewAdoption(),call=session.uno.call
+  session.uno.call=async(method,params)=>{
+    const result=await call(method,params)
+    if(method==='check_revision_batch')for(const {index} of params.targets)
+      session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:31,payload:JSON.stringify({redline:{action:'Modify',index:items[index].revisionId}})})
+    return result
+  }
+  const result=await session.executeQueued('apply_review_edit',{revision:0})
+  assert.equal(result.reason,'stale');assert.equal(session.revision,1)
+  assert.equal(batches.length,3);assert.equal(session.viewReadGuard,null)
+})
+
+test('permission revocation during the adoption proof rejects before entering the native write',async()=>{
+  const {session,writes,events}=pendingReviewAdoption(),entered=latch(),release=latch(),call=session.uno.call
+  session.model.trackingInitialized=true
+  session.uno.call=async(method,params)=>{
+    if(method==='check_revision_batch'){entered.resolve();await release.promise}
+    return call(method,params)
+  }
+  const engine=session.engine.call
+  session.engine.call=async(method,params)=>method==='set_read_only'?{...params,lastInputSeq:0}:engine(method,params)
+  const adopting=session.executeQueued('apply_review_edit',{revision:0})
+  const rejected=assert.rejects(adopting,{code:'READ_ONLY'})
+  await entered.promise
+  const revoked=session.execute('set_read_only',{documentEpoch:7,permissionSeq:1,readOnly:true})
+  assert.equal(session.readOnly,true);release.resolve()
+  await rejected;await revoked
+  assert.equal(writes.length,0);assert.equal(session.revision,1)
+  assert.equal(events.filter(e=>e.type==='modified').length,0)
+})
+
+test('an unknown revision event at the adoption worker barrier still expires the captured request',async()=>{
+  const {session,writes,events}=pendingReviewAdoption(),engine=session.engine.call
+  let sent=false
+  session.engine.call=async(method,params)=>{
+    if(method==='selected_text'&&!sent){sent=true;session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:30,payload:'{}'})}
+    return engine(method,params)
+  }
+  const result=await session.executeQueued('apply_review_edit',{revision:0})
+  assert.equal(result.reason,'stale');assert.equal(session.revision,1)
+  assert.equal(writes[0].params.revision,0);assert.equal(writes[0].params.nativeRevision,1)
+  assert.equal(events.filter(e=>e.type==='modified').length,0)
+})
