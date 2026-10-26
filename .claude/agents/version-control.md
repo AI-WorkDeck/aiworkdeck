@@ -13,6 +13,10 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 
 ## 版本操作后的文件树刷新（dev-board#1470）
 
+AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/一次性操作协议见 `ai-chat.md` 的“AI 项目版本操作”。前端必须先完成保存屏障，再调用写操作，并核对重载完成；不可用普通单向 `doc_reload_file` 充当完成回执。`version_restore` 恢复整个项目且保留当前工作历史；`version_pull` 沿现有主线、无活动工作及无待决合并的限制，不能静默丢弃或切稿。
+
+`merge/resolve-file` 和 `merge/resolve-structured` 的冲突校验、两侧版本读取、字节落盘与待决记录现在都在原 `WorkSessionService.runLocked` 锁内。新客户端同时传 `ctx/mainRef/otherRef`，锁内核对 `HEAD/MERGE_HEAD`，过期结果拒绝写入；旧客户端可省略两侧编号，保留原接口兼容。上传字节接收在锁前，防止网络上传长期占用仓库锁。
+
 工作台文件树以 `v-show` 保留挂载，切栏不再触发重新读清单。`onVersionReloadFiles` 必须主动调用 `fileTree.loadFiles()`，包括受影响编辑器 ID 为空的切稿/采纳/团队取回；不能等待文件树请求再重载打开中的文档，以免旧内容被自动保存回磁盘。相关可执行回归见 `frontend/tests/project-home/version-reload-files.test.mjs`；全应用 J10/J11 验证切稿隔离与两份都留后的清单。
 
 ## 上传与 text_* 的内容发布协调（2026-10-25）

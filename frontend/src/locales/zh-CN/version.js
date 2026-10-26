@@ -3,6 +3,20 @@
 // 版本记录 / 协作（version/*.vue、collab/CollabDialog.vue、InviteMemberDialog.vue、
 // CloudAcceptDialog.vue）：工作段、稿、时间线、三语境采纳冲突弹窗、团队案件库协作。
 export default {
+  aiSaving: '正在保存打开的文件…',
+  aiExecuting: '正在处理项目版本…',
+  aiMerging: '正在合并不冲突的改动…',
+  aiReloading: '正在更新打开的文件…',
+  aiInvalidAction: '版本操作请求不完整，请重新发起。',
+  aiActionBusy: '项目版本正在处理，请完成后再编辑。',
+  aiActionExpired: '当前项目或会话已变化，版本操作已停止。',
+  aiDrawioSaveFirst: '请先保存并关闭打开的流程图，再进行版本操作。',
+  aiStreamBusy: 'AI 仍在写入文档，请完成后再进行版本操作。',
+  aiEditorNotReady: '尚未确认所有文件保存完成，未执行版本操作。请稍后重试。',
+  aiActionUnknown: '暂时无法确认版本操作结果。已暂停旧内容保存，请恢复连接后重新打开文件。',
+  aiReloadFailed: '文件尚未更新完成，已暂停旧内容保存。请重新打开文件。',
+  aiConflictNeedsReview: '仍有需要你确认的冲突，请在版本控制面板处理。',
+  aiActionFailed: '版本操作未完成，请查看版本控制面板后重试。',
   exitProgressChecking: '正在确认提交结果（3/3）…',
   exitProgressCommitting: '正在提交改动（2/3）…',
   exitProgressSaving: '正在保存文件（1/3）…',

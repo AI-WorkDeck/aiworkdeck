@@ -73,6 +73,79 @@ const conflictOf = (rows, over = {}) => ({
   ...over,
 })
 
+test('自动合并把当前两侧版本和语境透传到文件写入端点', async () => {
+  const { calls, deps } = makeHarness()
+  await useDocumentMerge(deps).onConflictStatus(conflictOf([docxRow(), docxRow({ path: '清单.xlsx', kind: 'XLSX' })], { sessionId: 5, sessionTip: 'session-tip' }), 'session-end')
+  for (const body of [...calls.resolveFile, ...calls.resolveStructured]) {
+    assert.deepEqual([body.ctx, body.mainRef, body.otherRef], ['session-end', 'main1', 'session-tip'])
+  }
+})
+
+test('合并完成回执必须等待所有文件真正重载', async () => {
+  let finishReload, finished = false
+  const { calls, deps } = makeHarness({ reloadFiles: () => new Promise(resolve => { finishReload = resolve }) })
+  const result = useDocumentMerge(deps).onConflictStatus(conflictOf([docxRow({ kind: 'XLSX' })]), 'adopt').then(value => { finished = true; return value })
+  for (let i = 0; i < 20; i++) await Promise.resolve()
+  assert.equal(calls.adopt.length, 1)
+  assert.equal(finished, false)
+  finishReload(true)
+  assert.deepEqual(await result, { merged: true })
+})
+
+test('收尾已经落盘但重载失败，后续轮询不再次提交或冒报成功', async () => {
+  const { calls, deps } = makeHarness({ reloadFiles: async () => false })
+  const merge = useDocumentMerge(deps)
+  const conflict = conflictOf([docxRow({ kind: 'XLSX' })])
+  assert.deepEqual(await merge.onConflictStatus(conflict, 'adopt'), { merged: false })
+  assert.deepEqual(await merge.onConflictStatus(conflict, 'adopt'), { merged: false })
+  assert.equal(calls.adopt.length, 1)
+})
+
+test('入队时固定取消守卫；等待引擎时清理宿主引用不能放行迟到写入', async () => {
+  let finishBuild
+  const { calls, deps } = makeHarness({ buildMergeDraft: () => new Promise(resolve => { finishBuild = resolve }) })
+  const merge = useDocumentMerge(deps)
+  const conflict = conflictOf([docxRow()])
+  const options = { canContinue: async () => false }
+  const result = merge.onConflictStatus(conflict, 'adopt', options)
+  for (let i = 0; i < 12; i++) await Promise.resolve()
+  options.canContinue = null
+  finishBuild({ success: true, formatOnly: [] })
+  assert.deepEqual(await result, { merged: false })
+  assert.equal(calls.resolveFile.length, 0)
+  assert.equal(calls.adopt.length, 0)
+  // 即使周期刷新没有 AI 守卫，这一次冲突也必须等人明确重试。
+  assert.deepEqual(await merge.onConflictStatus(conflict, 'adopt'), { merged: false })
+  assert.equal(calls.resolveFile.length, 0)
+  deps.buildMergeDraft = async () => ({ success: true, formatOnly: [] })
+  merge.retry('合同.docx')
+  assert.deepEqual(await merge.onConflictStatus(conflict, 'adopt'), { merged: true })
+  assert.equal(calls.resolveFile.length, 1)
+})
+
+test('已停止任务留下的冲突不会由下一轮刷新启动自动合并', async () => {
+  const { calls, deps } = makeHarness()
+  const merge = useDocumentMerge(deps)
+  const conflict = conflictOf([docxRow({ kind: 'XLSX' })])
+  merge.suspend(conflict, 'adopt')
+  assert.deepEqual(await merge.onConflictStatus(conflict, 'adopt'), { merged: false })
+  assert.equal(calls.resolveStructured.length, 0)
+  merge.retry('合同.docx')
+  assert.deepEqual(await merge.onConflictStatus(conflict, 'adopt'), { merged: true })
+})
+
+test('自动合并写入丢失回执属于未知结果，不再继续写入或收尾', async () => {
+  const { calls, deps } = makeHarness()
+  deps.api.postMergeResolveStructured = async () => { calls.resolveStructured.push('unknown'); throw Error('lost receipt') }
+  const merge = useDocumentMerge(deps)
+  const conflict = conflictOf([docxRow({ kind: 'XLSX' }), docxRow({ path: 'second.xlsx', kind: 'XLSX' })])
+  assert.deepEqual(await merge.onConflictStatus(conflict, 'adopt', { canContinue: async () => true }), { merged: false, uncertain: true })
+  assert.equal(calls.resolveStructured.length, 1)
+  assert.equal(calls.adopt.length, 0)
+  await merge.onConflictStatus(conflict, 'adopt')
+  assert.equal(calls.resolveStructured.length, 1)
+})
+
 test('全是 AUTO 且都成功 → 自动收尾，三份文件都报 MERGED，只收一次尾', async () => {
   const { calls, deps } = makeHarness()
   const merge = useDocumentMerge(deps)

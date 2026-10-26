@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -73,6 +74,11 @@ public class VersionController {
         this.pendingMergeStore = store;
     }
 
+    /** AI continuation validates its pinned conflict and invokes existing endpoints under the same lock. */
+    public void withVersionLock(Long projectId, Runnable action) {
+        sessionService.runLocked(projectId, action);
+    }
+
     /**
      * 逐段溯源（spec 2026-09-14 §4.7）。同样字段注入且允许缺席，理由同上——
      * 手工 new 本控制器的几个测试用不到它，缺席时 {@code /provenance} 回空 units。
@@ -105,7 +111,12 @@ public class VersionController {
     public ResponseEntity<Map<String, Object>> status(
             @PathVariable Long projectId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        Long viewerId = requireMember(projectId, sessionId);
+        return statusForUser(projectId, requireMember(projectId, sessionId));
+    }
+
+    /** Trusted AI context uses the same membership boundary as HTTP callers. */
+    public ResponseEntity<Map<String, Object>> statusForUser(Long projectId, Long viewerId) {
+        requireMemberUser(projectId, viewerId);
         Map<String, Object> data = new HashMap<>();
         boolean enabled = repoService.isInitialized(projectId);
         data.put("enabled", enabled);
@@ -358,6 +369,31 @@ public class VersionController {
         return ok(Map.of("changes", changes));
     }
 
+    /** Bounded, read-only name/status inspection for trusted AI callers. */
+    public ResponseEntity<Map<String, Object>> changesForUser(Long projectId, String from, String to, Long userId) {
+        requireMemberUser(projectId, userId);
+        String scope = to == null ? "working" : from == null ? "commit" : "compare";
+        boolean enabled = repoService.isInitialized(projectId);
+        List<FileChange> changes = List.of();
+        if (enabled) {
+            if (to == null) changes = sessionService.pendingChangesLocked(projectId);
+            else {
+                requireResolvable(projectId, to);
+                if (from != null) requireResolvable(projectId, from);
+                changes = repoService.diffNameStatus(projectId, from == null ? to + "^" : from, to);
+            }
+        }
+        List<FileChange> visible = changes.stream().filter(c -> !c.path().startsWith(".awd/")).toList();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("enabled", enabled); data.put("scope", scope);
+        data.put("changes", visible.stream().limit(500).toList());
+        data.put("total", visible.size()); data.put("truncated", visible.size() > 500);
+        data.put("includesUnsavedEditorBuffers", false);
+        if (from != null) data.put("from", from);
+        if (to != null) data.put("to", to);
+        return ok(data);
+    }
+
     // ==================== 统一历史与任意两版对比（spec 2026-09-14 §2.4） ====================
 
     /**
@@ -381,7 +417,13 @@ public class VersionController {
             @RequestParam(required = false) String to,
             @RequestParam(defaultValue = "false") boolean includeAuto,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        Long userId = requireMember(projectId, sessionId);
+        return historyForUser(projectId, limit, cursor, author, fileId, q, from, to, includeAuto,
+                requireMember(projectId, sessionId));
+    }
+
+    public ResponseEntity<Map<String, Object>> historyForUser(Long projectId, int limit, String cursor,
+            String author, Long fileId, String q, String from, String to, boolean includeAuto, Long userId) {
+        requireMemberUser(projectId, userId);
         Map<String, Object> data = new HashMap<>();
         if (!repoService.isInitialized(projectId)) {
             data.put("enabled", false);
@@ -765,16 +807,24 @@ public class VersionController {
             @RequestParam(value = "mode", required = false) String mode,
             @RequestParam(value = "decisions", required = false) String decisions,
             @RequestParam(value = "ctx", required = false) String ctx,
+            @RequestParam(value = "mainRef", required = false) String mainRef,
+            @RequestParam(value = "otherRef", required = false) String otherRef,
             @RequestPart(value = "file", required = false) org.springframework.web.multipart.MultipartFile file,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireWriteMember(projectId, sessionId);
-        String rel = requireConflictPath(projectId, path, ctx);
         byte[] bytes = readUpload(file);
         if (bytes == null) {
             throw VersionException.userFacing(LangText.of(
                     "没有收到合并后的文件", "The merged file didn't come through"));
         }
-        return ok(landMerged(projectId, rel, mode, parseDecisions(decisions), bytes));
+        Map<String, Object> result = new HashMap<>();
+        sessionService.runLocked(projectId, () -> {
+            requireWriteMember(projectId, sessionId);
+            String rel = requireConflictPath(projectId, path, ctx);
+            requireMergeIdentity(projectId, mainRef, otherRef);
+            result.putAll(landMerged(projectId, rel, mode, parseDecisions(decisions), bytes));
+        });
+        return ok(result);
     }
 
     /**
@@ -788,27 +838,45 @@ public class VersionController {
             @RequestBody(required = false) Map<String, Object> body,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireWriteMember(projectId, sessionId);
-        Object rawPath = body == null ? null : body.get("path");
-        String rel = requireConflictPath(projectId,
-                rawPath == null ? null : String.valueOf(rawPath), null);
-        List<com.checkba.version.merge.Decision> decisions = decisionsFromList(
-                body == null ? null : body.get("decisions"));
+        Map<String, Object> request = body == null ? Map.of() : body;
+        Map<String, Object> result = new HashMap<>();
+        sessionService.runLocked(projectId, () -> {
+            requireWriteMember(projectId, sessionId);
+            String rel = requireConflictPath(projectId, stringValue(request.get("path")),
+                    stringValue(request.get("ctx")));
+            requireMergeIdentity(projectId, stringValue(request.get("mainRef")),
+                    stringValue(request.get("otherRef")));
+            List<com.checkba.version.merge.Decision> decisions = decisionsFromList(request.get("decisions"));
+            com.checkba.version.merge.Analysis analysis = mergeAnalysisService.analysisFor(projectId, rel);
+            if (analysis == null || (analysis.kind() != com.checkba.version.merge.MergeKind.XLSX
+                    && analysis.kind() != com.checkba.version.merge.MergeKind.PPTX)) {
+                throw VersionException.userFacing(LangText.of(
+                        "这份文件不能这样合并", "This file can't be merged this way"));
+            }
+            String head = repoService.resolveRef(projectId, "HEAD");
+            String mergeHead = repoService.mergeHeadRef(projectId);
+            byte[] mainBytes = repoService.readBlobAtCommit(projectId, head, rel);
+            byte[] otherBytes = repoService.readBlobAtCommit(projectId, mergeHead, rel);
+            byte[] merged = analysis.kind() == com.checkba.version.merge.MergeKind.XLSX
+                    ? com.checkba.version.merge.XlsxMerger.merge(mainBytes, otherBytes, analysis, decisions)
+                    : com.checkba.version.merge.PptxMerger.merge(mainBytes, otherBytes, analysis, decisions);
+            String mode = decisions.isEmpty() ? "auto" : "manual";
+            result.putAll(landMerged(projectId, rel, mode, decisions, merged));
+        });
+        return ok(result);
+    }
 
-        com.checkba.version.merge.Analysis analysis = mergeAnalysisService.analysisFor(projectId, rel);
-        if (analysis == null || (analysis.kind() != com.checkba.version.merge.MergeKind.XLSX
-                && analysis.kind() != com.checkba.version.merge.MergeKind.PPTX)) {
+    private static String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    /** Uploaded merge bytes must still belong to these exact two revisions. Legacy clients omit them. */
+    private void requireMergeIdentity(long projectId, String mainRef, String otherRef) {
+        if ((mainRef != null && !mainRef.equals(repoService.resolveRef(projectId, "HEAD")))
+                || (otherRef != null && !otherRef.equals(repoService.mergeHeadRef(projectId)))) {
             throw VersionException.userFacing(LangText.of(
-                    "这份文件不能这样合并", "This file can't be merged this way"));
+                    "待合并的版本已变化，请重新查看合并内容", "The versions being merged have changed; review the merge again"));
         }
-        String head = repoService.resolveRef(projectId, "HEAD");
-        String mergeHead = repoService.mergeHeadRef(projectId);
-        byte[] mainBytes = repoService.readBlobAtCommit(projectId, head, rel);
-        byte[] otherBytes = repoService.readBlobAtCommit(projectId, mergeHead, rel);
-        byte[] merged = analysis.kind() == com.checkba.version.merge.MergeKind.XLSX
-                ? com.checkba.version.merge.XlsxMerger.merge(mainBytes, otherBytes, analysis, decisions)
-                : com.checkba.version.merge.PptxMerger.merge(mainBytes, otherBytes, analysis, decisions);
-        String mode = decisions.isEmpty() ? "auto" : "manual";
-        return ok(landMerged(projectId, rel, mode, decisions, merged));
     }
 
     /**
@@ -1217,6 +1285,11 @@ public class VersionController {
     /** 校验并返回当前用户 id。非成员或 CLIENT 一律拒绝。 */
     private Long requireMember(Long projectId, String sessionId) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
+        requireMemberUser(projectId, userId);
+        return userId;
+    }
+
+    private void requireMemberUser(Long projectId, Long userId) {
         if (userId == null) throw new IllegalArgumentException("未登录");
         if (!projectMemberService.hasReadPermission(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权访问该项目", "You don't have access to this project"));
@@ -1224,7 +1297,6 @@ public class VersionController {
         if (projectMemberService.isClient(projectId, userId)) {
             throw new IllegalArgumentException(LangText.of("无权访问该项目", "You don't have access to this project"));
         }
-        return userId;
     }
 
     /**
