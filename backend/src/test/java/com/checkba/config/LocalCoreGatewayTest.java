@@ -23,6 +23,56 @@ import static org.junit.jupiter.api.Assertions.*;
 class LocalCoreGatewayTest {
     private final HttpClient client = HttpClient.newHttpClient();
 
+    @Test void documentReadyOnlyReleasesExactMethodsAndPathsUntilFullReadiness() throws Exception {
+        var owner = new LocalCoreOwnership(); owner.drainAndHandoff(Duration.ZERO, () -> {});
+        var calls = new AtomicInteger();
+        HttpServer backend = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        backend.createContext("/", exchange -> {
+            calls.incrementAndGet();
+            exchange.sendResponseHeaders(exchange.getRequestURI().getPath().startsWith("/api/desktop/") ? 503 : 204, -1);
+            exchange.close();
+        }); backend.start();
+        try (var gateway = new LocalCoreGateway(0, owner, (q, r) -> fail("Retired CORE"), "", false, Duration.ofMillis(30))) {
+            gateway.documentBackendReady(backend.getAddress().getPort());
+            for (String path : new String[]{"/api/document/generator/settings", "/api/projects/my", "/api/projects/1/files", "/api/files/1/download"}) {
+                assertEquals(204, send(gateway, "GET", path).statusCode());
+                assertEquals(204, send(gateway, "HEAD", path).statusCode());
+            }
+            String content = "/api/local-core/projects/1/files/2/content";
+            String receipt = content + "/receipts/00000000-0000-0000-0000-000000000001";
+            for (String method : new String[]{"GET", "HEAD", "PUT"}) assertEquals(204, send(gateway, method, content).statusCode());
+            for (String method : new String[]{"GET", "DELETE"}) assertEquals(204, send(gateway, method, receipt).statusCode());
+            for (String path : new String[]{"/api/desktop/health", "/api/desktop/startup-health"})
+                for (String method : new String[]{"GET", "HEAD"}) assertEquals(503, send(gateway, method, path).statusCode());
+            int allowed = calls.get();
+            for (String path : new String[]{"/api/unknown", content + "/unexpected", content.replace("/1/", "/01/")})
+                assertEquals(503, send(gateway, "GET", path).statusCode());
+            assertEquals(503, send(gateway, "PUT", "/api/document/generator/settings").statusCode());
+            assertEquals(503, send(gateway, "POST", content).statusCode());
+            assertEquals(503, send(gateway, "PUT", receipt).statusCode());
+            assertEquals(403, send(gateway, "PUT", content, "Origin", "https://evil.example").statusCode());
+            assertEquals(allowed, calls.get(), "Unadvertised requests must not reach MVC yet");
+            gateway.backendReady(backend.getAddress().getPort());
+            assertEquals(204, send(gateway, "GET", "/api/unknown").statusCode());
+            gateway.backendFailed();
+            assertEquals(503, send(gateway, "GET", "/api/document/generator/settings").statusCode());
+            assertEquals(503, send(gateway, "GET", "/api/unknown").statusCode());
+            assertThrows(IllegalStateException.class, () -> gateway.documentBackendReady(backend.getAddress().getPort()));
+        } finally { backend.stop(0); }
+    }
+
+    @Test void documentReadinessRequiresSuccessfulHandoffAndCannotOutliveClose() throws Exception {
+        var owner = new LocalCoreOwnership();
+        var gateway = new LocalCoreGateway(0, owner, (q, r) -> false, "", false, Duration.ofMillis(30));
+        try {
+            assertThrows(IllegalStateException.class, () -> gateway.documentBackendReady(12345));
+            owner.drainAndHandoff(Duration.ZERO, () -> {});
+            gateway.close();
+            assertThrows(IllegalStateException.class, () -> gateway.documentBackendReady(12345));
+            assertThrows(IllegalStateException.class, () -> gateway.backendReady(12345));
+        } finally { gateway.close(); }
+    }
+
     @Test void closeReleasesStandaloneTomcatKeepAliveThread() throws Exception {
         var before = Thread.getAllStackTraces().keySet();
         var gateway = new LocalCoreGateway(0, new LocalCoreOwnership(), (request, response) -> false,

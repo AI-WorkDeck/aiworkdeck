@@ -34,6 +34,40 @@ class LocalCoreApplicationTest {
     private final LocalCoreContentService.SaveReceipt receipt = new LocalCoreContentService.SaveReceipt(
             request, "b".repeat(64), 3, "2026-10-25T00:00:00Z");
 
+    @Test void documentPublicationRequiresOwnContextAndSuccessfulRepairAndLeavesFullReadyAlone() {
+        var context = mock(org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.class);
+        var event = new org.springframework.boot.context.event.ApplicationReadyEvent(
+                new org.springframework.boot.SpringApplication(), new String[0], context, java.time.Duration.ZERO);
+        application.documentRoutesReady(event);
+        verifyNoInteractions(context); // Feature-off has no gateway and adds no lifecycle work.
+        var gateway = mock(com.checkba.config.LocalCoreGateway.class);
+        ReflectionTestUtils.setField(application, "gateway", gateway);
+        application.documentRoutesReady(event);
+        verifyNoInteractions(gateway, context); // A child/foreign context cannot redirect our port.
+        ReflectionTestUtils.setField(application, "applicationContext", context);
+        var repair = mock(com.checkba.service.maintenance.OrphanParentReconciler.class);
+        when(context.getBean(com.checkba.service.maintenance.OrphanParentReconciler.class)).thenReturn(repair);
+        application.documentRoutesReady(event);
+        verifyNoInteractions(gateway); // Repair failed: retain the existing full startup barrier.
+        when(repair.prepareForDocumentRequests()).thenReturn(true);
+        var server = mock(org.springframework.boot.web.server.WebServer.class);
+        when(context.getWebServer()).thenReturn(server); when(server.getPort()).thenReturn(12345);
+        application.documentRoutesReady(event);
+        verify(gateway).documentBackendReady(12345);
+        verify(gateway, never()).backendReady(anyInt());
+        assertNull(ReflectionTestUtils.getField(application, "effects"));
+    }
+
+    @Test void requiredRepairIsRunOnceAndFailureDoesNotGrantDocumentReadiness() {
+        var repository = mock(ProjectFileRepository.class);
+        when(repository.findByParentId(0L)).thenThrow(new IllegalStateException("owned repair failure"));
+        var repair = new com.checkba.service.maintenance.OrphanParentReconciler(repository);
+        assertFalse(repair.prepareForDocumentRequests());
+        repair.onStartup();
+        assertFalse(repair.prepareForDocumentRequests());
+        verify(repository, times(1)).findByParentId(0L);
+    }
+
     private void prepare() {
         var file = new ProjectFile();
         file.setId(9L); file.setProjectId(7L); file.setUid("owned-file"); file.setIsDeleted(false);

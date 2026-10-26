@@ -3,6 +3,7 @@
 package com.checkba.config;
 
 import com.checkba.localcore.LocalCoreOwnership;
+import com.checkba.localcore.LocalCoreHttpReads;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import jakarta.servlet.ServletException;
@@ -43,10 +44,12 @@ public final class LocalCoreGateway implements AutoCloseable {
     private final CoreHandler core;
     private final Duration waitForBackend;
     private final CompletableFuture<Integer> backend = new CompletableFuture<>();
+    private final CompletableFuture<Integer> documentBackend = new CompletableFuture<>();
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
             .followRedirects(HttpClient.Redirect.NEVER).version(HttpClient.Version.HTTP_1_1).build();
     private final WebServer server;
-    private boolean closed;
+    private volatile boolean closed;
+    private volatile boolean failed;
 
     public LocalCoreGateway(int port, LocalCoreOwnership ownership, CoreHandler core,
                             String allowedOrigins, boolean allowAll, Duration waitForBackend) throws IOException {
@@ -83,17 +86,46 @@ public final class LocalCoreGateway implements AutoCloseable {
     public int port() { return server.getPort(); }
 
     /** Called only after Spring readiness, which must follow successful ownership handoff. */
-    public void backendReady(int port) {
-        if (ownership.state() != LocalCoreOwnership.State.JPA || port <= 0 || port > 65535 || port == port()) {
-            throw new IllegalStateException("Backend is not ready for handoff");
-        }
+    public synchronized void backendReady(int port) {
+        validateDestination(port);
         if (!backend.complete(port)) throw new IllegalStateException("Backend destination already published");
+        documentBackend.complete(port);
     }
 
-    public void backendFailed() { backend.completeExceptionally(new IllegalStateException("Backend startup failed")); }
+    /** Only document routes, after runners and synchronous file reconciliation; not full readiness. */
+    public synchronized void documentBackendReady(int port) {
+        validateDestination(port);
+        if (!documentBackend.complete(port)) throw new IllegalStateException("Document destination already published");
+    }
+
+    private void validateDestination(int port) {
+        if (closed || failed || ownership.state() != LocalCoreOwnership.State.JPA || port <= 0 || port > 65535 || port == port()
+                || (documentBackend.isDone() && !documentBackend.isCompletedExceptionally() && documentBackend.getNow(port) != port)) {
+            throw new IllegalStateException("Backend is not ready for handoff");
+        }
+    }
+
+    public synchronized void backendFailed() {
+        failed = true;
+        var failure = new IllegalStateException("Backend startup failed");
+        backend.completeExceptionally(failure); documentBackend.completeExceptionally(failure);
+    }
+
+    private static boolean documentRoute(String method, String path) {
+        // Proxy health to its existing readiness checks; an accepting socket must never mean UP.
+        if ((method.equals("GET") || method.equals("HEAD"))
+                && Set.of("/api/desktop/health", "/api/desktop/startup-health").contains(path)) return true;
+        if ((method.equals("GET") || method.equals("HEAD")) && LocalCoreHttpReads.READ_PATHS.stream()
+                .anyMatch(route -> path.matches(route.replace(":id", "[1-9][0-9]*")))) return true;
+        String content = "/api/local-core/projects/[1-9][0-9]*/files/[1-9][0-9]*/content";
+        if (path.matches(content)) return Set.of("GET", "HEAD", "PUT").contains(method);
+        return Set.of("GET", "DELETE").contains(method) && path.matches(content
+                + "/receipts/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+    }
 
     private void dispatch(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         try {
+            if (closed || failed) { unavailable(response); return; }
             if (ownership.state() == LocalCoreOwnership.State.CORE) {
                 LocalCoreOwnership.CoreLease lease = null;
                 try { lease = ownership.acquireCoreLease(); }
@@ -106,7 +138,9 @@ public final class LocalCoreGateway implements AutoCloseable {
             }
             if (ownership.state() == LocalCoreOwnership.State.FAILED) { unavailable(response); return; }
             // Never retain a core lease while waiting for the backend that needs to drain those leases.
-            int target = backend.get(waitForBackend.toMillis(), TimeUnit.MILLISECONDS);
+            var destination = documentRoute(request.getMethod(), request.getRequestURI()) ? documentBackend : backend;
+            int target = destination.get(waitForBackend.toMillis(), TimeUnit.MILLISECONDS);
+            if (closed || failed) { unavailable(response); return; }
             proxy(request, response, target);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
