@@ -4595,3 +4595,30 @@ export const cancelOcrRouting = (data, scope) => request({
   url: scope ? scope.baseUrl.replace(/\/$/, '') + '/api/ocr/routing/cancel' : '/api/ocr/routing/cancel',
   method: 'POST', data, header: scope?.headers, logBody: false,
 })
+
+// ===================== Harness² 用户自进化控制面板 API (dev-board#1481) =====================
+export const getHarnessEvolutions = (params = {}) => request({
+  url: '/api/agent/harness/evolutions',
+  method: 'GET',
+  data: params,
+})
+
+export const switchHarnessEvolutionScope = (id, scope) => request({
+  url: `/api/agent/harness/evolutions/${encodeURIComponent(id)}/scope`,
+  method: 'POST',
+  data: { scope },
+  header: { 'Content-Type': 'application/json' },
+})
+
+export const promoteHarnessEvolutionToSkill = (id, payload = {}) => request({
+  url: `/api/agent/harness/evolutions/${encodeURIComponent(id)}/promote-skill`,
+  method: 'POST',
+  data: payload,
+  header: { 'Content-Type': 'application/json' },
+})
+
+export const revertHarnessEvolution = (id) => request({
+  url: `/api/agent/harness/evolutions/${encodeURIComponent(id)}`,
+  method: 'DELETE',
+})
+
