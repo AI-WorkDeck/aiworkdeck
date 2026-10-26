@@ -77,6 +77,7 @@
     "test:lowa-redline-author": "node tests/lowa-e2e/redline-author.mjs",
     "test:lowa-modal-keyboard": "node tests/lowa-e2e/modal-keyboard.mjs",
     "test:lowa-pdf-export": "node tests/lowa-e2e/pdf-export.mjs",
+    "test:lowa-multilang-fonts": "node tests/lowa-e2e/multilang-fonts.mjs",
     "test:lowa-undo-redo": "node tests/lowa-e2e/undo-redo-kinds.mjs",
     "test:lowa-anchor-insert": "node tests/lowa-e2e/anchor-insert-export-pdf.mjs",
     "test:lowa-sheet-format": "node tests/lowa-e2e/sheet-format-inherit.mjs",

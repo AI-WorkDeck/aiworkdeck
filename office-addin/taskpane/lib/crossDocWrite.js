@@ -172,7 +172,7 @@ async function safeExec(exec, command, args) {
   try {
     const r = await exec(command, args)
     if (r && typeof r === 'object') return r
-    return { ok: false, error: '插件执行失败（未返回结果）' }
+    return { ok: false, error: t('crossDocExecNoResult') }
   } catch (e) {
     return { ok: false, error: (e && e.message) || String(e) }
   }
@@ -180,13 +180,12 @@ async function safeExec(exec, command, args) {
 
 function noTrackingError(family) {
   return family === 'wps'
-    ? '本机 WPS 文字无法标记修订，已拒绝跨文档修改'
-    : '本机 Word 版本无法标记修订，已拒绝跨文档修改'
+    ? t('crossDocWpsNoTracking')
+    : t('crossDocWordNoTracking')
 }
 
 function untrackableError(command) {
-  return `该操作（${command}）在 Word/WPS 文字里无法标记为修订，跨文档执行会留下没有痕迹的修改，已拒绝。`
-    + '请让用户在目标文档自己的 AI WorkDeck 窗格里完成这一步。'
+  return t('crossDocCommandUntrackable', { command })
 }
 
 /**

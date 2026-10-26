@@ -45,14 +45,14 @@ public class SensitiveService {
             customTerms = cleanTerms(customTerms);
             excludedTerms = cleanTerms(excludedTerms);
             mode = mode == null ? "MASK" : mode;
-            if (!Set.of("MASK", "TOKEN").contains(mode)) throw new IllegalArgumentException("未知脱敏模式");
-            if (strategies.stream().anyMatch(s -> SensitiveType.fromCode(s) == null)) throw new IllegalArgumentException("未知脱敏策略");
-            if (strategies.isEmpty() && customTerms.isEmpty()) throw new IllegalArgumentException("请选择策略或填写补充敏感词");
+            if (!Set.of("MASK", "TOKEN").contains(mode)) throw new IllegalArgumentException(LangText.of("未知脱敏模式", "Unknown redaction mode"));
+            if (strategies.stream().anyMatch(s -> SensitiveType.fromCode(s) == null)) throw new IllegalArgumentException(LangText.of("未知脱敏策略", "Unknown redaction strategy"));
+            if (strategies.isEmpty() && customTerms.isEmpty()) throw new IllegalArgumentException(LangText.of("请选择策略或填写补充敏感词", "Please select at least one strategy or enter custom sensitive terms"));
         }
         private static List<String> cleanTerms(List<String> terms) {
             if (terms == null) return List.of();
-            if (terms.size() > 500) throw new IllegalArgumentException("词表最多500项");
-            if (terms.stream().anyMatch(t -> t == null || t.length() > 200)) throw new IllegalArgumentException("单项词条最长200字符");
+            if (terms.size() > 500) throw new IllegalArgumentException(LangText.of("词表最多500项", "Up to 500 terms allowed"));
+            if (terms.stream().anyMatch(t -> t == null || t.length() > 200)) throw new IllegalArgumentException(LangText.of("单项词条最长200字符", "Each term can be at most 200 characters"));
             return terms.stream().map(String::trim).filter(t -> !t.isEmpty()).distinct().toList();
         }
     }
@@ -86,20 +86,26 @@ public class SensitiveService {
     }
 
     private String validateSource(Path source, boolean reversible) throws IOException {
-        if (!Files.isRegularFile(source)) throw new IllegalArgumentException("文件不存在或不是普通文件");
-        if (Files.size(source) > 32 * 1024 * 1024) throw new IllegalArgumentException("文件超过32MB，请拆分处理");
+        if (!Files.isRegularFile(source)) throw new IllegalArgumentException(LangText.of("文件不存在或不是普通文件", "File does not exist or is not a regular file"));
+        if (Files.size(source) > 32 * 1024 * 1024) throw new IllegalArgumentException(LangText.of("文件超过32MB，请拆分处理", "File exceeds 32 MB; please split it before processing"));
         String ext = FileUtil.extName(source.toFile()).toLowerCase(Locale.ROOT);
         if (!TEXT_EXTENSIONS.contains(ext) && !Set.of("docx", "pdf").contains(ext)) {
-            throw new IllegalArgumentException("仅支持 DOCX、文本型 PDF 和 UTF-8 文本（txt/md/csv/log）");
+            throw new IllegalArgumentException(LangText.of("仅支持 DOCX、文本型 PDF 和 UTF-8 文本（txt/md/csv/log）", "Only DOCX, text-based PDF, and UTF-8 text files (txt/md/csv/log) are supported"));
         }
-        if (reversible && ext.equals("pdf")) throw new IllegalArgumentException("PDF 黑框脱敏不可复敏；请先使用文本或 DOCX 文件");
+        if (reversible && ext.equals("pdf")) throw new IllegalArgumentException(LangText.of("PDF 黑框脱敏不可复敏；请先使用文本或 DOCX 文件", "PDF black-box redaction is irreversible; please use a text or DOCX file"));
         return ext;
     }
 
     private List<String> warnings(String ext) {
-        if (ext.equals("docx")) return List.of("处理正文、表格、页眉页脚、脚注尾注、批注文字及文本框；图片、嵌入附件、修订作者和文档属性未处理，请人工核查。字段更新可能重新带入内容。");
-        if (ext.equals("pdf")) return List.of("PDF 采用不可逆黑框并移除文字层，输出不可选中文字；图片中的内容未识别，请逐页核查。");
-        return List.of("规则可能漏识别或误识别；请检查预览，并补充简称、人名等敏感词。");
+        if (ext.equals("docx")) return List.of(LangText.of(
+                "处理正文、表格、页眉页脚、脚注尾注、批注文字及文本框；图片、嵌入附件、修订作者和文档属性未处理，请人工核查。字段更新可能重新带入内容。",
+                "Processes body text, tables, headers/footers, footnotes/endnotes, comments, and text boxes; images, embedded attachments, revision authors, and document properties are not processed—please review manually."));
+        if (ext.equals("pdf")) return List.of(LangText.of(
+                "PDF 采用不可逆黑框并移除文字层，输出不可选中文字；图片中的内容未识别，请逐页核查。",
+                "PDF redaction applies irreversible black boxes and flattens the text layer into images; content inside images is not detected—please verify page by page."));
+        return List.of(LangText.of(
+                "规则可能漏识别或误识别；请检查预览，并补充简称、人名等敏感词。",
+                "Rule-based detection may miss or over-match items; please review the preview and add abbreviations or names as custom terms."));
     }
 
     private SensitiveTextEngine engine(Options options, String text) {
@@ -120,8 +126,8 @@ public class SensitiveService {
         SensitiveTextEngine engine = engine(options, text);
         String preview = engine.apply(text);
         var messages = new ArrayList<>(warnings(ext));
-        if (engine.counts().isEmpty()) messages.add("未识别到敏感信息，不代表原文没有敏感信息。");
-        if (preview.length() > 12000) messages.add("预览仅显示前12000字符，统计和实际处理覆盖全文。");
+        if (engine.counts().isEmpty()) messages.add(LangText.of("未识别到敏感信息，不代表原文没有敏感信息。", "No sensitive items were detected; this does not guarantee the document contains none."));
+        if (preview.length() > 12000) messages.add(LangText.of("预览仅显示前12000字符，统计和实际处理覆盖全文。", "Preview shows only the first 12,000 characters; statistics and actual processing cover the full document."));
         return new Preview(preview.substring(0, Math.min(12000, preview.length())),
                 engine.counts(), engine.suspects(), messages);
     }
@@ -134,14 +140,14 @@ public class SensitiveService {
         SensitiveDocx doc = ext.equals("docx") ? new SensitiveDocx(source) : null;
         String text = doc != null ? String.join("\n", doc.texts()) : ext.equals("pdf") ? "" : Files.readString(source, StandardCharsets.UTF_8);
         SensitiveTextEngine engine = engine(options, text);
-        Path dest = outputPath(source, ext, "已脱敏");
+        Path dest = outputPath(source, ext, LangText.of("已脱敏", "Redacted"));
         try {
             if (doc != null) { doc.transform(engine::edits); writeDocx(doc, dest); }
             else if (ext.equals("pdf")) processPdf(source.toFile(), dest.toFile(), engine);
             else Files.writeString(dest, engine.apply(text), StandardCharsets.UTF_8);
             String kit = reversible && !engine.recovery().isEmpty() ? SensitiveRecoveryKit.encrypt(engine.recovery(), options.password()) : "";
             var messages = new ArrayList<>(warnings(ext));
-            if (engine.counts().isEmpty()) messages.add("未识别到敏感信息，本次没有替换任何内容。");
+            if (engine.counts().isEmpty()) messages.add(LangText.of("未识别到敏感信息，本次没有替换任何内容。", "No sensitive items were detected; no content was replaced."));
             return new Result(dest.toString(), kit, engine.counts(), engine.suspects(), messages);
         } catch (Exception e) { Files.deleteIfExists(dest); throw e; }
     }
@@ -163,13 +169,13 @@ public class SensitiveService {
         String result = null;
         if (doc == null) result = SensitiveTextEngine.apply(text, transform.apply(text));
         else doc.transform(transform);
-        if (restored[0] == 0) throw new IllegalArgumentException("没有找到与该复敏文件匹配的编号；请核对文件，星号、黑框及被改写的编号无法还原");
-        Path dest = outputPath(source, ext, "已复敏");
+        if (restored[0] == 0) throw new IllegalArgumentException(LangText.of("没有找到与该复敏文件匹配的编号；请核对文件，星号、黑框及被改写的编号无法还原", "No matching tokens found for this recovery kit; asterisk masks, black boxes, and modified tokens cannot be restored"));
+        Path dest = outputPath(source, ext, LangText.of("已复敏", "Restored"));
         try {
             if (doc != null) writeDocx(doc, dest); else Files.writeString(dest, result, StandardCharsets.UTF_8);
             var messages = new ArrayList<String>();
-            messages.add("仅恢复原样保留的编号；已删除或被改写的编号无法还原。复敏后的文件含原始敏感信息。");
-            if (unknown[0] > 0) messages.add("另有" + unknown[0] + "个编号不属于此复敏文件，已保留原样。");
+            messages.add(LangText.of("仅恢复原样保留的编号；已删除或被改写的编号无法还原。复敏后的文件含原始敏感信息。", "Only intact tokens are restored; deleted or modified tokens cannot be recovered. The restored file contains original sensitive data."));
+            if (unknown[0] > 0) messages.add(LangText.of("另有" + unknown[0] + "个编号不属于此复敏文件，已保留原样。", unknown[0] + " token(s) did not belong to this recovery kit and were left unchanged."));
             return new Result(dest.toString(), "", Map.of("RESTORED", restored[0]), Map.of(), messages);
         } catch (Exception e) { Files.deleteIfExists(dest); throw e; }
     }
@@ -180,7 +186,7 @@ public class SensitiveService {
     }
 
     private String pdfText(PDDocument document) throws IOException {
-        if (document.isEncrypted()) throw new IllegalArgumentException("请先解除 PDF 密码保护");
+        if (document.isEncrypted()) throw new IllegalArgumentException(LangText.of("请先解除 PDF 密码保护", "Please remove password protection from the PDF first"));
         PDFTextStripper stripper = new PDFTextStripper();
         stripper.setSortByPosition(true);
         StringBuilder text = new StringBuilder();
@@ -191,11 +197,15 @@ public class SensitiveService {
                     || crop.getLowerLeftX() != 0 || crop.getLowerLeftY() != 0
                     || media.getLowerLeftX() != 0 || media.getLowerLeftY() != 0
                     || crop.getWidth() != media.getWidth() || crop.getHeight() != media.getHeight()) {
-                throw new IllegalArgumentException("PDF 第" + page + "页存在旋转或特殊页面坐标，请先规范页面或转为 DOCX/文本后处理");
+                throw new IllegalArgumentException(LangText.of(
+                        "PDF 第" + page + "页存在旋转或特殊页面坐标，请先规范页面或转为 DOCX/文本后处理",
+                        "PDF page " + page + " has page rotation or non-standard coordinates; please normalize the page or convert to DOCX/text first"));
             }
             stripper.setStartPage(page); stripper.setEndPage(page);
             String pageText = stripper.getText(document);
-            if (pageText.isBlank()) throw new IllegalArgumentException("PDF 第" + page + "页无可识别文字；扫描页或空白页请先人工核查，不能直接自动脱敏");
+            if (pageText.isBlank()) throw new IllegalArgumentException(LangText.of(
+                    "PDF 第" + page + "页无可识别文字；扫描页或空白页请先人工核查，不能直接自动脱敏",
+                    "PDF page " + page + " has no extractable text; scanned or blank pages require manual review and cannot be auto-redacted"));
             text.append(pageText).append('\n');
         }
         return text.toString();
@@ -367,9 +377,9 @@ public class SensitiveService {
                     // 如实记为"这次命中没能画框"，避免出现"看起来已脱敏、实则未覆盖"的假阳性。
                     log.warn("PDF脱敏：第{}页命中{}但命中区间内存在无法映射坐标的字符，跳过画框（原文可能未被遮盖，请人工核查）",
                             currentPdfPageIndex + 1, "敏感信息");
-                    throw new IllegalArgumentException("PDF 文字坐标无法可靠定位，请改用文本或 DOCX 处理");
+                    throw new IllegalArgumentException(LangText.of("PDF 文字坐标无法可靠定位，请改用文本或 DOCX 处理", "PDF text coordinates cannot be reliably located; please use text or DOCX instead"));
                 }
-                if (tp.getDir() != 0f) throw new IllegalArgumentException("PDF 命中旋转文字，无法可靠遮蔽，请转为 DOCX/文本后处理");
+                if (tp.getDir() != 0f) throw new IllegalArgumentException(LangText.of("PDF 命中旋转文字，无法可靠遮蔽，请转为 DOCX/文本后处理", "PDF contains rotated text that cannot be reliably masked; please convert to DOCX/text first"));
                 float y = tp.getYDirAdj();
                 if (lineY == null) {
                     lineY = y;

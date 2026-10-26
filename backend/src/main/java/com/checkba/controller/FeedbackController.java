@@ -60,7 +60,7 @@ public class FeedbackController {
             @RequestParam(value = "files", required = false) List<MultipartFile> files) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("请先登录"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(LangText.of("请先登录", "Please sign in first")));
         }
         try {
             Map<String, Object> payload = parsePayload(payloadJson);
@@ -97,7 +97,7 @@ public class FeedbackController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("请先登录"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(LangText.of("请先登录", "Please sign in first")));
         }
         List<Map<String, Object>> items = new ArrayList<>();
         for (UserFeedback fb : feedbackService.listByUser(userId, 100)) {

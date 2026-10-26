@@ -720,9 +720,9 @@ export default {
       return {
         activeMatters,
         pendingClearances,
-        totalContractedText: `${totalContractedWan} 万`,
-        totalBilledText: `${totalBilledWan} 万`,
-        totalCollectedText: `${totalCollectedWan} 万`,
+        totalContractedText: this.$t('team.lawfirmWanSuffix', { amount: totalContractedWan }),
+        totalBilledText: this.$t('team.lawfirmWanSuffix', { amount: totalBilledWan }),
+        totalCollectedText: this.$t('team.lawfirmWanSuffix', { amount: totalCollectedWan }),
         collectionRate,
       }
     },
@@ -847,9 +847,9 @@ export default {
       return res
     },
     formatLawFirmWan(cents, wan) {
-      if (wan != null && wan !== '') return `${Number(wan).toFixed(2)} 万`
+      if (wan != null && wan !== '') return this.$t('team.lawfirmWanSuffix', { amount: Number(wan).toFixed(2) })
       const c = Number(cents || 0)
-      return `${(c / 1000000).toFixed(2)} 万`
+      return this.$t('team.lawfirmWanSuffix', { amount: (c / 1000000).toFixed(2) })
     },
     formatLawFirmRate(rate) {
       if (rate == null || rate === '') return '-'
@@ -875,7 +875,7 @@ export default {
         else await this.loadLawFirmDashboard()
         this.toast(this.$t('account.caseDemoSeededToast'))
       } catch (e) {
-        this.toast(e?.message || '操作失败')
+        this.toast(e?.message || this.$t('team.lawfirmActionFailedToast'))
       } finally {
         this.lawfirmBusy = false
       }
@@ -888,7 +888,7 @@ export default {
         uni.$emit('awd:open-lawfirm-plugin', { tab })
         this.toast(this.$t('account.casePluginOpenedToast'))
       } catch (e) {
-        this.toast(e?.message || '打开工作台失败')
+        this.toast(e?.message || this.$t('team.lawfirmOpenWorkbenchFailedToast'))
       } finally {
         this.lawfirmBusy = false
       }

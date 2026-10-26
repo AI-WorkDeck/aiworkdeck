@@ -129,7 +129,7 @@ public class PluginController {
     public ResponseEntity<Map<String, Object>> listMarket(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         if (AuthController.getUserIdFromSession(sessionId) == null) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error("未登录"));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("未登录", "Not signed in")));
         }
         try {
             Map<String, Object> result = ok();
@@ -471,26 +471,117 @@ public class PluginController {
     }
 
     private PluginView toView(PluginService.PluginMetadata meta) {
+        String id = meta.getId();
         PluginView view = new PluginView();
-        view.setId(meta.getId());
-        view.setName(meta.getName());
+        view.setId(id);
+        view.setName(pluginService.localize(id, meta.getName()));
         view.setVersion(meta.getVersion());
-        view.setDescription(meta.getDescription());
+        view.setDescription(pluginService.localize(id, meta.getDescription()));
         view.setIcon(meta.getIcon());
-        view.setAuthor(meta.getAuthor());
+        view.setAuthor(pluginService.localize(id, meta.getAuthor()));
         view.setHomepage(meta.getHomepage());
         view.setFrontendEntry(meta.getFrontendEntry());
         view.setPermissions(meta.getPermissions() == null ? List.of() : meta.getPermissions());
-        view.setTools(meta.getTools() == null ? List.of() : meta.getTools());
+        if (meta.getTools() == null) {
+            view.setTools(List.of());
+        } else {
+            view.setTools(meta.getTools().stream().map(tool -> {
+                PluginService.PluginToolInfo copy = new PluginService.PluginToolInfo();
+                copy.setName(tool.getName());
+                copy.setDescription(pluginService.localize(id, tool.getDescription()));
+                copy.setPermissions(tool.getPermissions());
+                return copy;
+            }).toList());
+        }
         view.setToolCount(view.getTools().size());
-        view.setGuide(meta.getGuide());
-        view.setEnabled(pluginService.isEnabled(meta.getId()));
-        view.setRevokedReason(pluginService.revokedReason(meta.getId()));
+        view.setGuide(localizeGuide(id, meta.getGuide()));
+        view.setEnabled(pluginService.isEnabled(id));
+        view.setRevokedReason(pluginService.revokedReason(id));
         view.setMinHostVersion(meta.getMinHostVersion());
-        view.setIncompatibleReason(pluginService.incompatibleReason(meta.getId()));
-        view.setDevInstalled(pluginService.isDevInstalled(meta.getId()));
-        view.setContributes(meta.getContributes());
+        view.setIncompatibleReason(pluginService.incompatibleReason(id));
+        view.setDevInstalled(pluginService.isDevInstalled(id));
+        view.setContributes(localizeContributes(id, meta.getContributes()));
         return view;
+    }
+
+    private PluginService.PluginGuide localizeGuide(String pluginId, PluginService.PluginGuide guide) {
+        if (guide == null) {
+            return null;
+        }
+        PluginService.PluginGuide copy = new PluginService.PluginGuide();
+        copy.setIntro(pluginService.localize(pluginId, guide.getIntro()));
+        if (guide.getSteps() != null) {
+            copy.setSteps(guide.getSteps().stream()
+                    .map(step -> pluginService.localize(pluginId, step))
+                    .toList());
+        }
+        if (guide.getQuickActions() != null) {
+            copy.setQuickActions(guide.getQuickActions().stream().map(qa -> {
+                PluginService.PluginQuickAction qaCopy = new PluginService.PluginQuickAction();
+                qaCopy.setLabel(pluginService.localize(pluginId, qa.getLabel()));
+                qaCopy.setPrompt(pluginService.localize(pluginId, qa.getPrompt()));
+                qaCopy.setHint(pluginService.localize(pluginId, qa.getHint()));
+                return qaCopy;
+            }).toList());
+        }
+        return copy;
+    }
+
+    private PluginService.Contributes localizeContributes(String pluginId, PluginService.Contributes contributes) {
+        if (contributes == null) {
+            return null;
+        }
+        PluginService.Contributes copy = new PluginService.Contributes();
+        copy.setCapabilities(contributes.getCapabilities());
+        copy.setMcpServers(contributes.getMcpServers());
+        copy.setConnections(contributes.getConnections());
+        if (contributes.getViews() != null) {
+            copy.setViews(contributes.getViews().stream().map(v -> {
+                PluginService.PluginViewDecl vc = new PluginService.PluginViewDecl();
+                vc.setId(v.getId());
+                vc.setName(pluginService.localize(pluginId, v.getName()));
+                vc.setEntry(v.getEntry());
+                vc.setPlacement(v.getPlacement());
+                vc.setScope(v.getScope());
+                vc.setDefaultDock(v.getDefaultDock());
+                vc.setAllowedDocks(v.getAllowedDocks());
+                return vc;
+            }).toList());
+        }
+        if (contributes.getTemplates() != null) {
+            copy.setTemplates(contributes.getTemplates().stream().map(t -> {
+                PluginService.TemplateDecl tc = new PluginService.TemplateDecl();
+                tc.setId(t.getId());
+                tc.setName(pluginService.localize(pluginId, t.getName()));
+                tc.setGenre(t.getGenre());
+                tc.setFile(t.getFile());
+                tc.setDescription(pluginService.localize(pluginId, t.getDescription()));
+                tc.setLanguage(t.getLanguage());
+                return tc;
+            }).toList());
+        }
+        if (contributes.getStyleProfiles() != null) {
+            copy.setStyleProfiles(contributes.getStyleProfiles().stream().map(sp -> {
+                PluginService.StyleProfileDecl spc = new PluginService.StyleProfileDecl();
+                spc.setId(sp.getId());
+                spc.setName(pluginService.localize(pluginId, sp.getName()));
+                spc.setFile(sp.getFile());
+                return spc;
+            }).toList());
+        }
+        if (contributes.getEvidenceSources() != null) {
+            copy.setEvidenceSources(contributes.getEvidenceSources().stream().map(es -> {
+                PluginService.EvidenceSourceDecl esc = new PluginService.EvidenceSourceDecl();
+                esc.setSourceId(es.getSourceId());
+                esc.setName(pluginService.localize(pluginId, es.getName()));
+                esc.setDescription(pluginService.localize(pluginId, es.getDescription()));
+                esc.setTransport(es.getTransport());
+                esc.setServer(es.getServer());
+                esc.setTool(es.getTool());
+                return esc;
+            }).toList());
+        }
+        return copy;
     }
 
     /** 与 AdminConfigController 相同的管理员判定：session -> userId -> AdminAccessService（桌面单机全员管理员的唯一出口） */

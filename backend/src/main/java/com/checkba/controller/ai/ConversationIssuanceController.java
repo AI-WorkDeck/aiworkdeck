@@ -4,6 +4,7 @@
 package com.checkba.controller.ai;
 
 import com.checkba.controller.AuthController;
+import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
 import com.checkba.service.ai.ConversationIssuanceService;
 import lombok.Data;
@@ -41,11 +42,11 @@ public class ConversationIssuanceController {
                                                      @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) {
-            return ResponseEntity.status(403).body(Map.of("error", "会话身份无效"));
+            return ResponseEntity.status(403).body(Map.of("error", LangText.of("会话身份无效", "Invalid session identity")));
         }
         Long projectId = request == null ? null : request.getProjectId();
         if (projectId == null || !projectMemberService.hasReadPermission(projectId, userId)) {
-            return ResponseEntity.status(403).body(Map.of("error", "无权访问该项目"));
+            return ResponseEntity.status(403).body(Map.of("error", LangText.of("无权访问该项目", "You do not have access to this project")));
         }
         String conversationId = conversationIssuanceService.issue(userId, projectId);
         return ResponseEntity.ok(Map.of("conversationId", conversationId));

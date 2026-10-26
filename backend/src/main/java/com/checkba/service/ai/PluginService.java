@@ -603,26 +603,171 @@ public class PluginService {
         }
     }
 
+    private static final Map<String, Map<String, String>> BUILTIN_PLUGIN_EN = Map.ofEntries(
+            Map.entry("baoqingtian", Map.ofEntries(
+                    Map.entry("plugin.name", "Baoqingtian · Leads & Notes"),
+                    Map.entry("包晴天 · 案源与笔记", "Baoqingtian · Leads & Notes"),
+                    Map.entry("plugin.description", "Connect your Baoqingtian lawyer account to browse the case lead marketplace and manage platform notes and drafts in an independent workspace. Open a project first."),
+                    Map.entry("连接包晴天律师账号，在独立工作区浏览案源广场、管理平台图文笔记和草稿。先打开一个项目再使用。", "Connect your Baoqingtian lawyer account to browse the case lead marketplace and manage platform notes and drafts in an independent workspace. Open a project first."),
+                    Map.entry("tool.baoqingtian_action.description", "Baoqingtian case leads and platform notes workspace."),
+                    Map.entry("包晴天案源和平台笔记工作区。", "Baoqingtian case leads and platform notes workspace.")
+            )),
+            Map.entry("calendar", Map.ofEntries(
+                    Map.entry("plugin.name", "Calendar"),
+                    Map.entry("view.sidebar.name", "Calendar"),
+                    Map.entry("view.main.name", "Calendar"),
+                    Map.entry("日程", "Calendar"),
+                    Map.entry("plugin.description", "Cross-project calendar, tasks, reminders, and file links."),
+                    Map.entry("跨项目日历、任务、提醒和文件关联。", "Cross-project calendar, tasks, reminders, and file links.")
+            )),
+            Map.entry("clipboard", Map.ofEntries(
+                    Map.entry("plugin.name", "Clipboard"),
+                    Map.entry("view.main.name", "Clipboard"),
+                    Map.entry("剪贴板", "Clipboard"),
+                    Map.entry("plugin.description", "Search clipboard history, copy, and insert content."),
+                    Map.entry("查找剪贴记录、复制和插入内容。", "Search clipboard history, copy, and insert content.")
+            )),
+            Map.entry("desensitize", Map.ofEntries(
+                    Map.entry("plugin.name", "Desensitize"),
+                    Map.entry("view.main.name", "Desensitize"),
+                    Map.entry("脱敏", "Desensitize"),
+                    Map.entry("plugin.description", "Inspect sensitive information, generate desensitized copies, and restore with recovery packages."),
+                    Map.entry("核查敏感信息并生成脱敏副本，可用恢复包复敏。", "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.")
+            )),
+            Map.entry("dpia-workbench", Map.ofEntries(
+                    Map.entry("plugin.name", "DPIA Workbench"),
+                    Map.entry("DPIA 工作台", "DPIA Workbench"),
+                    Map.entry("plugin.description", "Data Protection Impact Assessment: source tracing, fact confirmation, Q&A follow-up, risk & remediation, continuous re-assessment, and versioned reports. Adapted from Zhu Lingfeng's DSH DPIA Workbench; requires Node.js, Python, and LibreOffice."),
+                    Map.entry("数据保护影响评估：材料溯源、事实确认、问题补答、风险与整改、持续复评及分版本报告。基于朱玲凤的 DSH DPIA Workbench 适配；需 Node.js、Python 和 LibreOffice。", "Data Protection Impact Assessment: source tracing, fact confirmation, Q&A follow-up, risk & remediation, continuous re-assessment, and versioned reports. Adapted from Zhu Lingfeng's DSH DPIA Workbench; requires Node.js, Python, and LibreOffice."),
+                    Map.entry("plugin.author", "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)"),
+                    Map.entry("AI WorkDeck（上游：朱玲凤 / The-Data-Galaxy）", "AI WorkDeck (Upstream: Zhu Lingfeng / The-Data-Galaxy)"),
+                    Map.entry("setting.nodePath.label", "Node.js Executable"),
+                    Map.entry("Node.js 可执行文件", "Node.js Executable"),
+                    Map.entry("setting.nodePath.description", "Leave blank to use node from system PATH; requires Node.js 20 or newer."),
+                    Map.entry("留空使用系统 PATH 中的 node；需要 Node.js 20 或更新版本。", "Leave blank to use node from system PATH; requires Node.js 20 or newer."),
+                    Map.entry("setting.pythonPath.label", "Python Executable"),
+                    Map.entry("Python 可执行文件", "Python Executable"),
+                    Map.entry("setting.pythonPath.description", "Requires document dependencies from runtime/requirements.txt; can specify a Python path from a virtual environment."),
+                    Map.entry("需安装 runtime/requirements.txt 中的文档依赖；可填写独立虚拟环境中的 Python 路径。", "Requires document dependencies from runtime/requirements.txt; can specify a Python path from a virtual environment."),
+                    Map.entry("setting.pdfFontPath.label", "PDF CJK Font File"),
+                    Map.entry("PDF 中文字体文件", "PDF CJK Font File"),
+                    Map.entry("setting.pdfFontPath.description", "Filling CJK text in native PDF templates requires an embeddable TrueType font (TTF/TTC); leave blank to use system font lookup."),
+                    Map.entry("原生 PDF 模板填写中文需可嵌入的 TrueType 字体（TTF/TTC）；Linux 可安装文泉驿正黑。留空使用上游系统字体查找。", "Filling CJK text in native PDF templates requires an embeddable TrueType font (TTF/TTC); leave blank to use system font lookup."),
+                    Map.entry("setting.sofficePath.label", "LibreOffice Executable"),
+                    Map.entry("LibreOffice 可执行文件", "LibreOffice Executable"),
+                    Map.entry("setting.sofficePath.description", "Only needed for report PDF export and page preview; leave blank to try default system locations."),
+                    Map.entry("仅报告 PDF 与页面预览需要；留空尝试系统安装位置。", "Only needed for report PDF export and page preview; leave blank to try default system locations."),
+                    Map.entry("tool.dpia_workbench_action.description", "DPIA case, materials, fact confirmation, Q&A, run status, and report operations. For workbench UI only; AI must not invoke manual confirmation/approval entries."),
+                    Map.entry("DPIA 案件、材料、事实确认、补答、运行状态及报告操作。仅供工作台界面调用，AI 不可调用人工确认/审批入口。", "DPIA case, materials, fact confirmation, Q&A, run status, and report operations. For workbench UI only; AI must not invoke manual confirmation/approval entries."),
+                    Map.entry("tool.dpia_workbench_task.description", "Execute currently frozen DPIA tasks: context/read/write/script/commit/report; strictly scoped to the current user project and case output directory."),
+                    Map.entry("执行当前冻结的 DPIA 任务：context/read/write/script/commit/report；严格限定当前用户项目及案件输出目录，不执行任意代码。", "Execute currently frozen DPIA tasks: context/read/write/script/commit/report; strictly scoped to the current user project and case output directory.")
+            )),
+            Map.entry("favorites", Map.ofEntries(
+                    Map.entry("plugin.name", "Favorites"),
+                    Map.entry("view.main.name", "Favorites"),
+                    Map.entry("收藏夹", "Favorites"),
+                    Map.entry("plugin.description", "Search project favorites, copy, insert, or open sources."),
+                    Map.entry("查找项目收藏，复制、插入或打开来源。", "Search project favorites, copy, insert, or open sources.")
+            )),
+            Map.entry("insight", Map.ofEntries(
+                    Map.entry("plugin.name", "Evidence & Insight"),
+                    Map.entry("view.main.name", "Evidence & Insight"),
+                    Map.entry("依据", "Evidence & Insight"),
+                    Map.entry("plugin.description", "Document evidence retrieval, consistency verification, and contract review."),
+                    Map.entry("文档依据检索、一致性核验和合同审查。", "Document evidence retrieval, consistency verification, and contract review.")
+            )),
+            Map.entry("lawfirm-management", Map.ofEntries(
+                    Map.entry("plugin.name", "Law Firm Management"),
+                    Map.entry("律所管理", "Law Firm Management"),
+                    Map.entry("plugin.description", "Case intake & approval, regulatory-grade conflict-of-interest checks with collaborative clearance, billing & invoice ledger (manual reconciliation and Kingdee/Yonyou integration), and lawyer workload & executive dashboard."),
+                    Map.entry("律所收案立项、法规级利益冲突检索与站内信协同放行、发票与财务收费台账（支持手动核销与金蝶/用友对接）、律师工作负荷与管理决策看板。", "Case intake & approval, regulatory-grade conflict-of-interest checks with collaborative clearance, billing & invoice ledger (manual reconciliation and Kingdee/Yonyou integration), and lawyer workload & executive dashboard.")
+            )),
+            Map.entry("litigation-visual", Map.ofEntries(
+                    Map.entry("plugin.name", "Litigation Visualization"),
+                    Map.entry("view.main.name", "Litigation Visualization"),
+                    Map.entry("诉讼可视化", "Litigation Visualization"),
+                    Map.entry("plugin.description", "Select case materials to generate and manage editable litigation charts."),
+                    Map.entry("选择案卷材料，生成并管理可编辑的诉讼图表。", "Select case materials to generate and manage editable litigation charts.")
+            )),
+            Map.entry("project-im", Map.ofEntries(
+                    Map.entry("plugin.name", "Project Messaging"),
+                    Map.entry("项目沟通", "Project Messaging"),
+                    Map.entry("plugin.description", "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only."),
+                    Map.entry("律所、团队与项目的沟通：共享助手、私聊、文件归档与 AI 引用。目前仅支持中国大陆站账号，国际站暂未开通。", "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only.")
+            )),
+            Map.entry("search", Map.ofEntries(
+                    Map.entry("plugin.name", "Project Search"),
+                    Map.entry("view.main.name", "Project Search"),
+                    Map.entry("项目搜索", "Project Search"),
+                    Map.entry("plugin.description", "Search project files by full text or tags and jump directly to documents."),
+                    Map.entry("按正文、标签搜索项目文件，并定位到文档。", "Search project files by full text or tags and jump directly to documents.")
+            )),
+            Map.entry("tencent-meeting", Map.ofEntries(
+                    Map.entry("plugin.name", "Tencent Meeting"),
+                    Map.entry("腾讯会议", "Tencent Meeting"),
+                    Map.entry("plugin.description", "Connect Tencent Meeting to sync meetings and recordings on demand, view transcripts and smart minutes, archive to projects, and generate meeting minutes and action items. Requires the official tmeet CLI and account authorization."),
+                    Map.entry("连接腾讯会议，按需同步会议与录制、查看逐字稿和智能纪要，归档到项目并生成会议纪要及待办。需安装腾讯会议官方 tmeet CLI 并完成账号授权。", "Connect Tencent Meeting to sync meetings and recordings on demand, view transcripts and smart minutes, archive to projects, and generate meeting minutes and action items. Requires the official tmeet CLI and account authorization."),
+                    Map.entry("tool.tencent_meeting_action.description", "Tencent Meeting plugin: check connection, authorize login, sync on demand, view meetings and transcripts, and archive project files."),
+                    Map.entry("腾讯会议插件：检查连接、用户授权登录、按需同步、查看会议及逐字稿、归档项目文件。", "Tencent Meeting plugin: check connection, authorize login, sync on demand, view meetings and transcripts, and archive project files.")
+            )),
+            Map.entry("voice", Map.ofEntries(
+                    Map.entry("plugin.name", "Voice & Speech"),
+                    Map.entry("view.main.name", "Voice & Speech"),
+                    Map.entry("语音", "Voice & Speech"),
+                    Map.entry("plugin.description", "Instant read-aloud, real-time speed control, subtitle highlighting, and meeting recording."),
+                    Map.entry("即时朗读、实时调速、字幕高亮与会议录音。", "Instant read-aloud, real-time speed control, subtitle highlighting, and meeting recording.")
+            ))
+    );
+
     /**
      * 解析 manifest 字符串里的 {@code %key%} 引用（规范 v2.9 P4，VS Code package.nls 机制）：
-     * 整值形如 %key% 才解析；按当前应用语言查表，缺键回退 zh-CN 表，再缺回退原文
-     * （保留 %key% 字面量让作者看见漏了哪个键）。
+     * 整值形如 %key% 时优先查表，缺键回退 zh-CN 表，再缺回退原文；
+     * 若原文为直接字符串且当前语言为英文，亦支持通过插件 l10n 表或内置官方插件表匹配对应英文译文。
      */
     public String localize(String pluginId, String raw) {
-        if (raw == null || raw.length() < 3 || raw.charAt(0) != '%' || raw.charAt(raw.length() - 1) != '%') {
+        if (raw == null || raw.isBlank()) {
             return raw;
         }
-        Map<String, Map<String, String>> tables = pluginL10n.get(pluginId);
-        if (tables == null) {
+        boolean isToken = raw.length() >= 3 && raw.charAt(0) == '%' && raw.charAt(raw.length() - 1) == '%';
+        Map<String, Map<String, String>> tables = pluginId != null ? pluginL10n.get(pluginId) : null;
+        boolean english = com.checkba.service.LangText.isEnglish();
+        String lang = english ? "en-US" : "zh-CN";
+        if (isToken) {
+            String key = raw.substring(1, raw.length() - 1);
+            if (tables != null) {
+                String v = tables.getOrDefault(lang, Map.of()).get(key);
+                if (v == null) {
+                    v = tables.getOrDefault("zh-CN", Map.of()).get(key);
+                }
+                if (v != null) {
+                    return v;
+                }
+            }
+            if (english && pluginId != null) {
+                String builtinEn = BUILTIN_PLUGIN_EN.getOrDefault(pluginId, Map.of()).get(key);
+                if (builtinEn != null) {
+                    return builtinEn;
+                }
+            }
             return raw;
         }
-        String key = raw.substring(1, raw.length() - 1);
-        String lang = com.checkba.service.LangText.isEnglish() ? "en-US" : "zh-CN";
-        String v = tables.getOrDefault(lang, Map.of()).get(key);
-        if (v == null) {
-            v = tables.getOrDefault("zh-CN", Map.of()).get(key);
+        if (!english || pluginId == null) {
+            return raw;
         }
-        return v != null ? v : raw;
+        if (tables != null) {
+            Map<String, String> zhTable = tables.getOrDefault("zh-CN", Map.of());
+            Map<String, String> enTable = tables.getOrDefault("en-US", Map.of());
+            for (Map.Entry<String, String> entry : zhTable.entrySet()) {
+                if (raw.equals(entry.getValue())) {
+                    String enVal = enTable.get(entry.getKey());
+                    if (enVal != null && !enVal.isBlank()) {
+                        return enVal;
+                    }
+                }
+            }
+        }
+        String builtinEn = BUILTIN_PLUGIN_EN.getOrDefault(pluginId, Map.of()).get(raw);
+        return builtinEn != null ? builtinEn : raw;
     }
 
     /** minHostVersion 与宿主版本比对；不达标返回原因文案，达标/无声明/dev 态宿主返回 null */
@@ -638,7 +783,9 @@ public class PluginService {
             return null;
         }
         if (com.checkba.util.Semver.compare(appVersion, min) < 0) {
-            return "需要宿主版本 ≥ " + min + "（当前 " + appVersion + "），请升级客户端";
+            return com.checkba.service.LangText.of(
+                    "需要宿主版本 ≥ " + min + "（当前 " + appVersion + "），请升级客户端",
+                    "Requires host version >= " + min + " (current " + appVersion + "); please upgrade the client");
         }
         return null;
     }
@@ -700,8 +847,9 @@ public class PluginService {
         }
         // 平台封禁是强制的：用户可以卸载，但不能把被封禁的插件重新启用
         if (enabled && revokedPluginIds.containsKey(pluginId)) {
-            throw new IllegalStateException(
-                    "该插件已被平台下架：" + revokedPluginIds.get(pluginId) + "，无法启用，建议卸载");
+            throw new IllegalStateException(com.checkba.service.LangText.of(
+                    "该插件已被平台下架：" + revokedPluginIds.get(pluginId) + "，无法启用，建议卸载",
+                    "This plugin has been revoked by the platform: " + revokedPluginIds.get(pluginId) + "; cannot enable, please uninstall"));
         }
         // 版本不兼容时拒绝启用：不能静默翻一个不生效的位（规范 v2.7 P0）
         if (enabled && incompatiblePluginIds.containsKey(pluginId)) {

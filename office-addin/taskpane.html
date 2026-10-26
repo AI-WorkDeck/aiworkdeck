@@ -17,9 +17,13 @@
         shown = true
         var app = document.getElementById('app')
         if (!app) return
+        var lang = ''
+        try { lang = (localStorage.getItem('awd_addin_lang') || navigator.language || '').toLowerCase() } catch (e) {}
+        var isZh = lang.indexOf('zh') === 0
         app.innerHTML = '<div style="padding:24px;font-family:-apple-system,\'Segoe UI\',sans-serif;font-size:13px;line-height:1.6;color:#333;">'
-          + '<p>Office 组件加载失败，请检查网络或代理设置后重新打开任务窗格。</p>'
-          + '<p>Failed to load the Office component. Check your network or proxy settings, then reopen the task pane.</p>'
+          + (isZh
+            ? '<p>Office 组件加载失败，请检查网络或代理设置后重新打开任务窗格。</p>'
+            : '<p>Failed to load the Office component. Check your network or proxy settings, then reopen the task pane.</p>')
           + '</div>'
       }
       window.__awdOfficeLoadFailed = showOfficeLoadFailure

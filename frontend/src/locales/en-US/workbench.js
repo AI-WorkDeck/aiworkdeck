@@ -343,6 +343,21 @@ export default {
   dragUnsupported: 'This content cannot be dropped here; drop a file, an editor tab, or a file from your computer',
   dragFolderUnsupported: 'The chat area accepts files only; drop a whole folder onto the file explorer on the left',
   dragUploadingToRoot: 'Importing to the project root folder...',
+  editorProgressWithTotal: 'Processing {done}/{total}',
+  editorProgressCount: 'Processed {done} items',
+  contextTruncatedSuffix: '...[Context truncated by {count} chars]',
+  pluginDragExpiredToast: 'Drag expired. Please drag the file card again',
+  pluginAddToAiFailedToast: 'Could not add to AI chat. Please try again',
+  pluginFallbackName: 'Plugin',
+  pluginLabels: {
+    tencentMeeting: 'Tencent Meeting',
+    baoqingtian: 'Baoqingtian · Fact Timeline & Contradiction Review',
+    dpiaWorkbench: 'DPIA Compliance Workbench',
+    lawfirmManagement: 'Law Firm Management',
+    projectIm: 'Project Chat',
+  },
+  sensitiveEditorNotReadyError: 'The editor is not ready yet and cannot save current changes. Please try again later',
+  sensitiveSavePendingError: 'Current changes have not been saved yet. Please save the file and try again',
   // EvidenceLink: drop-to-link in the editor / method bar / link locating (evidenceLinkActions.js, EvidenceMethodBar.vue, LibreOfficeEditor.vue)
   evidence: {
     selectFirst: 'Select the text to link first',

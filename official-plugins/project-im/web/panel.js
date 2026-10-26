@@ -600,6 +600,218 @@
     $('dialog-body').append(node('p', '发送的是受控版本快照；源文件后续更改不会自动替换。文件默认供内部成员读取，客户需单独授权；客户本人上传的文件可自行读取。', 'hint'));
   }
   const controlIds = ['new-chat', 'join-chat', 'refresh', 'add-friend', 'directory-home'];
+  const EN_EXACT = {
+    '项目沟通 · AI WorkDeck': 'Project Messaging · AI WorkDeck',
+    '正在连接项目沟通…': 'Connecting to Project Messaging…',
+    '会话与通讯录': 'Conversations & Directory',
+    '新建会话': 'New Chat',
+    '邀请码加入': 'Join with Code',
+    '搜索会话或联系人': 'Search chats or contacts',
+    '项目、团队与律所助手': 'Project, Team & Firm Assistants',
+    '对话列表': 'Conversations',
+    '会话': 'Chats',
+    '刷新': 'Refresh',
+    '还没有会话。新建会话，或用邀请码加入。': 'No conversations yet. Start a new chat or join with an invite code.',
+    '没有匹配的会话。': 'No matching conversations.',
+    '通讯录': 'Directory',
+    '律所 · 团队 · 项目': 'Firm · Team · Project',
+    '当前团队与律所': 'Current Team & Firm',
+    '添加联系人': 'Add Contact',
+    '当前会话': 'Active Chat',
+    '项目沟通': 'Project Messaging',
+    '从左侧选择会话，继续讨论。': 'Select a conversation on the left to continue.',
+    '同事与客户可通过邀请码加入。需要联系项目成员时，展开通讯录。': 'Colleagues and clients can join via invite code. Expand the directory to reach project members.',
+    '返回会话列表': 'Back to conversations',
+    '返回': 'Back',
+    '展开通讯录': 'Open directory',
+    '与助手私聊': 'Private Chat with Assistant',
+    '成员': 'Members',
+    '关联当前项目': 'Link Current Project',
+    '已关联当前项目': 'Linked to Current Project',
+    '归档聊天': 'Archive Chat',
+    '加载更早消息': 'Load Older Messages',
+    '聊天消息': 'Chat messages',
+    '还没有消息，打个招呼吧。': 'No messages yet. Say hello!',
+    '上下文与模型': 'Context & Model',
+    '发送本机文件': 'Send Local File',
+    '引用项目文件': 'Cite Project File',
+    '单文件不超过 8 MB': 'Max 8 MB per file',
+    '移除': 'Remove',
+    '输入消息': 'Type a message',
+    '输入消息…': 'Type a message…',
+    '与助手私聊，仅你可见…': 'Private chat with assistant (visible only to you)…',
+    '向群成员和助手发送消息…': 'Message group members and assistant…',
+    '请助手回复': 'Ask Assistant to Reply',
+    'Enter 发送 · Shift+Enter 换行': 'Enter to send · Shift+Enter for new line',
+    '发送': 'Send',
+    '关闭': 'Close',
+    '确定': 'OK',
+    '确认操作': 'Confirm Action',
+    '取消': 'Cancel',
+    '继续': 'Continue',
+    '请先选择一个项目，再使用项目沟通。': 'Please select a project first to use Project Messaging.',
+    '没有操作权限，或已不在此会话中。请刷新会话。': 'Permission denied or you are no longer in this conversation. Please refresh.',
+    '当前客户端不支持项目沟通，请升级至 0.61.0 或更新版本。': 'Your client does not support Project Messaging. Please upgrade to 0.61.0 or newer.',
+    '操作未完成，请检查连接后重试。草稿仍保留在当前会话。': 'Operation incomplete. Please check your connection and try again. Your draft is preserved.',
+    '未命名团队': 'Unnamed Team',
+    '尚未加入团队': 'Not in a Team Yet',
+    '未并入律所': 'Not affiliated with a law firm',
+    '加入团队后可看到同事': 'Join a team to see colleagues',
+    '团队与律所设置': 'Team & Firm Settings',
+    '在「设置 › 团队」创建团队或用邀请码加入。': 'Create a team or join with an invite code in Settings › Team.',
+    '你是团队负责人，可在「设置 › 团队」创建律所或用律所邀请码并入。': 'As team owner, you can create a law firm or join one via invite code in Settings › Team.',
+    '总部团队不能退出律所；团队负责人不能切换到其他团队。': 'Headquarters teams cannot leave the firm; team owners cannot switch to another team.',
+    '团队负责人不能切换团队；可在「设置 › 团队」把本团队切换到其他律所。': 'Team owners cannot switch teams; you can switch your team to another firm in Settings › Team.',
+    '一个账户同一时间只属于一个团队。切换团队会退出当前团队，已有会话按会话成员身份保留。': 'An account belongs to one team at a time. Switching teams leaves the current team while keeping existing chats.',
+    '团队信息暂时取不到，稍后点「刷新会话」重试。': 'Unable to load team info right now. Click Refresh to try again later.',
+    '当前项目': 'Current Project',
+    '项目成员': 'Project Members',
+    '项目中暂无其他成员。': 'No other members in this project.',
+    '我的团队': 'My Team',
+    '团队里暂时只有你。': 'Only you are in this team right now.',
+    '尚未加入团队。': 'Not in a team yet.',
+    '去创建或加入': 'Create or Join',
+    '我的律所': 'My Law Firm',
+    '本团队未并入律所': 'Team not affiliated with a firm',
+    '加入团队后可并入律所': 'Join a team first to affiliate with a firm',
+    '律所下暂无其他团队。': 'No other teams in this law firm.',
+    '本团队尚未并入律所。': 'This team is not affiliated with a law firm yet.',
+    '去设置': 'Open Settings',
+    '其他联系人': 'Other Contacts',
+    '个人通讯录与项目客户': 'Personal Directory & Project Clients',
+    '还没有其他联系人。添加外部律师、客户或专家后可一键发起私聊。': 'No other contacts yet. Add external counsel, clients, or experts to start direct chats.',
+    '发消息': 'Message',
+    '发起群聊': 'Start Group Chat',
+    '云端助手私聊 · 仅你可见': 'Cloud Assistant Private Chat · Only visible to you',
+    '云端助手群聊 · 群成员可见': 'Cloud Assistant Group Chat · Visible to group members',
+    '使用平台 AI 额度，结合你可读的当前项目资料在云端回复。': 'Replies in the cloud using platform AI credits and current project materials you can read.',
+    '使用平台 AI 额度，结合本层级共享信息在云端回复。': 'Replies in the cloud using platform AI credits and shared information at this level.',
+    '使用平台 AI 额度，结合本群公开材料在云端回复。': 'Replies in the cloud using platform AI credits and shared materials in this group.',
+    '项目概况、文件目录及部分材料正文会随提问发送；不使用本机选择的模型。': 'Project overview, file tree, and relevant excerpts are sent with your prompt; local models are not used.',
+    '结合云端的团队或律所共享信息；不使用本机选择的模型。': 'Uses cloud team or firm shared context; local models are not used.',
+    '群内消息与已公开的附件可用于回复；团队与律所助手还会结合本层级共享信息。不使用本机选择的模型。': 'Group messages and shared attachments are used for replies; team and firm assistants also use shared context.',
+    '助手正在回复…': 'Assistant is replying…',
+    '正在等待助手回复…': 'Waiting for assistant reply…',
+    '正在请求助手回复…': 'Requesting assistant reply…',
+    '重试助手回复': 'Retry Assistant Reply',
+    '消息已发送。可点击「请助手回复」继续。': 'Message sent. Click "Ask Assistant to Reply" to continue.',
+    '与助手开始私聊；这段对话仅你可见。': 'Start a private chat with the assistant; only visible to you.',
+    '助手已加入本群。只有你一人时会自动回复；有其他成员时，发送后点击「请助手回复」。': 'Assistant is in this group. Replies automatically when you are alone; with other members, click "Ask Assistant to Reply".',
+    '群内回复供成员查看；个人项目资料可在助手私聊中讨论。': 'Group replies are visible to members; discuss private project materials in a private assistant chat.',
+    '可关联当前项目，或将聊天记录归档到项目。': 'Link to the current project or archive chat history to the project.',
+    '发送中…': 'Sending…',
+    '发送未确认': 'Send unconfirmed',
+    '重试发送': 'Retry Send',
+    '项目文件': 'Project File',
+    '文件待准备': 'File being prepared',
+    '查看文件': 'View File',
+    '抱歉文件还在准备中，请联系您的律师。': 'This file is still being prepared. Please contact your lawyer.',
+    '项目文件引用 · 发送时版本': 'Project file reference · Snapshot at send time',
+    '客户可见': 'Client Visible',
+    '内部文件 · 客户需单独授权': 'Internal File · Client requires authorization',
+    '下载': 'Download',
+    '可下载已开放或本人上传的文件。': 'You can download shared files or files you uploaded.',
+    '存入项目': 'Save to Project',
+    '先存入项目，再打开或交给 AI。': 'Save to project first to open or send to AI.',
+    '打开': 'Open',
+    '添加到 AI': 'Add to AI',
+    '拖到 AI': 'Drag to AI',
+    '设为内部': 'Make Internal',
+    '创建并邀请': 'Create & Invite',
+    '会话名称': 'Conversation Title',
+    '会话类型': 'Conversation Type',
+    '群聊': 'Group Chat',
+    '私聊（最多两人）': 'Direct Chat (up to 2 people)',
+    '创建后，将邀请码交给对方；同事和客户均可加入，无需属于同一律所。': 'After creation, share the invite code; both colleagues and clients can join.',
+    '加入会话': 'Join Conversation',
+    '邀请码': 'Invite Code',
+    '保存到通讯录': 'Save to Directory',
+    '姓名 / 称呼': 'Name / Title',
+    '角色（选填）': 'Role (Optional)',
+    '如：外部合作律师 / 客户 / 行业专家': 'e.g., External Counsel / Client / Domain Expert',
+    '所属单位（选填）': 'Organization (Optional)',
+    '这些联系人属于你的个人通讯录，只保存在本机当前账户下；切换团队或律所不影响。': 'These contacts belong to your personal directory on this device and are unaffected by team/firm switches.',
+    '会话成员': 'Conversation Members',
+    '邀请身份': 'Invite Role',
+    '客户': 'Client',
+    '生成邀请码': 'Generate Invite Code',
+    '复制邀请码': 'Copy Invite Code',
+    '负责人需先移除其他成员，才能退出会话。': 'The owner must remove other members before leaving the conversation.',
+    '退出会话': 'Leave Conversation',
+    '选用文件': 'Select File',
+    '项目内还没有可发送的文件。': 'No sendable files in this project yet.',
+    '发送的是受控版本快照；源文件后续更改不会自动替换。文件默认供内部成员读取，客户需单独授权；客户本人上传的文件可自行读取。': 'Sends a versioned snapshot; later edits to the source file are not synced automatically. Internal by default unless shared with clients.'
+  };
+  const EN_PATTERNS = [
+    [/^(私聊|群聊) · (负责人|成员|客户)$/, (_, t, r) => `${t === '私聊' ? 'Direct' : 'Group'} · ${{ '负责人': 'Owner', '成员': 'Member', '客户': 'Client' }[r] || r}`],
+    [/^律所：(.+?)(（总部团队）)?$/, (_, n, h) => `Firm: ${n}${h ? ' (HQ Team)' : ''}`],
+    [/^已创建(私聊|群聊)「(.+)」。请生成邀请码交给对方，对方加入后即可开始沟通。$/, (_, l, t) => `Created ${l === '私聊' ? 'direct chat' : 'group chat'} "${t}". Generate an invite code and share it to start messaging.`],
+    [/^聊天已归档到项目：(.+)。可在版本记录中提交。$/, (_, p) => `Chat archived to project: ${p}.`],
+    [/^已将「(.+)」添加到其他联系人。$/, (_, n) => `Added "${n}" to Other Contacts.`],
+    [/^持码人可加入会话并查看历史消息。文件按访问权限开放，请仅交给预期成员。有效期至 (.+)$/, (_, exp) => `Anyone with the code can join and view history. Valid until ${exp}`],
+    [/^(.+) · (负责人|成员|客户|AI 助手)$/, (_, n, r) => `${n} · ${{ '负责人': 'Owner', '成员': 'Member', '客户': 'Client', 'AI 助手': 'AI Assistant' }[r] || r}`]
+  ];
+  let enObserverReady = false;
+  function trEn(s) {
+    if (!s || typeof s !== 'string') return s;
+    const trimmed = s.trim();
+    if (!trimmed) return s;
+    if (EN_EXACT[trimmed]) return s.replace(trimmed, EN_EXACT[trimmed]);
+    for (const [re, fn] of EN_PATTERNS) {
+      if (re.test(trimmed)) return trimmed.replace(re, fn);
+    }
+    return s;
+  }
+  function translateSubtree(root) {
+    if (!root) return;
+    const walk = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    let curr = walk.currentNode;
+    while (curr) {
+      if (curr.nodeType === Node.TEXT_NODE) {
+        const next = trEn(curr.nodeValue);
+        if (next !== curr.nodeValue) curr.nodeValue = next;
+      } else if (curr.nodeType === Node.ELEMENT_NODE) {
+        for (const attr of ['placeholder', 'aria-label', 'title']) {
+          const val = curr.getAttribute?.(attr);
+          if (val) {
+            const next = trEn(val);
+            if (next !== val) curr.setAttribute(attr, next);
+          }
+        }
+      }
+      curr = walk.nextNode();
+    }
+  }
+  function maybeEnableEnglish(ctx) {
+    let lang = ctx?.language || ctx?.locale || '';
+    if (!lang) {
+      try { lang = localStorage.getItem('checkba_locale') || localStorage.getItem('awd_locale') || ''; } catch {}
+    }
+    if (!String(lang).toLowerCase().startsWith('en')) return;
+    document.documentElement.lang = 'en-US';
+    document.title = trEn(document.title);
+    translateSubtree(document.body);
+    if (!enObserverReady && typeof MutationObserver !== 'undefined') {
+      enObserverReady = true;
+      const obs = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          if (m.type === 'characterData') {
+            const next = trEn(m.target.nodeValue);
+            if (next !== m.target.nodeValue) m.target.nodeValue = next;
+          } else if (m.type === 'attributes') {
+            const val = m.target.getAttribute?.(m.attributeName);
+            if (val) {
+              const next = trEn(val);
+              if (next !== val) m.target.setAttribute(m.attributeName, next);
+            }
+          } else {
+            for (const n of m.addedNodes) translateSubtree(n);
+          }
+        }
+      });
+      obs.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'aria-label', 'title'] });
+    }
+  }
   async function reload() {
     $('workspace').classList.remove('host-sidebar');
     state.context = null;
@@ -608,6 +820,7 @@
     for (const id of controlIds) if ($(id)) $(id).disabled = true;
     try {
       const context = await awd.call('context.get', {}); if (epoch !== state.epoch) return; state.context = context;
+      maybeEnableEnglish(context);
       if (!context.projectId) { notice('请先选择一个项目，再使用项目沟通。'); return; }
       syncHostSidebar();
       const self = await request('self'); if (epoch !== state.epoch) return; state.self = self;
