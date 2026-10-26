@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Pause model/tool writes first; only then can editor saves form an exit barrier.
-export function createDesktopQuitGuard({ prepare, abort, flush, progress, errorText,
+export function createDesktopQuitGuard({ prepare, abort, flush, confirm, progress, errorText,
   now = Date.now, timeoutMs = 50000, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   let generation = 0
   let pending = null
@@ -25,13 +25,20 @@ export function createDesktopQuitGuard({ prepare, abort, flush, progress, errorT
       abortPending = null
       const attempt = { attemptId }
       pending = (async () => {
-        const started = now()
+        let started = now()
+        const checkCancelled = () => {
+          if (current !== generation) throw Object.assign(new Error(errorText('cancelled')), { cancelled: true })
+        }
         const check = () => {
-          if (current !== generation) throw new Error(errorText('cancelled'))
+          checkCancelled()
           if (now() - started >= timeoutMs) throw new Error(errorText('timeout'))
         }
+        const report = async (stage) => {
+          if (await progress(stage) === false) throw Object.assign(new Error(errorText('cancelled')), { cancelled: true })
+          checkCancelled()
+        }
         try {
-          progress('pausing')
+          await report('pausing')
           while (true) {
             check()
             const state = await prepare(attempt)
@@ -39,15 +46,28 @@ export function createDesktopQuitGuard({ prepare, abort, flush, progress, errorT
             if (state?.ready === true) break
             await wait(300)
           }
-          progress('saving')
+          await report('saving')
           const result = await flush()
           check()
           if (result.failed) throw new Error(errorText('saveFailed'))
+          if (confirm) {
+            await report('confirming')
+            const accepted = await confirm({ isCurrent: () => current === generation })
+            checkCancelled()
+            if (accepted === false) throw Object.assign(new Error(errorText('cancelled')), { cancelled: true })
+            // Reading and choosing a version action is not part of the save deadline.
+            // Recheck saves before ACK in case the confirmation itself edited a file.
+            started = now()
+            await report('saving')
+            const finalSave = await flush()
+            check()
+            if (finalSave.failed) throw new Error(errorText('saveFailed'))
+          }
           return { ok: true }
         } catch (error) {
           let recoveryPending = false
           try { recoveryPending = (await abortOnce())?.paused > 0 } catch (_) { recoveryPending = true }
-          return { ok: false, error: (error.message || errorText('saveFailed'))
+          return { ok: false, ...(error.cancelled && !recoveryPending ? { cancelled: true } : {}), error: (error.message || errorText('saveFailed'))
             + (recoveryPending ? '\n' + errorText('recoveryPending') : '') }
         } finally {
           pending = null
@@ -59,12 +79,20 @@ export function createDesktopQuitGuard({ prepare, abort, flush, progress, errorT
 }
 
 const workbenches = new Map()
-export function registerQuitSave(owner, save) { workbenches.set(owner, save) }
+export function registerQuitSave(owner, save, confirm) { workbenches.set(owner, { save, confirm }) }
 export function unregisterQuitSave(owner) { workbenches.delete(owner) }
 export async function flushQuitWorkbenches() {
   let failed = 0
-  for (const save of workbenches.values()) {
+  for (const { save } of workbenches.values()) {
     try { failed += (await save()).failed || 0 } catch (_) { failed++ }
   }
   return { failed }
+}
+
+export async function confirmQuitWorkbenches(context = {}) {
+  for (const { confirm } of workbenches.values()) {
+    if (context.isCurrent?.() === false) return false
+    if (confirm && await confirm(context) === false) return false
+  }
+  return true
 }

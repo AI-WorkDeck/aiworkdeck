@@ -11,6 +11,7 @@ const dataUrl = source => 'data:text/javascript;base64,' + Buffer.from(source).t
 const grouping = dataUrl(await readFile(new URL('../../src/utils/reviewGrouping.js', import.meta.url), 'utf8'))
 const moduleUrl = dataUrl((await readFile(new URL('../../src/composables/zetaOfficeReviewBalloons.js', import.meta.url), 'utf8'))
   .replace("'../utils/reviewGrouping.js'", JSON.stringify(grouping)))
+const vueUrl = dataUrl(await readFile(new URL('../../node_modules/vue/dist/vue.esm-browser.prod.js', import.meta.url), 'utf8'))
 let browser
 before(async () => {
   browser = await puppeteer.launch({
@@ -29,6 +30,7 @@ async function mount(t, options = {}) {
   await page.evaluate(async (url, options) => {
     const { attachReviewBalloons } = await import(url)
     window.model = { name: 'A', revision: 1, writable: options.writable !== false, notes: true, nativeWidth: options.nativeWidth || 0 }
+    window.layoutFlags = { truncated: !!options.truncated }
     if (options.insertOnly) window.reviewItems = [{key:'r0',kind:'revision',data:{index:0,identifier:'insert-1',type:'Insert',text:'Inserted body text'},x:3000,y:1500,page:1}]
     window.commands = []; window.resizes = 0; window.sent = []
     // Count the component's explicit canvas resize, excluding browser setup.
@@ -48,6 +50,10 @@ async function mount(t, options = {}) {
         }
         if (action === 'resolve_revisions' && window.resolveFailure) return window.resolveFailure
         if (action !== 'get_review_layout') return { success: true }
+        if (window.deferRead) {
+          window.deferRead = false
+          return new Promise((resolve, reject) => { window.rejectRead = () => reject(new Error('Old layout failed')) })
+        }
         const m = window.model
         const top = (window.viewTop || 0) * 15, left = (window.viewLeft || 0) * 15, zoom = window.zoom || 1
         return {
@@ -59,6 +65,7 @@ async function mount(t, options = {}) {
           pages: window.reviewPages || [{ number: 1, x: options.leftSidebar ? 4200 : 0, y: 0, width: 7200, height: 15000, sidebar: options.leftSidebar ? 'left' : 'right', gutterWidth: 4200 }],
           view: { left, right: left + 12000 / zoom, top, bottom: top + 9000 / zoom, caretY: 1500, frameWidth: 800, frameHeight: 600,
             viewport: { x: 0, y: 0, width: 800, height: 600 } },
+          ...window.layoutFlags,
         }
       },
     })
@@ -71,6 +78,80 @@ const commentButton = (page, label) => page.evaluate(label => {
   if (!button) throw new Error('Missing comment button: ' + label)
   button.click()
 }, label)
+
+for (const action of ['compare_document', 'build_comparison_document', 'build_merge_draft']) {
+  test(`${action} hides previous review cards and notices until a fresh result is ready`, async t => {
+    const page = await mount(t, { truncated: true })
+    await page.waitForSelector('.awd-rb-notice', { visible: true })
+    await page.evaluate(action => window.balloons.suspend(action), action)
+    assert.equal(await page.$eval('.awd-review-balloons', n => n.hidden), true)
+    await page.evaluate(() => {
+      window.layoutFlags.truncated = false
+      window.model.name = 'B'
+      window.commands = []
+      window.balloons.resume()
+    })
+    await page.waitForFunction(() => document.querySelector('[data-key="c0"] .awd-rb-meta')?.textContent === 'CommentB'
+      && !document.querySelector('.awd-review-balloons').hidden)
+    assert.equal(await page.$eval('.awd-rb-notice', n => n.hidden), true)
+    assert.equal(await page.evaluate(() => window.commands.find(c => c.action === 'get_review_layout').params.fresh), true)
+  })
+}
+
+test('an old layout rejection cannot replace the notice during comparison', async t => {
+  const page = await mount(t, { truncated: true })
+  await page.waitForSelector('.awd-rb-notice', { visible: true })
+  await page.evaluate(() => { window.deferRead = true; window.balloons.cursorMoved() })
+  await page.waitForFunction(() => !!window.rejectRead)
+  await page.evaluate(async () => {
+    window.balloons.suspend('compare_document')
+    window.rejectRead()
+    await new Promise(resolve => setTimeout(resolve, 0))
+  })
+  assert.equal(await page.$eval('.awd-review-balloons', n => n.hidden), true)
+  assert.equal(await page.$eval('.awd-rb-notice', n => n.textContent.includes('Could not update review')), false)
+})
+
+test('a partial review notice offers a fresh read without repeating any document mutation', async t => {
+  const page = await mount(t, { truncated: true })
+  await page.waitForSelector('.awd-rb-notice', { visible: true })
+  await page.evaluate(() => { window.layoutFlags.truncated = false; window.commands = [] })
+  await page.click('.awd-rb-notice button')
+  await page.waitForFunction(() => window.commands.some(c => c.action === 'get_review_layout') && document.querySelector('.awd-rb-notice').hidden)
+  assert.deepEqual(await page.evaluate(() => window.commands), [{ action: 'get_review_layout', params: { fresh: true }, document: 'A' }])
+})
+
+for (const [component, selector] of [['VersionCompareTab', '.vcmp-host'], ['MergeReviewTab', '.mrt-host']]) {
+  test(`${component} keeps the engine attached at full size but unseen while loading or failed`, async t => {
+    const source = await readFile(new URL(`../../src/components/version/${component}.vue`, import.meta.url), 'utf8')
+    const template = source.match(/<template>([\s\S]*?)<\/template>/)[1]
+    const page = await browser.newPage()
+    t.after(() => page.close())
+    await page.setContent('<style>view{display:block}.vcmp-host,.mrt-host{height:300px;width:500px}</style><div id="app"></div>')
+    await page.evaluate(async (url, template, selector) => {
+      const { createApp } = await import(url)
+      const app = createApp({ template, data: () => ({
+        hostId: 'review-test-host', ready: false, statusText: 'Generating comparison', redlineCount: 0,
+        finished: false, error: '', readonly: true, headline: '', sidesLine: '', canFinish: false, finishLabel: '',
+      }), methods: { finish() {} } })
+      app.config.globalProperties.$t = key => key
+      app.config.compilerOptions.isCustomElement = tag => ['view', 'text'].includes(tag)
+      window.component = app.mount('#app')
+      window.originalHost = document.querySelector(selector)
+    }, vueUrl, template, selector)
+    const state = () => page.$eval(selector, n => ({
+      attached: n === window.originalHost && n.isConnected,
+      width: n.getBoundingClientRect().width, height: n.getBoundingClientRect().height,
+      opacity: getComputedStyle(n).opacity,
+    }))
+    assert.deepEqual(await state(), { attached: true, width: 500, height: 300, opacity: '0' })
+    await page.evaluate(() => { window.component.error = 'Failed'; window.component.statusText = 'Failed' })
+    assert.equal((await state()).opacity, '0')
+    await page.evaluate(() => { window.component.error = ''; window.component.ready = true })
+    await page.waitForFunction(selector => getComputedStyle(document.querySelector(selector)).opacity === '1', {}, selector)
+    assert.deepEqual(await state(), { attached: true, width: 500, height: 300, opacity: '1' })
+  })
+}
 
 test('loading a document cancels the old draft even when comment IDs and original content match', async t => {
   const page = await mount(t)
@@ -395,7 +476,7 @@ test('revision actions keep readable worker failures visible after refresh witho
       ;[...card.querySelectorAll('button')].find(b => b.textContent === label).click()
     }, label, failure)
     await page.waitForFunction(reads => window.commands.filter(c => c.action === 'get_review_layout').length > reads, {}, reads)
-    assert.deepEqual(await page.$eval('.awd-rb-notice', n => ({ text: n.textContent, hidden: n.hidden })), { text: expected, hidden: false })
+    assert.deepEqual(await page.$eval('.awd-rb-notice', n => ({ text: n.querySelector('.awd-rb-notice-text').textContent, hidden: n.hidden })), { text: expected, hidden: false })
     assert.equal(await page.$$eval('[data-key="g:revision-A"] button:disabled', nodes => nodes.length), 0)
   }
   const mutations = await page.evaluate(() => window.commands.filter(c => c.action === 'resolve_revisions'))

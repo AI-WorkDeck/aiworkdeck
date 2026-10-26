@@ -133,6 +133,13 @@ Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实
 - 回归：`npm run test:completion`（含 `tests/completion/autocomplete-toolbar.test.mjs` 宿主接线 + `controller.test.mjs` 里客体的开合/回报/命名三条）、`test:lowa-completion`、`test:writing-ui`、`test:automatic-writing-ui`、`test:writing-caret`、`test:lowa-link-preview`、`test:writing-desktop`；引擎测试包含移动/输入/重载拒旧 token、跨导出仍可插入、撤销/重做及资料表格。桌面用例从真实项目词库经中文输入/Tab 到自动保存后下载 DOCX 核对，夹具文件隔离在临时目录。
 - 语义原语回归：先 `npm run build:zetaoffice`，再 `LOWA_ENGINE_DIR=<已准备的引擎目录> npm run test:semantic-writing`（真实引擎 `tests/lowa-e2e/semantic-writing.mjs`）；验证多段原样后缀、精确选区、一次撤销/重做、普通补全刷新、其他段落修改、换文档、自动保存、长度和控制字符、显式 composition 参数、比较只读模型。此专项不代表已经验证表格/脚注全部位置，也不替代 guest 的真实 IME 与菜单点击验收；菜单/Tab 接线仍跑 `test:writing-ui` 与 `test:completion`。需要并行运行引擎服务时设置不同 `LOWA_E2E_PORT`，不同时覆盖 `dist/zetaoffice`。
 
+## 保存提示与审阅加载层（2026-10-26，dev-board#1486/#1487）
+
+- `LibreOfficeEditor` 的 `.libre-save-bar` 只表达当前文件保存状态，删除旧 `.libre-prov-bar` 版本身份小条；逐段溯源与历史跳转保留。真实保存回执后发 `awd:file-saved`，失效上下文/失败不得发成功信号。
+- `VersionCompareTab`/`MergeReviewTab` 在 ready 前通过 opacity 隐藏 guest，保持真实尺寸和挂载；不能改为 display:none，否则可能影响引擎排版/绘制。
+- 审阅气泡 suspend 对 load/compare/build comparison/build merge 清旧快照，完成后 fresh 读取；迟到读错误按 generation 丢弃。真实缺项/失败提示保留“刷新审阅”，只重读，不重放修改命令。
+- 回归：`tests/revision-view/word-review-lifecycle.mjs`（Chrome DOM及实际Vue模板）、保存状态/本地内容回执专项。
+
 ## 保存失败与关闭（实测清单 A6/C10）
 
 - `LibreOfficeEditor.uploadBytes` 的 XHR 必须有 60s 超时与中止终态；导出沿用三层 180s 预算。
