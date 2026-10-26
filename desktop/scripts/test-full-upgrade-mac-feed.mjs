@@ -8,16 +8,26 @@ import { createReadStream } from 'node:fs'
 import { mkdir, open, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { pipeline } from 'node:stream/promises'
 
-function signedManifest(installer) {
+export function validateVersions(baseline, candidate) {
+  assert(/^\d+\.\d+\.\d+$/.test(baseline || '') && /^\d+\.\d+\.\d+$/.test(candidate || ''), 'Explicit semantic versions required')
+  const old = baseline.split('.').map(Number), next = candidate.split('.').map(Number)
+  const difference = next.map((n, i) => n - old[i]).find(n => n !== 0)
+  assert(difference > 0, 'Candidate must be newer than baseline')
+}
+export function signedManifest(installer, baseline) {
+  validateVersions(baseline, installer.version)
+  const candidateMajor = installer.version.split('.').slice(0, 2).join('.')
+  const baselineMajor = baseline.split('.').slice(0, 2).join('.')
   const { publicKey, privateKey } = generateKeyPairSync('ed25519')
   const bytes = Buffer.from(JSON.stringify({
     schema: 1,
-    latestMajor: '0.66',
+    latestMajor: candidateMajor,
     channels: {
-      '0.65': { latest: '0.65.0', components: [] },
-      '0.66': { latest: '0.66.0', components: [], installers: { 'darwin-arm64': installer } }
+      [baselineMajor]: { latest: baseline, components: [] },
+      [candidateMajor]: { latest: installer.version, components: [], installers: { 'darwin-arm64': installer } }
     }
   }) + '\n')
   const signature = sign(null, bytes, privateKey)
@@ -26,28 +36,32 @@ function signedManifest(installer) {
     publicKey: publicKey.export({ format: 'pem', type: 'spki' }) }
 }
 
-if (process.argv.includes('--self-test')) {
-  const fixture = signedManifest({ version: '0.66.0', sha256: 'a'.repeat(64), size: 1, urls: ['http://127.0.0.1/example.dmg'] })
-  assert.equal(JSON.parse(fixture.bytes).channels['0.66'].installers['darwin-arm64'].version, '0.66.0')
-  assert(verify(null, fixture.bytes, fixture.publicKey, Buffer.from(fixture.signature.toString().trim(), 'base64')))
-  assert.equal(verify(null, Buffer.concat([fixture.bytes, Buffer.from(' ')]), fixture.publicKey,
-    Buffer.from(fixture.signature.toString().trim(), 'base64')), false)
-  console.log('PASS: schema, ephemeral Ed25519 signature, tamper rejection; no server or application started')
-} else if (process.argv.includes('--help')) {
-  console.log('node mac-update-feed.mjs --dmg /absolute/candidate.dmg --sha256 VERIFIED_SHA256 --out /absolute/NEW/private/fixture-dir [--port 0]')
-  console.log('Serves only 127.0.0.1. Output config.json contains the two official CHECKBA update overrides. This is a TEST signer, not the production signer.')
-} else {
-  await serve()
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--self-test')) {
+    const fixture = signedManifest({ version: '0.66.0', sha256: 'a'.repeat(64), size: 1, urls: ['http://127.0.0.1/example.dmg'] }, '0.65.0')
+    assert.equal(JSON.parse(fixture.bytes).channels['0.66'].installers['darwin-arm64'].version, '0.66.0')
+    assert(verify(null, fixture.bytes, fixture.publicKey, Buffer.from(fixture.signature.toString().trim(), 'base64')))
+    assert.equal(verify(null, Buffer.concat([fixture.bytes, Buffer.from(' ')]), fixture.publicKey,
+      Buffer.from(fixture.signature.toString().trim(), 'base64')), false)
+    console.log('PASS: schema, ephemeral Ed25519 signature, tamper rejection; no server or application started')
+  } else if (process.argv.includes('--help')) {
+    console.log('node mac-update-feed.mjs --dmg /absolute/candidate.dmg --sha256 VERIFIED_SHA256 --out /absolute/NEW/private/fixture-dir --baseline-version VERSION --candidate-version VERSION [--port 0]')
+    console.log('Serves only 127.0.0.1. Output config.json contains the two official CHECKBA update overrides. This is a TEST signer, not the production signer.')
+  } else {
+    await serve()
+  }
 }
 
 async function serve() {
   const args = {}
-  const allowed = new Set(['--dmg', '--sha256', '--out', '--port'])
+  const allowed = new Set(['--dmg', '--sha256', '--out', '--port', '--baseline-version', '--candidate-version'])
   for (let i = 2; i < process.argv.length; i += 2) {
     const key = process.argv[i]
     assert(allowed.has(key) && process.argv[i + 1] && args[key] === undefined, `Invalid argument: ${key}`)
     args[key] = process.argv[i + 1]
   }
+  const baseline = args['--baseline-version'], candidate = args['--candidate-version']
+  validateVersions(baseline, candidate)
   assert(path.isAbsolute(args['--dmg'] || '') && /\.dmg$/i.test(args['--dmg']), '--dmg must be an absolute DMG path')
   assert(/^[a-f\d]{64}$/i.test(args['--sha256'] || ''), '--sha256 must be independently verified')
   assert(path.isAbsolute(args['--out'] || ''), '--out must be a new absolute directory')
@@ -63,7 +77,7 @@ async function serve() {
   // mkdir without recursive refuses an existing directory, including a symlink.
   await mkdir(args['--out'], { mode: 0o700 })
   const token = randomBytes(24).toString('hex')
-  const routes = { manifest: `/${token}/manifest.json`, signature: `/${token}/manifest.json.sig`, dmg: `/${token}/candidate-0.66.0.dmg` }
+  const routes = { manifest: `/${token}/manifest.json`, signature: `/${token}/manifest.json.sig`, dmg: `/${token}/candidate-${candidate}.dmg` }
   let fixture
   const server = createServer(async (request, response) => {
     try {
@@ -96,12 +110,12 @@ async function serve() {
     server.listen(port, '127.0.0.1', resolve)
   })
   const origin = `http://127.0.0.1:${server.address().port}`
-  fixture = signedManifest({ version: '0.66.0', sha256, size: initial.size, urls: [origin + routes.dmg] })
+  fixture = signedManifest({ version: candidate, sha256, size: initial.size, urls: [origin + routes.dmg] }, baseline)
   const publicKeyFile = path.join(args['--out'], 'TEST-public-key.pem')
   const config = {
     fixtureOnly: true,
     productionSignature: false,
-    baseline: '0.65.0', candidate: '0.66.0', platform: 'darwin-arm64', sha256, size: initial.size,
+    baseline, candidate, platform: 'darwin-arm64', sha256, size: initial.size,
     env: { CHECKBA_UPDATE_MANIFEST_URL: origin + routes.manifest, CHECKBA_UPDATE_PUBKEY_FILE: publicKeyFile },
     nativeIsolation: 'Before using this feed in an app, isolate the macOS user launchd domain and Foundation caches; Electron app.setPath alone does not isolate ShipIt.',
     quitMode: 'Ordinary quit; do not call quitAndInstall. Reopen only through the guarded QA launcher.'

@@ -5,21 +5,27 @@ on:
   workflow_dispatch:
     inputs:
       baseline_run_id:
-        description: Successful signed 0.65.0 build containing the full updater
+        description: Successful signed baseline build containing the full updater
         required: true
-        default: '39213434701'
+        default: '39939848049'
       baseline_sha:
         description: Exact expected baseline source commit
         required: true
-        default: '109ebe48b97630bb336a8dd60c691420c9b855a9'
+        default: '58d7fbacbab68a19179467e8b53f0bf4a244adb7'
       candidate_run_id:
-        description: Successful signed 0.66.0 candidate build
+        description: Successful signed candidate build
         required: true
-        default: '39214022951'
       candidate_sha:
         description: Exact expected candidate source commit
         required: true
-        default: 'a1fa26317270df303b99b99fe1735460b236e8b7'
+      baseline_version:
+        description: Baseline version
+        required: true
+        default: '0.71.0'
+      candidate_version:
+        description: Candidate version
+        required: true
+        default: '0.72.0'
 permissions:
   contents: read
   actions: read
@@ -35,6 +41,8 @@ jobs:
       - name: Exercise genuine signed bundles, Squirrel, ordinary quit and manual reopen
         env:
           GH_TOKEN: ${{ github.token }}
+          BASELINE_VERSION: ${{ inputs.baseline_version }}
+          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
           BASELINE_RUN: ${{ inputs.baseline_run_id }}
           BASELINE_SHA: ${{ inputs.baseline_sha }}
           CANDIDATE_RUN: ${{ inputs.candidate_run_id }}

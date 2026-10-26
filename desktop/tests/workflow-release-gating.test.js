@@ -358,3 +358,69 @@ test('master 暖缓存与安装包实际消费的缓存路径、key 和运行时
   assert.deepEqual(warm.on.push.branches, ['master'])
   assert.ok(!warm.on.push.tags)
 })
+
+test('upgrade provenance accepts pinned official tag runs and rejects branch, foreign, failed or mismatched builds', async () => {
+  const { validateBuild } = await import('../scripts/download-upgrade-build.mjs')
+  const sha = 'a'.repeat(40)
+  const build = { repository: { full_name: 'AI-WorkDeck/aiworkdeck' }, path: '.github/workflows/desktop-build.yml', conclusion: 'success', head_sha: sha, event: 'push', head_branch: 'v0.71.0' }
+  const expected = { sha, version: '0.71.0', tagSha: sha, sourceVersion: '0.71.0' }
+  assert.doesNotThrow(() => validateBuild(build, expected))
+  assert.doesNotThrow(() => validateBuild({ ...build, event: 'workflow_dispatch', head_branch: 'candidate' }, expected))
+  for (const patch of [
+    { event: 'pull_request' }, { head_branch: 'master' }, { head_branch: 'v0.72.0' },
+    { head_sha: 'b'.repeat(40) }, { conclusion: 'failure' },
+    { repository: { full_name: 'someone/aiworkdeck' } }, { path: '.github/workflows/ci.yml' }
+  ]) assert.throws(() => validateBuild({ ...build, ...patch }, expected))
+  assert.throws(() => validateBuild(build, { ...expected, tagSha: 'b'.repeat(40) }))
+  assert.throws(() => validateBuild(build, { ...expected, sourceVersion: '0.70.0' }))
+})
+
+test('upgrade release gate verifies manifest signature, exact version, official URL and real bytes', async () => {
+  const { signedInstaller, verifyInstaller } = await import('../scripts/download-upgrade-build.mjs')
+  const crypto = require('crypto'), os = require('os')
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519')
+  const payload = Buffer.from('synthetic signed installer')
+  const info = { version: '0.71.0', size: payload.length, sha256: crypto.createHash('sha256').update(payload).digest('hex'), urls: ['https://github.com/AI-WorkDeck/aiworkdeck/releases/download/v0.71.0/AI.WorkDeck.Setup.0.71.0.exe'] }
+  const bytes = Buffer.from(JSON.stringify({ channels: { '0.71': { latest: '0.71.0', installers: { win32: info } } } }))
+  const signature = crypto.sign(null, bytes, privateKey).toString('base64')
+  const expected = signedInstaller(bytes, signature, publicKey, '0.71.0', 'win32')
+  assert.equal(expected.name, 'AI.WorkDeck.Setup.0.71.0.exe')
+  assert.throws(() => signedInstaller(Buffer.concat([bytes, Buffer.from(' ')]), signature, publicKey, '0.71.0', 'win32'))
+  assert.throws(() => signedInstaller(bytes, signature, crypto.generateKeyPairSync('ed25519').publicKey, '0.71.0', 'win32'))
+  assert.throws(() => signedInstaller(bytes, signature, publicKey, '0.72.0', 'win32'))
+  assert.throws(() => signedInstaller(bytes, signature, publicKey, '0.71.0', 'darwin-arm64'))
+  const wrongUrl = Buffer.from(bytes.toString().replace('AI-WorkDeck/aiworkdeck/releases', 'someone/aiworkdeck/releases'))
+  assert.throws(() => signedInstaller(wrongUrl, crypto.sign(null, wrongUrl, privateKey).toString('base64'), publicKey, '0.71.0', 'win32'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upgrade-byte-gate-'))
+  try {
+    const file = path.join(dir, 'fixture.exe'); fs.writeFileSync(file, payload)
+    assert.equal(await verifyInstaller(file, expected), info.sha256)
+    await assert.rejects(verifyInstaller(file, { ...expected, size: info.size + 1 }))
+    fs.writeFileSync(file, Buffer.alloc(payload.length))
+    await assert.rejects(verifyInstaller(file, expected))
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('Mac upgrade fixture uses explicit 0.71 to 0.72 inputs and rejects absent/equal/older versions', async () => {
+  const { validateVersions, signedManifest } = await import('../scripts/test-full-upgrade-mac-feed.mjs')
+  const crypto = require('crypto')
+  for (const [baseline, candidate] of [[undefined, '0.72.0'], ['0.71.0', undefined], ['0.71.0', '0.71.0'], ['0.71.0', '0.70.9'], ['0.71.0', 'latest']]) {
+    assert.throws(() => validateVersions(baseline, candidate))
+  }
+  const installer = { version: '0.72.0', size: 1, sha256: 'a'.repeat(64), urls: ['http://127.0.0.1/candidate.dmg'] }
+  const fixture = signedManifest(installer, '0.71.0')
+  const manifest = JSON.parse(fixture.bytes)
+  assert.equal(manifest.latestMajor, '0.72')
+  assert.equal(manifest.channels['0.71'].latest, '0.71.0')
+  assert.deepEqual(manifest.channels['0.72'].installers['darwin-arm64'], installer)
+  assert(crypto.verify(null, fixture.bytes, fixture.publicKey, Buffer.from(fixture.signature.toString().trim(), 'base64')))
+  const workflow = loadWorkflow('full-upgrade-mac-smoke.yml')
+  const env = workflow.jobs['native-upgrade'].steps.find(s => s.run?.includes('test-full-upgrade-mac.mjs')).env
+  assert.equal(env.BASELINE_VERSION, '${{ inputs.baseline_version }}')
+  assert.equal(env.CANDIDATE_VERSION, '${{ inputs.candidate_version }}')
+  for (const kind of ['baseline', 'candidate']) {
+    const win = loadWorkflow('full-upgrade-smoke.yml').jobs.windows.steps.find(s => s.name === 'Download and identify signed installer builds')
+    assert.equal(win.env[kind.toUpperCase() + '_SHA'], '${{ inputs.' + kind + '_sha }}')
+    assert(win.run.includes(`download-upgrade-build.mjs ${kind} win32`))
+  }
+})
