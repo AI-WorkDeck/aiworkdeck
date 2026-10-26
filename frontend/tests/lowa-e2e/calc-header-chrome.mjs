@@ -6,8 +6,9 @@
 // CALC_HEADER_OUT selects screenshots + JSON (default: a new temp directory).
 // Runs DPR 1 and 2; old r6 must fail the palette/font assertions. This is an
 // engine test, not a claim about the packaged Electron or automatic-save path.
-// CALC_HEADER_RESIZE=1 opts into resize/double-click gestures. Old r6 may leave
-// a drag active; skipped gestures are explicitly recorded, never counted as PASS.
+// CALC_HEADER_RESIZE=1 opts into resize/double-click with native chrome visible.
+// Bare-canvas tooltip interception is an existing r6/r7 limitation; skips are
+// explicitly recorded and never counted as PASS.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -137,6 +138,14 @@ try {
   for(const dpr of (process.env.LOWA_E2E_DPR ? [Number(process.env.LOWA_E2E_DPR)] : [1,2])) {
     const page=await openEditor(browser,{clipboard:false,viewport:{width:1000,height:720,deviceScaleFactor:dpr}})
     await page.evaluate(()=>{for(const type of ['keydown','keyup','beforeinput','input']) window.addEventListener(type,e=>{e.preventDefault();e.stopImmediatePropagation()},true)})
+    await page.evaluate(()=>{
+      window.__headerPointerLog=[]
+      for(const type of ['pointerdown','pointermove','pointerup','mousedown','mousemove','mouseup']) document.addEventListener(type,e=>{
+        const rect=e.target.getBoundingClientRect()
+        window.__headerPointerLog.push({type,x:e.clientX,y:e.clientY,buttons:e.buttons,time:e.timeStamp,target:e.target.tagName+'#'+e.target.id+'.'+e.target.className,rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}})
+        if(window.__headerPointerLog.length>100)window.__headerPointerLog.shift()
+      },true)
+    })
     const exec=async(action,params={})=>{
       const r=await page.evaluate((a,p)=>window.__loExecutor.executeCommand(a,p),action,params)
       assert.equal(r?.success,true,action+': '+JSON.stringify(r));return r
@@ -199,10 +208,15 @@ try {
     let s=await state(),g=geometry(s)
     const cssPoint=async(x,y)=>{
       const rect=await page.$eval('#qtcanvas',e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}})
-      return {x:rect.x+x*rect.width/s.frame.Width,y:rect.y+y*rect.height/s.frame.Height}
+      return {x:rect.x+x*rect.width/s.frame.Width,y:rect.y+y*rect.width/s.frame.Width}
     }
     const pause=()=>new Promise(r=>setTimeout(r,80))
-    const click=async(x,y,clickCount=1)=>{const p=await cssPoint(x,y);await page.mouse.click(p.x,p.y,{clickCount,delay:80});await pause()}
+    const click=async(x,y,clickCount=1)=>{
+      const p=await cssPoint(x,y)
+      // Qt counts native presses; Puppeteer's clickCount alone only sets the
+      // DOM count on one press. Send two actual down/up pairs for a double-click.
+      for(let i=0;i<clickCount;i++){await page.mouse.click(p.x,p.y,{delay:80});await pause()}
+    }
     const waitState=async(predicate)=>{for(let i=0;i<30;i++){const v=await state();if(predicate(v))return v;await new Promise(r=>setTimeout(r,50))}throw Error('native interaction state did not converge')}
     let shot=await capture(`dpr${dpr}-before-interaction`)
     let colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
@@ -216,6 +230,22 @@ try {
     check(`DPR${dpr} click selects whole row`,s.selection.StartColumn===0,s.selection)
     await exec('sheet_select_range',{range:'A1'});s=await state();g=geometry(s)
     if(process.env.CALC_HEADER_RESIZE==='1') {
+      // Native chrome gives Calc's above-header size tooltip room. With a bare
+      // canvas at y=0, both r6 and r7 place the tooltip beside the pointer and
+      // Qt WASM's 5px windowAt padding intercepts subsequent move/up events.
+      // Keep that known limitation separate; do not hide or disable the tip.
+      await exec('set_chrome',{all:true})
+      await page.setViewport({width:1000,height:719,deviceScaleFactor:dpr})
+      await page.setViewport({width:1000,height:720,deviceScaleFactor:dpr})
+      shot=await capture(`dpr${dpr}-native-chrome-before-resize`)
+      s=await state();g=geometry(s)
+      // The UNO container excludes the native menubar. Like drag-wheel.mjs,
+      // align its bottom with the canvas using one width-derived scale.
+      const nativeTop=Math.max(0,shot.height*s.frame.Width/shot.width-s.frame.Height)
+      g=Object.fromEntries(Object.entries(g).map(([key,rect])=>[key,{...rect,y:rect.y+nativeTop}]))
+      fs.writeFileSync(path.join(out,`dpr${dpr}-native-chrome-state.json`),JSON.stringify({state:s,geometry:g},null,2))
+      colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
+      rowEdge=boundaries(shot,g.vertical,shot.width/s.frame.Width,false)[1]
       const drag=async(x,y,dx,dy)=>{
         const a=await cssPoint(x,y),b=await cssPoint(x+dx,y+dy)
         await page.mouse.move(a.x,a.y);await pause();await page.mouse.down();await pause()
@@ -225,20 +255,20 @@ try {
       const oldWidth=s.columns[0],oldHeight=s.rows[0]
       await drag(colEdge,g.horizontal.y+g.horizontal.height/2,40*s.dpi/96,0)
       s=await waitState(v=>v.columns[0]>oldWidth+200)
-      check(`DPR${dpr} drag column width`,s.columns[0]>oldWidth,{before:oldWidth,after:s.columns[0]})
+      check(`DPR${dpr} drag column width (native chrome)`,s.columns[0]>oldWidth,{before:oldWidth,after:s.columns[0]})
       shot=await capture(`dpr${dpr}-column-dragged`);colEdge=boundaries(shot,g.horizontal,shot.width/s.frame.Width,true)[1]
       await click(colEdge,g.horizontal.y+g.horizontal.height/2,2)
       s=await waitState(v=>v.columns[0]<oldWidth)
-      check(`DPR${dpr} double click auto width`,s.columns[0]<oldWidth,s.columns)
+      check(`DPR${dpr} double click auto width (native chrome)`,s.columns[0]<oldWidth,s.columns)
       await drag(g.vertical.x+g.vertical.width/2,rowEdge,0,16*s.dpi/96)
       s=await waitState(v=>v.rows[0]>oldHeight+150)
-      check(`DPR${dpr} drag row height`,s.rows[0]>oldHeight,{before:oldHeight,after:s.rows[0]})
+      check(`DPR${dpr} drag row height (native chrome)`,s.rows[0]>oldHeight,{before:oldHeight,after:s.rows[0]})
       shot=await capture(`dpr${dpr}-row-dragged`);rowEdge=boundaries(shot,g.vertical,shot.width/s.frame.Width,false)[1]
       await click(g.vertical.x+g.vertical.width/2,rowEdge,2)
       s=await waitState(v=>v.rows[0]<oldHeight+150)
-      check(`DPR${dpr} double click auto height`,s.rows[0]<oldHeight+150,s.rows)
+      check(`DPR${dpr} double click auto height (native chrome)`,s.rows[0]<oldHeight+150,s.rows)
     } else {
-      results.push({name:`DPR${dpr} resize and double-click`,status:'skipped',reason:'Enable CALC_HEADER_RESIZE=1; r6 native drag release does not converge.'})
+      results.push({name:`DPR${dpr} resize and double-click`,status:'skipped',reason:'Enable CALC_HEADER_RESIZE=1 for native chrome; bare-canvas tooltip interception remains a known r6/r7 limitation.'})
       console.log(`SKIP DPR${dpr} resize and double-click (CALC_HEADER_RESIZE=1 to enable)`)
     }
     const p=await cssPoint(g.grid.x+g.grid.width/2,g.grid.y+g.grid.height/2)
@@ -265,6 +295,7 @@ try {
   check('test execution',false,error.stack)
   for(const page of await browser.pages().catch(()=>[])) if(page.url().includes('editor.html')) {
     await page.screenshot({path:path.join(out,'failure.png')}).catch(()=>{})
+    fs.writeFileSync(path.join(out,'pointer-log.json'),JSON.stringify(await page.evaluate(()=>({events:window.__headerPointerLog,canvases:[...document.querySelectorAll('canvas')].map(e=>({id:e.id,className:e.className,html:e.parentElement.outerHTML.slice(0,1000)}))})).catch(()=>null),null,2))
     console.error(await page.evaluate(()=>document.querySelector('#vlog')?.textContent).catch(()=>''))
   }
 }
