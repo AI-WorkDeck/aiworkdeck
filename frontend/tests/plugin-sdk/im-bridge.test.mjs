@@ -20,9 +20,9 @@ function harness(deps = {}) {
   const win = { addEventListener() {}, removeEventListener() {}, ...deps.window }
   const uni = { $on: (key, fn) => listeners.set(key, fn), $off: key => listeners.delete(key), $emit: (...args) => events.push(args) }
   const options = new Function('getProjectFiles', 'requestPluginIm', 'preparePluginImDrag', 'endPluginImDrag',
-    'ACCOUNT_CHANGED_EVENT', 'APP_THEME_EVENT', 'window', 'uni', 'setTimeout', 'subscribeTaskChanges', 'getPlugins', body)(deps.getProjectFiles || (async () => files),
+    'ACCOUNT_CHANGED_EVENT', 'APP_THEME_EVENT', 'APP_LANGUAGE_EVENT', 'window', 'uni', 'setTimeout', 'subscribeTaskChanges', 'getPlugins', body)(deps.getProjectFiles || (async () => files),
     deps.requestPluginIm || (async () => ({ code: 0, data: { conversations: [] } })), preparePluginImDrag, endPluginImDrag,
-    'awd:account-changed', 'theme', win, uni, deps.setTimeout || setTimeout, () => () => {}, async () => [{ id: 'project-im', enabled: true, permissions: ['im', 'file_read'], version: '1.0', devInstalled: false }])
+    'awd:account-changed', 'theme', 'language', win, uni, deps.setTimeout || setTimeout, () => () => {}, async () => [{ id: 'project-im', enabled: true, permissions: ['im', 'file_read'], version: '1.0', devInstalled: false }])
   const vm = { ...options.data(), projectId: 5, pluginId: 'project-im', url: '/api/plugin-web/project-im/index.html',
     permissions: ['im', 'file_read'], addFileToAi: deps.addFileToAi || (async value => { events.push(['addFile', value]) }),
     $refs: { pluginFrame: { contentWindow: { postMessage: message => sent.push(message) } } },

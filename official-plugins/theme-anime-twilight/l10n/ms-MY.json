@@ -2,5 +2,11 @@
   "plugin.name": "Anime Twilight · Kataware-doki Skin",
   "plugin.desc": "Makoto Shinkai-inspired twilight ultramarine, sunset coral, and lavender starlight with translucent cel glass.",
   "theme.name": "Anime Twilight",
-  "theme.desc": "Twilight Ultramarine × Sunset Coral × Lavender Star × Cel Glass"
+  "theme.desc": "Twilight Ultramarine × Sunset Coral × Lavender Star × Cel Glass",
+  "gallery.badge": "Galeri tema",
+  "gallery.swatch1": "Langit pagi",
+  "gallery.swatch2": "Nila bintang",
+  "gallery.swatch3": "Karang senja",
+  "gallery.swatch4": "Bintang lavender",
+  "gallery.swatch5": "Biru senja"
 }

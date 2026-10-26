@@ -67,7 +67,7 @@ import { createPluginVoiceServices } from '@/utils/pluginVoiceServices.js'
 import { createPluginBusinessServices, clonePluginData } from '@/utils/pluginBusinessServices.js'
 import { createPluginPlatformServices } from '@/utils/pluginPlatformServices.js'
 import { PLUGIN_DOC_ACTIONS } from '@/config/pluginDocActions.js'
-import { getAppLanguage } from '@/utils/appLanguage.js'
+import { APP_LANGUAGE_EVENT, getAppLanguage } from '@/utils/appLanguage.js'
 import { getResolvedTheme, collectThemeTokens, APP_THEME_EVENT } from '@/utils/appTheme.js'
 import { resolveAnchor, toPluginLink, toTargetInputs } from '@/utils/pluginEvidence.js'
 import { createEvidenceLinkForSelection } from '@/pages/project-overview/evidenceLinkCore.js'
@@ -239,6 +239,7 @@ export default {
     window.addEventListener('message', this.onMessage)
     this._onThemeChanged = () => this.pushTheme()
     uni.$on(APP_THEME_EVENT, this._onThemeChanged)
+    uni.$on(APP_LANGUAGE_EVENT, this._onThemeChanged)
     // 事件源（v2.7）：FileTree.loadFiles 成功后与编辑器选区变化时各发一个应用级事件，
     // 这里按插件的订阅集合转发进 iframe（未订阅不推，见 forwardEvent）
     if (this.hasPermission('speech') && host.model?.onProgress) this._unsubscribeSpeech = host.model.onProgress(event => { if (['kokoro-models', 'asr-models'].includes(event?.id)) this.forwardEvent('speech.progress', event) })
@@ -311,7 +312,7 @@ export default {
     this.sessionGeneration++
     this.clearPreparedDrag()
     window.removeEventListener('message', this.onMessage)
-    if (this._onThemeChanged) { uni.$off(APP_THEME_EVENT, this._onThemeChanged); this._onThemeChanged = null }
+    if (this._onThemeChanged) { uni.$off(APP_THEME_EVENT, this._onThemeChanged); uni.$off(APP_LANGUAGE_EVENT, this._onThemeChanged); this._onThemeChanged = null }
     if (this._onFilesChanged) { uni.$off('awd:files-changed', this._onFilesChanged); this._onFilesChanged = null }
     if (this._onDiagramChanged) { uni.$off('awd:litviz-restyled', this._onDiagramChanged); this._onDiagramChanged = null }
     if (this._onSelectionChanged) { uni.$off('awd:selection-changed', this._onSelectionChanged); this._onSelectionChanged = null }
@@ -476,7 +477,7 @@ export default {
       const frame = this.$refs.pluginFrame
       if (!frame || !frame.contentWindow) return
       frame.contentWindow.postMessage(
-        { awd: PROTOCOL, type: 'theme', theme: getResolvedTheme(), tokens: collectThemeTokens() },
+        { awd: PROTOCOL, type: 'theme', theme: getResolvedTheme(), tokens: collectThemeTokens(), language: getAppLanguage() },
         '*'
       )
     },

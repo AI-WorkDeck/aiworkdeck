@@ -2,5 +2,11 @@
   "plugin.name": "Ink Wash Zen · Calligraphy Skin",
   "plugin.desc": "Xuan paper whitespace, five-step ink wash hierarchy, and purple-ink focal accents across light and dark modes.",
   "theme.name": "Ink Wash Zen",
-  "theme.desc": "Xuan Paper × Five-Tone Ink Wash × Purple Ink Drop × Cinnabar Seal"
+  "theme.desc": "Xuan Paper × Five-Tone Ink Wash × Purple Ink Drop × Cinnabar Seal",
+  "gallery.badge": "Галерея тем",
+  "gallery.swatch1": "Белая рисовая бумага",
+  "gallery.swatch2": "Глубокая тушь",
+  "gallery.swatch3": "Фиолетовая тушь",
+  "gallery.swatch4": "Киноварь",
+  "gallery.swatch5": "Ночная тушь"
 }

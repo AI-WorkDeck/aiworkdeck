@@ -321,6 +321,7 @@
 // 由左栏 MarketSidebarPanel 点行打开。自行拉取市场与已安装两份数据合成视图，
 // 装/卸/启停后通过 uni.$emit('awd:market-changed') 通知左栏刷新。
 import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile, getContributedThemes, selectContributedTheme, resolvePluginEntryUrl } from '@/services/api.js'
+import { APP_LANGUAGE_EVENT, getAppLanguage } from '@/utils/appLanguage.js'
 import { setActiveSkin, getResolvedTheme, collectThemeTokens, APP_THEME_EVENT } from '@/utils/appTheme.js'
 import { ICONS } from '@/config/icons.js'
 import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
@@ -626,6 +627,7 @@ export default {
   },
   mounted() {
     uni.$on(APP_THEME_EVENT, this.pushThemePreview)
+    uni.$on(APP_LANGUAGE_EVENT, this.pushThemePreview)
     uni.$on('awd:account-changed', this.loadContribution)
     this.reload()
     uni.$on('awd:market-changed-from-sidebar', this.reload)
@@ -635,6 +637,7 @@ export default {
     this.reloadGeneration++
     this.contributionGeneration++
     uni.$off(APP_THEME_EVENT, this.pushThemePreview)
+    uni.$off(APP_LANGUAGE_EVENT, this.pushThemePreview)
     uni.$off('awd:account-changed', this.loadContribution)
     uni.$off('awd:market-changed-from-sidebar', this.reload)
     uni.$off('awd:market-update-checked', this.onUpdatesChecked)
@@ -643,7 +646,7 @@ export default {
   methods: {
     pushThemePreview() {
       this.$refs.themePreview?.contentWindow?.postMessage({
-        awd: 1, type: 'theme', theme: getResolvedTheme(), tokens: collectThemeTokens(),
+        awd: 1, type: 'theme', theme: getResolvedTheme(), tokens: collectThemeTokens(), language: getAppLanguage(),
       }, '*')
     },
     onUpdatesChecked() {
