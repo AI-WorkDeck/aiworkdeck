@@ -10,18 +10,26 @@ on:
       candidate_version:
         description: Candidate version
         required: true
-        default: '0.66.0'
+        default: '0.72.0'
       baseline_run_id:
-        description: Optional signed older-version new-updater build (empty uses original v0.65.0)
-        required: false
+        description: Successful signed baseline build
+        required: true
+        default: '39939848049'
       baseline_version:
         description: Baseline version
         required: true
-        default: '0.65.0'
+        default: '0.71.0'
+      baseline_sha:
+        description: Exact expected baseline source commit
+        required: true
+        default: '58d7fbacbab68a19179467e8b53f0bf4a244adb7'
+      candidate_sha:
+        description: Exact expected candidate source commit
+        required: true
       mechanism:
         type: choice
         options: [LegacyHelper, AppUpdater]
-        default: LegacyHelper
+        default: AppUpdater
       exit_mode:
         type: choice
         options: [Restart, Quit, Reopen]
@@ -60,29 +68,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_RUN: ${{ inputs.candidate_run_id }}
           BASELINE_RUN: ${{ inputs.baseline_run_id }}
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           CANDIDATE_VERSION: ${{ inputs.candidate_version }}
           BASELINE_VERSION: ${{ inputs.baseline_version }}
           MECHANISM: ${{ inputs.mechanism }}
         run: |
           $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Force evidence, candidate, baseline | Out-Null
-          if ($env:CANDIDATE_VERSION -notmatch '^\d+\.\d+\.\d+$' -or $env:BASELINE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
-          function Download-Build($id, $destination) {
-            if ($id -notmatch '^\d+$') { throw 'Run ID must be numeric' }
-            $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$id" | ConvertFrom-Json
-            if ($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.path -ne '.github/workflows/desktop-build.yml' -or $run.event -ne 'workflow_dispatch') { throw 'Requires successful manually dispatched official desktop build' }
-            $run | Select-Object id, head_sha, head_branch, path, event, conclusion, html_url | ConvertTo-Json | Set-Content "evidence/$destination-build.json"
-            gh run download $id --repo $env:GITHUB_REPOSITORY --name aiworkdeck-windows-latest --dir $destination
-            if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed' }
-          }
-          Download-Build $env:CANDIDATE_RUN candidate
-          if ($env:BASELINE_RUN) { Download-Build $env:BASELINE_RUN baseline }
-          else {
-            if ($env:MECHANISM -eq 'AppUpdater') { throw 'AppUpdater requires an explicitly supplied signed baseline with new updater code' }
-            gh release download "v$env:BASELINE_VERSION" --repo $env:GITHUB_REPOSITORY --pattern '*.exe' --dir baseline
-            if ($LASTEXITCODE -ne 0) { throw 'Original release download failed' }
-            @{ tag = "v$env:BASELINE_VERSION"; source = 'Original published release; no full-update mechanism' } | ConvertTo-Json | Set-Content evidence/baseline-build.json
-          }
+          node desktop/scripts/download-upgrade-build.mjs baseline win32
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline provenance/download failed' }
+          node desktop/scripts/download-upgrade-build.mjs candidate win32
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate provenance/download failed' }
           # Use the helper from the candidate's exact source commit, even when test scripts are newer.
           $candidate = Get-Content evidence/candidate-build.json -Raw | ConvertFrom-Json
           git fetch origin $candidate.head_sha --depth=1
