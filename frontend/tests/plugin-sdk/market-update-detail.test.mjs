@@ -4,6 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { mergePluginCatalog, isPluginUpdateAvailable } from '../../src/utils/marketUpdates.js'
+import { APP_THEME_EVENT } from '../../src/utils/appTheme.js'
 
 const detail = readFileSync(new URL('../../src/components/MarketDetailPane.vue', import.meta.url), 'utf8')
 const pane = readFileSync(new URL('../../src/components/MarketPane.vue', import.meta.url), 'utf8')
@@ -130,18 +131,22 @@ test('open detail refreshes after manual update checks and removes its listener 
     $off: event => handlers.delete(event),
   }
   const reloads = []
-  const vm = { reload: (...args) => { reloads.push(args) }, loadContribution() {}, stopPackPoll() {}, contributionGeneration: 0, reloadGeneration: 0 }
+  let previewUpdates = 0
+  const vm = { reload: (...args) => { reloads.push(args) }, loadContribution() {}, pushThemePreview() { previewUpdates++ }, stopPackPoll() {}, contributionGeneration: 0, reloadGeneration: 0 }
   vm.onUpdatesChecked = method(detail, 'onUpdatesChecked', {}).bind(vm)
   const lifecycle = name => {
     const start = detail.indexOf(`  ${name}() {`)
     const end = detail.indexOf('\n  },', start)
-    return new Function('uni', `return ({${detail.slice(start, end + 5)}}).${name}`).call(null, uni)
+    return new Function('uni', 'APP_THEME_EVENT', `return ({${detail.slice(start, end + 5)}}).${name}`).call(null, uni, APP_THEME_EVENT)
   }
   lifecycle('mounted').call(vm)
+  handlers.get(APP_THEME_EVENT)()
+  assert.equal(previewUpdates, 1)
   handlers.get('awd:market-update-checked')()
   assert.deepEqual(reloads, [[], [false]], 'background checks only refresh metadata')
   lifecycle('beforeUnmount').call(vm)
   assert.equal(handlers.has('awd:market-update-checked'), false)
+  assert.equal(handlers.has(APP_THEME_EVENT), false)
 })
 
 test('background version checks preserve an unsaved plugin settings draft', async () => {
