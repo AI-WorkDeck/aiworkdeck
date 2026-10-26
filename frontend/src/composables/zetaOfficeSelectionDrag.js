@@ -224,10 +224,10 @@ export function attachSelectionDrag({ canvas, execute, onAfterDrop, onLog } = {}
   }
 
   function dispatchCanvasClick(clientX, clientY, downX, downY) {
-    // Qt5-WASM passes timestamp=0 to QWindowSystemInterface::handleMouseEvent,
-    // so two consecutive mousedown events seen by Qt within double-click distance
-    // are always treated as a double-click (word selection) regardless of elapsed
-    // wall-clock time. Because we intercept mousedown at (downX, downY), Qt only
+    // Older Qt5-WASM builds narrow epoch milliseconds to a 32-bit timestamp,
+    // causing nearby presses to be treated as double-clicks even seconds apart.
+    // Keep this compensation for those engines; r7 uses Qt elapsed-time overloads.
+    // Because we intercept mousedown at (downX, downY), Qt only
     // sees the drop clicks; if the previous canvas click seen by Qt was near
     // (clientX, clientY), first click at (downX, downY) (or a distant margin X)
     // after stashing so Qt resets mnClickCount to 1 for the drop click.
