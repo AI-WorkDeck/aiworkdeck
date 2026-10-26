@@ -19,6 +19,7 @@ import native_document_uno as document
 import native_input_uno as native_input
 import native_document_edit_uno as document_edit
 import native_evidence_uno as evidence
+import native_export_uno as export
 
 document_commands = document.NativeDocumentCommands()
 input_undo = native_input.NativeInputUndo()
@@ -260,6 +261,8 @@ def apply_tracking(model, enabled, initialize):
 
 def dispatch(method, params, model, uno_mod, context=None):
     ctrl = model.getCurrentController()
+    if method == 'export_pdf':
+        return export.export_pdf(model, uno_mod, params.get('nativeOutputPath'))
     toolbar_params = {key: value for key, value in params.items() if key not in ('documentUrl', 'nativeReadOnly', 'nativeDocumentEpoch', 'nativeRevision')}
     if method in ('input_undo_begin', 'input_undo_end'):
         return input_undo.execute(method, params, model, document_epoch=params.get('nativeDocumentEpoch'),

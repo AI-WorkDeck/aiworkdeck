@@ -22,6 +22,32 @@ test('unknown capabilities fail explicitly, without issuing a native command', a
   assert.equal(calls.length, 0)
 })
 
+test('PDF export allows readonly, owns output path and returns verified bytes without a mutation',async()=>{
+  const {session,events}=opened(true)
+  session.run=await fs.mkdtemp(path.join(os.tmpdir(),'awd-pdf-'))
+  session.unoCall=async(action,params)=>{
+    assert.equal(action,'export_pdf');assert.equal(params.nativeOutputPath,path.join(session.run,'export.pdf'))
+    await fs.writeFile(params.nativeOutputPath,'%PDF-test')
+    return {success:true}
+  }
+  try{
+    const result=await session.execute('export_pdf',{nativeOutputPath:'/untrusted.pdf'})
+    assert.equal(Buffer.from(result.bytes).toString(),'%PDF-test');assert.equal(result.size,9)
+    assert.equal(events.length,0);assert.equal(session.revision,0)
+    await assert.rejects(fs.access(path.join(session.run,'export.pdf')),{code:'ENOENT'})
+  }finally{await fs.rm(session.run,{recursive:true,force:true})}
+})
+
+test('PDF state uncertainty locks the native session instead of returning bytes',async()=>{
+  const {session}=opened(true)
+  session.run=await fs.mkdtemp(path.join(os.tmpdir(),'awd-pdf-'))
+  session.unoCall=async()=>{throw Error('PDF_EXPORT_OUTCOME_UNKNOWN: source changed')}
+  try{
+    await assert.rejects(session.execute('export_pdf'),/PDF_EXPORT_OUTCOME_UNKNOWN/)
+    assert.ok(session.failure)
+  }finally{await fs.rm(session.run,{recursive:true,force:true})}
+})
+
 test('a queued paint from the previous page width requests a fresh viewport without failing the engine', async () => {
   const { session, calls } = opened()
   session.model.widthTwips = 16676; session.model.heightTwips = 137260

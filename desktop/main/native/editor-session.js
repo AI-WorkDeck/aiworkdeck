@@ -511,6 +511,20 @@ class NativeEditorSession {
       }
       if (action === 'native_paint') return this.paint(params)
       if (action === 'native_input') return this.input(params.action, params.params || {})
+      if (action === 'export_pdf') {
+        const local = path.join(this.run, 'export.pdf')
+        try {
+          await fs.rm(local, { force: true })
+          const result = await this.unoCall('export_pdf', { nativeOutputPath: local })
+          if (result.success !== true) throw Error('Native PDF export failed')
+          const bytes = await fs.readFile(local)
+          if (bytes.length < 5 || bytes.subarray(0, 5).toString('ascii') !== '%PDF-') throw Error('Native PDF export is empty or invalid')
+          return { success: true, size: bytes.length, bytes: new Uint8Array(bytes) }
+        } catch (error) {
+          if (error.message.includes('PDF_EXPORT_OUTCOME_UNKNOWN')) this.fail(error)
+          throw error
+        } finally { await fs.rm(local, { force: true }) }
+      }
       if (action === 'export_document') {
         this.assertWrite()
         return exportWithInlineRevisions(params => this.unoCall('view', params), async () => {
