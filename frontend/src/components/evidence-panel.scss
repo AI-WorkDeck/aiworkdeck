@@ -83,8 +83,6 @@
 .ep-chip.conf { background: var(--awd-info-soft); color: var(--awd-info-text); }
 .ep-chip.rel.contradicts { background: var(--awd-danger-soft); color: var(--awd-danger-text); }
 .ep-chip.rel.partial { background: var(--awd-warning-soft); color: var(--awd-text); }
-.ep-chip.pick { background: var(--awd-surface); border: 1px solid var(--awd-border); color: var(--awd-text-2); }
-.ep-chip.pick.on { border-color: var(--awd-mint); color: var(--awd-accent-text); }
 .ep-target-rm { margin-left: auto; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
 .ep-method-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
 .ep-acts { display: flex; gap: 6px; margin-top: 7px; }
