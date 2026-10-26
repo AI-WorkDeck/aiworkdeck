@@ -38,6 +38,7 @@ languages:
   - en-US
 
 name_en: Litigation Visualization
+description_en: Turn case materials into publication-ready litigation diagrams—fact timelines, statute of limitations / guarantee period Gantt charts, procedural flowcharts, party relationship maps, equity control trees, and A/B comparison tables—preserving source wording verbatim.
 
 # 触发条件：用户输入包含任一关键词即命中（不区分大小写）
 triggers:

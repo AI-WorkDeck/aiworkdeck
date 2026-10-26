@@ -1,0 +1,5 @@
+{
+  "plugin.name": "收藏夹",
+  "plugin.description": "查找项目收藏，复制、插入或打开来源。",
+  "view.main.name": "收藏夹"
+}

@@ -1,0 +1,6 @@
+{
+  "plugin.name": "日程",
+  "plugin.description": "跨项目日历、任务、提醒和文件关联。",
+  "view.sidebar.name": "日程",
+  "view.main.name": "日程"
+}

@@ -102,6 +102,17 @@ export default {
   placeholderOpenedAt: 'e.g., 2026-08-01',
   placeholderNextStep: 'e.g., First draft of due diligence report by August 15',
   placeholderCounterparty: 'e.g., Beta Trading Co., Ltd.',
+  matterTypeCorporateGovernance: 'Corporate Governance',
+  matterTypeCapitalMarkets: 'Capital Markets & Securities',
+  matterTypeMna: 'M&A Transactions',
+  matterTypeDisputeResolution: 'Dispute Resolution',
+  matterTypeContractReview: 'Contract Review & Drafting',
+  matterTypeCompliance: 'Compliance & Regulatory',
+  matterTypeIp: 'Intellectual Property',
+  matterTypeLabor: 'Employment & Labor',
+  matterTypeBankruptcy: 'Bankruptcy & Restructuring',
+  matterTypeOtherLegal: 'Other Legal Matters',
+  matterTypeNonLegal: 'Non-Legal Matters',
 
   // OverviewStatsBar.vue
   statsLoadingHint: 'Loading project status…',

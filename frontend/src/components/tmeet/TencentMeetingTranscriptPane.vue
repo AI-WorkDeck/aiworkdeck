@@ -16,7 +16,7 @@
             <text>{{ $t('tmeet.aiTodos') }}</text>
           </button>
           <button class="tmeet-pane-btn" :disabled="exporting" @tap="onExportDoc">
-            <text>{{ exporting ? '导出中…' : $t('tmeet.exportDoc') }}</text>
+            <text>{{ exporting ? $t('tmeet.exportingDoc') : $t('tmeet.exportDoc') }}</text>
           </button>
           <button class="tmeet-pane-btn" @tap="onCopyTranscript">
             <text>{{ copied ? $t('tmeet.copied') : $t('tmeet.copyTranscript') }}</text>
@@ -77,7 +77,7 @@
 
         <scroll-view class="tmeet-timeline-scroll" scroll-y>
           <view v-if="filteredParagraphs.length === 0" class="tmeet-pane-empty">
-            <text>{{ searchQuery ? '未找到匹配的发言内容' : $t('tmeet.noTranscript') }}</text>
+            <text>{{ searchQuery ? $t('tmeet.noMatchedSpeech') : $t('tmeet.noTranscript') }}</text>
           </view>
 
           <view class="tmeet-timeline">
@@ -98,7 +98,7 @@
                 </view>
               </view>
               <view class="tmeet-content-col">
-                <view class="tmeet-speaker-name">{{ p.speakerName || '发言人' }}</view>
+                <view class="tmeet-speaker-name">{{ p.speakerName || $t('tmeet.defaultSpeaker') }}</view>
                 <view class="tmeet-bubble">
                   <text class="tmeet-text">{{ p.text }}</text>
                 </view>
@@ -238,7 +238,7 @@ export default {
     async onExportDoc() {
       const rec = this.record || this.meeting
       if (!this.projectId) {
-        uni.showToast({ title: '请先打开一个项目后再导出', icon: 'none' })
+        uni.showToast({ title: this.$t('tmeet.openProjectBeforeExport'), icon: 'none' })
         return
       }
       this.exporting = true

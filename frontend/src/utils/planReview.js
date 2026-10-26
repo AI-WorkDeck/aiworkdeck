@@ -17,10 +17,18 @@ export function reanchorComment(comment, currentText) {
   return { fromLine: hit + 1, toLine: hit + span, found: true }
 }
 
-export function buildPlanReviewPrompt({ lang = 'zh', currentText, diff, comments }) {
+function isEnLang() {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') return true
+    if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') return true
+  } catch (_) { /* ignore */ }
+  return false
+}
+
+export function buildPlanReviewPrompt({ lang, currentText, diff, comments }) {
   const n = diff ? diff.hunks : 0
   const m = Array.isArray(comments) ? comments.length : 0
-  const en = lang === 'en'
+  const en = lang ? (lang === 'en' || lang === 'en-US') : isEnLang()
   if (!n && !m) {
     return en
       ? { message: 'Implementation plan confirmed, please proceed.', displayText: 'Proceed' }

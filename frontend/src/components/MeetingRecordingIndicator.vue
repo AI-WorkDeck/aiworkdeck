@@ -5,12 +5,12 @@
   <div v-if="visible" class="mri-pill" :class="{ paused: state.status === 'paused' }">
     <span class="mri-dot"></span>
     <span class="mri-time">{{ timeText }}</span>
-    <span class="mri-label">{{ state.status === 'interrupted' ? '已中断' : (state.status === 'paused' ? '已暂停' : '录音中') }}</span>
+    <span class="mri-label">{{ state.status === 'interrupted' ? t('meeting.interrupted') : (state.status === 'paused' ? t('meeting.paused') : t('meeting.recording')) }}</span>
     <button class="mri-btn" type="button" @click="togglePause">
-      {{ state.status === 'paused' ? '继续' : '暂停' }}
+      {{ state.status === 'paused' ? t('meeting.resume') : t('meeting.pause') }}
     </button>
     <button class="mri-btn stop" type="button" :disabled="state.status === 'stopping'" @click="stop">
-      {{ state.status === 'stopping' ? '保存中' : '停止' }}
+      {{ state.status === 'stopping' ? t('meeting.savingShort') : t('meeting.stopShort') }}
     </button>
     <!-- 电平条：贴着胶囊底边的细条，靠 .mri-pill 的 overflow:hidden 借用胶囊自身的圆角裁边，
          不占布局高度（反馈8，与面板里 mr-level-bar 同一份数据源 recorderState.level） -->
@@ -44,6 +44,7 @@ export default {
     }
   },
   methods: {
+    t,
     togglePause() {
       if (this.state.status === 'paused') resumeRecording()
       else pauseRecording()

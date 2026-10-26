@@ -337,12 +337,12 @@ function uploadChunk(blob, offset, isLast) {
       if (xhr.status >= 200 && xhr.status < 300) resolve()
       else reject(new Error('HTTP ' + xhr.status))
     }
-    xhr.onerror = () => { clearTimeout(timer); reject(new Error('网络错误')) }
-    xhr.onabort = () => { clearTimeout(timer); reject(new Error('上传超时')) }
+    xhr.onerror = () => { clearTimeout(timer); reject(new Error(t('meeting.uploadNetworkError'))) }
+    xhr.onabort = () => { clearTimeout(timer); reject(new Error(t('meeting.uploadTimeout'))) }
     xhr.send(blob)
     // #endif
     // #ifndef H5
-    reject(new Error('当前平台不支持录音上传'))
+    reject(new Error(t('meeting.uploadPlatformUnsupported')))
     // #endif
   })
 }

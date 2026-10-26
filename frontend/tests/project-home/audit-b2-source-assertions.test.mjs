@@ -153,8 +153,8 @@ test('面板与胶囊的状态标签都要认 interrupted，否则头条文案�
     'MeetingRecordingPanel 的实时标签必须区分 interrupted，不能落到"录音中"/"已暂停"两选一')
 
   const indicator = stripComments(read('components/MeetingRecordingIndicator.vue'))
-  assert.match(indicator, /state\.status === 'interrupted' \? '已中断'/,
-    'MeetingRecordingIndicator 同理——它是硬编码中文没做 i18n，是既有欠账，这里保持同一风格')
+  assert.match(indicator, /state\.status === 'interrupted' \? (?:t|\$t)\('meeting\.interrupted'\)/,
+    'MeetingRecordingIndicator 的实时标签同样必须区分 interrupted 并走 meeting.interrupted 词条')
 })
 
 // ======================================================================

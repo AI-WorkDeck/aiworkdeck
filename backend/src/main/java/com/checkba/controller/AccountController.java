@@ -340,7 +340,7 @@ public class AccountController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireUser(sessionId);
         if (outTradeNo == null || outTradeNo.isBlank()) {
-            throw new IllegalArgumentException("outTradeNo 不能为空");
+            throw new IllegalArgumentException(LangText.of("outTradeNo 不能为空", "outTradeNo cannot be empty"));
         }
         return ok(accountService.queryRecharge(outTradeNo));
     }
@@ -369,7 +369,7 @@ public class AccountController {
         String skuId = body == null ? null : body.get("skuId");
         if (skuId == null || !PURCHASABLE_SKUS.contains(skuId)) {
             // 文案不含「登录/未授权/请先」，不会被 api.js 误判成掉线
-            throw new IllegalArgumentException("无效商品：该功能不支持应用内购买");
+            throw new IllegalArgumentException(LangText.of("无效商品：该功能不支持应用内购买", "Invalid item: this feature does not support in-app purchase"));
         }
         Map<String, Object> purchased = accountService.purchaseSku(skuId);
         // 同步刷新：refreshQuietly 失败静默（权益下次陈旧刷新会兜住），不吞掉已成功的购买
@@ -504,7 +504,7 @@ public class AccountController {
         requireUser(sessionId);
         String name = body == null ? null : body.get("name");
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("团队名称不能为空");
+            throw new IllegalArgumentException(LangText.of("团队名称不能为空", "Team name cannot be empty"));
         }
         return ok(accountService.createTeam(name));
     }
@@ -526,7 +526,7 @@ public class AccountController {
             patch.put("shareProjectNames", share);
         }
         if (patch.isEmpty()) {
-            throw new IllegalArgumentException("没有需要修改的团队设置");
+            throw new IllegalArgumentException(LangText.of("没有需要修改的团队设置", "No team settings to update"));
         }
         Map<String, Object> updated = accountService.updateTeam(patch);
         // 官网返回的 team 才是权威值，用它刷新本机缓存（不要拿刚才提交的 patch 顶）
@@ -544,7 +544,7 @@ public class AccountController {
         requireUser(sessionId);
         String phone = body == null ? null : body.get("phone");
         if (phone == null || phone.trim().isEmpty()) {
-            throw new IllegalArgumentException("手机号不能为空");
+            throw new IllegalArgumentException(LangText.of("手机号不能为空", "Phone number cannot be empty"));
         }
         return ok(accountService.createTeamInvite(phone, body.get("role")));
     }
@@ -580,7 +580,7 @@ public class AccountController {
         requireUser(sessionId);
         String role = body == null ? null : body.get("role");
         if (role == null || role.trim().isEmpty()) {
-            throw new IllegalArgumentException("角色不能为空");
+            throw new IllegalArgumentException(LangText.of("角色不能为空", "Role cannot be empty"));
         }
         return ok(accountService.updateTeamMember(accountId, role));
     }
@@ -624,7 +624,7 @@ public class AccountController {
         requireUser(sessionId);
         String code = body == null ? null : body.get("code");
         if (code == null || code.trim().isEmpty()) {
-            throw new IllegalArgumentException("邀请码不能为空");
+            throw new IllegalArgumentException(LangText.of("邀请码不能为空", "Invite code cannot be empty"));
         }
         Map<String, Object> joined = accountService.joinTeam(code);
         if (joined.get("team") instanceof Map<?, ?> team) {
@@ -649,7 +649,7 @@ public class AccountController {
         requireUser(sessionId);
         String name = body == null ? null : body.get("name");
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("律所名称不能为空");
+            throw new IllegalArgumentException(LangText.of("律所名称不能为空", "Law firm name cannot be empty"));
         }
         return ok(accountService.createFirm(name));
     }
@@ -662,7 +662,7 @@ public class AccountController {
         requireUser(sessionId);
         String code = body == null ? null : body.get("code");
         if (code == null || code.trim().isEmpty()) {
-            throw new IllegalArgumentException("邀请码不能为空");
+            throw new IllegalArgumentException(LangText.of("邀请码不能为空", "Invite code cannot be empty"));
         }
         return ok(accountService.joinFirm(code));
     }
@@ -678,7 +678,7 @@ public class AccountController {
         requireUser(sessionId);
         String name = body == null ? null : body.get("name");
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("律所名称不能为空");
+            throw new IllegalArgumentException(LangText.of("律所名称不能为空", "Law firm name cannot be empty"));
         }
         return ok(accountService.updateFirm(name));
     }
@@ -731,7 +731,7 @@ public class AccountController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireUser(sessionId);
         if (body == null || !(body.get("enabled") instanceof Boolean enabled)) {
-            throw new IllegalArgumentException("enabled 必须是布尔值");
+            throw new IllegalArgumentException(LangText.of("enabled 必须是布尔值", "enabled must be a boolean"));
         }
         teamUsageSettings.setEnabled(enabled);
         return ok(sharingState());
@@ -777,7 +777,7 @@ public class AccountController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireUser(sessionId);
         if (body == null || !(body.get("granted") instanceof Boolean granted)) {
-            throw new IllegalArgumentException("granted 必须是布尔值");
+            throw new IllegalArgumentException(LangText.of("granted 必须是布尔值", "granted must be a boolean"));
         }
         teamUsageUploadService.decideProjectNames(granted);
         return ok(sharingState());
@@ -801,18 +801,18 @@ public class AccountController {
      */
     private static long parseAmountCents(Object raw) {
         if (!(raw instanceof Number number)) {
-            throw new IllegalArgumentException("充值金额必须是整数（单位：分）");
+            throw new IllegalArgumentException(LangText.of("充值金额必须是整数（单位：分）", "Top-up amount must be an integer (in cents)"));
         }
         double value = number.doubleValue();
         if (Double.isNaN(value) || Double.isInfinite(value) || value != Math.floor(value)) {
-            throw new IllegalArgumentException("充值金额必须是整数（单位：分）");
+            throw new IllegalArgumentException(LangText.of("充值金额必须是整数（单位：分）", "Top-up amount must be an integer (in cents)"));
         }
         long amountCents = number.longValue();
         if (amountCents <= 0) {
-            throw new IllegalArgumentException("充值金额必须大于 0");
+            throw new IllegalArgumentException(LangText.of("充值金额必须大于 0", "Top-up amount must be greater than 0"));
         }
         if (amountCents > RECHARGE_MAX_CENTS) {
-            throw new IllegalArgumentException("单笔充值金额不能超过 10000 元");
+            throw new IllegalArgumentException(LangText.of("单笔充值金额不能超过 10000 元", "Single top-up amount cannot exceed 10,000 CNY"));
         }
         return amountCents;
     }
@@ -937,7 +937,7 @@ public class AccountController {
                 platform.put("usageUsd", quota.get("usageUsd"));
                 platform.put("remainingUsd", quota.get("remainingUsd"));
             } else {
-                platform.put("quotaMessage", "用量暂时查不到，Credits 余额不受影响");
+                platform.put("quotaMessage", LangText.of("用量暂时查不到，Credits 余额不受影响", "Usage details are temporarily unavailable; Credits balance is unaffected"));
                 platform.put("limitUsd", platformAiChannel.limitUsd());
             }
         } catch (AccountException e) {

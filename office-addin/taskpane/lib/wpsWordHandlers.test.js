@@ -342,9 +342,9 @@ test('锚点未命中的报错必须带证据：给出文档里最接近的原�
   await assert.rejects(
     H.insert_text({ anchorText: '甲方应于每月十日前向乙方支付服务费', text: 'x', position: 'after' }),
     (e) => {
-      assert.ok(/最接近的一段原文/.test(e.message), `报错要摆出候选：${e.message}`)
+      assert.ok(/最接近的一段原文|closest text in the document/i.test(e.message), `报错要摆出候选：${e.message}`)
       assert.ok(/十五日/.test(e.message), '候选片段要是文档原文')
-      assert.ok(/重试|重新读取/.test(e.message), '要告诉模型下一步做什么')
+      assert.ok(/重试|重新读取|retry|re-read/i.test(e.message), '要告诉模型下一步做什么')
       return true
     }
   )

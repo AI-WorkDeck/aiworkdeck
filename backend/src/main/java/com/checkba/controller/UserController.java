@@ -51,7 +51,7 @@ public class UserController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
 
         if (sessionId == null) {
-            return ResponseEntity.status(401).body(Map.of("code", 1, "message", "未登录"));
+            return ResponseEntity.status(401).body(Map.of("code", 1, "message", LangText.of("未登录", "Not signed in")));
         }
 
         Long userId = AuthController.getUserIdFromSession(sessionId);

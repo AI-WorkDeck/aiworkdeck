@@ -1,11 +1,24 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import editorZh from '../locales/zh-CN/editor.js'
+import editorEn from '../locales/en-US/editor.js'
+
+function sw(key) {
+  let en = false
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') en = true
+    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') en = true
+  } catch (_) { /* ignore */ }
+  const dict = (en ? editorEn : editorZh)?.semanticWriting || editorZh.semanticWriting
+  return dict[key] || editorZh.semanticWriting[key] || key
+}
+
 export function createSemanticWritingHost({ projectId, fileId, title, writable, execute, send, api }) {
   let session = '', generation = 0, disposed = false, active = null, applying = false, generating = false, saving = false
   let automaticEnabled = false, tabActive = true, automaticGeneration = 0, automatic = null, automaticGenerating = false
   let lastSourceFileIds = [], lastDocumentType = 'auto'
   const empty = () => ({ view: { status: 'EMPTY', advice: [] }, notices: [] })
-  const stale = () => new Error('正文或光标已变化，请重新生成建议。')
+  const stale = () => new Error(sw('staleError'))
   const current = seq => !disposed && seq === generation
   const cancel = id => id && Promise.resolve(api.cancel(projectId, id)).catch(() => {})
   function invalidate(state = 'STALE') {
@@ -44,7 +57,7 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
         || snapshot.hasSelection || snapshot.selectedText
         || before.replace(/\s/gu, '').length < 20 || !/^[\s\p{P}]*$/u.test(after.split(/\r?\n/u)[0])) return empty()
       const sourceFileIds = [...new Set(data.sourceFileIds ?? lastSourceFileIds)]
-      if (sourceFileIds.length > 4 || sourceFileIds.some(id => !Number.isSafeInteger(id) || id <= 0)) throw new Error('最多选择四份项目材料。')
+      if (sourceFileIds.length > 4 || sourceFileIds.some(id => !Number.isSafeInteger(id) || id <= 0)) throw new Error(sw('maxFourMaterialsError'))
       const nearby = await execute('get_document_text', { startParagraph: Math.max(0, snapshot.paragraphIndex - 3), maxParagraphs: 7, __agent: true })
       checkAutomatic(seq)
       if (!nearby?.success || String(nearby.revision) !== String(snapshot.revision) || !Array.isArray(nearby.paragraphs)) throw stale()
@@ -88,11 +101,11 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
   function check(seq) { if (!current(seq)) throw stale() }
   async function generate(data) {
     invalidateAutomatic()
-    if (saving) throw new Error('项目设置正在保存，请稍后生成。')
-    if (data.composing) throw new Error('请先完成当前输入，再生成建议。')
-    if (!['local', 'sentence', 'paragraph', 'rewrite'].includes(data.mode)) throw new Error('请选择建议类型。')
+    if (saving) throw new Error(sw('savingWaitGenerateError'))
+    if (data.composing) throw new Error(sw('finishComposingBeforeGenerateError'))
+    if (!['local', 'sentence', 'paragraph', 'rewrite'].includes(data.mode)) throw new Error(sw('selectModeError'))
     const sourceFileIds = [...new Set(data.sourceFileIds || [])]
-    if (sourceFileIds.length > 4 || sourceFileIds.some(id => !Number.isSafeInteger(id) || id <= 0)) throw new Error('最多选择四份项目材料。')
+    if (sourceFileIds.length > 4 || sourceFileIds.some(id => !Number.isSafeInteger(id) || id <= 0)) throw new Error(sw('maxFourMaterialsError'))
     lastSourceFileIds = sourceFileIds
     lastDocumentType = ['auto', 'litigation', 'contract', 'diligence'].includes(data.documentType) ? data.documentType : 'auto'
     invalidate('LOADING')
@@ -101,10 +114,10 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
     try {
       const snapshot = await execute('capture_writing_context', {})
       check(seq)
-      if (!snapshot?.success || !snapshot.available || !snapshot.token || snapshot.revision == null) throw new Error(snapshot?.message || '当前位置不能生成建议，请检查编辑权限及修订视图。')
+      if (!snapshot?.success || !snapshot.available || !snapshot.token || snapshot.revision == null) throw new Error(snapshot?.message || sw('cannotGenerateAtCursorError'))
       const selection = snapshot.selectedText || ''
-      if (data.mode === 'rewrite' ? !selection : !!selection) throw new Error(data.mode === 'rewrite' ? '请先选中要改写的文字。' : '当前有选区，请选择“改写选区”或取消选区。')
-      if (selection.length > 2000) throw new Error('请将改写选区缩短至 2000 字以内。')
+      if (data.mode === 'rewrite' ? !selection : !!selection) throw new Error(data.mode === 'rewrite' ? sw('selectTextForRewriteError') : sw('hasSelectionError'))
+      if (selection.length > 2000) throw new Error(sw('selectionTooLongError'))
       const paragraphs = [], coveredParagraphs = new Set()
       let start = 0, body = '', truncated = false
       for (let page = 0; page < 100 && body.length < 16000; page++) {
@@ -123,9 +136,9 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
         if (!Number.isInteger(text.nextStartParagraph) || text.nextStartParagraph <= start) break
         start = text.nextStartParagraph
       }
-      const notices = truncated ? ['本次正文参考范围最多 16000 字；长文请结合当前章节与所选材料核对。'] : []
+      const notices = truncated ? [sw('truncatedNotice')] : []
       const scopeKnown = snapshot.scopeKnown !== false && coveredParagraphs.has(snapshot.paragraphIndex)
-      if (!scopeKnown) notices.push('当前位置未纳入可确认的正文范围，局部条款字段不会自动套用；请核对章节与材料。')
+      if (!scopeKnown) notices.push(sw('scopeUnknownNotice'))
       const context = { fileId, revision: String(snapshot.revision), documentText: body.slice(0, 16000),
         before: String(snapshot.before || '').slice(-2000), after: String(snapshot.after || '').slice(0, 2000),
         selection, title: title || '', section: scopeKnown ? snapshot.sectionTitle || '' : '',
@@ -137,8 +150,8 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
     } finally { if (current(seq)) generating = false }
   }
   async function accept(job, data, checkCurrent, isAutomatic = false) {
-    if (data.composing) throw new Error('请先完成当前输入，再采用建议。')
-    if ((isAutomatic && data.index !== 0) || !Number.isInteger(data.index) || data.index < 0 || job.view.status !== 'READY' || !job.view.advice?.[data.index]) throw new Error('请选择有效的建议。')
+    if (data.composing) throw new Error(sw('finishComposingBeforeAcceptError'))
+    if ((isAutomatic && data.index !== 0) || !Number.isInteger(data.index) || data.index < 0 || job.view.status !== 'READY' || !job.view.advice?.[data.index]) throw new Error(sw('selectValidAdviceError'))
     const review = await execute('get_review_context', {}); checkCurrent()
     if (String(review?.revision) !== String(job.snapshot.revision)) throw stale()
     const result = await api.accept(projectId, job.id, { index: data.index, revision: String(job.snapshot.revision) }); checkCurrent()
@@ -146,10 +159,10 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
     applying = true
     try {
       const applied = await execute('accept_writing_suggestion', { token: job.snapshot.token, revision: job.snapshot.revision, text: result.text, expectedSelection: job.selection, __agent: job.mode !== 'local' })
-      if (!applied?.success) throw new Error(applied?.message || '未能插入，正文或光标可能已变化，请重新生成。')
+      if (!applied?.success) throw new Error(applied?.message || sw('insertFailedError'))
       if (isAutomatic) { automatic = null; automaticGeneration++ }
       else { active = null; generation++ }
-      return { applied: true, message: '已采用，可用 Ctrl+Z / ⌘Z 撤销。' }
+      return { applied: true, message: sw('acceptedUndoHint') }
     } finally { applying = false }
   }
   return {
@@ -157,10 +170,10 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
     setActive(value) { tabActive = value === true; if (!tabActive) invalidateAutomatic(true) },
     bindSession(value) { session = value },
     async perform(action, data = {}) {
-      if (disposed || !writable) throw new Error('当前文档不可编辑。')
+      if (disposed || !writable) throw new Error(sw('docNotWritableError'))
       if (action.startsWith('semantic-auto-')) {
         if (action === 'semantic-auto-cancel') { invalidateAutomatic(); return { cancelled: true } }
-        if (!automaticEnabled || !tabActive) throw new Error('自动补全已关闭或文档未激活。')
+        if (!automaticEnabled || !tabActive) throw new Error(sw('autoDisabledOrInactiveError'))
         if (action === 'semantic-auto-generate') return generateAutomatic(data)
         if (!automatic) throw stale()
         const seq = automaticGeneration, job = automatic
@@ -170,11 +183,11 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
           return { view: job.view, notices: [] }
         }
         if (action === 'semantic-auto-accept') return accept(job, data, () => checkAutomatic(seq), true)
-        throw new Error('不支持的语义写作操作。')
+        throw new Error(sw('unsupportedActionError'))
       }
       if (action === 'semantic-context') {
         const ids = [...new Set(data.sourceFileIds || [])]
-        if (ids.length > 4 || ids.some(id => !Number.isSafeInteger(id) || id <= 0)) throw new Error('最多选择四份项目材料。')
+        if (ids.length > 4 || ids.some(id => !Number.isSafeInteger(id) || id <= 0)) throw new Error(sw('maxFourMaterialsError'))
         lastSourceFileIds = ids
         lastDocumentType = ['auto', 'litigation', 'contract', 'diligence'].includes(data.documentType) ? data.documentType : 'auto'
         invalidateAutomatic(true)
@@ -185,7 +198,7 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
         return { ...settings, files: (settings.files || []).filter(file => String(file.id) !== String(fileId)) }
       }
       if (action === 'semantic-save-settings') {
-        if (saving) throw new Error('项目设置正在保存，请稍候。')
+        if (saving) throw new Error(sw('savingWaitError'))
         saving = true; invalidateAutomatic(); invalidate()
         try { return await api.saveSettings(projectId, { stance: data.stance || '', cutoffDate: data.cutoffDate || '' }) }
         finally { saving = false }
@@ -199,7 +212,7 @@ export function createSemanticWritingHost({ projectId, fileId, title, writable, 
         return { view, notices: job.notices }
       }
       if (action === 'semantic-accept') return accept(job, data, () => check(seq))
-      throw new Error('不支持的语义写作操作。')
+      throw new Error(sw('unsupportedActionError'))
     },
     modified() {
       if (disposed || applying) return
