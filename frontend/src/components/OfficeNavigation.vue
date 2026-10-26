@@ -21,10 +21,10 @@
         <text v-else class="office-nav-sheet-name">{{ item.name }}</text>
       </button>
     </view>
-    <button v-if="kind === 'calc' && writable" type="button" class="office-nav-add" :title="$t('editor.toolbar.calcSheetAdd')" :aria-label="$t('editor.toolbar.calcSheetAdd')" @click="$emit('add-sheet')">+</button>
+    <button v-if="kind === 'calc' && writable" type="button" role="button" tabindex="0" class="office-nav-add" :title="$t('editor.toolbar.calcSheetAdd')" :aria-label="$t('editor.toolbar.calcSheetAdd')" @click="$emit('add-sheet')" @keydown="onActionKey($event, 'add-sheet')">+</button>
     <view v-if="loading || error" class="office-nav-status" role="status">
       <text>{{ error || $t('editor.navigation.loading') }}</text>
-      <button v-if="error" type="button" class="office-nav-retry" @click="refresh">{{ $t('editor.retryLoad') }}</button>
+      <button v-if="error" type="button" role="button" tabindex="0" class="office-nav-retry" @click="refresh" @keydown="onActionKey($event, 'retry')">{{ $t('editor.retryLoad') }}</button>
     </view>
   </view>
 </template>
@@ -145,11 +145,18 @@ export default {
         return false
       } finally { if (activationSeq === this._activationSeq) this._switching = false }
     },
+    onActionKey(event, action) {
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      if (action === 'retry') this.refresh()
+      else this.$emit('add-sheet')
+    },
     async onKey(event, index) {
       const previous = this.kind === 'calc' ? 'ArrowLeft' : 'ArrowUp'
       const next = this.kind === 'calc' ? 'ArrowRight' : 'ArrowDown'
       let target
-      if (event.key === previous) target = Math.max(0, index - 1)
+      if (event.key === 'Enter' || event.key === ' ') target = index
+      else if (event.key === previous) target = Math.max(0, index - 1)
       else if (event.key === next) target = Math.min(this.items.length - 1, index + 1)
       else if (event.key === 'Home') target = 0
       else if (event.key === 'End') target = this.items.length - 1
