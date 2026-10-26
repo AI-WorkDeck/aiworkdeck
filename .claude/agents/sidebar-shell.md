@@ -165,6 +165,14 @@ filelink 点击定位、多 target 弹窗、method 小条；契约见 ai-doc-bri
 - 生命周期：beforeUnmount:1781（多实例守卫，只清指向自身的活跃指针）、onLoad:1882、onShow:1932（返回时重新接管全局处理器）、mounted:1988（事件监听登记）。注意有个 beforeDestroy 误嵌在 methods 内（~:5344）。
 - :2261-6729 methods：**toggleLeftPane :2988**、goToSystemSettings:4498、toggleSidebar:4528、toggleAiPanel:4532、toggleToolsPanel:4544、triggerWorkbenchResize:4550、toggleSplitMode:4817、动态插件加载:6266。
 
+## 全局消息入口（dev-board#1490，2026-10-26）
+
+消息中心入口在顶栏右上角 `AccountEntry.vue`：已登录头像显示未读数字（超过 99 显示 `99+`），下拉首个动作是「消息中心」。消息来自现有 `messageCenterTab.js` 轮询；来源暂不可用时不能把未读归零，未知且部分失败显示 `·`，并保留不可用说明。余额/宽限提醒小点与消息角标共存。未连接统一账户时，登录按钮旁仍提供消息图标，因为受邀 DD 连接可独立于统一账户使用；旧 CLIENT 视角仍不开放消息入口。
+
+头像动作直接调用 `openMessageCenterTab`，沿用跨左右窗格的单例标签，不切换或展开左栏。`messages` 不再属于 rail / 无项目左栏白名单；旧有项目 `leftPaneKey=messages` 迁移成 `files`，无项目恢复默认 `projects`。`MessageCenterPane.vue` 保留对话、通知、待处理分类及原业务跳转；阅读不替代业务确认，项目切换仍走落盘出口，账号切换仍清除旧内容和迟到响应。
+
+验证：`node --test tests/messages/*.test.mjs tests/account/account-entry-account-changed.test.mjs`（`frontend/`），`npm run check:nav:full`。头像浏览器测试使用实际组件与单例方法、合成账户状态，隔离夹具把 uni `tap` 映射为 H5 点击；不代表正式 Electron 客户端、真实账户或跨设备已验。
+
 ## 面板切换状态机
 
 rail 点击 → toggleLeftPane(key)（:2988）：staging 单独分支 → 把当前 activeFile 存 lastActiveIdsByMode[oldKey]（:3005）→ 同 key 则收/展 sidebarCollapsed（:3011），异 key 则设 leftPaneKey 并展开（:3014）→ 动态插件通过 `openPluginTab(pluginId)` 打开/聚焦工作区单例（dev-board#1143/#1144，左栏仅 `PluginWorkspaceSummary`）→ 恢复该模式记忆的左右 tab（:3029）→ 持久化到 uni.storage（:3055）。
@@ -516,6 +524,13 @@ launch（**启动页**）/ unlock / identity / login / newproject / **project-li
 **隐藏系统文件夹的单一名单**：`frontend/src/utils/fileTreeBuild.js` 的 `HIDDEN_SYSTEM_FOLDER_NAMES`（`.stagezone` / `__staging_area__`）。文件树只要不展示那个文件夹就够了（`groupByParent` 跳过它，子树自然到不了），但**凡是扁平清单都必须连子树一起剔**——`aiContextFiles.excludeSystemFolders` 干这件事，Cmd+P 快速打开与 AI 的两个「挑一份文件」入口都过它。不这么做的话暂存区里的文件会一条条列出来（真机实测：「从项目选择」页签第一行就是 `__staging_area__`）。
 
 ## 窗口外壳与菜单栏（2026-08-16）
+
+**工作台主布局不得滚动（dev-board#1503）**：`.main-layout` 使用 `overflow:clip` +
+`min-height:0`，只裁切内容、允许 flex 收缩；不要改回 `overflow:hidden`，后者仍可被
+后代 `scrollIntoView` / 聚焦带着滚动。rail 内容超高时，定位文件会让整排左栏标题与
+文档标签上移到顶栏下方，之后滚回文件列表顶部也无法恢复。浏览器回归
+`npm run test:workbench-scroll` 使用真实 SCSS 与合成内容，覆盖三种窗口尺寸的文件定位、
+聚焦及滚轮往返，检查标题几何和底栏位置；可用 `CHROME_PATH` 指定 Chromium。
 
 **没有系统标题栏了。** `main.js` 的 `titleBarStyle:'hidden'`：mac 用
 `trafficLightPosition:{x:18,y:13}` 把三颗交通灯精确摆进 42px 的 `.project-header`
@@ -1495,11 +1510,17 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 8个业务包为search/voice/desensitize/litigation-visual/calendar/favorites/clipboard/insight；tmeet由已有tencent-meeting包承接。布局从manifest contributes.views解析，动态PluginPane承载sidebar/workspace，global无项目可开，project受项目/CLIENT门控。源在frontend/plugin-app，构建npm run build:plugins；npm run build:h5先构建8包。业务服务桥分pluginBusinessServices/pluginCollectionServices/pluginVoiceServices/pluginInsightServices，账号与本机设备仍在宿主。日历深链转插件workspace视图，保留task/file/focus过滤。核心保留home/projects/files/dev/market/version/staging/members及受限CLIENT dd-files，详见PLUGIN_SPEC §17盘点。验证除了单元测试还需真实Uni+opaque sandbox：ES模块静态资产需要仅plugin-web路由ACAO:*；不增加allow-same-origin或unsafe-eval。
 
 
+## 插件与客户协作导航的层级（dev-board#1493/#1494）
+
+通用 `PluginWorkspaceSummary` 以一行工作区导航显示 `workspaceTabState`（当前显示/已打开/打开），简介默认折叠，业务阶段与 AI 动作保留为轻量行。客户协作使用相同导航方式，左栏和中栏名称一致；不再重复大介绍卡与“打开工作区”按钮。状态读取真实左右窗格，定位隐藏右分屏中的已有插件时恢复 splitMode；不创建重复实例，不令普通切标签自动切左栏。回归 `plugin-workspace-tabs` / `dd-client-i18n`。
+
+消息会话与项目沟通插件把上下文、过程状态、附件、输入和发送包在同一输入表面，内部不重复加框；保留云端处理范围与原有发送、附件和重试逻辑。项目沟通实测须使用真实 SDK/opaque iframe，见 `official-plugins/project-im/tests/agent-browser-sandbox.mjs`。全局消息页及入口重整由 #1490 / PR #1223 承接，勿回退它的布局。
+
 ## 文件标签浏览（dev-board#1446）
 
-主资源管理器给 FileTree 传 `enable-tag-view`，顶部「文件夹 / 标签」切换；选择器等复用方默认关闭。
+主资源管理器给 FileTree 传 `enable-tag-view`，显示下方标签分组；选择器等复用方默认关闭。
 标签视图跨折叠目录列出已标记文件，显示原父目录，多选标签 AND，不改文件实际位置和文件夹展开状态。
-共用 `TagFilter.vue` 的限高分组、名称过滤和常驻已选项，搜索契约见 utility-tools.md。
+资源管理器共用 `TagFilter.vue` 的 `sidebar` 形态（dev-board#1491）：取消顶部“文件夹／标签”切换，在文件列表下方显示可折叠的“标签”分组，圆点+名称；超过 8 项才出现名称过滤。点击标签进入跨目录筛选，清空/返回文件夹恢复目录，`showAllTaggedFiles` 单独处理“空 ids + 标签视图”的全部已标记文件。折叠保留所选条件，回收站和其他嵌入文件树不显示此入口；搜索沿用默认形态，契约见 utility-tools.md。
 过滤改变时清空选择；后台刷新移除命中项时清除隐藏选择，并关闭含失效目标的右键菜单。
 `fileOpenTabs.syncFileTreeSelectionWithActiveTab` 不能重新选中筛选外文件；批量操作取当前可见选择。
 标签列表按一个根窗口分页，键盘跨第 100 项必须同步扩展根窗口，不再按文件原父目录计数。

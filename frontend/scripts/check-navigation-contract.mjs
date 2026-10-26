@@ -518,7 +518,7 @@ check('工作台「全部项目」开左栏「项目」面板，不离开工作�
   return null
 })
 
-check('账户入口在顶栏右上角（AccountEntry），rail 底部没有账户入口与设置齿轮；下拉恰好三项：我的日程 + 设置 + 退出登录（dev-board#205 / #899 / #1047 / #1062）', () => {
+check('账户入口在顶栏右上角（AccountEntry），rail 没有账户或消息入口；下拉恰好四项：消息中心 + 我的日程 + 设置 + 退出登录（dev-board#1490）', () => {
   // 沿革：2026-08-20 个人中心并进设置后下拉只剩一项，2026-08-21（dev-board#96）撤下拉、
   // 点头像直开设置；2026-08-27（dev-board#205）「退出登录」要有一级入口，下拉恢复成
   // 两项；2026-09-25（dev-board#899）加「我的日程」成三项。2026-09-29（dev-board#1047）
@@ -542,7 +542,7 @@ check('账户入口在顶栏右上角（AccountEntry），rail 底部没有账�
   if (tagAt < header.indexOf('toggleRecording')) return '账户入口应在「活动记录」右侧'
   const tag = header.slice(tagAt, header.indexOf('/>', tagAt))
   if (/\bv-if=/.test(tag)) return '账户入口有无项目两态都渲染、不按 isClientView 收（客户也有自己的个人组）'
-  for (const [ev, handler] of [['@schedule', 'onAvatarMenuSchedule'], ['@settings', 'onAvatarMenuSettings'], ['@sign-out', 'onAvatarMenuSignOut'], ['@login', 'onAccountLogin']]) {
+  for (const [ev, handler] of [['@messages', 'openMessageCenterTab'], ['@schedule', 'onAvatarMenuSchedule'], ['@settings', 'onAvatarMenuSettings'], ['@sign-out', 'onAvatarMenuSignOut'], ['@login', 'onAccountLogin']]) {
     if (!tag.includes(`${ev}="${handler}"`)) return `账户入口没有把 ${ev} 接到 ${handler}`
   }
   // 顶栏整条是 drag 区：账户入口的按钮与下拉要在 App.vue 的 no-drag 名单里
@@ -564,10 +564,14 @@ check('账户入口在顶栏右上角（AccountEntry），rail 底部没有账�
   if (menuIdx < 0) return 'AccountEntry 里找不到下拉 .avatar-menu'
   const menu = entry.slice(menuIdx, entry.indexOf('</template>', menuIdx))
   const actions = menu.match(/class="avatar-menu-item/g) || []
-  if (actions.length !== 3) return `下拉动作项应恰好三项，实际 ${actions.length} 项`
-  for (const ev of ['schedule', 'settings', 'sign-out']) {
+  if (actions.length !== 4) return `下拉动作项应恰好四项，实际 ${actions.length} 项`
+  for (const ev of ['messages', 'schedule', 'settings', 'sign-out']) {
     if (!menu.includes(`emitAndClose('${ev}')`)) return `下拉里没有 ${ev} 项`
   }
+  const firstAction = menu.slice(menu.indexOf('class="avatar-menu-item'), menu.indexOf('</view>', menu.indexOf('class="avatar-menu-item')))
+  if (!firstAction.includes("emitAndClose('messages')")) return '消息中心必须是头像下拉的第一个动作'
+  if (!tag.includes(':message-unread="messageCenterUnread"') || !tag.includes(':message-partial="messageCenterBadgePartial"')) return '头像没有接收消息未读数与来源不完整状态'
+  if (/key:\s*'messages'/.test(readVue('src/config/leftSidebarPlugins.js'))) return '消息入口不应继续占用 rail'
   // 登录就地弹层（dev-board#1046）：未登录点击发 login，宿主 requireAccount({ reason: 'account' })，不离开工作台
   const onTap = extractMethodBody(entry, 'onTap() {')
   if (!onTap || !onTap.includes("this.$emit('login')")) return '未登录态点击没有 emit login'
