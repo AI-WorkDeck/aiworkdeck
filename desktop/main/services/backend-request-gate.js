@@ -22,17 +22,21 @@ function coreReadMatchers(paths) {
  */
 function installBackendRequestGate(session, { getState }) {
   if (installed.has(session)) return installed.get(session)
-  const pending = new Set()
+  const pending = new Map()
   let timer = null
+  const forget = id => {
+    pending.delete(id)
+    if (pending.size === 0 && timer) { clearInterval(timer); timer = null }
+  }
   const finish = (entry, cancel) => {
-    pending.delete(entry)
+    forget(entry.id)
     try { entry.callback({ cancel }) } catch (e) { /* A navigation may already have cancelled it. */ }
   }
   const invalid = (state, launch) => state.closing || state.launch !== launch ||
     !launch.process || launch.process.exitCode != null || launch.process.signalCode != null
   const flush = () => {
     const state = getState()
-    for (const entry of pending) {
+    for (const entry of pending.values()) {
       if (invalid(state, entry.launch) || state.port !== entry.port) finish(entry, true)
       else if (entry.launch.fullReady) finish(entry, false)
       else if (!Number.isFinite(entry.launch.deadline) || Date.now() >= entry.launch.deadline) finish(entry, true)
@@ -61,18 +65,24 @@ function installBackendRequestGate(session, { getState }) {
         matchers.some(pattern => pattern.test(url.pathname)))) {
       callback({ cancel: false }); return
     }
-    pending.add({ launch, port: state.port, callback })
+    pending.set(details.id, { id: details.id, launch, port: state.port, callback })
     if (!timer) { timer = setInterval(flush, 100); timer.unref?.() }
     flush()
   })
+  // Chromium destroys a cancelled request while its before-request callback is still held.
+  // Invoking that callback later can crash Electron 30 in native code (not a catchable JS error).
+  session.webRequest.onErrorOccurred(details => forget(details.id))
+  session.webRequest.onCompleted(details => forget(details.id))
   let disposed = false
   const dispose = () => {
     if (disposed) return
     disposed = true
     if (timer) clearInterval(timer)
     timer = null
-    for (const entry of pending) finish(entry, true)
+    for (const entry of pending.values()) finish(entry, true)
     session.webRequest.onBeforeRequest(null)
+    session.webRequest.onErrorOccurred(null)
+    session.webRequest.onCompleted(null)
     installed.delete(session)
   }
   installed.set(session, dispose)

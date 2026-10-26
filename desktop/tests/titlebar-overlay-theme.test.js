@@ -45,7 +45,11 @@ function harness({ platform = 'win32', systemDark = false } = {}) {
       this.webContents.send = () => {}
       this.webContents.setWindowOpenHandler = () => {}
       this.webContents.session = new EventEmitter()
-      this.webContents.session.webRequest = { onBeforeRequest(listener) { this.listener = listener } }
+      this.webContents.session.webRequest = {
+        onBeforeRequest(listener) { this.listener = listener },
+        onErrorOccurred(listener) { this.errorListener = listener },
+        onCompleted(listener) { this.completedListener = listener },
+      }
       windows.push(this)
     }
     isDestroyed() { return this.destroyed }

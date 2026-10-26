@@ -9,16 +9,33 @@ function fixture(t) {
   const launch = { process: { exitCode: null, signalCode: null }, deadline: 6000, fullReady: false,
     coreReadPaths: ['/api/projects/my', '/api/projects/:id/files', '/api/files/:id/download'] }
   const state = { launch, port: 8765, closing: false }
-  let listener, registrations = 0
-  const session = { webRequest: { onBeforeRequest(fn) { listener = fn; registrations++ } } }
+  let listener, error, completed, requestId = 0, registrations = 0
+  const session = { webRequest: { onBeforeRequest(fn) { listener = fn; registrations++ },
+    onErrorOccurred(fn) { error = fn }, onCompleted(fn) { completed = fn } } }
   const dispose = installBackendRequestGate(session, { getState: () => state })
   t.after(dispose)
   const send = (path, method = 'GET') => {
     const results = []
-    listener({ url: path.startsWith('http') ? path : `http://127.0.0.1:8765${path}`, method }, value => results.push(value))
+    listener({ id: ++requestId, url: path.startsWith('http') ? path : `http://127.0.0.1:8765${path}`, method }, value => results.push(value))
     return results
   }
-  return { launch, state, session, send, registrations: () => registrations }
+  return { launch, state, session, send, dispose, registrations: () => registrations,
+    error: id => error({ id, error: 'net::ERR_ABORTED' }), completed: id => completed({ id }) }
+}
+
+for (const terminal of ['error', 'completed']) {
+  test(`a ${terminal} request never receives its stale callback after ready, deadline or dispose`, t => {
+    const fixtureValue = fixture(t), { send, launch, dispose } = fixtureValue
+    const abandoned = send('/api/optional'), live = send('/api/other')
+    fixtureValue[terminal](1)
+    launch.fullReady = true
+    t.mock.timers.tick(100)
+    assert.deepEqual(abandoned, [])
+    assert.deepEqual(live, [{ cancel: false }])
+    t.mock.timers.tick(10000); dispose()
+    assert.deepEqual(abandoned, [])
+    assert.equal(live.length, 1)
+  })
 }
 
 test('six optional requests stay unsent while file reads can start immediately', t => {
@@ -43,6 +60,19 @@ test('writes to a read route wait, and a different origin or port is unaffected'
   for (const url of ['https://127.0.0.1:8765/api/site', 'http://127.0.0.1:8766/api/site', 'https://example.org/api/site']) {
     assert.deepEqual(send(url), [{ cancel: false }])
   }
+  launch.fullReady = true
+  t.mock.timers.tick(100)
+  assert.deepEqual(write, [{ cancel: false }])
+})
+
+test('advertised save metadata reads do not wait for the full backend; settings writes still wait', t => {
+  const { send, launch } = fixture(t)
+  const path = '/api/document/generator/settings'
+  launch.coreReadPaths.push(path)
+  assert.deepEqual(send(path), [{ cancel: false }])
+  assert.deepEqual(send(path, 'HEAD'), [{ cancel: false }])
+  const write = send(path, 'PUT')
+  assert.deepEqual(write, [])
   launch.fullReady = true
   t.mock.timers.tick(100)
   assert.deepEqual(write, [{ cancel: false }])
@@ -103,7 +133,7 @@ test('only bounded literal path templates can advertise early reads', () => {
 
 test('a disposed window callback cannot remove a later installation', () => {
   let listener
-  const session = { webRequest: { onBeforeRequest(fn) { listener = fn } } }
+  const session = { webRequest: { onBeforeRequest(fn) { listener = fn }, onErrorOccurred() {}, onCompleted() {} } }
   const first = installBackendRequestGate(session, { getState: () => ({}) })
   first()
   const second = installBackendRequestGate(session, { getState: () => ({}) })

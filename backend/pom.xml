@@ -130,10 +130,10 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- LangChain4j + Ollama -->
+        <!-- Tools/model orchestration is explicit; no @AiService proxies or classpath scanner. -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-spring-boot-starter</artifactId>
+            <artifactId>langchain4j</artifactId>
             <version>0.36.0</version>
         </dependency>
         <dependency>
