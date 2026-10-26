@@ -387,3 +387,42 @@ test('更老的一份 /status 快照不许把本地已知的「已合好」抹�
   assert.equal(calls.resolveStructured.length, 1, '幂等：同一份文件不重合')
   assert.equal(calls.cloud.length, 1, '收尾也只发一次')
 })
+
+
+test('人工裁决同一冲突只首次自动导航，新冲突和清空后仍可打开', async () => {
+  const { calls, deps } = makeHarness()
+  const merge = useDocumentMerge(deps)
+  const conflict = conflictOf([], { conflictingPaths: ['legacy.txt'] })
+  for (let i = 0; i < 3; i++) await merge.onConflictStatus(conflict, 'adopt')
+  assert.equal(calls.overview, 1)
+  assert.equal(merge.state.overviewRequired, true)
+  assert.equal(calls.adopt.length, 0)
+  await merge.onConflictStatus({ ...conflict, mainlineTip: 'main2' }, 'adopt')
+  assert.equal(calls.overview, 2)
+  await merge.onConflictStatus(null, 'adopt')
+  await merge.onConflictStatus({ ...conflict, mainlineTip: 'main2' }, 'adopt')
+  assert.equal(calls.overview, 3)
+})
+
+test('自动合并失败转人工会首次打开，后续状态读取不抢回用户面板', async () => {
+  const { calls, deps } = makeHarness({ buildMergeDraft: async () => ({ success: false, stage: 'align' }) })
+  const merge = useDocumentMerge(deps)
+  const conflict = conflictOf([docxRow()])
+  await merge.onConflictStatus(conflict, 'adopt')
+  await merge.onConflictStatus(conflict, 'adopt')
+  assert.equal(calls.overview, 1)
+  assert.equal(merge.state.overviewRequired, true)
+  assert.equal(calls.resolveFile.length, 0)
+  assert.equal(calls.adopt.length, 0)
+})
+
+test('暂停的冲突只首次自动导航，后续读取不重新触发处理入口', async () => {
+  const { calls, deps } = makeHarness()
+  const merge = useDocumentMerge(deps)
+  const conflict = conflictOf([docxRow({ kind: 'XLSX' })])
+  merge.suspend(conflict, 'adopt')
+  await merge.onConflictStatus(conflict, 'adopt')
+  await merge.onConflictStatus(conflict, 'adopt')
+  assert.equal(calls.overview, 1)
+  assert.equal(calls.resolveStructured.length, 0)
+})
