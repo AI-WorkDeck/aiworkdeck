@@ -1244,13 +1244,22 @@ export function useAgentStream() {
                     name: s.name || s.id,
                     source: s.source === 'manual' ? 'manual' : 'auto',
                     builtinWorkflow: !!s.builtinWorkflow,
+                    versionId: s.versionId || 'default',
+                    versionName: s.versionName || '',
+                    customVersion: !!s.customVersion,
                     justActivated: freshAuto.some(f => f.id === s.id)
                 }))
                 if (freshAuto.length) {
+                    const first = freshAuto[0]
+                    const display = first.customVersion && first.versionName
+                        ? `${first.name || first.id} · ${first.versionName}`
+                        : (first.name || first.id)
                     skillNotice.value = {
-                        id: freshAuto[0].id,
-                        name: freshAuto[0].name || freshAuto[0].id,
-                        builtinWorkflow: !!freshAuto[0].builtinWorkflow,
+                        id: first.id,
+                        name: display,
+                        builtinWorkflow: !!first.builtinWorkflow,
+                        versionName: first.versionName || '',
+                        customVersion: !!first.customVersion,
                         at: Date.now()
                     }
                     clearSkillFlash()
