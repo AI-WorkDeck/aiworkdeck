@@ -16,6 +16,7 @@
 // 启动最早期就要用，不能卷进循环引用。
 
 export const APP_THEME_KEY = 'awd_theme'
+export const APP_SKIN_KEY = 'awd_skin_cache'
 export const APP_THEME_EVENT = 'awd-theme-changed'
 export const THEME_MODES = ['light', 'dark', 'system']
 
@@ -94,6 +95,9 @@ export function collectThemeTokens() {
 const DEFAULT_MODE = 'light'
 
 let cachedMode = ''
+let cachedSkin = null
+let skinLoadedFromStorage = false
+let appliedSkinKeys = []
 let systemDark = false
 let mediaQuery = null
 
@@ -104,6 +108,76 @@ function readStorage(key) {
   } catch (e) {
     return ''
   }
+}
+
+function loadCachedSkin() {
+  if (skinLoadedFromStorage) return cachedSkin
+  skinLoadedFromStorage = true
+  try {
+    const raw = uni.getStorageSync(APP_SKIN_KEY)
+    const obj = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (obj && typeof obj === 'object' && obj.ref && obj.lightTokens && obj.darkTokens) {
+      cachedSkin = obj
+    }
+  } catch (e) {
+    cachedSkin = null
+  }
+  return cachedSkin
+}
+
+/** 当前生效的皮肤引用（如 'theme-inkwash-zen:inkwash-zen'，默认皮肤为 ''） */
+export function getActiveSkinRef() {
+  const s = loadCachedSkin()
+  return (s && s.ref) ? String(s.ref) : ''
+}
+
+/** 当前生效的皮肤对象（默认皮肤为 null） */
+export function getActiveSkin() {
+  return loadCachedSkin()
+}
+
+function applySkinVariables(resolved) {
+  try {
+    if (typeof document === 'undefined' || !document.documentElement) return
+    const el = document.documentElement
+    if (appliedSkinKeys.length && el.style && el.style.removeProperty) {
+      for (const k of appliedSkinKeys) el.style.removeProperty(k)
+    }
+    appliedSkinKeys = []
+    const skin = loadCachedSkin()
+    if (!skin || !skin.ref || !el.style || !el.style.setProperty) {
+      if (el.removeAttribute) {
+        el.removeAttribute('data-skin')
+        el.removeAttribute('data-skin-pulse')
+        el.removeAttribute('data-skin-texture')
+      }
+      return
+    }
+    if (el.setAttribute) {
+      el.setAttribute('data-skin', String(skin.ref))
+      if (skin.effects && skin.effects.aiPulseStyle) el.setAttribute('data-skin-pulse', String(skin.effects.aiPulseStyle))
+      else if (el.removeAttribute) el.removeAttribute('data-skin-pulse')
+      if (skin.effects && skin.effects.surfaceTexture) el.setAttribute('data-skin-texture', String(skin.effects.surfaceTexture))
+      else if (el.removeAttribute) el.removeAttribute('data-skin-texture')
+    }
+    const tokens = (resolved === 'dark' ? skin.darkTokens : skin.lightTokens) || {}
+    for (const [k, v] of Object.entries(tokens)) {
+      const prop = k.startsWith('--awd-') ? k : '--awd-' + k
+      if (/^--awd-[a-z0-9-]+$/.test(prop) && typeof v === 'string' && v) {
+        el.style.setProperty(prop, v)
+        appliedSkinKeys.push(prop)
+      }
+    }
+    if (skin.fonts && typeof skin.fonts === 'object') {
+      for (const [fk, fv] of Object.entries(skin.fonts)) {
+        const prop = fk.startsWith('--awd-font-') ? fk : '--awd-font-' + fk
+        if (/^--awd-font-(?:serif|sans|mono)$/.test(prop) && typeof fv === 'string' && fv) {
+          el.style.setProperty(prop, fv)
+          appliedSkinKeys.push(prop)
+        }
+      }
+    }
+  } catch (e) { /* 非浏览器环境静默 */ }
 }
 
 /** 当前 mode（'light' | 'dark' | 'system'） */
@@ -126,6 +200,7 @@ function paint() {
   try {
     document.documentElement.setAttribute('data-theme', resolved)
   } catch (e) { /* 非浏览器环境（小程序端）静默 */ }
+  applySkinVariables(resolved)
   return resolved
 }
 
@@ -187,4 +262,34 @@ export function setThemeMode(mode) {
     try { uni.$emit(APP_THEME_EVENT, resolved) } catch (e) { /* ignore */ }
   }
   return cachedMode
+}
+
+/**
+ * 切换或清除外观皮肤并广播 APP_THEME_EVENT（自动同步主工作台、Web 插件 iframe 与编辑器）。
+ * @param {object|null} skin 形如 { ref, pluginId, id, name, lightTokens, darkTokens, fonts, effects }；传 null/空恢复默认皮肤
+ */
+export function setActiveSkin(skin) {
+  const prevRef = getActiveSkinRef()
+  if (!skin || typeof skin !== 'object' || (!skin.ref && !(skin.pluginId && skin.id))) {
+    cachedSkin = null
+    skinLoadedFromStorage = true
+    try { uni.removeStorageSync(APP_SKIN_KEY) } catch (e) { /* ignore */ }
+  } else {
+    const ref = skin.ref || `${skin.pluginId}:${skin.id}`
+    cachedSkin = {
+      ref,
+      name: skin.name || ref,
+      lightTokens: skin.lightTokens || {},
+      darkTokens: skin.darkTokens || {},
+      fonts: skin.fonts || {},
+      effects: skin.effects || {},
+    }
+    skinLoadedFromStorage = true
+    try { uni.setStorageSync(APP_SKIN_KEY, JSON.stringify(cachedSkin)) } catch (e) { /* ignore */ }
+  }
+  const resolved = paint()
+  if (prevRef !== getActiveSkinRef() || cachedSkin) {
+    try { uni.$emit(APP_THEME_EVENT, resolved) } catch (e) { /* ignore */ }
+  }
+  return getActiveSkinRef()
 }

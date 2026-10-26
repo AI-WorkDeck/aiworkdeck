@@ -51,6 +51,11 @@ class PluginContributionServiceTest {
                "styleProfiles": [
                  {"id": "court", "name": "法院画像", "file": "profiles/court.json"},
                  {"id": "broken", "name": "坏画像", "file": "profiles/broken.json"}
+               ],
+               "themes": [
+                 {"id": "inkwash", "name": "%theme.inkwash%", "description": "宣纸水墨", "file": "themes/inkwash.json"},
+                 {"id": "bad-css", "name": "注入皮肤", "file": "themes/bad-css.json"},
+                 {"id": "escape-theme", "name": "越界皮肤", "file": "../escape.json"}
                ]
              },
              "settings": [
@@ -72,13 +77,20 @@ class PluginContributionServiceTest {
         Path dir = pluginsDir.resolve("hr-pack");
         Files.createDirectories(dir.resolve("templates"));
         Files.createDirectories(dir.resolve("profiles"));
+        Files.createDirectories(dir.resolve("themes"));
         Files.createDirectories(dir.resolve("l10n"));
         Files.writeString(dir.resolve("manifest.json"), MANIFEST, StandardCharsets.UTF_8);
         Files.writeString(dir.resolve("templates/labor.md"), "# 劳动合同模板正文", StandardCharsets.UTF_8);
         Files.writeString(dir.resolve("profiles/court.json"), "{\"version\": 1}", StandardCharsets.UTF_8);
         Files.writeString(dir.resolve("profiles/broken.json"), "not json", StandardCharsets.UTF_8);
+        Files.writeString(dir.resolve("themes/inkwash.json"),
+                "{\"previewSwatches\":[\"#F4F1EA\",\"#5B4B7A\"],\"roles\":{\"light\":{\"bg\":\"#F4F1EA\",\"accent\":\"#5B4B7A\"},\"dark\":{\"bg\":\"#141312\",\"accent\":\"#7E6BA3\"}}}",
+                StandardCharsets.UTF_8);
+        Files.writeString(dir.resolve("themes/bad-css.json"),
+                "{\"roles\":{\"light\":{\"bg\":\"#fff; background:url(evil)\"},\"dark\":{\"bg\":\"#000\"}}}",
+                StandardCharsets.UTF_8);
         Files.writeString(dir.resolve("l10n/zh-CN.json"),
-                "{\"name\": \"HR 模板包\", \"tpl.labor\": \"劳动合同（标准版）\", \"set.region\": \"数据源区域\"}",
+                "{\"name\": \"HR 模板包\", \"tpl.labor\": \"劳动合同（标准版）\", \"set.region\": \"数据源区域\", \"theme.inkwash\": \"东方水墨\"}",
                 StandardCharsets.UTF_8);
 
         pluginService = new PluginService(settings, pluginsDir.toString());
@@ -181,6 +193,34 @@ class PluginContributionServiceTest {
         invalid.put("tone", "must-not-save"); invalid.put("undeclared", "bad");
         assertThrows(IllegalArgumentException.class, () -> svc.saveSettings("hr-pack", invalid, 1L, 11L));
         assertEquals("formal", svc.settingsView("hr-pack", 1L, 11L).get(0).get("value"));
+    }
+
+    @Test
+    @DisplayName("外观皮肤：l10n 名称解析 + 令牌键归一化 + CSS 注入拦截 + 禁用后自动退回默认皮肤")
+    void themeContributionAndSelection() {
+        var themes = svc.listThemes();
+        assertEquals(1, themes.size(), "越界与含 CSS 注入的皮肤应在解析/列表期被拦截");
+        var t = themes.get(0);
+        assertEquals("inkwash", t.id());
+        assertEquals("东方水墨", t.name());
+        assertEquals("#F4F1EA", t.lightTokens().get("--awd-bg"));
+        assertEquals("#7E6BA3", t.darkTokens().get("--awd-accent"));
+        assertFalse(t.selected());
+
+        svc.selectTheme("hr-pack:inkwash");
+        assertEquals("hr-pack:inkwash", svc.selectedThemeRef());
+        assertTrue(svc.listThemes().get(0).selected());
+
+        assertThrows(IllegalArgumentException.class, () -> svc.selectTheme("hr-pack:bad-css"));
+        assertThrows(IllegalArgumentException.class, () -> svc.selectTheme("hr-pack:escape-theme"));
+
+        pluginService.setEnabled("hr-pack", false);
+        assertEquals("", svc.selectedThemeRef(), "插件禁用后自动退回默认皮肤");
+        assertTrue(svc.listThemes().isEmpty());
+
+        pluginService.setEnabled("hr-pack", true);
+        svc.selectTheme("default");
+        assertEquals("", svc.selectedThemeRef());
     }
 
 }
