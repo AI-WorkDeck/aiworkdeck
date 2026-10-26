@@ -10,13 +10,16 @@ import os from 'node:os'
 import path from 'node:path'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { downloadBuild as downloadVerifiedBuild } from './download-upgrade-build.mjs'
+import { validateVersions } from './test-full-upgrade-mac-feed.mjs'
 
 const run = (file, args = [], options = {}) => execFileSync(file, args, { encoding: 'utf8', timeout: 120000, ...options }).trim()
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 const exists = fs.existsSync
 const bundleId = 'com.aiworkdeck.desktop'
 const expectedTeam = '8WKHZVR2W8'
-const versions = { baseline: '0.65.0', candidate: '0.66.0' }
+const versions = { baseline: process.env.BASELINE_VERSION, candidate: process.env.CANDIDATE_VERSION }
+validateVersions(versions.baseline, versions.candidate)
 const ports = { api: 19566, renderer: 19567, inspector: 19569 }
 const evidence = { result: 'FAIL', productionManifestTrustTested: false, liveAiRecoveryTested: false, assertions: [] }
 const out = path.resolve('evidence/mac-upgrade')
@@ -52,22 +55,8 @@ function spawnSyncReport(command, args) {
   return text
 }
 async function downloadBuild(kind, root) {
-  const id = process.env[`${kind.toUpperCase()}_RUN`]
-  const sha = process.env[`${kind.toUpperCase()}_SHA`]
-  assert(/^\d+$/.test(id || '') && /^[a-f\d]{40}$/.test(sha || ''), `Invalid ${kind} build inputs`)
-  const repo = process.env.GITHUB_REPOSITORY
-  const build = JSON.parse(run('gh', ['api', `repos/${repo}/actions/runs/${id}`]))
-  check(build.repository.full_name === repo && build.path === '.github/workflows/desktop-build.yml' && build.event === 'workflow_dispatch' && build.conclusion === 'success' && build.head_sha === sha, `${kind}: successful official build from pinned source`)
-  save(`${kind}-build.json`, Object.fromEntries(['id', 'head_sha', 'head_branch', 'path', 'event', 'conclusion', 'html_url'].map(key => [key, build[key]])))
-  const artifacts = JSON.parse(run('gh', ['api', `repos/${repo}/actions/runs/${id}/artifacts`])).artifacts.filter(a => a.name === 'aiworkdeck-macos-latest' && !a.expired)
-  check(artifacts.length === 1, `${kind}: exactly one live Mac artifact`)
-  save(`${kind}-artifact.json`, { id: artifacts[0].id, name: artifacts[0].name, digest: artifacts[0].digest, size: artifacts[0].size_in_bytes })
-  const dir = path.join(root, kind)
-  run('gh', ['run', 'download', id, '--repo', repo, '--name', artifacts[0].name, '--dir', dir], { timeout: 600000 })
-  const files = fs.readdirSync(dir).filter(name => name.endsWith('.dmg'))
-  check(files.length === 1, `${kind}: exactly one DMG`)
-  const dmg = path.join(dir, files[0])
-  evidence[kind] = { dmgName: files[0], sha256: await hash(dmg), size: fs.statSync(dmg).size }
+  const dmg = await downloadVerifiedBuild(kind, 'darwin-arm64', root, out)
+  evidence[kind] = { dmgName: path.basename(dmg), sha256: await hash(dmg), size: fs.statSync(dmg).size }
   return dmg
 }
 
@@ -166,7 +155,7 @@ try {
   detach(newer.dir)
   const fixtureDir = path.join(root, 'feed')
   const feedLog = fs.openSync(path.join(out, 'feed.log'), 'w')
-  feed = spawn(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), 'test-full-upgrade-mac-feed.mjs'), '--dmg', candidate, '--sha256', evidence.candidate.sha256, '--out', fixtureDir], { stdio: ['ignore', feedLog, feedLog] })
+  feed = spawn(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), 'test-full-upgrade-mac-feed.mjs'), '--dmg', candidate, '--sha256', evidence.candidate.sha256, '--out', fixtureDir, '--baseline-version', versions.baseline, '--candidate-version', versions.candidate], { stdio: ['ignore', feedLog, feedLog] })
   fs.closeSync(feedLog)
   const config = await until(() => exists(path.join(fixtureDir, 'config.json')) && JSON.parse(fs.readFileSync(path.join(fixtureDir, 'config.json'))), 'test feed ready', 90)
   save('fixture-feed.json', config)
