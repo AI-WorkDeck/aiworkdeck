@@ -1,7 +1,7 @@
 {
   "id": "insight",
   "name": "依据",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "文档依据检索、一致性核验和合同审查。",
   "author": "AI WorkDeck",
   "permissions": [

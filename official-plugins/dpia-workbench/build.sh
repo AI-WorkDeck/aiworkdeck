@@ -22,7 +22,7 @@ out.mkdir(exist_ok=True)
 files = [(jar, jar.name)]
 for name in ('manifest.json', 'README.md', 'UPSTREAM.md', 'package.json', 'package-lock.json', 'build-web.mjs', 'build.sh'):
     files.append((root / name, name))
-for folder in ('runtime', 'web', 'web-src', 'skill', 'tests', 'backend/src'):
+for folder in ('runtime', 'web', 'web-src', 'skill', 'tests', 'backend/src', 'l10n'):
     for path in sorted((root / folder).rglob('*')):
         if path.is_file() and '__pycache__' not in path.parts and path.suffix != '.pyc':
             files.append((path, str(path.relative_to(root))))

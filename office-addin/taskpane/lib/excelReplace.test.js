@@ -342,7 +342,8 @@ test('excel_replace 在 Office 执行器里登记齐全：HANDLERS / 宿主 / �
   assert.match(src, /EXCEL_UNDOABLE_COMMANDS[^\n]*excel_replace/, '批量替换必须可回退')
   assert.ok(typeof WPS_ET_HANDLERS.excel_replace === 'function', 'WPS 侧缺实现 = 双边三端不齐')
 
-  const i18n = readFileSync(new URL('./i18n.js', import.meta.url), 'utf8')
-  assert.match(i18n, /cmdExcelReplace: '替换单元格文本'/)
-  assert.match(i18n, /cmdExcelReplace: 'Replace in cells'/)
+  const { ZH } = await import('../locales/zh-CN.js')
+  const { EN } = await import('../locales/en-US.js')
+  assert.equal(ZH.cmdExcelReplace, '替换单元格文本')
+  assert.equal(EN.cmdExcelReplace, 'Replace in cells')
 })
