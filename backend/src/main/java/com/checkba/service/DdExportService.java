@@ -223,7 +223,7 @@ public class DdExportService {
         return out;
     }
 
-    /** 查验计划分组：按 EvidenceLinkTarget.METHODS 固定顺序归类，method 为空/null 归入「未注明」桶排最后。 */
+    /** 查验计划分组：内置标签固定顺序、自定义标签首遇顺序，未注明排最后。 */
     static List<VerifyPlanRow> groupVerifyPlan(List<LinkView> links) {
         Map<String, List<VerifyPlanRow>> byMethod = new LinkedHashMap<>();
         if (links != null) {
@@ -236,7 +236,13 @@ public class DdExportService {
             }
         }
         List<VerifyPlanRow> out = new ArrayList<>();
-        for (String m : METHOD_ORDER) out.addAll(byMethod.getOrDefault(m, List.of()));
+        for (String m : METHOD_ORDER) {
+            if (!m.isEmpty()) out.addAll(byMethod.getOrDefault(m, List.of()));
+        }
+        for (Map.Entry<String, List<VerifyPlanRow>> entry : byMethod.entrySet()) {
+            if (!METHOD_ORDER.contains(entry.getKey())) out.addAll(entry.getValue());
+        }
+        out.addAll(byMethod.getOrDefault("", List.of()));
         return out;
     }
 

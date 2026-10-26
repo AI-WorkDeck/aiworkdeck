@@ -536,8 +536,11 @@ $color-accent: var(--awd-mint); // Mint Green
 /* 主布局 */
 .main-layout {
   flex: 1;
+  min-height: 0;
   display: flex;
-  overflow: hidden;
+  // hidden 仍会被子项 scrollIntoView/focus 滚动，导致左栏与标签栏钻进顶栏下方。
+  // 外壳只裁切；滚动留给面板内部。clip 下须显式允许 flex 高度收缩。
+  overflow: clip;
   position: relative;
 }
 
@@ -4875,40 +4878,24 @@ $color-accent: var(--awd-mint); // Mint Green
 
 
 .dd-client-entry {
-  margin: var(--awd-space-3) var(--awd-panel-pad-x);
-  padding: var(--awd-space-4);
-  background: var(--awd-surface);
-  border: 1px solid var(--awd-border-subtle);
-  border-radius: var(--awd-radius-md);
-  box-shadow: var(--awd-shadow-sm);
-  color: var(--awd-text-2);
+  padding: var(--awd-panel-gap) var(--awd-panel-pad-x);
+  color: var(--awd-panel-text);
   font-size: var(--awd-panel-fs);
-  line-height: 1.65;
-  display: flex;
-  flex-direction: column;
-  gap: var(--awd-space-3);
-
-  button {
-    margin: 0;
-    padding: 0 var(--awd-space-3);
-    height: var(--awd-control-height);
-    width: 100%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font: inherit;
-    font-weight: 500;
-    line-height: 1.4;
-    background: var(--awd-accent);
-    border: 1px solid var(--awd-accent);
-    color: var(--awd-text-on-accent);
-    border-radius: var(--awd-radius-sm);
-    cursor: pointer;
-    transition: background var(--awd-motion-fast), border-color var(--awd-motion-fast);
-  }
-  button::after { border: 0; display: none; }
-  button:hover { background: var(--awd-accent-hover); border-color: var(--awd-accent-hover); }
 }
+.dd-client-nav {
+  width: 100%; min-width: 0; margin: 0; padding: var(--awd-panel-gap);
+  display: flex; align-items: center; gap: var(--awd-panel-gap);
+  border: 0; border-radius: var(--awd-panel-radius); background: transparent;
+  color: inherit; font: inherit; line-height: 1.5; text-align: left; cursor: pointer;
+  &::after { border: 0; }
+  &:hover { background: var(--awd-panel-hover); }
+  &.active { background: var(--awd-panel-accent-wash); }
+  &:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent-text); outline-offset: var(--awd-focus-offset); }
+}
+.dd-client-nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-client-nav-state { flex-shrink: 0; font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-2); }
+.dd-client-nav-hint { display: block; padding: var(--awd-panel-gap); font-size: var(--awd-panel-fs-meta); line-height: 1.6; color: var(--awd-panel-text-2); }
+
 
 
 /* Chat / Scratch 双模式：只改外壳布局，ChatInterface 与 LOWA 实例保持挂载。 */

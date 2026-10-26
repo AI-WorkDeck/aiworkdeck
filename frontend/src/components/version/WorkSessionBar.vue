@@ -3,22 +3,30 @@
 <template>
   <view class="session-bar">
     <template v-if="onDraft">
-      <view class="session-dot draft-dot" />
-      <text class="session-text">{{ $t('version.workingOnDraft', { name: onDraft.name }) }}</text>
+      <view class="session-status">
+        <view class="session-dot draft-dot" />
+        <text class="session-text">{{ $t('version.workingOnDraft', { name: onDraft.name }) }}</text>
+      </view>
       <!-- 稿上同样要能「结束本次工作」并起名字：不给这个入口的话，稿上的改动只剩
            无名的自动存档，采纳之后历史里这一稿全是「修改了《X》」（真机反馈 B2）。
            走的是主线那条一模一样的命名流程（openNaming → end → endWorkSession），
            后端按「当前站在稿上」把它落成这一稿上的一笔命名版本，不并回主线。 -->
-      <view class="awd-btn awd-btn-secondary session-btn" @tap="openNaming">{{ $t('version.endSession') }}</view>
-      <view class="awd-btn awd-btn-secondary session-btn" @tap="returnToMainline">{{ $t('version.returnToMainline') }}</view>
-      <view class="awd-btn awd-btn-primary session-btn" @tap="adopt">{{ $t('version.adoptDraft') }}</view>
-      <view class="awd-btn awd-btn-danger session-btn" @tap="confirmAbandon">{{ $t('version.abandonDraft') }}</view>
+      <view class="session-actions">
+        <component :is="'button'" type="button" class="session-btn session-btn-main" :disabled="busy" @click="openNaming">{{ $t('version.endSession') }}</component>
+        <component :is="'button'" type="button" class="session-btn" :disabled="busy" @click="returnToMainline">{{ $t('version.returnToMainline') }}</component>
+        <component :is="'button'" type="button" class="session-btn" :disabled="busy" @click="adopt">{{ $t('version.adoptDraft') }}</component>
+        <component :is="'button'" type="button" class="session-btn session-btn-danger" :disabled="busy" @click="confirmAbandon">{{ $t('version.abandonDraft') }}</component>
+      </view>
     </template>
     <template v-else-if="working || changedCount > 0">
-      <view class="session-dot" />
-      <text class="session-text">{{ changedCount ? $t('version.pendingFileCount', { count: changedCount }) : $t('version.changesAutoRecorded') }}</text>
-      <view class="awd-btn awd-btn-primary session-btn" @tap="openNaming">{{ $t('version.endSession') }}</view>
-      <view v-if="working" class="awd-btn awd-btn-danger session-btn" @tap="confirmDiscard">{{ $t('version.discard') }}</view>
+      <view class="session-status">
+        <view class="session-dot" />
+        <text class="session-text">{{ changedCount ? $t('version.pendingFileCount', { count: changedCount }) : $t('version.changesAutoRecorded') }}</text>
+      </view>
+      <view class="session-actions">
+        <component :is="'button'" type="button" class="session-btn session-btn-main" :disabled="busy" @click="openNaming">{{ $t('version.endSession') }}</component>
+        <component :is="'button'" type="button" v-if="working" class="session-btn session-btn-danger" :disabled="busy" @click="confirmDiscard">{{ $t('version.discard') }}</component>
+      </view>
     </template>
     <template v-else>
       <text class="session-text session-idle">{{ $t('version.noActiveSession') }}</text>
@@ -170,25 +178,30 @@ export default {
 
 <style lang="scss" scoped>
 .session-bar {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 12rpx;
-  padding: 16rpx 20rpx; border-bottom: 1px solid var(--awd-border);
+  display: flex; flex-direction: column; gap: var(--awd-panel-gap);
+  padding: var(--awd-panel-gap) var(--awd-panel-pad-x);
 }
+.session-status { display: flex; align-items: center; gap: var(--awd-panel-gap); min-width: 0; }
 .session-dot {
-  width: 14rpx; height: 14rpx; border-radius: 50%; background: var(--awd-warning);
+  flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--awd-warning);
 }
 .draft-dot { background: var(--awd-info); }
-/* 稿态一行有 3 个操作按钮（回到主线工作/采纳这一稿/放弃这一稿），加上这段文字，
-   窄侧栏下自然宽度之和远超容器宽度。flex 默认不换行时，session-text（flex:1，
-   会被按钮的 flex-shrink:0 挤到只剩几像素）与溢出的按钮一起被侧栏容器的
-   overflow 裁切掉——按钮仍在 DOM 里、也仍"可见"（不是 display:none），但视觉
-   上被别的内容盖住，真实点击落在盖住它的那块内容上，跟"稿态选择器存在"这条
-   断言无关，是另一种假阳性（e2e 实测：elementFromPoint 在按钮几何坐标处命中的
-   是编辑区内容，不是按钮本身）。min-width 防止文字被挤到只剩几像素竖排；
-   wrap 让按钮在窄侧栏下换行，而不是被裁切成不可点。 */
-.session-text { font-size: 26rpx; color: var(--awd-text); flex: 1; min-width: 200rpx; }
-.session-idle { color: var(--awd-text-3); }
-.session-help { display: block; flex-basis: 100%; font-size: 12px; line-height: 1.6; color: var(--awd-text-2); margin-bottom: 8px; }
-.session-btn { flex-shrink: 0; }
+.session-text { min-width: 0; font-size: var(--awd-panel-fs); line-height: 1.5; color: var(--awd-panel-text); overflow-wrap: anywhere; }
+.session-idle { color: var(--awd-panel-text-2); }
+.session-help { display: block; font-size: var(--awd-panel-fs-meta); line-height: 1.6; color: var(--awd-text-2); margin-bottom: var(--awd-space-1); }
+.session-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--awd-space-1) var(--awd-panel-gap); }
+.session-btn {
+  margin: 0; padding: var(--awd-space-1) var(--awd-panel-gap); max-width: 100%;
+  min-height: var(--awd-panel-row-h); border: 0; border-radius: var(--awd-panel-radius);
+  background: transparent; color: var(--awd-panel-text-2); font: inherit; font-size: var(--awd-panel-fs);
+  line-height: 1.5; text-align: left; white-space: normal; overflow-wrap: anywhere; cursor: pointer;
+  &::after { border: 0; }
+  &:hover { background: var(--awd-panel-hover); }
+  &:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent-text); outline-offset: var(--awd-focus-offset); }
+  &:disabled { opacity: .5; cursor: default; }
+}
+.session-btn-main { background: var(--awd-panel-accent-wash); color: var(--awd-accent-text); }
+.session-btn-danger { color: var(--awd-danger-text); }
 
 .awd-btn {
   padding: 8px 18px; border-radius: 6px; font-size: 13.5px; cursor: pointer;

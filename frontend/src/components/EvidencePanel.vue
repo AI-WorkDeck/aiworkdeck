@@ -73,14 +73,14 @@
             <!-- 引文摘要：底稿里被引的原文。定位符没带 quote 就整行不渲染（不拿别的顶替） -->
             <text v-if="quoteOf(tg)" class="ep-quote">{{ $t('evidence.loc.quote', { quote: quoteOf(tg) }) }}</text>
             <view class="ep-target-row">
-              <text class="ep-chip" :class="{ none: !tg.method }" @tap.stop="toggleMethodPicker(tg)">{{ $t('evidence.method.' + (tg.method || 'none')) }}</text>
+              <text class="ep-chip" :class="{ none: !tg.method }" @tap.stop="toggleMethodPicker(tg)">{{ tagLabel(tg.method) }}</text>
               <!-- 置信度只有核查跑过才有（人工建链是 null）：没有就不渲染，不显示 0 也不编造 -->
               <text v-if="tg.confidence != null" class="ep-chip conf">{{ $t('evidence.confidence', { value: tg.confidence }) }}</text>
               <text v-if="tg.relation && tg.relation !== 'supports'" class="ep-chip rel" :class="tg.relation">{{ $t('evidence.relation.' + tg.relation) }}</text>
               <text class="ep-target-rm" @tap.stop="removeTarget(r.link, tg)">{{ $t('evidence.action.removeTarget') }}</text>
             </view>
             <view v-if="methodPickerFor === tg.id" class="ep-method-picker">
-              <text v-for="m in METHODS" :key="m" class="ep-chip pick" :class="{ on: tg.method === m }" @tap.stop="setMethod(r.link, tg, m)">{{ $t('evidence.method.' + m) }}</text>
+              <EvidenceTagPicker :model-value="tg.method || ''" :disabled="busy" @change="setMethod(r.link, tg, $event)" />
             </view>
           </view>
 
@@ -120,13 +120,16 @@ import { ulid } from '@/utils/ulid.js'
 import { WPS_INTERNAL_HTTP_LINK_BASE } from '@/config/workbenchActions.js'
 import { EVIDENCE_CHANGED_EVENT } from '@/utils/evidenceEvents.js'
 import { DOC_MUTATED_EVENT } from '@/utils/docEvents.js'
+import EvidenceTagPicker from './EvidenceTagPicker.vue'
+import { evidenceTagLabel } from '@/utils/evidenceTags.js'
 import { resolveKeepText } from '@/composables/useEvidenceAnchors.js'
 
 const STATUSES = ['all', ...STATUS_KEYS]
-const METHODS = ['written_review', 'written_statement', 'web_check', 'third_party', 'interview']
+
 
 export default {
   name: 'EvidencePanel',
+  components: { EvidenceTagPicker },
   emits: ['locate', 'count', 'changed'],
   props: {
     executor: { type: Object, default: null },
@@ -143,7 +146,6 @@ export default {
       rebinding: null, // 正在重新指定的 linkKey
       methodPickerFor: null, // 展开方法选择的 targetId
       busy: false,
-      METHODS,
       STATUS_KEYS,
     }
   },
@@ -220,6 +222,7 @@ export default {
     try { uni.$off(DOC_MUTATED_EVENT, this._onDocMutated) } catch (e) { /* ignore */ }
   },
   methods: {
+    tagLabel(method) { return evidenceTagLabel(method, (key) => this.$t(key)) },
     // 视图/筛选按项目记住（与工作台左栏面板同一套 uni.setStorageSync 约定，
     // 见 pages/project-overview/panelSwitching.js）。面板是 v-if 挂载的，关一次就重建，
     // 不落盘的话每次打开都退回「按章节 / 全部」。
@@ -430,15 +433,22 @@ export default {
     },
     toggleMethodPicker(tg) { this.methodPickerFor = this.methodPickerFor === tg.id ? null : tg.id },
     async setMethod(l, tg, method) {
-      this.methodPickerFor = null
-      if (tg.method === method) return
+      if (this.busy || tg.method === method) return
+      const pid = this.pid, did = this.did
+      this.busy = true
       this.error = ''
       try {
-        const updated = await updateEvidenceTarget(this.pid, tg.id, { method })
-        const targets = (l.targets || []).map((x) => (x.id === tg.id ? { ...x, ...(updated || {}), method } : x))
-        this.replaceLink({ ...l, targets })
+        await updateEvidenceTarget(pid, tg.id, { method })
+        if (this.pid === pid && this.did === did) {
+          const current = this.links.find(x => x.linkKey === l.linkKey)
+          if (current) this.replaceLink({ ...current, targets: (current.targets || []).map(x => x.id === tg.id ? { ...x, method } : x) })
+          this.methodPickerFor = null
+        }
+        uni.$emit(EVIDENCE_CHANGED_EVENT, { docFileId: did, source: 'panel' })
       } catch (e) {
-        this.error = (e && e.message) || this.$t('evidence.opFailed')
+        if (this.pid === pid && this.did === did) this.error = (e && e.message) || this.$t('evidence.opFailed')
+      } finally {
+        this.busy = false
       }
     },
     removeTarget(l, tg) {

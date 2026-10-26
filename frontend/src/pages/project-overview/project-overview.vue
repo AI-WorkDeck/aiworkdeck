@@ -275,9 +275,12 @@
           :trial-text="trialMenuText"
           :notice-text="accountNoticeText"
           :client-view="isClientView"
+          :message-unread="messageCenterUnread"
+          :message-partial="messageCenterBadgePartial"
           @login="onAccountLogin"
           @account="onAvatarMenuAccount"
           @grace-info="showTrialInfo = true"
+          @messages="openMessageCenterTab"
           @schedule="onAvatarMenuSchedule"
           @settings="onAvatarMenuSettings"
           @sign-out="onAvatarMenuSignOut"
@@ -310,7 +313,7 @@
           v-for="p in LEFT_SIDEBAR_PLUGINS"
           :key="p.key"
           class="rail-btn"
-          :class="{ active: (p.key === 'messages' && (focusedPane === 'right' ? activeFileRight : activeFileLeft)?.tabType === 'message-center') || ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
+          :class="{ active: ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
           :title="p.label"
           :draggable="!isClientView"
           @tap="onRailBtnTap(p.key)"
@@ -351,7 +354,6 @@
             </svg>
           </view>
           <text v-else class="rail-icon">{{ p.icon }}</text>
-          <text v-if="p.key === 'messages' && (messageCenterUnread > 0 || messageCenterBadgePartial)" class="rail-badge" :title="messageCenterBadgePartial ? $t('messageCenter.sourcesUnavailable') : $t('messageCenter.unreadCount', { count: messageCenterUnread })" :aria-label="messageCenterBadgePartial ? $t('messageCenter.sourcesUnavailable') : $t('messageCenter.unreadCount', { count: messageCenterUnread })">{{ messageCenterUnread > 99 ? '99+' : messageCenterUnread > 0 ? messageCenterUnread : '·' }}</text>
           <text v-if="p.key === 'market' && pluginUpdateState.count > 0" class="rail-badge" :aria-label="$t('market.updateAvailableCount', { count: pluginUpdateState.count })" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count > 99 ? '99+' : pluginUpdateState.count }}</text>
           <text v-if="p.key === 'dd-client' && ddClientUnread > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddClientUnread })">{{ ddClientUnread > 99 ? '99+' : ddClientUnread }}</text>
           <text v-if="p.key === 'dd-files' && ddLawyerNotifications.length > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddLawyerNotifications.length })">{{ ddLawyerNotifications.length > 99 ? '99+' : ddLawyerNotifications.length }}</text>
@@ -717,8 +719,12 @@
             @activate-current-project="showCurrentProjectFiles"
           />
           <view v-else-if="leftPaneKey === 'dd-client'" class="dd-client-entry">
-            <text>{{ $t('ddWorkflow.clientWorkspaceHint') }}</text>
-            <button @tap="openDdClientTab">{{ $t('ddWorkflow.openClientWorkspace') }}</button>
+            <component :is="'button'" type="button" class="dd-client-nav" :class="{ active: workspaceTabState('dd-client') === 'active' }" :aria-current="workspaceTabState('dd-client') === 'active' ? 'page' : undefined" @click.stop="openDdClientTab">
+              <text class="dd-client-nav-label">{{ $t('ddWorkflow.client.invitedProjects') }}</text>
+              <text class="dd-client-nav-state">{{ $t('panels.workspaceState.' + workspaceTabState('dd-client')) }}</text>
+              <text aria-hidden="true">›</text>
+            </component>
+            <text class="dd-client-nav-hint">{{ $t('ddWorkflow.clientWorkspaceHint') }}</text>
           </view>
           <DdFilesPanel
             ref="ddFilesPanel"
@@ -830,6 +836,7 @@
             v-else-if="activeDynamicPlugin"
             :plugin="activeDynamicPlugin"
             :project-id="projectId"
+            :workspace-state="workspaceTabState('plugin', activeDynamicPlugin.pluginId)"
             @open="openPluginTab(activeDynamicPlugin.pluginId)"
             @quick-action="onPluginQuickAction"
           />
@@ -1067,6 +1074,7 @@
                     :target-id="evidenceMethodBar.targetId"
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
+                    :saving="evidenceMethodBar.saving"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />
@@ -1368,6 +1376,7 @@
                     :target-id="evidenceMethodBar.targetId"
                     :status="evidenceMethodBar.status"
                     :error-text="evidenceMethodBar.errorText"
+                    :saving="evidenceMethodBar.saving"
                     @change="onEvidenceMethodChange"
                     @close="closeEvidenceMethodBar"
                   />

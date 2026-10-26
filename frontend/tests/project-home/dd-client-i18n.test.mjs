@@ -37,13 +37,13 @@ test('all client templates resolve fixed copy through locale keys, including ari
 })
 test('the actual English workspace and portal renders contain no fixed Chinese copy', async () => {
   const workspace = await render(files[0], 'en-US', { cloudConnections: [{ id: 1, displayName: 'Test server' }] })
-  assert.match(workspace, /Invited due diligence/); assert.match(workspace, /Join project/)
+  assert.match(workspace, /Client collaboration/); assert.match(workspace, /Join project/)
   assert.match(workspace, /Official case library/); assert.match(workspace, /Enter invitation code/)
   assert.match(workspace, /System notifications are off/); assert.doesNotMatch(workspace, /[\p{Script=Han}]/u)
   const portal = await render(files[2], 'en-US')
   assert.match(portal, /Source code/); assert.match(portal, /https:\/\/github.com\/AI-WorkDeck\/aiworkdeck/)
   assert.doesNotMatch(portal, /[\p{Script=Han}]/u)
-  assert.match(await render(files[0], 'zh-CN'), /受邀尽调/)
+  assert.match(await render(files[0], 'zh-CN'), /客户协作/)
 })
 test('English checklist renders upload, AI consent, appeal, history and progress in English', async () => {
   const item = { id: 7, title: 'Business license', description: 'All pages', status: 'UPLOADED', exampleFileId: 3 }

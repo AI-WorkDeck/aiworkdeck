@@ -228,3 +228,17 @@ test('createEvidenceLinkForSelection：选区已带 filelink?k= → 整组 targe
   assert.deepEqual(h.actions(), ['get_selection_hyperlink', 'get_bookmark_context'])
   assert.deepEqual(h.apiCalls, [['add', 1, 'EVID_OLD', targets]])
 })
+
+// Configuring favorites also determines the tag for the next new reference.
+test('drop uses the configured first tag, allows no default, and preserves a deduplicated target tag', async () => {
+  for (const method of ['原件核对', null]) {
+    const h = harness({ selection: { success: true, text: '合成选区', url: '' } })
+    const result = await createEvidenceLinkForDrop({ ...h, projectId: 1, docFileId: 10, file, method })
+    assert.equal(h.apiCalls[0][2].targets[0].method, method)
+    assert.equal(result.method, method)
+  }
+  const h = harness({ selection: { success: true, text: '合成选区', url: WRAPPED_OLD } })
+  h.api.addEvidenceTargets = async () => ({targets: [{id: 12, fileId: 77, method: '已有标签'}]})
+  const result = await createEvidenceLinkForDrop({ ...h, projectId: 1, docFileId: 10, file, method: '新默认' })
+  assert.equal(result.method, '已有标签')
+})

@@ -4,6 +4,18 @@
 import { isGlobalPlugin } from '../../utils/pluginViews.js'
 
 export const pluginWorkspaceTabMethods = {
+  workspaceTabState(tabType, pluginId) {
+    let opened = false
+    for (const pane of ['left', 'right']) {
+      const tab = this[pane === 'left' ? 'leftFiles' : 'rightFiles'].find(item => item.tabType === tabType && (!pluginId || item.pluginId === pluginId))
+      if (!tab) continue
+      opened = true
+      const activeId = this[pane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight']
+      if ((pane === 'left' || this.splitMode) && activeId === tab.id) return 'active'
+    }
+    return opened ? 'open' : 'closed'
+  },
+
   openPluginTab(pluginId) {
     const plugin = this.dynamicPlugins.find(p => p.pluginId === pluginId)
     if (!plugin || (!this.hasProject && !isGlobalPlugin(plugin))) return
@@ -12,6 +24,7 @@ export const pluginWorkspaceTabMethods = {
       if (!existing) continue
       this[pane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'] = existing.id
       this.focusedPane = pane
+      if (pane === 'right' && !this.splitMode) this.splitMode = true
       this.$nextTick(() => this.triggerWorkbenchResize())
       return
     }

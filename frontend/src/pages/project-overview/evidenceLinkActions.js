@@ -10,6 +10,7 @@
 import {
   createEvidenceLink, addEvidenceTargets, updateEvidenceTarget, getEvidenceLink, getFileDetail,
 } from '@/services/api.js'
+import { evidenceTagLabel, loadEvidenceTags } from '@/utils/evidenceTags.js'
 import { parseFileLinkUrl, locatorSummary } from '@/utils/evidenceLocator.js'
 import { createEvidenceLinkForDrop, pickEvidenceTarget } from './evidenceLinkCore.js'
 
@@ -28,7 +29,7 @@ export const evidenceLinkData = () => ({
   // dev-board#133/#139：失败只弹 toast = 用户毫无感知的静默失败）。
   evidenceMethodBar: {
     visible: false, side: 'left', fileName: '', method: 'written_review',
-    targetId: null, linkKey: '', docFileId: null, status: 'success', errorText: '',
+    targetId: null, linkKey: '', docFileId: null, status: 'success', errorText: '', saving: false,
   },
 })
 
@@ -59,6 +60,7 @@ export const evidenceLinkMethods = {
     try {
       res = await createEvidenceLinkForDrop({
         exec, api: { createEvidenceLink: (p, b) => createEvidenceLink(p, b).then(unwrap), addEvidenceTargets: (p, k, t) => addEvidenceTargets(p, k, t).then(unwrap) },
+        method: loadEvidenceTags()[0] || null,
         projectId: pid, docFileId: Number(doc.id), file, internalBase: this.WPS_INTERNAL_HTTP_LINK_BASE || '',
       })
     } catch (e) {
@@ -80,7 +82,7 @@ export const evidenceLinkMethods = {
       return
     }
     this.showEvidenceMethodBar({
-      side, fileName: file.name || '', targetId: res.targetId, linkKey: res.linkKey, docFileId: Number(doc.id),
+      side, fileName: file.name || '', targetId: res.targetId, linkKey: res.linkKey, docFileId: Number(doc.id), method: res.method || '',
     })
     uni.$emit('awd:evidence-changed', { docFileId: Number(doc.id), linkKey: res.linkKey })
   },
@@ -93,11 +95,11 @@ export const evidenceLinkMethods = {
    * 收起只由用户动作驱动：点 ×、选了方法、又建了新的一条（整体替换）、
    * 或者换到别的文档（模板里按 docFileId 收，见 project-overview.vue）。
    */
-  showEvidenceMethodBar({ side, fileName, targetId, linkKey, docFileId }) {
+  showEvidenceMethodBar({ side, fileName, targetId, linkKey, docFileId, method = 'written_review' }) {
     this.evidenceMethodBar = {
-      visible: true, side, fileName, method: 'written_review', targetId, linkKey,
+      visible: true, side, fileName, method, targetId, linkKey,
       docFileId: docFileId == null ? null : Number(docFileId),
-      status: 'success', errorText: '',
+      status: 'success', errorText: '', saving: false,
     }
   },
   /** 建链失败的回执小条（同一个位置、红描边）。toast 在编辑器场景会被 webview 遮挡，不许用。 */
@@ -112,15 +114,19 @@ export const evidenceLinkMethods = {
     this.evidenceMethodBar.visible = false
   },
   async onEvidenceMethodChange({ targetId, method }) {
-    if (!targetId || !method) return
-    this.evidenceMethodBar.method = method
-    const pid = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
+    const bar = this.evidenceMethodBar
+    if (!targetId || !method || bar.saving || bar.targetId !== targetId) return
+    const pid = Number(this.projectId)
+    bar.saving = true
+    bar.errorText = ''
     try {
       await updateEvidenceTarget(pid, targetId, { method })
-      const doc = this.evidenceMethodBar.side === 'right' ? this.activeFileRight : this.activeFileLeft
-      uni.$emit('awd:evidence-changed', { docFileId: doc ? Number(doc.id) : null, linkKey: this.evidenceMethodBar.linkKey })
+      bar.method = method
+      uni.$emit('awd:evidence-changed', { docFileId: bar.docFileId, linkKey: bar.linkKey })
     } catch (e) {
-      uni.showToast({ title: (e && e.message) || this.$t('workbench.linkFailed'), icon: 'none' })
+      bar.errorText = (e && e.message) || this.$t('workbench.evidence.tags.updateFailed')
+    } finally {
+      bar.saving = false
     }
   },
 
@@ -160,7 +166,7 @@ export const evidenceLinkMethods = {
     return locatorSummary(target && target.locator, (k, p) => this.$t('workbench.' + k, p))
   },
   evidenceMethodLabel(method) {
-    return method ? this.$t('workbench.evidence.method.' + method) : ''
+    return method ? evidenceTagLabel(method, (key) => this.$t(key)) : ''
   },
   // target = TargetView {id, fileId, file, locator, ...}
   async openFileLinkTarget(target, sideOverride = null, { preview = null } = {}) {

@@ -67,7 +67,7 @@ description: 插件系统领域（具体插件实现）。任务涉及尽调/脱
 
 **「语音」合并插件（dev-board#66，2026-08-20）**：概念模型「左栏一个图标 = 一个插件，skill 只在 AI 对话生效」——text-to-speech 与 meeting-recorder 两个成员 skill 在广场三处 UI 里合并成**一个**「语音」条目（分组定义 `VOICE_PLUGIN_GROUP` + 合成视图 `buildVoiceGroupSkill()`，都在 `leftSidebarPlugins.js`），启停一体：前端开关一次翻全部成员，后端 `SkillRegistry.convergeVoiceMergedSkills()` 每次扫描后把分裂态收敛为「任一启用 → 全部启用」（防「tab 可见但生成纪要 kick-off 命不中 skill」的静默断裂）；meeting-recorder 的 `enabled_by_default` 因此也改为 true。两个 skill 文件本身、AI 对话行为、触发词都没动。
 
-**动态 JAR / Web 插件（dev-board#1143/#1144，2026-10-08）**：点击 rail 使用 `pluginWorkspaceTabs.js` 的 `openPluginTab(pluginId)` 打开或聚焦工作区单例标签（`tabType:'plugin'`）。左栏 `PluginWorkspaceSummary.vue` 只显示简介与「打开工作区」入口。腾讯会议与尽调报告的 Web 主界面由工作区承载；后续动态插件默认复用该能力，不要再把复杂操作全部塞在左栏。
+**动态 JAR / Web 插件（dev-board#1143/#1144，2026-10-08；#1493，2026-10-26）**：点击 rail 使用 `pluginWorkspaceTabs.js` 的 `openPluginTab(pluginId)` 打开或聚焦工作区单例标签（`tabType:'plugin'`）。左栏 `PluginWorkspaceSummary.vue` 显示轻量工作区导航和真实标签状态，简介默认折叠在「关于此插件」。腾讯会议与尽调报告的 Web 主界面由工作区承载；后续动态插件默认复用该能力，不要再把复杂操作全部塞在左栏。
 
 - 有 `frontendEntry` → 工作区 `PluginPane`；无入口 → `PluginGuidePane`（manifest.guide 的 intro/steps/quickActions 与工具清单）。两者都连接 `onPluginQuickAction`，prompt 仍需包含 skill 触发词。
 - 左右工作区分别按标签 `v-for/v-show` 保留实例，普通标签切换不丢输入；关闭、禁用、卸载、封禁或不兼容卸载实例。跨窗格移动可能重建，不承诺未持久化表单保活。插件禁止 Alt 双开。
@@ -417,6 +417,10 @@ CSS 在弹窗期间把 `.pane-content` 里的 `iframe`/`webview` 置 `visibility
 验证：`mvn test -Dtest='Sensitive*Test'`（204 项，含新增 `SensitiveCredentialRulesTest`）；
 `npm run test:desensitize`（41 项，含新增 `tests/desensitize/credential-rules.test.mjs`）；
 `cd desktop && node --test tests/recovery-download.test.js`（7 项，已进 desktop `npm test` 清单）。
+
+## 动态腾讯会议插件授权（dev-board#1495/#1496，2026-10-26）
+
+当前市场插件位于 `official-plugins/tencent-meeting`。opaque iframe 内复制链接先在点击事件中同步执行，并核对复制结果；不可因浏览器提供 Clipboard API 就假设写入成功，也不把短期授权 URL 存入剪贴板历史。授权进程存活时不启动 `--version`、`auth status` 或其他 CLI 命令，以免争用 CLI 凭据锁。宿主内跨插件重扫只共享进程 PID/启动时间；授权 URL 仅保存在原实例内存，新实例不能取消旧授权。前端遇到 pending 恢复轮询并允许继续授权；跨重扫取不回链接时提示回原浏览器完成。验证为插件 Java/前端套件与 `tests/auth-copy-browser.mjs`（真实 Chrome、合成服务和隔离剪贴板）。本契约不保证外部应用同时运行 CLI 的互斥；真实 OAuth 与 Windows 实机需另行验收。
 
 ## 内置腾讯会议面板契约（dev-board#1197，2026-10-11）
 
