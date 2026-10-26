@@ -1,19 +1,19 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view class="tag-filter">
+  <view class="tag-filter" :class="{ 'tag-filter-sidebar': sidebar }">
     <view class="tag-filter-head">
       <component :is="'button'" type="button" class="tag-filter-button tag-filter-toggle" :aria-expanded="open" @click.stop="open = !open">
         <text class="tag-filter-chevron" :class="{ open }" aria-hidden="true">›</text>
-        <text class="tag-filter-title">{{ $t('files.filterByTag') }}</text>
-        <text class="tag-filter-total">{{ tags.length }}</text>
+        <text class="tag-filter-title">{{ $t(sidebar ? 'files.tagViewTags' : 'files.filterByTag') }}</text>
+        <text v-if="!sidebar" class="tag-filter-total">{{ tags.length }}</text>
       </component>
-      <component :is="'button'" v-if="modelValue.length" type="button" class="tag-filter-button tag-filter-clear" @click.stop="$emit('update:modelValue', [])">
+      <component :is="'button'" v-if="modelValue.length || browsing" type="button" class="tag-filter-button tag-filter-clear" @click.stop="$emit('update:modelValue', [])">
         {{ $t('files.tagClear') }}
       </component>
     </view>
 
-    <view v-if="selectedTags.length" class="tag-filter-selected">
+    <view v-if="selectedTags.length && (!sidebar || !open)" class="tag-filter-selected">
       <component :is="'button'"
         v-for="tag in selectedTags"
         :key="tag.id"
@@ -40,6 +40,7 @@
       <template v-if="tags.length">
         <component
           :is="'input'"
+          v-if="!sidebar || tags.length > 8"
           type="text"
           :value="query"
           @input="query = $event.target.value"
@@ -50,7 +51,7 @@
         <view class="tag-filter-options">
           <template v-for="group in tagGroups" :key="group.type">
             <template v-if="group.tags.length">
-              <text class="tag-group-title">{{ $t(group.labelKey) }}</text>
+              <text v-if="!sidebar" class="tag-group-title">{{ $t(group.labelKey) }}</text>
               <component :is="'button'"
                 v-for="tag in group.tags"
                 :key="tag.id"
@@ -63,13 +64,17 @@
               >
                 <text class="tag-dot" :style="{ backgroundColor: tag.color || 'var(--awd-panel-text-2)' }"></text>
                 <text class="tag-name">{{ tag.name }}</text>
-                <text v-if="counts[tag.id]" class="tag-count">{{ counts[tag.id] }}</text>
+                <text v-if="!sidebar && counts[tag.id]" class="tag-count">{{ counts[tag.id] }}</text>
                 <text class="tag-check" aria-hidden="true">{{ isSelected(tag.id) ? '✓' : '' }}</text>
               </component>
             </template>
           </template>
           <text v-if="!filteredTags.length" class="tag-filter-message">{{ $t('files.tagNoMatch') }}</text>
         </view>
+        <component :is="'button'" v-if="sidebar" type="button" class="tag-filter-button tag-option tag-browse-all" :class="{ selected: browsing && !modelValue.length }" :aria-pressed="browsing && !modelValue.length" @click.stop="$emit('browse-all')">
+          <text class="tag-dot tag-dot-all" aria-hidden="true"></text>
+          <text class="tag-name">{{ $t('files.tagViewAllTagged') }}</text>
+        </component>
       </template>
     </view>
   </view>
@@ -81,13 +86,15 @@ import { TAG_TYPE_PARTY, TAG_TYPE_ISSUE, TAG_TYPE_NORMAL, normalizeTagType } fro
 export default {
   name: 'TagFilter',
   props: {
+    sidebar: { type: Boolean, default: false },
+    browsing: { type: Boolean, default: false },
     tags: { type: Array, default: () => [] },
     modelValue: { type: Array, default: () => [] },
     counts: { type: Object, default: () => ({}) },
     loading: { type: Boolean, default: false },
     error: { type: String, default: '' }
   },
-  emits: ['update:modelValue', 'retry'],
+  emits: ['update:modelValue', 'retry', 'browse-all'],
   data() {
     return { open: true, query: '' }
   },
@@ -96,14 +103,16 @@ export default {
       return this.tags.filter(tag => this.isSelected(tag.id))
     },
     filteredTags() {
-      const query = this.query.trim().toLowerCase()
+      const query = this.sidebar && this.tags.length <= 8 ? '' : this.query.trim().toLowerCase()
       return this.tags.filter(tag => String(tag.name || '').toLowerCase().includes(query)).sort((a, b) => {
+        if (this.sidebar) return String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hans-CN')
         const selected = Number(this.isSelected(b.id)) - Number(this.isSelected(a.id))
         return selected || (this.counts[b.id] || 0) - (this.counts[a.id] || 0)
           || String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hans-CN')
       })
     },
     tagGroups() {
+      if (this.sidebar) return [{ type: 'all', tags: this.filteredTags }]
       return [
         { type: TAG_TYPE_PARTY, labelKey: 'files.tagGroupParty' },
         { type: TAG_TYPE_ISSUE, labelKey: 'files.tagGroupIssue' },
@@ -186,4 +195,14 @@ export default {
 .tag-check { flex: 0 0 14px; text-align: center; }
 .tag-filter-error { display: flex; align-items: center; gap: var(--awd-panel-gap); color: var(--awd-danger-text); font-size: var(--awd-panel-fs-meta); }
 .tag-filter-error > text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+.tag-filter-sidebar .tag-filter-toggle { min-height: var(--awd-panel-sec-h); color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-sec); }
+.tag-filter-sidebar .tag-filter-chevron { order: 1; margin-left: auto; }
+.tag-filter-sidebar .tag-filter-clear { min-height: var(--awd-panel-sec-h); font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-2); }
+.tag-filter-sidebar .tag-filter-options { padding: 0; }
+.tag-filter-sidebar .tag-option { min-height: var(--awd-panel-row-h); padding: var(--awd-space-1) var(--awd-panel-gap); gap: var(--awd-panel-gap); }
+.tag-filter-sidebar .tag-dot { flex-basis: 9px; width: 9px; height: 9px; }
+.tag-filter-sidebar .tag-dot-all { box-sizing: border-box; border: 1px solid var(--awd-panel-text-2); }
+.tag-filter-sidebar .selected-tag { border: 0; background: var(--awd-panel-hover); color: var(--awd-panel-text); }
+.tag-filter-sidebar .tag-browse-all { color: var(--awd-panel-text-2); }
 </style>

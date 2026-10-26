@@ -5,7 +5,7 @@ import puppeteer from 'puppeteer-core'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 const base = process.env.TAG_FILTER_UI_BASE || 'http://127.0.0.1:5196'
-const out = process.env.TAG_FILTER_UI_OUT || '/tmp/awd-1446-ui'
+const out = process.env.TAG_FILTER_UI_OUT || '/tmp/awd-1491-ui'
 fs.mkdirSync(out, { recursive: true })
 const project = { id: 42, name: '标签筛选隔离测试', userId: 7, projectType: 'BLANK' }
 const tags = [{ id: 7, name: '待审阅', color: '#B45309' }, { id: 8, name: '证据', color: '#B91C1C' }, { id: 9, name: '没有文件的标签', type: 'PARTY' }, ...Array.from({ length: 20 }, (_, i) => ({ id: 20 + i, name: '长标签名称与当事人名称测试' + i, type: 'ISSUE' }))]
@@ -69,8 +69,17 @@ try {
   await page.goto(base + '/#/pages/project-overview/project-overview?id=42', { waitUntil: 'networkidle0' })
   await page.waitForSelector('.file-tree .tree-item[data-file-id="1"]', { visible: true })
   assert.deepEqual(await visibleIds(), [1, 5, 6])
-  await page.click('.file-browse-tab:nth-child(2)')
+  const initialLayout = await page.$eval('.tree-content', el => ({
+    listHeight: el.querySelector('.tree-list').getBoundingClientRect().height,
+    tagTop: el.querySelector('.file-tag-sidebar').getBoundingClientRect().top,
+    bottom: el.getBoundingClientRect().bottom,
+    height: el.clientHeight
+  }))
+  assert.ok(initialLayout.listHeight < initialLayout.height / 2, JSON.stringify(initialLayout))
+  assert.ok(initialLayout.tagTop < initialLayout.bottom, 'a short directory shows the tag section without scrolling')
+  await page.click('.file-tree .tag-browse-all')
   await page.waitForSelector('.file-tree .tag-option', { visible: true })
+  assert.equal(await page.$('.file-browse-tabs'), null)
   assert.deepEqual(await visibleIds(), [3, 4, 5])
   assert.match(await page.$eval('.tree-item[data-file-id="3"] .tag-file-location', el => el.textContent), /证据目录.*子目录/)
   await pickTag('待审阅')
@@ -83,18 +92,17 @@ try {
   await page.click('.tag-filter-toggle')
   assert.equal(await page.$$eval('.selected-tag', rows => rows.length), 2)
   await page.click('.tag-filter-clear')
-  assert.deepEqual(await visibleIds(), [3, 4, 5])
+  assert.deepEqual(await visibleIds(), [1, 5, 6])
   await page.click('.tag-filter-toggle')
   await pickTag('没有文件的标签')
   await page.waitForSelector('.file-tree .tree-empty', { visible: true })
   assert.match(await page.$eval('.file-tree .tree-empty', el => el.textContent), /标签条件/)
   await page.click('.tag-filter-clear')
-  await page.click('.file-browse-tab:first-child')
   assert.deepEqual(await visibleIds(), [1, 5, 6])
-  await page.focus('.file-browse-tab:nth-child(2)')
+  await page.focus('.file-tree .tag-browse-all')
   await page.keyboard.press('Enter')
   await page.waitForSelector('.file-tree .tag-option', { visible: true })
-  await page.click('.file-browse-tab:first-child')
+  await page.click('.tag-view-back')
   await page.click('.tree-item[data-file-id="6"]', { button: 'right' })
   const manage = await page.evaluateHandle(() => Array.from(document.querySelectorAll('.context-menu-item')).find(el => el.textContent.includes('管理标签')))
   await manage.click()
@@ -105,7 +113,7 @@ try {
   await page.waitForSelector('.awd-dialog .tag-chip', { visible: true })
   assert.deepEqual(files[5].tags.map(tag => tag.id), [7])
   await page.keyboard.press('Escape')
-  await page.click('.file-browse-tab:nth-child(2)')
+  await page.click('.file-tree .tag-browse-all')
   await page.waitForSelector('.tree-item[data-file-id="6"]', { visible: true })
   await pickTag('待审阅')
   assert.deepEqual(await visibleIds(), [3, 4, 6])
@@ -131,6 +139,68 @@ try {
       await (await page.$('.sidebar-left')).screenshot({ path: out + '/explorer-' + width + '-' + theme + '.png' })
     }
   }
+  // The normal, small tag collection stays quiet: no search box, badges or duplicate chips.
+  await page.$eval('.file-tree .tag-filter-input', input => {
+    input.value = '不存在的标签'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  tags.splice(3)
+  await page.click('.tree-item[data-file-id="6"]', { button: 'right' })
+  await (await page.evaluateHandle(() => Array.from(document.querySelectorAll('.context-menu-item')).find(el => el.textContent.includes('管理标签')))).click()
+  await page.waitForSelector('.file-tree .tag-filter-input', { hidden: true })
+  await page.keyboard.press('Escape')
+  assert.equal(await page.$$eval('.file-tag-sidebar .tag-option[title]', rows => rows.length), 3, 'a hidden name query must not hide tags after the collection shrinks')
+  await page.reload({ waitUntil: 'networkidle0' })
+  await page.waitForSelector('.file-tree .tag-option', { visible: true })
+  assert.equal(await page.$('.file-tree .tag-filter-input'), null)
+  assert.equal(await page.$('.file-tree .tag-group-title'), null)
+  assert.equal(await page.$('.file-tree .tag-filter-total'), null)
+  await page.focus('.file-tree .tag-option[title="待审阅"]')
+  await page.keyboard.press('Space')
+  await page.waitForFunction(() => document.querySelectorAll('.file-tree .tree-item[data-file-id]').length === 2)
+  assert.deepEqual(await visibleIds(), [3, 4])
+  assert.equal(await page.$('.file-tree .selected-tag'), null)
+  await page.click('.file-tree .tag-option[title="待审阅"]')
+  assert.deepEqual(await visibleIds(), [1, 5, 6], 'removing the last tag restores folders')
+  await page.click('.tree-item[data-file-id="1"] .tree-expand-icon-wrapper')
+  await page.waitForSelector('.tree-item[data-file-id="2"]', { visible: true })
+  await page.click('.file-tree .tag-option[title="证据"]')
+  await page.click('.tag-view-back')
+  assert.deepEqual(await visibleIds(), [1, 2, 4, 5, 6], 'folder expansion survives a tag visit')
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(theme => {
+      document.querySelector('.sidebar-left').style.setProperty('width', '260px', 'important')
+      document.documentElement.setAttribute('data-theme', theme)
+      document.documentElement.classList.toggle('dark', theme === 'dark')
+    }, theme)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    await (await page.$('.sidebar-left')).screenshot({ path: out + '/sidebar-260-' + theme + '.png' })
+  }
+  // Tags live below the directory, so selecting them from a long list must reveal the new results.
+  files.push(...Array.from({ length: 80 }, (_, i) => ({
+    id: 100 + i, projectId: 42, parentId: null, isFolder: false, fileType: 'txt',
+    name: '长目录测试' + String(i).padStart(3, '0') + '.txt', filePath: '/synthetic/long-' + i + '.txt', tags: [tags[0]]
+  })))
+  await page.reload({ waitUntil: 'networkidle0' })
+  await page.waitForSelector('.file-tree .tag-option[title="待审阅"]')
+  await page.evaluate(() => {
+    document.documentElement.setAttribute('data-theme', 'light')
+    document.documentElement.classList.remove('dark')
+  })
+  const folderScroll = await page.$eval('.tree-content', el => { el.scrollTop = el.scrollHeight; return el.scrollTop })
+  assert.ok(folderScroll > 500)
+  await page.click('.file-tree .tag-option[title="待审阅"]')
+  await page.waitForFunction(() => document.querySelectorAll('.file-tree .tree-item[data-file-id]').length === 82 && document.querySelector('.tree-content').scrollTop === 0)
+  const resultPosition = await page.$eval('.tree-content', el => ({
+    top: el.getBoundingClientRect().top,
+    bottom: el.getBoundingClientRect().bottom,
+    firstTop: el.querySelector('.tree-item').getBoundingClientRect().top
+  }))
+  assert.ok(resultPosition.firstTop >= resultPosition.top && resultPosition.firstTop < resultPosition.bottom, JSON.stringify(resultPosition))
+  await (await page.$('.sidebar-left')).screenshot({ path: out + '/long-results-260-light.png' })
+  await page.click('.tag-view-back')
+  await page.waitForFunction(expected => Math.abs(document.querySelector('.tree-content').scrollTop - expected) < 2, {}, folderScroll)
+  await (await page.$('.sidebar-left')).screenshot({ path: out + '/long-folder-return-260-light.png' })
   assert.deepEqual(errors, [])
-  console.log(JSON.stringify({ passed: true, checks: ['collapsed-folder media', 'AND filters', 'selected chips', 'clear', 'empty state', 'folder restoration', 'keyboard switch', 'right-click add/remove updates tag results', '220/260/420 widths', 'light/dark'], screenshots: out }))
+  console.log(JSON.stringify({ passed: true, checks: ['collapsed-folder media', 'AND filters', 'selected chips', 'clear', 'empty state', 'folder restoration', 'keyboard tags', 'quiet small collection', 'short-directory visible tags', 'long-directory visible results and scroll restoration', 'last tag restores folders', 'right-click add/remove updates tag results', '220/260/420 widths', 'light/dark'], screenshots: out }))
 } catch (error) { await page.screenshot({ path: out + '/failure.png' }); console.error(errors); throw error } finally { await browser.close() }
