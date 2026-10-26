@@ -26,9 +26,9 @@ try {
     const url=new URL(req.url())
     if(req.method()==='PATCH' && url.pathname.includes('/evidence-links/targets/')) {
       requests.push(JSON.parse(req.postData()))
-      return req.respond({status:200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify(failTarget ? {code:1,message:'合成保存失败'} : {code:0,data:{id:7,...requests.at(-1)}})})
+      return req.respond({status:200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,PATCH,PUT,DELETE,OPTIONS'},body:JSON.stringify(failTarget ? {code:1,message:'合成保存失败'} : {code:0,data:{id:7,...requests.at(-1)}})})
     }
-    if(url.pathname.startsWith('/api/') || url.origin !== `http://127.0.0.1:${server.address().port}`) return req.respond({status:200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*'},body:JSON.stringify({code:0,data:[]})})
+    if(url.pathname.startsWith('/api/') || url.origin !== `http://127.0.0.1:${server.address().port}`) return req.respond({status:200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,PATCH,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'*'},body:JSON.stringify({code:0,data:[]})})
     req.continue()
   })
   await page.evaluateOnNewDocument(()=>{localStorage.setItem('awd_app_language','zh-CN')})
