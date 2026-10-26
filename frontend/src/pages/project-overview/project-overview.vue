@@ -396,17 +396,23 @@
 
         <!-- Version History：无项目态不给 -->
         <view
-          v-if="hasNamedProject"
-          class="rail-btn"
+          v-if="hasNamedProject && !isClientView"
+          class="rail-btn version-entry"
           :class="{ active: leftPaneKey === 'version' && !sidebarCollapsed }"
-          :title="VERSION_PLUGIN.label"
-          @tap="toggleLeftPane('version')"
+          :title="versionEntry.title"
+          :aria-label="versionEntry.title"
+          role="button"
+          tabindex="0"
+          @tap="openProjectVersionPanel"
+          @keydown.enter.prevent="openProjectVersionPanel"
+          @keydown.space.prevent="openProjectVersionPanel"
         >
           <view class="rail-icon-wrapper">
             <svg class="rail-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(path, idx) in VERSION_PLUGIN.svgPaths" :key="idx" :d="path.d" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-icon-path" />
             </svg>
           </view>
+          <text v-if="versionEntry.badge" class="rail-badge" :class="{ 'is-overdue': versionEntry.attention }" aria-hidden="true">{{ versionEntry.badge }}</text>
         </view>
 
         <!-- Project Members Stack -->
@@ -757,6 +763,8 @@
             :collab-refresh-token="collabRefreshToken"
             :cloud-snapshot="collabCloud"
             :document-merge-state="documentMergeState"
+            :work-status="versionStatusLoaded ? versionWorkStatus : null"
+            :before-commit="prepareVersionCommit"
             @compare-file="onVersionCompareFile"
             @clear-file-filter="versionFileFilter = null"
             @reload-files="onVersionReloadFiles"
@@ -2344,7 +2352,7 @@ import InviteMemberDialog from '@/components/InviteMemberDialog.vue'
 import CollabDialog from '@/components/collab/CollabDialog.vue'
 import SubmitDraftGuide from '@/components/collab/SubmitDraftGuide.vue'
 import { MEMBER_GROUP_LABELS } from '@/config/memberRoles.js'
-import { globalOverlayActive } from '@/utils/overlayState.js'
+import { globalOverlayActive, setGlobalOverlay } from '@/utils/overlayState.js'
 import { AI_PROMPT_EVENT } from '@/utils/paragraphFormat.js'
 import CompareDocDialog from '@/components/CompareDocDialog.vue'
 import DocDiffViewer from '@/components/DocDiffViewer.vue'
@@ -2386,6 +2394,7 @@ import {
   getSkills,
   getFileText,
   getVersionStatus, // 版本面板之外也要知道「有没有采纳等待处理」
+  endWorkSession,
   promptFeatureNotConfigured, // 功能未配置统一引导（#18 T7）
   getProjectLocalPath, // 在访达中显示（IDE 化）
   getFileLocalPath,
@@ -2417,6 +2426,9 @@ import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
 import { getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { mergeMembers } from '@/utils/mergeMembers.js'
 import { remoteAheadText } from '@/utils/collabWording.js'
+import { versionEntryState } from '@/utils/versionEntryState.js'
+import { createVersionExitGuard } from '@/utils/versionExitGuard.js'
+import { showSheet } from '@/utils/dialog.js'
 import { getInitial } from '@/utils/textInitial.js'
 import { recordProjectVisit, getRecentProjectIds, syncRecentToMenuFetching } from '@/utils/recentProjects.js'
 import { markdownToPlainText } from '@/utils/markdownPlain.js'
@@ -2853,6 +2865,8 @@ export default {
       switcherProjects: [],
       switcherLoadFailed: false, // 拉取最近项目失败：与"确实没有其他最近项目"的空态区分开，不能吞成同一句文案
       versionWorkStatus: { enabled: false, working: false, changedCount: 0, onDraft: null }, // 底部状态栏工作状态点（顶栏胶囊已去掉）
+      versionStatusLoaded: false,
+      versionStatusError: false,
       // 协作（团队案件库）状态：{linked, serverUrl, pendingUpload, remoteAhead, offline}
       collabCloud: null,
       collabDialogVisible: false,
@@ -3174,8 +3188,14 @@ export default {
     versionWorkStatusLabel() {
       const s = this.versionWorkStatus
       if (s.onDraft && s.onDraft.name) return this.$t('workbench.workingOnDraft', { name: s.onDraft.name })
-      if (s.working) return s.changedCount ? this.$t('workbench.workingChanged', { count: s.changedCount }) : this.$t('workbench.working')
+      if (s.working) return s.changedCount ? this.$t('version.pendingFileCount', { count: s.changedCount }) : this.$t('version.changesAutoRecorded')
       return ''
+    },
+    versionEntry() {
+      return versionEntryState((key, params) => this.$t(key, params), {
+        status: this.versionWorkStatus, cloud: this.collabCloud,
+        conflict: this.adoptConflictPending, unavailable: this.versionStatusError,
+      })
     },
     isClientView() {
       const user = getCurrentUser()
@@ -3641,6 +3661,7 @@ export default {
     this.unbindTabsWheel()
     this._comparisonDisposed = true
     clearInterval(this._mergeElapsedTimer)
+    this.stopVersionStatusUpdates()
     this.stopMessageCenterBadge()
     this._stopPluginUpdateChecks?.()
     this._ddClientPollStopped = true
@@ -4046,6 +4067,7 @@ export default {
     }
   },
   onUnload() {
+    this.stopVersionStatusUpdates()
     this.cancelFileTreePdfExport()
     this.disposeRestartRecovery()
     unregisterQuitSave(this)
@@ -4070,10 +4092,10 @@ export default {
     this._ddClientPollStopped = false
     this.pollDdClientInbox()
     registerQuitSave(this, async () => {
-      const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs)
+      const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs, { timeoutMs: 0 })
       this.flushTabSnapshot()
       return result
-    })
+    }, (options) => this.confirmVersionBeforeLeaving(options))
     // 多实例守卫：本页经 navigateTo 反复进入时页面栈里会有多个存活实例，每个都在
     // mounted 绑定了全局（ipcRenderer/window 级）监听；全局事件只让最近展示的实例
     // 处理，否则一次事件触发 N 份副作用（与 PR#148 剪贴板重复入库同源）
@@ -4163,8 +4185,21 @@ export default {
     this._onFilesChangedSyncTabs = () => {
       if (!this.isActiveOverviewInstance()) return
       this.syncOpenTabsFromFileTree()
+      this.scheduleVersionStatusRefresh()
     }
     uni.$on('awd:files-changed', this._onFilesChangedSyncTabs)
+    this._onFileSavedVersion = (event) => {
+      if (String(event?.projectId) !== String(this.projectId)) return
+      this.scheduleVersionStatusRefresh()
+    }
+    uni.$on('awd:file-saved', this._onFileSavedVersion)
+    // Auto-recording can finish without a file-tree event. Keep the badge current
+    // even when the version panel is closed; cloud network polling stays separate.
+    this._versionStatusTimer = setInterval(() => {
+      if (!this.isActiveOverviewInstance() || (typeof document !== 'undefined' && document.hidden)) return
+      this.checkAdoptConflict()
+      this.fetchCollabState()
+    }, 15000)
     // 编辑器段落面板「交给 AI 调整格式」：把编辑器拼好的那句话以 AGENT 模式发进 AI 对话，
     // 与插件一键动作（onPluginQuickAction）同一条 resolveChatInterface 路。只让活跃实例接。
     this._onEditorAiPrompt = (payload) => {
@@ -4819,6 +4854,8 @@ export default {
         return false
       }
       if (!canNavigate()) return false
+      if (!restartRecovery && !await this.confirmVersionBeforeLeaving()) return false
+      if (!canNavigate()) return false
       await new Promise((resolve, reject) => uni.reLaunch({ url, success: resolve, fail: reject }))
       return true
     },
@@ -4962,7 +4999,87 @@ export default {
     // 「有一次采纳等待处理」固定条的入口：切到版本面板，AdoptConflictDialog 会随
     // 面板的 /status 自动弹出（它本来就是这么起来的，含崩溃后重开的场景）。
     goHandleAdoptConflict() {
-      if (this.leftPaneKey !== 'version') this.toggleLeftPane('version')
+      this.openProjectVersionPanel()
+    },
+    openProjectVersionPanel() {
+      this.versionFileFilter = null
+      if (this.leftPaneKey !== 'version' || this.sidebarCollapsed) this.toggleLeftPane('version')
+      this.checkAdoptConflict()
+    },
+    async prepareVersionCommit() {
+      const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs, { timeoutMs: 0 })
+      if (result.failed) {
+        uni.showToast({ title: this.$t('version.saveBeforeCommitFailed'), icon: 'none', duration: 4000 })
+        return false
+      }
+      return true
+    },
+    confirmVersionBeforeLeaving({ isCurrent = () => true } = {}) {
+      if (!this.hasNamedProject || this.isClientView) return Promise.resolve(true)
+      if (!this._versionExitPromise) {
+        const projectId = this.projectId
+        const overlayHolder = Symbol('version-exit')
+        const blockInput = event => { event.preventDefault(); event.stopImmediatePropagation() }
+        const releaseProgress = () => {
+          if (typeof window !== 'undefined') window.removeEventListener('keydown', blockInput, true)
+          setGlobalOverlay(false, overlayHolder)
+          uni.hideLoading()
+        }
+        const guard = createVersionExitGuard({
+          isCurrent: () => isCurrent() && !this._versionStatusDisposed && projectId === this.projectId,
+          save: () => this.prepareVersionCommit(),
+          progress: (stage) => {
+            if (stage === 'idle') { releaseProgress(); return }
+            if (stage === 'saving') uni.hideToast?.()
+            // A loading mask alone cannot cover native BrowserViews or stop
+            // keyboard edits underneath. Hold both barriers until the receipt.
+            setGlobalOverlay(true, overlayHolder)
+            if (typeof window !== 'undefined') window.addEventListener('keydown', blockInput, true)
+            const key = { saving: 'exitProgressSaving', committing: 'exitProgressCommitting', checking: 'exitProgressChecking' }[stage]
+            uni.showLoading({ title: this.$t('version.' + key), mask: true })
+          },
+          readStatus: async () => {
+            const result = await getVersionStatus(projectId)
+            return result?.data || {}
+          },
+          choose: async () => {
+            const result = await showSheet({
+              title: this.$t('version.exitPrompt', { name: this.project?.name || '' }),
+              itemList: [this.$t('version.exitCommit'), this.$t('version.exitSkip')],
+              cancelText: this.$t('version.exitCancel'),
+            })
+            return result.tapIndex === 0 ? 'commit' : result.tapIndex === 1 ? 'skip' : 'cancel'
+          },
+          commit: async () => {
+            const result = await endWorkSession(projectId, '')
+            await this.onVersionPanelStatusChanged()
+            this.collabRefreshToken += 1
+            return result?.data || {}
+          },
+          onBlocked: (reason) => {
+            if (reason === 'conflict' || reason === 'new-changes') this.openProjectVersionPanel()
+            const key = reason === 'conflict' ? 'exitConflict'
+              : reason === 'new-changes' ? 'exitNewChanges'
+                : reason === 'save-failed' ? 'saveBeforeCommitFailed' : 'exitCheckFailed'
+            uni.showToast({ title: this.$t('version.' + key), icon: 'none', duration: 5000 })
+          },
+        })
+        this._versionExitPromise = guard.confirm().finally(() => { releaseProgress(); this._versionExitPromise = null })
+      }
+      return this._versionExitPromise
+    },
+    scheduleVersionStatusRefresh() {
+      if (this._versionStatusDisposed || !this.isActiveOverviewInstance()) return
+      clearTimeout(this._versionStatusRefreshTimer)
+      this._versionStatusRefreshTimer = setTimeout(() => this.checkAdoptConflict(), 400)
+    },
+    stopVersionStatusUpdates() {
+      this._versionStatusDisposed = true
+      this._versionStatusSeq = (this._versionStatusSeq || 0) + 1
+      clearInterval(this._versionStatusTimer)
+      clearTimeout(this._versionStatusRefreshTimer)
+      if (this._onFileSavedVersion) uni.$off('awd:file-saved', this._onFileSavedVersion)
+      this._onFileSavedVersion = null
     },
     // 裁决清单里「打开合并比对稿」/「查看合并稿」：标签页由 fileOpenTabs 开
     // （openMergeReviewTab 是同一批任务里另一件产出，并行开发期间可能还没到位——
@@ -4984,10 +5101,15 @@ export default {
     // 面板内部的结束工作/丢弃/回主线/采纳/放弃等操作完成后也会经 status-changed
     // 事件再调一次这里，否则底部状态栏会停在操作之前的样子（同步滞后 bug）。
     async checkAdoptConflict() {
-      if (!this.projectInfoLoaded || !this.hasNamedProject) return
+      if (this._versionStatusDisposed || !this.projectInfoLoaded || !this.hasNamedProject || this.isClientView) return
+      const projectId = this.projectId
+      const seq = this._versionStatusSeq = (this._versionStatusSeq || 0) + 1
       try {
-        const res = await getVersionStatus(this.projectId)
+        const res = await getVersionStatus(projectId)
+        if (this._versionStatusDisposed || projectId !== this.projectId || seq !== this._versionStatusSeq) return
         const d = (res && res.data) || {}
+        this.versionStatusLoaded = true
+        this.versionStatusError = false
         this.adoptConflictPending = !!(d.adoptConflict || d.cloudConflict || d.sessionEndConflict)
         // 三语境判定链的优先级由后端保证互斥（sessionEnd > cloud > adopt），这里照同序取。
         const conflict = d.sessionEndConflict || d.cloudConflict || d.adoptConflict || null
@@ -5009,6 +5131,12 @@ export default {
           onDraft: d.onDraft || null,
         }
       } catch (e) {
+        if (this._versionStatusDisposed || projectId !== this.projectId || seq !== this._versionStatusSeq) return
+        if (e.kind === 'VERSION_BUSY') {
+          this.scheduleVersionStatusRefresh()
+          return
+        }
+        this.versionStatusError = true
         console.warn('[Version] 读取采纳状态失败', e)
       }
     },
@@ -5668,6 +5796,7 @@ export default {
         uni.showToast({ title: this.$t('editor.saveBeforeLeaving'), icon: 'none', duration: 4000 })
         return false
       }
+      if (!await this.confirmVersionBeforeLeaving()) return false
       try {
          clearSession()
       } catch (e) {}

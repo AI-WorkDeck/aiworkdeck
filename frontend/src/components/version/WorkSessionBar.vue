@@ -14,29 +14,32 @@
       <view class="awd-btn awd-btn-primary session-btn" @tap="adopt">{{ $t('version.adoptDraft') }}</view>
       <view class="awd-btn awd-btn-danger session-btn" @tap="confirmAbandon">{{ $t('version.abandonDraft') }}</view>
     </template>
-    <template v-else-if="working">
+    <template v-else-if="working || changedCount > 0">
       <view class="session-dot" />
-      <text class="session-text">{{ changedCount ? $t('version.workingWithCount', { count: changedCount }) : $t('version.working') }}</text>
+      <text class="session-text">{{ changedCount ? $t('version.pendingFileCount', { count: changedCount }) : $t('version.changesAutoRecorded') }}</text>
       <view class="awd-btn awd-btn-primary session-btn" @tap="openNaming">{{ $t('version.endSession') }}</view>
-      <view class="awd-btn awd-btn-danger session-btn" @tap="confirmDiscard">{{ $t('version.discard') }}</view>
+      <view v-if="working" class="awd-btn awd-btn-danger session-btn" @tap="confirmDiscard">{{ $t('version.discard') }}</view>
     </template>
     <template v-else>
       <text class="session-text session-idle">{{ $t('version.noActiveSession') }}</text>
     </template>
+    <text class="session-help">{{ $t('version.commitHistoryHelp') }}</text>
 
-    <view v-if="naming" class="awd-mask" @tap.self="naming = false">
+    <view v-if="naming" class="awd-mask" @tap.self="!busy && (naming = false)">
       <view class="awd-dialog">
         <view class="awd-header"><text class="awd-title">{{ $t('version.nameSessionTitle') }}</text></view>
         <view class="awd-body">
+          <text class="session-help">{{ $t(cloudLinked && !onDraft ? 'version.commitCloudHelp' : 'version.commitLocalHelp') }}</text>
           <input
             v-model="title"
             class="awd-input"
+            :disabled="busy"
             :placeholder="$t('version.sessionNamePlaceholder')"
           />
         </view>
         <view class="awd-footer">
-          <view class="awd-btn awd-btn-secondary" @tap="naming = false">{{ $t('common.cancel') }}</view>
-          <view class="awd-btn awd-btn-primary" @tap="end">{{ $t('version.finish') }}</view>
+          <view class="awd-btn awd-btn-secondary" :aria-disabled="busy" @tap="!busy && (naming = false)">{{ $t('common.cancel') }}</view>
+          <view class="awd-btn awd-btn-primary" :aria-disabled="busy" @tap="end">{{ $t(busy ? 'version.committingChanges' : 'version.finish') }}</view>
         </view>
       </view>
     </view>
@@ -55,6 +58,8 @@ export default {
     working: { type: Boolean, default: false },
     changedCount: { type: Number, default: 0 },
     onDraft: { type: Object, default: null },
+    beforeCommit: { type: Function, default: null },
+    cloudLinked: { type: Boolean, default: false },
   },
   emits: ['ended', 'discarded', 'mainline-resumed', 'draft-adopted', 'draft-abandoned'],
   data() {
@@ -122,6 +127,7 @@ export default {
       if (this.busy) return
       this.busy = true
       try {
+        if (this.beforeCommit && await this.beforeCommit() === false) return
         const res = await endWorkSession(this.projectId, this.title)
         // notice = 结束成功但没生成版本（整段工作一个改动都没有）。后端刻意用返回值
         // 而不是异常表达：它已经把工作段收尾了，走 catch 分支会让弹窗卡开、状态条
@@ -181,6 +187,7 @@ export default {
    wrap 让按钮在窄侧栏下换行，而不是被裁切成不可点。 */
 .session-text { font-size: 26rpx; color: var(--awd-text); flex: 1; min-width: 200rpx; }
 .session-idle { color: var(--awd-text-3); }
+.session-help { display: block; flex-basis: 100%; font-size: 12px; line-height: 1.6; color: var(--awd-text-2); margin-bottom: 8px; }
 .session-btn { flex-shrink: 0; }
 
 .awd-btn {

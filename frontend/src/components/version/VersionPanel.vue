@@ -25,9 +25,11 @@
         <text class="version-history-link" @tap="$emit('open-history')">{{ $t('version.openFullHistory') }}</text>
       </view>
       <WorkSessionBar
-        :working="working"
-        :changed-count="changedCount"
-        :on-draft="onDraft"
+        :working="sessionStatus.working"
+        :changed-count="sessionStatus.changedCount"
+        :on-draft="sessionStatus.onDraft"
+        :before-commit="beforeCommit"
+        :cloud-linked="!!displayCloud?.linked"
         @ended="onVersionLanded"
         @discarded="onReload"
         @mainline-resumed="onReload"
@@ -38,7 +40,7 @@
         :cloud="displayCloud"
         :has-connection="hasConnection"
         :conflict-pending="!!(sessionEndConflict || cloudConflict || adoptConflict)"
-        :working="working"
+        :working="sessionStatus.working"
         @open-collab="$emit('open-collab', $event)"
       />
       <view v-if="fileFilter" class="version-file-filter">
@@ -140,6 +142,8 @@ export default {
   name: 'VersionPanel',
   components: { WorkSessionBar, VersionTimeline, DraftList, AdoptConflictDialog, CloudSyncBar },
   props: {
+    workStatus: { type: Object, default: null },
+    beforeCommit: { type: Function, default: null },
     projectId: { type: [String, Number], required: true },
     fileFilter: { type: Object, default: null },
     documentMergeState: { type: Object, default: null },
@@ -183,6 +187,9 @@ export default {
     }
   },
   computed: {
+    sessionStatus() {
+      return this.workStatus || { working: this.working, changedCount: this.changedCount, onDraft: this.onDraft }
+    },
     displayCloud() {
       return this.cloudSnapshot === undefined ? this.cloud : this.cloudSnapshot
     },

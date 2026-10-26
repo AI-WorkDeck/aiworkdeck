@@ -10,13 +10,13 @@ import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
 const body = source.match(/<script>([\s\S]*?)<\/script>/)[1]
   .replace(/^import .*$/gm, '').replace(/export default \{/, 'return {')
-function makeVm(extra = {}) {
+function makeVm(extra = {}, events = []) {
   // stampApplication / documentStampApplication 是 B4 的打标链路，这里喂成「开关关着」，
   // 保存行为与打标前完全一致；打标本身另有 libre-save-generator-stamp.test.mjs。
   const options = new Function(...Object.keys(barriers), 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar', 'getFileWriteUrl',
-    'stampApplication', 'documentStampApplication', 'observeLocalContentBackend', body)(...Object.values(barriers),
+    'stampApplication', 'documentStampApplication', 'observeLocalContentBackend', 'uni', body)(...Object.values(barriers),
     null, null, null, id => '/upload/' + id,
-    async (bytes) => bytes, async () => null, observeLocalContentBackend)
+    async (bytes) => bytes, async () => null, observeLocalContentBackend, { $emit: (...args) => events.push(args) })
   const vm = {
     ready: true, file: { id: 7, name: '证据清单.docx' }, statusKey: 'ready',
     dirty: true, saving: false, _dirtySince: Date.now(),
@@ -373,7 +373,7 @@ test('保存状态固定展示待保存、保存中、已保存及失败；不�
   vm.docLoadFailed = true
   assert.equal(state(), '', '装载失败不显示已保存')
   assert.match(source, /class="libre-save-state"/)
-  assert.match(source, /v-if="saveStateText \|\| provenanceBarVisible"/)
+  assert.match(source, /v-if="saveStateText" class="libre-save-bar"/)
   for (const statusKey of ['saving', 'saveFailed', 'movedSaveFailed']) {
     assert.equal(options.computed.displayStatus.call({ statusKey, saveStateText: 'status', $t: k => k }), '')
   }
@@ -515,3 +515,22 @@ test('版本忙碌的安全回执不能抹掉更早一次网络上传的未知�
   assert.equal(await barrier.drained, false)
   barriers.endCheckpointSaveBarrier(vm.projectId, vm.file.id, 'keep-uncertain')
 })
+
+for (const outcome of ['saved', 'failed', 'discarded', 'reloading', 'project-changed', 'file-changed', 'context-changed']) {
+  test(`文件保存事件等待上传确认，${outcome} 只通知有效的当前文件`, async () => {
+    const gate = deferred(), events = []
+    const vm = makeVm({ projectId: 1487, scheduleProvenanceReload() {}, uploadBytes: () => gate.promise }, events)
+    const saved = vm.saveDocument()
+    await tick()
+    assert.deepEqual(events, [], '不能在上传确认前刷新为已保存')
+    if (outcome === 'discarded') vm._saveDiscarded = true
+    if (outcome === 'reloading') vm._reloading = true
+    if (outcome === 'project-changed') vm.projectId = 1488
+    if (outcome === 'file-changed') vm.file = { id: 8 }
+    if (outcome === 'context-changed') vm._backendSaveContext = 1
+    if (outcome === 'failed') gate.reject(new Error('offline'))
+    else gate.resolve()
+    await saved
+    assert.deepEqual(events, outcome === 'saved' ? [['awd:file-saved', { projectId: 1487, fileId: 7 }]] : [])
+  })
+}

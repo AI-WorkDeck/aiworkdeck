@@ -20,7 +20,7 @@ const source = readFileSync(
 /** 稿态那一段模板（v-if="onDraft" 到下一个 template 分支之前）。 */
 function draftBlock() {
   const start = source.indexOf('<template v-if="onDraft">')
-  const end = source.indexOf('<template v-else-if="working">')
+  const end = source.indexOf('<template v-else-if=', start + 1)
   assert.ok(start > 0 && end > start, '模板结构变了，先来核对这个测试')
   return source.slice(start, end)
 }
