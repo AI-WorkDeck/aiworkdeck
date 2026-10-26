@@ -12,7 +12,15 @@ const unsupported = action => Object.assign(Error(`Native editor does not suppor
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
 const documentActions = new Set(['get_document_text', 'get_paragraph', 'get_outline', 'find_text_locations', 'set_selection', 'clear_anchors', 'get_cursor_context', 'get_hyperlink_at_cursor', 'get_review_context', 'goto_review_range'])
 const readActions = new Set([...documentActions, 'collapse_selection', 'get_bookmark_context', 'check_link_anchors', 'goto_bookmark', 'get_selection_hyperlink'])
-const textEditActions = new Set(['replace_at_position', 'replace_selection', 'insert_at_cursor', 'modify_paragraph', 'apply_review_edit'])
+const completionReads = new Set(['get_completion_context', 'capture_writing_context', 'get_context_menu_context'])
+for (const action of completionReads) readActions.add(action)
+readActions.add('set_host_context_menu')
+const viewReadActions = new Set(['set_revision_view', 'export_document', 'export_pdf', 'set_review_balloons'])
+const pureContextReads = new Set(['get_document_text', 'get_paragraph', 'get_outline', 'get_cursor_context', 'get_review_context', ...completionReads])
+const completionWrites = new Set(['accept_completion', 'insert_completion_content', 'accept_writing_suggestion'])
+const textEditActions = new Set(['replace_at_position', 'replace_selection', 'insert_at_cursor', 'modify_paragraph', 'apply_review_edit', ...completionWrites])
+const expectedCompletionRefusals = new Set(['not-writer', 'composing', 'readonly', 'stale', 'selection', 'invalid-completion',
+  'selection-mismatch', 'invalid-suggestion', 'invalid-content', 'invalid-table', 'table-requires-body'])
 const evidenceWriteActions = new Set(['bookmark_selection', 'set_selection_hyperlink', 'adopt_legacy_links'])
 const commentActions = new Set(['list_comments', 'goto_comment', 'add_comment_at_selection', 'update_comment', 'delete_comment', 'reply_comment', 'set_comment_resolved'])
 const commentFields = ['id', 'author', 'content', 'timestamp', 'anchorText', 'resolved']
@@ -69,21 +77,47 @@ class NativeEditorSession {
     }
     if ([30, 31].includes(event.callbackType)) {
       if (event.callbackType === 31 && this.deferViewRevision(event)) return
-      this.viewReadGuard = null; this.reviewLoading = null
-      this.revision++
-      this.onEvent({ type: 'review-changed', documentEpoch: event.documentEpoch })
+      this.invalidateReview('review-changed', event.documentEpoch)
     }
     this.onEvent(event)
-    if ([2, 3, 4].includes(event.callbackType)) this.onEvent({ type: 'selection', documentEpoch: event.documentEpoch })
+    if ([2, 3, 4].includes(event.callbackType)) {
+      const selection = { type: 'selection', documentEpoch: event.documentEpoch }
+      const guard = this.viewReadGuard
+      if (this.currentViewRead(guard) && guard.selectionProof) {
+        guard.selections.push(selection); this.scheduleViewReadCheck(guard)
+      } else this.onEvent(selection)
+    }
   }
-  changed() {
-    this.viewReadGuard = null; this.reviewLoading = null
-    this.revision++
-    this.onEvent({ type: 'modified', documentEpoch: this.model.documentEpoch })
+  invalidateReview(type, documentEpoch = this.model.documentEpoch) {
+    this.clearViewRead(false); this.reviewLoading = null
+    const scope = this.mutationScope
+    if (!scope?.invalidated) {
+      this.revision++
+      if (scope) scope.invalidated = true
+      this.onEvent({ type, documentEpoch })
+    } else if (type === 'modified' && !scope.modified) this.onEvent({ type, documentEpoch })
+    if (scope && type === 'modified') scope.modified = true
+  }
+  changed() { this.invalidateReview('modified') }
+  clearViewRead(invalidatePending = true) {
+    const guard = this.viewReadGuard
+    this.viewReadGuard = null
+    // A callback removed from pending is still unproven until its UNO check ends.
+    // Changing owners/permissions or navigating must not silently discard it.
+    if (invalidatePending && guard?.model === this.model && guard?.revision === this.revision
+        && (guard.pending.size || guard.verifying)) this.invalidateReview('review-changed', guard.model.documentEpoch)
+    for (const event of guard?.selections || []) this.onEvent(event)
+    if (guard) guard.selections = []
+  }
+  beginViewRead() {
+    if (this.currentViewRead(this.viewReadGuard)) return this.viewReadGuard
+    this.clearViewRead()
+    if (this.review?.revision !== this.revision) throw Error('STALE_REVIEW_BATCH')
+    return (this.viewReadGuard = { model: this.model, identity: this.review, revision: this.revision, permission: this.permissionSeq, pending: new Set(), selections: [] })
   }
   currentViewRead(guard) {
     return guard && !this.closed && !this.failure && this.viewReadGuard === guard && this.model === guard.model
-      && this.review === guard.identity && this.revision === guard.revision
+      && this.review === guard.identity && this.revision === guard.revision && this.permissionSeq === guard.permission
   }
   deferViewRevision(event) {
     const guard = this.viewReadGuard
@@ -104,35 +138,65 @@ class NativeEditorSession {
     // transition cannot put all full-text reads ahead of queued typing.
     tick().then(() => this.task(() => this.verifyViewRead(guard))).catch(() => {}).finally(() => {
       guard.scheduled = false
-      if (this.currentViewRead(guard) && guard.pending.size) this.scheduleViewReadCheck(guard)
+      if (this.currentViewRead(guard) && (guard.pending.size || guard.selections?.length)) this.scheduleViewReadCheck(guard)
     })
   }
   async verifyViewRead(guard) {
-    if (!this.currentViewRead(guard) || !guard.pending.size) return
+    if (!this.currentViewRead(guard)) return
+    if (!guard.pending.size) return this.verifyViewSelection(guard)
     const indices = [...guard.pending].slice(0, REVIEW_BATCH_SIZE)
     indices.forEach(index => guard.pending.delete(index))
+    guard.verifying = true
     const items = guard.identity.items
     const snapshot = async () => {
       const value = await this.engine.call('review_snapshot', { documentEpoch: guard.model.documentEpoch })
       if (!this.currentViewRead(guard)) return false
-      return value.documentEpoch === guard.model.documentEpoch && value.items?.length === items.length
-        && value.items.every((item, index) => matchesCapiRevision(items[index], item))
+      const matches = value.documentEpoch === guard.model.documentEpoch && value.items?.length === items.length
+        && value.items.every((item, index) => matchesCapiRevision(items[index], guard.displayChanged
+          && ['Insert', 'Delete'].includes(items[index].type) ? { ...item, description: items[index].description } : item))
+      if (matches && guard.displayChanged) {
+        // A controlled display transition abbreviates deletion descriptions.
+        // Full UNO identities/text were checked above; retain only fresh geometry summaries.
+        items.forEach((item, index) => { item.description = value.items[index].description })
+        guard.displayChanged = false
+      }
+      return matches
     }
     try {
-      if (!await snapshot()) throw Error('View-read review identity changed')
       const full = await this.unoCall('check_revision_batch', { expectedCount: items.length,
         targets: indices.map(index => ({ index, identifier: items[index].identifier })) })
       if (!this.currentViewRead(guard)) return
       if (full.total !== items.length || full.entries?.length !== indices.length
           || !full.entries.every((item, offset) => item.index === indices[offset]
-            && matchesUnoRevision(items[item.index], item)) || !await snapshot())
+            && matchesUnoRevision(items[item.index], item)))
         throw Error('View-read revision text changed')
-    } catch {
-      if (this.currentViewRead(guard)) {
-        this.viewReadGuard = null; this.reviewLoading = null; this.revision++
-        this.onEvent({ type: 'review-changed', documentEpoch: guard.model.documentEpoch })
+      if (!guard.pending.size) {
+        if (!await snapshot()) throw Error('View-read review identity changed')
+        await this.verifyViewSelection(guard)
       }
+    } catch (error) {
+      if (this.currentViewRead(guard)) {
+        this.invalidateReview('review-changed', guard.model.documentEpoch)
+      }
+    } finally { guard.verifying = false }
+  }
+  async verifyViewSelection(guard) {
+    if (!this.currentViewRead(guard) || !guard.selectionProof || !guard.selections.length) return
+    const events = guard.selections.splice(0)
+    let proof
+    try { proof = await this.unoCall('check_view_read', { token: guard.selectionProof }) }
+    catch {
+      if (this.currentViewRead(guard)) this.invalidateReview('review-changed', guard.model.documentEpoch)
+      for (const event of events) this.onEvent(event)
+      return
     }
+    if (!this.currentViewRead(guard)) { for (const event of events) this.onEvent(event); return }
+    if (!proof.contentUnchanged) {
+      this.invalidateReview('review-changed', guard.model.documentEpoch)
+    }
+    if (!proof.selectionUnchanged) guard.selectionProof = null
+    for (const event of events) this.onEvent(proof.contentUnchanged && proof.selectionUnchanged
+      ? { ...event, origin: 'view-read' } : event)
   }
   async start() {
     if (this.engine) return
@@ -165,7 +229,7 @@ class NativeEditorSession {
         onFailure: error => this.fail(error) })
     }
     return this.uno.call(method, { ...params, documentUrl: this.model.documentUrl, nativeReadOnly: this.readOnly,
-      nativeDocumentEpoch: this.model.documentEpoch, nativeRevision: this.revision })
+      nativeDocumentEpoch: this.model.documentEpoch, nativeRevision: this.revision, nativePermissionSeq: this.permissionSeq })
   }
   async load(params) {
     if (params.bytes === undefined) {
@@ -227,6 +291,7 @@ class NativeEditorSession {
   }
   async input(action, params) {
     this.assertDocument(params.documentEpoch)
+    if (['input_mouse', 'input_key', 'input_text', 'command'].includes(action)) this.clearViewRead()
     if (this.permissionPending && action === 'input_mouse') throw Object.assign(Error('Native permission update pending'), { code: 'READ_ONLY_PENDING', inputNotConsumed: true })
     const key = Number(params.keyCode), base = key & 0xFFF, modifiers = key & ~0xFFF
     const navigation = Number.isInteger(key) && Number(params.charCode || 0) === 0
@@ -319,6 +384,8 @@ class NativeEditorSession {
       }
       return await this.task(() => {
         this.assertDocument(owner.documentEpoch)
+        if (this.reviewLoading !== identity) throw Error('STALE_REVIEW_BATCH')
+        this.clearViewRead()
         if (this.reviewLoading !== identity) throw Error('STALE_REVIEW_BATCH')
         identity.revision = this.revision
         this.review = identity
@@ -415,6 +482,7 @@ class NativeEditorSession {
       throw Error('INVALID_PERMISSION_UPDATE')
     }
     const owner = this.model, seq = params.permissionSeq
+    this.clearViewRead()
     this.permissionSeq = seq
     // Synchronous, before joining the native queue: queued mutations must see
     // revocation immediately. Promotion also stays locked until the view agrees.
@@ -477,12 +545,28 @@ class NativeEditorSession {
     }
   }
   execute(action, params = {}) {
+    if (action === 'export_document' && this.readOnly) return Promise.reject(Object.assign(Error('Read-only document'), { code: 'READ_ONLY' }))
     if (action === 'set_read_only') {
       try { return this.setReadOnly(params) } catch (error) { return Promise.reject(error) }
     }
     if (action === 'list_revisions') return this.listRevisions()
     if (action === 'get_review_layout') return this.reviewLayout(params)
-    const finalRead = ['get_review_context', 'goto_review_range'].includes(action)
+    if (completionWrites.has(action)) {
+      const owner = this.model
+      return this.executeQueued(action, params).then(async result => {
+        if (result.success !== true) return result
+        // The edit is already committed. A fresh continuation token is optional
+        // and must still refer to its exact post-edit position after proof setup.
+        // Never replay the write when intervening input makes this read stale.
+        try {
+          if (this.model !== owner || this.revision !== result.revision) return { ...result, token: null }
+          const context = await this.execute('get_completion_context', { documentEpoch: owner.documentEpoch,
+            nativeAfterToken: result.token, nativeExpectedRevision: result.revision })
+          return context.success === true ? { ...result, ...context } : { ...result, token: null }
+        } catch { return { ...result, token: null } }
+      })
+    }
+    const finalRead = viewReadActions.has(action) || completionReads.has(action) || ['get_review_context', 'goto_review_range'].includes(action)
       || (action === 'get_document_text' && params.__agent === true)
     if (finalRead) {
       const owner = this.model
@@ -506,9 +590,25 @@ class NativeEditorSession {
       this.assertDocument(params.documentEpoch)
       if (finalReadOwner) {
         this.assertDocument(finalReadOwner.documentEpoch)
+        if (params.nativeExpectedRevision !== undefined && params.nativeExpectedRevision !== this.revision)
+          return { success: false, available: false, reason: 'stale', error: 'stale', message: 'stale' }
         if (this.review?.revision !== this.revision || !this.review.items.every(item => item.textAvailable === true))
           throw Error('STALE_REVIEW_BATCH: document changed while preparing final-text read')
       }
+      const actualMutation = (action === 'native_input' && ['input_text', 'input_key', 'input_mouse', 'command'].includes(params.action))
+        || textEditActions.has(action) || evidenceWriteActions.has(action)
+        || (commentActions.has(action) && action !== 'list_comments')
+        || ['format_selection', 'ui_command', 'set_style', 'set_ruler_state', 'set_track_changes', 'undo', 'redo', 'resolve_revision', 'resolve_revisions', 'goto_revision', 'set_selection', 'collapse_selection', 'goto_bookmark'].includes(action)
+        || (!this.readOnly && ['find_text_locations', 'clear_anchors'].includes(action))
+      if (actualMutation) this.clearViewRead()
+      const mutation = actualMutation ? (this.mutationScope = { invalidated: false, modified: false }) : null
+      const guard = finalReadOwner ? this.beginViewRead() : null
+      if (guard && viewReadActions.has(action)) guard.displayChanged = true
+      if (guard && !pureContextReads.has(action)) {
+        for (const event of guard.selections.splice(0)) this.onEvent(event)
+        guard.selectionProof = null
+      }
+      const runAction = async () => {
       if (action === 'native_paint') return this.paint(params)
       if (action === 'native_input') return this.input(params.action, params.params || {})
       if (action === 'export_pdf') {
@@ -536,6 +636,7 @@ class NativeEditorSession {
         })
       }
       if (action === 'get_ui_state') return { success: true, ...await this.unoCall('ui_state') }
+      if (action === 'get_ruler_state') return { success: true, ...await this.unoCall(action, params) }
       if (action === 'list_fonts' || action === 'list_styles') {
         const { documentEpoch: _, ...query } = params
         return { success: true, ...await this.unoCall(action, query) }
@@ -559,7 +660,7 @@ class NativeEditorSession {
           throw error
         }
       }
-      if (action === 'format_selection' || action === 'ui_command' || action === 'set_style') {
+      if (action === 'format_selection' || action === 'ui_command' || action === 'set_style' || action === 'set_ruler_state') {
         const { documentEpoch: _, ...command } = params
         const navigation = action === 'ui_command' && ['select_all', 'escape'].includes(command.name)
         if (!navigation) this.assertWrite()
@@ -569,7 +670,9 @@ class NativeEditorSession {
           const result = navigation ? await run() : await this.undo.edit(run)
           if (result.changed && !result.atCursor) this.changed()
           else this.onEvent({ type: 'selection', documentEpoch: this.model.documentEpoch })
-          return { success: true, ...result }
+          return { success: true, ...result,
+            ...(action === 'set_ruler_state' ? { ...await this.unoCall('get_ruler_state'), changed: result.changed,
+              nativeLayout: await this.unoCall('view_metrics') } : {}) }
         } catch (error) {
           if (error.message.includes('FORMAT_OUTCOME_UNKNOWN')) this.fail(error)
           throw error
@@ -583,8 +686,9 @@ class NativeEditorSession {
         const run = async () => {
           this.assertWrite()
           const result = await this.unoCall(action, query)
-          const reviewRefused = action === 'apply_review_edit' && result.success === false
-            && ['not-writer', 'stale', 'invalid-range', 'unsupported-unicode-range', 'invalid-replacement'].includes(result.reason)
+          const reviewRefused = result.success === false && (action === 'apply_review_edit'
+            ? ['not-writer', 'stale', 'invalid-range', 'unsupported-unicode-range', 'invalid-replacement'].includes(result.reason)
+            : completionWrites.has(action) && expectedCompletionRefusals.has(result.reason))
             && result.changed === false && result.textChanged === false && result.trackingChanged === false
           if ((!reviewRefused && result.success !== true) || typeof result.changed !== 'boolean'
               || (textEdit ? typeof result.textChanged !== 'boolean' || typeof result.trackingChanged !== 'boolean'
@@ -600,7 +704,7 @@ class NativeEditorSession {
             : value.bookmarkMutations === 0 && value.hyperlinkMutations === 0 })
           if (result.changed) this.changed()
           this.onEvent({ type: 'selection', documentEpoch: this.model.documentEpoch })
-          return action === 'apply_review_edit' ? { ...result, revision: this.revision } : result
+          return action === 'apply_review_edit' || completionWrites.has(action) ? { ...result, revision: this.revision } : result
         } catch (error) {
           if (/EDIT_OUTCOME_UNKNOWN|EVIDENCE_OUTCOME_UNKNOWN|FINAL_TEXT_RESTORE_FAILED/.test(error.message)) this.fail(error)
           throw error
@@ -611,10 +715,9 @@ class NativeEditorSession {
         const { documentEpoch: _, ...query } = params
         const bookmarks = !this.readOnly && ['find_text_locations', 'clear_anchors'].includes(action)
         let guard = null
-        if ((query.__agent || ['get_review_context', 'goto_review_range'].includes(action)) && !bookmarks && this.review?.revision === this.revision
+        if ((query.__agent || completionReads.has(action) || ['get_review_context', 'goto_review_range'].includes(action)) && !bookmarks && this.review?.revision === this.revision
             && this.review.items.every(item => item.textAvailable === true)) {
-          guard = this.currentViewRead(this.viewReadGuard) ? this.viewReadGuard
-            : (this.viewReadGuard = { model: this.model, identity: this.review, revision: this.revision, pending: new Set() })
+          guard = finalReadOwner ? null : this.beginViewRead()
         }
         const run = () => { if (bookmarks) this.assertWrite(); return this.unoCall(action, query) }
         try {
@@ -631,8 +734,7 @@ class NativeEditorSession {
           return result
         } catch (error) {
           if (this.currentViewRead(guard)) {
-            this.viewReadGuard = null; this.reviewLoading = null; this.revision++
-            this.onEvent({ type: 'review-changed', documentEpoch: this.model.documentEpoch })
+            this.invalidateReview('review-changed')
           }
           if (bookmarks || /FINAL_TEXT_RESTORE_FAILED|EDIT_OUTCOME_UNKNOWN|EVIDENCE_OUTCOME_UNKNOWN/.test(error.message)) this.fail(error)
           throw error
@@ -662,7 +764,6 @@ class NativeEditorSession {
         const result = await this.unoCall('view', { mode: params.mode, refresh: true })
         const size = await this.engine.call('review_snapshot', { documentEpoch: this.model.documentEpoch })
         this.model.widthTwips = size.widthTwips; this.model.heightTwips = size.heightTwips
-        this.review = null
         return { success: true, ...result, widthTwips: size.widthTwips, heightTwips: size.heightTwips,
           nativeLayout: await this.unoCall('view_metrics') }
       }
@@ -689,6 +790,33 @@ class NativeEditorSession {
       }
       // No invented empty results or raw postUno acknowledgement as success.
       throw unsupported(action)
+      }
+      try {
+        if (guard && pureContextReads.has(action)) {
+          // A new capture cannot retroactively attribute a prior unknown selection.
+          for (const event of guard.selections.splice(0)) this.onEvent(event)
+          guard.selectionProof = null
+          const proof = await this.unoCall('capture_view_read')
+          guard.selectionProof = proof.token
+        }
+        const result = await runAction()
+        // The worker acknowledgement fences callbacks from this owned mutation.
+        // They all invalidate the same atomic operation, not thousands of revisions.
+        if (mutation) await this.engine.call('selected_text', { documentEpoch: this.model.documentEpoch })
+        if (guard) {
+          await this.engine.call('selected_text', { documentEpoch: this.model.documentEpoch })
+          await this.verifyViewRead(guard)
+        }
+        return result
+      } catch (error) {
+        if (this.currentViewRead(guard)) {
+          this.invalidateReview('review-changed', guard.model.documentEpoch)
+        }
+        if (/FINAL_TEXT_RESTORE_FAILED|VIEW_OUTCOME_UNKNOWN|EDIT_OUTCOME_UNKNOWN/.test(error.message)) this.fail(error)
+        throw error
+      } finally {
+        if (this.mutationScope === mutation) this.mutationScope = null
+      }
     })
   }
   close() {

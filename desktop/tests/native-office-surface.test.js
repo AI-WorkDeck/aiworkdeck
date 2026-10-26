@@ -19,7 +19,7 @@ async function surfaceHarness(options = {}) {
   globalThis.AWDDocumentInput = input
   globalThis.ResizeObserver = class { observe() {} disconnect() {} }
   globalThis.ImageData = class { constructor(data, width, height) { Object.assign(this, { data, width, height }) } }
-  const dom = new JSDOM('<main></main>', { pretendToBeVisual: true })
+  const dom = options.dom || new JSDOM('<main></main>', { pretendToBeVisual: true })
   dom.window.HTMLCanvasElement.prototype.getContext = () => ({ putImageData() {} })
   const calls = [], events = [], resultWaiters = new Map()
   let event, off = false, closed = false, nextEpoch = 0, pendingText, pendingPaint
@@ -49,7 +49,7 @@ async function surfaceHarness(options = {}) {
     onNativeEvent(id, cb) { event = cb; return () => { off = true } },
     async nativeClose() { closed = true }
   }
-  const surface = factory({ api, info: { sessionId: 'one', initialBlank: options.initialBlank }, document: dom.window.document })
+  const surface = factory({ api, info: { sessionId: options.sessionId || 'one', initialBlank: options.initialBlank }, document: dom.window.document })
   dom.window.document.querySelector('main').append(surface.element)
   Object.defineProperties(surface.element, { clientWidth: { value: 800 }, clientHeight: { value: 600 } })
   surface.transport.subscribe(message => { events.push(message); if (message.type === 'result') resultWaiters.get(message.reqId)?.(message.result) })
@@ -60,9 +60,139 @@ async function surfaceHarness(options = {}) {
   }
   return { surface, dom, calls, events, execute, event: value => event(value),
     deferText: () => (pendingText = deferred()), deferPaint: () => (pendingPaint = deferred()), isClosed: () => closed && off,
-    async close() { await surface.dispose(); dom.window.close() } }
+    async close() { await surface.dispose(); if (!options.dom) dom.window.close() } }
 }
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
+const writingConfig = session => ({ __lo: 'lo-relay', type: 'writing-config', config: { session, writable: true, enabled: false, learning: false, hints: false,
+  items: [{ id: 'local-company', text: '北京测试有限公司', kind: 'COMPANY', source: 'project' }] } })
+const key = (h, name, options = {}) => h.surface.element.querySelector('input').dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true, ...options }))
+test('surface enables the real ruler asynchronously and retires its handles on a new document', async () => {
+  let token = 0
+  const h = await surfaceHarness({ nativeRequest: action => action === 'get_ruler_state' ? { success: true, available: true, contextToken: 'ruler-' + ++token,
+    pageIndex: 0, pageWidth: 11600, pageHeight: 17600, leftMargin: 1000, rightMargin: 1000, topMargin: 1000, bottomMargin: 1000,
+    leftIndent: 100, rightIndent: 100, firstLineIndent: 200 } : action === 'set_ruler_state' ? { success: true } : undefined })
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    assert.equal(h.calls.some(call => call.action === 'get_ruler_state'), false)
+    await h.execute('set_view_options', { ruler: true }); await new Promise(resolve => setTimeout(resolve, 120))
+    const handle = h.surface.element.querySelector('[data-ruler-handle="leftIndent"]')
+    assert.ok(handle)
+    handle.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); await tick(); await tick()
+    const write = h.calls.find(call => call.action === 'set_ruler_state')
+    assert.deepEqual(write.params.patch, { leftIndent: 157 }); assert.equal(write.params.documentEpoch, 1)
+    await h.execute('load_document', { bytes: [2], name: 'b.docx' })
+    assert.equal(h.surface.element.querySelectorAll('[data-ruler-handle]').length, 0)
+    assert.equal(h.surface.element.querySelectorAll('[data-native-ruler-notice]').length, 1)
+  } finally { await h.close() }
+})
+test('two native document guests isolate menus, candidates, semantic composition, and destruction', async () => {
+  const dom = new JSDOM('<main></main>', { pretendToBeVisual: true })
+  const nativeRequest = action => action === 'get_completion_context'
+    ? { success: true, available: true, token: 'cursor-one', before: '北京测试', after: '', paragraph: '北京测试', hasSelection: false }
+    : action === 'accept_completion' ? { success: true, token: 'cursor-two' } : undefined
+  const a = await surfaceHarness({ dom, sessionId: 'a', nativeRequest }), b = await surfaceHarness({ dom, sessionId: 'b', nativeRequest })
+  try {
+    await a.execute('load_document', { bytes: [1], name: 'a.docx' }); await b.execute('load_document', { bytes: [2], name: 'b.docx' })
+    a.surface.transport.send(writingConfig('session-a')); b.surface.transport.send(writingConfig('session-b'))
+    a.surface.transport.send({ __lo: 'lo-relay', type: 'writing-assistance-panel', open: true })
+    assert.equal(a.surface.element.querySelector('.awd-wa-panel').hidden, false)
+    assert.equal(b.surface.element.querySelector('.awd-wa-panel').hidden, true)
+    b.surface.transport.send({ __lo: 'lo-relay', type: 'semantic-writing-panel', open: true })
+    assert.equal(a.surface.element.querySelector('.awd-semantic-sheet').hidden, true)
+    assert.equal(b.surface.element.querySelector('.awd-semantic-sheet').hidden, false)
+    const settings = b.events.find(event => event.type === 'writing-request' && event.action === 'semantic-settings')
+    b.surface.transport.send({ __lo: 'lo-relay', type: 'writing-response', session: settings.session, id: settings.id, result: { files: [], stance: 'B 专属项目立场' } })
+    await tick()
+    assert.equal(a.surface.element.textContent.includes('B 专属项目立场'), false)
+    assert.equal(b.surface.element.querySelector('[data-semantic-stance]').value, 'B 专属项目立场')
+    const inputA = a.surface.element.querySelector('input'), inputB = b.surface.element.querySelector('input')
+    inputA.dispatchEvent(new dom.window.CompositionEvent('compositionstart', { bubbles: true }))
+    const generateB = [...b.surface.element.querySelectorAll('button')].find(button => button.textContent === '续写一句')
+    generateB.click(); await tick()
+    assert.ok(b.events.some(event => event.type === 'writing-request' && event.action === 'semantic-generate' && event.session === 'session-b'))
+    key(a, ' ', { ctrlKey: true }); await tick()
+    assert.equal(a.calls.some(call => call.action === 'get_completion_context'), false, 'IME owns the composing document keyboard')
+    inputA.dispatchEvent(new dom.window.CompositionEvent('compositionend', { bubbles: true, data: '' }))
+    key(a, ' ', { ctrlKey: true }); await new Promise(resolve => setTimeout(resolve, 210))
+    assert.equal(inputA.getAttribute('aria-expanded'), 'true')
+    assert.notEqual(inputB.getAttribute('aria-expanded'), 'true')
+    assert.equal(b.calls.some(call => call.action === 'get_completion_context'), false)
+    key(a, 'Tab'); await tick(); await tick()
+    assert.ok(a.calls.some(call => call.action === 'accept_completion'))
+    assert.equal(a.calls.some(call => call.action === 'native_input' && call.params.action === 'input_key' && call.params.params.keyCode === 1282), false)
+    // Partial config updates retain the instance session and local permission.
+    a.surface.transport.send({ __lo: 'lo-relay', type: 'writing-config', config: { enabled: true } })
+    inputA.focus(); inputA.dispatchEvent(new dom.window.InputEvent('input', { bubbles: true, inputType: 'insertText', data: '这是只属于甲文档的二十个以上字符的确定性合成输入。' }))
+    await new Promise(resolve => setTimeout(resolve, 1900))
+    const automatic = a.events.find(event => event.type === 'writing-request' && event.action === 'semantic-auto-generate')
+    assert.ok(automatic, 'another document semantic sheet cannot suppress this document automatic suggestions')
+    assert.equal(automatic.session, 'session-a')
+    a.surface.transport.send({ __lo: 'lo-relay', type: 'writing-response', session: automatic.session, id: automatic.id, result: { view: { status: 'READY', advice: [{ text: '只属于甲文档的合成建议' }] } } })
+    await tick(); assert.equal(inputA.getAttribute('aria-expanded'), 'true'); assert.notEqual(inputB.getAttribute('aria-expanded'), 'true')
+    assert.equal(b.surface.element.textContent.includes('只属于甲文档的合成建议'), false)
+    a.surface.transport.send({ __lo: 'lo-relay', type: 'inline-review-state', session: 'review-a', status: 'stale', findings: [], ai: false })
+    b.surface.transport.send({ __lo: 'lo-relay', type: 'inline-review-state', session: 'review-b', status: 'stale', findings: [], ai: false })
+    a.surface.element.querySelector('.awd-ir-open').click(); await tick()
+    assert.ok(a.events.some(event => event.type === 'inline-review-request' && event.session === 'review-a'))
+    assert.equal(b.events.some(event => event.type === 'inline-review-request'), false)
+    const pending = b.events.find(event => event.type === 'writing-request' && event.action === 'semantic-generate')
+    await b.execute('load_document', { bytes: [3], name: 'c.docx' })
+    b.surface.transport.send({ __lo: 'lo-relay', type: 'writing-response', session: pending.session, id: pending.id, result: { view: { status: 'READY', advice: [{ text: '旧文档建议不得出现' }] } } })
+    await tick(); assert.equal(b.surface.element.textContent.includes('旧文档建议不得出现'), false)
+    await a.close()
+    assert.equal(dom.window.document.querySelectorAll('[data-native-assistance]').length, 1)
+    b.surface.transport.send(writingConfig('session-c')); b.surface.transport.send({ __lo: 'lo-relay', type: 'writing-assistance-panel', open: true })
+    assert.equal(b.surface.element.querySelector('.awd-wa-panel').hidden, false)
+  } finally { await a.close(); await b.close(); dom.window.close() }
+})
+test('native writing availability waits for permission acknowledgement and overlays stay in editor bounds', async () => {
+  let gate
+  const h = await surfaceHarness({ nativeRequest: (action, params) => action === 'set_read_only'
+    ? (async () => { if (gate) await gate.promise; return { success: true, ...params, lastInputSeq: 0 } })() : undefined })
+  try {
+    h.surface.element.getBoundingClientRect = () => ({ left: 200, top: 100, right: 800, bottom: 600, width: 600, height: 500 })
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' }); h.surface.transport.send(writingConfig('session-a'))
+    h.surface.transport.send({ __lo: 'lo-relay', type: 'writing-assistance-panel', open: true })
+    const panel = h.surface.element.querySelector('.awd-wa-panel')
+    assert.ok(parseFloat(panel.style.left) >= 208); assert.ok(parseFloat(panel.style.top) >= 108)
+    assert.equal(panel.style.maxWidth, '576px')
+    h.surface.transport.send({ __lo: 'lo-relay', type: 'semantic-writing-panel', open: true })
+    assert.equal(h.surface.element.querySelector('.awd-semantic').style.top, '114px')
+    assert.equal(h.surface.element.querySelector('.awd-semantic-sheet').style.maxHeight, '472px')
+    assert.equal(h.surface.element.querySelector('[data-native-assistance]').style.clipPath, 'inset(100px 224px 168px 200px)')
+    gate = deferred(); const revoke = h.surface.setReadOnly(true)
+    h.surface.transport.send(writingConfig('session-a'))
+    assert.equal(h.events.filter(event => event.type === 'writing-assistance-state').at(-1).available, false)
+    assert.equal(h.events.filter(event => event.type === 'semantic-writing-state').at(-1).available, false)
+    gate.resolve(); await revoke
+    gate = deferred(); const grant = h.surface.setReadOnly(false)
+    h.surface.transport.send(writingConfig('session-a'))
+    assert.equal(h.events.filter(event => event.type === 'writing-assistance-state').at(-1).available, false)
+    gate.resolve(); await grant
+    assert.equal(h.events.filter(event => event.type === 'writing-assistance-state').at(-1).available, true)
+  } finally { gate?.resolve(); await h.close() }
+})
+test('native writing and review guests receive host state and report their actual panel state', async () => {
+  const h = await surfaceHarness()
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    h.surface.transport.send({ __lo: 'lo-relay', type: 'writing-config', config: { session: 'writing-one', writable: true, enabled: false, items: [] } })
+    assert.ok(h.events.some(event => event.type === 'writing-assistance-state' && event.available && !event.open))
+    assert.ok(h.events.some(event => event.type === 'semantic-writing-state' && event.available && !event.open))
+    h.surface.transport.send({ __lo: 'lo-relay', type: 'writing-assistance-panel', open: true })
+    assert.equal(h.surface.element.querySelector('.awd-wa-panel').hidden, false)
+    assert.ok(h.events.some(event => event.type === 'writing-assistance-state' && event.open))
+    h.surface.transport.send({ __lo: 'lo-relay', type: 'inline-review-state', session: 'review-one', status: 'stale', findings: [], ai: false })
+    h.surface.element.querySelector('.awd-ir-open').click(); await tick()
+    assert.ok(h.events.some(event => event.type === 'inline-review-request' && event.session === 'review-one' && event.action === 'open-panel'))
+    await h.execute('load_document', { bytes: [2], name: 'b.docx' })
+    assert.equal(h.surface.element.querySelectorAll('.awd-writing-assistance').length, 1)
+    assert.equal(h.surface.element.querySelectorAll('.awd-inline-review').length, 1)
+    assert.equal(h.surface.element.querySelector('.awd-wa-panel').hidden, true)
+    await h.surface.dispose()
+    assert.equal(h.dom.window.document.querySelectorAll('.awd-writing-assistance, .awd-inline-review, .awd-semantic').length, 0)
+  } finally { await h.close() }
+})
 test('review layout follows the visible native tile and its overlay retires with the document', async () => {
   const h = await surfaceHarness({ nativeRequest: action => action === 'get_review_layout'
     ? { success: true, available: true, items: [], pages: [], mode: 'all', pending: 0, unread: 0 } : undefined })
@@ -321,3 +451,154 @@ test('page exterior transparency uses geometry and preserves every byte of insid
     assert.deepEqual([...mask({...tile,xTwips:10,widthTwips:40},[{x:10,y:0,width:20,height:10}]).slice(0,8)], [...pixels.slice(0,8)])
   } finally {await h.close()}
 })
+
+
+test('assistance context waits for all confirmed input and retires a delayed old-model read', async () => {
+  const h = await surfaceHarness({ nativeRequest: action => action === 'get_completion_context'
+    ? { success: true, available: true, token: 'fresh', before: '北京测试', hasSelection: false } : undefined })
+  let held
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' }); h.surface.transport.send(writingConfig('s'))
+    const input = h.surface.element.querySelector('input'); held = h.deferText()
+    for (const data of ['甲', '乙']) input.dispatchEvent(new h.dom.window.InputEvent('input', { bubbles: true, inputType: 'insertText', data }))
+    await tick(); key(h, ' ', { ctrlKey: true }); await tick()
+    assert.equal(h.calls.some(call => call.action === 'get_completion_context'), false, 'context must not overtake queued input')
+    held.resolve(); await tick(); await tick(); await tick()
+    const actions = h.calls.map(call => call.action === 'native_input' ? call.params.action + ':' + (call.params.params.text || '') : call.action)
+    assert.ok(actions.indexOf('get_completion_context') > actions.indexOf('input_text:乙'))
+    held = h.deferText(); input.dispatchEvent(new h.dom.window.InputEvent('input', { bubbles: true, inputType: 'insertText', data: '丙' }))
+    key(h, ' ', { ctrlKey: true }); const before = h.calls.filter(c => c.action === 'get_completion_context').length
+    const retarget = h.execute('load_document', { bytes: [2], name: 'b.docx' }); held.resolve(); await retarget; await tick()
+    assert.equal(h.calls.filter(c => c.action === 'get_completion_context' && c.params.documentEpoch === 2).length, 0)
+    assert.ok(h.calls.filter(c => c.action === 'get_completion_context').length <= before + 1)
+  } finally { held?.resolve(); await h.close() }
+})
+
+test('completion-owned notifications preserve related details only with a fresh uncontested receipt', async () => {
+  for (const variant of ['fresh', 'no-token', 'external', 'external-blur', 'permission', 'retarget']) {
+    let h, accepted = 0
+    h = await surfaceHarness({ nativeRequest: async (action, params) => {
+      if (action === 'get_completion_context') return { success: true, available: true, token: 'cursor', before: '北京测试', hasSelection: false }
+      if (action === 'accept_completion' || action === 'insert_completion_content') {
+        accepted++
+        if (variant === 'external-blur') h.surface.element.querySelector('input').dispatchEvent(new h.dom.window.FocusEvent('blur', { relatedTarget: null }))
+        h.event({ type: 'modified', documentEpoch: 1 }); h.event({ type: 'selection', documentEpoch: 1 })
+        if (variant === 'external') await h.execute('format_selection', { bold: true })
+        if (variant === 'permission') await h.surface.setReadOnly(true)
+        if (variant === 'retarget') await h.execute('load_document', { bytes: [2], name: 'b.docx' })
+        return { success: true, changed: true, revision: accepted, token: variant === 'no-token' ? null : 'fresh-continuation' }
+      }
+      if (action === 'format_selection') return { success: true }
+      if (action === 'set_read_only') return { success: true, ...params, lastInputSeq: 0 }
+    } })
+    try {
+      await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+      const entry = h.surface.element.querySelector('input'); let disabled = entry.disabled
+      Object.defineProperty(entry, 'disabled', { get: () => disabled, set(value) {
+        const changed = value && !disabled; disabled = value
+        if (changed) entry.dispatchEvent(new h.dom.window.FocusEvent('blur', { relatedTarget: null }))
+      } })
+      const config = writingConfig('session'); config.config.hints = true; config.config.items[0].entityId = 1; h.surface.transport.send(config)
+      key(h, ' ', { ctrlKey: true }); await tick(); await tick(); key(h, 'Tab'); await tick(); await tick()
+      const panel = h.surface.element.querySelector('.awd-wa-panel')
+      assert.equal(accepted, 1); assert.equal(panel.hidden, variant !== 'fresh', variant)
+      if (variant !== 'fresh') continue
+      assert.ok(panel.textContent.includes('查看已有资料'))
+      ;[...panel.querySelectorAll('button')].find(b => b.textContent === '查看已有资料').click(); await tick()
+      const detail = h.events.find(e => e.type === 'writing-request' && e.action === 'detail')
+      h.surface.transport.send({ __lo: 'lo-relay', type: 'writing-response', id: detail.id, session: detail.session, result: { variants: [{ text: '可插入资料', rows: [['列一'], ['资料']] }] } }); await tick()
+      const insert = [...panel.querySelectorAll('button')].find(b => b.textContent.includes('插入'))
+      assert.ok(insert); insert.click(); await tick(); await tick()
+      assert.equal(accepted, 2); assert.equal(panel.hidden, false); assert.ok(panel.textContent.includes('已插入'))
+    } finally { await h.close() }
+  }
+})
+
+
+test('readback selections do not reschedule inline review or discard completion, but fresh input still does', async () => {
+  let h
+  h = await surfaceHarness({ nativeRequest: action => {
+    if (action === 'get_review_layout') return { success: true, available: false }
+    if (action === 'get_review_context' || action === 'get_completion_context') {
+      h.event({ type: 'selection', documentEpoch: 1, origin: 'view-read' })
+      return { success: true, available: true, revision: 1, token: 'cursor', before: '北京测试', hasSelection: false }
+    }
+    if (action === 'format_selection') return { success: true }
+  } })
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' }); h.surface.transport.send(writingConfig('s'))
+    h.surface.transport.send({ __lo: 'lo-relay', type: 'inline-review-state', session: 'r', status: 'ready', revision: 1, findings: [], ai: false })
+    await new Promise(resolve => setTimeout(resolve, 650))
+    assert.equal(h.calls.filter(c => c.action === 'get_review_context').length, 1, 'a read callback cannot schedule the same read forever')
+    key(h, ' ', { ctrlKey: true }); await tick(); await tick(); await tick()
+    const panel = h.surface.element.querySelector('.awd-wa-panel'); assert.equal(panel.hidden, false, 'own readback must preserve its candidate result')
+    key(h, 'ArrowLeft'); await tick(); h.event({ type: 'selection', documentEpoch: 1 }); await new Promise(resolve => setTimeout(resolve, 230))
+    assert.equal(panel.hidden, true); assert.equal(h.calls.filter(c => c.action === 'get_review_context').length, 2, 'real input must schedule a fresh context')
+    await h.execute('format_selection', { bold: true }); h.event({ type: 'selection', documentEpoch: 1 }); await new Promise(resolve => setTimeout(resolve, 230))
+    assert.equal(h.calls.filter(c => c.action === 'get_review_context').length, 3, 'external command must schedule a fresh context')
+  } finally { await h.close() }
+})
+
+test('readback coalescing preserves genuine pointer IME permission and retarget invalidation', async () => {
+  for (const kind of ['pointer', 'ime', 'permission', 'retarget', 'native-selection']) {
+    let h; const held = deferred()
+    h = await surfaceHarness({ nativeRequest: async (action, params) => {
+      if (action === 'get_review_layout') return { success: true, available: false }
+      if (action === 'get_completion_context') { await held.promise; h.event({ type: 'selection', documentEpoch: 1, origin: 'view-read' }); return { success: true, available: true, token: 'late', before: '北京测试', hasSelection: false } }
+      if (action === 'set_read_only') return { success: true, ...params, lastInputSeq: 0 }
+    } })
+    try {
+      await h.execute('load_document', { bytes: [1], name: 'a.docx' }); h.surface.transport.send(writingConfig('s')); key(h, ' ', { ctrlKey: true }); await tick(); await tick()
+      if (kind === 'pointer') h.surface.element.querySelector('canvas').dispatchEvent(new h.dom.window.MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, clientX: 10, clientY: 10 }))
+      if (kind === 'native-selection') h.event({ type: 'selection', documentEpoch: 1 })
+      if (kind === 'ime') h.surface.element.querySelector('input').dispatchEvent(new h.dom.window.CompositionEvent('compositionstart', { bubbles: true }))
+      if (kind === 'permission') await h.surface.setReadOnly(true)
+      if (kind === 'retarget') await h.execute('load_document', { bytes: [2], name: 'b.docx' })
+      held.resolve(); await tick(); await tick()
+      assert.equal(h.surface.element.querySelector('.awd-wa-panel').hidden, true, kind)
+    } finally { held.resolve(); await h.close() }
+  }
+})
+
+
+test('host semantic capture also waits for queued native input', async () => {
+  const h = await surfaceHarness({ nativeRequest: action => action === 'capture_writing_context' ? { success: true, available: true } : undefined })
+  let held
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' }); held = h.deferText()
+    h.surface.element.querySelector('input').dispatchEvent(new h.dom.window.InputEvent('input', { bubbles: true, inputType: 'insertText', data: '输入' }))
+    const captured = h.execute('capture_writing_context'); await tick()
+    assert.equal(h.calls.some(c => c.action === 'capture_writing_context'), false)
+    held.resolve(); assert.equal((await captured).success, true)
+  } finally { held?.resolve(); await h.close() }
+})
+
+
+for (const change of ['fresh', 'retarget', 'permission', 'permission-roundtrip']) {
+  test(`generic context results reject stale document or permission: ${change}`, async () => {
+    for (const action of ['capture_writing_context', 'get_completion_context', 'get_context_menu_context', 'get_review_context', 'get_ruler_state']) {
+      const held = deferred(), started = deferred()
+      const h = await surfaceHarness({ nativeRequest: async (name, params) => {
+        if (name === action) {
+          started.resolve(); await held.promise
+          return { success: true, available: true, token: 'old-context', documentEpoch: params.documentEpoch }
+        }
+        if (name === 'set_read_only') return { success: true, ...params, lastInputSeq: 0 }
+      } })
+      try {
+        await h.execute('load_document', { bytes: [1], name: 'a.docx' }); await h.surface.setReadOnly(false)
+        const pending = h.execute(action); await started.promise
+        if (change === 'retarget') await h.execute('load_document', { bytes: [2], name: 'b.docx' })
+        if (change.startsWith('permission')) await h.surface.setReadOnly(true)
+        if (change === 'permission-roundtrip') await h.surface.setReadOnly(false)
+        held.resolve(); const result = await pending
+        assert.equal(result.success, change === 'fresh', `${action}: ${change}`)
+        if (change === 'fresh') assert.equal(result.token, 'old-context')
+        else {
+          assert.equal(result.token, undefined, 'stale context must not reach the host')
+          assert.equal(result.message, 'STALE_DOCUMENT_ASSISTANCE')
+        }
+      } finally { held.resolve(); await h.close() }
+    }
+  })
+}

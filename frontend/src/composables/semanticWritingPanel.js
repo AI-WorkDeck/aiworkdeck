@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /** Guest UI only. All data and mutations travel through the existing writing session. */
-export function attachSemanticWritingPanel({ canvas, input, transport, focus }) {
+export function attachSemanticWritingPanel({ canvas, input, transport, focus, overlayContainer, bounds }) {
   const doc = canvas.ownerDocument, win = doc.defaultView
   let session = '', writable = false, available = false, sheetOpen = false, composing = false, disposed = false, sequence = 0, requestId = 0, timer = null, active = false, accepting = false, saving = false
   const pending = new Map(), selected = new Set()
@@ -18,10 +18,19 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
     .awd-semantic-head{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--awd-border-subtle)}.awd-semantic-head strong{font-size:16px}.awd-semantic-section{padding:14px 18px;border-bottom:1px solid var(--awd-border-subtle)}.awd-semantic-label{display:block;font-size:12px;font-weight:600;color:var(--awd-text-2);margin:0 0 5px}.awd-semantic select,.awd-semantic textarea,.awd-semantic input[type=date]{display:block;width:100%;border:1px solid var(--awd-border);border-radius:6px;padding:7px;background:var(--awd-surface);color:var(--awd-text);margin-bottom:10px}.awd-semantic textarea{resize:vertical;min-height:56px}
     .awd-semantic-files{max-height:126px;overflow:auto;margin:8px 0}.awd-semantic-file{display:flex;gap:8px;align-items:flex-start;padding:5px 0;overflow-wrap:anywhere}.awd-semantic-file input{margin-top:4px}.awd-semantic-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.awd-semantic .awd-semantic-primary{background:var(--awd-accent);color:var(--awd-text-on-accent);border-color:var(--awd-accent)}.awd-semantic .awd-semantic-primary:hover{background:var(--awd-accent-hover);border-color:var(--awd-accent-hover)}.awd-semantic-hint{font-size:12px;color:var(--awd-text-2);margin:6px 0;white-space:pre-wrap}.awd-semantic-status{padding:12px 18px;background:var(--awd-accent-soft);white-space:pre-wrap;color:var(--awd-accent-text)}.awd-semantic-card{padding:15px 18px;border-top:1px solid var(--awd-border-subtle)}.awd-semantic-preview{font-size:14px;line-height:1.85;white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 12px}.awd-semantic details{border-left:2px solid var(--awd-gold-line);padding-left:10px;margin:10px 0;color:var(--awd-text-2)}.awd-semantic summary{cursor:pointer;font-size:12px}.awd-semantic blockquote{margin:8px 0;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}.awd-semantic [hidden]{display:none!important}
   `
-  doc.head.append(style); doc.body.append(root)
+  doc.head.append(style); (overlayContainer || doc.body).append(root)
+  if (overlayContainer) root.style.pointerEvents = 'auto'
   function element(tag, text, parent, cls) { const el = doc.createElement(tag); if (text != null) el.textContent = text; if (cls) el.className = cls; parent?.append(el); return el }
   function button(text, parent, handler, cls) { const el = element('button', text, parent, cls); el.type = 'button'; el.addEventListener('click', () => Promise.resolve(handler()).catch(e => status(e.message))); return el }
   const sheet = element('section', null, root, 'awd-semantic-sheet'); sheet.hidden = true; sheet.setAttribute('aria-label', '有据续写'); sheet.setAttribute('role', 'dialog')
+  function reposition() {
+    if (!bounds) return
+    const b = bounds()
+    root.style.right = Math.max(0, win.innerWidth - b.right + 16) + 'px'
+    root.style.top = (b.top + 14) + 'px'
+    sheet.style.width = Math.max(0, Math.min(420, b.width - 32)) + 'px'
+    sheet.style.maxHeight = Math.max(0, b.height - 28) + 'px'
+  }
   const head = element('div', null, sheet, 'awd-semantic-head'); element('strong', '有据续写', head); button('关闭', head, () => closePanel(true))
   const controls = element('div', null, sheet, 'awd-semantic-section')
   element('label', '文书类型', controls, 'awd-semantic-label')
@@ -50,7 +59,7 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
   function report() { try { transport.send({ __lo: 'lo-relay', type: 'semantic-writing-state', available, open: sheetOpen }) } catch (e) { /* 通道没起来 */ } }
   function applyOpen() { sheetOpen = sheetOpen && available; sheet.hidden = !sheetOpen; root.hidden = !sheetOpen }
   function closePanel(refocus) { if (!sheetOpen) return; sheetOpen = false; applyOpen(); invalidate(true); report(); if (refocus) focus?.() }
-  function openPanel() { if (!available || sheetOpen) return; sheetOpen = true; applyOpen(); report(); loadSettings().catch(e => status(e.message)) }
+  function openPanel() { if (!available || sheetOpen) return; reposition(); sheetOpen = true; applyOpen(); report(); loadSettings().catch(e => status(e.message)) }
   function rpc(action, data = {}) {
     if (disposed || !session) return Promise.reject(new Error('文档已切换，请重新打开面板。'))
     const id = `semantic-${++requestId}`, expected = session
@@ -159,11 +168,14 @@ export function attachSemanticWritingPanel({ canvas, input, transport, focus }) 
     pending.delete(msg.id); win.clearTimeout(item.timeout)
     if (msg.error) item.reject(new Error(msg.error)); else item.resolve(msg.result)
   })
-  const beginComposition = () => { composing = true; if (active) invalidate(true) }, endComposition = () => { composing = false }
+  const ownComposition = event => !overlayContainer || event.target === input || root.contains(event.target)
+  const beginComposition = event => { if (!ownComposition(event)) return; composing = true; if (active) invalidate(true) }
+  const endComposition = event => { if (ownComposition(event)) composing = false }
   doc.addEventListener('compositionstart', beginComposition, true); doc.addEventListener('compositionend', endComposition, true)
   sheet.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape') closePanel(true) })
   profile.addEventListener('change', () => { invalidate(true); syncContext() }); stance.addEventListener('input', () => invalidate(true)); cutoff.addEventListener('change', () => invalidate(true))
   return {
+    reposition,
     isComposing() { return composing },
     cursorMoved() { if (!accepting && active) invalidate(true) },
     committed() { if (!accepting && active) invalidate(true) },

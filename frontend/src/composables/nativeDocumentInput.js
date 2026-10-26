@@ -30,7 +30,8 @@
    * This component's synthetic tests do not verify a system IME candidate window.
    */
   function createDocumentInput({ canvas, request, viewport, onError = () => {},
-    onState = () => {}, onChanged = () => {}, onEnsureVisible = () => {}, onSave = () => {}, writeClipboard }) {
+    onState = () => {}, onChanged = () => {}, onEnsureVisible = () => {}, onSave = () => {},
+    onCommitted = () => {}, onAssistanceKey = () => false, writeClipboard }) {
     if (!canvas?.parentElement || typeof request !== 'function' || typeof viewport !== 'function') {
       throw new TypeError('canvas, request and viewport are required');
     }
@@ -169,7 +170,11 @@
     function commit(text) {
       if (!composing) input.value = '';
       if (!text || !model || model.readOnly || !caretRect || disposed || failure || suspended || permissionPending) return;
-      send(enqueue('input_text', { text }, true, true));
+      const owner = model, policy = permissionEpoch;
+      send(enqueue('input_text', { text }, true, true).then(result => {
+        if (result.applied && owner === model && policy === permissionEpoch) onCommitted(text);
+        return result;
+      }));
     }
     function listen(target, type, callback, options) {
       target.addEventListener(type, callback, options); listeners.push(() => target.removeEventListener(type, callback, options));
@@ -217,6 +222,7 @@
         if(!navigation&&!selectOrCopy){event.preventDefault();return;}
       }
       if (composing || event.isComposing || event.keyCode === 229) return;
+      if (onAssistanceKey(event)) { event.preventDefault(); event.stopImmediatePropagation(); return; }
       echo(null);
       if ((event.metaKey || event.ctrlKey) && !event.altKey && /^[zy]$/i.test(event.key)) {
         event.preventDefault();
@@ -360,7 +366,7 @@
       disposed = true; model = null; window.clearTimeout(trailingTimer);
       for (const remove of listeners) remove(); layer.remove(); notify();
     }
-    return { setDocument, setReadOnly, handleCallback, viewportChanged, flush,
+    return { get element() { return input; }, setDocument, setReadOnly, handleCallback, viewportChanged, flush,
       async suspend(){active();if(composing)throw problem('COMPOSITION_ACTIVE','Finish or cancel composition before leaving');releaseMouse();releaseKeys();suspended=true;input.disabled=true;notify();await flush();},
       resume(){active();suspended=false;input.disabled=!caretRect;layout();notify();}, getState: state, dispose,
       focus() { active(); requestedFocus = true; layout(); } };
