@@ -68,16 +68,22 @@ public class SkillTools implements AgentToolComponent {
         SkillDefinition skill = def.get();
         ToolContext ctx = ToolContextHolder.get();
         String runId = ctx == null ? null : ctx.runId();
+        Long userId = ctx == null ? null : ctx.userId();
+        String projectId = (ctx != null && ctx.projectId() != null) ? String.valueOf(ctx.projectId()) : null;
         String name = skillRouter.displayName(skill);
         log.info("Tool: use_skill conv={} skill={}", conversationId, skill.getId());
         if (skillRouter.isActiveInRun(runId, skill.getId())) {
             return "Skill '" + skill.getId() + "' (" + name + ") is already active for this turn - "
                     + "its instructions are already in your context. Follow them; do not call use_skill again.";
         }
+        String instructions = skillRouter.skillInstructionsFor(skill, userId, projectId);
+        if (instructions == null) {
+            instructions = skillRouter.skillInstructionsFor(skill);
+        }
         StringBuilder sb = new StringBuilder();
         sb.append("# Skill: ").append(name).append(" (").append(skill.getId()).append(")\n")
                 .append("Follow these instructions for the rest of this turn.\n\n")
-                .append(skillRouter.skillInstructionsFor(skill));
+                .append(instructions == null ? "" : instructions);
         List<String> tools = skill.getAllowedTools() == null ? List.of() : skill.getAllowedTools();
         if (!tools.isEmpty()) {
             sb.append("\n\n---\nTools this skill uses: ").append(String.join(", ", tools))

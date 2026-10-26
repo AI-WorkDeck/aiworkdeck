@@ -997,6 +997,52 @@ export function getSkills() {
   });
 }
 
+// 获取内置常驻工作流（懒人模式，dev-board#1438）的多版本与当前项目选中态
+export function getBuiltinWorkflows(projectId) {
+  const query = projectId ? `?projectId=${encodeURIComponent(String(projectId))}` : '';
+  return request({
+    url: `/api/skills/builtin-workflows${query}`,
+    method: 'GET'
+  });
+}
+
+// 新建或编辑内置常驻工作流的自定义版本（系统默认版只读兜底）
+export function saveBuiltinWorkflowVersion(skillId, payload) {
+  return request({
+    url: `/api/skills/builtin-workflows/${encodeURIComponent(skillId)}/versions`,
+    method: 'POST',
+    data: payload || {},
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 切换当前项目或全局默认选用的内置常驻工作流版本
+export function selectBuiltinWorkflowVersion(skillId, payload) {
+  return request({
+    url: `/api/skills/builtin-workflows/${encodeURIComponent(skillId)}/select`,
+    method: 'POST',
+    data: payload || {},
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+// 删除内置常驻工作流的自定义版本
+export function deleteBuiltinWorkflowVersion(skillId, versionId, projectId) {
+  const query = projectId ? `?projectId=${encodeURIComponent(String(projectId))}` : '';
+  return request({
+    url: `/api/skills/builtin-workflows/${encodeURIComponent(skillId)}/versions/${encodeURIComponent(versionId)}/delete${query}`,
+    method: 'POST',
+    data: projectId ? { projectId: String(projectId) } : {},
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 // 启用 / 禁用 Skill（仅管理员）
 export function setSkillEnabled(skillId, enabled) {
   return request({

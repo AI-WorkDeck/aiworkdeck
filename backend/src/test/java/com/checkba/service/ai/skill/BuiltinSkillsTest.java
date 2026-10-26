@@ -239,6 +239,7 @@ class BuiltinSkillsTest {
                 "text-to-speech", SkillDefinition.ToolPolicy.PASSTHROUGH));
         // Map.of 最多 10 对，第 11 个起逐个 put
         expected.put("evidence-linked-report", SkillDefinition.ToolPolicy.PASSTHROUGH);
+        expected.put("file-organization", SkillDefinition.ToolPolicy.PASSTHROUGH);
         Map<String, SkillDefinition.ToolPolicy> actual = new TreeMap<>();
         for (SkillDefinition skill : registry.getSkills()) {
             actual.put(skill.getId(), skill.getToolPolicy());
@@ -488,9 +489,14 @@ class BuiltinSkillsTest {
     }
 
     @Test
-    @DisplayName("#1431 懒人模式：高频核心工作流（合同审查、法律意见书审查、证据整理与闭环报告）内置且恒为 AUTO 启用")
+    @DisplayName("#1431/#1438 懒人模式：四大高频核心工作流（合同审查、证据整理、文件整理、法律意见书核查）内置且恒为 AUTO 启用")
     void lazyModeBuiltinWorkflowsAreAlwaysAutoEnabled() {
-        Set<String> expectedBuiltins = Set.of("contract-review", "legal-opinion-review", "evidence-linked-report");
+        Set<String> expectedBuiltins = Set.of(
+                "contract-review",
+                "legal-opinion-review",
+                "evidence-linked-report",
+                "file-organization"
+        );
         for (SkillDefinition skill : registry.getSkills()) {
             assertEquals(expectedBuiltins.contains(skill.getId()), skill.isBuiltinWorkflow(),
                     skill.getId() + " 的 builtin_workflow 标记不符合懒人模式边界");
