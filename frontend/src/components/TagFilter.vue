@@ -13,7 +13,7 @@
       </component>
     </view>
 
-    <view v-if="selectedTags.length && (!sidebar || !open)" class="tag-filter-selected">
+    <view v-if="selectedTags.length && (!sidebar || !open || (tags.length > 8 && query.trim()))" class="tag-filter-selected">
       <component :is="'button'"
         v-for="tag in selectedTags"
         :key="tag.id"

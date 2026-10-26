@@ -3,6 +3,10 @@
 // 长尾面板/页面命名空间（PR3 分片）：诉讼可视化、股东大会核查、脱敏、尽调、
 // 浏览器面板、项目收藏夹、插件容器、语音合成、剪贴板、变量库。
 export default {
+  workspaceNavigation: '工作区',
+  workspaceAiActions: 'AI 协助',
+  workspaceAbout: '关于此插件',
+  workspaceState: { active: '当前显示', open: '已打开', closed: '打开' },
   // LitigationVisualPanel.vue
   litRefresh: '刷新',
   litNoGraphvizNotice: '这台机器没有 graphviz，流程图暂时画不了；时间轴、关系图、股权结构树等六种照常。',

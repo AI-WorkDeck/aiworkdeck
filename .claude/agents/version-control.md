@@ -9,7 +9,7 @@ description: 项目级版本记录领域。任务涉及版本记录/工作段（
 
 ## 工作段状态与动作布局（dev-board#1492）
 
-`WorkSessionBar.vue` 的状态独占一行，操作在下方轻量换行排列；“结束本次工作”用浅色背景，丢弃/放弃保持危险文字但不使用抢眼外框。按钮用原生 button 支持键盘与 busy 禁用，仍调用原来的命名、结束、丢弃和稿操作流程；不改版本落盘与确认语义。窄侧栏和长稿名须保留所有动作，不能裁切。回归 `tests/version-history/draftEndSession.test.mjs` 及该目录既有套件。
+`WorkSessionBar.vue` 的状态独占一行，操作在下方轻量换行排列；“提交本次改动”用浅色背景，丢弃/放弃保持危险文字但不使用抢眼外框。按钮用原生 button 支持键盘与 busy 禁用，仍调用原来的命名、结束、丢弃和稿操作流程；保留提交前保存文件、待提交计数及确认语义。窄侧栏和长稿名须保留所有动作，不能裁切。回归 `tests/version-history/draftEndSession.test.mjs` 及该目录既有套件。
 
 ## 版本操作后的文件树刷新（dev-board#1470）
 

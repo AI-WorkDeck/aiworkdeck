@@ -717,8 +717,12 @@
             @activate-current-project="showCurrentProjectFiles"
           />
           <view v-else-if="leftPaneKey === 'dd-client'" class="dd-client-entry">
-            <text>{{ $t('ddWorkflow.clientWorkspaceHint') }}</text>
-            <button @tap="openDdClientTab">{{ $t('ddWorkflow.openClientWorkspace') }}</button>
+            <component :is="'button'" type="button" class="dd-client-nav" :class="{ active: workspaceTabState('dd-client') === 'active' }" :aria-current="workspaceTabState('dd-client') === 'active' ? 'page' : undefined" @click.stop="openDdClientTab">
+              <text class="dd-client-nav-label">{{ $t('ddWorkflow.client.invitedProjects') }}</text>
+              <text class="dd-client-nav-state">{{ $t('panels.workspaceState.' + workspaceTabState('dd-client')) }}</text>
+              <text aria-hidden="true">›</text>
+            </component>
+            <text class="dd-client-nav-hint">{{ $t('ddWorkflow.clientWorkspaceHint') }}</text>
           </view>
           <DdFilesPanel
             ref="ddFilesPanel"
@@ -830,6 +834,7 @@
             v-else-if="activeDynamicPlugin"
             :plugin="activeDynamicPlugin"
             :project-id="projectId"
+            :workspace-state="workspaceTabState('plugin', activeDynamicPlugin.pluginId)"
             @open="openPluginTab(activeDynamicPlugin.pluginId)"
             @quick-action="onPluginQuickAction"
           />
