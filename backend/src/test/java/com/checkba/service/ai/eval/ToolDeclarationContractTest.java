@@ -84,6 +84,8 @@ class ToolDeclarationContractTest {
      *       这一组不发上述四个 send，所以不在下面的调用点绊线里，只靠这份清单钉住。</li>
      *   <li>{@code doc_export_pdf}（T-25）—— PDF 字节是桌面编辑器里的引擎导出来的；doc_ 前缀链本来就只放给
      *       LOWA，声明是为了让这份清单一眼看得出它离不开桌面编辑器。</li>
+     *   <li>{@code version_*}（dev-board#1498）—— 项目版本操作经宿主保存并重载打开的编辑器；
+     *       只读入口跟随同一桌面项目版本面，不要求已有活动文档。</li>
      * </ul>
      *
      * <p><b>要增删先读这一段</b>：后四组（pdf_* 与 text_*）的实际写入是纯服务端的，
@@ -114,6 +116,13 @@ class ToolDeclarationContractTest {
             "pptx_get_project_pages",
             "pptx_check_service",
             "pptx_export_editable",
+            // 项目版本（dev-board#1498）：宿主门禁，不是活动文档门禁
+            "version_status",
+            "version_history",
+            "version_changes",
+            "version_commit",
+            "version_pull",
+            "version_restore",
             // 导出 PDF（dev-board#1065 T-25）
             "doc_export_pdf"));
 
