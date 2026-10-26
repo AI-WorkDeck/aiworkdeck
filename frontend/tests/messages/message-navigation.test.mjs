@@ -18,7 +18,7 @@ function fixture(overrides={}) {
  return{vm,events,routes,business,requests,replaceAccount(){identity='two'}}
 }
 test('message center is a global singleton without modifying the sidebar or split layout',()=>{
- const {vm}=fixture({leftPaneKey:'files',sidebarCollapsed:true});vm.openMessageCenterTab();vm.openMessageCenterTab({conversationId:'c1'});assert.equal(vm.leftFiles.length,1);assert.equal(vm.leftFiles[0].messageFocus,'c1');assert.equal(vm.leftPaneKey,'files');assert.equal(vm.sidebarCollapsed,true);assert.equal(vm.splitMode,false);assert.equal(isPaneAllowedWithoutProject('messages'),true);assert.equal(isContextEligibleTab(vm.leftFiles[0]),false)
+ const {vm}=fixture({leftPaneKey:'files',sidebarCollapsed:true});vm.openMessageCenterTab();vm.openMessageCenterTab({conversationId:'c1'});assert.equal(vm.leftFiles.length,1);assert.equal(vm.leftFiles[0].messageFocus,'c1');assert.equal(vm.leftPaneKey,'files');assert.equal(vm.sidebarCollapsed,true);assert.equal(vm.splitMode,false);assert.equal(isPaneAllowedWithoutProject('messages'),false);assert.equal(isContextEligibleTab(vm.leftFiles[0]),false)
  const tab=vm.leftFiles.pop();vm.rightFiles=[tab];vm.openMessageCenterTab();assert.equal(vm.focusedPane,'right');assert.equal(vm.splitMode,true);assert.equal(vm.leftFiles.length,0)
 })
 test('snapshot restores global singleton but never message contents, target or focus',()=>{
