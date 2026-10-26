@@ -6,7 +6,8 @@
   const copy = {
     zh: {
       logoutWarning: '退出将清除本机共享的腾讯会议 CLI 授权，其他使用它的应用也需要重新登录。', confirmLogout: '确认退出本机登录', cancel: '取消', incomplete: '会议材料尚未完整读取，暂不能导出或交给 AI。请重新打开会议重试。', detailErrors: '未完成的读取：', title: '腾讯会议', subtitle: '连接会议记录，把讨论带回项目。', connection: '连接',
-      localCli: '需要本机安装腾讯会议 tmeet CLI。登录凭据由 CLI 保存在本机。', refresh: '检查连接', login: '登录授权', logout: '退出登录',
+      localCli: '需要本机安装腾讯会议 tmeet CLI。登录凭据由 CLI 保存在本机。', refresh: '检查连接', login: '登录授权', resumeLogin: '继续授权', logout: '退出登录',
+      originalLogin: '授权仍在原浏览器中进行，请切回原授权页完成。这里会自动更新；如已关闭原页面，请等待此次授权结束后重新点击“登录授权”。',
       authHint: '复制链接到浏览器完成授权，然后返回这里。', copy: '复制链接', recordings: '会议记录', sync: '同步会议',
       syncHint: '仅在点击同步时读取腾讯会议记录。云录制和智能纪要是否可用取决于账号权限及会议处理状态。',
       settings: '同步范围与排除词', lookback: '最近多少天', exclude: '排除会议标题包含的词（每行一个）', save: '保存设置', search: '搜索已同步会议',
@@ -17,14 +18,15 @@
       noTranscript: '暂无可用逐字稿，录制可能仍在处理或当前账号无访问权限。', noMinutes: '暂无可用智能纪要。', unnamed: '未命名会议', speaker: '发言人',
       failed: '操作未完成，请检查连接和账号权限后重试。', unsupported: '当前客户端不支持此插件操作，请检查客户端版本。',
       busy: '正在处理，请稍候…', saved: '设置已保存，下次手动同步时生效。', invalidConfig: '同步范围须为 1–90 天。',
-      waiting: '正在等待授权，最多检查两分钟。', expired: '已停止自动检查。完成授权后请点击「检查连接」。',
+      waiting: '正在等待浏览器授权，完成后会自动更新连接状态。', checkingFailed: '暂时未能检查授权状态，正在重试；也可点击“检查连接”。', expired: '已停止自动检查。完成授权后请点击「检查连接」。',
       copied: '链接已复制，请到浏览器粘贴并授权。', copyFallback: '链接已选中，请手动复制到浏览器。', invalidUrl: '未取得有效的授权链接，请重试登录。',
       exported: '已保存到当前项目：', sent: '会议材料已保存，已发送到当前 AI 对话。', partial: '部分会议未能同步，可稍后重试。',
       synced: '同步完成，会议数：', loggedOut: '已退出腾讯会议登录。', badExport: '会议材料未能保存，尚未发送到 AI 对话。', timedOut: '处理仍未完成，已停止等待。请稍后检查会议列表。'
     },
     en: {
       logoutWarning: 'Signing out clears the shared Tencent Meeting CLI authorization on this computer. Other applications using it will also need to sign in again.', confirmLogout: 'Confirm sign out on this computer', cancel: 'Cancel', incomplete: 'Meeting material is incomplete. Export and AI actions are unavailable. Reopen the meeting to retry.', detailErrors: 'Incomplete reads: ', title: 'Tencent Meeting', subtitle: 'Bring meeting records into your project.', connection: 'Connection',
-      localCli: 'Requires the Tencent Meeting tmeet CLI on this computer. Login credentials stay with the local CLI.', refresh: 'Check connection', login: 'Authorize login', logout: 'Sign out',
+      localCli: 'Requires the Tencent Meeting tmeet CLI on this computer. Login credentials stay with the local CLI.', refresh: 'Check connection', login: 'Authorize login', resumeLogin: 'Continue authorization', logout: 'Sign out',
+      originalLogin: 'Authorization is still running in the original browser page. Complete it there and this view will update. If that page was closed, wait for this attempt to finish, then click Authorize login again.',
       authHint: 'Copy this link into your browser to authorize, then return here.', copy: 'Copy link', recordings: 'Meeting records', sync: 'Sync meetings',
       syncHint: 'Records are synced only when you click Sync. Cloud recordings and smart minutes depend on your account permissions and processing status.',
       settings: 'Sync range and exclusions', lookback: 'Look back (days)', exclude: 'Exclude titles containing these words (one per line)', save: 'Save settings', search: 'Search synced meetings',
@@ -35,21 +37,22 @@
       noTranscript: 'No transcript is available. The recording may still be processing, or this account may lack access.', noMinutes: 'No smart minutes are available.', unnamed: 'Untitled meeting', speaker: 'Speaker',
       failed: 'The action could not be completed. Check your connection and account access, then retry.', unsupported: 'This client does not support this plugin action. Check your client version.',
       busy: 'Working…', saved: 'Settings saved. They apply to the next manual sync.', invalidConfig: 'The sync range must be between 1 and 90 days.',
-      waiting: 'Waiting for authorization. Checking for up to two minutes.', expired: 'Automatic checks have stopped. After authorizing, click Check connection.',
+      waiting: 'Waiting for browser authorization. The connection will update when it finishes.', checkingFailed: 'Authorization status could not be checked. Retrying; you can also click Check connection.', expired: 'Automatic checks have stopped. After authorizing, click Check connection.',
       copied: 'Link copied. Paste it into your browser to authorize.', copyFallback: 'Link selected. Copy and paste it into your browser.', invalidUrl: 'No valid authorization link was returned. Try signing in again.',
       exported: 'Saved to this project: ', sent: 'Meeting material saved and sent to the current AI chat.', partial: 'Some meetings could not be synced. You can retry later.',
       synced: 'Sync complete. Meetings: ', loggedOut: 'Signed out of Tencent Meeting.', badExport: 'Meeting material could not be saved. Nothing was sent to AI chat.', timedOut: 'Processing has not finished. Waiting stopped; check the meeting list again later.'
     }
   };
   let context = {}, language = 'zh', epoch = 0, busy = false, status = null, meetings = [], selected = null;
-  let loginTimer = null, loginAttempts = 0, loginEpoch = 0;
+  let loginTimer = null, loginAttempts = 0, loginEpoch = 0, statusRequest = null;
   const t = (key) => copy[language][key];
   const value = (input) => typeof input === 'string' || typeof input === 'number' ? String(input) : '';
   const stale = () => Object.assign(new Error('stale'), { stale: true });
   function feedback(message, error = false) { $('feedback').textContent = message; $('feedback').dataset.error = String(error); }
   function controls() {
     document.querySelectorAll('button').forEach((button) => { button.disabled = busy || !context.projectId; });
-    $('login').disabled ||= status?.cliAvailable === false || status?.loggedIn === true;
+    $('login').disabled ||= status?.cliAvailable === false || status?.loggedIn === true || (status?.loginPending === true && !!$('authorize-url').value);
+    $('login').textContent = t(status?.loginPending ? 'resumeLogin' : 'login');
     $('logout').disabled ||= !status?.loggedIn;
     $('sync').disabled ||= !status?.loggedIn;
     ['export', 'draft-minutes', 'draft-todos'].forEach((id) => { $(id).disabled ||= !selected || selected.complete === false || !!selected.errors?.length; });
@@ -90,8 +93,12 @@
   function stopLogin() { clearTimeout(loginTimer); loginTimer = null; loginEpoch++; }
   function paintStatus(data) {
     status = data || {};
-    $('connection-status').textContent = status.cliAvailable === false ? (value(status.message) || t('missingCli')) : status.loggedIn ? t('connected') + (value(status.userName) ? ' · ' + value(status.userName) : '') : t('disconnected');
+    $('connection-status').textContent = status.cliAvailable === false ? (value(status.message) || t('missingCli')) : status.loggedIn ? t('connected') + (value(status.userName) ? ' · ' + value(status.userName) : '') : status.loginPending ? t('waiting') : t('disconnected');
     if (status.loggedIn) { stopLogin(); $('authorization').hidden = true; $('authorize-url').value = ''; }
+    else if (status.loginPending) {
+      $('login-wait').textContent = t('waiting');
+      if (!loginTimer && context.projectId) { loginAttempts = 0; pollLogin(epoch, loginEpoch); }
+    }
     controls();
   }
   function dateLabel(input) {
@@ -164,34 +171,45 @@
     const list = await invoke('list', {}, current);
     meetings = Array.isArray(list?.meetings) ? list.meetings : []; paintList();
   }
+  function readStatus(current) {
+    if (statusRequest?.epoch === current) return statusRequest.promise;
+    const request = { epoch: current, promise: null };
+    request.promise = invoke('status', {}, current).finally(() => { if (statusRequest === request) statusRequest = null; });
+    statusRequest = request;
+    return request.promise;
+  }
   function pollLogin(current, session) {
     loginTimer = setTimeout(async () => {
       if (current !== epoch || session !== loginEpoch || !context.projectId) return;
       loginAttempts++;
       try {
-        const data = await invoke('status', {}, current);
+        const data = await readStatus(current);
         if (session !== loginEpoch) return;
         paintStatus(data);
         if (data?.loggedIn) { await run(async (scope) => { await loadLocal(scope); feedback(''); }); return; }
       } catch (error) {
         if (error.stale || session !== loginEpoch) return;
-        stopLogin(); $('login-wait').textContent = t('expired'); return;
+        $('login-wait').textContent = t('checkingFailed');
       }
-      if (loginAttempts >= 40) { stopLogin(); $('login-wait').textContent = t('expired'); return; }
+      if (loginAttempts >= 110) { stopLogin(); $('login-wait').textContent = t('expired'); return; }
       pollLogin(current, session);
     }, 3000);
   }
   $('refresh').addEventListener('click', () => run(async (current) => {
-    const data = await invoke('status', {}, current); paintStatus(data); await loadLocal(current); feedback('');
+    const data = await readStatus(current); paintStatus(data); await loadLocal(current); feedback('');
   }));
   $('login').addEventListener('click', () => run(async (current) => {
     stopLogin();
     const data = await invoke('login', {}, current);
+    if (data?.loginPending && !data.authorizeUrl) {
+      paintStatus({ cliAvailable: true, loggedIn: false, loginPending: true }); feedback(t('originalLogin')); return;
+    }
     let url;
     try { url = new URL(data?.authorizeUrl); } catch { throw new Error('invalidUrl'); }
     if (url.protocol !== 'https:' || url.username || url.password || !/(^|\.)meeting\.tencent\.com$/.test(url.hostname)) throw new Error('invalidUrl');
     $('authorize-url').value = url.href; $('authorization').hidden = false; $('login-wait').textContent = t('waiting');
-    loginAttempts = 0; pollLogin(current, loginEpoch); feedback('');
+    status = { cliAvailable: true, loggedIn: false, loginPending: true }; paintStatus(status);
+    feedback('');
   }));
   $('logout').addEventListener('click', () => { $('logout-confirmation').hidden = false; $('confirm-logout').focus(); });
   $('cancel-logout').addEventListener('click', () => { $('logout-confirmation').hidden = true; $('logout').focus(); });
@@ -201,11 +219,14 @@
   }));
   $('copy-url').addEventListener('click', async () => {
     const input = $('authorize-url'); input.focus(); input.select();
-    try {
-      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(input.value);
-      else if (!document.execCommand('copy')) throw new Error('copy');
-      feedback(t('copied'));
-    } catch { feedback(t('copyFallback')); }
+    // Copy synchronously while the click is active. Clipboard API is policy-blocked in opaque plugin frames.
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch { /* Try the modern API outside restricted frames. */ }
+    if (!copied) {
+      try { await navigator.clipboard.writeText(input.value); copied = true; }
+      catch { /* Keep the selected text available for manual copy. */ }
+    }
+    feedback(t(copied ? 'copied' : 'copyFallback'), !copied);
   });
   $('save-config').addEventListener('click', () => run(async (current) => {
     const lookbackDays = Number($('lookback').value);
@@ -267,5 +288,15 @@
       catch { if (current === epoch) feedback(t('failed'), true); }
     });
   });
+  function refreshAuthorization() {
+    if (($('authorization').hidden && !status?.loginPending) || status?.loggedIn || busy || !context.projectId) return;
+    run(async (current) => {
+      const data = await readStatus(current); paintStatus(data);
+      if (data?.loggedIn) await loadLocal(current);
+      feedback('');
+    });
+  }
+  window.addEventListener('focus', refreshAuthorization);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAuthorization(); });
   window.addEventListener('pagehide', () => { ++epoch; stopLogin(); });
 })();
