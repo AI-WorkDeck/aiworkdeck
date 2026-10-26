@@ -9,76 +9,124 @@
   <style>
     :root {
       color-scheme: light dark;
+      --skin-bg: #F4F1EA;
+      --skin-surface: #FAF8F3;
+      --skin-text: #1A1816;
+      --skin-text-2: #524E48;
+      --skin-border: #D4CFC3;
+      --skin-accent-soft: #EAE6F2;
+      --skin-accent-text: #514170;
+    }
+    html[data-theme='dark'] {
+      --skin-bg: #141312;
+      --skin-surface: #1D1B19;
+      --skin-text: #EDEAE2;
+      --skin-text-2: #B0AAA0;
+      --skin-border: #383530;
+      --skin-accent-soft: rgba(164, 148, 199, 0.16);
+      --skin-accent-text: #C0B2DE;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: var(--awd-font-sans, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif);
-      background: var(--awd-bg, #F4F1EA);
-      color: var(--awd-text, #1A1816);
-      padding: 24px;
-      line-height: 1.6;
+      background: transparent;
+      color: var(--skin-text);
+      padding: 2px;
+      line-height: 1.5;
+      overflow: hidden;
     }
     .card {
-      background: var(--awd-surface, #FAF8F3);
-      border: 1px solid var(--awd-border, #D4CFC3);
+      background: var(--skin-surface);
+      border: 1px solid var(--skin-border);
       border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 16px;
-      box-shadow: var(--awd-shadow-sm, 0 1px 2px rgba(0,0,0,0.06));
+      padding: 16px 18px;
+    }
+    .head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
     }
     .title {
       font-family: var(--awd-font-serif, "Songti SC", serif);
-      font-size: 20px;
+      font-size: 16px;
       font-weight: 600;
-      margin-bottom: 6px;
     }
     .subtitle {
-      color: var(--awd-text-2, #524E48);
-      font-size: 13px;
-      margin-bottom: 16px;
+      color: var(--skin-text-2);
+      font-size: 12px;
+      margin-bottom: 12px;
     }
     .swatches {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
     }
     .swatch {
-      border: 1px solid var(--awd-border, #D4CFC3);
+      background: var(--skin-bg);
+      border: 1px solid var(--skin-border);
       border-radius: 8px;
-      padding: 12px;
-      font-size: 12px;
+      padding: 10px;
+      font-size: 11px;
     }
     .swatch-dot {
-      width: 28px;
-      height: 28px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
-      margin-bottom: 8px;
-      border: 1px solid rgba(128,128,128,0.25);
+      margin-bottom: 6px;
+      border: 1px solid rgba(128,128,128,0.28);
+    }
+    .swatch-hex {
+      color: var(--skin-text-2);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
     }
     .badge {
       display: inline-block;
-      padding: 3px 10px;
+      padding: 2px 9px;
       border-radius: 999px;
-      background: var(--awd-accent-soft, #EAE6F2);
-      color: var(--awd-accent-text, #514170);
-      font-size: 12px;
+      background: var(--skin-accent-soft);
+      color: var(--skin-accent-text);
+      font-size: 11px;
       font-weight: 500;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <span class="badge">UI 皮肤插件 · Skin 02</span>
-    <h1 class="title" style="margin-top:10px">东方水墨 · 一笔禅圆</h1>
+    <div class="head-row">
+      <h1 class="title">东方水墨 · 一笔禅圆</h1>
+      <span class="badge">UI 皮肤画廊 · Skin 02</span>
+    </div>
     <p class="subtitle">计白当黑，墨分五色（焦、浓、重、淡、清），怀中一滴紫墨自然润开，配以朱砂印泥语义警示。</p>
     <div class="swatches">
-      <div class="swatch"><div class="swatch-dot" style="background:#F4F1EA"></div><strong>生宣留白</strong><div>#F4F1EA</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#1A1816"></div><strong>焦墨正文</strong><div>#1A1816</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#5B4B7A"></div><strong>紫墨点睛</strong><div>#5B4B7A</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#B5483C"></div><strong>朱砂印泥</strong><div>#B5483C</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#141312"></div><strong>浓墨夜读</strong><div>#141312</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#F4F1EA"></div><strong>生宣留白</strong><div class="swatch-hex">#F4F1EA</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#1A1816"></div><strong>焦墨正文</strong><div class="swatch-hex">#1A1816</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#5B4B7A"></div><strong>紫墨点睛</strong><div class="swatch-hex">#5B4B7A</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#B5483C"></div><strong>朱砂印泥</strong><div class="swatch-hex">#B5483C</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#141312"></div><strong>浓墨夜读</strong><div class="swatch-hex">#141312</div></div>
     </div>
   </div>
+  <script>
+    (function () {
+      function syncHostTheme() {
+        try {
+          var hostDoc = window.parent && window.parent.document && window.parent.document.documentElement;
+          if (!hostDoc) return;
+          var t = hostDoc.getAttribute('data-theme') || 'light';
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      }
+      syncHostTheme();
+      try {
+        var hostEl = window.parent && window.parent.document && window.parent.document.documentElement;
+        if (hostEl && typeof MutationObserver !== 'undefined') {
+          new MutationObserver(syncHostTheme).observe(hostEl, { attributes: true, attributeFilter: ['data-theme'] });
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script src="/api/plugins/sdk/awd-plugin-sdk.js"></script>
 </body>
 </html>

@@ -12,6 +12,7 @@
       "surface": "#F9FCFF",
       "surface-2": "#E3EEF7",
       "surface-3": "#D4E4F2",
+      "surface-elevated": "#FFFFFF",
       "canvas": "#DCEAF5",
 
       "text": "#0F1E2E",
@@ -65,6 +66,7 @@
       "surface": "#111D2E",
       "surface-2": "#18283E",
       "surface-3": "#213550",
+      "surface-elevated": "#16263B",
       "canvas": "#070D15",
 
       "text": "#E6F1FA",

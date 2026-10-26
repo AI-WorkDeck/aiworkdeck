@@ -274,6 +274,12 @@
             </text>
           </view>
           <text class="mdp-sec-note">{{ $t('market.themeNote') }}</text>
+          <iframe
+            v-if="themePreviewUrl"
+            :src="themePreviewUrl"
+            class="mdp-theme-preview-frame"
+            sandbox="allow-scripts allow-same-origin"
+          ></iframe>
         </view>
 
         <!-- 详细信息：工具权限压缩为一行人话摘要，不再枚举内部工具名 -->
@@ -312,7 +318,7 @@
 // 插件广场详情 tab（VS Code 扩展详情页形态）。spec = { kind: 'skill'|'plugin', id, name }
 // 由左栏 MarketSidebarPanel 点行打开。自行拉取市场与已安装两份数据合成视图，
 // 装/卸/启停后通过 uni.$emit('awd:market-changed') 通知左栏刷新。
-import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile, getContributedThemes, selectContributedTheme } from '@/services/api.js'
+import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile, getContributedThemes, selectContributedTheme, resolvePluginEntryUrl } from '@/services/api.js'
 import { setActiveSkin } from '@/utils/appTheme.js'
 import { ICONS } from '@/config/icons.js'
 import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
@@ -606,6 +612,11 @@ export default {
       if (this.marketInfo?.bundled) return this.$t('pluginPlatform.bundled')
       if (this.marketInfo) return this.$t('market.sourceOfficialMarket')
       return this.$t('market.sourceLocal')
+    },
+    themePreviewUrl() {
+      if (this.spec.kind !== 'plugin' || !this.installedInfo || !this.installedInfo.enabled || !this.ownThemes.length) return ''
+      const entry = this.installedInfo.frontendEntry || this.marketInfo?.frontendEntry || ''
+      return entry ? resolvePluginEntryUrl(this.spec.id, entry) : ''
     },
   },
   watch: {
@@ -1589,5 +1600,15 @@ export default {
   height: 12px;
   border-radius: 50%;
   border: 1px solid var(--awd-border);
+}
+
+.mdp-theme-preview-frame {
+  width: 100%;
+  height: 184px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: var(--awd-radius-md);
+  background: transparent;
+  display: block;
 }
 </style>
