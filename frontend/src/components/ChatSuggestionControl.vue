@@ -7,7 +7,7 @@
       <span class="suggestion-shortcut">{{ $t('chatSuggestions.tab') }}</span>
       <button class="suggestion-dismiss" type="button" :aria-label="$t('chatSuggestions.dismiss')" @click="$emit('dismiss')">×</button>
     </div>
-    <div class="suggestion-settings">
+    <div v-if="showSettings" class="suggestion-settings">
       <button type="button" class="suggestion-toggle" :aria-pressed="enabled" @click="$emit('toggle')">{{ $t(enabled ? 'chatSuggestions.on' : 'chatSuggestions.off') }}</button>
       <details><summary>{{ $t('chatSuggestions.about') }}</summary><p>{{ $t('chatSuggestions.help') }}</p></details>
     </div>
@@ -15,7 +15,7 @@
 </template>
 <script>
 export default {
-  props: { enabled: Boolean, suggestion: Object },
+  props: { enabled: Boolean, suggestion: Object, showSettings: { type: Boolean, default: true } },
   emits: ['edit', 'dismiss', 'toggle'],
 }
 </script>
