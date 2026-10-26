@@ -1,14 +1,14 @@
 {
   "id": "tencent-meeting",
   "name": "腾讯会议",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "连接腾讯会议，按需同步会议与录制、查看逐字稿和智能纪要，归档到项目并生成会议纪要及待办。需安装腾讯会议官方 tmeet CLI 并完成账号授权。",
   "author": "AI WorkDeck",
   "homepage": "https://www.aiworkdeck.com/zh/marketplace/plugins",
   "minHostVersion": "0.53.1",
   "permissions": ["file_read", "file_write", "network"],
   "frontendEntry": "web/index.html",
-  "backendJars": ["tencent-meeting-1.0.2.jar"],
+  "backendJars": ["tencent-meeting-1.0.3.jar"],
   "skills": ["skill"],
   "tools": [{
     "name": "tencent_meeting_action",

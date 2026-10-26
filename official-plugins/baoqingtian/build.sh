@@ -17,7 +17,7 @@ jar=root/'backend/target'/manifest['backendJars'][0]
 if not jar.is_file(): raise SystemExit('Missing plugin jar: '+str(jar))
 out=root/'dist';out.mkdir(exist_ok=True)
 files=[(root/'manifest.json','manifest.json'),(root/'README.md','README.md'),(jar,jar.name)]
-for folder in ('web',):
+for folder in ('web','l10n'):
  for f in sorted((root/folder).rglob('*')):
   if f.is_file(): files.append((f,str(f.relative_to(root))))
 with zipfile.ZipFile(out/f"{manifest['id']}-{manifest['version']}.zip",'w',zipfile.ZIP_DEFLATED) as z:
