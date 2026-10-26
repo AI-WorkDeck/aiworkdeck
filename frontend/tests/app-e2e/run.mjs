@@ -50,7 +50,7 @@
 //  - 切语言必须整页 reload：i18n 单例的 locale 与 utils/appLanguage.js 的模块级
 //    cached 都在模块加载时定死，uni 的 hash 跳转不产生新 document，改了存储也
 //    不生效（admin 页面栈缓存同理，J11 连接步骤的注释有实证）。语言键
-//    awd_app_language 直写 localStorage 裸字符串即可（uni h5 getStorageSync 兼容）
+//    app_language 直写 localStorage 裸字符串即可（uni h5 getStorageSync 兼容）
 //
 // Env: APP_E2E_BASE / APP_E2E_BACKEND / PUPPETEER_EXECUTABLE_PATH
 
@@ -489,8 +489,8 @@ try {
   // 同时视为用户亲手选过中文：登录卡选国际站时「从没选过语言就顺带切英文」（设计 2026-09-23 §2.4）
   // 会整页 reload 成英文；并钉住「首装按语言预选站点」已做过，套件全程不让页面替用户切站。
   const PIN_ZH_CN = `
-    try { localStorage.setItem('awd_app_language', 'zh-CN') } catch (e) {}
-    try { localStorage.setItem('awd_app_language_manual', '1') } catch (e) {}
+    try { localStorage.setItem('app_language', 'zh-CN') } catch (e) {}
+    try { localStorage.setItem('app_language_manual', '1') } catch (e) {}
     try { localStorage.setItem('awd_site_preselected', '1') } catch (e) {}
   `
   await page.evaluateOnNewDocument((apiBase) => {
@@ -622,8 +622,8 @@ try {
     })
 
     await step('顶栏右上角账户入口：未连账户显示「登录」态，rail 底部无账户入口与设置齿轮', async () => {
-      await j1Page.waitForSelector('.project-header .header-account .account-entry-btn', { timeout: 15000 })
-      const st = await j1Page.$eval('.project-header .header-account .account-entry-btn', (e) => ({
+      await j1Page.waitForSelector('.project-header .header-account .account-entry-btn:not(.signed-out-messages)', { timeout: 15000 })
+      const st = await j1Page.$eval('.project-header .header-account .account-entry-btn:not(.signed-out-messages)', (e) => ({
         signedOut: e.classList.contains('is-signed-out'),
         label: ((e.querySelector('.account-entry-label') || {}).textContent || '').trim(),
         avatar: !!e.querySelector('.account-avatar'),
@@ -642,7 +642,8 @@ try {
 
     await step('无项目态：AI 栏不渲染、项目专属 rail 项不挂、有「项目」入口', async () => {
       if (await j1Page.$('.chat-input-rich')) throw new Error('无项目态不该渲染 AI 输入框')
-      for (const title of ['资源管理器', '版本记录', '文件暂存区']) {
+      if (await j1Page.$('.left-rail .version-entry')) throw new Error('无项目态 rail 不该有版本入口')
+      for (const title of ['资源管理器', '文件暂存区']) {
         if (await j1Page.$('.left-rail [title="' + title + '"]')) throw new Error('无项目态 rail 不该有「' + title + '」')
       }
       if (!(await j1Page.$('.left-rail [title="项目"]'))) throw new Error('无项目态 rail 缺「项目」入口')
@@ -1174,7 +1175,7 @@ try {
   console.log('== J6.3 账户入口与设置标签 ==')
   if (accountConnected0) {
     await step('点顶栏头像开三项下拉，点「设置」开中栏标签、不跳页', async () => {
-      await mouseClickSel('.project-header .header-account .account-entry-btn')
+      await mouseClickSel('.project-header .header-account .account-entry-btn:not(.signed-out-messages)')
       await page.waitForSelector('.account-entry-menu', { timeout: 8000 })
       const items = await page.$$eval('.account-entry-menu .avatar-menu-item', (els) => els.map((e) => e.textContent.trim()))
       if (items.length !== 3) throw new Error('账户下拉应当恰好三项（我的日程/设置/退出登录），实际: ' + JSON.stringify(items))
@@ -1604,7 +1605,7 @@ try {
   // → 手动再开」这条新增的拒绝链补成三步——手动开启这一步同时把旅程接回旧基线的
   // 起点（已开启的空仓），后面 runWorkSession 那一串一个字都不用改。
   await step('打开版本面板即已是开启态（默认开启，无需手动点开启）', async () => {
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     // 认已开启态的**结构**，不认「空闲/工作中」哪一种：VersionPanel 的 v-else 分支
     // （WorkSessionBar + footer）只在 enabled 为真时渲染。这里刻意不断言 .session-idle
     // ——默认开启之后，J4 那两次上传本身就是变更信号，会在这个项目上隐式开一段工作，
@@ -1680,15 +1681,15 @@ try {
       throw new Error('改动信号把已 opt-out 的项目又开回来了: ' + JSON.stringify(st).slice(0, 200))
     }
     // 面板只在挂载时读一次 /status，靠切出/切回侧栏挂载点强制重新挂载（既有手法）。
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     await waitText('这个项目没有开启版本记录', 15000)
   })
 
   await step('手动开启清掉 opt-out 后回到已开启空闲态', async () => {
     await mouseClickText('开启版本记录')
     await page.waitForSelector('.session-bar .session-idle', { timeout: 15000 })
-    // 旧基线的文案断言原样保留（空闲态文案是「当前没有进行中的工作」）。
-    await waitText('当前没有进行中的工作')
+    // 空闲态应明确没有待提交的改动。
+    await waitText('当前没有待提交的改动')
   })
 
   // 工作段空闲先于子时间线异步加载完成；点击前等本次命名节点真正可见。
@@ -1702,10 +1703,10 @@ try {
     await mouseClickSel('[title="资源管理器"]')
     await uploadOne(file, uploadLabel)
     await waitText(uploadLabel, 20000)
-    await mouseClickSel('[title="版本"]')
-    await waitText('工作中')
+    await mouseClickSel('.version-entry')
+    await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
 
-    await mouseClickText('结束本次工作')
+    await mouseClickText('提交本次改动…')
     // 注意：brief 原写法选 .awd-input（模板里 <input> 标签自带的 class），
     // 但那是 uni-app <input> 组件编译到 H5 后的外层包装元素的 class，
     // 真正可编辑的原生 <input> 在其内部另有 .uni-input-input（顶部注释
@@ -1720,10 +1721,9 @@ try {
     // Vue 数据层的 title 仍是去抖前的值，提交的标题会丢最后一个字。
     // 实测过 300ms 足够让同步落定（真实网络请求里标题不再缺字）。
     await sleep(300)
-    await mouseClickText('完成')
-    // brief 原断言是 waitText('主线')；实际空闲态文案是"当前没有进行中的工作"
-    // （见上一步同样的改动理由），以实际组件模板为准。
-    await waitText('当前没有进行中的工作')
+    await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
+    // 提交后回到无待提交改动态，并在下方核验命名版本节点。
+    await waitText('当前没有待提交的改动')
     await waitVersionTitle(title)
   }
 
@@ -1824,18 +1824,18 @@ try {
     // 裸 REST 调用不会推送给前端；版本面板只在挂载时读一次状态，靠切出/切回
     // 侧栏挂载点强制重新挂载、重新拉取状态（与 runWorkSession 里同样的手法）。
     await mouseClickSel('[title="资源管理器"]')
-    await mouseClickSel('[title="版本"]')
-    await waitText('工作中')
+    await mouseClickSel('.version-entry')
+    await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
   })
 
   await step('结束追加工作并命名（产生 MODIFY 提交）', async () => {
-    await mouseClickText('结束本次工作')
+    await mouseClickText('提交本次改动…')
     await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
     const input = await page.$('.awd-dialog .uni-input-input')
     await input.click(); await input.type('端到端测试稿四', { delay: 15 })
     await sleep(300)
-    await mouseClickText('完成')
-    await waitText('当前没有进行中的工作')
+    await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
+    await waitText('当前没有待提交的改动')
     await waitVersionTitle('端到端测试稿四')
   })
 
@@ -1986,7 +1986,7 @@ try {
   })
 
   await step('回到主线工作后稿态消失', async () => {
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     await mouseClickText('回到主稿工作')
     await page.waitForFunction(
       () => !!document.querySelector('.session-bar .session-idle'),
@@ -2004,7 +2004,7 @@ try {
 
   // ---- 4. 「切到这一稿」→ 断言文件回来（两线内容隔离的正反双证） ----
   await step('切到这一稿', async () => {
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     await waitText('进行中的稿')
     await mouseClickText('切到这一稿')
     await page.waitForFunction(
@@ -2024,7 +2024,7 @@ try {
   // ---- 5. 回主线 → 主线上裸 REST 改文件 → 稿上也裸 REST 改同一文件 → 「采纳这一稿」
   //         → 断言三选一弹窗出现且列出该文件（认 AdoptConflictDialog 选择器） ----
   await step('回到主线工作', async () => {
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     await mouseClickText('回到主稿工作')
     await page.waitForFunction(
       () => !!document.querySelector('.session-bar .session-idle'),
@@ -2039,14 +2039,14 @@ try {
     // REST 直传会隐式在主线上开一段工作段（onChangeSignal 对非稿分支的口径），
     // adoptDraft 要求"没有进行中的工作"，必须先收尾，理由见领域文档核心契约。
     await mouseClickSel('[title="资源管理器"]')
-    await mouseClickSel('[title="版本"]')
-    await waitText('工作中')
-    await mouseClickText('结束本次工作')
+    await mouseClickSel('.version-entry')
+    await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
+    await mouseClickText('提交本次改动…')
     await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
     const input = await page.$('.awd-dialog .uni-input-input')
     await input.click(); await input.type('J10 主线追加修改', { delay: 15 })
     await sleep(300)
-    await mouseClickText('完成')
+    await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
     await page.waitForFunction(
       () => !!document.querySelector('.session-bar .session-idle'),
       { timeout: 10000 },
@@ -2115,7 +2115,7 @@ try {
   })
 
   await step('时间线出现「采纳：试验稿」节点', async () => {
-    await mouseClickSel('[title="版本"]')
+    await mouseClickSel('.version-entry')
     await page.waitForFunction(() => {
       const titles = [...document.querySelectorAll('.timeline-node .node-title')].map((e) => e.innerText || '')
       return titles.some((t) => t.includes('采纳：试验稿'))
@@ -2301,7 +2301,7 @@ try {
       // 靠切出/切回侧栏挂载点强制重新挂载」是同一条既有纪律（J9/J10 到处这么用），
       // 这里只是补上「整页 goto 之后第一次开面板」这一种也需要它的场景。
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       // CloudSyncBar 的内容要等 VersionPanel.refresh()→fetchCloudState() 两次串行网络
       // 请求都落地才出现；这个项目此时已经带着 J9/J10 攒下的一整段真实历史，读取比
       // 早期空项目慢，mouseClickSel 自带的 700ms 不够稳（现场调试实证：直接点文案
@@ -2346,9 +2346,9 @@ try {
     // 两条主分支由后端单测 ProjectMemberLookupTest / ProjectMemberAddByContactTest 覆盖。
     await step('A：协作抽屉里查出 lawyer_b 的人卡并确认加进案卷（UI 两步加人）', async () => {
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       await page.waitForSelector('.cloud-dot', { timeout: 15000 })
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('案件参与人')
       await page.waitForSelector('.collab-add-row .uni-input-input', { timeout: 10000 })
@@ -2453,11 +2453,11 @@ try {
 
     await step('A：点「取回最新稿」', async () => {
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       // 同上一步的教训：等 .cloud-dot 出现（已放进案件库才有的选择器）比等 700ms 定式稳，
       // 面板这时候要重新拉 /status+/drafts+/cloud/status 三串请求才会渲染出这行状态。
       await page.waitForSelector('.cloud-dot', { timeout: 15000 })
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('取回最新稿')
       await sleep(2000)
@@ -2479,7 +2479,7 @@ try {
 
     await step('A：版本时间线出现 B 的工作段节点', async () => {
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       await page.waitForFunction(() => {
         const titles = [...document.querySelectorAll('.timeline-node .node-title')].map((e) => e.innerText || '')
         return titles.some((t) => t.includes('B 第一次修改'))
@@ -2505,15 +2505,15 @@ try {
 
     await step('A：结束这段隐式打开的工作（标题「甲的撞车工作」）', async () => {
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
-      await waitText('工作中')
-      await mouseClickText('结束本次工作')
+      await mouseClickSel('.version-entry')
+      await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
+      await mouseClickText('提交本次改动…')
       await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
       const input = await page.$('.awd-dialog .uni-input-input')
       await input.click(); await input.type('甲的撞车工作', { delay: 15 })
       await sleep(300)
-      await mouseClickText('完成')
-      await waitText('当前没有进行中的工作')
+      await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
+      await waitText('当前没有待提交的改动')
     })
 
     await step('A：结束工作后台上传被拒只置待交稿标记（不自动整合）', async () => {
@@ -2529,7 +2529,7 @@ try {
       }, 40000, 2000)
       if (!ok) throw new Error('等待超时：结束工作后 pendingUpload 没有被置上')
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       // dev-board#623 之后这句话不再是写死的「同事交了新稿」：后端算得出作者与版数时
       // 会说成「{谁}交了新稿 · N 版」（utils/collabWording.js 的三态），算不出来才落回老
       // 那句。这里只断「说了有新稿」这件事本身——具体是哪一支由下面 J11-历史 那几步
@@ -2550,7 +2550,7 @@ try {
     })
 
     await step('A：点「交稿」按引导取回新稿后冲突弹窗标签正确', async () => {
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('交稿')
       // 已知案件库领先时，交稿先进入 #645 三步引导，按当前可操作步骤取回新稿。
@@ -2612,7 +2612,7 @@ try {
     })
 
     await step('时间线出现「取回最新稿」节点', async () => {
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       await page.waitForFunction(() => {
         const titles = [...document.querySelectorAll('.timeline-node .node-title')].map((e) => e.innerText || '')
         return titles.some((t) => t.includes('取回最新稿'))
@@ -3104,9 +3104,9 @@ try {
 
   await step('J12 切 en-US 并整页 reload 生效', async () => {
     await page.evaluateOnNewDocument(() => {
-      try { localStorage.setItem('awd_app_language', 'en-US') } catch (e) { /* ignore */ }
+      try { localStorage.setItem('app_language', 'en-US') } catch (e) { /* ignore */ }
     })
-    await page.evaluate(() => localStorage.setItem('awd_app_language', 'en-US'))
+    await page.evaluate(() => localStorage.setItem('app_language', 'en-US'))
     await page.goto(BASE + '/#/pages/project-overview/project-overview?id=' + QA.projectId,
       { waitUntil: 'networkidle2', timeout: 30000 })
     await page.reload({ waitUntil: 'networkidle2', timeout: 30000 })
@@ -3114,8 +3114,14 @@ try {
   })
 
   await step('J12 工作台四列英文锚点（rail title 属性）', async () => {
-    for (const title of ['Explorer', 'Version History', 'AI Assistant', 'Staging Area']) {
+    for (const title of ['Explorer', 'AI Assistant', 'Staging Area']) {
       await page.waitForSelector('[title="' + title + '"]', { timeout: 15000 })
+    }
+    // 版本入口会附带待提交/同步状态，仍核验英文可访问标题而非只检查按钮存在。
+    const versionTitle = await page.$eval('.version-entry', (e) => e.getAttribute('title') || '')
+    if (!versionTitle.startsWith('Source Control · ') ||
+        !versionTitle.endsWith('View project changes and sync') || /[一-鿿]/.test(versionTitle)) {
+      throw new Error('en-US 下版本入口标题不正确: ' + versionTitle)
     }
   })
 
@@ -3275,9 +3281,9 @@ try {
 
   await step('J12 还原 zh-CN 并整页 reload', async () => {
     await page.evaluateOnNewDocument(() => {
-      try { localStorage.setItem('awd_app_language', 'zh-CN') } catch (e) { /* ignore */ }
+      try { localStorage.setItem('app_language', 'zh-CN') } catch (e) { /* ignore */ }
     })
-    await page.evaluate(() => localStorage.setItem('awd_app_language', 'zh-CN'))
+    await page.evaluate(() => localStorage.setItem('app_language', 'zh-CN'))
     await page.reload({ waitUntil: 'networkidle2', timeout: 30000 })
     await page.waitForSelector('[title="资源管理器"]', { timeout: 20000 })
   })
@@ -3365,7 +3371,7 @@ try {
         // 端口就是这么注入的，同一套机制）。
         await j13Page.evaluateOnNewDocument((apiBase) => {
           window.checkbaDesktop = { apiBaseUrl: apiBase, shell: { openExternal: () => Promise.resolve() } }
-          try { localStorage.setItem('awd_app_language', 'zh-CN') } catch (e) { /* 全新页面没有「已有痕迹」，不设置会按 navigator.language 猜成 en-US */ }
+          try { localStorage.setItem('app_language', 'zh-CN') } catch (e) { /* 全新页面没有「已有痕迹」，不设置会按 navigator.language 猜成 en-US */ }
         }, j13Backend)
 
         const j13WaitText = async (t, ms = 15000) => j13Page.waitForFunction((x) => document.body.innerText.includes(x), { timeout: ms }, t)
@@ -3771,12 +3777,12 @@ try {
     // （自动合并编排器挂在它上面，见 project-overview.vue 的 @status-changed）。
     const remountVersionPanel = async () => {
       await mouseClickSel('[title="资源管理器"]')
-      await mouseClickSel('[title="版本"]')
+      await mouseClickSel('.version-entry')
       await page.waitForSelector('.cloud-dot', { timeout: 20000 })
     }
     const pullViaUi = async () => {
       // 进这一步时仓库必须是干净的。上一轮没收尾的话裁决弹窗还挂着，而它是全屏遮罩
-      // （.awd-mask）：下面点「打开协作」会点在遮罩上，症状是 .collab-dialog 十秒超时，
+      // （.awd-mask）：下面点「管理云端同步」会点在遮罩上，症状是 .collab-dialog 十秒超时，
       // 完全看不出真因。把前提写成一条明确的失败信息，别让它伪装成 UI 回归。
       const stale = await conflictA()
       if (stale) {
@@ -3784,7 +3790,7 @@ try {
           + String(JSON.stringify(stale)).slice(0, 200))
       }
       await remountVersionPanel()
-      await mouseClickText('打开协作')
+      await mouseClickText('管理云端同步')
       await page.waitForSelector('.collab-dialog', { timeout: 10000 })
       await mouseClickText('取回最新稿')
       await sleep(2500)
