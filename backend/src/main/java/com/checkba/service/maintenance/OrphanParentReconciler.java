@@ -63,15 +63,26 @@ public class OrphanParentReconciler {
     private static final long ORPHAN_PARENT_ID = 0L;
 
     private final ProjectFileRepository projectFileRepository;
+    private boolean startupAttempted;
+    private boolean startupSucceeded;
 
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
+        prepareForDocumentRequests();
+    }
+
+    /** The local document gate may require this repair earlier in the same Ready event. */
+    public synchronized boolean prepareForDocumentRequests() {
+        if (startupAttempted) return startupSucceeded;
+        startupAttempted = true;
         try {
             reconcile();
+            startupSucceeded = true;
         } catch (RuntimeException e) {
             // 对账是顺手活，读不到文件表不该拦住启动
             log.warn("孤儿父节点对账跳过：{}", e.toString());
         }
+        return startupSucceeded;
     }
 
     /** @return 被改写（含软删除）的行数，供测试与日志用 */

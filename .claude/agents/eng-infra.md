@@ -601,6 +601,8 @@ Windows 实机门：`desktop/scripts/test-file-associations.ps1` 在一次性 Ac
 
 独立 `LocalCoreGateway` 保持公开端口，Spring 私有 connector 使用随机端口，配置中的 server.port 和回调 URL 仍用公开端口。复用本机准入、CORS、源代码声明过滤器；文件通过现有 ResourceHttpRequestHandler 支持 HEAD/Range/416。关闭独立 Tomcat 必须 stop 后 destroy，否则容器 await 线程会使 JVM 退出不完。未知路由转交完整后端前先释放 CORE lease，不能持 lease 等待交权。
 
+兼容候选另有较窄的「文档路由就绪」门槛：所有 runners 已结束后的 Ready 事件先显式完成 `OrphanParentReconciler`（同次启动只执行一次，失败不提前放行），再允许既有核心 GET/HEAD、内容协议 GET/HEAD/PUT 与 receipt GET/DELETE 经原 MVC 访问。尚未完成的普通 Ready 回调仍挡住其他业务路由；两条精确健康 GET/HEAD 经原 MVC 就绪检查返回503，不能据端口可用提前报UP。该阶段保留原本机准入、控制器鉴权、内容事务和版本锁，保存后的 AI/标签副作用仍等完整 Ready。启动失败/关闭会同时撤销文档准入；无 gateway 的 legacy/首次安装/feature-off 不触发额外修复或提前路由。仅解决 Ready 后半段：handoff→私有 connector 启动与 runners 的等待仍存在。`LocalCoreDocumentReadyTest` 用随机本机端口、受控阻塞的 Ready listener、真实 MVC 与 H2 内容发布验证；版本服务使用替身，不能据此称完整 JPA/JGit 或正常负载提速已验。
+
 `/api/desktop/startup-health` 的 UP/phase=core 只表示早期业务读取可用，原 `/api/desktop/health` 此时仍是503。phase=full 与完整健康必须等 ACCEPTING_TRAFFIC，不能只看 ApplicationReadyEvent 或 FactoryBean 代理。桌面首屏只等 startup-health；完整后端在原启动 deadline 内以最多500ms周期检测，确认完整健康后恢复10s。新路由只有明确404才兼容旧健康链，dev 的 wizard 同样不能覆盖已存在的503。健康结果、overlay 成功/失败均绑定实际 launch/process，迟到旧结果不能给新启动记成功；内部 launch 含 child，不得放入 renderer IPC。
 
 完整 UI 曾暴露 HTTP/1.1 六连接饥饿：六个非早期接口在网关等完整后端，使文件树在浏览器排队约4秒，真正读取仅约13ms。`backend-request-gate.js` 在主窗 session 的 onBeforeRequest 中排队这些请求，保留早期 GET/HEAD 与 OPTIONS 通道；能力清单只来自 build 校验成功的 core 健康响应。未知旧后端保持原传输；换 launch、端口、退出或到截止时取消待发请求，不重放到新进程。不要同时给同一 session 安装第二个 onBeforeRequest listener。实际隔离 UI 文件树4019→150ms只属诊断，不替代正常负载正式对照。

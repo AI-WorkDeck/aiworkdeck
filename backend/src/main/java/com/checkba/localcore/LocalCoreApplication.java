@@ -47,6 +47,7 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
     private final Map<String, Object> shared = new LinkedHashMap<>();
     private ObjectMapper json;
     private LocalCoreGateway gateway;
+    private ConfigurableApplicationContext applicationContext;
     private LocalCoreContentService content;
     private LocalCoreContentHttp contentHttp;
     private volatile boolean protocolPublished;
@@ -276,6 +277,7 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
     }
 
     @Override public void onApplicationEvent(ApplicationContextInitializedEvent event) {
+        applicationContext = event.getApplicationContext();
         var factory = (org.springframework.beans.factory.support.BeanDefinitionRegistry) event.getApplicationContext().getBeanFactory();
         factory.registerBeanDefinition("localCoreApplication", new RootBeanDefinition(LocalCoreApplication.class, () -> this));
         shared.forEach((name, instance) -> {
@@ -292,6 +294,20 @@ public final class LocalCoreApplication implements LocalCoreBootstrap.Callbacks,
         versions.handoff(content);
         for (var image : pending) savedBeforeReady.put(image.request().operationId(), image.request());
         sessions = context.getBean(com.checkba.version.WorkSessionService.class);
+    }
+
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    @org.springframework.core.annotation.Order(org.springframework.core.Ordered.HIGHEST_PRECEDENCE + 100)
+    public void documentRoutesReady(org.springframework.boot.context.event.ApplicationReadyEvent event) {
+        if (gateway == null) return; // Legacy/fresh/feature-off startup retains its original readiness.
+        var context = event.getApplicationContext();
+        if (context != applicationContext) return;
+        if (!(context instanceof ServletWebServerApplicationContext web)) return;
+        // All runners (including identity and file-type repair) have returned. This remaining
+        // synchronous file repair must finish before PUTs can overlap unrelated Ready listeners.
+        var repair = context.getBean(com.checkba.service.maintenance.OrphanParentReconciler.class);
+        if (!repair.prepareForDocumentRequests()) return;
+        gateway.documentBackendReady(web.getWebServer().getPort());
     }
 
     @Override public void onReady(ConfigurableApplicationContext context, boolean recordedSchema) {
