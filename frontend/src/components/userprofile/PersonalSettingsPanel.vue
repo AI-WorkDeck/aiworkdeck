@@ -266,7 +266,7 @@ export default {
       // 界面语言：读写走 utils/appLanguage.js（storage 权威源 + App.vue 镜像同步）。
       // 选项标签用各自母语，刻意不随语言翻译。
       appLanguage: getAppLanguage(),
-      appLanguageOptions: LOCALE_REGISTRY.map((entry) => ({
+      appLanguageOptions: (Array.isArray(LOCALE_REGISTRY) ? LOCALE_REGISTRY : []).map((entry) => ({
         value: entry.code,
         label: entry.nativeName,
       })),

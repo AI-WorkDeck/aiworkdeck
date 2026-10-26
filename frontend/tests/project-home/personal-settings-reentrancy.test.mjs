@@ -53,7 +53,7 @@ function onceOnly(okValue) {
 
 function setup(depsOverride) {
   const toasts = []
-  const deps = Object.assign({ setSessionUser: () => {}, getAppLanguage: () => 'zh-CN' }, depsOverride)
+  const deps = Object.assign({ setSessionUser: () => {}, getAppLanguage: () => 'zh-CN', LOCALE_REGISTRY: [] }, depsOverride)
   const vm = makeVm(deps, { showToast: (o) => toasts.push(o.title) })
   return { vm, toasts }
 }
