@@ -9,9 +9,39 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 SOURCE = Path(__file__).resolve().parents[1] / 'main' / 'native'
 sys.path.insert(0, str(SOURCE))
+
+class NativeRulerIdentityContract(unittest.TestCase):
+    def test_real_helper_rejects_revision_changed_after_capture_without_writing(self):
+        from native_ruler_uno import NativeRulerCommands
+        properties = dict(Width=21000, Height=29700, LeftMargin=2540, RightMargin=2540,
+                          TopMargin=2540, BottomMargin=2540, PageStyleName='Default',
+                          ParaLeftMargin=0, ParaRightMargin=0, ParaFirstLineIndent=0)
+        cursor = SimpleNamespace(getPropertyValue=lambda name: properties[name], getPage=lambda: 1,
+                                 gotoStartOfParagraph=lambda expand: None, gotoEndOfParagraph=lambda expand: None)
+        text = SimpleNamespace(createTextCursorByRange=lambda target: cursor,
+                               compareRegionStarts=lambda left, right: 0, compareRegionEnds=lambda left, right: 0)
+        cursor.getText = lambda: text
+        cursor.getStart = cursor.getEnd = lambda: cursor
+        style = SimpleNamespace(getPropertyValue=lambda name: properties[name])
+        styles = SimpleNamespace(getByName=lambda name: style)
+        model = SimpleNamespace(getURL=lambda: 'file:///isolated-ruler.docx', isReadonly=lambda: False,
+                                getCurrentController=lambda: SimpleNamespace(getViewCursor=lambda: cursor),
+                                getStyleFamilies=lambda: SimpleNamespace(getByName=lambda name: styles))
+        commands = NativeRulerCommands()
+        params = dict(nativeDocumentEpoch=1, nativeRevision=9, nativeReadOnly=False)
+        captured = commands.execute('get_ruler_state', params, model, None)
+        self.assertTrue(captured['available'])
+        with patch('native_ruler_uno.apply_properties') as write:
+            with self.assertRaisesRegex(ValueError, 'STALE_RULER_CONTEXT'):
+                commands.execute('set_ruler_state', dict(params, nativeRevision=10,
+                    contextToken=captured['contextToken'], patch=dict(leftIndent=180)), model, None)
+            write.assert_not_called()
+
 
 SCENARIO = r'''
 const fs=require('node:fs/promises'),assert=require('node:assert/strict');

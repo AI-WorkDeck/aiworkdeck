@@ -363,6 +363,8 @@ test('document reads leave an active composition intact while selection changes 
       assert.equal((await h.execute(action, {})).success, true, action)
     }
     assert.equal(h.calls.slice(before).filter(call => ['native_input', 'native_paint'].includes(call.action)).length, 0)
+    assert.equal((await h.execute('get_document_text', { __agent: true })).code, 'COMPOSITION_ACTIVE')
+    assert.equal(h.calls.filter(call => call.action === 'get_document_text').length, 1, 'final-text read must not commit or bypass active composition')
     assert.equal((await h.execute('set_selection', {})).code, 'COMPOSITION_ACTIVE')
     assert.equal((await h.execute('goto_bookmark', { name: 'EVID_TEST' })).code, 'COMPOSITION_ACTIVE')
     assert.equal((await h.execute('collapse_selection', {})).code, 'COMPOSITION_ACTIVE')
@@ -576,7 +578,7 @@ test('host semantic capture also waits for queued native input', async () => {
 
 for (const change of ['fresh', 'retarget', 'permission', 'permission-roundtrip']) {
   test(`generic context results reject stale document or permission: ${change}`, async () => {
-    for (const action of ['capture_writing_context', 'get_completion_context', 'get_context_menu_context', 'get_review_context', 'get_ruler_state']) {
+    for (const action of ['capture_writing_context', 'get_completion_context', 'get_context_menu_context', 'get_review_context', 'get_ruler_state', 'get_document_text']) {
       const held = deferred(), started = deferred()
       const h = await surfaceHarness({ nativeRequest: async (name, params) => {
         if (name === action) {
@@ -587,7 +589,7 @@ for (const change of ['fresh', 'retarget', 'permission', 'permission-roundtrip']
       } })
       try {
         await h.execute('load_document', { bytes: [1], name: 'a.docx' }); await h.surface.setReadOnly(false)
-        const pending = h.execute(action); await started.promise
+        const pending = h.execute(action, action === 'get_document_text' ? { __agent: true } : undefined); await started.promise
         if (change === 'retarget') await h.execute('load_document', { bytes: [2], name: 'b.docx' })
         if (change.startsWith('permission')) await h.surface.setReadOnly(true)
         if (change === 'permission-roundtrip') await h.surface.setReadOnly(false)
@@ -602,3 +604,29 @@ for (const change of ['fresh', 'retarget', 'permission', 'permission-roundtrip']
     }
   })
 }
+
+
+test('document text waits for queued Escape and the native input barrier acknowledgement', async () => {
+  const keyHeld = deferred(), keyStarted = deferred(), barrierHeld = deferred(), barrierStarted = deferred()
+  const h = await surfaceHarness({ nativeRequest: async (action, params) => {
+    if (action === 'native_input' && params.action === 'input_key' && params.params.eventType === 0) {
+      keyStarted.resolve(); await keyHeld.promise
+    }
+    if (action === 'native_input' && params.action === 'input_barrier') {
+      barrierStarted.resolve(); await barrierHeld.promise
+    }
+    if (action === 'get_document_text') return { success: true, revision: 1, paragraphs: [{ index: 0, text: '确认后的正文' }] }
+  } })
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    key(h, 'Escape'); await keyStarted.promise
+    const pending = h.execute('get_document_text', { __agent: true }); await tick()
+    assert.equal(h.calls.some(call => call.action === 'get_document_text'), false, 'body read must wait for queued input')
+    keyHeld.resolve(); await barrierStarted.promise; await tick()
+    assert.equal(h.calls.some(call => call.action === 'get_document_text'), false, 'body read must wait for the barrier ACK')
+    barrierHeld.resolve()
+    const result = await pending
+    assert.equal(result.success, true); assert.equal(result.paragraphs[0].text, '确认后的正文')
+    assert.equal(h.calls.filter(call => call.action === 'get_document_text').length, 1, 'the read is not retried')
+  } finally { keyHeld.resolve(); barrierHeld.resolve(); await h.close() }
+})

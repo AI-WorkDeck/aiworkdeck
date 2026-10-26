@@ -252,7 +252,8 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
   })
   async function execute(action, params = {}, assistanceOperation = null) {
     const previous = model, previousInput = input, previousPermission = permissionRevision
-    const contextRead = ['get_completion_context', 'get_context_menu_context', 'capture_writing_context', 'get_review_context', 'get_ruler_state'].includes(action)
+    const contextRead = (action === 'get_document_text' && params.__agent === true)
+      || ['get_completion_context', 'get_context_menu_context', 'capture_writing_context', 'get_review_context', 'get_ruler_state'].includes(action)
     const currentContext = () => previous === model && previousInput === input && previousPermission === permissionRevision && !modelLoads && !disposed && !failed
     const read = ['get_ui_state', 'get_selection', 'list_revisions', 'list_comments', 'list_fonts', 'list_styles',
       'get_document_text', 'get_paragraph', 'get_outline', 'find_text_locations', 'get_cursor_context',

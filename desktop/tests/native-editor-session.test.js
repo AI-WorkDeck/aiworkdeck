@@ -845,3 +845,23 @@ test('an unknown revision event at the adoption worker barrier still expires the
   assert.equal(writes[0].params.revision,0);assert.equal(writes[0].params.nativeRevision,1)
   assert.equal(events.filter(e=>e.type==='modified').length,0)
 })
+
+test('ruler drag verifies pending view callbacks without rebasing its captured revision',async()=>{
+  const {session,guard,batches}=pendingReviewAdoption(),call=session.uno.call
+  let captured,indent=0,writeRevision
+  session.uno.call=async(method,params)=>{
+    if(method==='get_ruler_state'){captured=params.nativeRevision;return {available:true,contextToken:'ruler-token',leftIndent:indent}}
+    if(method==='set_ruler_state'){
+      writeRevision=params.nativeRevision
+      if(writeRevision!==captured)throw Error('STALE_RULER_CONTEXT')
+      indent=params.patch.leftIndent;return {success:true,changed:true}
+    }
+    if(method==='view_metrics')return {pages:[],unit:'twip'}
+    return call(method,params)
+  }
+  await session.verifyViewRead(guard);assert.equal(guard.pending.size,35)
+  const state=await session.execute('get_ruler_state')
+  const result=await session.execute('set_ruler_state',{contextToken:state.contextToken,patch:{leftIndent:180}})
+  assert.equal(result.leftIndent,180);assert.equal(result.changed,true)
+  assert.deepEqual(batches,[25,25,10]);assert.equal(writeRevision,0);assert.equal(session.revision,1)
+})
