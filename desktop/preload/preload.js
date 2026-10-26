@@ -179,7 +179,9 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
     onPrepareQuit: (handler) => {
       const listener = async (_event, { requestId }) => {
         let result
-        try { result = await handler() } catch (e) { result = { ok: false, error: String(e?.message || e) } }
+        try {
+          result = await handler({ reportStage: (stage) => ipcRenderer.invoke('checkba:quit-stage', { requestId, stage }) })
+        } catch (e) { result = { ok: false, error: String(e?.message || e) } }
         return ipcRenderer.invoke('checkba:quit-prepared', { requestId, ...result })
       }
       ipcRenderer.on('checkba:prepare-quit', listener)

@@ -1091,8 +1091,13 @@ public class WorkSessionService {
             if (onDraftBranch(projectId)) {
                 return endSessionOnDraft(projectId, userId, userName, title);
             }
-            WorkSession s = activeSession(projectId)
-                    .orElseThrow(() -> VersionException.userFacing(LangText.of("当前没有进行中的工作", "No work session in progress")));
+            WorkSession s = activeSession(projectId).orElseGet(() -> {
+                // 插件或 AI 直接落文件可能没有发改动信号；显式提交时只为真实改动补开工作段。
+                if (repoService.pendingChanges(projectId).isEmpty()) {
+                    throw VersionException.userFacing(LangText.of("当前没有进行中的工作", "No work session in progress"));
+                }
+                return ensureSession(projectId, userId, userName);
+            });
 
             cancelPending(projectId);
             commitNow(projectId, userId, userName, null);

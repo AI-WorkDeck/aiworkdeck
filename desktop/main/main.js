@@ -590,12 +590,23 @@ function createMainWindow() {
   }
 
   const createdWindow = mainWindow
+  let closePreparationPending = false
   createdWindow.on('close', (event) => {
     if (quitInProgress && !services) return
     event.preventDefault()
-    if (quitInProgress) return
-    if (process.platform === 'darwin') createdWindow.hide()
-    else app.quit()
+    if (quitInProgress || closePreparationPending) return
+    if (process.platform !== 'darwin') { app.quit(); return }
+    closePreparationPending = true
+    prepareRendererForQuit().then(() => {
+      // Cmd+Q during the confirmation adopts this same preparation for real exit.
+      if (quitInProgress || createdWindow.isDestroyed()) return
+      createdWindow.hide()
+      createdWindow.webContents.send('checkba:quit-cancelled', { windowHidden: true })
+    }).catch((error) => {
+      if (!quitInProgress && !createdWindow.isDestroyed()) {
+        createdWindow.webContents.send('checkba:quit-cancelled', { error: String(error.message || error) })
+      }
+    }).finally(() => { closePreparationPending = false })
   })
   createdWindow.on('closed', () => {
     // 旧窗迟到的 closed 不能断开新窗的剪贴板、菜单和原生弹窗。
@@ -1967,17 +1978,48 @@ ipcMain.handle('checkba:quit-prepared', (event, data = {}) => {
 ipcMain.handle('checkba:cancel-quit', (event) => {
   if (event.sender === mainWindow?.webContents) quitPreparation?.reject(new Error('已取消退出'))
 })
+ipcMain.handle('checkba:quit-stage', (event, data = {}) => {
+  if (!quitPreparation || quitPreparation.settled || event.sender !== mainWindow?.webContents
+      || data.requestId !== quitPreparation.id) return false
+  if (!['pausing', 'saving', 'confirming'].includes(data.stage)) return false
+  quitPreparation.setStage(data.stage)
+  return true
+})
 async function prepareRendererForQuit() {
+  if (quitPreparation) return quitPreparation.promise
   if (!mainWindow || mainWindow.isDestroyed()) return
   if (quitHandlerSender !== mainWindow.webContents) throw new Error('工作台尚未准备好退出，请稍后重试')
+  const preparation = { id: require('crypto').randomUUID(), settled: false }
+  let timer
+  preparation.promise = new Promise((resolve, reject) => {
+    const finish = (error) => {
+      if (preparation.settled) return
+      preparation.settled = true
+      clearTimeout(timer)
+      error ? reject(error) : resolve()
+    }
+    preparation.resolve = () => finish()
+    preparation.reject = finish
+    preparation.setStage = (stage) => {
+      clearTimeout(timer)
+      if (stage !== 'confirming') timer = setTimeout(() => finish(new Error('任务或文档仍在保存，已取消退出')), 60000)
+    }
+  })
+  quitPreparation = preparation
+  preparation.setStage('pausing')
+  const sender = mainWindow.webContents
+  const rendererLost = () => preparation.reject(new Error('工作台已停止响应，已取消退出'))
+  sender.once('destroyed', rendererLost)
+  sender.once('render-process-gone', rendererLost)
   try {
-    await new Promise((resolve, reject) => {
-      const id = require('crypto').randomUUID()
-      const timer = setTimeout(() => reject(new Error('任务或文档仍在保存，已取消退出')), 60000)
-      quitPreparation = { id, resolve: () => { clearTimeout(timer); resolve() }, reject: (e) => { clearTimeout(timer); reject(e) } }
-      mainWindow.webContents.send('checkba:prepare-quit', { requestId: id })
-    })
-  } finally { quitPreparation = null }
+    try { sender.send('checkba:prepare-quit', { requestId: preparation.id }) }
+    catch (error) { preparation.reject(error) }
+    await preparation.promise
+  } finally {
+    sender.removeListener('destroyed', rendererLost)
+    sender.removeListener('render-process-gone', rendererLost)
+    if (quitPreparation === preparation) quitPreparation = null
+  }
 }
 
 app.on('window-all-closed', () => {
@@ -2013,7 +2055,7 @@ app.on('before-quit', async (e) => {
       try { await prepareRendererForQuit() } catch (err) {
         updateRestartRequested = false
         quitInProgress = false
-        mainWindow?.webContents.send('checkba:quit-cancelled', { error: String(err.message || err) })
+        try { mainWindow?.webContents.send('checkba:quit-cancelled', { error: String(err.message || err) }) } catch (_) { /* Renderer already gone. */ }
         logDesktopEvent('quit-cancelled', { message: String(err.message || err) })
         openPaths.resume()
         return

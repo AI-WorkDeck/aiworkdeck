@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <view class="libre-editor-wrapper" :class="{ 'evidence-drop-armed': evidenceDropArmed }">
-    <!-- 保存状态沿用版本身份细栏，保持固定位置；加载与其它错误仍走原有浮层。 -->
+    <!-- 文件保存状态保持固定位置；加载与其它错误仍走原有浮层。 -->
     <!-- 加载进度面板：引擎启动 + 文档下载/打开是感知最慢的一段（尤其大文档），
          把过程阶段化展示出来（用户反馈：不能更快，也要看得见进展）。 -->
     <view v-if="loadingOverlayVisible" class="libre-loading">
@@ -88,19 +88,8 @@
       @focus-editor="focusEditor"
       @ai-format="onToolbarAiFormat"
     />
-    <!-- 版本身份小条（dev-board#632 起有它，#672 复测改成文件级）：说这份**文件**
-         最近一次有名字的版本，磁盘内容领先版本记录时说「已保存，尚未存为版本」。
-         点一下跳到提交历史并高亮那一行。
-         为什么不再逐段跟光标：律师在这里要读的是「我现在看的这份文件存进版本记录了
-         吗、是哪一版」，而光标随便一动那句话就换个名字、落进表格还整条消失。
-         逐段归属一个字没动，仍在审阅面板的「溯源」标签里（设计稿 §5.5）。 -->
-    <view v-if="saveStateText || provenanceBarVisible" class="libre-prov-bar">
-      <text
-        v-if="provenanceBarVisible"
-        class="libre-prov-text"
-        :class="{ clickable: !!provSha }"
-        @tap="openProvenanceHistory"
-      >{{ provText }}</text>
+    <!-- 文件保存状态只反映当前编辑内容是否落盘；版本提交与同步在全局面板管理。 -->
+    <view v-if="saveStateText" class="libre-save-bar">
       <view v-if="saveStateText" class="libre-save-state" :class="{ error: isError && !saving }" role="status">
         <text class="libre-save-label" :title="saveStateText">{{ saveStateText }}</text>
         <text v-if="(statusKey === 'saveFailed' || statusKey === 'movedSaveFailed') && !saving" class="libre-save-retry" @tap="retrySave">{{ $t('editor.retrySave') }}</text>
@@ -214,7 +203,7 @@ import { createSemanticWritingHost } from '@/composables/semanticWritingHost.js'
 import { getSemanticWritingSettings, saveSemanticWritingSettings, createSemanticWritingSuggestion, getSemanticWritingSuggestion, cancelSemanticWritingSuggestion, acceptSemanticWritingSuggestion } from '@/services/api.js'
 import { getProvenance, reviewDocInsight, listWritingCompletions, learnWritingCompletions, deleteWritingCompletion, clearWritingCompletions, lookupWritingSelection, getDocInsightEntity, getWritingCompletionDetail } from '@/services/api.js'
 import { guestPointToHost } from '@/utils/insightPopup.js'
-import { alignProvenance, fileVersionBar, provenanceSummary } from '@/utils/provenanceAlign.js'
+import { alignProvenance, provenanceSummary } from '@/utils/provenanceAlign.js'
 import { localContentUrl, localContentCapability, observeLocalContentBackend, downloadLocalContent, createLocalContentSave, saveLocalContent, cancelLocalContent } from '@/utils/localContentProtocol.js'
 import { resolveDocumentSaveOperation } from '@/utils/checkpointSaveBarrier.js'
 
@@ -349,7 +338,7 @@ export default {
       staleItems: [],
       // 逐段溯源（dev-board#632）。provUnits 是后端按历史算好的「每个单元最后是哪一版
       // 改的」，provRows 是它对到画布此刻段序之后的结果（对齐在 utils/provenanceAlign.js）。
-      // 这两样只喂**侧栏「溯源」标签**；顶上那条小条是文件级的，见下面 provFileVersion。
+      // 这两样只喂侧栏「溯源」标签，不参与文件保存状态。
       // 没开版本记录 / 老服务端 / 拉失败时 provLoaded 恒为 false，侧栏标签整个不出现——
       // 溯源是锦上添花，不该在编辑器里弹错。
       provLoaded: false,
@@ -357,12 +346,6 @@ export default {
       provUnits: [],
       provTruncated: false,
       provRows: [],
-      // 顶上那条版本身份小条的三个入参（#672 复测改成文件级，见 utils/provenanceAlign
-      // 的 fileVersionBar）：版本记录开没开、这份文件磁盘上是不是领先版本记录、
-      // 它最近一次有名字的版本是哪一版。都由后端一次算好随 provenance 回来。
-      provVersioned: false,
-      provDirty: false,
-      provFileVersion: null,
     }
   },
   computed: {
@@ -420,25 +403,6 @@ export default {
     },
     bootStageText() {
       return this.$t('editor.boot.' + this.bootStageKey)
-    },
-    // ---- 版本身份小条（文件级）与逐段溯源侧栏 ----
-    // 三态（不出现 / 已保存尚未存为版本 / 作者·日期·版本标题）全在纯函数里，
-    // 免得同一套判定在模板、computed、测试里各写一遍走散。
-    provenanceBar() {
-      return fileVersionBar((k, p) => this.$t(k, p), {
-        versioned: this.provVersioned,
-        dirty: this.provDirty,
-        fileVersion: this.provFileVersion,
-      })
-    },
-    provenanceBarVisible() {
-      return !!(this.ready && this.file && !this.loadingOverlayVisible && this.provenanceBar.visible)
-    },
-    provText() {
-      return this.provenanceBar.text
-    },
-    provSha() {
-      return this.provenanceBar.sha
     },
     // 侧栏「溯源」标签的数据。null = 这份文件没有溯源可看，标签整个不出现。
     provenanceForPanel() {
@@ -2350,7 +2314,7 @@ export default {
     },
     // ================= 逐段溯源（dev-board#632） =================
     // 数据流：后端按历史算好「每个单元最后是哪一版改的」→ 这里对到画布此刻的段序
-    // → 光标条与侧栏「溯源」标签。对齐必须做：后端的段序是**落版那一刻**的，律师
+    // → 侧栏「溯源」标签。对齐必须做：后端的段序是**落版那一刻**的，律师
     // 手上还没保存的插入/删除会把它推着漂，按 key 硬对会把名字贴到邻段头上。
 
     /** 只读命令的薄封装：溯源整条是锦上添花，任何失败都只让它静默，不打扰编辑。 */
@@ -2371,11 +2335,6 @@ export default {
         const res = await getProvenance(this.projectId, f.id)
         if (seq !== this._provSeq) return
         const d = (res && res.data) || {}
-        // 顶上那条小条的三个值后端**先**算好了（一次早停 walk + 一次单路径 status），
-        // 所以逐段回溯超预算那条路也带着——不然律师要盯着一条空白小条等几十秒。
-        this.provVersioned = !!d.versioned
-        this.provDirty = !!d.dirty
-        this.provFileVersion = d.fileVersion || null
         // 后端还在算逐段归属（首次对着老文件回溯几百版）：3 秒后再问一次。
         if (d.computing) {
           clearTimeout(this._provRetryTimer)
@@ -2397,9 +2356,6 @@ export default {
         this.provLoaded = false
         this.provUnits = []
         this.provRows = []
-        this.provVersioned = false
-        this.provDirty = false
-        this.provFileVersion = null
       } finally {
         if (seq === this._provSeq) this.provLoading = false
       }
@@ -2433,9 +2389,9 @@ export default {
         index: para.index, text: para.text, unit: map.get(para.index) || null,
       }))
     },
-    /** 点版本身份小条 / 侧栏里的某一版 → 提交历史标签页定位到那一行。 */
+    /** 点侧栏里的某一版 → 提交历史标签页定位到那一行。 */
     openProvenanceHistory(payload) {
-      const sha = (payload && payload.sha) || this.provSha
+      const sha = payload && payload.sha
       if (!sha) return
       this.$emit('open-history', { sha, fileId: this.file && this.file.id })
     },
@@ -2559,6 +2515,12 @@ export default {
         }
         safeToOverwrite = true
         this._savedOnce = true
+        // 保存确认后通知项目入口刷新；过期文件/重载中的回执不参与当前状态。
+        if (!this._reloading && !this._saveDiscarded && !this._pendingReload && !this._checkpointInvalidated &&
+            saveContext === (this._backendSaveContext || 0) && this.file?.id === fileId &&
+            this.projectId === saveProjectId && documentCheckpointGeneration(saveProjectId, fileId) === generation) {
+          try { uni.$emit('awd:file-saved', { projectId: saveProjectId, fileId }) } catch (e) { /* ignore */ }
+        }
         this.appendLog('  ← saved to backend (fileId=' + fileId + ')')
         this._savePaused = false
         this.statusKey = prevStatusKey
@@ -2723,18 +2685,12 @@ export default {
 .libre-host { width: 100%; height: 100%; }
 /* Explicit review overview overlays the native gutter without shrinking the canvas. */
 .libre-review-overview { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; max-width: 100%; box-shadow: -8px 0 24px #00000018; }
-/* 版本身份小条：工具栏下面一条细带，右对齐一句「谁 · 哪天 · 哪一版」。
-   浅色外壳，不抢戏；能点的时候才给下划线与手型。 */
-.libre-prov-bar {
+/* 文件保存状态固定在工具栏下面，不随正文滚动。 */
+.libre-save-bar {
   display: flex; align-items: center; justify-content: flex-end; gap: 6px;
   height: 22px; flex-shrink: 0; padding: 0 10px; box-sizing: border-box;
   background: var(--awd-bg); border-bottom: 1px solid var(--awd-border-subtle);
 }
-.libre-prov-text {
-  font-size: 11px; color: var(--awd-text-2); min-width: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.libre-prov-text.clickable { color: var(--awd-accent-text); text-decoration: underline; cursor: pointer; }
 .libre-save-state { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; margin-left: auto; font-size: 11px; color: var(--awd-text-2); }
 .libre-save-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .libre-save-state .libre-save-retry { flex-shrink: 0; }
