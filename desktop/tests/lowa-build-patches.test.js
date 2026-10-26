@@ -21,6 +21,15 @@ function writeFileEnsured(filePath, content) {
 }
 
 function createMockLibreOfficeTree(rootDir, { use242Layout = false } = {}) {
+  // Exact changed anchors from core dced3bc711d18407a2cc2400eb46e8261b663d95.
+  // This fixture validates patch application, not compiled Calc UI behavior.
+  writeFileEnsured(path.join(rootDir, 'sc/source/ui/view/hdrcont.cxx'), [
+    '    aNormFont = GetFont();',
+    '    const StyleSettings& rStyleSettings = GetSettings().GetStyleSettings();',
+    '    aSelLineColor.Merge( COL_BLACK, 0xe0 );        // darken just a little bit',
+    '',
+  ].join('\n'))
+
   writeFileEnsured(
     path.join(rootDir, 'solenv/gbuild/platform/EMSCRIPTEN_INTEL_GCC.mk'),
     [
@@ -362,6 +371,20 @@ test('apply-source-patches.py applies all C++ kernel & dictionary patches cleanl
     assert.match(loktxdocCxx, /void GetWordCount\(/)
     assert.match(loktxdocCxx, /void GetOutline\(/)
 
+    // The embedded C++ palette must remain in sync with the product tokens.
+    const header = fs.readFileSync(path.join(tmpDir, 'sc/source/ui/view/hdrcont.cxx'), 'utf8')
+    const roles = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'design/tokens/awd-palette.json'), 'utf8')).roles
+    const roleBySetter = { FaceColor: 'bg', ButtonTextColor: 'text-2', DarkShadowColor: 'border', AccentColor: 'accent', HighlightColor: 'accent-text' }
+    for (const [setter, role] of Object.entries(roleBySetter)) {
+      const colors = header.match(new RegExp(`Set${setter}\\(bHeaderDark \\? Color\\(0x([A-Fa-f0-9]{6})\\) : Color\\(0x([A-Fa-f0-9]{6})\\)\\)`))
+      assert.ok(colors, `${setter} must have explicit light and dark colors`)
+      assert.equal('#' + colors[1], roles.dark[role])
+      assert.equal('#' + colors[2], roles.light[role])
+    }
+    const selectedText = header.match(/SetHighlightTextColor\(Color\(0x([A-Fa-f0-9]{6})\)\)/)
+    assert.equal('#' + selectedText[1], roles.light['text-on-accent'])
+    assert.equal('#' + selectedText[1], roles.dark['text-on-accent'])
+
     // Verify instdir dictionary slimming & Lightproof removal
     assert.ok(fs.existsSync(path.join(tmpDir, 'instdir/share/extensions/dict-en/en_US.aff')))
     assert.ok(fs.existsSync(path.join(tmpDir, 'instdir/share/extensions/dict-zh-CN/zh_CN.dic')))
@@ -412,6 +435,24 @@ test('apply-source-patches.py also supports LibreOffice 24.2 file paths (layout/
     assert.match(builder, /m_aNotifierWindow->isDisposed\(\)/)
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})
+
+test('Calc header patch rejects a missing target or changed upstream font anchor', () => {
+  for (const missing of [true, false]) {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-lowa-calc-drift-'))
+    try {
+      createMockLibreOfficeTree(tmpDir)
+      const header = path.join(tmpDir, 'sc/source/ui/view/hdrcont.cxx')
+      if (missing) fs.unlinkSync(header)
+      else fs.writeFileSync(header, fs.readFileSync(header, 'utf8').replace('aNormFont = GetFont();', 'aNormFont = GetControlFont();'))
+      const result = spawnSync('python3', [APPLY_PATCHES_PY, tmpDir], { encoding: 'utf8' })
+      assert.notEqual(result.status, 0)
+      assert.match(result.stdout, /FAIL Calc header UI font:/)
+      assert.doesNotMatch(result.stdout, /ALL_PATCHES_OK/)
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
   }
 })
 
