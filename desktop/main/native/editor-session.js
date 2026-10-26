@@ -10,9 +10,9 @@ const { REVIEW_BATCH_SIZE, hydrateReviewBatch, requireReviewDetails } = require(
 const { matchesCapiRevision, matchesUnoRevision, verifyReviewTarget } = require('./review-match.cjs')
 const unsupported = action => Object.assign(Error(`Native editor does not support ${action}`), { code: 'UNSUPPORTED_NATIVE_ACTION' })
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
-const documentActions = new Set(['get_document_text', 'get_paragraph', 'get_outline', 'find_text_locations', 'set_selection', 'clear_anchors', 'get_cursor_context', 'get_hyperlink_at_cursor'])
+const documentActions = new Set(['get_document_text', 'get_paragraph', 'get_outline', 'find_text_locations', 'set_selection', 'clear_anchors', 'get_cursor_context', 'get_hyperlink_at_cursor', 'get_review_context', 'goto_review_range'])
 const readActions = new Set([...documentActions, 'collapse_selection', 'get_bookmark_context', 'check_link_anchors', 'goto_bookmark', 'get_selection_hyperlink'])
-const textEditActions = new Set(['replace_at_position', 'replace_selection', 'insert_at_cursor', 'modify_paragraph'])
+const textEditActions = new Set(['replace_at_position', 'replace_selection', 'insert_at_cursor', 'modify_paragraph', 'apply_review_edit'])
 const evidenceWriteActions = new Set(['bookmark_selection', 'set_selection_hyperlink', 'adopt_legacy_links'])
 const commentActions = new Set(['list_comments', 'goto_comment', 'add_comment_at_selection', 'update_comment', 'delete_comment', 'reply_comment', 'set_comment_resolved'])
 const commentFields = ['id', 'author', 'content', 'timestamp', 'anchorText', 'resolved']
@@ -482,9 +482,33 @@ class NativeEditorSession {
     }
     if (action === 'list_revisions') return this.listRevisions()
     if (action === 'get_review_layout') return this.reviewLayout(params)
+    const finalRead = ['get_review_context', 'goto_review_range'].includes(action)
+      || (action === 'get_document_text' && params.__agent === true)
+    if (finalRead) {
+      const owner = this.model
+      if (this.review?.revision === this.revision && this.review.items.every(item => item.textAvailable === true))
+        return this.executeQueued(action, params, owner)
+      return this.task(() => {
+        this.assertDocument(params.documentEpoch); this.assertDocument(owner?.documentEpoch)
+        return this.review?.revision === this.revision && this.review.items.every(item => item.textAvailable === true)
+      }).then(async ready => {
+        // Hydration uses bounded queued batches, so it must run outside a task.
+        // A background context read cannot depend on the sidebar having opened.
+        if (!ready) await this.listRevisions()
+        return this.executeQueued(action, params, owner)
+      })
+    }
+    return this.executeQueued(action, params)
+  }
+  executeQueued(action, params, finalReadOwner) {
     return this.task(async () => {
       if (action === 'load_document') return this.load(params)
       this.assertDocument(params.documentEpoch)
+      if (finalReadOwner) {
+        this.assertDocument(finalReadOwner.documentEpoch)
+        if (this.review?.revision !== this.revision || !this.review.items.every(item => item.textAvailable === true))
+          throw Error('STALE_REVIEW_BATCH: document changed while preparing final-text read')
+      }
       if (action === 'native_paint') return this.paint(params)
       if (action === 'native_input') return this.input(params.action, params.params || {})
       if (action === 'export_document') {
@@ -545,7 +569,10 @@ class NativeEditorSession {
         const run = async () => {
           this.assertWrite()
           const result = await this.unoCall(action, query)
-          if (result.success !== true || typeof result.changed !== 'boolean'
+          const reviewRefused = action === 'apply_review_edit' && result.success === false
+            && ['not-writer', 'stale', 'invalid-range', 'unsupported-unicode-range', 'invalid-replacement'].includes(result.reason)
+            && result.changed === false && result.textChanged === false && result.trackingChanged === false
+          if ((!reviewRefused && result.success !== true) || typeof result.changed !== 'boolean'
               || (textEdit ? typeof result.textChanged !== 'boolean' || typeof result.trackingChanged !== 'boolean'
                 || result.changed !== (result.textChanged || result.trackingChanged)
                 : !Number.isSafeInteger(result.bookmarkMutations) || result.bookmarkMutations < 0
@@ -559,7 +586,7 @@ class NativeEditorSession {
             : value.bookmarkMutations === 0 && value.hyperlinkMutations === 0 })
           if (result.changed) this.changed()
           this.onEvent({ type: 'selection', documentEpoch: this.model.documentEpoch })
-          return result
+          return action === 'apply_review_edit' ? { ...result, revision: this.revision } : result
         } catch (error) {
           if (/EDIT_OUTCOME_UNKNOWN|EVIDENCE_OUTCOME_UNKNOWN|FINAL_TEXT_RESTORE_FAILED/.test(error.message)) this.fail(error)
           throw error
@@ -570,7 +597,7 @@ class NativeEditorSession {
         const { documentEpoch: _, ...query } = params
         const bookmarks = !this.readOnly && ['find_text_locations', 'clear_anchors'].includes(action)
         let guard = null
-        if (query.__agent && !bookmarks && this.review?.revision === this.revision
+        if ((query.__agent || ['get_review_context', 'goto_review_range'].includes(action)) && !bookmarks && this.review?.revision === this.revision
             && this.review.items.every(item => item.textAvailable === true)) {
           guard = this.currentViewRead(this.viewReadGuard) ? this.viewReadGuard
             : (this.viewReadGuard = { model: this.model, identity: this.review, revision: this.revision, pending: new Set() })

@@ -13,7 +13,7 @@ import re
 import native_document_uno as document
 
 ACTIONS = frozenset(('replace_at_position', 'replace_selection', 'insert_at_cursor',
-                     'modify_paragraph', 'collapse_selection'))
+                     'modify_paragraph', 'collapse_selection', 'apply_review_edit'))
 MAX_DIFF_DISTANCE = 2000
 MARKDOWN = re.compile(r'(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\)|^\s*#{1,6}\s|^\s*>\s)', re.M)
 
@@ -152,7 +152,7 @@ def write_author(access, given, surname):
 
 
 @contextmanager
-def mutation(model, uno_mod, context, agent):
+def mutation(model, uno_mod, context, agent, title=None):
     # Display suppression may never span an actual edit or future saves would
     # miss the modified signal. Refuse an already suppressed model.
     if model.isSetModifiedEnabled() is not True:
@@ -161,7 +161,7 @@ def mutation(model, uno_mod, context, agent):
     old_author = (access.getByName('givenname'), access.getByName('sn')) if access else None
     manager = model.getUndoManager()
     try:
-        manager.enterUndoContext('AI 文本修改' if agent else '文本修改')
+        manager.enterUndoContext(title or ('AI 文本修改' if agent else '文本修改'))
     except Exception as error:
         raise RuntimeError('EDIT_OUTCOME_UNKNOWN: undo context could not be entered: ' + str(error)) from error
     try:
@@ -265,6 +265,8 @@ class NativeDocumentEdits:
         if not model.getURL():
             raise ValueError('Native document URL is required')
         agent = bool(params.get('__agent'))
+        if action == 'apply_review_edit':
+            return self.review_edit(params, model, uno_mod, context, revision, agent)
         if action == 'collapse_selection':
             to = params.get('to', 'end')
             if to not in ('start', 'end'):
@@ -339,6 +341,62 @@ class NativeDocumentEdits:
                 # the intended string as evidence that the native edit worked.
                 self.finish_selection(model, action, target)
                 return self.result(action, params, target, new, old != new, force_tracking and not recording)
+
+    @staticmethod
+    def review_edit(params, model, uno_mod, context, revision, agent):
+        unchanged = dict(changed=False, textChanged=False, trackingChanged=False)
+        with final_view(model, uno_mod, True):
+            checked = document.check_review_range(model, params, revision)
+            if not checked['success']:
+                return dict(checked, **unchanged)
+            replacement = params.get('replacement')
+            if (not isinstance(replacement, str) or document.utf16_length(replacement) > 15000
+                    or any(char in '\r\n\x00' or 0xD800 <= ord(char) <= 0xDFFF for char in replacement)):
+                return dict(document.review_unavailable('invalid-replacement'), **unchanged)
+            target, paragraph = checked['range'], checked['paragraph']
+            # Range validation excludes surrogates through end, so these offsets
+            # are also Python/UNO character offsets. The trailing text stays exact.
+            expected = params['expectedParagraph'][:params['start']] + replacement + params['expectedParagraph'][params['end']:]
+            recording = model.getPropertyValue('RecordChanges')
+            if type(recording) is not bool:
+                raise RuntimeError('TRACKING_STATE_UNAVAILABLE')
+            if replacement == params['quote'] and recording:
+                return dict(success=True, revision=revision, **unchanged)
+            manager, title = model.getUndoManager(), '采用审校建议'
+            before = list(manager.getAllUndoActionTitles())
+            try:
+                with mutation(model, uno_mod, context, agent, title):
+                    if not recording:
+                        model.setPropertyValue('RecordChanges', True)
+                        if model.getPropertyValue('RecordChanges') is not True:
+                            raise RuntimeError('Tracking enablement was not confirmed')
+                    # No partial replacement is published before both the current
+                    # paragraph and the exact live quote have been checked again.
+                    if paragraph.getString() != params['expectedParagraph'] or target.getString() != params['quote']:
+                        raise RuntimeError('Review range changed before publication')
+                    apply_replacement(target, replacement, True)
+                    if paragraph.getString() != expected:
+                        raise RuntimeError('Review edit verification failed')
+            except Exception as error:
+                try:
+                    after = list(manager.getAllUndoActionTitles())
+                    # Only this command's newly appended group may be undone.
+                    if len(after) == len(before) + 1 and after[1:] == before and after[0] == title:
+                        manager.undo()
+                    if model.getPropertyValue('RecordChanges') is not recording:
+                        model.setPropertyValue('RecordChanges', recording)
+                    if (paragraph.getString() != params['expectedParagraph']
+                            or model.getPropertyValue('RecordChanges') is not recording
+                            or list(manager.getAllUndoActionTitles()) != before):
+                        raise RuntimeError('Review rollback verification failed')
+                except Exception as rollback_error:
+                    raise RuntimeError('EDIT_OUTCOME_UNKNOWN: ' + str(rollback_error)) from error
+                # A rollback can replace the redo branch. Do not leave the host's
+                # retained inline-undo identities usable after a failed mutation.
+                raise RuntimeError('EDIT_OUTCOME_UNKNOWN: review edit rolled back; ' + str(error)) from error
+            text_changed = replacement != params['quote']
+            return dict(success=True, revision=revision, changed=text_changed or not recording,
+                        textChanged=text_changed, trackingChanged=not recording)
 
     @staticmethod
     def finish_selection(model, action, target):

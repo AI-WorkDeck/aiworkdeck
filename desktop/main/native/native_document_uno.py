@@ -16,7 +16,8 @@ from urllib.parse import quote, unquote
 
 ACTIONS = frozenset(('get_document_text', 'get_paragraph', 'get_outline',
                      'find_text_locations', 'set_selection', 'clear_anchors',
-                     'get_cursor_context', 'get_hyperlink_at_cursor'))
+                     'get_cursor_context', 'get_hyperlink_at_cursor',
+                     'get_review_context', 'goto_review_range'))
 ANCHOR_PREFIX = '__ai_anchor_'
 ANCHOR_CHANGED = '锚点原文已变化或失效，未执行编辑；请重新 doc_find_text 核对上下文后再试'
 
@@ -113,6 +114,83 @@ def cursor_context(model, params):
     selected = cursor.getString()
     return dict(success=True, selectedText=selected, hasSelection=bool(selected),
                 before=before, after=after, paragraph=utf16_slice(paragraph_text(cursor), 300))
+
+
+def review_unavailable(reason):
+    return dict(success=False, available=False, reason=reason, error=reason, message=reason)
+
+
+def check_review_range(model, params, revision):
+    # Called in final-text view; offsets belong to one immutable body paragraph.
+    if not model.supportsService('com.sun.star.text.TextDocument'):
+        return review_unavailable('not-writer')
+    if type(params.get('revision')) is not int or params['revision'] != revision:
+        return review_unavailable('stale')
+    index, start, end = (params.get(key) for key in ('paragraphIndex', 'start', 'end'))
+    expected, quote = params.get('expectedParagraph'), params.get('quote')
+    if (any(type(value) is not int for value in (index, start, end)) or index < 0 or start < 0
+            or end <= start or not isinstance(expected, str) or utf16_length(expected) > 15000
+            or not isinstance(quote, str) or not quote or end > utf16_length(expected)
+            or expected.encode('utf-16-le', 'surrogatepass')[start * 2:end * 2].decode('utf-16-le', 'surrogatepass') != quote):
+        return review_unavailable('invalid-range')
+    if any(0xD800 <= ord(char) <= 0xDFFF or ord(char) > 0xFFFF for char in utf16_slice(expected, end)):
+        return review_unavailable('unsupported-unicode-range')
+    try:
+        available = paragraphs(model)
+        paragraph = available[index] if index < len(available) else None
+        if paragraph is None or paragraph.getString() != expected:
+            return review_unavailable('stale')
+        cursor = paragraph.getText().createTextCursorByRange(paragraph.getStart())
+        if start and not cursor.goRight(start, False):
+            return review_unavailable('invalid-range')
+        if not cursor.goRight(end - start, True) or cursor.getString() != quote:
+            return review_unavailable('stale')
+        return dict(success=True, range=cursor, paragraph=paragraph)
+    except Exception:
+        return review_unavailable('stale')
+
+
+def review_context(model, revision):
+    if not model.supportsService('com.sun.star.text.TextDocument'):
+        return dict(review_unavailable('not-writer'), revision=revision)
+    try:
+        cursor = cursor_range(model)
+        body, start = model.getText(), cursor.getStart()
+        for index, paragraph in enumerate(paragraphs(model)):
+            try:
+                belongs = (body.compareRegionStarts(paragraph.getStart(), start) >= 0
+                           and body.compareRegionEnds(paragraph.getEnd(), start) <= 0)
+            except Exception:
+                return dict(review_unavailable('body-only'), revision=revision)
+            if not belongs:
+                continue
+            head = body.createTextCursorByRange(paragraph.getStart())
+            head.gotoRange(start, True)
+            text, selected = paragraph.getString(), cursor.getString()
+            return dict(success=True, available=utf16_length(text) <= 15000, revision=revision,
+                        paragraphIndex=index, text=utf16_slice(text, 15000), truncated=utf16_length(text) > 15000,
+                        numbering=numbering(paragraph), offset=utf16_length(head.getString()),
+                        selectedText=utf16_slice(selected, 15000), hasSelection=not cursor.isCollapsed(),
+                        scope='body-paragraphs')
+        return dict(review_unavailable('body-only'), revision=revision)
+    except Exception:
+        return dict(review_unavailable('unavailable-context'), revision=revision)
+
+
+def review_cursor_rect(model):
+    # Read after restoring the user's view, just like the WASM result wrapper.
+    result = dict(success=True)
+    ctrl = model.getCurrentController()
+    cursor = ctrl.getViewCursor()
+    try:
+        point = cursor.getPosition()
+        result['pos'] = dict(X=point.X, Y=point.Y)
+        result['charHeightPt'] = cursor.getPropertyValue('CharHeight')
+        result['collapsed'] = cursor.isCollapsed()
+        result['zoom'] = ctrl.getViewSettings().getPropertyValue('ZoomValue')
+    except Exception as error:
+        result['posErr'] = str(error)
+    return result
 
 
 def hyperlink_at_cursor(model):
@@ -284,6 +362,25 @@ class NativeDocumentCommands:
         # exact document range; position the visible cursor in the user's view.
         if action == 'set_selection':
             return self.select(model, params, uno_mod)
+        if action in ('get_review_context', 'goto_review_range'):
+            with final_text(model, uno_mod, True):
+                if action == 'get_review_context':
+                    result = review_context(model, revision)
+                else:
+                    checked = check_review_range(model, params, revision)
+                    if not checked['success']:
+                        return checked
+                    ctrl, target = model.getCurrentController(), checked['range']
+                    if ctrl.select(target) is False:
+                        return review_unavailable('unavailable-context')
+                    selected, story = cursor_range(model), target.getText()
+                    if (story.compareRegionStarts(selected, target) != 0
+                            or story.compareRegionEnds(selected, target) != 0):
+                        return review_unavailable('unavailable-context')
+                    result = dict(success=True, revision=revision)
+            if action == 'get_review_context' and result['success']:
+                result['cursorRectRaw'] = review_cursor_rect(model)
+            return result
         with final_text(model, uno_mod, bool(params.get('__agent'))):
             if action == 'get_document_text':
                 return self.document_text(model, params, revision)

@@ -225,10 +225,11 @@ class DocumentContractTests(unittest.TestCase):
         self.commands.anchors = {'expired': {'bookmark': expired}}
         self.assertEqual(self.commands.clear(model, False)['bookmarkMutations'], 0)
 
-    def test_only_eight_actions_and_unknown_action_refuses(self):
+    def test_supported_read_actions_and_unknown_action_refuses(self):
         self.assertEqual(document.ACTIONS, {'get_document_text', 'get_paragraph', 'get_outline',
                                            'find_text_locations', 'set_selection', 'clear_anchors',
-                                           'get_cursor_context', 'get_hyperlink_at_cursor'})
+                                           'get_cursor_context', 'get_hyperlink_at_cursor',
+                                           'get_review_context', 'goto_review_range'})
         with self.assertRaisesRegex(ValueError, 'UNSUPPORTED'):
             self.run_action('get_document_outline', Model())
 
