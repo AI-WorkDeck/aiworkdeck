@@ -7,8 +7,9 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -46,7 +47,8 @@ public class HarnessEvolutionEntry {
     @Column(length = 24)
     private String status;
 
-    @Lob
+    // PostgreSQL TEXT must use string binding rather than @Lob large-object OIDs.
+    @JdbcTypeCode(SqlTypes.LONGVARCHAR)
     @Column(name = "payload_json", nullable = false, columnDefinition = "TEXT")
     private String payloadJson;
 
