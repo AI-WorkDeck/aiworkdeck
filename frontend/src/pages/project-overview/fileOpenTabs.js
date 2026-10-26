@@ -229,6 +229,7 @@ export const fileOpenTabsMethods = {
       // 保留已有 id 的类型，避免数字/字符串来源差异重建编辑器实例。
       const sameFile = tab => tab.id != null && file.id != null
         && String(tab.id) === String(file.id) && (tab.tabType || '') === (file.tabType || '')
+        && (file.tabType !== 'cross-project-preview' || String(tab.projectId) === String(file.projectId))
       const preferredPane = this.splitMode ? this.focusedPane : 'left'
       const otherPane = preferredPane === 'left' ? 'right' : 'left'
       const preferredList = preferredPane === 'left' ? this.leftFiles : this.rightFiles
@@ -576,7 +577,7 @@ export const fileOpenTabsMethods = {
     },
     isEditorOpenableFile(file) {
       // 判断是否为「文档编辑器可打开」的 Office 类文件
-      if (!file || file.tabType === 'web' || file.tabType === 'markdown' || !file.fileType) return false
+      if (!file || file.tabType === 'web' || file.tabType === 'markdown' || file.tabType === 'cross-project-preview' || !file.fileType) return false
 
       const type = file.fileType.toLowerCase()
 

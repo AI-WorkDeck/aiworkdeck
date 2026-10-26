@@ -960,6 +960,7 @@ import { warmDragImage } from '@/utils/dragImage.js'
 import {
   DEFAULT_CONTEXT_LIMITS,
   normalizeContextLimits,
+  normalizeContextItem,
   visionNoticeKey,
   admitFileToContext,
   admitPastedImage,
@@ -2557,7 +2558,10 @@ export default {
         fileName: f.name,
         fileType: f.fileType,
         wpsFileId: f.wpsFileId,
-        isDir: f.isDir
+        isDir: f.isDir,
+        projectId: f.projectId,
+        projectName: f.projectName,
+        readOnly: f.readOnly
       })).concat(pastedFileList.map(f => ({
         id: f.id,
         fileName: f.name,
@@ -3482,13 +3486,7 @@ export default {
         // duplicate 静默：同一份拖两遍是常见误操作，弹提示只是噪音
         return
       }
-      const fileData = {
-        id: file.id,
-        name: file.name,
-        fileType: file.fileType,
-        wpsFileId: file.wpsFileId,
-        isDir: file.isDir || file.fileType === 'folder'
-      }
+      const fileData = normalizeContextItem(file)
       contextFiles.value.push(fileData)
       // 只有真挂了音视频才去问「它转写过没有」（dev-board#814 K34；视频见 #1024）
       if (isTranscribableMedia(fileData)) refreshTranscribedAudio()
@@ -3509,6 +3507,9 @@ export default {
       const displayName = truncateName(file.name)
       // 文件名由项目成员自由命名（后端只挡路径分隔符），这段字符串会直接进 DOM，必须转义
       const safeDisplayName = escapeHtml(displayName)
+      const projectBadge = file.projectName
+        ? `<span class="ctx-project-badge">${escapeHtml(file.projectName)} /</span>`
+        : ''
       // 淡态 = 上一轮带过的，仍然会继续带上（这才是 E-2 要的跨轮保留）；
       // title 里明说这件事，否则用户会以为淡态是「已失效」
       const carriedClass = carried ? ' is-carried' : ''
@@ -3518,6 +3519,7 @@ export default {
         <span class="context-tag-inline${carriedClass}" contenteditable="false" data-file-id="${file.id}" data-is-dir="${file.isDir ? 'true' : 'false'}" title="${tagTitle}">
           <img src="${icon}" class="tag-icon"/>
           <span class="tag-at">@</span>
+          ${projectBadge}
           <span class="tag-name">${safeDisplayName}</span>
           <span class="tag-close">×</span>
         </span>&nbsp;`.replace(/\s+/g, ' ').trim()
@@ -3594,7 +3596,7 @@ export default {
       if (!Array.isArray(fileList) || !fileList.length) return
       carriedFileIds.value = []
       for (const f of fileList) {
-        addFile({ id: f.id, name: f.fileName, fileType: f.fileType, wpsFileId: f.wpsFileId, isDir: f.isDir })
+        addFile({ id: f.id, name: f.fileName, fileType: f.fileType, wpsFileId: f.wpsFileId, isDir: f.isDir, projectId: f.projectId, projectName: f.projectName, readOnly: f.readOnly })
       }
       if (richInput.value) inputPrompt.value = richInput.value.innerText
     }
@@ -4103,6 +4105,20 @@ export default {
       return { files, failed }
     }
 
+    const attachCrossProjectFile = (contextItem) => {
+      if (!contextItem) return
+      addFile(contextItem)
+      uni.showToast({ title: t('chat.crossProjectAttached', { name: contextItem.name }), icon: 'none' })
+    }
+
+    const sendQuickPrompt = (promptText) => {
+      const prompt = String(promptText || '').trim()
+      if (!prompt) return
+      inputPrompt.value = prompt
+      if (richInput.value) richInput.value.textContent = prompt
+      nextTick(() => handleSubmit())
+    }
+
     // 外部面板（如股东大会核查）注入预设 prompt：强制 AGENT 模式发送
     // （skill 注入依赖 prompt 文本内的触发词；ASK 模式会跳过注入）。
     // 返回本次会话 ID，供调用方把业务对象绑定到该会话。
@@ -4293,6 +4309,7 @@ export default {
     // Expose methods for parent ref access
     expose({
       addFile, loadMessages, loadConversationMetadata, sendExternalPrompt, resumeAfterRestart,
+      attachCrossProjectFile, sendQuickPrompt,
       startNewChat, menuSetMode, menuStop, menuState,
       uploadLocalFilesAndAddContext,
       handleReviewSubmit, handleReviewState,
@@ -5642,6 +5659,15 @@ export default {
  :deep(.tag-at) {
    color: var(--awd-accent-text);
    font-weight: 600;
+ }
+
+ :deep(.ctx-project-badge) {
+   max-width: 88px;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+   color: var(--awd-text-3);
+   font-size: var(--awd-panel-fs-meta);
  }
 
  :deep(.tag-name) {

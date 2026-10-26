@@ -26,6 +26,25 @@
         <text class="welcome-lead">{{ $t('onboarding.unlock.brand.lead') }}</text>
       </view>
 
+      <view class="welcome-quick-chat">
+        <textarea
+          v-model="quickPrompt"
+          class="welcome-quick-chat-input"
+          :placeholder="$t('workbench.welcome.quickChatPlaceholder')"
+          :maxlength="-1"
+          :auto-height="true"
+          @keydown.enter.exact.prevent="submitQuickChat"
+        />
+        <view class="welcome-quick-chat-actions">
+          <view class="welcome-quick-chat-pills">
+            <view class="welcome-quick-pill" @click="$emit('start-chat', { prompt: '' })">💬 {{ $t('workbench.welcome.enterChatMode') }}</view>
+            <view class="welcome-quick-pill" @click="$emit('quick-create-doc', 'docx')">📝 {{ $t('workbench.welcome.quickNewDocx') }}</view>
+            <view class="welcome-quick-pill" @click="$emit('quick-create-doc', 'md')">📄 {{ $t('workbench.welcome.quickNewMd') }}</view>
+          </view>
+          <view class="welcome-quick-send" @click="submitQuickChat">{{ $t('workbench.welcome.quickChatSend') }} ↵</view>
+        </view>
+      </view>
+
       <view class="welcome-columns">
         <view class="welcome-col welcome-col-main">
           <view class="welcome-section welcome-start">
@@ -159,9 +178,10 @@ export default {
     /** 「启动时显示欢迎页」当前值（本机记忆由宿主持有） */
     showOnStartup: { type: Boolean, default: true },
   },
-  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'open-projects-pane', 'open-client-workspace', 'update:show-on-startup'],
+  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'open-projects-pane', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc'],
   data() {
     return {
+      quickPrompt: '',
       recentProjects: [],
       recentState: 'loading', // loading | ready | error
       showCloudAccept: false,
@@ -215,6 +235,11 @@ export default {
     setGlobalOverlay(false, this._overlayHolder)
   },
   methods: {
+    submitQuickChat() {
+      const prompt = (this.quickPrompt || '').trim()
+      this.$emit('start-chat', { prompt })
+      this.quickPrompt = ''
+    },
     async loadRecent() {
       this.recentState = 'loading'
       try {
@@ -317,6 +342,65 @@ export default {
   color: var(--awd-text-2);
   line-height: 1.6;
   max-width: 560px;
+}
+
+.welcome-quick-chat {
+  margin: -12px 0 32px;
+  padding: 12px;
+  border: 1px solid var(--awd-border-strong);
+  border-radius: var(--awd-radius-dialog);
+  background: var(--awd-bg);
+  box-shadow: var(--awd-shadow-sm);
+}
+
+.welcome-quick-chat-input {
+  width: 100%;
+  min-height: 54px;
+  max-height: 140px;
+  padding: 4px;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  color: var(--awd-text);
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
+}
+
+.welcome-quick-chat-actions,
+.welcome-quick-chat-pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.welcome-quick-chat-actions {
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.welcome-quick-pill,
+.welcome-quick-send {
+  padding: 5px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: var(--awd-panel-fs);
+}
+
+.welcome-quick-pill {
+  background: var(--awd-surface-2);
+  color: var(--awd-text-2);
+}
+
+.welcome-quick-pill:hover {
+  color: var(--awd-accent-text);
+  background: var(--awd-accent-soft);
+}
+
+.welcome-quick-send {
+  flex-shrink: 0;
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
 }
 
 .welcome-columns {
