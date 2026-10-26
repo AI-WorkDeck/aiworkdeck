@@ -418,6 +418,10 @@ CSS 在弹窗期间把 `.pane-content` 里的 `iframe`/`webview` 置 `visibility
 `npm run test:desensitize`（41 项，含新增 `tests/desensitize/credential-rules.test.mjs`）；
 `cd desktop && node --test tests/recovery-download.test.js`（7 项，已进 desktop `npm test` 清单）。
 
+## 动态腾讯会议插件授权（dev-board#1495/#1496，2026-10-26）
+
+当前市场插件位于 `official-plugins/tencent-meeting`。opaque iframe 内复制链接先在点击事件中同步执行，并核对复制结果；不可因浏览器提供 Clipboard API 就假设写入成功，也不把短期授权 URL 存入剪贴板历史。授权进程存活时不启动 `--version`、`auth status` 或其他 CLI 命令，以免争用 CLI 凭据锁。宿主内跨插件重扫只共享进程 PID/启动时间；授权 URL 仅保存在原实例内存，新实例不能取消旧授权。前端遇到 pending 恢复轮询并允许继续授权；跨重扫取不回链接时提示回原浏览器完成。验证为插件 Java/前端套件与 `tests/auth-copy-browser.mjs`（真实 Chrome、合成服务和隔离剪贴板）。本契约不保证外部应用同时运行 CLI 的互斥；真实 OAuth 与 Windows 实机需另行验收。
+
 ## 内置腾讯会议面板契约（dev-board#1197，2026-10-11）
 
 用户截图对应旧内置TencentMeetingPanel，并非动态market插件。认证POST `/api/tmeet/auth/login-start`，状态字段为loggedIn/userName/cliAvailable；不存在`/auth/login`，错误请求会落到NoResourceFoundException。退出data=false不表示断开。同步POST `/sync` 的projectId/force在query（Controller @RequestParam）；两个AI材料端点minutes-prompt/todos-prompt为POST，取data.prompt字符串。失败不能伪造提示词或成功状态。

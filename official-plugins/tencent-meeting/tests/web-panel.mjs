@@ -106,8 +106,8 @@ test('login links are copyable and status polling is bounded to the login wait',
   const p = await panel({ invoke: ({ action }) => action === 'status' ? { cliAvailable: true, loggedIn: false } : undefined });
   t.after(() => p.dom.window.close()); await p.click('login');
   assert.equal(p.$('authorization').hidden, false); assert.equal(p.$('authorize-url').readOnly, true);
-  for (let i = 0; i < 41; i++) await p.timer();
-  assert.equal(p.calls.filter((call) => call.action === 'status').length, 40);
+  for (let i = 0; i < 111; i++) await p.timer();
+  assert.equal(p.calls.filter((call) => call.action === 'status').length, 110);
   assert.match(p.$('login-wait').textContent, /已停止自动检查/); assert.equal(await p.timer(), false);
   await p.click('copy-url'); assert.match(p.$('feedback').textContent, /手动复制/);
 });
@@ -168,4 +168,85 @@ test('missing Node guidance is visible and checking again recovers without login
   await p.click('refresh');
   assert.match(p.$('connection-status').textContent, /Synthetic User/);
   assert.equal(p.calls.filter(call => call.action === 'login').length, 0);
+});
+
+
+test('copy tries synchronous selection before a policy-blocked Clipboard API', async (t) => {
+  const p = await panel(); t.after(() => p.dom.window.close()); await p.click('login');
+  const copied = [];
+  p.dom.window.document.execCommand = command => { assert.equal(command, 'copy'); copied.push(p.$('authorize-url').value); return true; };
+  Object.defineProperty(p.dom.window.navigator, 'clipboard', { value: { writeText: () => { throw new Error('must not use blocked API'); } } });
+  await p.click('copy-url');
+  assert.deepEqual(copied, [fixture.login.authorizeUrl]);
+  assert.match(p.$('feedback').textContent, /已复制/);
+  assert.equal(p.$('feedback').dataset.error, 'false');
+});
+
+test('copy falls back to Clipboard API and never claims success when both copies fail', async (t) => {
+  const p = await panel(); t.after(() => p.dom.window.close()); await p.click('login');
+  const copied = []; let fail = false;
+  p.dom.window.document.execCommand = () => false;
+  Object.defineProperty(p.dom.window.navigator, 'clipboard', { value: { writeText: async text => { if (fail) throw new Error('blocked'); copied.push(text); } } });
+  await p.click('copy-url');
+  assert.deepEqual(copied, [fixture.login.authorizeUrl]);
+  assert.match(p.$('feedback').textContent, /已复制/);
+  fail = true; await p.click('copy-url');
+  assert.match(p.$('feedback').textContent, /手动复制/);
+  assert.doesNotMatch(p.$('feedback').textContent, /已复制/);
+  assert.equal(p.$('feedback').dataset.error, 'true');
+});
+
+test('authorization survives a transient status failure and enables sync after the login process finishes', async (t) => {
+  let checks = 0;
+  const p = await panel({ invoke: ({ action }) => {
+    if (action !== 'status') return;
+    if (++checks === 1) throw new Error('temporary failure');
+    return { cliAvailable: true, loggedIn: checks >= 3, loginPending: checks < 3 };
+  } });
+  t.after(() => p.dom.window.close()); await p.click('login');
+  assert.equal(p.$('login').disabled, true);
+  await p.timer(); assert.match(p.$('login-wait').textContent, /正在重试/);
+  await p.timer(); assert.match(p.$('connection-status').textContent, /等待浏览器授权/);
+  assert.equal(p.$('sync').disabled, true);
+  await p.timer(); assert.match(p.$('connection-status').textContent, /已连接/);
+  assert.equal(p.$('authorization').hidden, true); assert.equal(p.$('sync').disabled, false);
+  assert.deepEqual(p.calls.slice(-2).map(call => call.action), ['config', 'list']);
+});
+
+test('returning from browser authorization rechecks without waiting for the next timer', async (t) => {
+  const p = await panel(); t.after(() => p.dom.window.close()); await p.click('login');
+  p.dom.window.dispatchEvent(new p.dom.window.Event('focus')); await tick();
+  assert.equal(p.calls.filter(call => call.action === 'status').length, 1);
+  assert.equal(p.$('authorization').hidden, true); assert.equal(p.$('sync').disabled, false);
+});
+
+test('reopening or switching projects can resume the existing authorization link and polling', async (t) => {
+  let connected = false;
+  const p = await panel({ invoke: ({ action }) => action === 'status'
+    ? { cliAvailable: true, loggedIn: connected, loginPending: !connected } : undefined });
+  t.after(() => p.dom.window.close());
+  await p.click('refresh');
+  assert.equal(p.$('login').disabled, false);
+  assert.match(p.$('login').textContent, /继续授权/);
+  await p.click('login');
+  assert.equal(p.$('authorize-url').value, fixture.login.authorizeUrl);
+  await p.switch({ projectId: 2, language: 'zh-CN' });
+  await p.click('refresh'); await p.click('login');
+  assert.equal(p.$('authorize-url').value, fixture.login.authorizeUrl);
+  connected = true; await p.timer();
+  assert.equal(p.$('sync').disabled, false); assert.equal(p.$('authorization').hidden, true);
+});
+
+test('a plugin reload without its old link keeps checking and explains how to finish authorization', async (t) => {
+  let connected = false;
+  const p = await panel({ invoke: ({ action }) => action === 'status'
+    ? { cliAvailable: true, loggedIn: connected, loginPending: !connected }
+    : action === 'login' ? { loginPending: true } : undefined });
+  t.after(() => p.dom.window.close());
+  await p.click('refresh'); await p.click('login');
+  assert.match(p.$('feedback').textContent, /原浏览器/);
+  assert.equal(p.$('feedback').dataset.error, 'false');
+  assert.equal(p.$('authorization').hidden, true);
+  connected = true; await p.timer();
+  assert.equal(p.$('sync').disabled, false);
 });
