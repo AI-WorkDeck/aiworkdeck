@@ -27,7 +27,23 @@ void wheel_cb() {
     QWasmEventDispatcher::maintainTimers();
 }
 `
-function run(body, source = fixture) {
+// windowAt code at qtbase a320678c85ec8029d5394bcd673d4c208af1de3a,
+// with only blank lines and existing debug comments omitted.
+const compositorFixture = `QWindow *QWasmCompositor::windowAt(QPoint globalPoint, int padding) const
+{
+    int index = m_windowStack.count() - 1;
+    while (index >= 0) {
+        const QWasmCompositedWindow &compositedWindow = m_compositedWindows[m_windowStack.at(index)];
+        QRect geometry = compositedWindow.window->windowFrameGeometry()
+                         .adjusted(-padding, -padding, padding, padding);
+        if (compositedWindow.visible && geometry.contains(globalPoint))
+            return m_windowStack.at(index)->window();
+        --index;
+    }
+    return 0;
+}
+`
+function run(body, source = fixture, compositor = compositorFixture) {
   return spawnSync('python3', ['-c', `
 import importlib.util, json, sys, tempfile
 from pathlib import Path
@@ -35,9 +51,17 @@ from unittest.mock import patch
 spec = importlib.util.spec_from_file_location('qt_patch', sys.argv[1])
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
-source = json.load(sys.stdin)
+payload = json.load(sys.stdin)
+source, compositor = payload['source'], payload['compositor']
+def make_tree(root):
+    target = root / m.SOURCE
+    target.parent.mkdir(parents=True)
+    target.write_text(source)
+    hit_test = root / m.COMPOSITOR_SOURCE
+    hit_test.write_text(compositor)
+    return target, hit_test
 ${body}
-`, patcher], { input: JSON.stringify(source), encoding: 'utf8', env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } })
+`, patcher], { input: JSON.stringify({ source, compositor }), encoding: 'utf8', env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } })
 }
 function succeeds(result) {
   assert.equal(result.status, 0, result.stderr || result.stdout)
@@ -67,9 +91,7 @@ for (const [name, source] of [
     succeeds(run(`
 with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)
-    target = root / m.SOURCE
-    target.parent.mkdir(parents=True)
-    target.write_text(source)
+    target, hit_test = make_tree(root)
     with patch.object(m.subprocess, 'check_output', return_value=m.EXPECTED_QTBASE):
         try:
             m.apply(root)
@@ -78,6 +100,7 @@ with tempfile.TemporaryDirectory() as directory:
         else:
             raise AssertionError('invalid source accepted')
     assert target.read_text() == source
+    assert hit_test.read_text() == compositor
 `, source))
   })
 }
@@ -86,9 +109,7 @@ test('rejects unpinned Qt commit before modifying source', () => {
   succeeds(run(`
 with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)
-    target = root / m.SOURCE
-    target.parent.mkdir(parents=True)
-    target.write_text(source)
+    target, hit_test = make_tree(root)
     with patch.object(m.subprocess, 'check_output', return_value='0' * 40):
         try:
             m.apply(root)
@@ -97,6 +118,7 @@ with tempfile.TemporaryDirectory() as directory:
         else:
             raise AssertionError('wrong commit accepted')
     assert target.read_text() == source
+    assert hit_test.read_text() == compositor
 `))
 })
 
@@ -104,21 +126,77 @@ test('pinned source writes once and repeat application preserves modification ti
   succeeds(run(`
 with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)
-    target = root / m.SOURCE
-    target.parent.mkdir(parents=True)
-    target.write_text(source)
+    target, hit_test = make_tree(root)
     with patch.object(m.subprocess, 'check_output', return_value=m.EXPECTED_QTBASE):
         m.apply(root)
         first = target.read_text()
         stamp = target.stat().st_mtime_ns
+        first_hit_test = hit_test.read_text()
+        hit_test_stamp = hit_test.stat().st_mtime_ns
         m.apply(root)
         assert target.read_text() == first
         assert target.stat().st_mtime_ns == stamp
+        assert hit_test.read_text() == first_hit_test
+        assert hit_test.stat().st_mtime_ns == hit_test_stamp
+`))
+})
+
+test('hit testing honors input transparency without excluding interactive tooltip-type popups', () => {
+  const result = succeeds(run('print(m.patch_compositor(compositor), end="")'))
+  assert.equal(result, compositorFixture.replace(
+    'if (compositedWindow.visible && geometry.contains(globalPoint))',
+    'if (compositedWindow.visible\n            && !compositedWindow.window->window()->flags().testFlag(Qt::WindowTransparentForInput)\n            && geometry.contains(globalPoint))'))
+  assert.doesNotMatch(result, /Qt::ToolTip|Qt::Popup/)
+  succeeds(run('once = m.patch_compositor(compositor)\nassert m.patch_compositor(once) == once'))
+})
+
+for (const mode of ['missing file', 'changed anchor', 'duplicate anchor', 'mixed original and patched']) {
+  test(`rejects compositor ${mode} before writing either source`, () => {
+    succeeds(run(`
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory)
+    target, hit_test = make_tree(root)
+    mode = ${JSON.stringify(mode)}
+    if mode == 'missing file':
+        hit_test.unlink()
+    elif mode == 'changed anchor':
+        hit_test.write_text(compositor.replace('geometry.contains(globalPoint)', 'geometry.contains(otherPoint)'))
+    elif mode == 'duplicate anchor':
+        hit_test.write_text(compositor + compositor)
+    else:
+        hit_test.write_text(compositor + m.patch_compositor(compositor))
+    before = hit_test.read_text() if hit_test.exists() else None
+    with patch.object(m.subprocess, 'check_output', return_value=m.EXPECTED_QTBASE):
+        try:
+            m.apply(root)
+        except (ValueError, FileNotFoundError):
+            pass
+        else:
+            raise AssertionError('invalid compositor accepted')
+    assert target.read_text() == source
+    assert (hit_test.read_text() if hit_test.exists() else None) == before
+`))
+  })
+}
+
+test('adds hit-test fix to an already clock-patched tree without rewriting clock source', () => {
+  succeeds(run(`
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory)
+    target, hit_test = make_tree(root)
+    target.write_text(m.patch_source(source))
+    before = target.read_text()
+    stamp = target.stat().st_mtime_ns
+    with patch.object(m.subprocess, 'check_output', return_value=m.EXPECTED_QTBASE):
+        m.apply(root)
+    assert target.read_text() == before
+    assert target.stat().st_mtime_ns == stamp
+    assert hit_test.read_text() == m.patch_compositor(compositor)
 `))
 })
 
 test('command line reports nonzero on absent Qt source checkout', () => {
   const result = spawnSync('python3', [patcher, '/nonexistent/awd-qt-patch-source'], { encoding: 'utf8' })
   assert.equal(result.status, 1)
-  assert.match(result.stderr, /FAIL Qt input-clock patch/)
+  assert.match(result.stderr, /FAIL Qt input patches/)
 })

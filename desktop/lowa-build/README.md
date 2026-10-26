@@ -101,18 +101,27 @@ evidence of native runtime correctness.
 本轮范围与近期未并入项见 [重烧复核](REBUILD-2026-10-26.md)。
 `mega-build.sh` 现钉死 core、Qt5、emscripten fork 和 emsdk 源码提交；
 新增的 `patches/apply-qt-patches.py` 须与其他构建脚本一起上传到 `/root/`。
-它在 Qt 子模块初始化后、configure 前修正鼠标及滚轮的计时来源。
+它在 Qt 子模块初始化后、configure 前修正鼠标及滚轮的计时来源，并让窗口命中尊重输入透明标记。
 已有 Qt 安装目录会拒绝继续，避免静默链接旧库；使用干净构建目录。
 
 表头补丁只修改 Calc 的 `ScHeaderControl`：包内 Liberation Sans 9pt、
 与产品令牌一致的局部深浅配色。没有改动正文/单元格格式或全局 Qt 调色板。
 正式 wrapper 的旧引擎点击补偿仍保留。
 
+#1515 补充修复在 WASM 的真实 tooltip frame 上保留输入透明语义，配合 Qt 命中补丁，
+让尺寸提示框显示时不截走拖动。不能统一跳过 `Qt::ToolTip` 类型：LO 的交互式下拉框也用此类型。
+
 构建后使用 `LOWA_ENGINE_DIR` 指向候选产物，运行
 `npm run test:lowa-calc-chrome` 与 `npm run test:lowa-mouse-clock`；
 `LOWA_MOUSE_CLOCK_DRAG=1` 另跑生产补偿及测试专用取消补偿的拖移/撤销。
-`CALC_HEADER_RESIZE=1` 另验原生菜单/工具栏可见时的真实行列拖动、双击与重开；
-隐藏chrome时顶部提示窗截获输入是旧新共有的已知问题（dev-board#1515），不得把前者通过当作后者已修复。
+默认检查产品裸画布下真实行列拖动、反向缩小、撤销、双击与重开；
+`CALC_HEADER_NATIVE_CHROME=1` 才额外打开原生菜单/工具栏用于对照。
+仅在样式诊断时用 `CALC_HEADER_RESIZE=0` 明确跳过，结果中会记录 SKIP。
+首个 r7 候选仍复现顶部提示框截获输入，补充候选必须在相同裸画布路径通过；
+不得仅隐藏提示框或改变布局避开失败。
+`node frontend/tests/lowa-e2e/native-font-popup.mjs` 另用真实鼠标选择原生字体下拉项、检查单元格格式与撤销，
+防止误伤同属 `ToolTip` 类型的交互窗口。该测试用 UITest 读取原生控件几何，不调用其动作 API；
+UITest 可能关闭控件双缓冲，因此这项只作输入回归，不用来证明标题像素或渲染性能。
 两项样式/慢击断言须先在旧 r6 失败再在新引擎通过。具体产物与实际验收
 结果写入 `RECIPE.md`；没有真实结果的候选不能替换默认引擎地址。
 

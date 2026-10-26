@@ -21,6 +21,13 @@ function writeFileEnsured(filePath, content) {
 }
 
 function createMockLibreOfficeTree(rootDir, { use242Layout = false } = {}) {
+  writeFileEnsured(path.join(rootDir, 'vcl/qt5/QtFrame.cxx'), [
+    '        else if (nStyle & SalFrameStyleFlags::TOOLTIP)',
+    '            aWinFlags = Qt::ToolTip;',
+    '        else if (isPopup())',
+    '            aWinFlags = Qt::ToolTip | Qt::FramelessWindowHint;',
+    '',
+  ].join('\n'))
   // Exact changed anchors from core dced3bc711d18407a2cc2400eb46e8261b663d95.
   // This fixture validates patch application, not compiled Calc UI behavior.
   writeFileEnsured(path.join(rootDir, 'sc/source/ui/view/hdrcont.cxx'), [
@@ -344,6 +351,11 @@ test('apply-source-patches.py applies all C++ kernel & dictionary patches cleanl
     const qtInstanceCxx = fs.readFileSync(path.join(tmpDir, 'vcl/qt5/QtInstance.cxx'), 'utf8')
     assert.match(qtInstanceCxx, /AAA-CJK\.ttc/)
 
+    const qtFrameCxx = fs.readFileSync(path.join(tmpDir, 'vcl/qt5/QtFrame.cxx'), 'utf8')
+    assert.match(qtFrameCxx, /SalFrameStyleFlags::TOOLTIP\)\n        \{\n            aWinFlags = Qt::ToolTip;\n            if \(QGuiApplication::platformName\(\) == "wasm"\)\n                aWinFlags \|= Qt::WindowTransparentForInput;/)
+    assert.match(qtFrameCxx, /else if \(isPopup\(\)\)\n            aWinFlags = Qt::ToolTip \| Qt::FramelessWindowHint;/)
+    assert.equal(qtFrameCxx.match(/WindowTransparentForInput/g).length, 1)
+
     const frmpaintCxx = fs.readFileSync(path.join(tmpDir, 'sw/source/core/text/frmpaint.cxx'), 'utf8')
     assert.match(frmpaintCxx, /FindTabFrame\(\)/)
     assert.match(frmpaintCxx, /GetExternalReviewWidth\(\)/)
@@ -450,6 +462,25 @@ test('Calc header patch rejects a missing target or changed upstream font anchor
       assert.notEqual(result.status, 0)
       assert.match(result.stdout, /FAIL Calc header UI font:/)
       assert.doesNotMatch(result.stdout, /ALL_PATCHES_OK/)
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  }
+})
+
+test('WASM tooltip patch rejects changed or duplicated tooltip anchors', () => {
+  for (const duplicate of [false, true]) {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-lowa-tooltip-drift-'))
+    try {
+      createMockLibreOfficeTree(tmpDir)
+      const target = path.join(tmpDir, 'vcl/qt5/QtFrame.cxx')
+      const source = fs.readFileSync(target, 'utf8')
+      const invalid = duplicate ? source + source : source.replace('SalFrameStyleFlags::TOOLTIP', 'SalFrameStyleFlags::FLOAT')
+      fs.writeFileSync(target, invalid)
+      const result = spawnSync('python3', [APPLY_PATCHES_PY, tmpDir], { encoding: 'utf8' })
+      assert.notEqual(result.status, 0)
+      assert.match(result.stdout, /FAIL WASM tooltip input transparency:/)
+      assert.equal(fs.readFileSync(target, 'utf8'), invalid)
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
