@@ -49,7 +49,21 @@ Writer 的 `ShowTextBoundaries` 与格式标记联动：打开 ¶ 时会把文�
 
 宿主同文件 AI 完成的即时审阅刷新取消此前已覆盖的 modified 停笔计时器；后续真实编辑仍重新排刷新。回归 `test:lowa-paragraph-performance` 用真实引擎核对 60 段合成正文中 24 段修改、批注框切换、DOCX 原稿/目标稿双向还原及重开续改；`async-view-switch.test.mjs` 覆盖全部初始显示态、异常、重叠批次及排队署名。不得把合成引擎测试称为已安装客户端升级后的用户原稿复测。
 
+**原生候选的页边审阅（dev-board#1474，默认关闭）**：`nativeOfficeSurface` 复用 `zetaOfficeReviewBalloons`，卡片用原生修订 ID 关联完整元数据，定位采用宿主当前 tile 视口，不能用 headless UNO 的整篇视口。侧栏与气泡对同一模型/修订世代共用在途清单读取，完成后不长期缓存。气泡裁决内部切回正文显示时，Writer 的删除摘要会重新展开；只有明确的内部显示切换、Insert/Delete 且完整文字可用时允许该显示摘要差异，原生 ID、作者、类型、时间、UNO 唯一标识和完整文本仍逐一验证。格式修订不放宽。视图重排可能让已排队绘制的页面宽度过期；主进程返回当前尺寸，宿主重新绘制，不把它当引擎崩溃，不重放写操作。完整窗口已验证实际菜单、气泡接受/撤销、三态切换、侧栏批注回复/解决/重开、历史与比较；其他原生编辑能力与最终正常负载门槛仍待验。
+
+原生 `get_review_context`、`goto_review_range`、`apply_review_edit` 复用正文最终稿、UTF-16 坐标及 revision/原文校验；即使非 `__agent` UI 请求也不能读到删除层。最终稿全文与审校读取在缺少证明时分批建立现有完整审阅快照，不能依赖用户先打开侧栏，否则自身显示切换会把刚返回的 revision 弄过期；真实修改仍使旧建议失效。采用建议形成一个跟踪修改撤销组；普通校验拒绝返回确认无变化的回执，写入后异常仅撤回自己新增的组并核验原文，因 redo 身份不确定仍锁定后续写入。`desktop/tests/test_native_review_actions.py` 含便携测试和显式运行时门控的真实读/定位/采用/撤销/重开/故障回滚验收。600 修订诊断仍有约2秒级首次建立证明、随后数百毫秒读取成本，不代表完整 UI 无延迟；正文浮球和自动补全接线另验，不能把三个动作通过称为全部审校体验通过。
+
 ## 关键文件
+
+原生补全/续写与右键上下文：`native_completion_uno.py` 保持既有五个写作动作及右键两动作；token 同时校验文档、revision、权限代次、实际选区和前后文，IME/只读/旧 token 拒绝须确认零改动。成功写入后的后续资料 token 必须在宿主确认 revision、重新建立最终稿证明并核对刚写完的位置后取得；期间有新输入则返回空 token，不重放写入。资料为真实多段/表格，默认表格字体、边框、行段距与数字对齐读取同一份 `house-default.json`，缺失/损坏明确失败；项目覆盖画像尚未接线。`test_native_completion.py` 真实引擎覆盖采用、失败回滚、撤销重做、格式和 DOCX 重开。会话元数据（包括 `nativePermissionSeq`）必须在调用工具栏严格参数校验前剥除，`test_native_toolbar.py` 覆盖缩放/视图/外壳分派，防补全接入破坏已有按钮。
+
+`nativeOfficeAssistance` 复用原审校、补全与语义写作组件，但原生同页多实例必须使用各自容器、输入事件目标和视口边界；不能用全 document 查询另一份文档的菜单或监听它的 IME。正文提交应答后才通知补全/学习；权限待确认、撤回、换文档、销毁均撤掉可写状态与旧响应。原 WASM 默认参数不变。真实完整窗口验收独立于 jsdom 的双实例与生命周期回归。
+
+补全、语义写作、审校和标尺的上下文读取，以及 `get_document_text(__agent:true)` 最终正文读取，统一等待当前输入队列提交，宿主通用 transport 与组件直调都必须经过该屏障；返回后再核对模型、输入实例及权限代次，撤权后再授权也不能接回旧结果。补全写操作自身的通知仅在本次操作范围内延后失效，且须有成功回执、写后新 token 与未被真实输入打断的证明；不能用全局 busy 忽略选区或权限变化。`native-office-surface.test.js` 包含回读自触发、输入顺序、换文档与权限往返的负向回归。
+
+Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实修改。会话保留完整修订身份并分批核对 UNO 全文，完成一轮后核对 CAPI 映射；纯显示变化保留语义缓存、另读几何。同一个串行写操作只失效一次，仍发 `modified` 触发保存。只有正文、story/选区、撤销、脏状态、跟踪和权限证明一致的回读通知可标 `origin:'view-read'`；原始光标通知照常处理。丢弃 guard 时，待核验或正在核验的 Modify 必须保守失效，未知选区按普通事件发布；替换完整修订列表后不得继续使用旧证明。审校采用、三类补全与标尺写入在同一队列任务内先经过 worker 屏障，再最多核验一轮完整列表，避免合法建议因未完成的只读通知而自过期；不刷新调用者 revision，正文变化、未知回调、撤权或超过核验上限仍拒绝旧请求，普通逐键输入不等待这轮核验。`test_native_revision_read.py` 是独立 600 修订真实引擎验收，包含未完成显示通知时立即采用、精确正文回读与单步撤销；便携回归另覆盖列表替换、权限撤回与在途核验。
+
+原生 PDF 使用 `storeToURL` 导出当前可见修订态的副本，允许只读；不切换源 URL，不改变脏状态、作者、跟踪或撤销栈，输出路径由会话拥有并清理。标尺支持四边页边距与三个段落缩进，每次拖动先取当前页/选区 token，松手只写一次；跨段混合上下文不显示伪一致手柄。锁定的 Writer 26.2 页边距 slot 参数名为 `Page`、单位整数 twip，不能沿用旧版本 property 名或传 mm/100；直接写页样式属性虽会变值却不产生可撤销记录，应走原生命令并回读验证。`test_native_ruler.py` 覆盖七项单步撤销、分数值量化、权限/过期拒绝与全部值保存重开。制表位、镜像页/复杂分节与完整签名包仍未验，不能据此默认替换所有文档引擎。
 
 **打开编辑器的重复工作（dev-board#1474）**：`LibreOfficeEditor.tryDocxPreview` 的自动预览只在引擎尚未就绪时开始，避免热备胎过继时与 `load_document` 同时解包、布局同一 DOCX；动态加载预览模块后再次核验。冷启动预览与失败后的显式 `force` 只读预览仍保留；热备胎探活失败转冷启动时，复用已下载且曾跳过预览的字节补回预览，文件、装载世代、检查点或缓存已失效则不重放，尚在下载的原回调只执行一次。`EditorToolbar.bootstrap` 先隐藏原生外壳、应用视图偏好并回读真实状态，再拉样式/字体清单；清单尚未返回不阻止视图按钮启用。设置偏好失败仍回读一次状态，不用默认值冒充引擎真实状态。`tests/toolbar/open-critical-path.test.mjs` 覆盖三文种顺序、慢清单、视图失败、热/冷启动预览及模块加载中的就绪竞争；保存、失败诊断与保活预算不变。
 
@@ -152,6 +166,18 @@ Writer 的 `ShowTextBoundaries` 与格式标记联动：打开 ¶ 时会把文�
 
 激活文档 → 渲染 LibreOfficeEditor → getEditor() IPC（装隔离+起服务）→ 建 webview（persist:zetaoffice）+ 并行 prefetch 文档字节 → editor.html/editor-main.js 选传输 → bootZetaOffice（校验 crossOriginIsolated、fetch CJK 字体、fontconfig conf、加载 soffice.js、uno_main resolve worker port）→ office_thread.js boot（Desktop.create → 空白 swriter、RecordChanges=true、installModifyListener → ui_ready）→ executor 握手 ready → loadDocument：`load_document {bytes}` 写 MEMFS + loadComponentFromURL 重定位 xModel → ready → onLibreReady 注册 executor + syncLibreExecutor。
 
+### 原生候选入口（dev-board#1472/#1474，默认关闭）
+
+`desktop/main/native/` 是候选正式实现；`desktop/prototypes/workbench/` 的审阅与输入模块只转接同一实现，不能另修一份。`editor-session.js` 管理模型代次、权限、串行命令和审阅快照，Python helper 只访问按 URL 核验的当前模型；原生 worker 仍在 `desktop/prototypes/native-lok/worker.mm`。`frontend/src/composables/nativeOfficeSurface.js` 适配既有 executor transport，`nativeDocumentInput.js` 接 Chromium 预编辑和原生输入回执，导出字节仍交给 `LibreOfficeEditor` 保存。
+
+只有 macOS、显式 `AWD_EDITOR_ENGINE=lok`、有效绝对配置路径、明确只读状态及已知不超过 64 MiB 的 `.docx` 才选原生。比对、三方合并、通用备胎和未知大小等请求在建模型前仍走 WASM；选中原生后失败不得重放写命令到另一引擎。 主进程经窗口参数同步下发原生 DOCX 大小资格，保活池不得把符合资格的文档过继给已绑定 WASM 的备胎；原生文档在前台时暂停额外 WASM 预热，其他格式和默认宿主继续原策略。未知身份按只读处理，授权变更必须核对当前模型代次与权限序号；撤权期间的旧预编辑不能在再次授权后补写。
+
+原生选区通知仅合并同模型/视图/类型的相同值，避免 `get_selection` 回读再发通知形成队列循环；绘制失效仍处理。审阅完整列表明确返回 `truncated:false`，不能因超过默认 500 项误报不完整。当前冻结功能轮已通过实际中文保存、601 项审阅接受/撤销、重载和缩放，但并不代表全部 AI/右键/标尺交互等价。新增动作须做真实文档回读与撤销验证；可移植 Node/Python 测试通过不等于系统候选窗或正常负载通过。实测范围与未完成项见 `desktop/prototypes/EXPERIMENT.md`。
+
+原生文档加载使用与工具栏同源的用户显示偏好，在 `trackingReady` 发布前应用并等待 worker 回执。后续 `set_view_options` 先实读 UNO 属性（含标尺三个属性），完全相同才返回 `unchanged:true`，宿主仍核对归属、权限、已绘制视口和坐标回执；不能用模型缓存推定无需设置。实际需要改变时，必须在队列外共享当前修订读取，再使用现有完整语义证明处理显示回调；匹配检查期间新启动的读取也须纳入，不能穿插在分批读取之间清掉它。已有完整快照直接复用，首次没有读取者时只等待 worker 回执，不为初始化另扫全篇。等待期间的真实输入、换文档、撤权和关闭仍拒绝旧请求。`ready`/无加载浮层并不等同工具栏 `viewPrefsReady`，后台正文读取也必须遵守这一边界；不要用界面等待或自动重试掩盖竞争。定点回归在 `desktop/tests/native-editor-session.test.js`。
+
+修订气泡的定位和接受/拒绝使用捕获时的修订身份；若前序纯回读的显示证明尚未完成，先结清该证明，再验证原请求，不能重写版本号或重试旧目标。保存期间合并自动绘图，真实滚动/缩放仍绘图；返回字节前必须确认当前视口画面和原生坐标回执。必需绘图失败锁闭当前输入，换文档期间旧保存不能恢复旧输入、排旧帧或锁闭新文档。回归分别在 `native-editor-session.test.js` 与 `native-office-surface.test.js`。
+
 ## 画布配色（知识存档：深色化已否决回退，勿再启用）
 
 - PR#243 曾做「深绿画布上浮纸页」并已随配色回退撤销（维护者否决深色）。**引擎画布保持默认浅色**。
@@ -173,9 +199,13 @@ Writer 的 `ShowTextBoundaries` 与格式标记联动：打开 ¶ 时会把文�
 
 ## 自动保存（LibreOfficeEditor.vue）
 
+**版本操作忙时的保存重试（dev-board#1472/#1474）**：上传仅在 HTTP 423 且响应同时为 `code:-1`、`reason:VERSION_BUSY`、`writeState:not_started` 时，视为本次正文尚未发布。保留 dirty、失败状态和手动「重试保存」入口，显示版本忙提示；只将本次保存 lease 结束为安全，不清除更早未知上传留下的检查点屏障。网络错误、5xx、其他 423 和进入发布后的异常仍属结果未知。提示按文件/项目/保存代次失效；不得据此自动重载或恢复快照。回归在 `libre-save-recovery.test.mjs`。
+
 触发链：worker modified → 节流 → onDocModified 置 dirty → scheduleAutoSave（延迟 max(200, min(2500, 15000-脏龄))）→ autoSave：**命令在飞（_cmdBusy>0）或距上次命令<1.5s 且脏龄<60s 时让路 2s 重试**（防 export 冻结 Qt 事件循环，PR#182）→ saveDocument → export_document → 整文件 multipart POST /api/files/{id}/upload。失败保持 dirty 并暂停自动保存，使用既有「重试保存」入口恢复；不能再定时堆积引擎导出。flushSave 在 tab 关闭（~:5051）与 LRU 淘汰前 await。
 
 **本地服务恢复与保存（dev-board#1219）**：底栏 `BackendHealthStatus.vue` 消费 `host.backend.getHealth/onHealthChanged` 的真实快照；无API的旧壳不显示，failed且owned才允许通过既有restart手动恢复。非本壳的 `external-backend` 指引检查启动服务的应用；`startup-failed` 指引重开应用；只有健康端点明确404且wizard能识别旧服务时才用 `external-health-unverified`（degraded），提示旧版服务无法检查健康，不能显示正常或接管重启。订阅先于初始读取，事件到达后迟到的getHealth不能倒退状态，组件销毁即退订。服务健康不等于文稿已保存，恢复提示明确要求重试未保存文稿，绝不自动重载页面/编辑器。LOWA仅对 `uploadBytes` 的网络/超时/5xx标记本次上传失败，恢复后在既有保存失败行提示「服务已恢复，文稿尚未保存，请重试保存」；引擎导出、取消、404/409/权限错误不使用此提示。上传开始时捕获恢复序号，因此健康事件早于旧XHR失败也能识别；文件身份、重载/放弃换代、销毁均使旧提示失效。**不自动调用retrySave**：上传异常的uncertain结果与检查点写入围栏不能被健康检测代替，保留内存文稿由用户重试。回归见 `tests/project-home/backend-health-status.test.mjs` 与 `libre-save-recovery.test.mjs`（健康事件排序、订阅清理、手动重启防重、失败来源、恢复先后及旧上下文失效）；Chrome注入快照仅验证UI接线，不等于真实后端崩溃恢复或真实LOWA落盘验收。
+
+**保存的引擎快照边界（dev-board#1474）**：宿主排入 `export_document` 时，前一次 IME 写入可能还在 office 队列里。仅在排队时清 dirty 会把随后到达、实际已包含在导出中的 modified 误算成新输入，出现上传成功但关闭被阻止。`autoSave`/`flushSave` 给本次导出附递增 `saveSnapshotId`；worker 真正开始同步导出前按同一消息通道发 `save-snapshot`，宿主核对活动保存编号、文件/项目、保存上下文与检查点代次后只消费一次。导出之后的 modified 仍留脏；页面中继收到快照时重置 500 ms 修改节流，避免刚导出后的新输入被漏报。普通下载导出不确认自动保存；旧引擎无此消息时保留原有保守行为。失败/超时恢复 dirty，旧回调不能清掉新文档。回归：`lowa-unit/save-snapshot`、`project-home/libre-save-recovery`（真实正常负载复测另记，单测不替代落盘验收）。
 
 **后端就地改了文件后重载活动实例**：`reloadFromBackend()`（版本退回 / 检查点恢复 / AI 直接改文件都该走它）。组件的 `watch file` **只认 null→文档**（备胎过继，PR#220），文档→文档换内容一概不触发，模板 key 也只含 `file.id`——改 `wpsFileId` 不会让正在显示的实例重新加载，必须显式调这个方法。它按序：取消 `_saveTimer` + 清 `dirty` → 等在途 `saving` 结束 → 清 `_bytesPromise`（预取的是旧字节）→ `loadDocument()` 就地 `load_document` 换文档 → 再清一次脏（retarget 里设 `RecordChanges` 会触发一次 modified）。失败则置 `docLoadFailed`（画布上还是旧内容，保存闸必须落下）。`loadDocument()` 返回 `true`=真换了文档、`false`=后端 0 字节（新建文件，保留空白 boot 文档）。宿主侧入口 `librePool.js` 的 `reloadActiveLibreInstances(fileId)`（只刷 `activeFileId` 命中**且 `inst.file.id` 相符**的实例——空白备胎不注册 `_libreRefs`，这条是硬判据）。**不能用 `closeFile`/淘汰活动实例代替**——那会 `flushSave` 把旧字节写回。
 
@@ -522,6 +552,8 @@ IME 光标定位优先用 `XController.getViewData()` 的实时分号数据与 V
 `utils/checkpointSaveBarrier.js` 按 projectId/fileId 登记从导出开始到实际 upload promise 结束的保存 lease。prepare 同步建立屏障并等待这些 lease（不依赖 Vue refs）；reload/abort 只能释放同一 restoreId。恢复期间新登记实例使本次恢复失败；文件 generation 同时拦截恢复结束后才登记的旧预取/旧模型，成功加载当前 generation 的后端字节才解除实例失效状态。
 
 上传 rejection 保守保留本页面会话的 uncertain 状态，后续 checkpoint prepare 拒绝，普通 reload 不清除该状态；即使编辑器已卸载也不会遗忘。当前实现不提供跨页面、跨客户端的服务端写入 CAS，因此不能声称 HTTP 超时后本地重开即可证明旧服务端写入停止。普通加载失败可通过现有重试/重载恢复，uncertain 上传则需核对服务端文件与请求结果。回归：`node --test tests/project-home/checkpoint*.test.mjs tests/version-history/reloadChrome.test.mjs`。
+
+本地轻量候选新增的版本化内容协议是上述旧上传路径的例外：`utils/localContentProtocol.js` 只在启动健康明确宣告数字 `coreContentProtocol=1` 后使用，按精确下载字节绑定 UID/身份/SHA，保存冻结字节与操作 UUID。响应丢失后先查同一操作回执；仅明确 `RECEIPT_NOT_FOUND` 才允许重发原字节，不能重新导出新内容冒用旧操作，也不能退回旧 POST。核验过的保存/取消回执仅释放该 UUID 的 uncertain 标记，其他未知上传继续阻止覆盖；有新输入时确认旧保存后再保存新代次。取消回执建立持久栅栏，迟到 PUT 被拒绝；该保证不能泛化到未使用此协议的旧上传或跨页面丢失的客户端状态。回归：`local-content-protocol.test.mjs`、`libre-local-content-save.test.mjs` 及实际保存后丢弃响应的完整应用验收。
 
 
 页面销毁后丢失 reload/abort 时，恢复锁通过 `checkpoint-restore-state` 查询核对精确 conversationId/fileId/restoreId。服务端在 prepare 前登记“可能写存储”，仅在 prepare/storage.load/save 路径退出后移除，不以 run_state 或取消回执代替写入结束。新页面/普通重试确认 mayWrite=false 后失效旧实例、释放原操作并重新下载；查询失败或仍可能写入保持阻止。原 owner 正常 checkpoint reload 不走此对账；加载 seq 在首次 await 前捕获，迟到查询不能冒用后一次加载身份。该查询只用于已经收到 prepare 并持有本地精确锁的操作，不用于推断任意未知请求状态。同页残留的旧 pending entry 也走同一条对账：新 prepare 先用旧 barrier 自己的 conversationId/restoreId 查写入态，mayWrite=false 才 reconcile 旧操作（failCheckpointRestore 旧实例 + 清 pending）再走全新 prepare；同 restoreId 重复 prepare、查询失败/未知、mayWrite=true 或所有权已变一律保持阻止，不动旧 entry。对账成功不代表新 prepare 成功——旧实例被失效（ready=false/_checkpointInvalidated）后新 prepare 可能仍要在 `prepareCheckpointRestore` 处失败并给出重开指引。

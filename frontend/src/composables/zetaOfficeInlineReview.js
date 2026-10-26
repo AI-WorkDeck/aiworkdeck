@@ -43,8 +43,10 @@ const LABELS = {
  * 只露一截可点的把手（.awd-ir-dock），点一下就展开回原位。持久化沿用原来的
  * hidden 偏好（协议字段与存储键都没改，只是语义从「不挂」变成「贴边」）。
  */
-export function attachInlineReview({ canvas, input, execute, transport, language = 'zh-CN' }) {
+export function attachInlineReview({ canvas, input, execute, transport, language = 'zh-CN', overlayContainer, bounds }) {
   const doc = canvas.ownerDocument, view = doc.defaultView
+  const viewportBounds = () => bounds?.() || { left: 0, top: 0, right: view.innerWidth, bottom: view.innerHeight, width: view.innerWidth, height: view.innerHeight }
+  const queryRoot = overlayContainer || doc
   const english = language.startsWith('en')
   const t = LABELS[english ? 'en' : 'zh']
   let autocomplete = { session: '', available: false, enabled: false, error: '' }
@@ -59,7 +61,7 @@ export function attachInlineReview({ canvas, input, execute, transport, language
   // html.theme-dark 上的令牌取值切换，这里不再写 .theme-dark 分支。
   const style = doc.createElement('style')
   style.textContent = `.awd-inline-review{position:fixed;inset:0;z-index:9998;pointer-events:none;font:13px/1.5 system-ui,sans-serif;color:var(--awd-text)}.awd-inline-review button{font:inherit;color:inherit;border:1px solid var(--awd-border);border-radius:6px;background:var(--awd-surface);padding:5px 9px;cursor:pointer}.awd-inline-review button:focus-visible{outline:2px solid var(--awd-accent-text);outline-offset:2px}.awd-ir-ball{pointer-events:auto;position:absolute;left:18px;bottom:64px;display:flex;align-items:center;border:1px solid var(--awd-border);border-radius:999px;background:var(--awd-surface);box-shadow:var(--awd-shadow-md);cursor:pointer;user-select:none}.awd-ir-ball.busy{opacity:.7}.awd-ir-ball.off{opacity:.6}.awd-inline-review .awd-ir-ball button{border:0;background:none;border-radius:999px;padding:6px 9px}.awd-ir-open{display:flex;align-items:center;gap:5px}.awd-ir-more{padding-left:4px!important;opacity:.75}.awd-ir-ball-i{font-weight:600}.awd-ir-ball-n{min-width:17px;padding:0 5px;border-radius:999px;background:var(--awd-accent);color:var(--awd-text-on-accent);font-size:11px;text-align:center}.awd-ir-ball.off .awd-ir-ball-n{background:var(--awd-surface-3);color:var(--awd-text-2)}.awd-ir-autocomplete-state{padding:var(--awd-space-2,8px) var(--awd-space-2,8px) var(--awd-space-1,4px);color:var(--awd-text-2);font-size:var(--awd-font-size-body,13px);border-top:1px solid var(--awd-border)}.awd-ir-preference-error{max-width:20em;padding:var(--awd-space-1,4px) var(--awd-space-2,8px);color:var(--awd-danger-text);font-size:var(--awd-font-size-body,13px)}.awd-ir-menu{pointer-events:auto;position:absolute;display:flex;flex-direction:column;gap:2px;min-width:160px;padding:4px;border:1px solid var(--awd-border);border-radius:8px;background:var(--awd-surface);box-shadow:var(--awd-shadow-md)}.awd-inline-review .awd-ir-menu button{border:0;background:none;text-align:left;white-space:nowrap}.awd-inline-review .awd-ir-menu button:hover{background:var(--awd-surface-2)}.awd-ir-chip{pointer-events:auto;position:absolute;box-shadow:var(--awd-shadow-md);white-space:nowrap}.awd-inline-review .awd-ir-dock{pointer-events:auto;position:absolute;display:flex;align-items:center;justify-content:center;width:${DOCK_WIDTH}px;height:${DOCK_HEIGHT}px;padding:0;border:1px solid var(--awd-border-strong);background:var(--awd-surface);box-shadow:var(--awd-shadow-md);transition:width .12s ease,background-color .12s ease,border-color .12s ease}.awd-inline-review .awd-ir-dock.left{left:0;border-left:0;border-radius:0 12px 12px 0}.awd-inline-review .awd-ir-dock.right{border-right:0;border-radius:12px 0 0 12px}.awd-inline-review .awd-ir-dock:hover{width:${DOCK_WIDTH + 4}px;background:var(--awd-surface-2);border-color:var(--awd-accent-text)}.awd-ir-dock-g{display:block;width:3px;height:20px;border-radius:2px;background:var(--awd-accent-text);transition:height .12s ease}.awd-inline-review .awd-ir-dock:hover .awd-ir-dock-g{height:26px}.awd-ir-dock.has .awd-ir-dock-g{box-shadow:0 0 0 2px var(--awd-accent-soft)}.awd-inline-review [hidden]{display:none!important}`
-  doc.head.appendChild(style); doc.body.appendChild(root)
+  doc.head.appendChild(style); (overlayContainer || doc.body).appendChild(root)
   function button(label, action, parent) {
     const b = doc.createElement('button'); b.type = 'button'; b.textContent = label
     b.addEventListener('mousedown', e => e.preventDefault())
@@ -119,11 +121,13 @@ export function attachInlineReview({ canvas, input, execute, transport, language
   }
   function placeMenu() {
     if (menu.hidden) return
-    const rect = ball.getBoundingClientRect(), width = menu.offsetWidth || 160, height = menu.offsetHeight || 96
-    const left = rect.left + width + 8 > view.innerWidth ? Math.max(8, rect.right - width) : rect.left
+    const rect = ball.getBoundingClientRect(), b = viewportBounds(), width = menu.offsetWidth || 160, height = menu.offsetHeight || 96
+    const left = rect.left + width + 8 > b.right ? Math.max(b.left + 8, rect.right - width) : Math.max(b.left + 8, rect.left)
     const above = rect.top - height - 6
     menu.style.left = left + 'px'
-    menu.style.top = (above >= 8 ? above : Math.min(rect.bottom + 6, view.innerHeight - height - 8)) + 'px'
+    menu.style.maxWidth = Math.max(0, b.width - 16) + 'px'; menu.style.minWidth = Math.min(160, Math.max(0, b.width - 16)) + 'px'
+    menu.style.maxHeight = Math.max(0, b.height - 16) + 'px'; menu.style.overflow = 'auto'
+    menu.style.top = Math.max(b.top + 8, above >= b.top + 8 ? above : Math.min(rect.bottom + 6, b.bottom - height - 8)) + 'px'
   }
   function statusLabel() {
     // AI 那一层的三态压过规则那一层的状态：浮球上只有一行字，先说最要紧的那件事。
@@ -171,19 +175,20 @@ export function attachInlineReview({ canvas, input, execute, transport, language
     placeBall(); placeMenu()
   }
   function clampPosition(pos) {
-    const width = ball.offsetWidth || 64, height = ball.offsetHeight || 32
-    return { x: Math.max(8, Math.min(pos.x, view.innerWidth - width - 8)), y: Math.max(8, Math.min(pos.y, view.innerHeight - height - 8)) }
+    const width = ball.offsetWidth || 64, height = ball.offsetHeight || 32, b = viewportBounds()
+    return { x: Math.max(b.left + 8, Math.min(pos.x, b.right - width - 8)), y: Math.max(b.top + 8, Math.min(pos.y, b.bottom - height - 8)) }
   }
   /** 靠边吸附：松手后回到最近的一侧，只保留纵向位置。 */
   function snapPosition(pos) {
-    const width = ball.offsetWidth || 64
-    const left = pos.x + width / 2 < view.innerWidth / 2
-    return clampPosition({ x: left ? 12 : view.innerWidth - width - 12, y: pos.y })
+    const width = ball.offsetWidth || 64, b = viewportBounds()
+    const left = pos.x + width / 2 < b.left + b.width / 2
+    return clampPosition({ x: left ? b.left + 12 : b.right - width - 12, y: pos.y })
   }
   // 位置用 localStorage：客体页每开一份文档就是一个新 webview（sessionStorage 每次重来），
   // 而浮球摆在哪是跨文档的本机习惯，与 awd_sidebar_collapsed 同一口径。
   function savePosition() { try { if (storageKey && ballPosition) view.localStorage?.setItem(storageKey, JSON.stringify(ballPosition)) } catch {} }
   function placeBall() {
+    if (!ballPosition && bounds) { const b = viewportBounds(); ballPosition = { x: b.left + 18, y: b.bottom - 96 } }
     if (!ballPosition || ball.hidden) return
     ballPosition = clampPosition(ballPosition)
     ball.style.left = ballPosition.x + 'px'; ball.style.top = ballPosition.y + 'px'; ball.style.bottom = 'auto'
@@ -195,16 +200,17 @@ export function attachInlineReview({ canvas, input, execute, transport, language
    */
   function placeDock() {
     if (dock.hidden) return
-    const right = !!ballPosition && ballPosition.x + ballSize.width / 2 >= view.innerWidth / 2
+    const b = viewportBounds(), right = !!ballPosition && ballPosition.x + ballSize.width / 2 >= b.left + b.width / 2
     dock.classList.toggle('right', right); dock.classList.toggle('left', !right)
     // 左侧靠 .left 的 left:0；右侧用 right 定位，hover 变宽时向正文一侧长，不压滚动条。
-    dock.style.right = right ? SCROLLBAR_GUTTER + 'px' : ''
+    dock.style.left = right ? '' : b.left + 'px'
+    dock.style.right = right ? (view.innerWidth - b.right + SCROLLBAR_GUTTER) + 'px' : ''
     if (ballPosition) {
       const top = ballPosition.y + (ballSize.height - DOCK_HEIGHT) / 2
-      dock.style.top = Math.max(8, Math.min(top, view.innerHeight - DOCK_HEIGHT - 8)) + 'px'; dock.style.bottom = 'auto'
+      dock.style.top = Math.max(b.top + 8, Math.min(top, b.bottom - DOCK_HEIGHT - 8)) + 'px'; dock.style.bottom = 'auto'
     } else {
       // 与 .awd-ir-ball 的默认 bottom:64px 同一条中线。
-      dock.style.top = 'auto'; dock.style.bottom = Math.max(8, 64 + (ballSize.height - DOCK_HEIGHT) / 2) + 'px'
+      dock.style.top = 'auto'; dock.style.bottom = (view.innerHeight - b.bottom + Math.max(8, 64 + (ballSize.height - DOCK_HEIGHT) / 2)) + 'px'
     }
   }
   function renderChip() {
@@ -212,12 +218,13 @@ export function attachInlineReview({ canvas, input, execute, transport, language
     // 收起到边缘就是「别打扰我」：行旁标记一起安静，计数只在把手的提示里。
     if (state.hidden === true) return
     if ((!anchor && !context?.cursorRectRaw?.nativeCaret) || !context?.available || context.hasSelection || context.revision !== state.revision || !isFresh(state) || composing || !currentFindings().length) return
-    if (!doc.querySelector('.awd-wa-panel')?.hidden && doc.querySelector('.awd-wa-panel')) return
+    if (!queryRoot.querySelector('.awd-wa-panel')?.hidden && queryRoot.querySelector('.awd-wa-panel')) return
     const rect = nativeCursorRectToPixels(context.cursorRectRaw, canvas.getBoundingClientRect()) || cursorRectToPixels(context.cursorRectRaw, anchor)
-    if (!rect || rect.top < 0 || rect.top > view.innerHeight - 35 || rect.left < 0 || rect.left > view.innerWidth) return
+    const b = viewportBounds()
+    if (!rect || rect.top < b.top || rect.top > b.bottom - 35 || rect.left < b.left || rect.left > b.right) return
     chip.textContent = t.count(currentFindings().length); chip.hidden = false
-    chip.style.left = Math.max(8, Math.min(rect.left + 22, view.innerWidth - chip.offsetWidth - 12)) + 'px'
-    chip.style.top = Math.max(8, Math.min(rect.top + rect.height + 4, view.innerHeight - chip.offsetHeight - 12)) + 'px'
+    chip.style.left = Math.max(b.left + 8, Math.min(rect.left + 22, b.right - chip.offsetWidth - 12)) + 'px'
+    chip.style.top = Math.max(b.top + 8, Math.min(rect.top + rect.height + 4, b.bottom - chip.offsetHeight - 12)) + 'px'
   }
   async function refreshContext() {
     if (disposed || composing || !state.session || state.status === 'disabled' || (state.status !== 'ready' && !click)) return
@@ -314,7 +321,7 @@ export function attachInlineReview({ canvas, input, execute, transport, language
   canvas.addEventListener('mouseup', onClick, true); canvas.addEventListener('wheel', onScroll, { passive: true }); view.addEventListener('resize', onResize)
   ball.addEventListener('mousedown', onDragDown); view.addEventListener('mousemove', onDragMove); view.addEventListener('mouseup', onDragUp)
   menu.addEventListener('keydown', onMenuKey)
-  const completionPanel = doc.querySelector('.awd-wa-panel')
+  const completionPanel = queryRoot.querySelector('.awd-wa-panel')
   const observer = completionPanel ? new view.MutationObserver(() => {
     // The caret-adjacent chip competes with completion choices.
     if (!completionPanel.hidden) chip.hidden = true
@@ -322,6 +329,7 @@ export function attachInlineReview({ canvas, input, execute, transport, language
   }) : null
   observer?.observe(completionPanel, { attributes: true, attributeFilter: ['hidden'] })
   return {
+    reposition() { onResize(); placeBall(); placeDock(); placeMenu() },
     cursorMoved: moved, committed() { click = null; invalidate(); schedule() }, documentChanged: invalidate,
     destroy() {
       disposed = true; invalidate(); unsubscribe?.(); observer?.disconnect()

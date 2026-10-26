@@ -22,6 +22,12 @@ public class StartupDataInitializer implements SmartInitializingSingleton {
     private final PluginService plugins;
     private final SkillRegistry skills;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.localcore.LocalCoreBootstrap localCore;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.context.ConfigurableApplicationContext context;
+
     public StartupDataInitializer(ExternalProviderBackfill providers, PluginJobService jobs,
                                   PluginService plugins, SkillRegistry skills) {
         this.providers = providers;
@@ -32,6 +38,7 @@ public class StartupDataInitializer implements SmartInitializingSingleton {
 
     @Override
     public void afterSingletonsInstantiated() {
+        if (localCore != null) localCore.beforeJpaBusinessInitialization(context, java.time.Duration.ofSeconds(30));
         providers.onStartup();
         // 插件加载可以提交任务，恢复必须先于插件执行；新任务不能被误认作上轮的孤儿。
         jobs.recoverOrphans();

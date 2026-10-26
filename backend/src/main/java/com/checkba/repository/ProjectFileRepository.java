@@ -12,6 +12,12 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ProjectFileRepository extends JpaRepository<ProjectFile, Long> {
+    /** Content publication must not merge a stale path/deletion state back over a concurrent move. */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE ProjectFile p SET p.fileSize = COALESCE(:size, p.fileSize), p.updatedAt = COALESCE(:modifiedAt, p.updatedAt) "
+            + "WHERE p.id = :id AND p.projectId = :projectId AND p.filePath = :path AND p.isDeleted = false")
+    int updateContentMetadataIfCurrent(Long id, Long projectId, String path, Long size, java.time.LocalDateTime modifiedAt);
+
     Optional<ProjectFile> findFirstByProjectIdAndExternalPathAndIsDeletedFalse(Long projectId, String externalPath);
 
     @org.springframework.data.jpa.repository.Modifying

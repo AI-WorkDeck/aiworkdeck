@@ -11,7 +11,12 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -22,6 +27,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * 文件夹监听的性能契约：**建立监听时不许读文件内容**。
@@ -34,6 +41,53 @@ import static org.mockito.Mockito.verify;
  * 正是 dataless 占位文件的行为放大版。换回内容哈希，本用例会直接超时。
  */
 class LocalRootWatchServiceTest {
+
+    @Test
+    void startupReturnsWhileExistingProjectLookupIsBlockedAndRunsOnlyOnce() throws Exception {
+        var repository = mock(com.checkba.repository.ProjectRepository.class);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        when(repository.findByLocalRootIsNotNull()).thenAnswer(call -> {
+            entered.countDown();
+            assertTrue(release.await(10, TimeUnit.SECONDS));
+            return List.of();
+        });
+        var service = new LocalRootWatchService(repository, mock(LocalProjectService.class),
+                mock(LocalProjectFileChangeService.class));
+        var caller = Executors.newSingleThreadExecutor();
+        try {
+            var readyListener = caller.submit(service::onStartup);
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            assertDoesNotThrow(() -> readyListener.get(1, TimeUnit.SECONDS),
+                    "Ready listener must not wait for the existing-project scan");
+            service.onStartup();
+            release.countDown();
+            var startup = (java.util.concurrent.Future<?>)
+                    org.springframework.test.util.ReflectionTestUtils.getField(service, "startupTask");
+            startup.get(5, TimeUnit.SECONDS);
+            verify(repository).findByLocalRootIsNotNull();
+        } finally {
+            release.countDown();
+            service.shutdown();
+            caller.shutdownNow();
+        }
+    }
+
+    @Test
+    void shutdownRejectsLateOpenAndStartup(@TempDir Path dir) {
+        var repository = mock(com.checkba.repository.ProjectRepository.class);
+        var service = new LocalRootWatchService(repository, mock(LocalProjectService.class),
+                mock(LocalProjectFileChangeService.class));
+        try {
+            service.shutdown();
+            assertFalse(service.ensureWatch(1L, dir.toString()));
+            assertFalse(service.isWatching(1L));
+            assertDoesNotThrow(service::onStartup);
+            verifyNoInteractions(repository);
+        } finally {
+            service.shutdown();
+        }
+    }
 
     @Test
     void watchFileHasherReadsMetadataOnlyAndNeverBlocksOnFileContent(@TempDir Path dir) throws Exception {

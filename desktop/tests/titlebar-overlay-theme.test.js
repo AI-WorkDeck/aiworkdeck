@@ -45,6 +45,11 @@ function harness({ platform = 'win32', systemDark = false } = {}) {
       this.webContents.send = () => {}
       this.webContents.setWindowOpenHandler = () => {}
       this.webContents.session = new EventEmitter()
+      this.webContents.session.webRequest = {
+        onBeforeRequest(listener) { this.listener = listener },
+        onErrorOccurred(listener) { this.errorListener = listener },
+        onCompleted(listener) { this.completedListener = listener },
+      }
       windows.push(this)
     }
     isDestroyed() { return this.destroyed }
@@ -74,6 +79,7 @@ function harness({ platform = 'win32', systemDark = false } = {}) {
         'node:os': { totalmem: () => 8 * 1024 ** 3 },
         './services/win-arch': { isWinArmEmulated: () => false },
         './reload-guard': { attachReloadGuard: () => true },
+        './services/backend-request-gate': require('../main/services/backend-request-gate'),
       }
       assert.ok(name in stubs, '多了一个没桩的 require: ' + name)
       return stubs[name]
