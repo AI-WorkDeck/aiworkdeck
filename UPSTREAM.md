@@ -16,6 +16,18 @@ This root `UPSTREAM.md` tracks the upstream projects, branches, commits, license
 | Local Paths | `desktop/lowa-build/`, `frontend/src/zetaoffice/public/` |
 | Subsystem Provenance | [`frontend/src/zetaoffice/public/UPSTREAM.md`](frontend/src/zetaoffice/public/UPSTREAM.md) |
 
+The Calc header adaptation in `desktop/lowa-build/patches/apply-source-patches.py` targets
+`sc/source/ui/view/hdrcont.cxx` at the LibreOffice commit above; its original
+MPL-2.0 notice remains unchanged. The Qt WASM input-clock adaptation in
+`desktop/lowa-build/patches/apply-qt-patches.py` targets allotropia
+`qt5@3d440b7787f9b5ba15e5f8bcd7aef39b388f94fa`, whose `qtbase` submodule is
+`a320678c85ec8029d5394bcd673d4c208af1de3a`. The target
+`src/plugins/platforms/wasm/qwasmeventtranslator.cpp` retains its Copyright
+(C) 2018 The Qt Company Ltd. notice and GPL version 3 or later license header.
+The adaptation uses the existing Qt elapsed-time mouse/wheel overloads; it
+does not copy another editor's implementation. Build source revisions are
+pinned in `desktop/lowa-build/mega-build.sh`.
+
 ### Local Modifications (`desktop/lowa-build/`)
 
 - **`patches/apply-source-patches.py` & `patches/source-patches.diff`**:
