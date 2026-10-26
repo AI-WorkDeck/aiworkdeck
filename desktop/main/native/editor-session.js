@@ -19,6 +19,7 @@ const viewReadActions = new Set(['set_revision_view', 'export_document', 'export
 const pureContextReads = new Set(['get_document_text', 'get_paragraph', 'get_outline', 'get_cursor_context', 'get_review_context', ...completionReads])
 const completionWrites = new Set(['accept_completion', 'insert_completion_content', 'accept_writing_suggestion'])
 const textEditActions = new Set(['replace_at_position', 'replace_selection', 'insert_at_cursor', 'modify_paragraph', 'apply_review_edit', ...completionWrites])
+const reviewTargetActions = new Set(['goto_revision', 'resolve_revision', 'resolve_revisions'])
 const expectedCompletionRefusals = new Set(['not-writer', 'composing', 'readonly', 'stale', 'selection', 'invalid-completion',
   'selection-mismatch', 'invalid-suggestion', 'invalid-content', 'invalid-table', 'table-requires-body'])
 const evidenceWriteActions = new Set(['bookmark_selection', 'set_selection_hyperlink', 'adopt_legacy_links'])
@@ -566,6 +567,16 @@ class NativeEditorSession {
         } catch { return { ...result, token: null } }
       })
     }
+    if (action === 'set_view_options') {
+      const owner = this.model, permission = this.permissionSeq, read = this.reviewRead
+      const pending = read?.owner === owner && read.revision === this.revision ? read.promise : null
+      const ready = this.review?.revision === this.revision && this.review.items.every(item => item.textAvailable === true)
+      // Initial toolbar preferences can arrive between an existing reader's
+      // bounded hydration batches. Share that read before publishing view-only
+      // callbacks; do not start a new full scan just to initialize the toolbar.
+      if (pending || ready) return (pending || Promise.resolve()).then(() =>
+        this.executeQueued(action, params, owner, permission))
+    }
     const finalRead = viewReadActions.has(action) || completionReads.has(action) || ['get_review_context', 'goto_review_range'].includes(action)
       || (action === 'get_document_text' && params.__agent === true)
     if (finalRead) {
@@ -584,23 +595,25 @@ class NativeEditorSession {
     }
     return this.executeQueued(action, params)
   }
-  executeQueued(action, params, finalReadOwner) {
+  executeQueued(action, params, finalReadOwner, finalReadPermission) {
     return this.task(async () => {
       if (action === 'load_document') return this.load(params)
       this.assertDocument(params.documentEpoch)
       if (finalReadOwner) {
         this.assertDocument(finalReadOwner.documentEpoch)
+        if (this.model !== finalReadOwner) throw Error('STALE_DOCUMENT')
+        if (finalReadPermission !== undefined && finalReadPermission !== this.permissionSeq) throw Error('STALE_PERMISSION_UPDATE')
         if (params.nativeExpectedRevision !== undefined && params.nativeExpectedRevision !== this.revision)
           return { success: false, available: false, reason: 'stale', error: 'stale', message: 'stale' }
         if (this.review?.revision !== this.revision || !this.review.items.every(item => item.textAvailable === true))
           throw Error('STALE_REVIEW_BATCH: document changed while preparing final-text read')
       }
       const actualMutation = (action === 'native_input' && ['input_text', 'input_key', 'input_mouse', 'command'].includes(params.action))
-        || textEditActions.has(action) || evidenceWriteActions.has(action)
+        || textEditActions.has(action) || evidenceWriteActions.has(action) || reviewTargetActions.has(action)
         || (commentActions.has(action) && action !== 'list_comments')
-        || ['format_selection', 'ui_command', 'set_style', 'set_ruler_state', 'set_track_changes', 'undo', 'redo', 'resolve_revision', 'resolve_revisions', 'goto_revision', 'set_selection', 'collapse_selection', 'goto_bookmark'].includes(action)
+        || ['format_selection', 'ui_command', 'set_style', 'set_ruler_state', 'set_track_changes', 'undo', 'redo', 'set_selection', 'collapse_selection', 'goto_bookmark'].includes(action)
         || (!this.readOnly && ['find_text_locations', 'clear_anchors'].includes(action))
-      if (action === 'apply_review_edit' || action === 'set_ruler_state' || completionWrites.has(action)) {
+      if (action === 'apply_review_edit' || action === 'set_ruler_state' || reviewTargetActions.has(action) || completionWrites.has(action)) {
         const pendingRead = this.viewReadGuard
         if (this.currentViewRead(pendingRead)) {
           // A captured edit may arrive between bounded read-proof batches.
@@ -615,7 +628,7 @@ class NativeEditorSession {
       if (actualMutation) this.clearViewRead()
       const mutation = actualMutation ? (this.mutationScope = { invalidated: false, modified: false }) : null
       const guard = finalReadOwner ? this.beginViewRead() : null
-      if (guard && viewReadActions.has(action)) guard.displayChanged = true
+      if (guard && (viewReadActions.has(action) || action === 'set_view_options')) guard.displayChanged = true
       if (guard && !pureContextReads.has(action)) {
         for (const event of guard.selections.splice(0)) this.onEvent(event)
         guard.selectionProof = null
@@ -814,7 +827,7 @@ class NativeEditorSession {
         const result = await runAction()
         // The worker acknowledgement fences callbacks from this owned mutation.
         // They all invalidate the same atomic operation, not thousands of revisions.
-        if (mutation) await this.engine.call('selected_text', { documentEpoch: this.model.documentEpoch })
+        if (mutation || (action === 'set_view_options' && !guard)) await this.engine.call('selected_text', { documentEpoch: this.model.documentEpoch })
         if (guard) {
           await this.engine.call('selected_text', { documentEpoch: this.model.documentEpoch })
           await this.verifyViewRead(guard)

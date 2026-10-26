@@ -17,7 +17,8 @@ async function surfaceHarness(options = {}) {
     factory = module.createNativeOfficeSurface; mask = module.transparentPageExterior
   }
   globalThis.AWDDocumentInput = input
-  globalThis.ResizeObserver = class { observe() {} disconnect() {} }
+  let resizeCallback
+  globalThis.ResizeObserver = class { constructor(callback) { resizeCallback = callback } observe() {} disconnect() {} }
   globalThis.ImageData = class { constructor(data, width, height) { Object.assign(this, { data, width, height }) } }
   const dom = options.dom || new JSDOM('<main></main>', { pretendToBeVisual: true })
   dom.window.HTMLCanvasElement.prototype.getContext = () => ({ putImageData() {} })
@@ -51,7 +52,7 @@ async function surfaceHarness(options = {}) {
   }
   const surface = factory({ api, info: { sessionId: options.sessionId || 'one', initialBlank: options.initialBlank }, document: dom.window.document })
   dom.window.document.querySelector('main').append(surface.element)
-  Object.defineProperties(surface.element, { clientWidth: { value: 800 }, clientHeight: { value: 600 } })
+  Object.defineProperties(surface.element, { clientWidth: { value: 800, configurable: true }, clientHeight: { value: 600, configurable: true } })
   surface.transport.subscribe(message => { events.push(message); if (message.type === 'result') resultWaiters.get(message.reqId)?.(message.result) })
   let seq = 0
   function execute(action, params) {
@@ -59,6 +60,7 @@ async function surfaceHarness(options = {}) {
     return new Promise(resolve => { resultWaiters.set(reqId, resolve); surface.transport.send({ type: 'exec', reqId, action, params }) })
   }
   return { surface, dom, calls, events, execute, event: value => event(value),
+    resize: () => resizeCallback(),
     deferText: () => (pendingText = deferred()), deferPaint: () => (pendingPaint = deferred()), isClosed: () => closed && off,
     async close() { await surface.dispose(); if (!options.dom) dom.window.close() } }
 }
@@ -629,4 +631,173 @@ test('document text waits for queued Escape and the native input barrier acknowl
     assert.equal(result.success, true); assert.equal(result.paragraphs[0].text, '确认后的正文')
     assert.equal(h.calls.filter(call => call.action === 'get_document_text').length, 1, 'the read is not retried')
   } finally { keyHeld.resolve(); barrierHeld.resolve(); await h.close() }
+})
+
+// Save must not wait behind optional reads just to obtain an unchanged tile.
+test('save returns ready bytes without waiting for another same-viewport paint', async () => {
+  const h = await surfaceHarness()
+  let held, pending
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    held = h.deferPaint()
+    let finished = false
+    pending = h.execute('export_document').then(result => { finished = true; return result })
+    await new Promise(resolve => setTimeout(resolve, 35))
+    assert.equal(finished, true)
+    assert.deepEqual((await pending).bytes, new Uint8Array([1, 2, 3]))
+    assert.equal(h.surface.element.querySelector('input').disabled, false)
+  } finally { held?.resolve(); await pending; await h.close() }
+})
+
+test('save presents new input once and coalesces repeated automatic readback paints', async () => {
+  const held = deferred(), started = deferred()
+  const h = await surfaceHarness({ nativeRequest: async action => {
+    if (action === 'export_document') { started.resolve(); await held.promise }
+  } })
+  let pending
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    pending = h.execute('export_document'); await started.promise
+    const before = h.calls.filter(call => call.action === 'native_paint').length
+    for (let i = 0; i < 3; i++) {
+      h.event({ type: 'callback', callbackType: 0, payload: 'EMPTY', documentEpoch: 1, viewId: 0 })
+      await new Promise(resolve => setTimeout(resolve, 35))
+    }
+    assert.equal(h.calls.filter(call => call.action === 'native_paint').length - before, 1)
+    assert.equal(h.surface.element.querySelector('input').disabled, true)
+    held.resolve(); assert.equal((await pending).success, true)
+    await new Promise(resolve => setTimeout(resolve, 35))
+    assert.equal(h.calls.filter(call => call.action === 'native_paint').length - before, 2, 'latest pending content is repainted after save')
+  } finally { held.resolve(); await pending; await h.close() }
+})
+
+test('save keeps real scroll and resize paints active', async () => {
+  const held = deferred(), started = deferred()
+  const h = await surfaceHarness({ nativeRequest: async action => {
+    if (action === 'export_document') { started.resolve(); await held.promise }
+  } })
+  let pending
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    pending = h.execute('export_document'); await started.promise
+    h.event({ type: 'callback', callbackType: 0, payload: 'EMPTY', documentEpoch: 1, viewId: 0 })
+    await new Promise(resolve => setTimeout(resolve, 35))
+    const before = h.calls.filter(call => call.action === 'native_paint').length
+    h.surface.element.scrollTop = 200; h.surface.element.dispatchEvent(new h.dom.window.Event('scroll'))
+    await new Promise(resolve => setTimeout(resolve, 35))
+    Object.defineProperty(h.surface.element, 'clientWidth', { value: 650 }); h.resize()
+    await new Promise(resolve => setTimeout(resolve, 35))
+    const paints = h.calls.filter(call => call.action === 'native_paint').slice(before)
+    assert.equal(paints.length, 2); assert.equal(paints[0].params.yTwips, 3000); assert.equal(paints[1].params.width, 650)
+    held.resolve(); assert.equal((await pending).success, true)
+  } finally { held.resolve(); await pending; await h.close() }
+})
+
+test('save waits for resized pixels and viewport ACK, then rechecks a second resize', async () => {
+  const exported = deferred(), started = deferred(), ack = deferred(), ackStarted = deferred()
+  let gateAck = false, changedAgain = false, h
+  h = await surfaceHarness({ nativeRequest: async (action, params) => {
+    if (action === 'export_document') { started.resolve(); await exported.promise }
+    if (gateAck && action === 'native_input' && params.action === 'set_viewport') {
+      ackStarted.resolve(); await ack.promise
+      if (!changedAgain) { changedAgain = true; Object.defineProperty(h.surface.element, 'clientWidth', { value: 600 }); h.resize() }
+    }
+  } })
+  let pending
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    let finished = false
+    pending = h.execute('export_document').then(result => { finished = true; return result }); await started.promise
+    gateAck = true; Object.defineProperty(h.surface.element, 'clientWidth', { value: 650 }); h.resize()
+    exported.resolve(); await ackStarted.promise; await tick()
+    assert.equal(finished, false); assert.equal(h.surface.element.querySelector('input').disabled, true)
+    ack.resolve(); assert.equal((await pending).success, true)
+    assert.equal(h.surface.element.querySelector('canvas').style.width, '600px', 'returning bytes must not reopen input over old-sized pixels')
+    const viewport = h.calls.filter(call => call.action === 'native_input' && call.params.action === 'set_viewport').at(-1)
+    assert.equal(viewport.params.params.cssWidth, 600)
+  } finally { exported.resolve(); ack.resolve(); await pending; await h.close() }
+})
+
+for (const change of ['retarget', 'permission', 'permission-roundtrip']) {
+  test(`save cannot return old-owner bytes after ${change}`, async () => {
+    const held = deferred(), started = deferred()
+    const h = await surfaceHarness({ nativeRequest: async (action, params) => {
+      if (action === 'export_document') { started.resolve(); await held.promise }
+      if (action === 'set_read_only') return { success: true, ...params, lastInputSeq: 0 }
+    } })
+    let pending
+    try {
+      await h.execute('load_document', { bytes: [1], name: 'a.docx' }); await h.surface.setReadOnly(false)
+      pending = h.execute('export_document'); await started.promise
+      if (change === 'retarget') await h.execute('load_document', { bytes: [2], name: 'b.docx' })
+      else await h.surface.setReadOnly(true)
+      if (change === 'permission-roundtrip') await h.surface.setReadOnly(false)
+      held.resolve(); const result = await pending
+      assert.equal(result.success, false); assert.equal(result.message, 'STALE_DOCUMENT_EXPORT'); assert.equal(result.bytes, undefined)
+      if (change === 'permission') assert.equal(h.surface.element.querySelector('input').readOnly, true)
+    } finally { held.resolve(); await pending; await h.close() }
+  })
+}
+
+test('save required viewport paint failure closes the current input without publishing bytes', async () => {
+  let failPaint = false, h
+  h = await surfaceHarness({ nativeRequest: action => {
+    if (action === 'export_document') { Object.defineProperty(h.surface.element, 'clientWidth', { value: 650 }); failPaint = true }
+    if (action === 'native_paint' && failPaint) throw Error('REQUIRED_SAVE_PAINT_FAILURE')
+  } })
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    const result = await h.execute('export_document')
+    assert.equal(result.success, false); assert.equal(result.bytes, undefined)
+    assert.equal(result.message, 'REQUIRED_SAVE_PAINT_FAILURE')
+    assert.equal(h.surface.element.querySelector('input'), null, 'failed geometry cannot remain editable')
+    assert.equal(h.events.filter(event => event.type === 'engine-failed').length, 1)
+    assert.equal((await h.execute('export_document')).success, false)
+  } finally { await h.close() }
+})
+
+test('save settling during pending retarget neither resumes old input nor queues old-epoch paint', async () => {
+  const saveHeld = deferred(), saveStarted = deferred(), loadHeld = deferred(), loadStarted = deferred()
+  let loads = 0, loading = false
+  const h = await surfaceHarness({ nativeRequest: async (action, params) => {
+    if (action === 'export_document') { saveStarted.resolve(); await saveHeld.promise }
+    if (action === 'load_document' && ++loads > 1) { loading = true; loadStarted.resolve(); await loadHeld.promise; loading = false }
+    if (loading && action === 'native_paint' && params.documentEpoch === 1) throw Error('OLD_EPOCH_PAINT_DURING_LOAD')
+  } })
+  let saving, retarget
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    const oldInput = h.surface.element.querySelector('input')
+    saving = h.execute('export_document'); await saveStarted.promise
+    retarget = h.execute('load_document', { bytes: [2], name: 'b.docx' }); await loadStarted.promise
+    const before = h.calls.filter(call => call.action === 'native_paint').length
+    saveHeld.resolve(); assert.equal((await saving).success, false)
+    assert.equal(oldInput.disabled, true, 'old input remains suspended while modelLoads is nonzero')
+    await new Promise(resolve => setTimeout(resolve, 35))
+    assert.equal(h.calls.filter(call => call.action === 'native_paint').length, before)
+    loadHeld.resolve(); assert.equal((await retarget).success, true)
+    assert.notEqual(h.surface.element.querySelector('input'), oldInput)
+    assert.equal(h.surface.element.querySelector('input').disabled, false)
+    assert.equal(h.events.some(event => event.type === 'engine-failed'), false)
+  } finally { saveHeld.resolve(); loadHeld.resolve(); await saving; await retarget; await h.close() }
+})
+
+test('save required old-viewport paint failing during retarget does not poison the new document', async () => {
+  const paintHeld = deferred(), paintStarted = deferred(), loadHeld = deferred(), loadStarted = deferred()
+  let loads = 0, failPaint = false, h
+  h = await surfaceHarness({ nativeRequest: async (action, params) => {
+    if (action === 'export_document') { Object.defineProperty(h.surface.element, 'clientWidth', { value: 650 }); failPaint = true }
+    if (action === 'native_paint' && failPaint && params.documentEpoch === 1) { paintStarted.resolve(); await paintHeld.promise; throw Error('OLD_REQUIRED_PAINT_FAILURE') }
+    if (action === 'load_document' && ++loads > 1) { loadStarted.resolve(); await loadHeld.promise }
+  } })
+  let saving, retarget
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    saving = h.execute('export_document'); await paintStarted.promise
+    retarget = h.execute('load_document', { bytes: [2], name: 'b.docx' }); await loadStarted.promise
+    paintHeld.resolve(); assert.equal((await saving).success, false)
+    loadHeld.resolve(); assert.equal((await retarget).success, true)
+    assert.equal(h.events.some(event => event.type === 'engine-failed'), false)
+    assert.equal(h.surface.element.querySelector('input').disabled, false)
+  } finally { paintHeld.resolve(); loadHeld.resolve(); await saving; await retarget; await h.close() }
 })
