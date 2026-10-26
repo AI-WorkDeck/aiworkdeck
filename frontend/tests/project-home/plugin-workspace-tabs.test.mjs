@@ -139,3 +139,35 @@ test('plugin tabs cannot be duplicated with an Alt drag', async () => {
   vm.openPluginTab('tencent-meeting')
   assert.equal(tabDragSplitMethods.canDualOpenTab.call(vm, 'plugin-tencent-meeting', 'left'), false)
 })
+
+
+test('sidebar workspace status reflects actual visible panes without changing tab or sidebar selection', () => {
+  const vm = workbench({ leftPaneKey: 'files' })
+  assert.equal(vm.workspaceTabState('plugin', 'tencent-meeting'), 'closed')
+  vm.openPluginTab('tencent-meeting')
+  assert.equal(vm.workspaceTabState('plugin', 'tencent-meeting'), 'active')
+  vm.leftFiles.push({ id: 42, fileType: 'docx' }); vm.activeFileIdLeft = 42
+  assert.equal(vm.workspaceTabState('plugin', 'tencent-meeting'), 'open')
+  assert.equal(vm.activeFileIdLeft, 42)
+  assert.equal(vm.leftPaneKey, 'files')
+  vm.rightFiles.push({ id: 'dd-client', tabType: 'dd-client' }); vm.activeFileIdRight = 'dd-client'
+  assert.equal(vm.workspaceTabState('dd-client'), 'open')
+  vm.splitMode = true
+  assert.equal(vm.workspaceTabState('dd-client'), 'active')
+  vm.rightFiles = []
+  assert.equal(vm.workspaceTabState('dd-client'), 'closed')
+})
+
+test('workspace navigation reveals an existing plugin in a hidden right pane without duplicating it', () => {
+  const vm = workbench({ splitMode: true, focusedPane: 'right' })
+  vm.openPluginTab('tencent-meeting')
+  const existing = vm.rightFiles[0]
+  vm.splitMode = false
+  assert.equal(vm.workspaceTabState('plugin', 'tencent-meeting'), 'open')
+  vm.openPluginTab('tencent-meeting')
+  assert.equal(vm.splitMode, true)
+  assert.equal(vm.workspaceTabState('plugin', 'tencent-meeting'), 'active')
+  assert.equal(vm.rightFiles[0], existing)
+  assert.equal(vm.rightFiles.length, 1)
+  assert.equal(vm.leftFiles.length, 0)
+})
