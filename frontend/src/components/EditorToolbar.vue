@@ -752,7 +752,7 @@
               <template v-if="(impressState.shapes || []).length > 0">
                 <text class="etb-pg-sec">{{ $t('editor.toolbar.impressShapeTextSection') }}</text>
                 <view class="etb-inline-row">
-                  <input class="etb-input" v-model="impressShapeTextInput" :placeholder="$t('editor.toolbar.impressShapeTextPh')"
+                  <input ref="impressShapeText" class="etb-input" v-model="impressShapeTextInput" :placeholder="$t('editor.toolbar.impressShapeTextPh')"
                          @focus="impressShapeTextFocused = true" @blur="impressShapeTextFocused = false"
                          @confirm="updateImpressShapeText" @click.stop />
                   <text class="etb-form-b ok sm" @tap.stop="updateImpressShapeText">{{ $t('editor.toolbar.impressShapeTextApply') }}</text>
@@ -830,7 +830,7 @@
                 </view>
               </view>
               <view class="etb-inline-row">
-                <input class="etb-input" v-model="impressTableCellForm.text" :placeholder="$t('editor.toolbar.impressTableCellTextPh')" @confirm="setImpressTableCell" @click.stop />
+                <input ref="impressTableText" class="etb-input" v-model="impressTableCellForm.text" :placeholder="$t('editor.toolbar.impressTableCellTextPh')" @confirm="setImpressTableCell" @click.stop />
                 <text class="etb-form-b ok sm" @tap.stop="setImpressTableCell">{{ $t('editor.toolbar.impressTableCellWrite') }}</text>
               </view>
               <text v-if="impressErr" class="etb-err">{{ impressErr }}</text>
@@ -848,7 +848,7 @@
                 <text class="etb-pg-title">{{ $t('editor.toolbar.impressNotesTitle') }}</text>
                 <text class="etb-form-b ok sm" @tap.stop="saveImpressNotes">{{ $t('editor.toolbar.impressNotesSave') }}</text>
               </view>
-              <textarea class="etb-input ta" v-model="impressNotesInput" :placeholder="$t('editor.toolbar.impressNotesPh')" @focus="impressNotesFocused = true" @blur="impressNotesFocused = false" @click.stop />
+              <textarea ref="impressNotes" class="etb-input ta" v-model="impressNotesInput" :placeholder="$t('editor.toolbar.impressNotesPh')" @focus="impressNotesFocused = true" @blur="impressNotesFocused = false" @click.stop />
               <text v-if="impressErr" class="etb-err">{{ impressErr }}</text>
             </view>
           </view>
@@ -945,15 +945,15 @@
       <text class="etb-caret">⌄</text>
     </view>
     <view class="etb-sep"></view>
-    <input class="etb-calc-name-box" v-model="calcAddressInput" :title="$t('editor.toolbar.calcNameBoxTitle')"
+    <input ref="calcAddress" class="etb-calc-name-box" v-model="calcAddressInput" :title="$t('editor.toolbar.calcNameBoxTitle')"
            @focus="calcAddressFocused = true" @blur="calcAddressFocused = false"
-           @confirm="submitCalcAddress" @keydown.enter.prevent="submitCalcAddress" />
+           @confirm="submitCalcAddress" />
     <text class="etb-calc-fx">fx</text>
     <text class="etb-calc-fx-btn ok" :title="$t('editor.toolbar.apply')" @tap.stop="submitCalcFormula">✓</text>
     <text class="etb-calc-fx-btn" :title="$t('editor.toolbar.cancel')" @tap.stop="cancelCalcFormula">✕</text>
-    <input class="etb-calc-formula-input" v-model="calcFormulaInput" :placeholder="$t('editor.toolbar.calcFormulaPh')"
+    <input ref="calcFormula" class="etb-calc-formula-input" v-model="calcFormulaInput" :placeholder="$t('editor.toolbar.calcFormulaPh')"
            @focus="calcFormulaFocused = true" @blur="calcFormulaFocused = false"
-           @confirm="submitCalcFormula" @keydown.enter.prevent="submitCalcFormula" @keydown.esc.prevent="cancelCalcFormula" />
+           @confirm="submitCalcFormula" @keydown.esc.prevent="cancelCalcFormula" />
     <view class="etb-calc-fn-chips">
       <text v-for="fn in CALC_QUICK_FNS" :key="fn.fn" class="etb-calc-fn-chip"
             :title="$t('editor.toolbar.' + fn.label) + ' (' + fn.fn + ')'"
@@ -971,7 +971,7 @@
        钉法与 EvidenceStaleBar/状态胶囊同规矩（浮在画布上，不进流）。 -->
   <view v-if="findOpen" class="etb-find-layer">
   <view class="etb-find">
-    <input class="etb-input fi" v-model="findText" :placeholder="$t('editor.toolbar.findPlaceholder')" @input="onFindInput" @confirm="findNext" />
+    <input ref="findInput" class="etb-input fi" v-model="findText" :placeholder="$t('editor.toolbar.findPlaceholder')" @input="onFindInput" @confirm="findNext" />
     <text class="etb-find-n">{{ findStatus }}</text>
     <text class="etb-find-b" :title="$t('editor.toolbar.prevMatch')" @tap.stop="findPrev">{{ $t('editor.toolbar.prevMatch') }}</text>
     <text class="etb-find-b" :title="$t('editor.toolbar.nextMatch')" @tap.stop="findNext">{{ $t('editor.toolbar.nextMatch') }}</text>
@@ -1384,6 +1384,20 @@ export default {
   },
 
   methods: {
+    submittedInputValue(event, refName, fallback) {
+      if (!event) return fallback
+      // UniInput 的 v-model 有 100 ms 节流；确认事件与真实输入框才是提交时的新值。
+      if (event && event.detail && event.detail.value != null) return String(event.detail.value)
+      const ref = this.$refs[refName]
+      const root = ref && (ref.$el || ref)
+      const input = root && (root.matches?.('input,textarea') ? root : root.querySelector?.('input,textarea'))
+      return input ? input.value : fallback
+    },
+    focusEditorAfterSubmit() {
+      const active = typeof document !== 'undefined' ? document.activeElement : null
+      if (this._toolbarDisposed || active && (active.matches?.('input,textarea') || active.isContentEditable)) return
+      this.$emit('focus-editor')
+    },
     async call(action, params) {
       if (!this.executor) return null
       try { return await this.executor.executeCommand(action, params || {}) }
@@ -1990,7 +2004,8 @@ export default {
       if (!this.findText) return
       this._findTimer = setTimeout(() => this.findNext(), 350)
     },
-    async findGo(direction) {
+    async findGo(direction, event) {
+      this.findText = this.submittedInputValue(event, 'findInput', this.findText)
       const keyword = String(this.findText || '')
       if (!keyword) return null
       this.findErr = ''
@@ -2003,8 +2018,8 @@ export default {
       await this.refresh()
       return r
     },
-    findNext() { return this.findGo('next') },
-    findPrev() { return this.findGo('prev') },
+    findNext(event) { return this.findGo('next', event) },
+    findPrev(event) { return this.findGo('prev', event) },
     // 替换当前这一处：查找栏已经把它选中了，直接替换选区。RecordChanges 开着时
     // replace_selection 走最小修订路径，跟 AI 改文档同一条路。
     async replaceCurrent() {
@@ -2254,23 +2269,25 @@ export default {
       if (r && r.success) await this.refresh()
       return r
     },
-    async submitCalcAddress() {
+    async submitCalcAddress(event) {
+      this.calcAddressInput = this.submittedInputValue(event, 'calcAddress', this.calcAddressInput)
       const range = String(this.calcAddressInput || '').trim()
       if (!range) return null
       this.calcAddressFocused = false
       const res = await this.call('sheet_select_range', { range })
       await this.refresh()
-      this.$emit('focus-editor')
+      this.focusEditorAfterSubmit()
       return res
     },
-    async submitCalcFormula() {
+    async submitCalcFormula(event) {
+      this.calcFormulaInput = this.submittedInputValue(event, 'calcFormula', this.calcFormulaInput)
       const cell = (this.calcState && this.calcState.address) || 'A1'
       this.calcFormulaFocused = false
       const res = await this.runCalcOp('sheet_write_cells', {
         startCell: cell,
         rows: [[this.calcFormulaInput != null ? String(this.calcFormulaInput) : '']],
       })
-      this.$emit('focus-editor')
+      this.focusEditorAfterSubmit()
       return res
     },
     cancelCalcFormula() {
@@ -2431,7 +2448,8 @@ export default {
       }
       return null
     },
-    updateImpressShapeText() {
+    updateImpressShapeText(event) {
+      this.impressShapeTextInput = this.submittedInputValue(event, 'impressShapeText', this.impressShapeTextInput)
       const cur = (this.impressState && this.impressState.slideNumber) || 1
       const shapeName = this.activeShapeName
       this.impressShapeTextFocused = false
@@ -2472,7 +2490,8 @@ export default {
       if (tbl && (tbl.name || tbl.shapeName)) params.shapeName = tbl.name || tbl.shapeName
       return this.runImpressOp('slide_table_set_style', params)
     },
-    setImpressTableCell() {
+    setImpressTableCell(event) {
+      this.impressTableCellForm.text = this.submittedInputValue(event, 'impressTableText', this.impressTableCellForm.text)
       const cur = (this.impressState && this.impressState.slideNumber) || 1
       const shapes = (this.impressState && this.impressState.shapes) || []
       const tbl = (this.impressShape && this.impressShape.isTable ? this.impressShape : null) || shapes.find((s) => s && s.isTable)
@@ -2487,7 +2506,8 @@ export default {
       if (tbl && (tbl.name || tbl.shapeName)) params.shapeName = tbl.name || tbl.shapeName
       return this.runImpressOp('slide_table_set_cell', params)
     },
-    saveImpressNotes() {
+    saveImpressNotes(event) {
+      this.impressNotesInput = this.submittedInputValue(event, 'impressNotes', this.impressNotesInput)
       const cur = (this.impressState && this.impressState.slideNumber) || 1
       return this.runImpressOp('slide_write_notes', {
         slideNumber: cur,
