@@ -5929,7 +5929,7 @@ const EXEC = {
     };
     // 不带任何字段 = 只读查询：回报当前各处可见性。宿主用它复核「藏了之后
     // 真的没再冒出来」（上下文工具栏是选中表格/图片时由引擎自己拉起来的）。
-    const anyField = ['all', 'menubar', 'statusbar', 'toolbars', 'rulers'].some((k) => req[k] != null);
+    const anyField = ['all', 'menubar', 'statusbar', 'toolbars', 'rulers', 'sheetTabs'].some((k) => req[k] != null);
     if (!anyField) {
       const cur = { toolbars: {} };
       try { cur.all = !!lm.isVisible(); } catch (e) {}
@@ -5943,6 +5943,7 @@ const EXEC = {
         const vs = ctrl.getViewSettings();
         cur.rulers = { ShowHoriRuler: !!vs.getPropertyValue('ShowHoriRuler'), ShowVertRuler: !!vs.getPropertyValue('ShowVertRuler') };
       } catch (e) {}
+      if (isCalcDoc()) { try { cur.sheetTabs = !!ctrl.getPropertyValue('HasSheetTabs'); } catch (e) {} }
       return { success: true, visible: cur };
     }
     if (req.all != null) {
@@ -5979,6 +5980,12 @@ const EXEC = {
       } else if (req.menubar === false && req.statusbar === false && req.toolbars === false) {
         try { lm.setVisible(false); } catch (e) {}
       }
+    }
+    if (req.sheetTabs != null && isCalcDoc()) {
+      try {
+        ctrl.setPropertyValue('HasSheetTabs', !!req.sheetTabs);
+        out.applied.sheetTabs = !!ctrl.getPropertyValue('HasSheetTabs');
+      } catch (e) { out.sheetTabsErr = errStr(e); }
     }
     if (req.rulers != null) {
       let vs = null;
@@ -9253,6 +9260,93 @@ const EXEC = {
       revisionCount: (acc && acc.resolved) || 0, remainingInParagraph: left.length,
       text: para2 ? String(para2.getString() || '') : '',
     };
+  },
+  // Lightweight navigation: read native identities without changing the active page/sheet.
+  office_get_navigation() {
+    try {
+      const kind = docKindOf();
+      const items = [];
+      let activeId = null;
+      if (kind === 'calc') {
+        const sheets = xModel.getSheets();
+        activeId = String(ctrl.getActiveSheet().getName());
+        for (let i = 0; i < sheets.getCount(); i++) {
+          const sheet = sheets.getByIndex(i);
+          if (!sheet.getPropertyValue('IsVisible')) continue;
+          const name = String(sheet.getName());
+          items.push({ id: name, name: name });
+        }
+      } else if (kind === 'impress') {
+        const pages = xModel.getDrawPages();
+        const current = ctrl.getCurrentPage();
+        for (let i = 0; i < pages.getCount(); i++) {
+          const page = pages.getByIndex(i);
+          if (unoSameDrawPage(current, page)) activeId = i + 1;
+          items.push({ id: i + 1, name: String(page.getName()),
+            width: Number(page.getPropertyValue('Width')), height: Number(page.getPropertyValue('Height')) });
+        }
+      }
+      return { success: true, kind: kind, items: items, activeId: activeId, documentSeq: docSeq, revision: currentReviewRevision() };
+    } catch (e) { return { success: false, message: errStr(e) }; }
+  },
+  office_activate_item(p) {
+    if (!p || p.documentSeq !== docSeq) return { success: false, message: '文档已切换，请重试' };
+    try {
+      if (isCalcDoc()) {
+        const sheets = xModel.getSheets();
+        if (typeof p.id !== 'string' || !sheets.hasByName(p.id)) return { success: false, message: '工作表不存在' };
+        const sheet = sheets.getByName(p.id);
+        if (!sheet.getPropertyValue('IsVisible')) return { success: false, message: '工作表不可见' };
+        ctrl.setActiveSheet(sheet);
+      } else if (isImpressDoc()) {
+        const pages = xModel.getDrawPages();
+        if (!Number.isInteger(p.id) || p.id < 1 || p.id > pages.getCount()) return slideFail('页码越界');
+        ctrl.setCurrentPage(pages.getByIndex(p.id - 1));
+      } else return { success: false, message: '当前文档不支持此导航' };
+      return EXEC.office_get_navigation();
+    } catch (e) { return { success: false, message: errStr(e) }; }
+  },
+  // Export one draw page directly; resolvePage would move the user's current page.
+  slide_get_thumbnail(p) {
+    if (!p || p.documentSeq !== docSeq) return slideFail('文档已切换，请重试');
+    if (!isImpressDoc()) return slideFail(NOT_PRESENTATION_MSG);
+    const pages = xModel.getDrawPages();
+    const number = Number(p && p.slideNumber);
+    if (!Number.isInteger(number) || number < 1 || number > pages.getCount()) return slideFail('页码越界');
+    const page = pages.getByIndex(number - 1);
+    const width = Math.max(80, Math.min(480, Math.round(Number(p && p.width) || 240)));
+    const pageWidth = Number(page.getPropertyValue('Width'));
+    const pageHeight = Number(page.getPropertyValue('Height'));
+    const height = Math.max(1, Math.round(width * pageHeight / pageWidth));
+    const chunks = [];
+    let total = 0;
+    const sink = zetajs.unoObject([css.io.XOutputStream], {
+      writeBytes(seq) {
+        const bytes = new Uint8Array(seq.buffer ? seq.buffer.slice(seq.byteOffset, seq.byteOffset + seq.byteLength) : seq);
+        chunks.push(bytes); total += bytes.length;
+      },
+      flush() {}, closeOutput() {},
+    });
+    const wasModified = xModel.isModified();
+    exportInFlight = true;
+    try {
+      const exporter = context.getServiceManager().createInstanceWithContext('com.sun.star.drawing.GraphicExportFilter', context);
+      exporter.setSourceDocument(page);
+      const filterData = new zetajs.Any(zetajs.type.sequence(zetajs.type.struct(css.beans.PropertyValue)), [
+        mkProp('PixelWidth', width), mkProp('PixelHeight', height),
+      ]);
+      if (!exporter.filter([mkProp('MediaType', 'image/png'), mkProp('OutputStream', sink), mkProp('FilterData', filterData)]))
+        return slideFail('缩略图导出失败');
+      if (!total) return slideFail('缩略图为空');
+      const bytes = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+      return { success: true, slideNumber: number, width: width, height: height, bytes: bytes, documentSeq: docSeq, revision: currentReviewRevision() };
+    } catch (e) { return slideFail(errStr(e)); }
+    finally {
+      try { if (xModel.isModified() !== wasModified) xModel.setModified(wasModified); } catch (e) {}
+      exportInFlight = false;
+    }
   },
   // [逐段溯源] 表格里的「当前这一格」。段落级用 get_review_context 的
   // paragraphIndex，xlsx 这一条与 pptx 的 slide_get_current 是它的对应物。

@@ -933,14 +933,8 @@
     </view>
   </view>
 
-  <!-- Excel (calc) 专属名称框、工作表标签栏、公式栏与快捷函数（ElyOffice apps/ely-table/src/bars.rs） -->
+  <!-- Excel (calc) 专属名称框、公式栏与快捷函数（ElyOffice apps/ely-table/src/bars.rs） -->
   <view v-if="isCalc" class="etb-calc-bar" @tap="closeMenus">
-    <view class="etb-calc-sheet-tabs">
-      <text v-for="sh in calcSheetsList" :key="sh" class="etb-calc-sheet-tab"
-            :class="{ on: sh === (calcState.sheet || 'Sheet1') }"
-            @tap.stop="switchCalcSheet(sh)">{{ sh }}</text>
-    </view>
-    <text class="etb-calc-sheet-add" :title="$t('editor.toolbar.calcSheetAdd')" @tap.stop="addCalcSheet">+</text>
     <view class="etb-calc-sheet-pill" :title="$t('editor.toolbar.calcSheetTitle')" @tap.stop="openCalcMenu('calcSheet')">
       <text class="etb-caret">⌄</text>
     </view>
@@ -1864,6 +1858,7 @@ export default {
     async applyChrome(hide) {
       const res = await this.call('set_chrome', {
         menubar: !hide, statusbar: !hide, toolbars: !hide,
+        ...(this.isCalc ? { sheetTabs: false } : {}),
       })
       if (res && res.success) this.chromeHidden = hide
       return res
@@ -2644,18 +2639,11 @@ export default {
 .etb-pg-chip.danger, .etb-form-b.danger { border-color: var(--awd-danger); color: var(--awd-danger-text); background: var(--awd-danger-soft); }
 .etb-calc-bar { display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 8px; flex-shrink: 0;
   background: var(--awd-surface); border-bottom: 1px solid var(--awd-border); }
-.etb-calc-sheet-tabs { display: flex; align-items: center; gap: 3px; max-width: 240px; overflow-x: auto; flex-shrink: 0; }
-.etb-calc-sheet-tab { padding: 2px 8px; border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm);
-  background: var(--awd-bg); font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.etb-calc-sheet-tab:hover { border-color: var(--awd-mint); color: var(--awd-accent-text); }
-.etb-calc-sheet-tab.on { border-color: var(--awd-mint); background: var(--awd-accent-soft); color: var(--awd-accent-text); font-weight: 600; }
 .etb-calc-sheet-pill { display: flex; align-items: center; justify-content: center; gap: 4px; height: 22px; padding: 0 6px;
   border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-bg); cursor: pointer; flex-shrink: 0; }
 .etb-calc-sheet-pill:hover { border-color: var(--awd-mint); color: var(--awd-accent-text); }
 .etb-calc-sheet-name { font-size: var(--awd-panel-fs-meta); font-weight: 600; color: var(--awd-text); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.etb-calc-sheet-add { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px;
-  border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); font-size: var(--awd-panel-fs); color: var(--awd-text-2); cursor: pointer; flex-shrink: 0; }
-.etb-calc-sheet-add:hover { border-color: var(--awd-mint); color: var(--awd-accent-text); background: var(--awd-accent-soft); }
+
 .etb-calc-name-box { width: 72px; height: 22px; padding: 0 6px; box-sizing: border-box; font-size: var(--awd-panel-fs-meta); font-family: monospace;
   color: var(--awd-text); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); background: var(--awd-bg); flex-shrink: 0; text-align: center; }
 .etb-calc-fx { font-size: var(--awd-panel-fs-meta); font-style: italic; font-weight: 600; font-family: Georgia, serif; color: var(--awd-text-3); padding: 0 2px; flex-shrink: 0; }

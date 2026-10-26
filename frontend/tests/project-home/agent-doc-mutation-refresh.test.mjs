@@ -40,6 +40,7 @@ function loadActionMethods(uni) {
 
 function loadEditorMethods() {
   const body = EDITOR_SRC.match(/<script>([\s\S]*?)<\/script>/)[1]
+    .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '')
     .replace(/export default \{/, 'return {')
   const factory = new Function(...Object.keys(barriers),
