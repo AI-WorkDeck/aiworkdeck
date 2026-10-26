@@ -881,6 +881,21 @@ export function selectContributedStyleProfile(ref) {
   });
 }
 
+// 插件贡献的外观皮肤清单 -> { code, selected, themes: [{pluginId, id, name, description, selected, lightTokens, darkTokens, fonts, effects, previewSwatches}] }
+export function getContributedThemes() {
+  return request({ url: '/api/plugins/contributed/themes', method: 'GET' });
+}
+
+// 选定/清除全局外观皮肤；ref 形如 "<pluginId>:<themeId>"，空或 "default" = 恢复默认内置皮肤
+export function selectContributedTheme(ref) {
+  return request({
+    url: '/api/plugins/contributed/themes/select',
+    method: 'POST',
+    data: { ref: ref || '' },
+    header: { 'Content-Type': 'application/json' },
+  });
+}
+
 // 重新扫描 plugins/ 目录（仅管理员）
 export function rescanPlugins() {
   return request({

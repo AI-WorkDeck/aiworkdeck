@@ -88,7 +88,27 @@
           "calendar/web/**",
           "favorites/web/**",
           "clipboard/web/**",
-          "insight/web/**"
+          "insight/web/**",
+          "search/l10n/**",
+          "voice/l10n/**",
+          "desensitize/l10n/**",
+          "litigation-visual/l10n/**",
+          "calendar/l10n/**",
+          "favorites/l10n/**",
+          "clipboard/l10n/**",
+          "insight/l10n/**",
+          "theme-inkwash-zen/manifest.json",
+          "theme-inkwash-zen/web/**",
+          "theme-inkwash-zen/themes/**",
+          "theme-inkwash-zen/l10n/**",
+          "theme-anime-twilight/manifest.json",
+          "theme-anime-twilight/web/**",
+          "theme-anime-twilight/themes/**",
+          "theme-anime-twilight/l10n/**",
+          "theme-aurora-glass/manifest.json",
+          "theme-aurora-glass/web/**",
+          "theme-aurora-glass/themes/**",
+          "theme-aurora-glass/l10n/**"
         ]
       }
     ],

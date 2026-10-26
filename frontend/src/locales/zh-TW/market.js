@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "themesTitle": "外觀皮膚",
+  "themeSelect": "套用皮膚",
+  "themeSelected": "使用中（點擊恢復預設）",
+  "themeNote": "皮膚會同步更新工作台、插件與編輯器外觀的語意色彩，支援淺色與深色模式。",
   "redactionEngineUpdateNotice": "本地规则自动识别公司与中文姓名，支持预览、编号替换和复敏。实际功能随桌面端补丁升级，重新安装说明文件不会更新引擎。",
   "redactionEngineUpdateButton": "检查脱敏引擎更新",
   "heroWatermark": "技",

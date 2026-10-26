@@ -15,7 +15,10 @@ import java.util.*;
 @Service
 public class PluginBundledInstaller {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Set<String> IDS = Set.of("search", "voice", "desensitize", "litigation-visual", "calendar", "favorites", "clipboard", "insight");
+    private static final Set<String> IDS = Set.of(
+            "search", "voice", "desensitize", "litigation-visual",
+            "calendar", "favorites", "clipboard", "insight",
+            "theme-inkwash-zen", "theme-anime-twilight", "theme-aurora-glass");
     private static final String MARKER = ".awd-bundled";
     private final SystemSettingService settings;
     private final Path source;
@@ -77,7 +80,7 @@ public class PluginBundledInstaller {
             Path root = source.resolve(id).toRealPath();
             // Source projects may include src/tests; only signed-distribution payload goes into an installation.
             List<Path> payload = new ArrayList<>(); payload.add(root.resolve("manifest.json"));
-            for (String sub : List.of("web", "l10n", "skills")) if (Files.isDirectory(root.resolve(sub))) {
+            for (String sub : List.of("web", "l10n", "skills", "themes", "templates", "profiles")) if (Files.isDirectory(root.resolve(sub))) {
                 try (var files = Files.walk(root.resolve(sub))) { payload.addAll(files.toList()); }
             }
             for (Path file : payload) {

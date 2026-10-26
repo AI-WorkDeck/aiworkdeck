@@ -491,7 +491,7 @@ public class PluginDevService {
         if (contributes == null) {
             return false;
         }
-        for (String key : List.of("templates", "styleProfiles", "capabilities")) {
+        for (String key : List.of("templates", "styleProfiles", "themes", "capabilities")) {
             JSONArray arr = contributes.getJSONArray(key);
             if (arr != null && !arr.isEmpty()) {
                 return true;

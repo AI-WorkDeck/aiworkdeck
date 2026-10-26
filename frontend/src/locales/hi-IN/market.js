@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "themesTitle": "UI Skins",
+  "themeSelect": "Apply skin",
+  "themeSelected": "Active (tap for default)",
+  "themeNote": "Applying a skin updates semantic color tokens across the workbench, plugins, and editor chrome in both Light and Dark modes.",
   "redactionEngineUpdateNotice": "स्थानीय नियम स्वतः कंपनियों और चीनी नामों का पता लगाते हैं, पूर्वावलोकन, टोकन और पुनर्स्थापना के साथ। इंजन डेस्कटॉप पैच के माध्यम से अपडेट होता है; Skill निर्देश पुनः इंस्टॉल करने से यह अपडेट नहीं होता।",
   "redactionEngineUpdateButton": "रिडैक्शन इंजन अपडेट की जाँच करें",
   "heroWatermark": "E",

@@ -120,6 +120,8 @@ export default {
   appearanceLight: '浅色',
   appearanceDark: '深色',
   appearanceSystem: '跟随系统',
+  skinSectionTitle: '主题皮肤',
+  skinDefaultName: '东方清雅（默认）',
   walletChipTitle: 'Credits 余额与会员等级，点击打开账户设置',
   walletMenuLabel: '账户与用量',
   trialInfo: '试用版说明',

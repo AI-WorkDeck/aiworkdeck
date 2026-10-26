@@ -234,7 +234,8 @@ export default {
 <style>
 /* AI WorkDeck Global Overrides */
 
-/* ============ 全局字体（dev-board#849） ============
+/* ============ 全局字体（dev-board#849） =====}
+
    此前全仓没有 html/body 字体规则：页面里的组件各自带字体没露馅，挂在 document.body
    上的 uni 弹层（<uni-toast>，以及接管前的 <uni-modal>）却直接掉到浏览器默认衬线字。
    字栈与 uni.scss 的 $awd-font-serif / $awd-font-sans / $awd-font-mono 逐字一致
@@ -252,7 +253,8 @@ uni-toast {
     font-family: var(--awd-font-sans);
 }
 
-/* ============ 颜色语义令牌（浅色/深色两套取值） ============
+/* ============ 颜色语义令牌（浅色/深色两套取值） =====}
+
    改造前全前端有 3950 处硬编码颜色、435 种色值，文字/背景/边框各自混着四套
    并行灰阶（Bootstrap 的 #6C757D/#ADB5BD、Tailwind slate 的 #64748B/#94A3B8、
    Tailwind gray 的 #6B7280/#D1D5DB，外加 #333/#666/#999 遗留）。收敛成下面这
@@ -450,7 +452,8 @@ html[data-theme='dark'] .awd-brand-logo > img {
     filter: invert(1) hue-rotate(180deg) saturate(1.35) brightness(1.1);
 }
 
-/* ============ 无边框窗口：给系统窗口控件让位 ============
+/* ============ 无边框窗口：给系统窗口控件让位 =====}
+
    桌面壳去掉了系统标题栏（main.js titleBarStyle: 'hidden'），窗口控件浮在
    网页内容上。类名由 utils/windowChrome.js 挂在 documentElement 上。
    设计见 docs/superpowers/specs/2026-08-16-desktop-chrome-and-command-menu.md */
@@ -839,6 +842,31 @@ html.is-desktop .page-variable-library .header-card {
 /* plugin-market：hero 的分类标签在最上一行 */
 html.is-desktop .page-plugin-market .hero {
     padding-top: 38px;
+}
+
+/* ============ 声明式皮肤插件特征质感（dev-board#1480） =====}
+
+   当用户启用了带 surfaceTexture / aiPulseStyle 的皮肤插件时，appTheme.js 在
+   documentElement 上挂载 data-skin-texture 与 data-skin-pulse。通过极轻量的
+   全局特征样式增强三套皮肤的视觉辨识度，同时严格复用 var(--awd-*) 语义令牌。 */
+html[data-skin-texture='xuan-paper'] .page-project-overview,
+html[data-skin-texture='xuan-paper'] .pane-empty {
+    background-image:
+        radial-gradient(ellipse 85% 65% at 50% 35%, var(--awd-halo-1) 0%, transparent 72%),
+        repeating-linear-gradient(0deg, transparent 0px, transparent 3px, var(--awd-accent-wash) 3px, var(--awd-accent-wash) 4px);
+}
+html[data-skin-texture='xuan-paper'] .project-title-text,
+html[data-skin-texture='xuan-paper'] .sidebar-title-text {
+    font-family: var(--awd-font-serif);
+    letter-spacing: 0.03em;
+}
+html[data-skin-texture='cel-glass'] .pane-empty,
+html[data-skin-texture='cel-glass'] .project-header {
+    background-image: linear-gradient(125deg, var(--awd-halo-1) 0%, transparent 48%, var(--awd-halo-2) 100%);
+}
+html[data-skin-texture='frosted-glass'] .pane-empty,
+html[data-skin-texture='frosted-glass'] .project-header {
+    background-image: radial-gradient(circle at 80% 15%, var(--awd-halo-1) 0%, var(--awd-halo-2) 45%, transparent 78%);
 }
 
 /* ---- RTL 基础排版与布局适配（ar-SA，dev-board#1477） ---- */

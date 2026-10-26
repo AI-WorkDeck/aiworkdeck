@@ -251,6 +251,39 @@
           <text class="mdp-sec-note">{{ $t('market.styleProfileNote') }}</text>
         </view>
 
+        <!-- 外观皮肤（contributes.themes）：插件贡献的双模式色彩令牌，一键切换工作台皮肤 -->
+        <view v-if="spec.kind === 'plugin' && installedInfo && ownThemes.length" class="mdp-section">
+          <text class="mdp-sec-title">{{ $t('market.themesTitle') }}</text>
+          <view v-for="th in ownThemes" :key="th.id" class="mdp-theme-row">
+            <view class="mdp-theme-main">
+              <view class="mdp-theme-head">
+                <text class="mdp-theme-name">{{ th.name || th.id }}</text>
+                <view v-if="th.previewSwatches && th.previewSwatches.length" class="mdp-theme-swatches">
+                  <view
+                    v-for="(sw, si) in th.previewSwatches"
+                    :key="si"
+                    class="mdp-theme-dot"
+                    :style="{ background: sw }"
+                  ></view>
+                </view>
+              </view>
+              <text v-if="th.description" class="mdp-sec-note">{{ th.description }}</text>
+            </view>
+            <text class="mdp-v mdp-link" @tap="toggleTheme(th)">
+              {{ th.selected ? $t('market.themeSelected') : $t('market.themeSelect') }}
+            </text>
+          </view>
+          <text class="mdp-sec-note">{{ $t('market.themeNote') }}</text>
+          <iframe
+            v-if="themePreviewUrl"
+            ref="themePreview"
+            :src="themePreviewUrl"
+            @load="pushThemePreview"
+            class="mdp-theme-preview-frame"
+            sandbox="allow-scripts"
+          ></iframe>
+        </view>
+
         <!-- 详细信息：工具权限压缩为一行人话摘要，不再枚举内部工具名 -->
         <view class="mdp-section">
           <text class="mdp-sec-title">{{ $t('market.detailInfo') }}</text>
@@ -287,7 +320,8 @@
 // 插件广场详情 tab（VS Code 扩展详情页形态）。spec = { kind: 'skill'|'plugin', id, name }
 // 由左栏 MarketSidebarPanel 点行打开。自行拉取市场与已安装两份数据合成视图，
 // 装/卸/启停后通过 uni.$emit('awd:market-changed') 通知左栏刷新。
-import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile } from '@/services/api.js'
+import { getBundledPlugins, installBundledPlugin, getPlugins, getSkills, getSkillMarket, getPluginMarket, installMarketSkill, uninstallMarketSkill, installMarketPlugin, uninstallMarketPlugin, setPluginEnabled, setSkillActivation, packStatus, packInfo, packInstall, packUpgrade, packUninstall, getPluginSettings, savePluginSettings, getContributedStyleProfiles, selectContributedStyleProfile, getContributedThemes, selectContributedTheme, resolvePluginEntryUrl } from '@/services/api.js'
+import { setActiveSkin, getResolvedTheme, collectThemeTokens, APP_THEME_EVENT } from '@/utils/appTheme.js'
 import { ICONS } from '@/config/icons.js'
 import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { isPanelSkill, buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
@@ -389,6 +423,7 @@ export default {
       settingsBusy: false,
       contributionGeneration: 0,
       ownStyleProfiles: [], // 本插件贡献的样式画像 + 是否被选为全局默认
+      ownThemes: [],        // 本插件贡献的外观皮肤 + 是否当前启用
     }
   },
   computed: {
@@ -580,11 +615,17 @@ export default {
       if (this.marketInfo) return this.$t('market.sourceOfficialMarket')
       return this.$t('market.sourceLocal')
     },
+    themePreviewUrl() {
+      if (this.spec.kind !== 'plugin' || !this.installedInfo || !this.installedInfo.enabled || !this.ownThemes.length) return ''
+      const entry = this.installedInfo.frontendEntry || this.marketInfo?.frontendEntry || ''
+      return entry ? resolvePluginEntryUrl(this.spec.id, entry) : ''
+    },
   },
   watch: {
     'spec.projectId'() { this.loadContribution() },
   },
   mounted() {
+    uni.$on(APP_THEME_EVENT, this.pushThemePreview)
     uni.$on('awd:account-changed', this.loadContribution)
     this.reload()
     uni.$on('awd:market-changed-from-sidebar', this.reload)
@@ -593,12 +634,18 @@ export default {
   beforeUnmount() {
     this.reloadGeneration++
     this.contributionGeneration++
+    uni.$off(APP_THEME_EVENT, this.pushThemePreview)
     uni.$off('awd:account-changed', this.loadContribution)
     uni.$off('awd:market-changed-from-sidebar', this.reload)
     uni.$off('awd:market-update-checked', this.onUpdatesChecked)
     this.stopPackPoll()
   },
   methods: {
+    pushThemePreview() {
+      this.$refs.themePreview?.contentWindow?.postMessage({
+        awd: 1, type: 'theme', theme: getResolvedTheme(), tokens: collectThemeTokens(),
+      }, '*')
+    },
     onUpdatesChecked() {
       if (this.loading || this.busy) return
       return this.reload(false)
@@ -683,10 +730,11 @@ export default {
     async loadContribution() {
       const generation = ++this.contributionGeneration
       const { id, projectId } = this.spec
-      this.pluginSettings = []; this.settingsDraft = {}; this.ownStyleProfiles = []
+      this.pluginSettings = []; this.settingsDraft = {}; this.ownStyleProfiles = []; this.ownThemes = []
       if (this.spec.kind !== 'plugin' || !this.installedInfo) {
         this.pluginSettings = []
         this.ownStyleProfiles = []
+        this.ownThemes = []
         return
       }
       try {
@@ -710,6 +758,16 @@ export default {
       } catch (e) {
         if (generation !== this.contributionGeneration) return
         this.ownStyleProfiles = []
+      }
+      try {
+        const res = await getContributedThemes()
+        if (generation !== this.contributionGeneration) return
+        const body = res && res.themes !== undefined ? res : (res && res.data) || {}
+        const all = Array.isArray(body.themes) ? body.themes : []
+        this.ownThemes = all.filter(t => t.pluginId === id)
+      } catch (e) {
+        if (generation !== this.contributionGeneration) return
+        this.ownThemes = []
       }
     },
 
@@ -744,6 +802,20 @@ export default {
         const res = await selectContributedStyleProfile(ref)
         const body = res && res.code !== undefined ? res : (res && res.data) || {}
         if (body.code !== 0) throw new Error(body.message || this.$t('market.saveFailed'))
+        await this.loadContribution()
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || this.$t('market.saveFailed'), icon: 'none' })
+      }
+    },
+
+    async toggleTheme(th) {
+      try {
+        const ref = th.selected ? '' : (th.pluginId + ':' + th.id)
+        const res = await selectContributedTheme(ref)
+        const body = res && res.code !== undefined ? res : (res && res.data) || {}
+        if (body.code !== 0) throw new Error(body.message || this.$t('market.saveFailed'))
+        setActiveSkin(ref ? { ...th, ref } : null)
+        try { uni.$emit('awd:skin-changed') } catch (e) { /* ignore */ }
         await this.loadContribution()
       } catch (e) {
         uni.showToast({ title: (e && e.message) || this.$t('market.saveFailed'), icon: 'none' })
@@ -1491,5 +1563,61 @@ export default {
   color: var(--awd-accent-text);
   text-decoration: underline;
   cursor: pointer;
+}
+
+.mdp-theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--awd-border-subtle);
+}
+
+.mdp-theme-row:last-of-type {
+  border-bottom: 0;
+}
+
+.mdp-theme-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mdp-theme-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mdp-theme-name {
+  font-size: var(--awd-font-size-body);
+  font-weight: 600;
+  color: var(--awd-text);
+}
+
+.mdp-theme-swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mdp-theme-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--awd-border);
+}
+
+.mdp-theme-preview-frame {
+  width: 100%;
+  height: 184px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: var(--awd-radius-md);
+  background: transparent;
+  display: block;
 }
 </style>

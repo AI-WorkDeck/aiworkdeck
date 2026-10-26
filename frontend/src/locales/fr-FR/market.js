@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "themesTitle": "UI Skins",
+  "themeSelect": "Apply skin",
+  "themeSelected": "Active (tap for default)",
+  "themeNote": "Applying a skin updates semantic color tokens across the workbench, plugins, and editor chrome in both Light and Dark modes.",
   "redactionEngineUpdateNotice": "Les règles locales détectent automatiquement les noms de sociétés et les noms chinois, avec aperçus, jetons et restauration. Le moteur est mis à jour via les correctifs du bureau ; la réinstallation des instructions de Skill ne le met pas à jour.",
   "redactionEngineUpdateButton": "Vérifier les mises à jour du moteur de rédaction",
   "heroWatermark": "E",

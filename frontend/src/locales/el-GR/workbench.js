@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "skinSectionTitle": "Theme Skin",
+  "skinDefaultName": "Oriental Serenity (Default)",
   "restartPending": "{count} tasks can be resumed",
   "restartContinue": "Continue: {name}",
   "restartRestoring": "Restoring the original conversation and document…",

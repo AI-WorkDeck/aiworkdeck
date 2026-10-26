@@ -416,6 +416,37 @@ public class PluginController {
         }
     }
 
+    /** 已启用插件贡献的外观皮肤主题清单 + 当前选中项 */
+    @GetMapping("/contributed/themes")
+    public ResponseEntity<Map<String, Object>> listContributedThemes(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        if (AuthController.getUserIdFromSession(sessionId) == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(LangText.of("请先登录", "Please sign in first")));
+        }
+        Map<String, Object> result = ok();
+        result.put("selected", contributionService.selectedThemeRef());
+        result.put("themes", contributionService.listThemes());
+        return ResponseEntity.ok(result);
+    }
+
+    /** 选定/清除全局外观皮肤；ref 形如 "<pluginId>:<themeId>"，空或 "default" = 恢复默认 */
+    @PostMapping("/contributed/themes/select")
+    public ResponseEntity<Map<String, Object>> selectContributedTheme(
+            @org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        if (!isAdmin(sessionId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("仅管理员可操作", "Administrator permission required")));
+        }
+        try {
+            contributionService.selectTheme(body == null ? null : body.get("ref"));
+            Map<String, Object> result = ok();
+            result.put("selected", contributionService.selectedThemeRef());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.ok(error(e.getMessage()));
+        }
+    }
+
     /** 插件设置：声明 + 当前值（secret 只回显尾 4 位） */
     public ResponseEntity<Map<String, Object>> getPluginSettings(String pluginId, String sessionId) {
         return getPluginSettings(pluginId, null, sessionId);
