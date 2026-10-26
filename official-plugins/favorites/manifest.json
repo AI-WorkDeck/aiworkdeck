@@ -1,7 +1,7 @@
 {
   "id": "favorites",
   "name": "收藏夹",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "查找项目收藏，复制、插入或打开来源。",
   "author": "AI WorkDeck",
   "permissions": [

@@ -1,7 +1,7 @@
 {
   "id": "desensitize",
   "name": "脱敏",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "核查敏感信息并生成脱敏副本，可用恢复包复敏。",
   "author": "AI WorkDeck",
   "permissions": ["file_read", "file_write", "editor"],
