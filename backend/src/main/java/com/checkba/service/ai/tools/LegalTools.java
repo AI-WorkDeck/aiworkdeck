@@ -38,6 +38,17 @@ public class LegalTools implements AgentToolComponent {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.service.platform.ExternalServiceAvailability externalServiceAvailability;
 
+    /**
+     * 跨项目只读放行（dev-board#1479）。字段注入 + required=false：既有测试手工 new 本类，
+     * 不能进构造器；null 时 read_document 维持原来的项目内围栏口径。
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ProjectMemberService projectMemberService;
+
+    public void setProjectMemberService(com.checkba.service.ProjectMemberService projectMemberService) {
+        this.projectMemberService = projectMemberService;
+    }
+
     /** 平台档下法宝检索必须经网关，没连账户时四个 law_* 工具每次都只会回一句「不可用」。 */
     private static final java.util.Set<String> PKULAW_TOOLS =
             java.util.Set.of("law_search", "law_search_keyword", "law_recognition", "get_law_article");
@@ -103,7 +114,7 @@ public class LegalTools implements AgentToolComponent {
             Long fId = Long.parseLong(fileId);
             ProjectFile file = projectFileService.getFile(fId);
             if (file == null) return "Error: File not found.";
-            String denied = ToolFileGuard.rejectIfOutsideProject(file);
+            String denied = ToolFileGuard.rejectIfCannotRead(file, projectMemberService);
             if (denied != null) return denied;
 
             String name = file.getName();

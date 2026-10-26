@@ -88,8 +88,8 @@ public class ProjectService {
 
     @Transactional
     public Project createProject(ProjectCreateRequest request, Long userId) {
-        if (Project.LOOSE_FILES.equals(request.getProjectType())) {
-            throw new IllegalArgumentException(LangText.of("请通过打开文件创建独立文件工作区", "Open a file to create a standalone workspace"));
+        if (Project.LOOSE_FILES.equals(request.getProjectType()) || Project.SCRATCH.equals(request.getProjectType())) {
+            throw new IllegalArgumentException(LangText.of("不支持的项目类型", "Unsupported project type"));
         }
         if (!StringUtils.hasText(request.getProjectType())) {
             throw new IllegalArgumentException(LangText.of("项目类型不能为空", "Project type must not be empty"));
@@ -208,7 +208,7 @@ public class ProjectService {
         allProjects.addAll(memberProjects);
 
         return allProjects.stream()
-                .filter(p -> !p.isLooseFileWorkspace())
+                .filter(p -> !p.isLooseFileWorkspace() && !p.isScratchWorkspace())
                 .sorted((p1, p2) -> {
                      if (p1.getCreatedAt() == null || p2.getCreatedAt() == null) return 0;
                      return p2.getCreatedAt().compareTo(p1.getCreatedAt());
@@ -283,6 +283,71 @@ public class ProjectService {
     public Project getProject(Long id) {
         return projectRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("项目不存在: ", "Project not found: ") + id));
+    }
+
+    /**
+     * 随手工作区（dev-board#1479，Chat/Scratch Mode）：每用户至多一个的隐藏 SCRATCH 项目。
+     * 幂等：已存在即复用，不存在才建。versionOptOut=true——聊天草稿不该被版本记录搅扰。
+     */
+    @Transactional
+    public Project getOrCreateScratchProject(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException(LangText.of("请先登录", "Please sign in first"));
+        }
+        return projectRepository.findFirstByUserIdAndProjectTypeOrderByIdAsc(userId, Project.SCRATCH)
+                .orElseGet(() -> {
+                    Project p = new Project();
+                    p.setName(LangText.of("随手工作区", "Scratch Workspace"));
+                    p.setProjectType(Project.SCRATCH);
+                    p.setListedCompanyName("");
+                    p.setTargetCompanyName("");
+                    p.setUserId(userId);
+                    p.setVersionOptOut(true);
+                    p.setCreatedAt(LocalDateTime.now());
+                    p.setUpdatedAt(p.getCreatedAt());
+                    Project saved = projectRepository.save(p);
+                    ProjectMember member = new ProjectMember();
+                    member.setProjectId(saved.getId());
+                    member.setUserId(userId);
+                    member.setRole("ADMIN");
+                    projectMemberRepository.save(member);
+                    return saved;
+                });
+    }
+
+    /**
+     * 随手工作区就地转正（dev-board#1479）：SCRATCH → 正式项目（默认 BLANK），
+     * 转正后开始计入「我的项目」并允许版本记录；下一次 getOrCreateScratchProject 会另建新的。
+     */
+    @Transactional
+    public Project promoteScratchProject(Long projectId, String name, String targetProjectType, Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException(LangText.of("请先登录", "Please sign in first"));
+        }
+        Project p = getProject(projectId);
+        if (!userId.equals(p.getUserId())) {
+            throw new IllegalArgumentException(LangText.of("无权操作此项目", "Permission denied"));
+        }
+        if (!p.isScratchWorkspace()) {
+            throw new IllegalArgumentException(LangText.of("该项目不是随手工作区", "Project is not a scratch workspace"));
+        }
+        String resolvedName = (name != null && !name.trim().isEmpty())
+                ? name.trim()
+                : LangText.of("未命名项目", "Untitled Project");
+        String resolvedType = (targetProjectType != null && !targetProjectType.trim().isEmpty()
+                && !Project.SCRATCH.equals(targetProjectType.trim())
+                && !Project.LOOSE_FILES.equals(targetProjectType.trim()))
+                ? targetProjectType.trim()
+                : "BLANK";
+        p.setName(resolvedName);
+        p.setProjectType(resolvedType);
+        p.setVersionOptOut(false);
+        p.setUpdatedAt(LocalDateTime.now());
+        Project saved = projectRepository.save(p);
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new ProjectCreatedEvent(saved.getId(), userId));
+        }
+        return saved;
     }
 
     /**

@@ -10,6 +10,8 @@ import com.checkba.service.LocalProjectService;
 import com.checkba.service.ProjectMemberService;
 import com.checkba.service.ProjectService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -353,6 +355,42 @@ public class ProjectController {
         result.put("code", 0);
         result.put("message", com.checkba.service.LangText.of("删除成功", "Deleted successfully"));
         return result;
+    }
+
+    @PostMapping("/scratch")
+    public ResponseEntity<?> getOrCreateScratchProject(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "code", 401,
+                    "message", com.checkba.service.LangText.of("请先登录", "Please sign in first")
+            ));
+        }
+        Project scratch = projectService.getOrCreateScratchProject(userId);
+        return ResponseEntity.ok(Map.of("code", 0, "data", scratch));
+    }
+
+    @PostMapping("/{id}/promote")
+    public ResponseEntity<?> promoteScratchProject(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "code", 401,
+                    "message", com.checkba.service.LangText.of("请先登录", "Please sign in first")
+            ));
+        }
+        try {
+            String name = body != null ? body.get("name") : null;
+            String projectType = body != null ? body.get("projectType") : null;
+            Project promoted = projectService.promoteScratchProject(id, name, projectType, userId);
+            return ResponseEntity.ok(Map.of("code", 0, "data", promoted));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "message", e.getMessage()));
+        }
     }
 
     private Long getUserIdFromSession(String sessionId) {

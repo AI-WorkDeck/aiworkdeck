@@ -54,6 +54,24 @@ public class FileTools implements AgentToolComponent {
     private static final Long AGENT_USER_ID = 10001L;
 
     /**
+     * 跨项目只读（dev-board#1479）。字段注入 + required=false：既有测试手工 new 本类，
+     * 不能进构造器；null 时 extract_file_text / search_across_projects 维持项目内围栏口径。
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ProjectMemberService projectMemberService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ProjectService projectService;
+
+    public void setProjectMemberService(com.checkba.service.ProjectMemberService projectMemberService) {
+        this.projectMemberService = projectMemberService;
+    }
+
+    public void setProjectService(com.checkba.service.ProjectService projectService) {
+        this.projectService = projectService;
+    }
+
+    /**
      * 路径类工具的唯一围栏基准：当前会话所属项目的物理目录。
      *
      * 不能用服务端安装根（user.dir）：所有租户的 data/projects/{id} 与 skills/、plugins/
@@ -309,7 +327,7 @@ public class FileTools implements AgentToolComponent {
             return "Error: File not found in database: " + fileId;
         }
         ProjectFile pf = fileOpt.get();
-        String denied = ToolFileGuard.rejectIfOutsideProject(pf);
+        String denied = ToolFileGuard.rejectIfCannotRead(pf, projectMemberService);
         if (denied != null) return denied;
         if ("folder".equalsIgnoreCase(pf.getFileType()) || Boolean.TRUE.equals(pf.getIsFolder())) {
             // 直接把文件夹内容答出来，而不是只说一句"这是个文件夹"。
@@ -359,6 +377,48 @@ public class FileTools implements AgentToolComponent {
     /** 从头读的便捷重载（非工具入口；ToolRegistry 只登记带 {@code @Tool} 的那个）。 */
     public String extract_file_text(Long fileId) {
         return extract_file_text(fileId, null, null);
+    }
+
+    @ToolMeta(displayName = "跨项目搜索文件", category = "file")
+    @Tool("Search for files by name keyword across ALL projects that the current user has permission to read. "
+            + "Returns matching files with their project name, projectId, and fileId. "
+            + "After finding a file, call extract_file_text(fileId=...) to read its content (read-only).")
+    public String search_across_projects(
+            @P("Keyword or substring to match against file names across all user projects") String keyword
+    ) {
+        log.info("Tool: search_across_projects called keyword='{}'", keyword);
+        if (keyword == null || keyword.isBlank()) {
+            return "Error: keyword is required.";
+        }
+        Long userId = com.checkba.service.ai.context.ProjectContextHolder.getUserId();
+        if (userId == null) {
+            return "Error: no user context for cross-project search.";
+        }
+        if (projectService == null || projectFileRepository == null) {
+            return "Error: cross-project search service unavailable.";
+        }
+        String kwLower = keyword.toLowerCase();
+        StringBuilder sb = new StringBuilder();
+        int found = 0;
+        for (com.checkba.model.entity.Project p : projectService.getUserProjects(userId)) {
+            if (found >= 50) break;
+            for (ProjectFile f : projectFileRepository
+                    .findByProjectIdAndIsDeletedFalseOrderBySortOrderAsc(p.getId())) {
+                if (found >= 50) break;
+                if (Boolean.TRUE.equals(f.getIsFolder())) continue;
+                if (f.getName() == null || !f.getName().toLowerCase().contains(kwLower)) continue;
+                String relativePath = f.getFilePath() != null ? f.getFilePath() : f.getName();
+                sb.append("- [项目: ").append(p.getName()).append(" (projectId=").append(p.getId())
+                        .append(")] ").append(relativePath)
+                        .append(" (fileId=").append(f.getId())
+                        .append(", type=").append(f.getFileType()).append(")\n");
+                found++;
+            }
+        }
+        if (found == 0) {
+            return "No files matching '" + keyword + "' found across your projects.";
+        }
+        return sb.toString();
     }
 
     /**

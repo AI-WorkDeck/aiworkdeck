@@ -423,4 +423,5 @@ export default {
   autoModelBadge: 'Recommended',
   autoModelDesc: 'Automatically routes between fast, balanced, and flagship models based on task complexity and modality',
   autoModelRoutedLabel: 'Auto · {name}',
+  crossProjectAttached: 'Attached cross-project file: {name}',
 }
