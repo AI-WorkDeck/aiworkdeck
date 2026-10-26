@@ -536,8 +536,11 @@ $color-accent: var(--awd-mint); // Mint Green
 /* 主布局 */
 .main-layout {
   flex: 1;
+  min-height: 0;
   display: flex;
-  overflow: hidden;
+  // hidden 仍会被子项 scrollIntoView/focus 滚动，导致左栏与标签栏钻进顶栏下方。
+  // 外壳只裁切；滚动留给面板内部。clip 下须显式允许 flex 高度收缩。
+  overflow: clip;
   position: relative;
 }
 
