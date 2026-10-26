@@ -4427,8 +4427,8 @@ export default {
           console.log('[ChatInterface] Artifact Approved:', art.id, art.revised ? `(revised x${art.changeCount})` : '')
           // 计划卡一键推进：普通批准发确认语；修订版把改动数与修订后全文一并回喂模型
           const prompt = art.revised
-             ? `我已修订计划（共 ${art.changeCount} 处改动，${art.diffSummary}）。请以下方修订版计划为准执行，注意修订处的差异：\n\n${art.content}`
-             : `已确认${art.type === 'implementation_plan' ? '实施计划' : '计划'}，请按此推进。`
+             ? t('chat.approvePromptRevised', { changeCount: art.changeCount, diffSummary: art.diffSummary, content: art.content })
+             : (art.type === 'implementation_plan' ? t('chat.approvePromptImplPlan') : t('chat.approvePromptPlan'))
           // 契约 D 要解决的原始病灶就在这里：上面那段是模型需要的细节（尤其修订版全文），
           // 但它此前直接当成用户消息显示，于是用户在自己的气泡里读到一句自己没说过的机器口吻话。
           // 现在细节仍走 message，气泡里只显示 displayText 这句人话。

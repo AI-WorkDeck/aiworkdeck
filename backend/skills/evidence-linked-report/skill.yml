@@ -14,6 +14,7 @@ name: 证据整理与闭环报告
 name_en: Evidence Organization & Linked Report
 builtin_workflow: true
 description: 梳理项目材料生成结构化证据目录/证据清单，或在撰写尽调报告、备忘录时逐条把有依据的结论链接回原文出处（可一键跳转高亮）；缺证据的事项在正文中写明缺少什么材料，不挂链接、不写成定论。
+description_en: Organize project materials into a structured evidence catalog or checklist, and link each substantiated conclusion in due diligence reports or legal memoranda back to its source passage with one-click highlight navigation while explicitly flagging any evidence gaps.
 
 author: AI Workdeck
 author_url: https://www.aiworkdeck.com

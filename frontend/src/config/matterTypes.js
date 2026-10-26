@@ -21,3 +21,25 @@ export const MATTER_TYPES = [
   '其他法律事务',
   '非法律事务',
 ]
+
+const MATTER_TYPE_LOCALE_KEYS = {
+  '公司治理': 'projects.matterTypeCorporateGovernance',
+  '资本市场证券': 'projects.matterTypeCapitalMarkets',
+  '并购交易': 'projects.matterTypeMna',
+  '争议解决': 'projects.matterTypeDisputeResolution',
+  '合同审查起草': 'projects.matterTypeContractReview',
+  '合规监管': 'projects.matterTypeCompliance',
+  '知识产权': 'projects.matterTypeIp',
+  '劳动人事': 'projects.matterTypeLabor',
+  '破产重整': 'projects.matterTypeBankruptcy',
+  '其他法律事务': 'projects.matterTypeOtherLegal',
+  '非法律事务': 'projects.matterTypeNonLegal',
+}
+
+export function matterTypeLabel(value, translate) {
+  if (!value) return ''
+  const key = MATTER_TYPE_LOCALE_KEYS[value]
+  if (!key || typeof translate !== 'function') return value
+  const translated = translate(key)
+  return translated && translated !== key ? translated : value
+}

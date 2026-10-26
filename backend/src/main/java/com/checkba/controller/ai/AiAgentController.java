@@ -183,7 +183,7 @@ public class AiAgentController {
         // ToolRegistry 把 projectId 强制注入工具参数只挡得住 LLM，挡不住 HTTP 调用方，
         // 于是「按项目隔离」的工具反而成了跨租户读写别家文档的入口
         if (userId == null) {
-            return chatError(401, "请先登录");
+            return chatError(401, LangText.of("请先登录", "Please sign in first"));
         }
         if (request.getProjectId() == null || !projectMemberService.hasReadPermission(request.getProjectId(), userId)) {
             return chatError(403, LangText.of("无权访问该项目", "You do not have access to this project"));
@@ -445,7 +445,8 @@ public class AiAgentController {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         // 越权校验：此前未登录会顶着写死的 10001 号用户往请求体给定的项目里写文件
         if (userId == null) {
-            return ResponseEntity.status(401).body("{\"status\":\"error\", \"message\":\"请先登录\"}");
+            return ResponseEntity.status(401).body("{\"status\":\"error\", \"message\":\"" +
+                    LangText.of("请先登录", "Please sign in first") + "\"}");
         }
         if (request.getProjectId() == null || !projectMemberService.hasWritePermission(request.getProjectId(), userId)
                 || fileAccess.isClient(request.getProjectId(), userId)) {

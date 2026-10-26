@@ -55,10 +55,19 @@ export default {
   pause: 'Pause',
   resume: 'Resume',
   stopRecording: 'Stop Recording',
+  stopShort: 'Stop',
   saving: 'Saving...',
+  savingShort: 'Saving',
   backgroundHint: 'Recording keeps running when you switch pages, and can be stopped any time from the capsule at the top.',
   otherProjectRecording: 'Another project is recording. Stop it from the capsule at the top and you can start one here.',
   cannotStartRecording: 'Could not start recording',
+  noticeTitle: 'Transcription Notice',
+  noticeCheckLabel: 'I understand how the recording will be processed',
+  noticeConfirm: 'Confirm and continue with cloud transcription',
+  noticeSwitchLocal: 'Switch to on-device transcription',
+  noticeSaveFailed: 'Could not save. Try again later.',
+  noticeBlockBeforeRecording: 'Review the transcription notice above before starting a recording',
+  noticeBlockBeforeUpload: 'Review the transcription notice above before uploading',
 
   // ---- Recording engine, utils/meetingRecorder.js ----
   alreadyRecording: 'A recording is already in progress',
@@ -150,4 +159,7 @@ export default {
   deleteDialogBody: 'This deletes the transcript and the audio file for this meeting and cannot be undone. Delete it?',
   confirmDelete: 'Delete',
   deleteFailed: 'Could not delete: {message}',
+  uploadNetworkError: 'Network error',
+  uploadTimeout: 'Upload timed out',
+  uploadPlatformUnsupported: 'Recording upload is not supported on this platform',
 }

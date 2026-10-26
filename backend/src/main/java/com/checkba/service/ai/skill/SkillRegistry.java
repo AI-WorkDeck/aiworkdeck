@@ -484,6 +484,7 @@ public class SkillRegistry {
         // 应用语言相关的可选字段（EN 版 PR5）：缺省时全部为空，语义 = 只在 zh-CN 可用
         skill.setLanguages(asStringList(raw.get("languages")));
         skill.setNameEn(asString(raw.get("name_en")));
+        skill.setDescriptionEn(asString(raw.get("description_en")));
         skill.setTriggersEn(asStringList(raw.get("triggers_en")));
         skill.setOutputEn(asString(raw.get("output_en")));
         Boolean enabledByDefault = asBoolean(raw.get("enabled_by_default"));

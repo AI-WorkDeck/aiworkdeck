@@ -195,6 +195,9 @@ export default {
   lawfirmColContracted: '签约额',
   lawfirmColCollected: '已到账',
   lawfirmColRate: '回款率',
+  lawfirmWanSuffix: '{amount} 万',
+  lawfirmActionFailedToast: '操作失败',
+  lawfirmOpenWorkbenchFailedToast: '打开工作台失败',
 
   // ---- 切换团队 / 律所（一人一队、一队一所；切换为两步非原子操作）----
   switchTeamTitle: '切换团队',

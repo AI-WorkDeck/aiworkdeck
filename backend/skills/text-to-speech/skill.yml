@@ -27,6 +27,7 @@ languages:
   - en-US
 
 name_en: Text to Speech
+description_en: "Offline text-to-speech synthesis: read documents or input text aloud using the local neural voice engine without an internet connection (requires a one-time ~300 MB voice pack download in the panel)."
 
 # 触发条件：用户输入包含任一关键词即命中
 triggers:

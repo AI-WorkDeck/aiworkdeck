@@ -135,7 +135,7 @@ public class ProjectMemberService {
         User user = resolveMemberUser(identifier, requesterId);
 
         if (projectMemberRepository.findByProjectIdAndUserId(projectId, user.getId()).isPresent()) {
-            throw new IllegalArgumentException("用户已在项目中");
+            throw new IllegalArgumentException(LangText.of("用户已在项目中", "User is already in this project"));
         }
 
         ProjectMember member = new ProjectMember();
@@ -150,7 +150,7 @@ public class ProjectMemberService {
             // @Transactional，插入失败后同一事务在部分数据库（如 Postgres）上已经
             // 不可再用，追加查询本身会再报错——只把异常翻译成查重分支本该给出的提示，
             // 跟着事务一起干净回滚。
-            throw new IllegalArgumentException("用户已在项目中");
+            throw new IllegalArgumentException(LangText.of("用户已在项目中", "User is already in this project"));
         }
         recordMemberEvent(com.checkba.version.cloud.CollabEvent.Kind.MEMBER_ADDED,
                 projectId, requesterId, user.getId(), role);
@@ -272,7 +272,7 @@ public class ProjectMemberService {
                         "还没有人用这个手机号注册 AI WorkDeck 账户，请让对方先注册并登录一次桌面端",
                         "Nobody has registered an AI WorkDeck account with that phone number yet. Ask them to register and sign in to the desktop app once");
             }
-            return "用户不存在: " + raw;
+            return LangText.of("用户不存在: ", "User not found: ") + raw;
         }
         if (raw.contains("@")) {
             return LangText.of(
@@ -284,7 +284,7 @@ public class ProjectMemberService {
                     "对方还没用这个手机号登录过 AI WorkDeck，请让对方先登录一次再加",
                     "Nobody has signed in to AI WorkDeck with that phone number yet - ask them to sign in once, then add them");
         }
-        return "用户不存在: " + raw;
+        return LangText.of("用户不存在: ", "User not found: ") + raw;
     }
 
     /**
@@ -429,14 +429,14 @@ public class ProjectMemberService {
     @Transactional
     public void removeMember(Long projectId, Long userIdToRemove, Long requesterId) {
         if (userIdToRemove.equals(requesterId)) {
-             throw new IllegalArgumentException("无法将自己移出项目");
+             throw new IllegalArgumentException(LangText.of("无法将自己移出项目", "You cannot remove yourself from the project"));
         }
 
         String requesterRole = getMemberRole(projectId, requesterId);
         String targetRole = getMemberRole(projectId, userIdToRemove);
 
         if (requesterRole == null) {
-            throw new IllegalArgumentException("无权操作");
+            throw new IllegalArgumentException(LangText.of("无权操作", "Permission denied"));
         }
 
         boolean allowed = false;
@@ -453,11 +453,11 @@ public class ProjectMemberService {
         }
 
         if (!allowed) {
-            throw new IllegalArgumentException("权限不足：您无法移除该角色的成员");
+            throw new IllegalArgumentException(LangText.of("权限不足：您无法移除该角色的成员", "Insufficient permissions: you cannot remove a member with this role"));
         }
 
         ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, userIdToRemove)
-                .orElseThrow(() -> new IllegalArgumentException("成员不存在"));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("成员不存在", "Member not found")));
 
         projectMemberRepository.delete(member);
         recordMemberEvent(com.checkba.version.cloud.CollabEvent.Kind.MEMBER_REMOVED,
@@ -476,7 +476,7 @@ public class ProjectMemberService {
 
     private String getMemberRole(Long projectId, Long userId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new IllegalArgumentException("项目不存在"));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("项目不存在", "Project not found")));
         
         if (project.getUserId().equals(userId)) {
             return "OWNER";
@@ -490,7 +490,7 @@ public class ProjectMemberService {
     public void checkAdminPermission(Long projectId, Long userId) {
         // Check if user is creator
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new IllegalArgumentException("项目不存在"));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("项目不存在", "Project not found")));
         
         if (project.getUserId().equals(userId)) {
             return; 
@@ -502,7 +502,7 @@ public class ProjectMemberService {
             return;
         }
 
-        throw new IllegalArgumentException("权限不足：只有管理员可以执行此操作");
+        throw new IllegalArgumentException(LangText.of("权限不足：只有管理员可以执行此操作", "Insufficient permissions: only project administrators can perform this action"));
     }
 
     public boolean hasReadPermission(Long projectId, Long userId) {

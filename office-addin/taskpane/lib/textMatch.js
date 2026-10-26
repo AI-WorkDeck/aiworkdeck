@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { t } from './i18n.js'
 /**
  * 锚点文本定位的归一化层（六个宿主面共用：Office/WPS × 文字/表格/演示）。
  *
@@ -228,15 +229,11 @@ function overlapScore(text, at, win, wanted) {
  * 三件事缺一不可：说清没找到什么、给出文档里最接近的原文、告诉它下一步怎么做。
  */
 export function describeAnchorFailure(kind, needle, haystack, options) {
-  const shown = String(needle == null ? '' : needle)
-  const head = `${kind}：在文档中未找到该文本。已按全角/半角、直弯引号、不间断空格与零宽字符做过归一化后仍无命中。`
+  const head = t('anchorFailureHead', { kind })
   const near = closestFragment(haystack, needle, options)
   if (!near) {
-    return head + '文档中没有与之相近的片段，请先用读取类工具确认文档当前内容，不要凭上一轮的印象拼锚点。'
+    return head + t('anchorFailureNoCandidate')
   }
   const frag = near.text.length > 160 ? near.text.slice(0, 160) + '…' : near.text
-  return head
-    + `文档里最接近的一段原文是：「${frag}」（相似度约 ${Math.round(near.similarity * 100)}%）。`
-    + '请改用这段原文里逐字照抄的一小段（建议 10-30 字、且在全文唯一）作为锚点重试；'
-    + '若差异来自你自己改写过的措辞，请先重新读取该处的当前内容。'
+  return head + t('anchorFailureCandidate', { frag, pct: Math.round(near.similarity * 100) })
 }

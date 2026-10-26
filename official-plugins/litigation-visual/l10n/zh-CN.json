@@ -1,0 +1,5 @@
+{
+  "plugin.name": "诉讼可视化",
+  "plugin.description": "选择案卷材料，生成并管理可编辑的诉讼图表。",
+  "view.main.name": "诉讼可视化"
+}
