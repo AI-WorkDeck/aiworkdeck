@@ -158,3 +158,21 @@ test('clicking a failed preview retries it explicitly', async () => {
   await new Promise(resolve => setTimeout(resolve, 0))
   assert.ok(h.vm.thumbnails[1])
 })
+
+test('Enter and Space explicitly activate Uni tab buttons and secondary actions', async () => {
+  let selected = 'Sheet1', prevented = 0
+  const h = harness('calc', (action, params) => { if (action === 'office_activate_item') selected = params.id; return navigation(selected) })
+  await h.vm.refresh()
+  h.vm.$refs.list = { querySelector: () => null, querySelectorAll: () => [{ focus() {} }, { focus() {} }] }
+  await h.vm.onKey({ key: 'Enter', preventDefault: () => prevented++ }, 1)
+  assert.equal(h.vm.activeId, 'Sheet2')
+  await h.vm.onKey({ key: ' ', preventDefault: () => prevented++ }, 0)
+  assert.equal(h.vm.activeId, 'Sheet1')
+  h.vm.onActionKey({ key: ' ', preventDefault: () => prevented++ }, 'add-sheet')
+  assert.deepEqual(h.events.at(-1), ['add-sheet'])
+  h.vm.error = 'failed'
+  h.vm.onActionKey({ key: 'Enter', preventDefault: () => prevented++ }, 'retry')
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.equal(h.vm.error, '')
+  assert.equal(prevented, 4)
+})

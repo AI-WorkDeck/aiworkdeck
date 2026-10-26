@@ -70,6 +70,20 @@ try{
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(`http://127.0.0.1:${server.address().port}/?kind=${kind}&real=${real?1:0}`)
   await page.waitForSelector('.office-nav-item',{timeout:240000})
   const prefix=(real?'real':'synthetic')+'-'+kind
+  // Uni compiles <button> to UNI-BUTTON, whose Enter/Space defaults differ
+  // from a native HTML button. Assert actual keyboard input and one activation.
+  assert.equal(await page.$eval('.office-nav-item',e=>e.tagName),'UNI-BUTTON')
+  for(const key of ['Enter','Space']){
+   await page.click('.office-nav-item:first-child')
+   await page.waitForFunction(()=>document.querySelector('.office-nav-item:first-child').getAttribute('aria-selected')==='true' && !window.qa.$refs.nav._switching)
+   const count=await page.evaluate(()=>window.qa.requests.filter(r=>r.action==='office_activate_item').length)
+   await page.focus('.office-nav-item:nth-child(2)')
+   await page.keyboard.press(key)
+   await page.waitForFunction(()=>document.querySelector('.office-nav-item:nth-child(2)').getAttribute('aria-selected')==='true' && !window.qa.$refs.nav._switching)
+   assert.equal(await page.evaluate(()=>window.qa.requests.filter(r=>r.action==='office_activate_item').length),count+1,`${key} must activate the unselected tab exactly once`)
+  }
+  await page.focus('.office-nav-item:nth-child(2)');await page.keyboard.press('Home')
+  await page.waitForFunction(()=>document.querySelector('.office-nav-item:first-child').getAttribute('aria-selected')==='true' && !window.qa.$refs.nav._switching)
   if(kind==='impress'){
    await page.waitForFunction(()=>document.querySelector('.office-nav-preview img')?.naturalWidth>0,{timeout:30000})
    const before=await page.evaluate(()=>window.qa.activeId);await page.click('.office-nav-item:nth-child(2)');await page.waitForFunction(()=>window.qa.activeId===2,{timeout:10000});assert.notEqual(before,2)
@@ -83,7 +97,18 @@ try{
    await page.keyboard.press('End');await page.waitForFunction(()=>window.qa.activeId==='工作表 60')
    assert.ok(await page.$eval('.office-nav-list',e=>e.scrollLeft>0))
    assert.ok(await page.$eval('.office-nav.calc',e=>e.getBoundingClientRect().bottom>=innerHeight-1))
-   await page.evaluate(()=>window.qa.writable=false);await page.waitForFunction(()=>!document.querySelector('.office-nav-add'));await page.keyboard.press('Home');await page.waitForFunction(()=>window.qa.activeId==='项目总览')
+   if(!real){
+    // The fixture records the parent's add-sheet event; no document mutation is
+    // simulated here. Tab must reach the action, not merely programmatic focus.
+    await page.keyboard.press('Tab')
+    assert.equal(await page.evaluate(()=>document.activeElement.classList.contains('office-nav-add')),true,'Tab reaches the add-sheet action')
+    assert.deepEqual(await page.$eval('.office-nav-add',e=>({role:e.getAttribute('role'),tabIndex:e.tabIndex})),{role:'button',tabIndex:0})
+    for(const [index,key] of ['Enter','Space'].entries()){
+     await page.keyboard.press(key)
+     await page.waitForFunction(count=>window.qa.added===count,{},index+1)
+    }
+   }
+   await page.evaluate(()=>window.qa.writable=false);await page.waitForFunction(()=>!document.querySelector('.office-nav-add'));await page.focus('.office-nav-item.selected');await page.keyboard.press('Home');await page.waitForFunction(()=>window.qa.activeId==='项目总览')
   }
   for(const theme of ['light','dark']){
    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.classList.toggle('theme-dark',theme==='dark');if(window.qa.real)window.qa.$refs.engine.contentWindow.postMessage({__lo:'lo-relay',type:'set-theme',theme},location.origin)},theme)
