@@ -4095,6 +4095,7 @@ export default {
     this._ddClientPollStopped = false
     this.pollDdClientInbox()
     registerQuitSave(this, async () => {
+      if (this._projectVersionBusy) return { failed: 1 }
       const result = await flushDirtyEditors(this._libreRefs, this._plainTextRefs, { timeoutMs: 0 })
       this.flushTabSnapshot()
       return result
@@ -4126,8 +4127,8 @@ export default {
       fetchMergeInputs,
       buildMergeDraft,
       api: { postMergeResolveFile, postMergeResolveStructured, resolveAdopt, resolveCloudMerge, resolveSessionEnd },
-      reloadFiles: (ids) => {
-        this.onVersionReloadFiles(ids || [])
+      reloadFiles: async (ids) => {
+        const reloaded = await this.onVersionReloadFiles(ids || [])
         // 自动合并收尾之后必须把版本面板也刷一次。撞冲突时 onCollabConflict 已经把人送到
         // 了版本面板（裁决弹窗随它那一次 /status 弹出来），而合并是在那之后几秒才完成的——
         // 不刷的话面板一直端着合并前那份 /status，律师面对一个说着「已合并」、点「就按我
@@ -4139,6 +4140,7 @@ export default {
         // 不补这一趟，自动合并收尾后 chip 会继续说「同事交了新稿 · N 版」直到 120 秒轮询
         // （真机走查截图：toast 已出、面板已「和大家的稿一致」、chip 仍是旧话）。
         this.fetchCollabState({ online: false }).catch(() => {})
+        return reloaded
       },
       openOverview: () => this.goHandleAdoptConflict(),
     })
@@ -5121,7 +5123,7 @@ export default {
         // 不重叠的那些文件在这里被静默合掉（docx 走隐藏引擎实例，xlsx/pptx 走后端 POI），
         // 全部合成功就自己收尾，不打扰律师；有一份要他动手才把人带到裁决清单。
         // 组合函数内部按 (另一侧 tip, path) 幂等，这条每 120 秒轮询一次也不会重放。
-        if (this._documentMerge) {
+        if (this._documentMerge && !this._projectVersionBusy) {
           this._documentMerge.onConflictStatus(conflict, ctx).catch((e) => {
             console.warn('[DocumentMerge] 自动合并编排失败', e)
           })

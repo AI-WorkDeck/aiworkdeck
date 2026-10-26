@@ -7,6 +7,12 @@ description: AI↔文档编辑桥接领域。任务涉及 doc_*/sheet_*/slide_* 
 
 职责边界：AI 侧发出编辑指令 → 编辑器执行 的整条链路。不含编辑器内核本身（那是 doc-editor 领域），不含对话编排（ai-chat 领域）。
 
+## 项目版本操作的保存与回执（2026-10-26，dev-board#1498）
+
+`project_version_action` 在 `agentClientActions` 的项目路由先处理，无需活动文档，不能落入普通 executor 等待。`projectVersionAction.js` 先保存、核对一次性操作，再执行与重载；`projectVersionEditors.js` 复用 `checkpointSaveBarrier` 暂停 LOWA/纯文本旧实例保存，覆盖双栏及已卸载但仍在途的保存。普通检查点 prepare 会丢弃脏态，因此版本操作必须先 flush 成功，不能反过来调用。活动流程图未接入此保存契约时拒绝，并说明先保存关闭。
+
+回执的传输成功与业务成功分开：桥传输返回完整 `{operationId,success,hostReloaded,...}`，服务端结合实际写入结果判断。保存失败不执行，重载失败或写入结果未知不解开旧实例的保存保护。带自定义 `readWriteState` 的版本屏障按对应操作对账，不能查询文档检查点状态来释放它。
+
 ## 单处修改先定位与锚点原文校验（dev-board#1206）
 
 LOWA 中英提示及工具描述默认“读 → 查找核对上下文 → 锚点局部编辑 → 回读”；仅明确要求全文统一修改时使用 `doc_find_replace`。正文查找排除删除修订，历史通过 `doc_list_revisions` 单独读，不能凭全文唯一的推测跳过定位。

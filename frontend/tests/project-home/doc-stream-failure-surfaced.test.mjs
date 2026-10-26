@@ -38,6 +38,27 @@ function loadMethods() {
 
 const METHODS = loadMethods()
 
+test('版本操作中抵达的流式正文不会迟到写回，结束必须报告失败', async () => {
+  const writes = []
+  const vm = makeVm({ _projectVersionBusy: 'op', libreOfficeExecutor: { executeCommand: async (...args) => { writes.push(args); return { success: true } } } })
+  vm.handleDocStreamData('late body')
+  await vm.flushDocStreamBuffer()
+  vm._projectVersionBusy = null
+  const reason = await vm.handleDocStreamEnd({ status: 'finished', wrote: true })
+  assert.equal(reason, 'version.aiActionBusy')
+  assert.deepEqual(writes, [])
+  assert.equal(vm._docStreamBuffer, 'late body')
+  assert.equal(vm._docStreamActive, false)
+})
+
+test('版本操作中只有结束事件也不能把历史写入冒充本轮成功', async () => {
+  const reports = []
+  const vm = makeVm({ _projectVersionBusy: 'op', _docStreamWroteAny: true })
+  const result = await vm.handleClientAction({ action: 'doc_stream_end', payload: { status: 'finished', wrote: true }, report: value => reports.push(value) })
+  assert.equal(result, 'version.aiActionBusy')
+  assert.deepEqual(reports, ['version.aiActionBusy'])
+})
+
 function makeVm(overrides = {}) {
   const vm = {
     projectId: 1,

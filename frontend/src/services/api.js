@@ -3477,6 +3477,41 @@ export function deleteMeetingRecording(meetingId) {
 
 // ==================== 编辑器操作结果回调 ====================
 
+export function getProjectVersionActionState(operationId, conversationId, stepId) {
+  const step = stepId ? `&stepId=${encodeURIComponent(stepId)}` : ''
+  return request({ url: `/api/ai/agent/version-action/state?operationId=${encodeURIComponent(operationId)}&conversationId=${encodeURIComponent(conversationId)}${step}`, method: 'GET' })
+}
+
+export function executeProjectVersionAction(operationId, conversationId) {
+  return request({ url: '/api/ai/agent/version-action/execute', method: 'POST', data: { operationId, conversationId } })
+}
+
+export function continueProjectVersionMerge(data) {
+  return request({ url: '/api/ai/agent/version-action/merge', method: 'POST', data })
+}
+
+export function continueProjectVersionMergeFile({ operationId, conversationId, stepId, path, bytes, name }) {
+  const form = new FormData()
+  for (const [key, value] of Object.entries({ operationId, conversationId, stepId, path })) form.append(key, value)
+  form.append('file', bytes instanceof Blob ? bytes : new Blob([bytes], { type: 'application/octet-stream' }), name || String(path).split('/').pop())
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${getApiBaseUrl().replace(/\/$/, '')}/api/ai/agent/version-action/merge-file`)
+    const sessionId = getSessionId()
+    if (sessionId) xhr.setRequestHeader('X-Session-Id', sessionId)
+    xhr.timeout = 180000
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText)
+        if (xhr.status === 200 && data.code === 0) resolve(data)
+        else reject(new Error(data.message || t('common.submitFailed')))
+      } catch { reject(new Error(t('common.parseResponseFailed'))) }
+    }
+    xhr.onerror = xhr.ontimeout = () => reject(new Error(t('common.networkError')))
+    xhr.send(form)
+  })
+}
+
 export function getCheckpointRestoreWriteState(conversationId, fileId, restoreId) {
   return request({
     url: `/api/ai/agent/checkpoint-restore-state?conversationId=${encodeURIComponent(conversationId)}&fileId=${encodeURIComponent(fileId)}&restoreId=${encodeURIComponent(restoreId)}`,
@@ -4066,7 +4101,7 @@ export function getMergeAnalysis(projectId, path) {
 // submitFeedback 已是同样的写法）。
 // bytes：Uint8Array（引擎 export_document 的出参）；decisions：Decision[] 数组，
 // 元素 {key, side: 'M'|'T'|'', action: 'A'|'R'|'X'|'F'}，mode=auto 时允许为空。
-export function postMergeResolveFile(projectId, { path, mode, decisions, bytes, name, ctx }) {
+export function postMergeResolveFile(projectId, { path, mode, decisions, bytes, name, ctx, mainRef, otherRef }) {
   const baseUrl = getApiBaseUrl()
   const sessionId = getSessionId()
   const form = new FormData()
@@ -4074,6 +4109,8 @@ export function postMergeResolveFile(projectId, { path, mode, decisions, bytes, 
   form.append('mode', mode || 'manual')
   form.append('decisions', JSON.stringify(decisions || []))
   if (ctx) form.append('ctx', ctx)
+  if (mainRef) form.append('mainRef', mainRef)
+  if (otherRef) form.append('otherRef', otherRef)
   if (bytes) {
     const blob = bytes instanceof Blob ? bytes : new Blob([bytes], { type: 'application/octet-stream' })
     form.append('file', blob, name || (String(path).split('/').pop() || 'merged.bin'))
@@ -4141,11 +4178,11 @@ export function createComparisonFile(projectId, { bytes, name, baseFileId, revis
 
 // xlsx / pptx：合并文件由后端 POI 按 decisions 拼，前端只送决定，不送字节。
 // decisions 为空数组 = 自动模式（把另一侧独有的改动全部合入）。
-export function postMergeResolveStructured(projectId, { path, decisions }) {
+export function postMergeResolveStructured(projectId, { path, decisions, ctx, mainRef, otherRef }) {
   return request({
     url: `/api/projects/${projectId}/version/merge/resolve-structured`,
     method: 'POST',
-    data: { path, decisions: decisions || [] }
+    data: { path, decisions: decisions || [], ...(ctx ? { ctx } : {}), ...(mainRef ? { mainRef } : {}), ...(otherRef ? { otherRef } : {}) }
   });
 }
 
