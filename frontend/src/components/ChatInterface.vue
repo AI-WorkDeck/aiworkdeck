@@ -947,6 +947,8 @@ import { ICONS } from '@/config/icons.js'
 import OcrRoutingCard from '@/components/OcrRoutingCard.vue'
 import { createOcrRoutingHandler } from '@/composables/useOcrRouting.js'
 import { chooseOcrRouting, cancelOcrRouting } from '@/services/api.js'
+import { getHarnessEvolutions } from '@/services/api.js'
+import { attachEvolutionsToBubbles } from '@/utils/harnessEvolutionHistory.mjs'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import { componentDownloads } from '@/services/componentDownloads.js'
 import { createComponentRequiredHandler, shouldAutoResend } from '@/composables/useComponentRequired.js'
@@ -2868,6 +2870,20 @@ export default {
        }
     }
 
+    // Harness 自进化卡片的历史回放（dev-board#1481）：卡片原本只随当轮 SSE 出现，刷新后要按
+    // assistantMessageId 从持久化记录挂回原气泡，否则「撤销这次学习」的入口随刷新消失而规则仍在生效。
+    // 失败静默：这是附加信息，拿不到也不该影响历史本身的展示。
+    const restoreHarnessEvolutions = async (conversationId) => {
+       if (!conversationId) return
+       try {
+          const records = await getHarnessEvolutions({ conversationId })
+          if (currentConversationId.value !== conversationId) return
+          attachEvolutionsToBubbles(bubbles.value, Array.isArray(records) ? records : (records?.data || []))
+       } catch (e) {
+          console.warn('[ChatInterface] restore harness evolutions failed', e)
+       }
+    }
+
     // 历史分页（dev-board#811 K31，审查 C-12）。首屏只取最近一页，向上滚再补更早的。
     // hasMore 为假时这三个状态恒定，翻页那条链整条不参与——旧后端（不认 limit，回裸数组）
     // 与夹具直接传数组的调用一样落在这一档。
@@ -2898,6 +2914,7 @@ export default {
 
        bubbles.value.push(...historyBubbles(loadedMsgs))
        markAnsweredQuestions()
+       restoreHarnessEvolutions(conversationId)
 
        // 后台续跑关键一步：切回会话时重连 SSE。后端 connect 会推 run_state
        // （运行中还会推 state_recovery 全量续流 + plan_update 恢复任务清单），
@@ -2938,6 +2955,7 @@ export default {
           if (older.length) {
              bubbles.value.unshift(...historyBubbles(older))
              markAnsweredQuestions()
+             restoreHarnessEvolutions(conversationId)
           }
           historyHasMore.value = !!(page && page.hasMore)
           historyBefore.value = (page && page.nextBefore) ?? historyBefore.value

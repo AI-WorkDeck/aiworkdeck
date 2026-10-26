@@ -3,7 +3,11 @@
 
 package com.checkba.service.ai.harness;
 
+import com.checkba.model.entity.HarnessEvolutionEntry;
+import com.checkba.repository.HarnessEvolutionEntryRepository;
 import com.checkba.service.LangText;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.checkba.service.ai.memory.document.MemoryDocumentService;
 import com.checkba.service.ai.memory.document.MemoryFileView;
 import com.checkba.service.ai.memory.document.MemorySpaceView;
@@ -19,6 +23,9 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -118,32 +125,128 @@ public class HarnessEvolutionService {
             String promotedSkillId,
             String verificationPolicy,
             String status,
-            String createdAt
+            String createdAt,
+            /** 这条进化归属的助手消息（历史回放时据此把卡片挂回对应气泡）；旧记录/无落库轮次为 null */
+            Long assistantMessageId
     ) {
     }
+
+    /** evaluateTurnEvolution 调用期内的助手消息 id（只在同一线程的同步调用链里传递，免得层层加参数）。 */
+    private static final ThreadLocal<Long> CURRENT_ASSISTANT_MESSAGE = new ThreadLocal<>();
+
+    private static final ObjectMapper RECORD_MAPPER = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    /** 只有本服务生成的技能目录才允许被撤销时删除，绝不碰内置/广场/插件技能。 */
+    static final String PROMOTED_SKILL_PREFIX = "user-evo-";
 
     private final MemoryDocumentService memoryDocumentService;
     private final SkillRegistry skillRegistry;
     private final SkillProperties skillProperties;
+    private final HarnessEvolutionEntryRepository repository;
 
-    /** conversationId -> 最近一次回退待配对信号 */
+    /**
+     * conversationId -> 最近一次回退待配对信号。刻意只放内存：它在「回退」与「下一条重发」之间
+     * 存活几秒到几分钟，重启丢失只是少学一次，不影响任何已落盘的规则或卡片入口。
+     */
     private final Map<String, PendingRollbackSignal> pendingRollbacks = new ConcurrentHashMap<>();
 
-    /** evolutionId -> 自进化记录 */
+    /**
+     * evolutionId -> 自进化记录的读缓存。权威存储是 {@link HarnessEvolutionEntryRepository}
+     * （进程重启后卡片上的切换作用域 / 升格 / 撤销必须仍然可用）；无仓库（单测）时退化为纯内存。
+     */
     private final Map<String, HarnessEvolutionRecord> evolutions = new ConcurrentHashMap<>();
 
     public HarnessEvolutionService() {
-        this(null, null, null);
+        this(null, null, null, null);
+    }
+
+    public HarnessEvolutionService(
+            @Nullable MemoryDocumentService memoryDocumentService,
+            @Nullable SkillRegistry skillRegistry,
+            @Nullable SkillProperties skillProperties) {
+        this(memoryDocumentService, skillRegistry, skillProperties, null);
     }
 
     @Autowired
     public HarnessEvolutionService(
             @Nullable MemoryDocumentService memoryDocumentService,
             @Nullable SkillRegistry skillRegistry,
-            @Nullable SkillProperties skillProperties) {
+            @Nullable SkillProperties skillProperties,
+            @Nullable HarnessEvolutionEntryRepository repository) {
         this.memoryDocumentService = memoryDocumentService;
         this.skillRegistry = skillRegistry;
         this.skillProperties = skillProperties;
+        this.repository = repository;
+    }
+
+    // ---------------------------------------------------------------- 持久化
+
+    private void store(HarnessEvolutionRecord record) {
+        evolutions.put(record.id(), record);
+        if (repository == null) {
+            return;
+        }
+        try {
+            HarnessEvolutionEntry entry = repository.findById(record.id()).orElseGet(HarnessEvolutionEntry::new);
+            entry.setId(record.id());
+            entry.setUserId(record.userId());
+            entry.setProjectId(record.projectId());
+            entry.setConversationId(record.conversationId());
+            entry.setScope(record.scope());
+            entry.setStatus(record.status());
+            entry.setPayloadJson(RECORD_MAPPER.writeValueAsString(record));
+            if (entry.getCreatedAt() == null) {
+                entry.setCreatedAt(LocalDateTime.now());
+            }
+            entry.setUpdatedAt(LocalDateTime.now());
+            repository.save(entry);
+        } catch (Exception e) {
+            // 落表失败不阻断本轮：规则正文已进记忆文档；只是重启后卡片入口找不回这一条
+            log.warn("Failed to persist harness evolution {}: {}", record.id(), e.getMessage());
+        }
+    }
+
+    private Optional<HarnessEvolutionRecord> load(String evolutionId) {
+        if (evolutionId == null || evolutionId.isBlank()) {
+            return Optional.empty();
+        }
+        HarnessEvolutionRecord cached = evolutions.get(evolutionId);
+        if (cached != null) {
+            return Optional.of(cached);
+        }
+        if (repository == null) {
+            return Optional.empty();
+        }
+        try {
+            return repository.findById(evolutionId).map(HarnessEvolutionService::decode).map(r -> {
+                evolutions.put(r.id(), r);
+                return r;
+            });
+        } catch (Exception e) {
+            log.warn("Failed to load harness evolution {}: {}", evolutionId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private static HarnessEvolutionRecord decode(HarnessEvolutionEntry entry) {
+        try {
+            return RECORD_MAPPER.readValue(entry.getPayloadJson(), HarnessEvolutionRecord.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("Corrupt harness evolution payload: " + entry.getId(), e);
+        }
+    }
+
+    /**
+     * 取记录并校验归属：不是本人的记录一律按「不存在」处理（不泄露他人记录是否存在）。
+     */
+    private HarnessEvolutionRecord requireOwned(Long userId, String evolutionId) {
+        HarnessEvolutionRecord existing = load(evolutionId).orElse(null);
+        if (existing == null
+                || (userId != null && existing.userId() != null && !userId.equals(existing.userId()))) {
+            throw new IllegalArgumentException("Evolution record not found: " + evolutionId);
+        }
+        return existing;
     }
 
     /**
@@ -187,6 +290,37 @@ public class HarnessEvolutionService {
      * 合成一条可感知的自进化记录并写入分层记忆。
      */
     public Optional<HarnessEvolutionRecord> evaluateTurnEvolution(
+            String conversationId,
+            Long userId,
+            Long projectId,
+            String initialUserInstruction,
+            PendingRollbackSignal rollbackSignal,
+            List<String> steeredInstructions,
+            List<HarnessDiagnosticService.HarnessAdaptation> adaptations) {
+        return evaluateTurnEvolution(conversationId, userId, projectId, initialUserInstruction,
+                rollbackSignal, steeredInstructions, adaptations, null);
+    }
+
+    /** 同上，并把记录挂到本轮已落库的助手消息上（历史回放据此把卡片放回原气泡）。 */
+    public Optional<HarnessEvolutionRecord> evaluateTurnEvolution(
+            String conversationId,
+            Long userId,
+            Long projectId,
+            String initialUserInstruction,
+            PendingRollbackSignal rollbackSignal,
+            List<String> steeredInstructions,
+            List<HarnessDiagnosticService.HarnessAdaptation> adaptations,
+            @Nullable Long assistantMessageId) {
+        CURRENT_ASSISTANT_MESSAGE.set(assistantMessageId);
+        try {
+            return evaluateTurnEvolutionInternal(conversationId, userId, projectId, initialUserInstruction,
+                    rollbackSignal, steeredInstructions, adaptations);
+        } finally {
+            CURRENT_ASSISTANT_MESSAGE.remove();
+        }
+    }
+
+    private Optional<HarnessEvolutionRecord> evaluateTurnEvolutionInternal(
             String conversationId,
             Long userId,
             Long projectId,
@@ -390,8 +524,9 @@ public class HarnessEvolutionService {
                 null,
                 verificationPolicy,
                 STATUS_APPLIED_MEMORY,
-                Instant.now().toString());
-        evolutions.put(id, record);
+                Instant.now().toString(),
+                CURRENT_ASSISTANT_MESSAGE.get());
+        store(record);
         return record;
     }
 
@@ -402,7 +537,26 @@ public class HarnessEvolutionService {
             @Nullable Long userId,
             @Nullable Long projectId,
             @Nullable String conversationId) {
-        return evolutions.values().stream()
+        Map<String, HarnessEvolutionRecord> merged = new LinkedHashMap<>();
+        if (repository != null) {
+            try {
+                List<HarnessEvolutionEntry> rows = conversationId != null && !conversationId.isBlank()
+                        ? repository.findByConversationIdOrderByCreatedAtDesc(conversationId)
+                        : (userId != null ? repository.findTop200ByUserIdOrderByCreatedAtDesc(userId) : List.of());
+                for (HarnessEvolutionEntry row : rows) {
+                    try {
+                        HarnessEvolutionRecord r = decode(row);
+                        merged.put(r.id(), r);
+                    } catch (Exception e) {
+                        log.warn("Skipping unreadable harness evolution row {}: {}", row.getId(), e.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to query harness evolutions: {}", e.getMessage());
+            }
+        }
+        evolutions.values().forEach(r -> merged.put(r.id(), r));
+        return merged.values().stream()
                 .filter(r -> conversationId == null || conversationId.isBlank() || conversationId.equals(r.conversationId()))
                 .filter(r -> projectId == null || projectId.equals(r.projectId()) || SCOPE_USER.equals(r.scope()))
                 .filter(r -> userId == null || r.userId() == null || userId.equals(r.userId()))
@@ -411,17 +565,14 @@ public class HarnessEvolutionService {
     }
 
     public Optional<HarnessEvolutionRecord> getEvolution(String evolutionId) {
-        return evolutionId == null ? Optional.empty() : Optional.ofNullable(evolutions.get(evolutionId));
+        return load(evolutionId);
     }
 
     /**
      * 切换进化规则的记忆作用域（{@code project} ⇄ {@code user}）。
      */
     public HarnessEvolutionRecord switchScope(Long userId, String evolutionId, String targetScope) {
-        HarnessEvolutionRecord existing = evolutions.get(evolutionId);
-        if (existing == null) {
-            throw new IllegalArgumentException("Evolution record not found: " + evolutionId);
-        }
+        HarnessEvolutionRecord existing = requireOwned(userId, evolutionId);
         String normalizedScope = SCOPE_USER.equalsIgnoreCase(targetScope) ? SCOPE_USER : SCOPE_PROJECT;
         if (normalizedScope.equals(existing.scope()) && !STATUS_REVERTED.equals(existing.status())) {
             return existing;
@@ -461,8 +612,9 @@ public class HarnessEvolutionService {
                 existing.promotedSkillId(),
                 existing.verificationPolicy(),
                 STATUS_REVERTED.equals(existing.status()) ? STATUS_APPLIED_MEMORY : existing.status(),
-                existing.createdAt());
-        evolutions.put(evolutionId, updated);
+                existing.createdAt(),
+                existing.assistantMessageId());
+        store(updated);
         return updated;
     }
 
@@ -477,10 +629,7 @@ public class HarnessEvolutionService {
             @Nullable String customActionableRule,
             @Nullable String verificationPolicy) {
 
-        HarnessEvolutionRecord existing = evolutions.get(evolutionId);
-        if (existing == null) {
-            throw new IllegalArgumentException("Evolution record not found: " + evolutionId);
-        }
+        HarnessEvolutionRecord existing = requireOwned(userId, evolutionId);
         String skillId = sanitizeKebabId(existing.suggestedSkillId());
         String skillName = (customSkillName != null && !customSkillName.isBlank())
                 ? customSkillName.trim()
@@ -539,8 +688,9 @@ public class HarnessEvolutionService {
                 skillId,
                 finalPolicy.toUpperCase(Locale.ROOT),
                 STATUS_PROMOTED_SKILL,
-                existing.createdAt());
-        evolutions.put(evolutionId, updated);
+                existing.createdAt(),
+                existing.assistantMessageId());
+        store(updated);
         return updated;
     }
 
@@ -548,14 +698,12 @@ public class HarnessEvolutionService {
      * 一键撤销自进化规则：删除对应的记忆文档及已晋升的 Skill 目录。
      */
     public HarnessEvolutionRecord revertEvolution(Long userId, String evolutionId) {
-        HarnessEvolutionRecord existing = evolutions.get(evolutionId);
-        if (existing == null) {
-            throw new IllegalArgumentException("Evolution record not found: " + evolutionId);
-        }
+        HarnessEvolutionRecord existing = requireOwned(userId, evolutionId);
         Long effectiveUser = userId != null ? userId : existing.userId();
         deleteFromMemorySpace(effectiveUser, existing.memorySpaceId(), existing.memoryPath(), existing.memoryRevision());
 
-        if (existing.promotedSkillId() != null && !existing.promotedSkillId().isBlank()) {
+        if (existing.promotedSkillId() != null
+                && existing.promotedSkillId().startsWith(PROMOTED_SKILL_PREFIX)) {
             File skillDir = new File(resolveWritableSkillsDir(), existing.promotedSkillId());
             deleteDirectoryQuietly(skillDir);
             if (skillRegistry != null) {
@@ -584,8 +732,9 @@ public class HarnessEvolutionService {
                 null,
                 existing.verificationPolicy(),
                 STATUS_REVERTED,
-                existing.createdAt());
-        evolutions.put(evolutionId, reverted);
+                existing.createdAt(),
+                existing.assistantMessageId());
+        store(reverted);
         return reverted;
     }
 
@@ -906,7 +1055,11 @@ public class HarnessEvolutionService {
             return "user-evo-" + UUID.randomUUID().toString().substring(0, 8);
         }
         String cleaned = raw.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9-]+", "-").replaceAll("^-+|-+$", "");
-        return cleaned.isEmpty() ? "user-evo-" + UUID.randomUUID().toString().substring(0, 8) : cleaned;
+        if (cleaned.isEmpty()) {
+            return PROMOTED_SKILL_PREFIX + UUID.randomUUID().toString().substring(0, 8);
+        }
+        // 升格出的技能一律落在 user-evo-* 命名空间：既不会覆盖内置/广场技能目录，撤销时也只删这一类
+        return cleaned.startsWith(PROMOTED_SKILL_PREFIX) ? cleaned : PROMOTED_SKILL_PREFIX + cleaned;
     }
 
     private static String escapeYaml(String s) {

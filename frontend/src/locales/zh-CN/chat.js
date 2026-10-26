@@ -463,4 +463,6 @@ export default {
   evolutionContrastToggle: '查看进化前后对比',
   evolutionContrastBefore: '纠偏前',
   evolutionContrastAfter: '纠偏后',
+  evolutionActionFailed: '操作未成功，请稍后重试',
+  evolutionPromoteAdminOnly: '升格技能会对本实例所有成员生效，仅管理员可操作',
 }

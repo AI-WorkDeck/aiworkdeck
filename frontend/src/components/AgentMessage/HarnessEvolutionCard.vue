@@ -26,11 +26,11 @@
       <div class="he-rule">{{ localRecord.actionableRule }}</div>
 
       <div v-if="localRecord.beforeSummary || localRecord.afterSummary" class="he-contrast-wrap">
-        <button type="button" class="he-contrast-toggle" @click="showContrast = !showContrast">
+        <button type="button" class="he-contrast-toggle" data-evolution-contrast-toggle @click="showContrast = !showContrast">
           <span>{{ $t('chat.evolutionContrastToggle') }}</span>
           <span class="he-chevron" :class="{ open: showContrast }">›</span>
         </button>
-        <div v-if="showContrast" class="he-contrast-box">
+        <div v-if="showContrast" class="he-contrast-box" data-evolution-contrast>
           <div v-if="localRecord.beforeSummary" class="he-contrast-row before">
             <span class="he-contrast-tag">{{ $t('chat.evolutionContrastBefore') }}</span>
             <span class="he-contrast-text">{{ localRecord.beforeSummary }}</span>
@@ -82,6 +82,7 @@
     <div v-else class="he-reverted-notice" data-evolution-reverted-notice>
       {{ $t('chat.evolutionRevertedBadge') }}
     </div>
+    <div v-if="errorText" class="he-error" role="alert" data-evolution-error>{{ errorText }}</div>
   </section>
 </template>
 
@@ -103,6 +104,23 @@ const emit = defineEmits(['updated'])
 const localRecord = ref({ ...props.evolution })
 const showContrast = ref(false)
 const busy = ref(false)
+// 操作失败的就地提示：不能只打 console——用户点了「撤销」没反应，会以为规则已经撤掉
+const errorText = ref('')
+
+function applyResult(res) {
+  const updated = res?.data && res.data.id ? res.data : res
+  if (!updated || !updated.id) {
+    throw new Error(t('chat.evolutionActionFailed'))
+  }
+  localRecord.value = { ...localRecord.value, ...updated }
+  emit('updated', localRecord.value)
+}
+
+function reportError(e) {
+  errorText.value = (e && e.status === 403)
+    ? t('chat.evolutionPromoteAdminOnly')
+    : ((e && e.message) || t('chat.evolutionActionFailed'))
+}
 
 watch(
   () => props.evolution,
@@ -137,17 +155,13 @@ async function handleToggleScope() {
   if (busy.value || !localRecord.value?.id) return
   const targetScope = localRecord.value.scope === 'user' ? 'project' : 'user'
   busy.value = true
+  errorText.value = ''
   try {
     const res = await switchHarnessEvolutionScope(localRecord.value.id, targetScope)
-    const updated = res?.data && res.data.id ? res.data : res
-    if (updated && updated.id) {
-      localRecord.value = { ...localRecord.value, ...updated }
-    } else {
-      localRecord.value = { ...localRecord.value, scope: targetScope }
-    }
-    emit('updated', localRecord.value)
+    applyResult(res)
   } catch (e) {
     console.warn('[HarnessEvolutionCard] switchScope failed:', e)
+    reportError(e)
   } finally {
     busy.value = false
   }
@@ -156,6 +170,7 @@ async function handleToggleScope() {
 async function handlePromoteSkill() {
   if (busy.value || !localRecord.value?.id) return
   busy.value = true
+  errorText.value = ''
   try {
     const res = await promoteHarnessEvolutionToSkill(localRecord.value.id, {
       name: localRecord.value.suggestedSkillName,
@@ -163,19 +178,10 @@ async function handlePromoteSkill() {
       actionableRule: localRecord.value.actionableRule,
       verificationPolicy: localRecord.value.verificationPolicy,
     })
-    const updated = res?.data && res.data.id ? res.data : res
-    if (updated && updated.id) {
-      localRecord.value = { ...localRecord.value, ...updated }
-    } else {
-      localRecord.value = {
-        ...localRecord.value,
-        promotedSkillId: localRecord.value.suggestedSkillId || 'custom-skill',
-        status: 'PROMOTED_SKILL',
-      }
-    }
-    emit('updated', localRecord.value)
+    applyResult(res)
   } catch (e) {
     console.warn('[HarnessEvolutionCard] promoteToSkill failed:', e)
+    reportError(e)
   } finally {
     busy.value = false
   }
@@ -184,17 +190,13 @@ async function handlePromoteSkill() {
 async function handleRevert() {
   if (busy.value || !localRecord.value?.id) return
   busy.value = true
+  errorText.value = ''
   try {
     const res = await revertHarnessEvolution(localRecord.value.id)
-    const updated = res?.data && res.data.id ? res.data : res
-    if (updated && updated.id) {
-      localRecord.value = { ...localRecord.value, ...updated }
-    } else {
-      localRecord.value = { ...localRecord.value, status: 'REVERTED', promotedSkillId: null }
-    }
-    emit('updated', localRecord.value)
+    applyResult(res)
   } catch (e) {
     console.warn('[HarnessEvolutionCard] revertEvolution failed:', e)
+    reportError(e)
   } finally {
     busy.value = false
   }
@@ -202,6 +204,11 @@ async function handleRevert() {
 </script>
 
 <style scoped>
+.he-error {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-danger, #dc2626);
+}
 .harness-evolution-card {
   margin-top: var(--awd-space-2);
   padding: var(--awd-space-3);
