@@ -1,7 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view class="page-project-overview" :class="{ 'quick-look-open': !!quickLookFile, 'compact-mode': isCompactLayout, 'is-resizing': resizing && resizing.active, 'rail-edit-mode': railEditMode, 'no-project': !hasProject }">
+  <view class="page-project-overview" :class="{ 'quick-look-open': !!quickLookFile, 'compact-mode': isCompactLayout, 'is-resizing': resizing && resizing.active, 'rail-edit-mode': railEditMode, 'no-project': !hasProject, 'chat-mode': isChatMode, 'chat-canvas-open': chatCanvasVisible, 'scratch-workspace': isScratchWorkspace }">
     <!-- 顶部固定项目信息 -->
     <view class="project-header">
       <view class="header-left">
@@ -9,6 +9,10 @@
              消失，只能自绘（spec §6.4）。读的是与 mac 完全同一份命令表数据。
              mac 上组件内部 visible=false，不渲染。 -->
         <AppMenuBar :refresh-key="menuBarRefreshKey" />
+        <view v-if="isScratchWorkspace" class="scratch-workspace-actions">
+          <text class="scratch-badge">{{ $t('workbench.chatMode.scratchBadge') }}</text>
+          <view class="scratch-promote-btn" @click="handlePromoteScratchWorkspace">{{ $t('workbench.chatMode.promoteAction') }}</view>
+        </view>
 
         <!-- 无项目态（dev-board#1047）：顶栏只有应用名，没有项目切换器 / 协作 chip / 负责人一行 -->
         <view v-if="!hasNamedProject" class="project-info no-project-info">
@@ -110,7 +114,14 @@
 
       <!-- Center Logo -->
       <view class="header-center">
-         <image src="/static/logo_full_v2.png" mode="heightFix" class="project-logo awd-brand-logo" />
+        <view class="mode-switch-capsule" role="tablist">
+          <view class="mode-switch-item" :class="{ active: viewMode === 'chat' }" role="tab" @click="switchViewMode('chat')">
+            <text class="mode-switch-label">💬 {{ $t('workbench.chatMode.modeChat') }}</text>
+          </view>
+          <view class="mode-switch-item" :class="{ active: viewMode === 'ide' }" role="tab" @click="switchViewMode('ide')">
+            <text class="mode-switch-label">🛠 {{ $t('workbench.chatMode.modeIde') }}</text>
+          </view>
+        </view>
       </view>
 
       <view class="header-right">
@@ -866,6 +877,26 @@
         </view>
       </view>
 
+      <ChatModeSidebar
+        v-if="isChatMode"
+        :collapsed="chatSidebarCollapsed"
+        :project="project"
+        :is-scratch="isScratchWorkspace"
+        :conversations="chatHistoryList"
+        :current-conversation-id="currentConversationId || ''"
+        :workspace-files="chatWorkspaceFiles"
+        :active-file-id="activeFileIdLeft"
+        @toggle-collapse="chatSidebarCollapsed = !chatSidebarCollapsed; $nextTick(() => triggerWorkbenchResize())"
+        @new-chat="handleChatSidebarNewChat"
+        @select-conversation="handleChatSidebarSelectConversation"
+        @delete-conversation="handleChatSidebarDeleteConversation"
+        @create-doc="handleChatSidebarCreateDoc"
+        @open-file="openFile"
+        @attach-cross-project-file="handleAttachCrossProjectFile"
+        @promote-scratch="handlePromoteScratchWorkspace"
+        @switch-to-ide="switchViewMode('ide')"
+      />
+
       <!-- IDE 工作台：中(编辑) + 右(AI) + 底(工具) -->
       <view class="workbench">
         <view class="workbench-main">
@@ -958,6 +989,11 @@
                   <text class="tabs-plus-icon">＋</text>
                 </view>
               </view>
+              <view
+                v-if="isChatMode && chatCanvasVisible"
+                class="chat-canvas-close-btn"
+                @click="chatCanvasOpen = false; $nextTick(() => triggerWorkbenchResize())"
+              >{{ $t('workbench.chatMode.closeCanvas') }} ×</view>
 
             </view>
 
@@ -1257,6 +1293,8 @@
                       @open-projects-pane="openProjectsPane"
                       @open-client-workspace="openDdClientTab"
                       @update:show-on-startup="setShowWelcomeOnStartup"
+                      @start-chat="handleWelcomeStartChat"
+                      @quick-create-doc="handleWelcomeQuickCreateDoc"
                     />
                     <!-- 「日程」标签（dev-board#1048）：单例，全局视图（projectId 恒传 null，跨项目事项，
                          筛选里可按项目收窄）。宿主 .pane-content 是定高 flex 列，FullCalendar 不会塌成 0；
@@ -1291,7 +1329,7 @@
                     <FilePreview
                       v-else
                       :file="activeFileLeft"
-                      :project-id="projectId"
+                      :project-id="activeFileLeft.projectId || projectId"
                       :locator="activeFileLeft.pendingLocator || null"
                       :show-edit-btn="false"
                       @extracted="onArchiveExtracted"
@@ -1503,6 +1541,8 @@
                       @open-projects-pane="openProjectsPane"
                       @open-client-workspace="openDdClientTab"
                       @update:show-on-startup="setShowWelcomeOnStartup"
+                      @start-chat="handleWelcomeStartChat"
+                      @quick-create-doc="handleWelcomeQuickCreateDoc"
                     />
                     <!-- 「日程」标签：见左窗格同名注释 -->
 
@@ -1532,7 +1572,7 @@
                     <FilePreview
                       v-else
                       :file="activeFileRight"
-                      :project-id="projectId"
+                      :project-id="activeFileRight.projectId || projectId"
                       :locator="activeFileRight.pendingLocator || null"
                       :show-edit-btn="false"
                       @extracted="onArchiveExtracted"
@@ -2325,6 +2365,9 @@ import {
   getProjectVariables,
   getProjectFiles,
   getProjectFilesByIds,
+  createFile,
+  ensureScratchProject,
+  promoteScratchProject,
   batchCopyFiles,
   exportAiDocx,
   getProjectMembers,
@@ -2419,6 +2462,18 @@ import { messageCenterTabMethods } from './messageCenterTab.js'
 import { pollDdClientNotifications } from '@/services/ddClient'
 import { getDdNotifications, readDdNotification } from '@/services/ddWorkflow'
 import ChatInterface from '@/components/ChatInterface.vue'
+import ChatModeSidebar from '@/components/chat/ChatModeSidebar.vue'
+import {
+  STARTUP_ENTRY_MODE_KEY,
+  VIEW_MODE_STORAGE_KEY,
+  buildCrossProjectContextItem,
+  flattenProjectFileTree,
+  hasNonWelcomeOpenTabs,
+  isScratchProject,
+  normalizeViewMode,
+  resolveInitialViewMode,
+  shouldShowChatCanvas,
+} from './chatMode.js'
 import { panelSwitchingMethods } from './panelSwitching.js'
 import explorerRecordingMixin from './explorerRecording.js'
 import { menuCommandsMethods } from './menuCommands.js'
@@ -2511,6 +2566,7 @@ export default {
     CollabDialog,
     SubmitDraftGuide,
     ChatInterface,
+    ChatModeSidebar,
     MarkdownPreview,
     PluginPane, // Added
     PluginGuidePane,
@@ -2595,6 +2651,13 @@ export default {
       trialBalance: null,
 
       // 布局状态
+      viewMode: 'ide',
+      chatSidebarCollapsed: false,
+      chatCanvasOpen: false,
+      pendingQuickChatPrompt: '',
+      showPromoteScratchModal: false,
+      promoteScratchName: '',
+      chatWorkspaceFiles: [],
       sidebarWidth: 260, // 侧边栏宽度
       sidebarCollapsed: true,
       isCompactLayout: false,
@@ -3129,6 +3192,19 @@ export default {
     },
     hasProject() {
       return this.projectId != null && this.projectId !== '' && !Number.isNaN(Number(this.projectId))
+    },
+    isScratchWorkspace() {
+      return isScratchProject(this.project)
+    },
+    isChatMode() {
+      return this.viewMode === 'chat'
+    },
+    chatCanvasVisible() {
+      return shouldShowChatCanvas({
+        viewMode: this.viewMode,
+        chatCanvasOpen: this.chatCanvasOpen,
+        openTabs: [...(this.leftFiles || []), ...(this.rightFiles || [])],
+      })
     },
     /**
      * 顶栏账户入口的「已登录」判据。桌面端以「已连接账户」为准（spec §5.3：
@@ -3744,6 +3820,7 @@ export default {
     // Cleanup manual event listener removed
   },
   onLoad(query) {
+    this.initializeChatViewMode?.(query || {})
     this.initRestartRecovery(query || {})
     this._restartProjectReady = Promise.resolve()
     this._collabDisposed = false
@@ -3859,8 +3936,8 @@ export default {
     // 的旧记忆）。恢复完再决定要不要开欢迎页、要不要开日程深链——
     // 无项目态启动时「启动时显示欢迎页」只在什么都没恢复出来时生效（同 VS Code 的 startupEditor：
     // 恢复了编辑器就不另开欢迎页；快照里本来就有欢迎标签则照恢复）。
-    this.restoreTabSnapshot().then((restored) => {
-      if (!this.hasProject && this.showWelcomeOnStartup && !restored) this.openWelcomeTab()
+    this.restoreTabSnapshot().then(async (restored) => {
+      if (!this.hasProject && !this.isChatMode && this.showWelcomeOnStartup && !restored) this.openWelcomeTab()
       // 深链文件须等标签恢复完成，避免新标签被旧快照覆盖。
       if (query?.openFileId) this.openPendingLocalFile(Number(query.openFileId))
       if (query?.inviteMembers === '1' && this.hasProject) this.showInviteModal = true
@@ -3870,6 +3947,10 @@ export default {
       if (query && query.tab === 'calendar') {
         this.openCalendarTab({ focus: query.focus || '', group: query.group || '' })
       }
+      if (this.isChatMode) await this.switchViewMode('chat')
+    }).catch((error) => {
+      console.error('[project-overview] 初始化对话模式失败', error)
+      uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.scratchFailed'), icon: 'none' })
     }).finally(() => {
       this._openWorkbenchRestored = true
       this.maybeRegisterOpenWorkbench()
@@ -4578,6 +4659,10 @@ export default {
     },
     openFile(file, options = {}) {
       if (!options.restartRecovery) this.cancelRestartRecovery()
+      if (this.viewMode === 'chat') {
+        this.chatCanvasOpen = true
+        this.$nextTick(() => this.triggerWorkbenchResize())
+      }
       return fileOpenTabsMethods.openFile.call(this, file, options)
     },
     // 右键「这份文件的历史」：切到版本面板并只显示这份文件的版本
@@ -6906,6 +6991,10 @@ export default {
     // Handle artifact open-tab event from ChatInterface
     // Creates a virtual .md tab in the left pane with typewriter effect
     handleArtifactOpenTab(artifactInfo) {
+      if (this.viewMode === 'chat') {
+        this.chatCanvasOpen = true
+        this.$nextTick(() => this.triggerWorkbenchResize())
+      }
       console.log('[ProjectOverview] Opening artifact in tab:', artifactInfo)
 
       // Check if tab already exists
@@ -8205,6 +8294,178 @@ export default {
             this.forkingConversation = false
         }
     },
+    initializeChatViewMode(query = {}) {
+      this.viewMode = resolveInitialViewMode({
+        queryMode: query.mode,
+        startupEntryMode: uni.getStorageSync(STARTUP_ENTRY_MODE_KEY),
+        lastViewMode: uni.getStorageSync(VIEW_MODE_STORAGE_KEY),
+      })
+    },
+
+    async loadChatWorkspaceFiles() {
+      if (!this.hasProject) {
+        this.chatWorkspaceFiles = []
+        return []
+      }
+      const res = await getProjectFiles(this.projectId, null, true)
+      const nodes = Array.isArray(res) ? res : (res?.data || [])
+      this.chatWorkspaceFiles = flattenProjectFileTree(nodes)
+      return this.chatWorkspaceFiles
+    },
+
+    async ensureScratchWorkspaceLoaded() {
+      if (this.hasProject) return true
+      if (this._scratchWorkspacePromise) return this._scratchWorkspacePromise
+      this._scratchWorkspacePromise = (async () => {
+        const res = await ensureScratchProject()
+        const scratch = res?.data || res
+        if (!scratch || !scratch.id) throw new Error(this.$t('workbench.chatMode.scratchFailed'))
+        this.projectId = String(scratch.id)
+        this.project = scratch
+        this.projectInfoLoaded = true
+        this.aiPanelMounted = true
+        this.showAiPanel = true
+        this.rightPaneKey = 'ai'
+        await this.loadChatWorkspaceFiles()
+        await this.fetchChatHistory(true)
+        return true
+      })()
+      try {
+        return await this._scratchWorkspacePromise
+      } finally {
+        this._scratchWorkspacePromise = null
+      }
+    },
+
+    async switchViewMode(targetMode, options = {}) {
+      const mode = normalizeViewMode(targetMode)
+      if (mode === 'chat') {
+        try {
+          if (!this.hasProject) await this.ensureScratchWorkspaceLoaded()
+        } catch (error) {
+          uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.scratchFailed'), icon: 'none' })
+          return false
+        }
+        this.aiPanelMounted = true
+        this.showAiPanel = true
+        this.rightPaneKey = 'ai'
+        this.viewMode = 'chat'
+        if (options.openCanvas !== undefined) this.chatCanvasOpen = Boolean(options.openCanvas)
+        else this.chatCanvasOpen = hasNonWelcomeOpenTabs([...(this.leftFiles || []), ...(this.rightFiles || [])])
+        await this.loadChatWorkspaceFiles().catch(() => {})
+        await this.fetchChatHistory(true)
+      } else {
+        this.viewMode = 'ide'
+      }
+      uni.setStorageSync(VIEW_MODE_STORAGE_KEY, mode)
+      this.$nextTick(() => this.triggerWorkbenchResize?.())
+      return true
+    },
+
+    async handleWelcomeStartChat(payload = {}) {
+      const prompt = (payload && payload.prompt ? String(payload.prompt) : '').trim()
+      const switched = await this.switchViewMode('chat', { openCanvas: false })
+      if (!switched) return
+      if (prompt) {
+        this.pendingQuickChatPrompt = prompt
+        await this.$nextTick()
+        for (let i = 0; i < 30 && !this.$refs.chatInterface?.sendQuickPrompt; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+        this.$refs.chatInterface?.sendQuickPrompt?.(prompt)
+        this.pendingQuickChatPrompt = ''
+      }
+    },
+
+    async handleWelcomeQuickCreateDoc(docType = 'docx') {
+      const switched = await this.switchViewMode('chat', { openCanvas: true })
+      if (switched) await this.handleChatSidebarCreateDoc(docType)
+    },
+
+    nextChatDocumentName(docType) {
+      const ext = docType === 'md' ? '.md' : '.docx'
+      const base = this.$t(docType === 'md' ? 'workbench.chatMode.untitledMarkdown' : 'workbench.chatMode.untitledDocument')
+      const used = new Set(this.chatWorkspaceFiles.map((file) => String(file.name || '').toLowerCase()))
+      let index = 1
+      let name = `${base}${ext}`
+      while (used.has(name.toLowerCase())) {
+        index += 1
+        name = `${base} ${index}${ext}`
+      }
+      return name
+    },
+
+    async handleChatSidebarCreateDoc(docType = 'docx') {
+      const type = docType === 'md' ? 'md' : 'docx'
+      try {
+        if (!this.hasProject) await this.ensureScratchWorkspaceLoaded()
+        const name = this.nextChatDocumentName(type)
+        const res = await createFile(this.projectId, null, name, type, null, null)
+        const createdFile = res?.data || res
+        await this.loadChatWorkspaceFiles()
+        if (this.$refs.fileTree?.loadFiles) await this.$refs.fileTree.loadFiles()
+        if (!createdFile || !createdFile.id) throw new Error(this.$t('workbench.chatMode.createFailed'))
+        this.openFile(createdFile)
+        this.chatCanvasOpen = true
+        this.$nextTick(() => this.triggerWorkbenchResize?.())
+      } catch (error) {
+        uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.createFailed'), icon: 'none' })
+      }
+    },
+
+    handleChatSidebarNewChat() {
+      if (this.$refs.chatInterface?.startNewChat) this.$refs.chatInterface.startNewChat()
+      else this.startNewChat()
+    },
+
+    handleChatSidebarSelectConversation(conversationId) {
+      if (conversationId) this.loadHistoryChat({ conversationId })
+    },
+
+    handleChatSidebarDeleteConversation(conversationId) {
+      const chat = this.chatHistoryList.find((item) => String(item.conversationId) === String(conversationId))
+      if (chat) this.confirmDeleteConversation(chat)
+    },
+
+    handleAttachCrossProjectFile({ file, project }) {
+      const ctxItem = buildCrossProjectContextItem(file, project)
+      this.showAiPanel = true
+      this.rightPaneKey = 'ai'
+      this.$refs.chatInterface?.attachCrossProjectFile?.(ctxItem)
+    },
+
+    async handlePromoteScratchWorkspace() {
+      if (!this.isScratchWorkspace) return
+      this.showPromoteScratchModal = true
+      this.promoteScratchName = this.project?.name || ''
+      const modal = await new Promise((resolve) => {
+        uni.showModal({
+          title: this.$t('workbench.chatMode.promoteTitle'),
+          editable: true,
+          content: this.promoteScratchName,
+          placeholderText: this.$t('workbench.chatMode.promotePlaceholder'),
+          success: resolve,
+          fail: () => resolve({ confirm: false }),
+        })
+      })
+      this.showPromoteScratchModal = false
+      if (!modal.confirm) return
+      const name = String(modal.content || '').trim()
+      if (!name) {
+        uni.showToast({ title: this.$t('workbench.chatMode.promotePlaceholder'), icon: 'none' })
+        return
+      }
+      try {
+        const res = await promoteScratchProject(this.projectId, { name })
+        this.project = res?.data || res
+        this.promoteScratchName = ''
+        await this.fetchChatHistory(true)
+        uni.showToast({ title: this.$t('workbench.chatMode.promoteSuccess'), icon: 'success' })
+      } catch (error) {
+        uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.promoteFailed'), icon: 'none' })
+      }
+    },
+
     // 会话状态 → 状态点样式类。黄=等用户（暂停/待审批）、蓝=后台跑完未读、
     // 动画绿=运行中、红=出错；无任务/已读完成不打点。
     convDotClass(chat) {

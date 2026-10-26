@@ -426,4 +426,5 @@ export default {
   autoModelBadge: '推荐',
   autoModelDesc: '按任务难度与模态自动匹配极速、均衡或旗舰模型，兼顾响应速度与专业质量',
   autoModelRoutedLabel: '智能 · {name}',
+  crossProjectAttached: '已引用跨项目文件：{name}',
 }
