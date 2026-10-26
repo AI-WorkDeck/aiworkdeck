@@ -176,9 +176,9 @@ public class CapabilitySlotRegistry {
             }
         }
         boolean ok = dir != null && hasEntryFile(dir, def);
-        return new Candidate(REF_BUILTIN, SOURCE_BUILTIN, "内置",
+        return new Candidate(REF_BUILTIN, SOURCE_BUILTIN, com.checkba.service.LangText.of("内置", "Built-in"),
                 dir == null ? null : dir.toString(), ok, false,
-                ok ? null : "随包内置资源不在场");
+                ok ? null : com.checkba.service.LangText.of("随包内置资源不在场", "Bundled built-in resources are not present"));
     }
 
     private Optional<Candidate> packCandidate(SlotDef def) {
@@ -194,8 +194,8 @@ public class CapabilitySlotRegistry {
             return Optional.empty();
         }
         boolean ok = hasEntryFile(dir, def);
-        return Optional.of(new Candidate("pack:" + def.packId(), SOURCE_PACK, "签名包 " + def.packId(),
-                dir.toString(), ok, false, ok ? null : "资源包里没有 " + def.entryFile()));
+        return Optional.of(new Candidate("pack:" + def.packId(), SOURCE_PACK, com.checkba.service.LangText.of("签名包 ", "Signed Pack ") + def.packId(),
+                dir.toString(), ok, false, ok ? null : com.checkba.service.LangText.of("资源包里没有 ", "Resource pack does not contain ") + def.entryFile()));
     }
 
     private List<Candidate> pluginCandidates(SlotDef def) {
@@ -213,19 +213,22 @@ public class CapabilitySlotRegistry {
                 // 协议不匹配的实现照样列出来（否则用户看不见「装了但没生效」），但不可选
                 if (!def.protocol().equals(decl.getProtocol())) {
                     out.add(new Candidate(ref, SOURCE_PLUGIN, meta.getName(), null, false, false,
-                            "协议不匹配：槽要求 " + def.protocol() + "，实现声明 " + decl.getProtocol()));
+                            com.checkba.service.LangText.of("协议不匹配：槽要求 " + def.protocol() + "，实现声明 " + decl.getProtocol(),
+                                    "Protocol mismatch: slot requires " + def.protocol() + ", implementation declares " + decl.getProtocol())));
                     continue;
                 }
                 Path dir = resolveEntryDir(meta.getId(), decl.getEntry());
                 boolean unsigned = isDevInstalled(meta.getId());
                 if (dir == null) {
                     out.add(new Candidate(ref, SOURCE_PLUGIN, meta.getName(), null, false, unsigned,
-                            "entry 目录不存在或逃逸插件目录：" + decl.getEntry()));
+                            com.checkba.service.LangText.of("entry 目录不存在或逃逸插件目录：" + decl.getEntry(),
+                                    "entry directory does not exist or escapes plugin directory: " + decl.getEntry())));
                     continue;
                 }
                 boolean ok = hasEntryFile(dir, def);
                 out.add(new Candidate(ref, SOURCE_PLUGIN, meta.getName(), dir.toString(), ok, unsigned,
-                        ok ? null : "entry 目录下没有 " + def.entryFile()));
+                        ok ? null : com.checkba.service.LangText.of("entry 目录下没有 " + def.entryFile(),
+                                "entry directory does not contain " + def.entryFile())));
             }
         }
         return out;
@@ -328,15 +331,15 @@ public class CapabilitySlotRegistry {
     public void select(String slotId, String ref) {
         SlotDef def = SLOTS.get(slotId);
         if (def == null) {
-            throw new IllegalArgumentException("未知能力槽: " + slotId);
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("未知能力槽: ", "Unknown capability slot: ") + slotId);
         }
         String target = (ref == null || ref.isBlank()) ? REF_BUILTIN : ref.trim();
         if (!REF_BUILTIN.equals(target)) {
             Candidate c = candidates(slotId).stream().filter(x -> x.ref().equals(target)).findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("候选实现不存在: " + target));
+                    .orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("候选实现不存在: ", "Candidate implementation does not exist: ") + target));
             if (!c.available()) {
-                throw new IllegalArgumentException("候选实现当前不可用: " + target
-                        + (c.reason() == null ? "" : "（" + c.reason() + "）"));
+                throw new IllegalArgumentException(com.checkba.service.LangText.of("候选实现当前不可用: ", "Candidate implementation is currently unavailable: ") + target
+                        + (c.reason() == null ? "" : " (" + c.reason() + ")"));
             }
         }
         String current = effectiveRef(slotId);
@@ -352,11 +355,11 @@ public class CapabilitySlotRegistry {
     /** 回到上一次选择（再点一次即在两者之间来回切——这正是「回滚」该有的手感）。 */
     public void rollback(String slotId) {
         if (!SLOTS.containsKey(slotId)) {
-            throw new IllegalArgumentException("未知能力槽: " + slotId);
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("未知能力槽: ", "Unknown capability slot: ") + slotId);
         }
         String previous = previousRef(slotId);
         if (previous == null || previous.isBlank()) {
-            throw new IllegalArgumentException("没有可回滚的上一次选择");
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("没有可回滚的上一次选择", "No previous selection available for rollback"));
         }
         String current = effectiveRef(slotId);
         systemSettingService.set(previousKey(slotId), current);

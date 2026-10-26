@@ -5339,9 +5339,8 @@ export default {
                 label: isFolder ? this.$t('workbench.folderScopeLabel', { name: file.name }) : file.name,
                 isFolder,
                 description: isFolder
-                    ? `文件夹「${file.name}」（folderId=${file.id}）及其下全部材料。`
-                      + `先对 ${file.id} 调 extract_file_text 拿到该文件夹的文件清单，再逐份通读。`
-                    : `《${file.name}》（fileId=${file.id}）`
+                    ? this.$t('workbench.folderScopeDesc', { name: file.name, id: file.id })
+                    : this.$t('workbench.fileScopeDesc', { name: file.name, id: file.id })
             })
             this.litigationScopeCallback = null
             return

@@ -19,7 +19,7 @@ public class MobileReceiveController {
     }
 
     private void requireUser(String session) {
-        if (AuthController.getUserIdFromSession(session) == null) throw new IllegalStateException("请先登录");
+        if (AuthController.getUserIdFromSession(session) == null) throw new IllegalStateException(com.checkba.service.LangText.of("请先登录", "Please sign in first"));
     }
 
     @GetMapping("/catalog")

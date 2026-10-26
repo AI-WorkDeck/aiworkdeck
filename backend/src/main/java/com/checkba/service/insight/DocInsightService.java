@@ -269,7 +269,7 @@ public class DocInsightService {
         if (deep) {
             chatModelFactory.ensurePaidAccess(userId);
             String key = projectId + ":" + docFileId;
-            if (!deepReviews.add(key)) throw new IllegalStateException("这份文档正在深入审校中");
+            if (!deepReviews.add(key)) throw new IllegalStateException(LangText.of("这份文档正在深入审校中", "Deep review is already running for this document"));
             try {
                 List<InlineDeepReview.Issue> issues = new ArrayList<>();
                 DeepRun run = new DeepRun();
@@ -1767,11 +1767,11 @@ public class DocInsightService {
     public EntityView lookupSelection(Long userId, Long projectId, String kind, String text) {
         requireWrite(projectId, userId);
         if (kind == null || !Set.of("COMPANY", "LAW", "CASE").contains(kind)) {
-            throw new IllegalArgumentException("在线查询仅支持机构、法规和案例");
+            throw new IllegalArgumentException(LangText.of("在线查询仅支持机构、法规和案例", "Online lookup only supports companies, statutes, and cases"));
         }
         String name = text == null ? "" : text.strip();
         if (name.length() < 2 || name.length() > 160 || name.codePoints().anyMatch(Character::isISOControl)) {
-            throw new IllegalArgumentException("查询文本须为 2 至 160 字的单行文字");
+            throw new IllegalArgumentException(LangText.of("查询文本须为 2 至 160 字的单行文字", "Lookup text must be a single line between 2 and 160 characters"));
         }
         ensureLookupAccount(kind);
         DocInsightExtraction.RawEntity raw;

@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Procesvisualisatie",
+  "plugin.description": "Selecteer zaakmaterialen om bewerkbare litigatiediagrammen te genereren en beheren.",
+  "view.main.name": "Procesvisualisatie"
+}

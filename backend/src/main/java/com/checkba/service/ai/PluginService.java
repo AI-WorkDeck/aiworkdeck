@@ -569,7 +569,7 @@ public class PluginService {
     /** pluginId -> (lang -> (key -> 文案))；来自插件目录 l10n/<lang>.json，rescan 重建 */
     private final Map<String, Map<String, Map<String, String>>> pluginL10n = new ConcurrentHashMap<>();
 
-    private static final Set<String> L10N_LANGS = Set.of("zh-CN", "en-US");
+    private static final Set<String> L10N_LANGS = com.checkba.util.AppLocale.supportedCodes();
     private static final long L10N_MAX_BYTES = 256 * 1024;
 
     private void loadL10n(String pluginId, File pluginDir) {
@@ -719,31 +719,22 @@ public class PluginService {
             ))
     );
 
-    /**
-     * 解析 manifest 字符串里的 {@code %key%} 引用（规范 v2.9 P4，VS Code package.nls 机制）：
-     * 整值形如 %key% 时优先查表，缺键回退 zh-CN 表，再缺回退原文；
-     * 若原文为直接字符串且当前语言为英文，亦支持通过插件 l10n 表或内置官方插件表匹配对应英文译文。
-     */
+    /** 按当前语种及其回退链解析 manifest 文案；繁体中文可复用简体中文表。 */
     public String localize(String pluginId, String raw) {
         if (raw == null || raw.isBlank()) {
             return raw;
         }
         boolean isToken = raw.length() >= 3 && raw.charAt(0) == '%' && raw.charAt(raw.length() - 1) == '%';
         Map<String, Map<String, String>> tables = pluginId != null ? pluginL10n.get(pluginId) : null;
-        boolean english = com.checkba.service.LangText.isEnglish();
-        String lang = english ? "en-US" : "zh-CN";
+        com.checkba.util.AppLocale current = com.checkba.util.AppLocale.fromCode(
+                com.checkba.service.LangText.localeCode());
         if (isToken) {
             String key = raw.substring(1, raw.length() - 1);
-            if (tables != null) {
-                String v = tables.getOrDefault(lang, Map.of()).get(key);
-                if (v == null) {
-                    v = tables.getOrDefault("zh-CN", Map.of()).get(key);
-                }
-                if (v != null) {
-                    return v;
-                }
+            String localized = localizeToken(tables, current, key);
+            if (localized != null) {
+                return localized;
             }
-            if (english && pluginId != null) {
+            if (!current.isChinese() && pluginId != null) {
                 String builtinEn = BUILTIN_PLUGIN_EN.getOrDefault(pluginId, Map.of()).get(key);
                 if (builtinEn != null) {
                     return builtinEn;
@@ -751,23 +742,45 @@ public class PluginService {
             }
             return raw;
         }
-        if (!english || pluginId == null) {
+        if (pluginId == null) {
             return raw;
         }
         if (tables != null) {
             Map<String, String> zhTable = tables.getOrDefault("zh-CN", Map.of());
-            Map<String, String> enTable = tables.getOrDefault("en-US", Map.of());
             for (Map.Entry<String, String> entry : zhTable.entrySet()) {
                 if (raw.equals(entry.getValue())) {
-                    String enVal = enTable.get(entry.getKey());
-                    if (enVal != null && !enVal.isBlank()) {
-                        return enVal;
+                    String localized = localizeToken(tables, current, entry.getKey());
+                    if (localized != null && !localized.isBlank()) {
+                        return localized;
                     }
                 }
             }
         }
-        String builtinEn = BUILTIN_PLUGIN_EN.getOrDefault(pluginId, Map.of()).get(raw);
-        return builtinEn != null ? builtinEn : raw;
+        if (!current.isChinese()) {
+            String builtinEn = BUILTIN_PLUGIN_EN.getOrDefault(pluginId, Map.of()).get(raw);
+            return builtinEn != null ? builtinEn : raw;
+        }
+        return raw;
+    }
+
+    private static String localizeToken(Map<String, Map<String, String>> tables,
+                                        com.checkba.util.AppLocale current,
+                                        String key) {
+        if (tables == null) {
+            return null;
+        }
+        for (com.checkba.util.AppLocale candidate : current.fallbackChain()) {
+            String value = tables.getOrDefault(candidate.code(), Map.of()).get(key);
+            if (value == null) {
+                continue;
+            }
+            if (current == com.checkba.util.AppLocale.ZH_TW
+                    && candidate == com.checkba.util.AppLocale.ZH_CN) {
+                return com.checkba.util.ZhHantConverter.toTraditional(value);
+            }
+            return value;
+        }
+        return null;
     }
 
     /** minHostVersion 与宿主版本比对；不达标返回原因文案，达标/无声明/dev 态宿主返回 null */

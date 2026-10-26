@@ -87,6 +87,8 @@ public class DdProjectScopeFilter extends OncePerRequestFilter implements Ordere
         response.setStatus(status);
         response.setHeader(SourceCodeNoticeFilter.HEADER, SourceCodeNoticeFilter.SOURCE_URL);
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"code\":" + status + ",\"message\":\"无权访问该项目的资料\"}");
+        response.getWriter().write("{\"code\":" + status + ",\"message\":\""
+                + com.checkba.service.LangText.of("无权访问该项目的资料", "You do not have permission to access materials in this project")
+                + "\"}");
     }
 }

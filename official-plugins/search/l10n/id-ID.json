@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Pencarian Proyek",
+  "plugin.description": "Telusuri berkas proyek berdasarkan teks penuh atau tag dan langsung lompat ke dokumen.",
+  "view.main.name": "Pencarian Proyek"
+}

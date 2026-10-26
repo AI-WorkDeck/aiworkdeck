@@ -33,9 +33,9 @@ public class PluginLawFirmController {
         Long userId = LawFirmManagementController.requireUser(sessionId);
         var plugin = plugins.getPlugin(pluginId);
         if (plugin == null || !plugins.isEnabled(pluginId) || plugins.revokedReason(pluginId) != null)
-            throw new IllegalArgumentException("插件不存在或未启用");
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("插件不存在或未启用", "Plugin does not exist or is not enabled"));
         if (plugin.getPermissions() == null || !plugin.getPermissions().contains("lawfirm"))
-            throw new IllegalArgumentException("插件未获得律所管理权限");
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("插件未获得律所管理权限", "Plugin does not have law firm management permission"));
         Map<String, Object> body = ImController.readBody(request, mapper);
         Map<String, Object> params = ImController.params(body);
         String action = body.get("action") == null ? "" : String.valueOf(body.get("action")).trim();

@@ -4,6 +4,8 @@
 package com.checkba.config;
 
 import com.checkba.service.AppLanguageScope;
+import com.checkba.util.AppLocale;
+import com.checkba.util.GeoIpLocaleResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -50,14 +52,22 @@ public class AppLanguageRequestFilter extends OncePerRequestFilter implements Or
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         String declared = request.getHeader(HEADER);
-        if (AppLanguageScope.normalize(declared) == null) {
+        String resolved = AppLanguageScope.normalize(declared);
+        if (resolved == null) {
+            AppLocale geo = GeoIpLocaleResolver.resolveFromRequest(request);
+            if (geo != null) {
+                resolved = geo.code();
+            }
+        }
+        if (resolved == null) {
             // 未声明 / 认不出来：不建作用域，连 ThreadLocal 都不碰（桌面端走的就是这条）
             chain.doFilter(request, response);
             return;
         }
+        final String effective = resolved;
         // 受检异常穿不过 Runnable，包一层再原样抛回容器
         try {
-            AppLanguageScope.run(declared, () -> {
+            AppLanguageScope.run(effective, () -> {
                 try {
                     chain.doFilter(request, response);
                 } catch (IOException | ServletException e) {

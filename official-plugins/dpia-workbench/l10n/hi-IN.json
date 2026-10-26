@@ -1,0 +1,15 @@
+{
+  "plugin.name": "DPIA वर्कबेंच",
+  "plugin.description": "डेटा प्रोटेक्शन इम्पैक्ट असेसमेंट: स्रोत अनुरेखण, तथ्य पुष्टि, प्रश्नोत्तर फ़ॉलो-अप, जोखिम और सुधार, निरंतर पुनर्मूल्यांकन और संस्करणित रिपोर्ट। Zhu Lingfeng के DSH DPIA Workbench से अनुकूलित; Node.js, Python और LibreOffice आवश्यक हैं।",
+  "plugin.author": "AI WorkDeck (अपस्ट्रीम: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Node.js एक्ज़ीक्यूटेबल",
+  "setting.nodePath.description": "सिस्टम PATH से node उपयोग करने के लिए खाली छोड़ें; Node.js 20 या नया आवश्यक है।",
+  "setting.pythonPath.label": "Python एक्ज़ीक्यूटेबल",
+  "setting.pythonPath.description": "runtime/requirements.txt से दस्तावेज़ निर्भरताएँ आवश्यक हैं; वर्चुअल एनवायरनमेंट से Python पथ निर्दिष्ट किया जा सकता है।",
+  "setting.pdfFontPath.label": "PDF CJK फ़ॉन्ट फ़ाइल",
+  "setting.pdfFontPath.description": "नेटिव PDF टेम्पलेट में CJK टेक्स्ट भरने के लिए एम्बेड करने योग्य TrueType फ़ॉन्ट (TTF/TTC) आवश्यक है; सिस्टम फ़ॉन्ट खोज के लिए खाली छोड़ें।",
+  "setting.sofficePath.label": "LibreOffice एक्ज़ीक्यूटेबल",
+  "setting.sofficePath.description": "केवल रिपोर्ट PDF निर्यात और पेज प्रीव्यू के लिए आवश्यक; डिफ़ॉल्ट सिस्टम स्थान आज़माने के लिए खाली छोड़ें।",
+  "tool.dpia_workbench_action.description": "DPIA केस, सामग्री, तथ्य पुष्टि, प्रश्नोत्तर, रन स्थिति और रिपोर्ट संचालन। केवल वर्कबेंच UI के लिए; AI को मैनुअल पुष्टि/अनुमोदन प्रविष्टियाँ आमंत्रित नहीं करनी चाहिए।",
+  "tool.dpia_workbench_task.description": "वर्तमान में फ़्रीज़ किए गए DPIA कार्यों को निष्पादित करें: context/read/write/script/commit/report; सख्ती से वर्तमान उपयोगकर्ता प्रोजेक्ट और केस आउटपुट निर्देशिका तक सीमित।"
+}

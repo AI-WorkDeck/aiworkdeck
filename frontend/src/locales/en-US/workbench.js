@@ -282,6 +282,8 @@ export default {
   // Script-side messages
   defaultUserName: 'User',
   folderScopeLabel: 'Folder: {name}',
+  folderScopeDesc: 'Folder "{name}" (folderId={id}) and all materials under it. First call extract_file_text on {id} to list the files in this folder, then read through each file.',
+  fileScopeDesc: '"{name}" (fileId={id})',
   importing: 'Importing...',
   importSuccess: 'Imported',
   importFailed: 'Import failed',

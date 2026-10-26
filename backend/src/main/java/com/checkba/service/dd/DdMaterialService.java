@@ -54,26 +54,26 @@ public class DdMaterialService {
     }
 
     private Snapshot collect(DdAiJob job, Long requestId) throws Exception {
-        jobs.stage(job, "读取清单与材料版本");
+        jobs.stage(job, LangText.of("读取清单与材料版本", "Reading checklist and material versions"));
         ProjectRemote binding = remotes.findByProjectId(job.getProjectId()).orElse(null);
         JsonNode request; List<JsonNode> itemRows = new ArrayList<>(); Map<Long, JsonNode> current = new HashMap<>();
         if (binding != null) {
             JsonNode details = remoteJson(job.getProjectId(), "/requests/" + requestId);
             request = details.path("request");
-            if (!binding.getRemoteProjectId().equals(request.path("projectId").asText())) throw new DdProcessingException("清单不属于当前受邀项目");
+            if (!binding.getRemoteProjectId().equals(request.path("projectId").asText())) throw new DdProcessingException(LangText.of("清单不属于当前受邀项目", "Checklist does not belong to the current invited project"));
             boolean legacy = false;
             for (JsonNode row : details.path("items")) legacy |= row.hasNonNull("uploadedFileId") && !row.hasNonNull("currentSubmissionId");
             if (legacy) {
                 var prepared = cloud.proxyDd(job.getProjectId(), "POST", "/requests/" + requestId + "/prepare-materials", "", "{}".getBytes(StandardCharsets.UTF_8), "application/json");
                 if (prepared.status() != 200 || !json.readTree(prepared.body()).path("prepared").asBoolean())
-                    throw new DdProcessingException("案件库尚未完成旧材料版本整理，请稍后重试");
+                    throw new DdProcessingException(LangText.of("案件库尚未完成旧材料版本整理，请稍后重试", "Case library has not finished preparing legacy material versions; please try again later"));
                 details = remoteJson(job.getProjectId(), "/requests/" + requestId);
             }
             details.path("items").forEach(itemRows::add);
             details.path("submissionsByItem").fields().forEachRemaining(e -> current.put(Long.parseLong(e.getKey()), e.getValue()));
         } else {
             DdRequest local = dd.getRequest(requestId);
-            if (!job.getProjectId().equals(local.getProjectId())) throw new DdProcessingException("清单不属于当前项目");
+            if (!job.getProjectId().equals(local.getProjectId())) throw new DdProcessingException(LangText.of("清单不属于当前项目", "Checklist does not belong to the current project"));
             workflow.prepareMaterials(requestId, job.getUserId());
             request = json.valueToTree(local);
             for (DdItem item : dd.getItems(requestId)) {
@@ -87,10 +87,10 @@ public class DdMaterialService {
             if (submission == null || !"FILES".equals(submission.path("type").asText())) continue;
             Long submissionId = submission.path("id").asLong(); int version = submission.path("version").asInt();
             JsonNode fileIds = submission.path("fileIds");
-            if (!fileIds.isArray()) throw new DdProcessingException("材料版本缺少文件目录，请刷新清单重试");
+            if (!fileIds.isArray()) throw new DdProcessingException(LangText.of("材料版本缺少文件目录，请刷新清单重试", "Material version is missing file directory; please refresh the checklist and try again"));
             for (JsonNode fileIdNode : fileIds) {
                 Long remoteFileId = fileIdNode.asLong();
-                jobs.stage(job, "归档材料：" + item.path("title").asText());
+                jobs.stage(job, LangText.of("归档材料：", "Archiving material: ") + item.path("title").asText());
                 ProjectFile localFile;
                 if (binding == null) {
                     localFile = files.findById(remoteFileId).filter(f -> job.getProjectId().equals(f.getProjectId()) && !Boolean.TRUE.equals(f.getIsDeleted())).orElseThrow();
@@ -102,8 +102,8 @@ public class DdMaterialService {
                         if (localFile == null || !old.get().getSha256().equals(hash(readFile(localFile)))) {
                             var response = cloud.proxyDd(job.getProjectId(), "GET", "/items/" + itemId + "/submissions/" + submissionId + "/files/" + remoteFileId, "", null, null);
                             if (response.status() != 200 || response.body() == null || response.contentType() != null && response.contentType().contains("application/json"))
-                                throw new DdProcessingException("底稿文件下载未完成，已归档的材料保留，请稍后重试");
-                            byte[] bytes = response.body(); if (bytes.length > 100 * 1024 * 1024) throw new DdProcessingException("单份底稿超过100MB，请在清单中分拆");
+                                throw new DdProcessingException(LangText.of("底稿文件下载未完成，已归档的材料保留，请稍后重试", "Working paper download incomplete; archived materials are preserved, please try again later"));
+                            byte[] bytes = response.body(); if (bytes.length > 100 * 1024 * 1024) throw new DdProcessingException(LangText.of("单份底稿超过100MB，请在清单中分拆", "A single working paper exceeds 100 MB; please split it in the checklist"));
                             String name = "材料-" + remoteFileId;
                             for (JsonNode meta : submission.path("files")) if (meta.path("fileId").asLong() == remoteFileId) name = meta.path("name").asText(name);
                             Long folder = folder(job.getProjectId(), job.getUserId(), null, "尽调底稿");
@@ -124,9 +124,9 @@ public class DdMaterialService {
 
     private JsonNode remoteJson(Long projectId, String path) throws IOException {
         var response = cloud.proxyDd(projectId, "GET", path, "", null, null);
-        if (response.status() != 200) throw new DdProcessingException("案件库暂时无法连接，请稍后重试");
+        if (response.status() != 200) throw new DdProcessingException(LangText.of("案件库暂时无法连接，请稍后重试", "Cannot connect to the case library right now; please try again later"));
         JsonNode value = json.readTree(response.body());
-        if (value.has("code") && value.path("code").asInt() != 0) throw new DdProcessingException("案件库暂时无法读取这份清单，请刷新后重试");
+        if (value.has("code") && value.path("code").asInt() != 0) throw new DdProcessingException(LangText.of("案件库暂时无法读取这份清单，请刷新后重试", "Case library cannot read this checklist right now; please refresh and try again"));
         return value;
     }
 
@@ -150,9 +150,10 @@ public class DdMaterialService {
             if (parents.contains(item.path("id").asLong()) && !byItem.containsKey(item.path("id").asLong())) continue;
             String title = item.path("title").asText(); List<Material> accepted = byItem.getOrDefault(item.path("id").asLong(), List.of()).stream().filter(m -> "APPROVED".equals(m.reviewStatus())).toList();
             if (accepted.isEmpty()) {
-                paragraphs.add(new Paragraph("【待核实】尚无经律师确认可用于本事项分析的文件；材料未取得或未确认，不表示该事项不存在。", title, null, List.of())); continue;
+                paragraphs.add(new Paragraph(LangText.of("【待核实】尚无经律师确认可用于本事项分析的文件；材料未取得或未确认，不表示该事项不存在。",
+                        "[To Verify] No lawyer-approved files are available for analyzing this item yet; missing or unconfirmed materials do not imply the absence of this matter."), title, null, List.of())); continue;
             }
-            jobs.stage(job, "依据底稿起草：" + title);
+            jobs.stage(job, LangText.of("依据底稿起草：", "Drafting from working papers: ") + title);
             Map<Long, String> texts = new LinkedHashMap<>(); int total = 0;
             for (Material m : accepted) {
                 sourceHashes.put(m.file().getId(), hash(readFile(m.file())));
@@ -160,7 +161,8 @@ public class DdMaterialService {
                 if (text != null && !text.isBlank()) { total += text.length(); texts.put(m.file().getId(), text); }
             }
             if (texts.size() != accepted.size() || total > 160_000) {
-                paragraphs.add(new Paragraph("【待核实】已归档本事项材料，但尚未完整读取全部内容，需要律师进一步核查。", title, null, List.of())); continue;
+                paragraphs.add(new Paragraph(LangText.of("【待核实】已归档本事项材料，但尚未完整读取全部内容，需要律师进一步核查。",
+                        "[To Verify] Materials for this item have been archived, but their full contents could not be read completely; further lawyer review is required."), title, null, List.of())); continue;
             }
             JsonNode response = ai.structured(job.getProjectId(), job.getUserId(), """
                 根据本项提交要求与底稿撰写尽调报告初稿的事实分析段落，不是收件总结。仅依据所给文件，不编造法条、日期、主体、核验过程或最终合规结论。
@@ -171,21 +173,23 @@ public class DdMaterialService {
                 无法依据材料判断时用“尚待核实”并说明缺口，不能虚构引用。
                 """, json.writeValueAsString(Map.of("item", title, "requirements", item.path("description").asText(""), "files", texts)));
             JsonNode rows = response.path("paragraphs");
-            if (!rows.isArray() || rows.isEmpty() || rows.size() > 8) throw new DdProcessingException("报告段落未完整生成；已归档材料保留，请重试");
+            if (!rows.isArray() || rows.isEmpty() || rows.size() > 8) throw new DdProcessingException(LangText.of("报告段落未完整生成；已归档材料保留，请重试", "Report paragraphs were not completely generated; archived materials are preserved, please try again"));
             for (JsonNode row : rows) {
                 List<EvidenceLinkViews.TargetInput> targets = validatedTargets(row, texts, accepted);
                 String text = row.path("text").asText();
                 if (text.isBlank() || text.length() > 1000 || targets.isEmpty())
-                    paragraphs.add(new Paragraph("【待核实】AI未能为本段分析提供可核对的底稿依据，请律师补充分析。", title, null, List.of()));
+                    paragraphs.add(new Paragraph(LangText.of("【待核实】AI未能为本段分析提供可核对的底稿依据，请律师补充分析。",
+                            "[To Verify] AI could not provide verifiable working paper citations for this analysis; please supplement with lawyer review."), title, null, List.of()));
                 else paragraphs.add(new Paragraph(text, title, "EVID_DD_" + UUID.randomUUID().toString().replace("-", ""), targets));
             }
         }
-        jobs.stage(job, "保存报告与原文勾稽");
+        jobs.stage(job, LangText.of("保存报告与原文勾稽", "Saving report and evidence links"));
         for (Material material : snapshot.materials()) if (sourceHashes.containsKey(material.file().getId())
                 && !sourceHashes.get(material.file().getId()).equals(hash(readFile(material.file()))))
-            throw new DdProcessingException("生成期间底稿发生修改，请按最新材料重新起草；没有保存与原文不一致的报告");
+            throw new DdProcessingException(LangText.of("生成期间底稿发生修改，请按最新材料重新起草；没有保存与原文不一致的报告",
+                    "Working papers were modified during generation; please redraft with the latest materials (inconsistent report was not saved)"));
         requireCurrentApprovals(job, snapshot);
-        String name = safeName(snapshot.request().path("name").asText()) + "-尽调报告初稿.docx";
+        String name = safeName(snapshot.request().path("name").asText()) + LangText.of("-尽调报告初稿.docx", "-DD-Report-Draft.docx");
         byte[] bytes = render(job.getProjectId(), snapshot.request().path("name").asText(), paragraphs);
         ProjectFile report = transactions.execute(tx -> {
             Long folder = folder(job.getProjectId(), job.getUserId(), null, "_交付件");
@@ -210,7 +214,8 @@ public class DdMaterialService {
         }
         for (Material material : snapshot.materials()) if ("APPROVED".equals(material.reviewStatus())
                 && (!Objects.equals(currentIds.get(material.itemId()), material.submissionId()) || !"APPROVED".equals(decisions.get(material.submissionId()))))
-            throw new DdProcessingException("生成期间材料版本或律师确认已变更，请刷新清单后重新起草");
+            throw new DdProcessingException(LangText.of("生成期间材料版本或律师确认已变更，请刷新清单后重新起草",
+                    "Material versions or lawyer approvals changed during generation; please refresh the checklist and redraft"));
     }
 
     private List<EvidenceLinkViews.TargetInput> validatedTargets(JsonNode paragraph, Map<Long, String> texts, List<Material> materials) throws IOException {

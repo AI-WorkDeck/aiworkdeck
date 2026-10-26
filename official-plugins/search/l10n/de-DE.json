@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Projektsuche",
+  "plugin.description": "Durchsuchen Sie Projektdateien per Volltext oder Tags und springen Sie direkt zu Dokumenten.",
+  "view.main.name": "Projektsuche"
+}

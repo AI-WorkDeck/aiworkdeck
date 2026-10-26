@@ -10,6 +10,7 @@ import com.checkba.repository.CompletionEntryRepository;
 import com.checkba.repository.DocInsightEntityRepository;
 import com.checkba.repository.ProjectVariableRepository;
 import com.checkba.repository.UserVariableRepository;
+import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
 import com.checkba.service.insight.DocInsightService;
 import com.checkba.service.insight.DocInsightViews.EntityView;
@@ -65,7 +66,7 @@ public class CompletionService {
     @Transactional(readOnly = true)
     public Candidates candidates(Long userId, Long projectId, String prefix) {
         requireRead(userId, projectId);
-        if (prefix != null && prefix.length() > 160) throw new IllegalArgumentException("前缀过长");
+        if (prefix != null && prefix.length() > 160) throw new IllegalArgumentException(LangText.of("前缀过长", "Prefix is too long"));
         Map<String, Item> result = new LinkedHashMap<>();
         // 阅读项目资料永不写入个人词库；候选获取也不会更新使用次数。
         insights.findTop200ByProjectIdOrderByIdDesc(projectId).forEach(e -> {
@@ -103,17 +104,17 @@ public class CompletionService {
     @Transactional
     public LearnResult learn(Long userId, Long projectId, LearnRequest request) {
         requireWrite(userId, projectId);
-        if (request == null) throw new IllegalArgumentException("请提供学习条目");
+        if (request == null) throw new IllegalArgumentException(LangText.of("请提供学习条目", "Please provide learning entries"));
         String key = scopeKey(request.scope(), userId, projectId);
         if (request.entries() == null || request.entries().isEmpty() || request.entries().size() > 50) {
-            throw new IllegalArgumentException("每批学习条目须为 1 至 50 条");
+            throw new IllegalArgumentException(LangText.of("每批学习条目须为 1 至 50 条", "Each batch must contain 1 to 50 learning entries"));
         }
         // 整批先校验，避免无事务的调用方也留下部分学习结果；一批中的同名只计一次。
         Map<String, String> validated = new LinkedHashMap<>();
         for (LearnEntry item : request.entries()) {
-            if (item == null || item.kind() == null || !KINDS.contains(item.kind())) throw new IllegalArgumentException("不支持的补全类型");
+            if (item == null || item.kind() == null || !KINDS.contains(item.kind())) throw new IllegalArgumentException(LangText.of("不支持的补全类型", "Unsupported completion kind"));
             String text = validTextOrNull(item.text());
-            if (text == null) throw new IllegalArgumentException("学习文本须为 2 至 160 字的单行文字");
+            if (text == null) throw new IllegalArgumentException(LangText.of("学习文本须为 2 至 160 字的单行文字", "Learning text must be a single line between 2 and 160 characters"));
             validated.putIfAbsent(text, item.kind());
         }
         lockScope(request.scope(), userId, projectId);
@@ -158,7 +159,7 @@ public class CompletionService {
         try {
             row.setDetailJson(objectMapper.writeValueAsString(result));
         } catch (java.io.IOException ex) {
-            throw new IllegalArgumentException("无法保存查询资料");
+            throw new IllegalArgumentException(LangText.of("无法保存查询资料", "Unable to save lookup details"));
         }
         entries.saveAndFlush(row);
         prune(key);
@@ -171,13 +172,13 @@ public class CompletionService {
         CompletionEntry row = requireEntry(entryId);
         if (!row.getScopeKey().equals(scopeKey("project", userId, projectId))
                 && !row.getScopeKey().equals(scopeKey("user", userId, projectId))) {
-            throw new IllegalArgumentException("条目不存在");
+            throw new IllegalArgumentException(LangText.of("条目不存在", "Entry not found"));
         }
-        if (row.getDetailJson() == null || row.getDetailJson().isBlank()) throw new IllegalArgumentException("该条目尚无已保存资料");
+        if (row.getDetailJson() == null || row.getDetailJson().isBlank()) throw new IllegalArgumentException(LangText.of("该条目尚无已保存资料", "No saved details for this entry"));
         try {
             return objectMapper.readValue(row.getDetailJson(), EntityView.class);
         } catch (java.io.IOException ex) {
-            throw new IllegalArgumentException("无法读取已保存资料");
+            throw new IllegalArgumentException(LangText.of("无法读取已保存资料", "Unable to read saved details"));
         }
     }
 
@@ -186,9 +187,9 @@ public class CompletionService {
         try {
             id = Long.parseLong(entryId.startsWith("learned:") ? entryId.substring(8) : entryId);
         } catch (RuntimeException ex) {
-            throw new IllegalArgumentException("条目不存在");
+            throw new IllegalArgumentException(LangText.of("条目不存在", "Entry not found"));
         }
-        return entries.findById(id).orElseThrow(() -> new IllegalArgumentException("条目不存在"));
+        return entries.findById(id).orElseThrow(() -> new IllegalArgumentException(LangText.of("条目不存在", "Entry not found")));
     }
 
     private void prune(String key) {
@@ -207,7 +208,7 @@ public class CompletionService {
             requireWrite(userId, projectId);
             scope = "project";
         } else {
-            throw new IllegalArgumentException("条目不存在");
+            throw new IllegalArgumentException(LangText.of("条目不存在", "Entry not found"));
         }
         lockScope(scope, userId, projectId);
         entries.delete(row);
@@ -225,18 +226,18 @@ public class CompletionService {
 
     private void requireRead(Long userId, Long projectId) {
         if (userId == null) throw new IllegalArgumentException("请先登录");
-        if (!members.hasReadPermission(projectId, userId)) throw new IllegalArgumentException("无权限访问该项目");
+        if (!members.hasReadPermission(projectId, userId)) throw new IllegalArgumentException(LangText.of("无权限访问该项目", "No permission to access this project"));
     }
 
     private void requireWrite(Long userId, Long projectId) {
         if (userId == null) throw new IllegalArgumentException("请先登录");
-        if (!members.hasWritePermission(projectId, userId)) throw new IllegalArgumentException("无权限修改该项目");
+        if (!members.hasWritePermission(projectId, userId)) throw new IllegalArgumentException(LangText.of("无权限修改该项目", "No permission to modify this project"));
     }
 
     private static String scopeKey(String scope, Long userId, Long projectId) {
         if ("project".equals(scope)) return "p:" + projectId;
         if ("user".equals(scope)) return "u:" + userId;
-        throw new IllegalArgumentException("学习范围须为 project 或 user");
+        throw new IllegalArgumentException(LangText.of("学习范围须为 project 或 user", "Learning scope must be project or user"));
     }
 
     /** 锁住已存在的范围所有者，空词库也能串行 upsert；锁持有到事务提交。 */
@@ -244,7 +245,7 @@ public class CompletionService {
         Object owner = "project".equals(scope)
                 ? entityManager.find(Project.class, projectId, LockModeType.PESSIMISTIC_WRITE)
                 : entityManager.find(User.class, userId, LockModeType.PESSIMISTIC_WRITE);
-        if (owner == null) throw new IllegalArgumentException("学习范围不存在");
+        if (owner == null) throw new IllegalArgumentException(LangText.of("学习范围不存在", "Learning scope not found"));
     }
 
     private static String validTextOrNull(String raw) {

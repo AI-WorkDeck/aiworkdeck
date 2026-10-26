@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Preferiti",
+  "plugin.description": "Cercare nei preferiti del progetto, copiare, inserire o aprire le fonti.",
+  "view.main.name": "Preferiti"
+}

@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { preparePluginImDrag, endPluginImDrag, consumePluginImDrag } from '../../src/utils/pluginImDrag.js'
 import { addPluginImFileToAi } from '../../src/utils/pluginImAi.js'
 import { nativeDataTransfer } from '../../src/utils/fileTreeExternalDrop.js'
+import workbench from '../../src/locales/zh-CN/workbench.js'
 
 const source = readFileSync(new URL('../../src/components/PluginPane.vue', import.meta.url), 'utf8')
 const body = source.match(/<script>([\s\S]*?)<\/script>/)[1]

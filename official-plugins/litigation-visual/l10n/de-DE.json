@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Prozessvisualisierung",
+  "plugin.description": "Wählen Sie Fallsunterlagen aus, um bearbeitbare Prozessdiagramme zu erstellen und zu verwalten.",
+  "view.main.name": "Prozessvisualisierung"
+}

@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Desensitize",
+  "plugin.description": "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.",
+  "view.main.name": "Desensitize"
+}

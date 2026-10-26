@@ -73,9 +73,9 @@ public class MessageCenterGateway {
             }
             case "im" -> im(userId,p,projectId);
             case "ddClientIm" -> {
-                if (!local) throw bad("请在已连接客户项目的桌面端打开");
+                if (!local) throw bad(com.checkba.service.LangText.of("请在已连接客户项目的桌面端打开", "Please open in the desktop app connected to the client project"));
                 MessageCenterSource source=sources.orderedStream().filter(s -> s.localOnly() && "dd-client".equals(s.id()))
-                        .findFirst().orElseThrow(() -> bad("客户项目连接不可用"));
+                        .findFirst().orElseThrow(() -> bad(com.checkba.service.LangText.of("客户项目连接不可用", "Client project connection is unavailable")));
                 String scope=account.accountFingerprintOrNull();
                 Map<String,Object> params=new LinkedHashMap<>(map(p.get("params")));
                 params.put("connectionId",MessageCenterService.required(p,"connectionId",160));
@@ -83,12 +83,12 @@ public class MessageCenterGateway {
                 assertAccount(scope); yield result;
             }
             // The local endpoint does not expose these paths. Cloud recipients remain the authenticated account only.
-            case "pluginPublish" -> { if (local) throw bad("请通过插件通知接口发布");
+            case "pluginPublish" -> { if (local) throw bad(com.checkba.service.LangText.of("请通过插件通知接口发布", "Please publish through the plugin notification endpoint"));
                 yield service.publishToSelf(MessageCenterService.required(p,"pluginId",64),userId,map(p.get("notification"))); }
-            case "pluginResolve" -> { if (local) throw bad("请通过插件通知接口更新");
+            case "pluginResolve" -> { if (local) throw bad(com.checkba.service.LangText.of("请通过插件通知接口更新", "Please update through the plugin notification endpoint"));
                 yield service.resolveOwn(MessageCenterService.required(p,"pluginId",64),userId,
                         MessageCenterService.required(p,"eventKey",160),MessageCenterService.optional(p,"state","done",16)); }
-            default -> throw bad("不支持的消息中心操作");
+            default -> throw bad(com.checkba.service.LangText.of("不支持的消息中心操作", "Unsupported Message Center action"));
         };
     }
 
@@ -110,25 +110,25 @@ public class MessageCenterGateway {
             // Client-supplied material is never accepted as project context by the core host either.
             params.remove("projectContext");
             if ("projectGroup".equals(action)) {
-                if (projectId==null || !projectMembers.hasReadPermission(projectId,userId)) throw bad("没有当前项目的访问权限");
+                if (projectId==null || !projectMembers.hasReadPermission(projectId,userId)) throw bad(com.checkba.service.LangText.of("没有当前项目的访问权限", "You do not have access to the current project"));
                 String scope=im.captureAccountScope(); var connection=cloud.connectOfficial(userId);
-                if (!userId.equals(connection.getUserId()) || !scope.equals(connection.getAccountFingerprint())) throw bad("账户已变化，请重新打开消息中心");
+                if (!userId.equals(connection.getUserId()) || !scope.equals(connection.getAccountFingerprint())) throw bad(com.checkba.service.LangText.of("账户已变化，请重新打开消息中心", "Account has changed; please reopen the Message Center"));
                 var remote=projectRemotes.findByProjectId(projectId).filter(r -> connection.getId().equals(r.getConnectionId()))
-                        .orElseThrow(() -> bad("先将项目放入官方案件库后再创建项目群"));
+                        .orElseThrow(() -> bad(com.checkba.service.LangText.of("先将项目放入官方案件库后再创建项目群", "Please sync the project to the official case library before creating a project group")));
                 String remoteId=remote.getRemoteProjectId();
-                if (remoteId==null || !remoteId.matches("[1-9][0-9]{0,18}")) throw bad("案件库项目标识无效");
+                if (remoteId==null || !remoteId.matches("[1-9][0-9]{0,18}")) throw bad(com.checkba.service.LangText.of("案件库项目标识无效", "Invalid case library project ID"));
                 try { params.put("projectId",Long.parseLong(remoteId)); }
-                catch (NumberFormatException e) { throw bad("案件库项目标识无效"); }
+                catch (NumberFormatException e) { throw bad(com.checkba.service.LangText.of("案件库项目标识无效", "Invalid case library project ID")); }
                 Map<String,Object> result=new LinkedHashMap<>(map(im.executeWithinScope(userId,scope,action,params)));
                 result.put("localProjectId",projectId); im.assertAccountScope(scope); return result;
             }
             if (projectId!=null) for (var handler : projectHandlers) if (handler.supports(action))
                 return handler.execute(userId,projectId,action,params);
-            if ("ensureAgent".equals(action) && "project".equals(params.get("scope"))) throw bad("请先打开助手所属项目");
+            if ("ensureAgent".equals(action) && "project".equals(params.get("scope"))) throw bad(com.checkba.service.LangText.of("请先打开助手所属项目", "Please open the project this assistant belongs to first"));
             if ("agentReply".equals(action)) {
                 Map<String,Object> info=map(im.execute(userId,"agentInfo",Map.of("conversationId",params.get("conversationId"))));
                 Map<String,Object> agent=map(info.get("agent"));
-                if (Boolean.TRUE.equals(agent.get("private")) && "project".equals(agent.get("scope"))) throw bad("请先打开助手所属项目");
+                if (Boolean.TRUE.equals(agent.get("private")) && "project".equals(agent.get("scope"))) throw bad(com.checkba.service.LangText.of("请先打开助手所属项目", "Please open the project this assistant belongs to first"));
             }
         }
         return im.execute(userId,action,params);
@@ -169,7 +169,7 @@ public class MessageCenterGateway {
         notifications.sort(Comparator.comparing((Map<String,Object> n) -> Objects.toString(n.get("createdAt"),"")).reversed());
         result.put("notifications",notifications); result.put("projects",projectChoices(notifications,conversations));
         if (p.get("projectKey") instanceof String projectKey && !projectKey.isBlank()) {
-            if (projectKey.length()>256) throw bad("项目筛选无效");
+            if (projectKey.length()>256) throw bad(com.checkba.service.LangText.of("项目筛选无效", "Invalid project filter"));
             List<Map<String,Object>> filteredNotices=notifications.stream().filter(n -> projectKey.equals(n.get("projectKey"))).toList();
             List<Map<String,Object>> filteredConversations=conversations.stream().filter(c -> projectKey.equals(c.get("projectKey"))).toList();
             result.put("notifications",filteredNotices); result.put("conversations",filteredConversations);
@@ -187,7 +187,7 @@ public class MessageCenterGateway {
             Object key=n.get("projectKey"); if (key==null && n.get("projectId")!=null) key="project:"+n.get("projectId");
             if (key==null) continue; Map<String,Object> entry=new LinkedHashMap<>();
             entry.put("key",key); entry.put("id",n.get("projectId"));
-            entry.put("name",n.get("projectName")==null?"项目 "+n.get("projectId"):n.get("projectName")); projects.put(String.valueOf(key),entry);
+            entry.put("name",n.get("projectName")==null?com.checkba.service.LangText.of("项目 ", "Project ")+n.get("projectId"):n.get("projectName")); projects.put(String.valueOf(key),entry);
         }
         return new ArrayList<>(projects.values());
     }
@@ -210,7 +210,7 @@ public class MessageCenterGateway {
             Object remoteId=target.get("projectId"); Long localId=localProject(userId,String.valueOf(remoteId));
             result.put("projectKey","cloud:"+remoteId);
             if (localId==null) {
-                if (opening) throw bad("请先从案件库取回此项目，再打开该事项");
+                if (opening) throw bad(com.checkba.service.LangText.of("请先从案件库取回此项目，再打开该事项", "Please pull this project from the case library first before opening this item"));
                 result.remove("projectId");
             } else result.put("projectId",localId);
         }
@@ -219,7 +219,7 @@ public class MessageCenterGateway {
     private Long localProject(Long userId,String remoteId) {
         var connection=cloud.connectOfficial(userId);
         if (!userId.equals(connection.getUserId()) || !Objects.equals(connection.getAccountFingerprint(),account.accountFingerprintOrNull()))
-            throw bad("账户已变化，请重新打开消息中心");
+            throw bad(com.checkba.service.LangText.of("账户已变化，请重新打开消息中心", "Account has changed; please reopen the Message Center"));
         return projectRemotes.findByConnectionIdAndRemoteProjectId(connection.getId(),remoteId)
                 .filter(r -> projectMembers.hasReadPermission(r.getProjectId(),userId)).map(r -> r.getProjectId()).orElse(null);
     }
@@ -234,10 +234,10 @@ public class MessageCenterGateway {
 
     protected Object remote(Long userId,String action,Map<String,Object> params) {
         String scope=im.captureAccountScope(); var connection=cloud.connectOfficial(userId);
-        if (!scope.equals(connection.getAccountFingerprint())) throw bad("账户已变化，请重新打开消息中心");
+        if (!scope.equals(connection.getAccountFingerprint())) throw bad(com.checkba.service.LangText.of("账户已变化，请重新打开消息中心", "Account has changed; please reopen the Message Center"));
         try {
             byte[] payload=json.writeValueAsBytes(Map.of("action",action,"params",params));
-            if (payload.length>65536) throw bad("通知请求过大");
+            if (payload.length>65536) throw bad(com.checkba.service.LangText.of("通知请求过大", "Notification request too large"));
             HttpRequest request=HttpRequest.newBuilder(URI.create(connection.getServerUrl()+"/api/message-center/action"))
                     .timeout(Duration.ofSeconds(30)).header("Content-Type","application/json")
                     .header("X-Session-Id",connection.getDeviceToken()).POST(HttpRequest.BodyPublishers.ofByteArray(payload)).build();
@@ -245,19 +245,19 @@ public class MessageCenterGateway {
             byte[] bytes;
             try (var body=new com.checkba.util.DeadlineInputStream(response.body(),Duration.ofSeconds(30))) { bytes=body.readNBytes(4*1024*1024+1); }
             im.assertAccountScope(scope);
-            if (response.statusCode()==401) throw bad("云端账户凭据已失效，请重新连接账户");
-            if (response.statusCode()==404) throw bad("云端尚未开通消息中心");
-            if (response.statusCode()!=200 || bytes.length>4*1024*1024) throw bad("云端消息中心暂不可用");
+            if (response.statusCode()==401) throw bad(com.checkba.service.LangText.of("云端账户凭据已失效，请重新连接账户", "Cloud account credentials have expired; please reconnect your account"));
+            if (response.statusCode()==404) throw bad(com.checkba.service.LangText.of("云端尚未开通消息中心", "Cloud Message Center is not enabled yet"));
+            if (response.statusCode()!=200 || bytes.length>4*1024*1024) throw bad(com.checkba.service.LangText.of("云端消息中心暂不可用", "Cloud Message Center is temporarily unavailable"));
             Map<String,Object> body=json.readValue(bytes,new TypeReference<>(){});
             if (!(body.get("code") instanceof Number code) || code.intValue()!=0)
-                throw bad(body.get("message") instanceof String message?message:"消息中心操作失败");
+                throw bad(body.get("message") instanceof String message?message:com.checkba.service.LangText.of("消息中心操作失败", "Message Center action failed"));
             return body.get("data");
-        } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw bad("消息请求已取消"); }
-        catch (java.io.IOException e) { throw bad("云端消息中心暂时无法连接"); }
+        } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw bad(com.checkba.service.LangText.of("消息请求已取消", "Message request was cancelled")); }
+        catch (java.io.IOException e) { throw bad(com.checkba.service.LangText.of("云端消息中心暂时无法连接", "Cloud Message Center is temporarily unreachable")); }
     }
-    private void assertAccount(String scope) { if (!Objects.equals(scope,account.accountFingerprintOrNull())) throw bad("账户已变化，请重新打开消息中心"); }
+    private void assertAccount(String scope) { if (!Objects.equals(scope,account.accountFingerprintOrNull())) throw bad(com.checkba.service.LangText.of("账户已变化，请重新打开消息中心", "Account has changed; please reopen the Message Center")); }
     @SuppressWarnings("unchecked") public static Map<String,Object> map(Object value) {
-        if (value==null) return Map.of(); if (!(value instanceof Map<?,?>)) throw bad("消息请求格式无效"); return (Map<String,Object>)value;
+        if (value==null) return Map.of(); if (!(value instanceof Map<?,?>)) throw bad(com.checkba.service.LangText.of("消息请求格式无效", "Invalid message request format")); return (Map<String,Object>)value;
     }
     @SuppressWarnings("unchecked") private static List<Map<String,Object>> rows(Object value) { return value instanceof List<?> list?new ArrayList<>((List<Map<String,Object>>)list):new ArrayList<>(); }
     private static long number(Object value) { return value instanceof Number n?n.longValue():0; }

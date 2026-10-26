@@ -42,13 +42,13 @@ public class MessageCenterService {
     public Map<String,Object> publishToSelf(String pluginId, Long userId, Map<String,Object> p) {
         pluginId = pluginId(pluginId);
         for (String prohibited : Set.of("recipientId","recipients","userId","senderId","sourceId","sourceKind","sourceName","pluginId"))
-            if (p.containsKey(prohibited)) throw bad("插件不能指定来源身份或其他收件人");
+            if (p.containsKey(prohibited)) throw bad(com.checkba.service.LangText.of("插件不能指定来源身份或其他收件人", "Plugins cannot specify source identity or other recipients"));
         lockUsers(List.of(userId));
         Map<String,Object> target = targetMap(p.get("target"));
         if (!target.isEmpty() && (!"plugin".equals(target.get("kind")) || !pluginId.equals(target.get("pluginId"))))
-            throw bad("插件通知只能打开本插件");
-        if (target.containsKey("projectId")) throw bad("插件不能将本机项目编号作为云端项目权限");
-        return view(publish("plugin."+pluginId,"插件消息（当前账号触发）","PLUGIN",userId,userId,null,
+            throw bad(com.checkba.service.LangText.of("插件通知只能打开本插件", "Plugin notifications can only open their own plugin"));
+        if (target.containsKey("projectId")) throw bad(com.checkba.service.LangText.of("插件不能将本机项目编号作为云端项目权限", "Plugins cannot use local project IDs as cloud project permissions"));
+        return view(publish("plugin."+pluginId,com.checkba.service.LangText.of("插件消息（当前账号触发）", "Plugin Message (Triggered by Current Account)"),"PLUGIN",userId,userId,null,
                 required(p,"eventKey",160), optional(p,"kind","notification",40), required(p,"title",256),
                 optional(p,"body","",4000), optional(p,"actionState","none",16),target));
     }
@@ -58,14 +58,14 @@ public class MessageCenterService {
     public List<Map<String,Object>> publishBusiness(String sourceId,String sourceName,Long senderId,List<Long> recipients,
             Long projectId,String eventKey,String kind,String title,String body,String actionState,Map<String,Object> target) {
         if (projectId == null || !realMember(projectId,senderId) || !permissions.hasWritePermission(projectId,senderId))
-            throw bad("没有项目通知发送权限");
+            throw bad(com.checkba.service.LangText.of("没有项目通知发送权限", "You do not have permission to send project notifications"));
         if (recipients == null || recipients.isEmpty() || recipients.size()>100 || recipients.stream().anyMatch(Objects::isNull))
-            throw bad("收件人无效");
+            throw bad(com.checkba.service.LangText.of("收件人无效", "Invalid recipients"));
         for (Long recipient : recipients) {
             if (!realMember(projectId,recipient) || !permissions.hasReadPermission(projectId,recipient))
-                throw bad("收件人不是当前项目成员");
+                throw bad(com.checkba.service.LangText.of("收件人不是当前项目成员", "Recipient is not a member of the current project"));
             if (permissions.isClient(projectId,recipient) || users.findById(recipient).map(u -> "CLIENT".equalsIgnoreCase(u.getRole())).orElse(true))
-                throw bad("客户通知须由对应业务服务发送");
+                throw bad(com.checkba.service.LangText.of("客户通知须由对应业务服务发送", "Client notifications must be sent by the corresponding business service"));
         }
         return publishAuthorizedBusiness(sourceId,sourceName,senderId,recipients,projectId,eventKey,kind,title,body,actionState,target);
     }
@@ -74,13 +74,13 @@ public class MessageCenterService {
     @Transactional
     public List<Map<String,Object>> publishAuthorizedBusiness(String sourceId,String sourceName,Long senderId,List<Long> recipients,
             Long projectId,String eventKey,String kind,String title,String body,String actionState,Map<String,Object> target) {
-        if (sourceId == null || !sourceId.matches("[a-z][a-z0-9-]{0,99}")) throw bad("业务来源无效");
+        if (sourceId == null || !sourceId.matches("[a-z][a-z0-9-]{0,99}")) throw bad(com.checkba.service.LangText.of("业务来源无效", "Invalid business source"));
         if (recipients == null || recipients.isEmpty() || recipients.size()>100 || recipients.stream().anyMatch(Objects::isNull))
-            throw bad("收件人无效");
+            throw bad(com.checkba.service.LangText.of("收件人无效", "Invalid recipients"));
         List<Long> locks=new ArrayList<>(recipients); locks.add(senderId); lockUsers(locks);
         if (projectId == null) {
             MessageCenterAccessPolicy policy=policy(sourceId);
-            if (policy == null || recipients.stream().anyMatch(u -> !policy.canAccess(u,eventKey))) throw bad("业务通知范围无法核验");
+            if (policy == null || recipients.stream().anyMatch(u -> !policy.canAccess(u,eventKey))) throw bad(com.checkba.service.LangText.of("业务通知范围无法核验", "Cannot verify business notification scope"));
         }
         Map<String,Object> safeTarget=targetMap(target);
         List<Map<String,Object>> result=new ArrayList<>();
@@ -91,16 +91,16 @@ public class MessageCenterService {
 
     @Transactional
     public Map<String,Object> resolveOwn(String pluginId,Long userId,String eventKey,String state) {
-        if (!Set.of("done","cancelled").contains(state)) throw bad("处理状态无效");
+        if (!Set.of("done","cancelled").contains(state)) throw bad(com.checkba.service.LangText.of("处理状态无效", "Invalid action state"));
         lockUsers(List.of(userId));
         MessageCenterNotice row=notices.findByRecipientIdAndSourceIdAndEventKey(userId,"plugin."+pluginId(pluginId),eventKey)
-                .orElseThrow(() -> bad("通知不存在"));
+                .orElseThrow(() -> bad(com.checkba.service.LangText.of("通知不存在", "Notification not found")));
         row.setActionState(state); row.setUpdatedAt(Instant.now()); notices.save(row); return view(row);
     }
 
     @Transactional
     public void updateBusinessState(String sourceId,String eventKey,List<Long> recipients,String state) {
-        if (!STATES.contains(state)) throw bad("处理状态无效");
+        if (!STATES.contains(state)) throw bad(com.checkba.service.LangText.of("处理状态无效", "Invalid action state"));
         lockUsers(recipients);
         for (Long userId : recipients) notices.findByRecipientIdAndSourceIdAndEventKey(userId,sourceId,eventKey)
                 .filter(n -> "BUSINESS".equals(n.getSourceKind())).ifPresent(n -> {
@@ -112,16 +112,16 @@ public class MessageCenterService {
             String eventKey,String kind,String title,String body,String state,Map<String,Object> target) {
         checked(sourceName,128,false); checked(eventKey,160,false); checked(kind,40,false);
         checked(title,256,false); checked(body,4000,true);
-        if (!STATES.contains(state)) throw bad("处理状态无效");
+        if (!STATES.contains(state)) throw bad(com.checkba.service.LangText.of("处理状态无效", "Invalid action state"));
         String targetJson=write(target);
         String hash=hash(write(Arrays.asList(sourceKind,sender,projectId,kind,title,body,state,target)));
         Optional<MessageCenterNotice> existing=notices.findByRecipientIdAndSourceIdAndEventKey(recipient,source,eventKey);
         if (existing.isPresent()) {
-            if (!existing.get().getPayloadHash().equals(hash)) throw bad("通知重试标识已用于其他内容");
+            if (!existing.get().getPayloadHash().equals(hash)) throw bad(com.checkba.service.LangText.of("通知重试标识已用于其他内容", "Notification retry key has already been used for different content"));
             return existing.get();
         }
         if ("PLUGIN".equals(sourceKind) && notices.countByRecipientIdAndSourceIdAndCreatedAtAfter(recipient,source,Instant.now().minusSeconds(60))>=60)
-            throw bad("插件通知过于频繁，请稍后重试");
+            throw bad(com.checkba.service.LangText.of("插件通知过于频繁，请稍后重试", "Too many plugin notifications; please try again later"));
         MessageCenterNotice n=new MessageCenterNotice(); n.setId(UUID.randomUUID().toString());
         n.setRecipientId(recipient); n.setSenderId(sender); n.setProjectId(projectId); n.setSourceId(source);
         n.setSourceKind(sourceKind); n.setSourceName(sourceName); n.setEventKey(eventKey); n.setKind(kind);
@@ -185,20 +185,20 @@ public class MessageCenterService {
     private Routed route(String id,boolean localOnly) {
         requireUserIdFormat(id);
         String raw=localOnly && id.startsWith("local:") ? id.substring(6) : id;
-        int separator=raw.indexOf(':'); if (separator<1) throw bad("通知不存在");
+        int separator=raw.indexOf(':'); if (separator<1) throw bad(com.checkba.service.LangText.of("通知不存在", "Notification not found"));
         String sourceId=raw.substring(0,separator);
         MessageCenterSource source=sources.orderedStream().filter(s -> s.localOnly()==localOnly && s.id().equals(sourceId))
-                .findFirst().orElseThrow(() -> bad("通知来源不可用"));
+                .findFirst().orElseThrow(() -> bad(com.checkba.service.LangText.of("通知来源不可用", "Notification source is unavailable")));
         return new Routed(source,raw.substring(separator+1));
     }
 
     private MessageCenterNotice own(Long userId,String id) {
         requireUser(userId);
-        MessageCenterNotice n=notices.findById(id).filter(row -> row.getRecipientId().equals(userId)).orElseThrow(() -> bad("通知不存在"));
+        MessageCenterNotice n=notices.findById(id).filter(row -> row.getRecipientId().equals(userId)).orElseThrow(() -> bad(com.checkba.service.LangText.of("通知不存在", "Notification not found")));
         boolean allowed;
         try { allowed=canAccess(n,userId); }
-        catch (RuntimeException failure) { throw new IllegalArgumentException("暂时无法核对通知权限，请稍后重试",failure); }
-        if (!allowed) throw bad("通知已无访问权限"); return n;
+        catch (RuntimeException failure) { throw new IllegalArgumentException(com.checkba.service.LangText.of("暂时无法核对通知权限，请稍后重试", "Cannot verify notification permissions right now; please try again later"),failure); }
+        if (!allowed) throw bad(com.checkba.service.LangText.of("通知已无访问权限", "You no longer have access to this notification")); return n;
     }
     private boolean canAccess(MessageCenterNotice n,Long userId) {
         if ("PLUGIN".equals(n.getSourceKind())) return true;
@@ -217,8 +217,8 @@ public class MessageCenterService {
     }
     private void requireUser(Long userId) { if (userId==null || !users.existsById(userId)) throw bad("请先登录"); }
     private void lockUsers(List<Long> ids) {
-        if (ids==null || ids.stream().anyMatch(Objects::isNull)) throw bad("用户无效");
-        ids.stream().distinct().sorted().forEach(id -> { if (users.lockStorageOwner(id).isEmpty()) throw bad("用户不存在"); });
+        if (ids==null || ids.stream().anyMatch(Objects::isNull)) throw bad(com.checkba.service.LangText.of("用户无效", "Invalid user"));
+        ids.stream().distinct().sorted().forEach(id -> { if (users.lockStorageOwner(id).isEmpty()) throw bad(com.checkba.service.LangText.of("用户不存在", "User not found")); });
     }
     private Map<String,Object> view(MessageCenterNotice n) {
         Map<String,Object> m=new LinkedHashMap<>(); m.put("id","notice:"+n.getId()); m.put("sourceId",n.getSourceId());
@@ -226,7 +226,7 @@ public class MessageCenterService {
         m.put("title",n.getTitle()); m.put("body",n.getBody()); m.put("projectId",n.getProjectId());
         if (n.getProjectId()!=null) {
             m.put("projectKey","project:"+n.getProjectId());
-            m.put("projectName",projects.findById(n.getProjectId()).map(p -> p.getName()).orElse("项目"));
+            m.put("projectName",projects.findById(n.getProjectId()).map(p -> p.getName()).orElse(com.checkba.service.LangText.of("项目", "Project")));
         }
         m.put("createdAt",n.getCreatedAt().toString()); m.put("readAt",n.getReadAt()==null?null:n.getReadAt().toString());
         m.put("read",n.getReadAt()!=null);
@@ -239,34 +239,34 @@ public class MessageCenterService {
         m.put("readAt",e.readAt()==null?null:e.readAt().toString()); m.put("target",targetMap(e.target())); return m;
     }
     public Map<String,Object> targetMap(Object raw) {
-        if (raw==null) return Map.of(); if (!(raw instanceof Map<?,?> input)) throw bad("通知目标无效");
+        if (raw==null) return Map.of(); if (!(raw instanceof Map<?,?> input)) throw bad(com.checkba.service.LangText.of("通知目标无效", "Invalid notification target"));
         Map<String,Object> safe=new TreeMap<>();
         for (var e : input.entrySet()) {
             if (!(e.getKey() instanceof String key) || !TARGET_KEYS.contains(key)
-                    || !(e.getValue() instanceof String || e.getValue() instanceof Number)) throw bad("通知目标包含不支持的字段");
-            String value=String.valueOf(e.getValue()); if (value.length()>256 || value.contains("\n") || value.contains("\r")) throw bad("通知目标无效");
-            if (Set.of("projectId","requestId","itemId").contains(key) && !value.matches("[1-9][0-9]{0,18}")) throw bad("通知目标编号无效");
+                    || !(e.getValue() instanceof String || e.getValue() instanceof Number)) throw bad(com.checkba.service.LangText.of("通知目标包含不支持的字段", "Notification target contains unsupported fields"));
+            String value=String.valueOf(e.getValue()); if (value.length()>256 || value.contains("\n") || value.contains("\r")) throw bad(com.checkba.service.LangText.of("通知目标无效", "Invalid notification target"));
+            if (Set.of("projectId","requestId","itemId").contains(key) && !value.matches("[1-9][0-9]{0,18}")) throw bad(com.checkba.service.LangText.of("通知目标编号无效", "Invalid notification target ID"));
             safe.put(key,e.getValue());
         }
-        if (!safe.isEmpty() && !Set.of("plugin","im","dd-client","dd","agent","calendar").contains(safe.get("kind"))) throw bad("通知目标类型无效");
+        if (!safe.isEmpty() && !Set.of("plugin","im","dd-client","dd","agent","calendar").contains(safe.get("kind"))) throw bad(com.checkba.service.LangText.of("通知目标类型无效", "Invalid notification target type"));
         if (safe.containsKey("pluginId")) pluginId(String.valueOf(safe.get("pluginId")));
-        if (write(safe).length()>2048) throw bad("通知目标过长"); return safe;
+        if (write(safe).length()>2048) throw bad(com.checkba.service.LangText.of("通知目标过长", "Notification target is too long")); return safe;
     }
     private Map<String,Object> parseTarget(String s) {
         try { return targetMap(json.readValue(s,new TypeReference<Map<String,Object>>(){})); }
-        catch (java.io.IOException e) { throw bad("通知目标不可用"); }
+        catch (java.io.IOException e) { throw bad(com.checkba.service.LangText.of("通知目标不可用", "Notification target is unavailable")); }
     }
-    private String write(Object v) { try { return json.writeValueAsString(v); } catch (Exception e) { throw bad("通知格式无效"); } }
+    private String write(Object v) { try { return json.writeValueAsString(v); } catch (Exception e) { throw bad(com.checkba.service.LangText.of("通知格式无效", "Invalid notification format")); } }
     public static String pluginId(String id) {
-        if (id==null || !id.matches("[a-z][a-z0-9-]{0,63}") || Set.of("system","builtin","host","core").contains(id)) throw bad("插件标识无效");
+        if (id==null || !id.matches("[a-z][a-z0-9-]{0,63}") || Set.of("system","builtin","host","core").contains(id)) throw bad(com.checkba.service.LangText.of("插件标识无效", "Invalid plugin identifier"));
         return id;
     }
     static String required(Map<String,Object> p,String key,int max) { return checked(p.get(key),max,false); }
     static String optional(Map<String,Object> p,String key,String fallback,int max) { return p.containsKey(key)?checked(p.get(key),max,true):fallback; }
     private static String checked(Object value,int max,boolean empty) {
-        if (!(value instanceof String s) || s.length()>max || (!empty&&s.isBlank())) throw bad("通知字段无效或过长"); return s;
+        if (!(value instanceof String s) || s.length()>max || (!empty&&s.isBlank())) throw bad(com.checkba.service.LangText.of("通知字段无效或过长", "Notification field is invalid or too long")); return s;
     }
-    private static void requireUserIdFormat(String id) { if (id==null || id.length()>300) throw bad("通知编号无效"); }
+    private static void requireUserIdFormat(String id) { if (id==null || id.length()>300) throw bad(com.checkba.service.LangText.of("通知编号无效", "Invalid notification ID")); }
     private static String hash(String s) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8))); } catch (Exception e) { throw new IllegalStateException(e); } }
     private static IllegalArgumentException bad(String s) { return new IllegalArgumentException(s); }
 }

@@ -43,35 +43,35 @@ public final class TrialCodeVerifier {
 
     public static Result verify(String code, PublicKey publicKey) {
         if (code == null || code.isBlank()) {
-            return Result.fail("试用码格式不正确");
+            return Result.fail(LangText.of("试用码格式不正确", "Invalid trial code format"));
         }
         String normalized = code.replaceAll("[\\s-]", "").toUpperCase(Locale.ROOT);
         if (!normalized.startsWith(PREFIX)) {
-            return Result.fail("试用码格式不正确");
+            return Result.fail(LangText.of("试用码格式不正确", "Invalid trial code format"));
         }
         byte[] raw;
         try {
             raw = base32Decode(normalized.substring(PREFIX.length()));
         } catch (IllegalArgumentException e) {
-            return Result.fail("试用码格式不正确");
+            return Result.fail(LangText.of("试用码格式不正确", "Invalid trial code format"));
         }
         if (raw.length != RAW_LENGTH) {
-            return Result.fail("试用码格式不正确");
+            return Result.fail(LangText.of("试用码格式不正确", "Invalid trial code format"));
         }
         byte[] payload = Arrays.copyOfRange(raw, 0, PAYLOAD_LENGTH);
         byte[] signature = Arrays.copyOfRange(raw, PAYLOAD_LENGTH, RAW_LENGTH);
         if (payload[0] != 0x01 || payload[1] != 0x01) {
-            return Result.fail("试用码格式不正确");
+            return Result.fail(LangText.of("试用码格式不正确", "Invalid trial code format"));
         }
         try {
             Signature verifier = Signature.getInstance("Ed25519");
             verifier.initVerify(publicKey);
             verifier.update(payload);
             if (!verifier.verify(signature)) {
-                return Result.fail("试用码签名无效");
+                return Result.fail(LangText.of("试用码签名无效", "Invalid trial code signature"));
             }
         } catch (Exception e) {
-            return Result.fail("试用码签名无效");
+            return Result.fail(LangText.of("试用码签名无效", "Invalid trial code signature"));
         }
         long iat = ((payload[2] & 0xFFL) << 24)
                 | ((payload[3] & 0xFFL) << 16)

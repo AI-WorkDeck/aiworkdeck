@@ -93,9 +93,9 @@ public class AgentInboxController {
 
     private ResponseEntity<?> authorize(String conversationId, String sessionId) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
-        if (userId == null) return error(401, "请先登录");
+        if (userId == null) return error(401, com.checkba.service.LangText.of("请先登录", "Please sign in first"));
         if (!messageService.canUseConversation(conversationId, userId)) {
-            return error(403, "无权操作该会话");
+            return error(403, com.checkba.service.LangText.of("无权操作该会话", "You do not have permission to operate on this conversation"));
         }
         return null;
     }

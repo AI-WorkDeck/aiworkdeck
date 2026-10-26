@@ -49,6 +49,7 @@ const NAMES = {
   search_project_files: { zh: '搜索项目文件', en: 'Search files' },
   search_across_projects: { zh: '跨项目搜索文件', en: 'Search files across projects' },
   search_project_content: { zh: '搜索文件内容', en: 'Search file contents' },
+  search_across_projects: { zh: '跨项目检索', en: 'Search across projects' },
   read_file: { zh: '读取文件', en: 'Read file' },
   extract_file_text: { zh: '提取文档全文', en: 'Extract document text' },
   list_files: { zh: '列出文件', en: 'List files' },

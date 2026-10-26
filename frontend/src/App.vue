@@ -11,10 +11,11 @@ import { mountRecordingIndicator } from '@/utils/recordingIndicator.js'
 import { initWindowChrome, refreshDragStrip } from '@/utils/windowChrome.js'
 import { mountGlobalBack, refreshGlobalBack } from '@/utils/globalBack.js'
 import { initAppMenuBridge } from '@/utils/appMenuBridge.js'
-import { getAppLanguage, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
+import { getAppLanguage, setAppLanguage, isLanguageManuallyChosen, normalizeLocaleCode, APP_LANGUAGE_EVENT } from '@/utils/appLanguage.js'
+import { applyI18nLocale } from '@/i18n/index.js'
 import { initAppTheme } from '@/utils/appTheme.js'
 import { installModalFocusGuard } from '@/utils/modalFocusGuard.js'
-import { saveAppLanguageRemote, prepareAgentRestart, abortAgentRestart } from '@/services/api.js'
+import { getAppLanguageRemote, saveAppLanguageRemote, prepareAgentRestart, abortAgentRestart } from '@/services/api.js'
 import { createDesktopQuitGuard, flushQuitWorkbenches, confirmQuitWorkbenches } from '@/utils/desktopQuitGuard.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 
@@ -30,15 +31,35 @@ export default {
     // 桌面主进程（菜单等原生文案）与后端 system_setting（prompt/文案语言）。
     // 之后语言切换（设置页 setAppLanguage）经 APP_LANGUAGE_EVENT 走同一条同步链。
     const syncLanguageMirrors = (lang) => {
-      try { if (host.appLanguage && host.appLanguage.set) host.appLanguage.set(lang) } catch (e) { /* ignore */ }
+      const canonical = normalizeLocaleCode(lang) || getAppLanguage()
+      try { if (host.appLanguage && host.appLanguage.set) host.appLanguage.set(canonical) } catch (e) { /* ignore */ }
       // fire-and-forget：后端没起来也不能拦启动，下次切换/启动会再补。
       // 浏览器态未登录时不发——POST 会回「未登录」，request 包装器据此清会话
       // 并 reLaunch 登录页，启动链会被这条后台同步搅乱；桌面 local-mode 恒可发。
       if (isDesktopHost() || getSessionId()) {
-        try { saveAppLanguageRemote(lang).catch(() => {}) } catch (e) { /* ignore */ }
+        try { saveAppLanguageRemote(canonical).catch(() => {}) } catch (e) { /* ignore */ }
       }
     }
-    syncLanguageMirrors(getAppLanguage())
+    const initialLang = getAppLanguage()
+    applyI18nLocale(initialLang)
+    syncLanguageMirrors(initialLang)
+    if ((isDesktopHost() || getSessionId()) && !isLanguageManuallyChosen()) {
+      try {
+        getAppLanguageRemote()
+          .then((res) => {
+            if (isLanguageManuallyChosen()) return
+            const payload = (res && res.data) || res || {}
+            const remoteLang = normalizeLocaleCode(
+              res && (res.language || res.appLanguage || payload.language || payload.geoLocale || res.geoLocale)
+            )
+            if (remoteLang && remoteLang !== getAppLanguage()) {
+              const resolved = setAppLanguage(remoteLang, { auto: true })
+              applyI18nLocale(resolved)
+            }
+          })
+          .catch(() => {})
+      } catch (e) { /* ignore */ }
+    }
     try { uni.$on(APP_LANGUAGE_EVENT, syncLanguageMirrors) } catch (e) { /* ignore */ }
     // 常驻反馈浮窗：挂在页面树之外，全应用一个实例（见 utils/feedbackWidget.js）
     mountFeedbackWidget()
@@ -818,5 +839,42 @@ html.is-desktop .page-variable-library .header-card {
 /* plugin-market：hero 的分类标签在最上一行 */
 html.is-desktop .page-plugin-market .hero {
     padding-top: 38px;
+}
+
+/* ---- RTL 基础排版与布局适配（ar-SA，dev-board#1477） ---- */
+html[dir="rtl"] body {
+    direction: rtl;
+    text-align: right;
+}
+
+html[dir="rtl"] .awd-global-back {
+    left: auto;
+    right: max(12px, var(--awd-titlebar-safe-inline-start));
+    padding: 0 8px 0 11px;
+}
+
+html[dir="rtl"] .project-header,
+html[dir="rtl"] .home-topbar,
+html[dir="rtl"] .top-nav,
+html[dir="rtl"] .awd-set-row,
+html[dir="rtl"] .settings-row {
+    direction: rtl;
+}
+
+html[dir="rtl"] input[type="tel"],
+html[dir="rtl"] input[type="email"],
+html[dir="rtl"] input[type="url"],
+html[dir="rtl"] code,
+html[dir="rtl"] pre,
+html[dir="rtl"] .mono,
+html[dir="rtl"] .file-path,
+html[dir="rtl"] .shortcut-key,
+html[dir="rtl"] .ltr-inline {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .rtl-flip {
+    transform: scaleX(-1);
 }
 </style>

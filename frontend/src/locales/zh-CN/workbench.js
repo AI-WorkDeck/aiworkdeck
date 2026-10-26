@@ -282,6 +282,8 @@ export default {
   // 脚本侧提示
   defaultUserName: '用户',
   folderScopeLabel: '文件夹：{name}',
+  folderScopeDesc: '文件夹「{name}」（folderId={id}）及其下全部材料。先对 {id} 调 extract_file_text 拿到该文件夹的文件清单，再逐份通读。',
+  fileScopeDesc: '《{name}》（fileId={id}）',
   importing: '正在导入...',
   importSuccess: '导入成功',
   importFailed: '导入失败',

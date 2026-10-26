@@ -83,7 +83,7 @@ public class AiChatController {
         // 两条路都能匿名读到别家律所的对话正文与工具输出（含文档原文）
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) {
-            return ResponseEntity.status(401).body("请先登录");
+            return ResponseEntity.status(401).body(LangText.of("请先登录", "Please sign in first"));
         }
 
         // If conversationId is provided, return specific messages

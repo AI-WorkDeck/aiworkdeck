@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Anonimiseren",
+  "plugin.description": "Inspecteer gevoelige informatie, genereer geanonimiseerde kopieën en herstel met herstelpakketten.",
+  "view.main.name": "Anonimiseren"
+}

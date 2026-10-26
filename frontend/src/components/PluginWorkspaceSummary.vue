@@ -35,7 +35,7 @@
               v-for="tag in FRIEND_ROLE_TAGS"
               :key="tag"
               class="pws-form-tag"
-              :class="{ active: friendDraft.roleLabel === tag }"
+              :class="{ active: (friendDraft.roleLabel || FRIEND_ROLE_TAGS[0]) === tag }"
               @tap="friendDraft.roleLabel = tag"
             >
               <text>{{ tag }}</text>
@@ -530,7 +530,7 @@ export default {
       friendDraft: {
         name: '',
         org: '',
-        roleLabel: '外部合作律师',
+        roleLabel: '',
       },
       // 只放真实数据：organization / firm 为 null 表示没有，界面给空态与入口
       directory: {
@@ -811,7 +811,7 @@ export default {
         const res = addImFriend(this.directory.accountKey, {
           name,
           org: this.friendDraft.org,
-          roleLabel: this.friendDraft.roleLabel,
+          roleLabel: this.friendDraft.roleLabel || this.FRIEND_ROLE_TAGS[0],
         })
         this.directory.friends = [Object.assign({ source: 'personal' }, res.added), ...this.directory.friends.filter(f => f.name !== name)]
       } catch (e) {

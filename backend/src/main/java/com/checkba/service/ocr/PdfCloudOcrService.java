@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.service.ocr;
 
+import com.checkba.service.LangText;
 import com.checkba.service.OcrService;
 import org.springframework.stereotype.Service;
 import org.apache.pdfbox.Loader;
@@ -21,7 +22,7 @@ public class PdfCloudOcrService {
 
     public String recognize(Path path, UploadGuard guard) throws Exception {
         try (var pdf = Loader.loadPDF(path.toFile())) {
-            if (pdf.getNumberOfPages() == 0) throw new IllegalStateException("PDF 没有页面");
+            if (pdf.getNumberOfPages() == 0) throw new IllegalStateException(LangText.of("PDF 没有页面", "PDF has no pages"));
             var renderer = new PDFRenderer(pdf);
             var text = new StringBuilder();
             for (int page = 0; page < pdf.getNumberOfPages(); page++) {
@@ -35,12 +36,13 @@ public class PdfCloudOcrService {
                         guard.check(); // Immediately before each billable upload, not merely before the document.
                         OcrResult result = ocr.recognizeGeneral(Base64.getEncoder().encodeToString(bytes.toByteArray()));
                         if (result == null || result.getText() == null || result.getText().isBlank())
-                            throw new IllegalStateException("未返回可识别文字");
+                            throw new IllegalStateException(LangText.of("未返回可识别文字", "No recognizable text returned"));
                         text.append(escapeMarkdown(result.getText())).append("\n\n");
                     } finally { image.flush(); }
                 } catch (Exception error) {
-                    throw new IllegalStateException("云端 OCR 第 " + (page + 1) + " 页未完成：" + error.getMessage()
-                            + "。未生成不完整 Word；已完成页的识别可能已计费，重试会重新识别。", error);
+                    throw new IllegalStateException(LangText.of(
+                            "云端 OCR 第 " + (page + 1) + " 页未完成：" + error.getMessage() + "。未生成不完整 Word；已完成页的识别可能已计费，重试会重新识别。",
+                            "Cloud OCR failed on page " + (page + 1) + ": " + error.getMessage() + ". No partial Word file was generated; completed pages may have been billed, and retrying will re-run OCR."), error);
                 }
             }
             guard.check(); // A cancellation during the final HTTP request must not produce a late document.

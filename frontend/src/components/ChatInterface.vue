@@ -1471,6 +1471,7 @@ export default {
 
     const ocrRouteState = ref(null)
     const ocrRouteHandler = createOcrRoutingHandler({
+      t,
       conversation: () => currentConversationId.value,
       identity: () => JSON.stringify([getApiBaseUrl(), getSessionId(), getCloudAccountGeneration()]),
       userCount: userMessageCount,
