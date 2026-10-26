@@ -1355,7 +1355,9 @@ public class AgentOrchestrator {
      * <p>推送失败只 log：一个提示 chip 不该让对话中断（与 plan_update 同口径）。
      */
     private void sendSkillUpdate(RunGuard guard,
-                                 List<com.checkba.service.ai.skill.SkillRouter.ActiveSkill> active) {
+                                 List<com.checkba.service.ai.skill.SkillRouter.ActiveSkill> active,
+                                 Long userId,
+                                 String projectId) {
         try {
             List<java.util.Map<String, Object>> skills = active.stream()
                     .map(a -> {
@@ -1365,6 +1367,12 @@ public class AgentOrchestrator {
                         item.put("source", a.source());
                         if (a.definition().isBuiltinWorkflow()) {
                             item.put("builtinWorkflow", true);
+                            var activeVer = skillRouter.resolveActiveWorkflowVersion(a.definition(), userId, projectId);
+                            if (activeVer != null) {
+                                item.put("versionId", activeVer.getId());
+                                item.put("versionName", activeVer.getName());
+                                item.put("customVersion", !activeVer.isSystemDefault());
+                            }
                         }
                         return item;
                     })
@@ -2054,7 +2062,8 @@ public class AgentOrchestrator {
             // 空列表也发：前端靠它把上一轮的 chip 清掉。
             List<com.checkba.service.ai.skill.SkillRouter.ActiveSkill> effectiveSkills =
                     skillsEffective ? skillRouter.activeSkills(guard.runId) : List.of();
-            sendSkillUpdate(guard, effectiveSkills);
+            String reqProjectId = request.getProjectId() != null ? String.valueOf(request.getProjectId()) : null;
+            sendSkillUpdate(guard, effectiveSkills, userId, reqProjectId);
 
             // A clarification does not authorize editing whichever file is open now.
             if (clarification != null && clarification.targetFileId() != null

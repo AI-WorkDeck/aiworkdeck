@@ -580,7 +580,13 @@ public class ContextAssemblerService {
         if (agentMode != AgentMode.ASK) {
             for (com.checkba.service.ai.skill.SkillRouter.ActiveSkill active
                     : skillRouter.activeSkills(runId)) {
-                systemText.append(skillRouter.promptInjectionFor(active.definition()));
+                String injection = skillRouter.promptInjectionFor(active.definition(), userId, projectId);
+                if (injection == null) {
+                    injection = skillRouter.promptInjectionFor(active.definition());
+                }
+                if (injection != null) {
+                    systemText.append(injection);
+                }
             }
         }
 
