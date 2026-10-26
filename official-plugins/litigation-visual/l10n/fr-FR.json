@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Visualisation des litiges",
+  "plugin.description": "Sélectionnez des documents du dossier pour générer et gérer des schémas de litige modifiables.",
+  "view.main.name": "Visualisation des litiges"
+}

@@ -18,6 +18,7 @@ import java.util.*;
 public class OcrRoutingService {
     public static final String VERSION = "2026-10-21";
     public static final String NOTICE = "云端识别会将这份文档的页面图片发送至阿里云 OCR；平台通道按识别页数消耗 Credits，自备服务按供应商规则计费。结果为识别内容，不保证保留原版布局。";
+    public static final String NOTICE_EN = "Cloud OCR sends page images of this document to Alibaba Cloud OCR; the platform channel consumes Credits per page, while BYOK services bill according to the provider's rules. Results are recognized text and are not guaranteed to preserve the original layout.";
     public enum Route { ASK, LOCAL, CLOUD, CANCELLED }
     private record Scope(Long user, String conversation, Long project, Long file, String stamp) {}
     private static final class Decision {
@@ -54,7 +55,7 @@ public class OcrRoutingService {
         this.files = files; this.bridge = bridge; this.clock = clock;
     }
     private String key(Long user) {
-        if (user == null || user <= 0) throw new IllegalArgumentException("无法确认当前用户，请重新打开会话");
+        if (user == null || user <= 0) throw new IllegalArgumentException(LangText.of("无法确认当前用户，请重新打开会话", "Unable to verify current user; please reopen the conversation"));
         return "user." + user + ".ocr.fallback";
     }
     public Map<String, Object> preference(Long user) {
@@ -62,11 +63,11 @@ public class OcrRoutingService {
         String value = settings.get(key, "ask");
         if ("cloud".equals(value) && !VERSION.equals(settings.get(key + ".version", ""))) value = "ask";
         if (!Set.of("ask", "cloud", "local").contains(value)) value = "ask";
-        return Map.of("choice", value, "notice", NOTICE, "version", VERSION);
+        return Map.of("choice", value, "notice", LangText.of(NOTICE, NOTICE_EN), "version", VERSION);
     }
     public synchronized void savePreference(Long user, String choice, String version) {
-        if (!Set.of("ask", "cloud", "local").contains(choice)) throw new IllegalArgumentException("识别方式无效");
-        if ("cloud".equals(choice) && !VERSION.equals(version)) throw new IllegalArgumentException("识别说明已更新，请重新确认");
+        if (!Set.of("ask", "cloud", "local").contains(choice)) throw new IllegalArgumentException(LangText.of("识别方式无效", "Invalid OCR mode"));
+        if ("cloud".equals(choice) && !VERSION.equals(version)) throw new IllegalArgumentException(LangText.of("识别说明已更新，请重新确认", "OCR notice has been updated; please confirm again"));
         String key = key(user);
         if (!"cloud".equals(choice)) decisions.values().stream().filter(d -> d.scope.user().equals(user) && d.choice == Route.CLOUD).forEach(d -> d.choice = Route.ASK);
         settings.setMany(Map.of(key, choice, key + ".version", VERSION, key + ".at", clock.instant().toString()));
@@ -75,7 +76,7 @@ public class OcrRoutingService {
         Long user = PlatformAiUserScope.current();
         key(user);
         String conversation = bridge.getCurrentConversationId();
-        if (!messages.isConversationOwnedBy(conversation, user)) throw new IllegalArgumentException("当前会话不可用");
+        if (!messages.isConversationOwnedBy(conversation, user)) throw new IllegalArgumentException(LangText.of("当前会话不可用", "Current conversation is unavailable"));
         access.requireRead(file, user);
         return new Scope(user, conversation, file.getProjectId(), file.getId(),
                 path.toRealPath() + ":" + Files.size(path) + ":" + Files.getLastModifiedTime(path).toMillis());
@@ -114,9 +115,9 @@ public class OcrRoutingService {
         return Route.valueOf(preference(scope.user()).get("choice").toString().toUpperCase(Locale.ROOT));
     }
     public synchronized void requireCloudPermission(ProjectFile original, Path path) throws Exception {
-        ProjectFile current = files.findById(original.getId()).orElseThrow(() -> new IllegalArgumentException("文件已不可用"));
-        if (!Objects.equals(current.getProjectId(), original.getProjectId())) throw new IllegalArgumentException("文件项目已改变");
-        if (route(current, path) != Route.CLOUD) throw new IllegalStateException("云端识别授权已撤回或过期，后续页面未上传");
+        ProjectFile current = files.findById(original.getId()).orElseThrow(() -> new IllegalArgumentException(LangText.of("文件已不可用", "File is no longer available")));
+        if (!Objects.equals(current.getProjectId(), original.getProjectId())) throw new IllegalArgumentException(LangText.of("文件项目已改变", "File project has changed"));
+        if (route(current, path) != Route.CLOUD) throw new IllegalStateException(LangText.of("云端识别授权已撤回或过期，后续页面未上传", "Cloud OCR authorization was revoked or expired; remaining pages were not uploaded"));
     }
     public synchronized boolean cloudChosenForTask(ProjectFile file, Path path) throws Exception {
         Scope scope = scope(file, path); expire();
@@ -136,25 +137,25 @@ public class OcrRoutingService {
         Decision decision = new Decision(scope, clock.instant().plus(Duration.ofMinutes(30)), localAvailable);
         decisions.put(scope, decision);
         bridge.sendOcrRouteRequiredAction(Map.of("decisionId", decision.id, "conversationId", scope.conversation(),
-                "fileId", file.getId(), "reason", reason, "notice", NOTICE, "version", VERSION,
+                "fileId", file.getId(), "reason", reason, "notice", LangText.of(NOTICE, NOTICE_EN), "version", VERSION,
                 "localAvailable", localAvailable));
     }
     public synchronized void choose(Long user, String conversation, String id, String choice, boolean remember, String version) {
         key(user); expire();
         Decision decision = decisions.values().stream().filter(d -> d.id.equals(id)).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("此选择已过期，请在原会话重新发起转换"));
-        if (decision.cancelled) throw new IllegalArgumentException("此识别任务已取消，请重新选择识别方式");
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("此选择已过期，请在原会话重新发起转换", "This choice has expired; please restart conversion in the original conversation")));
+        if (decision.cancelled) throw new IllegalArgumentException(LangText.of("此识别任务已取消，请重新选择识别方式", "This OCR task was cancelled; please select an OCR mode again"));
         Scope s = decision.scope;
         if (!s.user().equals(user) || !s.conversation().equals(conversation)
-                || !messages.isConversationOwnedBy(conversation, user)) throw new IllegalArgumentException("此选择不属于当前会话");
-        ProjectFile file = files.findById(s.file()).orElseThrow(() -> new IllegalArgumentException("文件已不可用"));
-        if (!Objects.equals(file.getProjectId(), s.project())) throw new IllegalArgumentException("文件项目已改变");
+                || !messages.isConversationOwnedBy(conversation, user)) throw new IllegalArgumentException(LangText.of("此选择不属于当前会话", "This choice does not belong to the current conversation"));
+        ProjectFile file = files.findById(s.file()).orElseThrow(() -> new IllegalArgumentException(LangText.of("文件已不可用", "File is no longer available")));
+        if (!Objects.equals(file.getProjectId(), s.project())) throw new IllegalArgumentException(LangText.of("文件项目已改变", "File project has changed"));
         access.requireRead(file, user);
-        Route target = switch (choice) { case "cloud" -> Route.CLOUD; case "local" -> Route.LOCAL; default -> throw new IllegalArgumentException("识别方式无效"); };
-        if (target == Route.CLOUD && !VERSION.equals(version)) throw new IllegalArgumentException("识别说明已更新，请重新确认");
-        if (target == Route.LOCAL && !decision.localAvailable) throw new IllegalArgumentException("当前本地组件需要更新后才能继续");
+        Route target = switch (choice) { case "cloud" -> Route.CLOUD; case "local" -> Route.LOCAL; default -> throw new IllegalArgumentException(LangText.of("识别方式无效", "Invalid OCR mode")); };
+        if (target == Route.CLOUD && !VERSION.equals(version)) throw new IllegalArgumentException(LangText.of("识别说明已更新，请重新确认", "OCR notice has been updated; please confirm again"));
+        if (target == Route.LOCAL && !decision.localAvailable) throw new IllegalArgumentException(LangText.of("当前本地组件需要更新后才能继续", "The local OCR component requires an update before continuing"));
         if (decision.choice != Route.ASK) {
-            if (decision.choice != target || decision.remembered != remember) throw new IllegalArgumentException("此选择已经处理，请重新发起转换");
+            if (decision.choice != target || decision.remembered != remember) throw new IllegalArgumentException(LangText.of("此选择已经处理，请重新发起转换", "This choice has already been processed; please restart conversion"));
             return; // Duplicate UI clicks are idempotent.
         }
         if (remember) savePreference(user, choice, version);
@@ -168,7 +169,7 @@ public class OcrRoutingService {
         if (decision == null) decision = superseded.get(id);
         if (decision == null) return; // Expired nonces already reject choose.
         if (!decision.scope.user().equals(user) || !decision.scope.conversation().equals(conversation)
-                || !messages.isConversationOwnedBy(conversation, user)) throw new IllegalArgumentException("此选择不属于当前会话");
+                || !messages.isConversationOwnedBy(conversation, user)) throw new IllegalArgumentException(LangText.of("此选择不属于当前会话", "This choice does not belong to the current conversation"));
         decision.cancelled = true;
     }
     public synchronized void complete(ProjectFile file, Path path) throws Exception {

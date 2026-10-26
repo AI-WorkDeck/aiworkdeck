@@ -49,7 +49,7 @@ public class OllamaProbeController {
         // （baseUrl 只从配置解析），不构成 SSRF 跳板。
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null && !wizardStateService.inAnonymousSetupWindow()) {
-            return ResponseEntity.status(401).body("请先登录");
+            return ResponseEntity.status(401).body(com.checkba.service.LangText.of("请先登录", "Please sign in first"));
         }
         return ResponseEntity.ok(ollamaProbeService.probe(model));
     }

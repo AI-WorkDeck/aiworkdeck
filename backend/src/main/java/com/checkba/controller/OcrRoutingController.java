@@ -34,7 +34,7 @@ public class OcrRoutingController {
     }
     @PostMapping("/choice") public Map<String, Object> choose(@RequestHeader(value="X-Session-Id", required=false) String session,
             @RequestBody JsonNode body) {
-        if (!body.path("remember").isBoolean()) throw new IllegalArgumentException("记住选择必须为布尔值");
+        if (!body.path("remember").isBoolean()) throw new IllegalArgumentException(com.checkba.service.LangText.of("记住选择必须为布尔值", "remember must be a boolean"));
         routing.choose(user(session), body.path("conversationId").asText(), body.path("decisionId").asText(),
                 body.path("choice").asText(), body.path("remember").booleanValue(), body.path("version").asText());
         return ok(Map.of("accepted", true));

@@ -1,0 +1,6 @@
+{
+  "plugin.name": "التقويم",
+  "plugin.description": "تقويم عبر المشاريع، والمهام، والتذكيرات، وروابط الملفات.",
+  "view.sidebar.name": "التقويم",
+  "view.main.name": "التقويم"
+}

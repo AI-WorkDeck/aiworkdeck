@@ -65,4 +65,9 @@ export default {
   sourceChannelWpsExcel: 'WPS 表格',
   sourceChannelWpsPowerpoint: 'WPS 演示',
   sourceChannelPlugin: '插件',
+  // ---- components/LanguagePicker.vue ----
+  languagePickerLabel: '选择界面语言',
+  languageFollowSystem: '跟随系统',
+  languageSearchPlaceholder: '搜索语言…',
+  languageNoMatch: '无匹配语言',
 }

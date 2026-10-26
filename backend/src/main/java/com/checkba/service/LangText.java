@@ -3,9 +3,14 @@
 
 package com.checkba.service;
 
+import com.checkba.util.AppLocale;
+import com.checkba.util.ZhHantConverter;
+
+import java.util.Map;
+
 /**
  * 静态语言文案桥：非 Spring 托管的产文案点（enum、new 出来的 handler、静态方法）
- * 经它按应用语言二选一取用户可见文案，Spring bean 也可直接用它避免构造器扩散。
+ * 经它按应用语言取用户可见文案，Spring bean 也可直接用它避免构造器扩散。
  *
  * <p>指针由 AppLanguageService 的 @PostConstruct 登记——只登记 Spring 容器里的那个实例，
  * 单测里 new 出来的不登记，避免跨测试类污染静态状态。未登记（启动早期 / 纯单测）或取值
@@ -33,7 +38,7 @@ public final class LangText {
         // Early desktop requests already resolved the language from the lightweight store.
         // Honor their scope before asking a Spring service whose repository may still be starting.
         String scoped = AppLanguageScope.current();
-        if (scoped != null) return AppLanguageService.EN_US.equals(scoped);
+        if (scoped != null) return !AppLocale.fromCode(scoped).isChinese();
         AppLanguageService svc = languageService;
         if (svc == null) return false;
         try {
@@ -44,8 +49,42 @@ public final class LangText {
         }
     }
 
-    /** 按应用语言二选一：zh-CN（含未初始化/异常回退）取 zh，en-US 取 en。 */
+    public static String localeCode() {
+        String scoped = AppLanguageScope.current();
+        if (scoped != null) return AppLocale.fromCode(scoped).code();
+        AppLanguageService svc = languageService;
+        if (svc == null) return AppLanguageService.ZH_CN;
+        try {
+            String language = svc.language();
+            if (language != null) return language;
+            return svc.isEnglish() ? AppLanguageService.EN_US : AppLanguageService.ZH_CN;
+        } catch (Exception e) {
+            return AppLanguageService.ZH_CN;
+        }
+    }
+
+    public static AppLocale locale() {
+        return AppLocale.fromCode(localeCode());
+    }
+
+    /** 中英双语入口兼容既有调用方；繁体中文由简体中文自动转换。 */
     public static String of(String zh, String en) {
-        return isEnglish() ? en : zh;
+        if (isEnglish()) return en;
+        if (locale() == AppLocale.ZH_TW) return ZhHantConverter.toTraditional(zh);
+        return zh;
+    }
+
+    public static String of(Map<String, String> localized) {
+        if (localized == null) return null;
+        AppLocale current = locale();
+        for (AppLocale candidate : current.fallbackChain()) {
+            String value = localized.get(candidate.code());
+            if (value == null || value.isBlank()) continue;
+            if (current == AppLocale.ZH_TW && candidate == AppLocale.ZH_CN) {
+                return ZhHantConverter.toTraditional(value);
+            }
+            return value;
+        }
+        return null;
     }
 }

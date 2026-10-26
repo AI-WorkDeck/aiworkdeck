@@ -55,16 +55,16 @@ public class DdAiService {
         try {
             serialized = json.writeValueAsString(new TreeMap<>(input));
             hash = HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(serialized.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-        } catch (Exception e) { throw new DdProcessingException("任务内容无法保存"); }
+        } catch (Exception e) { throw new DdProcessingException(LangText.of("任务内容无法保存", "Failed to save task content")); }
         if (key != null) {
-            if (key.isBlank() || key.length() > 100) throw new DdProcessingException("提交标识无效，请刷新后重试");
+            if (key.isBlank() || key.length() > 100) throw new DdProcessingException(LangText.of("提交标识无效，请刷新后重试", "Invalid submission key; please refresh and try again"));
             Optional<DdAiJob> existing = jobs.findByProjectIdAndUserIdAndKindAndIdempotencyKey(projectId, userId, kind, key);
             if (existing.isPresent()) {
-                if (!Objects.equals(existing.get().getInputHash(), hash)) throw new DdProcessingException("本次提交内容已经改变，请重新发起");
+                if (!Objects.equals(existing.get().getInputHash(), hash)) throw new DdProcessingException(LangText.of("本次提交内容已经改变，请重新发起", "Submission content has changed; please submit again"));
                 return existing.get();
             }
         }
-        if (jobs.countByStatusIn(List.of("QUEUED", "RUNNING")) >= 64) throw new DdProcessingException("当前处理较多，请稍后重试；尚未发起AI请求");
+        if (jobs.countByStatusIn(List.of("QUEUED", "RUNNING")) >= 64) throw new DdProcessingException(LangText.of("当前处理较多，请稍后重试；尚未发起AI请求", "Too many active tasks; please try again later (no AI request was sent)"));
         DdAiJob job = new DdAiJob();
         job.setId(UUID.randomUUID().toString()); job.setProjectId(projectId); job.setUserId(userId);
         job.setKind(kind); job.setItemId(itemId); job.setSubmissionId(submissionId);
@@ -83,7 +83,7 @@ public class DdAiService {
         return out;
     }
 
-    public DdAiJob get(String id) { return jobs.findById(id).orElseThrow(() -> new DdProcessingException("任务不存在")); }
+    public DdAiJob get(String id) { return jobs.findById(id).orElseThrow(() -> new DdProcessingException(LangText.of("任务不存在", "Task not found"))); }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
@@ -97,20 +97,20 @@ public class DdAiService {
     }
 
     public synchronized DdAiJob reviewSubmission(Long submissionId) {
-        DdSubmission submission = submissions.findById(submissionId).orElseThrow(() -> new DdProcessingException("提交记录不存在"));
+        DdSubmission submission = submissions.findById(submissionId).orElseThrow(() -> new DdProcessingException(LangText.of("提交记录不存在", "Submission record not found")));
         DdRequest request = dd.getRequest(submission.getRequestId());
         if (!"PUBLISHED".equals(request.getStatus()) || !items.findById(submission.getItemId())
                 .map(item -> submissionId.equals(item.getCurrentSubmissionId())).orElse(false))
-            throw new DdProcessingException("仅能核验进行中清单的当前材料版本");
+            throw new DdProcessingException(LangText.of("仅能核验进行中清单的当前材料版本", "Only the current material version of an active checklist can be verified"));
         if (!submission.isAiConsent() || !Boolean.TRUE.equals(request.getAiReviewEnabled()) || !"FILES".equals(submission.getType()))
-            throw new DdProcessingException("这份提交按人工复核处理");
+            throw new DdProcessingException(LangText.of("这份提交按人工复核处理", "This submission requires manual review"));
         Optional<DdAiJob> existing = jobs.findFirstByKindAndSubmissionIdAndStatusInOrderByCreatedAtDesc(
                 "VERIFY", submissionId, List.of("QUEUED", "RUNNING"));
         if (existing.isPresent()) return existing.get();
         if ("PASSED".equals(submission.getAiStatus())) return jobs.findFirstByKindAndSubmissionIdAndStatusInOrderByCreatedAtDesc(
-                "VERIFY", submissionId, List.of("SUCCEEDED")).orElseThrow(() -> new DdProcessingException("本版材料已完成AI核验"));
+                "VERIFY", submissionId, List.of("SUCCEEDED")).orElseThrow(() -> new DdProcessingException(LangText.of("本版材料已完成AI核验", "This material version has already completed AI verification")));
         if (jobs.countByKindAndSubmissionId("VERIFY", submissionId) >= 3)
-            throw new DdProcessingException("本版材料已核验三次，请补传更清晰的材料或提交律师复核");
+            throw new DdProcessingException(LangText.of("本版材料已核验三次，请补传更清晰的材料或提交律师复核", "This material version has been verified three times; please upload clearer materials or submit for lawyer review"));
         Long reviewer = request.getPublishedBy() != null ? request.getPublishedBy() : request.getCreatedBy();
         DdAiJob job = enqueue(request.getProjectId(), reviewer, "VERIFY", submission.getItemId(), submissionId, Map.of());
         submissions.updateAssessment(submissionId, "QUEUED", null);
@@ -118,8 +118,8 @@ public class DdAiService {
     }
 
     public synchronized DdAiJob example(Long itemId, Long userId) {
-        DdItem item = items.findById(itemId).orElseThrow(() -> new DdProcessingException("清单项不存在"));
-        if (!"DRAFT".equals(dd.getRequest(item.getDdRequestId()).getStatus())) throw new DdProcessingException("已发布清单的示例不能直接替换");
+        DdItem item = items.findById(itemId).orElseThrow(() -> new DdProcessingException(LangText.of("清单项不存在", "Checklist item not found")));
+        if (!"DRAFT".equals(dd.getRequest(item.getDdRequestId()).getStatus())) throw new DdProcessingException(LangText.of("已发布清单的示例不能直接替换", "Examples in a published checklist cannot be replaced directly"));
         Optional<DdAiJob> existing = jobs.findFirstByKindAndItemIdAndStatusInOrderByCreatedAtDesc("EXAMPLE", itemId, List.of("QUEUED", "RUNNING"));
         if (existing.isPresent()) return existing.get();
         return enqueue(dd.getProjectIdByItemId(itemId), userId, "EXAMPLE", itemId, null,
@@ -132,7 +132,8 @@ public class DdAiService {
         do {
             interrupted = jobs.findTop8ByStatusOrderByCreatedAtAsc("RUNNING");
             for (DdAiJob job : interrupted)
-                fail(job, "服务重启中断了本次处理。材料已保留，请重试；系统没有自动重复付费请求。");
+                fail(job, LangText.of("服务重启中断了本次处理。材料已保留，请重试；系统没有自动重复付费请求。",
+                        "Processing was interrupted by a service restart. Materials have been preserved; please try again (paid requests were not automatically replayed)."));
         } while (!interrupted.isEmpty());
     }
 
@@ -146,7 +147,7 @@ public class DdAiService {
                 DdAiJob job = candidate;
                 try {
                     job = get(candidate.getId());
-                    if (!members.hasWritePermission(job.getProjectId(), job.getUserId())) throw new DdProcessingException("项目授权已变更，请由当前负责律师重新发起");
+                    if (!members.hasWritePermission(job.getProjectId(), job.getUserId())) throw new DdProcessingException(LangText.of("项目授权已变更，请由当前负责律师重新发起", "Project permissions have changed; please ask the current responsible lawyer to restart"));
                     JsonNode input = json.readTree(job.getInputJson());
                     Object result = switch (job.getKind()) {
                         case "VERIFY" -> verify(job);
@@ -154,25 +155,27 @@ public class DdAiService {
                         case "IMPORT" -> importChecklist(job, input);
                         case "MATERIALS" -> materials.getObject().importMaterials(job, input);
                         case "REPORT" -> materials.getObject().report(job, input);
-                        default -> throw new DdProcessingException("未知处理任务");
+                        default -> throw new DdProcessingException(LangText.of("未知处理任务", "Unknown processing task"));
                     };
-                    jobs.finish(job.getId(), "SUCCEEDED", "处理完成", json.writeValueAsString(result), null);
+                    jobs.finish(job.getId(), "SUCCEEDED", LangText.of("处理完成", "Completed"), json.writeValueAsString(result), null);
                 } catch (Exception e) {
                     // Provider bodies, file text and credentials must not enter logs or public errors.
                     String message = e instanceof DdProcessingException ? e.getMessage() : null;
                     if (e instanceof com.checkba.service.platform.GatewayException gateway) message = gateway.userHint();
-                    fail(job, message == null || message.isBlank() || message.length() > 500 ? "处理未完成，原材料已保留，请重试或联系律师复核" : message);
+                    fail(job, message == null || message.isBlank() || message.length() > 500
+                            ? LangText.of("处理未完成，原材料已保留，请重试或联系律师复核", "Processing did not complete; original materials are preserved, please try again or contact a lawyer for review")
+                            : message);
                 } finally { running.decrementAndGet(); }
             });
         }
     }
 
     public void stage(DdAiJob job, String stage) {
-        if (jobs.progress(job.getId(), stage) != 1) throw new DdProcessingException("任务已结束或项目已删除");
+        if (jobs.progress(job.getId(), stage) != 1) throw new DdProcessingException(LangText.of("任务已结束或项目已删除", "Task has ended or project has been deleted"));
     }
 
     private void fail(DdAiJob job, String reason) {
-        if (jobs.finish(job.getId(), "FAILED", "需要处理", null, reason) != 1) return;
+        if (jobs.finish(job.getId(), "FAILED", LangText.of("需要处理", "Action required"), null, reason) != 1) return;
         if ("VERIFY".equals(job.getKind()) && job.getSubmissionId() != null) {
             try { submissions.updateAssessment(job.getSubmissionId(), "MANUAL_REQUIRED",
                     json.writeValueAsString(Map.of("verdict", "MANUAL_REQUIRED", "summary", reason, "checks", List.of()))); }
@@ -183,9 +186,9 @@ public class DdAiService {
     private Map<String, Object> verify(DdAiJob job) throws IOException {
         DdSubmission submission = submissions.findById(job.getSubmissionId()).orElseThrow();
         DdItem item = items.findById(submission.getItemId()).orElseThrow();
-        if (!submission.isAiConsent() || !"FILES".equals(submission.getType())) throw new DdProcessingException("本次提交未启用AI核验");
+        if (!submission.isAiConsent() || !"FILES".equals(submission.getType())) throw new DdProcessingException(LangText.of("本次提交未启用AI核验", "AI verification is not enabled for this submission"));
         submissions.updateAssessment(submission.getId(), "RUNNING", null);
-        stage(job, "读取提交材料");
+        stage(job, LangText.of("读取提交材料", "Reading submitted materials"));
         Map<Long, String> texts = new LinkedHashMap<>(); List<String> unreadable = new ArrayList<>();
         int total = 0;
         for (Long id : submission.getFileIds()) {
@@ -197,9 +200,13 @@ public class DdAiService {
         JsonNode result;
         if (!unreadable.isEmpty() || texts.isEmpty() || total > 160_000) {
             result = json.valueToTree(Map.of("verdict", "MANUAL_REQUIRED", "summary",
-                    total > 160_000 ? "材料较长，需要律师完整复核；已保留全部文件。" : "以下材料无法完整读取：" + String.join("、", unreadable) + "。可上传清晰的图片或可读取的PDF，也可提交说明请律师复核。", "checks", List.of()));
+                    total > 160_000
+                            ? LangText.of("材料较长，需要律师完整复核；已保留全部文件。", "Materials are lengthy and require full lawyer review; all files have been preserved.")
+                            : LangText.of("以下材料无法完整读取：" + String.join("、", unreadable) + "。可上传清晰的图片或可读取的PDF，也可提交说明请律师复核。",
+                                    "The following materials could not be fully read: " + String.join(", ", unreadable) + ". You may upload clearer images or readable PDFs, or submit an explanation for lawyer review."),
+                    "checks", List.of()));
         } else {
-            stage(job, "逐项比对材料要求");
+            stage(job, LangText.of("逐项比对材料要求", "Comparing against checklist requirements"));
             result = ai.structured(job.getProjectId(), job.getUserId(), """
                 你是尽调收件核验助手。只检查提交的文件是否满足本清单项的收件要求，不能判断证照真伪、法律合规或替律师作专业结论。
                 按文件类型、要求的主体/日期/版本、内容完整性分别检查。不同于示例的排版不是不合格理由。
@@ -222,7 +229,7 @@ public class DdAiService {
     public static JsonNode validateReview(JsonNode result, Map<Long, String> texts, ObjectMapper json) {
         if (result == null || !result.isObject() || !Set.of("PASSED", "FAILED", "MANUAL_REQUIRED").contains(result.path("verdict").asText())
                 || result.path("summary").asText().isBlank() || !result.path("checks").isArray())
-            throw new DdProcessingException("AI核验结果不完整，请重试或交由律师复核");
+            throw new DdProcessingException(LangText.of("AI核验结果不完整，请重试或交由律师复核", "AI verification result is incomplete; please try again or submit for lawyer review"));
         boolean complete = result.path("checks").size() >= 3;
         boolean validFailure = false, invalidEvidence = false;
         Set<Long> covered = new HashSet<>();
@@ -241,22 +248,23 @@ public class DdAiService {
         if ("PASSED".equals(result.path("verdict").asText()) && !complete
                 || "FAILED".equals(result.path("verdict").asText()) && (!validFailure || invalidEvidence)) {
             ObjectNode safe = result.deepCopy(); safe.put("verdict", "MANUAL_REQUIRED");
-            safe.put("summary", "AI未能为全部检查提供可核对的原文依据，请律师复核。材料已保留。"); return safe;
+            safe.put("summary", LangText.of("AI未能为全部检查提供可核对的原文依据，请律师复核。材料已保留。",
+                    "AI could not provide verifiable source quotes for all checks; lawyer review is required. Materials have been preserved.")); return safe;
         }
         return result;
     }
 
     private Map<String, Object> generateExample(DdAiJob job, JsonNode input) throws IOException {
-        stage(job, "生成材料准备参考图");
+        stage(job, LangText.of("生成材料准备参考图", "Generating material reference image"));
         byte[] image = ai.example(job.getProjectId(), job.getUserId(), input.path("title").asText(), input.path("description").asText());
         java.awt.image.BufferedImage picture;
         try (var stream = javax.imageio.ImageIO.createImageInputStream(new ByteArrayInputStream(image))) {
             var readers = javax.imageio.ImageIO.getImageReaders(stream);
-            if (!readers.hasNext()) throw new DdProcessingException("生成的参考图无法读取，请重试");
+            if (!readers.hasNext()) throw new DdProcessingException(LangText.of("生成的参考图无法读取，请重试", "Generated reference image could not be read; please try again"));
             var reader = readers.next();
             try {
                 reader.setInput(stream);
-                if (reader.getWidth(0) > 8192 || reader.getHeight(0) > 8192) throw new DdProcessingException("生成的参考图尺寸过大，请重试");
+                if (reader.getWidth(0) > 8192 || reader.getHeight(0) > 8192) throw new DdProcessingException(LangText.of("生成的参考图尺寸过大，请重试", "Generated reference image is too large; please try again"));
                 picture = reader.read(0);
             } finally { reader.dispose(); }
         }
@@ -264,37 +272,37 @@ public class DdAiService {
         return transactions.execute(tx -> {
             Long requestId = items.findRequestIdById(job.getItemId()).orElseThrow();
             DdRequest request = requests.findByIdForUpdate(requestId).orElseThrow();
-            if (!"DRAFT".equals(request.getStatus())) throw new DdProcessingException("生成期间清单已发布，本次结果未替换已发布的参考示例");
+            if (!"DRAFT".equals(request.getStatus())) throw new DdProcessingException(LangText.of("生成期间清单已发布，本次结果未替换已发布的参考示例", "Checklist was published during generation; published reference example was not replaced"));
             DdItem item = items.findByIdForUpdate(job.getItemId()).orElseThrow();
             if (!Objects.equals(item.getTitle(), input.path("title").asText()) || !Objects.equals(Objects.toString(item.getDescription(), ""), input.path("description").asText()))
-                throw new DdProcessingException("生成期间材料要求已修改，请按最新要求重新生成");
-            ProjectFile file = saveFile(job.getProjectId(), job.getUserId(), "示例-" + input.path("title").asText().substring(0, Math.min(60, input.path("title").asText().length())) + ".png", "png", png.toByteArray(), null);
+                throw new DdProcessingException(LangText.of("生成期间材料要求已修改，请按最新要求重新生成", "Material requirements changed during generation; please regenerate with the latest requirements"));
+            ProjectFile file = saveFile(job.getProjectId(), job.getUserId(), LangText.of("示例-", "Example-") + input.path("title").asText().substring(0, Math.min(60, input.path("title").asText().length())) + ".png", "png", png.toByteArray(), null);
             item.setExampleFileId(file.getId()); items.save(item);
             return Map.<String, Object>of("fileId", file.getId(), "itemId", job.getItemId());
         });
     }
 
     private Map<String, Object> importChecklist(DdAiJob job, JsonNode input) throws IOException {
-        stage(job, "拆分清单事项与提交要求");
+        stage(job, LangText.of("拆分清单事项与提交要求", "Parsing checklist items and requirements"));
         JsonNode parsed = ai.structured(job.getProjectId(), job.getUserId(), """
             将律师已有清单忠实拆成可逐项提交的事项，不新增原文没有的义务或材料。保留层级、日期、版本、主体及替代材料说明。
             返回 {"items":[{"title":"材料名称","description":"完整提交要求","sourceQuote":"对应原文逐字片段","parentIndex":null或先前父项的0起始索引}]}。
             标题最多200字、说明最多1000字，最多300项，父项必须先于子项。一个事项多附件仍为一个事项。只负责拆分，不评价法律要求。
             """, input.path("content").asText());
         JsonNode rows = parsed.path("items");
-        if (!rows.isArray() || rows.isEmpty() || rows.size() > 300) throw new DdProcessingException("未识别到完整的清单事项，请检查原文件或粘贴清单文字重试");
+        if (!rows.isArray() || rows.isEmpty() || rows.size() > 300) throw new DdProcessingException(LangText.of("未识别到完整的清单事项，请检查原文件或粘贴清单文字重试", "Failed to recognize complete checklist items; please check the source file or paste checklist text and try again"));
         String source = input.path("content").asText();
         for (int index = 0; index < rows.size(); index++) {
             JsonNode row = rows.get(index);
             if (row.path("title").asText().isBlank() || row.path("title").asText().length() > 200 || row.path("description").asText().length() > 1000
                     || row.path("sourceQuote").asText().isBlank() || !source.contains(row.path("sourceQuote").asText())
                     || row.hasNonNull("parentIndex") && (!row.path("parentIndex").isInt() || row.path("parentIndex").asInt() < 0 || row.path("parentIndex").asInt() >= index))
-                throw new DdProcessingException("部分拆分事项无法与原文对应，请重试；没有发布不完整清单");
+                throw new DdProcessingException(LangText.of("部分拆分事项无法与原文对应，请重试；没有发布不完整清单", "Some parsed items could not be matched to the source text; please try again (incomplete checklist was not saved)"));
         }
-        stage(job, "保存待律师确认的清单");
+        stage(job, LangText.of("保存待律师确认的清单", "Saving draft checklist for lawyer confirmation"));
         return transactions.execute(tx -> {
             requireActiveProject(job.getProjectId(), job.getUserId());
-            DdRequest request = dd.createRequest(job.getProjectId(), input.path("name").asText("导入的尽调清单"), "", job.getUserId());
+            DdRequest request = dd.createRequest(job.getProjectId(), input.path("name").asText(LangText.of("导入的尽调清单", "Imported Due Diligence Checklist")), "", job.getUserId());
             List<DdItem> created = new ArrayList<>();
             for (JsonNode row : rows) {
                 DdItem parent = row.hasNonNull("parentIndex") ? created.get(row.path("parentIndex").asInt()) : null;
@@ -319,14 +327,14 @@ public class DdAiService {
                     }
                 });
             try { storage.getStorageService().save(file.getFilePath(), new ByteArrayInputStream(bytes)); }
-            catch (com.checkba.storage.StorageException e) { throw new DdProcessingException("文件保存失败，请重试"); }
+            catch (com.checkba.storage.StorageException e) { throw new DdProcessingException(LangText.of("文件保存失败，请重试", "Failed to save file; please try again")); }
             return file;
         });
     }
 
     void requireActiveProject(Long projectId, Long userId) {
         if (projects.lockForImWrite(projectId).isEmpty() || !members.hasWritePermission(projectId, userId))
-            throw new DdProcessingException("项目已删除或授权已变更，处理已停止");
+            throw new DdProcessingException(LangText.of("项目已删除或授权已变更，处理已停止", "Project was deleted or permissions changed; processing stopped"));
     }
 
     @PreDestroy public void close() { workers.shutdownNow(); }

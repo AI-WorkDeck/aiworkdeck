@@ -68,7 +68,7 @@ public class ImAgentService {
         List<Map<String,Object>> agents = new ArrayList<>();
         List<MemorySpaceView> spaces;
         try {spaces=memory.listSpaces(userId);}
-        catch (RuntimeException unavailable) {return Map.of("agents",agents,"reason","团队、律所信息暂时无法读取，请稍后重试");}
+        catch (RuntimeException unavailable) {return Map.of("agents",agents,"reason",com.checkba.service.LangText.of("团队、律所信息暂时无法读取，请稍后重试", "Team and law firm info is temporarily unavailable; please try again later"));}
         for (MemorySpaceView space : spaces) {
             if (!usable(space)) continue;
             String name = scopeName(space.scope());
@@ -76,27 +76,27 @@ public class ImAgentService {
                     "title",space.label() == null ? name : space.label(),"private",false));
         }
         String reason=spaces.stream().filter(Objects::nonNull).map(MemorySpaceView::reason).filter(Objects::nonNull)
-                .filter(value -> !value.isBlank()).findFirst().orElse("加入团队或律所后可与对应助手对话");
+                .filter(value -> !value.isBlank()).findFirst().orElse(com.checkba.service.LangText.of("加入团队或律所后可与对应助手对话", "Join a team or law firm to chat with its assistant"));
         return agents.isEmpty() ? Map.of("agents",agents,"reason",clip(reason,300)) : Map.of("agents",agents);
     }
 
     /** Commit creation under one local admission lock; the unique binding also protects storage. */
     public synchronized ImConversation ensure(Long userId, Map<String,Object> params) {
         String scope=required(params,"scope",16), key=required(params,"scopeKey",160);
-        if (!Set.of("project","team","firm").contains(scope)) throw bad("助手层级无效");
-        if (!(params.getOrDefault("private",false) instanceof Boolean)) throw bad("private必须为布尔值");
+        if (!Set.of("project","team","firm").contains(scope)) throw bad(com.checkba.service.LangText.of("助手层级无效", "Invalid assistant scope"));
+        if (!(params.getOrDefault("private",false) instanceof Boolean)) throw bad(com.checkba.service.LangText.of("private必须为布尔值", "private must be a boolean"));
         boolean privateChat=Boolean.TRUE.equals(params.get("private"));
         Long boundProject = null;
         if (params.containsKey("projectId")) {
             Object value=params.get("projectId");
             if (!"project".equals(scope) || !privateChat || !(value instanceof Number number)
-                    || number.longValue()<1 || number.doubleValue()!=number.longValue()) throw bad("项目关联无效");
+                    || number.longValue()<1 || number.doubleValue()!=number.longValue()) throw bad(com.checkba.service.LangText.of("项目关联无效", "Invalid project association"));
             boundProject=number.longValue(); requireProjectAccess(boundProject,userId);
         }
         Long verifiedProject=boundProject;
         MemorySpaceView authoritative=null;
         if ("project".equals(scope)) {
-            if (!key.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) throw bad("项目标识无效");
+            if (!key.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) throw bad(com.checkba.service.LangText.of("项目标识无效", "Invalid project identifier"));
             key=UUID.fromString(key).toString();
         } else authoritative=requireSpace(userId,scope,key);
         String title="project".equals(scope) ? clip(required(params,"title",256),128)
@@ -108,11 +108,11 @@ public class ImAgentService {
             if (existing.isPresent()) {
                 ImConversation c=conversations.lockById(existing.get().getId()).orElseThrow();
                 if (members.findByConversationIdAndUserId(c.getId(),userId).isEmpty()) {
-                    if ("project".equals(scope)) throw bad("此项目已建立沟通群，请使用群邀请码加入");
+                    if ("project".equals(scope)) throw bad(com.checkba.service.LangText.of("此项目已建立沟通群，请使用群邀请码加入", "This project already has a group conversation; please join using the group invitation code"));
                     addMember(c,userId,"MEMBER");
                 }
                 if (verifiedProject != null) {
-                    if (c.getAgentProjectId()!=null && !verifiedProject.equals(c.getAgentProjectId())) throw bad("此助手私聊已关联其他项目");
+                    if (c.getAgentProjectId()!=null && !verifiedProject.equals(c.getAgentProjectId())) throw bad(com.checkba.service.LangText.of("此助手私聊已关联其他项目", "This assistant direct chat is already linked to another project"));
                     c.setAgentProjectId(verifiedProject); conversations.saveAndFlush(c);
                 }
                 authorize(c,userId);
@@ -135,7 +135,7 @@ public class ImAgentService {
     /** Called again on every operation and before delivery: leaving a team revokes IM access too. */
     public void authorize(ImConversation c,Long userId) {
         if (c.getAgentScope()==null) return;
-        if (Boolean.TRUE.equals(c.getAgentPrivate()) && !Objects.equals(c.getOwnerId(),userId)) throw bad("无权访问此助手私聊");
+        if (Boolean.TRUE.equals(c.getAgentPrivate()) && !Objects.equals(c.getOwnerId(),userId)) throw bad(com.checkba.service.LangText.of("无权访问此助手私聊", "You do not have access to this assistant direct chat"));
         requireProjectAccess(projectAssociation(c),userId);
         if (!"project".equals(c.getAgentScope())) requireSpace(userId,c.getAgentScope(),c.getAgentScopeKey());
     }
@@ -147,30 +147,30 @@ public class ImAgentService {
 
     public static void requireInvitable(ImConversation c) {
         if (c.getAgentScope()!=null && (Boolean.TRUE.equals(c.getAgentPrivate()) || !"project".equals(c.getAgentScope())))
-            throw bad("助手私聊及团队、律所沟通不能使用外部邀请");
+            throw bad(com.checkba.service.LangText.of("助手私聊及团队、律所沟通不能使用外部邀请", "Assistant direct chats and team/firm conversations cannot use external invitations"));
     }
 
     /** Admission runs under ImService's conversation lock; generation starts only after commit. */
     public Map<String,Object> reply(ImConversation c,Long userId,Map<String,Object> params) {
-        if (c.getAgentScope()==null) throw bad("此会话没有助手");
+        if (c.getAgentScope()==null) throw bad(com.checkba.service.LangText.of("此会话没有助手", "This conversation does not have an assistant"));
         requireProjectReplyAccess(projectAssociation(c),userId);
         Object raw=params.get("messageId");
-        if (!(raw instanceof Number number) || number.longValue()<1 || number.doubleValue()!=number.longValue()) throw bad("消息编号无效");
+        if (!(raw instanceof Number number) || number.longValue()<1 || number.doubleValue()!=number.longValue()) throw bad(com.checkba.service.LangText.of("消息编号无效", "Invalid message ID"));
         long id=number.longValue();
-        ImMessage source=messages.findById(id).orElseThrow(()->bad("消息不存在"));
-        if (!c.getId().equals(source.getConversationId()) || !userId.equals(source.getSenderId()) || "AGENT".equals(source.getActorType())) throw bad("只能请求助手回复自己在本会话发送的消息");
+        ImMessage source=messages.findById(id).orElseThrow(()->bad(com.checkba.service.LangText.of("消息不存在", "Message not found")));
+        if (!c.getId().equals(source.getConversationId()) || !userId.equals(source.getSenderId()) || "AGENT".equals(source.getActorType())) throw bad(com.checkba.service.LangText.of("只能请求助手回复自己在本会话发送的消息", "You can only ask the assistant to reply to your own messages in this conversation"));
         ImAgentTurn turn=turns.findById(id).orElse(null);
         if (turn!=null && !"failed".equals(turn.getStatus())) return receipt(turn);
-        if (turn!=null && turn.getAttempts()>=3) throw bad("此消息已重试三次，请重新发送消息");
+        if (turn!=null && turn.getAttempts()>=3) throw bad(com.checkba.service.LangText.of("此消息已重试三次，请重新发送消息", "This message has been retried three times; please send a new message"));
         // Lock order is conversation -> requester. Different conversations cannot race this user's admission.
-        users.lockStorageOwner(userId).orElseThrow(()->bad("用户不存在"));
-        if (turns.existsByConversationIdAndStatusIn(c.getId(),ACTIVE)) throw bad("助手正在回复，请稍后再试");
+        users.lockStorageOwner(userId).orElseThrow(()->bad(com.checkba.service.LangText.of("用户不存在", "User not found")));
+        if (turns.existsByConversationIdAndStatusIn(c.getId(),ACTIVE)) throw bad(com.checkba.service.LangText.of("助手正在回复，请稍后再试", "Assistant is currently replying; please try again later"));
         if (turns.existsByRequestedByAndStatusIn(userId,ACTIVE) || turns.countByRequestedByAndUpdatedAtAfter(userId,Instant.now().minusSeconds(60))>=6)
-            throw bad("助手请求较多，请稍后再试");
+            throw bad(com.checkba.service.LangText.of("助手请求较多，请稍后再试", "Too many assistant requests; please try again later"));
         String context="";
         if ("project".equals(c.getAgentScope()) && Boolean.TRUE.equals(c.getAgentPrivate())) {
             context=ImService.string(params,"projectContext");
-            if (context.length()>48000) throw bad("项目上下文过长");
+            if (context.length()>48000) throw bad(com.checkba.service.LangText.of("项目上下文过长", "Project context is too long"));
         }
         // Group requests deliberately do not read or store a supplied projectContext.
         if (turn==null) {turn=new ImAgentTurn(); turn.setSourceMessageId(id); turn.setConversationId(c.getId()); turn.setRequestedBy(userId); turn.setCreatedAt(Instant.now());}
@@ -178,7 +178,7 @@ public class ImAgentService {
         String projectContext=context;
         Runnable launch=()-> {
             try {executor.execute(()->generate(id,projectContext));}
-            catch (RejectedExecutionException busy) {fail(id,"助手暂时繁忙，请稍后重试");}
+            catch (RejectedExecutionException busy) {fail(id,com.checkba.service.LangText.of("助手暂时繁忙，请稍后重试", "Assistant is currently busy; please try again later"));}
         };
         if (TransactionSynchronizationManager.isSynchronizationActive()) TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() {launch.run();}
@@ -314,7 +314,7 @@ public class ImAgentService {
     private void requireMember(ImConversation c,Long userId) {
         requireProjectReplyAccess(projectAssociation(c),userId);
         if (members.findByConversationIdAndUserId(c.getId(),userId).isEmpty()
-                || (Boolean.TRUE.equals(c.getAgentPrivate()) && !userId.equals(c.getOwnerId()))) throw bad("会话权限已变化");
+                || (Boolean.TRUE.equals(c.getAgentPrivate()) && !userId.equals(c.getOwnerId()))) throw bad(com.checkba.service.LangText.of("会话权限已变化", "Conversation permissions have changed"));
     }
 
     private static Long projectAssociation(ImConversation c) {
@@ -323,19 +323,19 @@ public class ImAgentService {
 
     private void requireProjectAccess(Long projectId,Long userId) {
         if (projectId!=null && (projectPermissions==null || !projectPermissions.hasReadPermission(projectId,userId)))
-            throw bad("项目权限已变化，请重新打开项目");
+            throw bad(com.checkba.service.LangText.of("项目权限已变化，请重新打开项目", "Project permissions have changed; please reopen the project"));
     }
 
     private void requireProjectReplyAccess(Long projectId,Long userId) {
         requireProjectAccess(projectId,userId);
         if (projectId!=null && (projectPermissions.isClient(projectId,userId)
                 || users.findById(userId).map(User::getRole).filter("CLIENT"::equals).isPresent()))
-            throw bad("客户可以查看项目助手回复，请由项目内部成员发起回复");
+            throw bad(com.checkba.service.LangText.of("客户可以查看项目助手回复，请由项目内部成员发起回复", "Clients can view Project Assistant replies; please ask an internal project member to initiate a reply"));
     }
 
     private MemorySpaceView requireSpace(Long userId,String scope,String key) {
         return memory.listSpaces(userId).stream().filter(this::usable)
-                .filter(s -> scope.equals(s.scope()) && key.equals(s.id())).findFirst().orElseThrow(()->bad("无权访问该团队或律所助手"));
+                .filter(s -> scope.equals(s.scope()) && key.equals(s.id())).findFirst().orElseThrow(()->bad(com.checkba.service.LangText.of("无权访问该团队或律所助手", "You do not have access to this team or law firm assistant")));
     }
 
     private boolean usable(MemorySpaceView space) {
@@ -345,17 +345,17 @@ public class ImAgentService {
 
     private static String failureMessage(Exception failure) {
         if (failure instanceof com.checkba.service.account.AccountException account) return switch(account.getKind()) {
-            case NOT_CONNECTED, UNAUTHORIZED -> "请重新连接AI WorkDeck账户后重试";
-            case CONFLICT -> "当前账户的AI额度不可用，请检查账户余额与额度后重试";
-            case NETWORK -> "账户服务暂时无法连接，请稍后重试";
-            default -> "账户暂时无法使用AI，请检查账户设置后重试";
+            case NOT_CONNECTED, UNAUTHORIZED -> com.checkba.service.LangText.of("请重新连接AI WorkDeck账户后重试", "Please reconnect your AI WorkDeck account and try again");
+            case CONFLICT -> com.checkba.service.LangText.of("当前账户的AI额度不可用，请检查账户余额与额度后重试", "AI quota is unavailable for this account; please check your balance and quota and try again");
+            case NETWORK -> com.checkba.service.LangText.of("账户服务暂时无法连接，请稍后重试", "Account service is temporarily unreachable; please try again later");
+            default -> com.checkba.service.LangText.of("账户暂时无法使用AI，请检查账户设置后重试", "Account cannot use AI right now; please check your account settings and try again");
         };
         if (failure instanceof com.checkba.service.platform.GatewayException gateway) return switch(gateway.getKind()) {
-            case NO_CREDITS -> "账户Credits余额不足，充值后重试";
-            case NOT_CONNECTED, UNAUTHORIZED -> "请重新连接AI WorkDeck账户后重试";
-            default -> "AI服务暂时不可用，请稍后重试";
+            case NO_CREDITS -> com.checkba.service.LangText.of("账户Credits余额不足，充值后重试", "Insufficient account Credits balance; please top up and try again");
+            case NOT_CONNECTED, UNAUTHORIZED -> com.checkba.service.LangText.of("请重新连接AI WorkDeck账户后重试", "Please reconnect your AI WorkDeck account and try again");
+            default -> com.checkba.service.LangText.of("AI服务暂时不可用，请稍后重试", "AI service is temporarily unavailable; please try again later");
         };
-        return "助手未能完成回复，或会话权限已变化。请检查后重试";
+        return com.checkba.service.LangText.of("助手未能完成回复，或会话权限已变化。请检查后重试", "Assistant could not complete the reply, or conversation permissions changed. Please check and try again");
     }
 
     private void fail(long id,String error) {
@@ -369,14 +369,14 @@ public class ImAgentService {
     public void recoverInterrupted() {
         tx.executeWithoutResult(status -> {
             for (ImAgentTurn turn:turns.findByStatusIn(ACTIVE)) {
-                turn.setStatus("failed"); turn.setError("服务已重新启动，上次回复未完成，请重试"); turn.setUpdatedAt(Instant.now()); turns.save(turn);
+                turn.setStatus("failed"); turn.setError(com.checkba.service.LangText.of("服务已重新启动，上次回复未完成，请重试", "Service restarted before the previous reply completed; please try again")); turn.setUpdatedAt(Instant.now()); turns.save(turn);
             }
         });
     }
 
     @PreDestroy public void close() {if (executor instanceof ExecutorService service) service.shutdownNow();}
-    private static String scopeName(String scope) {return switch(scope) {case "project"->"项目助手"; case "team"->"团队助手"; default->"律所助手";};}
+    private static String scopeName(String scope) {return switch(scope) {case "project"->com.checkba.service.LangText.of("项目助手", "Project Assistant"); case "team"->com.checkba.service.LangText.of("团队助手", "Team Assistant"); default->com.checkba.service.LangText.of("律所助手", "Firm Assistant");};}
     private static String clip(String value,int limit) {return value==null ? "" : value.substring(0,Math.min(limit,value.length()));}
-    private static String required(Map<String,Object> p,String key,int max) {String s=ImService.string(p,key).trim();if(s.isEmpty()||s.length()>max)throw bad("参数无效："+key);return s;}
+    private static String required(Map<String,Object> p,String key,int max) {String s=ImService.string(p,key).trim();if(s.isEmpty()||s.length()>max)throw bad(com.checkba.service.LangText.of("参数无效："+key, "Invalid parameter: "+key));return s;}
     private static IllegalArgumentException bad(String message) {return new IllegalArgumentException(message);}
 }

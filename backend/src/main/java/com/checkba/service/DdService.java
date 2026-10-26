@@ -78,7 +78,7 @@ public class DdService {
      */
     public DdRequest getRequest(Long requestId) {
         return ddRequestRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("请求不存在"));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("请求不存在", "Request not found")));
     }
 
     /** 返回请求所属项目 id（用于越权校验），不存在返回 null。 */
@@ -99,7 +99,7 @@ public class DdService {
      */
     public ProjectFile getUploadedFile(Long itemId) {
         DdItem item = ddItemRepository.findById(itemId)
-                .orElseThrow(() -> new IllegalArgumentException("清单项不存在"));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("清单项不存在", "Checklist item not found")));
         if (item.getUploadedFileId() == null) {
             throw new IllegalArgumentException(LangText.of("这一项还没有上传文件", "No file has been uploaded for this item yet"));
         }
@@ -226,7 +226,7 @@ public class DdService {
     @Transactional(rollbackFor = Exception.class)
     public ProjectFile storeAttachment(Long itemId, MultipartFile file, Long userId) throws IOException {
         DdItem item = ddItemRepository.findById(itemId)
-                .orElseThrow(() -> new IllegalArgumentException("清单项不存在"));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("清单项不存在", "Checklist item not found")));
         // 已通过的条目不再收材料：要换文件得律师先撤回通过（dev-board#1057）。
         // 驳回后重传照常，落库时状态回到 UPLOADED（待审核）。
         if ("APPROVED".equals(item.getStatus())) {
@@ -441,7 +441,7 @@ public class DdService {
                     "Invalid checklist item status: " + status));
         }
         DdItem item = ddItemRepository.findById(itemId)
-                .orElseThrow(() -> new IllegalArgumentException("清单项不存在"));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("清单项不存在", "Checklist item not found")));
         String from = item.getStatus();
         if (item.getUploadedFileId() == null) {
             throw new IllegalTransitionException(LangText.of("客户还没上传材料，不能审核",
@@ -503,7 +503,7 @@ public class DdService {
     @Transactional
     public DdItem updateItemInfo(Long itemId, String title, String description) {
         DdItem item = ddItemRepository.findById(itemId)
-                .orElseThrow(() -> new IllegalArgumentException("清单项不存在"));
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("清单项不存在", "Checklist item not found")));
         if (title != null) item.setTitle(title);
         if (description != null) item.setDescription(description);
         return ddItemRepository.save(item);
@@ -516,13 +516,13 @@ public class DdService {
     public DdItem addItem(Long requestId, Long parentId) {
         DdItem item = new DdItem();
         item.setDdRequestId(requestId);
-        item.setTitle("新事项"); // Default title
+        item.setTitle(LangText.of("新事项", "New Item")); // Default title
         item.setStatus("PENDING");
         item.setParentId(parentId);
         
         // Calculate level and sortOrder
         if (parentId != null) {
-            DdItem parent = ddItemRepository.findById(parentId).orElseThrow(() -> new IllegalArgumentException("父项不存在"));
+            DdItem parent = ddItemRepository.findById(parentId).orElseThrow(() -> new IllegalArgumentException(LangText.of("父项不存在", "Parent item not found")));
             item.setLevel(parent.getLevel() + 1);
         } else {
             item.setLevel(0);
@@ -543,18 +543,18 @@ public class DdService {
      */
     @Transactional
     public DdItem moveItem(Long itemId, Long newParentId) {
-        DdItem item = ddItemRepository.findById(itemId).orElseThrow(() -> new IllegalArgumentException("项不存在"));
+        DdItem item = ddItemRepository.findById(itemId).orElseThrow(() -> new IllegalArgumentException(LangText.of("项不存在", "Item not found")));
         
         if (newParentId != null) {
             // Check loop
-            if (itemId.equals(newParentId)) throw new IllegalArgumentException("不能移动到自己下面");
+            if (itemId.equals(newParentId)) throw new IllegalArgumentException(LangText.of("不能移动到自己下面", "Cannot move an item under itself"));
             // 深层环检测（原来是一句 TODO）：只挡「移到自己身上」挡不住「移到自己的子孙身上」。
             // 一旦成环（A.parent=B 且 B 在 A 的子树里），凡是顺着父子关系走的代码都会打转——
             // deleteItem 的递归删子项会直接 StackOverflowError，前端建树也拼不出来，
             // 而且这条坏数据**存进库里就再也移不回来**（每次操作都先撞上死循环）。
             rejectIfDescendant(itemId, newParentId);
 
-            DdItem newParent = ddItemRepository.findById(newParentId).orElseThrow(() -> new IllegalArgumentException("父项不存在"));
+            DdItem newParent = ddItemRepository.findById(newParentId).orElseThrow(() -> new IllegalArgumentException(LangText.of("父项不存在", "Parent item not found")));
             item.setParentId(newParentId);
             item.setLevel(newParent.getLevel() + 1);
         } else {
@@ -577,14 +577,14 @@ public class DdService {
         int guard = 0;
         while (cursor != null && guard++ < MAX_DD_TREE_DEPTH) {
             if (cursor.equals(itemId)) {
-                throw new IllegalArgumentException("不能移动到自己的子项下面");
+                throw new IllegalArgumentException(LangText.of("不能移动到自己的子项下面", "Cannot move an item under its own child item"));
             }
             DdItem node = ddItemRepository.findById(cursor).orElse(null);
             if (node == null) break;
             cursor = node.getParentId();
         }
         if (guard >= MAX_DD_TREE_DEPTH) {
-            throw new IllegalArgumentException("清单层级异常（疑似已有循环引用），请刷新后重试");
+            throw new IllegalArgumentException(LangText.of("清单层级异常（疑似已有循环引用），请刷新后重试", "Abnormal checklist hierarchy (possible circular reference); please refresh and try again"));
         }
     }
 
@@ -658,7 +658,7 @@ public class DdService {
         // 1. Create new request record
         DdRequest copy = new DdRequest();
         copy.setProjectId(original.getProjectId());
-        copy.setName("【副本】" + original.getName());
+        copy.setName(LangText.of("【副本】", "[Copy] ") + original.getName());
         copy.setCreatedBy(userId);
         copy.setStatus("DRAFT");
         copy = ddRequestRepository.save(copy);

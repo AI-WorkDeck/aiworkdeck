@@ -75,7 +75,7 @@ export default {
   computed: {
     en() {
       // 读 $i18n.locale 而不是 isEnglish()：后者不是响应式的，解锁页就地切语言后排版类不跟
-      return String(this.$i18n.locale || '').startsWith('en')
+      return String(this.$i18n.locale || '') !== 'zh-CN' && String(this.$i18n.locale || '') !== 'zh-TW'
     },
     isIntl() {
       return this.site === 'intl'

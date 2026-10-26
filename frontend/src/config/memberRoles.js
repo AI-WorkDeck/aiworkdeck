@@ -19,14 +19,14 @@
 import { t } from '@/i18n'
 
 export const ROLE_LABELS = {
-  OWNER: t('config.roles.owner'),
-  MANAGER: t('config.roles.owner'),
-  ADMIN: t('config.roles.admin'),
-  PARTICIPANT: t('config.roles.participant'),
-  READ_ONLY: t('config.roles.readOnly'),
-  CLIENT: t('config.roles.client'),
-  CLIENT_NAMED: t('config.roles.client'),
-  CLIENT_GENERIC: t('config.roles.client'),
+  get OWNER() { return t('config.roles.owner') },
+  get MANAGER() { return t('config.roles.owner') },
+  get ADMIN() { return t('config.roles.admin') },
+  get PARTICIPANT() { return t('config.roles.participant') },
+  get READ_ONLY() { return t('config.roles.readOnly') },
+  get CLIENT() { return t('config.roles.client') },
+  get CLIENT_NAMED() { return t('config.roles.client') },
+  get CLIENT_GENERIC() { return t('config.roles.client') },
 }
 
 export function roleLabel(role) {
@@ -35,14 +35,14 @@ export function roleLabel(role) {
 
 /** 邀请内部同事时可选的三个角色（负责人是项目创建者，客户走访问码，都不在这里选）。 */
 export const ASSIGNABLE_ROLES = [
-  { value: 'ADMIN', label: ROLE_LABELS.ADMIN, hint: t('config.roleHints.admin') },
-  { value: 'PARTICIPANT', label: ROLE_LABELS.PARTICIPANT, hint: t('config.roleHints.participant') },
-  { value: 'READ_ONLY', label: ROLE_LABELS.READ_ONLY, hint: t('config.roleHints.readOnly') },
+  { value: 'ADMIN', get label() { return ROLE_LABELS.ADMIN }, get hint() { return t('config.roleHints.admin') } },
+  { value: 'PARTICIPANT', get label() { return ROLE_LABELS.PARTICIPANT }, get hint() { return t('config.roleHints.participant') } },
+  { value: 'READ_ONLY', get label() { return ROLE_LABELS.READ_ONLY }, get hint() { return t('config.roleHints.readOnly') } },
 ]
 
 /** 参与人分组（成员堆叠展开面板用）。 */
 export const MEMBER_GROUP_LABELS = {
-  admin: t('config.memberGroups.admin'),
-  member: t('config.memberGroups.member'),
-  client: t('config.memberGroups.client'),
+  get admin() { return t('config.memberGroups.admin') },
+  get member() { return t('config.memberGroups.member') },
+  get client() { return t('config.memberGroups.client') },
 }
