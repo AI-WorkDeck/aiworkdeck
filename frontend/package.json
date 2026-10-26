@@ -95,6 +95,7 @@
     "test:ai-alignment-e2e": "node tests/ai-alignment-e2e/run.mjs",
     "test:tts": "node --test tests/tts/*.test.mjs",
     "test:project-home": "node --test tests/project-home/*.test.mjs tests/messages/*.test.mjs",
+    "test:workbench-scroll": "node tests/workbench-scroll/run.mjs",
     "test:editor-open": "node --test tests/toolbar/open-critical-path.test.mjs",
     "test:media": "node --test tests/media/*.test.mjs",
     "test:calendar": "node --test tests/calendar/*.test.mjs",
