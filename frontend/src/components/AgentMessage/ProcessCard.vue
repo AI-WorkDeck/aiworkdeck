@@ -140,6 +140,14 @@
             <span class="step-text">{{ step.text }}</span>
          </div>
       </div>
+      <!-- Harness 运行期自愈（dev-board#1481）：失败步骤的「归因 → 处方」，让用户看见系统如何自己纠偏 -->
+      <div v-if="process.harnessAdaptations && process.harnessAdaptations.length" class="harness-adaptation-list" data-harness-adaptation-list>
+        <div v-for="item in process.harnessAdaptations" :key="item.id" class="harness-adaptation-item" :class="`tier-${String(item.tier || '').toLowerCase()}`">
+          <span class="ha-badge">{{ item.tier === 'DOMAIN' ? $t('chat.harnessAdaptationBadgeDomain') : $t('chat.harnessAdaptationBadgeInvariant') }}</span>
+          <div class="ha-title">{{ item.title }}</div>
+          <div v-if="item.diagnosis" class="ha-diagnosis">{{ item.diagnosis }}</div>
+        </div>
+      </div>
       <div class="process-divider"></div>
 
 
@@ -364,6 +372,36 @@ const renderItems = computed(() => {
 </script>
 
 <style scoped>
+.harness-adaptation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 2px;
+}
+.harness-adaptation-item {
+  border-left: 2px solid var(--color-primary, #4f6bed);
+  background: var(--color-bg-subtle, rgba(79, 107, 237, 0.06));
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.harness-adaptation-item.tier-domain {
+  border-left-color: var(--color-warning, #d97706);
+  background: rgba(217, 119, 6, 0.06);
+}
+.ha-badge {
+  display: inline-block;
+  font-size: 11px;
+  opacity: 0.75;
+  margin-bottom: 2px;
+}
+.ha-title {
+  font-weight: 600;
+}
+.ha-diagnosis {
+  opacity: 0.8;
+}
 .process-divider { width: 100%; border-bottom: 1px solid var(--awd-border-subtle); margin-top: var(--awd-space-1); }
 .process-card {
   background: var(--awd-surface);

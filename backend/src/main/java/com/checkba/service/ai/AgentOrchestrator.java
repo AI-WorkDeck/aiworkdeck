@@ -315,6 +315,10 @@ public class AgentOrchestrator {
         volatile Long opinionTargetFileId;
         volatile String opinionTargetFileName;
         java.util.List<String> clarificationSkillIds = java.util.List.of();
+        /** dev-board#1481：本轮运行期触发过的 Harness 自愈记录与待配对的回退信号。 */
+        final java.util.List<com.checkba.service.ai.harness.HarnessDiagnosticService.HarnessAdaptation> harnessAdaptations =
+                new java.util.concurrent.CopyOnWriteArrayList<>();
+        volatile com.checkba.service.ai.harness.HarnessEvolutionService.PendingRollbackSignal pendingRollbackSignal;
         /**
          * 本轮下发工具时用的活跃文档类型（dev-board#729 ①）：doc / sheet / slide，
          * null = 不裁剪（没有活跃文档、纯文本、或本轮中途换过文档类型）。
@@ -1488,6 +1492,34 @@ public class AgentOrchestrator {
     }
 
     /**
+     * Harness² 运行期双层诊断自愈、VeriHarness 收尾核验与用户自进化服务（dev-board#1481）。
+     * 走 setter 注入并提供无状态安全兜底，不改动构造器签名。
+     */
+    private volatile com.checkba.service.ai.harness.HarnessDiagnosticService harnessDiagnosticService;
+    private volatile com.checkba.service.ai.harness.VerificationHarness verificationHarness =
+            new com.checkba.service.ai.harness.VerificationHarness();
+    private volatile com.checkba.service.ai.harness.HarnessEvolutionService harnessEvolutionService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setHarnessDiagnosticService(
+            com.checkba.service.ai.harness.HarnessDiagnosticService harnessDiagnosticService) {
+        this.harnessDiagnosticService = harnessDiagnosticService;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setVerificationHarness(com.checkba.service.ai.harness.VerificationHarness verificationHarness) {
+        if (verificationHarness != null) {
+            this.verificationHarness = verificationHarness;
+        }
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setHarnessEvolutionService(
+            com.checkba.service.ai.harness.HarnessEvolutionService harnessEvolutionService) {
+        this.harnessEvolutionService = harnessEvolutionService;
+    }
+
+    /**
      * 处理用户消息 (入口)。
      *
      * <p><b>轮次登记同步发生在调用方（控制器）线程上</b>（dev-board#533）：本方法此前整体挂
@@ -2176,6 +2208,11 @@ public class AgentOrchestrator {
             guard.opinionInstructions.add(request.getMessage());
             guard.opinionTargetFileId = clarification == null ? guard.activeFileId : clarification.targetFileId();
             guard.opinionTargetFileName = clarification == null ? guard.activeFileName : clarification.targetFileName();
+            if (harnessEvolutionService != null) {
+                guard.pendingRollbackSignal = harnessEvolutionService
+                        .consumePendingRollback(conversationId)
+                        .orElse(null);
+            }
             // 工具可见性按活跃文档类型收窄（dev-board#729 ①）：本轮只算这一次，
             // 之后每轮递归都沿用，保证同一轮工具集不变
             guard.activeDocKind = initialDocKind(request.getActiveContext());
@@ -2491,6 +2528,10 @@ public class AgentOrchestrator {
                         stuckNudge = editorBooting ? EDITOR_BOOTING_STUCK_PATTERN : guard.stuck.lastPattern();
                     }
                     result = appendFailureNudge(guard, result, success, editorBooting);
+                    if (!success && !editorBooting) {
+                        result = applyHarnessAdaptationIfDiagnosed(
+                                guard, conversationId, req.name(), req.arguments(), result);
+                    }
                     // 工具刚请用户下载组件（dev-board#1016）：本轮到此为止，等用户装好后自动重发
                     boolean awaitingComponent = editorBridgeService.consumeComponentWait(conversationId);
 
@@ -2661,6 +2702,10 @@ public class AgentOrchestrator {
                         stuckNudge = xmlEditorBooting ? EDITOR_BOOTING_STUCK_PATTERN : guard.stuck.lastPattern();
                     }
                     result = appendFailureNudge(guard, result, xmlToolSuccess, xmlEditorBooting);
+                    if (!xmlToolSuccess && !xmlEditorBooting) {
+                        result = applyHarnessAdaptationIfDiagnosed(
+                                guard, conversationId, call.toolName(), call.argsJson(), result);
+                    }
                     boolean xmlAwaitingComponent = editorBridgeService.consumeComponentWait(conversationId);
 
                     // Add Result to History
@@ -2995,6 +3040,7 @@ public class AgentOrchestrator {
             } catch (Exception vEx) {
                 log.warn("AI 轮次版本落档失败: project={}", projectId, vEx);
             }
+            emitTurnEvolutionIfApplicable(guard, conversationId, projectId, userId);
             markRunState(guard, AgentRunStateService.RunStatus.FINISHED);
             // 发送 bubble_end 表示整个循环真正结束
             sendRunEvent(guard, "bubble_end", bubbleEndPayload(guard, "finished"));
@@ -3555,9 +3601,16 @@ public class AgentOrchestrator {
             handleCancellation(guard, projectId, userId, executionLog);
             return true;
         }
+        java.util.Optional<com.checkba.service.ai.skill.SkillDefinition> challengerSkill =
+                verificationHarness != null
+                        ? verificationHarness.resolveChallengerSkill(skillRouter, guard == null ? null : guard.runId)
+                        : java.util.Optional.empty();
+        boolean opinionSkillActive = guard != null
+                && (skillRouter.isActiveInRun(guard.runId, OpinionCompletionCheck.SKILL_ID)
+                || challengerSkill.isPresent());
         if (guard == null || agentMode != AgentMode.AGENT || subAgentService == null
                 || guard.opinionCompletionCheckDone || !isCurrentRun(guard)
-                || !skillRouter.isActiveInRun(guard.runId, OpinionCompletionCheck.SKILL_ID)
+                || !opinionSkillActive
                 || guard.opinionInstructions.isEmpty()
                 || !com.checkba.service.ai.skill.SkillRouter.requestsOpinionReview(
                         String.join("；", guard.opinionInstructions))
@@ -3626,12 +3679,117 @@ public class AgentOrchestrator {
                 status, AgentTagProtocol.escape(truncate(String.valueOf(outcomeText), displayLimit)));
         appendBoundedExecutionLog(executionLog, processCard);
         sendTextDelta(guard, processCard);
+        emitVerificationReportQuietly(guard, challengerSkill.orElse(null), outcome);
 
         messages.add(dev.langchain4j.data.message.UserMessage.from(
                 OpinionCompletionCheck.handoffMessage(outcome)));
         continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                 depth + 1, executionLog, agentMode, guard);
         return true;
+    }
+
+    private String applyHarnessAdaptationIfDiagnosed(
+            RunGuard guard,
+            String conversationId,
+            String toolName,
+            String argsJson,
+            String resultText) {
+        com.checkba.service.ai.harness.HarnessDiagnosticService diag = this.harnessDiagnosticService;
+        if (diag == null || guard == null) {
+            return resultText;
+        }
+        try {
+            String initialInstruction = guard.opinionInstructions.isEmpty() ? "" : guard.opinionInstructions.get(0);
+            // 点名调了本轮未下发的工具时，noteToolCategoryExpansion 已先把它的类目放回展开集；
+            // 诊断看的是「派发前」的视图，才能把这次放回如实归因并告诉用户/模型（只增不减，算完并回）。
+            java.util.Set<String> diagView = new java.util.LinkedHashSet<>(guard.expandedToolCategories);
+            ToolDisclosurePolicy policy = this.toolDisclosurePolicy;
+            if (policy != null && toolName != null && guard.roundOffered != null
+                    && !guard.roundOffered.isEmpty() && !guard.roundOffered.contains(toolName)) {
+                diagView.remove(policy.categoryOf(toolName));
+            }
+            java.util.Optional<com.checkba.service.ai.harness.HarnessDiagnosticService.HarnessAdaptation> adapted =
+                    diag.diagnoseAndAdapt(
+                            conversationId,
+                            guard.runId,
+                            initialInstruction,
+                            toolName,
+                            argsJson,
+                            resultText,
+                            guard.consecutiveFailures,
+                            diagView,
+                            guard.harnessAdaptations);
+            guard.expandedToolCategories.addAll(diagView);
+            if (adapted.isPresent()) {
+                var record = adapted.get();
+                guard.harnessAdaptations.add(record);
+                sendRunEvent(guard, "harness_adaptation", SKILL_UPDATE_MAPPER.writeValueAsString(record));
+                return resultText + "\n\n" + record.prescription();
+            }
+        } catch (Exception e) {
+            log.warn("Harness diagnostic adaptation skipped for {}: {}", conversationId, e.getMessage());
+        }
+        return resultText;
+    }
+
+    private void emitVerificationReportQuietly(
+            RunGuard guard,
+            com.checkba.service.ai.skill.SkillDefinition challengerSkill,
+            com.checkba.service.ai.subagent.SubAgentResult outcome) {
+        if (guard == null) {
+            return;
+        }
+        try {
+            com.checkba.service.ai.harness.VerificationHarness vh = this.verificationHarness != null
+                    ? this.verificationHarness
+                    : new com.checkba.service.ai.harness.VerificationHarness();
+            String skillId = challengerSkill != null ? challengerSkill.getId() : OpinionCompletionCheck.SKILL_ID;
+            String skillName = challengerSkill != null ? skillRouter.displayName(challengerSkill) : null;
+            var report = vh.buildReport(
+                    skillId,
+                    skillName,
+                    guard.opinionTargetFileId,
+                    guard.opinionTargetFileName,
+                    outcome);
+            sendRunEvent(guard, "verification_report", SKILL_UPDATE_MAPPER.writeValueAsString(report));
+        } catch (Exception e) {
+            log.warn("Failed to emit verification_report for {}: {}", guard.conversationId, e.getMessage());
+        }
+    }
+
+    private void emitTurnEvolutionIfApplicable(
+            RunGuard guard,
+            String conversationId,
+            String projectIdStr,
+            Long userId) {
+        com.checkba.service.ai.harness.HarnessEvolutionService evoSvc = this.harnessEvolutionService;
+        if (evoSvc == null || guard == null) {
+            return;
+        }
+        try {
+            Long projectId = null;
+            try {
+                projectId = projectIdStr != null ? Long.parseLong(projectIdStr) : null;
+            } catch (NumberFormatException ignored) {
+            }
+            String initialInstruction = guard.opinionInstructions.isEmpty() ? "" : guard.opinionInstructions.get(0);
+            java.util.List<String> steered = guard.opinionInstructions.size() > 1
+                    ? guard.opinionInstructions.subList(1, guard.opinionInstructions.size())
+                    : java.util.List.of();
+            var evolved = evoSvc.evaluateTurnEvolution(
+                    conversationId,
+                    userId,
+                    projectId,
+                    initialInstruction,
+                    guard.pendingRollbackSignal,
+                    steered,
+                    guard.harnessAdaptations);
+            if (evolved.isPresent()) {
+                sendRunEvent(guard, "harness_evolution", SKILL_UPDATE_MAPPER.writeValueAsString(evolved.get()));
+            }
+        } catch (Exception e) {
+            log.warn("Failed to evaluate/emit harness_evolution for {}: {}", conversationId, e.getMessage());
+        }
     }
 
     /**
