@@ -344,6 +344,8 @@ export const ZH = {
   docReadFailedBanner: '未能读取文档内容，本条消息不附带文档内容',
 
   // ---- lib/api.js（客户端自造文案；服务端透传文案不进字典） ----
+  sseConnectFailedHttp: 'SSE 建连失败（HTTP {status}）：令牌无效或后端拒绝了请求',
+  sseConnectFailedUnreachable: 'SSE 建连失败：网络不可达',
   apiServerUrlEmpty: '连接未就绪：后端地址为空',
   apiBackendUnreachable: '后端不可达：请检查地址、网络与 HTTPS/证书',
   apiConnectFailedHttp: '连接失败（HTTP {status}）：令牌无效或后端拒绝了请求',
@@ -844,6 +846,8 @@ export const EN = {
   docReadFailedBanner: 'Could not read the document content; this message will not include it',
 
   // ---- lib/api.js（客户端自造文案；服务端透传文案不进字典） ----
+  sseConnectFailedHttp: 'SSE connection failed (HTTP {status}): invalid token or the backend rejected the request',
+  sseConnectFailedUnreachable: 'SSE connection failed: network unreachable',
   apiServerUrlEmpty: 'Not connected: server address is empty',
   apiBackendUnreachable: 'Backend unreachable: check the address, network, and HTTPS/certificate',
   apiConnectFailedHttp: 'Connection failed (HTTP {status}): invalid token or the backend rejected the request',

@@ -20,7 +20,7 @@ public class DdClientConnectionController {
     public DdClientConnectionController(DdClientConnectionService service) { this.service = service; }
     private Long user(String session) {
         Long id = AuthController.getUserIdFromSession(session);
-        if (id == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "请先打开 AI WorkDeck");
+        if (id == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, com.checkba.service.LangText.of("请先打开 AI WorkDeck", "Please open AI WorkDeck first"));
         return id;
     }
     public record Connect(String code, Long cloudConnectionId) {}
@@ -58,6 +58,6 @@ public class DdClientConnectionController {
         return builder.body(reply.body());
     }
     @ExceptionHandler(ResponseStatusException.class) public ResponseEntity<Map<String, Object>> failure(ResponseStatusException error) {
-        return ResponseEntity.status(error.getStatusCode()).body(Map.of("code", error.getStatusCode().value(), "message", Objects.toString(error.getReason(), "请求失败")));
+        return ResponseEntity.status(error.getStatusCode()).body(Map.of("code", error.getStatusCode().value(), "message", Objects.toString(error.getReason(), com.checkba.service.LangText.of("请求失败", "Request failed"))));
     }
 }

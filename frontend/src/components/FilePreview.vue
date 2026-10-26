@@ -605,14 +605,14 @@ export default {
     // 带鉴权下载为 Blob（复用 loadMediaResource 的 XHR 鉴权方式，但返回 Promise<Blob>）
     fetchAuthedBlob() {
       return new Promise((resolve, reject) => {
-        if (!this.fileUrl) return reject(new Error('文件地址为空'))
+        if (!this.fileUrl) return reject(new Error(this.$t('files.fileUrlEmptyError')))
         const headers = getAuthHeaders() || {}
         const xhr = new XMLHttpRequest()
         xhr.open('GET', this.fileUrl, true)
         xhr.responseType = 'blob'
         Object.keys(headers).forEach(key => xhr.setRequestHeader(key, headers[key]))
         xhr.onload = () => xhr.status === 200 ? resolve(xhr.response) : reject(new Error('HTTP ' + xhr.status))
-        xhr.onerror = () => reject(new Error('网络错误'))
+        xhr.onerror = () => reject(new Error(this.$t('common.networkError')))
         xhr.send()
       })
     },
@@ -625,7 +625,7 @@ export default {
         await this.$nextTick()
         const ref = this.$refs.docxContainer
         const container = ref && (ref.$el || ref)
-        if (!container) throw new Error('渲染容器未就绪')
+        if (!container) throw new Error(this.$t('files.renderContainerNotReadyError'))
         container.innerHTML = ''
         const { renderAsync } = await import('docx-preview')
         await renderAsync(blob, container, null, {
@@ -653,7 +653,7 @@ export default {
         await this.$nextTick()
         const ref = this.$refs.pptxContainer
         const container = ref && (ref.$el || ref)
-        if (!container) throw new Error('渲染容器未就绪')
+        if (!container) throw new Error(this.$t('files.renderContainerNotReadyError'))
         container.innerHTML = ''
         const { init } = await import('pptx-preview')
         const width = Math.max(320, (container.clientWidth || 960) - 32)

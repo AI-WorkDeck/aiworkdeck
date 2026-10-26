@@ -56,7 +56,7 @@ public class EditorResultController {
         // 拦住「回传到别人的会话」这一点两者一致
         if (!messageService.canUseConversation(payload.getConversationId(), userId)) {
             log.warn("Rejected editor result: requestId={}, conversationId={}", payload.getRequestId(), payload.getConversationId());
-            return new EditorResultResponse(false, "无权回传该会话的结果");
+            return new EditorResultResponse(false, com.checkba.service.LangText.of("无权回传该会话的结果", "You do not have permission to submit results for this conversation"));
         }
 
         log.info("Received editor result: requestId={}, success={}", payload.getRequestId(), payload.isSuccess());
@@ -70,7 +70,7 @@ public class EditorResultController {
                     payload.getError()
             );
             if (!accepted) {
-                return new EditorResultResponse(false, "无效的 requestId 或不属于该会话");
+                return new EditorResultResponse(false, com.checkba.service.LangText.of("无效的 requestId 或不属于该会话", "Invalid requestId or does not belong to this conversation"));
             }
             return new EditorResultResponse(true, "Result received");
             

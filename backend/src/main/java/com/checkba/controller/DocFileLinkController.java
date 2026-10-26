@@ -42,7 +42,8 @@ public class DocFileLinkController {
     public ResponseEntity<Map<String, Object>> createOrAppend() {
         return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
                 "code", 1,
-                "message", "doc-links 已下线，请改用 /api/projects/{projectId}/evidence-links"));
+                "message", com.checkba.service.LangText.of("doc-links 已下线，请改用 /api/projects/{projectId}/evidence-links",
+                        "doc-links is deprecated; please use /api/projects/{projectId}/evidence-links instead")));
     }
 
     @GetMapping("/{linkKey}")

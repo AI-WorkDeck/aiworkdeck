@@ -43,11 +43,11 @@ public class DdClientConnectionService {
 
     public Map<String, Object> connect(Long userId, String code, Long cloudConnectionId) {
         String owner = scope(userId);
-        if (code == null || code.isBlank() || code.length() > 256) throw bad("请输入有效的邀请码");
+        if (code == null || code.isBlank() || code.length() > 256) throw bad(LangText.of("请输入有效的邀请码", "Please enter a valid invitation code"));
         String base;
         if (cloudConnectionId == null) {
             base = official.officialBaseUrl();
-            if (base == null) throw bad("本站暂未提供案件库，请选择已连接的团队案件库");
+            if (base == null) throw bad(LangText.of("本站暂未提供案件库，请选择已连接的团队案件库", "This site does not provide a case library; please select a connected team case library"));
         } else {
             CloudConnection connection = cloudConnections.findById(cloudConnectionId).orElseThrow(() -> denied());
             if (!Objects.equals(userId, connection.getUserId()) || (connection.getAccountFingerprint() != null
@@ -56,17 +56,17 @@ public class DdClientConnectionService {
         }
         base = AccountEndpoint.requireSecure(base).replaceAll("/+$", "");
         Map<String, Object> response = object(send(base, "", "POST", "/api/auth/client-login", jsonBody(Map.of("accessCode", code.trim()))));
-        if (!(response.get("code") instanceof Number n) || n.intValue() != 0) throw bad("邀请码无效、已过期或已撤销，请核对后重试");
+        if (!(response.get("code") instanceof Number n) || n.intValue() != 0) throw bad(LangText.of("邀请码无效、已过期或已撤销，请核对后重试", "Invitation code is invalid, expired, or revoked; please check and try again"));
         Map<String, Object> data = map(response.get("data"));
         String session = Objects.toString(data.get("sessionId"), "");
         long projectId = number(data.get("projectId"));
-        if (session.isBlank() || projectId <= 0) throw bad("案件库返回的信息不完整，请稍后重试");
+        if (session.isBlank() || projectId <= 0) throw bad(LangText.of("案件库返回的信息不完整，请稍后重试", "Incomplete response from case library; please try again later"));
         String projectName = Objects.toString(data.get("projectName"), "");
         if (projectName.isBlank()) {
             requireCurrent(userId, owner);
             Map<String, Object> project = object(send(base, session, "GET", "/api/projects/" + projectId, null));
             if (project.get("data") instanceof Map<?, ?>) project = map(project.get("data"));
-            projectName = Objects.toString(project.get("name"), "受邀项目 " + projectId);
+            projectName = Objects.toString(project.get("name"), LangText.of("受邀项目 ", "Invited Project ") + projectId);
         }
         Connection added = new Connection(UUID.randomUUID().toString(), base, projectId,
                 projectName, session);
@@ -112,15 +112,15 @@ public class DdClientConnectionService {
     private Object imReply(Reply response) {
         Map<String,Object> envelope = object(response);
         if (!(envelope.get("code") instanceof Number code) || code.intValue() != 0)
-            throw bad(Objects.toString(envelope.get("message"), "项目群暂不可用，请稍后重试"));
+            throw bad(Objects.toString(envelope.get("message"), LangText.of("项目群暂不可用，请稍后重试", "Project group is temporarily unavailable; please try again later")));
         return envelope.get("data");
     }
 
     public List<Map<String,Object>> notifications(Long userId, String id) {
         Reply reply = proxy(userId, id, "GET", "/notifications", null, null);
-        if (reply.status() != 200) throw bad("受邀项目通知暂不可用");
+        if (reply.status() != 200) throw bad(LangText.of("受邀项目通知暂不可用", "Invited project notifications are temporarily unavailable"));
         try { return JSON.readValue(reply.body(), new TypeReference<List<Map<String,Object>>>() {}); }
-        catch (IOException e) { throw bad("案件库返回的通知无法读取"); }
+        catch (IOException e) { throw bad(LangText.of("案件库返回的通知无法读取", "Failed to read notifications returned by the case library")); }
     }
 
     /** A closed operation set: callers cannot choose an origin, query, method or arbitrary file API. */
@@ -176,11 +176,11 @@ public class DdClientConnectionService {
         if (!session.isBlank()) request.header("X-Session-Id", session);
         try (Response response = http.newCall(request.build()).execute()) {
             byte[] bytes = response.body() == null ? new byte[0] : response.body().bytes();
-            if (response.code() == 401 || response.code() == 403) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "邀请已失效，请重新输入邀请码");
-            if (response.isRedirect()) throw bad("案件库地址已变更，请重新连接");
+            if (response.code() == 401 || response.code() == 403) throw new ResponseStatusException(HttpStatus.FORBIDDEN, LangText.of("邀请已失效，请重新输入邀请码", "Invitation has expired; please re-enter the invitation code"));
+            if (response.isRedirect()) throw bad(LangText.of("案件库地址已变更，请重新连接", "Case library address has changed; please reconnect"));
             return new Reply(response.code(), response.header("Content-Type"), response.header("Content-Disposition"), bytes);
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "暂时无法连接案件库，请稍后重试");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, LangText.of("暂时无法连接案件库，请稍后重试", "Cannot connect to the case library right now; please try again later"));
         }
     }
 
@@ -200,7 +200,7 @@ public class DdClientConnectionService {
         String stored = credentials.get(owner);
         if (stored.isBlank()) return List.of();
         try { return JSON.readValue(stored, new TypeReference<List<Connection>>() {}); }
-        catch (IOException e) { throw bad("受邀项目连接不可用，请重新输入邀请码"); }
+        catch (IOException e) { throw bad(LangText.of("受邀项目连接不可用，请重新输入邀请码", "Invited project connection is unavailable; please re-enter the invitation code")); }
     }
     private void write(String owner, List<Connection> rows) { credentials.put(owner, new String(bytes(rows), java.nio.charset.StandardCharsets.UTF_8)); }
     private Map<String, Object> publicView(Connection c) {
@@ -210,16 +210,16 @@ public class DdClientConnectionService {
         if (number(map(detail.get("request")).get("projectId")) != projectId) throw denied();
     }
     static Map<String, Object> object(Reply response) {
-        if (response.status() < 200 || response.status() >= 300) throw bad("案件库未能完成请求，请稍后重试");
+        if (response.status() < 200 || response.status() >= 300) throw bad(LangText.of("案件库未能完成请求，请稍后重试", "Case library could not complete the request; please try again later"));
         try { return JSON.readValue(response.body(), new TypeReference<Map<String, Object>>() {}); }
-        catch (IOException e) { throw bad("案件库返回的信息无法读取"); }
+        catch (IOException e) { throw bad(LangText.of("案件库返回的信息无法读取", "Failed to read response from the case library")); }
     }
     @SuppressWarnings("unchecked") private static Map<String, Object> map(Object o) { return o instanceof Map<?, ?> ? (Map<String, Object>) o : Map.of(); }
     private static long number(Object n) { return n instanceof Number number ? number.longValue() : -1; }
     public static RequestBody jsonBody(Object data) { return RequestBody.create(bytes(data), MediaType.get("application/json")); }
     private static byte[] bytes(Object value) {
-        try { return JSON.writeValueAsBytes(value); } catch (IOException e) { throw bad("请求内容无法处理"); }
+        try { return JSON.writeValueAsBytes(value); } catch (IOException e) { throw bad(LangText.of("请求内容无法处理", "Failed to process request content")); }
     }
-    private static ResponseStatusException denied() { return new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该受邀项目"); }
+    private static ResponseStatusException denied() { return new ResponseStatusException(HttpStatus.FORBIDDEN, LangText.of("无权访问该受邀项目", "You do not have permission to access this invited project")); }
     private static ResponseStatusException bad(String message) { return new ResponseStatusException(HttpStatus.BAD_REQUEST, message); }
 }

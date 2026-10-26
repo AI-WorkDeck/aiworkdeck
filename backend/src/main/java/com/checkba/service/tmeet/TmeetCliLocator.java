@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import com.checkba.service.LangText;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -57,7 +58,9 @@ final class TmeetCliLocator {
         try {
             return new TmeetCliLocator(windows, env, userHome).resolve(configuredCliPath);
         } catch (java.nio.file.InvalidPathException error) {
-            throw new UnresolvableException("腾讯会议 CLI 安装路径或入口无效，请检查路径设置或重新安装 @tencentcloud/tmeet");
+            throw new UnresolvableException(LangText.of(
+                    "腾讯会议 CLI 安装路径或入口无效，请检查路径设置或重新安装 @tencentcloud/tmeet",
+                    "Invalid Tencent Meeting CLI installation path or entry point; please check path settings or reinstall @tencentcloud/tmeet"));
         }
     }
 
@@ -110,7 +113,7 @@ final class TmeetCliLocator {
         try (var input = Files.newInputStream(script)) {
             header = new String(input.readNBytes(160), java.nio.charset.StandardCharsets.UTF_8).split("\n", 2)[0];
         } catch (IOException error) {
-            throw new UnresolvableException("腾讯会议 CLI 无法读取，请检查安装路径与权限");
+            throw new UnresolvableException(LangText.of("腾讯会议 CLI 无法读取，请检查安装路径与权限", "Unable to read Tencent Meeting CLI; please check installation path and permissions"));
         }
         if (!header.startsWith("#!") || !header.matches(".*(?:/|\\s)node(?:\\s.*)?")) {
             return new Resolution(List.of(script.toString()), script.toString());
@@ -129,7 +132,9 @@ final class TmeetCliLocator {
             if (isExecutableFile(node)) return new Resolution(
                     List.of(node.toAbsolutePath().normalize().toString(), script.toString()), script.toString());
         }
-        throw new UnresolvableException("RUNTIME_MISSING", "腾讯会议 CLI 已安装，但未找到 Node.js；请安装 Node.js LTS 或设置 TMEET_NODE_PATH");
+        throw new UnresolvableException("RUNTIME_MISSING", LangText.of(
+                "腾讯会议 CLI 已安装，但未找到 Node.js；请安装 Node.js LTS 或设置 TMEET_NODE_PATH",
+                "Tencent Meeting CLI is installed, but Node.js was not found; please install Node.js LTS or set TMEET_NODE_PATH"));
     }
 
     // ==================== Windows ====================
@@ -161,17 +166,19 @@ final class TmeetCliLocator {
                 return fromShim(shim);
             }
         }
-        throw new UnresolvableException("MISSING",
+        throw new UnresolvableException("MISSING", LangText.of(
                 "未找到 tmeet CLI（Windows 下需 npm 安装 @tencentcloud/tmeet，"
-                        + "或通过 tmeet.cli.path / TMEET_PATH 指定 tmeet.cmd 或包内 JS 入口）");
+                        + "或通过 tmeet.cli.path / TMEET_PATH 指定 tmeet.cmd 或包内 JS 入口）",
+                "tmeet CLI not found (on Windows, install @tencentcloud/tmeet via npm, or set tmeet.cli.path / TMEET_PATH to tmeet.cmd or the package JS entry)"));
     }
 
     private Resolution fromShim(Path shim) {
         Path pkg = findPackageDir(shim);
         if (pkg == null) {
-            throw new UnresolvableException(
+            throw new UnresolvableException(LangText.of(
                     "tmeet shim 旁边找不到 @tencentcloud/tmeet 包（" + shim + "），"
-                            + "请重装 npm 包或在 tmeet.cli.path 里直接配置包内 JS 入口");
+                            + "请重装 npm 包或在 tmeet.cli.path 里直接配置包内 JS 入口",
+                    "@tencentcloud/tmeet package not found next to tmeet shim (" + shim + "); please reinstall the npm package or point tmeet.cli.path directly to the package JS entry"));
         }
         Path js = resolveBinEntry(pkg);
         Path node = findNodeExe(shim.getParent());
@@ -200,20 +207,21 @@ final class TmeetCliLocator {
         Path manifest = pkg.resolve("package.json");
         String binValue = readBinValue(manifest);
         if (binValue == null || binValue.isBlank()) {
-            throw new UnresolvableException("tmeet 包 package.json 缺少 bin 入口: " + manifest);
+            throw new UnresolvableException(LangText.of("tmeet 包 package.json 缺少 bin 入口: ", "tmeet package.json is missing bin entry: ") + manifest);
         }
         Path js = pkg.resolve(binValue).normalize();
         if (!js.startsWith(pkg) || !Files.isRegularFile(js)) {
-            throw new UnresolvableException(
-                    "tmeet bin 入口越出包目录或不存在（" + binValue + "），拒绝执行: " + js);
+            throw new UnresolvableException(LangText.of(
+                    "tmeet bin 入口越出包目录或不存在（" + binValue + "），拒绝执行: " + js,
+                    "tmeet bin entry escapes package directory or does not exist (" + binValue + "), execution refused: " + js));
         }
         try {
             if (!js.toRealPath().startsWith(pkg.toRealPath())) {
-                throw new UnresolvableException("tmeet 入口链接指向包目录外，请重新安装腾讯会议 CLI");
+                throw new UnresolvableException(LangText.of("tmeet 入口链接指向包目录外，请重新安装腾讯会议 CLI", "tmeet entry symlink points outside package directory; please reinstall Tencent Meeting CLI"));
             }
             return js.toAbsolutePath();
         } catch (IOException e) {
-            throw new UnresolvableException("tmeet 入口无法读取，请重新安装腾讯会议 CLI");
+            throw new UnresolvableException(LangText.of("tmeet 入口无法读取，请重新安装腾讯会议 CLI", "Unable to read tmeet entry; please reinstall Tencent Meeting CLI"));
         }
     }
 
@@ -224,7 +232,7 @@ final class TmeetCliLocator {
             var entry = bin.isTextual() ? bin : bin.path("tmeet");
             return entry.isTextual() ? entry.asText() : null;
         } catch (IOException e) {
-            throw new UnresolvableException("无法读取 tmeet 安装清单，请修复或重新安装腾讯会议 CLI");
+            throw new UnresolvableException(LangText.of("无法读取 tmeet 安装清单，请修复或重新安装腾讯会议 CLI", "Unable to read tmeet package manifest; please repair or reinstall Tencent Meeting CLI"));
         }
     }
 
@@ -248,8 +256,9 @@ final class TmeetCliLocator {
                 if (Files.isRegularFile(p)) return p.toAbsolutePath().normalize();
             }
         }
-        throw new UnresolvableException("RUNTIME_MISSING",
-                "未找到 node.exe（请安装 Node.js，或用 TMEET_NODE_PATH 指定 node.exe 路径）");
+        throw new UnresolvableException("RUNTIME_MISSING", LangText.of(
+                "未找到 node.exe（请安装 Node.js，或用 TMEET_NODE_PATH 指定 node.exe 路径）",
+                "node.exe not found (please install Node.js or set TMEET_NODE_PATH to the node.exe path)"));
     }
 
     // ==================== 通用 ====================

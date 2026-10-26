@@ -35,7 +35,14 @@ if (!singleInstanceLock) {
 
 // NSIS may still be replacing files after a very fast manual reopen.
 if (app.isPackaged && process.platform === 'win32' && require('./services/full-update').deferWindowsLaunch(path.join(app.getPath('home'), '.aiworkdeck'), undefined, () => {
-  require('electron').dialog.showErrorBox('AI WorkDeck 更新仍在进行', '安装过程超过预期，请检查正在运行的安装程序后再打开应用。 / Installation is taking longer than expected. Check the running installer before reopening the app.')
+  const { t: langT } = require('./app-language')
+  require('electron').dialog.showErrorBox(
+    langT({ zh: 'AI WorkDeck 更新仍在进行', en: 'AI WorkDeck Update Still in Progress' }),
+    langT({
+      zh: '安装过程超过预期，请检查正在运行的安装程序后再打开应用。',
+      en: 'Installation is taking longer than expected. Check the running installer before reopening the app.'
+    })
+  )
 }, require('./open-paths').pathsFromArgv(process.argv))) {
   app.exit(0)
   return

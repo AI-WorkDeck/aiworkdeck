@@ -5,6 +5,7 @@ package com.checkba.service.ai.memory.document;
 
 import com.checkba.model.entity.AccountBinding;
 import com.checkba.repository.AccountBindingRepository;
+import com.checkba.service.LangText;
 import com.checkba.service.account.AccountService;
 import com.checkba.service.site.SiteProfileService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -63,7 +64,7 @@ public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGatewa
             }
             return result;
         } catch (RuntimeException e) {
-            return unavailableSpaces("共享记忆服务暂时不可用");
+            return unavailableSpaces(LangText.of("共享记忆服务暂时不可用", "Shared memory service is temporarily unavailable"));
         }
     }
 
@@ -126,13 +127,13 @@ public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGatewa
             Number code = envelope.get("code") instanceof Number n ? n : null;
             if (code == null || code.intValue() != 200) {
                 throw new MemoryDocumentException(code == null ? 502 : code.intValue(),
-                        text(envelope.get("message")) == null ? "共享记忆响应不正确" : text(envelope.get("message")));
+                        text(envelope.get("message")) == null ? LangText.of("共享记忆响应不正确", "Invalid shared memory response") : text(envelope.get("message")));
             }
             return envelope.get("data");
         } catch (MemoryDocumentException e) {
             throw e;
         } catch (Exception e) {
-            throw new MemoryDocumentException(502, "共享记忆响应无法解析");
+            throw new MemoryDocumentException(502, LangText.of("共享记忆响应无法解析", "Unable to parse shared memory response"));
         }
     }
 
@@ -161,14 +162,14 @@ public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGatewa
     }
 
     private String unavailableReason() {
-        if (localMode) return "尚未连接 AI WorkDeck 账户";
-        if (sharedBaseUrl.isBlank() || sharedSecret.isBlank()) return "当前服务器未配置共享记忆";
-        return "当前登录身份尚未绑定官网账户";
+        if (localMode) return LangText.of("尚未连接 AI WorkDeck 账户", "Not connected to an AI WorkDeck account");
+        if (sharedBaseUrl.isBlank() || sharedSecret.isBlank()) return LangText.of("当前服务器未配置共享记忆", "Shared memory is not configured on this server");
+        return LangText.of("当前登录身份尚未绑定官网账户", "Current login identity is not bound to an official account");
     }
 
     private static List<MemorySpaceView> unavailableSpaces(String reason) {
-        return List.of(MemorySpaceView.unavailable("team", "团队记忆", reason),
-                MemorySpaceView.unavailable("firm", "律所记忆", reason));
+        return List.of(MemorySpaceView.unavailable("team", LangText.of("团队记忆", "Team Memory"), reason),
+                MemorySpaceView.unavailable("firm", LangText.of("律所记忆", "Law Firm Memory"), reason));
     }
 
     private MemoryDocumentException remoteError(MemoryHttpTransport.Reply reply) {
@@ -178,7 +179,7 @@ public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGatewa
             message = text(body.get("message"));
         } catch (Exception ignored) {}
         int status = reply.status() <= 0 ? 503 : reply.status();
-        return new MemoryDocumentException(status, message == null ? "共享记忆请求失败" : message);
+        return new MemoryDocumentException(status, message == null ? LangText.of("共享记忆请求失败", "Shared memory request failed") : message);
     }
 
     private static MemoryFileView file(Map<String, Object> row, boolean content) {
@@ -189,7 +190,7 @@ public class RemoteMemoryOrganizationGateway implements MemoryOrganizationGatewa
 
     private String json(Object value) {
         try { return mapper.writeValueAsString(value); }
-        catch (Exception e) { throw new MemoryDocumentException(400, "记忆请求无法序列化"); }
+        catch (Exception e) { throw new MemoryDocumentException(400, LangText.of("记忆请求无法序列化", "Unable to serialize memory request")); }
     }
 
     private static LocalDateTime date(Object raw) {
