@@ -398,9 +398,175 @@
   }));
   window.addEventListener('pagehide', () => { clearTimeout(cooldownTimer); $('mobile').value = ''; $('auth-code').value = ''; });
 
+  const EN_EXACT = {
+    '包晴天': 'Baoqingtian',
+    '让法律服务相遇': 'Connecting Legal Services',
+    '正在连接工作台…': 'Connecting to workbench…',
+    '检查连接': 'Check Connection',
+    '退出': 'Sign Out',
+    '连接包晴天账号': 'Connect Baoqingtian Account',
+    '连接后，可以浏览案源广场，管理平台上的图文笔记和草稿。': 'Connect to browse the Case Lead Marketplace and manage your platform notes and drafts.',
+    '区号': 'Region Code',
+    '中国大陆 +86': 'Mainland China +86',
+    '中国香港 +852': 'Hong Kong +852',
+    '手机号': 'Phone Number',
+    '获取验证码': 'Send Code',
+    '短信验证码': 'SMS Code',
+    '登录包晴天': 'Sign In to Baoqingtian',
+    '我已阅读并同意包晴天律师用户协议、隐私政策和律师入驻协议，使用手机号连接包晴天律师账号。': 'I have read and agree to the Baoqingtian Lawyer User Agreement, Privacy Policy, and Lawyer Onboarding Agreement.',
+    '短信和登录请求由本插件直接发送至包晴天。手机号和验证码仅在本页临时使用。': 'SMS and sign-in requests are sent directly to Baoqingtian by this plugin. Phone numbers and codes are used only temporarily on this page.',
+    '阅读包晴天协议（复制链接到浏览器）': 'Read Baoqingtian Agreements (Copy Link to Browser)',
+    '律师用户协议': 'Lawyer User Agreement',
+    '复制用户协议链接': 'Copy User Agreement Link',
+    '隐私政策': 'Privacy Policy',
+    '复制隐私政策链接': 'Copy Privacy Policy Link',
+    '律师入驻协议': 'Lawyer Onboarding Agreement',
+    '复制入驻协议链接': 'Copy Onboarding Agreement Link',
+    '包晴天功能': 'Baoqingtian Navigation',
+    '案源广场': 'Lead Marketplace',
+    '我的笔记': 'My Notes',
+    '新建笔记': 'New Note',
+    '编辑笔记': 'Edit Note',
+    '了解法律需求，找到合适的合作机会。': 'Explore legal needs and discover collaboration opportunities.',
+    '管理您在包晴天发布的图文笔记，也照顾尚在打磨的草稿。': 'Manage your published notes and drafts on Baoqingtian.',
+    '搜索标题或内容': 'Search title or content',
+    '筛选本页案源标题或内容': 'Filter leads on this page by title or content',
+    '搜索我的全部笔记标题或正文': 'Search all my notes by title or body',
+    '本页笔记状态': 'Note status on this page',
+    '全部笔记': 'All Notes',
+    '草稿': 'Draft',
+    '公开发布': 'Public',
+    '仅自己可见': 'Private (Only Me)',
+    '其他状态': 'Other Status',
+    '筛选本页': 'Filter Page',
+    '搜索': 'Search',
+    '刷新': 'Refresh',
+    '关键词仅筛选当前页案源；可翻页继续查找。': 'Keywords filter leads on the current page only; turn pages to browse more.',
+    '关键词搜索全部本人笔记的标题或文字正文；状态仅筛选当前页。': 'Keywords search all your notes by title or text; status filters the current page only.',
+    '正在连接包晴天…': 'Connecting to Baoqingtian…',
+    '上一页': 'Previous',
+    '下一页': 'Next',
+    '案源详情': 'Lead Details',
+    '关闭详情': 'Close details',
+    '关闭': 'Close',
+    '尚未保存': 'Unsaved',
+    '有未保存的修改': 'Unsaved changes',
+    '业务类别': 'Practice Category',
+    '请选择业务类别': 'Select a practice category',
+    '正在读取业务类别…': 'Loading practice categories…',
+    '类别读取失败': 'Failed to load categories',
+    '笔记媒体': 'Note Media',
+    '类型': 'Type',
+    '图文笔记': 'Image Note',
+    '视频笔记': 'Video Note',
+    '图片（1–9 张，每张不超过 10 MiB）': 'Images (1–9 images, max 10 MiB each)',
+    '视频（MP4/MOV/WebM，不超过 50 MiB）': 'Video (MP4/MOV/WebM, max 50 MiB)',
+    '视频封面（独立图片，不超过 10 MiB）': 'Video Cover (Separate image, max 10 MiB)',
+    '请选择图片后保存。': 'Please select images before saving.',
+    '请选择一个视频和一张独立封面。': 'Please select one video and one cover image.',
+    '请选择 1–9 张图片。': 'Please select 1–9 images.',
+    '文件已选择，保存时开始上传。': 'Files selected; upload starts when saving.',
+    '标题': 'Title',
+    '给这篇笔记起个标题': 'Enter a title for this note',
+    '正文': 'Body',
+    '正文（可选）': 'Body (Optional)',
+    '写下希望分享的法律知识或服务经验': 'Share your legal insights or practice experience',
+    '新建需上传图片或视频及封面；编辑现有笔记时保留原媒体。': 'New notes require images or a video with cover; editing an existing note preserves original media.',
+    '发布可见范围': 'Visibility',
+    '保存草稿': 'Save Draft',
+    '发布笔记': 'Publish Note',
+    '保存发布修改': 'Save Published Changes',
+    '更新已发布笔记': 'Update Published Note',
+    '删除': 'Delete',
+    '继续上传同一篇笔记': 'Resume Uploading This Note',
+    '恢复同一次创建': 'Resume This Creation',
+    '刷新本人笔记，核对保存结果': 'Refresh My Notes to Verify Save',
+    '保存草稿不会发布。发布前会再次请您确认。': 'Saving a draft does not publish it. You will be asked to confirm before publishing.',
+    '请确认': 'Confirm',
+    '取消': 'Cancel',
+    '确认': 'Confirm',
+    '请先打开项目': 'Open a Project First',
+    '请先在 AI WorkDeck 打开项目，再连接包晴天。': 'Please open a project in AI WorkDeck first before connecting to Baoqingtian.',
+    '正在检查连接…': 'Checking connection…',
+    '包晴天账号已连接': 'Baoqingtian Connected',
+    '尚未连接包晴天': 'Not Connected to Baoqingtian',
+    '连接包晴天账号后即可查看。': 'Connect your Baoqingtian account to view.',
+    '连接检查未完成': 'Connection check incomplete',
+    '工作台连接未完成': 'Workbench connection incomplete',
+    '登录已过期': 'Session Expired',
+    '请重新登录包晴天。': 'Please sign in to Baoqingtian again.',
+    '正在读取…': 'Loading…',
+    '正在读取详情…': 'Loading details…',
+    '当前页没有匹配的内容，可翻页继续查看，或清除本页筛选。': 'No matching items on this page. Turn pages or clear the filter.',
+    '没有找到匹配的笔记，换个关键词试试。': 'No matching notes found. Try another keyword.',
+    '暂时没有案源，稍后再来看看。': 'No leads available right now. Check back later.',
+    '还没有笔记。可以从一篇草稿开始。': 'No notes yet. Start with a draft.'
+  };
+  let enObserverReady = false;
+  function trEn(s) {
+    if (!s || typeof s !== 'string') return s;
+    const trimmed = s.trim();
+    if (!trimmed) return s;
+    if (EN_EXACT[trimmed]) return s.replace(trimmed, EN_EXACT[trimmed]);
+    if (/^第 (\d+) 页$/.test(trimmed)) return trimmed.replace(/^第 (\d+) 页$/, 'Page $1');
+    if (/^(\d+) 秒后重发$/.test(trimmed)) return trimmed.replace(/^(\d+) 秒后重发$/, 'Resend in $1s');
+    return s;
+  }
+  function translateSubtree(root) {
+    if (!root) return;
+    const walk = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    let curr = walk.currentNode;
+    while (curr) {
+      if (curr.nodeType === Node.TEXT_NODE) {
+        const next = trEn(curr.nodeValue);
+        if (next !== curr.nodeValue) curr.nodeValue = next;
+      } else if (curr.nodeType === Node.ELEMENT_NODE) {
+        for (const attr of ['placeholder', 'aria-label', 'title', 'alt']) {
+          const val = curr.getAttribute?.(attr);
+          if (val) {
+            const next = trEn(val);
+            if (next !== val) curr.setAttribute(attr, next);
+          }
+        }
+      }
+      curr = walk.nextNode();
+    }
+  }
+  function maybeEnableEnglish(ctx) {
+    let lang = ctx?.language || ctx?.locale || '';
+    if (!lang) {
+      try { lang = localStorage.getItem('checkba_locale') || localStorage.getItem('awd_locale') || ''; } catch {}
+    }
+    if (!String(lang).toLowerCase().startsWith('en')) return;
+    document.documentElement.lang = 'en-US';
+    document.title = trEn(document.title);
+    translateSubtree(document.body);
+    if (!enObserverReady && typeof MutationObserver !== 'undefined') {
+      enObserverReady = true;
+      const obs = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          if (m.type === 'characterData') {
+            const next = trEn(m.target.nodeValue);
+            if (next !== m.target.nodeValue) m.target.nodeValue = next;
+          } else if (m.type === 'attributes') {
+            const val = m.target.getAttribute?.(m.attributeName);
+            if (val) {
+              const next = trEn(val);
+              if (next !== val) m.target.setAttribute(m.attributeName, next);
+            }
+          } else {
+            for (const n of m.addedNodes) translateSubtree(n);
+          }
+        }
+      });
+      obs.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'aria-label', 'title', 'alt'] });
+    }
+  }
+
   controls();
   awd.ready().then(async current => {
     context = current || {};
+    maybeEnableEnglish(context);
     awd.events?.on('project.switched', async () => {
       generation++; window.bqtSecure?.reset(); statusRequest++; saving = false; connected = false; account = ''; clearContent(); closeConfirmation(); $('mobile').value = ''; $('auth-code').value = ''; $('agreement').checked = false;
       context = await awd.call('context.get'); await checkAccount();

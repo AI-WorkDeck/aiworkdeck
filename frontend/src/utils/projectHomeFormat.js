@@ -161,6 +161,13 @@ export function summarizeTemplateProfile(profile) {
 export function templateProfileLine(summary) {
   if (!summary) return ''
   const { font, size, levels, tables } = summary
-  return tr('projects.learnedTemplateLine', { font, size, levels, tables },
-    `已学习模板：${font} ${size}pt / ${levels} 级编号 / ${tables} 类表格`)
+  let isEn = false
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
+    else if (typeof document !== 'undefined' && document.documentElement?.lang === 'en-US') isEn = true
+  } catch (_) { /* ignore */ }
+  const fallback = isEn
+    ? `Learned template: ${font} ${size}pt / ${levels} heading levels / ${tables} table styles`
+    : `已学习模板：${font} ${size}pt / ${levels} 级编号 / ${tables} 类表格`
+  return tr('projects.learnedTemplateLine', { font, size, levels, tables }, fallback)
 }

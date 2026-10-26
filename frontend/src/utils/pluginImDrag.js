@@ -55,11 +55,17 @@ function installNativeDragHandle(record, { frame, rect }) {
   const right = Math.min(originX + frame.clientWidth * scaleX, originX + (rect.left + rect.width) * scaleX)
   const bottom = Math.min(originY + frame.clientHeight * scaleY, originY + (rect.top + rect.height) * scaleY)
   if (right - left < 24 || bottom - top < 24) return
+  let isEn = false
+  try {
+    if (win?.document?.documentElement?.lang === 'en-US') isEn = true
+    else if (win?.localStorage?.getItem('checkba_app_language') === 'en-US') isEn = true
+    else if (typeof localStorage !== 'undefined' && localStorage.getItem('checkba_app_language') === 'en-US') isEn = true
+  } catch (_) { /* ignore */ }
   const handle = win.document.createElement('button')
   handle.type = 'button'
   handle.draggable = true
-  handle.textContent = '拖到 AI'
-  handle.setAttribute('aria-label', '拖拽此项目文件到 AI 对话')
+  handle.textContent = isEn ? 'Drag to AI' : '拖到 AI'
+  handle.setAttribute('aria-label', isEn ? 'Drag this project file to AI chat' : '拖拽此项目文件到 AI 对话')
   handle.setAttribute('data-awd-plugin-drag-handle', '')
   Object.assign(handle.style, {
     position: 'fixed', left: `${left}px`, top: `${top}px`, width: `${right - left}px`, height: `${bottom - top}px`,

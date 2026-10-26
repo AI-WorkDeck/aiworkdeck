@@ -39,8 +39,8 @@ public class SensitiveController {
     public ResponseEntity<List<Map<String, String>>> getSensitiveOptions() {
         List<Map<String, String>> options = new ArrayList<>();
         for (SensitiveType type : SensitiveType.autoDetectTypes()) {
-            options.add(Map.of("value", type.getCode(), "label", type.getLabel(),
-                    "example", type.getExample(), "description", type.getDescription()));
+            options.add(Map.of("value", type.getCode(), "label", type.getLocalizedLabel(),
+                    "example", type.getExample(), "description", type.getLocalizedDescription()));
         }
         return ResponseEntity.ok(options);
     }
@@ -72,7 +72,7 @@ public class SensitiveController {
             fileAccess.requireRead(source, userId);
             if (!projectMemberService.hasReadPermission(source.getProjectId(), userId)
                     || (!action.equals("preview") && !projectMemberService.hasWritePermission(source.getProjectId(), userId))) {
-                return response(403, Map.of("error", "无权读取文件或在该项目生成文件"));
+                return response(403, Map.of("error", LangText.of("无权读取文件或在该项目生成文件", "No permission to read the file or create files in this project")));
             }
             File file = storageServiceFactory.getStorageService().load(source.getFilePath()).getFile();
             if (action.equals("preview")) return response(200, sensitiveService.previewFile(file.getAbsolutePath(), request.options()));
@@ -89,11 +89,11 @@ public class SensitiveController {
         } catch (ProjectFileAccessService.FileAccessDeniedException e) {
             return response(403, Map.of("error", e.getMessage()));
         } catch (IllegalArgumentException e) {
-            return response(400, Map.of("error", e.getMessage() == null ? "请求无效" : e.getMessage()));
+            return response(400, Map.of("error", e.getMessage() == null ? LangText.of("请求无效", "Invalid request") : e.getMessage()));
         } catch (Exception e) {
             // Paths, original words, passwords and mapping content must not reach diagnostic logs.
             log.warn("Sensitive operation failed: action={}, fileId={}, exception={}", action, request.fileId(), e.getClass().getSimpleName());
-            return response(500, Map.of("error", "文件处理失败，请检查文件格式、编码或是否加密"));
+            return response(500, Map.of("error", LangText.of("文件处理失败，请检查文件格式、编码或是否加密", "Failed to process file. Please check file format, encoding, or encryption status.")));
         }
     }
 

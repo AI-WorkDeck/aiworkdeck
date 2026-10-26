@@ -182,6 +182,9 @@ export default {
   lawfirmColContracted: 'Contracted',
   lawfirmColCollected: 'Collected',
   lawfirmColRate: 'Collection Rate',
+  lawfirmWanSuffix: '¥{amount}0k',
+  lawfirmActionFailedToast: 'Operation failed',
+  lawfirmOpenWorkbenchFailedToast: 'Failed to open workbench',
 
   // ---- Switch team / firm (one team per account, one firm per team; two non-atomic steps) ----
   switchTeamTitle: 'Switch team',

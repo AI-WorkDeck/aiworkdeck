@@ -408,7 +408,11 @@ export default {
   typeNameWalkthrough: 'Details',
   generatedClickView: 'Generated {name}. Click to view details.',
   revisionNote: 'Revised in {hunks} places (+{added} lines / -{removed} lines)',
+  diffSummaryLines: '+{added} lines / -{removed} lines',
   approveDisplayRevised: 'Plan revised',
+  approvePromptRevised: 'I have revised the plan ({changeCount} change(s), {diffSummary}). Please execute according to the revised plan below and note the differences:\n\n{content}',
+  approvePromptImplPlan: 'Implementation plan confirmed. Please proceed accordingly.',
+  approvePromptPlan: 'Plan confirmed. Please proceed accordingly.',
   // Plan review (dev-board#1022)
   openRevisionBtn: 'Open Revision',
   reviewInProgress: 'Revising · {hunks} change(s) · {comments} comment(s)',

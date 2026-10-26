@@ -169,9 +169,6 @@ function truncate(text) {
     : { text: s, truncated: false, totalChars: s.length }
 }
 
-/** 跨文档写入标不了修订时的回错（模型可见，保持中文） */
-const CROSS_DOC_NO_TRACKING = '本机 Word 版本无法标记修订，已拒绝跨文档修改'
-
 /**
  * 跨文档写入的强制修订（dev-board#717）：executeOfficeCommand 见到 args.__forceTracking
  * 就在执行期间把这里加一。强制期间 withTracking **不许**降级直改——别的窗格的 AI 改本文档，
@@ -186,7 +183,7 @@ let forcedTrackingDepth = 0
  */
 async function withTracking(context, fn) {
   if (!trackingSupported()) {
-    if (forcedTrackingDepth > 0) throw new Error(CROSS_DOC_NO_TRACKING)
+    if (forcedTrackingDepth > 0) throw new Error(t('officeCrossDocNoTracking'))
     const data = await fn()
     return { ...data, tracked: false }
   }
@@ -4323,7 +4320,7 @@ export function commandDisplayName(command) {
  */
 export async function executeOfficeCommand(command, args) {
   if (!officeAvailable()) {
-    return { ok: false, error: 'Office 环境不可用：请在 Office 任务窗格中使用本插件' }
+    return { ok: false, error: t('officeEnvUnavailable') }
   }
   const handler = HANDLERS[command]
   if (!handler) {
@@ -4334,7 +4331,10 @@ export async function executeOfficeCommand(command, args) {
   if (requiredHost && host !== requiredHost) {
     return {
       ok: false,
-      error: `unsupported host: 该命令只在 ${HOST_LABELS[requiredHost]} 中可用（当前宿主：${HOST_LABELS[host] || '未知'}）`
+      error: t('officeUnsupportedHost', {
+        required: HOST_LABELS[requiredHost],
+        current: HOST_LABELS[host] || t('officeUnknownHost')
+      })
     }
   }
   // __forceTracking 是跨文档写入的内部标记（crossDocWrite 加的），不许漏进 handler 的参数
@@ -4369,8 +4369,10 @@ async function describeExecutionError(e, command, args) {
   if (code === 'ItemNotFound' && command.startsWith('excel_') && args.sheetName) {
     const names = await listWorksheetNames()
     if (names.length) {
-      return `未找到名为「${args.sheetName}」的工作表。本工作簿现有工作表：${names.join('、')}。`
-        + '请用其中之一重试（名称区分空格与全角半角），或留空 sheetName 表示活动工作表。'
+      return t('officeWorksheetNotFound', {
+        sheetName: args.sheetName,
+        names: names.join('、')
+      })
     }
   }
   if (code) message += `（宿主错误码 ${code}${where ? '，出错位置 ' + where : ''}）`
@@ -4576,7 +4578,7 @@ export async function writeOfficeState(state) {
       const cell = table.getCellOrNullObject(s.row, s.col)
       cell.load('isNullObject')
       await context.sync()
-      if (cell.isNullObject) throw new Error('目标单元格已不存在')
+      if (cell.isNullObject) throw new Error(t('officeTargetCellMissing'))
       cell.text = s.text
       await context.sync()
     })
@@ -4586,7 +4588,7 @@ export async function writeOfficeState(state) {
       const frames = await loadPptTextFrames(context)
       for (const f of s.frames || []) {
         const tf = frames[f.slide - 1] && frames[f.slide - 1][f.frame]
-        if (!tf || tf.isNullObject) throw new Error('目标文本框已不存在')
+        if (!tf || tf.isNullObject) throw new Error(t('officeTargetTextFrameMissing'))
         const current = tf.hasText ? (tf.textRange.text || '') : ''
         if (current === f.text) continue
         if (!current.length) {
@@ -4603,7 +4605,7 @@ export async function writeOfficeState(state) {
       await context.sync()
     })
   }
-  throw new Error('无法识别的修订快照，撤销未执行')
+  throw new Error(t('officeUnrecognizedSnapshot'))
 }
 
 /* ==================== 修订记录的「定位」（dev-board#717） ==================== */

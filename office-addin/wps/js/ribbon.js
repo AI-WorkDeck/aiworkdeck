@@ -70,7 +70,12 @@ function OnAction(control) {
     } catch (e) {
         // 异常冒出回调只会被宿主静默吞掉，用户与我们都拿不到线索——弹一个最简提示，
         // 至少让用户知道点击没生效以及为什么
-        try { window.alert("AI 助手窗格打开失败：" + ((e && e.message) || e)) } catch (e2) { /* alert 也不可用就放弃 */ }
+        try {
+            var lang = ""
+            try { lang = (localStorage.getItem("awd_addin_lang") || navigator.language || "").toLowerCase() } catch (e3) {}
+            var prefix = lang.indexOf("zh") === 0 ? "AI 助手窗格打开失败：" : "Failed to open AI Assistant pane: "
+            window.alert(prefix + ((e && e.message) || e))
+        } catch (e2) { /* alert 也不可用就放弃 */ }
     }
     return true
 }

@@ -675,7 +675,7 @@ ipcMain.handle('checkba:ocr-start-selection', async (_evt, payload) => {
 <body>
   <div class="layer">
     <div class="shade"></div>
-    <div class="hint">拖动框选网页区域 · 点击其它区域或 ESC 退出</div>
+    <div class="hint">${escapeHtml(require('./app-language').t({ zh: '拖动框选网页区域 · 点击其它区域或 ESC 退出', en: 'Drag to select an area · Click outside or press ESC to cancel' }))}</div>
     <div id="rect" class="rect"></div>
   </div>
   <script>
@@ -1596,7 +1596,7 @@ ipcMain.handle('checkba:model-status', async () => {
   return { components }
 })
 ipcMain.handle('checkba:model-download', async (_evt, payload) => {
-  if (!modelManager) return { ok: false, message: 'model manager 未就绪' }
+  if (!modelManager) return { ok: false, message: require('./app-language').t({ zh: 'model manager 未就绪', en: 'model manager not ready' }) }
   const id = payload && payload.id
   const repair = payload?.repair === true
   const svc = COMPONENT_SERVICE[id]
@@ -1605,11 +1605,11 @@ ipcMain.handle('checkba:model-download', async (_evt, payload) => {
   } })
 })
 ipcMain.handle('checkba:model-cancel', async (_evt, payload) => {
-  if (!modelManager) return { ok: false, message: 'model manager 未就绪' }
+  if (!modelManager) return { ok: false, message: require('./app-language').t({ zh: 'model manager 未就绪', en: 'model manager not ready' }) }
   return modelManager.cancel(payload && payload.id)
 })
 ipcMain.handle('checkba:model-remove', async (_evt, payload) => {
-  if (!modelManager) return { ok: false, message: 'model manager 未就绪' }
+  if (!modelManager) return { ok: false, message: require('./app-language').t({ zh: 'model manager 未就绪', en: 'model manager not ready' }) }
   // 先停服务再删模型，避免删除运行中文件
   const svc = payload && COMPONENT_SERVICE[payload.id]
   if (svc && services) {
@@ -1666,7 +1666,7 @@ ipcMain.handle('checkba:prefs-set', async (_evt, payload) => {
 ipcMain.handle('checkba:reveal-logs', async () => {
   try {
     const dir = path.join(app.getPath('home'), '.aiworkdeck', 'logs')
-    if (!require('fs').existsSync(dir)) return { ok: false, message: '日志目录尚未生成' }
+    if (!require('fs').existsSync(dir)) return { ok: false, message: require('./app-language').t({ zh: '日志目录尚未生成', en: 'Log directory has not been created yet' }) }
     shell.showItemInFolder(path.join(dir, '.'))
     return { ok: true, path: dir }
   } catch (e) {
@@ -1680,7 +1680,7 @@ ipcMain.handle('checkba:update-status', async () => {
   return updateService.getState()
 })
 ipcMain.handle('checkba:update-check', async () => {
-  if (!updateService) return { phase: 'error', error: 'update service 未就绪' }
+  if (!updateService) return { phase: 'error', error: require('./app-language').t({ zh: 'update service 未就绪', en: 'update service not ready' }) }
   return updateService.check()
 })
 ipcMain.handle('checkba:update-restart', async () => {
