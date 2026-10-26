@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Anonimización",
+  "plugin.description": "Inspeccione información sensible, genere copias anonimizadas y restáurelas con paquetes de recuperación.",
+  "view.main.name": "Anonimización"
+}

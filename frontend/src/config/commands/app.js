@@ -4,6 +4,25 @@
 //
 // 关于 / 隐藏 / 退出 那几条是 Electron roles，由主进程常驻持有，不经这里下发。
 
+import { LOCALE_REGISTRY } from '../../locales/registry.js'
+
+const LANGUAGE_SUBCOMMANDS = [
+  {
+    id: 'app.lang.system',
+    label: { zh: '语言：跟随系统', en: 'Language: Follow System' },
+    menu: 'app', group: 3,
+    inMenu: false,
+    run: 'app:setLang:system',
+  },
+  ...LOCALE_REGISTRY.map((entry) => ({
+    id: `app.lang.${entry.code}`,
+    label: { zh: `语言：${entry.nativeName}`, en: `Language: ${entry.nativeName}` },
+    menu: 'app', group: 3,
+    inMenu: false,
+    run: `app:setLang:${entry.code}`,
+  })),
+]
+
 export const APP_COMMANDS = [
   {
     id: 'app.checkUpdate',
@@ -33,17 +52,10 @@ export const APP_COMMANDS = [
     run: 'app:logout',
   },
   {
-    id: 'app.langZh',
-    label: { zh: '语言：中文', en: 'Language: 中文' },
+    id: 'app.language',
+    label: { zh: '语言', en: 'Language' },
     menu: 'app', group: 3,
-    type: 'checkbox', checked: 'langZh',
-    run: 'app:setLang:zh-CN',
+    run: 'app:noop',
   },
-  {
-    id: 'app.langEn',
-    label: { zh: '语言：English', en: 'Language: English' },
-    menu: 'app', group: 3,
-    type: 'checkbox', checked: 'langEn',
-    run: 'app:setLang:en-US',
-  },
+  ...LANGUAGE_SUBCOMMANDS,
 ]

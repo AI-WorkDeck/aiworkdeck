@@ -33,6 +33,9 @@ jobs:
       # 审计 A10 就是 contract-review 列了 doc_reply_comment 却漏了 office_reply_comment。
       - name: Check tool parity between LOWA and Office families
         run: node scripts/check-tool-parity.mjs
+      - name: Check multi-language tokenization and locale parity
+        working-directory: frontend
+        run: npm run check:locales
 
   backend:
     name: Backend (mvn test)

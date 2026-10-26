@@ -438,8 +438,9 @@ public class ContextAssemblerService {
             ProjectContextHolder.setUserId(userId);
         }
 
-        // 应用语言：本次组装全程按它二选一（协议面 zh/en 完全一致，只有措辞与 Language 行不同）
+        // 既有中英文路径保持原文；新增语种复用同一基底，仅替换最终 Language 规则。
         final boolean english = appLanguageService.isEnglish();
+        final String rawLang = appLanguageService.language();
 
         // 本轮的 projectId 数值形态。**必须在扇出之前解析**：下面几个后台任务都按它查库。
         // 纯本地解析、无副作用，提前到这里不改变任何行为。
@@ -495,8 +496,8 @@ public class ContextAssemblerService {
         String currentPhase = determinePhase(planId, taskListId);
 
         // [Injection] Enforcement (HIGHEST PRIORITY)
-        // zh/en 差异只有 Language 一节（SIMPLIFIED CHINESE ONLY -> ENGLISH ONLY）与
-        // artifact 命名示例；停机条件/输出顺序/工具规则两版逐条一致。
+        // 中英文基底保持原文，其他语种在最终组装后只替换 Language 规则。
+        // 停机条件/输出顺序/工具规则不因应用语言变化。
         //
         // **这一段三档能力共用，所以不许点名任何挑客户端的工具**（dev-board#809 / K29）：
         // doc_* / sheet_* / slide_* / office_* 在别的能力档下压根不可见，提到名字就是在
@@ -1114,6 +1115,24 @@ public class ContextAssemblerService {
         // 通道层按它拆 content block 并只缓存前半段。标记恰好一次，且必须在最后拼——
         // 任何在这行之后再往 systemText 追加的内容都会掉进被缓存的前缀里。
         systemText.append(SYSTEM_VOLATILE_SEPARATOR).append(volatileText);
+
+        if ("zh-TW".equals(rawLang)) {
+            int at = systemText.indexOf("SIMPLIFIED CHINESE ONLY");
+            if (at >= 0) {
+                systemText.replace(at, at + "SIMPLIFIED CHINESE ONLY".length(),
+                        "TRADITIONAL CHINESE (繁體中文, zh-TW) ONLY");
+            }
+        } else if (rawLang != null && !"zh-CN".equals(rawLang) && !"en-US".equals(rawLang)) {
+            com.checkba.util.AppLocale locale = com.checkba.util.AppLocale.fromCode(rawLang);
+            String englishRule = "- ENGLISH ONLY for all user-facing output.";
+            String localizedRule = "- Reply in " + locale.englishName() + " (" + locale.nativeName()
+                    + ", " + locale.code() + ") by default for all user-facing output."
+                    + " If the user explicitly writes in another language, follow the user's message language.";
+            int at = systemText.indexOf(englishRule);
+            if (at >= 0) {
+                systemText.replace(at, at + englishRule.length(), localizedRule);
+            }
+        }
 
         messages.add(dev.langchain4j.data.message.SystemMessage.from(systemText.toString()));
 

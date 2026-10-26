@@ -1,0 +1,15 @@
+{
+  "plugin.name": "DPIA Çalışma Alanı",
+  "plugin.description": "Veri Koruma Etki Değerlendirmesi: kaynak izleme, olgu doğrulama, soru-cevap takibi, risk & iyileştirme, sürekli yeniden değerlendirme ve sürümlü raporlar. Zhu Lingfeng'in DSH DPIA Workbench'inden uyarlanmıştır; Node.js, Python ve LibreOffice gerektirir.",
+  "plugin.author": "AI WorkDeck (Kaynak: Zhu Lingfeng / The-Data-Galaxy)",
+  "setting.nodePath.label": "Node.js Çalıştırılabilir Dosyası",
+  "setting.nodePath.description": "Sistem PATH'inden node kullanmak için boş bırakın; Node.js 20 veya daha yenisi gerekir.",
+  "setting.pythonPath.label": "Python Çalıştırılabilir Dosyası",
+  "setting.pythonPath.description": "runtime/requirements.txt dosyasındaki belge bağımlılıklarını gerektirir; sanal ortamdan bir Python yolu belirtilebilir.",
+  "setting.pdfFontPath.label": "PDF CJK Yazı Tipi Dosyası",
+  "setting.pdfFontPath.description": "Yerel PDF şablonlarına CJK metni doldurmak gömülebilir bir TrueType yazı tipi (TTF/TTC) gerektirir; sistem yazı tipi araması için boş bırakın.",
+  "setting.sofficePath.label": "LibreOffice Çalıştırılabilir Dosyası",
+  "setting.sofficePath.description": "Yalnızca rapor PDF dışa aktarma ve sayfa önizleme için gereklidir; varsayılan sistem konumlarını denemek için boş bırakın.",
+  "tool.dpia_workbench_action.description": "DPIA dosyası, materyaller, olgu teyidi, soru-cevap, çalışma durumu ve rapor işlemleri. Yalnızca çalışma tezgahı arayüzü içindir; yapay zekâ manuel onay/yeterli giriş çağrıları yapmamalıdır.",
+  "tool.dpia_workbench_task.description": "Şu anda donmuş DPIA görevlerini yürüt: context/read/write/script/commit/report; kesin olarak mevcut kullanıcı projesi ve dosya çıktı diziniyle sınırlıdır."
+}

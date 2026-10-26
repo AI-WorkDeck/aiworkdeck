@@ -4,6 +4,9 @@
 package com.checkba.controller;
 
 import com.checkba.service.AppLanguageService;
+import com.checkba.util.AppLocale;
+import com.checkba.util.GeoIpLocaleResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -24,21 +27,31 @@ public class AppLanguageController {
     private final AppLanguageService appLanguage;
 
     @GetMapping("/language")
-    public Map<String, Object> getLanguage() {
+    public Map<String, Object> getLanguage(HttpServletRequest httpRequest) {
         Map<String, Object> r = new HashMap<>();
         r.put("code", 0);
         r.put("language", appLanguage.language());
+        r.put("supportedLocales", AppLocale.catalogMetadata());
+        String geoCountry = GeoIpLocaleResolver.extractCountryCode(httpRequest);
+        if (geoCountry != null) {
+            r.put("geoCountry", geoCountry);
+            AppLocale geoLocale = GeoIpLocaleResolver.fromCountryCode(geoCountry);
+            if (geoLocale != null) {
+                r.put("geoLocale", geoLocale.code());
+            }
+        }
         return r;
     }
 
     @PostMapping("/language")
     public Map<String, Object> setLanguage(
             @RequestBody LanguageRequest request,
-            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            HttpServletRequest httpRequest) {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) throw new IllegalArgumentException("未登录");
         appLanguage.setLanguage(request == null ? null : request.getLanguage());
-        return getLanguage();
+        return getLanguage(httpRequest);
     }
 
     @Data

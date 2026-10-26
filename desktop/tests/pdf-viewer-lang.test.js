@@ -70,7 +70,7 @@ test('新装机（无 app-language.json）：不追加 --lang，也不把「猜�
     '启动块把 ready 之前的空 locale 猜测写进了缓存——中文系统首启整个界面会变英文')
 })
 
-test('有落盘语言：按它追加 --lang（中文系统上选了英文界面也一样）', () => {
+test('有落盘语言：按它追加 --lang（中文系统上选了英文界面或多语种也一样）', () => {
   fs.writeFileSync(storeFile, JSON.stringify({ language: 'en-US' }))
   locale = ''
   freshLang()
@@ -78,13 +78,20 @@ test('有落盘语言：按它追加 --lang（中文系统上选了英文界面�
   fs.writeFileSync(storeFile, JSON.stringify({ language: 'zh-CN' }))
   freshLang()
   assert.deepStrictEqual(runStartupBlock(), [['lang', 'zh-CN']])
+  fs.writeFileSync(storeFile, JSON.stringify({ language: 'fr-FR' }))
+  freshLang()
+  assert.deepStrictEqual(runStartupBlock(), [['lang', 'fr-FR']])
 })
 
-test('落盘文件损坏或语言不受支持：当作没有，不追加', () => {
+test('落盘文件损坏、跟随系统或语言不受支持：当作没有，不追加', () => {
   fs.writeFileSync(storeFile, '{not json')
   freshLang()
   assert.deepStrictEqual(runStartupBlock(), [])
-  fs.writeFileSync(storeFile, JSON.stringify({ language: 'fr-FR' }))
+  fs.writeFileSync(storeFile, JSON.stringify({ language: 'system' }))
+  freshLang()
+  assert.deepStrictEqual(runStartupBlock(), [])
+  assert.strictEqual(require('../main/app-language').getPersistedAppLanguage(), null)
+  fs.writeFileSync(storeFile, JSON.stringify({ language: 'xx-YY' }))
   freshLang()
   assert.deepStrictEqual(runStartupBlock(), [])
   assert.strictEqual(require('../main/app-language').getPersistedAppLanguage(), null)

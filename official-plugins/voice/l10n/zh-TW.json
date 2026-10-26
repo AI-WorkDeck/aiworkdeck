@@ -1,0 +1,5 @@
+{
+  "plugin.name": "語音",
+  "plugin.description": "Instant read-aloud, real-time speed control, subtitle highlighting, and meeting recording.",
+  "view.main.name": "語音"
+}

@@ -197,6 +197,7 @@ export default {
   languageGroupHint: 'Applies to the interface, document editor, and AI replies. Newly opened editors use the new language; restart the app for full effect.',
   languageSwitchingToZh: 'Switching to Simplified Chinese…',
   languageSwitchingToEn: 'Switching to English…',
+  languageSwitchedToast: 'Language switched to {lang}',
 
   // ---- login.vue: top nav ----
   guideNav: 'Guide',

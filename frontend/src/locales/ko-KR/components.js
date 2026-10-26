@@ -1,0 +1,91 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+export default {
+  "panelTitle": "Optional components",
+  "panelSubtitle": "These components are not bundled with the installer. Download only what you use — everything runs on this computer and nothing leaves it.",
+  "installSelected": "Download selected",
+  "installOne": "Download this component",
+  "later": "나중에",
+  "laterHint": "You can download them any time from Settings → Components.",
+  "alreadyReady": "Already installed: {names}.",
+  "nameSeparator": ", ",
+  "manageTitle": "Components",
+  "promptWithModel": "{name} needs to be downloaded (about {runtime} MB; about {total} MB including the model). It is stored under ~/.aiworkdeck and can be removed from Settings → Components.",
+  "promptNoModel": "{name} needs to be downloaded (about {runtime} MB). It is stored under ~/.aiworkdeck and can be removed from Settings → Components.",
+  "promptUsage": "It powers: {unlocks}. Without it: {impact}. Everything else keeps working.",
+  "sizeUnknown": "Checking size…",
+  "stateNotInstalled": "Not installed",
+  "stateReady": "Installed (not run yet)",
+  "stateServiceStarted": "Service started (function not yet verified)",
+  "errorServiceUnavailable": "The component service could not start. Check the installation and retry.",
+  "stateDownloadingRuntime": "Downloading runtime {percent}%",
+  "stateDownloadingModel": "Downloading model {percent}%",
+  "stateStartingService": "Starting the component…",
+  "stateVerifyingRuntime": "Verifying the download…",
+  "stateExtractingRuntime": "Unpacking {percent}%",
+  "stateCheckingRuntime": "Checking files…",
+  "stateFinalizingRuntime": "Finishing up…",
+  "errorStalled": "No progress for a long time, so we stopped waiting. Please retry; if it keeps failing, check the backend log under ~/.aiworkdeck/logs.",
+  "errorBackendRestarted": "The background service restarted and interrupted the download. Please retry.",
+  "stateFailed": "Preparation failed: {msg}",
+  "progressTotal": "Overall {done}/{count} ({percent}%)",
+  "cancelDownload": "Cancel download",
+  "checkStartup": "Check startup",
+  "verifyRepair": "Verify and repair",
+  "retry": "재시도",
+  "chatTitle": "A component is required",
+  "chatConfirm": "Download and continue",
+  "chatCancel": "나중에",
+  "chatInstalling": "Preparing the component…",
+  "chatStage": {
+    "preparing": "Preparing the component…",
+    "downloading": "Downloading. Tap \"Download in background\" to keep chatting meanwhile.",
+    "verifying": "Download finished. Verifying its contents…",
+    "extracting": "Unpacking and installing. There are many files, so this can take a few minutes.",
+    "checking": "Checking the unpacked files…",
+    "finalizing": "Almost done. Writing to the install folder…",
+    "model": "Downloading the model…",
+    "starting": "Starting the component…"
+  },
+  "chatResending": "The component is ready. Continuing your request…",
+  "chatReadyRetry": "The component is ready. You can resend your request.",
+  "chatReadyContinue": "The component is ready. You can continue the step you were on.",
+  "chatReadyContinueBtn": "Continue",
+  "backgroundDownload": "Download in background",
+  "backgroundStarted": "Downloading in the background. Track progress in Settings → Components.",
+  "backgroundDone": "{name} is installed and started. You can try using it.",
+  "backgroundFailed": "{name} failed to download: {msg}",
+  "asrRuntimeMissingAction": "Download on-device speech recognition",
+  "pptxRuntime": {
+    "name": "Slides and PDF-to-Word",
+    "unlocks": "AI slide generation, PPTX reading and formatting, layout-preserving Word conversion for text-based PDFs; scanned PDFs also need the OCR engine below",
+    "impact": "those features are unavailable; PDF preview and structural conversion still work"
+  },
+  "mineruRuntime": {
+    "name": "Scanned-document OCR engine (MinerU)",
+    "unlocks": "Word conversion and layout recognition for scanned PDFs with no text layer, editable PPT export; only needed for scans, and requires \"Slides and PDF-to-Word\"",
+    "impact": "scanned PDFs cannot be converted to Word; text-based PDFs are unaffected"
+  },
+  "kokoroRuntime": {
+    "name": "Speech synthesis",
+    "unlocks": "the Speech synthesis tab of the Voice panel",
+    "impact": "speech synthesis is unavailable"
+  },
+  "asrRuntime": {
+    "name": "On-device speech recognition",
+    "unlocks": "the \"recordings never leave this computer\" transcription tier",
+    "impact": "only the two cloud transcription tiers remain"
+  },
+  "features": {
+    "pptxGenerate": "AI slide generation",
+    "pptxFormat": "PPTX read/edit formatting",
+    "pdfToWordLayout": "PDF to Word (layout-preserving)",
+    "scannedOcrEntry": "scanned-document OCR entry (also needs the OCR engine)",
+    "scannedPdfToWord": "scanned PDF to Word",
+    "ocrParse": "OCR layout parsing",
+    "pptxEditableExport": "editable PPT export",
+    "ttsPanel": "speech synthesis panel",
+    "localTranscription": "on-device transcription"
+  }
+}

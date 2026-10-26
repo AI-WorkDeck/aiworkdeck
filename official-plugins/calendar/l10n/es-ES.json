@@ -1,0 +1,6 @@
+{
+  "plugin.name": "Calendario",
+  "plugin.description": "Calendario entre proyectos, tareas, recordatorios y enlaces a archivos.",
+  "view.sidebar.name": "Calendario",
+  "view.main.name": "Calendario"
+}

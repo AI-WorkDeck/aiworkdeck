@@ -16,7 +16,7 @@
 // 唯一被规范化的是 zetaoffice.getEditor：它现在返回带 kind 的描述符，
 // 宿主据此挂 <webview>（桌面）或 <iframe>（Web）。见 LibreOfficeEditor.vue。
 
-import { getAppLanguage } from '../utils/appLanguage.js'
+import { getLocaleMeta } from '../utils/appLanguage.js'
 
 /** 是否运行在桌面壳里。用于「仅桌面版可用」类的能力分支。 */
 export function isDesktopHost() {
@@ -38,7 +38,7 @@ function webEditorDescriptor() {
   q.set('lowa', WEB_EDITOR_BASE + 'lowa/')
   // LO 画布 UI 语言跟随应用语言（editor-main.js 的既有 ?uilang= 契约；引擎双语
   // 资源已随包）。桌面态的对应注入点在 desktop/main/zetaoffice-server.js editorUrl。
-  q.set('uilang', getAppLanguage())
+  q.set('uilang', getLocaleMeta().lowaUiLang)
   return { kind: 'iframe', url: WEB_EDITOR_BASE + 'editor.html?' + q.toString() }
 }
 
