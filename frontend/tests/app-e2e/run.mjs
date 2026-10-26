@@ -1706,7 +1706,7 @@ try {
     await mouseClickSel('.version-entry')
     await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
 
-    await mouseClickText('提交本次改动')
+    await mouseClickText('提交本次改动…')
     // 注意：brief 原写法选 .awd-input（模板里 <input> 标签自带的 class），
     // 但那是 uni-app <input> 组件编译到 H5 后的外层包装元素的 class，
     // 真正可编辑的原生 <input> 在其内部另有 .uni-input-input（顶部注释
@@ -1829,7 +1829,7 @@ try {
   })
 
   await step('结束追加工作并命名（产生 MODIFY 提交）', async () => {
-    await mouseClickText('提交本次改动')
+    await mouseClickText('提交本次改动…')
     await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
     const input = await page.$('.awd-dialog .uni-input-input')
     await input.click(); await input.type('端到端测试稿四', { delay: 15 })
@@ -2041,7 +2041,7 @@ try {
     await mouseClickSel('[title="资源管理器"]')
     await mouseClickSel('.version-entry')
     await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
-    await mouseClickText('提交本次改动')
+    await mouseClickText('提交本次改动…')
     await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
     const input = await page.$('.awd-dialog .uni-input-input')
     await input.click(); await input.type('J10 主线追加修改', { delay: 15 })
@@ -2507,7 +2507,7 @@ try {
       await mouseClickSel('[title="资源管理器"]')
       await mouseClickSel('.version-entry')
       await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
-      await mouseClickText('提交本次改动')
+      await mouseClickText('提交本次改动…')
       await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
       const input = await page.$('.awd-dialog .uni-input-input')
       await input.click(); await input.type('甲的撞车工作', { delay: 15 })
