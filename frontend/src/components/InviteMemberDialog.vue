@@ -8,8 +8,8 @@
         <view class="modal-close" @tap="close">×</view>
       </view>
 
-      <!-- Tabs -->
-      <view class="dialog-tabs">
+      <!-- 只有同事和客户两种邀请方式都可用时才显示切换栏。 -->
+      <view v-if="showClientTab" class="dialog-tabs">
         <view
           class="dialog-tab"
           :class="{ active: activeTab === 'MEMBER' }"
