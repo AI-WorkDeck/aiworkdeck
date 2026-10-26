@@ -1033,7 +1033,7 @@
 
     <!-- 内置常驻工作流多版本与规则编辑器弹窗（支持顶部切换四大工作流，dev-board#1438） -->
     <view v-if="showBuiltinWorkflowModal && activeModalWorkflow"
-          class="awd-modal-mask bw-modal-mask"
+          class="awd-dialog-mask bw-modal-mask"
           @tap="closeBuiltinWorkflowModal">
       <view class="awd-dialog bw-editor-dialog" @tap.stop>
         <view class="awd-dialog-header bw-editor-header">
