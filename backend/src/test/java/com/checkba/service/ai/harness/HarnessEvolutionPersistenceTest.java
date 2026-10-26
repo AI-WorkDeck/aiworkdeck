@@ -3,8 +3,10 @@
 
 package com.checkba.service.ai.harness;
 
+import com.checkba.model.entity.HarnessEvolutionEntry;
 import com.checkba.repository.HarnessEvolutionEntryRepository;
 import com.checkba.service.ai.skill.SkillProperties;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +45,20 @@ class HarnessEvolutionPersistenceTest {
 
     @Autowired
     private HarnessEvolutionEntryRepository repository;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Test
+    void longUnicodeJsonSurvivesDatabaseRoundTrip() {
+        String payload = "{\"rule\":\"" + "规则🙂".repeat(20000) + "\"}";
+        HarnessEvolutionEntry entry = new HarnessEvolutionEntry();
+        entry.setId("long-json");
+        entry.setPayloadJson(payload);
+        repository.saveAndFlush(entry);
+        entityManager.clear();
+        assertEquals(payload, repository.findById(entry.getId()).orElseThrow().getPayloadJson());
+    }
 
     @TempDir
     Path skillsDir;
