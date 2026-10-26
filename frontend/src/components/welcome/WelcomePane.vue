@@ -36,12 +36,23 @@
           @keydown.enter.exact.prevent="submitQuickChat"
         />
         <view class="welcome-quick-chat-actions">
-          <view class="welcome-quick-chat-pills">
-            <view class="welcome-quick-pill" @click="$emit('start-chat', { prompt: '' })">💬 {{ $t('workbench.welcome.enterChatMode') }}</view>
-            <view class="welcome-quick-pill" @click="$emit('quick-create-doc', 'docx')">📝 {{ $t('workbench.welcome.quickNewDocx') }}</view>
-            <view class="welcome-quick-pill" @click="$emit('quick-create-doc', 'md')">📄 {{ $t('workbench.welcome.quickNewMd') }}</view>
+          <view class="welcome-quick-chat-tools">
+            <view class="welcome-quick-tool" data-quick="new-docx" @tap="$emit('quick-create-doc', 'docx')">
+              <svg class="welcome-quick-tool-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path v-for="(d, gi) in ICONS.filePlus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <text>{{ $t('workbench.welcome.quickNewDocx') }}</text>
+            </view>
+            <view class="welcome-quick-tool" data-quick="new-md" @tap="$emit('quick-create-doc', 'md')">
+              <svg class="welcome-quick-tool-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path v-for="(d, gi) in ICONS.docText" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <text>{{ $t('workbench.welcome.quickNewMd') }}</text>
+            </view>
           </view>
-          <view class="welcome-quick-send" @click="submitQuickChat">{{ $t('workbench.welcome.quickChatSend') }} ↵</view>
+          <view class="welcome-quick-send" data-quick="send" @tap="submitQuickChat">
+            <text>{{ quickPrompt.trim() ? $t('workbench.welcome.quickChatSend') : $t('workbench.welcome.enterChatMode') }}</text>
+          </view>
         </view>
       </view>
 
@@ -345,62 +356,111 @@ export default {
 }
 
 .welcome-quick-chat {
-  margin: -12px 0 32px;
-  padding: 12px;
-  border: 1px solid var(--awd-border-strong);
+  margin: -8px 0 36px;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-dialog);
-  background: var(--awd-bg);
+  background: var(--awd-surface);
   box-shadow: var(--awd-shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.welcome-quick-chat:focus-within {
+  border-color: var(--awd-accent);
+  box-shadow: 0 0 0 2px var(--awd-accent-soft);
 }
 
 .welcome-quick-chat-input {
   width: 100%;
-  min-height: 54px;
+  min-height: 44px;
   max-height: 140px;
-  padding: 4px;
+  padding: 2px 0;
   box-sizing: border-box;
-  border: none;
-  background: transparent;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
   color: var(--awd-text);
   font-size: var(--awd-font-size-body);
   line-height: 1.6;
 }
 
-.welcome-quick-chat-actions,
-.welcome-quick-chat-pills {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+.welcome-quick-chat :deep(.uni-textarea-wrapper),
+.welcome-quick-chat :deep(.uni-textarea-textarea),
+.welcome-quick-chat :deep(.uni-textarea-placeholder),
+.welcome-quick-chat :deep(textarea) {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: var(--awd-text);
+  font-size: var(--awd-font-size-body);
+  line-height: 1.6;
+}
+
+.welcome-quick-chat :deep(.uni-textarea-placeholder) {
+  color: var(--awd-text-3);
 }
 
 .welcome-quick-chat-actions {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  margin-top: 10px;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--awd-border-subtle);
 }
 
-.welcome-quick-pill,
-.welcome-quick-send {
-  padding: 5px 9px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: var(--awd-panel-fs);
+.welcome-quick-chat-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
 
-.welcome-quick-pill {
-  background: var(--awd-surface-2);
+.welcome-quick-tool {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-text-2);
+  font-size: var(--awd-panel-fs);
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.welcome-quick-pill:hover {
-  color: var(--awd-accent-text);
-  background: var(--awd-accent-soft);
+.welcome-quick-tool:hover {
+  background: var(--awd-surface-2);
+  color: var(--awd-text);
+}
+
+.welcome-quick-tool-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
 }
 
 .welcome-quick-send {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: var(--awd-radius-sm);
   background: var(--awd-accent);
   color: var(--awd-text-on-accent);
+  font-size: var(--awd-panel-fs);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.welcome-quick-send:hover {
+  background: var(--awd-accent-hover);
 }
 
 .welcome-columns {
