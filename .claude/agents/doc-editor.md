@@ -55,6 +55,16 @@ Writer 的 `ShowTextBoundaries` 与格式标记联动：打开 ¶ 时会把文�
 
 ## 关键文件
 
+原生补全/续写与右键上下文：`native_completion_uno.py` 保持既有五个写作动作及右键两动作；token 同时校验文档、revision、权限代次、实际选区和前后文，IME/只读/旧 token 拒绝须确认零改动。成功写入后的后续资料 token 必须在宿主确认 revision、重新建立最终稿证明并核对刚写完的位置后取得；期间有新输入则返回空 token，不重放写入。资料为真实多段/表格，默认表格字体、边框、行段距与数字对齐读取同一份 `house-default.json`，缺失/损坏明确失败；项目覆盖画像尚未接线。`test_native_completion.py` 真实引擎覆盖采用、失败回滚、撤销重做、格式和 DOCX 重开。会话元数据（包括 `nativePermissionSeq`）必须在调用工具栏严格参数校验前剥除，`test_native_toolbar.py` 覆盖缩放/视图/外壳分派，防补全接入破坏已有按钮。
+
+`nativeOfficeAssistance` 复用原审校、补全与语义写作组件，但原生同页多实例必须使用各自容器、输入事件目标和视口边界；不能用全 document 查询另一份文档的菜单或监听它的 IME。正文提交应答后才通知补全/学习；权限待确认、撤回、换文档、销毁均撤掉可写状态与旧响应。原 WASM 默认参数不变。真实完整窗口验收独立于 jsdom 的双实例与生命周期回归。
+
+补全、语义写作、审校和标尺的上下文读取统一等待当前输入队列提交，宿主通用 transport 与组件直调都必须经过该屏障；返回后再核对模型、输入实例及权限代次，撤权后再授权也不能接回旧结果。补全写操作自身的通知仅在本次操作范围内延后失效，且须有成功回执、写后新 token 与未被真实输入打断的证明；不能用全局 busy 忽略选区或权限变化。`native-office-surface.test.js` 包含回读自触发、输入顺序、换文档与权限往返的负向回归。
+
+Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实修改。会话保留完整修订身份并分批核对 UNO 全文，完成一轮后核对 CAPI 映射；纯显示变化保留语义缓存、另读几何。同一个串行写操作只失效一次，仍发 `modified` 触发保存。只有正文、story/选区、撤销、脏状态、跟踪和权限证明一致的回读通知可标 `origin:'view-read'`；原始光标通知照常处理。丢弃 guard 时，待核验或正在核验的 Modify 必须保守失效，未知选区按普通事件发布；替换完整修订列表后不得继续使用旧证明。`test_native_revision_read.py` 是独立 600 修订真实引擎验收，便携回归另覆盖列表替换、权限撤回与在途核验。
+
+原生 PDF 使用 `storeToURL` 导出当前可见修订态的副本，允许只读；不切换源 URL，不改变脏状态、作者、跟踪或撤销栈，输出路径由会话拥有并清理。标尺支持四边页边距与三个段落缩进，每次拖动先取当前页/选区 token，松手只写一次；跨段混合上下文不显示伪一致手柄。锁定的 Writer 26.2 页边距 slot 参数名为 `Page`、单位整数 twip，不能沿用旧版本 property 名或传 mm/100；直接写页样式属性虽会变值却不产生可撤销记录，应走原生命令并回读验证。`test_native_ruler.py` 覆盖七项单步撤销、分数值量化、权限/过期拒绝与全部值保存重开。制表位、镜像页/复杂分节与完整签名包仍未验，不能据此默认替换所有文档引擎。
+
 **打开编辑器的重复工作（dev-board#1474）**：`LibreOfficeEditor.tryDocxPreview` 的自动预览只在引擎尚未就绪时开始，避免热备胎过继时与 `load_document` 同时解包、布局同一 DOCX；动态加载预览模块后再次核验。冷启动预览与失败后的显式 `force` 只读预览仍保留；热备胎探活失败转冷启动时，复用已下载且曾跳过预览的字节补回预览，文件、装载世代、检查点或缓存已失效则不重放，尚在下载的原回调只执行一次。`EditorToolbar.bootstrap` 先隐藏原生外壳、应用视图偏好并回读真实状态，再拉样式/字体清单；清单尚未返回不阻止视图按钮启用。设置偏好失败仍回读一次状态，不用默认值冒充引擎真实状态。`tests/toolbar/open-critical-path.test.mjs` 覆盖三文种顺序、慢清单、视图失败、热/冷启动预览及模块加载中的就绪竞争；保存、失败诊断与保活预算不变。
 
 **非空文件冷开的首个模型（dev-board#1474）**：`LibreOfficeEditor.mountEditor` 只在挂载时已知 `fileSize>0` 才向 guest 传 `initialDocument=1`，`editor-main`→`bootZetaOffice` 的 pthread bootstrap shim 转给 worker。worker 先建立 UNO desktop，首个模型直接由既有 `load_document` 装入，避免先建空白 Writer 再替换；spare、隐藏合并实例（file=null）、新空文件和大小未知的旧入口仍用空白 boot。relay ready 表示命令通道已接好，`ui_ready` 只在首个模型真正成功后发出，失败不得显示可编辑空白。模型出现前，模型命令回 `DOCUMENT_NOT_READY`；主题、右键配置和样式画像这三种引擎级配置仍可执行。缺 `bytes` 的 `load_document` 只更新署名，绝不能被异步作者解析抢先触发空白模型；显式空字节才允许必要的空白初始化。宿主空文件支路明确传空字节，无模型实例初始化失败继续落保存保护；已有空白实例的署名失败沿用容错。回归：`tests/lowa-unit/first-document-boot.test.mjs`、`tests/revision-view/boot-resize.test.mjs`、`tests/project-home/libre-redline-author.test.mjs`、`tests/toolbar/open-critical-path.test.mjs`。完整性能必须另测未预热实例的正文首帧、IME 和原文件保存，不能把跳过的 blank span 全当净收益（首次 native 公共初始化仍由真实文档承担）。

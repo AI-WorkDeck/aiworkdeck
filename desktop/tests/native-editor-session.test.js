@@ -24,6 +24,7 @@ test('unknown capabilities fail explicitly, without issuing a native command', a
 
 test('PDF export allows readonly, owns output path and returns verified bytes without a mutation',async()=>{
   const {session,events}=opened(true)
+  session.review={revision:0,items:[],hydratedCount:0}
   session.run=await fs.mkdtemp(path.join(os.tmpdir(),'awd-pdf-'))
   session.unoCall=async(action,params)=>{
     assert.equal(action,'export_pdf');assert.equal(params.nativeOutputPath,path.join(session.run,'export.pdf'))
@@ -40,6 +41,7 @@ test('PDF export allows readonly, owns output path and returns verified bytes wi
 
 test('PDF state uncertainty locks the native session instead of returning bytes',async()=>{
   const {session}=opened(true)
+  session.review={revision:0,items:[],hydratedCount:0}
   session.run=await fs.mkdtemp(path.join(os.tmpdir(),'awd-pdf-'))
   session.unoCall=async()=>{throw Error('PDF_EXPORT_OUTCOME_UNKNOWN: source changed')}
   try{
@@ -137,7 +139,7 @@ test('readonly blocks text, formatting key, review and export while retaining na
   await assert.rejects(session.execute('native_input', { action: 'input_text', params: { documentEpoch: 7, text: '中' } }), { code: 'READ_ONLY' })
   await assert.rejects(session.execute('native_input', { action: 'input_key', params: { documentEpoch: 7, eventType: 0, charCode: 0, keyCode: 0x2000 | 513 } }), { code: 'READ_ONLY' })
   await session.execute('native_input', { action: 'input_key', params: { documentEpoch: 7, eventType: 0, charCode: 0, keyCode: 1024 } })
-  assert.equal(calls.length, 1)
+  assert.deepEqual(calls.map(call=>call.action), ['input_key','selected_text'])
 })
 test('old epoch and malformed tracking flags cannot mutate current model', async () => {
   const { session, calls } = opened()
@@ -358,7 +360,7 @@ test('document commands use session authority and writable bookmarks join the un
   const {session}=opened();session.revision=42
   session.review={revision:42,items:[],hydratedCount:0}
   const calls=[];let edits=0
-  session.uno={call:async(action,params)=>{calls.push({action,params});return {success:true,revision:params.nativeRevision}}}
+  session.uno={call:async(action,params)=>{if(action==='capture_view_read')return {token:'proof'};calls.push({action,params});return {success:true,revision:params.nativeRevision}}}
   session.undo.edit=async run=>{edits++;return run()}
   const result=await session.execute('get_document_text',{nativeReadOnly:true,nativeDocumentEpoch:999,nativeRevision:999,__agent:true})
   assert.equal(result.revision,42)
@@ -396,6 +398,7 @@ test('agent view callbacks require fresh complete revision proof before retainin
   let currentText=item.text,proofs=0
   session.engine.call=async()=>({documentEpoch:7,items:[{...item}]})
   session.unoCall=async(method)=>{
+    if(method==='capture_view_read')return {token:'proof'}
     if(method==='get_document_text'){session.event(callback);return {success:true}}
     if(method==='check_revision_batch'){proofs++;return {entries:[{...item,index:0,text:currentText}],total:1}}
     throw Error(method)
@@ -427,6 +430,7 @@ test('view proofs are bounded, yield to queued input and cannot publish into ano
   const batches=[],order=[]
   session.engine.call=async()=>({documentEpoch:7,items})
   session.unoCall=async(method,params)=>{
+    if(method==='capture_view_read')return {token:'proof'}
     if(method==='get_document_text'){
       for(let index=0;index<60;index++)session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:31,payload:JSON.stringify({redline:{action:'Modify',index:String(index)}})})
       return {success:true}
@@ -453,7 +457,7 @@ test('selected native text commits inside one owned context and collapsed typing
     session.unoCall=async(method,params)=>{calls.push(method);return {...params,grouped,closed:true}}
     session.engine.call=async(action,params)=>{calls.push(action);return {applied:true,lastInputSeq:params.inputSeq,documentEpoch:7}}
     await session.execute('native_input',{action:'input_text',params:{documentEpoch:7,inputSeq:1,text:'中文'}})
-    assert.deepEqual(calls,grouped?['input_undo_begin','input_text','input_undo_end']:['input_undo_begin','input_text'])
+    assert.deepEqual(calls,grouped?['input_undo_begin','input_text','input_undo_end','selected_text']:['input_undo_begin','input_text','selected_text'])
   }
 })
 
@@ -560,10 +564,50 @@ test('non-agent review context uses the existing verified final-view callback gu
   assert.equal(session.revision,0)
 })
 
+test('completion returns a continuation token only after authoritative post-edit proof',async()=>{
+  const {session}=opened();const calls=[]
+  session.listRevisions=async()=>{session.review={revision:session.revision,items:[],hydratedCount:0}}
+  session.unoCall=async(action,params)=>{
+    if(action==='capture_view_read')return {token:'proof'}
+    calls.push({action,params,revision:session.revision})
+    if(action==='accept_completion')return {success:true,changed:true,textChanged:true,trackingChanged:false,token:'pending',inserted:'后缀'}
+    assert.equal(action,'get_completion_context');assert.equal(params.nativeAfterToken,'pending');assert.equal(params.nativeExpectedRevision,1)
+    return {success:true,token:'fresh',revision:session.revision}
+  }
+  const result=await session.execute('accept_completion',{token:'old',prefix:'前',text:'前后缀'})
+  assert.equal(result.token,'fresh');assert.equal(result.revision,1);assert.equal(result.inserted,'后缀')
+  assert.deepEqual(calls.map(x=>[x.action,x.revision]),[['accept_completion',0],['get_completion_context',1]])
+})
+
+test('intervening input drops only the follow-up token without replaying a completed insertion',async()=>{
+  const {session}=opened();let writes=0
+  session.listRevisions=async()=>{session.changed();session.review={revision:session.revision,items:[],hydratedCount:0}}
+  session.unoCall=async(action)=>{
+    assert.equal(action,'accept_completion');writes++
+    return {success:true,changed:true,textChanged:true,trackingChanged:false,token:'pending',inserted:'一次'}
+  }
+  const result=await session.execute('accept_completion',{token:'old',prefix:'前',text:'前一次'})
+  assert.equal(result.success,true);assert.equal(result.token,null);assert.equal(result.inserted,'一次');assert.equal(writes,1)
+})
+
+test('completion write refusal is nonfatal, readonly gates all three writes and permission sequence is owned',async()=>{
+  const {session}=opened();let proofReads=0
+  session.listRevisions=async()=>{proofReads++;throw Error('not needed for refused write')}
+  session.unoCall=async()=>({success:false,reason:'composing',changed:false,textChanged:false,trackingChanged:false})
+  assert.equal((await session.execute('accept_writing_suggestion',{composing:true})).reason,'composing')
+  assert.equal(session.failure,undefined);assert.equal(proofReads,0)
+  const {session:readonly}=opened(true)
+  for(const action of ['accept_completion','insert_completion_content','accept_writing_suggestion'])
+    await assert.rejects(readonly.execute(action),{code:'READ_ONLY'})
+  session.permissionSeq=8
+  session.uno={call:async(action,params)=>{assert.equal(params.nativePermissionSeq,8);return {success:true}}}
+  await NativeEditorSession.prototype.unoCall.call(session,'get_completion_context',{nativePermissionSeq:99})
+})
+
 test('final-text snapshots hydrate without the sidebar and reuse current complete proof',async()=>{
   const {session}=opened(true);let hydrated=0,reads=0
   session.listRevisions=async()=>{hydrated++;session.review={revision:session.revision,items:[],hydratedCount:0}}
-  session.unoCall=async()=>{reads++;return {success:true,revision:session.revision}}
+  session.unoCall=async(method)=>{if(method==='capture_view_read')return {token:'proof'};reads++;return {success:true,revision:session.revision}}
   for(const [action,params] of [['get_document_text',{__agent:true}],['get_review_context',{}],['goto_review_range',{revision:0}]])
     assert.equal((await session.execute(action,params)).revision,0)
   assert.equal(hydrated,1);assert.equal(reads,3)
@@ -590,4 +634,122 @@ test('evidence navigation shares host model authority and restoration failure lo
   session.unoCall=async()=>{throw Error('EDIT_OUTCOME_UNKNOWN: final restoration failed')}
   await assert.rejects(session.execute('collapse_selection'),/EDIT_OUTCOME_UNKNOWN/)
   await assert.rejects(session.execute('get_selection'),/EDIT_OUTCOME_UNKNOWN/)
+})
+
+
+test('selection readback requires complete native proof; unknown navigation and proof errors remain ordinary',async()=>{
+  const {session,events}=opened(true)
+  session.review={revision:0,items:[],hydratedCount:0}
+  let selectionUnchanged=true,contentUnchanged=true,broken=false,sequence=0
+  const emit=()=>session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:2,payload:String(++sequence)})
+  session.unoCall=async(method)=>{
+    if(method==='capture_view_read')return {token:'owned-proof'}
+    if(method==='check_view_read'){if(broken)throw Error('unreadable');return {selectionUnchanged,contentUnchanged}}
+    if(method==='get_review_context'){emit();return {success:true,revision:session.revision}}
+    throw Error(method)
+  }
+  await session.execute('get_review_context')
+  assert.equal(events.filter(e=>e.type==='selection').at(-1).origin,'view-read')
+  selectionUnchanged=false;emit();await new Promise(r=>setTimeout(r,10));await session.queue
+  assert.equal(events.filter(e=>e.type==='selection').at(-1).origin,undefined)
+  assert.equal(session.revision,0)
+  selectionUnchanged=true;await session.execute('get_review_context')
+  broken=true;emit();await new Promise(r=>setTimeout(r,10));await session.queue
+  assert.equal(events.filter(e=>e.type==='selection').at(-1).origin,undefined)
+  assert.equal(session.revision,1)
+})
+
+test('owned write callback burst invalidates once and still emits modified; later external edits invalidate again',async()=>{
+  const {session,events}=opened()
+  const callback={type:'callback',documentEpoch:7,viewId:3,callbackType:31,payload:JSON.stringify({redline:{action:'Modify',index:1}})}
+  session.unoCall=async()=>{for(let i=0;i<100;i++)session.event(callback);return {success:true,changed:true,textChanged:true,trackingChanged:false}}
+  await session.execute('insert_at_cursor',{text:'once'})
+  assert.equal(session.revision,1)
+  assert.equal(events.filter(e=>e.type==='review-changed').length,1)
+  assert.equal(events.filter(e=>e.type==='modified').length,1)
+  session.event(callback);assert.equal(session.revision,2)
+})
+
+test('pointer and permission boundaries revoke readback provenance before native callbacks',async()=>{
+  const {session,events}=opened(true)
+  session.review={revision:0,items:[],hydratedCount:0}
+  session.beginViewRead().selectionProof='old-proof'
+  session.engine.call=async(action)=>{if(action==='input_mouse')session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:2,payload:'moved'});return {success:true}}
+  await session.execute('native_input',{action:'input_mouse',params:{documentEpoch:7}})
+  assert.equal(events.find(e=>e.type==='selection').origin,undefined)
+  assert.equal(session.viewReadGuard,null)
+})
+
+test('replacing a review identity publishes pending unproven selections before another read',async()=>{
+  const {session,events}=opened(true)
+  session.review={revision:0,items:[],hydratedCount:0}
+  const previous=session.beginViewRead();previous.selectionProof='previous-proof'
+  session.engine.call=async action=>{
+    if(action==='review_snapshot'){
+      session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:2,payload:'new-selection'})
+      return {documentEpoch:7,refreshEpoch:2,items:[]}
+    }
+    return {success:true}
+  }
+  await session.execute('list_revisions')
+  assert.notEqual(session.review,previous.identity)
+  assert.deepEqual(events.filter(e=>e.type==='selection'),[{type:'selection',documentEpoch:7}])
+  assert.equal(previous.selections.length,0)
+  assert.equal(session.viewReadGuard,null)
+})
+
+test('hydration cannot publish a new full text under an old revision while an unknown Modify is pending',async()=>{
+  const {session,events}=opened(true)
+  const item={revisionId:'1',identifier:'uno-1',author:'A',type:'Delete',dateTime:'date',description:'same short summary',text:'old full text',textAvailable:true}
+  const previous={documentEpoch:7,revision:0,items:[item],hydratedCount:1}
+  session.review=previous;session.beginViewRead()
+  let snapshots=0
+  session.engine.call=async()=>{
+    if(++snapshots===3)session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:31,payload:JSON.stringify({redline:{action:'Modify',index:'1'}})})
+    return {documentEpoch:7,refreshEpoch:2,items:[item]}
+  }
+  session.unoCall=async()=>({start:0,total:1,entries:[{...item,index:0,text:'different full text behind the same summary'}]})
+  await assert.rejects(session.execute('list_revisions'),/STALE_REVIEW_BATCH/)
+  assert.equal(session.review,previous);assert.equal(session.revision,1)
+  assert.equal(events.filter(e=>e.type==='review-changed').length,1)
+})
+
+test('mouse, navigation and permission boundaries conservatively invalidate unverified Modify events',async()=>{
+  for(const boundary of ['mouse','navigation','permission']){
+    const {session,events}=opened(true)
+    session.model.trackingInitialized=true
+    const item={revisionId:'1',identifier:'uno-1',text:'old full text',textAvailable:true}
+    session.review={revision:0,items:[item],hydratedCount:1};session.beginViewRead()
+    session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:31,payload:JSON.stringify({redline:{action:'Modify',index:'1'}})})
+    session.unoCall=async()=>({success:true})
+    session.engine.call=async(action,params)=>({success:true,...params,lastInputSeq:0})
+    if(boundary==='mouse')await session.execute('native_input',{action:'input_mouse',params:{documentEpoch:7}})
+    else if(boundary==='navigation')await session.execute('goto_bookmark',{name:'anchor'})
+    else await session.execute('set_read_only',{documentEpoch:7,permissionSeq:1,readOnly:true})
+    assert.equal(session.revision,1,boundary);assert.equal(session.viewReadGuard,null)
+    assert.equal(events.filter(e=>e.type==='review-changed').length,1,boundary)
+  }
+})
+
+test('permission revocation also invalidates a Modify whose full-text proof is in flight',async()=>{
+  const {session,events}=opened(true),entered=latch(),release=latch()
+  session.model.trackingInitialized=true
+  const item={revisionId:'1',identifier:'uno-1',text:'old full text',textAvailable:true}
+  session.review={revision:0,items:[item],hydratedCount:1}
+  const guard=session.beginViewRead();guard.pending.add(0)
+  session.unoCall=async()=>{entered.resolve();await release.promise;return {total:1,entries:[{...item,index:0,text:'new full text'}]}}
+  session.engine.call=async(action,params)=>({success:true,...params,lastInputSeq:0})
+  const checking=session.verifyViewRead(guard);await entered.promise
+  await session.execute('set_read_only',{documentEpoch:7,permissionSeq:1,readOnly:true})
+  release.resolve();await checking
+  assert.equal(session.revision,1);assert.equal(events.filter(e=>e.type==='review-changed').length,1)
+})
+
+test('explicit mutation invalidation absorbs pending proof exactly once without recursion',()=>{
+  const {session,events}=opened()
+  session.review={revision:0,items:[],hydratedCount:0}
+  session.beginViewRead().pending.add(0)
+  session.changed()
+  assert.equal(session.revision,1);assert.equal(session.viewReadGuard,null)
+  assert.deepEqual(events.map(e=>e.type),['modified'])
 })

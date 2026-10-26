@@ -5,14 +5,42 @@ const {JSDOM}=require('../../frontend/node_modules/jsdom')
 const {createDocumentInput}=require('../../frontend/src/composables/nativeDocumentInput.js')
 const tick=()=>new Promise(r=>setImmediate(r))
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return{promise,resolve,reject}}
-function harness(request) {
+function harness(request, hooks = {}) {
  const dom=new JSDOM('<div><canvas></canvas></div>',{pretendToBeVisual:true}),calls=[],errors=[]
  const controller=createDocumentInput({canvas:dom.window.document.querySelector('canvas'),viewport:()=>({xTwips:0,yTwips:0,widthTwips:1500,heightTwips:1500,cssWidth:100,cssHeight:100}),
-  request:async(action,params)=>{calls.push({action,params});if(request)return request(action,params);return{applied:true,documentEpoch:1,viewId:0,lastInputSeq:params.inputSeq}},onError:error=>errors.push(error)})
+  request:async(action,params)=>{calls.push({action,params});if(request)return request(action,params);return{applied:true,documentEpoch:1,viewId:0,lastInputSeq:params.inputSeq}},onError:error=>errors.push(error),...hooks})
  controller.setDocument({documentEpoch:1,viewId:0,readOnly:false});controller.handleCallback({callbackType:1,documentEpoch:1,viewId:0,payload:'100,100,0,100'})
  const input=dom.window.document.querySelector('input')
  return{controller,input,dom,calls,errors,type:text=>input.dispatchEvent(new dom.window.InputEvent('input',{bubbles:true,data:text,inputType:'insertText'})),close(){controller.dispose();dom.window.close()}}
 }
+test('writing notifications require native confirmation and cannot cross a permission epoch',async()=>{
+ const held=deferred(),committed=[]
+ const h=harness(async(action,p)=>action==='input_text'?held.promise:{applied:true,documentEpoch:1,viewId:0,lastInputSeq:p.inputSeq},{onCommitted:text=>committed.push(text)})
+ try{
+  assert.equal(h.controller.element,h.input)
+  h.type('在途文字');await tick();assert.deepEqual(committed,[])
+  h.controller.setReadOnly(true,{pending:true});h.controller.setReadOnly(false)
+  held.resolve({applied:true,documentEpoch:1,viewId:0,lastInputSeq:1});await h.controller.flush()
+  assert.deepEqual(committed,[])
+ }finally{held.resolve({applied:true,documentEpoch:1,viewId:0,lastInputSeq:1});h.close()}
+ const confirmed=[];const second=harness(undefined,{onCommitted:text=>confirmed.push(text)})
+ try{
+  second.input.dispatchEvent(new second.dom.window.CompositionEvent('compositionstart',{bubbles:true}))
+  second.input.dispatchEvent(new second.dom.window.CompositionEvent('compositionend',{bubbles:true,data:'中文'}));second.type('中文')
+  await second.controller.flush();assert.deepEqual(confirmed,['中文'])
+ }finally{second.close()}
+})
+test('assistance keyboard routing precedes native keys but never intercepts an active IME',async()=>{
+ const seen=[],leaked=[];const h=harness(undefined,{onAssistanceKey:event=>{seen.push(event.key);event.preventDefault();return true}})
+ try{
+  h.dom.window.addEventListener('keydown',event=>leaked.push(event.key))
+  h.input.dispatchEvent(new h.dom.window.KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:'Tab'}));await tick()
+  assert.deepEqual(seen,['Tab']);assert.deepEqual(leaked,[]);assert.equal(h.calls.length,0)
+  h.input.dispatchEvent(new h.dom.window.CompositionEvent('compositionstart',{bubbles:true}))
+  h.input.dispatchEvent(new h.dom.window.KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:'Tab',isComposing:true}));await tick()
+  assert.deepEqual(seen,['Tab']);assert.equal(h.calls.length,0)
+ }finally{h.close()}
+})
 test('revocation during IME locks immediately and late completion cannot replay after regrant',async()=>{
  const h=harness();try{
   h.input.dispatchEvent(new h.dom.window.CompositionEvent('compositionstart',{bubbles:true}))

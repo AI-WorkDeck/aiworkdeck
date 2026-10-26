@@ -165,6 +165,19 @@ class ViewModel:
 
 
 class ViewTests(unittest.TestCase):
+    def test_session_identity_metadata_does_not_leak_into_view_options(self):
+        import native_review_uno as review
+        metadata = dict(documentUrl='file:///owned.docx', nativeReadOnly=False,
+                        nativeDocumentEpoch=2, nativeRevision=4, nativePermissionSeq=3)
+        model = ViewModel()
+        uno = SimpleNamespace(Any=Uno.Any, invoke=Uno.invoke, getConstantByName=lambda _: 3)
+        self.assertEqual(review.dispatch('set_zoom', {**metadata, 'delta': 10}, model, uno)['zoom'], 110)
+        self.assertTrue(review.dispatch('set_view_options', {**metadata, 'ruler': True}, model, Uno)['ruler'])
+        self.assertFalse(review.dispatch('set_chrome', {**metadata, 'menubar': False,
+                            'toolbars': False, 'statusbar': False}, model, Uno)['visible'])
+        self.assertTrue(model.modified)
+        self.assertTrue(model.recording)
+
     def test_view_options_strict_boolean_and_unknown_rejected_before_writes(self):
         for options in [{'ruler':1},{'formattingMarks':'true'},{'unknown':True}]:
             model=ViewModel()

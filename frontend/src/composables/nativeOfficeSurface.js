@@ -3,6 +3,8 @@
 import './nativeDocumentInput.js'
 import { attachDocumentLinkClicks } from './zetaOfficeLinkClick.js'
 import { attachReviewBalloons } from './zetaOfficeReviewBalloons.js'
+import { attachNativeOfficeAssistance } from './nativeOfficeAssistance.js'
+import { attachNativeDocumentRulers } from './nativeDocumentRulers.js'
 import { CURSOR_RADIUS } from '../utils/insightMatch.js'
 
 // Implements the existing lo-relay transport. There is no HTTP publication here:
@@ -24,11 +26,11 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
   let model, input, disposed = false, paintJob, paintAgain = false, paintTimer, layoutTimer, failed = false
   let desiredReadOnly = null, permissionRevision = 0, permissionSeq = 0, permissionApplied = -1, permissionJob
   let insightSub = false, contextGeneration = 0, contextJob, pendingContext, lastContextAt = 0, detachLinks, modelLoads = 0
-  let reviewBalloons
+  let reviewBalloons, assistance, rulers
   const emit = message => { if (!disposed) for (const listener of [...listeners]) listener({ __lo: 'lo-relay', ...message }) }
   const fail = error => {
     if (failed || disposed) return
-    failed = true; input?.dispose(); reviewBalloons?.destroy()
+    failed = true; rulers?.destroy(); rulers = null; assistance?.destroy(); assistance = null; input?.dispose(); reviewBalloons?.destroy()
     emit({ type: 'engine-failed', message: error.message || String(error) })
   }
   const request = async (action, params) => {
@@ -90,6 +92,8 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
     const seq = permissionSeq = Math.max(permissionSeq, owner.permissionSeq || 0) + 1
     const readOnly = desiredReadOnly
     owner.readOnly = true
+    rulers?.invalidate()
+    assistance?.setWritable(false)
     input?.setReadOnly(true, { pending: true })
     const job = { owner, revision }
     job.promise = (async () => {
@@ -100,6 +104,8 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
             || !Number.isSafeInteger(result.lastInputSeq) || result.lastInputSeq < 0) throw Error('Native permission acknowledgement does not match')
         owner.readOnly = readOnly; owner.permissionSeq = seq; permissionApplied = revision
         input?.setReadOnly(readOnly, { pending: false })
+        assistance?.setWritable(!readOnly)
+        rulers?.invalidate()
         return result
       } catch (error) {
         if (owner !== model || revision !== permissionRevision || disposed) return { stale: true }
@@ -118,6 +124,8 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
     if (desiredReadOnly !== readOnly) { desiredReadOnly = readOnly; permissionRevision++ }
     if (model && permissionApplied === permissionRevision) return { success: true, readOnly: model.readOnly, documentEpoch: model.documentEpoch, permissionSeq: model.permissionSeq }
     input?.setReadOnly(true, { pending: true })
+    assistance?.setWritable(false)
+    rulers?.invalidate()
     if (!model) return { pending: true, readOnly: true }
     return applyPermission(model, permissionRevision)
   }
@@ -131,6 +139,7 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
       widthTwips: Math.min(model.widthTwips, Math.round(width / scale)), heightTwips: Math.round(height / scale) }
   }
   function drawRulers(viewport) {
+    if (rulers?.isDragging()) return
     horizontalRuler.hidden = !model.view.ruler; verticalRuler.hidden = !model.view.verticalRuler
     if (horizontalRuler.hidden && verticalRuler.hidden) return
     const { inset, insetX, scale, width, height } = viewport
@@ -153,6 +162,7 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
         }
       }
     }
+    rulers?.render()
   }
   function scheduleLayout() {
     doc.defaultView.clearTimeout(layoutTimer)
@@ -203,6 +213,7 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
       canvas.style.left = Math.round(viewport.xTwips * viewport.scale) + 'px'
       canvas.getContext('2d').putImageData(new ImageData(transparentPageExterior(tile, owner.layout.pages), tile.width, tile.height), 0, 0)
       drawRulers(viewport)
+      assistance?.layout()
       await input?.viewportChanged()
     } catch (error) {
       if (owner === model && !disposed) throw error
@@ -212,9 +223,9 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
     if (disposed || paintTimer) return
     paintTimer = doc.defaultView.setTimeout(() => { paintTimer = null; paint().catch(fail) }, 16)
   }
-  const scroll = () => { input?.viewportChanged()?.catch(fail); reviewBalloons?.cursorMoved(); schedulePaint() }
+  const scroll = () => { rulers?.invalidate(); input?.viewportChanged()?.catch(fail); reviewBalloons?.cursorMoved(); assistance?.cursorMoved(); assistance?.layout(); schedulePaint() }
   element.addEventListener('scroll', scroll)
-  const resize = new ResizeObserver(schedulePaint); resize.observe(element)
+  const resize = new ResizeObserver(() => { rulers?.invalidate(); assistance?.layout(); schedulePaint() }); resize.observe(element)
   const off = api.onNativeEvent(info.sessionId, event => {
     if (event.type === 'engine-failed') { fail(Error(event.message || 'Native worker stopped')); return }
     if (!model || event.documentEpoch !== model.documentEpoch) return
@@ -230,25 +241,47 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
       schedulePaint()
     } else {
       emit(event)
-      if (event.type === 'selection') { queueContext(); reviewBalloons?.cursorMoved() }
-      if (event.type === 'modified') { reviewBalloons?.documentChanged(); schedulePaint() }
+      if (event.type === 'selection') {
+        queueContext(); rulers?.refresh(); reviewBalloons?.cursorMoved()
+        // Only the main process's completed read proof can identify view-only
+        // readback. Untagged/asynchronous native selection remains a real change.
+        if (event.origin !== 'view-read') assistance?.cursorMoved()
+      }
+      if (event.type === 'modified') { rulers?.refresh(); reviewBalloons?.documentChanged(); assistance?.documentChanged(); schedulePaint() }
     }
   })
-  async function execute(action, params = {}) {
-    const previous = model
+  async function execute(action, params = {}, assistanceOperation = null) {
+    const previous = model, previousInput = input, previousPermission = permissionRevision
+    const contextRead = ['get_completion_context', 'get_context_menu_context', 'capture_writing_context', 'get_review_context', 'get_ruler_state'].includes(action)
+    const currentContext = () => previous === model && previousInput === input && previousPermission === permissionRevision && !modelLoads && !disposed && !failed
     const read = ['get_ui_state', 'get_selection', 'list_revisions', 'list_comments', 'list_fonts', 'list_styles',
       'get_document_text', 'get_paragraph', 'get_outline', 'find_text_locations', 'get_cursor_context',
-      'get_hyperlink_at_cursor', 'get_bookmark_context', 'check_link_anchors', 'get_selection_hyperlink', 'get_review_layout'].includes(action)
+      'get_hyperlink_at_cursor', 'get_bookmark_context', 'check_link_anchors', 'get_selection_hyperlink', 'get_review_layout',
+      'get_review_context', 'get_completion_context', 'get_context_menu_context', 'capture_writing_context', 'set_host_context_menu', 'get_ruler_state'].includes(action)
+    if (!read && assistanceOperation !== assistance?.mutationScope) assistance?.externalChange()
     const reviewOwner = !read && action !== 'set_review_balloons' ? reviewBalloons : null
     let suspended = false, loading = false
     try {
+      if (contextRead) {
+        await previousInput?.flush()
+        if (!currentContext()) throw Error('STALE_DOCUMENT_ASSISTANCE')
+      }
       reviewOwner?.suspend(action)
       // Composition cannot be committed implicitly by Save, toolbar or retarget.
-      if (input && !read) { await input.suspend(); suspended = true }
+      if (input && !read) {
+        let suspension
+        if (assistanceOperation) assistanceOperation.suspending = true
+        try { suspension = input.suspend() }
+        finally { if (assistanceOperation) assistanceOperation.suspending = false }
+        await suspension; suspended = true
+      }
       if (action === 'load_document') {
         loading = true; modelLoads++; invalidateContext(); detachLinks?.(); detachLinks = null
+        assistance?.destroy(); assistance = null
+        rulers?.destroy(); rulers = null
       }
       const result = await request(action, { ...params, ...(model ? { documentEpoch: model.documentEpoch } : {}) })
+      if (contextRead && !currentContext()) throw Error('STALE_DOCUMENT_ASSISTANCE')
       if (disposed) throw Error('Native editor disposed during command')
       if (action === 'load_document' && result.nativeModel) {
         invalidateContext(); detachLinks?.(); detachLinks = null
@@ -268,7 +301,10 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
           request: (name, values) => request('native_input', { documentEpoch: model.documentEpoch, action: name, params: values }),
           writeClipboard: text => doc.defaultView.navigator.clipboard.writeText(text),
           onSave: () => emit({ type: 'save-request' }), onError: fail,
-          onChanged: schedulePaint,
+          onChanged: () => { assistance?.externalChange(); schedulePaint() },
+          onState: state => assistance?.setWritable(state.readOnly === false && !state.permissionPending && !state.failed),
+          onCommitted: text => { assistance?.committed(text); rulers?.refresh() },
+          onAssistanceKey: event => assistance?.keydown(event) || false,
           onEnsureVisible: rect => {
             const viewport = metrics(), top = rect.y * viewport.scale
             if (top < element.scrollTop || top > element.scrollTop + element.clientHeight - 40) element.scrollTop = Math.max(0, top - 80)
@@ -280,8 +316,23 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
         reviewBalloons?.destroy()
         reviewBalloons = attachReviewBalloons({ canvas, execute,
           transport: { send: emit }, locale: doc.documentElement.lang || 'zh-CN' })
+        const ownedInput = input
+        const executeOwned = async (action, params, operation) => {
+          const current = () => owner === model && ownedInput === input && !modelLoads && !disposed && !failed
+          if (!current()) throw Error('STALE_DOCUMENT_ASSISTANCE')
+          const result = await execute(action, params, operation)
+          if (!current()) throw Error('STALE_DOCUMENT_ASSISTANCE')
+          return result
+        }
+        assistance = attachNativeOfficeAssistance({ element, canvas, input, send: emit, execute: executeOwned })
+        assistance.setWritable(!owner.readOnly)
+        rulers = attachNativeDocumentRulers({ element, horizontal: horizontalRuler, vertical: verticalRuler, input,
+          model: () => model, viewport: metrics,
+          canWrite: () => owner === model && !modelLoads && !disposed && !failed && !owner.readOnly && !input.getState().permissionPending && !input.getState().suspended,
+          execute: executeOwned })
+        rulers.refresh()
       } else if (model) {
-        if (result.nativeView) model.view = result.nativeView
+        if (result.nativeView) { model.view = result.nativeView; rulers?.refresh() }
         if (result.nativeLayout) model.layout = result.nativeLayout
         if (result.widthTwips) model.widthTwips = result.widthTwips
         if (result.heightTwips) model.heightTwips = result.heightTwips
@@ -315,7 +366,7 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
         if (insightSub) queueContext(null, true)
         return
       }
-      if (message.type !== 'exec') return
+      if (message.type !== 'exec') { if (!modelLoads) assistance?.receive(message); return }
       execute(message.action, message.params).then(result => emit({ type: 'result', reqId: message.reqId, result }),
         error => emit({ type: 'result', reqId: message.reqId, result: { success: false, code: error.code || 'NATIVE_ACTION_FAILED', message: error.message } }))
     }
@@ -330,6 +381,8 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
     focus() { input?.focus() },
     dispose() {
       if (disposed) return
+      assistance?.destroy(); assistance = null
+      rulers?.destroy(); rulers = null
       disposed = true; invalidateContext(); detachLinks?.(); reviewBalloons?.destroy(); off(); listeners.clear(); resize.disconnect(); element.removeEventListener('scroll', scroll)
       doc.defaultView.clearTimeout(paintTimer); doc.defaultView.clearTimeout(layoutTimer); input?.dispose()
       return api.nativeClose(info.sessionId)

@@ -11,6 +11,8 @@ only for a user entering balloons from another mode. Display transitions never
 write RecordChanges; tracking has a separate, verified operation.
 """
 import argparse
+import hashlib
+import uuid
 import json
 import sys
 import native_toolbar_uno as toolbar
@@ -20,10 +22,15 @@ import native_input_uno as native_input
 import native_document_edit_uno as document_edit
 import native_evidence_uno as evidence
 import native_export_uno as export
+import native_completion_uno as completion
+import native_ruler_uno as ruler
 
 document_commands = document.NativeDocumentCommands()
 input_undo = native_input.NativeInputUndo()
 document_edits = document_edit.NativeDocumentEdits(document_commands)
+completion_commands = completion.NativeCompletionCommands()
+ruler_commands = ruler.NativeRulerCommands()
+view_read_proof = None
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, required=True)
@@ -259,11 +266,50 @@ def apply_tracking(model, enabled, initialize):
     return {'enabled': actual, 'changed': changed, 'modified': modified}
 
 
+def view_read_state(model):
+    cursor = model.getCurrentController().getViewCursor()
+    text = cursor.getText()
+    prefix = text.createTextCursor()
+    prefix.gotoStart(False)
+    prefix.gotoRange(cursor.getStart(), True)
+    # Preserve story identity as a UNO reference; identical cell text must not
+    # make navigation to another cell look like a readback of the same range.
+    digest = lambda value: hashlib.sha256(value.encode('utf-8')).hexdigest()
+    return dict(text=text, start=prefix.getString(), selected=cursor.getString(),
+                body=digest(model.getText().getString()), story=digest(text.getString()),
+                undo=undo_state(model), recording=model.getPropertyValue('RecordChanges'),
+                modified=model.isModified(), display=model.getPropertyValue('RedlineDisplayType'))
+
+
+def view_read_identity(params):
+    return tuple(params.get(key) for key in ('documentUrl', 'nativeDocumentEpoch', 'nativeRevision', 'nativePermissionSeq'))
+
+
 def dispatch(method, params, model, uno_mod, context=None):
     ctrl = model.getCurrentController()
+    if method in ('capture_view_read', 'check_view_read'):
+        global view_read_proof
+        state, identity = view_read_state(model), view_read_identity(params)
+        if method == 'capture_view_read':
+            token = uuid.uuid4().hex
+            view_read_proof = (token, model, identity, state)
+            return {'token': token}
+        previous = view_read_proof
+        if not previous or params.get('token') != previous[0] or model != previous[1] or identity != previous[2]:
+            return dict(contentUnchanged=False, selectionUnchanged=False)
+        before = previous[3]
+        content = all(before[key] == state[key] for key in ('body', 'undo', 'recording', 'modified', 'display'))
+        selected = all(before[key] == state[key] for key in ('text', 'start', 'selected', 'story'))
+        return dict(contentUnchanged=content, selectionUnchanged=selected)
     if method == 'export_pdf':
         return export.export_pdf(model, uno_mod, params.get('nativeOutputPath'))
-    toolbar_params = {key: value for key, value in params.items() if key not in ('documentUrl', 'nativeReadOnly', 'nativeDocumentEpoch', 'nativeRevision')}
+    if method in ('get_ruler_state', 'set_ruler_state'):
+        return ruler_commands.execute(method, params, model, uno_mod, context)
+    if method in completion.ACTIONS:
+        return completion_commands.execute(method, params, model, uno_mod, context,
+            document_epoch=params.get('nativeDocumentEpoch'), revision=params.get('nativeRevision'),
+            read_only=params.get('nativeReadOnly'), permission_seq=params.get('nativePermissionSeq'))
+    toolbar_params = {key: value for key, value in params.items() if key not in ('documentUrl', 'nativeReadOnly', 'nativeDocumentEpoch', 'nativeRevision', 'nativePermissionSeq')}
     if method in ('input_undo_begin', 'input_undo_end'):
         return input_undo.execute(method, params, model, document_epoch=params.get('nativeDocumentEpoch'),
                                   read_only=params.get('nativeReadOnly'))
