@@ -1,11 +1,11 @@
 <!doctype html>
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-<html lang="zh-CN">
+<html lang="en-US">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>东方水墨 · 飞白禅圆</title>
+  <title data-i18n="plugin.name"></title>
   <style>
     :root {
       color-scheme: light dark;
@@ -96,18 +96,20 @@
 <body>
   <div class="card">
     <div class="head-row">
-      <h1 class="title">东方水墨 · 一笔禅圆</h1>
-      <span class="badge">UI 皮肤画廊 · Skin 02</span>
+      <h1 class="title" data-i18n="plugin.name"></h1>
+      <span class="badge" data-i18n="gallery.badge"></span>
     </div>
-    <p class="subtitle">计白当黑，墨分五色（焦、浓、重、淡、清），怀中一滴紫墨自然润开，配以朱砂印泥语义警示。</p>
+    <p class="subtitle" data-i18n="plugin.desc"></p>
     <div class="swatches">
-      <div class="swatch"><div class="swatch-dot" style="background:#F4F1EA"></div><strong>生宣留白</strong><div class="swatch-hex">#F4F1EA</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#1A1816"></div><strong>焦墨正文</strong><div class="swatch-hex">#1A1816</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#5B4B7A"></div><strong>紫墨点睛</strong><div class="swatch-hex">#5B4B7A</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#B5483C"></div><strong>朱砂印泥</strong><div class="swatch-hex">#B5483C</div></div>
-      <div class="swatch"><div class="swatch-dot" style="background:#141312"></div><strong>浓墨夜读</strong><div class="swatch-hex">#141312</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#F4F1EA"></div><strong data-i18n="gallery.swatch1"></strong><div class="swatch-hex">#F4F1EA</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#1A1816"></div><strong data-i18n="gallery.swatch2"></strong><div class="swatch-hex">#1A1816</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#5B4B7A"></div><strong data-i18n="gallery.swatch3"></strong><div class="swatch-hex">#5B4B7A</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#B5483C"></div><strong data-i18n="gallery.swatch4"></strong><div class="swatch-hex">#B5483C</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#141312"></div><strong data-i18n="gallery.swatch5"></strong><div class="swatch-hex">#141312</div></div>
     </div>
   </div>
-  <script src="/api/plugins/sdk/awd-plugin-sdk.js"></script>
+  <script src="awd-plugin-sdk.js"></script>
+  <script src="gallery-l10n.js"></script>
+  <script src="gallery.js"></script>
 </body>
 </html>
