@@ -274,22 +274,36 @@ def view_change(model, work):
                 raise RuntimeError(f'VIEW_OUTCOME_UNKNOWN: cannot restore modified enablement: {error}') from error
 
 
-def set_view_options(model, params):
+def view_option_values(model, params):
     allowed = set(VIEW_PROPERTIES) - {'verticalRuler'}
-    if set(params) - allowed or any(type(value) is not bool for value in params.values()):
+    if type(params) is not dict or set(params) - allowed or any(type(value) is not bool for value in params.values()):
         raise ValueError('View options must be supported boolean values')
     settings = model.getCurrentController().getViewSettings()
     # Check all capabilities before applying even the first preference.
-    writes = {VIEW_PROPERTIES[key]: value for key, value in params.items()}
+    desired = {VIEW_PROPERTIES[key]: value for key, value in params.items()}
     if 'ruler' in params:
-        writes.update(ShowRulers=params['ruler'], ShowVertRuler=params['ruler'])
-    for name in writes:
-        if type(settings.getPropertyValue(name)) is not bool:
+        desired.update(ShowRulers=params['ruler'], ShowVertRuler=params['ruler'])
+    actual = {name: settings.getPropertyValue(name) for name in desired}
+    for name, value in actual.items():
+        if type(value) is not bool:
             raise RuntimeError(f'{name} is unavailable')
+    return settings, desired, actual
+
+
+def match_view_options(model, params):
+    _, desired, actual = view_option_values(model, params)
+    return {'matches': desired == actual, 'view': read_view(model)}
+
+
+def set_view_options(model, params):
+    settings, desired, actual = view_option_values(model, params)
+    if desired == actual:
+        return read_view(model)
     def apply():
-        for name, value in writes.items():
-            settings.setPropertyValue(name, value)
-        for name, value in writes.items():
+        for name, value in desired.items():
+            if actual[name] != value:
+                settings.setPropertyValue(name, value)
+        for name, value in desired.items():
             if settings.getPropertyValue(name) != value:
                 raise RuntimeError(f'{name} was not applied')
         return read_view(model)

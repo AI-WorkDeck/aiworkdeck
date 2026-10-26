@@ -6,6 +6,7 @@ import { attachReviewBalloons } from './zetaOfficeReviewBalloons.js'
 import { attachNativeOfficeAssistance } from './nativeOfficeAssistance.js'
 import { attachNativeDocumentRulers } from './nativeDocumentRulers.js'
 import { CURSOR_RADIUS } from '../utils/insightMatch.js'
+import { getWriterViewOptions } from '../utils/editorViewPrefs.js'
 
 // Implements the existing lo-relay transport. There is no HTTP publication here:
 // export_document returns bytes to LibreOfficeEditor's ordinary save pipeline.
@@ -297,8 +298,12 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
         assistance?.destroy(); assistance = null
         rulers?.destroy(); rulers = null
       }
-      const result = await request(action, { ...params, ...(model ? { documentEpoch: model.documentEpoch } : {}) })
+      const result = await request(action, { ...params,
+        ...(action === 'load_document' && params.bytes !== undefined ? { viewOptions: getWriterViewOptions() } : {}),
+        ...(model ? { documentEpoch: model.documentEpoch } : {}) })
+      const unchangedView = action === 'set_view_options' && result.success === true && result.unchanged === true
       if (contextRead && !currentContext()) throw Error('STALE_DOCUMENT_ASSISTANCE')
+      if (unchangedView && !currentContext()) throw Error('STALE_DOCUMENT_VIEW_OPTIONS')
       if (disposed) throw Error('Native editor disposed during command')
       if (action === 'load_document' && result.nativeModel) {
         invalidateContext(); detachLinks?.(); detachLinks = null
@@ -349,7 +354,7 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
           execute: executeOwned })
         rulers.refresh()
       } else if (model) {
-        if (result.nativeView) { model.view = result.nativeView; rulers?.refresh() }
+        if (result.nativeView) { model.view = result.nativeView; if (!unchangedView) rulers?.refresh() }
         if (result.nativeLayout) model.layout = result.nativeLayout
         if (result.widthTwips) model.widthTwips = result.widthTwips
         if (result.heightTwips) model.heightTwips = result.heightTwips
@@ -357,13 +362,14 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
           const rectangle = result.rects[0], y = Array.isArray(rectangle) ? rectangle[1] : rectangle.y
           if (Number.isFinite(y)) element.scrollTop = Math.max(0, y * metrics().scale - 80)
         }
-        if (action === 'export_document') {
-          // Bytes are ready and the engine has restored its view. Saving need
-          // not wait behind optional reads for another tile, but input must use
-          // the acknowledged viewport, including a resize during that ACK.
+        if (action === 'export_document' || unchangedView) {
+          // Export bytes are ready, or the engine verified unchanged view
+          // options. Keep the visible geometry and input viewport acknowledged
+          // without waiting for a redundant tile behind optional body reads.
+          const stale = unchangedView ? 'STALE_DOCUMENT_VIEW_OPTIONS' : 'STALE_DOCUMENT_EXPORT'
           let viewport
           do {
-            if (!currentContext()) throw Error('STALE_DOCUMENT_EXPORT')
+            if (!currentContext()) throw Error(stale)
             viewport = JSON.stringify(metrics())
             if (paintedViewport?.owner !== previous || paintedViewport.signature !== viewport) {
               try { await paint(previous) }
@@ -373,7 +379,7 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
               }
             }
             await previousInput?.viewportChanged()
-            if (!currentContext()) throw Error('STALE_DOCUMENT_EXPORT')
+            if (!currentContext()) throw Error(stale)
           } while (viewport !== JSON.stringify(metrics()) || paintedViewport?.signature !== viewport)
         } else if (!read) await paint()
       }

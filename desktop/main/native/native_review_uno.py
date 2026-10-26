@@ -333,6 +333,8 @@ def dispatch(method, params, model, uno_mod, context=None):
         return toolbar.list_styles(model, toolbar_params)
     if method == 'view_settings':
         return toolbar.read_view(model)
+    if method == 'match_view_options':
+        return toolbar.match_view_options(model, toolbar_params)
     if method == 'set_view_options':
         return toolbar.set_view_options(model, toolbar_params)
     if method == 'set_zoom':

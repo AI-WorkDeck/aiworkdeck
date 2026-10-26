@@ -1014,6 +1014,7 @@ import { watchScrollEdges } from '@/utils/scrollEdges.js'
 import { isEnglish } from '@/utils/appLanguage.js'
 import { host } from '@/services/host.js'
 import { CN_FONT_SIZES, PT_FONT_SIZES } from '@/utils/paragraphFormat.js'
+import { MARK_OPTIONS, readViewPrefs, writeViewPrefs, getWriterViewOptions } from '@/utils/editorViewPrefs.js'
 import ParagraphFormatPanel from './ParagraphFormatPanel.vue'
 import SystemFontsPanel from './SystemFontsPanel.vue'
 
@@ -1078,25 +1079,8 @@ const REVISION_VIEWS = [
 const SIZES = PT_FONT_SIZES
 // 沿用原总开关偏好；未保存分类时四类均开启，升级不会擅自覆盖旧选择。
 // 引擎换文档后会重置视图，因此 bootstrap / reapplyChrome 都重新应用。
-const MARK_OPTIONS = [
-  { key: 'paragraphMarks', label: 'paragraphMarks' },
-  { key: 'lineBreaks', label: 'lineBreaks' },
-  { key: 'spaces', label: 'spaces' },
-  { key: 'tabs', label: 'tabs' },
-]
-const MARK_DEFAULTS = Object.fromEntries(MARK_OPTIONS.map(o => [o.key, true]))
-const VIEW_PREFS_KEY = 'awd_editor_view_prefs'
 const VIEW_PREFS_HOSTS = new Set()
 let viewPrefsUpdate = Promise.resolve()
-const VIEW_PREFS_DEFAULT = { formattingMarks: true, ruler: true, ...MARK_DEFAULTS }
-function readViewPrefs() {
-  try {
-    const v = uni.getStorageSync(VIEW_PREFS_KEY)
-    const o = typeof v === 'string' && v ? JSON.parse(v) : (v && typeof v === 'object' ? v : {})
-    return Object.assign({}, VIEW_PREFS_DEFAULT, o)
-  } catch (e) { return Object.assign({}, VIEW_PREFS_DEFAULT) }
-}
-function writeViewPrefs(p) { uni.setStorageSync(VIEW_PREFS_KEY, JSON.stringify(p)) }
 // 插入表格的网格选择器：8 行 × 8 列够覆盖手工建表的绝大多数情形，再大的表
 // 律师是从 Excel 粘过来或让 AI 生成的，不是在这里点出来的。
 const GRID_R = 8, GRID_C = 8
@@ -1904,11 +1888,7 @@ export default {
         await this.refresh()
         return { success: true }
       }
-      const r = await this.call('set_view_options', {
-        ...prefs, formattingMarks: !!prefs.formattingMarks, ruler: !!prefs.ruler,
-        // Writer 开格式标记时会把文本边界画成整页矩形；只隐藏辅助线，保留 ¶ 和标尺偏好。
-        textBoundaries: false,
-      })
+      const r = await this.call('set_view_options', getWriterViewOptions(prefs))
       if (r && r.success) await this.refresh()
       return r
     },

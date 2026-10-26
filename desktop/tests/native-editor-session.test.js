@@ -883,6 +883,7 @@ function initializingViewRead() {
     }
     if(action==='capture_view_read')return {token:'init-proof'}
     if(action==='get_document_text')return {success:true,text:'restored document'}
+    if(action==='match_view_options')return {matches:false,view:{ruler:false}}
     if(action==='set_view_options'){
       for(const item of items)session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:31,payload:JSON.stringify({redline:{action:'Modify',index:item.revisionId}})})
       return {success:true}
@@ -913,9 +914,9 @@ test('late view initialization shares in-flight hydration instead of invalidatin
 
 test('view initialization without a review reader stays light and fences worker callbacks',async()=>{
   const {session,calls}=opened();const uno=[]
-  session.unoCall=async action=>{uno.push(action);return action==='view_settings'?{ruler:false}:{success:true}}
+  session.unoCall=async action=>{uno.push(action);return action==='match_view_options'?{matches:false,view:{ruler:false}}:action==='view_settings'?{ruler:false}:{success:true}}
   await session.execute('set_view_options',{formattingMarks:true})
-  assert.deepEqual(uno,['set_view_options','view_settings'])
+  assert.deepEqual(uno,['match_view_options','set_view_options','view_settings'])
   assert.deepEqual(calls.map(c=>c.action),['selected_text'])
   assert.equal(session.review,null);assert.equal(session.reviewRead,undefined)
 })
@@ -1065,4 +1066,98 @@ test('all balloon target actions retain the original stale caller revision',asyn
     assert.equal(request.revision,-1);assert.equal(session.revision,0)
     assert.equal(resolved.length,0);assert.equal(checked.length,0)
   }
+})
+
+
+test('view preference fast path reads actual UNO state without waiting for existing hydration',async()=>{
+  const {session,calls}=opened(),view={ruler:true,verticalRuler:true,zoom:137},read=latch(),uno=[]
+  session.model.view={ruler:false,zoom:100}
+  session.reviewRead={owner:session.model,revision:0,promise:read.promise}
+  session.unoCall=async(action,params)=>{uno.push({action,params});assert.equal(action,'match_view_options');return {matches:true,view}}
+  const result=await Promise.race([session.execute('set_view_options',{ruler:true,documentEpoch:7}),new Promise((_,reject)=>setTimeout(()=>reject(Error('waited for hydration')),100))])
+  assert.equal(result.success,true);assert.equal(result.unchanged,true);assert.deepEqual(result.nativeView,view)
+  assert.deepEqual(uno,[{action:'match_view_options',params:{ruler:true}}]);assert.deepEqual(calls,[])
+  assert.equal(session.review,null);assert.equal(session.revision,0);read.resolve()
+})
+
+test('view preference fast path refuses changed owner permission close or real edit during actual-state read',async()=>{
+  for(const boundary of ['retarget','permission','close','edit']){
+    const {session}=opened(),entered=latch(),release=latch();let writes=0
+    session.unoCall=async action=>{if(action!=='match_view_options'){writes++;return {ruler:true}}
+      entered.resolve();await release.promise;return {matches:true,view:{ruler:true,zoom:100}}}
+    const result=session.execute('set_view_options',{ruler:true,documentEpoch:7}),done=assert.rejects(result,/STALE_|closed/)
+    await entered.promise
+    if(boundary==='retarget')session.model={...session.model,documentEpoch:8}
+    if(boundary==='permission'){session.permissionSeq++;session.readOnly=true}
+    if(boundary==='close')session.closed=true
+    if(boundary==='edit')session.changed()
+    release.resolve();await done;assert.equal(writes,0,boundary)
+  }
+})
+
+test('view preference fast path never trusts cached options when actual UNO state differs',async()=>{
+  const {session,calls}=opened(),uno=[]
+  session.model.view={ruler:true,zoom:100}
+  session.unoCall=async action=>{uno.push(action);return action==='match_view_options'?{matches:false,view:{ruler:false,zoom:100}}:{ruler:true,zoom:100}}
+  const result=await session.execute('set_view_options',{ruler:true})
+  assert.notEqual(result.unchanged,true)
+  assert.deepEqual(uno,['match_view_options','set_view_options','view_settings','view_metrics'])
+  assert.deepEqual(calls.map(c=>c.action),['selected_text']);assert.equal(session.review,null)
+})
+
+test('load view preferences are applied and worker callbacks drained before trackingReady',async()=>{
+  for(const readOnly of [false,true]){
+    const run=await fs.mkdtemp(path.join(os.tmpdir(),'awd-native-view-init-'))
+    const session=new NativeEditorSession({config:{},run,readOnly}),calls=[],prefs={ruler:true,formattingMarks:true,textBoundaries:false}
+    const callback=()=>session.event({type:'callback',documentEpoch:7,viewId:3,callbackType:31,payload:JSON.stringify({redline:{action:'Modify',index:1}})})
+    session.start=async()=>{}
+    session.engine={call:async(action)=>{calls.push(action);if(action==='open_blank')return {readOnly,documentEpoch:7,viewId:3}
+      assert.equal(action,'selected_text');assert.equal(session.model.trackingReady,false);callback();return {success:true}}}
+    session.unoCall=async(action,params)=>{calls.push(action);assert.equal(session.model.trackingReady,false)
+      if(action==='tracking'||action==='tracking_state')return {enabled:true,modified:false}
+      if(action==='set_view_options'){assert.deepEqual(params,prefs);callback();return {ruler:true,verticalRuler:true,zoom:100}}
+      return action==='view_settings'?{ruler:true,verticalRuler:true,zoom:100}:{} }
+    try{
+      const result=await session.execute('load_document',{bytes:[],name:'blank.docx',authorName:'A',viewOptions:prefs})
+      assert.deepEqual(calls,['open_blank','author',readOnly?'tracking_state':'tracking','set_view_options','view_settings','view_metrics','selected_text'])
+      assert.equal(result.nativeModel.view.ruler,true);assert.equal(session.model.trackingReady,true);assert.equal(session.revision,1)
+      callback();assert.equal(session.revision,2,'external post-ready change still invalidates')
+    }finally{await fs.rm(run,{recursive:true,force:true})}
+  }
+})
+
+test('load view preference validation and async ownership refuse invalid readiness',async()=>{
+  for(const options of [null,[],true,'invalid']){
+    const session=new NativeEditorSession({config:{},run:'/unused',readOnly:false});let starts=0
+    session.start=async()=>{starts++;throw Error('must not start')}
+    await assert.rejects(session.execute('load_document',{bytes:[],name:'blank.docx',authorName:'A',viewOptions:options}),/viewOptions/)
+    assert.equal(starts,0)
+  }
+  for(const boundary of ['permission','close','retarget']){
+    const session=new NativeEditorSession({config:{},run:'/unused',readOnly:false}),entered=latch(),release=latch()
+    session.start=async()=>{}
+    session.engine={call:async action=>{if(action==='open_blank')return {readOnly:false,documentEpoch:7,viewId:3}
+      entered.resolve();await release.promise;return {success:true}}}
+    session.unoCall=async action=>(action==='tracking'?{enabled:true,modified:false}:{})
+    const loading=session.execute('load_document',{bytes:[],name:'blank.docx',authorName:'A',viewOptions:{ruler:true}})
+    const done=assert.rejects(loading,/STALE_|closed/);await entered.promise
+    if(boundary==='permission')session.permissionSeq++
+    if(boundary==='close')session.closed=true
+    if(boundary==='retarget')session.model={...session.model,documentEpoch:8}
+    release.resolve();await done;assert.equal(session.model.trackingReady,false)
+  }
+})
+
+test('view preference mismatch shares a new final reader started while actual-state matching is pending',async()=>{
+  const h=initializingViewRead(),{session}=h,matching=latch(),releaseMatch=latch(),uno=session.unoCall
+  session.unoCall=async(action,params)=>{if(action==='match_view_options'){matching.resolve();await releaseMatch.promise;return {matches:false,view:{ruler:false}}}return uno(action,params)}
+  const view=session.execute('set_view_options',{formattingMarks:true,ruler:true})
+  await matching.promise
+  const read=session.execute('get_document_text',{__agent:true}),completed=Promise.allSettled([view,read])
+  releaseMatch.resolve();await h.entered.promise
+  assert.equal(h.calls.filter(c=>c.action==='set_view_options').length,0,'setter must wait for reader created during match')
+  h.release.resolve();const results=await completed
+  assert.deepEqual(results.map(r=>r.status),['fulfilled','fulfilled'])
+  assert.equal(session.revision,0);assert.equal(h.calls.filter(c=>c.action==='snapshot_batch').length,3)
+  await new Promise(r=>setTimeout(r,15));await session.queue;assert.equal(session.revision,0)
 })

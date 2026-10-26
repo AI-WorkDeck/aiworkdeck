@@ -801,3 +801,85 @@ test('save required old-viewport paint failing during retarget does not poison t
     assert.equal(h.surface.element.querySelector('input').disabled, false)
   } finally { paintHeld.resolve(); loadHeld.resolve(); await saving; await retarget; await h.close() }
 })
+
+test('native byte loads including initial blank read the latest shared toolbar view preferences', async () => {
+  const previousUni = globalThis.uni
+  let stored = JSON.stringify({ formattingMarks: false, ruler: false, spaces: false })
+  globalThis.uni = { getStorageSync: key => { assert.equal(key, 'awd_editor_view_prefs'); return stored } }
+  const h = await surfaceHarness({ initialBlank: true })
+  try {
+    h.surface.start()
+    for (let count = 0; count < 20 && !h.events.some(event => event.type === 'ready'); count++) await tick()
+    assert.equal(h.events.some(event => event.type === 'ready'), true)
+    const first = h.calls.find(call => call.action === 'load_document')
+    assert.equal(first.params.bytes.length, 0)
+    assert.deepEqual(first.params.viewOptions, { formattingMarks: false, ruler: false, paragraphMarks: true, lineBreaks: true, spaces: false, tabs: true, textBoundaries: false })
+    stored = { formattingMarks: true, ruler: true, tabs: false }
+    await h.execute('load_document', { bytes: [1], name: 'reload.docx' })
+    const reloaded = h.calls.filter(call => call.action === 'load_document').at(-1)
+    assert.deepEqual(reloaded.params.viewOptions, { formattingMarks: true, ruler: true, paragraphMarks: true, lineBreaks: true, spaces: true, tabs: false, textBoundaries: false })
+    await h.execute('load_document', { authorName: 'author only' })
+    assert.equal(Object.hasOwn(h.calls.filter(call => call.action === 'load_document').at(-1).params, 'viewOptions'), false)
+  } finally { globalThis.uni = previousUni; await h.close() }
+})
+
+for (const unchanged of [true, false, undefined, 'true']) {
+  test(`view options skip a same-viewport paint only with exact authoritative unchanged: ${unchanged}`, async () => {
+    const h = await surfaceHarness({ nativeRequest: action => action === 'set_view_options'
+      ? { success: true, unchanged, nativeView: { zoom: 100, ruler: false } } : undefined })
+    let held, pending
+    try {
+      await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+      held = h.deferPaint()
+      let finished = false
+      pending = h.execute('set_view_options', { ruler: false }).then(result => { finished = true; return result })
+      await new Promise(resolve => setTimeout(resolve, 35))
+      assert.equal(finished, unchanged === true)
+      held.resolve(); assert.equal((await pending).success, true)
+    } finally { held?.resolve(); await pending; await h.close() }
+  })
+}
+
+test('unchanged view options still await resized pixels and viewport ACK before enabling input', async () => {
+  const ack = deferred(), ackStarted = deferred()
+  let gate = false, h
+  h = await surfaceHarness({ nativeRequest: async (action, params) => {
+    if (action === 'set_view_options') {
+      Object.defineProperty(h.surface.element, 'clientWidth', { value: 650 }); gate = true
+      return { success: true, unchanged: true, nativeView: { zoom: 100, ruler: false } }
+    }
+    if (gate && action === 'native_input' && params.action === 'set_viewport') { ackStarted.resolve(); await ack.promise }
+  } })
+  let pending
+  try {
+    await h.execute('load_document', { bytes: [1], name: 'a.docx' })
+    let finished = false
+    pending = h.execute('set_view_options', { ruler: false }).then(result => { finished = true; return result })
+    await ackStarted.promise; await tick()
+    assert.equal(finished, false); assert.equal(h.surface.element.querySelector('input').disabled, true)
+    ack.resolve(); assert.equal((await pending).success, true)
+    assert.equal(h.surface.element.querySelector('canvas').style.width, '650px')
+  } finally { ack.resolve(); await pending; await h.close() }
+})
+
+for (const change of ['retarget', 'permission', 'permission-roundtrip']) {
+  test(`unchanged view result must not update a different owner or permission: ${change}`, async () => {
+    const held = deferred(), started = deferred()
+    const h = await surfaceHarness({ nativeRequest: async (action, params) => {
+      if (action === 'set_view_options') { started.resolve(); await held.promise; return { success: true, unchanged: true, nativeView: { zoom: 175, ruler: false } } }
+      if (action === 'set_read_only') return { success: true, ...params, lastInputSeq: 0 }
+    } })
+    let pending
+    try {
+      await h.execute('load_document', { bytes: [1], name: 'a.docx' }); await h.surface.setReadOnly(false)
+      pending = h.execute('set_view_options', { ruler: false }); await started.promise
+      if (change === 'retarget') await h.execute('load_document', { bytes: [2], name: 'b.docx' })
+      else await h.surface.setReadOnly(true)
+      if (change === 'permission-roundtrip') await h.surface.setReadOnly(false)
+      const before = h.surface.element.querySelector('canvas').style.width
+      held.resolve(); const result = await pending
+      assert.equal(result.success, false); assert.equal(result.message, 'STALE_DOCUMENT_VIEW_OPTIONS')
+      assert.equal(h.surface.element.querySelector('canvas').style.width, before)
+    } finally { held.resolve(); await pending; await h.close() }
+  })
+}

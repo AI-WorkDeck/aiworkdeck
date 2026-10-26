@@ -201,6 +201,30 @@ class ViewTests(unittest.TestCase):
         model=ViewModel(); model.enabled=False
         toolbar.set_view_options(model,{'spaces':True})
         self.assertFalse(model.enabled); self.assertEqual(model.events,[])
+    def test_match_options_reads_all_ruler_properties_without_writing(self):
+        model=ViewModel()
+        result=toolbar.match_view_options(model, {'ruler':False,'formattingMarks':False})
+        self.assertTrue(result['matches']); self.assertEqual(result['view']['zoom'],100)
+        self.assertEqual(model.writes,[]); self.assertEqual(model.events,[])
+        for prop in ['ShowRulers','ShowVertRuler','ShowHoriRuler']:
+            model.props[prop]=True
+            self.assertFalse(toolbar.match_view_options(model,{'ruler':False})['matches'],prop)
+            model.props[prop]=False
+        self.assertTrue(model.modified); self.assertTrue(model.recording)
+    def test_matching_options_setter_is_a_true_noop(self):
+        model=ViewModel()
+        toolbar.set_view_options(model,{'ruler':False,'spaces':False})
+        self.assertEqual(model.writes,[]); self.assertEqual(model.events,[])
+        toolbar.set_view_options(model,{'ruler':True,'spaces':False})
+        self.assertEqual({name for name,_ in model.writes},{'ShowHoriRuler','ShowRulers','ShowVertRuler'})
+    def test_match_options_rejects_bad_values_and_strips_only_native_metadata(self):
+        import native_review_uno as review
+        model=ViewModel()
+        for params in [None,[],True,{'ruler':1},{'zoom':100},{'verticalRuler':True}]:
+            with self.assertRaises(ValueError): toolbar.match_view_options(model,params)
+        self.assertTrue(review.dispatch('match_view_options',{'ruler':False,'documentUrl':'file:///owned.docx',
+            'nativeReadOnly':True,'nativeDocumentEpoch':7,'nativeRevision':1,'nativePermissionSeq':0},model,Uno)['matches'])
+        self.assertEqual(model.writes,[]); self.assertEqual(model.events,[])
     def test_zoom_is_actual_typed_readback_and_clamped(self):
         model=ViewModel()
         uno=SimpleNamespace(invoke=Uno.invoke,Any=Uno.Any,getConstantByName=lambda _:3)
