@@ -3,6 +3,7 @@
 
 package com.checkba.controller;
 
+import com.checkba.service.LangText;
 import com.checkba.service.WizardStateService;
 import com.checkba.service.meeting.LocalAsrClient;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +40,7 @@ public class LocalAsrProbeController {
         // local-mode 下 getUserIdFromSession 恒解析出本机用户，这条分支只对团队服务器生效。
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null && !wizardStateService.inAnonymousSetupWindow()) {
-            return ResponseEntity.status(401).body("请先登录");
+            return ResponseEntity.status(401).body(LangText.of("请先登录", "Please sign in first"));
         }
         return ResponseEntity.ok(localAsrClient.probe());
     }

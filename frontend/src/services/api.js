@@ -443,17 +443,28 @@ function request(options) {
           originalUrl: options.url
         })
         // 根据 errMsg 提供更准确的诊断信息
-        let diagnosticMessage = '网络请求失败，请检查：'
+        const isEn = typeof isEnglish === 'function' && isEnglish()
+        let diagnosticMessage = isEn ? 'Network request failed. Please check:' : '网络请求失败，请检查：'
         if (err.errMsg && err.errMsg.includes('request:fail')) {
-          diagnosticMessage += '\n1. 后端服务是否正在运行（检查端口 9696）'
-          diagnosticMessage += '\n2. 后端服务是否启动成功（检查后端日志 backend/app.log）'
-          diagnosticMessage += '\n3. 网络连接是否正常'
-          diagnosticMessage += `\n4. 当前配置的 API 地址: ${baseUrl}`
-          diagnosticMessage += '\n5. 如果使用内网穿透，请确认隧道是否正常运行'
+          diagnosticMessage += isEn
+            ? '\n1. Whether the backend service is running (check port 9696)'
+              + '\n2. Whether the backend service started cleanly (check backend/app.log)'
+              + '\n3. Whether the network connection is healthy'
+              + `\n4. Configured API URL: ${baseUrl}`
+              + '\n5. If using a tunnel, verify that the tunnel is active'
+            : '\n1. 后端服务是否正在运行（检查端口 9696）'
+              + '\n2. 后端服务是否启动成功（检查后端日志 backend/app.log）'
+              + '\n3. 网络连接是否正常'
+              + `\n4. 当前配置的 API 地址: ${baseUrl}`
+              + '\n5. 如果使用内网穿透，请确认隧道是否正常运行'
         } else {
-          diagnosticMessage += '\n1. 网络连接问题'
-          diagnosticMessage += '\n2. 后端服务异常'
-          diagnosticMessage += `\n3. 当前配置的 API 地址: ${baseUrl}`
+          diagnosticMessage += isEn
+            ? '\n1. Network connectivity'
+              + '\n2. Backend service status'
+              + `\n3. Configured API URL: ${baseUrl}`
+            : '\n1. 网络连接问题'
+              + '\n2. 后端服务异常'
+              + `\n3. 当前配置的 API 地址: ${baseUrl}`
         }
         console.error('诊断信息:', diagnosticMessage)
         reject(err);

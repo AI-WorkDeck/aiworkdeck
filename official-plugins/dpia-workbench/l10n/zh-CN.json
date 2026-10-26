@@ -1,0 +1,15 @@
+{
+  "plugin.name": "DPIA 工作台",
+  "plugin.description": "数据保护影响评估：材料溯源、事实确认、问题补答、风险与整改、持续复评及分版本报告。基于朱玲凤的 DSH DPIA Workbench 适配；需 Node.js、Python 和 LibreOffice。",
+  "plugin.author": "AI WorkDeck（上游：朱玲凤 / The-Data-Galaxy）",
+  "setting.nodePath.label": "Node.js 可执行文件",
+  "setting.nodePath.description": "留空使用系统 PATH 中的 node；需要 Node.js 20 或更新版本。",
+  "setting.pythonPath.label": "Python 可执行文件",
+  "setting.pythonPath.description": "需安装 runtime/requirements.txt 中的文档依赖；可填写独立虚拟环境中的 Python 路径。",
+  "setting.pdfFontPath.label": "PDF 中文字体文件",
+  "setting.pdfFontPath.description": "原生 PDF 模板填写中文需可嵌入的 TrueType 字体（TTF/TTC）；Linux 可安装文泉驿正黑。留空使用上游系统字体查找。",
+  "setting.sofficePath.label": "LibreOffice 可执行文件",
+  "setting.sofficePath.description": "仅报告 PDF 与页面预览需要；留空尝试系统安装位置。",
+  "tool.dpia_workbench_action.description": "DPIA 案件、材料、事实确认、补答、运行状态及报告操作。仅供工作台界面调用，AI 不可调用人工确认/审批入口。",
+  "tool.dpia_workbench_task.description": "执行当前冻结的 DPIA 任务：context/read/write/script/commit/report；严格限定当前用户项目及案件输出目录，不执行任意代码。"
+}

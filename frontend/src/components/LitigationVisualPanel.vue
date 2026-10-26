@@ -86,7 +86,7 @@
       <view class="lv-row-main">
         <text class="lv-row-name">{{ d.name }}</text>
         <text class="lv-row-meta">
-          {{ layoutLabel(d.layout) }}<template v-if="d.mode"> · {{ d.mode }}</template
+          {{ layoutLabel(d.layout) }}<template v-if="d.mode"> · {{ modeLabel(d.mode) }}</template
           ><template v-if="d.formats && d.formats.length"> · {{ d.formats.join(' ') }}</template>
         </text>
       </view>
@@ -112,7 +112,7 @@
             class="lv-mode"
             :class="{ active: d.mode === m, disabled: restylingId === d.folderId }"
             @tap.stop="restyle(d, m)"
-          >{{ m }}</text>
+          >{{ modeLabel(m) }}</text>
         </view>
       </template>
     </view>
@@ -283,6 +283,15 @@ export default {
       return key ? this.$t(`panels.${key}`) : this.$t('panels.litLayoutFallback')
     },
 
+    modeLabel(mode) {
+      const map = {
+        '奇川风': 'panels.litModeQichuan',
+        '歸藏风': 'panels.litModeGuizang',
+        '白描': 'panels.litModeLineArt'
+      }
+      return map[mode] ? this.$t(map[mode]) : mode
+    },
+
     async reload() {
       if (!this.projectId) return
       this.loading = true
@@ -355,10 +364,11 @@ export default {
     async restyle(d, mode) {
       if (this.restylingId) return
       // 地图无法反映当前画布；时间戳也不可靠，所以每次覆盖都需明确确认。
+      const modeText = this.modeLabel(mode)
       const ok = await new Promise((resolve) => {
         uni.showModal({
           title: this.$t('panels.litHandEditedConfirmTitle'),
-          content: this.$t('panels.litHandEditedConfirmBody', { mode }),
+          content: this.$t('panels.litHandEditedConfirmBody', { mode: modeText }),
           confirmText: this.$t('panels.litContinueRedraw'),
           cancelText: this.$t('panels.litCancel'),
           success: (res) => resolve(!!res.confirm),
@@ -375,7 +385,7 @@ export default {
         await restyleLitigationDiagram(this.projectId, d.folderId, mode, true)
         // 图变了但文件 ID 没变，已打开的标签要重新拉一次
         uni.$emit('awd:litviz-restyled', { projectId: this.projectId, folderId: d.folderId, svgFileId: d.svgFileId, kind: 'restyle' })
-        uni.showToast({ title: this.$t('panels.litRestyledTo', { mode }), icon: 'none' })
+        uni.showToast({ title: this.$t('panels.litRestyledTo', { mode: modeText }), icon: 'none' })
       } catch (e) {
         uni.$emit('awd:litviz-restyled', { projectId: this.projectId, folderId: d.folderId, kind: 'restyle', failed: true })
         uni.showToast({ title: (e && e.message) || this.$t('panels.litRedrawFailedFallback'), icon: 'none' })

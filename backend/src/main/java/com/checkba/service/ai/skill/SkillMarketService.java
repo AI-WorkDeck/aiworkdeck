@@ -64,7 +64,9 @@ public class SkillMarketService {
     public static class MarketSkillView {
         private String id;
         private String name;
+        private String nameEn;
         private String description;
+        private String descriptionEn;
         private String icon;
         private String version;
         private String author;
@@ -111,6 +113,24 @@ public class SkillMarketService {
                 view.setPricingModel("once");
             }
             view.setInstalled(view.getId() != null && skillRegistry.getSkill(view.getId()).isPresent());
+            if (view.getId() != null) {
+                skillRegistry.getSkill(view.getId()).ifPresent(local -> {
+                    if (view.getNameEn() == null || view.getNameEn().isBlank()) {
+                        view.setNameEn(local.getNameEn());
+                    }
+                    if (view.getDescriptionEn() == null || view.getDescriptionEn().isBlank()) {
+                        view.setDescriptionEn(local.getDescriptionEn());
+                    }
+                });
+            }
+            if (LangText.isEnglish()) {
+                if (view.getNameEn() != null && !view.getNameEn().isBlank()) {
+                    view.setName(view.getNameEn());
+                }
+                if (view.getDescriptionEn() != null && !view.getDescriptionEn().isBlank()) {
+                    view.setDescription(view.getDescriptionEn());
+                }
+            }
             view.setPurchased(view.getPriceCents() > 0 && view.getId() != null
                     && purchaseGate.purchased(MarketPurchaseGate.skillFeature(view.getId())));
         }

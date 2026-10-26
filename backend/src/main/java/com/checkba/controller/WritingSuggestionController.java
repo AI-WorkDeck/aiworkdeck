@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.controller;
 
+import com.checkba.service.LangText;
 import com.checkba.service.writing.WritingContextService;
 import com.checkba.service.writing.WritingSuggestionService;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 public class WritingSuggestionController {
     private final WritingContextService contexts;
     private final WritingSuggestionService suggestions;
-    private Long uid(String sid) { Long uid=AuthController.getUserIdFromSession(sid); if(uid==null) throw new IllegalArgumentException("请先登录"); return uid; }
+    private Long uid(String sid) { Long uid=AuthController.getUserIdFromSession(sid); if(uid==null) throw new IllegalArgumentException(LangText.of("请先登录", "Please sign in first")); return uid; }
     @GetMapping("/settings") public WritingContextService.Settings settings(@PathVariable Long projectId,@RequestHeader(value="X-Session-Id",required=false) String sid) {return contexts.settings(uid(sid),projectId);}
     @PutMapping("/settings") public WritingContextService.Settings save(@PathVariable Long projectId,@RequestBody WritingContextService.SettingsInput body,@RequestHeader(value="X-Session-Id",required=false) String sid) {return contexts.saveSettings(uid(sid),projectId,body);}
     @PostMapping("/suggestions") public WritingSuggestionService.View start(@PathVariable Long projectId,@RequestBody WritingSuggestionService.Input body,@RequestHeader(value="X-Session-Id",required=false) String sid) {return suggestions.start(uid(sid),projectId,body);}

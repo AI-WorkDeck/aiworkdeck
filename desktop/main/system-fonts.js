@@ -37,15 +37,18 @@ const CURATED_FAMILIES = [
   '华文仿宋', 'STFangsong', '华文楷体', 'STKaiti', '华文中宋', 'STZhongsong',
   '微软雅黑', 'Microsoft YaHei', '等线', 'DengXian',
   'Times New Roman', 'Arial', 'Calibri', 'Cambria', 'Courier New',
+  'Yu Gothic', '游ゴシック', 'MS Mincho', 'ＭＳ 明朝', 'MS Gothic', 'ＭＳ ゴシック', 'Meiryo', 'メイリオ',
+  'Malgun Gothic', '맑은 고딕', 'Batang', '바탕', 'NanumGothic', '나눔고딕',
+  'TH Sarabun New', 'TH SarabunPSK', 'Sarabun', 'Angsana New', 'Cordia New', 'Leelawadee UI', 'Thonburi', 'Tahoma',
 ]
 
-const ZH_LANGS = new Set([0x0804, 0x0404, 0x0C04, 0x1004, 0x1404])
+const ZH_LANGS = new Set([0x0804, 0x0404, 0x0C04, 0x1004, 0x1404, 0x0411, 0x0412, 0x041E])
 const EN_LANG = 0x0409
 
 // fontconfig 比较族名时忽略大小写与空白（FcStrCmpIgnoreBlanksAndCase），这里同口径
 function normFamily(s) { return String(s || '').replace(/\s+/g, '').toLowerCase() }
 
-function hasCjk(s) { return /[\u3400-\u9fff\uf900-\ufaff]/.test(s) }
+function hasCjk(s) { return /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff\u0e00-\u0e7f]/.test(s) }
 
 // ---------------------------------------------------------------- name 表解析
 

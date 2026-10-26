@@ -50,6 +50,15 @@
 //   dist/zetaoffice/cjk-serif.otf    (Noto Serif SC Regular, OFL — 宋体类映射目标)
 //   dist/zetaoffice/cjk-kai.ttf      (LXGW WenKai / 霞鹜文楷 Regular, OFL — 楷体类)
 //   dist/zetaoffice/cjk-fangsong.ttf (Zhuque Fangsong / 朱雀仿宋 Regular, OFL — 仿宋类)
+//   dist/zetaoffice/cjk-kr.otf       (Noto Sans KR Regular, OFL — 韩文黑体/无衬线回退)
+//   dist/zetaoffice/cjk-kr-serif.otf (Noto Serif KR Regular, OFL — 韩文明朝/衬线回退)
+//   dist/zetaoffice/cjk-thai.ttf     (Noto Sans Thai Regular, OFL — 泰语无衬线)
+//   dist/zetaoffice/cjk-thai-serif.ttf (Noto Serif Thai Regular, OFL — 泰语衬线)
+//   dist/zetaoffice/cjk-khmer.ttf    (Noto Sans Khmer Regular, OFL — 柬埔寨高棉语)
+//   dist/zetaoffice/cjk-lao.ttf      (Noto Sans Lao Regular, OFL — 老挝语)
+//   dist/zetaoffice/cjk-myanmar.ttf  (Noto Sans Myanmar Regular, OFL — 缅甸语)
+//   dist/zetaoffice/cjk-arabic.ttf   (Noto Sans Arabic Regular, OFL — 阿拉伯语)
+//   dist/zetaoffice/cjk-devanagari.ttf (Noto Sans Devanagari Regular, OFL — 印地语/天城文)
 //
 // Usage:  node desktop/scripts/fetch-lowa-assets.js   (idempotent; keeps a file
 //         that already validates). Runs in CI before electron-builder, and
@@ -89,6 +98,21 @@ const FONT_SERIF_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@Serif2.
 const FONT_KAI_URL = 'https://github.com/lxgw/LxgwWenKai/releases/download/v1.520/LXGWWenKai-Regular.ttf';
 // Zhuque only publishes a zip; zipEntry extracts the single ttf inside.
 const FONT_FANGSONG_URL = 'https://github.com/TrionesType/zhuque/releases/download/v0.212/ZhuqueFangsong-v0.212.zip';
+// Multilingual fonts (OFL-1.1): SubsetOTF/SC lacks Hangul (0/11,172) and LOWA's
+// bundled Liberation/Carlito/Caladea contain 0 Thai/SEA/CTL glyphs. Bundling
+// Korean Sans/Serif + Thai Sans/Serif + SEA/CTL Noto fonts ensures Korean, Thai,
+// Khmer, Lao, Myanmar, Arabic, and Devanagari render natively without tofu (□).
+// Names keep the `cjk-` prefix so build-patch-assets.js (`/^cjk[.-]/`) excludes
+// all font binaries from lightweight wrapper patches.
+const FONT_KR_SANS_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@Sans2.004/Sans/SubsetOTF/KR/NotoSansKR-Regular.otf';
+const FONT_KR_SERIF_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@Serif2.002/Serif/SubsetOTF/KR/NotoSerifKR-Regular.otf';
+const FONT_THAI_SANS_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansThai/NotoSansThai-Regular.ttf';
+const FONT_THAI_SERIF_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSerifThai/NotoSerifThai-Regular.ttf';
+const FONT_KHMER_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansKhmer/NotoSansKhmer-Regular.ttf';
+const FONT_LAO_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansLao/NotoSansLao-Regular.ttf';
+const FONT_MYANMAR_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansMyanmar/NotoSansMyanmar-Regular.ttf';
+const FONT_ARABIC_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf';
+const FONT_DEVANAGARI_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf';
 
 const distRoot = path.join(__dirname, '../../frontend/dist/zetaoffice');
 
@@ -110,6 +134,15 @@ const ASSETS = [
   { url: FONT_KAI_URL,                           dest: 'cjk-kai.ttf',                   serve: 'static', encoding: null, magic: 'font' },
   { url: FONT_FANGSONG_URL,                      dest: 'cjk-fangsong.ttf',              serve: 'static', encoding: null, magic: 'font',
     zipEntry: 'ZhuqueFangsong-Regular.ttf' },
+  { url: FONT_KR_SANS_URL,                       dest: 'cjk-kr.otf',                    serve: 'static', encoding: null, magic: 'font' },
+  { url: FONT_KR_SERIF_URL,                      dest: 'cjk-kr-serif.otf',              serve: 'static', encoding: null, magic: 'font' },
+  { url: FONT_THAI_SANS_URL,                     dest: 'cjk-thai.ttf',                  serve: 'static', encoding: null, magic: 'font' },
+  { url: FONT_THAI_SERIF_URL,                    dest: 'cjk-thai-serif.ttf',            serve: 'static', encoding: null, magic: 'font' },
+  { url: FONT_KHMER_URL,                         dest: 'cjk-khmer.ttf',                 serve: 'static', encoding: null, magic: 'font' },
+  { url: FONT_LAO_URL,                           dest: 'cjk-lao.ttf',                   serve: 'static', encoding: null, magic: 'font' },
+  { url: FONT_MYANMAR_URL,                       dest: 'cjk-myanmar.ttf',               serve: 'static', encoding: null, magic: 'font' },
+  { url: FONT_ARABIC_URL,                        dest: 'cjk-arabic.ttf',                serve: 'static', encoding: null, magic: 'font' },
+  { url: FONT_DEVANAGARI_URL,                    dest: 'cjk-devanagari.ttf',            serve: 'static', encoding: null, magic: 'font' },
 ];
 
 // Minimal single-entry zip extraction (Zhuque ships a zip with one ttf inside;

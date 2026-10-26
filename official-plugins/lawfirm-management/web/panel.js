@@ -905,12 +905,336 @@
     renderAll();
   }
 
+  const EN_EXACT = {
+    '律所管理 · AI WorkDeck': 'Law Firm Management · AI WorkDeck',
+    '律所业务与决策管理中心': 'Law Firm Practice & Executive Center',
+    '正在加载身份与业务分类…': 'Loading identity & practice areas…',
+    '加载典型律所样板数据': 'Load Demo Law Firm Data',
+    '刷新数据': 'Refresh Data',
+    '律所管理主导航': 'Law Firm Management Navigation',
+    '收案与立项': 'Case Intake & Filing',
+    '利冲审查中心': 'Conflict Check Center',
+    '发票与财务收费': 'Invoicing & Billing',
+    '决策与业务看板': 'Executive Dashboard',
+    '正在连接律所管理引擎…': 'Connecting to Law Firm Management engine…',
+    '收案、财务和样板数据属于本机台账。本机征询记录不表示同事已收到消息。需要本人确认时，请使用「利冲审查中心」中的律所云端协作。': 'Intake, finance, and demo data are stored in your local ledger. Local clearance entries do not notify colleagues automatically; use Firm Cloud Collaboration in the Conflict Check Center for cross-account confirmation.',
+    '新建本机收案记录': 'New Local Case Intake',
+    '依据《律师法》第39、50条及《全国律协执业行为规范》第50–56条自动检索全所在办、历史及关联主体冲突': 'Automatically screens active, historical, and affiliate conflicts across the firm.',
+    '案件 / 专项名称': 'Matter / Project Title',
+    '例如：华星半导体与蓝海光电专利侵权及商业秘密纠纷案': 'e.g., Huaxing Semiconductor v. Blue Ocean Optoelectronics Patent & Trade Secret Dispute',
+    '业务领域': 'Practice Area',
+    '民商事诉讼与仲裁': 'Commercial Litigation & Arbitration',
+    '资本市场与证券': 'Capital Markets & Securities',
+    '资本市场/IPO': 'Capital Markets / IPO',
+    '公司并购与投融资': 'Corporate M&A & Investment',
+    '知识产权与数据合规': 'IP & Data Compliance',
+    '刑事辩护与代理': 'Criminal Defense & Representation',
+    '行政复议与诉讼': 'Administrative Reconsideration & Litigation',
+    '婚姻家事与财富传承': 'Family Law & Wealth Succession',
+    '常年法律顾问': 'Retainer Legal Counsel',
+    '破产重整与清收': 'Bankruptcy Reorganization & Recovery',
+    '劳动人事合规': 'Labor & Employment Compliance',
+    '业务分类': 'Practice Group',
+    '争议解决': 'Dispute Resolution',
+    '例如：争议解决 / 资本市场': 'e.g., Dispute Resolution / Capital Markets',
+    '拟任主办负责人': 'Proposed Lead Counsel',
+    '主办合伙人/律师姓名': 'Lead partner / lawyer name',
+    '收费方式': 'Billing Mode',
+    '固定收费（FIXED）': 'Fixed Fee (FIXED)',
+    '按标的额比例收费（PROPORTIONAL）': 'Proportional Fee (PROPORTIONAL)',
+    '风险代理收费（CONTINGENCY）': 'Contingency Fee (CONTINGENCY)',
+    '计时收费（HOURLY）': 'Hourly Billing (HOURLY)',
+    '常年法律顾问（RETAINER）': 'Retainer Fee (RETAINER)',
+    '固定收费': 'Fixed Fee',
+    '按标的额比例': 'Proportional Fee',
+    '风险代理': 'Contingency Fee',
+    '计时收费': 'Hourly Fee',
+    '常年顾问': 'Retainer',
+    '委托人 / 客户名称': 'Client Name',
+    '客户法定全称或自然人姓名': 'Full legal name of entity or individual client',
+    '客户统一社会信用代码': 'Client Unified Social Credit Code',
+    '选填，18位信用代码': 'Optional, 18-digit credit code',
+    '对方当事人名称': 'Counterparty Name',
+    '对方当事人全称，无对抗方填无': 'Full name of counterparty (enter None if N/A)',
+    '对方统一社会信用代码': 'Counterparty Unified Social Credit Code',
+    '关联方 / 控股股东 / 一致行动人': 'Related Party / Controlling Shareholder / Concerted Actor',
+    '选填，集团母公司、实控人或担保方名称': 'Optional, parent company, controller, or guarantor',
+    '关联方身份关系': 'Related Party Role',
+    '控股股东 / 实际控制人': 'Controlling Shareholder / Actual Controller',
+    '集团关联公司 / 母子公司': 'Affiliate / Parent-Subsidiary',
+    '一致行动人': 'Concerted Actor',
+    '担保人 / 连带债务人': 'Guarantor / Joint Debtor',
+    '签约合同额（万元）': 'Contract Amount (10k CNY)',
+    '风险代理提成比例（%）': 'Contingency Rate (%)',
+    '实时利冲与合规预检': 'Run Conflict & Compliance Pre-check',
+    '保存本机收案与核查记录': 'Save Local Intake & Check Record',
+    '我的收案申请与利冲五步进展': 'My Case Intakes & 5-Step Conflict Progress',
+    '与个人中心「收案与利冲」共享本机台账。以下进展为本机登记，跨账户征询及本人终审请使用云端协作。': 'Shares the local ledger with Personal Center. Use Cloud Collaboration for cross-account clearance and final review.',
+    '律所云端利冲协作': 'Firm Cloud Conflict Collaboration',
+    '管理员指定委员，由本人接受；关联律师与指定委员分别确认。仅发送你明确提交的信息，本机旧台账不会自动上传。': 'Admins appoint committee members who accept personally; related counsel and committee members confirm separately. Only explicitly submitted data is sent.',
+    '连接并刷新': 'Connect & Refresh',
+    '连接后可查看本人待办和已提交申请。': 'Connect to view your pending tasks and submitted requests.',
+    '核验同所账户': 'Verify Firm Account',
+    '同事账户手机号或邮箱': 'Colleague phone number or email',
+    '核验并加入选择列表': 'Verify & Add to List',
+    '指定利冲委员': 'Appoint Conflict Committee Member',
+    '委员候选账户': 'Committee candidate account',
+    '发送委员指派': 'Send Appointment',
+    '发起新的利冲协作申请': 'Submit New Conflict Collaboration Request',
+    '案件名称': 'Matter Title',
+    '委托人名称': 'Client Name',
+    '主办律师账户': 'Lead Counsel Account',
+    '已接受指派的终审委员': 'Accepted Final Review Committee Member',
+    '需要人工征询的关联律师（可选）': 'Related Counsel for Manual Clearance (Optional)',
+    '不另行指定': 'None specified',
+    '仅向该律师发送的关联案件摘要': 'Related Matter Summary (Sent Only to This Lawyer)',
+    '如涉及本机案件，只填写对方核查所必需的信息；请勿粘贴无关客户材料。': 'Enter only the information necessary for conflict verification; do not paste unrelated client materials.',
+    '将以上申请信息发送至本所云端协作，向关联律师及所选委员发出通知。系统仅检索本所已经主动提交的云端申请。': 'Send the above request to Firm Cloud Collaboration and notify related counsel and the selected committee member.',
+    '发送利冲协作申请': 'Submit Conflict Request',
+    '重新编辑同一申请': 'Edit Same Request',
+    '重试同一申请': 'Retry Same Request',
+    '重新发送同一申请': 'Resend Same Request',
+    '本机历史征询记录': 'Local Clearance History',
+    '以下仅为本机台账与演示记录，不表示已向其他设备送达。跨账户确认请使用上方云端协作。': 'Local ledger and demo records only. Use Cloud Collaboration above for cross-account confirmation.',
+    '本机收案核查台账': 'Local Intake Review Ledger',
+    '保留本机核查结论与建项功能。此处登记不代表云端指定委员已作出终审决定。': 'Retains local review conclusions and project creation. Does not represent cloud committee final approval.',
+    '提交发票申请（数电专票 / 普票）': 'Submit Invoice Application (Digital VAT Special / Normal)',
+    '自动核算不含税金额与增值税税额，支持关联已立案项目或收案台账': 'Automatically calculates tax-exclusive amount and VAT, linked to filed matters.',
+    '关联案件立项': 'Linked Matter Intake',
+    '发票类型': 'Invoice Type',
+    '数电增值税专用发票': 'Digital VAT Special Invoice',
+    '数电普通发票': 'Digital VAT Normal Invoice',
+    '增值税专用发票': 'VAT Special Invoice',
+    '增值税普通发票': 'VAT Normal Invoice',
+    '税率 / 征收率': 'Tax / Levy Rate',
+    '6%（现代服务 · 法律鉴证咨询）': '6% (Modern Services · Legal Advisory)',
+    '3%（小规模纳税人征收率）': '3% (Small-Scale Taxpayer Levy Rate)',
+    '1%（阶段性减按征收率）': '1% (Reduced Levy Rate)',
+    '申请开票含税金额（元）': 'Invoice Tax-Inclusive Amount (CNY)',
+    '购买方名称（客户抬头）': 'Buyer Name (Client Title)',
+    '购买方法定全称': 'Full legal name of buyer',
+    '购买方纳税人识别号': 'Buyer Taxpayer ID',
+    '18位统一社会信用代码': '18-digit Unified Social Credit Code',
+    '购买方开户行及账号': 'Buyer Bank & Account No.',
+    '选填，专票备查开户行及账号': 'Optional, bank name and account number',
+    '数电票交付邮箱': 'Digital Invoice Delivery Email',
+    '提交发票申请': 'Submit Invoice Request',
+    '手动登记收费 / 到账核销': 'Record Payment / Reconciliation',
+    '在未直连外部财务软件前，支持手动录入银行到账流水并与发票及案件合同额自动核销': 'Manually record bank receipts and reconcile with invoices and contract amounts.',
+    '核销关联发票（可选）': 'Reconcile with Invoice (Optional)',
+    '不绑定特定发票（先款后票/预收款）': 'Unbound (Advance Payment / Unbilled)',
+    '不绑定特定发票（先款后票 / 预收款）': 'Unbound (Advance Payment / Unbilled)',
+    '付款方名称': 'Payer Name',
+    '实际打款主体名称': 'Actual paying entity name',
+    '本次到账实收金额（元）': 'Received Amount (CNY)',
+    '收款方式': 'Payment Method',
+    '对公银行转账': 'Corporate Bank Transfer',
+    '提存 / 监管账户划转': 'Escrow Account Transfer',
+    '提存/监管账户划转': 'Escrow Account Transfer',
+    '银行本票 / 支票': 'Bank Cashier Order / Check',
+    '银行本票/支票': 'Bank Cashier Order / Check',
+    '其他合规收款': 'Other Compliant Payment',
+    '银行流水号 / 凭证号': 'Bank Reference / Voucher No.',
+    '例如：BK-20261015-8801': 'e.g., BK-20261015-8801',
+    '到账日期': 'Received Date',
+    '登记收费并核销': 'Record Payment & Reconcile',
+    '发票与财务收费台账（支持金蝶 / 用友对接）': 'Invoice & Billing Ledger (Kingdee / Yonyou Ready)',
+    '实时计算每案开票率、账单回收率与合同回款率；支持一键同步用友/金蝶财务凭证或导出标准台账': 'Tracks billing and collection rates per matter; syncs vouchers with Kingdee/Yonyou or exports standard CSV ledgers.',
+    '与财务系统同步核销（金蝶/用友）': 'Sync with ERP (Kingdee / Yonyou)',
+    '导出标准财务台账': 'Export Standard Finance CSV',
+    '发票申请与开票核销明细': 'Invoice Applications & Reconciliation Details',
+    '申请单号 / 发票号': 'App No. / Invoice No.',
+    '关联案件与业务分类': 'Linked Matter & Practice Group',
+    '购买方与税号': 'Buyer & Tax ID',
+    '含税金额 / 税额': 'Tax-Inclusive / Tax',
+    '已核销回款': 'Reconciled Collection',
+    '开票与回款状态': 'Billing & Collection Status',
+    '财务ERP同步': 'ERP Sync',
+    '操作': 'Actions',
+    '到账实收与核销流水明细': 'Payment Receipts & Reconciliation Ledger',
+    '收款单号': 'Receipt No.',
+    '关联案件': 'Linked Matter',
+    '核销发票号': 'Reconciled Invoice',
+    '实收金额': 'Received Amount',
+    '银行流水凭证号': 'Bank Voucher No.',
+    '核销状态': 'Reconciliation Status',
+    '各业务分类表现对比（忙闲负荷 · 创收 · 开票 · 回收率）': 'Practice Group Performance (Workload · Revenue · Billing · Collection)',
+    '汇总工作台在办项目与财务台账，按业务分类对比案件饱和度、签约创收、已开票、实收回款与回收率': 'Compares case saturation, contracted revenue, billed amounts, collections, and recovery rates across practice groups.',
+    '主办律师': 'Lead Counsel',
+    '活跃律师': 'Active Lawyers',
+    '在办案件数': 'Active Matters',
+    '平均负荷与忙闲状态': 'Avg Workload & Status',
+    '签约合同总额': 'Total Contracted',
+    '已开票金额': 'Billed Amount',
+    '已到账实收': 'Collected Amount',
+    '账单回收率 / 合同回款率': 'Billed / Contract Recovery',
+    '待收账款（AR）': 'Accounts Receivable (AR)',
+    '主办律师业务统计': 'Lead Counsel Statistics',
+    '按主办律师汇总案件规模、工作负荷、实收创收、回收率、利冲一次通过率与立案效率': 'Summarizes matter volume, workload, collections, recovery rate, conflict pass rate, and filing cycle by lead counsel.',
+    '项目协作人数': 'Team Size',
+    '主办案件数': 'Lead Matters',
+    '主办律师负荷': 'Lead Workload',
+    '实收回款额': 'Collected Amount',
+    '账单回收率': 'Recovery Rate',
+    '利冲通过率': 'Conflict Pass Rate',
+    '平均立案周期': 'Avg Filing Cycle',
+    '律师工作负荷与创收明细': 'Lawyer Workload & Revenue Details',
+    '按主办案件、协办案件、待办/逾期任务与近30日工作台活跃时长综合计算个体负荷指数（空闲 / 适中 / 饱和 / 超负荷）': 'Computes individual workload index (Idle / Optimal / Saturated / Overloaded) from lead/co-counsel matters, open/overdue tasks, and 30-day activity.',
+    '律师姓名': 'Lawyer Name',
+    '执业角色': 'Role',
+    '主办案件': 'Lead Matters',
+    '协办案件': 'Co-Counsel Matters',
+    '待办 / 临期逾期事项': 'Open / Overdue Tasks',
+    '近30日工作台活跃': '30d Active Hours',
+    'Workload 负荷指数与忙闲状态': 'Workload Index & Status',
+    '个人签约 / 实收': 'Contracted / Collected',
+    '个人回收率': 'Recovery Rate',
+    '直接利冲 · 禁止代理': 'Direct Conflict · Representation Prohibited',
+    '潜在利冲 · 需征询放行': 'Potential Conflict · Clearance Required',
+    '无利冲 · 审查通过': 'No Conflict · Cleared',
+    '1. 提交收案申请': '1. Intake Submitted',
+    '2. 自动利冲检索': '2. Auto Conflict Check',
+    '3. 关联律师站内信放行': '3. Related Counsel Clearance',
+    '4. 利冲委员终审': '4. Committee Final Review',
+    '5. 正式立案并建项': '5. Approved & Filed',
+    '实时利益冲突与收费合规审查结论': 'Real-Time Conflict & Fee Compliance Conclusion',
+    '已完成全所利益冲突扫描。': 'Completed firm-wide conflict of interest scan.',
+    '暂无收案立项记录。可在左侧填写新案信息并预检利冲，或点击顶部「加载典型律所样板数据」。': 'No intake records yet. Fill out the form on the left or click "Load Demo Law Firm Data" above.',
+    '当前没有待处理的利益冲突放行征询单。': 'No pending conflict clearance requests.',
+    '本机登记放行': 'Record Local Approval',
+    '本机登记附条件放行': 'Record Conditional Approval (Wall)',
+    '本机登记拒绝放行': 'Record Local Rejection',
+    '全所利冲审查队列为空。': 'Firm conflict review queue is empty.',
+    '启用信息隔离墙承诺（Ethical Wall）': 'Apply Ethical Wall Undertaking',
+    '已核验当事人书面豁免函': 'Verified Written Client Waiver',
+    '本机登记通过并建项': 'Approve & Create Project Locally',
+    '本机登记驳回': 'Reject Locally',
+    '暂无发票记录。': 'No invoice records.',
+    '待开票': 'Pending Issue',
+    '已开票 · 待回款': 'Issued · Awaiting Payment',
+    '已开票 · 部分回款': 'Issued · Partially Paid',
+    '已全额回款': 'Paid in Full',
+    '已作废': 'Voided',
+    '已红冲': 'Red-Invoiced',
+    '待同步': 'Pending Sync',
+    '确认开票': 'Confirm Issue',
+    '已开具': 'Issued',
+    '暂无收费到账流水记录。': 'No payment collection records.',
+    '未绑定发票': 'Unbound',
+    '已核销': 'Reconciled',
+    '已入账': 'Recorded',
+    '在办正式案件 / 累计收案': 'Active Filed Matters / Total Intakes',
+    '工作台与立项中心全所实时汇总': 'Real-time firm-wide summary across workbench and intake center',
+    '活跃律师与平均负荷': 'Active Lawyers & Avg Workload',
+    '综合主办、协办、待办与近30日工时': 'Combined lead, co-counsel, open tasks, and 30d active hours',
+    '全所签约合同总额': 'Firm Total Contracted Amount',
+    '已开票总额与开票率': 'Total Billed & Billing Rate',
+    '已到账实收与回收率': 'Total Collected & Recovery Rate',
+    '待收账款（AR）与账龄结构': 'Accounts Receivable (AR) & Aging',
+    '暂无业务分类统计数据。': 'No practice group statistics available.',
+    '暂无主办律师统计数据。': 'No lead counsel statistics available.',
+    '暂无律师工作负荷数据。': 'No lawyer workload data available.',
+    '数据已刷新。': 'Data refreshed.',
+    '已完成全所利益冲突与收费合规预检。': 'Completed firm-wide conflict and fee compliance pre-check.',
+    '已与财务系统（金蝶/用友）完成凭证同步与核销。': 'Completed voucher sync and reconciliation with ERP (Kingdee/Yonyou).',
+    '已生成金蝶/用友标准财务台账。': 'Generated standard Kingdee/Yonyou finance ledger CSV.',
+    '接受委员指派': 'Accept Appointment',
+    '拒绝委员指派': 'Decline Appointment',
+    '撤销委员指派': 'Revoke Appointment',
+    '暂无与你有关的云端利冲申请。': 'No cloud conflict requests involving you.',
+    '本人确认放行': 'Confirm Clearance',
+    '附条件放行': 'Conditional Clearance',
+    '本人拒绝放行': 'Decline Clearance',
+    '本人终审通过': 'Approve Final Review',
+    '本人终审拒绝': 'Reject Final Review',
+    '云端协作已更新。仅显示本人有权查看的记录。': 'Cloud collaboration updated. Showing only records you are authorized to view.',
+    '账户或项目已切换，请重新连接云端协作。': 'Account or project switched. Please reconnect to cloud collaboration.'
+  };
+  let enObserverReady = false;
+  function trEn(s) {
+    if (!s || typeof s !== 'string') return s;
+    const trimmed = s.trim();
+    if (!trimmed) return s;
+    if (EN_EXACT[trimmed]) return s.replace(trimmed, EN_EXACT[trimmed]);
+    return s
+      .replace(/空闲 · 可优先派案/g, 'Idle · Ready for Assignment')
+      .replace(/适中 · 良性饱和/g, 'Optimal · Balanced')
+      .replace(/饱和 · 高负荷/g, 'Saturated · High Load')
+      .replace(/超负荷 · 预警分流/g, 'Overloaded · Rebalance Needed')
+      .replace(/（草稿）/g, ' (Draft)')
+      .replace(/（自动利冲检索中）/g, ' (Auto Conflict Checking)')
+      .replace(/（待关联律师放行）/g, ' (Pending Counsel Clearance)')
+      .replace(/（待利冲委员终审）/g, ' (Pending Committee Review)')
+      .replace(/（正式立案并建项）/g, ' (Approved & Filed)')
+      .replace(/（利冲驳回）/g, ' (Rejected for Conflict)')
+      .replace(/（已结案归档）/g, ' (Closed & Archived)')
+      .replace(/^业务领域：/, 'Practice Area: ')
+      .replace(/^业务分类：/, 'Practice Group: ')
+      .replace(/^主办：/, 'Lead: ')
+      .replace(/^委托人：/, 'Client: ')
+      .replace(/^对方当事人：/, 'Counterparty: ')
+      .replace(/^收费：/, 'Fee: ')
+      .replace(/^状态：/, 'Status: ')
+      .replace(/ 万元/g, '0k CNY');
+  }
+  function translateSubtree(root) {
+    if (!root) return;
+    const walk = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    let curr = walk.currentNode;
+    while (curr) {
+      if (curr.nodeType === Node.TEXT_NODE) {
+        const next = trEn(curr.nodeValue);
+        if (next !== curr.nodeValue) curr.nodeValue = next;
+      } else if (curr.nodeType === Node.ELEMENT_NODE) {
+        for (const attr of ['placeholder', 'aria-label', 'title']) {
+          const val = curr.getAttribute?.(attr);
+          if (val) {
+            const next = trEn(val);
+            if (next !== val) curr.setAttribute(attr, next);
+          }
+        }
+      }
+      curr = walk.nextNode();
+    }
+  }
+  function maybeEnableEnglish(ctx) {
+    let lang = ctx?.language || ctx?.locale || '';
+    if (!lang) {
+      try { lang = localStorage.getItem('checkba_locale') || localStorage.getItem('awd_locale') || ''; } catch {}
+    }
+    if (!String(lang).toLowerCase().startsWith('en')) return;
+    document.documentElement.lang = 'en-US';
+    document.title = trEn(document.title);
+    translateSubtree(document.body);
+    if (!enObserverReady && typeof MutationObserver !== 'undefined') {
+      enObserverReady = true;
+      const obs = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          if (m.type === 'characterData') {
+            const next = trEn(m.target.nodeValue);
+            if (next !== m.target.nodeValue) m.target.nodeValue = next;
+          } else if (m.type === 'attributes') {
+            const val = m.target.getAttribute?.(m.attributeName);
+            if (val) {
+              const next = trEn(val);
+              if (next !== val) m.target.setAttribute(m.attributeName, next);
+            }
+          } else {
+            for (const n of m.addedNodes) translateSubtree(n);
+          }
+        }
+      });
+      obs.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'aria-label', 'title'] });
+    }
+  }
+
   async function reload() {
     const epoch = ++state.epoch;
     try {
       const ctx = await awd.call('context.get', {});
       if (epoch !== state.epoch) return;
       state.context = ctx || {};
+      maybeEnableEnglish(state.context);
       await loadOverview(epoch);
       if (epoch === state.epoch) notice('');
     } catch (err) {

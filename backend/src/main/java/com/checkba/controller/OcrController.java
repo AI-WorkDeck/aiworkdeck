@@ -38,11 +38,11 @@ public class OcrController {
 
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("请先登录"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(LangText.of("请先登录", "Please sign in first")));
         }
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error("请先登录"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(LangText.of("请先登录", "Please sign in first")));
         }
 
         OcrResult result = ocrService.recognizeGeneral(request.getImageBase64());

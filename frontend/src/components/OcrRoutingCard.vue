@@ -1,25 +1,26 @@
 <!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view class="ocr-choice" role="dialog" aria-label="选择扫描件识别方式">
-    <text class="ocr-title">继续识别这份扫描件</text>
+  <view class="ocr-choice" role="dialog" :aria-label="t('admin.ocrChoiceAriaLabel')">
+    <text class="ocr-title">{{ t('admin.ocrChoiceTitle') }}</text>
     <text>{{ state.reason }}</text>
     <text>{{ state.notice }}</text>
-    <text>本地识别不上传文档；缺少组件时会引导下载，装好后继续。</text>
+    <text>{{ t('admin.ocrChoiceLocalHint') }}</text>
     <text v-if="state.error" class="ocr-error" role="alert">{{ state.error }}</text>
     <view v-if="state.phase === 'choose'">
-      <button class="ocr-remember" type="button" role="checkbox" :aria-checked="remember" @click="remember = !remember"><view class="ocr-check" :class="{ checked: remember }" />记住我的选择，可在设置中更改</button>
+      <button class="ocr-remember" type="button" role="checkbox" :aria-checked="remember" @click="remember = !remember"><view class="ocr-check" :class="{ checked: remember }" />{{ t('admin.ocrChoiceRemember') }}</button>
       <view class="ocr-actions">
-        <button @click="$emit('choose', 'cloud', remember)">使用云端并继续</button>
-        <button :disabled="!state.localAvailable" @click="$emit('choose', 'local', remember)">使用本地并继续</button>
+        <button @click="$emit('choose', 'cloud', remember)">{{ t('admin.ocrChoiceCloudBtn') }}</button>
+        <button :disabled="!state.localAvailable" @click="$emit('choose', 'local', remember)">{{ t('admin.ocrChoiceLocalBtn') }}</button>
       </view>
     </view>
-    <text v-else-if="state.phase !== 'cancelFailed'" role="status">{{ state.phase === 'saving' ? '正在保存选择…' : '已确认，当前回复结束后继续原任务…' }}</text>
-    <button class="ocr-cancel" @click="$emit('cancel')">{{ state.phase === 'cancelFailed' ? '重试取消' : '取消' }}</button>
+    <text v-else-if="state.phase !== 'cancelFailed'" role="status">{{ state.phase === 'saving' ? t('admin.ocrChoiceSaving') : t('admin.ocrChoiceConfirmed') }}</text>
+    <button class="ocr-cancel" @click="$emit('cancel')">{{ state.phase === 'cancelFailed' ? t('admin.ocrChoiceRetryCancel') : t('admin.ocrChoiceCancel') }}</button>
   </view>
 </template>
 <script setup>
 import { ref } from 'vue'
+import { t } from '@/i18n'
 defineProps({ state: { type: Object, required: true } })
 defineEmits(['choose', 'cancel'])
 const remember = ref(false)
