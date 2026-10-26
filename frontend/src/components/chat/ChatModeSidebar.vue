@@ -3,64 +3,128 @@
 <template>
   <view class="chat-mode-sidebar" :class="{ collapsed }">
     <template v-if="collapsed">
-      <view class="chat-sidebar-strip-action" :title="$t('workbench.chatMode.expandSidebar')" @click="$emit('toggle-collapse')">»</view>
-      <view class="chat-sidebar-strip-action" :title="$t('workbench.chatMode.newChat')" @click="$emit('new-chat')">＋</view>
-      <view class="chat-sidebar-strip-action" :title="$t('workbench.chatMode.newDocument')" @click="$emit('create-doc', 'docx')">▤</view>
+      <view class="chat-sidebar-strip-action" :title="$t('workbench.chatMode.expandSidebar')" @click="$emit('toggle-collapse')">
+        <svg class="chat-sidebar-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path v-for="(d, gi) in ICONS.panelLeft" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </view>
+      <view class="chat-sidebar-strip-action" :title="$t('workbench.chatMode.newChat')" @click="$emit('new-chat')">
+        <svg class="chat-sidebar-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path v-for="(d, gi) in ICONS.plus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </view>
+      <view class="chat-sidebar-strip-action" :title="$t('workbench.chatMode.newDocument')" @click="$emit('create-doc', 'docx')">
+        <svg class="chat-sidebar-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path v-for="(d, gi) in ICONS.filePlus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </view>
     </template>
     <template v-else>
       <view class="chat-sidebar-header">
-        <view class="chat-sidebar-heading" @click="$emit('switch-to-ide')">
-          <text class="chat-sidebar-title">{{ isScratch ? $t('workbench.chatMode.scratchTitle') : (project?.name || $t('workbench.chatMode.chatTitle')) }}</text>
-          <text v-if="isScratch" class="chat-sidebar-scratch-badge">{{ $t('workbench.chatMode.scratchBadge') }}</text>
+        <view class="chat-sidebar-new-btn" @click="$emit('new-chat')">
+          <svg class="chat-sidebar-icon-sm" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path v-for="(d, gi) in ICONS.plus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <text>{{ $t('workbench.chatMode.newChat') }}</text>
         </view>
-        <view class="chat-sidebar-collapse" :title="$t('workbench.chatMode.collapseSidebar')" @click="$emit('toggle-collapse')">«</view>
+        <view class="chat-sidebar-collapse" :title="$t('workbench.chatMode.collapseSidebar')" @click="$emit('toggle-collapse')">
+          <svg class="chat-sidebar-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path v-for="(d, gi) in ICONS.panelLeft" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </view>
       </view>
-      <view v-if="isScratch" class="chat-sidebar-promote" @click="$emit('promote-scratch')">{{ $t('workbench.chatMode.promoteAction') }}</view>
 
       <scroll-view scroll-y class="chat-sidebar-scroll">
         <view class="chat-sidebar-section">
           <view class="chat-sidebar-section-header">
-            <text>{{ $t('workbench.chatMode.recentConversations') }}</text>
-            <view class="chat-sidebar-section-action" @click="$emit('new-chat')">＋ {{ $t('workbench.chatMode.newChat') }}</view>
+            <text class="chat-sidebar-section-title">{{ $t('workbench.chatMode.recentConversations') }}</text>
           </view>
           <input v-model="conversationQuery" class="chat-sidebar-search" :placeholder="$t('workbench.chatMode.searchConversations')" />
-          <view v-for="conv in filteredConversations" :key="conv.id || conv.conversationId" class="chat-sidebar-row conversation-row" :class="{ active: String(conv.id || conv.conversationId) === String(currentConversationId || '') }" @click="$emit('select-conversation', conv.id || conv.conversationId)">
+          <view
+            v-for="conv in filteredConversations"
+            :key="conv.id || conv.conversationId"
+            class="chat-sidebar-row conversation-row"
+            :class="{ active: String(conv.id || conv.conversationId) === String(currentConversationId || '') }"
+            @click="$emit('select-conversation', conv.id || conv.conversationId)"
+          >
+            <svg class="chat-sidebar-row-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path v-for="(d, gi) in ICONS.chat" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
             <text class="chat-sidebar-row-name">{{ conv.title || $t('workbench.chatMode.newChat') }}</text>
-            <text class="chat-sidebar-row-delete" :title="$t('workbench.chatMode.deleteConversation')" @click.stop="$emit('delete-conversation', conv.id || conv.conversationId)">×</text>
+            <view class="chat-sidebar-row-delete" :title="$t('workbench.chatMode.deleteConversation')" @click.stop="$emit('delete-conversation', conv.id || conv.conversationId)">
+              <svg class="chat-sidebar-icon-sm" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path v-for="(d, gi) in ICONS.close" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </view>
           </view>
           <text v-if="!filteredConversations.length" class="chat-sidebar-empty">{{ $t('workbench.chatMode.noConversations') }}</text>
         </view>
 
         <view class="chat-sidebar-section">
           <view class="chat-sidebar-section-header">
-            <text>{{ $t('workbench.chatMode.workspaceFiles') }}</text>
+            <text class="chat-sidebar-section-title">{{ $t('workbench.chatMode.workspaceFiles') }}</text>
             <view class="chat-sidebar-doc-actions">
-              <view class="chat-sidebar-section-action" @click="$emit('create-doc', 'docx')">＋ Word</view>
-              <view class="chat-sidebar-section-action" @click="$emit('create-doc', 'md')">＋ MD</view>
+              <view class="chat-sidebar-section-action" @click="$emit('create-doc', 'docx')">
+                <svg class="chat-sidebar-icon-sm" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path v-for="(d, gi) in ICONS.plus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <text>Word</text>
+              </view>
+              <view class="chat-sidebar-section-action" @click="$emit('create-doc', 'md')">
+                <svg class="chat-sidebar-icon-sm" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path v-for="(d, gi) in ICONS.plus" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <text>MD</text>
+              </view>
             </view>
           </view>
-          <view v-for="file in regularWorkspaceFiles" :key="file.id" class="chat-sidebar-row" :class="{ active: String(activeFileId) === String(file.id) }" @click="$emit('open-file', file)">
-            <text class="chat-sidebar-file-icon">{{ file.fileType === 'md' ? 'MD' : 'W' }}</text>
+          <view
+            v-for="file in regularWorkspaceFiles"
+            :key="file.id"
+            class="chat-sidebar-row"
+            :class="{ active: String(activeFileId) === String(file.id) }"
+            @click="$emit('open-file', file)"
+          >
+            <svg class="chat-sidebar-row-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path v-for="(d, gi) in (file.fileType === 'md' ? ICONS.docText : ICONS.doc)" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
             <text class="chat-sidebar-row-name" :title="file.relativePath || file.name">{{ file.name }}</text>
           </view>
           <text v-if="!regularWorkspaceFiles.length" class="chat-sidebar-empty">{{ $t('workbench.chatMode.noWorkspaceFiles') }}</text>
         </view>
 
         <view class="chat-sidebar-section cross-project-section">
-          <view class="chat-sidebar-section-header"><text>{{ $t('workbench.chatMode.crossProject') }}</text></view>
+          <view class="chat-sidebar-section-header">
+            <text class="chat-sidebar-section-title">{{ $t('workbench.chatMode.crossProject') }}</text>
+          </view>
           <input v-model="crossSearchQuery" class="chat-sidebar-search" :placeholder="$t('workbench.chatMode.crossProjectSearch')" />
           <text v-if="projectsError" class="chat-sidebar-empty chat-sidebar-error" @click="loadProjects">{{ $t('workbench.chatMode.retry') }}</text>
           <view v-for="proj in filteredProjects" :key="proj.id" class="cross-project-group">
             <view class="chat-sidebar-row project-row" @click="toggleProject(proj)">
-              <text class="cross-project-chevron">{{ expandedProjectIds[proj.id] ? '▾' : '▸' }}</text>
+              <svg class="cross-project-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path v-for="(d, gi) in (expandedProjectIds[proj.id] ? ICONS.chevronDown : ICONS.chevronRight)" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <svg class="chat-sidebar-row-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path v-for="(d, gi) in ICONS.folder" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
               <text class="chat-sidebar-row-name">{{ proj.name }}</text>
             </view>
             <template v-if="expandedProjectIds[proj.id]">
               <text v-if="loadingProjectIds[proj.id]" class="chat-sidebar-empty">{{ $t('workbench.chatMode.loading') }}</text>
               <template v-else>
-                <view v-for="file in filesForProject(proj)" :key="file.id" class="chat-sidebar-row cross-file-row" @click="$emit('open-file', { ...file, projectId: proj.id, projectName: proj.name, tabType: 'cross-project-preview', readOnly: true })">
+                <view
+                  v-for="file in filesForProject(proj)"
+                  :key="file.id"
+                  class="chat-sidebar-row cross-file-row"
+                  @click="$emit('open-file', { ...file, projectId: proj.id, projectName: proj.name, tabType: 'cross-project-preview', readOnly: true })"
+                >
+                  <svg class="chat-sidebar-row-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path v-for="(d, gi) in ICONS.doc" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
                   <text class="chat-sidebar-row-name" :title="file.relativePath">{{ file.name }}</text>
-                  <view class="cross-project-attach" @click.stop="$emit('attach-cross-project-file', { file, project: proj })">＋ {{ $t('workbench.chatMode.attach') }}</view>
+                  <view class="cross-project-attach" @click.stop="$emit('attach-cross-project-file', { file, project: proj })">
+                    <text>{{ $t('workbench.chatMode.attach') }}</text>
+                  </view>
                 </view>
                 <text v-if="!filesForProject(proj).length" class="chat-sidebar-empty">{{ $t('workbench.chatMode.noMatchingFiles') }}</text>
               </template>
@@ -76,6 +140,7 @@
 <script>
 import { getMyProjects, getProjectFiles } from '@/services/api'
 import { flattenProjectFileTree } from '@/pages/project-overview/chatMode'
+import { ICONS } from '@/config/icons.js'
 
 export default {
   name: 'ChatModeSidebar',
@@ -112,6 +177,9 @@ export default {
     }
   },
   computed: {
+    ICONS() {
+      return ICONS
+    },
     filteredConversations() {
       const query = this.conversationQuery.trim().toLowerCase()
       if (!query) return this.conversations
@@ -173,31 +241,35 @@ export default {
 <style scoped>
 .chat-mode-sidebar { width: 248px; flex: 0 0 248px; min-height: 0; display: flex; flex-direction: column; background: var(--awd-bg); border-right: 1px solid var(--awd-border-subtle); color: var(--awd-text); }
 .chat-mode-sidebar.collapsed { width: 40px; flex-basis: 40px; align-items: center; padding-top: 8px; box-sizing: border-box; }
-.chat-sidebar-strip-action { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px; border-radius: var(--awd-radius-sm); color: var(--awd-text-2); cursor: pointer; }
-.chat-sidebar-strip-action:hover, .chat-sidebar-collapse:hover, .chat-sidebar-section-action:hover { color: var(--awd-accent-text); background: var(--awd-accent-soft); }
-.chat-sidebar-header { min-height: 42px; padding: 6px 10px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--awd-border-subtle); }
-.chat-sidebar-heading { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.chat-sidebar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--awd-font-size-body); font-weight: 600; }
-.chat-sidebar-scratch-badge { flex-shrink: 0; padding: 1px 5px; border-radius: 999px; background: var(--awd-accent-soft); color: var(--awd-accent-text); font-size: var(--awd-panel-fs-meta); }
-.chat-sidebar-collapse { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: var(--awd-radius-sm); color: var(--awd-text-3); cursor: pointer; }
-.chat-sidebar-promote { margin: 8px 10px 0; padding: 6px 8px; border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); color: var(--awd-accent-text); font-size: var(--awd-panel-fs-meta); text-align: center; cursor: pointer; }
+.chat-sidebar-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.chat-sidebar-icon-sm { width: 13px; height: 13px; flex-shrink: 0; }
+.chat-sidebar-strip-action { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px; border-radius: var(--awd-radius-sm); color: var(--awd-text-2); cursor: pointer; }
+.chat-sidebar-strip-action:hover, .chat-sidebar-collapse:hover, .chat-sidebar-section-action:hover { color: var(--awd-text); background: var(--awd-surface-2); }
+.chat-sidebar-header { min-height: 44px; padding: 8px 10px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--awd-border-subtle); }
+.chat-sidebar-new-btn { flex: 1; height: 28px; padding: 0 10px; display: flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); background: var(--awd-surface); color: var(--awd-text); font-size: var(--awd-panel-fs); font-weight: 500; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease; }
+.chat-sidebar-new-btn:hover { background: var(--awd-surface-2); border-color: var(--awd-border); }
+.chat-sidebar-collapse { width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: var(--awd-radius-sm); color: var(--awd-text-3); cursor: pointer; }
 .chat-sidebar-scroll { flex: 1; min-height: 0; }
-.chat-sidebar-section { padding: 10px 8px; border-bottom: 1px solid var(--awd-border-subtle); }
-.chat-sidebar-section-header { min-height: 24px; display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 5px; color: var(--awd-text-2); font-size: var(--awd-panel-fs-sec); font-weight: 600; }
-.chat-sidebar-section-action { padding: 2px 4px; border-radius: var(--awd-radius-sm); color: var(--awd-accent-text); font-size: var(--awd-panel-fs-meta); font-weight: 400; white-space: nowrap; cursor: pointer; }
-.chat-sidebar-doc-actions { display: flex; gap: 2px; }
-.chat-sidebar-search { width: 100%; height: 28px; margin-bottom: 6px; padding: 0 7px; box-sizing: border-box; border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); background: var(--awd-surface); color: var(--awd-text); font-size: var(--awd-panel-fs-meta); }
-.chat-sidebar-row { min-height: 28px; display: flex; align-items: center; gap: 5px; padding: 3px 5px; border-radius: var(--awd-radius-sm); color: var(--awd-text-2); font-size: var(--awd-panel-fs); cursor: pointer; }
+.chat-sidebar-section { padding: 12px 10px; border-bottom: 1px solid var(--awd-border-subtle); }
+.chat-sidebar-section-header { min-height: 24px; display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; color: var(--awd-text-2); font-size: var(--awd-panel-fs-sec); font-weight: 600; }
+.chat-sidebar-section-action { display: flex; align-items: center; gap: 3px; height: 22px; padding: 0 6px; border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); background: var(--awd-surface); color: var(--awd-text-2); font-size: var(--awd-panel-fs-meta); font-weight: 400; white-space: nowrap; cursor: pointer; }
+.chat-sidebar-doc-actions { display: flex; gap: 4px; }
+.chat-sidebar-search { width: 100%; height: 28px; margin-bottom: 8px; padding: 0 8px; box-sizing: border-box; display: flex; align-items: center; border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); background: var(--awd-surface); color: var(--awd-text); font-size: var(--awd-panel-fs-meta); }
+.chat-sidebar-search :deep(.uni-input-wrapper), .chat-sidebar-search :deep(.uni-input-input), .chat-sidebar-search :deep(input) { width: 100%; height: 100%; border: none !important; outline: none !important; box-shadow: none !important; background: transparent !important; padding: 0 !important; margin: 0 !important; color: var(--awd-text); font-size: var(--awd-panel-fs-meta); line-height: 26px; }
+.chat-sidebar-search :deep(.uni-input-placeholder) { color: var(--awd-text-3); line-height: 26px; }
+.chat-sidebar-row { min-height: 28px; display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: var(--awd-radius-sm); color: var(--awd-text-2); font-size: var(--awd-panel-fs); cursor: pointer; }
 .chat-sidebar-row:hover, .chat-sidebar-row.active { background: var(--awd-surface-2); color: var(--awd-text); }
 .chat-sidebar-row.active { box-shadow: inset 2px 0 0 var(--awd-accent); }
+.chat-sidebar-row-icon { width: 15px; height: 15px; flex-shrink: 0; color: var(--awd-text-3); }
 .chat-sidebar-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-sidebar-row-delete { display: none; width: 18px; text-align: center; color: var(--awd-text-3); }
-.conversation-row:hover .chat-sidebar-row-delete { display: block; }
-.chat-sidebar-file-icon { width: 20px; flex-shrink: 0; color: var(--awd-text-3); font-size: var(--awd-panel-fs-meta); text-align: center; }
-.chat-sidebar-empty { display: block; padding: 6px 5px; color: var(--awd-text-3); font-size: var(--awd-panel-fs-meta); line-height: 1.5; }
+.chat-sidebar-row-delete { display: none; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: var(--awd-radius-sm); color: var(--awd-text-3); }
+.chat-sidebar-row-delete:hover { color: var(--awd-danger); background: var(--awd-surface); }
+.conversation-row:hover .chat-sidebar-row-delete { display: flex; }
+.chat-sidebar-empty { display: block; padding: 6px 4px; color: var(--awd-text-3); font-size: var(--awd-panel-fs-meta); line-height: 1.5; }
 .chat-sidebar-error { color: var(--awd-danger); cursor: pointer; }
 .cross-project-section { border-bottom: none; }
-.cross-project-chevron { width: 12px; color: var(--awd-text-3); }
-.cross-file-row { padding-left: 18px; }
-.cross-project-attach { flex-shrink: 0; padding: 1px 5px; border: 1px solid var(--awd-border-subtle); border-radius: 999px; color: var(--awd-accent-text); font-size: var(--awd-panel-fs-meta); }
+.cross-project-chevron { width: 13px; height: 13px; flex-shrink: 0; color: var(--awd-text-3); }
+.cross-file-row { padding-left: 20px; }
+.cross-project-attach { flex-shrink: 0; padding: 1px 6px; border: 1px solid var(--awd-border-subtle); border-radius: var(--awd-radius-sm); color: var(--awd-text-2); font-size: var(--awd-panel-fs-meta); }
+.cross-project-attach:hover { color: var(--awd-accent-text); border-color: var(--awd-accent); background: var(--awd-accent-soft); }
 </style>

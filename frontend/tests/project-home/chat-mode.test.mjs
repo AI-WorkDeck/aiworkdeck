@@ -149,5 +149,14 @@ test('workbench header mode switcher, welcome quick chat, and chat sidebar contr
   assert.match(welcomeSrc, /class="welcome-quick-chat"/)
   assert.match(welcomeSrc, /submitQuickChat/)
   assert.match(sidebarSrc, /attach-cross-project-file/)
-  assert.match(sidebarSrc, /promote-scratch/)
+  assert.match(sidebarSrc, /chat-sidebar-new-btn/)
+
+  const emojiRe = /[\u{1F300}-\u{1FAFF}]/u
+  const zhWorkbench = readFileSync(new URL('../../src/locales/zh-CN/workbench.js', import.meta.url), 'utf8')
+  const enWorkbench = readFileSync(new URL('../../src/locales/en-US/workbench.js', import.meta.url), 'utf8')
+  assert.equal(emojiRe.test(overviewSrc), false, 'project-overview.vue must not contain emoji')
+  assert.equal(emojiRe.test(welcomeSrc), false, 'WelcomePane.vue must not contain emoji')
+  assert.equal(emojiRe.test(sidebarSrc), false, 'ChatModeSidebar.vue must not contain emoji')
+  assert.equal(emojiRe.test(zhWorkbench), false, 'zh-CN/workbench.js must not contain emoji')
+  assert.equal(emojiRe.test(enWorkbench), false, 'en-US/workbench.js must not contain emoji')
 })
